@@ -131,3 +131,108 @@ describe('Qwen metadata parsing', () => {
     expect(mockStore.dispatch).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('Detailer metadata parsing', () => {
+  it('recalls stored detailer params instead of Body effective runtime values', async () => {
+    const store = createStore();
+
+    const recalled = await MetadataUtils.recallByHandlers({
+      metadata: {
+        detailer_enabled: true,
+        detailer_detector: 'grounding-dino-sam',
+        detailer_quality: 'balanced',
+        detailer_target_profile: 'person',
+        detailer_target_prompt: 'person',
+        detailer_dino_model: 'grounding-dino-base',
+        detailer_sam_model: 'segment-anything-2-large',
+        detailer_detection_threshold: 0.3,
+        detailer_target_size: 1024,
+        detailer_param_target_size: 640,
+        detailer_max_upscale: 8,
+        detailer_param_max_upscale: 3,
+        detailer_max_process_size: 1024,
+        detailer_param_max_process_size: 896,
+        detailer_denoise_mask_expand: 0,
+        detailer_param_denoise_mask_expand: 10,
+        detailer_denoise_mask_feather: 2,
+        detailer_param_denoise_mask_feather: 8,
+        detailer_paste_mask_expand: 0,
+        detailer_param_paste_mask_expand: 2,
+        detailer_paste_mask_feather: 4,
+        detailer_param_paste_mask_feather: 12,
+        detailer_strength: 0.14,
+        detailer_param_strength: 0.4,
+        detailer_steps: 14,
+        detailer_param_steps: 22,
+        detailer_cfg_scale: 4.5,
+        detailer_param_cfg_scale: 9,
+        detailer_debug_enabled: true,
+      },
+      handlers: [ImageMetadataHandlers.DetailerSettings],
+      store,
+      silent: true,
+    });
+
+    expect(recalled.size).toBe(1);
+    const mockStore = store as ReturnType<typeof createMockStore>;
+    expect(mockStore.dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'params/setDetailerEnabled' }));
+    expect(mockStore.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'params/setDetailerTargetSize', payload: 640 })
+    );
+    expect(mockStore.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'params/setDetailerMaxUpscale', payload: 3 })
+    );
+    expect(mockStore.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'params/setDetailerMaxProcessSize', payload: 896 })
+    );
+    expect(mockStore.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'params/setDetailerStrength', payload: 0.4 })
+    );
+    expect(mockStore.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'params/setDetailerSteps', payload: 22 })
+    );
+    expect(mockStore.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'params/setDetailerCfgScale', payload: 9 })
+    );
+    expect(mockStore.dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'params/setDetailerDebugEnabled' })
+    );
+  });
+
+  it('does not recall legacy Body effective values into visible sliders', async () => {
+    const store = createStore();
+
+    const recalled = await MetadataUtils.recallByHandlers({
+      metadata: {
+        detailer_enabled: true,
+        detailer_quality: 'balanced',
+        detailer_target_profile: 'person',
+        detailer_target_prompt: 'person',
+        detailer_target_size: 1024,
+        detailer_max_process_size: 1024,
+        detailer_strength: 0.14,
+        detailer_steps: 14,
+        detailer_cfg_scale: 4.5,
+      },
+      handlers: [ImageMetadataHandlers.DetailerSettings],
+      store,
+      silent: true,
+    });
+
+    expect(recalled.size).toBe(1);
+    const mockStore = store as ReturnType<typeof createMockStore>;
+    expect(mockStore.dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'params/setDetailerTargetSize' })
+    );
+    expect(mockStore.dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'params/setDetailerMaxProcessSize' })
+    );
+    expect(mockStore.dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'params/setDetailerStrength' })
+    );
+    expect(mockStore.dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'params/setDetailerSteps' }));
+    expect(mockStore.dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'params/setDetailerCfgScale' })
+    );
+  });
+});

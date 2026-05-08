@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from typing import Literal
 
@@ -18,6 +19,36 @@ GROUNDING_DINO_MODEL_IDS: dict[GroundingDinoModelKey, str] = {
     "grounding-dino-tiny": "IDEA-Research/grounding-dino-tiny",
     "grounding-dino-base": "IDEA-Research/grounding-dino-base",
 }
+GROUNDING_DINO_LABEL_SPLIT_PATTERN = re.compile(r"[|,.;]+")
+
+
+def normalize_grounding_dino_label(label: str) -> str:
+    return label.strip().strip("|,.;").strip().lower()
+
+
+def parse_grounding_dino_labels(prompt: str) -> list[str]:
+    labels: list[str] = []
+    seen: set[str] = set()
+
+    for raw_label in GROUNDING_DINO_LABEL_SPLIT_PATTERN.split(prompt):
+        label = normalize_grounding_dino_label(raw_label)
+        if not label or label in seen:
+            continue
+        labels.append(label)
+        seen.add(label)
+
+    return labels
+
+
+def detection_result_to_bounding_box(detection: DetectionResult) -> BoundingBoxField:
+    return BoundingBoxField(
+        x_min=detection.box.xmin,
+        x_max=detection.box.xmax,
+        y_min=detection.box.ymin,
+        y_max=detection.box.ymax,
+        score=detection.score,
+        label=normalize_grounding_dino_label(detection.label),
+    )
 
 
 @invocation(
@@ -49,23 +80,16 @@ class GroundingDinoInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> BoundingBoxCollectionOutput:
         # The model expects a 3-channel RGB image.
         image_pil = context.images.get_pil(self.image.image_name, mode="RGB")
+        labels = parse_grounding_dino_labels(self.prompt)
+        if len(labels) == 0:
+            return BoundingBoxCollectionOutput(collection=[])
 
-        detections = self._detect(
-            context=context, image=image_pil, labels=[self.prompt], threshold=self.detection_threshold
-        )
+        detections = self._detect(context=context, image=image_pil, labels=labels, threshold=self.detection_threshold)
 
         # Convert detections to BoundingBoxCollectionOutput.
         bounding_boxes: list[BoundingBoxField] = []
         for detection in detections:
-            bounding_boxes.append(
-                BoundingBoxField(
-                    x_min=detection.box.xmin,
-                    x_max=detection.box.xmax,
-                    y_min=detection.box.ymin,
-                    y_max=detection.box.ymax,
-                    score=detection.score,
-                )
-            )
+            bounding_boxes.append(detection_result_to_bounding_box(detection))
         return BoundingBoxCollectionOutput(collection=bounding_boxes)
 
     @staticmethod

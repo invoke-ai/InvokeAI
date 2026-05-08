@@ -35,6 +35,32 @@ import {
   setCfgRescaleMultiplier,
   setCfgScale,
   setClipSkip,
+  setDetailerCfgScale,
+  setDetailerColorCorrectMode,
+  setDetailerCropPadding,
+  setDetailerDenoiseMaskExpand,
+  setDetailerDenoiseMaskFeather,
+  setDetailerDetectionThreshold,
+  setDetailerDetector,
+  setDetailerDinoModel,
+  setDetailerEnabled,
+  setDetailerFaceId,
+  setDetailerFaceSelection,
+  setDetailerMaskBlur,
+  setDetailerMaskExpand,
+  setDetailerMaskFeather,
+  setDetailerMaxProcessSize,
+  setDetailerMaxUpscale,
+  setDetailerMinConfidence,
+  setDetailerPadding,
+  setDetailerPasteMaskExpand,
+  setDetailerPasteMaskFeather,
+  setDetailerQuality,
+  setDetailerSamModel,
+  setDetailerSteps,
+  setDetailerStrength,
+  setDetailerTargetPrompt,
+  setDetailerTargetSize,
   setFluxDypeExponent,
   setFluxDypePreset,
   setFluxDypeScale,
@@ -65,7 +91,12 @@ import {
 } from 'features/controlLayers/store/paramsSlice';
 import { refImagesRecalled } from 'features/controlLayers/store/refImagesSlice';
 import type { CanvasMetadata, LoRA, RefImageState } from 'features/controlLayers/store/types';
-import { zCanvasMetadata, zCanvasReferenceImageState_OLD, zRefImageState } from 'features/controlLayers/store/types';
+import {
+  zCanvasMetadata,
+  zCanvasReferenceImageState_OLD,
+  zParamsState,
+  zRefImageState,
+} from 'features/controlLayers/store/types';
 import type { ModelIdentifierField, ModelType } from 'features/nodes/types/common';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { zModelIdentifier } from 'features/nodes/types/v2/common';
@@ -620,6 +651,286 @@ const DenoisingStrength: SingleMetadataHandler<ParameterStrength> = {
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterStrength>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion DenoisingStrength
+
+//#region Detailer Settings
+type DetailerSettingsMetadata = {
+  enabled: boolean;
+  detector?: z.infer<typeof zParamsState.shape.detailerDetector>;
+  quality?: z.infer<typeof zParamsState.shape.detailerQuality>;
+  targetPrompt?: string;
+  faceSelection?: z.infer<typeof zParamsState.shape.detailerFaceSelection>;
+  dinoModel?: z.infer<typeof zParamsState.shape.detailerDinoModel>;
+  samModel?: z.infer<typeof zParamsState.shape.detailerSamModel>;
+  detectionThreshold?: number;
+  targetSize?: number;
+  maxUpscale?: number;
+  maxProcessSize?: number;
+  cropPadding?: number;
+  maskExpand?: number;
+  maskFeather?: number;
+  denoiseMaskExpand?: number;
+  denoiseMaskFeather?: number;
+  pasteMaskExpand?: number;
+  pasteMaskFeather?: number;
+  colorCorrectMode?: z.infer<typeof zParamsState.shape.detailerColorCorrectMode>;
+  faceId?: number;
+  minConfidence?: number;
+  padding?: number;
+  strength?: number;
+  steps?: number;
+  cfgScale?: number;
+  maskBlur?: number;
+};
+
+const parseOptionalMetadataField = <T,>(metadata: unknown, key: string, schema: z.ZodType<T>): T | undefined => {
+  const raw = getProperty(metadata, key);
+  if (raw === undefined) {
+    return undefined;
+  }
+
+  const result = schema.safeParse(raw);
+  if (!result.success) {
+    return undefined;
+  }
+
+  return result.data;
+};
+
+const parseStoredOrRuntimeDetailerField = <T,>({
+  metadata,
+  storedKey,
+  runtimeKey,
+  schema,
+  canUseRuntime,
+}: {
+  metadata: unknown;
+  storedKey: string;
+  runtimeKey: string;
+  schema: z.ZodType<T>;
+  canUseRuntime: boolean;
+}): T | undefined => {
+  const storedValue = parseOptionalMetadataField(metadata, storedKey, schema);
+  if (storedValue !== undefined) {
+    return storedValue;
+  }
+
+  if (!canUseRuntime) {
+    return undefined;
+  }
+
+  return parseOptionalMetadataField(metadata, runtimeKey, schema);
+};
+
+const DetailerSettings: SingleMetadataHandler<DetailerSettingsMetadata> = {
+  [SingleMetadataKey]: true,
+  type: 'DetailerSettings',
+  parse: (metadata, _store) => {
+    const enabled = zParamsState.shape.detailerEnabled.parse(getProperty(metadata, 'detailer_enabled'));
+    const targetProfile = parseOptionalMetadataField(metadata, 'detailer_target_profile', z.enum(['localized', 'person']));
+    // Older Body/person metadata only stored effective runtime values. Avoid recalling those into visible sliders.
+    const canUseRuntimeDetailerValues = targetProfile !== 'person';
+
+    const parsed: DetailerSettingsMetadata = {
+      enabled,
+      detector: parseOptionalMetadataField(metadata, 'detailer_detector', zParamsState.shape.detailerDetector),
+      quality: parseOptionalMetadataField(metadata, 'detailer_quality', zParamsState.shape.detailerQuality),
+      targetPrompt: parseOptionalMetadataField(metadata, 'detailer_target_prompt', zParamsState.shape.detailerTargetPrompt),
+      faceSelection: parseOptionalMetadataField(
+        metadata,
+        'detailer_face_selection',
+        zParamsState.shape.detailerFaceSelection
+      ),
+      dinoModel: parseOptionalMetadataField(metadata, 'detailer_dino_model', zParamsState.shape.detailerDinoModel),
+      samModel: parseOptionalMetadataField(metadata, 'detailer_sam_model', zParamsState.shape.detailerSamModel),
+      detectionThreshold: parseOptionalMetadataField(
+        metadata,
+        'detailer_detection_threshold',
+        zParamsState.shape.detailerDetectionThreshold
+      ),
+      targetSize: parseStoredOrRuntimeDetailerField({
+        metadata,
+        storedKey: 'detailer_param_target_size',
+        runtimeKey: 'detailer_target_size',
+        schema: zParamsState.shape.detailerTargetSize,
+        canUseRuntime: canUseRuntimeDetailerValues,
+      }),
+      maxUpscale: parseStoredOrRuntimeDetailerField({
+        metadata,
+        storedKey: 'detailer_param_max_upscale',
+        runtimeKey: 'detailer_max_upscale',
+        schema: zParamsState.shape.detailerMaxUpscale,
+        canUseRuntime: canUseRuntimeDetailerValues,
+      }),
+      maxProcessSize: parseStoredOrRuntimeDetailerField({
+        metadata,
+        storedKey: 'detailer_param_max_process_size',
+        runtimeKey: 'detailer_max_process_size',
+        schema: zParamsState.shape.detailerMaxProcessSize,
+        canUseRuntime: canUseRuntimeDetailerValues,
+      }),
+      cropPadding: parseOptionalMetadataField(metadata, 'detailer_crop_padding', zParamsState.shape.detailerCropPadding),
+      maskExpand: parseOptionalMetadataField(metadata, 'detailer_mask_expand', zParamsState.shape.detailerMaskExpand),
+      maskFeather: parseOptionalMetadataField(metadata, 'detailer_mask_feather', zParamsState.shape.detailerMaskFeather),
+      denoiseMaskExpand: parseStoredOrRuntimeDetailerField({
+        metadata,
+        storedKey: 'detailer_param_denoise_mask_expand',
+        runtimeKey: 'detailer_denoise_mask_expand',
+        schema: zParamsState.shape.detailerDenoiseMaskExpand,
+        canUseRuntime: canUseRuntimeDetailerValues,
+      }),
+      denoiseMaskFeather: parseStoredOrRuntimeDetailerField({
+        metadata,
+        storedKey: 'detailer_param_denoise_mask_feather',
+        runtimeKey: 'detailer_denoise_mask_feather',
+        schema: zParamsState.shape.detailerDenoiseMaskFeather,
+        canUseRuntime: canUseRuntimeDetailerValues,
+      }),
+      pasteMaskExpand: parseStoredOrRuntimeDetailerField({
+        metadata,
+        storedKey: 'detailer_param_paste_mask_expand',
+        runtimeKey: 'detailer_paste_mask_expand',
+        schema: zParamsState.shape.detailerPasteMaskExpand,
+        canUseRuntime: canUseRuntimeDetailerValues,
+      }),
+      pasteMaskFeather: parseStoredOrRuntimeDetailerField({
+        metadata,
+        storedKey: 'detailer_param_paste_mask_feather',
+        runtimeKey: 'detailer_paste_mask_feather',
+        schema: zParamsState.shape.detailerPasteMaskFeather,
+        canUseRuntime: canUseRuntimeDetailerValues,
+      }),
+      colorCorrectMode: parseOptionalMetadataField(
+        metadata,
+        'detailer_color_correct_mode',
+        zParamsState.shape.detailerColorCorrectMode
+      ),
+      faceId: parseOptionalMetadataField(metadata, 'detailer_face_id', zParamsState.shape.detailerFaceId),
+      minConfidence: parseOptionalMetadataField(
+        metadata,
+        'detailer_min_confidence',
+        zParamsState.shape.detailerMinConfidence
+      ),
+      padding: parseOptionalMetadataField(metadata, 'detailer_padding', zParamsState.shape.detailerPadding),
+      strength: parseStoredOrRuntimeDetailerField({
+        metadata,
+        storedKey: 'detailer_param_strength',
+        runtimeKey: 'detailer_strength',
+        schema: zParamsState.shape.detailerStrength,
+        canUseRuntime: canUseRuntimeDetailerValues,
+      }),
+      steps: parseStoredOrRuntimeDetailerField({
+        metadata,
+        storedKey: 'detailer_param_steps',
+        runtimeKey: 'detailer_steps',
+        schema: zParamsState.shape.detailerSteps,
+        canUseRuntime: canUseRuntimeDetailerValues,
+      }),
+      cfgScale: parseStoredOrRuntimeDetailerField({
+        metadata,
+        storedKey: 'detailer_param_cfg_scale',
+        runtimeKey: 'detailer_cfg_scale',
+        schema: zParamsState.shape.detailerCfgScale,
+        canUseRuntime: canUseRuntimeDetailerValues,
+      }),
+      maskBlur: parseOptionalMetadataField(metadata, 'detailer_mask_blur', zParamsState.shape.detailerMaskBlur),
+    };
+
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setDetailerEnabled(value.enabled));
+    if (value.detector !== undefined) {
+      store.dispatch(setDetailerDetector(value.detector));
+    }
+    if (value.quality !== undefined) {
+      store.dispatch(setDetailerQuality(value.quality));
+    }
+    if (value.targetPrompt !== undefined) {
+      store.dispatch(setDetailerTargetPrompt(value.targetPrompt));
+    }
+    if (value.faceSelection !== undefined) {
+      store.dispatch(setDetailerFaceSelection(value.faceSelection));
+    }
+    if (value.faceId !== undefined) {
+      store.dispatch(setDetailerFaceId(value.faceId));
+    }
+    if (value.dinoModel !== undefined) {
+      store.dispatch(setDetailerDinoModel(value.dinoModel));
+    }
+    if (value.samModel !== undefined) {
+      store.dispatch(setDetailerSamModel(value.samModel));
+    }
+    if (value.detectionThreshold !== undefined) {
+      store.dispatch(setDetailerDetectionThreshold(value.detectionThreshold));
+    }
+    if (value.targetSize !== undefined) {
+      store.dispatch(setDetailerTargetSize(value.targetSize));
+    }
+    if (value.maxUpscale !== undefined) {
+      store.dispatch(setDetailerMaxUpscale(value.maxUpscale));
+    }
+    if (value.maxProcessSize !== undefined) {
+      store.dispatch(setDetailerMaxProcessSize(value.maxProcessSize));
+    }
+    if (value.cropPadding !== undefined) {
+      store.dispatch(setDetailerCropPadding(value.cropPadding));
+    }
+    if (value.maskExpand !== undefined) {
+      store.dispatch(setDetailerMaskExpand(value.maskExpand));
+    }
+    if (value.maskFeather !== undefined) {
+      store.dispatch(setDetailerMaskFeather(value.maskFeather));
+    }
+    if (value.denoiseMaskExpand !== undefined) {
+      store.dispatch(setDetailerDenoiseMaskExpand(value.denoiseMaskExpand));
+    }
+    if (value.denoiseMaskFeather !== undefined) {
+      store.dispatch(setDetailerDenoiseMaskFeather(value.denoiseMaskFeather));
+    }
+    if (value.pasteMaskExpand !== undefined) {
+      store.dispatch(setDetailerPasteMaskExpand(value.pasteMaskExpand));
+    }
+    if (value.pasteMaskFeather !== undefined) {
+      store.dispatch(setDetailerPasteMaskFeather(value.pasteMaskFeather));
+    }
+    if (value.colorCorrectMode !== undefined) {
+      store.dispatch(setDetailerColorCorrectMode(value.colorCorrectMode));
+    }
+    if (value.minConfidence !== undefined) {
+      store.dispatch(setDetailerMinConfidence(value.minConfidence));
+    }
+    if (value.padding !== undefined) {
+      store.dispatch(setDetailerPadding(value.padding));
+    }
+    if (value.strength !== undefined) {
+      store.dispatch(setDetailerStrength(value.strength));
+    }
+    if (value.steps !== undefined) {
+      store.dispatch(setDetailerSteps(value.steps));
+    }
+    if (value.cfgScale !== undefined) {
+      store.dispatch(setDetailerCfgScale(value.cfgScale));
+    }
+    if (value.maskBlur !== undefined) {
+      store.dispatch(setDetailerMaskBlur(value.maskBlur));
+    }
+  },
+  i18nKey: 'metadata.detailer',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<DetailerSettingsMetadata>) => (
+    <MetadataPrimitiveValue
+      value={[
+        value.enabled ? 'On' : 'Off',
+        value.targetPrompt,
+        value.quality,
+        value.detector,
+      ]
+        .filter(Boolean)
+        .join(' / ')}
+    />
+  ),
+};
+//#endregion Detailer Settings
 
 //#region SeamlessX
 const SeamlessX: SingleMetadataHandler<ParameterSeamlessX> = {
@@ -1620,6 +1931,7 @@ export const ImageMetadataHandlers = {
   Seed,
   Steps,
   DenoisingStrength,
+  DetailerSettings,
   SeamlessX,
   SeamlessY,
   RefinerModel,

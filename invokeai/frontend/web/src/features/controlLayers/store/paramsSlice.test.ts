@@ -7,6 +7,7 @@ import type {
 } from 'services/api/types';
 import { describe, expect, it } from 'vitest';
 
+import { DETAILER_QUALITY_PRESETS, isDetailerQualityPresetAdjusted } from './detailerQualityPresets';
 import {
   paramsSliceConfig,
   selectModelSupportsDimensions,
@@ -157,7 +158,7 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     const result = migrate?.(v2State) as ReturnType<typeof getInitialParamsState>;
 
-    expect(result._version).toBe(8);
+    expect(result._version).toBe(11);
     expect(result.qwenImageVaeModel).toBeNull();
     expect(result.qwenImageQwenVLEncoderModel).toBeNull();
     expect(result).toMatchObject(DEFAULT_FACE_DETAILER_PARAMS);
@@ -179,7 +180,7 @@ describe('paramsSliceConfig persisted state migration', () => {
     const migrated = paramsSliceConfig.persistConfig?.migrate(v3Params);
 
     expect(migrated).toMatchObject({
-      _version: 8,
+      _version: 11,
       ...DEFAULT_FACE_DETAILER_PARAMS,
     });
   });
@@ -209,7 +210,7 @@ describe('paramsSliceConfig persisted state migration', () => {
     const migrated = paramsSliceConfig.persistConfig?.migrate(v3Params);
 
     expect(migrated).toMatchObject({
-      _version: 8,
+      _version: 11,
       ...DEFAULT_FACE_DETAILER_PARAMS,
       detailerEnabled: true,
     });
@@ -234,13 +235,13 @@ describe('paramsSliceConfig persisted state migration', () => {
     const migrated = paramsSliceConfig.persistConfig?.migrate(v5Params);
 
     expect(migrated).toMatchObject({
-      _version: 8,
+      _version: 11,
       detailerEnabled: true,
       detailerTargetPrompt: 'face',
       detailerDenoiseMaskExpand: 14,
-      detailerDenoiseMaskFeather: 8,
+      detailerDenoiseMaskFeather: 6,
       detailerPasteMaskExpand: 0,
-      detailerPasteMaskFeather: 8,
+      detailerPasteMaskFeather: 6,
       detailerUpscaleMethod: 'pixel_crop_resize',
       detailerColorCorrectMode: 'off',
     });
@@ -260,13 +261,15 @@ describe('paramsSliceConfig persisted state migration', () => {
     const migrated = paramsSliceConfig.persistConfig?.migrate(v6Params);
 
     expect(migrated).toMatchObject({
-      _version: 8,
+      _version: 11,
       detailerEnabled: true,
       detailerTargetPrompt: 'hands',
       detailerTargetSize: 768,
       detailerMaxUpscale: 8,
+      detailerMaxProcessSize: 1024,
+      detailerStrength: 0.26,
       detailerPasteMaskExpand: 0,
-      detailerPasteMaskFeather: 8,
+      detailerPasteMaskFeather: 6,
       detailerColorCorrectMode: 'off',
     });
   });
@@ -279,7 +282,7 @@ describe('paramsSliceConfig persisted state migration', () => {
     const migrated = paramsSliceConfig.persistConfig?.migrate(v7Params);
 
     expect(migrated).toMatchObject({
-      _version: 8,
+      _version: 11,
       detailerColorCorrectMode: 'off',
     });
   });
@@ -292,8 +295,118 @@ describe('paramsSliceConfig persisted state migration', () => {
     const migrated = paramsSliceConfig.persistConfig?.migrate(v7Params);
 
     expect(migrated).toMatchObject({
-      _version: 8,
+      _version: 11,
       detailerColorCorrectMode: 'RGB',
+    });
+  });
+
+  it('migrates v8 params to add disabled debug output', () => {
+    const v8Params = getInitialParamsState() as unknown as Record<string, unknown>;
+    v8Params._version = 8;
+    delete v8Params.detailerDebugEnabled;
+
+    const migrated = paramsSliceConfig.persistConfig?.migrate(v8Params);
+
+    expect(migrated).toMatchObject({
+      _version: 11,
+      detailerDebugEnabled: false,
+    });
+  });
+
+  it('migrates untouched v9 quality preset values to crop-fidelity defaults', () => {
+    const v9Params = getInitialParamsState() as unknown as Record<string, unknown>;
+    Object.assign(v9Params, {
+      _version: 9,
+      detailerQuality: 'balanced',
+      detailerTargetSize: 768,
+      detailerMaxUpscale: 8,
+      detailerMaxProcessSize: 768,
+      detailerCropPadding: 64,
+      detailerStrength: 0.28,
+      detailerSteps: 14,
+      detailerCfgScale: 7.5,
+      detailerDenoiseMaskFeather: 8,
+      detailerPasteMaskExpand: 0,
+      detailerPasteMaskFeather: 8,
+      detailerSamModel: 'segment-anything-2-small',
+    });
+
+    const migrated = paramsSliceConfig.persistConfig?.migrate(v9Params);
+
+    expect(migrated).toMatchObject({
+      _version: 11,
+      detailerQuality: 'balanced',
+      detailerTargetSize: 768,
+      detailerMaxUpscale: 8,
+      detailerMaxProcessSize: 1024,
+      detailerCropPadding: 48,
+      detailerStrength: 0.26,
+      detailerSteps: 14,
+      detailerCfgScale: 4.5,
+      detailerDenoiseMaskFeather: 6,
+      detailerPasteMaskExpand: 0,
+      detailerPasteMaskFeather: 6,
+      detailerSamModel: 'segment-anything-2-base',
+    });
+  });
+
+  it('preserves custom v9 quality values during migration', () => {
+    const v9Params = getInitialParamsState() as unknown as Record<string, unknown>;
+    Object.assign(v9Params, {
+      _version: 9,
+      detailerQuality: 'balanced',
+      detailerTargetSize: 768,
+      detailerMaxUpscale: 8,
+      detailerMaxProcessSize: 768,
+      detailerCropPadding: 64,
+      detailerStrength: 0.27,
+      detailerSteps: 14,
+      detailerCfgScale: 7.5,
+      detailerDenoiseMaskFeather: 8,
+      detailerPasteMaskExpand: 0,
+      detailerPasteMaskFeather: 8,
+      detailerSamModel: 'segment-anything-2-large',
+    });
+
+    const migrated = paramsSliceConfig.persistConfig?.migrate(v9Params);
+
+    expect(migrated).toMatchObject({
+      _version: 11,
+      detailerMaxProcessSize: 768,
+      detailerCropPadding: 64,
+      detailerStrength: 0.27,
+      detailerCfgScale: 7.5,
+      detailerDenoiseMaskFeather: 8,
+      detailerPasteMaskFeather: 8,
+      detailerSamModel: 'segment-anything-2-large',
+    });
+  });
+
+  it('migrates untouched v10 detailer CFG and crop padding defaults', () => {
+    const v10Params = getInitialParamsState() as unknown as Record<string, unknown>;
+    Object.assign(v10Params, {
+      _version: 10,
+      detailerQuality: 'high',
+      detailerTargetSize: 1024,
+      detailerMaxUpscale: 12,
+      detailerMaxProcessSize: 1024,
+      detailerCropPadding: 64,
+      detailerStrength: 0.28,
+      detailerSteps: 18,
+      detailerCfgScale: 7.5,
+      detailerDenoiseMaskFeather: 6,
+      detailerPasteMaskExpand: 0,
+      detailerPasteMaskFeather: 6,
+      detailerSamModel: 'segment-anything-2-large',
+    });
+
+    const migrated = paramsSliceConfig.persistConfig?.migrate(v10Params);
+
+    expect(migrated).toMatchObject({
+      _version: 11,
+      detailerQuality: 'high',
+      detailerCropPadding: 32,
+      detailerCfgScale: 5,
     });
   });
 
@@ -308,13 +421,55 @@ describe('paramsSliceConfig persisted state migration', () => {
       detailerTargetSize: 1024,
       detailerMaxUpscale: 12,
       detailerMaxProcessSize: 1024,
-      detailerStrength: 0.32,
+      detailerCropPadding: 32,
+      detailerStrength: 0.28,
       detailerSteps: 18,
-      detailerDenoiseMaskFeather: 10,
+      detailerCfgScale: 5,
+      detailerDenoiseMaskFeather: 6,
       detailerPasteMaskExpand: 0,
-      detailerPasteMaskFeather: 8,
+      detailerPasteMaskFeather: 6,
+      detailerSamModel: 'segment-anything-2-large',
       detailerColorCorrectMode: 'RGB',
     });
+  });
+
+  it('preserves manual detailer tuning when clicking the selected quality again', () => {
+    const state = paramsSliceConfig.slice.reducer(
+      {
+        ...getInitialParamsState(),
+        detailerQuality: 'balanced',
+        detailerCfgScale: 3.5,
+        detailerCropPadding: 24,
+        detailerSamModel: 'segment-anything-2-large',
+        detailerStrength: 0.18,
+        detailerSteps: 16,
+      },
+      setDetailerQuality('balanced')
+    );
+
+    expect(state).toMatchObject({
+      detailerQuality: 'balanced',
+      detailerCfgScale: 3.5,
+      detailerCropPadding: 24,
+      detailerSamModel: 'segment-anything-2-large',
+      detailerStrength: 0.18,
+      detailerSteps: 16,
+    });
+  });
+
+  it('detects detailer quality values adjusted away from the selected preset', () => {
+    const state = getInitialParamsState();
+    const fastState = { ...state, detailerQuality: 'fast' as const, ...DETAILER_QUALITY_PRESETS.fast };
+    const highState = { ...state, detailerQuality: 'high' as const, ...DETAILER_QUALITY_PRESETS.high };
+
+    expect(isDetailerQualityPresetAdjusted(state)).toBe(false);
+    expect(isDetailerQualityPresetAdjusted(fastState)).toBe(false);
+    expect(isDetailerQualityPresetAdjusted(highState)).toBe(false);
+    expect(isDetailerQualityPresetAdjusted({ ...state, detailerCfgScale: 3.5 })).toBe(true);
+    expect(isDetailerQualityPresetAdjusted({ ...state, detailerCropPadding: 24 })).toBe(true);
+    expect(isDetailerQualityPresetAdjusted({ ...state, detailerSamModel: 'segment-anything-2-large' })).toBe(true);
+    expect(isDetailerQualityPresetAdjusted({ ...state, detailerStrength: 0.18 })).toBe(true);
+    expect(isDetailerQualityPresetAdjusted({ ...state, detailerSteps: 16 })).toBe(true);
   });
 
   it('supports the face detailer only for SD1, SD2, and SDXL', () => {

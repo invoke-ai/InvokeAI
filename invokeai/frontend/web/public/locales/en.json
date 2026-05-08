@@ -1019,6 +1019,7 @@
         "dypeScale": "$t(parameters.dypeScale)",
         "dypeExponent": "$t(parameters.dypeExponent)",
         "generationMode": "Generation Mode",
+        "detailer": "Detailer",
         "geminiTemperature": "Gemini Temperature",
         "geminiThinkingLevel": "Gemini Thinking Level",
         "openaiQuality": "OpenAI Quality",
@@ -1622,6 +1623,7 @@
         "faceDetailer": {
             "enabled": "Enable",
             "quality": "Quality",
+            "adjusted": "Adjusted",
             "detector": "Detector",
             "detectorModel": "Detector Model",
             "samModel": "SAM Model",
@@ -1642,11 +1644,47 @@
             "faceId": "Target ID",
             "minConfidence": "Confidence",
             "padding": "Padding",
-            "strength": "Strength",
+            "strength": "Denoising Strength",
             "steps": "Steps",
             "cfgScale": "CFG Scale",
             "maskBlur": "Mask Blur",
             "developerOptions": "Developer Options",
+            "debugOutput": "Debug Output",
+            "legacyDetector": "Legacy Detector",
+            "mediapipeLegacyWarning": "MediaPipe is a legacy face-only detector for development testing. It is not part of the supported DINO/SAM Detailer path.",
+            "effectiveProfile": "Profile",
+            "effectiveValue": "Effective: {{value}}",
+            "bodyProfileActive": "Body Profile Active",
+            "bodyProfileSummary": "Process {{process}} / Strength {{strength}} / Steps {{steps}} / CFG <= {{cfg}}",
+            "cropPaddingTooltip": "Smaller padding gives the target more processing pixels. Larger padding keeps more surrounding context.",
+            "tooltips": {
+                "strength": "How much the detail pass may regenerate the selected crop.",
+                "steps": "How many denoise steps to run for the detail pass.",
+                "faceSelection": "How to choose one target when the detector finds multiple matches.",
+                "faceId": "The zero-based target index used when Target Selection is Index.",
+                "detectionThreshold": "Minimum detector confidence. Lower values find more targets but can add false positives.",
+                "detector": "Choose the target detector used by the Detailer. DINO + SAM is the supported V1 path.",
+                "detectorModel": "GroundingDINO model used to find target boxes. Larger models may improve detection and run slower.",
+                "samModel": "SAM model used to segment the selected target. Larger models may improve masks and run slower.",
+                "targetSize": "Preferred processing size for small detected crops.",
+                "maxUpscale": "Maximum pixel scale factor allowed before denoising the crop.",
+                "maxProcessSize": "Maximum processing resolution for the detail pass.",
+                "denoiseMaskExpand": "Expands the detected mask before denoising.",
+                "denoiseMaskFeather": "Softens the denoise mask edge before the crop is regenerated.",
+                "pasteMaskExpand": "Expands the final paste region.",
+                "pasteMaskFeather": "Softens the final paste edge.",
+                "colorCorrectMode": "Optionally match the detailed crop colors to the original crop before paste.",
+                "cfgScale": "Prompt guidance used by the detail denoise pass.",
+                "minConfidence": "Minimum MediaPipe face confidence for the legacy detector.",
+                "padding": "Extra pixels around the MediaPipe face crop.",
+                "maskBlur": "Legacy MediaPipe mask blur used for the detail denoise mask."
+            },
+            "advancedGroups": {
+                "detection": "Detection",
+                "cropScale": "Crop & Scale",
+                "masksPaste": "Masks & Paste",
+                "denoise": "Denoise"
+            },
             "targetPresets": {
                 "label": "Target",
                 "face": "Face",
@@ -1657,12 +1695,17 @@
             },
             "detectors": {
                 "groundedSam": "DINO + SAM",
-                "mediapipe": "MediaPipe"
+                "mediapipe": "MediaPipe (Legacy)"
             },
             "qualities": {
                 "fast": "Fast",
                 "balanced": "Balanced",
                 "high": "High"
+            },
+            "qualityTooltips": {
+                "fast": "Fast applies visible speed-first starter settings, including the small SAM model.",
+                "balanced": "Balanced applies visible recommended starter settings, including the base SAM model.",
+                "high": "High applies visible quality-first starter settings, including the large SAM model."
             },
             "faceSelections": {
                 "highestScore": "Highest Score",
@@ -2167,6 +2210,109 @@
                 "• Higher Weight (.75-2): Creates a more significant impact on the final result.",
                 "• Lower Weight (0-.75): Creates a smaller impact on the final result."
             ]
+        },
+        "detailerQuality": {
+            "heading": "Detailer Quality",
+            "paragraphs": [
+                "Applies visible starter settings for the detail pass.",
+                "Fast favors speed, Balanced is the recommended default, and High uses larger mask models and processing sizes."
+            ]
+        },
+        "detailerDenoisingStrength": {
+            "heading": "Denoising Strength",
+            "paragraphs": [
+                "Controls how much the selected crop may change during the detail pass.",
+                "Lower values preserve the original image more closely. Higher values repaint more strongly."
+            ]
+        },
+        "detailerSteps": {
+            "heading": "Steps",
+            "paragraphs": ["Number of denoising steps used for the detail pass."]
+        },
+        "detailerTargetSelection": {
+            "heading": "Target Selection",
+            "paragraphs": ["Controls how one target is selected when the detector finds multiple matches."]
+        },
+        "detailerTargetId": {
+            "heading": "Target ID",
+            "paragraphs": ["Zero-based target index used when Target Selection is set to Index."]
+        },
+        "detailerDetectionThreshold": {
+            "heading": "Threshold",
+            "paragraphs": [
+                "Minimum detector confidence for candidate targets.",
+                "Lower values may find more targets, but can also add false positives."
+            ]
+        },
+        "detailerDetector": {
+            "heading": "Detector",
+            "paragraphs": ["Selects the detector path. DINO + SAM is the supported Detailer path for this version."]
+        },
+        "detailerDinoModel": {
+            "heading": "DINO Model",
+            "paragraphs": ["GroundingDINO model used to find target boxes. Larger models may improve detection and run slower."]
+        },
+        "detailerSamModel": {
+            "heading": "SAM Model",
+            "paragraphs": ["Segmentation model used to create the target mask. Larger models may improve masks and run slower."]
+        },
+        "detailerTargetSize": {
+            "heading": "Target Size",
+            "paragraphs": ["Preferred processing size for small detected crops before denoising."]
+        },
+        "detailerMaxUpscale": {
+            "heading": "Max Upscale",
+            "paragraphs": ["Maximum pixel resize factor allowed before the crop is denoised."]
+        },
+        "detailerMaxProcess": {
+            "heading": "Max Process",
+            "paragraphs": ["Maximum processing resolution for the detail pass. This is a hard safety cap."]
+        },
+        "detailerCropPadding": {
+            "heading": "Crop Padding",
+            "paragraphs": [
+                "Extra context added around the detected target.",
+                "Smaller padding gives the target more processing pixels. Larger padding preserves more surrounding context."
+            ]
+        },
+        "detailerDenoiseMaskExpand": {
+            "heading": "Denoise Expand",
+            "paragraphs": ["Expands the detected mask before the detail denoise pass."]
+        },
+        "detailerDenoiseMaskFeather": {
+            "heading": "Denoise Gradient",
+            "paragraphs": ["Softens the denoise mask edge used by the detail pass."]
+        },
+        "detailerPasteMaskExpand": {
+            "heading": "Paste Expand",
+            "paragraphs": ["Expands the final paste region used to composite the detailed crop back into the image."]
+        },
+        "detailerPasteMaskFeather": {
+            "heading": "Paste Feather",
+            "paragraphs": ["Softens the final paste edge when compositing the detailed crop back into the image."]
+        },
+        "detailerColorMatch": {
+            "heading": "Color Match",
+            "paragraphs": ["Optionally matches the detailed crop colors to the original crop before paste."]
+        },
+        "detailerCfgScale": {
+            "heading": "CFG Scale",
+            "paragraphs": [
+                "Prompt guidance used by the detail denoise pass.",
+                "Lower values usually preserve the original crop better. High values can overcook small inpainted regions."
+            ]
+        },
+        "detailerMediapipeConfidence": {
+            "heading": "Confidence",
+            "paragraphs": ["Minimum MediaPipe face confidence for the legacy detector."]
+        },
+        "detailerMediapipePadding": {
+            "heading": "Padding",
+            "paragraphs": ["Extra pixels around the MediaPipe face crop."]
+        },
+        "detailerMediapipeMaskBlur": {
+            "heading": "Mask Blur",
+            "paragraphs": ["Legacy MediaPipe mask blur used for the detail denoise mask."]
         },
         "dynamicPrompts": {
             "heading": "Dynamic Prompts",

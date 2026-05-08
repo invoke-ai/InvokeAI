@@ -7,6 +7,11 @@ import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMul
 import { isPlainObject } from 'es-toolkit';
 import { clamp } from 'es-toolkit/compat';
 import { logout } from 'features/auth/store/authSlice';
+import {
+  DETAILER_QUALITY_PRESET_KEYS,
+  DETAILER_QUALITY_PRESETS,
+  type DetailerQualityPreset,
+} from 'features/controlLayers/store/detailerQualityPresets';
 import type {
   AspectRatioID,
   DetailerColorCorrectMode,
@@ -57,55 +62,110 @@ import type { AnyModelConfigWithExternal } from 'services/api/types';
 import { isExternalApiModelConfig, isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
-const DETAILER_QUALITY_PRESETS = {
+const DETAILER_QUALITY_PRESETS_V8 = {
   fast: {
     detailerTargetSize: 512,
     detailerMaxUpscale: 4,
     detailerMaxProcessSize: 512,
+    detailerCropPadding: 64,
     detailerStrength: 0.25,
     detailerSteps: 8,
+    detailerCfgScale: 7.5,
     detailerDenoiseMaskFeather: 6,
     detailerPasteMaskExpand: 0,
     detailerPasteMaskFeather: 8,
+    detailerSamModel: 'segment-anything-2-small',
   },
   balanced: {
     detailerTargetSize: 768,
     detailerMaxUpscale: 8,
     detailerMaxProcessSize: 768,
+    detailerCropPadding: 64,
     detailerStrength: 0.28,
     detailerSteps: 14,
+    detailerCfgScale: 7.5,
     detailerDenoiseMaskFeather: 8,
     detailerPasteMaskExpand: 0,
     detailerPasteMaskFeather: 8,
+    detailerSamModel: 'segment-anything-2-small',
   },
   high: {
     detailerTargetSize: 1024,
     detailerMaxUpscale: 12,
     detailerMaxProcessSize: 1024,
+    detailerCropPadding: 64,
     detailerStrength: 0.32,
     detailerSteps: 18,
+    detailerCfgScale: 7.5,
     detailerDenoiseMaskFeather: 10,
     detailerPasteMaskExpand: 0,
     detailerPasteMaskFeather: 8,
+    detailerSamModel: 'segment-anything-2-small',
   },
-} satisfies Record<
-  DetailerQuality,
-  Pick<
-    ParamsState,
-    | 'detailerTargetSize'
-    | 'detailerMaxUpscale'
-    | 'detailerMaxProcessSize'
-    | 'detailerStrength'
-    | 'detailerSteps'
-    | 'detailerDenoiseMaskFeather'
-    | 'detailerPasteMaskExpand'
-    | 'detailerPasteMaskFeather'
-  >
->;
+} satisfies Record<DetailerQuality, DetailerQualityPreset>;
+
+const DETAILER_QUALITY_PRESETS_V9 = {
+  fast: {
+    detailerTargetSize: 512,
+    detailerMaxUpscale: 4,
+    detailerMaxProcessSize: 512,
+    detailerCropPadding: 64,
+    detailerStrength: 0.24,
+    detailerSteps: 8,
+    detailerCfgScale: 7.5,
+    detailerDenoiseMaskFeather: 4,
+    detailerPasteMaskExpand: 0,
+    detailerPasteMaskFeather: 6,
+    detailerSamModel: 'segment-anything-2-small',
+  },
+  balanced: {
+    detailerTargetSize: 768,
+    detailerMaxUpscale: 8,
+    detailerMaxProcessSize: 1024,
+    detailerCropPadding: 64,
+    detailerStrength: 0.26,
+    detailerSteps: 14,
+    detailerCfgScale: 7.5,
+    detailerDenoiseMaskFeather: 6,
+    detailerPasteMaskExpand: 0,
+    detailerPasteMaskFeather: 6,
+    detailerSamModel: 'segment-anything-2-base',
+  },
+  high: {
+    detailerTargetSize: 1024,
+    detailerMaxUpscale: 12,
+    detailerMaxProcessSize: 1024,
+    detailerCropPadding: 64,
+    detailerStrength: 0.28,
+    detailerSteps: 18,
+    detailerCfgScale: 7.5,
+    detailerDenoiseMaskFeather: 6,
+    detailerPasteMaskExpand: 0,
+    detailerPasteMaskFeather: 6,
+    detailerSamModel: 'segment-anything-2-large',
+  },
+} satisfies Record<DetailerQuality, DetailerQualityPreset>;
 
 const applyDetailerQualityPreset = (state: ParamsState, quality: DetailerQuality) => {
   state.detailerQuality = quality;
   Object.assign(state, DETAILER_QUALITY_PRESETS[quality]);
+};
+
+const maybeMigrateUntouchedDetailerQualityPreset = (
+  state: Record<string, unknown>,
+  oldPresets: Record<DetailerQuality, DetailerQualityPreset>,
+  newPresets: Record<DetailerQuality, DetailerQualityPreset>
+) => {
+  const quality = state.detailerQuality;
+  if (quality !== 'fast' && quality !== 'balanced' && quality !== 'high') {
+    return;
+  }
+
+  const oldPreset = oldPresets[quality];
+  const isUntouchedPreset = DETAILER_QUALITY_PRESET_KEYS.every((key) => state[key] === oldPreset[key]);
+  if (isUntouchedPreset) {
+    Object.assign(state, newPresets[quality]);
+  }
 };
 
 const slice = createSlice({
@@ -174,10 +234,17 @@ const slice = createSlice({
     setDetailerEnabled: (state, action: PayloadAction<boolean>) => {
       state.detailerEnabled = action.payload;
     },
+    setDetailerDebugEnabled: (state, action: PayloadAction<boolean>) => {
+      state.detailerDebugEnabled = action.payload;
+    },
     setDetailerDetector: (state, action: PayloadAction<ParamsState['detailerDetector']>) => {
       state.detailerDetector = action.payload;
     },
     setDetailerQuality: (state, action: PayloadAction<DetailerQuality>) => {
+      if (state.detailerQuality === action.payload) {
+        return;
+      }
+
       applyDetailerQualityPreset(state, action.payload);
     },
     setDetailerTargetPrompt: (state, action: PayloadAction<string>) => {
@@ -779,6 +846,7 @@ export const {
   setSeed,
   setImg2imgStrength,
   setDetailerEnabled,
+  setDetailerDebugEnabled,
   setDetailerDetector,
   setDetailerQuality,
   setDetailerTargetPrompt,
@@ -957,6 +1025,24 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         }
       }
 
+      if (state._version === 8) {
+        // v8 -> v9, add dev-only detailer debug output
+        state._version = 9;
+        state.detailerDebugEnabled = DEFAULT_FACE_DETAILER_PARAMS.detailerDebugEnabled;
+      }
+
+      if (state._version === 9) {
+        // v9 -> v10, retune untouched detailer quality presets for crop fidelity
+        state._version = 10;
+        maybeMigrateUntouchedDetailerQualityPreset(state, DETAILER_QUALITY_PRESETS_V8, DETAILER_QUALITY_PRESETS_V9);
+      }
+
+      if (state._version === 10) {
+        // v10 -> v11, lower detailer CFG defaults and make crop padding quality-driven
+        state._version = 11;
+        maybeMigrateUntouchedDetailerQualityPreset(state, DETAILER_QUALITY_PRESETS_V9, DETAILER_QUALITY_PRESETS);
+      }
+
       return zParamsState.parse(state);
     },
   },
@@ -1025,6 +1111,7 @@ export const selectInfillPatchmatchDownscaleSize = createParamsSelector(
 export const selectInfillColorValue = createParamsSelector((params) => params.infillColorValue);
 export const selectImg2imgStrength = createParamsSelector((params) => params.img2imgStrength);
 export const selectDetailerEnabled = createParamsSelector((params) => params.detailerEnabled);
+export const selectDetailerDebugEnabled = createParamsSelector((params) => params.detailerDebugEnabled);
 export const selectDetailerDetector = createParamsSelector((params) => params.detailerDetector);
 export const selectDetailerQuality = createParamsSelector((params) => params.detailerQuality);
 export const selectDetailerTargetPrompt = createParamsSelector((params) => params.detailerTargetPrompt);

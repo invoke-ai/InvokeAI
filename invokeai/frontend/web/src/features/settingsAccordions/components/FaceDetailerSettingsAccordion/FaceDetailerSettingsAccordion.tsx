@@ -20,10 +20,16 @@ import {
 } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import type { Feature } from 'common/components/InformationalPopover/constants';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { isDetailerQualityPresetAdjusted } from 'features/controlLayers/store/detailerQualityPresets';
+import type { GroundedSamDetailerRuntimeConfig } from 'features/controlLayers/store/detailerRuntimeConfig';
+import { getGroundedSamDetailerRuntimeConfig } from 'features/controlLayers/store/detailerRuntimeConfig';
 import {
   selectDetailerCfgScale,
   selectDetailerColorCorrectMode,
   selectDetailerCropPadding,
+  selectDetailerDebugEnabled,
   selectDetailerDenoiseMaskExpand,
   selectDetailerDenoiseMaskFeather,
   selectDetailerDetectionThreshold,
@@ -49,6 +55,7 @@ import {
   setDetailerCfgScale,
   setDetailerColorCorrectMode,
   setDetailerCropPadding,
+  setDetailerDebugEnabled,
   setDetailerDenoiseMaskExpand,
   setDetailerDenoiseMaskFeather,
   setDetailerDetectionThreshold,
@@ -82,16 +89,17 @@ import type {
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import type { ChangeEvent, MouseEventHandler, ReactNode } from 'react';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiHandBold, PiHeadCircuitBold, PiPencilSimpleBold, PiPersonBold, PiSmileyBold } from 'react-icons/pi';
 
-const formLabelProps: FormLabelProps = {
-  minW: '7.5rem',
-};
+const DETAILER_LABEL_WIDTH = '11rem';
 
-const compactFormLabelProps: FormLabelProps = {
-  minW: '4.5rem',
+const formLabelProps: FormLabelProps = {
+  lineHeight: 'shorter',
+  maxW: DETAILER_LABEL_WIDTH,
+  minW: DETAILER_LABEL_WIDTH,
+  whiteSpace: 'normal',
 };
 
 const DETAILER_DETECTORS = ['grounding-dino-sam', 'mediapipe'] as const;
@@ -110,31 +118,86 @@ const DETAILER_SAM_MODELS = [
 ] as const;
 
 const DETAILER_TARGET_PRESETS = [
-  { labelKey: 'parameters.faceDetailer.targetPresets.face', prompt: 'face', icon: PiSmileyBold },
-  { labelKey: 'parameters.faceDetailer.targetPresets.head', prompt: 'head', icon: PiHeadCircuitBold },
-  { labelKey: 'parameters.faceDetailer.targetPresets.hands', prompt: 'hands', icon: PiHandBold },
-  { labelKey: 'parameters.faceDetailer.targetPresets.body', prompt: 'person', icon: PiPersonBold },
+  {
+    labelKey: 'parameters.faceDetailer.targetPresets.face',
+    tooltipKey: 'parameters.faceDetailer.targetPresets.face',
+    prompt: 'face',
+    icon: PiSmileyBold,
+  },
+  {
+    labelKey: 'parameters.faceDetailer.targetPresets.head',
+    tooltipKey: 'parameters.faceDetailer.targetPresets.head',
+    prompt: 'head',
+    icon: PiHeadCircuitBold,
+  },
+  {
+    labelKey: 'parameters.faceDetailer.targetPresets.hands',
+    tooltipKey: 'parameters.faceDetailer.targetPresets.hands',
+    prompt: 'hands',
+    icon: PiHandBold,
+  },
+  {
+    labelKey: 'parameters.faceDetailer.targetPresets.body',
+    tooltipKey: 'parameters.faceDetailer.targetPresets.body',
+    prompt: 'person',
+    icon: PiPersonBold,
+  },
 ] as const;
 
 const DETAILER_TARGET_PRESET_PROMPTS = new Set<string>(DETAILER_TARGET_PRESETS.map(({ prompt }) => prompt));
-const DETAILER_TARGET_BUTTON_GRID_TEMPLATE = 'repeat(5, minmax(3.25rem, 3.5rem))';
+const DETAILER_TARGET_BUTTON_GRID_TEMPLATE = 'repeat(5, minmax(2.5rem, 3.5rem))';
+const DETAILER_SUPPORTED_DETECTOR: DetailerDetector = 'grounding-dino-sam';
+
+const customTargetInputStyleProps = {
+  bg: 'base.800',
+  borderColor: 'base.600',
+  color: 'base.50',
+  _focusVisible: {
+    bg: 'base.800',
+    borderColor: 'invokeBlue.400',
+    boxShadow: '0 0 0 1px var(--invoke-colors-invokeBlue-400)',
+  },
+  _hover: {
+    bg: 'base.800',
+    borderColor: 'base.500',
+  },
+  sx: {
+    '&:-webkit-autofill, &:-webkit-autofill:hover, &:-webkit-autofill:focus': {
+      WebkitBoxShadow: '0 0 0 1000px var(--invoke-colors-base-800) inset',
+      WebkitTextFillColor: 'var(--invoke-colors-base-50)',
+      caretColor: 'var(--invoke-colors-base-50)',
+      transition: 'background-color 9999s ease-in-out 0s',
+    },
+  },
+} as const;
 
 const getTargetButtonStyleProps = (isSelected: boolean) => ({
   aspectRatio: 1,
   bg: 'base.800',
-  borderColor: 'base.700',
+  borderColor: isSelected ? 'base.500' : 'base.600',
   borderRadius: 'base',
   borderStyle: 'solid',
   borderWidth: 1,
-  borderBottomColor: isSelected ? 'invokeBlue.400' : 'transparent',
-  borderBottomWidth: 2,
   boxShadow: 'none',
   color: isSelected ? 'base.50' : 'base.300',
   h: 'auto',
   minH: 13,
   minW: 0,
+  overflow: 'hidden',
+  position: 'relative' as const,
   variant: 'ghost',
   w: 'full',
+  _after: {
+    bg: isSelected ? 'invokeBlue.400' : 'transparent',
+    borderRadius: 'full',
+    bottom: 0,
+    content: '""',
+    h: 0.5,
+    insetInlineEnd: 2,
+    insetInlineStart: 2,
+    pointerEvents: 'none',
+    position: 'absolute' as const,
+  },
   _active: {
     bg: 'base.700',
   },
@@ -144,8 +207,11 @@ const getTargetButtonStyleProps = (isSelected: boolean) => ({
   },
   _hover: {
     bg: 'base.700',
-    borderBottomColor: isSelected ? 'invokeBlue.300' : 'transparent',
+    borderColor: isSelected ? 'base.400' : 'base.500',
     color: 'base.50',
+    _after: {
+      bg: isSelected ? 'invokeBlue.300' : 'transparent',
+    },
   },
 });
 
@@ -180,7 +246,7 @@ const PADDING_CONSTRAINTS = {
 };
 
 const CROP_PADDING_CONSTRAINTS = {
-  initial: 64,
+  initial: 48,
   sliderMin: 0,
   sliderMax: 256,
   numberInputMin: 0,
@@ -190,7 +256,7 @@ const CROP_PADDING_CONSTRAINTS = {
 };
 
 const STRENGTH_CONSTRAINTS = {
-  initial: 0.28,
+  initial: 0.26,
   sliderMin: 0,
   sliderMax: 1,
   numberInputMin: 0,
@@ -210,7 +276,7 @@ const STEPS_CONSTRAINTS = {
 };
 
 const CFG_SCALE_CONSTRAINTS = {
-  initial: 7.5,
+  initial: 4.5,
   sliderMin: 1,
   sliderMax: 20,
   numberInputMin: 1,
@@ -250,7 +316,7 @@ const MAX_UPSCALE_CONSTRAINTS = {
 };
 
 const MAX_PROCESS_SIZE_CONSTRAINTS = {
-  initial: 768,
+  initial: 1024,
   sliderMin: 256,
   sliderMax: 1536,
   numberInputMin: 64,
@@ -270,7 +336,7 @@ const DENOISE_MASK_EXPAND_CONSTRAINTS = {
 };
 
 const DENOISE_MASK_FEATHER_CONSTRAINTS = {
-  initial: 8,
+  initial: 6,
   sliderMin: 0,
   sliderMax: 96,
   numberInputMin: 0,
@@ -290,7 +356,7 @@ const PASTE_MASK_EXPAND_CONSTRAINTS = {
 };
 
 const PASTE_MASK_FEATHER_CONSTRAINTS = {
-  initial: 8,
+  initial: 6,
   sliderMin: 0,
   sliderMax: 96,
   numberInputMin: 0,
@@ -301,6 +367,9 @@ const PASTE_MASK_FEATHER_CONSTRAINTS = {
 
 const isInValues = <T extends string>(value: unknown, values: readonly T[]): value is T =>
   typeof value === 'string' && values.includes(value as T);
+
+const formatEffectiveValue = (value: number) =>
+  Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, '');
 
 type FaceDetailerNumberParamProps = {
   label: string;
@@ -314,7 +383,25 @@ type FaceDetailerNumberParamProps = {
   fineStep: number;
   onChange: (value: number) => void;
   isDisabled?: boolean;
+  effectiveValueLabel?: string;
+  popoverFeature?: Feature;
 };
+
+const FaceDetailerLabelText = memo(({ label, popoverFeature }: { label: string; popoverFeature?: Feature }) => {
+  const labelText = (
+    <Box as="span" cursor={popoverFeature ? 'help' : undefined}>
+      {label}
+    </Box>
+  );
+
+  if (!popoverFeature) {
+    return labelText;
+  }
+
+  return <InformationalPopover feature={popoverFeature}>{labelText}</InformationalPopover>;
+});
+
+FaceDetailerLabelText.displayName = 'FaceDetailerLabelText';
 
 const FaceDetailerNumberParam = memo(
   ({
@@ -329,29 +416,42 @@ const FaceDetailerNumberParam = memo(
     fineStep,
     onChange,
     isDisabled,
-  }: FaceDetailerNumberParamProps) => (
-    <FormControl isDisabled={isDisabled}>
-      <FormLabel>{label}</FormLabel>
-      <CompositeSlider
-        value={value}
-        defaultValue={defaultValue}
-        min={sliderMin}
-        max={sliderMax}
-        step={step}
-        fineStep={fineStep}
-        onChange={onChange}
-      />
-      <CompositeNumberInput
-        value={value}
-        defaultValue={defaultValue}
-        min={numberInputMin}
-        max={numberInputMax}
-        step={step}
-        fineStep={fineStep}
-        onChange={onChange}
-      />
-    </FormControl>
-  )
+    effectiveValueLabel,
+    popoverFeature,
+  }: FaceDetailerNumberParamProps) => {
+    return (
+      <FormControl isDisabled={isDisabled}>
+        <FormLabel>
+          <Flex flexDir="column" gap={1}>
+            <FaceDetailerLabelText label={label} popoverFeature={popoverFeature} />
+            {effectiveValueLabel && (
+              <Box as="span" color="invokeBlue.300" fontSize="xs" fontWeight="semibold" lineHeight="short">
+                {effectiveValueLabel}
+              </Box>
+            )}
+          </Flex>
+        </FormLabel>
+        <CompositeSlider
+          value={value}
+          defaultValue={defaultValue}
+          min={sliderMin}
+          max={sliderMax}
+          step={step}
+          fineStep={fineStep}
+          onChange={onChange}
+        />
+        <CompositeNumberInput
+          value={value}
+          defaultValue={defaultValue}
+          min={numberInputMin}
+          max={numberInputMax}
+          step={step}
+          fineStep={fineStep}
+          onChange={onChange}
+        />
+      </FormControl>
+    );
+  }
 );
 
 FaceDetailerNumberParam.displayName = 'FaceDetailerNumberParam';
@@ -362,15 +462,18 @@ type FaceDetailerSelectParamProps = {
   options: ComboboxOption[];
   onChange: ComboboxOnChange;
   isDisabled?: boolean;
+  popoverFeature?: Feature;
 };
 
 const FaceDetailerSelectParam = memo(
-  ({ label, value, options, onChange, isDisabled }: FaceDetailerSelectParamProps) => {
+  ({ label, value, options, onChange, isDisabled, popoverFeature }: FaceDetailerSelectParamProps) => {
     const selected = useMemo(() => options.find((option) => option.value === value), [options, value]);
 
     return (
       <FormControl isDisabled={isDisabled}>
-        <FormLabel>{label}</FormLabel>
+        <FormLabel>
+          <FaceDetailerLabelText label={label} popoverFeature={popoverFeature} />
+        </FormLabel>
         <Combobox value={selected} options={options} onChange={onChange} isSearchable={false} isClearable={false} />
       </FormControl>
     );
@@ -390,13 +493,17 @@ const FaceDetailerTargetPresetButtons = memo(
   ({ value, onChange, customInput, isDisabled }: FaceDetailerTargetPresetButtonsProps) => {
     const { t } = useTranslation();
     const [isCustomInputOpen, setIsCustomInputOpen] = useState(() => !DETAILER_TARGET_PRESET_PROMPTS.has(value));
+    const previousValueRef = useRef(value);
     const isPresetValue = DETAILER_TARGET_PRESET_PROMPTS.has(value);
 
     useEffect(() => {
-      if (!isPresetValue) {
-        setIsCustomInputOpen(true);
+      if (previousValueRef.current === value) {
+        return;
       }
-    }, [isPresetValue]);
+
+      previousValueRef.current = value;
+      setIsCustomInputOpen(!DETAILER_TARGET_PRESET_PROMPTS.has(value));
+    }, [value]);
 
     const onPresetClick = useCallback<MouseEventHandler<HTMLButtonElement>>(
       (event) => {
@@ -418,12 +525,13 @@ const FaceDetailerTargetPresetButtons = memo(
         <FormLabel>{t('parameters.faceDetailer.targetPresets.label')}</FormLabel>
         <Flex flexDir="column" gap={2} w="full">
           <Grid templateColumns={DETAILER_TARGET_BUTTON_GRID_TEMPLATE} justifyContent="space-between" gap={2} w="full">
-            {DETAILER_TARGET_PRESETS.map(({ labelKey, prompt, icon: Icon }) => {
+            {DETAILER_TARGET_PRESETS.map(({ labelKey, tooltipKey, prompt, icon: Icon }) => {
               const label = t(labelKey);
+              const tooltip = t(tooltipKey ?? labelKey);
               const isSelected = !isCustomInputOpen && value === prompt;
 
               return (
-                <Tooltip key={prompt} label={label}>
+                <Tooltip key={prompt} label={tooltip}>
                   <IconButton
                     aria-label={label}
                     icon={<Icon size={26} />}
@@ -454,48 +562,127 @@ const FaceDetailerTargetPresetButtons = memo(
 
 FaceDetailerTargetPresetButtons.displayName = 'FaceDetailerTargetPresetButtons';
 
-type FaceDetailerQualityButtonsProps = {
-  value: DetailerQuality;
-  onChange: (value: DetailerQuality) => void;
-  isDisabled?: boolean;
+type FaceDetailerAdvancedSectionProps = {
+  label: string;
+  children: ReactNode;
 };
 
-const FaceDetailerQualityButtons = memo(({ value, onChange, isDisabled }: FaceDetailerQualityButtonsProps) => {
-  const { t } = useTranslation();
-
-  const onQualityClick = useCallback<MouseEventHandler<HTMLButtonElement>>(
-    (event) => {
-      const quality = event.currentTarget.dataset.quality;
-      if (isInValues(quality, DETAILER_QUALITIES)) {
-        onChange(quality);
-      }
-    },
-    [onChange]
-  );
-
+const FaceDetailerAdvancedSection = memo(({ label, children }: FaceDetailerAdvancedSectionProps) => {
   return (
-    <FormControl isDisabled={isDisabled}>
-      <FormLabel>{t('parameters.faceDetailer.quality')}</FormLabel>
-      <ButtonGroup size="sm" variant="outline" w="full">
-        {DETAILER_QUALITIES.map((quality) => (
-          <Button
-            key={quality}
-            flex={1}
-            minW={0}
-            colorScheme={value === quality ? 'invokeBlue' : undefined}
-            data-quality={quality}
-            onClick={onQualityClick}
-            isDisabled={isDisabled}
-          >
-            {t(`parameters.faceDetailer.qualities.${quality}`)}
-          </Button>
-        ))}
-      </ButtonGroup>
-    </FormControl>
+    <Flex flexDir="column" gap={3}>
+      <Flex alignItems="center" gap={3} color="base.500">
+        <Box as="span" flexShrink={0} fontSize="sm" fontWeight="semibold">
+          {label}
+        </Box>
+        <Box borderTopColor="base.700" borderTopStyle="solid" borderTopWidth={1} flex={1} />
+      </Flex>
+      <FormControlGroup formLabelProps={formLabelProps}>{children}</FormControlGroup>
+    </Flex>
   );
 });
 
+FaceDetailerAdvancedSection.displayName = 'FaceDetailerAdvancedSection';
+
+type FaceDetailerQualityButtonsProps = {
+  value: DetailerQuality;
+  onChange: (value: DetailerQuality) => void;
+  isAdjusted: boolean;
+  isDisabled?: boolean;
+};
+
+const FaceDetailerQualityButtons = memo(
+  ({ value, onChange, isAdjusted, isDisabled }: FaceDetailerQualityButtonsProps) => {
+    const { t } = useTranslation();
+
+    const onQualityClick = useCallback<MouseEventHandler<HTMLButtonElement>>(
+      (event) => {
+        const quality = event.currentTarget.dataset.quality;
+        if (isInValues(quality, DETAILER_QUALITIES)) {
+          onChange(quality);
+        }
+      },
+      [onChange]
+    );
+
+    return (
+      <FormControl isDisabled={isDisabled}>
+        <FormLabel>
+          <Flex alignItems="center" gap={2}>
+            <FaceDetailerLabelText label={t('parameters.faceDetailer.quality')} popoverFeature="detailerQuality" />
+            {isAdjusted && (
+              <Box as="span" color="invokeBlue.300" fontSize="xs" fontWeight="semibold">
+                {t('parameters.faceDetailer.adjusted')}
+              </Box>
+            )}
+          </Flex>
+        </FormLabel>
+        <ButtonGroup size="sm" variant="outline" w="full">
+          {DETAILER_QUALITIES.map((quality) => {
+            const label = t(`parameters.faceDetailer.qualities.${quality}`);
+
+            return (
+              <Button
+                key={quality}
+                flex={1}
+                minW={0}
+                colorScheme={value === quality ? 'invokeBlue' : undefined}
+                data-quality={quality}
+                onClick={onQualityClick}
+                isDisabled={isDisabled}
+              >
+                {label}
+              </Button>
+            );
+          })}
+        </ButtonGroup>
+      </FormControl>
+    );
+  }
+);
+
 FaceDetailerQualityButtons.displayName = 'FaceDetailerQualityButtons';
+
+type FaceDetailerEffectiveProfileSummaryProps = {
+  runtimeConfig: GroundedSamDetailerRuntimeConfig;
+  isDisabled?: boolean;
+};
+
+const FaceDetailerEffectiveProfileSummary = memo(
+  ({ runtimeConfig, isDisabled }: FaceDetailerEffectiveProfileSummaryProps) => {
+    const { t } = useTranslation();
+
+    if (runtimeConfig.targetProfile !== 'person') {
+      return null;
+    }
+
+    return (
+      <FormControl isDisabled={isDisabled}>
+        <FormLabel>{t('parameters.faceDetailer.effectiveProfile')}</FormLabel>
+        <Flex
+          alignItems="center"
+          gap={2}
+          bg="base.800"
+          borderColor="base.700"
+          borderRadius="base"
+          borderStyle="solid"
+          borderWidth={1}
+          color="base.300"
+          fontSize="sm"
+          lineHeight="short"
+          minH={10}
+          px={3}
+          py={2}
+        >
+          <Box as="span" color="invokeBlue.300" fontWeight="semibold">
+            {t('parameters.faceDetailer.bodyProfileActive')}
+          </Box>
+        </Flex>
+      </FormControl>
+    );
+  }
+);
+
+FaceDetailerEffectiveProfileSummary.displayName = 'FaceDetailerEffectiveProfileSummary';
 
 export const FaceDetailerSettingsAccordion = memo(() => {
   const dispatch = useAppDispatch();
@@ -503,6 +690,7 @@ export const FaceDetailerSettingsAccordion = memo(() => {
   const modelSupportsFaceDetailer = useAppSelector(selectModelSupportsFaceDetailer);
   const detailerEnabled = useAppSelector(selectDetailerEnabled);
   const detailerDetector = useAppSelector(selectDetailerDetector);
+  const detailerDebugEnabled = useAppSelector(selectDetailerDebugEnabled);
   const detailerQuality = useAppSelector(selectDetailerQuality);
   const detailerFaceSelection = useAppSelector(selectDetailerFaceSelection);
   const detailerDinoModel = useAppSelector(selectDetailerDinoModel);
@@ -526,6 +714,81 @@ export const FaceDetailerSettingsAccordion = memo(() => {
   const detailerMaskBlur = useAppSelector(selectDetailerMaskBlur);
   const detailerTargetPrompt = useAppSelector(selectDetailerTargetPrompt);
   const isGroundedSam = detailerDetector === 'grounding-dino-sam';
+  const isDetailerQualityAdjusted = useMemo(
+    () =>
+      isDetailerQualityPresetAdjusted({
+        detailerQuality,
+        detailerTargetSize,
+        detailerMaxUpscale,
+        detailerMaxProcessSize,
+        detailerCropPadding,
+        detailerStrength,
+        detailerSteps,
+        detailerCfgScale,
+        detailerDenoiseMaskFeather,
+        detailerPasteMaskExpand,
+        detailerPasteMaskFeather,
+        detailerSamModel,
+      }),
+    [
+      detailerCfgScale,
+      detailerCropPadding,
+      detailerDenoiseMaskFeather,
+      detailerMaxProcessSize,
+      detailerMaxUpscale,
+      detailerPasteMaskExpand,
+      detailerPasteMaskFeather,
+      detailerQuality,
+      detailerSamModel,
+      detailerSteps,
+      detailerStrength,
+      detailerTargetSize,
+    ]
+  );
+  const detailerRuntimeConfig = useMemo(
+    () =>
+      getGroundedSamDetailerRuntimeConfig(
+        {
+          detailerQuality,
+          detailerTargetSize,
+          detailerMaxUpscale,
+          detailerMaxProcessSize,
+          detailerDenoiseMaskExpand,
+          detailerDenoiseMaskFeather,
+          detailerPasteMaskExpand,
+          detailerPasteMaskFeather,
+          detailerCfgScale,
+          detailerSteps,
+          detailerStrength,
+        },
+        detailerTargetPrompt
+      ),
+    [
+      detailerCfgScale,
+      detailerDenoiseMaskExpand,
+      detailerDenoiseMaskFeather,
+      detailerMaxProcessSize,
+      detailerMaxUpscale,
+      detailerPasteMaskExpand,
+      detailerPasteMaskFeather,
+      detailerQuality,
+      detailerSteps,
+      detailerStrength,
+      detailerTargetPrompt,
+      detailerTargetSize,
+    ]
+  );
+  const shouldShowEffectiveValues = isGroundedSam && detailerRuntimeConfig.targetProfile === 'person';
+  const getEffectiveValueLabel = useCallback(
+    (storedValue: number, effectiveValue: number) => {
+      if (!shouldShowEffectiveValues || storedValue === effectiveValue) {
+        return;
+      }
+
+      return t('parameters.faceDetailer.effectiveValue', { value: formatEffectiveValue(effectiveValue) });
+    },
+    [shouldShowEffectiveValues, t]
+  );
 
   const detectorOptions = useMemo<ComboboxOption[]>(
     () => [
@@ -574,6 +837,22 @@ export const FaceDetailerSettingsAccordion = memo(() => {
     defaultIsOpen: false,
   });
   const hasDeveloperOptions = import.meta.env.MODE === 'development';
+  useEffect(() => {
+    if (!hasDeveloperOptions && detailerDetector !== DETAILER_SUPPORTED_DETECTOR) {
+      dispatch(setDetailerDetector(DETAILER_SUPPORTED_DETECTOR));
+    }
+  }, [detailerDetector, dispatch, hasDeveloperOptions]);
+  const detailerTargetBadge = useMemo(() => {
+    const preset = DETAILER_TARGET_PRESETS.find(({ prompt }) => prompt === detailerTargetPrompt);
+    return preset ? t(preset.labelKey) : t('parameters.faceDetailer.targetPresets.custom');
+  }, [detailerTargetPrompt, t]);
+  const detailerBadges = useMemo(
+    () =>
+      detailerEnabled
+        ? [t('common.on'), detailerTargetBadge, t(`parameters.faceDetailer.qualities.${detailerQuality}`)]
+        : EMPTY_ARRAY,
+    [detailerEnabled, detailerQuality, detailerTargetBadge, t]
+  );
 
   const onEnabledChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
@@ -589,11 +868,19 @@ export const FaceDetailerSettingsAccordion = memo(() => {
     },
     [dispatch]
   );
-  const onQualityButtonChange = useCallback(
-    (quality: DetailerQuality) => {
-      dispatch(setDetailerQuality(quality));
+  const onDebugEnabledChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setDetailerDebugEnabled(event.target.checked));
     },
     [dispatch]
+  );
+  const onQualityButtonChange = useCallback(
+    (quality: DetailerQuality) => {
+      if (quality !== detailerQuality) {
+        dispatch(setDetailerQuality(quality));
+      }
+    },
+    [detailerQuality, dispatch]
   );
   const onTargetPromptChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
@@ -673,13 +960,13 @@ export const FaceDetailerSettingsAccordion = memo(() => {
   return (
     <StandaloneAccordion
       label={t('accordions.faceDetailer.title')}
-      badges={detailerEnabled ? [t('common.on')] : EMPTY_ARRAY}
+      badges={detailerBadges}
       isOpen={isOpen}
       onToggle={onToggle}
     >
       <Box px={4} pt={4} pb={0} data-testid="face-detailer-settings-accordion">
         <Flex gap={4} flexDir="column" pb={0}>
-          <FormControlGroup formLabelProps={compactFormLabelProps}>
+          <FormControlGroup formLabelProps={formLabelProps}>
             <FormControl w="min-content">
               <FormLabel>{t('parameters.faceDetailer.enabled')}</FormLabel>
               <Switch isChecked={detailerEnabled} onChange={onEnabledChange} />
@@ -693,6 +980,7 @@ export const FaceDetailerSettingsAccordion = memo(() => {
                     aria-label={t('parameters.faceDetailer.targetPrompt')}
                     value={detailerTargetPrompt}
                     onChange={onTargetPromptChange}
+                    {...customTargetInputStyleProps}
                   />
                 }
                 isDisabled={!detailerEnabled}
@@ -701,11 +989,20 @@ export const FaceDetailerSettingsAccordion = memo(() => {
             <FaceDetailerQualityButtons
               value={detailerQuality}
               onChange={onQualityButtonChange}
+              isAdjusted={isDetailerQualityAdjusted}
               isDisabled={!detailerEnabled}
             />
+            {isGroundedSam && (
+              <FaceDetailerEffectiveProfileSummary
+                runtimeConfig={detailerRuntimeConfig}
+                isDisabled={!detailerEnabled}
+              />
+            )}
             <FaceDetailerNumberParam
               label={t('parameters.faceDetailer.strength')}
+              popoverFeature="detailerDenoisingStrength"
               value={detailerStrength}
+              effectiveValueLabel={getEffectiveValueLabel(detailerStrength, detailerRuntimeConfig.strength)}
               defaultValue={STRENGTH_CONSTRAINTS.initial}
               sliderMin={STRENGTH_CONSTRAINTS.sliderMin}
               sliderMax={STRENGTH_CONSTRAINTS.sliderMax}
@@ -718,7 +1015,9 @@ export const FaceDetailerSettingsAccordion = memo(() => {
             />
             <FaceDetailerNumberParam
               label={t('parameters.faceDetailer.steps')}
+              popoverFeature="detailerSteps"
               value={detailerSteps}
+              effectiveValueLabel={getEffectiveValueLabel(detailerSteps, detailerRuntimeConfig.steps)}
               defaultValue={STEPS_CONSTRAINTS.initial}
               sliderMin={STEPS_CONSTRAINTS.sliderMin}
               sliderMax={STEPS_CONSTRAINTS.sliderMax}
@@ -733,11 +1032,12 @@ export const FaceDetailerSettingsAccordion = memo(() => {
         </Flex>
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenAdvanced} onToggle={onToggleAdvanced}>
           <Flex gap={4} flexDir="column" pb={hasDeveloperOptions ? 0 : 4}>
-            <FormControlGroup formLabelProps={formLabelProps}>
-              {isGroundedSam && (
-                <>
+            {isGroundedSam && (
+              <>
+                <FaceDetailerAdvancedSection label={t('parameters.faceDetailer.advancedGroups.detection')}>
                   <FaceDetailerSelectParam
                     label={t('parameters.faceDetailer.faceSelection')}
+                    popoverFeature="detailerTargetSelection"
                     value={detailerFaceSelection}
                     options={faceSelectionOptions}
                     onChange={onFaceSelectionChange}
@@ -746,6 +1046,7 @@ export const FaceDetailerSettingsAccordion = memo(() => {
                   {detailerFaceSelection === 'index' && (
                     <FaceDetailerNumberParam
                       label={t('parameters.faceDetailer.faceId')}
+                      popoverFeature="detailerTargetId"
                       value={detailerFaceId}
                       defaultValue={FACE_ID_CONSTRAINTS.initial}
                       sliderMin={FACE_ID_CONSTRAINTS.sliderMin}
@@ -760,6 +1061,7 @@ export const FaceDetailerSettingsAccordion = memo(() => {
                   )}
                   <FaceDetailerNumberParam
                     label={t('parameters.faceDetailer.detectionThreshold')}
+                    popoverFeature="detailerDetectionThreshold"
                     value={detailerDetectionThreshold}
                     defaultValue={CONFIDENCE_CONSTRAINTS.initial}
                     sliderMin={CONFIDENCE_CONSTRAINTS.sliderMin}
@@ -771,9 +1073,29 @@ export const FaceDetailerSettingsAccordion = memo(() => {
                     onChange={onDetectionThresholdChange}
                     isDisabled={!detailerEnabled}
                   />
+                  <FaceDetailerSelectParam
+                    label={t('parameters.faceDetailer.detectorModel')}
+                    popoverFeature="detailerDinoModel"
+                    value={detailerDinoModel}
+                    options={dinoModelOptions}
+                    onChange={onDinoModelChange}
+                    isDisabled={!detailerEnabled}
+                  />
+                  <FaceDetailerSelectParam
+                    label={t('parameters.faceDetailer.samModel')}
+                    popoverFeature="detailerSamModel"
+                    value={detailerSamModel}
+                    options={samModelOptions}
+                    onChange={onSamModelChange}
+                    isDisabled={!detailerEnabled}
+                  />
+                </FaceDetailerAdvancedSection>
+                <FaceDetailerAdvancedSection label={t('parameters.faceDetailer.advancedGroups.cropScale')}>
                   <FaceDetailerNumberParam
                     label={t('parameters.faceDetailer.targetSize')}
+                    popoverFeature="detailerTargetSize"
                     value={detailerTargetSize}
+                    effectiveValueLabel={getEffectiveValueLabel(detailerTargetSize, detailerRuntimeConfig.targetSize)}
                     defaultValue={TARGET_SIZE_CONSTRAINTS.initial}
                     sliderMin={TARGET_SIZE_CONSTRAINTS.sliderMin}
                     sliderMax={TARGET_SIZE_CONSTRAINTS.sliderMax}
@@ -786,7 +1108,9 @@ export const FaceDetailerSettingsAccordion = memo(() => {
                   />
                   <FaceDetailerNumberParam
                     label={t('parameters.faceDetailer.maxUpscale')}
+                    popoverFeature="detailerMaxUpscale"
                     value={detailerMaxUpscale}
+                    effectiveValueLabel={getEffectiveValueLabel(detailerMaxUpscale, detailerRuntimeConfig.maxUpscale)}
                     defaultValue={MAX_UPSCALE_CONSTRAINTS.initial}
                     sliderMin={MAX_UPSCALE_CONSTRAINTS.sliderMin}
                     sliderMax={MAX_UPSCALE_CONSTRAINTS.sliderMax}
@@ -799,7 +1123,12 @@ export const FaceDetailerSettingsAccordion = memo(() => {
                   />
                   <FaceDetailerNumberParam
                     label={t('parameters.faceDetailer.maxProcessSize')}
+                    popoverFeature="detailerMaxProcess"
                     value={detailerMaxProcessSize}
+                    effectiveValueLabel={getEffectiveValueLabel(
+                      detailerMaxProcessSize,
+                      detailerRuntimeConfig.maxProcessSize
+                    )}
                     defaultValue={MAX_PROCESS_SIZE_CONSTRAINTS.initial}
                     sliderMin={MAX_PROCESS_SIZE_CONSTRAINTS.sliderMin}
                     sliderMax={MAX_PROCESS_SIZE_CONSTRAINTS.sliderMax}
@@ -812,6 +1141,7 @@ export const FaceDetailerSettingsAccordion = memo(() => {
                   />
                   <FaceDetailerNumberParam
                     label={t('parameters.faceDetailer.cropPadding')}
+                    popoverFeature="detailerCropPadding"
                     value={detailerCropPadding}
                     defaultValue={CROP_PADDING_CONSTRAINTS.initial}
                     sliderMin={CROP_PADDING_CONSTRAINTS.sliderMin}
@@ -823,9 +1153,16 @@ export const FaceDetailerSettingsAccordion = memo(() => {
                     onChange={onCropPaddingChange}
                     isDisabled={!detailerEnabled}
                   />
+                </FaceDetailerAdvancedSection>
+                <FaceDetailerAdvancedSection label={t('parameters.faceDetailer.advancedGroups.masksPaste')}>
                   <FaceDetailerNumberParam
                     label={t('parameters.faceDetailer.denoiseMaskExpand')}
+                    popoverFeature="detailerDenoiseMaskExpand"
                     value={detailerDenoiseMaskExpand}
+                    effectiveValueLabel={getEffectiveValueLabel(
+                      detailerDenoiseMaskExpand,
+                      detailerRuntimeConfig.denoiseMaskExpand
+                    )}
                     defaultValue={DENOISE_MASK_EXPAND_CONSTRAINTS.initial}
                     sliderMin={DENOISE_MASK_EXPAND_CONSTRAINTS.sliderMin}
                     sliderMax={DENOISE_MASK_EXPAND_CONSTRAINTS.sliderMax}
@@ -838,7 +1175,12 @@ export const FaceDetailerSettingsAccordion = memo(() => {
                   />
                   <FaceDetailerNumberParam
                     label={t('parameters.faceDetailer.denoiseMaskFeather')}
+                    popoverFeature="detailerDenoiseMaskFeather"
                     value={detailerDenoiseMaskFeather}
+                    effectiveValueLabel={getEffectiveValueLabel(
+                      detailerDenoiseMaskFeather,
+                      detailerRuntimeConfig.denoiseMaskFeather
+                    )}
                     defaultValue={DENOISE_MASK_FEATHER_CONSTRAINTS.initial}
                     sliderMin={DENOISE_MASK_FEATHER_CONSTRAINTS.sliderMin}
                     sliderMax={DENOISE_MASK_FEATHER_CONSTRAINTS.sliderMax}
@@ -851,7 +1193,12 @@ export const FaceDetailerSettingsAccordion = memo(() => {
                   />
                   <FaceDetailerNumberParam
                     label={t('parameters.faceDetailer.pasteMaskExpand')}
+                    popoverFeature="detailerPasteMaskExpand"
                     value={detailerPasteMaskExpand}
+                    effectiveValueLabel={getEffectiveValueLabel(
+                      detailerPasteMaskExpand,
+                      detailerRuntimeConfig.pasteMaskExpand
+                    )}
                     defaultValue={PASTE_MASK_EXPAND_CONSTRAINTS.initial}
                     sliderMin={PASTE_MASK_EXPAND_CONSTRAINTS.sliderMin}
                     sliderMax={PASTE_MASK_EXPAND_CONSTRAINTS.sliderMax}
@@ -864,7 +1211,12 @@ export const FaceDetailerSettingsAccordion = memo(() => {
                   />
                   <FaceDetailerNumberParam
                     label={t('parameters.faceDetailer.pasteMaskFeather')}
+                    popoverFeature="detailerPasteMaskFeather"
                     value={detailerPasteMaskFeather}
+                    effectiveValueLabel={getEffectiveValueLabel(
+                      detailerPasteMaskFeather,
+                      detailerRuntimeConfig.pasteMaskFeather
+                    )}
                     defaultValue={PASTE_MASK_FEATHER_CONSTRAINTS.initial}
                     sliderMin={PASTE_MASK_FEATHER_CONSTRAINTS.sliderMin}
                     sliderMax={PASTE_MASK_FEATHER_CONSTRAINTS.sliderMax}
@@ -877,16 +1229,21 @@ export const FaceDetailerSettingsAccordion = memo(() => {
                   />
                   <FaceDetailerSelectParam
                     label={t('parameters.faceDetailer.colorCorrectMode')}
+                    popoverFeature="detailerColorMatch"
                     value={detailerColorCorrectMode}
                     options={colorCorrectModeOptions}
                     onChange={onColorCorrectModeChange}
                     isDisabled={!detailerEnabled}
                   />
-                </>
-              )}
+                </FaceDetailerAdvancedSection>
+              </>
+            )}
+            <FaceDetailerAdvancedSection label={t('parameters.faceDetailer.advancedGroups.denoise')}>
               <FaceDetailerNumberParam
                 label={t('parameters.faceDetailer.cfgScale')}
+                popoverFeature="detailerCfgScale"
                 value={detailerCfgScale}
+                effectiveValueLabel={getEffectiveValueLabel(detailerCfgScale, detailerRuntimeConfig.cfgScale)}
                 defaultValue={CFG_SCALE_CONSTRAINTS.initial}
                 sliderMin={CFG_SCALE_CONSTRAINTS.sliderMin}
                 sliderMax={CFG_SCALE_CONSTRAINTS.sliderMax}
@@ -897,7 +1254,7 @@ export const FaceDetailerSettingsAccordion = memo(() => {
                 onChange={onCfgScaleChange}
                 isDisabled={!detailerEnabled}
               />
-            </FormControlGroup>
+            </FaceDetailerAdvancedSection>
             {hasDeveloperOptions && (
               <Expander
                 label={t('parameters.faceDetailer.developerOptions')}
@@ -906,35 +1263,40 @@ export const FaceDetailerSettingsAccordion = memo(() => {
               >
                 <Flex gap={4} flexDir="column" pb={4}>
                   <FormControlGroup formLabelProps={formLabelProps}>
+                    <FormControl isDisabled={!detailerEnabled || !isGroundedSam} w="min-content">
+                      <FormLabel>{t('parameters.faceDetailer.debugOutput')}</FormLabel>
+                      <Switch isChecked={detailerDebugEnabled} onChange={onDebugEnabledChange} />
+                    </FormControl>
                     <FaceDetailerSelectParam
                       label={t('parameters.faceDetailer.detector')}
+                      popoverFeature="detailerDetector"
                       value={detailerDetector}
                       options={detectorOptions}
                       onChange={onDetectorChange}
                       isDisabled={!detailerEnabled}
                     />
-                    {isGroundedSam && (
-                      <>
-                        <FaceDetailerSelectParam
-                          label={t('parameters.faceDetailer.detectorModel')}
-                          value={detailerDinoModel}
-                          options={dinoModelOptions}
-                          onChange={onDinoModelChange}
-                          isDisabled={!detailerEnabled}
-                        />
-                        <FaceDetailerSelectParam
-                          label={t('parameters.faceDetailer.samModel')}
-                          value={detailerSamModel}
-                          options={samModelOptions}
-                          onChange={onSamModelChange}
-                          isDisabled={!detailerEnabled}
-                        />
-                      </>
-                    )}
                     {!isGroundedSam && (
                       <>
+                        <FormControl isDisabled={!detailerEnabled}>
+                          <FormLabel>{t('parameters.faceDetailer.legacyDetector')}</FormLabel>
+                          <Box
+                            bg="base.800"
+                            borderColor="base.700"
+                            borderRadius="base"
+                            borderStyle="solid"
+                            borderWidth={1}
+                            color="base.300"
+                            fontSize="sm"
+                            lineHeight="short"
+                            px={3}
+                            py={2}
+                          >
+                            {t('parameters.faceDetailer.mediapipeLegacyWarning')}
+                          </Box>
+                        </FormControl>
                         <FaceDetailerNumberParam
                           label={t('parameters.faceDetailer.faceId')}
+                          popoverFeature="detailerTargetId"
                           value={detailerFaceId}
                           defaultValue={FACE_ID_CONSTRAINTS.initial}
                           sliderMin={FACE_ID_CONSTRAINTS.sliderMin}
@@ -948,6 +1310,7 @@ export const FaceDetailerSettingsAccordion = memo(() => {
                         />
                         <FaceDetailerNumberParam
                           label={t('parameters.faceDetailer.minConfidence')}
+                          popoverFeature="detailerMediapipeConfidence"
                           value={detailerMinConfidence}
                           defaultValue={CONFIDENCE_CONSTRAINTS.initial}
                           sliderMin={CONFIDENCE_CONSTRAINTS.sliderMin}
@@ -961,6 +1324,7 @@ export const FaceDetailerSettingsAccordion = memo(() => {
                         />
                         <FaceDetailerNumberParam
                           label={t('parameters.faceDetailer.padding')}
+                          popoverFeature="detailerMediapipePadding"
                           value={detailerPadding}
                           defaultValue={PADDING_CONSTRAINTS.initial}
                           sliderMin={PADDING_CONSTRAINTS.sliderMin}
@@ -974,6 +1338,7 @@ export const FaceDetailerSettingsAccordion = memo(() => {
                         />
                         <FaceDetailerNumberParam
                           label={t('parameters.faceDetailer.maskBlur')}
+                          popoverFeature="detailerMediapipeMaskBlur"
                           value={detailerMaskBlur}
                           defaultValue={MASK_BLUR_CONSTRAINTS.initial}
                           sliderMin={MASK_BLUR_CONSTRAINTS.sliderMin}
