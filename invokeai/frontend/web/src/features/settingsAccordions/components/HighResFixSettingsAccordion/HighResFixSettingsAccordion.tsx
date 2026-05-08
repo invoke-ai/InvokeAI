@@ -241,7 +241,7 @@ const ParamHrfEnabled = memo(() => {
 
   return (
     <FormControl>
-      <InformationalPopover feature="paramHrf">
+      <InformationalPopover feature="hrfEnabled">
         <FormLabel m={0}>{t('hrf.enableHrf')}</FormLabel>
       </InformationalPopover>
       <Switch aria-label={t('hrf.enableUpscale')} isChecked={enabled} onChange={onChange} />
@@ -266,7 +266,7 @@ const ParamHrfMethod = memo(({ isDisabled = false }: DisabledProps) => {
 
   return (
     <FormControl>
-      <InformationalPopover feature="paramUpscaleMethod">
+      <InformationalPopover feature="hrfMethod">
         <FormLabel>{t('hrf.upscaleMethod')}</FormLabel>
       </InformationalPopover>
       <ButtonGroup size="sm" variant="outline" w="full">
@@ -309,7 +309,7 @@ const ParamHrfScale = memo(({ isDisabled = false }: DisabledProps) => {
 
   return (
     <FormControl>
-      <InformationalPopover feature="scale">
+      <InformationalPopover feature="hrfScale">
         <FormLabel>{t('hrf.scale')}</FormLabel>
       </InformationalPopover>
       <CompositeSlider
@@ -353,7 +353,7 @@ const ParamHrfStrength = memo(({ isDisabled = false }: DisabledProps) => {
 
   return (
     <FormControl>
-      <InformationalPopover feature="paramDenoisingStrength">
+      <InformationalPopover feature="hrfDenoisingStrength">
         <FormLabel>{t('hrf.strength')}</FormLabel>
       </InformationalPopover>
       <CompositeSlider
@@ -414,7 +414,7 @@ const ParamHrfLatentInterpolationMode = memo(({ isDisabled = false }: DisabledPr
 
   return (
     <FormControl>
-      <InformationalPopover feature="paramUpscaleMethod">
+      <InformationalPopover feature="hrfLatentInterpolation">
         <FormLabel>{t('hrf.latentInterpolationMode')}</FormLabel>
       </InformationalPopover>
       <Combobox value={value} options={options} onChange={onChange} isDisabled={isDisabled} />
@@ -453,7 +453,7 @@ const ParamHrfUpscaleModel = memo(({ isDisabled = false }: DisabledProps) => {
 
   return (
     <FormControl isDisabled={isDisabled}>
-      <InformationalPopover feature="upscaleModel">
+      <InformationalPopover feature="hrfUpscaleModel">
         <FormLabel>{t('upscaling.upscaleModel')}</FormLabel>
       </InformationalPopover>
       <Flex w="full" alignItems="center" gap={2}>
@@ -515,7 +515,7 @@ const ParamHrfTileControlNetModel = memo(({ isDisabled = false }: DisabledProps)
 
   return (
     <FormControl isDisabled={isDisabled || isMissingModel} isInvalid={isInvalid} minW={0} flexGrow={1} gap={2}>
-      <InformationalPopover feature="controlNet">
+      <InformationalPopover feature="hrfTileControl">
         <FormLabel m={0}>{t('upscaling.tileControl')}</FormLabel>
       </InformationalPopover>
       <ModelPicker
@@ -549,7 +549,7 @@ const ParamHrfTileControlWeight = memo(({ isDisabled = false }: DisabledProps) =
 
   return (
     <FormControl>
-      <InformationalPopover feature="controlNet">
+      <InformationalPopover feature="hrfTileControlWeight">
         <FormLabel>{t('hrf.tileControlWeight')}</FormLabel>
       </InformationalPopover>
       <CompositeSlider
@@ -597,7 +597,7 @@ const ParamHrfTileControlEnd = memo(({ isDisabled = false }: DisabledProps) => {
 
   return (
     <FormControl>
-      <InformationalPopover feature="paramDenoisingStrength">
+      <InformationalPopover feature="hrfTileControlEnd">
         <FormLabel>{t('hrf.tileControlEnd')}</FormLabel>
       </InformationalPopover>
       <CompositeSlider
@@ -645,7 +645,7 @@ const ParamHrfTileSize = memo(({ isDisabled = false }: DisabledProps) => {
 
   return (
     <FormControl>
-      <InformationalPopover feature="tileSize">
+      <InformationalPopover feature="hrfTileSize">
         <FormLabel>{t('upscaling.tileSize')}</FormLabel>
       </InformationalPopover>
       <CompositeSlider
@@ -689,7 +689,7 @@ const ParamHrfTileOverlap = memo(({ isDisabled = false }: DisabledProps) => {
 
   return (
     <FormControl>
-      <InformationalPopover feature="tileOverlap">
+      <InformationalPopover feature="hrfTileOverlap">
         <FormLabel>{t('upscaling.tileOverlap')}</FormLabel>
       </InformationalPopover>
       <CompositeSlider
@@ -747,7 +747,7 @@ const ParamHrfSteps = memo(({ isDisabled = false }: DisabledProps) => {
 
   return (
     <FormControl>
-      <InformationalPopover feature="paramSteps">
+      <InformationalPopover feature="hrfSteps">
         <FormLabel>{t('hrf.steps')}</FormLabel>
       </InformationalPopover>
       <Flex alignItems="center" minW={0} flex={1}>
@@ -796,7 +796,7 @@ const ParamHrfModel = memo(({ isDisabled = false }: DisabledProps) => {
 
   return (
     <FormControl isDisabled={isDisabled}>
-      <InformationalPopover feature="paramModel">
+      <InformationalPopover feature="hrfModel">
         <FormLabel>{t('hrf.model')}</FormLabel>
       </InformationalPopover>
       <ModelPicker
@@ -835,7 +835,7 @@ const ParamHrfLoraMode = memo(({ isDisabled = false }: DisabledProps) => {
 
   return (
     <FormControl>
-      <InformationalPopover feature="lora">
+      <InformationalPopover feature="hrfLoraMode">
         <FormLabel>{t('hrf.loraMode')}</FormLabel>
       </InformationalPopover>
       <ButtonGroup size="sm" variant="outline" w="full">
@@ -918,7 +918,7 @@ const ParamHrfLoraSelect = memo(({ isDisabled = false }: DisabledProps) => {
 
   return (
     <FormControl gap={2} isDisabled={isDisabled}>
-      <InformationalPopover feature="lora">
+      <InformationalPopover feature="hrfLoraSelect">
         <FormLabel>{t('hrf.dedicatedLoras')}</FormLabel>
       </InformationalPopover>
       <ModelPicker
@@ -1010,7 +1010,7 @@ const HrfLoRAContent = memo(({ lora, isDisabled = false }: { lora: LoRA } & Disa
           </Flex>
         </Flex>
       </CardHeader>
-      <InformationalPopover feature="loraWeight">
+      <InformationalPopover feature="hrfLoraWeight">
         <CardBody>
           <CompositeSlider
             value={lora.weight}
