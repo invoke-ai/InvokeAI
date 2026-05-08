@@ -499,8 +499,15 @@ const Scheduler: SingleMetadataHandler<ParameterScheduler> = {
         store.dispatch(setZImageScheduler(value));
       }
     } else if (base === 'anima') {
-      // Anima supports euler, heun, lcm
-      if (value === 'euler' || value === 'heun' || value === 'lcm') {
+      // Anima supports euler, heun, dpmpp_2m, dpmpp_2m_sde, er_sde, lcm
+      if (
+        value === 'euler' ||
+        value === 'heun' ||
+        value === 'dpmpp_2m' ||
+        value === 'dpmpp_2m_sde' ||
+        value === 'er_sde' ||
+        value === 'lcm'
+      ) {
         store.dispatch(setAnimaScheduler(value));
       }
     } else {
