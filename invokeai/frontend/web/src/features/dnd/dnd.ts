@@ -97,6 +97,16 @@ export const multipleImageDndSource: DndSource<MultipleImageDndSourceData> = {
 };
 //#endregion
 
+//#region Single Reference Image (reorder)
+const _singleRefImage = buildTypeAndKey('single-ref-image');
+type SingleRefImageDndSourceData = DndData<typeof _singleRefImage.type, typeof _singleRefImage.key, { id: string }>;
+export const singleRefImageDndSource: DndSource<SingleRefImageDndSourceData> = {
+  ..._singleRefImage,
+  typeGuard: buildTypeGuard(_singleRefImage.key),
+  getData: buildGetData(_singleRefImage.key, _singleRefImage.type),
+};
+//#endregion
+
 const _singleCanvasEntity = buildTypeAndKey('single-canvas-entity');
 type SingleCanvasEntityDndSourceData = DndData<
   typeof _singleCanvasEntity.type,

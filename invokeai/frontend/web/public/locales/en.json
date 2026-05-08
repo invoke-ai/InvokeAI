@@ -387,7 +387,12 @@
         "expandPromptWithLLM": "Expand Prompt with LLM",
         "expandPrompt": "Expand Prompt",
         "selectTextLLM": "Select Text LLM...",
-        "expand": "Expand"
+        "expand": "Expand",
+        "noTextLLMInstalledTitle": "No Text LLM installed",
+        "noTextLLMInstalledDescription": "Prompt expansion needs a Text LLM (causal language model). We recommend Qwen2.5-1.5B-Instruct (~3 GB) — small, fast, and available as a starter model.",
+        "noVisionModelInstalledTitle": "No vision model installed",
+        "noVisionModelInstalledDescription": "Image-to-prompt needs a vision-language model (e.g. LLaVA Onevision). The 0.5B starter (~1 GB) is the lightweight default.",
+        "openModelManager": "Open Model Manager"
     },
     "queue": {
         "queue": "Queue",
@@ -770,6 +775,14 @@
                 "title": "Reset Layer",
                 "desc": "Reset the selected layer. Only applies to Inpaint Mask and Regional Guidance."
             },
+            "mergeDown": {
+                "title": "Merge Layer Down",
+                "desc": "Merge the selected layer into the layer directly below it."
+            },
+            "mergeVisible": {
+                "title": "Merge All Visible Layers",
+                "desc": "Merge all visible layers of the selected layer type."
+            },
             "undo": {
                 "title": "Undo",
                 "desc": "Undo the last canvas action."
@@ -1008,6 +1021,8 @@
         "openaiQuality": "OpenAI Quality",
         "openaiBackground": "OpenAI Background",
         "openaiInputFidelity": "OpenAI Input Fidelity",
+        "seedreamWatermark": "Seedream Watermark",
+        "seedreamOptimizePrompt": "Seedream Optimize Prompt",
         "guidance": "Guidance",
         "height": "Height",
         "imageDetails": "Image Details",
@@ -1141,7 +1156,7 @@
         "externalApiKey": "API Key",
         "externalApiKeyPlaceholder": "Paste your API key",
         "externalApiKeyPlaceholderSet": "API key configured",
-        "externalApiKeyHelper": "Stored in your InvokeAI config file.",
+        "externalApiKeyHelper": "Stored in api_keys.yaml in your InvokeAI root directory.",
         "externalBaseUrl": "Base URL (optional)",
         "externalBaseUrlPlaceholder": "https://...",
         "externalBaseUrlHelper": "Override the default API base URL if needed.",
@@ -1323,6 +1338,7 @@
         "typePhraseHere": "Type phrase here",
         "t5Encoder": "T5 Encoder",
         "qwen3Encoder": "Qwen3 Encoder",
+        "qwenVLEncoder": "Qwen2.5-VL Encoder",
         "animaVae": "VAE",
         "animaVaePlaceholder": "Select Anima-compatible VAE",
         "animaQwen3Encoder": "Qwen3 0.6B Encoder",
@@ -1342,7 +1358,11 @@
         "flux2KleinQwen3EncoderPlaceholder": "From diffusers model",
         "flux2KleinQwen3EncoderNoModelPlaceholder": "No diffusers model available",
         "qwenImageComponentSource": "VAE/Encoder Source (Diffusers)",
-        "qwenImageComponentSourcePlaceholder": "Required for GGUF models",
+        "qwenImageComponentSourcePlaceholder": "GGUF models require this unless a standalone VAE & Encoder is installed",
+        "qwenImageVae": "VAE",
+        "qwenImageVaePlaceholder": "From VAE/Encoder Source",
+        "qwenImageQwenVLEncoder": "Qwen2.5-VL Encoder",
+        "qwenImageQwenVLEncoderPlaceholder": "From VAE/Encoder Source",
         "qwenImageQuantization": "Encoder Quantization",
         "qwenImageQuantizationNone": "None (bf16)",
         "qwenImageQuantizationInt8": "8-bit (int8)",
