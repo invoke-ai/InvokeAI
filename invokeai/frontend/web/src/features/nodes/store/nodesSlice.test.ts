@@ -19,6 +19,22 @@ const buildFixedConnectorNode = (id: string) => {
 };
 
 describe('nodesSlice connector actions', () => {
+  it('removes an unconnected connector', () => {
+    const connector = buildFixedConnectorNode('connector-1');
+
+    const initialState = deepClone(nodesSliceConfig.slice.reducer(undefined, { type: 'test/init' }));
+    initialState.nodes = [connector];
+    initialState.edges = [];
+
+    const nextState = nodesSliceConfig.slice.reducer(
+      initialState,
+      nodesChanged([{ type: 'remove', id: connector.id }])
+    );
+
+    expect(nextState.nodes).toEqual([]);
+    expect(nextState.edges).toEqual([]);
+  });
+
   it('splits a direct edge into source -> connector -> target edges when inserting a connector', () => {
     const source = buildNode(add);
     const target = buildNode(sub);

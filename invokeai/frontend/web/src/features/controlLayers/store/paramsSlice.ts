@@ -265,6 +265,23 @@ const slice = createSlice({
       }
       state.qwenImageComponentSource = result.data;
     },
+    qwenImageVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      const result = zParamsState.shape.qwenImageVaeModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.qwenImageVaeModel = result.data;
+    },
+    qwenImageQwenVLEncoderModelSelected: (
+      state,
+      action: PayloadAction<{ key: string; name: string; base: string } | null>
+    ) => {
+      const result = zParamsState.shape.qwenImageQwenVLEncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.qwenImageQwenVLEncoderModel = result.data;
+    },
     qwenImageQuantizationChanged: (state, action: PayloadAction<'none' | 'int8' | 'nf4'>) => {
       state.qwenImageQuantization = action.payload;
     },
@@ -500,6 +517,15 @@ const slice = createSlice({
     geminiTemperatureChanged: (state, action: PayloadAction<number | null>) => {
       state.geminiTemperature = action.payload;
     },
+    geminiThinkingLevelChanged: (state, action: PayloadAction<'minimal' | 'high' | null>) => {
+      state.geminiThinkingLevel = action.payload;
+    },
+    seedreamWatermarkChanged: (state, action: PayloadAction<boolean>) => {
+      state.seedreamWatermark = action.payload;
+    },
+    seedreamOptimizePromptChanged: (state, action: PayloadAction<boolean>) => {
+      state.seedreamOptimizePrompt = action.payload;
+    },
     resolutionPresetSelected: (
       state,
       action: PayloadAction<{ imageSize: string; aspectRatio: string; width: number; height: number }>
@@ -577,6 +603,8 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.kleinVaeModel = oldState.kleinVaeModel;
   newState.kleinQwen3EncoderModel = oldState.kleinQwen3EncoderModel;
   newState.qwenImageComponentSource = oldState.qwenImageComponentSource;
+  newState.qwenImageVaeModel = oldState.qwenImageVaeModel;
+  newState.qwenImageQwenVLEncoderModel = oldState.qwenImageQwenVLEncoderModel;
   newState.qwenImageQuantization = oldState.qwenImageQuantization;
   newState.qwenImageShift = oldState.qwenImageShift;
   return newState;
@@ -627,6 +655,8 @@ export const {
   kleinVaeModelSelected,
   kleinQwen3EncoderModelSelected,
   qwenImageComponentSourceSelected,
+  qwenImageVaeModelSelected,
+  qwenImageQwenVLEncoderModelSelected,
   qwenImageQuantizationChanged,
   qwenImageShiftChanged,
   setClipSkip,
@@ -663,6 +693,9 @@ export const {
   openaiBackgroundChanged,
   openaiInputFidelityChanged,
   geminiTemperatureChanged,
+  geminiThinkingLevelChanged,
+  seedreamWatermarkChanged,
+  seedreamOptimizePromptChanged,
   paramsRecalled,
   animaVaeModelSelected,
   animaQwen3EncoderModelSelected,
@@ -689,6 +722,13 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         // v1 -> v2, add positive prompt history
         state._version = 2;
         state.positivePromptHistory = [];
+      }
+
+      if (state._version === 2) {
+        // v2 -> v3, add standalone Qwen Image VAE and Qwen VL encoder fields
+        state._version = 3;
+        state.qwenImageVaeModel = null;
+        state.qwenImageQwenVLEncoderModel = null;
       }
 
       return zParamsState.parse(state);
@@ -736,6 +776,8 @@ export const selectAnimaScheduler = createParamsSelector((params) => params.anim
 export const selectKleinVaeModel = createParamsSelector((params) => params.kleinVaeModel);
 export const selectKleinQwen3EncoderModel = createParamsSelector((params) => params.kleinQwen3EncoderModel);
 export const selectQwenImageComponentSource = createParamsSelector((params) => params.qwenImageComponentSource);
+export const selectQwenImageVaeModel = createParamsSelector((params) => params.qwenImageVaeModel);
+export const selectQwenImageQwenVLEncoderModel = createParamsSelector((params) => params.qwenImageQwenVLEncoderModel);
 export const selectQwenImageQuantization = createParamsSelector((params) => params.qwenImageQuantization);
 export const selectQwenImageShift = createParamsSelector((params) => params.qwenImageShift);
 
@@ -917,6 +959,9 @@ export const selectOpenaiQuality = createParamsSelector((params) => params.opena
 export const selectOpenaiBackground = createParamsSelector((params) => params.openaiBackground);
 export const selectOpenaiInputFidelity = createParamsSelector((params) => params.openaiInputFidelity);
 export const selectGeminiTemperature = createParamsSelector((params) => params.geminiTemperature);
+export const selectGeminiThinkingLevel = createParamsSelector((params) => params.geminiThinkingLevel);
+export const selectSeedreamWatermark = createParamsSelector((params) => params.seedreamWatermark);
+export const selectSeedreamOptimizePrompt = createParamsSelector((params) => params.seedreamOptimizePrompt);
 export const selectExternalProviderId = createSelector(selectModelConfig, (modelConfig) => {
   if (modelConfig && isExternalApiModelConfig(modelConfig)) {
     return modelConfig.provider_id;
