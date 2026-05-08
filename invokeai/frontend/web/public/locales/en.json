@@ -2325,7 +2325,7 @@
             "heading": "Refinement LoRAs",
             "paragraphs": [
                 "Controls which LoRAs are applied during the Upscale refinement pass.",
-                "Reuse applies the Generate LoRAs again. None disables LoRAs for refinement. Dedicated lets you select LoRAs used only for refinement."
+                "Reuse applies the base generation LoRAs again. None disables LoRAs for refinement. Dedicated lets you select LoRAs used only for refinement."
             ]
         },
         "hrfLoraSelect": {
