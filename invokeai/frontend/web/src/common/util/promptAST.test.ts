@@ -70,6 +70,18 @@ describe('promptAST', () => {
       ]);
     });
 
+    it('should not tokenize hyphenated words as weights', () => {
+      const tokens = tokenize('dance-more rose-');
+      expect(tokens).toEqual([
+        { type: 'word', value: 'dance', start: 0, end: 5 },
+        { type: 'word', value: '-', start: 5, end: 6 },
+        { type: 'word', value: 'more', start: 6, end: 10 },
+        { type: 'whitespace', value: ' ', start: 10, end: 11 },
+        { type: 'word', value: 'rose', start: 11, end: 15 },
+        { type: 'weight', value: '-', start: 15, end: 16 },
+      ]);
+    });
+
     it('should tokenize embeddings', () => {
       const tokens = tokenize('<embedding_name>');
       expect(tokens).toEqual([
@@ -198,6 +210,17 @@ describe('promptAST', () => {
       const tokens = tokenize('cat+');
       const ast = parseTokens(tokens);
       expect(ast).toEqual([{ type: 'word', text: 'cat', attention: '+', range: { start: 0, end: 4 } }]);
+    });
+
+    it('should parse hyphenated words without attention', () => {
+      const ast = parseTokens(tokenize('dance-more rose-'));
+      expect(ast).toEqual([
+        { type: 'word', text: 'dance', range: { start: 0, end: 5 }, attention: undefined },
+        { type: 'word', text: '-', range: { start: 5, end: 6 }, attention: undefined },
+        { type: 'word', text: 'more', range: { start: 6, end: 10 }, attention: undefined },
+        { type: 'whitespace', value: ' ', range: { start: 10, end: 11 } },
+        { type: 'word', text: 'rose', attention: '-', range: { start: 11, end: 16 } },
+      ]);
     });
 
     it('should parse embeddings', () => {

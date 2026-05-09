@@ -52,7 +52,7 @@ type PromptInspectorProps = {
   setFixedValueElement: (index: number, element: HTMLElement | null) => void;
 };
 
-const ROW_GRID_TEMPLATE = '2.75rem minmax(0, 1fr) minmax(6.75rem, 7.5rem) 2.5rem 2.25rem';
+const ROW_GRID_TEMPLATE = '2rem minmax(0, 1fr) minmax(5.75rem, 6.25rem) 2rem 1.75rem';
 const INTENT_CARD_BG = 'linear-gradient(180deg, rgba(25, 35, 45, 0.94) 0%, rgba(17, 26, 35, 0.96) 100%)';
 const INTENT_CARD_HOVER_BG = 'linear-gradient(180deg, rgba(29, 41, 53, 0.98) 0%, rgba(20, 31, 41, 0.98) 100%)';
 const INTENT_CARD_BORDER = 'rgba(126, 143, 164, 0.3)';
@@ -79,8 +79,8 @@ export const PromptInspector = memo(
     }
 
     return (
-      <Flex flexDir="column" gap={1.5} data-testid="prompt-workbench-inspector">
-        <Flex flexDir="column" gap={1.5}>
+      <Flex flexDir="column" gap={1} data-testid="prompt-workbench-inspector">
+        <Flex flexDir="column" gap={1}>
           {occurrences.map((occurrence) =>
             occurrence.type === 'wildcard' ? (
               <WildcardInspectorRow
@@ -162,7 +162,7 @@ const WildcardInspectorRow = memo(
           display="grid"
           gridTemplateColumns={ROW_GRID_TEMPLATE}
           alignItems="stretch"
-          minH={16}
+          minH={12}
           role="group"
           aria-label={t('promptWorkbench.rows.wildcardIntentAria', { path: occurrence.path })}
         >
@@ -175,7 +175,7 @@ const WildcardInspectorRow = memo(
                 justifyContent="flex-start"
                 minW={0}
                 h="auto"
-                minH={6}
+                minH={5}
                 px={0}
                 py={0}
                 _hover={{ bg: 'transparent' }}
@@ -213,7 +213,7 @@ const WildcardInspectorRow = memo(
           </ActionsCell>
         </Box>
         {(fixedValues || isFetchingFixedValues) && (
-          <Flex flexDir="column" ms={12} me={2} mb={2} gap={0.5} maxH={36} overflowY="auto">
+          <Flex flexDir="column" ms={8} me={1.5} mb={1.5} gap={0.5} maxH={28} overflowY="auto">
             {isFetchingFixedValues && (
               <Text fontSize="sm" color="base.400">
                 {t('promptWorkbench.values.loading')}
@@ -299,10 +299,10 @@ const WildcardBehaviorControl = memo(
             as={Button}
             size="sm"
             variant="outline"
-            h={8}
+            h={7}
             minW={0}
             w="full"
-            px={2}
+            px={1.5}
             rightIcon={<PiCaretDownBold />}
             onMouseDown={onButtonMouseDown}
           >
@@ -361,8 +361,8 @@ const WildcardActionsMenu = memo(
           tooltip={t('promptWorkbench.actions.wildcardActions')}
           size="sm"
           variant="ghost"
-          minW={7}
-          h={7}
+          minW={6}
+          h={6}
           color="base.300"
           icon={<PiDotsThreeVerticalBold />}
           onMouseDown={onButtonMouseDown}
@@ -414,12 +414,12 @@ const FixedValueButton = memo(
         size="sm"
         variant="ghost"
         justifyContent="flex-start"
-        h={8}
-        px={3}
+        h={7}
+        px={2}
         bg={isActive ? 'base.700' : undefined}
         onMouseDown={onMouseDown}
       >
-        <Text as="span" noOfLines={1} fontSize="sm">
+        <Text as="span" noOfLines={1} fontSize="xs">
           {value}
         </Text>
       </Button>
@@ -455,7 +455,7 @@ const WeightInspectorRow = memo(({ occurrence, onSelectRange, onRemoveWeightOccu
         display="grid"
         gridTemplateColumns={ROW_GRID_TEMPLATE}
         alignItems="stretch"
-        minH={16}
+        minH={12}
         role="group"
         aria-label={t('promptWorkbench.rows.weightIntentAria', { text: occurrence.text })}
       >
@@ -468,7 +468,7 @@ const WeightInspectorRow = memo(({ occurrence, onSelectRange, onRemoveWeightOccu
               justifyContent="flex-start"
               minW={0}
               h="auto"
-              minH={6}
+              minH={5}
               px={0}
               py={0}
               _hover={{ bg: 'transparent' }}
@@ -514,8 +514,8 @@ const WeightActionsMenu = memo(
           tooltip={t('promptWorkbench.actions.weightActions')}
           size="sm"
           variant="ghost"
-          minW={7}
-          h={7}
+          minW={6}
+          h={6}
           color="base.300"
           icon={<PiDotsThreeVerticalBold />}
           onMouseDown={onButtonMouseDown}
@@ -541,7 +541,7 @@ const WeightValue = memo(({ occurrence }: { occurrence: PromptWeightOccurrence }
     <Tooltip label={t(behaviorLabel.key, behaviorLabel.options)}>
       <Text
         color={occurrence.isSupported ? 'base.100' : 'warning.300'}
-        fontSize="md"
+        fontSize="sm"
         fontWeight="semibold"
         lineHeight="short"
         noOfLines={1}
@@ -555,7 +555,7 @@ const WeightValue = memo(({ occurrence }: { occurrence: PromptWeightOccurrence }
 WeightValue.displayName = 'WeightValue';
 
 const TypeCell = memo(({ color, icon }: { color: string; icon: ReactElement }) => (
-  <Flex alignItems="center" justifyContent="center" color={color} fontSize="1.2rem" minW={0}>
+  <Flex alignItems="center" justifyContent="center" color={color} fontSize="1rem" minW={0}>
     {icon}
   </Flex>
 ));
@@ -563,7 +563,7 @@ const TypeCell = memo(({ color, icon }: { color: string; icon: ReactElement }) =
 TypeCell.displayName = 'TypeCell';
 
 const LabelCell = memo(({ children }: { children: ReactNode }) => (
-  <Flex flexDir="column" justifyContent="center" gap={0.5} minW={0} pe={2}>
+  <Flex flexDir="column" justifyContent="center" gap={0.25} minW={0} pe={1.5}>
     {children}
   </Flex>
 ));
@@ -571,7 +571,7 @@ const LabelCell = memo(({ children }: { children: ReactNode }) => (
 LabelCell.displayName = 'LabelCell';
 
 const BehaviorCell = memo(({ children }: { children: ReactNode }) => (
-  <Flex alignItems="center" justifyContent="center" minW={0} px={1}>
+  <Flex alignItems="center" justifyContent="center" minW={0} px={0.5}>
     {children}
   </Flex>
 ));
@@ -579,7 +579,7 @@ const BehaviorCell = memo(({ children }: { children: ReactNode }) => (
 BehaviorCell.displayName = 'BehaviorCell';
 
 const WeightCell = memo(({ children }: { children: ReactNode }) => (
-  <Flex alignItems="center" justifyContent="center" minW={0} px={1} borderLeftWidth={1} borderLeftColor="base.700">
+  <Flex alignItems="center" justifyContent="center" minW={0} px={0.5} borderLeftWidth={1} borderLeftColor="base.700">
     {children}
   </Flex>
 ));
@@ -587,7 +587,7 @@ const WeightCell = memo(({ children }: { children: ReactNode }) => (
 WeightCell.displayName = 'WeightCell';
 
 const ActionsCell = memo(({ children }: { children: ReactNode }) => (
-  <Flex alignItems="center" justifyContent="center" minW={0} px={1} borderLeftWidth={1} borderLeftColor="base.700">
+  <Flex alignItems="center" justifyContent="center" minW={0} px={0.5} borderLeftWidth={1} borderLeftColor="base.700">
     {children}
   </Flex>
 ));

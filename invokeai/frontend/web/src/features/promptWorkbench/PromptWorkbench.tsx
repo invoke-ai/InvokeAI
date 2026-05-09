@@ -811,17 +811,47 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
           bg={PROMPT_INTENT_PANEL_BG}
           boxShadow="0 1px 0 rgba(255, 255, 255, 0.025) inset"
           overflow="hidden"
-          p={2}
+          p={1.5}
           data-testid="prompt-intent-panel"
         >
-          <Flex alignItems="center" gap={2} mb={2}>
-            <Flex alignItems="center" gap={2} minW={0} flexShrink={0}>
-              <Box as={PiCubeBold} color="base.300" fontSize="1.05rem" />
+          <Flex flexDir="column" gap={1} mb={1.5}>
+            <Flex alignItems="center" gap={1.5} minW={0}>
+              <Box as={PiCubeBold} color="base.300" fontSize="0.95rem" flexShrink={0} />
               <Text color="base.100" fontSize="sm" fontWeight="semibold" lineHeight="short" noOfLines={1}>
                 {t('promptWorkbench.panel.title')}
               </Text>
+              {canShowWeightControls && (
+                <Flex gap={1} ms="auto">
+                  <Tooltip label={t(capabilities.attentionWeightsLabelKey)}>
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      minW={6}
+                      h={6}
+                      isDisabled={!canAdjustSelectionWeight}
+                      onMouseDown={onDecrementMouseDown}
+                      onClick={onDecrementClick}
+                    >
+                      -
+                    </Button>
+                  </Tooltip>
+                  <Tooltip label={t(capabilities.attentionWeightsLabelKey)}>
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      minW={6}
+                      h={6}
+                      isDisabled={!canAdjustSelectionWeight}
+                      onMouseDown={onIncrementMouseDown}
+                      onClick={onIncrementClick}
+                    >
+                      +
+                    </Button>
+                  </Tooltip>
+                </Flex>
+              )}
             </Flex>
-            <Flex gap={1} alignItems="center" justifyContent="flex-end" flexWrap="wrap" ms="auto" minW={0}>
+            <Flex gap={1} alignItems="center" flexWrap="wrap" minW={0}>
               {diagnostics.map((diagnostic) =>
                 diagnostic.code === 'dynamic-active' && hasRandomWildcardOccurrences ? (
                   <Menu key={diagnostic.code}>
@@ -878,36 +908,6 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
                     </PromptWorkbenchBadge>
                   </Tooltip>
                 )
-              )}
-              {canShowWeightControls && (
-                <Flex gap={1} ps={1}>
-                  <Tooltip label={t(capabilities.attentionWeightsLabelKey)}>
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      minW={7}
-                      h={7}
-                      isDisabled={!canAdjustSelectionWeight}
-                      onMouseDown={onDecrementMouseDown}
-                      onClick={onDecrementClick}
-                    >
-                      -
-                    </Button>
-                  </Tooltip>
-                  <Tooltip label={t(capabilities.attentionWeightsLabelKey)}>
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      minW={7}
-                      h={7}
-                      isDisabled={!canAdjustSelectionWeight}
-                      onMouseDown={onIncrementMouseDown}
-                      onClick={onIncrementClick}
-                    >
-                      +
-                    </Button>
-                  </Tooltip>
-                </Flex>
               )}
             </Flex>
           </Flex>

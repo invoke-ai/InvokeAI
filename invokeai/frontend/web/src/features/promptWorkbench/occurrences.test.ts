@@ -155,6 +155,12 @@ describe('prompt workbench occurrences', () => {
     ]);
   });
 
+  it('does not report hyphenated words as prompt weights', () => {
+    expect(getPromptWeightOccurrences({ prompt: 'dance-more, rose-', supportsAttentionWeights: true })).toMatchObject([
+      { type: 'weight', text: 'rose-', attention: '-' },
+    ]);
+  });
+
   it('returns mixed prompt workbench occurrences in prompt order', () => {
     expect(
       getPromptWorkbenchOccurrences({
