@@ -18,8 +18,10 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { positivePromptChanged, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
+import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
 import { setPromptUndo } from 'features/prompt/promptUndo';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImageBold } from 'react-icons/pi';
@@ -45,6 +47,8 @@ export const ImageToPromptButton = memo(({ droppedImage, onClearDroppedImage }: 
   const [selectedModel, setSelectedModel] = useState<AnyModelConfig | undefined>(undefined);
   const [uploadedImage, setUploadedImage] = useState<ImageDTO | undefined>(undefined);
   const [imageToPrompt, { isLoading }] = useImageToPromptMutation();
+
+  const hasModels = modelConfigs.length > 0;
 
   const handleModelChange = useCallback((model: AnyModelConfig) => {
     setSelectedModel(model);
@@ -93,10 +97,11 @@ export const ImageToPromptButton = memo(({ droppedImage, onClearDroppedImage }: 
     setUploadedImage(undefined);
   }, [popover]);
 
-  // Don't render if no LLaVA models are installed
-  if (modelConfigs.length === 0) {
-    return null;
-  }
+  const handleOpenModelManager = useCallback(() => {
+    handleClose();
+    navigationApi.switchToTab('models');
+    setInstallModelsTabByName('starterModels');
+  }, [handleClose]);
 
   return (
     <Popover
@@ -109,7 +114,7 @@ export const ImageToPromptButton = memo(({ droppedImage, onClearDroppedImage }: 
     >
       <PopoverTrigger>
         <span>
-          <Tooltip label={t('prompt.imageToPrompt')}>
+          <Tooltip label={hasModels ? t('prompt.imageToPrompt') : t('prompt.noVisionModelInstalledTitle')}>
             <IconButton
               size="sm"
               variant="promptOverlay"
@@ -125,42 +130,56 @@ export const ImageToPromptButton = memo(({ droppedImage, onClearDroppedImage }: 
         <PopoverContent p={3} w={350}>
           <PopoverArrow />
           <PopoverBody p={0}>
-            <Flex flexDir="column" gap={3}>
-              <Text fontWeight="semibold" fontSize="sm">
-                {t('prompt.imageToPrompt')}
-              </Text>
-              <ModelPicker
-                pickerId="image-to-prompt-model"
-                modelConfigs={modelConfigs}
-                selectedModelConfig={selectedModel}
-                onChange={handleModelChange}
-                placeholder={t('prompt.selectVisionModel')}
-              />
-              <Flex gap={2} alignItems="center">
-                <Button size="sm" variant="outline" flexGrow={1} {...getUploadButtonProps()}>
-                  {uploadedImage ? t('prompt.changeImage') : t('prompt.uploadImage')}
+            {hasModels ? (
+              <Flex flexDir="column" gap={3}>
+                <Text fontWeight="semibold" fontSize="sm">
+                  {t('prompt.imageToPrompt')}
+                </Text>
+                <ModelPicker
+                  pickerId="image-to-prompt-model"
+                  modelConfigs={modelConfigs}
+                  selectedModelConfig={selectedModel}
+                  onChange={handleModelChange}
+                  placeholder={t('prompt.selectVisionModel')}
+                />
+                <Flex gap={2} alignItems="center">
+                  <Button size="sm" variant="outline" flexGrow={1} {...getUploadButtonProps()}>
+                    {uploadedImage ? t('prompt.changeImage') : t('prompt.uploadImage')}
+                  </Button>
+                  <input {...getUploadInputProps()} />
+                  {uploadedImage && (
+                    <Image
+                      src={uploadedImage.image_url}
+                      alt="Uploaded"
+                      boxSize={10}
+                      objectFit="cover"
+                      borderRadius="base"
+                    />
+                  )}
+                </Flex>
+                <Button
+                  size="sm"
+                  colorScheme="invokeBlue"
+                  onClick={handleGenerate}
+                  isLoading={isLoading}
+                  isDisabled={!selectedModel || !uploadedImage}
+                >
+                  {t('prompt.generatePrompt')}
                 </Button>
-                <input {...getUploadInputProps()} />
-                {uploadedImage && (
-                  <Image
-                    src={uploadedImage.image_url}
-                    alt="Uploaded"
-                    boxSize={10}
-                    objectFit="cover"
-                    borderRadius="base"
-                  />
-                )}
               </Flex>
-              <Button
-                size="sm"
-                colorScheme="invokeBlue"
-                onClick={handleGenerate}
-                isLoading={isLoading}
-                isDisabled={!selectedModel || !uploadedImage}
-              >
-                {t('prompt.generatePrompt')}
-              </Button>
-            </Flex>
+            ) : (
+              <Flex flexDir="column" gap={3}>
+                <Text fontWeight="semibold" fontSize="sm">
+                  {t('prompt.noVisionModelInstalledTitle')}
+                </Text>
+                <Text fontSize="sm" color="base.300">
+                  {t('prompt.noVisionModelInstalledDescription')}
+                </Text>
+                <Button size="sm" colorScheme="invokeBlue" onClick={handleOpenModelManager}>
+                  {t('prompt.openModelManager')}
+                </Button>
+              </Flex>
+            )}
           </PopoverBody>
         </PopoverContent>
       </Portal>

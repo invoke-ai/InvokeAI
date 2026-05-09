@@ -16,8 +16,10 @@ import {
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { positivePromptChanged, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
+import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
 import { setPromptUndo } from 'features/prompt/promptUndo';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiSparkleBold } from 'react-icons/pi';
@@ -37,6 +39,8 @@ export const ExpandPromptButton = memo(() => {
   const popover = useDisclosure(false);
   const [selectedModel, setSelectedModel] = useState<AnyModelConfig | undefined>(undefined);
   const [expandPrompt, { isLoading }] = useExpandPromptMutation();
+
+  const hasModels = modelConfigs.length > 0;
 
   const handleModelChange = useCallback((model: AnyModelConfig) => {
     setSelectedModel(model);
@@ -61,10 +65,11 @@ export const ExpandPromptButton = memo(() => {
     }
   }, [selectedModel, prompt, expandPrompt, dispatch, popover]);
 
-  // Don't render if no TextLLM models are installed
-  if (modelConfigs.length === 0) {
-    return null;
-  }
+  const handleOpenModelManager = useCallback(() => {
+    popover.close();
+    navigationApi.switchToTab('models');
+    setInstallModelsTabByName('starterModels');
+  }, [popover]);
 
   return (
     <Popover
@@ -77,14 +82,14 @@ export const ExpandPromptButton = memo(() => {
     >
       <PopoverTrigger>
         <span>
-          <Tooltip label={t('prompt.expandPromptWithLLM')}>
+          <Tooltip label={hasModels ? t('prompt.expandPromptWithLLM') : t('prompt.noTextLLMInstalledTitle')}>
             <IconButton
               size="sm"
               variant="promptOverlay"
               aria-label={t('prompt.expandPromptWithLLM')}
               icon={<PiSparkleBold />}
               sx={isLoading ? loadingStyles : undefined}
-              isDisabled={isLoading || !prompt.trim()}
+              isDisabled={isLoading || (hasModels && !prompt.trim())}
             />
           </Tooltip>
         </span>
@@ -93,27 +98,41 @@ export const ExpandPromptButton = memo(() => {
         <PopoverContent p={3} w={350}>
           <PopoverArrow />
           <PopoverBody p={0}>
-            <Flex flexDir="column" gap={3}>
-              <Text fontWeight="semibold" fontSize="sm">
-                {t('prompt.expandPrompt')}
-              </Text>
-              <ModelPicker
-                pickerId="expand-prompt-model"
-                modelConfigs={modelConfigs}
-                selectedModelConfig={selectedModel}
-                onChange={handleModelChange}
-                placeholder={t('prompt.selectTextLLM')}
-              />
-              <Button
-                size="sm"
-                colorScheme="invokeBlue"
-                onClick={handleExpand}
-                isLoading={isLoading}
-                isDisabled={!selectedModel || !prompt.trim()}
-              >
-                {t('prompt.expand')}
-              </Button>
-            </Flex>
+            {hasModels ? (
+              <Flex flexDir="column" gap={3}>
+                <Text fontWeight="semibold" fontSize="sm">
+                  {t('prompt.expandPrompt')}
+                </Text>
+                <ModelPicker
+                  pickerId="expand-prompt-model"
+                  modelConfigs={modelConfigs}
+                  selectedModelConfig={selectedModel}
+                  onChange={handleModelChange}
+                  placeholder={t('prompt.selectTextLLM')}
+                />
+                <Button
+                  size="sm"
+                  colorScheme="invokeBlue"
+                  onClick={handleExpand}
+                  isLoading={isLoading}
+                  isDisabled={!selectedModel || !prompt.trim()}
+                >
+                  {t('prompt.expand')}
+                </Button>
+              </Flex>
+            ) : (
+              <Flex flexDir="column" gap={3}>
+                <Text fontWeight="semibold" fontSize="sm">
+                  {t('prompt.noTextLLMInstalledTitle')}
+                </Text>
+                <Text fontSize="sm" color="base.300">
+                  {t('prompt.noTextLLMInstalledDescription')}
+                </Text>
+                <Button size="sm" colorScheme="invokeBlue" onClick={handleOpenModelManager}>
+                  {t('prompt.openModelManager')}
+                </Button>
+              </Flex>
+            )}
           </PopoverBody>
         </PopoverContent>
       </Portal>
