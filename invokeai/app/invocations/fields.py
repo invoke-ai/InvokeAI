@@ -229,6 +229,7 @@ class FieldDescriptions:
     instantx_control_mode = "The control mode for InstantX ControlNet union models. Ignored for other ControlNet models. The standard mapping is: canny (0), tile (1), depth (2), blur (3), pose (4), gray (5), low quality (6). Negative values will be treated as 'None'."
     flux_redux_conditioning = "FLUX Redux conditioning tensor"
     vllm_model = "The VLLM model to use"
+    text_llm_model = "The text language model to use for text generation"
     flux_fill_conditioning = "FLUX Fill conditioning tensor"
     flux_kontext_conditioning = "FLUX Kontext conditioning (reference image)"
 

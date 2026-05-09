@@ -53,8 +53,8 @@ from invokeai.backend.util.devices import TorchDevice
     "flux2_denoise",
     title="FLUX2 Denoise",
     tags=["image", "flux", "flux2", "klein", "denoise"],
-    category="latents",
-    version="1.4.0",
+    category="image",
+    version="1.5.0",
     classification=Classification.Prototype,
 )
 class Flux2DenoiseInvocation(BaseInvocation):
@@ -100,6 +100,14 @@ class Flux2DenoiseInvocation(BaseInvocation):
         default=None,
         description="Negative conditioning tensor. Can be None if cfg_scale is 1.0.",
         input=Input.Connection,
+    )
+    guidance: float = InputField(
+        default=4.0,
+        ge=0,
+        le=20,
+        description="Guidance strength for distilled guidance-embedding models. "
+        "Inert for all current FLUX.2 Klein variants (their guidance_embeds weights are absent/zero); "
+        "kept for node-graph compatibility and future guidance-embedded models.",
     )
     cfg_scale: float = InputField(
         default=1.0,
@@ -467,6 +475,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 txt_ids=txt_ids,
                 timesteps=timesteps,
                 step_callback=self._build_step_callback(context),
+                guidance=self.guidance,
                 cfg_scale=cfg_scale_list,
                 neg_txt=neg_txt,
                 neg_txt_ids=neg_txt_ids,

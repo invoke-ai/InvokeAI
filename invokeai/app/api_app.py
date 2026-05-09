@@ -21,6 +21,7 @@ from invokeai.app.api.routers import (
     board_images,
     boards,
     client_state,
+    custom_nodes,
     download_queue,
     images,
     model_manager,
@@ -29,6 +30,7 @@ from invokeai.app.api.routers import (
     session_queue,
     style_presets,
     utilities,
+    virtual_boards,
     workflows,
 )
 from invokeai.app.api.sockets import SocketIO
@@ -177,6 +179,7 @@ app.include_router(download_queue.download_queue_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
 app.include_router(boards.boards_router, prefix="/api")
 app.include_router(board_images.board_images_router, prefix="/api")
+app.include_router(virtual_boards.virtual_boards_router, prefix="/api")
 app.include_router(model_relationships.model_relationships_router, prefix="/api")
 app.include_router(app_info.app_router, prefix="/api")
 app.include_router(session_queue.session_queue_router, prefix="/api")
@@ -184,6 +187,7 @@ app.include_router(workflows.workflows_router, prefix="/api")
 app.include_router(style_presets.style_presets_router, prefix="/api")
 app.include_router(client_state.client_state_router, prefix="/api")
 app.include_router(recall_parameters.recall_parameters_router, prefix="/api")
+app.include_router(custom_nodes.custom_nodes_router, prefix="/api")
 
 app.openapi = get_openapi_func(app)
 

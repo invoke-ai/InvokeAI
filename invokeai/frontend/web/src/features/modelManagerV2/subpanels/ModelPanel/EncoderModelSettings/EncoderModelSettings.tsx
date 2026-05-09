@@ -19,6 +19,7 @@ import type {
   Qwen3EncoderModelConfig,
   SigLIPModelConfig,
   T5EncoderModelConfig,
+  TextLLMModelConfig,
 } from 'services/api/types';
 
 export type EncoderModelSettingsFormData = {
@@ -31,7 +32,8 @@ type EncoderModelConfig =
   | Qwen3EncoderModelConfig
   | CLIPVisionModelConfig
   | SigLIPModelConfig
-  | LlavaOnevisionModelConfig;
+  | LlavaOnevisionModelConfig
+  | TextLLMModelConfig;
 
 type Props = {
   modelConfig: EncoderModelConfig;

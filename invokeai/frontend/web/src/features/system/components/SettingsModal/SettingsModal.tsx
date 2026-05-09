@@ -28,6 +28,7 @@ import { useRefreshAfterResetModal } from 'features/system/components/SettingsMo
 import { SettingsDeveloperLogIsEnabled } from 'features/system/components/SettingsModal/SettingsDeveloperLogIsEnabled';
 import { SettingsDeveloperLogLevel } from 'features/system/components/SettingsModal/SettingsDeveloperLogLevel';
 import { SettingsDeveloperLogNamespaces } from 'features/system/components/SettingsModal/SettingsDeveloperLogNamespaces';
+import { SettingsImageSubfolderStrategySelect } from 'features/system/components/SettingsModal/SettingsImageSubfolderStrategySelect';
 import { useClearIntermediates } from 'features/system/components/SettingsModal/useClearIntermediates';
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
 import {
@@ -319,6 +320,7 @@ const SettingsModal = (props: { children: ReactElement }) => {
                         <NumberInputField onKeyDown={handleKeyDownMaxQueueHistory} />
                       </NumberInput>
                     </FormControl>
+                    <SettingsImageSubfolderStrategySelect />
                   </StickyScrollable>
 
                   <StickyScrollable title={t('settings.models')}>

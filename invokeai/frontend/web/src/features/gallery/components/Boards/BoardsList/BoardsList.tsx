@@ -14,6 +14,7 @@ import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import AddBoardButton from './AddBoardButton';
 import GalleryBoard from './GalleryBoard';
 import NoBoardBoard from './NoBoardBoard';
+import { VirtualBoardSection } from './VirtualBoardSection';
 
 export const BoardsList = memo(() => {
   const { t } = useTranslation();
@@ -40,6 +41,7 @@ export const BoardsList = memo(() => {
 
     if (!boardSearchText.length) {
       elements.push(<NoBoardBoard key="none" isSelected={selectedBoardId === 'none'} />);
+      elements.push(<VirtualBoardSection key="virtual-boards" />);
     }
 
     filteredBoards.forEach((board) => {

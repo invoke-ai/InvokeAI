@@ -13,6 +13,7 @@ import {
 import BoardAutoAddSelect from 'features/gallery/components/Boards/BoardAutoAddSelect';
 import AutoAssignBoardCheckbox from 'features/gallery/components/GallerySettingsPopover/AutoAssignBoardCheckbox';
 import ShowArchivedBoardsCheckbox from 'features/gallery/components/GallerySettingsPopover/ShowArchivedBoardsCheckbox';
+import ShowVirtualBoardsCheckbox from 'features/gallery/components/GallerySettingsPopover/ShowVirtualBoardsCheckbox';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiGearSixFill } from 'react-icons/pi';
@@ -47,6 +48,7 @@ export const BoardsSettingsPopover = memo(() => {
 
               <AutoAssignBoardCheckbox />
               <ShowArchivedBoardsCheckbox />
+              <ShowVirtualBoardsCheckbox />
               <BoardAutoAddSelect />
 
               <Divider />
