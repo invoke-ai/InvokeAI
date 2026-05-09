@@ -34,8 +34,7 @@ export default defineConfig({
         baseUrl: 'https://github.com/invoke-ai/InvokeAI/edit/main/docs',
       },
       head: isGhPages
-        ? []
-        : [
+        ? [
             {
               tag: 'script',
               attrs: {
@@ -48,7 +47,8 @@ export default defineConfig({
               content:
                 'window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};plausible.init()',
             },
-          ],
+          ]
+        : [],
       defaultLocale: 'root',
       locales: {
         root: {
