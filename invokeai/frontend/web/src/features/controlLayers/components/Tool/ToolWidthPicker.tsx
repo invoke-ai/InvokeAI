@@ -25,6 +25,7 @@ import {
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import type { FocusEvent, KeyboardEvent, PointerEvent } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
 
 import { useToolIsSelected } from './hooks';
@@ -105,6 +106,7 @@ const DropDownToolWidthPickerComponent = memo(
     onPointerUpCapture,
     onBlur,
   }: ToolWidthPickerComponentProps) => {
+    const { t } = useTranslation();
     const onChangeNumberInput = useCallback(
       (valueAsString: string, valueAsNumber: number) => {
         onChangeInput(valueAsNumber);
@@ -136,7 +138,7 @@ const DropDownToolWidthPickerComponent = memo(
               <NumberInputField _focusVisible={{ zIndex: 0 }} title="" paddingInlineEnd={7} />
               <PopoverTrigger>
                 <IconButton
-                  aria-label="open-slider"
+                  aria-label={t('common.openSlider')}
                   icon={<PiCaretDownBold />}
                   size="sm"
                   variant="link"

@@ -45,6 +45,44 @@ async def set_client_state(
         raise HTTPException(status_code=500, detail="Error setting client state")
 
 
+@client_state_router.get(
+    "/{queue_id}/get_keys_by_prefix",
+    operation_id="get_client_state_keys_by_prefix",
+    response_model=list[str],
+)
+async def get_client_state_keys_by_prefix(
+    current_user: CurrentUserOrDefault,
+    queue_id: str = Path(description="The queue id (ignored, kept for backwards compatibility)"),
+    prefix: str = Query(..., description="Prefix to filter keys by"),
+) -> list[str]:
+    """Gets client state keys matching a prefix for the current user"""
+    try:
+        return ApiDependencies.invoker.services.client_state_persistence.get_keys_by_prefix(
+            current_user.user_id, prefix
+        )
+    except Exception as e:
+        logging.error(f"Error getting client state keys: {e}")
+        raise HTTPException(status_code=500, detail="Error getting client state keys")
+
+
+@client_state_router.post(
+    "/{queue_id}/delete_by_key",
+    operation_id="delete_client_state_by_key",
+    responses={204: {"description": "Client state key deleted"}},
+)
+async def delete_client_state_by_key(
+    current_user: CurrentUserOrDefault,
+    queue_id: str = Path(description="The queue id (ignored, kept for backwards compatibility)"),
+    key: str = Query(..., description="Key to delete"),
+) -> None:
+    """Deletes a specific client state key for the current user"""
+    try:
+        ApiDependencies.invoker.services.client_state_persistence.delete_by_key(current_user.user_id, key)
+    except Exception as e:
+        logging.error(f"Error deleting client state key: {e}")
+        raise HTTPException(status_code=500, detail="Error deleting client state key")
+
+
 @client_state_router.post(
     "/{queue_id}/delete",
     operation_id="delete_client_state",

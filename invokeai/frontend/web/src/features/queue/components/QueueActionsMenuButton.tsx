@@ -34,7 +34,13 @@ export const QueueActionsMenuButton = memo(() => {
   return (
     <>
       <Menu placement="bottom-end" isLazy lazyBehavior="unmount">
-        <MenuButton ref={ref} as={IconButton} size="lg" aria-label="Queue Actions Menu" icon={<PiListBold />} />
+        <MenuButton
+          ref={ref}
+          as={IconButton}
+          size="lg"
+          aria-label={t('queue.queueActionsMenu')}
+          icon={<PiListBold />}
+        />
         <MenuList>
           {(tab === 'canvas' || tab === 'generate') && (
             <MenuGroup title={t('common.new')}>

@@ -10,9 +10,9 @@ export const ToolTextButton = memo(() => {
   const selectText = useSelectTool('text');
 
   return (
-    <Tooltip label={`${t('controlLayers.tool.text', { defaultValue: 'Text' })}`} placement="end">
+    <Tooltip label={`${t('controlLayers.tool.text')}`} placement="end">
       <IconButton
-        aria-label={t('controlLayers.tool.text', { defaultValue: 'Text' })}
+        aria-label={t('controlLayers.tool.text')}
         icon={<PiTextTBold />}
         colorScheme={isSelected ? 'invokeBlue' : 'base'}
         variant="solid"

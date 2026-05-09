@@ -9,6 +9,9 @@ from invokeai.app.util.metaenum import MetaEnum
 
 __workflow_meta_version__ = semver.Version.parse("1.0.0")
 
+WORKFLOW_LIBRARY_DEFAULT_USER_ID = "system"
+"""Default user_id for workflows created in single-user mode or migrated from pre-multiuser databases."""
+
 
 class ExposedField(BaseModel):
     nodeId: str
@@ -26,6 +29,7 @@ class WorkflowRecordOrderBy(str, Enum, metaclass=MetaEnum):
     UpdatedAt = "updated_at"
     OpenedAt = "opened_at"
     Name = "name"
+    IsPublic = "is_public"
 
 
 class WorkflowCategory(str, Enum, metaclass=MetaEnum):
@@ -100,6 +104,8 @@ class WorkflowRecordDTOBase(BaseModel):
     opened_at: Optional[Union[datetime.datetime, str]] = Field(
         default=None, description="The opened timestamp of the workflow."
     )
+    user_id: str = Field(description="The id of the user who owns this workflow.")
+    is_public: bool = Field(description="Whether this workflow is shared with all users.")
 
 
 class WorkflowRecordDTO(WorkflowRecordDTOBase):

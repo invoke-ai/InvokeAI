@@ -12,7 +12,7 @@ import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
-const zOrderBy = z.enum(['opened_at', 'created_at', 'updated_at', 'name']);
+const zOrderBy = z.enum(['opened_at', 'created_at', 'updated_at', 'name', 'is_public']);
 type OrderBy = z.infer<typeof zOrderBy>;
 const isOrderBy = (v: unknown): v is OrderBy => zOrderBy.safeParse(v).success;
 
@@ -32,6 +32,7 @@ export const WorkflowSortControl = () => {
       created_at: t('workflows.created'),
       updated_at: t('workflows.updated'),
       name: t('workflows.name'),
+      is_public: t('workflows.shared'),
     }),
     [t]
   );

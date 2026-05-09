@@ -96,15 +96,18 @@ def denoise(
                 timestep = scheduler.timesteps[step_index]
                 # Convert scheduler timestep (0-1000) to normalized (0-1) for the model
                 t_curr = timestep.item() / scheduler.config.num_train_timesteps
+                dype_sigma = DyPEExtension.resolve_step_sigma(
+                    fallback_sigma=t_curr,
+                    step_index=step_index,
+                    scheduler_sigmas=getattr(scheduler, "sigmas", None),
+                )
                 t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
 
                 # DyPE: Update step state for timestep-dependent scaling
                 if dype_extension is not None and dype_embedder is not None:
                     dype_extension.update_step_state(
                         embedder=dype_embedder,
-                        timestep=t_curr,
-                        timestep_index=user_step,
-                        total_steps=total_steps,
+                        sigma=dype_sigma,
                     )
 
                 # For Heun scheduler, track if we're in first or second order step
@@ -264,9 +267,7 @@ def denoise(
             if dype_extension is not None and dype_embedder is not None:
                 dype_extension.update_step_state(
                     embedder=dype_embedder,
-                    timestep=t_curr,
-                    timestep_index=step_index,
-                    total_steps=total_steps,
+                    sigma=t_curr,
                 )
 
             t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)

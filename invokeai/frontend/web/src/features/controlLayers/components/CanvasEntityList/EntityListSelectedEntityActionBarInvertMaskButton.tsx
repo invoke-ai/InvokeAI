@@ -24,7 +24,7 @@ export const EntityListSelectedEntityActionBarInvertMaskButton = memo(() => {
 
   const label =
     selectedEntityIdentifier.type === 'regional_guidance'
-      ? t('controlLayers.invertRegion', { defaultValue: 'Invert Region' })
+      ? t('controlLayers.invertRegion')
       : t('controlLayers.invertMask');
 
   return (

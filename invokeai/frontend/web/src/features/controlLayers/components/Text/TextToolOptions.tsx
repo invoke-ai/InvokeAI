@@ -94,7 +94,7 @@ const FontSelect = () => {
   return (
     <Flex w="200px" minW="200px" alignItems="center" gap={2}>
       <Text fontSize="sm" lineHeight="1" whiteSpace="nowrap">
-        {t('controlLayers.text.font', { defaultValue: 'Font' })}
+        {t('controlLayers.text.font')}
       </Text>
       <Combobox
         size="sm"
@@ -177,10 +177,10 @@ const FontSizeControl = () => {
   return (
     <Flex w="auto" flexShrink={0} alignItems="center" gap={2}>
       <Text fontSize="sm" lineHeight="1" whiteSpace="nowrap">
-        {t('controlLayers.text.size', { defaultValue: 'Size' })}
+        {t('controlLayers.text.size')}
       </Text>
       <Flex gap={2} alignItems="center">
-        <Tooltip label={t('controlLayers.text.size', { defaultValue: 'Size' })}>
+        <Tooltip label={t('controlLayers.text.size')}>
           <Box w="80px" minW="80px">
             <Popover>
               <PopoverAnchor>
@@ -207,7 +207,7 @@ const FontSizeControl = () => {
                   </Box>
                   <PopoverTrigger>
                     <IconButton
-                      aria-label={t('controlLayers.text.size', { defaultValue: 'Size' })}
+                      aria-label={t('controlLayers.text.size')}
                       icon={<PiCaretDownBold />}
                       size="sm"
                       variant="link"
@@ -249,9 +249,9 @@ const LineHeightSelect = () => {
   const lineHeight = useAppSelector(selectTextLineHeight);
   const lineHeightOptions = useMemo(
     () => [
-      { value: '0.75', label: t('controlLayers.text.lineHeightDense', { defaultValue: 'Dense' }) },
-      { value: '1.0', label: t('controlLayers.text.lineHeightNormal', { defaultValue: 'Normal' }) },
-      { value: '1.25', label: t('controlLayers.text.lineHeightSpacious', { defaultValue: 'Spacious' }) },
+      { value: '0.75', label: t('controlLayers.text.lineHeightDense') },
+      { value: '1.0', label: t('controlLayers.text.lineHeightNormal') },
+      { value: '1.25', label: t('controlLayers.text.lineHeightSpacious') },
     ],
     [t]
   );
@@ -270,9 +270,9 @@ const LineHeightSelect = () => {
   return (
     <Flex w="160px" minW="160px" alignItems="center" gap={2}>
       <Text fontSize="sm" lineHeight="1" whiteSpace="nowrap">
-        {t('controlLayers.text.lineHeight', { defaultValue: 'Spacing' })}
+        {t('controlLayers.text.lineHeight')}
       </Text>
-      <Tooltip label={t('controlLayers.text.lineHeight', { defaultValue: 'Spacing' })}>
+      <Tooltip label={t('controlLayers.text.lineHeight')}>
         <Combobox
           size="sm"
           variant="outline"
@@ -300,36 +300,36 @@ const FormatControls = () => {
 
   return (
     <ButtonGroup isAttached variant="outline" flexShrink={0} size="sm">
-      <Tooltip label={t('controlLayers.text.bold', { defaultValue: 'Bold' })}>
+      <Tooltip label={t('controlLayers.text.bold')}>
         <IconButton
-          aria-label={t('controlLayers.text.bold', { defaultValue: 'Bold' })}
+          aria-label={t('controlLayers.text.bold')}
           isChecked={isBold}
           onClick={handleBoldToggle}
           icon={<PiTextBBold />}
           size="sm"
         />
       </Tooltip>
-      <Tooltip label={t('controlLayers.text.italic', { defaultValue: 'Italic' })}>
+      <Tooltip label={t('controlLayers.text.italic')}>
         <IconButton
-          aria-label={t('controlLayers.text.italic', { defaultValue: 'Italic' })}
+          aria-label={t('controlLayers.text.italic')}
           isChecked={isItalic}
           onClick={handleItalicToggle}
           icon={<PiTextItalicBold />}
           size="sm"
         />
       </Tooltip>
-      <Tooltip label={t('controlLayers.text.underline', { defaultValue: 'Underline' })}>
+      <Tooltip label={t('controlLayers.text.underline')}>
         <IconButton
-          aria-label={t('controlLayers.text.underline', { defaultValue: 'Underline' })}
+          aria-label={t('controlLayers.text.underline')}
           isChecked={isUnderline}
           onClick={handleUnderlineToggle}
           icon={<PiTextUnderlineBold />}
           size="sm"
         />
       </Tooltip>
-      <Tooltip label={t('controlLayers.text.strikethrough', { defaultValue: 'Strikethrough' })}>
+      <Tooltip label={t('controlLayers.text.strikethrough')}>
         <IconButton
-          aria-label={t('controlLayers.text.strikethrough', { defaultValue: 'Strikethrough' })}
+          aria-label={t('controlLayers.text.strikethrough')}
           isChecked={isStrikethrough}
           onClick={handleStrikethroughToggle}
           icon={<PiTextStrikethroughBold />}
@@ -350,27 +350,27 @@ const AlignmentControls = () => {
 
   return (
     <ButtonGroup isAttached variant="outline" flexShrink={0} size="sm">
-      <Tooltip label={t('controlLayers.text.alignLeft', { defaultValue: 'Align Left' })}>
+      <Tooltip label={t('controlLayers.text.alignLeft')}>
         <IconButton
-          aria-label={t('controlLayers.text.alignLeft', { defaultValue: 'Align Left' })}
+          aria-label={t('controlLayers.text.alignLeft')}
           isChecked={alignment === 'left'}
           onClick={handleAlignLeft}
           icon={<PiTextAlignLeftBold />}
           size="sm"
         />
       </Tooltip>
-      <Tooltip label={t('controlLayers.text.alignCenter', { defaultValue: 'Align Center' })}>
+      <Tooltip label={t('controlLayers.text.alignCenter')}>
         <IconButton
-          aria-label={t('controlLayers.text.alignCenter', { defaultValue: 'Align Center' })}
+          aria-label={t('controlLayers.text.alignCenter')}
           isChecked={alignment === 'center'}
           onClick={handleAlignCenter}
           icon={<PiTextAlignCenterBold />}
           size="sm"
         />
       </Tooltip>
-      <Tooltip label={t('controlLayers.text.alignRight', { defaultValue: 'Align Right' })}>
+      <Tooltip label={t('controlLayers.text.alignRight')}>
         <IconButton
-          aria-label={t('controlLayers.text.alignRight', { defaultValue: 'Align Right' })}
+          aria-label={t('controlLayers.text.alignRight')}
           isChecked={alignment === 'right'}
           onClick={handleAlignRight}
           icon={<PiTextAlignRightBold />}

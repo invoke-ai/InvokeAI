@@ -21,6 +21,7 @@ class TokenData(BaseModel):
     user_id: str
     email: str
     is_admin: bool
+    remember_me: bool = False
 
 
 def set_jwt_secret(secret: str) -> None:

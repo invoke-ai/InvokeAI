@@ -457,3 +457,221 @@ def test_enqueue_batch_requires_auth(enable_multiuser_for_tests: Any, client: Te
         },
     )
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+# ---------------------------------------------------------------------------
+# Board visibility tests
+# ---------------------------------------------------------------------------
+
+
+def test_board_created_with_private_visibility(client: TestClient, user1_token: str):
+    """Test that newly created boards default to private visibility."""
+    create = client.post(
+        "/api/v1/boards/?board_name=Visibility+Default+Board",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert create.status_code == status.HTTP_201_CREATED
+    data = create.json()
+    assert data["board_visibility"] == "private"
+
+
+def test_set_board_visibility_shared(client: TestClient, user1_token: str):
+    """Test that the board owner can set their board to shared."""
+    create = client.post(
+        "/api/v1/boards/?board_name=Shared+Board",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert create.status_code == status.HTTP_201_CREATED
+    board_id = create.json()["board_id"]
+
+    response = client.patch(
+        f"/api/v1/boards/{board_id}",
+        json={"board_visibility": "shared"},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.json()["board_visibility"] == "shared"
+
+
+def test_set_board_visibility_public(client: TestClient, user1_token: str):
+    """Test that the board owner can set their board to public."""
+    create = client.post(
+        "/api/v1/boards/?board_name=Public+Board",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert create.status_code == status.HTTP_201_CREATED
+    board_id = create.json()["board_id"]
+
+    response = client.patch(
+        f"/api/v1/boards/{board_id}",
+        json={"board_visibility": "public"},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.json()["board_visibility"] == "public"
+
+
+def test_shared_board_visible_to_other_users(client: TestClient, user1_token: str, user2_token: str):
+    """Test that a shared board is accessible to other authenticated users."""
+    # user1 creates a board and sets it to shared
+    create = client.post(
+        "/api/v1/boards/?board_name=User1+Shared+Board",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert create.status_code == status.HTTP_201_CREATED
+    board_id = create.json()["board_id"]
+
+    client.patch(
+        f"/api/v1/boards/{board_id}",
+        json={"board_visibility": "shared"},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    # user2 should be able to access the shared board
+    response = client.get(
+        f"/api/v1/boards/{board_id}",
+        headers={"Authorization": f"Bearer {user2_token}"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["board_id"] == board_id
+
+
+def test_public_board_visible_to_other_users(client: TestClient, user1_token: str, user2_token: str):
+    """Test that a public board is accessible to other authenticated users."""
+    # user1 creates a board and sets it to public
+    create = client.post(
+        "/api/v1/boards/?board_name=User1+Public+Board",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert create.status_code == status.HTTP_201_CREATED
+    board_id = create.json()["board_id"]
+
+    client.patch(
+        f"/api/v1/boards/{board_id}",
+        json={"board_visibility": "public"},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    # user2 should be able to access the public board
+    response = client.get(
+        f"/api/v1/boards/{board_id}",
+        headers={"Authorization": f"Bearer {user2_token}"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["board_id"] == board_id
+
+
+def test_shared_board_appears_in_other_user_list(client: TestClient, user1_token: str, user2_token: str):
+    """Test that shared boards appear in other users' board listings."""
+    # user1 creates and shares a board
+    create = client.post(
+        "/api/v1/boards/?board_name=User1+Listed+Shared+Board",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert create.status_code == status.HTTP_201_CREATED
+    board_id = create.json()["board_id"]
+
+    client.patch(
+        f"/api/v1/boards/{board_id}",
+        json={"board_visibility": "shared"},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    # user2 should see the shared board in their listing
+    response = client.get(
+        "/api/v1/boards/?all=true",
+        headers={"Authorization": f"Bearer {user2_token}"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    board_ids = [b["board_id"] for b in response.json()]
+    assert board_id in board_ids
+
+
+def test_private_board_not_visible_after_privacy_change(client: TestClient, user1_token: str, user2_token: str):
+    """Test that reverting a board from shared to private hides it from other users."""
+    # user1 creates a board, makes it shared, then reverts to private
+    create = client.post(
+        "/api/v1/boards/?board_name=Reverted+Board",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert create.status_code == status.HTTP_201_CREATED
+    board_id = create.json()["board_id"]
+
+    client.patch(
+        f"/api/v1/boards/{board_id}",
+        json={"board_visibility": "shared"},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    client.patch(
+        f"/api/v1/boards/{board_id}",
+        json={"board_visibility": "private"},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    # user2 should not be able to access the now-private board
+    response = client.get(
+        f"/api/v1/boards/{board_id}",
+        headers={"Authorization": f"Bearer {user2_token}"},
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_non_owner_cannot_change_board_visibility(client: TestClient, user1_token: str, user2_token: str):
+    """Test that a non-owner cannot change a board's visibility."""
+    # user1 creates a board
+    create = client.post(
+        "/api/v1/boards/?board_name=User1+Private+Locked+Board",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert create.status_code == status.HTTP_201_CREATED
+    board_id = create.json()["board_id"]
+
+    # user2 tries to make it public - should be forbidden
+    response = client.patch(
+        f"/api/v1/boards/{board_id}",
+        json={"board_visibility": "public"},
+        headers={"Authorization": f"Bearer {user2_token}"},
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_shared_board_image_names_visible_to_other_users(client: TestClient, user1_token: str, user2_token: str):
+    """Test that image names for shared boards are accessible to other users."""
+    create = client.post(
+        "/api/v1/boards/?board_name=User1+Shared+Images+Board",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert create.status_code == status.HTTP_201_CREATED
+    board_id = create.json()["board_id"]
+
+    client.patch(
+        f"/api/v1/boards/{board_id}",
+        json={"board_visibility": "shared"},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    # user2 can access image names for a shared board
+    response = client.get(
+        f"/api/v1/boards/{board_id}/image_names",
+        headers={"Authorization": f"Bearer {user2_token}"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+
+def test_admin_can_change_any_board_visibility(client: TestClient, admin_token: str, user1_token: str):
+    """Test that an admin can change the visibility of any user's board."""
+    create = client.post(
+        "/api/v1/boards/?board_name=User1+Board+For+Admin+Visibility",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert create.status_code == status.HTTP_201_CREATED
+    board_id = create.json()["board_id"]
+
+    # Admin sets it to public
+    response = client.patch(
+        f"/api/v1/boards/{board_id}",
+        json={"board_visibility": "public"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.json()["board_visibility"] == "public"

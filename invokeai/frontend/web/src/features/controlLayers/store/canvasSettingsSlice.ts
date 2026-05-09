@@ -13,6 +13,7 @@ const zTransformSmoothingMode = z.enum(['bilinear', 'bicubic', 'hamming', 'lancz
 export type TransformSmoothingMode = z.infer<typeof zTransformSmoothingMode>;
 
 const zGradientType = z.enum(['linear', 'radial']);
+const zLassoMode = z.enum(['freehand', 'polygon']);
 
 const zCanvasSettingsState = z.object({
   /**
@@ -118,6 +119,10 @@ const zCanvasSettingsState = z.object({
    * Whether the gradient tool clips to the drag gesture.
    */
   gradientClipEnabled: z.boolean().default(true),
+  /**
+   * The lasso tool mode.
+   */
+  lassoMode: zLassoMode.default('freehand'),
 });
 
 type CanvasSettingsState = z.infer<typeof zCanvasSettingsState>;
@@ -148,6 +153,7 @@ const getInitialState = (): CanvasSettingsState => ({
   transformSmoothingMode: 'bicubic',
   gradientType: 'linear',
   gradientClipEnabled: true,
+  lassoMode: 'freehand',
 });
 
 const slice = createSlice({
@@ -245,6 +251,9 @@ const slice = createSlice({
     settingsGradientClipToggled: (state) => {
       state.gradientClipEnabled = !state.gradientClipEnabled;
     },
+    settingsLassoModeChanged: (state, action: PayloadAction<CanvasSettingsState['lassoMode']>) => {
+      state.lassoMode = action.payload;
+    },
   },
 });
 
@@ -276,6 +285,7 @@ export const {
   settingsFillColorPickerPinnedSet,
   settingsGradientTypeChanged,
   settingsGradientClipToggled,
+  settingsLassoModeChanged,
 } = slice.actions;
 
 export const canvasSettingsSliceConfig: SliceConfig<typeof slice> = {
@@ -317,3 +327,4 @@ export const selectTransformSmoothingEnabled = createCanvasSettingsSelector(
 export const selectTransformSmoothingMode = createCanvasSettingsSelector((settings) => settings.transformSmoothingMode);
 export const selectGradientType = createCanvasSettingsSelector((settings) => settings.gradientType);
 export const selectGradientClipEnabled = createCanvasSettingsSelector((settings) => settings.gradientClipEnabled);
+export const selectLassoMode = createCanvasSettingsSelector((settings) => settings.lassoMode);

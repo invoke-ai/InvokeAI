@@ -7,6 +7,7 @@ import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPencilBold } from 'react-icons/pi';
 import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
+import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
 import type { BoardDTO } from 'services/api/types';
 
 type Props = {
@@ -19,6 +20,7 @@ export const BoardEditableTitle = memo(({ board, isSelected }: Props) => {
   const isHovering = useBoolean(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [updateBoard, updateBoardResult] = useUpdateBoardMutation();
+  const { canRenameBoard } = useBoardAccess(board);
 
   const onChange = useCallback(
     async (board_name: string) => {
@@ -51,15 +53,15 @@ export const BoardEditableTitle = memo(({ board, isSelected }: Props) => {
           fontWeight="semibold"
           userSelect="none"
           color={isSelected ? 'base.100' : 'base.300'}
-          onDoubleClick={editable.startEditing}
-          cursor="text"
+          onDoubleClick={canRenameBoard ? editable.startEditing : undefined}
+          cursor={canRenameBoard ? 'text' : 'default'}
           noOfLines={1}
         >
           {editable.value}
         </Text>
-        {isHovering.isTrue && (
+        {canRenameBoard && isHovering.isTrue && (
           <IconButton
-            aria-label="edit name"
+            aria-label={t('common.editName')}
             icon={<PiPencilBold />}
             size="sm"
             variant="ghost"

@@ -25,29 +25,34 @@ import { Trans, useTranslation } from 'react-i18next';
 export const [useVideosModal] = buildUseDisclosure(false);
 
 const GettingStartedPlaylistLink = () => {
+  const { t } = useTranslation();
   return (
     <ExternalLink
       fontWeight="semibold"
       href={gettingStartedPlaylistLink}
       display="inline-flex"
-      label="Getting Started playlist"
+      label={t('supportVideos.gettingStartedPlaylist')}
     />
   );
 };
 
 const StudioSessionsPlaylistLink = () => {
+  const { t } = useTranslation();
   return (
     <ExternalLink
       fontWeight="semibold"
       href={studioSessionsPlaylistLink}
       display="inline-flex"
-      label="Studio Sessions playlist"
+      label={t('supportVideos.studioSessionsPlaylist')}
     />
   );
 };
 
 const DiscordLink = () => {
-  return <ExternalLink fontWeight="semibold" href={discordLink} display="inline-flex" label="Discord" />;
+  const { t } = useTranslation();
+  return (
+    <ExternalLink fontWeight="semibold" href={discordLink} display="inline-flex" label={t('supportVideos.discord')} />
+  );
 };
 
 const components = {

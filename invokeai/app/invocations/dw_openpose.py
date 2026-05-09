@@ -11,7 +11,7 @@ from invokeai.backend.image_util.dw_openpose import DWOpenposeDetector
     "dw_openpose_detection",
     title="DW Openpose Detection",
     tags=["controlnet", "dwpose", "openpose"],
-    category="controlnet",
+    category="controlnet_preprocessors",
     version="1.1.1",
 )
 class DWOpenposeDetectionInvocation(BaseInvocation, WithMetadata, WithBoard):

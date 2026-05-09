@@ -16,10 +16,12 @@ type NonInvocationNodeWrapperProps = PropsWithChildren & {
   nodeId: string;
   selected: boolean;
   width?: ChakraProps['w'];
+  borderRadius?: ChakraProps['borderRadius'];
+  withChrome?: boolean;
 };
 
 const NonInvocationNodeWrapper = (props: NonInvocationNodeWrapperProps) => {
-  const { nodeId, width, children, selected } = props;
+  const { nodeId, width, children, selected, borderRadius = 'base', withChrome = true } = props;
   const mouseOverNode = useMouseOverNode(nodeId);
   const zoomToNode = useZoomToNode(nodeId);
 
@@ -62,14 +64,15 @@ const NonInvocationNodeWrapper = (props: NonInvocationNodeWrapperProps) => {
       onMouseOut={mouseOverNode.handleMouseOut}
       className={DRAG_HANDLE_CLASSNAME}
       sx={containerSx}
+      borderRadius={borderRadius}
       width={width || NODE_WIDTH}
       opacity={opacity}
       data-is-selected={selected}
     >
-      <Box sx={shadowsSx} />
-      <Box sx={inProgressSx} data-is-in-progress={isInProgress} />
+      {withChrome && <Box sx={shadowsSx} />}
+      {withChrome && <Box sx={inProgressSx} data-is-in-progress={isInProgress} />}
       {children}
-      <Box className="node-selection-overlay" />
+      {withChrome && <Box className="node-selection-overlay" />}
     </Box>
   );
 };

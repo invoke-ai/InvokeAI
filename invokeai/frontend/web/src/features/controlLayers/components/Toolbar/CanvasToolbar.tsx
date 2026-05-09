@@ -5,20 +5,25 @@ import { useToolIsSelected } from 'features/controlLayers/components/Tool/hooks'
 import { ToolFillColorPicker } from 'features/controlLayers/components/Tool/ToolFillColorPicker';
 import { ToolGradientClipToggle } from 'features/controlLayers/components/Tool/ToolGradientClipToggle';
 import { ToolGradientModeToggle } from 'features/controlLayers/components/Tool/ToolGradientModeToggle';
+import { ToolLassoModeToggle } from 'features/controlLayers/components/Tool/ToolLassoModeToggle';
 import { ToolOptionsRowContainer } from 'features/controlLayers/components/Tool/ToolOptionsRowContainer';
 import { ToolWidthPicker } from 'features/controlLayers/components/Tool/ToolWidthPicker';
 import { CanvasToolbarFitBboxToLayersButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToLayersButton';
 import { CanvasToolbarFitBboxToMasksButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToMasksButton';
 import { CanvasToolbarNewSessionMenuButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarNewSessionMenuButton';
+import { CanvasToolbarProjectMenuButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarProjectMenuButton';
 import { CanvasToolbarRedoButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarRedoButton';
 import { CanvasToolbarResetViewButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarResetViewButton';
 import { CanvasToolbarSaveToGalleryButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarSaveToGalleryButton';
 import { CanvasToolbarScale } from 'features/controlLayers/components/Toolbar/CanvasToolbarScale';
+import { CanvasToolbarSnapshotMenuButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarSnapshotMenuButton';
 import { CanvasToolbarUndoButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarUndoButton';
 import { useCanvasDeleteLayerHotkey } from 'features/controlLayers/hooks/useCanvasDeleteLayerHotkey';
 import { useCanvasEntityQuickSwitchHotkey } from 'features/controlLayers/hooks/useCanvasEntityQuickSwitchHotkey';
 import { useCanvasFilterHotkey } from 'features/controlLayers/hooks/useCanvasFilterHotkey';
 import { useCanvasInvertMaskHotkey } from 'features/controlLayers/hooks/useCanvasInvertMaskHotkey';
+import { useCanvasMergeDownHotkey } from 'features/controlLayers/hooks/useCanvasMergeDownHotkey';
+import { useCanvasMergeVisibleHotkey } from 'features/controlLayers/hooks/useCanvasMergeVisibleHotkey';
 import { useCanvasResetLayerHotkey } from 'features/controlLayers/hooks/useCanvasResetLayerHotkey';
 import { useCanvasToggleBboxHotkey } from 'features/controlLayers/hooks/useCanvasToggleBboxHotkey';
 import { useCanvasToggleNonRasterLayersHotkey } from 'features/controlLayers/hooks/useCanvasToggleNonRasterLayersHotkey';
@@ -31,6 +36,7 @@ export const CanvasToolbar = memo(() => {
   const isBrushSelected = useToolIsSelected('brush');
   const isEraserSelected = useToolIsSelected('eraser');
   const isTextSelected = useToolIsSelected('text');
+  const isLassoSelected = useToolIsSelected('lasso');
   const isGradientSelected = useToolIsSelected('gradient');
   const showToolWithPicker = useMemo(() => {
     return !isTextSelected && (isBrushSelected || isEraserSelected);
@@ -38,6 +44,8 @@ export const CanvasToolbar = memo(() => {
 
   useCanvasResetLayerHotkey();
   useCanvasDeleteLayerHotkey();
+  useCanvasMergeDownHotkey();
+  useCanvasMergeVisibleHotkey();
   useCanvasUndoRedoHotkeys();
   useCanvasEntityQuickSwitchHotkey();
   useNextPrevEntityHotkeys();
@@ -57,6 +65,11 @@ export const CanvasToolbar = memo(() => {
             <ToolGradientModeToggle />
           </Box>
         )}
+        {isLassoSelected && (
+          <Box ms={2} mt="-2px" display="flex" alignItems="center" gap={2}>
+            <ToolLassoModeToggle />
+          </Box>
+        )}
         {isTextSelected ? <TextToolOptions /> : showToolWithPicker && <ToolWidthPicker />}
       </ToolOptionsRowContainer>
       <Flex alignItems="center" h="full">
@@ -67,7 +80,9 @@ export const CanvasToolbar = memo(() => {
       </Flex>
       <Divider orientation="vertical" />
       <Flex alignItems="center" h="full">
+        <CanvasToolbarProjectMenuButton />
         <CanvasToolbarSaveToGalleryButton />
+        <CanvasToolbarSnapshotMenuButton />
         <CanvasToolbarUndoButton />
         <CanvasToolbarRedoButton />
         <CanvasToolbarNewSessionMenuButton />

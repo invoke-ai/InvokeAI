@@ -1,7 +1,7 @@
 import type { S } from 'services/api/types';
 import { describe, expect, it } from 'vitest';
 
-import { getOutputImageName, getProgressMessage, getQueueItemElementId } from './shared';
+import { getOutputImageNames, getProgressMessage, getQueueItemElementId } from './shared';
 
 describe('StagingAreaApi Utility Functions', () => {
   describe('getProgressMessage', () => {
@@ -34,7 +34,7 @@ describe('StagingAreaApi Utility Functions', () => {
     });
   });
 
-  describe('getOutputImageName', () => {
+  describe('getOutputImageNames', () => {
     it('should extract image name from completed queue item', () => {
       const queueItem: S['SessionQueueItem'] = {
         item_id: 1,
@@ -61,10 +61,10 @@ describe('StagingAreaApi Utility Functions', () => {
         },
       } as unknown as S['SessionQueueItem'];
 
-      expect(getOutputImageName(queueItem)).toBe('test-output.png');
+      expect(getOutputImageNames(queueItem)).toEqual(['test-output.png']);
     });
 
-    it('should return null when no canvas output node found', () => {
+    it('should return empty array when no canvas output node found', () => {
       const queueItem = {
         item_id: 1,
         status: 'completed',
@@ -93,10 +93,10 @@ describe('StagingAreaApi Utility Functions', () => {
         },
       } as unknown as S['SessionQueueItem'];
 
-      expect(getOutputImageName(queueItem)).toBe(null);
+      expect(getOutputImageNames(queueItem)).toEqual([]);
     });
 
-    it('should return null when output node has no results', () => {
+    it('should return empty array when output node has no results', () => {
       const queueItem: S['SessionQueueItem'] = {
         item_id: 1,
         status: 'completed',
@@ -116,10 +116,10 @@ describe('StagingAreaApi Utility Functions', () => {
         },
       } as unknown as S['SessionQueueItem'];
 
-      expect(getOutputImageName(queueItem)).toBe(null);
+      expect(getOutputImageNames(queueItem)).toEqual([]);
     });
 
-    it('should return null when results contain no image fields', () => {
+    it('should return empty array when results contain no image fields', () => {
       const queueItem: S['SessionQueueItem'] = {
         item_id: 1,
         status: 'completed',
@@ -144,10 +144,46 @@ describe('StagingAreaApi Utility Functions', () => {
         },
       } as unknown as S['SessionQueueItem'];
 
-      expect(getOutputImageName(queueItem)).toBe(null);
+      expect(getOutputImageNames(queueItem)).toEqual([]);
     });
 
-    it('should handle multiple outputs and return first image', () => {
+    it('should collect images from multiple canvas_output nodes', () => {
+      const queueItem: S['SessionQueueItem'] = {
+        item_id: 1,
+        status: 'completed',
+        priority: 0,
+        destination: 'test-session',
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+        started_at: '2024-01-01T00:00:01Z',
+        completed_at: '2024-01-01T00:01:00Z',
+        error: null,
+        session: {
+          id: 'test-session',
+          source_prepared_mapping: {
+            'canvas_output:abc123': ['output-node-1'],
+            'canvas_output:def456': ['output-node-2'],
+          },
+          results: {
+            'output-node-1': {
+              image: {
+                image_name: 'first-image.png',
+              },
+            },
+            'output-node-2': {
+              image: {
+                image_name: 'second-image.png',
+              },
+            },
+          },
+        },
+      } as unknown as S['SessionQueueItem'];
+
+      const result = getOutputImageNames(queueItem);
+      expect(result).toEqual(['first-image.png', 'second-image.png']);
+    });
+
+    it('should return first image from image collections', () => {
       const queueItem: S['SessionQueueItem'] = {
         item_id: 1,
         status: 'completed',
@@ -165,20 +201,13 @@ describe('StagingAreaApi Utility Functions', () => {
           },
           results: {
             'output-node-id': {
-              text: 'some text',
-              first_image: {
-                image_name: 'first-image.png',
-              },
-              second_image: {
-                image_name: 'second-image.png',
-              },
+              images: [{ image_name: 'first.png' }, { image_name: 'second.png' }],
             },
           },
         },
       } as unknown as S['SessionQueueItem'];
 
-      const result = getOutputImageName(queueItem);
-      expect(result).toBe('first-image.png');
+      expect(getOutputImageNames(queueItem)).toEqual(['first.png', 'second.png']);
     });
 
     it('should handle empty session mapping', () => {
@@ -199,7 +228,7 @@ describe('StagingAreaApi Utility Functions', () => {
         },
       } as unknown as S['SessionQueueItem'];
 
-      expect(getOutputImageName(queueItem)).toBe(null);
+      expect(getOutputImageNames(queueItem)).toEqual([]);
     });
   });
 });

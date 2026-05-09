@@ -1,0 +1,46 @@
+---
+title: Google Gemini
+---
+
+# :material-google: Google Gemini
+
+Invoke supports Google's Gemini image generation models through the Gemini API. This provider is a good fit if you want high-quality text-to-image and reference-based image edits without running a local model.
+
+## Getting an API Key
+
+1. Open [Google AI Studio](https://aistudio.google.com/) and sign in with your Google account.
+2. Generate a new API key.
+3. Note the key — it will only be shown once.
+
+## Configuration
+
+Add your key to `api_keys.yaml` in your Invoke root directory:
+
+```yaml
+external_gemini_api_key: "your-gemini-api-key"
+
+# Optional — only set this if you need to route requests through a different endpoint
+external_gemini_base_url: "https://generativelanguage.googleapis.com"
+```
+
+Restart Invoke for the change to take effect.
+
+## Available Models
+
+| Model | Modes | Reference Images | Notes |
+| --- | --- | --- | --- |
+| **Gemini 2.5 Flash Image** | txt2img, img2img, inpaint | Yes | 10 aspect ratios, fixed per-ratio resolutions. |
+| **Gemini 3 Pro Image Preview** | txt2img, img2img, inpaint | Up to 14 (6 object + 5 character) | 1K / 2K / 4K resolution presets. |
+| **Gemini 3.1 Flash Image Preview** | txt2img, img2img, inpaint | Up to 14 (10 object + 4 character) | 512 / 1K / 2K / 4K resolution presets. |
+
+All Gemini models are single-image-per-request — batch size is fixed at 1. To generate multiple variations, queue multiple invocations.
+
+## Provider-Specific Options
+
+Gemini exposes a **temperature** control in the parameters panel. Lower values make outputs more deterministic, higher values increase variability.
+
+## Tips
+
+- **Reference images** are sent directly to the API as inlined PNG data. Large references increase request latency and cost — crop tightly where possible.
+- **Aspect ratios** are mapped to the closest Gemini-supported ratio. For Gemini 3 models, use the resolution presets to stay at the provider's native output sizes and avoid unnecessary rescaling.
+- **Pricing** varies by model and region. Check Google's documentation before running large batches.

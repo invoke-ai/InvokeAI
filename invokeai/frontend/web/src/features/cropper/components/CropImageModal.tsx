@@ -2,10 +2,12 @@ import { Modal, ModalBody, ModalContent, ModalHeader, ModalOverlay } from '@invo
 import { useStore } from '@nanostores/react';
 import { cropImageModalApi } from 'features/cropper/store';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { CropImageEditor } from './CropImageEditor';
 
 export const CropImageModal = memo(() => {
+  const { t } = useTranslation();
   const state = useStore(cropImageModalApi.$state);
 
   if (!state) {
@@ -17,7 +19,7 @@ export const CropImageModal = memo(() => {
     <Modal isOpen={true} onClose={cropImageModalApi.close} isCentered useInert={false} size="full">
       <ModalOverlay />
       <ModalContent minH="unset" minW="unset" maxH="90vh" maxW="90vw" w="full" h="full" borderRadius="base">
-        <ModalHeader>Crop Image</ModalHeader>
+        <ModalHeader>{t('cropper.cropImage')}</ModalHeader>
         <ModalBody px={4} pb={4} pt={0}>
           <CropImageEditor editor={state.editor} onApplyCrop={state.onApplyCrop} onReady={state.onReady} />
         </ModalBody>

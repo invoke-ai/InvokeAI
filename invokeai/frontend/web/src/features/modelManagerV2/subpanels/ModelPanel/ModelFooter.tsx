@@ -1,7 +1,7 @@
 import { Flex, Heading, type SystemStyleObject } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { AnyModelConfig } from 'services/api/types';
+import type { AnyModelConfigWithExternal } from 'services/api/types';
 
 import { ModelConvertButton } from './ModelConvertButton';
 import { ModelDeleteButton } from './ModelDeleteButton';
@@ -20,7 +20,7 @@ const footerRowSx: SystemStyleObject = {
 };
 
 type Props = {
-  modelConfig: AnyModelConfig;
+  modelConfig: AnyModelConfigWithExternal;
   isEditing: boolean;
 };
 

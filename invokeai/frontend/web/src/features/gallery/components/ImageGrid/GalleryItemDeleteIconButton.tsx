@@ -5,6 +5,8 @@ import type { MouseEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleFill } from 'react-icons/pi';
+import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
+import { useSelectedBoard } from 'services/api/hooks/useSelectedBoard';
 import type { ImageDTO } from 'services/api/types';
 
 type Props = {
@@ -15,6 +17,8 @@ export const GalleryItemDeleteIconButton = memo(({ imageDTO }: Props) => {
   const shift = useShiftModifier();
   const { t } = useTranslation();
   const deleteImageModal = useDeleteImageModalApi();
+  const selectedBoard = useSelectedBoard();
+  const { canWriteImages } = useBoardAccess(selectedBoard);
 
   const onClick = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
@@ -24,7 +28,7 @@ export const GalleryItemDeleteIconButton = memo(({ imageDTO }: Props) => {
     [deleteImageModal, imageDTO]
   );
 
-  if (!shift) {
+  if (!shift || !canWriteImages) {
     return null;
   }
 

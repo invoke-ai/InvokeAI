@@ -44,7 +44,8 @@ def sanitize_queue_item_for_user(
     """Sanitize queue item for non-admin users viewing other users' items.
 
     For non-admin users viewing queue items belonging to other users,
-    the field_values, session graph, and workflow should be hidden/cleared to protect privacy.
+    only timestamps, status, and error information are exposed. All other
+    fields (user identity, generation parameters, graphs, workflows) are stripped.
 
     Args:
         queue_item: The queue item to sanitize
@@ -58,15 +59,25 @@ def sanitize_queue_item_for_user(
     if is_admin or queue_item.user_id == current_user_id:
         return queue_item
 
-    # For non-admins viewing other users' items, clear sensitive fields
-    # Create a shallow copy to avoid mutating the original
+    # For non-admins viewing other users' items, strip everything except
+    # item_id, queue_id, status, and timestamps
     sanitized_item = queue_item.model_copy(deep=False)
+    sanitized_item.user_id = "redacted"
+    sanitized_item.user_display_name = None
+    sanitized_item.user_email = None
+    sanitized_item.batch_id = "redacted"
+    sanitized_item.session_id = "redacted"
+    sanitized_item.origin = None
+    sanitized_item.destination = None
+    sanitized_item.priority = 0
     sanitized_item.field_values = None
+    sanitized_item.retried_from_item_id = None
     sanitized_item.workflow = None
-    # Clear the session graph by replacing it with an empty graph execution state
-    # This prevents information leakage through the generation graph
+    sanitized_item.error_type = None
+    sanitized_item.error_message = None
+    sanitized_item.error_traceback = None
     sanitized_item.session = GraphExecutionState(
-        id=queue_item.session.id,
+        id="redacted",
         graph=Graph(),
     )
     return sanitized_item
@@ -126,12 +137,16 @@ async def list_all_queue_items(
     },
 )
 async def get_queue_item_ids(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
 ) -> ItemIdsResult:
-    """Gets all queue item ids that match the given parameters"""
+    """Gets all queue item ids that match the given parameters. Non-admin users only see their own items."""
     try:
-        return ApiDependencies.invoker.services.session_queue.get_queue_item_ids(queue_id=queue_id, order_dir=order_dir)
+        user_id = None if current_user.is_admin else current_user.user_id
+        return ApiDependencies.invoker.services.session_queue.get_queue_item_ids(
+            queue_id=queue_id, order_dir=order_dir, user_id=user_id
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while listing all queue item ids: {e}")
 
@@ -376,11 +391,15 @@ async def prune(
     },
 )
 async def get_current_queue_item(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> Optional[SessionQueueItem]:
     """Gets the currently execution queue item"""
     try:
-        return ApiDependencies.invoker.services.session_queue.get_current(queue_id)
+        item = ApiDependencies.invoker.services.session_queue.get_current(queue_id)
+        if item is not None:
+            item = sanitize_queue_item_for_user(item, current_user.user_id, current_user.is_admin)
+        return item
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while getting current queue item: {e}")
 
@@ -393,11 +412,15 @@ async def get_current_queue_item(
     },
 )
 async def get_next_queue_item(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> Optional[SessionQueueItem]:
     """Gets the next queue item, without executing it"""
     try:
-        return ApiDependencies.invoker.services.session_queue.get_next(queue_id)
+        item = ApiDependencies.invoker.services.session_queue.get_next(queue_id)
+        if item is not None:
+            item = sanitize_queue_item_for_user(item, current_user.user_id, current_user.is_admin)
+        return item
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while getting next queue item: {e}")
 
@@ -413,9 +436,10 @@ async def get_queue_status(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> SessionQueueAndProcessorStatus:
-    """Gets the status of the session queue"""
+    """Gets the status of the session queue. Non-admin users see only their own counts and cannot see current item details unless they own it."""
     try:
-        queue = ApiDependencies.invoker.services.session_queue.get_queue_status(queue_id, user_id=current_user.user_id)
+        user_id = None if current_user.is_admin else current_user.user_id
+        queue = ApiDependencies.invoker.services.session_queue.get_queue_status(queue_id, user_id=user_id)
         processor = ApiDependencies.invoker.services.session_processor.get_status()
         return SessionQueueAndProcessorStatus(queue=queue, processor=processor)
     except Exception as e:
@@ -430,12 +454,16 @@ async def get_queue_status(
     },
 )
 async def get_batch_status(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     batch_id: str = Path(description="The batch to get the status of"),
 ) -> BatchStatus:
-    """Gets the status of the session queue"""
+    """Gets the status of a batch. Non-admin users only see their own batches."""
     try:
-        return ApiDependencies.invoker.services.session_queue.get_batch_status(queue_id=queue_id, batch_id=batch_id)
+        user_id = None if current_user.is_admin else current_user.user_id
+        return ApiDependencies.invoker.services.session_queue.get_batch_status(
+            queue_id=queue_id, batch_id=batch_id, user_id=user_id
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while getting batch status: {e}")
 
@@ -529,13 +557,15 @@ async def cancel_queue_item(
     responses={200: {"model": SessionQueueCountsByDestination}},
 )
 async def counts_by_destination(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to query"),
     destination: str = Query(description="The destination to query"),
 ) -> SessionQueueCountsByDestination:
-    """Gets the counts of queue items by destination"""
+    """Gets the counts of queue items by destination. Non-admin users only see their own items."""
     try:
+        user_id = None if current_user.is_admin else current_user.user_id
         return ApiDependencies.invoker.services.session_queue.get_counts_by_destination(
-            queue_id=queue_id, destination=destination
+            queue_id=queue_id, destination=destination, user_id=user_id
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while fetching counts by destination: {e}")

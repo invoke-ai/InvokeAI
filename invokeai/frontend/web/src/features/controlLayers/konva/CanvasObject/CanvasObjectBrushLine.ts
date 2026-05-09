@@ -6,7 +6,10 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasBrushLineState } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import type { NodeConfig } from 'konva/lib/Node';
 import type { Logger } from 'roarr';
+
+type GlobalCompositeOperation = NonNullable<NodeConfig['globalCompositeOperation']>;
 
 export class CanvasObjectBrushLine extends CanvasModuleBase {
   readonly type = 'object_brush_line';
@@ -46,7 +49,7 @@ export class CanvasObjectBrushLine extends CanvasModuleBase {
         tension: 0.3,
         lineCap: 'round',
         lineJoin: 'round',
-        globalCompositeOperation: 'source-over',
+        globalCompositeOperation: (state.globalCompositeOperation ?? 'source-over') as GlobalCompositeOperation,
         perfectDrawEnabled: false,
       }),
     };
@@ -57,12 +60,13 @@ export class CanvasObjectBrushLine extends CanvasModuleBase {
   update(state: CanvasBrushLineState, force = false): boolean {
     if (force || this.state !== state) {
       this.log.trace({ state }, 'Updating brush line');
-      const { points, color, strokeWidth } = state;
+      const { points, color, strokeWidth, globalCompositeOperation } = state;
       this.konva.line.setAttrs({
         // A line with only one point will not be rendered, so we duplicate the points to make it visible
         points: points.length === 2 ? [...points, ...points] : points,
         stroke: rgbaColorToString(color),
         strokeWidth,
+        globalCompositeOperation: (globalCompositeOperation ?? 'source-over') as GlobalCompositeOperation,
       });
       this.state = state;
       return true;

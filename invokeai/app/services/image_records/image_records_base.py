@@ -12,6 +12,7 @@ from invokeai.app.services.image_records.image_records_common import (
 )
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.virtual_boards.virtual_boards_common import VirtualSubBoardDTO
 
 
 class ImageRecordStorageBase(ABC):
@@ -69,13 +70,13 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
-    def delete_intermediates(self) -> list[str]:
-        """Deletes all intermediate image records, returning a list of deleted image names."""
+    def delete_intermediates(self) -> list[tuple[str, str]]:
+        """Deletes all intermediate image records, returning a list of (image_name, image_subfolder) tuples."""
         pass
 
     @abstractmethod
-    def get_intermediates_count(self) -> int:
-        """Gets a count of all intermediate images."""
+    def get_intermediates_count(self, user_id: Optional[str] = None) -> int:
+        """Gets a count of intermediate images. If user_id is provided, only counts that user's intermediates."""
         pass
 
     @abstractmethod
@@ -93,8 +94,14 @@ class ImageRecordStorageBase(ABC):
         node_id: Optional[str] = None,
         metadata: Optional[str] = None,
         user_id: Optional[str] = None,
+        image_subfolder: str = "",
     ) -> datetime:
         """Saves an image record."""
+        pass
+
+    @abstractmethod
+    def get_user_id(self, image_name: str) -> Optional[str]:
+        """Gets the user_id of the image owner. Returns None if image not found."""
         pass
 
     @abstractmethod
@@ -116,4 +123,27 @@ class ImageRecordStorageBase(ABC):
         is_admin: bool = False,
     ) -> ImageNamesResult:
         """Gets ordered list of image names with metadata for optimistic updates."""
+        pass
+
+    @abstractmethod
+    def get_image_dates(
+        self,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
+    ) -> list[VirtualSubBoardDTO]:
+        """Gets a list of dates with image counts, grouped by DATE(created_at)."""
+        pass
+
+    @abstractmethod
+    def get_image_names_by_date(
+        self,
+        date: str,
+        starred_first: bool = True,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        categories: Optional[list[ImageCategory]] = None,
+        search_term: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
+    ) -> ImageNamesResult:
+        """Gets ordered list of image names for a specific date."""
         pass

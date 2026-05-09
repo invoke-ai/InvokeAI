@@ -143,8 +143,8 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
-    def get_intermediates_count(self) -> int:
-        """Gets the number of intermediate images."""
+    def get_intermediates_count(self, user_id: Optional[str] = None) -> int:
+        """Gets the number of intermediate images. If user_id is provided, only counts that user's intermediates."""
         pass
 
     @abstractmethod

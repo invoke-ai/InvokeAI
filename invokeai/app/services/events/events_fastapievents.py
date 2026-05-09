@@ -46,3 +46,9 @@ class FastAPIEventService(EventServiceBase):
 
             except asyncio.CancelledError as e:
                 raise e  # Raise a proper error
+            except Exception:
+                import logging
+
+                logging.getLogger("InvokeAI").error(
+                    f"Error dispatching event {getattr(event, '__event_name__', event)}", exc_info=True
+                )

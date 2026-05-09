@@ -6,7 +6,7 @@ import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Param0 } from 'tsafe';
 
-const CLIPBOARD_FAQ_URL = 'https://invoke-ai.github.io/InvokeAI/faq/#unable-to-copy-on-firefox';
+const CLIPBOARD_FAQ_URL = 'https://invoke.ai/troubleshooting/faq/#unable-to-copy-on-firefox';
 
 export const useClipboard = () => {
   const { t } = useTranslation();

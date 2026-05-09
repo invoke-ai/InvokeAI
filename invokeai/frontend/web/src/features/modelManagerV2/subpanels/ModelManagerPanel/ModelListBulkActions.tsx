@@ -11,7 +11,7 @@ import {
 } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { t } from 'i18next';
 import { memo, useCallback, useMemo } from 'react';
-import { PiCaretDownBold, PiTrashSimpleBold } from 'react-icons/pi';
+import { PiCaretDownBold, PiSparkleFill, PiTrashSimpleBold } from 'react-icons/pi';
 import {
   modelConfigsAdapterSelectors,
   useGetMissingModelsQuery,
@@ -19,7 +19,7 @@ import {
 } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 
-import { useBulkDeleteModal } from './ModelList';
+import { useBulkDeleteModal, useBulkReidentifyModal } from './ModelList';
 
 const ModelListBulkActionsSx: SystemStyleObject = {
   alignItems: 'center',
@@ -40,10 +40,15 @@ export const ModelListBulkActions = memo(({ sx }: ModelListBulkActionsProps) => 
   const { data: allModelsData } = useGetModelConfigsQuery();
   const { data: missingModelsData } = useGetMissingModelsQuery();
   const bulkDeleteModal = useBulkDeleteModal();
+  const bulkReidentifyModal = useBulkReidentifyModal();
 
   const handleBulkDelete = useCallback(() => {
     bulkDeleteModal.open();
   }, [bulkDeleteModal]);
+
+  const handleBulkReidentify = useCallback(() => {
+    bulkReidentifyModal.open();
+  }, [bulkReidentifyModal]);
 
   // Calculate displayed (filtered) model keys
   const displayedModelKeys = useMemo(() => {
@@ -125,6 +130,12 @@ export const ModelListBulkActions = memo(({ sx }: ModelListBulkActionsProps) => 
               {t('modelManager.actions')}
             </MenuButton>
             <MenuList>
+              <MenuItem icon={<PiSparkleFill />} onClick={handleBulkReidentify}>
+                {t('modelManager.reidentifyModels', {
+                  count: selectionCount,
+                  defaultValue: 'Reidentify Models',
+                })}
+              </MenuItem>
               <MenuItem icon={<PiTrashSimpleBold />} onClick={handleBulkDelete} color="error.300">
                 {t('modelManager.deleteModels', { count: selectionCount })}
               </MenuItem>

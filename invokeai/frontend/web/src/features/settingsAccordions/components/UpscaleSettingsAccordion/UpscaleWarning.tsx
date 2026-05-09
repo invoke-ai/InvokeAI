@@ -1,5 +1,6 @@
-import { Button, Flex, ListItem, Text, UnorderedList } from '@invoke-ai/ui-library';
+import { Button, Flex, Link, ListItem, Text, UnorderedList } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import { selectModel } from 'features/controlLayers/store/paramsSlice';
 import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import {
@@ -10,6 +11,7 @@ import {
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { useCallback, useEffect, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
+import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
 import { useControlNetModels } from 'services/api/hooks/modelsByType';
 
 export const UpscaleWarning = () => {
@@ -19,6 +21,12 @@ export const UpscaleWarning = () => {
   const tileControlnetModel = useAppSelector(selectTileControlNetModel);
   const dispatch = useAppDispatch();
   const [modelConfigs, { isLoading }] = useControlNetModels();
+  const { data: setupStatus } = useGetSetupStatusQuery();
+  const user = useAppSelector(selectCurrentUser);
+
+  const isMultiuser = setupStatus?.multiuser_enabled ?? false;
+  const isAdmin = !isMultiuser || (user?.is_admin ?? false);
+  const adminEmail = setupStatus?.admin_email ?? null;
 
   useEffect(() => {
     const validModel = modelConfigs.find((cnetModel) => {
@@ -59,19 +67,33 @@ export const UpscaleWarning = () => {
     return null;
   }
 
+  const AdminEmailLink = adminEmail ? (
+    <Link href={`mailto:${adminEmail}`} color="base.50">
+      {adminEmail}
+    </Link>
+  ) : (
+    <Text as="span" color="base.50">
+      your administrator
+    </Text>
+  );
+
   return (
     <Flex bg="error.500" borderRadius="base" padding={4} direction="column" fontSize="sm" gap={2}>
       {!isBaseModelCompatible && <Text>{t('upscaling.incompatibleBaseModelDesc')}</Text>}
       {warnings.length > 0 && (
         <Text>
-          <Trans
-            i18nKey="upscaling.missingModelsWarning"
-            components={{
-              LinkComponent: (
-                <Button size="sm" flexGrow={0} variant="link" color="base.50" onClick={handleGoToModelManager} />
-              ),
-            }}
-          />
+          {isAdmin ? (
+            <Trans
+              i18nKey="upscaling.missingModelsWarning"
+              components={{
+                LinkComponent: (
+                  <Button size="sm" flexGrow={0} variant="link" color="base.50" onClick={handleGoToModelManager} />
+                ),
+              }}
+            />
+          ) : (
+            <Trans i18nKey="upscaling.missingModelsWarningNonAdmin" components={{ AdminEmailLink }} />
+          )}
         </Text>
       )}
       {warnings.length > 0 && (

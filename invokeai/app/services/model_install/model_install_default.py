@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
 
 import torch
 import yaml
-from huggingface_hub import HfFolder
+from huggingface_hub import get_token as hf_get_token
 from pydantic.networks import AnyHttpUrl
 from pydantic_core import Url
 from requests import Session
@@ -28,6 +28,7 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_install.model_install_base import ModelInstallServiceBase
 from invokeai.app.services.model_install.model_install_common import (
     MODEL_SOURCE_TO_TYPE_MAP,
+    ExternalModelSource,
     HFModelSource,
     InstallStatus,
     InvalidModelConfigException,
@@ -37,10 +38,15 @@ from invokeai.app.services.model_install.model_install_common import (
     StringLikeSource,
     URLModelSource,
 )
-from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase
+from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase, UnknownModelException
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.app.util.misc import get_iso_timestamp
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
+from invokeai.backend.model_manager.configs.external_api import (
+    ExternalApiModelConfig,
+    ExternalApiModelDefaultSettings,
+    ExternalModelCapabilities,
+)
 from invokeai.backend.model_manager.configs.factory import (
     AnyModelConfig,
     ModelConfigFactory,
@@ -55,7 +61,13 @@ from invokeai.backend.model_manager.metadata import (
 )
 from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMetadata
 from invokeai.backend.model_manager.search import ModelSearch
-from invokeai.backend.model_manager.taxonomy import ModelRepoVariant, ModelSourceType
+from invokeai.backend.model_manager.taxonomy import (
+    BaseModelType,
+    ModelFormat,
+    ModelRepoVariant,
+    ModelSourceType,
+    ModelType,
+)
 from invokeai.backend.model_manager.util.lora_metadata_extractor import apply_lora_metadata
 from invokeai.backend.util import InvokeAILogger
 from invokeai.backend.util.catch_sigint import catch_sigint
@@ -459,6 +471,9 @@ class ModelInstallService(ModelInstallServiceBase):
             install_job = self._import_from_hf(source, config)
         elif isinstance(source, URLModelSource):
             install_job = self._import_from_url(source, config)
+        elif isinstance(source, ExternalModelSource):
+            install_job = self._import_external_model(source, config)
+            self._put_in_queue(install_job)
         else:
             raise ValueError(f"Unsupported model source: '{type(source)}'")
 
@@ -758,7 +773,13 @@ class ModelInstallService(ModelInstallServiceBase):
         source_obj: Optional[StringLikeSource] = None
         source_stripped = source.strip('"')
 
-        if Path(source_stripped).exists():  # A local file or directory
+        if source_stripped.startswith("external://"):
+            external_id = source_stripped.removeprefix("external://")
+            provider_id, _, provider_model_id = external_id.partition("/")
+            if not provider_id or not provider_model_id:
+                raise ValueError(f"Invalid external model source: '{source_stripped}'")
+            source_obj = ExternalModelSource(provider_id=provider_id, provider_model_id=provider_model_id)
+        elif Path(source_stripped).exists():  # A local file or directory
             source_obj = LocalModelSource(path=Path(source_stripped))
         elif match := re.match(hf_repoid_re, source):
             source_obj = HFModelSource(
@@ -850,6 +871,9 @@ class ModelInstallService(ModelInstallServiceBase):
         self._logger.info(f"Installer thread {threading.get_ident()} exiting")
 
     def _register_or_install(self, job: ModelInstallJob) -> None:
+        if isinstance(job.source, ExternalModelSource):
+            self._register_external_model(job)
+            return
         # local jobs will be in waiting state, remote jobs will be downloading state
         job.total_bytes = self._stat_size(job.local_path)
         job.bytes = job.total_bytes
@@ -868,6 +892,71 @@ class ModelInstallService(ModelInstallServiceBase):
         else:
             key = self.install_path(job.local_path, job.config_in)
         job.config_out = self.record_store.get_model(key)
+        self._signal_job_completed(job)
+
+    def _register_external_model(self, job: ModelInstallJob) -> None:
+        job.total_bytes = 0
+        job.bytes = 0
+        self._signal_job_running(job)
+        job.config_in.source = str(job.source)
+        job.config_in.source_type = MODEL_SOURCE_TO_TYPE_MAP[job.source.__class__]
+
+        provider_id = job.source.provider_id
+        provider_model_id = job.source.provider_model_id
+        capabilities = job.config_in.capabilities or ExternalModelCapabilities()
+        default_settings = (
+            job.config_in.default_settings
+            if isinstance(job.config_in.default_settings, ExternalApiModelDefaultSettings)
+            else None
+        )
+        name = job.config_in.name or f"{provider_id} {provider_model_id}"
+        key = job.config_in.key or slugify(f"{provider_id}-{provider_model_id}")
+
+        existing_external = next(
+            (
+                model
+                for model in self.record_store.search_by_attr(
+                    base_model=BaseModelType.External, model_type=ModelType.ExternalImageGenerator
+                )
+                if isinstance(model, ExternalApiModelConfig)
+                and model.provider_id == provider_id
+                and model.provider_model_id == provider_model_id
+            ),
+            None,
+        )
+
+        if existing_external is not None:
+            key = existing_external.key
+        else:
+            try:
+                self.record_store.get_model(key)
+                raise DuplicateModelException(
+                    f"Model key '{key}' already exists. Provide a different key to install this external model."
+                )
+            except UnknownModelException:
+                pass
+
+        config = ExternalApiModelConfig(
+            key=key,
+            name=name,
+            description=job.config_in.description,
+            provider_id=provider_id,
+            provider_model_id=provider_model_id,
+            capabilities=capabilities,
+            default_settings=default_settings,
+            source=str(job.source),
+            source_type=MODEL_SOURCE_TO_TYPE_MAP[job.source.__class__],
+            path="",
+            hash="",
+            file_size=0,
+        )
+
+        if existing_external is not None:
+            self.record_store.replace_model(existing_external.key, config)
+        else:
+            self.record_store.add_model(config)
+
+        job.config_out = self.record_store.get_model(config.key)
         self._signal_job_completed(job)
 
     def _set_error(self, install_job: ModelInstallJob, excp: Exception) -> None:
@@ -905,6 +994,8 @@ class ModelInstallService(ModelInstallServiceBase):
         """Scan the models directory for missing models and return a list of them."""
         missing_models: list[AnyModelConfig] = []
         for model_config in self.record_store.all_models():
+            if model_config.base == BaseModelType.External or model_config.format == ModelFormat.ExternalApi:
+                continue
             if not (self.app_config.models_path / model_config.path).resolve().exists():
                 missing_models.append(model_config)
         return missing_models
@@ -1024,7 +1115,7 @@ class ModelInstallService(ModelInstallServiceBase):
     ) -> ModelInstallJob:
         # Add user's cached access token to HuggingFace requests
         if source.access_token is None:
-            source.access_token = HfFolder.get_token()
+            source.access_token = hf_get_token()
         remote_files, metadata = self._remote_files_from_source(source)
         return self._import_remote_model(
             source=source,
@@ -1044,6 +1135,19 @@ class ModelInstallService(ModelInstallServiceBase):
             config=config,
             metadata=metadata,
             remote_files=remote_files,
+        )
+
+    def _import_external_model(
+        self,
+        source: ExternalModelSource,
+        config: Optional[ModelRecordChanges] = None,
+    ) -> ModelInstallJob:
+        return ModelInstallJob(
+            id=self._next_id(),
+            source=source,
+            config_in=config or ModelRecordChanges(),
+            local_path=self._app_config.models_path,
+            inplace=True,
         )
 
     def _import_remote_model(

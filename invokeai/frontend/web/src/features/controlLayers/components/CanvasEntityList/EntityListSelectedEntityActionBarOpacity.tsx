@@ -155,7 +155,7 @@ export const EntityListSelectedEntityActionBarOpacity = memo(() => {
             <NumberInputField paddingInlineEnd={7} _focusVisible={{ zIndex: 0 }} title="" />
             <PopoverTrigger>
               <IconButton
-                aria-label="open-slider"
+                aria-label={t('common.openSlider')}
                 icon={<PiCaretDownBold />}
                 size="sm"
                 variant="link"

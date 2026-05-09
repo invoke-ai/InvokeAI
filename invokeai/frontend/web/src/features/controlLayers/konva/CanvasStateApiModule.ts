@@ -21,6 +21,7 @@ import {
   entityBrushLineAdded,
   entityEraserLineAdded,
   entityGradientAdded,
+  entityLassoAdded,
   entityMovedBy,
   entityMovedTo,
   entityRasterized,
@@ -43,6 +44,7 @@ import type {
   EntityEraserLineAddedPayload,
   EntityGradientAddedPayload,
   EntityIdentifierPayload,
+  EntityLassoAddedPayload,
   EntityMovedByPayload,
   EntityMovedToPayload,
   EntityRasterizedPayload,
@@ -173,6 +175,13 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    */
   addRect = (arg: EntityRectAddedPayload) => {
     this.store.dispatch(entityRectAdded(arg));
+  };
+
+  /**
+   * Adds a lasso object to an entity, pushing state to redux.
+   */
+  addLasso = (arg: EntityLassoAddedPayload) => {
+    this.store.dispatch(entityLassoAdded(arg));
   };
 
   /**

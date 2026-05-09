@@ -4,10 +4,11 @@ import { omit, reduce } from 'es-toolkit/compat';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { Templates } from 'features/nodes/store/types';
+import { resolveConnectorSource } from 'features/nodes/store/util/connectorTopology';
 import type { BoardField } from 'features/nodes/types/common';
 import type { BoardFieldInputInstance } from 'features/nodes/types/field';
 import { isBoardFieldInputInstance, isBoardFieldInputTemplate } from 'features/nodes/types/field';
-import { isExecutableNode, isInvocationNode } from 'features/nodes/types/invocation';
+import { isConnectorNode, isExecutableNode, isInvocationNode } from 'features/nodes/types/invocation';
 import type { AnyInvocation, Graph } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -96,12 +97,57 @@ export const buildNodesGraph = (state: RootState, templates: Templates): Require
   const filteredNodeIds = filteredNodes.map(({ id }) => id);
 
   // skip out the "dummy" edges between collapsed nodes
-  const filteredEdges = edges
-    .filter((edge) => edge.type !== 'collapsed')
-    .filter((edge) => filteredNodeIds.includes(edge.source) && filteredNodeIds.includes(edge.target));
+  const flattenedEdges = edges
+    .filter((edge) => edge.type === 'default')
+    .flatMap((edge) => {
+      const targetNode = nodes.find((node) => node.id === edge.target);
+      if (!targetNode || !isInvocationNode(targetNode) || !isExecutableNode(targetNode)) {
+        return [];
+      }
+
+      const sourceNode = nodes.find((node) => node.id === edge.source);
+      if (!sourceNode) {
+        return [];
+      }
+
+      if (isInvocationNode(sourceNode)) {
+        if (!isExecutableNode(sourceNode) || !filteredNodeIds.includes(sourceNode.id)) {
+          return [];
+        }
+        return [edge];
+      }
+
+      if (isConnectorNode(sourceNode)) {
+        const resolvedSource = resolveConnectorSource(sourceNode.id, nodes, edges);
+        if (!resolvedSource || !filteredNodeIds.includes(resolvedSource.nodeId)) {
+          return [];
+        }
+        return [
+          {
+            ...edge,
+            id: `flattened-${resolvedSource.nodeId}-${resolvedSource.fieldName}-${edge.target}-${edge.targetHandle}`,
+            source: resolvedSource.nodeId,
+            sourceHandle: resolvedSource.fieldName,
+          },
+        ];
+      }
+
+      return [];
+    })
+    .filter((edge, index, allEdges) => {
+      return (
+        allEdges.findIndex(
+          (candidate) =>
+            candidate.source === edge.source &&
+            candidate.sourceHandle === edge.sourceHandle &&
+            candidate.target === edge.target &&
+            candidate.targetHandle === edge.targetHandle
+        ) === index
+      );
+    });
 
   // Reduce the node editor edges into invocation graph edges
-  const parsedEdges = filteredEdges.reduce<NonNullable<Graph['edges']>>((edgesAccumulator, edge) => {
+  const parsedEdges = flattenedEdges.reduce<NonNullable<Graph['edges']>>((edgesAccumulator, edge) => {
     const { source, target, sourceHandle, targetHandle } = edge;
 
     if (!sourceHandle || !targetHandle) {

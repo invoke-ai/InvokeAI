@@ -4,11 +4,15 @@ import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';
+import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
+import { useSelectedBoard } from 'services/api/hooks/useSelectedBoard';
 
 export const ContextMenuItemDeleteImage = memo(() => {
   const { t } = useTranslation();
   const deleteImageModal = useDeleteImageModalApi();
   const imageDTO = useImageDTOContext();
+  const selectedBoard = useSelectedBoard();
+  const { canWriteImages } = useBoardAccess(selectedBoard);
 
   const onClick = useCallback(async () => {
     try {
@@ -17,6 +21,10 @@ export const ContextMenuItemDeleteImage = memo(() => {
       // noop;
     }
   }, [deleteImageModal, imageDTO]);
+
+  if (!canWriteImages) {
+    return null;
+  }
 
   return (
     <IconMenuItem

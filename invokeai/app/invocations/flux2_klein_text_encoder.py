@@ -45,7 +45,7 @@ KLEIN_MAX_SEQ_LEN = 512
     "flux2_klein_text_encoder",
     title="Prompt - Flux2 Klein",
     tags=["prompt", "conditioning", "flux", "klein", "qwen3"],
-    category="conditioning",
+    category="prompt",
     version="1.1.1",
     classification=Classification.Prototype,
 )

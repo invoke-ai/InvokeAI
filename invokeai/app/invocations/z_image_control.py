@@ -57,7 +57,7 @@ class ZImageControlOutput(BaseInvocationOutput):
     "z_image_control",
     title="Z-Image ControlNet",
     tags=["image", "z-image", "control", "controlnet"],
-    category="control",
+    category="conditioning",
     version="1.1.0",
     classification=Classification.Prototype,
 )
