@@ -7,6 +7,7 @@ import {
 import type { BaseModelType } from 'features/nodes/types/common';
 import type { WildcardIndexItem } from 'services/api/endpoints/utilities';
 
+import { type PromptWorkbenchTranslation, tx } from './i18n';
 import { getPromptModelCapabilities } from './modelCapabilities';
 import { getMissingWildcardReferences, getWildcardReferences } from './wildcards';
 
@@ -18,9 +19,9 @@ export type PromptDiagnosticSeverity = 'ok' | 'info' | 'warning' | 'error';
 
 export type PromptDiagnostic = {
   code: string;
-  label: string;
+  label: PromptWorkbenchTranslation;
   severity: PromptDiagnosticSeverity;
-  description: string;
+  description: PromptWorkbenchTranslation;
 };
 
 type GetPromptDiagnosticsArg = {
@@ -55,50 +56,53 @@ export const getPromptDiagnostics = ({
   if (hasAttentionSyntax && !capabilities.supportsAttentionWeights) {
     diagnostics.push({
       code: 'attention-unsupported',
-      label: 'Weights literal?',
+      label: tx('promptWorkbench.diagnostics.weightsLiteralLabel'),
       severity: 'warning',
-      description: 'This prompt uses weight syntax, but the selected model may encode it as literal text.',
+      description: tx('promptWorkbench.diagnostics.weightsLiteralDesc'),
     });
   }
 
   if (wildcardIndexUnavailable) {
     diagnostics.push({
       code: 'wildcards-unavailable',
-      label: 'Wildcard error',
+      label: tx('promptWorkbench.diagnostics.wildcardErrorLabel'),
       severity: 'error',
-      description: 'The local wildcard index could not be loaded. Restart the backend so /api/v1/utilities/wildcards is available.',
+      description: tx('promptWorkbench.diagnostics.wildcardErrorDesc'),
     });
   } else if (missingWildcards.length > 0) {
     diagnostics.push({
       code: 'wildcards-missing',
-      label: `Missing ${missingWildcards.length}`,
+      label: tx('promptWorkbench.diagnostics.missingLabel', { count: missingWildcards.length }),
       severity: 'error',
-      description: `Missing wildcard${missingWildcards.length === 1 ? '' : 's'}: ${missingWildcards.join(', ')}`,
+      description: tx('promptWorkbench.diagnostics.missingDesc', {
+        count: missingWildcards.length,
+        wildcards: missingWildcards.join(', '),
+      }),
     });
   } else if (wildcardReferences.length > 0) {
     diagnostics.push({
       code: 'wildcards-found',
-      label: `Wildcards ${wildcardReferences.length}`,
+      label: tx('promptWorkbench.diagnostics.wildcardsFoundLabel', { count: wildcardReferences.length }),
       severity: 'ok',
-      description: 'All referenced wildcards are available locally.',
+      description: tx('promptWorkbench.diagnostics.wildcardsFoundDesc'),
     });
   }
 
   if (!wildcardIndexUnavailable && wildcardIndexErrorCount > 0) {
     diagnostics.push({
       code: 'wildcards-index-errors',
-      label: `Index errors ${wildcardIndexErrorCount}`,
+      label: tx('promptWorkbench.diagnostics.indexErrorsLabel', { count: wildcardIndexErrorCount }),
       severity: 'warning',
-      description: 'Some local wildcard files could not be read.',
+      description: tx('promptWorkbench.diagnostics.indexErrorsDesc'),
     });
   }
 
   if (dynamicPromptError) {
     diagnostics.push({
       code: 'dynamic-error',
-      label: 'Dynamic error',
+      label: tx('promptWorkbench.diagnostics.dynamicErrorLabel'),
       severity: 'error',
-      description: `Dynamic prompt parser error: ${dynamicPromptError}`,
+      description: tx('promptWorkbench.diagnostics.dynamicErrorDesc', { error: dynamicPromptError }),
     });
   } else if (getHasDynamicPromptSyntax(prompt)) {
     const count = Math.max(dynamicPromptCount, 1);
@@ -128,7 +132,9 @@ export const getPromptDiagnostics = ({
 };
 
 export const getHasAttentionSyntax = (prompt: string): boolean =>
-  NUMERIC_ATTENTION_PATTERN.test(prompt) || COMPEL_ATTENTION_PATTERN.test(prompt) || BRACKET_ATTENTION_PATTERN.test(prompt);
+  NUMERIC_ATTENTION_PATTERN.test(prompt) ||
+  COMPEL_ATTENTION_PATTERN.test(prompt) ||
+  BRACKET_ATTENTION_PATTERN.test(prompt);
 
 const getDynamicPromptLabel = (arg: {
   count: number;
@@ -136,30 +142,30 @@ const getDynamicPromptLabel = (arg: {
   hasCyclicWildcard: boolean;
   hasMixedCyclicAndNonCyclicSyntax: boolean;
   randomRefreshMode: DynamicPromptRandomRefreshMode;
-}): string => {
+}): PromptWorkbenchTranslation => {
   const { count, isCombinatorial, hasCyclicWildcard, hasMixedCyclicAndNonCyclicSyntax, randomRefreshMode } = arg;
 
   if (isCombinatorial) {
-    return `All ${count}`;
+    return tx('promptWorkbench.diagnostics.dynamicAllLabel', { count });
   }
 
   if (hasMixedCyclicAndNonCyclicSyntax) {
-    return 'Mixed dynamic';
+    return tx('promptWorkbench.diagnostics.dynamicMixedLabel');
   }
 
   if (hasCyclicWildcard) {
-    return `Cycle ${count}`;
+    return tx('promptWorkbench.diagnostics.dynamicCycleLabel', { count });
   }
 
   if (randomRefreshMode === 'per_image') {
-    return 'Random/image';
+    return tx('promptWorkbench.behavior.randomImageShort');
   }
 
   if (randomRefreshMode === 'per_enqueue') {
-    return 'Random/invoke';
+    return tx('promptWorkbench.behavior.randomInvokeShort');
   }
 
-  return 'Random preview';
+  return tx('promptWorkbench.behavior.randomPreviewLabel');
 };
 
 const getDynamicPromptDescription = (arg: {
@@ -167,28 +173,28 @@ const getDynamicPromptDescription = (arg: {
   hasCyclicWildcard: boolean;
   hasMixedCyclicAndNonCyclicSyntax: boolean;
   randomRefreshMode: DynamicPromptRandomRefreshMode;
-}): string => {
+}): PromptWorkbenchTranslation => {
   const { isCombinatorial, hasCyclicWildcard, hasMixedCyclicAndNonCyclicSyntax, randomRefreshMode } = arg;
 
   if (isCombinatorial) {
-    return 'All-combinations prompt expansion is active for this prompt.';
+    return tx('promptWorkbench.diagnostics.dynamicAllDesc');
   }
 
   if (hasMixedCyclicAndNonCyclicSyntax) {
-    return 'Cyclic wildcards advance per output; random wildcards follow the selected randomness mode.';
+    return tx('promptWorkbench.diagnostics.dynamicMixedDesc');
   }
 
   if (hasCyclicWildcard) {
-    return 'Cyclic wildcard expansion is deterministic and cycles through values across generated outputs.';
+    return tx('promptWorkbench.diagnostics.dynamicCycleDesc');
   }
 
   if (randomRefreshMode === 'per_image') {
-    return 'Random prompt sampling will roll fresh values for each generated image.';
+    return tx('promptWorkbench.diagnostics.dynamicRandomImageDesc');
   }
 
   if (randomRefreshMode === 'per_enqueue') {
-    return 'Random prompt sampling will roll once when generation is queued.';
+    return tx('promptWorkbench.diagnostics.dynamicRandomInvokeDesc');
   }
 
-  return 'Random prompt sampling is fixed to the current preview until Reshuffle is used.';
+  return tx('promptWorkbench.diagnostics.dynamicRandomPreviewDesc');
 };

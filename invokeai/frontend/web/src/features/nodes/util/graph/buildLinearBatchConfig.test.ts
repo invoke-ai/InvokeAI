@@ -71,6 +71,31 @@ describe('prepareLinearUIBatch', () => {
     ]);
   });
 
+  it('ignores seedBehaviour in per-output mode because prompts are already final queued outputs', () => {
+    const batch = prepareLinearUIBatch({
+      state: buildState({
+        seedBehaviour: 'PER_PROMPT',
+        positivePrompt: '__@lighting/studio__',
+        prompts: ['softbox', 'window light', 'softbox'],
+        iterations: 3,
+      }),
+      g,
+      prepend: false,
+      base: 'sdxl',
+      positivePromptNode,
+      seedNode,
+      origin: 'generate',
+      destination: 'generate',
+    }).batch;
+
+    expect(batch.data).toEqual([
+      [
+        { node_path: 'seed', field_name: 'value', items: [100, 101, 102] },
+        { node_path: 'positive_prompt', field_name: 'value', items: ['softbox', 'window light', 'softbox'] },
+      ],
+    ]);
+  });
+
   it('queues randomSamples times iterations outputs for per-image random prompts', () => {
     const prompts = ['a', 'b', 'c', 'd', 'e', 'f'];
     const batch = prepareLinearUIBatch({

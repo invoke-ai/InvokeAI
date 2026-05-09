@@ -285,6 +285,46 @@ export type paths = {
         patch: operations["update_user_api_v1_auth_users__user_id__patch"];
         trace?: never;
     };
+    "/api/v1/utilities/wildcards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Wildcards
+         * @description List local dynamic prompt wildcards from INVOKEAI_ROOT/wildcards.
+         */
+        get: operations["list_wildcards"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/utilities/wildcards/values": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Wildcard Values
+         * @description List values for a single local dynamic prompt wildcard.
+         */
+        get: operations["get_wildcard_values"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/utilities/dynamicprompts": {
         parameters: {
             query?: never;
@@ -8808,6 +8848,10 @@ export type components = {
             prompts: string[];
             /** Error */
             error?: string | null;
+            /** Warnings */
+            warnings?: string[];
+            /** Missing Wildcards */
+            missing_wildcards?: string[];
         };
         /**
          * Upscale (RealESRGAN)
@@ -16160,14 +16204,14 @@ export type components = {
              * Convert Cache Dir
              * Format: path
              * @description Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).
-             * @default models/.convert_cache
+             * @default models\.convert_cache
              */
             convert_cache_dir?: string;
             /**
              * Download Cache Dir
              * Format: path
              * @description Path to the directory that contains dynamically downloaded models.
-             * @default models/.download_cache
+             * @default models\.download_cache
              */
             download_cache_dir?: string;
             /**
@@ -31030,6 +31074,63 @@ export type components = {
              */
             cover_image_name?: string | null;
         };
+        /** WildcardIndexError */
+        WildcardIndexError: {
+            /** Path */
+            path: string;
+            /** Message */
+            message: string;
+        };
+        /** WildcardIndexItem */
+        WildcardIndexItem: {
+            /** Token */
+            token: string;
+            /** Path */
+            path: string;
+            /** Label */
+            label: string;
+            /**
+             * File Type
+             * @enum {string}
+             */
+            file_type: "txt" | "json" | "yaml";
+            /** Value Count */
+            value_count: number;
+            /** Samples */
+            samples: string[];
+        };
+        /** WildcardValuesResponse */
+        WildcardValuesResponse: {
+            /** Token */
+            token: string;
+            /** Path */
+            path: string;
+            /** Label */
+            label: string;
+            /**
+             * File Type
+             * @enum {string}
+             */
+            file_type: "txt" | "json" | "yaml";
+            /** Value Count */
+            value_count: number;
+            /** Values */
+            values: string[];
+            /** Truncated */
+            truncated: boolean;
+        };
+        /** WildcardsResponse */
+        WildcardsResponse: {
+            /**
+             * Wildcard Dir
+             * @default wildcards
+             */
+            wildcard_dir?: string;
+            /** Wildcards */
+            wildcards: components["schemas"]["WildcardIndexItem"][];
+            /** Errors */
+            errors: components["schemas"]["WildcardIndexError"][];
+        };
         /** Workflow */
         Workflow: {
             /**
@@ -32490,6 +32591,60 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_wildcards: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WildcardsResponse"];
+                };
+            };
+        };
+    };
+    get_wildcard_values: {
+        parameters: {
+            query: {
+                /** @description The relative wildcard path to read values for */
+                path: string;
+                /** @description The max number of wildcard values to return */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WildcardValuesResponse"];
                 };
             };
             /** @description Validation Error */

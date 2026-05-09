@@ -25,8 +25,8 @@ vi.mock('services/api/endpoints/utilities', () => ({
   },
 }));
 
+import { getDynamicPromptsOutputCount } from './resolveDynamicPrompts';
 import {
-  getDynamicPromptsEnqueueRandomSamples,
   getShouldRefreshDynamicPromptsForEnqueue,
   refreshDynamicPromptsForEnqueue,
 } from './refreshDynamicPromptsForEnqueue';
@@ -68,43 +68,45 @@ describe('refreshDynamicPromptsForEnqueue', () => {
 
   it('requests randomSamples times iterations for per-image enqueue refresh', () => {
     expect(
-      getDynamicPromptsEnqueueRandomSamples(
-        buildState({ randomRefreshMode: 'per_image', randomSamples: 2, iterations: 3 })
-      )
+      getDynamicPromptsOutputCount({
+        prompt: '__camera/lens__',
+        randomRefreshMode: 'per_image',
+        randomSamples: 2,
+        iterations: 3,
+      })
     ).toBe(6);
   });
 
   it('requests only randomSamples for per-invoke enqueue refresh', () => {
     expect(
-      getDynamicPromptsEnqueueRandomSamples(
-        buildState({ randomRefreshMode: 'per_enqueue', randomSamples: 2, iterations: 3 })
-      )
+      getDynamicPromptsOutputCount({
+        prompt: '__camera/lens__',
+        randomRefreshMode: 'per_enqueue',
+        randomSamples: 2,
+        iterations: 3,
+      })
     ).toBe(2);
   });
 
   it('requests randomSamples times iterations for per-invoke cycle-only enqueue refresh', () => {
     expect(
-      getDynamicPromptsEnqueueRandomSamples(
-        buildState({
-          randomRefreshMode: 'per_enqueue',
-          randomSamples: 2,
-          iterations: 3,
-          positivePrompt: '__@lighting/studio__',
-        })
-      )
+      getDynamicPromptsOutputCount({
+        prompt: '__@lighting/studio__',
+        randomRefreshMode: 'per_enqueue',
+        randomSamples: 2,
+        iterations: 3,
+      })
     ).toBe(6);
   });
 
   it('counts cycle-only locked-preview prompts per generated output', () => {
     expect(
-      getDynamicPromptsEnqueueRandomSamples(
-        buildState({
-          randomRefreshMode: 'manual',
-          randomSamples: 2,
-          iterations: 3,
-          positivePrompt: '__@lighting/studio__',
-        })
-      )
+      getDynamicPromptsOutputCount({
+        prompt: '__@lighting/studio__',
+        randomRefreshMode: 'manual',
+        randomSamples: 2,
+        iterations: 3,
+      })
     ).toBe(6);
   });
 

@@ -35,30 +35,11 @@ type ImageToPromptResponse = {
   error?: string | null;
 };
 
-export type WildcardIndexItem = {
-  token: string;
-  path: string;
-  label: string;
-  file_type: 'txt' | 'json' | 'yaml';
-  value_count: number;
-  samples: string[];
-};
-
-export type WildcardsResponse = {
-  wildcard_dir: string;
-  wildcards: WildcardIndexItem[];
-  errors: { path: string; message: string }[];
-};
-
-export type WildcardValuesResponse = {
-  token: string;
-  path: string;
-  label: string;
-  file_type: 'txt' | 'json' | 'yaml';
-  value_count: number;
-  values: string[];
-  truncated: boolean;
-};
+export type WildcardsResponse =
+  paths['/api/v1/utilities/wildcards']['get']['responses']['200']['content']['application/json'];
+export type WildcardIndexItem = WildcardsResponse['wildcards'][number];
+export type WildcardValuesResponse =
+  paths['/api/v1/utilities/wildcards/values']['get']['responses']['200']['content']['application/json'];
 
 export const utilitiesApi = api.injectEndpoints({
   endpoints: (build) => ({

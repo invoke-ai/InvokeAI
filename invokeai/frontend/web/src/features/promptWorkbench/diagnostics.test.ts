@@ -38,7 +38,7 @@ describe('prompt workbench diagnostics', () => {
     });
 
     expect(diagnostics.find((diagnostic) => diagnostic.code === 'attention-unsupported')).toMatchObject({
-      label: 'Weights literal?',
+      label: { key: 'promptWorkbench.diagnostics.weightsLiteralLabel' },
       severity: 'warning',
     });
   });
@@ -54,7 +54,7 @@ describe('prompt workbench diagnostics', () => {
     });
 
     expect(diagnostics.find((diagnostic) => diagnostic.code === 'wildcards-missing')).toMatchObject({
-      label: 'Missing 1',
+      label: { key: 'promptWorkbench.diagnostics.missingLabel', options: { count: 1 } },
       severity: 'error',
     });
   });
@@ -71,7 +71,7 @@ describe('prompt workbench diagnostics', () => {
     });
 
     expect(diagnostics.find((diagnostic) => diagnostic.code === 'wildcards-unavailable')).toMatchObject({
-      label: 'Wildcard error',
+      label: { key: 'promptWorkbench.diagnostics.wildcardErrorLabel' },
       severity: 'error',
     });
     expect(diagnostics.find((diagnostic) => diagnostic.code === 'wildcards-missing')).toBeUndefined();
@@ -88,7 +88,9 @@ describe('prompt workbench diagnostics', () => {
     });
 
     expect(diagnostics.find((diagnostic) => diagnostic.code === 'wildcards-available')).toBeUndefined();
-    expect(diagnostics.find((diagnostic) => diagnostic.label === 'Wildcards')).toBeUndefined();
+    expect(
+      diagnostics.find((diagnostic) => diagnostic.label.key === 'promptWorkbench.diagnostics.wildcardsLabel')
+    ).toBeUndefined();
   });
 
   it('reports referenced wildcards when present', () => {
@@ -102,7 +104,7 @@ describe('prompt workbench diagnostics', () => {
     });
 
     expect(diagnostics.find((diagnostic) => diagnostic.code === 'wildcards-found')).toMatchObject({
-      label: 'Wildcards 1',
+      label: { key: 'promptWorkbench.diagnostics.wildcardsFoundLabel', options: { count: 1 } },
       severity: 'ok',
     });
   });
@@ -118,7 +120,7 @@ describe('prompt workbench diagnostics', () => {
     });
 
     expect(diagnostics.find((diagnostic) => diagnostic.code === 'wildcards-index-errors')).toMatchObject({
-      label: 'Index errors 2',
+      label: { key: 'promptWorkbench.diagnostics.indexErrorsLabel', options: { count: 2 } },
       severity: 'warning',
     });
   });
@@ -134,7 +136,7 @@ describe('prompt workbench diagnostics', () => {
     });
 
     expect(diagnostics.find((diagnostic) => diagnostic.code === 'dynamic-active')).toMatchObject({
-      label: 'Random/image',
+      label: { key: 'promptWorkbench.behavior.randomImageShort' },
       severity: 'ok',
     });
   });
@@ -151,7 +153,7 @@ describe('prompt workbench diagnostics', () => {
     });
 
     expect(diagnostics.find((diagnostic) => diagnostic.code === 'dynamic-active')).toMatchObject({
-      label: 'Random/image',
+      label: { key: 'promptWorkbench.behavior.randomImageShort' },
       severity: 'ok',
     });
   });
@@ -168,7 +170,7 @@ describe('prompt workbench diagnostics', () => {
     });
 
     expect(diagnostics.find((diagnostic) => diagnostic.code === 'dynamic-active')).toMatchObject({
-      label: 'Random/invoke',
+      label: { key: 'promptWorkbench.behavior.randomInvokeShort' },
       severity: 'ok',
     });
   });
@@ -185,7 +187,7 @@ describe('prompt workbench diagnostics', () => {
     });
 
     expect(diagnostics.find((diagnostic) => diagnostic.code === 'dynamic-active')).toMatchObject({
-      label: 'Random preview',
+      label: { key: 'promptWorkbench.behavior.randomPreviewLabel' },
       severity: 'ok',
     });
   });
@@ -202,7 +204,7 @@ describe('prompt workbench diagnostics', () => {
     });
 
     expect(diagnostics.find((diagnostic) => diagnostic.code === 'dynamic-active')).toMatchObject({
-      label: 'Cycle 1',
+      label: { key: 'promptWorkbench.diagnostics.dynamicCycleLabel', options: { count: 1 } },
       severity: 'ok',
     });
   });
@@ -219,9 +221,9 @@ describe('prompt workbench diagnostics', () => {
     });
 
     expect(diagnostics.find((diagnostic) => diagnostic.code === 'dynamic-active')).toMatchObject({
-      label: 'Mixed dynamic',
+      label: { key: 'promptWorkbench.diagnostics.dynamicMixedLabel' },
       severity: 'ok',
-      description: 'Cyclic wildcards advance per output; random wildcards follow the selected randomness mode.',
+      description: { key: 'promptWorkbench.diagnostics.dynamicMixedDesc' },
     });
   });
 
@@ -237,9 +239,12 @@ describe('prompt workbench diagnostics', () => {
     });
 
     expect(diagnostics.find((diagnostic) => diagnostic.code === 'dynamic-error')).toMatchObject({
-      label: 'Dynamic error',
+      label: { key: 'promptWorkbench.diagnostics.dynamicErrorLabel' },
       severity: 'error',
-      description: 'Dynamic prompt parser error: Could not parse prompt',
+      description: {
+        key: 'promptWorkbench.diagnostics.dynamicErrorDesc',
+        options: { error: 'Could not parse prompt' },
+      },
     });
   });
 });

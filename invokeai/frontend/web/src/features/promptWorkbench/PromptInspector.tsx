@@ -13,6 +13,7 @@ import {
 import type { DynamicPromptRandomRefreshMode } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import type { MouseEvent, ReactElement, ReactNode } from 'react';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   PiCaretDownBold,
   PiDiceFiveBold,
@@ -23,6 +24,7 @@ import {
   PiTrashSimpleBold,
 } from 'react-icons/pi';
 
+import { type PromptWorkbenchTranslation, tx } from './i18n';
 import {
   getWeightBehaviorLabel,
   getWeightShortLabel,
@@ -134,6 +136,7 @@ const WildcardInspectorRow = memo(
     onFixedValue,
     setFixedValueElement,
   }: WildcardInspectorRowProps) => {
+    const { t } = useTranslation();
     const hasWildcard = occurrence.wildcard !== null;
     const isActionable = occurrence.behavior !== 'missing' && occurrence.behavior !== 'unavailable';
     const selectionRange = occurrence.weight?.range ?? occurrence.range;
@@ -161,7 +164,7 @@ const WildcardInspectorRow = memo(
           alignItems="stretch"
           minH={16}
           role="group"
-          aria-label={`${occurrence.path} wildcard intent`}
+          aria-label={t('promptWorkbench.rows.wildcardIntentAria', { path: occurrence.path })}
         >
           <TypeCell color={getWildcardIconColor(occurrence)} icon={<PiDiceFiveBold />} />
           <LabelCell>
@@ -184,7 +187,7 @@ const WildcardInspectorRow = memo(
               </Button>
             </Tooltip>
             <Text color="base.400" fontSize="xs" fontWeight="medium" noOfLines={1}>
-              {getWildcardSecondaryText(occurrence)}
+              {t(getWildcardSecondaryText(occurrence).key, getWildcardSecondaryText(occurrence).options)}
             </Text>
           </LabelCell>
           <BehaviorCell>
@@ -213,7 +216,7 @@ const WildcardInspectorRow = memo(
           <Flex flexDir="column" ms={12} me={2} mb={2} gap={0.5} maxH={36} overflowY="auto">
             {isFetchingFixedValues && (
               <Text fontSize="sm" color="base.400">
-                Loading values...
+                {t('promptWorkbench.values.loading')}
               </Text>
             )}
             {fixedValues?.map((value, index) => (
@@ -249,6 +252,7 @@ const WildcardBehaviorControl = memo(
     canPickFixedValue: boolean;
     onAction: (action: WildcardBehaviorAction) => void;
   }) => {
+    const { t } = useTranslation();
     const onButtonMouseDown = useCallback((e: MouseEvent<HTMLButtonElement>) => {
       e.preventDefault();
     }, []);
@@ -267,9 +271,17 @@ const WildcardBehaviorControl = memo(
 
     if (!isActionable) {
       return (
-        <Tooltip label={getWildcardBehaviorLabel(occurrence, randomRefreshMode)}>
+        <Tooltip
+          label={t(
+            getWildcardBehaviorLabel(occurrence, randomRefreshMode).key,
+            getWildcardBehaviorLabel(occurrence, randomRefreshMode).options
+          )}
+        >
           <Text color="error.300" fontSize="md" fontWeight="semibold" noOfLines={1}>
-            {getWildcardBehaviorShortLabel(occurrence, randomRefreshMode)}
+            {t(
+              getWildcardBehaviorShortLabel(occurrence, randomRefreshMode).key,
+              getWildcardBehaviorShortLabel(occurrence, randomRefreshMode).options
+            )}
           </Text>
         </Tooltip>
       );
@@ -277,7 +289,12 @@ const WildcardBehaviorControl = memo(
 
     return (
       <Menu>
-        <Tooltip label={getWildcardBehaviorLabel(occurrence, randomRefreshMode)}>
+        <Tooltip
+          label={t(
+            getWildcardBehaviorLabel(occurrence, randomRefreshMode).key,
+            getWildcardBehaviorLabel(occurrence, randomRefreshMode).options
+          )}
+        >
           <MenuButton
             as={Button}
             size="sm"
@@ -290,7 +307,10 @@ const WildcardBehaviorControl = memo(
             onMouseDown={onButtonMouseDown}
           >
             <Text as="span" noOfLines={1} fontSize="xs" fontWeight="medium">
-              {getWildcardBehaviorShortLabel(occurrence, randomRefreshMode)}
+              {t(
+                getWildcardBehaviorShortLabel(occurrence, randomRefreshMode).key,
+                getWildcardBehaviorShortLabel(occurrence, randomRefreshMode).options
+              )}
             </Text>
           </MenuButton>
         </Tooltip>
@@ -298,15 +318,15 @@ const WildcardBehaviorControl = memo(
           <MenuItem
             icon={<PiDiceFiveBold />}
             onClick={onRandom}
-            title="Use this wildcard as a random token. Random cadence is controlled by the prompt."
+            title={t('promptWorkbench.actions.randomWildcardTooltip')}
           >
-            Random wildcard
+            {t('promptWorkbench.actions.randomWildcard')}
           </MenuItem>
-          <MenuItem icon={<PiRepeatBold />} onClick={onCycle} title="Cycles through values across generated outputs.">
-            Cycle through values
+          <MenuItem icon={<PiRepeatBold />} onClick={onCycle} title={t('promptWorkbench.actions.cycleTooltip')}>
+            {t('promptWorkbench.actions.cycle')}
           </MenuItem>
           <MenuItem icon={<PiPushPinSimpleBold />} onClick={onFixed} isDisabled={!canPickFixedValue}>
-            Pick fixed value
+            {t('promptWorkbench.actions.pickFixed')}
           </MenuItem>
         </MenuList>
       </Menu>
@@ -324,6 +344,7 @@ const WildcardActionsMenu = memo(
     occurrence: PromptWildcardOccurrence;
     onAction: (action: WildcardBehaviorAction) => void;
   }) => {
+    const { t } = useTranslation();
     const onButtonMouseDown = useCallback((e: MouseEvent<HTMLButtonElement>) => {
       e.preventDefault();
     }, []);
@@ -336,8 +357,8 @@ const WildcardActionsMenu = memo(
       <Menu>
         <MenuButton
           as={IconButton}
-          aria-label={`Open ${occurrence.path} wildcard actions`}
-          tooltip="Wildcard actions"
+          aria-label={t('promptWorkbench.actions.openWildcardActionsAria', { path: occurrence.path })}
+          tooltip={t('promptWorkbench.actions.wildcardActions')}
           size="sm"
           variant="ghost"
           minW={7}
@@ -348,7 +369,7 @@ const WildcardActionsMenu = memo(
         />
         <MenuList>
           <MenuItem icon={<PiTrashSimpleBold />} color="error.300" onClick={onRemove}>
-            Remove
+            {t('promptWorkbench.actions.remove')}
           </MenuItem>
         </MenuList>
       </Menu>
@@ -415,6 +436,7 @@ type WeightInspectorRowProps = {
 };
 
 const WeightInspectorRow = memo(({ occurrence, onSelectRange, onRemoveWeightOccurrence }: WeightInspectorRowProps) => {
+  const { t } = useTranslation();
   const onSelectMouseDown = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
       e.preventDefault();
@@ -435,7 +457,7 @@ const WeightInspectorRow = memo(({ occurrence, onSelectRange, onRemoveWeightOccu
         alignItems="stretch"
         minH={16}
         role="group"
-        aria-label={`${occurrence.text} prompt weight`}
+        aria-label={t('promptWorkbench.rows.weightIntentAria', { text: occurrence.text })}
       >
         <TypeCell color={occurrence.isSupported ? 'warning.300' : 'warning.400'} icon={<PiScalesBold />} />
         <LabelCell>
@@ -458,7 +480,7 @@ const WeightInspectorRow = memo(({ occurrence, onSelectRange, onRemoveWeightOccu
             </Button>
           </Tooltip>
           <Text color="base.400" fontSize="xs" fontWeight="medium" noOfLines={1}>
-            prompt weight
+            {t('promptWorkbench.weight.promptWeight')}
           </Text>
         </LabelCell>
         <BehaviorCell>
@@ -479,6 +501,7 @@ WeightInspectorRow.displayName = 'WeightInspectorRow';
 
 const WeightActionsMenu = memo(
   ({ occurrence, onRemove }: { occurrence: PromptWeightOccurrence; onRemove: () => void }) => {
+    const { t } = useTranslation();
     const onButtonMouseDown = useCallback((e: MouseEvent<HTMLButtonElement>) => {
       e.preventDefault();
     }, []);
@@ -487,8 +510,8 @@ const WeightActionsMenu = memo(
       <Menu>
         <MenuButton
           as={IconButton}
-          aria-label={`Open ${occurrence.text} weight actions`}
-          tooltip="Weight actions"
+          aria-label={t('promptWorkbench.actions.openWeightActionsAria', { text: occurrence.text })}
+          tooltip={t('promptWorkbench.actions.weightActions')}
           size="sm"
           variant="ghost"
           minW={7}
@@ -499,7 +522,7 @@ const WeightActionsMenu = memo(
         />
         <MenuList>
           <MenuItem icon={<PiTrashSimpleBold />} color="error.300" onClick={onRemove}>
-            Remove
+            {t('promptWorkbench.actions.remove')}
           </MenuItem>
         </MenuList>
       </Menu>
@@ -509,19 +532,25 @@ const WeightActionsMenu = memo(
 
 WeightActionsMenu.displayName = 'WeightActionsMenu';
 
-const WeightValue = memo(({ occurrence }: { occurrence: PromptWeightOccurrence }) => (
-  <Tooltip label={getWeightBehaviorLabel(occurrence)}>
-    <Text
-      color={occurrence.isSupported ? 'base.100' : 'warning.300'}
-      fontSize="md"
-      fontWeight="semibold"
-      lineHeight="short"
-      noOfLines={1}
-    >
-      {getWeightShortLabel(occurrence)}
-    </Text>
-  </Tooltip>
-));
+const WeightValue = memo(({ occurrence }: { occurrence: PromptWeightOccurrence }) => {
+  const { t } = useTranslation();
+  const behaviorLabel = getWeightBehaviorLabel(occurrence);
+  const shortLabel = getWeightShortLabel(occurrence);
+
+  return (
+    <Tooltip label={t(behaviorLabel.key, behaviorLabel.options)}>
+      <Text
+        color={occurrence.isSupported ? 'base.100' : 'warning.300'}
+        fontSize="md"
+        fontWeight="semibold"
+        lineHeight="short"
+        noOfLines={1}
+      >
+        {t(shortLabel.key, shortLabel.options)}
+      </Text>
+    </Tooltip>
+  );
+});
 
 WeightValue.displayName = 'WeightValue';
 
@@ -604,23 +633,36 @@ const IntentRowBox = memo(
 
 IntentRowBox.displayName = 'IntentRowBox';
 
-const getWildcardSecondaryText = (occurrence: PromptWildcardOccurrence): string => {
+const getWildcardSecondaryText = (occurrence: PromptWildcardOccurrence): PromptWorkbenchTranslation => {
   if (occurrence.behavior === 'missing') {
-    return 'Missing wildcard';
+    return tx('promptWorkbench.rows.missingWildcard');
   }
   if (occurrence.behavior === 'unavailable') {
-    return 'Wildcard index unavailable';
+    return tx('promptWorkbench.rows.wildcardIndexUnavailable');
   }
 
-  const countText = occurrence.valueCount !== null ? ` \u00b7 ${occurrence.valueCount} values` : '';
+  const options = occurrence.valueCount !== null ? { count: occurrence.valueCount } : undefined;
 
   switch (occurrence.behavior) {
     case 'random':
-      return `Random wildcard${countText}`;
+      return tx(
+        occurrence.valueCount !== null
+          ? 'promptWorkbench.rows.randomWildcardWithCount'
+          : 'promptWorkbench.rows.randomWildcard',
+        options
+      );
     case 'cycle':
-      return `Cycle${countText}`;
+      return tx(
+        occurrence.valueCount !== null ? 'promptWorkbench.rows.cycleWithCount' : 'promptWorkbench.rows.cycle',
+        options
+      );
     case 'all':
-      return `All combinations${countText}`;
+      return tx(
+        occurrence.valueCount !== null
+          ? 'promptWorkbench.rows.allCombinationsWithCount'
+          : 'promptWorkbench.rows.allCombinations',
+        options
+      );
   }
 };
 

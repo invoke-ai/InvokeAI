@@ -8,8 +8,10 @@ import {
   selectDynamicPromptsRandomRefreshMode,
 } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const ParamDynamicPromptsRandomRefreshMode = () => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const mode = useAppSelector(selectDynamicPromptsMode);
   const randomRefreshMode = useAppSelector(selectDynamicPromptsRandomRefreshMode);
@@ -18,21 +20,21 @@ const ParamDynamicPromptsRandomRefreshMode = () => {
     () => [
       {
         value: 'per_image',
-        label: 'Per Image',
-        description: 'Roll a new random sample for each generated image.',
+        label: t('dynamicPrompts.randomness.perImageLabel'),
+        description: t('dynamicPrompts.randomness.perImageDesc'),
       },
       {
         value: 'per_enqueue',
-        label: 'Per Invoke',
-        description: 'Random wildcards roll once per Invoke; cyclic wildcards still advance per queued output.',
+        label: t('dynamicPrompts.randomness.perInvokeLabel'),
+        description: t('dynamicPrompts.randomness.perInvokeDesc'),
       },
       {
         value: 'manual',
-        label: 'Locked Preview',
-        description: 'Keep the preview fixed until Reshuffle is used.',
+        label: t('dynamicPrompts.randomness.manualLabel'),
+        description: t('dynamicPrompts.randomness.manualDesc'),
       },
     ],
-    []
+    [t]
   );
 
   const handleChange = useCallback<ComboboxOnChange>(
@@ -53,7 +55,7 @@ const ParamDynamicPromptsRandomRefreshMode = () => {
 
   return (
     <FormControl>
-      <FormLabel>Randomness</FormLabel>
+      <FormLabel>{t('dynamicPrompts.randomness.label')}</FormLabel>
       <Combobox value={value} options={options} onChange={handleChange} />
     </FormControl>
   );

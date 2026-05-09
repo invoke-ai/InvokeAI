@@ -1,5 +1,8 @@
 import type { AppDispatch } from 'app/store/store';
-import type { DynamicPromptMode, DynamicPromptRandomRefreshMode } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
+import type {
+  DynamicPromptMode,
+  DynamicPromptRandomRefreshMode,
+} from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getDynamicPromptsQueryArg } from 'features/dynamicPrompts/util/getDynamicPromptsQueryArg';
 import {
   getHasCyclicWildcardSyntax,
@@ -9,10 +12,7 @@ import { utilitiesApi } from 'services/api/endpoints/utilities';
 import type { paths } from 'services/api/schema';
 
 type DynamicPromptsResponse =
-  paths['/api/v1/utilities/dynamicprompts']['post']['responses']['200']['content']['application/json'] & {
-    warnings?: string[];
-    missing_wildcards?: string[];
-  };
+  paths['/api/v1/utilities/dynamicprompts']['post']['responses']['200']['content']['application/json'];
 
 type ResolveDynamicPromptsArg = {
   dispatch: AppDispatch;
@@ -117,7 +117,10 @@ export const resolveDynamicPrompts = async ({
     )
   );
 
-  return mergeDynamicPromptResponses([randomResponse, ...cycleResponses], cycleResponses.flatMap((res) => res.prompts));
+  return mergeDynamicPromptResponses(
+    [randomResponse, ...cycleResponses],
+    cycleResponses.flatMap((res) => res.prompts)
+  );
 };
 
 const fetchDynamicPrompts = ({

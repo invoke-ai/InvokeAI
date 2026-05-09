@@ -7,8 +7,10 @@ import {
   selectDynamicPromptsMode,
 } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const ParamDynamicPromptsMode = () => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const mode = useAppSelector(selectDynamicPromptsMode);
 
@@ -16,16 +18,16 @@ const ParamDynamicPromptsMode = () => {
     () => [
       {
         value: 'random',
-        label: 'Random Sample',
-        description: 'Sample prompts. Randomness applies to random wildcards.',
+        label: t('dynamicPrompts.mode.randomLabel'),
+        description: t('dynamicPrompts.mode.randomDesc'),
       },
       {
         value: 'combinatorial',
-        label: 'All Combinations',
-        description: 'Preview and queue every combination up to the limit.',
+        label: t('dynamicPrompts.mode.combinatorialLabel'),
+        description: t('dynamicPrompts.mode.combinatorialDesc'),
       },
     ],
-    []
+    [t]
   );
 
   const handleChange = useCallback<ComboboxOnChange>(
@@ -42,7 +44,7 @@ const ParamDynamicPromptsMode = () => {
 
   return (
     <FormControl>
-      <FormLabel>Mode</FormLabel>
+      <FormLabel>{t('dynamicPrompts.mode.label')}</FormLabel>
       <Combobox value={value} options={options} onChange={handleChange} />
     </FormControl>
   );

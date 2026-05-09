@@ -7,11 +7,10 @@ import {
   randomSeedChanged,
 } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
-import { getDynamicPromptsOutputCount, resolveDynamicPrompts } from 'features/dynamicPrompts/util/resolveDynamicPrompts';
+import { resolveDynamicPrompts } from 'features/dynamicPrompts/util/resolveDynamicPrompts';
 import { selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 
 const getRandomSeed = () => Date.now() + Math.floor(Math.random() * 1_000_000);
-const MAX_RANDOM_PROMPTS_FOR_ENQUEUE = 10000;
 
 export const getShouldRefreshDynamicPromptsForEnqueue = (state: RootState): boolean => {
   const { dynamicPrompts } = state;
@@ -21,21 +20,6 @@ export const getShouldRefreshDynamicPromptsForEnqueue = (state: RootState): bool
   }
 
   return getShouldProcessPrompt(selectPresetModifiedPrompts(state).positive);
-};
-
-export const getDynamicPromptsEnqueueRandomSamples = (state: RootState): number => {
-  const { randomRefreshMode, randomSamples } = state.dynamicPrompts;
-  const prompt = selectPresetModifiedPrompts(state).positive;
-
-  return Math.min(
-    getDynamicPromptsOutputCount({
-      iterations: state.params.iterations,
-      prompt,
-      randomRefreshMode,
-      randomSamples,
-    }),
-    MAX_RANDOM_PROMPTS_FOR_ENQUEUE
-  );
 };
 
 /**

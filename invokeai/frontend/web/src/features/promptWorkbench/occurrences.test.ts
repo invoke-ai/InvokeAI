@@ -48,46 +48,65 @@ describe('prompt workbench occurrences', () => {
       behavior: 'random',
       valueCount: 4,
     });
-    expect(getWildcardBehaviorLabel(occurrences[0]!, 'per_image')).toBe('Random per Image');
-    expect(getWildcardBehaviorLabel(occurrences[0]!, 'per_enqueue')).toBe('Random per Invoke');
-    expect(getWildcardBehaviorShortLabel(occurrences[0]!, 'per_image')).toBe('Random/image');
-    expect(getWildcardBehaviorShortLabel(occurrences[0]!, 'per_enqueue')).toBe('Random/invoke');
-    expect(getWildcardBehaviorShortLabel(occurrences[0]!, 'manual')).toBe('Preview');
+    expect(getWildcardBehaviorLabel(occurrences[0]!, 'per_image')).toEqual({
+      key: 'promptWorkbench.behavior.randomImageLabel',
+      options: undefined,
+    });
+    expect(getWildcardBehaviorLabel(occurrences[0]!, 'per_enqueue')).toEqual({
+      key: 'promptWorkbench.behavior.randomInvokeLabel',
+      options: undefined,
+    });
+    expect(getWildcardBehaviorShortLabel(occurrences[0]!, 'per_image')).toEqual({
+      key: 'promptWorkbench.behavior.randomImageShort',
+      options: undefined,
+    });
+    expect(getWildcardBehaviorShortLabel(occurrences[0]!, 'per_enqueue')).toEqual({
+      key: 'promptWorkbench.behavior.randomInvokeShort',
+      options: undefined,
+    });
+    expect(getWildcardBehaviorShortLabel(occurrences[0]!, 'manual')).toEqual({
+      key: 'promptWorkbench.behavior.previewShort',
+      options: undefined,
+    });
     expect(getWildcardBehaviorIconType(occurrences[0]!)).toBe('random');
   });
 
   it('parses cyclic wildcard occurrences', () => {
-    const occurrence =
-      getPromptWildcardOccurrences({
-        prompt: 'portrait __@camera/lens__',
-        wildcards,
-        wildcardIndexUnavailable: false,
-        dynamicPromptMode: 'random',
-      })[0]!;
+    const occurrence = getPromptWildcardOccurrences({
+      prompt: 'portrait __@camera/lens__',
+      wildcards,
+      wildcardIndexUnavailable: false,
+      dynamicPromptMode: 'random',
+    })[0]!;
 
     expect(occurrence).toMatchObject({
       path: 'camera/lens',
       behavior: 'cycle',
     });
-    expect(getWildcardBehaviorShortLabel(occurrence, 'per_image')).toBe('Cycle');
+    expect(getWildcardBehaviorShortLabel(occurrence, 'per_image')).toEqual({
+      key: 'promptWorkbench.behavior.cycleShort',
+      options: undefined,
+    });
     expect(getWildcardBehaviorIconType(occurrence)).toBe('cycle');
   });
 
   it('marks unknown wildcards as missing', () => {
-    const occurrence =
-      getPromptWildcardOccurrences({
-        prompt: 'portrait __missing/path__',
-        wildcards,
-        wildcardIndexUnavailable: false,
-        dynamicPromptMode: 'random',
-      })[0]!;
+    const occurrence = getPromptWildcardOccurrences({
+      prompt: 'portrait __missing/path__',
+      wildcards,
+      wildcardIndexUnavailable: false,
+      dynamicPromptMode: 'random',
+    })[0]!;
 
     expect(occurrence).toMatchObject({
       path: 'missing/path',
       behavior: 'missing',
       valueCount: null,
     });
-    expect(getWildcardBehaviorShortLabel(occurrence, 'per_image')).toBe('Missing');
+    expect(getWildcardBehaviorShortLabel(occurrence, 'per_image')).toEqual({
+      key: 'promptWorkbench.behavior.missingLabel',
+      options: undefined,
+    });
     expect(getWildcardBehaviorIconType(occurrence)).toBe('warning');
   });
 
@@ -157,7 +176,10 @@ describe('prompt workbench occurrences', () => {
     })[0]!;
 
     expect(occurrence.behavior).toBe('all');
-    expect(getWildcardBehaviorShortLabel(occurrence, 'per_image')).toBe('All');
+    expect(getWildcardBehaviorShortLabel(occurrence, 'per_image')).toEqual({
+      key: 'promptWorkbench.behavior.allShort',
+      options: undefined,
+    });
     expect(getWildcardBehaviorIconType(occurrence)).toBe('all');
   });
 
@@ -165,9 +187,18 @@ describe('prompt workbench occurrences', () => {
     const supported = getPromptWeightOccurrences({ prompt: '(face)++', supportsAttentionWeights: true });
     const unsupported = getPromptWeightOccurrences({ prompt: '(face)+', supportsAttentionWeights: false });
 
-    expect(getWeightShortLabel(supported[0]!)).toBe('++');
-    expect(getWeightShortLabel({ ...supported[0]!, attention: 1.2 })).toBe('1.2');
-    expect(getWeightShortLabel(unsupported[0]!)).toBe('Literal?');
+    expect(getWeightShortLabel(supported[0]!)).toEqual({
+      key: 'promptWorkbench.weight.valueLabel',
+      options: { value: '++' },
+    });
+    expect(getWeightShortLabel({ ...supported[0]!, attention: 1.2 })).toEqual({
+      key: 'promptWorkbench.weight.valueLabel',
+      options: { value: '1.2' },
+    });
+    expect(getWeightShortLabel(unsupported[0]!)).toEqual({
+      key: 'promptWorkbench.weight.literalShort',
+      options: undefined,
+    });
   });
 
   it('maps wildcard behavior menu actions to prompt intent', () => {

@@ -1,7 +1,15 @@
 import { IconButton, Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import type { MouseEvent, ReactElement } from 'react';
 import { memo, useCallback } from 'react';
-import { PiDiceFiveBold, PiPushPinSimpleBold, PiRepeatBold, PiSquaresFourBold, PiTrashSimpleBold, PiWarningBold } from 'react-icons/pi';
+import { useTranslation } from 'react-i18next';
+import {
+  PiDiceFiveBold,
+  PiPushPinSimpleBold,
+  PiRepeatBold,
+  PiSquaresFourBold,
+  PiTrashSimpleBold,
+  PiWarningBold,
+} from 'react-icons/pi';
 
 import type { WildcardBehaviorAction, WildcardBehaviorIconType } from './occurrences';
 
@@ -31,6 +39,7 @@ export const PromptWildcardBehaviorMenu = memo(
     onOpen,
     onClose,
   }: PromptWildcardBehaviorMenuProps) => {
+    const { t } = useTranslation();
     const onButtonMouseDown = useCallback((e: MouseEvent<HTMLButtonElement>) => {
       e.preventDefault();
     }, []);
@@ -70,21 +79,21 @@ export const PromptWildcardBehaviorMenu = memo(
               <MenuItem
                 icon={<PiDiceFiveBold />}
                 onClick={onRandom}
-                title="Use this wildcard as a random token. Random cadence is controlled by the prompt."
+                title={t('promptWorkbench.actions.randomWildcardTooltip')}
               >
-                Random wildcard
+                {t('promptWorkbench.actions.randomWildcard')}
               </MenuItem>
-              <MenuItem icon={<PiRepeatBold />} onClick={onCycle} title="Cycles through values across generated outputs.">
-                Cycle through values
+              <MenuItem icon={<PiRepeatBold />} onClick={onCycle} title={t('promptWorkbench.actions.cycleTooltip')}>
+                {t('promptWorkbench.actions.cycle')}
               </MenuItem>
               <MenuItem icon={<PiPushPinSimpleBold />} onClick={onFixed} isDisabled={!canPickFixedValue}>
-                Pick fixed value
+                {t('promptWorkbench.actions.pickFixed')}
               </MenuItem>
             </>
           )}
           {includeRemove && (
             <MenuItem icon={<PiTrashSimpleBold />} color="error.300" onClick={onRemove}>
-              Remove
+              {t('promptWorkbench.actions.remove')}
             </MenuItem>
           )}
         </MenuList>

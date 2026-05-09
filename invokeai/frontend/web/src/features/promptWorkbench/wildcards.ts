@@ -1,5 +1,7 @@
 import type { WildcardIndexItem } from 'services/api/endpoints/utilities';
 
+import { type PromptWorkbenchTranslation, tx } from './i18n';
+
 const WILDCARD_REFERENCE_REGEX = /__([^\r\n]+?)__/g;
 const WILDCARD_COMPLETION_STOP_CHARS = new Set([',', ';', '{', '}', '[', ']', '(', ')']);
 
@@ -36,10 +38,7 @@ export const getWildcardCompletionContext = (prompt: string, caret: number): Wil
   }
 
   const query = beforeCaret.slice(start + 2);
-  if (
-    query.includes('__') ||
-    [...query].some((char) => WILDCARD_COMPLETION_STOP_CHARS.has(char) || /\s/.test(char))
-  ) {
+  if (query.includes('__') || [...query].some((char) => WILDCARD_COMPLETION_STOP_CHARS.has(char) || /\s/.test(char))) {
     return null;
   }
 
@@ -83,28 +82,28 @@ export const getWildcardAutocompleteStatusMessage = ({
   optionCount,
   query,
   wildcardCount,
-}: GetWildcardAutocompleteStatusMessageArg): string | null => {
+}: GetWildcardAutocompleteStatusMessageArg): PromptWorkbenchTranslation | null => {
   if (optionCount > 0) {
     return null;
   }
 
   if (isLoading) {
-    return 'Loading local wildcards...';
+    return tx('promptWorkbench.autocomplete.loading');
   }
 
   if (isUnavailable) {
-    return 'Wildcard index unavailable. Restart the backend or check the wildcard endpoint.';
+    return tx('promptWorkbench.autocomplete.unavailable');
   }
 
   if (wildcardCount === 0) {
-    return 'No local wildcards found.';
+    return tx('promptWorkbench.autocomplete.empty');
   }
 
   if (query) {
-    return `No local wildcards match "${query}".`;
+    return tx('promptWorkbench.autocomplete.noMatches', { query });
   }
 
-  return 'No local wildcard matches.';
+  return tx('promptWorkbench.autocomplete.noWildcardMatches');
 };
 
 export const getWildcardReferences = (prompt: string): string[] => {

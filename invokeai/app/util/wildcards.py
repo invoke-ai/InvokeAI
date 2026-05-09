@@ -55,6 +55,7 @@ def get_wildcards_path(root_path: Path) -> Path:
 def index_wildcards(wildcards_path: Path, max_samples: int = 5) -> WildcardsResponse:
     wildcards: list[WildcardIndexItem] = []
     errors: list[WildcardIndexError] = []
+    seen_paths: dict[str, str] = {}
 
     if not wildcards_path.exists():
         return WildcardsResponse(wildcards=wildcards, errors=errors)
@@ -89,7 +90,18 @@ def index_wildcards(wildcards_path: Path, max_samples: int = 5) -> WildcardsResp
                 items = _index_txt_wildcard(path, rel_path, max_samples)
             else:
                 items = _index_structured_wildcard(path, rel_path, file_type, max_samples)
-            wildcards.extend(items)
+            for item in items:
+                existing_path = seen_paths.get(item.path)
+                if existing_path is not None:
+                    errors.append(
+                        WildcardIndexError(
+                            path=_as_posix(rel_path),
+                            message=f"Duplicate wildcard path '{item.path}' already indexed from '{existing_path}'",
+                        )
+                    )
+                    continue
+                seen_paths[item.path] = _as_posix(rel_path)
+                wildcards.append(item)
         except Exception as e:
             errors.append(WildcardIndexError(path=_as_posix(rel_path), message=str(e)))
 
@@ -142,10 +154,13 @@ def get_wildcard_values(wildcards_path: Path, reference: str, limit: int = 200) 
         if rel_path is None or path.is_symlink():
             continue
 
-        if file_type == "txt":
-            item = _get_txt_wildcard_values(path, rel_path, wildcard_path, limit)
-        else:
-            item = _get_structured_wildcard_values(path, rel_path, file_type, wildcard_path, limit)
+        try:
+            if file_type == "txt":
+                item = _get_txt_wildcard_values(path, rel_path, wildcard_path, limit)
+            else:
+                item = _get_structured_wildcard_values(path, rel_path, file_type, wildcard_path, limit)
+        except Exception:
+            continue
 
         if item is not None:
             return item

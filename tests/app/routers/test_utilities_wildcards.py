@@ -2,7 +2,7 @@ import asyncio
 import os
 
 from invokeai.app.api.routers.utilities import parse_dynamicprompts
-from invokeai.app.api.routers.utilities_wildcards import (
+from invokeai.app.util.wildcards import (
     find_missing_wildcard_references,
     get_wildcard_references,
     get_wildcard_values,
@@ -74,6 +74,18 @@ def test_get_wildcard_values_resolves_txt_json_and_nested_yaml(tmp_path):
     assert yaml_values.values == ["calm", "intense"]
 
 
+def test_get_wildcard_values_skips_malformed_structured_files_for_unrelated_wildcards(tmp_path):
+    wildcards_dir = tmp_path / "wildcards"
+    wildcards_dir.mkdir()
+    (wildcards_dir / "bad.json").write_text('{"broken": [', encoding="utf-8")
+    (wildcards_dir / "valid.txt").write_text("one\ntwo\n", encoding="utf-8")
+
+    values = get_wildcard_values(wildcards_dir, "valid")
+
+    assert values is not None
+    assert values.values == ["one", "two"]
+
+
 def test_get_wildcard_values_rejects_traversal_and_unknown_paths(tmp_path):
     wildcards_dir = tmp_path / "wildcards"
     wildcards_dir.mkdir()
@@ -108,6 +120,20 @@ def test_index_wildcards_reports_invalid_structured_files(tmp_path):
 
     assert [wildcard.path for wildcard in result.wildcards] == ["good"]
     assert {error.path for error in result.errors} == {"bad.json", "bad.yaml"}
+
+
+def test_index_wildcards_reports_duplicate_structured_paths(tmp_path):
+    wildcards_dir = tmp_path / "wildcards"
+    wildcards_dir.mkdir()
+    (wildcards_dir / "a.json").write_text('{"k": ["x"]}', encoding="utf-8")
+    (wildcards_dir / "b.json").write_text('{"k": ["y"]}', encoding="utf-8")
+
+    result = index_wildcards(wildcards_dir)
+
+    assert [wildcard.path for wildcard in result.wildcards] == ["k"]
+    assert len(result.errors) == 1
+    assert result.errors[0].path == "b.json"
+    assert "Duplicate wildcard path 'k'" in result.errors[0].message
 
 
 def test_index_wildcards_blocks_symlinks_outside_root(tmp_path):
@@ -157,7 +183,7 @@ def test_parse_dynamicprompts_random_mode_returns_one_prompt(tmp_path, monkeypat
     (wildcards_dir / "colors.txt").write_text("red\nblue\n", encoding="utf-8")
     monkeypatch.setattr("invokeai.app.api.routers.utilities.ApiDependencies", _MockApiDependencies(tmp_path))
 
-    result = asyncio.run(parse_dynamicprompts(prompt="__colors__", max_prompts=1, combinatorial=False, seed=1))
+    result = asyncio.run(parse_dynamicprompts(None, prompt="__colors__", max_prompts=1, combinatorial=False, seed=1))
 
     assert len(result.prompts) == 1
     assert result.prompts[0] in {"red", "blue"}
@@ -169,7 +195,7 @@ def test_parse_dynamicprompts_combinatorial_mode_respects_max_prompts(tmp_path, 
     (wildcards_dir / "colors.txt").write_text("\ufeffred\nblue\ngreen\n", encoding="utf-8")
     monkeypatch.setattr("invokeai.app.api.routers.utilities.ApiDependencies", _MockApiDependencies(tmp_path))
 
-    result = asyncio.run(parse_dynamicprompts(prompt="__colors__", max_prompts=2, combinatorial=True))
+    result = asyncio.run(parse_dynamicprompts(None, prompt="__colors__", max_prompts=2, combinatorial=True))
 
     assert len(result.prompts) == 2
     assert set(result.prompts).issubset({"red", "blue", "green"})

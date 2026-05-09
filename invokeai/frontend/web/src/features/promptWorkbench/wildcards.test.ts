@@ -60,7 +60,10 @@ describe('prompt workbench wildcards', () => {
         query: 'camera',
         wildcardCount: 0,
       })
-    ).toBe('Wildcard index unavailable. Restart the backend or check the wildcard endpoint.');
+    ).toEqual({
+      key: 'promptWorkbench.autocomplete.unavailable',
+      options: undefined,
+    });
 
     expect(
       getWildcardAutocompleteStatusMessage({
@@ -70,7 +73,10 @@ describe('prompt workbench wildcards', () => {
         query: 'missing',
         wildcardCount: wildcards.length,
       })
-    ).toBe('No local wildcards match "missing".');
+    ).toEqual({
+      key: 'promptWorkbench.autocomplete.noMatches',
+      options: { query: 'missing' },
+    });
   });
 
   it('reports missing wildcard references while allowing glob references', () => {

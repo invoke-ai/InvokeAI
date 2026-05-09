@@ -9,6 +9,7 @@ import {
   selectDynamicPromptsRandomSamples,
 } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const CONSTRAINTS = {
   initial: 100,
@@ -21,12 +22,16 @@ const CONSTRAINTS = {
 };
 
 const ParamDynamicPromptsMaxPrompts = () => {
+  const { t } = useTranslation();
   const mode = useAppSelector(selectDynamicPromptsMode);
   const randomSamples = useAppSelector(selectDynamicPromptsRandomSamples);
   const maxCombinations = useAppSelector(selectDynamicPromptsMaxCombinations);
   const dispatch = useAppDispatch();
   const value = mode === 'combinatorial' ? maxCombinations : randomSamples;
-  const label = useMemo(() => (mode === 'combinatorial' ? 'Max Combinations' : 'Random Samples'), [mode]);
+  const label = useMemo(
+    () => (mode === 'combinatorial' ? t('dynamicPrompts.maxCombinations') : t('dynamicPrompts.randomSamples')),
+    [mode, t]
+  );
 
   const handleChange = useCallback(
     (v: number) => {

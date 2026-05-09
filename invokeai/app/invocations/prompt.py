@@ -6,11 +6,11 @@ from dynamicprompts.generators import CombinatorialPromptGenerator, RandomPrompt
 from dynamicprompts.wildcards import WildcardManager
 from pydantic import field_validator
 
-from invokeai.app.api.routers.utilities_wildcards import clean_dynamic_prompt_outputs
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import InputField, UIComponent
 from invokeai.app.invocations.primitives import StringCollectionOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.wildcards import clean_dynamic_prompt_outputs, get_wildcards_path
 
 
 @invocation(
@@ -32,7 +32,7 @@ class DynamicPromptInvocation(BaseInvocation):
     combinatorial: bool = InputField(default=False, description="Whether to use the combinatorial generator")
 
     def invoke(self, context: InvocationContext) -> StringCollectionOutput:
-        wildcards_path = context.config.get().root_path / "wildcards"
+        wildcards_path = get_wildcards_path(context.config.get().root_path)
         wildcard_manager = WildcardManager(wildcards_path) if wildcards_path.is_dir() else None
         if self.combinatorial:
             generator = CombinatorialPromptGenerator(wildcard_manager=wildcard_manager)

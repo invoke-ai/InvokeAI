@@ -31,6 +31,8 @@ export const prepareLinearUIBatch = (arg: {
     const perImageBatchDatumList: components['schemas']['BatchDatum'][] = [];
 
     if (seedNode) {
+      // Per-output dynamic prompt mode has already resolved the final queued outputs, so seeds are zipped one-to-one
+      // with those outputs instead of applying seedBehaviour as a second batching dimension.
       perImageBatchDatumList.push({
         node_path: seedNode.id,
         field_name: 'value',

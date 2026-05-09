@@ -15,11 +15,13 @@ import { selectSystemPrefersNumericAttentionWeights } from 'features/system/stor
 import type { MouseEvent, RefObject } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { PiCubeBold, PiDiceFiveBold } from 'react-icons/pi';
 import type { WildcardIndexItem } from 'services/api/endpoints/utilities';
 import { useLazyWildcardValuesQuery, useWildcardsQuery } from 'services/api/endpoints/utilities';
 
 import { getPromptDiagnostics, type PromptDiagnosticSeverity } from './diagnostics';
+import type { PromptWorkbenchTranslation } from './i18n';
 import { clampNavigationIndex, getNextNavigationIndex, getPromptWorkbenchKeyboardIntent } from './keyboardNavigation';
 import { getPromptModelCapabilities } from './modelCapabilities';
 import {
@@ -62,6 +64,7 @@ const PROMPT_INTENT_PANEL_BG = 'linear-gradient(180deg, rgba(15, 23, 31, 0.92) 0
 const PROMPT_INTENT_PANEL_BORDER = 'rgba(126, 143, 164, 0.28)';
 
 export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: PromptWorkbenchProps) => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { onOpen: onOpenDynamicPromptsModal } = useDynamicPromptsModal();
   const model = useAppSelector(selectModel);
@@ -93,6 +96,10 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
   const completionContextRef = useRef<WildcardCompletionContext | null>(null);
   const wildcardOptionElementsRef = useRef<Array<HTMLElement | null>>([]);
   const fixedValueElementsRef = useRef<Array<HTMLElement | null>>([]);
+  const translate = useCallback(
+    (translation: PromptWorkbenchTranslation) => t(translation.key, translation.options),
+    [t]
+  );
 
   const diagnostics = useMemo(
     () =>
@@ -711,7 +718,7 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
             {wildcardStatusMessage && (
               <Flex alignItems="center" minH={8} px={3}>
                 <Text fontSize="xs" color={isWildcardIndexUnavailable ? 'error.300' : 'base.400'} noOfLines={2}>
-                  {wildcardStatusMessage}
+                  {translate(wildcardStatusMessage)}
                 </Text>
               </Flex>
             )}
@@ -749,8 +756,8 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
                     {wildcard.value_count}
                   </Text>
                   <PromptWildcardBehaviorMenu
-                    ariaLabel={`Insert ${wildcard.path} with wildcard behavior`}
-                    tooltip="Wildcard behavior"
+                    ariaLabel={t('promptWorkbench.autocomplete.insertWithBehaviorAria', { path: wildcard.path })}
+                    tooltip={t('promptWorkbench.actions.wildcardBehavior')}
                     iconType="random"
                     isActionable
                     canPickFixedValue
@@ -764,7 +771,7 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
                   <Flex flexDir="column" ps={4} pe={1} pb={1} gap={0.5} maxH={36} overflowY="auto">
                     {wildcardValuesResult.isFetching && (
                       <Text fontSize="xs" color="base.400">
-                        Loading values...
+                        {t('promptWorkbench.values.loading')}
                       </Text>
                     )}
                     {fixedWildcardValues?.map((value, index) => (
@@ -790,7 +797,9 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
             ))}
           </Flex>
           <Text mt={1} fontSize="xs" color="base.400">
-            {completionContext.query ? `Matching "${completionContext.query}"` : 'Local wildcards'}
+            {completionContext.query
+              ? t('promptWorkbench.autocomplete.matching', { query: completionContext.query })
+              : t('promptWorkbench.autocomplete.localWildcards')}
           </Text>
         </Box>
       )}
@@ -809,34 +818,43 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
             <Flex alignItems="center" gap={2} minW={0} flexShrink={0}>
               <Box as={PiCubeBold} color="base.300" fontSize="1.05rem" />
               <Text color="base.100" fontSize="sm" fontWeight="semibold" lineHeight="short" noOfLines={1}>
-                Prompt intent
+                {t('promptWorkbench.panel.title')}
               </Text>
             </Flex>
             <Flex gap={1} alignItems="center" justifyContent="flex-end" flexWrap="wrap" ms="auto" minW={0}>
               {diagnostics.map((diagnostic) =>
                 diagnostic.code === 'dynamic-active' && hasRandomWildcardOccurrences ? (
                   <Menu key={diagnostic.code}>
-                    <Tooltip label={`${diagnostic.description} Change random wildcard behavior.`}>
+                    <Tooltip
+                      label={t('promptWorkbench.diagnostics.changeRandomBehaviorTooltip', {
+                        description: translate(diagnostic.description),
+                      })}
+                    >
                       <MenuButton as={Button} variant="unstyled" minW="unset" h="auto" cursor="pointer">
                         <PromptWorkbenchBadge tone={getDiagnosticBadgeTone(diagnostic.severity)}>
-                          {diagnostic.label}
+                          {translate(diagnostic.label)}
                         </PromptWorkbenchBadge>
                       </MenuButton>
                     </Tooltip>
                     <MenuList>
-                      <MenuItem onClick={onRandomPerImageClick} title="Random wildcards roll once per generated image.">
-                        Random/image
+                      <MenuItem onClick={onRandomPerImageClick} title={t('promptWorkbench.header.randomImageTooltip')}>
+                        {t('promptWorkbench.behavior.randomImageShort')}
                       </MenuItem>
                       <MenuItem
                         onClick={onRandomPerInvokeClick}
-                        title="Random wildcards roll once per Invoke; cyclic wildcards still advance per generated output."
+                        title={t('promptWorkbench.header.randomInvokeTooltip')}
                       >
-                        Random/invoke
+                        {t('promptWorkbench.behavior.randomInvokeShort')}
                       </MenuItem>
                     </MenuList>
                   </Menu>
                 ) : diagnostic.code === 'dynamic-active' ? (
-                  <Tooltip key={diagnostic.code} label={`${diagnostic.description} Open dynamic prompt preview.`}>
+                  <Tooltip
+                    key={diagnostic.code}
+                    label={t('promptWorkbench.diagnostics.openDynamicPreviewTooltip', {
+                      description: translate(diagnostic.description),
+                    })}
+                  >
                     <Button
                       variant="unstyled"
                       minW="unset"
@@ -846,24 +864,24 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
                       onClick={onOpenQueuedOutputsClick}
                     >
                       <PromptWorkbenchBadge tone={getDiagnosticBadgeTone(diagnostic.severity)}>
-                        {diagnostic.label}
+                        {translate(diagnostic.label)}
                       </PromptWorkbenchBadge>
                     </Button>
                   </Tooltip>
                 ) : (
-                  <Tooltip key={diagnostic.code} label={diagnostic.description}>
+                  <Tooltip key={diagnostic.code} label={translate(diagnostic.description)}>
                     <PromptWorkbenchBadge
                       tone={getDiagnosticBadgeTone(diagnostic.severity)}
                       icon={diagnostic.code === 'wildcards-found' ? <PiDiceFiveBold /> : undefined}
                     >
-                      {diagnostic.label}
+                      {translate(diagnostic.label)}
                     </PromptWorkbenchBadge>
                   </Tooltip>
                 )
               )}
               {canShowWeightControls && (
                 <Flex gap={1} ps={1}>
-                  <Tooltip label={capabilities.attentionWeightsLabel}>
+                  <Tooltip label={t(capabilities.attentionWeightsLabelKey)}>
                     <Button
                       size="xs"
                       variant="outline"
@@ -876,7 +894,7 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
                       -
                     </Button>
                   </Tooltip>
-                  <Tooltip label={capabilities.attentionWeightsLabel}>
+                  <Tooltip label={t(capabilities.attentionWeightsLabelKey)}>
                     <Button
                       size="xs"
                       variant="outline"

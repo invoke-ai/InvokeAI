@@ -13,8 +13,11 @@ from pydantic import BaseModel, Field
 from pyparsing import ParseException
 from transformers import AutoProcessor, AutoTokenizer, LlavaOnevisionForConditionalGeneration, LlavaOnevisionProcessor
 
+from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.api.routers.utilities_wildcards import (
+from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
+from invokeai.app.services.model_records.model_records_base import UnknownModelException
+from invokeai.app.util.wildcards import (
     WildcardsResponse,
     WildcardValuesResponse,
     clean_dynamic_prompt_outputs,
@@ -23,8 +26,6 @@ from invokeai.app.api.routers.utilities_wildcards import (
     get_wildcards_path,
     index_wildcards,
 )
-from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
-from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.backend.llava_onevision_pipeline import LlavaOnevisionPipeline
 from invokeai.backend.model_manager.taxonomy import ModelType
 from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT, TextLLMPipeline
@@ -52,7 +53,7 @@ class DynamicPromptsResponse(BaseModel):
         200: {"model": WildcardsResponse},
     },
 )
-async def list_wildcards() -> WildcardsResponse:
+async def list_wildcards(_: CurrentUserOrDefault) -> WildcardsResponse:
     """List local dynamic prompt wildcards from INVOKEAI_ROOT/wildcards."""
     wildcards_path = get_wildcards_path(ApiDependencies.invoker.services.configuration.root_path)
     return index_wildcards(wildcards_path)
@@ -66,6 +67,7 @@ async def list_wildcards() -> WildcardsResponse:
     },
 )
 async def list_wildcard_values(
+    _: CurrentUserOrDefault,
     path: str = Query(description="The relative wildcard path to read values for"),
     limit: int = Query(default=200, ge=1, le=1000, description="The max number of wildcard values to return"),
 ) -> WildcardValuesResponse:
@@ -85,6 +87,7 @@ async def list_wildcard_values(
     },
 )
 async def parse_dynamicprompts(
+    _: CurrentUserOrDefault,
     prompt: str = Body(description="The prompt to parse with dynamicprompts"),
     max_prompts: int = Body(ge=1, le=10000, default=1000, description="The max number of prompts to generate"),
     combinatorial: bool = Body(default=True, description="Whether to use the combinatorial generator"),

@@ -2,6 +2,7 @@ import { type ASTNode, type Attention, parseTokens, tokenize } from 'common/util
 import type { DynamicPromptRandomRefreshMode } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import type { WildcardIndexItem } from 'services/api/endpoints/utilities';
 
+import { type PromptWorkbenchTranslation, tx } from './i18n';
 import { getCyclicWildcardToken, normalizeWildcardReference } from './wildcards';
 
 const WILDCARD_OCCURRENCE_REGEX = /__([^\r\n]+?)__/g;
@@ -66,7 +67,12 @@ export const getPromptWorkbenchOccurrences = ({
   dynamicPromptMode,
   supportsAttentionWeights,
 }: GetPromptWorkbenchOccurrencesArg): PromptWorkbenchOccurrence[] => {
-  const wildcardOccurrences = getPromptWildcardOccurrences({ prompt, wildcards, wildcardIndexUnavailable, dynamicPromptMode });
+  const wildcardOccurrences = getPromptWildcardOccurrences({
+    prompt,
+    wildcards,
+    wildcardIndexUnavailable,
+    dynamicPromptMode,
+  });
   const weightOccurrences = getPromptWeightOccurrences({ prompt, supportsAttentionWeights });
   const attachedWeightIds = new Set<string>();
   const weightedWildcardOccurrences = wildcardOccurrences.map((occurrence) => {
@@ -130,48 +136,48 @@ export const getPromptWildcardOccurrences = ({
 export const getWildcardBehaviorLabel = (
   occurrence: PromptWildcardOccurrence,
   randomRefreshMode: DynamicPromptRandomRefreshMode
-): string => {
+): PromptWorkbenchTranslation => {
   switch (occurrence.behavior) {
     case 'random':
       if (randomRefreshMode === 'per_image') {
-        return 'Random per Image';
+        return tx('promptWorkbench.behavior.randomImageLabel');
       }
       if (randomRefreshMode === 'per_enqueue') {
-        return 'Random per Invoke';
+        return tx('promptWorkbench.behavior.randomInvokeLabel');
       }
-      return 'Random preview';
+      return tx('promptWorkbench.behavior.randomPreviewLabel');
     case 'cycle':
-      return 'Cycle';
+      return tx('promptWorkbench.behavior.cycleLabel');
     case 'all':
-      return 'All combinations';
+      return tx('promptWorkbench.behavior.allCombinationsLabel');
     case 'missing':
-      return 'Missing';
+      return tx('promptWorkbench.behavior.missingLabel');
     case 'unavailable':
-      return 'Unavailable';
+      return tx('promptWorkbench.behavior.unavailableLabel');
   }
 };
 
 export const getWildcardBehaviorShortLabel = (
   occurrence: PromptWildcardOccurrence,
   randomRefreshMode: DynamicPromptRandomRefreshMode
-): string => {
+): PromptWorkbenchTranslation => {
   switch (occurrence.behavior) {
     case 'random':
       if (randomRefreshMode === 'per_image') {
-        return 'Random/image';
+        return tx('promptWorkbench.behavior.randomImageShort');
       }
       if (randomRefreshMode === 'per_enqueue') {
-        return 'Random/invoke';
+        return tx('promptWorkbench.behavior.randomInvokeShort');
       }
-      return 'Preview';
+      return tx('promptWorkbench.behavior.previewShort');
     case 'cycle':
-      return 'Cycle';
+      return tx('promptWorkbench.behavior.cycleShort');
     case 'all':
-      return 'All';
+      return tx('promptWorkbench.behavior.allShort');
     case 'missing':
-      return 'Missing';
+      return tx('promptWorkbench.behavior.missingLabel');
     case 'unavailable':
-      return 'Unavailable';
+      return tx('promptWorkbench.behavior.unavailableLabel');
   }
 };
 
@@ -206,11 +212,13 @@ export const getPromptWeightOccurrences = ({
   }
 };
 
-export const getWeightBehaviorLabel = (occurrence: PromptWeightOccurrence): string =>
-  occurrence.isSupported ? 'Weight supported' : 'Weight may be literal';
+export const getWeightBehaviorLabel = (occurrence: PromptWeightOccurrence): PromptWorkbenchTranslation =>
+  occurrence.isSupported ? tx('promptWorkbench.weight.supportedLabel') : tx('promptWorkbench.weight.literalLabel');
 
-export const getWeightShortLabel = (occurrence: PromptWeightOccurrence): string =>
-  occurrence.isSupported ? String(occurrence.attention) : 'Literal?';
+export const getWeightShortLabel = (occurrence: PromptWeightOccurrence): PromptWorkbenchTranslation =>
+  occurrence.isSupported
+    ? tx('promptWorkbench.weight.valueLabel', { value: String(occurrence.attention) })
+    : tx('promptWorkbench.weight.literalShort');
 
 export const getWildcardBehaviorActionIntent = (
   action: WildcardBehaviorAction,
@@ -303,7 +311,10 @@ const getDoesWeightCleanlyWrapWildcard = (
   weightOccurrence: PromptWeightOccurrence,
   wildcardOccurrence: PromptWildcardOccurrence
 ): boolean => {
-  if (weightOccurrence.range.start >= wildcardOccurrence.range.start || weightOccurrence.range.end <= wildcardOccurrence.range.end) {
+  if (
+    weightOccurrence.range.start >= wildcardOccurrence.range.start ||
+    weightOccurrence.range.end <= wildcardOccurrence.range.end
+  ) {
     return false;
   }
 
