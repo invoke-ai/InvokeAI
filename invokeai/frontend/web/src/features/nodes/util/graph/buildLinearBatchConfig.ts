@@ -76,11 +76,15 @@ export const prepareLinearUIBatch = (arg: {
 
   data.push(firstBatchDatumList);
 
+  // Models without a seed node (e.g. external API models without seed support) can't express
+  // PER_ITERATION via a seed batch dimension, so use batch.runs to repeat the graph instead.
+  const runs = !seedNode && seedBehaviour === 'PER_ITERATION' ? iterations : 1;
+
   const enqueueBatchArg: EnqueueBatchArg = {
     prepend,
     batch: {
       graph: g.getGraph(),
-      runs: 1,
+      runs,
       data,
       origin,
       destination,

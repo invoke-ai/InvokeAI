@@ -10,15 +10,17 @@ This allows you to generate even if your GPU doesn't have enough VRAM to hold fu
 
 ## Enabling Low-VRAM mode
 
-To enable Low-VRAM mode, add this line to your `invokeai.yaml` configuration file, then restart Invoke:
-
-```yaml
-enable_partial_loading: true
-```
+Low-VRAM mode is **enabled by default** via the `enable_partial_loading: true` setting in `invokeai.yaml`. No action is required to turn it on.
 
 **Windows users should also [disable the Nvidia sysmem fallback](#disabling-nvidia-sysmem-fallback-windows-only)**.
 
 It is possible to fine-tune the settings for best performance or if you still get out-of-memory errors (OOMs).
+
+If you want to disable partial loading (e.g. on systems with plenty of VRAM where full loading is faster), add this line to your `invokeai.yaml` and restart Invoke:
+
+```yaml
+enable_partial_loading: false
+```
 
 :::tip[How to find `invokeai.yaml`]
   The `invokeai.yaml` configuration file lives in your install directory. To access it, run the **Invoke Community Edition** launcher and click the install location. This will open your install directory in a file explorer window.
@@ -48,11 +50,13 @@ When an operation needs layers that are not in VRAM, but there isn't enough room
 
 #### Enabling partial model loading
 
-As described above, you can enable partial model loading by adding this line to `invokeai.yaml`:
+Partial model loading is enabled by default. The corresponding setting in `invokeai.yaml` is:
 
 ```yaml
 enable_partial_loading: true
 ```
+
+Set it to `false` to disable partial loading.
 
 ### PyTorch CUDA allocator config
 

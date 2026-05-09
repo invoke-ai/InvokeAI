@@ -1,4 +1,6 @@
-# LLM Prompt Tools
+---
+title: LLM Prompt Tools
+---
 
 InvokeAI includes two built-in tools that use local language models to help you write better prompts. Both tools appear as small buttons in the top-right corner of the positive prompt area and are only visible when you have a compatible model installed.
 

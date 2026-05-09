@@ -39,7 +39,7 @@ It has two sections - one for internal use and one for user settings:
 
 ```yaml
 # Internal metadata - do not edit:
-schema_version: 4.0.2
+schema_version: 4.0.3
 
 # Put user settings here - see https://invoke-ai.github.io/InvokeAI/features/CONFIGURATION/:
 host: 0.0.0.0 # serve the app on your local network
@@ -143,6 +143,35 @@ Most common algorithms are supported, like `md5`, `sha256`, and `sha512`. These 
 #### Path Settings
 
 These options set the paths of various directories and files used by InvokeAI. Any user-defined paths should be absolute paths.
+
+#### Image Subfolder Strategy
+
+By default, all generated images are stored in a single flat directory (`outputs/images/`). This can become unwieldy with a large number of images. The `image_subfolder_strategy` setting lets you organize images into subfolders automatically.
+
+```yaml
+image_subfolder_strategy: flat # default value
+```
+
+Available strategies:
+
+| Strategy | Example Path | Description |
+|----------|-------------|-------------|
+| `flat` | `outputs/images/abc123.png` | **Default.** All images in one directory (current behavior). |
+| `date` | `outputs/images/2026/03/17/abc123.png` | Organized by creation date (YYYY/MM/DD). |
+| `type` | `outputs/images/general/abc123.png` | Organized by image category (`general`, `intermediate`, `mask`, `control`, etc.). |
+| `hash` | `outputs/images/ab/abc123.png` | Uses first 2 characters of the UUID as subfolder. Best for filesystem performance with very large collections (~256 evenly distributed subfolders). |
+
+!!! tip "Switching Strategies"
+
+    You can switch between strategies at any time. Existing images remain in their original location — only newly generated images will use the new subfolder structure. This works because each image's subfolder path is stored in the database.
+
+!!! example "Example: Using date-based organization"
+
+    ```yaml
+    image_subfolder_strategy: date
+    ```
+
+    New images will be saved as `outputs/images/2026/03/17/abc123.png`. Thumbnails mirror the same structure under `outputs/images/thumbnails/2026/03/17/abc123.webp`.
 
 #### Logging
 
