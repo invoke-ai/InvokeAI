@@ -1,1 +1,457 @@
-{}
+{
+    "accessibility": {
+        "about": "Despre",
+        "reset": "Resetează",
+        "menu": "Meniu",
+        "mode": "Mod"
+    },
+    "common": {
+        "hotkeysLabel": "Scurtături",
+        "languagePickerLabel": "Limbă",
+        "githubLabel": "Github",
+        "discordLabel": "Discord",
+        "settingsLabel": "Setări",
+        "nodes": "Workflow-uri",
+        "upload": "Încarcă",
+        "load": "Încarcă",
+        "back": "Înapoi",
+        "statusDisconnected": "Deconectat",
+        "loading": "Se încarcă",
+        "cancel": "Anulează",
+        "accept": "Acceptă",
+        "linear": "Linear",
+        "random": "Random",
+        "communityLabel": "Comunitate",
+        "advanced": "Avansat",
+        "controlNet": "ControlNet",
+        "auto": "Auto",
+        "on": "Pornit",
+        "checkpoint": "Checkpoint",
+        "data": "Date",
+        "details": "Detalii",
+        "inpaint": "inpaint",
+        "outpaint": "outpaint",
+        "outputs": "Outputs",
+        "safetensors": "Safetensors",
+        "simple": "Simplu",
+        "template": "Șablon",
+        "ai": "ai",
+        "error": "Eroare",
+        "file": "Fișier",
+        "folder": "Folder",
+        "format": "format",
+        "input": "Input",
+        "installed": "Instalat",
+        "unknown": "Necunoscut",
+        "delete": "Șterge",
+        "direction": "Direcție",
+        "save": "Salvează",
+        "updated": "Actualizat",
+        "created": "Creat",
+        "or": "sau",
+        "red": "Roșu",
+        "green": "Verde",
+        "blue": "Albastru",
+        "alpha": "Alpha",
+        "copy": "Copiază",
+        "add": "Adaugă",
+        "beta": "Beta",
+        "selected": "Selectat",
+        "editor": "Editor",
+        "tab": "Filă",
+        "enabled": "Activat",
+        "disabled": "Dezactivat",
+        "apply": "Aplică",
+        "view": "Vizualizează",
+        "edit": "Editează",
+        "off": "Oprit",
+        "reset": "Resetează",
+        "none": "Niciunul",
+        "new": "Nou"
+    },
+    "modelManager": {
+        "model": "Model",
+        "manual": "Manual",
+        "name": "Nume",
+        "description": "Descriere",
+        "config": "Configurare",
+        "width": "Lățime",
+        "height": "Înălțime",
+        "search": "Caută",
+        "load": "Încarcă",
+        "active": "activ",
+        "selected": "Selectat",
+        "delete": "Șterge",
+        "convert": "Convertește",
+        "alpha": "Alpha",
+        "none": "niciunul",
+        "vae": "VAE",
+        "variant": "Variantă",
+        "settings": "Setări",
+        "advanced": "Avansat",
+        "cancel": "Anulează",
+        "edit": "Editează",
+        "path": "Path",
+        "prune": "Taie",
+        "source": "Sursă",
+        "metadata": "Metadata",
+        "huggingFace": "HuggingFace",
+        "huggingFacePlaceholder": "autor/nume-model",
+        "install": "Instalează",
+        "loraModels": "LoRAs",
+        "main": "Main"
+    },
+    "parameters": {
+        "general": "General",
+        "images": "Imagini",
+        "steps": "Pași",
+        "width": "Lățime",
+        "height": "Înălțime",
+        "seed": "Seed",
+        "type": "Tip",
+        "strength": "Putere",
+        "upscaling": "Upscaling",
+        "scale": "Scale",
+        "symmetry": "Simetrie",
+        "info": "Informații",
+        "scheduler": "Planificator",
+        "coherenceMode": "Mod",
+        "patchmatchDownScaleSize": "Downscale",
+        "cancel": {
+            "cancel": "Anulează"
+        },
+        "invoke": {
+            "invoke": "Invocă"
+        },
+        "iterations": "Iterații",
+        "aspect": "Aspect"
+    },
+    "settings": {
+        "models": "Modele",
+        "developer": "Developer",
+        "general": "General",
+        "generation": "Generare",
+        "beta": "Beta"
+    },
+    "boards": {
+        "cancel": "Anulează",
+        "loading": "Se încarcă...",
+        "move": "Mută",
+        "uncategorized": "Necategorizat",
+        "archived": "Arhivat",
+        "boards": "Boards"
+    },
+    "gallery": {
+        "copy": "Copiază",
+        "download": "Descarcă",
+        "loading": "Se încarcă",
+        "drop": "Lasă",
+        "image": "imagine",
+        "starImage": "Adaugă la favorite",
+        "unstarImage": "Elimină de la favorite",
+        "slider": "Slider",
+        "sideBySide": "Side-by-Side",
+        "hover": "Hover",
+        "go": "Du-te",
+        "gallery": "Galerie"
+    },
+    "metadata": {
+        "height": "Înălțime",
+        "metadata": "Metadata",
+        "model": "Model",
+        "scheduler": "Planificator",
+        "seed": "Seed",
+        "steps": "Pași",
+        "width": "Lățime",
+        "workflow": "Workflow",
+        "vae": "VAE",
+        "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)"
+    },
+    "models": {
+        "loading": "se încarcă",
+        "lora": "LoRA",
+        "concepts": "Concepte"
+    },
+    "nodes": {
+        "notes": "Note",
+        "workflow": "Workflow",
+        "workflowAuthor": "Autor",
+        "workflowContact": "Contact",
+        "workflowName": "Nume",
+        "workflowNotes": "Note",
+        "workflowTags": "Etichete",
+        "workflowVersion": "Versiune",
+        "executionStateError": "Eroare",
+        "executionStateCompleted": "Completat",
+        "version": "Versiune",
+        "boolean": "Booleani",
+        "collection": "Colecție",
+        "edge": "Muchie",
+        "enum": "Enum",
+        "float": "Float",
+        "integer": "Integer",
+        "node": "Nod",
+        "scheduler": "Planificator",
+        "string": "String",
+        "ipAdapter": "IP-Adapter",
+        "edit": "Editează",
+        "graph": "Graf"
+    },
+    "sdxl": {
+        "loading": "Se încarcă...",
+        "refiner": "Refiner",
+        "scheduler": "Planificator",
+        "steps": "Pași"
+    },
+    "queue": {
+        "queue": "Coadă",
+        "resume": "Reia",
+        "pause": "Întrerupe",
+        "cancel": "Anulează",
+        "prune": "Taie",
+        "clear": "Golește",
+        "current": "Curent",
+        "next": "Următorul",
+        "status": "Status",
+        "total": "Total",
+        "pending": "În așteptare",
+        "completed": "Completat",
+        "failed": "Eșuat",
+        "canceled": "Anulat",
+        "batch": "Lot",
+        "item": "Item",
+        "session": "Sesiune",
+        "front": "față",
+        "back": "spate",
+        "time": "Timp",
+        "origin": "Origine",
+        "destination": "Destinație",
+        "upscaling": "Upscaling",
+        "canvas": "Canvas",
+        "generation": "Generare",
+        "workflows": "Workflows",
+        "other": "Altele",
+        "gallery": "Galerie"
+    },
+    "popovers": {
+        "compositingCoherenceMode": {
+            "heading": "Mod"
+        },
+        "controlNetWeight": {
+            "heading": "Weight"
+        },
+        "lora": {
+            "heading": "LoRA"
+        },
+        "paramModel": {
+            "heading": "Model"
+        },
+        "paramScheduler": {
+            "heading": "Planificator"
+        },
+        "paramSeed": {
+            "heading": "Seed"
+        },
+        "paramSteps": {
+            "heading": "Pași"
+        },
+        "paramVAE": {
+            "heading": "VAE"
+        },
+        "paramIterations": {
+            "heading": "Iterații"
+        },
+        "controlNet": {
+            "heading": "ControlNet"
+        },
+        "controlNetProcessor": {
+            "heading": "Procesator"
+        },
+        "loraWeight": {
+            "heading": "Weight"
+        },
+        "paramAspect": {
+            "heading": "Aspect"
+        },
+        "paramHeight": {
+            "heading": "Înălțime"
+        },
+        "paramWidth": {
+            "heading": "Lățime"
+        },
+        "patchmatchDownScaleSize": {
+            "heading": "Downscale"
+        },
+        "refinerScheduler": {
+            "heading": "Planificator"
+        },
+        "refinerSteps": {
+            "heading": "Pași"
+        },
+        "ipAdapterMethod": {
+            "heading": "Mod"
+        },
+        "scale": {
+            "heading": "Scale"
+        },
+        "creativity": {
+            "heading": "Creativitate"
+        },
+        "structure": {
+            "heading": "Structură"
+        }
+    },
+    "invocationCache": {
+        "clear": "Golește",
+        "enable": "Activează",
+        "disable": "Dezactivează"
+    },
+    "workflows": {
+        "workflows": "Workflows",
+        "ascending": "În ordine crescătoare",
+        "created": "Creat",
+        "descending": "În ordine descrescătoare",
+        "opened": "Deschis",
+        "updated": "Actualizat",
+        "name": "Nume"
+    },
+    "accordions": {
+        "generation": {
+            "title": "Generare"
+        },
+        "image": {
+            "title": "Imagine"
+        },
+        "advanced": {
+            "title": "Avansat"
+        },
+        "control": {
+            "title": "Control"
+        },
+        "compositing": {
+            "title": "Se compune",
+            "infillTab": "Infill"
+        }
+    },
+    "toast": {
+        "parameters": "Parametri"
+    },
+    "controlLayers": {
+        "rectangle": "Dreptunghi",
+        "opacity": "Opacitate",
+        "duplicate": "Duplică",
+        "width": "Lățime",
+        "transparency": "Transparență",
+        "locked": "Blocat",
+        "unlocked": "Deblocat",
+        "fill": {
+            "solid": "Solid",
+            "grid": "Grid",
+            "crosshatch": "Crosshatch",
+            "vertical": "Vertical",
+            "horizontal": "Orizontal",
+            "diagonal": "Diagonal"
+        },
+        "tool": {
+            "brush": "Pensulă",
+            "eraser": "Radieră",
+            "rectangle": "Dreptunghi",
+            "bbox": "Bbox",
+            "move": "Mută",
+            "view": "Vizualizează"
+        },
+        "filter": {
+            "filter": "Filtrează",
+            "filters": "Filtre",
+            "apply": "Aplică",
+            "cancel": "Anulează",
+            "reset": "Resetare",
+            "process": "Procesează",
+            "spandrel_filter": {
+                "model": "Model"
+            },
+            "depth_anything_depth_estimation": {
+                "model_size_small": "Mică",
+                "model_size_base": "Bază",
+                "model_size_large": "Mare"
+            },
+            "hed_edge_detection": {
+                "scribble": "Scribble"
+            },
+            "lineart_edge_detection": {
+                "coarse": "Coarse"
+            },
+            "pidi_edge_detection": {
+                "scribble": "Scribble"
+            }
+        },
+        "transform": {
+            "transform": "Transformă",
+            "reset": "Resetează",
+            "apply": "Aplică",
+            "cancel": "Anulează"
+        },
+        "settings": {
+            "snapToGrid": {
+                "off": "Oprit",
+                "on": "Pornit"
+            }
+        },
+        "HUD": {
+            "bbox": "Bbox"
+        },
+        "canvas": "Canvas",
+        "regional": "Regional",
+        "global": "Global",
+        "prompt": "Prompt",
+        "weight": "Weight"
+    },
+    "ui": {
+        "tabs": {
+            "canvas": "Canvas",
+            "workflows": "Workflows",
+            "models": "Modele",
+            "queue": "Coadă",
+            "upscaling": "Upscaling",
+            "gallery": "Galerie"
+        }
+    },
+    "upscaling": {
+        "creativity": "Creativitate",
+        "structure": "Structură",
+        "scale": "Scale",
+        "upscale": "Upscale"
+    },
+    "stylePresets": {
+        "active": "Activ",
+        "name": "Nume",
+        "preview": "Previzualizare",
+        "private": "Privat",
+        "shared": "Partajat",
+        "type": "Tip",
+        "nameColumn": "'nume'",
+        "negativePromptColumn": "'negative_prompt'"
+    },
+    "system": {
+        "logLevel": {
+            "trace": "Trace",
+            "debug": "Debug",
+            "info": "Informații",
+            "warn": "Avertizează",
+            "error": "Eroare",
+            "fatal": "Fatal"
+        },
+        "logNamespaces": {
+            "gallery": "Galerie",
+            "models": "Modele",
+            "config": "Configurare",
+            "canvas": "Canvas",
+            "generation": "Generare",
+            "workflows": "Workflows",
+            "system": "Sistem",
+            "events": "Evenimente",
+            "queue": "Coadă",
+            "metadata": "Metadata"
+        }
+    }
+}
