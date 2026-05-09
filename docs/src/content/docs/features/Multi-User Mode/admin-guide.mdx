@@ -96,11 +96,6 @@ multiuser: true   # Enable multi-user mode (requires authentication)
 
 # Optional password policy
 strict_password_checking: true  # Enforce uppercase/lowercase/number requirements
-
-# Session configuration (multi-user mode only and usually not needed)
-jwt_secret_key: "your-secret-key-here"  # Auto-generated if not specified
-jwt_token_expiry_hours: 24  # Default session timeout
-jwt_remember_me_days: 7  # "Remember me" duration
 ```
 
 JWT secrets are generated automatically and stored in the
