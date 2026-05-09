@@ -7,10 +7,13 @@ import { isParameterAnimaScheduler } from 'features/parameters/types/parameterSc
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-// Anima scheduler options (same flow-matching schedulers as Z-Image)
+// Anima scheduler options. Mirrors ANIMA_SCHEDULER_LABELS in invokeai/backend/flux/schedulers.py.
 const ANIMA_SCHEDULER_OPTIONS: ComboboxOption[] = [
   { value: 'euler', label: 'Euler' },
   { value: 'heun', label: 'Heun (2nd order)' },
+  { value: 'dpmpp_2m', label: 'DPM++ 2M' },
+  { value: 'dpmpp_2m_sde', label: 'DPM++ 2M SDE' },
+  { value: 'er_sde', label: 'ER-SDE' },
   { value: 'lcm', label: 'LCM' },
 ];
 

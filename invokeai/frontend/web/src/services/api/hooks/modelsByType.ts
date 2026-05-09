@@ -24,13 +24,17 @@ import {
   isFluxReduxModelConfig,
   isFluxVAEModelConfig,
   isIPAdapterModelConfig,
+  isLLaVAModelConfig,
   isLoRAModelConfig,
   isMainOrExternalModelConfig,
   isQwen3EncoderModelConfig,
   isQwenImageDiffusersMainModelConfig,
+  isQwenImageVAEModelConfig,
+  isQwenVLEncoderModelConfig,
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
   isT5EncoderModelConfigOrSubmodel,
+  isTextLLMModelConfig,
   isTIModelConfig,
   isVAEModelConfigOrSubmodel,
   isZImageDiffusersMainModelConfig,
@@ -104,6 +108,8 @@ export const useAnimaQwen3EncoderModels = () => buildModelsHook(isAnimaQwen3Enco
 export const useZImageDiffusersModels = () => buildModelsHook(isZImageDiffusersMainModelConfig)();
 export const useFlux2DiffusersModels = () => buildModelsHook(isFlux2DiffusersMainModelConfig)();
 export const useQwenImageDiffusersModels = () => buildModelsHook(isQwenImageDiffusersMainModelConfig)();
+export const useQwenImageVAEModels = () => buildModelsHook(isQwenImageVAEModelConfig)();
+export const useQwenVLEncoderModels = () => buildModelsHook(isQwenVLEncoderModelConfig)();
 export const useQwen3EncoderModels = () => buildModelsHook(isQwen3EncoderModelConfig)();
 export const useGlobalReferenceImageModels = buildModelsHook(
   (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config) || isFluxKontextModelConfig(config)
@@ -141,8 +147,12 @@ export const selectRegionalRefImageModels = buildModelsSelector(
 export const selectAnimaQwen3EncoderModels = buildModelsSelector(isAnimaQwen3EncoderModelConfig);
 export const selectQwen3EncoderModels = buildModelsSelector(isQwen3EncoderModelConfig);
 export const selectQwenImageDiffusersModels = buildModelsSelector(isQwenImageDiffusersMainModelConfig);
+export const selectQwenImageVAEModels = buildModelsSelector(isQwenImageVAEModelConfig);
+export const selectQwenVLEncoderModels = buildModelsSelector(isQwenVLEncoderModelConfig);
 export const selectZImageDiffusersModels = buildModelsSelector(isZImageDiffusersMainModelConfig);
 export const selectFlux2DiffusersModels = buildModelsSelector(isFlux2DiffusersMainModelConfig);
 export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
 export const selectAnimaVAEModels = buildModelsSelector(isAnimaVAEModelConfig);
 export const selectT5EncoderModels = buildModelsSelector(isT5EncoderModelConfigOrSubmodel);
+export const useTextLLMModels = () => buildModelsHook(isTextLLMModelConfig)();
+export const useLlavaModels = () => buildModelsHook(isLLaVAModelConfig)();

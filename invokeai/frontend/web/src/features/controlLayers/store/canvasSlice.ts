@@ -1783,9 +1783,30 @@ const slice = createSlice({
       state.controlLayers.entities = controlLayers;
       state.inpaintMasks.entities = inpaintMasks;
       state.regionalGuidance.entities = regionalGuidance;
+      // Preserve the current modelBase to avoid desync with the currently selected model
+      // (same pattern as canvasSnapshotRestored and resetState).
+      const currentModelBase = state.bbox.modelBase;
       state.bbox = bbox;
+      state.bbox.modelBase = currentModelBase;
+      syncScaledSize(state);
       state.selectedEntityIdentifier = selectedEntityIdentifier;
       state.bookmarkedEntityIdentifier = bookmarkedEntityIdentifier;
+      return state;
+    },
+    canvasSnapshotRestored: (state, action: PayloadAction<CanvasState>) => {
+      const snapshot = action.payload;
+      state.controlLayers = snapshot.controlLayers;
+      state.inpaintMasks = snapshot.inpaintMasks;
+      state.rasterLayers = snapshot.rasterLayers;
+      state.regionalGuidance = snapshot.regionalGuidance;
+      // Restore bbox from snapshot but preserve the current modelBase to avoid desync
+      // with the currently selected model (same pattern as resetState).
+      const currentModelBase = state.bbox.modelBase;
+      state.bbox = snapshot.bbox;
+      state.bbox.modelBase = currentModelBase;
+      syncScaledSize(state);
+      state.selectedEntityIdentifier = snapshot.selectedEntityIdentifier;
+      state.bookmarkedEntityIdentifier = snapshot.bookmarkedEntityIdentifier;
       return state;
     },
     canvasUndo: () => {},
@@ -1869,6 +1890,7 @@ const resetState = (state: CanvasState) => {
 
 export const {
   canvasMetadataRecalled,
+  canvasSnapshotRestored,
   canvasProjectRecalled,
   canvasUndo,
   canvasRedo,
@@ -1995,6 +2017,10 @@ const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
   filter: (action, _state, _history) => {
     // Ignore all actions from other slices
     if (!action.type.startsWith(slice.name)) {
+      return false;
+    }
+    // Snapshot restore and project load replace the canvas state and should not be undoable
+    if (action.type === canvasSnapshotRestored.type || action.type === canvasProjectRecalled.type) {
       return false;
     }
     // Throttle rapid actions of the same type

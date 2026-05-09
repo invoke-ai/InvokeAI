@@ -154,6 +154,11 @@ export const buildOnInvocationComplete = (
 
     // No need to invalidate tags since we're doing optimistic updates
     // Board totals are already updated above via upsertQueryEntries
+    // Exception: virtual board groupings aren't covered by the optimistic updates above, so
+    // their counts/cover thumbnails would otherwise lag behind until the next mutation.
+    if (Object.keys(boardTotalAdditions).length > 0) {
+      dispatch(imagesApi.util.invalidateTags(['VirtualBoards']));
+    }
 
     const autoSwitch = selectAutoSwitch(getState());
 

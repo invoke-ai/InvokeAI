@@ -8,7 +8,12 @@ from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocati
 from invokeai.app.invocations.collections import RangeInvocation
 from invokeai.app.invocations.logic import IfInvocation, IfInvocationOutput
 from invokeai.app.invocations.math import AddInvocation, MultiplyInvocation
-from invokeai.app.invocations.primitives import BooleanCollectionInvocation, BooleanInvocation
+from invokeai.app.invocations.primitives import (
+    BooleanCollectionInvocation,
+    BooleanCollectionOutput,
+    BooleanInvocation,
+    BooleanOutput,
+)
 from invokeai.app.services.shared.graph import (
     CollectInvocation,
     Graph,
@@ -19,6 +24,7 @@ from invokeai.app.services.shared.graph import (
 # This import must happen before other invoke imports or test in other files(!!) break
 from tests.test_nodes import (
     AnyTypeTestInvocation,
+    AnyTypeTestInvocationOutput,
     PromptCollectionTestInvocation,
     PromptTestInvocation,
     TextToImageTestInvocation,
@@ -816,6 +822,238 @@ def test_if_graph_optimized_behavior_keeps_shared_live_consumers_per_iteration()
     assert executed_source_ids.count("observer") == 3
     assert executed_source_ids.count("true_leaf") == 1
     assert executed_source_ids.count("false_branch") == 2
+
+
+def test_if_graph_optimized_behavior_handles_selected_true_branch_with_shared_false_input_ancestor():
+    graph = Graph()
+    graph.add_node(BooleanInvocation(id="condition", value=True))
+    graph.add_node(AnyTypeTestInvocation(id="shared_item", value="shared"))
+    graph.add_node(AnyTypeTestInvocation(id="true_item", value="true"))
+    graph.add_node(CollectInvocation(id="shared_collect"))
+    graph.add_node(CollectInvocation(id="true_collect"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(AnyTypeTestInvocation(id="selected_output"))
+
+    graph.add_edge(create_edge("condition", "value", "if", "condition"))
+    graph.add_edge(create_edge("shared_item", "value", "shared_collect", "item"))
+    graph.add_edge(create_edge("shared_collect", "collection", "true_collect", "collection"))
+    graph.add_edge(create_edge("true_item", "value", "true_collect", "item"))
+    graph.add_edge(create_edge("shared_collect", "collection", "if", "false_input"))
+    graph.add_edge(create_edge("true_collect", "collection", "if", "true_input"))
+    graph.add_edge(create_edge("if", "value", "selected_output", "value"))
+
+    g = GraphExecutionState(graph=graph)
+    executed_source_ids = execute_all_nodes(g)
+
+    prepared_selected_output_id = next(iter(g.source_prepared_mapping["selected_output"]))
+    assert g.results[prepared_selected_output_id].value == ["shared", "true"]
+    assert set(executed_source_ids) == {
+        "condition",
+        "shared_item",
+        "true_item",
+        "shared_collect",
+        "true_collect",
+        "if",
+        "selected_output",
+    }
+
+
+def test_if_graph_optimized_behavior_handles_selected_false_branch_with_shared_true_input_ancestor():
+    graph = Graph()
+    graph.add_node(BooleanInvocation(id="condition", value=False))
+    graph.add_node(AnyTypeTestInvocation(id="shared_item", value="shared"))
+    graph.add_node(AnyTypeTestInvocation(id="true_item", value="true"))
+    graph.add_node(CollectInvocation(id="shared_collect"))
+    graph.add_node(CollectInvocation(id="true_collect"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(AnyTypeTestInvocation(id="selected_output"))
+
+    graph.add_edge(create_edge("condition", "value", "if", "condition"))
+    graph.add_edge(create_edge("shared_item", "value", "shared_collect", "item"))
+    graph.add_edge(create_edge("shared_collect", "collection", "true_collect", "collection"))
+    graph.add_edge(create_edge("true_item", "value", "true_collect", "item"))
+    graph.add_edge(create_edge("shared_collect", "collection", "if", "false_input"))
+    graph.add_edge(create_edge("true_collect", "collection", "if", "true_input"))
+    graph.add_edge(create_edge("if", "value", "selected_output", "value"))
+
+    g = GraphExecutionState(graph=graph)
+    executed_source_ids = execute_all_nodes(g)
+
+    prepared_selected_output_id = next(iter(g.source_prepared_mapping["selected_output"]))
+    assert g.results[prepared_selected_output_id].value == ["shared"]
+    assert set(executed_source_ids) == {
+        "condition",
+        "shared_item",
+        "shared_collect",
+        "if",
+        "selected_output",
+    }
+    assert "true_item" not in executed_source_ids
+    assert "true_collect" not in executed_source_ids
+
+
+def test_prepare_if_inputs_raises_when_selected_branch_source_has_no_result():
+    graph = Graph()
+    graph.add_node(BooleanInvocation(id="condition", value=True))
+    graph.add_node(PromptTestInvocation(id="true_value", prompt="true branch"))
+    graph.add_node(IfInvocation(id="if"))
+
+    graph.add_edge(create_edge("condition", "value", "if", "condition"))
+    graph.add_edge(create_edge("true_value", "prompt", "if", "true_input"))
+
+    g = GraphExecutionState(graph=graph)
+
+    condition_exec_id = g._create_execution_node("condition", [])[0]
+    true_value_exec_id = g._create_execution_node("true_value", [])[0]
+    if_exec_id = g._create_execution_node(
+        "if",
+        [("condition", condition_exec_id), ("true_value", true_value_exec_id)],
+    )[0]
+
+    g.executed.add(condition_exec_id)
+    g.results[condition_exec_id] = BooleanOutput(value=True)
+    g.executed.add(true_value_exec_id)
+    g._resolved_if_exec_branches[if_exec_id] = "true_input"
+
+    if_node = g.execution_graph.get_node(if_exec_id)
+    with pytest.raises(RuntimeError) as exc_info:
+        g._prepare_inputs(if_node)
+
+    message = str(exc_info.value)
+    assert if_exec_id in message
+    assert true_value_exec_id in message
+    assert "iteration_path=()" in message
+
+
+def test_get_collect_iteration_mappings_ignores_skipped_prepared_exec_nodes():
+    graph = Graph()
+    graph.add_node(AnyTypeTestInvocation(id="parent", value="value"))
+
+    g = GraphExecutionState(graph=graph)
+
+    skipped_exec_id = g._create_execution_node("parent", [])[0]
+    active_exec_id = g._create_execution_node("parent", [])[0]
+    g._set_prepared_exec_state(skipped_exec_id, "skipped")
+
+    mappings = g._materializer()._get_collect_iteration_mappings(["parent"])
+
+    assert mappings == [("parent", active_exec_id)]
+
+
+def test_get_iteration_node_ignores_skipped_prepared_exec_nodes():
+    graph = Graph()
+    graph.add_node(PromptTestInvocation(id="value", prompt="branch value"))
+
+    g = GraphExecutionState(graph=graph)
+
+    skipped_exec_id = g._create_execution_node("value", [])[0]
+    active_exec_id = g._create_execution_node("value", [])[0]
+    g._set_prepared_exec_state(skipped_exec_id, "skipped")
+
+    selected_exec_id = g._get_iteration_node("value", graph.nx_graph_flat(), g.execution_graph.nx_graph_flat(), [])
+
+    assert selected_exec_id == active_exec_id
+
+
+def test_get_iteration_node_returns_single_active_prepared_exec_node():
+    graph = Graph()
+    graph.add_node(PromptTestInvocation(id="value", prompt="branch value"))
+
+    g = GraphExecutionState(graph=graph)
+
+    active_exec_id = g._create_execution_node("value", [])[0]
+
+    selected_exec_id = g._get_iteration_node("value", graph.nx_graph_flat(), g.execution_graph.nx_graph_flat(), [])
+
+    assert selected_exec_id == active_exec_id
+
+
+def test_get_iteration_node_returns_none_when_only_skipped_prepared_exec_nodes_exist():
+    graph = Graph()
+    graph.add_node(PromptTestInvocation(id="value", prompt="branch value"))
+
+    g = GraphExecutionState(graph=graph)
+
+    skipped_exec_id = g._create_execution_node("value", [])[0]
+    g._set_prepared_exec_state(skipped_exec_id, "skipped")
+
+    selected_exec_id = g._get_iteration_node("value", graph.nx_graph_flat(), g.execution_graph.nx_graph_flat(), [])
+
+    assert selected_exec_id is None
+
+
+def test_get_iteration_node_does_not_reuse_wrong_iterator_when_only_other_iteration_is_live():
+    graph = Graph()
+    graph.add_node(BooleanCollectionInvocation(id="conditions", collection=[True, False]))
+    graph.add_node(IterateInvocation(id="condition_iter"))
+    graph.add_node(AnyTypeTestInvocation(id="value"))
+
+    graph.add_edge(create_edge("conditions", "collection", "condition_iter", "collection"))
+    graph.add_edge(create_edge("condition_iter", "item", "value", "value"))
+
+    g = GraphExecutionState(graph=graph)
+
+    conditions_exec_id = g._create_execution_node("conditions", [])[0]
+    g.executed.add(conditions_exec_id)
+    g.results[conditions_exec_id] = BooleanCollectionOutput(collection=[True, False])
+
+    iterator_exec_ids = g._create_execution_node("condition_iter", [("conditions", conditions_exec_id)])
+    assert len(iterator_exec_ids) == 2
+    iterator_exec_ids_by_index = {g.execution_graph.get_node(exec_id).index: exec_id for exec_id in iterator_exec_ids}
+    first_iter_exec_id = iterator_exec_ids_by_index[0]
+    second_iter_exec_id = iterator_exec_ids_by_index[1]
+
+    value_exec_ids = []
+    value_exec_ids.extend(g._create_execution_node("value", [("condition_iter", first_iter_exec_id)]))
+    value_exec_ids.extend(g._create_execution_node("value", [("condition_iter", second_iter_exec_id)]))
+    assert len(value_exec_ids) == 2
+
+    for exec_id in value_exec_ids:
+        if g._get_iteration_path(exec_id) == (1,):
+            active_value_exec_id = exec_id
+        else:
+            skipped_value_exec_id = exec_id
+
+    g._set_prepared_exec_state(skipped_value_exec_id, "skipped")
+
+    selected_exec_id = g._get_iteration_node(
+        "value", graph.nx_graph_flat(), g.execution_graph.nx_graph_flat(), [first_iter_exec_id]
+    )
+
+    assert selected_exec_id is None
+    assert active_value_exec_id != skipped_value_exec_id
+
+
+def test_mark_exec_node_skipped_does_not_hide_already_executed_results():
+    graph = Graph()
+    graph.add_node(AnyTypeTestInvocation(id="value", value="value"))
+
+    g = GraphExecutionState(graph=graph)
+
+    exec_id = g._create_execution_node("value", [])[0]
+    g.results[exec_id] = AnyTypeTestInvocationOutput(value="value")
+    g.executed.add(exec_id)
+    g._set_prepared_exec_state(exec_id, "executed")
+
+    g._if_scheduler().mark_exec_node_skipped(exec_id)
+
+    assert g._get_prepared_exec_metadata(exec_id).state == "executed"
+    assert g.results[exec_id].value == "value"
+
+
+def test_mark_exec_node_skipped_is_idempotent_for_skipped_state():
+    graph = Graph()
+    graph.add_node(AnyTypeTestInvocation(id="value", value="value"))
+
+    g = GraphExecutionState(graph=graph)
+
+    exec_id = g._create_execution_node("value", [])[0]
+
+    g._if_scheduler().mark_exec_node_skipped(exec_id)
+    g._if_scheduler().mark_exec_node_skipped(exec_id)
+
+    assert g._get_prepared_exec_metadata(exec_id).state == "skipped"
+    assert g.executed_history.count("value") == 1
 
 
 def test_are_connection_types_compatible_accepts_subclass_to_base():

@@ -85,6 +85,7 @@ const _zImageDTO = z.object({
   starred: z.boolean(),
   has_workflow: z.boolean(),
   board_id: z.string().nullish(),
+  image_subfolder: z.string().optional(),
 });
 export type ImageDTO = z.infer<typeof _zImageDTO>;
 assert<Equals<ImageDTO, S['ImageDTO']>>();
@@ -108,12 +109,14 @@ export type CLIPLEmbedModelConfig = Extract<InternalAnyModelConfig, { type: 'cli
 export type CLIPGEmbedModelConfig = Extract<InternalAnyModelConfig, { type: 'clip_embed'; variant: 'gigantic' }>;
 export type CLIPEmbedModelConfig = Extract<InternalAnyModelConfig, { type: 'clip_embed' }>;
 export type LlavaOnevisionModelConfig = Extract<InternalAnyModelConfig, { type: 'llava_onevision' }>;
+export type TextLLMModelConfig = Extract<InternalAnyModelConfig, { type: 'text_llm' }>;
 export type T5EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 't5_encoder' }>;
 export type T5EncoderBnbQuantizedLlmInt8bModelConfig = Extract<
   InternalAnyModelConfig,
   { type: 't5_encoder'; format: 'bnb_quantized_int8b' }
 >;
 export type Qwen3EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen3_encoder' }>;
+export type QwenVLEncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen_vl_encoder' }>;
 export type SpandrelImageToImageModelConfig = Extract<InternalAnyModelConfig, { type: 'spandrel_image_to_image' }>;
 export type CheckpointModelConfig = Extract<InternalAnyModelConfig, { type: 'main'; format: 'checkpoint' }>;
 export type CLIPVisionModelConfig = Extract<InternalAnyModelConfig, { type: 'clip_vision' }>;
@@ -308,6 +311,16 @@ export const isAnimaVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?:
   );
 };
 
+export const isQwenImageVAEModelConfig = (
+  config: AnyModelConfig,
+  excludeSubmodels?: boolean
+): config is VAEModelConfig => {
+  return (
+    (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
+    config.base === 'qwen-image'
+  );
+};
+
 export const isControlNetModelConfig = (config: AnyModelConfig): config is ControlNetModelConfig => {
   return config.type === 'controlnet';
 };
@@ -328,6 +341,10 @@ export const isCLIPVisionModelConfig = (config: AnyModelConfig): config is CLIPV
 
 export const isLLaVAModelConfig = (config: AnyModelConfig): config is LlavaOnevisionModelConfig => {
   return config.type === 'llava_onevision';
+};
+
+export const isTextLLMModelConfig = (config: AnyModelConfig): config is TextLLMModelConfig => {
+  return config.type === 'text_llm';
 };
 
 export const isT2IAdapterModelConfig = (config: AnyModelConfig): config is T2IAdapterModelConfig => {
@@ -356,6 +373,10 @@ export const isQwen3EncoderModelConfig = (config: AnyModelConfig): config is Qwe
 
 export const isAnimaQwen3EncoderModelConfig = (config: AnyModelConfig): config is Qwen3EncoderModelConfig => {
   return config.type === 'qwen3_encoder' && config.variant === 'qwen3_06b';
+};
+
+export const isQwenVLEncoderModelConfig = (config: AnyModelConfig): config is QwenVLEncoderModelConfig => {
+  return config.type === 'qwen_vl_encoder';
 };
 
 export const isCLIPEmbedModelConfigOrSubmodel = (
