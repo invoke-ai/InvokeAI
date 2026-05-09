@@ -7,6 +7,8 @@ import {
   getConnectorDeletionSpliceConnections,
   getConnectorInputEdge,
   getConnectorOutputEdges,
+  resolveConnectorDisplayFieldType,
+  resolveConnectorSinkFieldType,
   resolveConnectorSource,
   resolveConnectorSourceFieldType,
 } from './connectorTopology';
@@ -122,5 +124,45 @@ describe('connectorTopology', () => {
     const edges = [buildEdge(connector.id, CONNECTOR_OUTPUT_HANDLE, target.id, 'a')];
 
     expect(getConnectorDeletionSpliceConnections(connector.id, nodes, edges, templates)).toBe(null);
+  });
+
+  it('resolves sink field type from downstream when the connector input is unwired', () => {
+    const connector = buildConnectorNode('connector-1');
+    const target = buildNode(sub);
+    const nodes: AnyNode[] = [connector, target];
+    const edges = [buildEdge(connector.id, CONNECTOR_OUTPUT_HANDLE, target.id, 'a')];
+
+    expect(resolveConnectorSourceFieldType(connector.id, nodes, edges, templates)).toBe(null);
+    expect(resolveConnectorSinkFieldType(connector.id, nodes, edges, templates)).toEqual(sub.inputs.a?.type);
+    expect(resolveConnectorDisplayFieldType(connector.id, nodes, edges, templates)).toEqual(sub.inputs.a?.type);
+  });
+
+  it('prefers upstream output type over downstream input for display when both are wired', () => {
+    const source = buildNode(add);
+    const connector = buildConnectorNode('connector-1');
+    const target = buildNode(sub);
+    const nodes: AnyNode[] = [source, connector, target];
+    const edges = [
+      buildEdge(source.id, 'value', connector.id, CONNECTOR_INPUT_HANDLE),
+      buildEdge(connector.id, CONNECTOR_OUTPUT_HANDLE, target.id, 'a'),
+    ];
+
+    expect(resolveConnectorDisplayFieldType(connector.id, nodes, edges, templates)).toEqual(add.outputs.value?.type);
+  });
+
+  it('resolves display type through a chain of connectors to an invocation input', () => {
+    const connectorA = buildConnectorNode('connector-a');
+    const connectorB = buildConnectorNode('connector-b');
+    const connectorC = buildConnectorNode('connector-c');
+    const target = buildNode(sub);
+    const nodes: AnyNode[] = [connectorA, connectorB, connectorC, target];
+    const edges = [
+      buildEdge(connectorA.id, CONNECTOR_OUTPUT_HANDLE, connectorB.id, CONNECTOR_INPUT_HANDLE),
+      buildEdge(connectorB.id, CONNECTOR_OUTPUT_HANDLE, connectorC.id, CONNECTOR_INPUT_HANDLE),
+      buildEdge(connectorC.id, CONNECTOR_OUTPUT_HANDLE, target.id, 'a'),
+    ];
+
+    expect(resolveConnectorDisplayFieldType(connectorA.id, nodes, edges, templates)).toEqual(sub.inputs.a?.type);
+    expect(resolveConnectorDisplayFieldType(connectorB.id, nodes, edges, templates)).toEqual(sub.inputs.a?.type);
   });
 });

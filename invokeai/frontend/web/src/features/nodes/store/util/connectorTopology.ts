@@ -105,6 +105,59 @@ export const resolveConnectorSourceFieldType = (
   return sourceTemplate?.outputs[resolvedSource.fieldName]?.type ?? null;
 };
 
+/**
+ * Input field types from outgoing edges: invocation inputs, or chained connectors until one resolves.
+ * `sinkWalkVisited` breaks cycles when following connector → connector → … → invocation.
+ */
+export const resolveConnectorSinkFieldType = (
+  connectorId: string,
+  nodes: AnyNode[],
+  edges: AnyEdge[],
+  templates: Templates,
+  sinkWalkVisited: Set<string> = new Set()
+): FieldType | null => {
+  if (sinkWalkVisited.has(connectorId)) {
+    return null;
+  }
+  sinkWalkVisited.add(connectorId);
+
+  for (const edge of getConnectorOutputEdges(connectorId, edges)) {
+    if (typeof edge.targetHandle !== 'string') {
+      continue;
+    }
+    const targetNode = nodes.find((node) => node.id === edge.target);
+    if (!targetNode) {
+      continue;
+    }
+    if (isInvocationNode(targetNode)) {
+      const inputTemplate = templates[targetNode.data.type]?.inputs[edge.targetHandle];
+      const t = inputTemplate?.type;
+      if (t) {
+        return t;
+      }
+      continue;
+    }
+    if (isConnectorNode(targetNode)) {
+      const nested = resolveConnectorDisplayFieldType(edge.target, nodes, edges, templates, sinkWalkVisited);
+      if (nested) {
+        return nested;
+      }
+    }
+  }
+  return null;
+};
+
+/** Upstream output type when wired; otherwise downstream input type from an outgoing edge (connector chrome / edges). */
+export const resolveConnectorDisplayFieldType = (
+  connectorId: string,
+  nodes: AnyNode[],
+  edges: AnyEdge[],
+  templates: Templates,
+  sinkWalkVisited: Set<string> = new Set()
+): FieldType | null =>
+  resolveConnectorSourceFieldType(connectorId, nodes, edges, templates) ??
+  resolveConnectorSinkFieldType(connectorId, nodes, edges, templates, sinkWalkVisited);
+
 export const getConnectorDeletionSpliceConnections = (
   connectorId: string,
   nodes: AnyNode[],
