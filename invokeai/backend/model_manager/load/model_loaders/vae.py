@@ -42,12 +42,10 @@ class VAELoader(GenericDiffusersLoader):
         elif isinstance(config, VAE_Checkpoint_QwenImage_Config):
             return self._load_qwen_image_vae(config)
         elif isinstance(config, VAE_Checkpoint_Config_Base):
-            result = AutoencoderKL.from_single_file(
+            return AutoencoderKL.from_single_file(
                 config.path,
                 torch_dtype=self._torch_dtype,
             )
-            result = self._apply_fp8_layerwise_casting(result, config, submodel_type)
-            return result
         else:
             return super()._load_model(config, submodel_type)
 

@@ -132,12 +132,16 @@ class ModelLoader(ModelLoaderBase):
 
         # Z-Image has dtype mismatch issues with diffusers' layerwise casting
         # (skipped modules produce bf16, hooked modules expect fp16).
-        from invokeai.backend.model_manager.taxonomy import BaseModelType
+        from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
         if hasattr(config, "base") and config.base == BaseModelType.ZImage:
             return False
 
-        # Don't apply FP8 to text encoders, tokenizers, schedulers, etc.
+        # VAEs are excluded — fp8 storage causes noticeable quality degradation in decode.
+        if hasattr(config, "type") and config.type == ModelType.VAE:
+            return False
+
+        # Don't apply FP8 to text encoders, tokenizers, schedulers, VAEs, etc.
         _excluded_submodel_types = {
             SubModelType.TextEncoder,
             SubModelType.TextEncoder2,
@@ -147,6 +151,9 @@ class ModelLoader(ModelLoaderBase):
             SubModelType.Tokenizer3,
             SubModelType.Scheduler,
             SubModelType.SafetyChecker,
+            SubModelType.VAE,
+            SubModelType.VAEDecoder,
+            SubModelType.VAEEncoder,
         }
         if submodel_type in _excluded_submodel_types:
             return False
