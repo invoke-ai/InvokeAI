@@ -12,6 +12,8 @@ import {
   kleinVaeModelSelected,
   modelChanged,
   qwenImageComponentSourceSelected,
+  qwenImageQwenVLEncoderModelSelected,
+  qwenImageVaeModelSelected,
   resolutionPresetSelected,
   setZImageScheduler,
   syncedToOptimalDimension,
@@ -57,6 +59,8 @@ import {
   selectGlobalRefImageModels,
   selectQwen3EncoderModels,
   selectQwenImageDiffusersModels,
+  selectQwenImageVAEModels,
+  selectQwenVLEncoderModels,
   selectRegionalRefImageModels,
   selectT5EncoderModels,
   selectZImageDiffusersModels,
@@ -251,10 +255,18 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         }
 
         // handle incompatible Qwen Image Edit component source - clear if switching away
-        const { qwenImageComponentSource } = state.params;
+        const { qwenImageComponentSource, qwenImageVaeModel, qwenImageQwenVLEncoderModel } = state.params;
         if (newBase !== 'qwen-image') {
           if (qwenImageComponentSource) {
             dispatch(qwenImageComponentSourceSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (qwenImageVaeModel) {
+            dispatch(qwenImageVaeModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (qwenImageQwenVLEncoderModel) {
+            dispatch(qwenImageQwenVLEncoderModelSelected(null));
             modelsUpdatedDisabledOrCleared += 1;
           }
         } else {
@@ -284,6 +296,27 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
 
             if (diffusersModel) {
               dispatch(qwenImageComponentSourceSelected(zModelIdentifierField.parse(diffusersModel)));
+            }
+          }
+
+          // Auto-select standalone VAE and Qwen2.5-VL Encoder if available - this allows GGUF
+          // users to be ready-to-go after installing the starter pack without having to dig into
+          // Advanced. Only set if the user hasn't already chosen one.
+          if (!qwenImageVaeModel) {
+            const availableQwenImageVAEs = selectQwenImageVAEModels(state);
+            const vae = availableQwenImageVAEs[0];
+            if (vae) {
+              dispatch(qwenImageVaeModelSelected(zModelIdentifierField.parse(vae)));
+            }
+          }
+          if (!qwenImageQwenVLEncoderModel) {
+            const availableQwenVLEncoders = selectQwenVLEncoderModels(state);
+            // Prefer diffusers (folder) format over single-file checkpoints, since the latter
+            // can fail to load on some checkpoints.
+            const encoder =
+              availableQwenVLEncoders.find((m) => m.format === 'qwen_vl_encoder') ?? availableQwenVLEncoders[0];
+            if (encoder) {
+              dispatch(qwenImageQwenVLEncoderModelSelected(zModelIdentifierField.parse(encoder)));
             }
           }
         }

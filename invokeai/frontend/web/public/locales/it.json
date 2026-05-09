@@ -468,6 +468,14 @@
             "selectLassoTool": {
                 "title": "Strumento Lazo",
                 "desc": "Seleziona lo strumento lazo."
+            },
+            "mergeDown": {
+                "title": "Unisci livello verso il basso",
+                "desc": "Unisci il livello selezionato al livello immediatamente sottostante."
+            },
+            "mergeVisible": {
+                "title": "Unisci tutti i livelli visibili",
+                "desc": "Unisci tutti i livelli visibili del tipo di livello selezionato."
             }
         },
         "workflows": {
@@ -788,7 +796,8 @@
             "welcome": "Benvenuti in Gestione Modelli",
             "bundleDescription": "Ogni pacchetto include modelli essenziali per ogni famiglia di modelli e modelli base selezionati per iniziare.",
             "quickStart": "Pacchetti di avvio rapido",
-            "browseAll": "Oppure sfoglia tutti i modelli disponibili:"
+            "browseAll": "Oppure sfoglia tutti i modelli disponibili:",
+            "externalDescription": "Collega una chiave API Gemini o OpenAI per abilitare la generazione esterna. L'utilizzo potrebbe comportare costi da parte del fornitore."
         },
         "launchpadTab": "Rampa di lancio",
         "installBundle": "Installa pacchetto",
@@ -808,9 +817,9 @@
         "reidentifySuccess": "Modello reidentificato con successo",
         "reidentifyUnknown": "Impossibile identificare il modello",
         "reidentifyError": "Errore durante la reidentificazione del modello",
-        "flux2KleinQwen3EncoderPlaceholder": "Dal modello principale",
+        "flux2KleinQwen3EncoderPlaceholder": "Dal modello diffusori",
         "flux2KleinQwen3Encoder": "Encoder Qwen3 (opzionale)",
-        "flux2KleinVaePlaceholder": "Dal modello principale",
+        "flux2KleinVaePlaceholder": "Dal modello diffusori",
         "flux2KleinVae": "VAE (opzionale)",
         "zImageQwen3SourcePlaceholder": "Obbligatorio se VAE/Encoder è vuoto",
         "zImageQwen3Source": "Modello sorgente Qwen3 e VAE",
@@ -896,7 +905,49 @@
         "qwenImageQuantization": "Quantizzazione dell'encoder",
         "qwenImageQuantizationNone": "Nessuna (bf16)",
         "modelPickerFallbackNoModelsInstalledNonAdmin": "Nessun modello installato. Chiedi al tuo amministratore di InvokeAI (<AdminEmailLink />) di installare alcuni modelli.",
-        "noModelsInstalledAskAdmin": "Chiedi al tuo amministratore di installarne alcuni."
+        "noModelsInstalledAskAdmin": "Chiedi al tuo amministratore di installarne alcuni.",
+        "externalImageGenerator": "Generatore di immagini esterno",
+        "externalProviders": "Fornitori esterni",
+        "externalSetupTitle": "Configurazione dei fornitori esterni",
+        "externalSetupDescription": "Collega una chiave API per abilitare la generazione di immagini esterne. I modelli di avvio esterni vengono installati automaticamente quando viene configurato un provider.",
+        "externalInstallDefaults": "Modelli di avviamento ad installazione automatica",
+        "externalProvidersUnavailable": "In questa versione non sono supportati i provider esterni.",
+        "externalSetupFooter": "È necessaria una chiave API. I fornitori esterni utilizzano API remote; l'utilizzo potrebbe comportare costi a carico del fornitore.",
+        "externalProviderCardDescription": "Configura le credenziali {{providerId}} per la generazione di immagini esterne.",
+        "externalApiKey": "Chiave API",
+        "externalApiKeyPlaceholder": "Incolla la tua chiave API",
+        "externalApiKeyPlaceholderSet": "Chiave API configurata",
+        "externalApiKeyHelper": "Memorizzato nel file di configurazione di InvokeAI.",
+        "externalBaseUrl": "URL di base (facoltativo)",
+        "externalBaseUrlHelper": "Se necessario, sovrascrivi l'URL di base predefinito dell'API.",
+        "externalResetHelper": "Cancella la chiave API e l'URL di base.",
+        "sortByName": "Nome",
+        "sortBySize": "Dimensione",
+        "sortByDateAdded": "Data di aggiunta",
+        "sortByDateModified": "Data di modifica",
+        "sortByPath": "Percorso",
+        "sortByType": "Tipo",
+        "sortByFormat": "Formato",
+        "sortDefault": "Predefinito",
+        "externalProvider": "Fornitore esterno",
+        "externalCapabilities": "Capacità",
+        "externalDefaults": "Impostazioni predefinite",
+        "providerId": "ID Fornitore",
+        "providerModelId": "ID modello del fornitore",
+        "supportedModes": "Modalità supportate",
+        "supportsNegativePrompt": "Supporta il prompt negativo",
+        "supportsReferenceImages": "Supporta immagini di riferimento",
+        "supportsSeed": "Supporta il Seme",
+        "supportsGuidance": "Supporta la guida",
+        "maxImagesPerRequest": "Numero massimo di immagini per richiesta",
+        "maxReferenceImages": "Numero massimo di immagini di riferimento",
+        "maxImageWidth": "Larghezza massima immagine",
+        "flux2KleinVaeNoModelPlaceholder": "Nessun modello diffusori disponibile",
+        "flux2KleinQwen3EncoderNoModelPlaceholder": "Nessun modello diffusori disponibile",
+        "maxImageHeight": "Altezza massima dell'immagine",
+        "numImages": "Numero di immagini",
+        "textLLM": "LLM testuale",
+        "sourceUrl": "URL di origine"
     },
     "parameters": {
         "images": "Immagini",
@@ -992,7 +1043,9 @@
             "noAnimaQwen3EncoderModelSelected": "Nessun modello di encoder Anima Qwen3 selezionato",
             "noAnimaT5EncoderModelSelected": "Nessun modello di encoder Anima T5 selezionato",
             "noQwenImageComponentSourceSelected": "I modelli GGUF Qwen Image richiedono una sorgente componente diffusori per VAE/encoder",
-            "boardNotWritable": "Non hai i permessi di scrittura per la bacheca \"{{boardName}}\". Seleziona una bacheca di tua proprietà oppure passa a Non categorizzata."
+            "boardNotWritable": "Non hai i permessi di scrittura per la bacheca \"{{boardName}}\". Seleziona una bacheca di tua proprietà oppure passa a Non categorizzata.",
+            "noFlux2KleinVaeModelSelected": "Nessun VAE selezionato. I modelli FLUX.2 Klein senza diffusori richiedono un VAE autonomo",
+            "noFlux2KleinQwen3EncoderModelSelected": "Nessun encoder Qwen3 selezionato. I modelli Klein FLUX.2 senza diffusori richiedono un encoder Qwen3 autonomo"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -1031,8 +1084,10 @@
         "showOptionsPanel": "Mostra pannello laterale (O o T)",
         "seedVarianceRandomizePercent": "Percentuale di variazione",
         "seedVarianceStrength": "Intensità della varianza",
-        "seedVarianceEnabled": "Potenziamento della varianza del seme",
-        "colorCompensation": "Compensazione Colore"
+        "seedVarianceEnabled": "Migliora varianza seme",
+        "colorCompensation": "Compensazione Colore",
+        "disabledNotSupported": "Non supportato dal modello",
+        "imageSize": "Dimensioni immagine"
     },
     "settings": {
         "models": "Modelli",
@@ -1075,7 +1130,12 @@
         "modelDescriptionsDisabledDesc": "Le descrizioni dei modelli nei menu a discesa sono state disattivate. Abilitale nelle Impostazioni.",
         "preferAttentionStyleNumeric": "Preferisci lo stile di attenzione numerico",
         "maxQueueHistory": "Cronologia massima della coda",
-        "maxQueueHistorySaveFailed": "Impossibile salvare la cronologia della coda massima"
+        "maxQueueHistorySaveFailed": "Impossibile salvare la cronologia della coda massima",
+        "middleClickOpenInNewTab": "Utilizza il clic centrale del mouse per aprire le immagini in una nuova scheda",
+        "externalProviders": "Fornitori esterni",
+        "externalProviderConfigured": "Configurato",
+        "externalProviderNotConfigured": "Chiave API necessaria",
+        "externalProviderNotConfiguredHint": "Aggiungi la tua chiave API in Gestione Modello o nella configurazione del server per abilitare questo provider."
     },
     "toast": {
         "uploadFailed": "Caricamento fallito",
@@ -2164,7 +2224,15 @@
         "recallParameter": "Richiama {{label}}",
         "seedVarianceRandomizePercent": "Casualità della varianza del seme %",
         "seedVarianceEnabled": "Varianza seme abilitata",
-        "seedVarianceStrength": "Intensità della varianza del seme"
+        "seedVarianceStrength": "Intensità della varianza del seme",
+        "geminiTemperature": "Gemini Temperatura",
+        "geminiThinkingLevel": "Gemini Livello di ragionamento",
+        "openaiQuality": "OpenAI Qualità",
+        "openaiInputFidelity": "OpenAI Fedeltà Input",
+        "imageSize": "Dimensioni immagine",
+        "openaiBackground": "OpenAI Sfondo",
+        "seedreamWatermark": "Filigrana Seedream",
+        "seedreamOptimizePrompt": "Seedream Ottimizza Prompt"
     },
     "hrf": {
         "metadata": {
@@ -2353,7 +2421,21 @@
         "promptHistory": "Cronologia dei prompt",
         "clearHistory": "Cancella cronologia",
         "usePrompt": "Utilizza il prompt",
-        "searchPrompts": "Ricerca..."
+        "searchPrompts": "Ricerca...",
+        "imageToPrompt": "Immagine a prompt",
+        "selectVisionModel": "Seleziona il modello di visione...",
+        "changeImage": "Cambia immagine",
+        "uploadImage": "Carica immagine",
+        "generatePrompt": "Genera prompt",
+        "expandPromptWithLLM": "Espandi il prompt con LLM",
+        "expandPrompt": "Espandi il prompt",
+        "selectTextLLM": "Seleziona LLM testuale...",
+        "expand": "Espandi",
+        "noTextLLMInstalledTitle": "Nessun modello LLM testuale installato",
+        "noTextLLMInstalledDescription": "L'espansione del prompt richiede un modello linguistico causale (LLM) di tipo testuale. Consigliamo Qwen2.5-1.5B-Instruct (~3 GB): è piccolo, veloce e disponibile come modello di partenza.",
+        "noVisionModelInstalledTitle": "Nessun modello di visione installato",
+        "noVisionModelInstalledDescription": "La funzione di conversione immagine-a-prompt richiede un modello di linguaggio visivo (ad esempio LLaVA Onevision). Il pacchetto iniziale da 0,5 byte (~1 GB) è quello predefinito più leggero.",
+        "openModelManager": "Apri Gestione Modelli"
     },
     "controlLayers": {
         "addLayer": "Aggiungi Livello",
@@ -2469,7 +2551,8 @@
             "brush": "Pennello",
             "eraser": "Cancellino",
             "gradient": "Gradiente",
-            "text": "Testo"
+            "text": "Testo",
+            "lasso": "Lazo"
         },
         "filter": {
             "apply": "Applica",
@@ -2967,6 +3050,29 @@
             "freehand": "A mano libera",
             "polygon": "Poligono",
             "polygonHint": "Fai clic per aggiungere punti, fai clic sul primo punto per chiudere."
+        },
+        "transparencyLocked": "Trasparenza bloccata",
+        "transparencyUnlocked": "Trasparenza sbloccata",
+        "snapshot": {
+            "snapshots": "Salva o carica l'istantanea della tela",
+            "saveSnapshot": "Salva istantanea",
+            "restoreSnapshot": "Ripristina istantanea",
+            "snapshotNamePlaceholder": "Nome dell'istantanea",
+            "save": "Salva",
+            "delete": "Elimina",
+            "snapshotSaved": "Istantanea \"{{name}}\" salvata",
+            "snapshotRestored": "Istantanea \"{{name}}\" ripristinata",
+            "snapshotDeleted": "Istantanea \"{{name}}\" eliminata",
+            "snapshotSaveFailed": "Impossibile salvare l'istantanea",
+            "snapshotRestoreFailed": "Impossibile ripristinare l'istantanea",
+            "snapshotDeleteFailed": "Impossibile eliminare l'istantanea",
+            "snapshotMissingImages_one": "{{count}} immagine a cui fa riferimento questa istantanea non esiste più e verrà visualizzata come segnaposto",
+            "snapshotMissingImages_many": "{{count}} immagini a cui fa riferimento questa istantanea non esistono più e verranno visualizzate come segnaposto",
+            "snapshotMissingImages_other": "{{count}} immagini a cui fa riferimento questa istantanea non esistono più e verranno visualizzate come segnaposto",
+            "snapshotIncompatible": "Questa istantanea è stata creata con una versione diversa e non è più compatibile",
+            "overwriteSnapshotTitle": "Sovrascrivere l'istantanea?",
+            "overwriteSnapshotMessage": "Esiste già un'istantanea denominata \"{{name}}\". Si desidera sovrascriverla?",
+            "overwrite": "Sovrascrivi"
         }
     },
     "ui": {
@@ -2980,7 +3086,8 @@
             "upscaling": "Amplia",
             "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)",
             "gallery": "Galleria",
-            "generate": "Genera"
+            "generate": "Genera",
+            "customNodes": "Nodi"
         },
         "launchpad": {
             "workflowsTitle": "Approfondisci i flussi di lavoro.",
@@ -3154,9 +3261,13 @@
         "readReleaseNotes": "Leggi le note di rilascio",
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "items": [
+            "Strumenti di prompt LLM: utilizza modelli linguistici locali per espandere i prompt o generarli da immagini. Installa un modello LLM di testo (ad esempio Qwen2.5-1.5B-Instruct) per iniziare.",
+            "Supporto per FLUX.2 Klein: InvokeAI ora supporta i nuovi modelli FLUX.2 Klein (varianti 4B e 9B) nei formati GGUF, FP8 e Diffusers. Le funzionalità includono conversione da testo a immagine, da immagine a immagine, inpainting e outpainting. Consulta la sezione \"Modelli di base\" per iniziare.",
+            "Il supporto DyPE per i modelli FLUX migliora le immagini ad alta risoluzione (>1536 px fino a 4K). Vai alla sezione \"Opzioni avanzate\" per attivarlo.",
+            "Diversità di Z-Image Turbo: Attiva \"Migliora varianza seme\" in \"Opzioni avanzate\" per aumentare la diversità delle tue generazioni con ZiT.",
             "La modalità multiutente supporta più utenti isolati sullo stesso server.",
             "Supporto migliorato per i modelli Z-Image e FLUX.2.",
-            "Numerosi miglioramenti dell'interfaccia utente e nuove funzionalità Tela."
+            "Numerosi miglioramenti all'interfaccia utente e nuove funzionalità per la tela."
         ],
         "watchUiUpdatesOverview": "Guarda la panoramica degli aggiornamenti dell'interfaccia utente",
         "takeUserSurvey": "📣 Facci sapere cosa ne pensi di InvokeAI. Partecipa al nostro sondaggio sull'esperienza utente!"
@@ -3303,5 +3414,35 @@
         "mouseWheelZoom": "Rotellina del mouse: Zoom",
         "spaceDragPan": "Spazio + trascina: Panoramica",
         "dragCropBoxToAdjust": "Trascina il riquadro di ritaglio o le maniglie per regolare"
+    },
+    "customNodes": {
+        "title": "Nodi personalizzati",
+        "gitUrl": "URL del repository Git",
+        "gitUrlLabel": "URL del repository",
+        "install": "Installa",
+        "installing": "Installazione in corso",
+        "installSuccess": "Pacchetto nodi installato",
+        "installTitle": "Installa pacchetto Nodi",
+        "installFailed": "Installazione non riuscita",
+        "installError": "Si è verificato un errore imprevisto durante l'installazione.",
+        "securityWarning": "I nodi personalizzati eseguono codice sul tuo sistema. Installa pacchetti di nodi solo da autori di cui ti fidi. I nodi dannosi potrebbero danneggiare il tuo sistema o compromettere i tuoi dati.",
+        "installDescription": "Clona il repository nella tua directory nodi. I file del flusso di lavoro (.json) vengono importati nella tua libreria. Le dipendenze Python (requirements.txt o pyproject.toml) NON vengono installate automaticamente: segui la documentazione del pacchetto node per installarle manualmente.",
+        "dependenciesRequiredTitle": "Installazione manuale delle dipendenze richiesta",
+        "dependenciesRequiredDescription": "'{{name}}' include un {{file}}. Segui la documentazione del pacchetto di nodi per installare le sue dipendenze Python prima di utilizzare i suoi nodi.",
+        "uninstall": "Disinstalla",
+        "reload": "Ricarica",
+        "reloading": "Ricaricamento in corso",
+        "noNodePacks": "Nessun pacchetto di nodi personalizzato installato.",
+        "scanFolder": "Scansiona la cartella",
+        "scanFolderDescription": "I pacchetti di nodi inseriti nella directory dei nodi vengono rilevati automaticamente all'avvio. Utilizzare il pulsante Ricarica per rilevare i pacchetti appena aggiunti senza riavviare il programma.",
+        "nodesDirectory": "Cartella nodi",
+        "installQueue": "Registro di installazione",
+        "queueEmpty": "Nessuna attività di installazione recente.",
+        "name": "Nome",
+        "message": "Messaggio",
+        "nodeCount_one": "{{count}} nodo",
+        "nodeCount_many": "{{count}} nodi",
+        "nodeCount_other": "{{count}} nodi",
+        "uninstalled": "Disinstallato"
     }
 }
