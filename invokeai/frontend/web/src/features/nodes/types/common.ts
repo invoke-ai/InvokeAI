@@ -100,6 +100,7 @@ export const zBaseModelType = z.enum([
   'z-image',
   'external',
   'anima',
+  'wan',
   'unknown',
 ]);
 export type BaseModelType = z.infer<typeof zBaseModelType>;
@@ -114,6 +115,7 @@ export const zMainModelBase = z.enum([
   'qwen-image',
   'z-image',
   'anima',
+  'wan',
 ]);
 type MainModelBase = z.infer<typeof zMainModelBase>;
 export const isMainModelBase = (base: unknown): base is MainModelBase => zMainModelBase.safeParse(base).success;
@@ -144,6 +146,7 @@ export type ModelType = z.infer<typeof zModelType>;
 export const zSubModelType = z.enum([
   'unet',
   'transformer',
+  'transformer_2',
   'text_encoder',
   'text_encoder_2',
   'text_encoder_3',
@@ -163,6 +166,7 @@ export const zFluxVariantType = z.enum(['dev', 'dev_fill', 'schnell']);
 export const zFlux2VariantType = z.enum(['klein_4b', 'klein_4b_base', 'klein_9b', 'klein_9b_base']);
 export const zZImageVariantType = z.enum(['turbo', 'zbase']);
 const zQwenImageVariantType = z.enum(['generate', 'edit']);
+export const zWanVariantType = z.enum(['t2v_a14b', 'ti2v_5b']);
 export const zQwen3VariantType = z.enum(['qwen3_4b', 'qwen3_8b', 'qwen3_06b']);
 export const zAnyModelVariant = z.union([
   zModelVariantType,
@@ -171,6 +175,7 @@ export const zAnyModelVariant = z.union([
   zFlux2VariantType,
   zZImageVariantType,
   zQwenImageVariantType,
+  zWanVariantType,
   zQwen3VariantType,
 ]);
 export type AnyModelVariant = z.infer<typeof zAnyModelVariant>;

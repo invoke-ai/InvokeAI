@@ -78,6 +78,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_SD3_Config,
     Main_Diffusers_SDXL_Config,
     Main_Diffusers_SDXLRefiner_Config,
+    Main_Diffusers_Wan_Config,
     Main_Diffusers_ZImage_Config,
     Main_GGUF_Flux2_Config,
     Main_GGUF_FLUX_Config,
@@ -173,6 +174,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Diffusers_Flux2_Config, Main_Diffusers_Flux2_Config.get_tag()],
         Annotated[Main_Diffusers_CogView4_Config, Main_Diffusers_CogView4_Config.get_tag()],
         Annotated[Main_Diffusers_QwenImage_Config, Main_Diffusers_QwenImage_Config.get_tag()],
+        Annotated[Main_Diffusers_Wan_Config, Main_Diffusers_Wan_Config.get_tag()],
         Annotated[Main_Diffusers_ZImage_Config, Main_Diffusers_ZImage_Config.get_tag()],
         # Main (Pipeline) - checkpoint format
         # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation

@@ -29,6 +29,7 @@ from invokeai.app.invocations.fields import (
     SD3ConditioningField,
     TensorField,
     UIComponent,
+    WanConditioningField,
     ZImageConditioningField,
 )
 from invokeai.app.services.images.images_common import ImageDTO
@@ -495,6 +496,17 @@ class AnimaConditioningOutput(BaseInvocationOutput):
     @classmethod
     def build(cls, conditioning_name: str) -> "AnimaConditioningOutput":
         return cls(conditioning=AnimaConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("wan_conditioning_output")
+class WanConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a Wan 2.2 text conditioning tensor."""
+
+    conditioning: WanConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "WanConditioningOutput":
+        return cls(conditioning=WanConditioningField(conditioning_name=conditioning_name))
 
 
 @invocation_output("conditioning_output")

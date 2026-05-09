@@ -31,6 +31,7 @@ from invokeai.backend.model_manager.taxonomy import (
     QwenImageVariantType,
     SchedulerPredictionType,
     SubModelType,
+    WanVariantType,
     ZImageVariantType,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
@@ -59,7 +60,12 @@ class MainModelDefaultSettings(BaseModel):
     def from_base(
         cls,
         base: BaseModelType,
-        variant: Flux2VariantType | FluxVariantType | ModelVariantType | ZImageVariantType | None = None,
+        variant: Flux2VariantType
+        | FluxVariantType
+        | ModelVariantType
+        | WanVariantType
+        | ZImageVariantType
+        | None = None,
     ) -> Self | None:
         match base:
             case BaseModelType.StableDiffusion1:
@@ -88,6 +94,12 @@ class MainModelDefaultSettings(BaseModel):
                     # Distilled models (Klein 4B, Klein 9B) use fewer steps
                     return cls(steps=4, cfg_scale=1.0, width=1024, height=1024)
             case BaseModelType.QwenImage:
+                return cls(steps=40, cfg_scale=4.0, width=1024, height=1024)
+            case BaseModelType.Wan:
+                # Wan 2.2 recommended defaults differ by variant.
+                if variant == WanVariantType.TI2V_5B:
+                    return cls(steps=30, cfg_scale=5.0, width=1024, height=1024)
+                # Default to A14B settings (also used when variant is unknown).
                 return cls(steps=40, cfg_scale=4.0, width=1024, height=1024)
             case _:
                 # TODO(psyche): Do we want defaults for other base types?
@@ -1377,6 +1389,106 @@ class Main_GGUF_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Confi
                     explicit_variant = QwenImageVariantType.Generate
 
         return cls(**override_fields, variant=explicit_variant)
+
+
+class Main_Diffusers_Wan_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Wan 2.2 diffusers models.
+
+    Covers both the dual-expert T2V-A14B family and the single-transformer TI2V-5B
+    family. Variant is detected from the on-disk transformer config (latent channel
+    count) plus the presence of a sibling ``transformer_2/`` directory.
+    """
+
+    base: Literal[BaseModelType.Wan] = Field(default=BaseModelType.Wan)
+    variant: WanVariantType = Field()
+    has_dual_expert: bool = Field(
+        default=False,
+        description="Whether this model ships two transformer experts (Wan 2.2 A14B MoE). False for TI2V-5B.",
+    )
+    boundary_ratio: float | None = Field(
+        default=None,
+        description="MoE expert switch point as a fraction of num_train_timesteps (typically 1000). "
+        "None for single-transformer models. Read from model_index.json by Diffusers' WanPipeline.",
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # Wan repos ship with WanPipeline (T2V) or WanImageToVideoPipeline (I2V/TI2V).
+        # Either class name is sufficient to identify a Wan diffusers model.
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "WanPipeline",
+                "WanImageToVideoPipeline",
+            },
+        )
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        explicit_variant = override_fields.pop("variant", None)
+        has_dual_expert = (mod.path / "transformer_2" / "config.json").exists()
+        variant = explicit_variant or cls._detect_wan_variant(mod, has_dual_expert)
+        boundary_ratio = override_fields.pop("boundary_ratio", None)
+        if boundary_ratio is None:
+            boundary_ratio = cls._read_boundary_ratio(mod)
+
+        return cls(
+            **override_fields,
+            repo_variant=repo_variant,
+            variant=variant,
+            has_dual_expert=has_dual_expert,
+            boundary_ratio=boundary_ratio,
+        )
+
+    @classmethod
+    def _read_boundary_ratio(cls, mod: ModelOnDisk) -> float | None:
+        """Pull ``boundary_ratio`` from ``model_index.json`` if present.
+
+        Diffusers' ``WanPipeline.__init__`` registers it via ``register_to_config``,
+        which persists it as a top-level key in the saved pipeline config.
+        """
+        try:
+            model_index = get_config_dict_or_raise(mod.path / "model_index.json")
+        except NotAMatchError:
+            return None
+        value = model_index.get("boundary_ratio")
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    @classmethod
+    def _detect_wan_variant(cls, mod: ModelOnDisk, has_dual_expert: bool) -> WanVariantType:
+        """Detect Wan variant from transformer + VAE config.
+
+        - A14B: dual transformer experts, standard Wan VAE (z_dim=16).
+        - TI2V-5B: single transformer, Wan2.2-VAE (z_dim=48).
+        """
+        if has_dual_expert:
+            return WanVariantType.T2V_A14B
+
+        # Single-transformer model: distinguish TI2V-5B from any future single-expert
+        # A14B-derived release by inspecting the VAE latent dimension.
+        try:
+            vae_config = get_config_dict_or_raise(mod.path / "vae" / "config.json")
+            z_dim = vae_config.get("z_dim")
+            if z_dim is not None and int(z_dim) >= 32:
+                return WanVariantType.TI2V_5B
+        except NotAMatchError:
+            # No VAE config to inspect — fall through to the heuristic path below.
+            pass
+
+        # Filename / repo-name heuristic as a last resort.
+        name = mod.path.name.lower()
+        if "5b" in name or "ti2v" in name:
+            return WanVariantType.TI2V_5B
+        return WanVariantType.T2V_A14B
 
 
 class Main_Checkpoint_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):

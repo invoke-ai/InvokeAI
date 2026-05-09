@@ -173,6 +173,8 @@ class FieldDescriptions:
     z_image_model = "Z-Image model (Transformer) to load"
     qwen_image_model = "Qwen Image Edit model (Transformer) to load"
     qwen_vl_encoder = "Qwen2.5-VL tokenizer, processor and text/vision encoder"
+    wan_model = "Wan 2.2 model (Transformer) to load"
+    wan_t5_encoder = "UMT5-XXL tokenizer and text encoder for Wan 2.2"
     sdxl_main_model = "SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load"
     sdxl_refiner_model = "SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load"
     onnx_main_model = "ONNX Main model (UNet, VAE, CLIP) to load"
@@ -362,6 +364,16 @@ class AnimaConditioningField(BaseModel):
         description="The mask associated with this conditioning tensor for regional prompting. "
         "Excluded regions should be set to False, included regions should be set to True.",
     )
+
+
+class WanConditioningField(BaseModel):
+    """A Wan 2.2 conditioning tensor primitive value.
+
+    Wan conditioning is the UMT5-XXL hidden state for the prompt plus an attention
+    mask marking valid (non-padding) tokens.
+    """
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
 
 
 class ConditioningField(BaseModel):

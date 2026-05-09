@@ -58,6 +58,8 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with Qwen Image Edit 2511 model architecture."""
     Anima = "anima"
     """Indicates the model is associated with Anima model architecture (Cosmos Predict2 DiT + LLM Adapter)."""
+    Wan = "wan"
+    """Indicates the model is associated with the Wan 2.2 model architecture (T2V-A14B / TI2V-5B), used for image generation at num_frames=1."""
     Unknown = "unknown"
     """Indicates the model's base architecture is unknown."""
 
@@ -93,6 +95,7 @@ class SubModelType(str, Enum):
 
     UNet = "unet"
     Transformer = "transformer"
+    Transformer2 = "transformer_2"
     TextEncoder = "text_encoder"
     TextEncoder2 = "text_encoder_2"
     TextEncoder3 = "text_encoder_3"
@@ -163,6 +166,22 @@ class QwenImageVariantType(str, Enum):
 
     Edit = "edit"
     """Qwen Image Edit - image editing model with reference image support."""
+
+
+class WanVariantType(str, Enum):
+    """Wan 2.2 model variants.
+
+    Both variants are used for image generation at num_frames=1. They differ in
+    architecture: A14B is a Mixture-of-Experts model with two transformer experts
+    (high-noise and low-noise) totalling ~28B params; TI2V-5B is a single ~5B
+    transformer with a higher-compression VAE (z_dim=48).
+    """
+
+    T2V_A14B = "t2v_a14b"
+    """Wan 2.2 T2V-A14B - dual-expert MoE flagship (high-noise + low-noise transformers, standard 16-channel Wan VAE)."""
+
+    TI2V_5B = "ti2v_5b"
+    """Wan 2.2 TI2V-5B - smaller single-transformer model with Wan2.2-VAE (48 latent channels)."""
 
 
 class Qwen3VariantType(str, Enum):
@@ -248,6 +267,7 @@ AnyVariant: TypeAlias = Union[
     Flux2VariantType,
     ZImageVariantType,
     QwenImageVariantType,
+    WanVariantType,
     Qwen3VariantType,
 ]
 variant_type_adapter = TypeAdapter[
@@ -257,6 +277,7 @@ variant_type_adapter = TypeAdapter[
     | Flux2VariantType
     | ZImageVariantType
     | QwenImageVariantType
+    | WanVariantType
     | Qwen3VariantType
 ](
     ModelVariantType
@@ -265,5 +286,6 @@ variant_type_adapter = TypeAdapter[
     | Flux2VariantType
     | ZImageVariantType
     | QwenImageVariantType
+    | WanVariantType
     | Qwen3VariantType
 )

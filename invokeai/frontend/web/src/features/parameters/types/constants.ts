@@ -49,6 +49,10 @@ export const CLIP_SKIP_MAP: { [key in BaseModelType]?: { maxClip: number; marker
     maxClip: 0,
     markers: [],
   },
+  wan: {
+    maxClip: 0,
+    markers: [],
+  },
 };
 
 /**

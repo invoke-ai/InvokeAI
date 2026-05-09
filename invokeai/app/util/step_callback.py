@@ -179,6 +179,31 @@ ANIMA_LATENT_RGB_FACTORS = [
 
 ANIMA_LATENT_RGB_BIAS = [-0.1835, -0.0868, -0.3360]
 
+# Wan 2.2 A14B uses the standard 16-channel Wan VAE (same as Anima / Qwen Image).
+# Wan 2.2 TI2V-5B uses Wan2.2-VAE with 48 latent channels — for now we slice the
+# first 16 channels for the preview. TODO: generate dedicated 48-channel factors via
+# scripts/generate_vae_linear_approximation.py once we have a TI2V-5B model on hand.
+WAN_LATENT_RGB_FACTORS = [
+    [-0.1299, -0.1692, 0.2932],
+    [0.0671, 0.0406, 0.0442],
+    [0.3568, 0.2548, 0.1747],
+    [0.0372, 0.2344, 0.1420],
+    [0.0313, 0.0189, -0.0328],
+    [0.0296, -0.0956, -0.0665],
+    [-0.3477, -0.4059, -0.2925],
+    [0.0166, 0.1902, 0.1975],
+    [-0.0412, 0.0267, -0.1364],
+    [-0.1293, 0.0740, 0.1636],
+    [0.0680, 0.3019, 0.1128],
+    [0.0032, 0.0581, 0.0639],
+    [-0.1251, 0.0927, 0.1699],
+    [0.0060, -0.0633, 0.0005],
+    [0.3477, 0.2275, 0.2950],
+    [0.1984, 0.0913, 0.1861],
+]
+
+WAN_LATENT_RGB_BIAS = [-0.1835, -0.0868, -0.3360]
+
 
 def sample_to_lowres_estimated_image(
     samples: torch.Tensor,
@@ -270,6 +295,13 @@ def diffusion_step_callback(
         # Anima uses Wan 2.1 VAE with 16 latent channels
         latent_rgb_factors = ANIMA_LATENT_RGB_FACTORS
         latent_rgb_bias = ANIMA_LATENT_RGB_BIAS
+    elif base_model == BaseModelType.Wan:
+        latent_rgb_factors = WAN_LATENT_RGB_FACTORS
+        latent_rgb_bias = WAN_LATENT_RGB_BIAS
+        # TI2V-5B latents have 48 channels; slice the first 16 as a degraded preview
+        # until proper 48-channel factors are generated.
+        if sample.shape[-3] > 16:
+            sample = sample[..., :16, :, :]
     else:
         raise ValueError(f"Unsupported base model: {base_model}")
 

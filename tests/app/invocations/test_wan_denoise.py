@@ -1,0 +1,482 @@
+"""CPU-only integration tests for ``WanDenoiseInvocation``.
+
+These tests substitute a synthetic transformer (no weights) for the real
+``WanTransformer3DModel`` so the denoise loop's shape-handling, scheduler
+integration, CFG branch, and step-callback wiring can be exercised on a CPU
+runner. End-to-end tests against real Wan checkpoints are gated behind
+``INVOKEAI_HEAVY_TESTS=1`` and require a working CUDA install.
+"""
+
+from __future__ import annotations
+
+import os
+from contextlib import contextmanager
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import MagicMock
+
+import pytest
+import torch
+import torch.nn as nn
+
+from invokeai.app.invocations.fields import WanConditioningField
+from invokeai.app.invocations.model import WanTransformerField
+from invokeai.app.invocations.wan_denoise import WanDenoiseInvocation
+from invokeai.backend.model_manager.taxonomy import WanVariantType
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
+    ConditioningFieldData,
+    WanConditioningInfo,
+)
+
+
+class _ZeroTransformer(nn.Module):
+    """Stand-in for ``WanTransformer3DModel``.
+
+    Returns ``torch.zeros_like(hidden_states)`` so the flow-matching scheduler
+    treats every step as a no-op velocity. After N steps the latents equal the
+    initial noise — a useful invariant for shape correctness.
+
+    ``label`` lets dual-expert tests record which expert was invoked.
+    """
+
+    def __init__(self, label: str = "single") -> None:
+        super().__init__()
+        self.dtype = torch.float32
+        self.label = label
+        self.calls: list[tuple[int, ...]] = []
+        self.timesteps_seen: list[float] = []
+
+    def forward(  # noqa: D401 — match diffusers signature
+        self,
+        hidden_states: torch.Tensor,
+        timestep: torch.Tensor,
+        encoder_hidden_states: torch.Tensor,
+        attention_kwargs=None,
+        return_dict: bool = True,
+    ):
+        # Record the call so assertions can verify shape contracts.
+        self.calls.append(
+            (
+                tuple(hidden_states.shape),
+                tuple(timestep.shape),
+                tuple(encoder_hidden_states.shape),
+            )
+        )
+        # Record the timestep (t.expand(B) → take first element).
+        self.timesteps_seen.append(float(timestep.flatten()[0].item()))
+        out = torch.zeros_like(hidden_states)
+        if return_dict:
+            return type("Out", (), {"sample": out})
+        return (out,)
+
+
+@contextmanager
+def _model_on_device_ctx(model: nn.Module):
+    yield (None, model)
+
+
+def _make_loaded_model(model: nn.Module) -> MagicMock:
+    """Mock ``LoadedModel`` exposing only the methods the denoise loop touches."""
+    loaded = MagicMock()
+    loaded.model_on_device = lambda: _model_on_device_ctx(model)
+    return loaded
+
+
+def _build_context(
+    transformer: nn.Module,
+    *,
+    variant: WanVariantType,
+    model_root: Path,
+    pos_cond: WanConditioningInfo,
+    neg_cond: WanConditioningInfo | None,
+    transformer_low: nn.Module | None = None,
+) -> MagicMock:
+    """Build a MagicMock InvocationContext sufficient for ``_run_diffusion``.
+
+    When ``transformer_low`` is provided, ``context.models.load`` routes the
+    request based on the ``ModelIdentifierField.submodel_type`` so dual-expert
+    code paths see two distinct loaded models.
+    """
+    config = MagicMock()
+    config.variant = variant
+    config.format = "diffusers"
+
+    context = MagicMock()
+    context.models.get_config.return_value = config
+    context.models.get_absolute_path.return_value = model_root
+
+    def _load(model_id) -> MagicMock:
+        submodel_type = getattr(model_id, "submodel_type", None)
+        if transformer_low is not None and str(submodel_type) == "SubModelType.Transformer2":
+            return _make_loaded_model(transformer_low)
+        return _make_loaded_model(transformer)
+
+    context.models.load.side_effect = _load
+
+    def _load_conditioning(name: str) -> ConditioningFieldData:
+        if name == "pos":
+            return ConditioningFieldData(conditionings=[pos_cond])
+        if name == "neg" and neg_cond is not None:
+            return ConditioningFieldData(conditionings=[neg_cond])
+        raise KeyError(name)
+
+    context.conditioning.load.side_effect = _load_conditioning
+    context.util.signal_progress = MagicMock()
+    context.util.sd_step_callback = MagicMock()
+    context.logger = MagicMock()
+    return context
+
+
+def _make_conditioning(seq_len: int = 226, hidden: int = 4096) -> WanConditioningInfo:
+    return WanConditioningInfo(
+        prompt_embeds=torch.zeros(seq_len, hidden),
+        prompt_attention_mask=None,
+    )
+
+
+def _make_invocation(
+    transformer_field: WanTransformerField,
+    pos_field: WanConditioningField,
+    neg_field: WanConditioningField | None,
+    *,
+    width: int,
+    height: int,
+    steps: int,
+    guidance_scale: float,
+    guidance_scale_low_noise: float | None = None,
+) -> WanDenoiseInvocation:
+    return WanDenoiseInvocation(
+        id="test",
+        transformer=transformer_field,
+        positive_conditioning=pos_field,
+        negative_conditioning=neg_field,
+        width=width,
+        height=height,
+        steps=steps,
+        guidance_scale=guidance_scale,
+        guidance_scale_low_noise=guidance_scale_low_noise,
+        seed=42,
+    )
+
+
+@pytest.fixture
+def fake_model_root():
+    """A directory layout the denoise helpers can read.
+
+    No ``scheduler/`` subfolder, so the scheduler falls back to defaults — that
+    keeps the test self-contained.
+    """
+    with TemporaryDirectory() as tmp:
+        yield Path(tmp)
+
+
+@pytest.fixture(autouse=True)
+def _force_cpu(monkeypatch):
+    """Pin TorchDevice to CPU + float32 for deterministic, GPU-free tests."""
+    from invokeai.backend.util.devices import TorchDevice
+
+    monkeypatch.setattr(TorchDevice, "choose_torch_device", classmethod(lambda cls: torch.device("cpu")))
+    monkeypatch.setattr(
+        TorchDevice, "choose_bfloat16_safe_dtype", classmethod(lambda cls, device=None: torch.float32)
+    )
+
+
+def _wan_transformer_field(*, dual: bool = False, boundary_ratio: float = 0.875) -> WanTransformerField:
+    """Build a WanTransformerField. With ``dual=True`` a low-noise expert slot
+    is also populated so the denoise loop exercises the MoE swap path."""
+    base_id = {
+        "key": "wan-test",
+        "name": "wan-test",
+        "base": "wan",
+        "type": "main",
+        "hash": "h",
+    }
+    field_kwargs: dict = {
+        "transformer": {**base_id, "submodel_type": "transformer"},
+        "boundary_ratio": boundary_ratio,
+    }
+    if dual:
+        field_kwargs["transformer_low_noise"] = {**base_id, "submodel_type": "transformer_2"}
+    return WanTransformerField(**field_kwargs)
+
+
+class TestWanDenoiseShapes:
+    """Verify the denoise loop runs end-to-end on CPU for both variants."""
+
+    @pytest.mark.parametrize(
+        "variant,latent_channels,scale,height,width",
+        [
+            (WanVariantType.T2V_A14B, 16, 8, 64, 64),
+            (WanVariantType.TI2V_5B, 48, 16, 64, 64),
+        ],
+    )
+    def test_run_diffusion_returns_4d_finite(
+        self, variant, latent_channels, scale, height, width, fake_model_root
+    ) -> None:
+        transformer = _ZeroTransformer()
+        pos = _make_conditioning()
+        ctx = _build_context(
+            transformer,
+            variant=variant,
+            model_root=fake_model_root,
+            pos_cond=pos,
+            neg_cond=None,
+        )
+
+        inv = _make_invocation(
+            transformer_field=_wan_transformer_field(),
+            pos_field=WanConditioningField(conditioning_name="pos"),
+            neg_field=None,
+            width=width,
+            height=height,
+            steps=4,
+            guidance_scale=1.0,  # disables CFG, so neg conditioning isn't required
+        )
+
+        latents = inv._run_diffusion(ctx)
+
+        # Output is 4D [B, C, H/scale, W/scale] — temporal dim squeezed.
+        assert latents.ndim == 4
+        assert latents.shape == (1, latent_channels, height // scale, width // scale)
+        assert torch.isfinite(latents).all()
+
+        # Transformer should have been called exactly steps times.
+        assert len(transformer.calls) == 4
+        # Hidden states are 5D with T=1.
+        h_shape, t_shape, ctx_shape = transformer.calls[0]
+        assert h_shape == (1, latent_channels, 1, height // scale, width // scale)
+        assert t_shape == (1,)
+        assert ctx_shape == (1, 226, 4096)
+
+        # Step callback invoked once per step.
+        assert ctx.util.sd_step_callback.call_count == 4
+
+    def test_cfg_doubles_transformer_calls(self, fake_model_root) -> None:
+        """With cfg_scale != 1.0 and a negative prompt, each step runs the model twice."""
+        transformer = _ZeroTransformer()
+        pos = _make_conditioning()
+        neg = _make_conditioning()
+        ctx = _build_context(
+            transformer,
+            variant=WanVariantType.T2V_A14B,
+            model_root=fake_model_root,
+            pos_cond=pos,
+            neg_cond=neg,
+        )
+
+        inv = _make_invocation(
+            transformer_field=_wan_transformer_field(),
+            pos_field=WanConditioningField(conditioning_name="pos"),
+            neg_field=WanConditioningField(conditioning_name="neg"),
+            width=64,
+            height=64,
+            steps=3,
+            guidance_scale=4.0,
+        )
+
+        inv._run_diffusion(ctx)
+        # 3 steps × 2 (cond + uncond) = 6 forward calls.
+        assert len(transformer.calls) == 6
+
+    def test_zero_velocity_preserves_initial_noise(self, fake_model_root) -> None:
+        """A zero-output transformer means the flow-match step never updates latents."""
+        transformer = _ZeroTransformer()
+        pos = _make_conditioning()
+        ctx = _build_context(
+            transformer,
+            variant=WanVariantType.T2V_A14B,
+            model_root=fake_model_root,
+            pos_cond=pos,
+            neg_cond=None,
+        )
+
+        inv = _make_invocation(
+            transformer_field=_wan_transformer_field(),
+            pos_field=WanConditioningField(conditioning_name="pos"),
+            neg_field=None,
+            width=64,
+            height=64,
+            steps=4,
+            guidance_scale=1.0,
+        )
+
+        latents = inv._run_diffusion(ctx)
+
+        # Reproduce the same noise the loop would have generated and compare.
+        from invokeai.backend.wan.sampling_utils import make_noise
+
+        expected = make_noise(
+            batch_size=1,
+            latent_channels=16,
+            height=64,
+            width=64,
+            spatial_scale_factor=8,
+            device=torch.device("cpu"),
+            dtype=torch.float32,
+            seed=42,
+        ).squeeze(2)
+
+        assert torch.allclose(latents, expected, atol=1e-5)
+
+
+class TestWanDenoiseDualExpert:
+    """Verify the A14B dual-expert MoE swap behaves correctly."""
+
+    def test_swap_fires_at_boundary(self, fake_model_root) -> None:
+        """High expert handles t >= boundary_timestep, low expert handles t < boundary_timestep."""
+        high = _ZeroTransformer(label="high")
+        low = _ZeroTransformer(label="low")
+        pos = _make_conditioning()
+        ctx = _build_context(
+            high,
+            transformer_low=low,
+            variant=WanVariantType.T2V_A14B,
+            model_root=fake_model_root,
+            pos_cond=pos,
+            neg_cond=None,
+        )
+
+        # boundary_ratio=0.5 → boundary_timestep=500 (default num_train_timesteps=1000).
+        inv = _make_invocation(
+            transformer_field=_wan_transformer_field(dual=True, boundary_ratio=0.5),
+            pos_field=WanConditioningField(conditioning_name="pos"),
+            neg_field=None,
+            width=64,
+            height=64,
+            steps=10,
+            guidance_scale=1.0,
+        )
+
+        inv._run_diffusion(ctx)
+
+        # Both experts called.
+        assert len(high.timesteps_seen) > 0, "high-noise expert never invoked"
+        assert len(low.timesteps_seen) > 0, "low-noise expert never invoked"
+
+        # Every high-noise timestep is >= 500; every low-noise timestep is < 500.
+        for t in high.timesteps_seen:
+            assert t >= 500.0, f"high-noise expert saw t={t}, should be >= 500"
+        for t in low.timesteps_seen:
+            assert t < 500.0, f"low-noise expert saw t={t}, should be < 500"
+
+        # Total steps adds up.
+        assert len(high.timesteps_seen) + len(low.timesteps_seen) == 10
+
+    def test_no_swap_when_boundary_skipped(self, fake_model_root) -> None:
+        """boundary_ratio=0.0 → boundary_timestep=0 → all timesteps go to high-noise expert."""
+        high = _ZeroTransformer(label="high")
+        low = _ZeroTransformer(label="low")
+        pos = _make_conditioning()
+        ctx = _build_context(
+            high,
+            transformer_low=low,
+            variant=WanVariantType.T2V_A14B,
+            model_root=fake_model_root,
+            pos_cond=pos,
+            neg_cond=None,
+        )
+
+        inv = _make_invocation(
+            transformer_field=_wan_transformer_field(dual=True, boundary_ratio=0.0),
+            pos_field=WanConditioningField(conditioning_name="pos"),
+            neg_field=None,
+            width=64,
+            height=64,
+            steps=4,
+            guidance_scale=1.0,
+        )
+
+        inv._run_diffusion(ctx)
+
+        # boundary_timestep=0 → t >= 0 always → high-noise expert handles every step.
+        assert len(high.timesteps_seen) == 4
+        assert len(low.timesteps_seen) == 0
+
+    def test_full_low_noise_when_boundary_at_max(self, fake_model_root) -> None:
+        """boundary_ratio=1.0 → boundary_timestep=1000 → almost all steps go to low-noise expert.
+
+        With FlowMatchEuler the first timestep is exactly 1000 so the high-noise
+        expert handles it (>= boundary), and every subsequent timestep is < 1000.
+        """
+        high = _ZeroTransformer(label="high")
+        low = _ZeroTransformer(label="low")
+        pos = _make_conditioning()
+        ctx = _build_context(
+            high,
+            transformer_low=low,
+            variant=WanVariantType.T2V_A14B,
+            model_root=fake_model_root,
+            pos_cond=pos,
+            neg_cond=None,
+        )
+
+        inv = _make_invocation(
+            transformer_field=_wan_transformer_field(dual=True, boundary_ratio=1.0),
+            pos_field=WanConditioningField(conditioning_name="pos"),
+            neg_field=None,
+            width=64,
+            height=64,
+            steps=4,
+            guidance_scale=1.0,
+        )
+
+        inv._run_diffusion(ctx)
+
+        # First step is t==1000 → high. All later steps are < 1000 → low.
+        assert len(high.timesteps_seen) == 1
+        assert high.timesteps_seen[0] == 1000.0
+        assert len(low.timesteps_seen) == 3
+
+    def test_cfg_with_dual_experts_doubles_calls_per_step(self, fake_model_root) -> None:
+        """With negative conditioning + cfg_scale != 1, every step runs the active expert twice."""
+        high = _ZeroTransformer(label="high")
+        low = _ZeroTransformer(label="low")
+        pos = _make_conditioning()
+        neg = _make_conditioning()
+        ctx = _build_context(
+            high,
+            transformer_low=low,
+            variant=WanVariantType.T2V_A14B,
+            model_root=fake_model_root,
+            pos_cond=pos,
+            neg_cond=neg,
+        )
+
+        inv = _make_invocation(
+            transformer_field=_wan_transformer_field(dual=True, boundary_ratio=0.5),
+            pos_field=WanConditioningField(conditioning_name="pos"),
+            neg_field=WanConditioningField(conditioning_name="neg"),
+            width=64,
+            height=64,
+            steps=6,
+            guidance_scale=4.0,
+            guidance_scale_low_noise=2.0,  # Field accepted by the invocation; effect is implicit.
+        )
+
+        inv._run_diffusion(ctx)
+
+        # Total transformer invocations: 6 steps × 2 (cond + uncond) = 12, split across experts.
+        total = len(high.timesteps_seen) + len(low.timesteps_seen)
+        assert total == 12
+
+        # Each unique timestep appears twice (cond + uncond) on the same expert.
+        from collections import Counter
+
+        high_counts = Counter(high.timesteps_seen)
+        low_counts = Counter(low.timesteps_seen)
+        assert all(v == 2 for v in high_counts.values()), high_counts
+        assert all(v == 2 for v in low_counts.values()), low_counts
+
+        # And the swap actually happened — both experts saw work.
+        assert len(high_counts) > 0 and len(low_counts) > 0
+
+
+@pytest.mark.skipif(
+    os.environ.get("INVOKEAI_HEAVY_TESTS") != "1",
+    reason="End-to-end test requires real Wan weights and CUDA; opt in with INVOKEAI_HEAVY_TESTS=1",
+)
+class TestWanDenoiseHeavy:
+    """Placeholder for a real-weights smoke test once CUDA is available."""
+
+    def test_real_ti2v_5b_runs(self) -> None:
+        pytest.skip("Heavy test stub — implement once a TI2V-5B checkpoint is installable.")

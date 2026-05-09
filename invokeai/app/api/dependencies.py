@@ -62,6 +62,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     QwenImageConditioningInfo,
     SD3ConditioningInfo,
     SDXLConditioningInfo,
+    WanConditioningInfo,
     ZImageConditioningInfo,
 )
 from invokeai.backend.util.logging import InvokeAILogger
@@ -152,6 +153,7 @@ class ApiDependencies:
                     ZImageConditioningInfo,
                     QwenImageConditioningInfo,
                     AnimaConditioningInfo,
+                    WanConditioningInfo,
                 ],
                 ephemeral=True,
             ),
