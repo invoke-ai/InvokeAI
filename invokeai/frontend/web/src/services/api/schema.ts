@@ -1001,6 +1001,57 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/image_moves/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Image Move */
+        post: operations["start_image_move"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/image_moves/recover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Image Move Recovery */
+        post: operations["start_image_move_recovery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/image_moves/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Image Move Status */
+        get: operations["get_image_move_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/images/upload": {
         parameters: {
             query?: never;
@@ -14278,6 +14329,50 @@ export type components = {
              * @constant
              */
             type: "image_mask_to_tensor";
+        };
+        /** ImageMoveJobResponse */
+        ImageMoveJobResponse: {
+            /**
+             * Id
+             * @description The image move job id.
+             */
+            id: number;
+            /**
+             * State
+             * @description The image move job state.
+             * @enum {string}
+             */
+            state: "planned" | "moving" | "moved" | "committed" | "error";
+            /**
+             * Error Message
+             * @description The last error recorded for the job, if any.
+             */
+            error_message?: string | null;
+        };
+        /** ImageMoveStatusResponse */
+        ImageMoveStatusResponse: {
+            /**
+             * Is Running
+             * @description Whether an image move background operation is currently running.
+             */
+            is_running: boolean;
+            /**
+             * Operation
+             * @description The active background operation, if any.
+             */
+            operation?: ("move_all" | "recovery") | null;
+            /**
+             * Active Job Id
+             * @description The active journal job id, if any.
+             */
+            active_job_id?: number | null;
+            /** @description The latest journal job, if any. */
+            latest_job?: components["schemas"]["ImageMoveJobResponse"] | null;
+            /**
+             * Last Error
+             * @description The last background worker error, if any.
+             */
+            last_error?: string | null;
         };
         /**
          * Multiply Images
@@ -34758,6 +34853,66 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    start_image_move: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageMoveStatusResponse"];
+                };
+            };
+        };
+    };
+    start_image_move_recovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageMoveStatusResponse"];
+                };
+            };
+        };
+    };
+    get_image_move_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageMoveStatusResponse"];
+                };
             };
         };
     };

@@ -1,3 +1,4 @@
+import threading
 from pathlib import Path
 from shutil import copy2
 from unittest.mock import MagicMock, patch
@@ -7,7 +8,7 @@ from PIL import Image
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
-from invokeai.app.services.image_moves.image_moves_default import ImageMoveService
+from invokeai.app.services.image_moves.image_moves_default import BACKGROUND_SHUTDOWN_ERROR, ImageMoveService
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
@@ -167,6 +168,64 @@ def test_startup_recovery_completes_planned_job_before_any_file_move(tmp_path: P
     assert records.get(image_name).image_subfolder == "2024/03/04"
     assert service.get_job(job_id).state == "committed"
     assert _job_item_states(service, job_id) == {image_name: "committed"}
+
+
+def test_background_recovery_can_start_when_journal_job_is_active(tmp_path: Path) -> None:
+    service, records = _service(tmp_path, strategy="date")
+    image_name = "image-background-recovery.png"
+    _save_image(service, records, image_name, "", "2024-03-05 05:06:07.000", "purple")
+    job_id = service.create_move_job(service.plan_batch(last_image_name="", limit=100))
+
+    status = service.start_background_recovery()
+    assert status.is_running is True
+    assert status.operation == "recovery"
+
+    assert service._future is not None
+    service._future.result(timeout=5)
+
+    assert records.get(image_name).image_subfolder == "2024/03/05"
+    assert service.get_job(job_id).state == "committed"
+
+
+def test_background_worker_error_is_exposed_in_status(tmp_path: Path) -> None:
+    service, _records = _service(tmp_path, strategy="date")
+
+    def raise_error() -> None:
+        raise RuntimeError("background failed")
+
+    status = service._start_background_operation("move_all", raise_error)
+    assert status.is_running is True
+
+    assert service._future is not None
+    service._future.result(timeout=5)
+
+    status = service.get_background_status()
+    assert status.is_running is False
+    assert status.operation is None
+    assert status.last_error == "background failed"
+
+
+def test_stop_records_error_message_for_active_background_job(tmp_path: Path) -> None:
+    service, records = _service(tmp_path, strategy="date")
+    image_name = "image-background-stop.png"
+    _save_image(service, records, image_name, "", "2024-03-05 05:06:07.000", "purple")
+    job_id = service.create_move_job(service.plan_batch(last_image_name="", limit=100))
+    release_worker = threading.Event()
+
+    def wait_for_shutdown() -> None:
+        release_worker.wait(timeout=5)
+
+    service._start_background_operation("recovery", wait_for_shutdown)
+
+    try:
+        service.stop()
+
+        assert service.get_job(job_id).error_message == BACKGROUND_SHUTDOWN_ERROR
+        assert service.get_background_status().last_error == BACKGROUND_SHUTDOWN_ERROR
+    finally:
+        release_worker.set()
+        assert service._future is not None
+        service._future.result(timeout=5)
 
 
 def test_startup_recovery_completes_partial_multi_image_move(tmp_path: Path) -> None:

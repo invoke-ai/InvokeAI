@@ -1,5 +1,7 @@
 import os
 import tempfile
+import threading
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +17,7 @@ from invokeai.app.util.thumbnails import make_thumbnail
 
 MoveJobState = Literal["planned", "moving", "moved", "committed", "error"]
 MoveItemState = Literal["planned", "moved", "committed", "error"]
+ImageMoveBackgroundOperation = Literal["move_all", "recovery"]
 
 
 @dataclass(frozen=True)
@@ -42,6 +45,22 @@ class ImageMoveResult:
     errors: int = 0
 
 
+@dataclass(frozen=True)
+class ImageMoveBackgroundStatus:
+    is_running: bool
+    operation: ImageMoveBackgroundOperation | None
+    active_job_id: int | None
+    latest_job: ImageMoveJob | None
+    last_error: str | None
+
+
+class ImageMoveJobAlreadyRunning(Exception):
+    pass
+
+
+BACKGROUND_SHUTDOWN_ERROR = "Image move service stopped while background operation was running"
+
+
 class ImageMoveService:
     def __init__(
         self,
@@ -54,6 +73,75 @@ class ImageMoveService:
         self.image_files = image_files
         self._config = config
         self._logger = logger
+        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="image-move")
+        self._future_lock = threading.Lock()
+        self._future: Future | None = None
+        self._future_operation: ImageMoveBackgroundOperation | None = None
+        self._last_background_error: str | None = None
+
+    def stop(self, *args, **kwargs) -> None:
+        with self._future_lock:
+            is_running = self._future is not None and not self._future.done()
+        if is_running:
+            self._record_background_error(BACKGROUND_SHUTDOWN_ERROR)
+        self._executor.shutdown(wait=False, cancel_futures=False)
+
+    def start_background_move_all(self) -> ImageMoveBackgroundStatus:
+        return self._start_background_operation("move_all", self.move_all_images)
+
+    def start_background_recovery(self) -> ImageMoveBackgroundStatus:
+        return self._start_background_operation("recovery", self.startup_recovery)
+
+    def get_background_status(self) -> ImageMoveBackgroundStatus:
+        with self._future_lock:
+            self._refresh_finished_future_locked()
+            return self._build_background_status_locked()
+
+    def _start_background_operation(self, operation: ImageMoveBackgroundOperation, target) -> ImageMoveBackgroundStatus:
+        with self._future_lock:
+            self._refresh_finished_future_locked()
+            if self._future is not None and not self._future.done():
+                raise ImageMoveJobAlreadyRunning("An image move job is already running")
+            active_job_id = self._get_active_job_id()
+            if operation != "recovery" and active_job_id is not None:
+                raise ImageMoveJobAlreadyRunning("An image move job is already active")
+            self._last_background_error = None
+            self._future_operation = operation
+            self._future = self._executor.submit(self._run_background_operation, operation, target)
+            return self._build_background_status_locked()
+
+    def _run_background_operation(self, operation: ImageMoveBackgroundOperation, target) -> None:
+        try:
+            target()
+        except Exception as e:
+            self._record_background_error(str(e))
+            self._logger.exception("Image move background operation failed: %s", operation)
+
+    def _record_background_error(self, message: str) -> None:
+        with self._future_lock:
+            self._last_background_error = message
+        active_job_id = self._get_active_job_id()
+        if active_job_id is not None:
+            try:
+                self.record_job_error_message(active_job_id, message)
+            except Exception:
+                self._logger.exception("Failed to record image move background error on active job")
+
+    def _refresh_finished_future_locked(self) -> None:
+        if self._future is None or not self._future.done():
+            return
+        self._future = None
+        self._future_operation = None
+
+    def _build_background_status_locked(self) -> ImageMoveBackgroundStatus:
+        latest_job = self.get_latest_job()
+        return ImageMoveBackgroundStatus(
+            is_running=self._future is not None and not self._future.done(),
+            operation=self._future_operation,
+            active_job_id=self._get_active_job_id(),
+            latest_job=latest_job,
+            last_error=self._last_background_error,
+        )
 
     def move_all_images(self) -> ImageMoveResult:
         recovered = self.startup_recovery()
@@ -377,6 +465,23 @@ class ImageMoveService:
             id=cast(int, row["id"]), state=cast(MoveJobState, row["state"]), error_message=row["error_message"]
         )
 
+    def get_latest_job(self) -> ImageMoveJob | None:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT id, state, error_message
+                FROM image_subfolder_move_jobs
+                ORDER BY id DESC
+                LIMIT 1;
+                """
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return ImageMoveJob(
+            id=cast(int, row["id"]), state=cast(MoveJobState, row["state"]), error_message=row["error_message"]
+        )
+
     def _get_new_subfolder(
         self, image_name: str, image_category: ImageCategory, is_intermediate: bool, created_at: str | datetime
     ) -> str:
@@ -439,6 +544,20 @@ class ImageMoveService:
                 (image_name,),
             )
             return cursor.fetchone() is not None
+
+    def _get_active_job_id(self) -> int | None:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT id
+                FROM image_subfolder_move_jobs
+                WHERE state NOT IN ('committed', 'error')
+                ORDER BY id
+                LIMIT 1;
+                """
+            )
+            row = cursor.fetchone()
+        return None if row is None else cast(int, row["id"])
 
     def _next_image_name(self, last_image_name: str) -> str | None:
         with self._db.transaction() as cursor:
