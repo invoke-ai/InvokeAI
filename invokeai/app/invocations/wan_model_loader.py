@@ -46,17 +46,19 @@ class WanModelLoaderInvocation(BaseInvocation):
 
     Components can be mixed and matched, mirroring the Qwen Image loader pattern:
 
-    - Transformer(s) always come from the main model. For A14B that's both
-      ``transformer/`` (high-noise) and ``transformer_2/`` (low-noise); for
-      TI2V-5B it's the single ``transformer/``.
+    - Transformer(s):
+        * Diffusers main: emits ``transformer/`` and (for A14B) ``transformer_2/``
+          from the same model record.
+        * GGUF main: emits the single GGUF as the primary transformer; for A14B
+          the second-expert GGUF must be wired to ``Transformer (Low Noise)``.
     - VAE: standalone Wan VAE > main (if Diffusers) > Component Source (Diffusers).
     - UMT5-XXL encoder: standalone Wan T5 encoder > main (if Diffusers) >
       Component Source (Diffusers).
 
     The Component Source slot lets users supply a Diffusers Wan main model purely
     for VAE / encoder extraction when the actual transformer is in a single-file
-    format (GGUF in Phase 4). Together, the standalone VAE + standalone encoder
-    let a GGUF transformer run without a full ~30 GB Diffusers install.
+    format. Together, the standalone VAE + standalone encoder let a GGUF
+    transformer run without a full ~30 GB Diffusers install.
     """
 
     model: ModelIdentifierField = InputField(
@@ -65,6 +67,19 @@ class WanModelLoaderInvocation(BaseInvocation):
         ui_model_base=BaseModelType.Wan,
         ui_model_type=ModelType.Main,
         title="Transformer",
+    )
+
+    transformer_low_noise_model: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="Optional second GGUF transformer for the A14B low-noise expert. "
+        "Only relevant when the main model is a single-file GGUF and the variant is A14B; "
+        "ignored when the main is a Diffusers A14B (both experts are pulled from "
+        "transformer/ and transformer_2/ already) or when the variant is TI2V-5B.",
+        input=Input.Direct,
+        ui_model_base=BaseModelType.Wan,
+        ui_model_type=ModelType.Main,
+        ui_model_format=ModelFormat.GGUFQuantized,
+        title="Transformer (Low Noise)",
     )
 
     vae_model: Optional[ModelIdentifierField] = InputField(
@@ -100,21 +115,84 @@ class WanModelLoaderInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> WanModelLoaderOutput:
         main_config = context.models.get_config(self.model)
-        main_is_diffusers = main_config.format == ModelFormat.Diffusers
+        main_format = main_config.format
+        main_is_diffusers = main_format == ModelFormat.Diffusers
+        main_is_gguf = main_format == ModelFormat.GGUFQuantized
 
-        # Primary transformer: the high-noise expert for A14B, or the only
-        # transformer for TI2V-5B.
-        transformer = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
+        # Resolve transformer + dual-expert wiring + boundary_ratio.
+        #
+        # Diffusers main: transformer/ is the primary, transformer_2/ is the
+        # low-noise expert (A14B only). boundary_ratio comes from the probed
+        # model_index.json.
+        #
+        # GGUF main: the file itself is one expert (high or low). For A14B,
+        # the user wires the other expert to transformer_low_noise_model.
+        # We swap so the *high*-noise expert is always the primary if needed.
+        # boundary_ratio falls back to 0.875 unless a Diffusers component_source
+        # provides a recorded value.
+        boundary_ratio = 0.875
+        transformer_low_noise: Optional[ModelIdentifierField] = None
 
-        # Dual-expert (A14B) wiring. The probe records ``has_dual_expert`` and
-        # the recorded ``boundary_ratio`` from model_index.json on the config.
-        transformer_low_noise = None
-        boundary_ratio = 0.875  # Sensible Wan A14B default; overridden by model config when present.
-        if getattr(main_config, "has_dual_expert", False):
-            transformer_low_noise = self.model.model_copy(update={"submodel_type": SubModelType.Transformer2})
-            recorded = getattr(main_config, "boundary_ratio", None)
-            if recorded is not None:
-                boundary_ratio = float(recorded)
+        if main_is_diffusers:
+            transformer = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
+            if getattr(main_config, "has_dual_expert", False):
+                transformer_low_noise = self.model.model_copy(
+                    update={"submodel_type": SubModelType.Transformer2}
+                )
+                recorded = getattr(main_config, "boundary_ratio", None)
+                if recorded is not None:
+                    boundary_ratio = float(recorded)
+        elif main_is_gguf:
+            primary_expert = getattr(main_config, "expert", "none")
+            primary_id = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
+
+            if self.transformer_low_noise_model is not None:
+                low_config = context.models.get_config(self.transformer_low_noise_model)
+                if low_config.format != ModelFormat.GGUFQuantized:
+                    raise ValueError(
+                        f"'Transformer (Low Noise)' must be a GGUF-format Wan model. "
+                        f"'{low_config.name}' is in {low_config.format.value} format."
+                    )
+                low_id = self.transformer_low_noise_model.model_copy(
+                    update={"submodel_type": SubModelType.Transformer}
+                )
+                low_expert = getattr(low_config, "expert", "none")
+
+                # Make sure 'transformer' is the high-noise expert and
+                # 'transformer_low_noise' is the low-noise expert. If the user
+                # accidentally swapped them, swap back.
+                if primary_expert == "low" and low_expert == "high":
+                    transformer = low_id
+                    transformer_low_noise = primary_id
+                else:
+                    transformer = primary_id
+                    transformer_low_noise = low_id
+            else:
+                transformer = primary_id
+                # A14B without a paired low-noise GGUF will produce degraded
+                # quality (only the high-noise expert runs). Warn but don't
+                # abort — TI2V-5B GGUFs are single-expert and totally fine.
+                if (
+                    getattr(main_config, "variant", None)
+                    and main_config.variant.value == "t2v_a14b"
+                ):
+                    context.logger.warning(
+                        "A14B GGUF main was provided without a paired 'Transformer (Low Noise)'. "
+                        "Only the high-noise expert will run; image quality will be reduced."
+                    )
+
+            # Borrow the boundary_ratio recorded on the optional Diffusers
+            # component_source, when one is wired.
+            if self.component_source is not None:
+                src_cfg = context.models.get_config(self.component_source)
+                src_boundary = getattr(src_cfg, "boundary_ratio", None)
+                if src_boundary is not None:
+                    boundary_ratio = float(src_boundary)
+        else:
+            raise ValueError(
+                f"Unsupported main model format for Wan: {main_format.value}. "
+                "Use a Diffusers folder or a GGUF single-file checkpoint."
+            )
 
         # VAE: standalone override > main (if Diffusers) > component source.
         if self.vae_model is not None:

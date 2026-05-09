@@ -1391,6 +1391,132 @@ class Main_GGUF_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Confi
         return cls(**override_fields, variant=explicit_variant)
 
 
+def _has_wan_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains Wan 2.2 transformer keys.
+
+    Two layouts are accepted:
+
+    * **Diffusers** (city96-style GGUF, Wan-AI/*-Diffusers safetensors): the text
+      projection is named ``condition_embedder.text_embedder.linear_1``.
+    * **Native upstream** (QuantStack-style GGUF, ComfyUI, Wan-AI's non-Diffusers
+      releases): the text projection is named ``text_embedding.0``.
+
+    Both layouts share ``patch_embedding.weight`` as the input conv. Combined with
+    the text-projection fingerprint, this won't collide with FLUX
+    (``double_blocks/single_blocks``), Qwen Image (``txt_in/img_in``), Z-Image
+    (``cap_embedder``), or Anima (``llm_adapter``).
+
+    Tolerates both bare keys and the ComfyUI ``model.diffusion_model.`` /
+    ``diffusion_model.`` prefixes.
+    """
+    text_proj_options = (
+        "condition_embedder.text_embedder.linear_1.weight",
+        "text_embedding.0.weight",
+    )
+    prefixes = ("", "model.diffusion_model.", "diffusion_model.")
+    keys = state_dict.keys()
+    if not any((p + "patch_embedding.weight") in keys for p in prefixes):
+        return False
+    return any((p + needle) in keys for p in prefixes for needle in text_proj_options)
+
+
+def _is_native_wan_layout(state_dict: dict[str | int, Any]) -> bool:
+    """True if the state dict uses the native upstream Wan key layout.
+
+    Native layout uses ``text_embedding.0/2``, ``self_attn``/``cross_attn``,
+    ``ffn.0/2``, ``head.head``, ``head.modulation``, etc. — what ComfyUI and
+    QuantStack ship. Diffusers layout uses ``condition_embedder.*``, ``attn1``/
+    ``attn2``, ``ffn.net.*``, ``proj_out``, ``scale_shift_table``.
+    """
+    prefixes = ("", "model.diffusion_model.", "diffusion_model.")
+    keys = state_dict.keys()
+    return any((p + "text_embedding.0.weight") in keys for p in prefixes)
+
+
+def _detect_wan_gguf_variant(state_dict: dict[str | int, Any]) -> WanVariantType | None:
+    """Determine A14B vs TI2V-5B from the GGUF state dict.
+
+    ``patch_embedding.weight`` has shape ``[inner_dim, in_channels, T, H, W]``
+    where ``in_channels`` is the latent channel count: 16 for the standard Wan
+    VAE (A14B family) or 48 for Wan2.2-VAE (TI2V-5B). Returns None if the
+    tensor isn't found or the channel count is unrecognised.
+    """
+    candidates = (
+        "patch_embedding.weight",
+        "model.diffusion_model.patch_embedding.weight",
+        "diffusion_model.patch_embedding.weight",
+    )
+    for key in candidates:
+        if key in state_dict:
+            tensor = state_dict[key]
+            shape = getattr(tensor, "tensor_shape", None) or getattr(tensor, "shape", None)
+            if shape is None or len(shape) < 2:
+                return None
+            in_channels = int(shape[1])
+            if in_channels == 16:
+                return WanVariantType.T2V_A14B
+            if in_channels == 48:
+                return WanVariantType.TI2V_5B
+            return None
+    return None
+
+
+def _detect_wan_gguf_expert(filename: str) -> Literal["high", "low", "none"]:
+    """Filename heuristic for the A14B dual-expert MoE.
+
+    Community releases tag each expert in the filename — typically
+    ``high_noise`` / ``low_noise`` (or hyphenated/concatenated variants).
+    Returns 'none' when neither marker is present (single-expert model or
+    ambiguous filename).
+    """
+    name = filename.lower()
+    if any(s in name for s in ("high_noise", "high-noise", "highnoise")):
+        return "high"
+    if any(s in name for s in ("low_noise", "low-noise", "lownoise")):
+        return "low"
+    return "none"
+
+
+class Main_GGUF_Wan_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized Wan 2.2 transformer models.
+
+    A14B's MoE ships as two GGUF files (one per expert); ``expert`` records
+    which one this is so the model loader invocation can pair them. TI2V-5B
+    is a single-transformer model and stores ``expert='none'``.
+    """
+
+    base: Literal[BaseModelType.Wan] = Field(default=BaseModelType.Wan)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    variant: WanVariantType = Field()
+    expert: Literal["high", "low", "none"] = Field(
+        default="none",
+        description="For Wan 2.2 A14B's dual-expert MoE: 'high' for the high-noise expert, "
+        "'low' for the low-noise expert. 'none' for single-transformer models (TI2V-5B).",
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+        raise_for_override_fields(cls, override_fields)
+
+        sd = mod.load_state_dict()
+
+        if not _has_ggml_tensors(sd):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+        if not _has_wan_keys(sd):
+            raise NotAMatchError("state dict does not look like a Wan transformer")
+
+        explicit_variant = override_fields.pop("variant", None)
+        variant = explicit_variant or _detect_wan_gguf_variant(sd)
+        if variant is None:
+            raise NotAMatchError("could not determine Wan variant from state dict")
+
+        explicit_expert = override_fields.pop("expert", None)
+        expert = explicit_expert or _detect_wan_gguf_expert(mod.path.stem)
+
+        return cls(**override_fields, variant=variant, expert=expert)
+
+
 class Main_Diffusers_Wan_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
     """Model config for Wan 2.2 diffusers models.
 

@@ -11,6 +11,7 @@ from invokeai.backend.model_manager.configs.vae import (
     VAE_Checkpoint_Config_Base,
     VAE_Checkpoint_QwenImage_Config,
     VAE_Checkpoint_Wan_Config,
+    VAE_Diffusers_Wan_Config,
 )
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
@@ -42,6 +43,8 @@ class VAELoader(GenericDiffusersLoader):
             )
         elif isinstance(config, VAE_Checkpoint_Wan_Config):
             return self._load_wan_vae(config)
+        elif isinstance(config, VAE_Diffusers_Wan_Config):
+            return self._load_wan_vae_diffusers(config)
         elif isinstance(config, VAE_Checkpoint_QwenImage_Config):
             return self._load_qwen_image_vae(config)
         elif isinstance(config, VAE_Checkpoint_Config_Base):
@@ -79,6 +82,28 @@ class VAELoader(GenericDiffusersLoader):
         model.load_state_dict(sd, strict=True, assign=True)
         model.eval()
         return model
+
+    def _load_wan_vae_diffusers(self, config: VAE_Diffusers_Wan_Config) -> AnyModel:
+        """Load a Wan 2.2 VAE from a flat diffusers folder (AutoencoderKLWan).
+
+        The standalone install ``Wan-AI/Wan2.2-T2V-A14B-Diffusers::vae`` lands as a
+        single-class folder (``config.json`` + ``diffusion_pytorch_model.safetensors``,
+        no ``model_index.json``). The generic loader rejects this when a
+        ``submodel_type`` is requested — we always pass ``SubModelType.VAE`` from
+        the model loader invocation since that's how cached entries are keyed.
+        Loading ``AutoencoderKLWan`` directly here sidesteps the submodel check.
+
+        Forces bfloat16 (same as ``WanDiffusersModel``) — fp16 is unstable on the
+        Wan VAE.
+        """
+        import torch
+        from diffusers.models.autoencoders.autoencoder_kl_wan import AutoencoderKLWan
+
+        return AutoencoderKLWan.from_pretrained(
+            config.path,
+            torch_dtype=torch.bfloat16,
+            local_files_only=True,
+        )
 
     def _load_qwen_image_vae(self, config: VAE_Checkpoint_QwenImage_Config) -> AnyModel:
         """Load a Qwen Image VAE from a single safetensors file.
