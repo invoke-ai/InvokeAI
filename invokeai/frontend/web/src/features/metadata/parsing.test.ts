@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { ImageMetadataHandlers, MetadataUtils } from './parsing';
+import { getDetailerSettingsValueParts, ImageMetadataHandlers, MetadataUtils } from './parsing';
 
 const createMockStore = () => ({
   dispatch: vi.fn(),
@@ -133,6 +133,50 @@ describe('Qwen metadata parsing', () => {
 });
 
 describe('Detailer metadata parsing', () => {
+  it('builds localized Detailer metadata display parts', () => {
+    expect(
+      getDetailerSettingsValueParts({
+        enabled: true,
+        targetPrompt: 'face',
+        quality: 'high',
+        detector: 'grounding-dino-sam',
+      })
+    ).toEqual([
+      { type: 'i18n', key: 'common.on' },
+      { type: 'text', value: 'face' },
+      { type: 'i18n', key: 'parameters.faceDetailer.qualities.high' },
+      { type: 'i18n', key: 'parameters.faceDetailer.detectors.groundedSam' },
+    ]);
+
+    expect(
+      getDetailerSettingsValueParts({
+        enabled: false,
+        detector: 'mediapipe',
+      })
+    ).toEqual([
+      { type: 'i18n', key: 'common.off' },
+      { type: 'i18n', key: 'parameters.faceDetailer.detectors.mediapipe' },
+    ]);
+  });
+
+  it('does not recall Detailer settings when detailer_enabled metadata is absent', async () => {
+    const store = createStore();
+
+    const recalled = await MetadataUtils.recallByHandlers({
+      metadata: {
+        detailer_quality: 'high',
+        detailer_target_prompt: 'face',
+      },
+      handlers: [ImageMetadataHandlers.DetailerSettings],
+      store,
+      silent: true,
+    });
+
+    expect(recalled.size).toBe(0);
+    const mockStore = store as ReturnType<typeof createMockStore>;
+    expect(mockStore.dispatch).not.toHaveBeenCalled();
+  });
+
   it('recalls stored detailer params instead of Body effective runtime values', async () => {
     const store = createStore();
 

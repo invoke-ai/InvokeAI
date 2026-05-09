@@ -163,6 +163,8 @@ const addDetailerColorCorrection = ({
 
   g.addEdge(image, 'image', colorCorrect, 'base_image');
   g.addEdge(crop, 'image', colorCorrect, 'color_reference');
+  // The detailer denoise mask is black = edit, white = preserve. color_correct uses
+  // white = original, black = result, so this limits color matching to the edited target.
   g.addEdge(crop, 'denoise_mask', colorCorrect, 'mask');
 
   return colorCorrect;

@@ -682,6 +682,29 @@ type DetailerSettingsMetadata = {
   maskBlur?: number;
 };
 
+type DetailerSettingsValuePart = { type: 'i18n'; key: string } | { type: 'text'; value: string };
+
+const DETAILER_DETECTOR_METADATA_I18N_KEYS: Record<
+  NonNullable<DetailerSettingsMetadata['detector']>,
+  string
+> = {
+  'grounding-dino-sam': 'parameters.faceDetailer.detectors.groundedSam',
+  mediapipe: 'parameters.faceDetailer.detectors.mediapipe',
+};
+
+export const getDetailerSettingsValueParts = (value: {
+  enabled: boolean;
+  targetPrompt?: string;
+  quality?: 'fast' | 'balanced' | 'high';
+  detector?: 'grounding-dino-sam' | 'mediapipe';
+}): DetailerSettingsValuePart[] =>
+  [
+    { type: 'i18n', key: value.enabled ? 'common.on' : 'common.off' },
+    value.targetPrompt ? { type: 'text', value: value.targetPrompt } : undefined,
+    value.quality ? { type: 'i18n', key: `parameters.faceDetailer.qualities.${value.quality}` } : undefined,
+    value.detector ? { type: 'i18n', key: DETAILER_DETECTOR_METADATA_I18N_KEYS[value.detector] } : undefined,
+  ].filter((part): part is DetailerSettingsValuePart => part !== undefined);
+
 const parseOptionalMetadataField = <T,>(metadata: unknown, key: string, schema: z.ZodType<T>): T | undefined => {
   const raw = getProperty(metadata, key);
   if (raw === undefined) {
@@ -917,18 +940,14 @@ const DetailerSettings: SingleMetadataHandler<DetailerSettingsMetadata> = {
   },
   i18nKey: 'metadata.detailer',
   LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<DetailerSettingsMetadata>) => (
-    <MetadataPrimitiveValue
-      value={[
-        value.enabled ? 'On' : 'Off',
-        value.targetPrompt,
-        value.quality,
-        value.detector,
-      ]
-        .filter(Boolean)
-        .join(' / ')}
-    />
-  ),
+  ValueComponent: ({ value }: SingleMetadataValueProps<DetailerSettingsMetadata>) => {
+    const { t } = useTranslation();
+    const displayValue = getDetailerSettingsValueParts(value)
+      .map((part) => (part.type === 'i18n' ? t(part.key) : part.value))
+      .join(' / ');
+
+    return <MetadataPrimitiveValue value={displayValue} />;
+  },
 };
 //#endregion Detailer Settings
 

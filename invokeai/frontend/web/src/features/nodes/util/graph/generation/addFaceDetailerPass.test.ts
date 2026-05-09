@@ -742,7 +742,7 @@ describe('addFaceDetailerPass', () => {
     expect(hasEdge(graph, detailL2I.id, 'image', paste.id, 'image')).toBe(true);
   });
 
-  it('adds detailer color correction when explicitly enabled', () => {
+  it('wires detailer color correction through the denoise mask polarity contract', () => {
     const { g, modelLoader, baseDenoise, baseImage, posCondCollect, negCondCollect, seed } = buildBaseGraph();
 
     addFaceDetailerPass({
@@ -776,6 +776,8 @@ describe('addFaceDetailerPass', () => {
     });
     expect(hasEdge(graph, detailL2I.id, 'image', colorCorrect.id, 'base_image')).toBe(true);
     expect(hasEdge(graph, crop.id, 'image', colorCorrect.id, 'color_reference')).toBe(true);
+    // detailer_crop_from_mask.denoise_mask is black = edit, white = preserve.
+    // color_correct.mask is white = original, black = result, so this corrects only the edited target.
     expect(hasEdge(graph, crop.id, 'denoise_mask', colorCorrect.id, 'mask')).toBe(true);
     expect(hasEdge(graph, colorCorrect.id, 'image', paste.id, 'image')).toBe(true);
   });

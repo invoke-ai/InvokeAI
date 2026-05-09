@@ -1644,7 +1644,7 @@
             "faceId": "Target ID",
             "minConfidence": "Confidence",
             "padding": "Padding",
-            "strength": "Denoising Strength",
+            "strength": "Denoise",
             "steps": "Steps",
             "cfgScale": "CFG Scale",
             "maskBlur": "Mask Blur",
@@ -1696,6 +1696,19 @@
             "detectors": {
                 "groundedSam": "DINO + SAM",
                 "mediapipe": "MediaPipe (Legacy)"
+            },
+            "dinoModels": {
+                "grounding-dino-tiny": "GroundingDINO Tiny",
+                "grounding-dino-base": "GroundingDINO Base"
+            },
+            "samModels": {
+                "segment-anything-2-small": "SAM 2 Small",
+                "segment-anything-2-tiny": "SAM 2 Tiny",
+                "segment-anything-2-base": "SAM 2 Base",
+                "segment-anything-2-large": "SAM 2 Large",
+                "segment-anything-base": "SAM Base",
+                "segment-anything-large": "SAM Large",
+                "segment-anything-huge": "SAM Huge"
             },
             "qualities": {
                 "fast": "Fast",

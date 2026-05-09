@@ -93,7 +93,14 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiHandBold, PiHeadCircuitBold, PiPencilSimpleBold, PiPersonBold, PiSmileyBold } from 'react-icons/pi';
 
-const DETAILER_LABEL_WIDTH = '11rem';
+import {
+  DETAILER_DINO_MODELS,
+  DETAILER_SAM_MODELS,
+  getDetailerDinoModelOptions,
+  getDetailerSamModelOptions,
+} from './detailerModelOptions';
+
+const DETAILER_LABEL_WIDTH = '6rem';
 
 const formLabelProps: FormLabelProps = {
   lineHeight: 'shorter',
@@ -105,17 +112,7 @@ const formLabelProps: FormLabelProps = {
 const DETAILER_DETECTORS = ['grounding-dino-sam', 'mediapipe'] as const;
 const DETAILER_QUALITIES = ['fast', 'balanced', 'high'] as const;
 const DETAILER_FACE_SELECTIONS = ['highest_score', 'largest_area', 'index'] as const;
-const DETAILER_DINO_MODELS = ['grounding-dino-tiny', 'grounding-dino-base'] as const;
 const DETAILER_COLOR_CORRECT_MODES = ['off', 'YCbCr-Luma', 'YCbCr-Chroma', 'YCbCr', 'RGB'] as const;
-const DETAILER_SAM_MODELS = [
-  'segment-anything-2-small',
-  'segment-anything-2-tiny',
-  'segment-anything-2-base',
-  'segment-anything-2-large',
-  'segment-anything-base',
-  'segment-anything-large',
-  'segment-anything-huge',
-] as const;
 
 const DETAILER_TARGET_PRESETS = [
   {
@@ -806,12 +803,12 @@ export const FaceDetailerSettingsAccordion = memo(() => {
     [t]
   );
   const dinoModelOptions = useMemo<ComboboxOption[]>(
-    () => DETAILER_DINO_MODELS.map((model) => ({ label: model, value: model })),
-    []
+    () => getDetailerDinoModelOptions(t),
+    [t]
   );
   const samModelOptions = useMemo<ComboboxOption[]>(
-    () => DETAILER_SAM_MODELS.map((model) => ({ label: model, value: model })),
-    []
+    () => getDetailerSamModelOptions(t),
+    [t]
   );
   const colorCorrectModeOptions = useMemo<ComboboxOption[]>(
     () => [
