@@ -926,6 +926,13 @@ class SqliteSessionQueue(SessionQueueBase):
         total = sum(row[1] or 0 for row in counts_result)
         counts: dict[str, int] = {row[0]: row[1] for row in counts_result}
 
+        user_pending: Optional[int] = None
+        user_in_progress: Optional[int] = None
+        if user_id is not None:
+            user_counts: dict[str, int] = {row[0]: row[1] for row in user_counts_result}
+            user_pending = user_counts.get("pending", 0)
+            user_in_progress = user_counts.get("in_progress", 0)
+
         # Redaction is decided from the same current_item snapshot used to embed identifiers,
         # so a concurrent transition (e.g. B finishing while A's status changes) cannot leave
         # stale identifiers in the result. user_id (count filter) and acting_user_id
