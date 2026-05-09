@@ -30604,6 +30604,12 @@ export type components = {
          */
         UpdateAppGenerationSettingsRequest: {
             /**
+             * Image Subfolder Strategy
+             * @description Strategy for organizing images into subfolders.
+             * @enum {string}
+             */
+            image_subfolder_strategy?: "flat" | "date" | "type" | "hash";
+            /**
              * Max Queue History
              * @description Keep the last N completed, failed, and canceled queue items on startup. Set to 0 to prune all terminal items.
              */
