@@ -6,7 +6,6 @@ import { memo } from 'react';
 import { ImageViewerContextProvider } from './context';
 import { ImageComparison } from './ImageComparison';
 import { ImageViewer } from './ImageViewer';
-import { VideoViewer } from './VideoViewer';
 
 const selectIsComparing = createSelector(
   [selectLastSelectedItem, selectImageToCompare],
@@ -23,8 +22,7 @@ export const ImageViewerPanel = memo(() => {
         // The image viewer renders progress images - if no image is selected, show the image viewer anyway
         !isComparing && !lastSelectedItem && <ImageViewer />
       }
-      {!isComparing && lastSelectedItem?.type === 'image' && <ImageViewer />}
-      {!isComparing && lastSelectedItem?.type === 'video' && <VideoViewer />}
+      {!isComparing && <ImageViewer />}
       {isComparing && <ImageComparison />}
     </ImageViewerContextProvider>
   );

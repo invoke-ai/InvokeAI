@@ -23,6 +23,7 @@ jobs:
           close-issue-message: "Due to inactivity, this issue was automatically closed. If you are still experiencing the issue, please recreate the issue."
           days-before-pr-stale: -1
           days-before-pr-close: -1
+          only-labels: "bug"
           exempt-issue-labels: "Active Issue"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           operations-per-run: 500

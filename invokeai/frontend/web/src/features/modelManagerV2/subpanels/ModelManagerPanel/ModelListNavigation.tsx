@@ -1,4 +1,4 @@
-import { Flex, IconButton, Input, InputGroup, InputRightElement, Spacer } from '@invoke-ai/ui-library';
+import { Flex, IconButton, Input, InputGroup, InputRightElement } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectSearchTerm, setSearchTerm } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { t } from 'i18next';
@@ -6,7 +6,8 @@ import type { ChangeEventHandler } from 'react';
 import { memo, useCallback } from 'react';
 import { PiXBold } from 'react-icons/pi';
 
-import { ModelTypeFilter } from './ModelTypeFilter';
+import { ModelFilterMenu } from './ModelFilterMenu';
+import { ModelListBulkActions } from './ModelListBulkActions';
 
 export const ModelListNavigation = memo(() => {
   const dispatch = useAppDispatch();
@@ -24,29 +25,35 @@ export const ModelListNavigation = memo(() => {
   }, [dispatch]);
 
   return (
-    <Flex gap={2} alignItems="center" justifyContent="space-between">
-      <ModelTypeFilter />
-      <Spacer />
-      <InputGroup maxW="400px">
-        <Input
-          placeholder={t('modelManager.search')}
-          value={searchTerm || ''}
-          data-testid="board-search-input"
-          onChange={handleSearch}
-        />
-
-        {!!searchTerm?.length && (
-          <InputRightElement h="full" pe={2}>
-            <IconButton
-              size="sm"
-              variant="link"
-              aria-label={t('boards.clearSearch')}
-              icon={<PiXBold />}
-              onClick={clearSearch}
+    <Flex flexDirection="column" gap={2} bg="base.800" p={3} pb={2} rounded="base">
+      <Flex gap={2} alignItems="center">
+        <Flex alignItems="center" w="100%">
+          <InputGroup>
+            <Input
+              placeholder={t('modelManager.search')}
+              value={searchTerm || ''}
+              data-testid="board-search-input"
+              onChange={handleSearch}
             />
-          </InputRightElement>
-        )}
-      </InputGroup>
+
+            {!!searchTerm?.length && (
+              <InputRightElement h="full" pe={2}>
+                <IconButton
+                  size="sm"
+                  variant="link"
+                  aria-label={t('boards.clearSearch')}
+                  icon={<PiXBold />}
+                  onClick={clearSearch}
+                />
+              </InputRightElement>
+            )}
+          </InputGroup>
+        </Flex>
+        <Flex shrink={0}>
+          <ModelFilterMenu />
+        </Flex>
+      </Flex>
+      <ModelListBulkActions />
     </Flex>
   );
 });

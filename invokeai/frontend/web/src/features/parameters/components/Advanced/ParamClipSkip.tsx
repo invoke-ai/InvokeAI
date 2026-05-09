@@ -2,14 +2,21 @@ import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { selectCLIPSkip, selectModel, setClipSkip } from 'features/controlLayers/store/paramsSlice';
+import type { BaseModelType } from 'features/nodes/types/common';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
-import { selectCLIPSkipConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+const CONSTRAINTS = {
+  initial: 0,
+  sliderMin: 0,
+  numberInputMin: 0,
+  fineStep: 1,
+  coarseStep: 1,
+};
+
 const ParamClipSkip = () => {
   const clipSkip = useAppSelector(selectCLIPSkip);
-  const config = useAppSelector(selectCLIPSkipConfig);
   const model = useAppSelector(selectModel);
 
   const dispatch = useAppDispatch();
@@ -26,14 +33,14 @@ const ParamClipSkip = () => {
     if (!model) {
       return CLIP_SKIP_MAP['sd-1']?.maxClip;
     }
-    return CLIP_SKIP_MAP[model.base]?.maxClip;
+    return CLIP_SKIP_MAP[model.base as BaseModelType]?.maxClip;
   }, [model]);
 
   const sliderMarks = useMemo(() => {
     if (!model) {
       return CLIP_SKIP_MAP['sd-1']?.markers;
     }
-    return CLIP_SKIP_MAP[model.base]?.markers;
+    return CLIP_SKIP_MAP[model.base as BaseModelType]?.markers;
   }, [model]);
 
   if (model?.base === 'sdxl') {
@@ -47,21 +54,21 @@ const ParamClipSkip = () => {
       </InformationalPopover>
       <CompositeSlider
         value={clipSkip}
-        defaultValue={config.initial}
-        min={config.sliderMin}
+        defaultValue={CONSTRAINTS.initial}
+        min={CONSTRAINTS.sliderMin}
         max={max ?? 0}
-        step={config.coarseStep}
-        fineStep={config.fineStep}
+        step={CONSTRAINTS.coarseStep}
+        fineStep={CONSTRAINTS.fineStep}
         onChange={handleClipSkipChange}
         marks={sliderMarks}
       />
       <CompositeNumberInput
         value={clipSkip}
-        defaultValue={config.initial}
-        min={config.numberInputMin}
+        defaultValue={CONSTRAINTS.initial}
+        min={CONSTRAINTS.numberInputMin}
         max={max ?? 0}
-        step={config.coarseStep}
-        fineStep={config.fineStep}
+        step={CONSTRAINTS.coarseStep}
+        fineStep={CONSTRAINTS.fineStep}
         onChange={handleClipSkipChange}
       />
     </FormControl>

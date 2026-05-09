@@ -13,6 +13,7 @@ import {
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
+  Portal,
   Select,
 } from '@invoke-ai/ui-library';
 import { useReactFlow } from '@xyflow/react';
@@ -120,74 +121,82 @@ export const AutoLayoutPopover = memo(() => {
           onClick={popover.toggle}
         />
       </PopoverTrigger>
-      <PopoverContent>
-        <PopoverArrow />
+      <Portal>
+        <PopoverContent>
+          <PopoverArrow />
 
-        <PopoverBody>
-          <Flex direction="column" gap={2}>
-            <FormControl>
-              <FormLabel>{t('nodes.layout.layoutDirection')}</FormLabel>
-              <Select size="sm" value={layoutDirection} onChange={handleLayoutDirectionChanged}>
-                <option value="LR">{t('nodes.layout.layoutDirectionRight')}</option>
-                <option value="TB">{t('nodes.layout.layoutDirectionDown')}</option>
-              </Select>
-            </FormControl>
-            <FormControl>
-              <FormLabel>{t('nodes.layout.layeringStrategy')}</FormLabel>
-              <Select size="sm" value={layeringStrategy} onChange={handleLayeringStrategyChanged}>
-                <option value="network-simplex">{t('nodes.layout.networkSimplex')}</option>
-                <option value="longest-path">{t('nodes.layout.longestPath')}</option>
-              </Select>
-            </FormControl>
-            <FormControl>
-              <FormLabel>{t('nodes.layout.alignment')}</FormLabel>
-              <Select size="sm" value={nodeAlignment} onChange={handleNodeAlignmentChanged}>
-                <option value="UL">{t('nodes.layout.alignmentUL')}</option>
-                <option value="DL">{t('nodes.layout.alignmentDL')}</option>
-                <option value="UR">{t('nodes.layout.alignmentUR')}</option>
-                <option value="DR">{t('nodes.layout.alignmentDR')}</option>
-              </Select>
-            </FormControl>
-            <Divider />
-            <FormControl>
-              <FormLabel>{t('nodes.layout.nodeSpacing')}</FormLabel>
-              <Grid w="full" gap={2} templateColumns="1fr auto">
-                <CompositeSlider min={0} max={200} value={nodeSpacing} onChange={handleNodeSpacingSliderChange} marks />
-                <CompositeNumberInput
-                  value={nodeSpacing}
-                  min={0}
-                  max={200}
-                  onChange={handleNodeSpacingInputChange}
-                  w={24}
-                />
-              </Grid>
-            </FormControl>
-            <FormControl>
-              <FormLabel>{t('nodes.layout.layerSpacing')}</FormLabel>
-              <Grid w="full" gap={2} templateColumns="1fr auto">
-                <CompositeSlider
-                  min={0}
-                  max={200}
-                  value={layerSpacing}
-                  onChange={handleLayerSpacingSliderChange}
-                  marks
-                />
-                <CompositeNumberInput
-                  value={layerSpacing}
-                  min={0}
-                  max={200}
-                  onChange={handleLayerSpacingInputChange}
-                  w={24}
-                />
-              </Grid>
-            </FormControl>
-            <Divider />
-            <Button w="full" onClick={handleApplyAutoLayout}>
-              {t('common.apply')}
-            </Button>
-          </Flex>
-        </PopoverBody>
-      </PopoverContent>
+          <PopoverBody>
+            <Flex direction="column" gap={2}>
+              <FormControl>
+                <FormLabel>{t('nodes.layout.layoutDirection')}</FormLabel>
+                <Select size="sm" value={layoutDirection} onChange={handleLayoutDirectionChanged}>
+                  <option value="LR">{t('nodes.layout.layoutDirectionRight')}</option>
+                  <option value="TB">{t('nodes.layout.layoutDirectionDown')}</option>
+                </Select>
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('nodes.layout.layeringStrategy')}</FormLabel>
+                <Select size="sm" value={layeringStrategy} onChange={handleLayeringStrategyChanged}>
+                  <option value="network-simplex">{t('nodes.layout.networkSimplex')}</option>
+                  <option value="longest-path">{t('nodes.layout.longestPath')}</option>
+                </Select>
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('nodes.layout.alignment')}</FormLabel>
+                <Select size="sm" value={nodeAlignment} onChange={handleNodeAlignmentChanged}>
+                  <option value="UL">{t('nodes.layout.alignmentUL')}</option>
+                  <option value="DL">{t('nodes.layout.alignmentDL')}</option>
+                  <option value="UR">{t('nodes.layout.alignmentUR')}</option>
+                  <option value="DR">{t('nodes.layout.alignmentDR')}</option>
+                </Select>
+              </FormControl>
+              <Divider />
+              <FormControl>
+                <FormLabel>{t('nodes.layout.nodeSpacing')}</FormLabel>
+                <Grid w="full" gap={2} templateColumns="1fr auto">
+                  <CompositeSlider
+                    min={0}
+                    max={200}
+                    value={nodeSpacing}
+                    onChange={handleNodeSpacingSliderChange}
+                    marks
+                  />
+                  <CompositeNumberInput
+                    value={nodeSpacing}
+                    min={0}
+                    max={200}
+                    onChange={handleNodeSpacingInputChange}
+                    w={24}
+                  />
+                </Grid>
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('nodes.layout.layerSpacing')}</FormLabel>
+                <Grid w="full" gap={2} templateColumns="1fr auto">
+                  <CompositeSlider
+                    min={0}
+                    max={200}
+                    value={layerSpacing}
+                    onChange={handleLayerSpacingSliderChange}
+                    marks
+                  />
+                  <CompositeNumberInput
+                    value={layerSpacing}
+                    min={0}
+                    max={200}
+                    onChange={handleLayerSpacingInputChange}
+                    w={24}
+                  />
+                </Grid>
+              </FormControl>
+              <Divider />
+              <Button w="full" onClick={handleApplyAutoLayout}>
+                {t('common.apply')}
+              </Button>
+            </Flex>
+          </PopoverBody>
+        </PopoverContent>
+      </Portal>
     </Popover>
   );
 });

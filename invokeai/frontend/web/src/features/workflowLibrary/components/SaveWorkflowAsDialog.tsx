@@ -14,13 +14,14 @@ import {
 import { useStore } from '@nanostores/react';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { deepClone } from 'common/util/deepClone';
-import { $workflowLibraryCategoriesOptions } from 'features/nodes/store/workflowLibrarySlice';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { isDraftWorkflow, useCreateLibraryWorkflow } from 'features/workflowLibrary/hooks/useCreateNewWorkflow';
 import { t } from 'i18next';
 import { atom, computed } from 'nanostores';
 import type { ChangeEvent, RefObject } from 'react';
 import { memo, useCallback, useRef, useState } from 'react';
+import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
+import { useUpdateWorkflowIsPublicMutation } from 'services/api/endpoints/workflows';
 import { assert } from 'tsafe';
 
 /**
@@ -83,16 +84,18 @@ export const SaveWorkflowAsDialog = () => {
 };
 
 const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef: RefObject<HTMLButtonElement> }) => {
-  const workflowCategories = useStore($workflowLibraryCategoriesOptions);
   const [name, setName] = useState(() => {
     if (workflow) {
       return getInitialName(workflow);
     }
     return '';
   });
-  const [shouldSaveToProject, setShouldSaveToProject] = useState(() => workflowCategories.includes('project'));
+  const [isPublic, setIsPublic] = useState(false);
+  const { data: setupStatus } = useGetSetupStatusQuery();
+  const multiuserEnabled = setupStatus?.multiuser_enabled ?? false;
 
   const { createNewWorkflow } = useCreateLibraryWorkflow();
+  const [updateIsPublic] = useUpdateWorkflowIsPublicMutation();
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -100,12 +103,9 @@ const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef
     setName(e.target.value);
   }, []);
 
-  const onChangeCheckbox = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      setShouldSaveToProject(e.target.checked);
-    },
-    [setShouldSaveToProject]
-  );
+  const onChangeIsPublic = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setIsPublic(e.target.checked);
+  }, []);
 
   const onClose = useCallback(() => {
     $workflowToSave.set(null);
@@ -114,18 +114,26 @@ const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef
   const onSave = useCallback(async () => {
     workflow.id = undefined;
     workflow.name = name;
-    workflow.meta.category = shouldSaveToProject ? 'project' : 'user';
-    workflow.is_published = false;
+    workflow.meta.category = 'user';
 
     // We've just made the workflow a draft, but TS doesn't know that. We need to assert it.
     assert(isDraftWorkflow(workflow));
 
     await createNewWorkflow({
       workflow,
-      onSuccess: onClose,
+      onSuccess: async (workflowId?: string) => {
+        if (isPublic && workflowId) {
+          try {
+            await updateIsPublic({ workflow_id: workflowId, is_public: true }).unwrap();
+          } catch {
+            // Sharing failed silently - workflow was saved, just not shared
+          }
+        }
+        onClose();
+      },
       onError: onClose,
     });
-  }, [workflow, name, shouldSaveToProject, createNewWorkflow, onClose]);
+  }, [workflow, name, isPublic, createNewWorkflow, updateIsPublic, onClose]);
 
   return (
     <AlertDialogContent>
@@ -138,10 +146,11 @@ const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef
           <FormLabel mt="2">{t('workflows.workflowName')}</FormLabel>
           <Flex flexDir="column" width="full" gap="2">
             <Input ref={inputRef} value={name} onChange={onChange} placeholder={t('workflows.workflowName')} />
-            {workflowCategories.includes('project') && (
-              <Checkbox isChecked={shouldSaveToProject} onChange={onChangeCheckbox}>
-                <FormLabel>{t('workflows.saveWorkflowToProject')}</FormLabel>
-              </Checkbox>
+            {multiuserEnabled && (
+              <Flex alignItems="center" gap={2}>
+                <Checkbox isChecked={isPublic} onChange={onChangeIsPublic} />
+                <FormLabel mb={0}>{t('workflows.shareWorkflow')}</FormLabel>
+              </Flex>
             )}
           </Flex>
         </FormControl>
@@ -163,7 +172,7 @@ Content.displayName = 'Content';
 const NoWorkflowToSaveContent = memo(() => {
   return (
     <AlertDialogContent>
-      <IAINoContentFallback icon={null} label="No workflow to save" />
+      <IAINoContentFallback icon={null} label={t('workflows.noWorkflowToSave')} />
     </AlertDialogContent>
   );
 });

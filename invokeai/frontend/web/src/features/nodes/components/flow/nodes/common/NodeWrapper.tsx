@@ -2,7 +2,6 @@ import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Box, useGlobalMenuClose } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
-import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { useMouseOverFormField, useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { useNodeHasErrors } from 'features/nodes/hooks/useNodeIsInvalid';
@@ -29,7 +28,6 @@ const NodeWrapper = (props: NodeWrapperProps) => {
   const mouseOverNode = useMouseOverNode(nodeId);
   const mouseOverFormField = useMouseOverFormField(nodeId);
   const zoomToNode = useZoomToNode(nodeId);
-  const isLocked = useIsWorkflowEditorLocked();
   const isInvalid = useNodeHasErrors();
   const hasError = isMissingTemplate || isInvalid;
 
@@ -72,9 +70,9 @@ const NodeWrapper = (props: NodeWrapperProps) => {
       onMouseOut={mouseOverNode.handleMouseOut}
       className={DRAG_HANDLE_CLASSNAME}
       sx={containerSx}
+      borderRadius="base"
       width={width || NODE_WIDTH}
       opacity={opacity}
-      data-is-editor-locked={isLocked}
       data-is-selected={selected}
       data-is-mouse-over-form-field={mouseOverFormField.isMouseOverFormField}
       data-status={hasError ? 'error' : needsUpdate ? 'warning' : undefined}

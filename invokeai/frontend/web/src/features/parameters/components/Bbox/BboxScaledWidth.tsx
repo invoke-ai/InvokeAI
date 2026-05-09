@@ -4,16 +4,21 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { bboxScaledWidthChanged } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice, selectGridSize, selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { useIsBboxSizeLocked } from 'features/parameters/components/Bbox/use-is-bbox-size-locked';
-import { selectConfigSlice } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selectIsManual = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.scaleMethod === 'manual');
 const selectScaledWidth = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.scaledSize.width);
-const selectScaledBoundingBoxWidthConfig = createSelector(
-  selectConfigSlice,
-  (config) => config.sd.scaledBoundingBoxWidth
-);
+
+const CONSTRAINTS = {
+  initial: 512,
+  sliderMin: 64,
+  sliderMax: 1536,
+  numberInputMin: 64,
+  numberInputMax: 4096,
+  fineStep: 8,
+  coarseStep: 64,
+};
 
 const BboxScaledWidth = () => {
   const { t } = useTranslation();
@@ -22,7 +27,6 @@ const BboxScaledWidth = () => {
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const isManual = useAppSelector(selectIsManual);
   const scaledWidth = useAppSelector(selectScaledWidth);
-  const config = useAppSelector(selectScaledBoundingBoxWidthConfig);
   const gridSize = useAppSelector(selectGridSize);
 
   const onChange = useCallback(
@@ -36,9 +40,9 @@ const BboxScaledWidth = () => {
     <FormControl isDisabled={!isManual || isBboxSizeLocked}>
       <FormLabel>{t('parameters.scaledWidth')}</FormLabel>
       <CompositeSlider
-        min={config.sliderMin}
-        max={config.sliderMax}
-        step={config.coarseStep}
+        min={CONSTRAINTS.sliderMin}
+        max={CONSTRAINTS.sliderMax}
+        step={CONSTRAINTS.coarseStep}
         fineStep={gridSize}
         value={scaledWidth}
         onChange={onChange}
@@ -46,9 +50,9 @@ const BboxScaledWidth = () => {
         marks
       />
       <CompositeNumberInput
-        min={config.numberInputMin}
-        max={config.numberInputMax}
-        step={config.coarseStep}
+        min={CONSTRAINTS.numberInputMin}
+        max={CONSTRAINTS.numberInputMax}
+        step={CONSTRAINTS.coarseStep}
         fineStep={gridSize}
         value={scaledWidth}
         onChange={onChange}

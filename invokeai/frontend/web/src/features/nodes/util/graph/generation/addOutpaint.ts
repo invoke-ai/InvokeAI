@@ -55,7 +55,15 @@ export const addOutpaint = async ({
 
   const { originalSize, scaledSize, rect } = getOriginalAndScaledSizesForOtherModes(state);
 
-  if (denoise.type === 'cogview4_denoise' || denoise.type === 'flux_denoise' || denoise.type === 'sd3_denoise') {
+  if (
+    denoise.type === 'cogview4_denoise' ||
+    denoise.type === 'qwen_image_denoise' ||
+    denoise.type === 'flux_denoise' ||
+    denoise.type === 'flux2_denoise' ||
+    denoise.type === 'sd3_denoise' ||
+    denoise.type === 'z_image_denoise' ||
+    denoise.type === 'anima_denoise'
+  ) {
     denoise.width = scaledSize.width;
     denoise.height = scaledSize.height;
   } else {

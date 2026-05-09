@@ -21,6 +21,9 @@ export const StarterModelsResults = memo(({ results }: StarterModelsResultsProps
 
   const filteredResults = useMemo(() => {
     return results.starter_models.filter((result) => {
+      if (result.source.startsWith('external://')) {
+        return false;
+      }
       const trimmedSearchTerm = searchTerm.trim().toLowerCase();
       const matchStrings = [
         result.name.toLowerCase(),
@@ -48,9 +51,9 @@ export const StarterModelsResults = memo(({ results }: StarterModelsResultsProps
 
   return (
     <Flex flexDir="column" gap={3} height="100%">
-      <Flex justifyContent="space-between" alignItems="center">
+      <Flex gap={3} direction="column">
         {size(results.starter_bundles) > 0 && (
-          <Flex gap={4} alignItems="center">
+          <Flex gap={4} alignItems="center" justifyContent="space-between" p={4} borderWidth="1px" rounded="base">
             <Flex gap={2} alignItems="center">
               <Text color="base.200" fontWeight="semibold">
                 {t('modelManager.starterBundles')}
@@ -61,7 +64,7 @@ export const StarterModelsResults = memo(({ results }: StarterModelsResultsProps
                 </Flex>
               </Tooltip>
             </Flex>
-            <Flex gap={2}>
+            <Flex gap={2} flexWrap="wrap" justifyContent="flex-end" flex={1} minW={0}>
               {map(results.starter_bundles, (bundle) => (
                 <StarterBundleButton
                   key={bundle.name}
@@ -73,7 +76,8 @@ export const StarterModelsResults = memo(({ results }: StarterModelsResultsProps
             </Flex>
           </Flex>
         )}
-        <InputGroup w={64} size="xs">
+
+        <InputGroup w="100%" size="xs">
           <Input
             placeholder={t('modelManager.search')}
             value={searchTerm}
@@ -96,9 +100,10 @@ export const StarterModelsResults = memo(({ results }: StarterModelsResultsProps
           )}
         </InputGroup>
       </Flex>
-      <Flex height="100%" layerStyle="third" borderRadius="base" p={3}>
+
+      <Flex height="100%" layerStyle="second" borderRadius="base" px={2}>
         <ScrollableContent>
-          <Flex flexDir="column" gap={3}>
+          <Flex flexDir="column">
             {filteredResults.map((result) => (
               <StarterModelsResultItem key={result.source} starterModel={result} />
             ))}

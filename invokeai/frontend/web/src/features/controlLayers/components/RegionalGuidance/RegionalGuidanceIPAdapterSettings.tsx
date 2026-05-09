@@ -6,7 +6,6 @@ import { FLUXReduxImageInfluence } from 'features/controlLayers/components/commo
 import { IPAdapterCLIPVisionModel } from 'features/controlLayers/components/common/IPAdapterCLIPVisionModel';
 import { Weight } from 'features/controlLayers/components/common/Weight';
 import { IPAdapterMethod } from 'features/controlLayers/components/RefImage/IPAdapterMethod';
-import { RefImageImage } from 'features/controlLayers/components/RefImage/RefImageImage';
 import { RegionalGuidanceIPAdapterSettingsEmptyState } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceIPAdapterSettingsEmptyState';
 import { RegionalReferenceImageModel } from 'features/controlLayers/components/RegionalGuidance/RegionalReferenceImageModel';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
@@ -36,6 +35,8 @@ import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold, PiXBold } from 'react-icons/pi';
 import type { FLUXReduxModelConfig, ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
+
+import { RegionalGuidanceRefImageImage } from './RegionalGuidanceRefImageImage';
 
 type Props = {
   referenceImageId: string;
@@ -114,7 +115,7 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
         { entityIdentifier, referenceImageId },
         config.image?.image_name
       ),
-    [entityIdentifier, config.image?.image_name, referenceImageId]
+    [entityIdentifier, config.image, referenceImageId]
   );
 
   const pullBboxIntoIPAdapter = usePullBboxIntoRegionalGuidanceReferenceImage(entityIdentifier, referenceImageId);
@@ -170,7 +171,7 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
             </Flex>
           )}
           <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1" flexGrow={1}>
-            <RefImageImage
+            <RegionalGuidanceRefImageImage
               image={config.image}
               onChangeImage={onChangeImage}
               dndTarget={setRegionalGuidanceReferenceImageDndTarget}

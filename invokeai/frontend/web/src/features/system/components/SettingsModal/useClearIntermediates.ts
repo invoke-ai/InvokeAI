@@ -12,12 +12,11 @@ type UseClearIntermediatesReturn = {
   refetchIntermediatesCount: () => void;
 };
 
-export const useClearIntermediates = (shouldShowClearIntermediates: boolean): UseClearIntermediatesReturn => {
+export const useClearIntermediates = (): UseClearIntermediatesReturn => {
   const { t } = useTranslation();
 
   const { data: intermediatesCount, refetch: refetchIntermediatesCount } = useGetIntermediatesCountQuery(undefined, {
     refetchOnMountOrArgChange: true,
-    skip: !shouldShowClearIntermediates,
   });
 
   const [_clearIntermediates, { isLoading }] = useClearIntermediatesMutation();

@@ -1,13 +1,17 @@
 from typing import TypeVar
 
 import torch
+from diffusers.models.normalization import RMSNorm as DiffusersRMSNorm
 
-from invokeai.backend.flux.modules.layers import RMSNorm
+from invokeai.backend.flux.modules.layers import RMSNorm as FluxRMSNorm
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_conv1d import (
     CustomConv1d,
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_conv2d import (
     CustomConv2d,
+)
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_diffusers_rms_norm import (
+    CustomDiffusersRMSNorm,
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_embedding import (
     CustomEmbedding,
@@ -17,6 +21,9 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_group_norm import (
     CustomGroupNorm,
+)
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_layer_norm import (
+    CustomLayerNorm,
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_linear import (
     CustomLinear,
@@ -31,7 +38,9 @@ AUTOCAST_MODULE_TYPE_MAPPING: dict[type[torch.nn.Module], type[torch.nn.Module]]
     torch.nn.Conv2d: CustomConv2d,
     torch.nn.GroupNorm: CustomGroupNorm,
     torch.nn.Embedding: CustomEmbedding,
-    RMSNorm: CustomFluxRMSNorm,
+    torch.nn.LayerNorm: CustomLayerNorm,
+    FluxRMSNorm: CustomFluxRMSNorm,
+    DiffusersRMSNorm: CustomDiffusersRMSNorm,
 }
 
 try:

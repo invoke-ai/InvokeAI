@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import { type FocusRegionName, setFocusedRegion } from 'common/hooks/focus';
 import { createDeferredPromise, type Deferred } from 'common/util/createDeferredPromise';
 import { parseify } from 'common/util/serialize';
 import type { GridviewApi, IDockviewPanel, IGridviewPanel } from 'dockview';
@@ -9,6 +10,7 @@ import type { Atom } from 'nanostores';
 import { atom } from 'nanostores';
 
 import {
+  GALLERY_PANEL_ID,
   LAUNCHPAD_PANEL_ID,
   LEFT_PANEL_ID,
   LEFT_PANEL_MIN_SIZE_PX,
@@ -21,6 +23,10 @@ import {
 const log = logger('system');
 
 type PanelType = IGridviewPanel | IDockviewPanel;
+type PanelWithFocusRegion = { params?: { focusRegion?: FocusRegionName } };
+type FocusPanelOptions = {
+  blurActiveElement?: boolean;
+};
 
 /**
  * An object that represents a promise that is waiting for a panel to be registered and ready.
@@ -87,6 +93,23 @@ export class NavigationApi {
    */
   _disposablesForTab: Map<TabName, Set<() => void>> = new Map();
 
+  _setFocusedRegionFromPanel = (tab: TabName, panel: PanelType | null | undefined): void => {
+    const focusRegion = (panel as PanelWithFocusRegion | null)?.params?.focusRegion;
+    if (focusRegion && this._app?.activeTab.get() === tab) {
+      setFocusedRegion(focusRegion);
+    }
+  };
+
+  _blurActiveElement = (): void => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+    if (!(document.activeElement instanceof HTMLElement)) {
+      return;
+    }
+    document.activeElement.blur();
+  };
+
   /**
    * Convenience method to add a dispose function for a specific tab.
    */
@@ -113,12 +136,19 @@ export class NavigationApi {
   _app: NavigationAppApi | null = null;
 
   /**
+   * A flag indicating if the application is currently connected to the navigation API.
+   */
+  private _$isConnected = atom(false);
+  $isConnected: Atom<boolean> = this._$isConnected;
+
+  /**
    * Connect to the application to manage tab switching.
    * @param api - The application API that provides methods to set and get the current app tab and manage panel
    *    state storage.
    */
   connectToApp = (api: NavigationAppApi): void => {
     this._app = api;
+    this._$isConnected.set(true);
   };
 
   /**
@@ -126,6 +156,7 @@ export class NavigationApi {
    */
   disconnectFromApp = (): void => {
     this._app = null;
+    this._$isConnected.set(false);
   };
 
   /**
@@ -246,10 +277,12 @@ export class NavigationApi {
     if (api instanceof DockviewApi) {
       this._currentActiveDockviewPanel.set(tab, api.activePanel?.id ?? null);
       this._prevActiveDockviewPanel.set(tab, null);
+      this._setFocusedRegionFromPanel(tab, api.activePanel);
       const { dispose } = api.onDidActivePanelChange((panel) => {
         const previousPanelId = this._currentActiveDockviewPanel.get(tab);
         this._prevActiveDockviewPanel.set(tab, previousPanelId ?? null);
         this._currentActiveDockviewPanel.set(tab, panel?.id ?? null);
+        this._setFocusedRegionFromPanel(tab, panel);
       });
       this._addDisposeForTab(tab, dispose);
     }
@@ -367,7 +400,7 @@ export class NavigationApi {
    * }
    * ```
    */
-  focusPanel = async (tab: TabName, panelId: string, timeout = 2000): Promise<boolean> => {
+  focusPanel = async (tab: TabName, panelId: string, timeout = 2000, options?: FocusPanelOptions): Promise<boolean> => {
     try {
       this.switchToTab(tab);
       await this.waitForPanel(tab, panelId, timeout);
@@ -382,6 +415,10 @@ export class NavigationApi {
 
       // Dockview uses the term "active", but we use "focused" for consistency.
       panel.api.setActive();
+      if (options?.blurActiveElement) {
+        this._blurActiveElement();
+      }
+      this._setFocusedRegionFromPanel(tab, panel);
       log.trace(`Focused panel ${key}`);
 
       return true;
@@ -705,6 +742,56 @@ export class NavigationApi {
     return Array.from(this.panels.keys())
       .filter((key) => key.startsWith(prefix))
       .map((key) => key.substring(prefix.length));
+  };
+
+  /**
+   * Returns true when a specific dockview panel is the currently active panel for the tab.
+   */
+  isDockviewPanelActive = (tab: TabName, panelId: string): boolean => {
+    return this._currentActiveDockviewPanel.get(tab) === panelId;
+  };
+
+  /**
+   * Returns true when both side panels are collapsed in the provided tab.
+   */
+  isFullscreen = (tab: TabName): boolean => {
+    const leftPanel = this.getPanel(tab, LEFT_PANEL_ID);
+    const rightPanel = this.getPanel(tab, RIGHT_PANEL_ID);
+
+    if (!(leftPanel instanceof GridviewPanel) || !(rightPanel instanceof GridviewPanel)) {
+      return false;
+    }
+
+    return leftPanel.width === 0 && rightPanel.width === 0;
+  };
+
+  /**
+   * Returns true when the gallery panel is collapsed in the provided tab.
+   */
+  isGalleryPanelCollapsed = (tab: TabName): boolean => {
+    const galleryPanel = this.getPanel(tab, GALLERY_PANEL_ID);
+    if (!(galleryPanel instanceof GridviewPanel)) {
+      return false;
+    }
+    return galleryPanel.height <= (galleryPanel.minimumHeight ?? 0);
+  };
+
+  /**
+   * Returns true when the right panel is collapsed in the provided tab.
+   */
+  isRightPanelCollapsed = (tab: TabName): boolean => {
+    const rightPanel = this.getPanel(tab, RIGHT_PANEL_ID);
+    if (!(rightPanel instanceof GridviewPanel)) {
+      return false;
+    }
+    return rightPanel.width === 0;
+  };
+
+  /**
+   * Returns true when viewer-level left/right arrow navigation should be active for gallery browsing.
+   */
+  isViewerArrowNavigationMode = (tab: TabName): boolean => {
+    return this.isFullscreen(tab) || this.isRightPanelCollapsed(tab) || this.isGalleryPanelCollapsed(tab);
   };
 
   /**

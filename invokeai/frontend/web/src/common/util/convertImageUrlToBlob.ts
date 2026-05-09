@@ -1,5 +1,3 @@
-import { $authToken } from 'app/store/nanostores/authToken';
-
 /**
  * Converts an image URL to a Blob by creating an <img /> element, drawing it to canvas
  * and then converting the canvas to a Blob.
@@ -40,6 +38,6 @@ export const convertImageUrlToBlob = (url: string) =>
       reject(new Error('Image failed to load. The URL may be invalid or the object may not exist.'));
     };
 
-    img.crossOrigin = $authToken.get() ? 'use-credentials' : 'anonymous';
+    img.crossOrigin = 'anonymous';
     img.src = url;
   });

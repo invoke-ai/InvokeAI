@@ -1,24 +1,16 @@
-import { useAppDispatch } from 'app/store/storeHooks';
 import { IconMenuItem } from 'common/components/IconMenuItem';
-import { useItemDTOContext } from 'features/gallery/contexts/ItemDTOContext';
-import { imageOpenedInNewTab } from 'features/gallery/store/actions';
+import { openImageInNewTab } from 'common/util/openImageInNewTab';
+import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowSquareOutBold } from 'react-icons/pi';
-import { isImageDTO } from 'services/api/types';
 
 export const ContextMenuItemOpenInNewTab = memo(() => {
   const { t } = useTranslation();
-  const itemDTO = useItemDTOContext();
-  const dispatch = useAppDispatch();
+  const imageDTO = useImageDTOContext();
   const onClick = useCallback(() => {
-    if (isImageDTO(itemDTO)) {
-      window.open(itemDTO.image_url, '_blank');
-      dispatch(imageOpenedInNewTab());
-    } else {
-      window.open(itemDTO.video_url, '_blank');
-    }
-  }, [itemDTO, dispatch]);
+    openImageInNewTab(imageDTO.image_url);
+  }, [imageDTO]);
 
   return (
     <IconMenuItem

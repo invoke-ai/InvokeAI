@@ -4,35 +4,25 @@ import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
-import { isPlainObject, uniq } from 'es-toolkit';
+import { isPlainObject } from 'es-toolkit';
 import { clamp } from 'es-toolkit/compat';
-import type { AspectRatioID, ParamsState, RgbaColor } from 'features/controlLayers/store/types';
+import { logout } from 'features/auth/store/authSlice';
+import type { AspectRatioID, InfillMethod, ParamsState, RgbaColor } from 'features/controlLayers/store/types';
 import {
   ASPECT_RATIO_MAP,
-  CHATGPT_ASPECT_RATIOS,
   DEFAULT_ASPECT_RATIO_CONFIG,
-  FLUX_KONTEXT_ASPECT_RATIOS,
-  GEMINI_2_5_ASPECT_RATIOS,
   getInitialParamsState,
-  IMAGEN_ASPECT_RATIOS,
-  isChatGPT4oAspectRatioID,
-  isFluxKontextAspectRatioID,
-  isGemini2_5AspectRatioID,
-  isImagenAspectRatioID,
   MAX_POSITIVE_PROMPT_HISTORY,
   zParamsState,
 } from 'features/controlLayers/store/types';
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import {
-  API_BASE_MODELS,
-  CLIP_SKIP_MAP,
-  SUPPORTS_ASPECT_RATIO_BASE_MODELS,
   SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS,
   SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS,
-  SUPPORTS_PIXEL_DIMENSIONS_BASE_MODELS,
   SUPPORTS_REF_IMAGES_BASE_MODELS,
-  SUPPORTS_SEED_BASE_MODELS,
-} from 'features/parameters/types/constants';
+} from 'features/modelManagerV2/models';
+import type { BaseModelType } from 'features/nodes/types/common';
+import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import type {
   ParameterCanvasCoherenceMode,
   ParameterCFGRescaleMultiplier,
@@ -41,6 +31,7 @@ import type {
   ParameterCLIPGEmbedModel,
   ParameterCLIPLEmbedModel,
   ParameterControlLoRAModel,
+  ParameterFluxDypePreset,
   ParameterGuidance,
   ParameterModel,
   ParameterNegativePrompt,
@@ -51,9 +42,11 @@ import type {
   ParameterT5EncoderModel,
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
+import { getExternalPanelControl, hasExternalPanelControl } from 'features/parameters/util/externalPanelSchema';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
-import { isNonRefinerMainModelConfig } from 'services/api/types';
+import type { AnyModelConfigWithExternal } from 'services/api/types';
+import { isExternalApiModelConfig, isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 const slice = createSlice({
@@ -80,6 +73,33 @@ const slice = createSlice({
     },
     setScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
       state.scheduler = action.payload;
+    },
+    setFluxScheduler: (state, action: PayloadAction<'euler' | 'heun' | 'lcm'>) => {
+      state.fluxScheduler = action.payload;
+    },
+    setFluxDypePreset: (state, action: PayloadAction<ParameterFluxDypePreset>) => {
+      state.fluxDypePreset = action.payload;
+    },
+    setFluxDypeScale: (state, action: PayloadAction<number>) => {
+      state.fluxDypeScale = action.payload;
+    },
+    setFluxDypeExponent: (state, action: PayloadAction<number>) => {
+      state.fluxDypeExponent = action.payload;
+    },
+    setZImageScheduler: (state, action: PayloadAction<'euler' | 'heun' | 'lcm'>) => {
+      state.zImageScheduler = action.payload;
+    },
+    setZImageShift: (state, action: PayloadAction<number | null>) => {
+      state.zImageShift = action.payload;
+    },
+    setZImageSeedVarianceEnabled: (state, action: PayloadAction<boolean>) => {
+      state.zImageSeedVarianceEnabled = action.payload;
+    },
+    setZImageSeedVarianceStrength: (state, action: PayloadAction<number>) => {
+      state.zImageSeedVarianceStrength = action.payload;
+    },
+    setZImageSeedVarianceRandomizePercent: (state, action: PayloadAction<number>) => {
+      state.zImageSeedVarianceRandomizePercent = action.payload;
     },
     setUpscaleScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
       state.upscaleScheduler = action.payload;
@@ -119,14 +139,6 @@ const slice = createSlice({
       // If the model base changes (e.g. SD1.5 -> SDXL), we need to change a few things
       if (model === null || previousModel?.base === model.base) {
         return;
-      }
-
-      if (API_BASE_MODELS.includes(model.base)) {
-        state.dimensions.aspectRatio.isLocked = true;
-        state.dimensions.aspectRatio.value = 1;
-        state.dimensions.aspectRatio.id = '1:1';
-        state.dimensions.width = 1024;
-        state.dimensions.height = 1024;
       }
 
       applyClipSkip(state, model, state.clipSkip);
@@ -181,6 +193,104 @@ const slice = createSlice({
       }
       state.clipGEmbedModel = result.data;
     },
+    zImageVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      const result = zParamsState.shape.zImageVaeModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.zImageVaeModel = result.data;
+    },
+    zImageQwen3EncoderModelSelected: (
+      state,
+      action: PayloadAction<{ key: string; name: string; base: string } | null>
+    ) => {
+      const result = zParamsState.shape.zImageQwen3EncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.zImageQwen3EncoderModel = result.data;
+    },
+    zImageQwen3SourceModelSelected: (state, action: PayloadAction<ParameterModel | null>) => {
+      const result = zParamsState.shape.zImageQwen3SourceModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.zImageQwen3SourceModel = result.data;
+    },
+    animaVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      const result = zParamsState.shape.animaVaeModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.animaVaeModel = result.data;
+    },
+    animaQwen3EncoderModelSelected: (state, action: PayloadAction<ParameterT5EncoderModel | null>) => {
+      const result = zParamsState.shape.animaQwen3EncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.animaQwen3EncoderModel = result.data;
+    },
+    animaT5EncoderModelSelected: (state, action: PayloadAction<ParameterT5EncoderModel | null>) => {
+      const result = zParamsState.shape.animaT5EncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.animaT5EncoderModel = result.data;
+    },
+    setAnimaScheduler: (
+      state,
+      action: PayloadAction<'euler' | 'heun' | 'dpmpp_2m' | 'dpmpp_2m_sde' | 'er_sde' | 'lcm'>
+    ) => {
+      state.animaScheduler = action.payload;
+    },
+    kleinVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      const result = zParamsState.shape.kleinVaeModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.kleinVaeModel = result.data;
+    },
+    kleinQwen3EncoderModelSelected: (
+      state,
+      action: PayloadAction<{ key: string; name: string; base: string } | null>
+    ) => {
+      const result = zParamsState.shape.kleinQwen3EncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.kleinQwen3EncoderModel = result.data;
+    },
+    qwenImageComponentSourceSelected: (state, action: PayloadAction<ParameterModel | null>) => {
+      const result = zParamsState.shape.qwenImageComponentSource.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.qwenImageComponentSource = result.data;
+    },
+    qwenImageVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      const result = zParamsState.shape.qwenImageVaeModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.qwenImageVaeModel = result.data;
+    },
+    qwenImageQwenVLEncoderModelSelected: (
+      state,
+      action: PayloadAction<{ key: string; name: string; base: string } | null>
+    ) => {
+      const result = zParamsState.shape.qwenImageQwenVLEncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.qwenImageQwenVLEncoderModel = result.data;
+    },
+    qwenImageQuantizationChanged: (state, action: PayloadAction<'none' | 'int8' | 'nf4'>) => {
+      state.qwenImageQuantization = action.payload;
+    },
+    qwenImageShiftChanged: (state, action: PayloadAction<number | null>) => {
+      state.qwenImageShift = action.payload;
+    },
     vaePrecisionChanged: (state, action: PayloadAction<ParameterPrecision>) => {
       state.vaePrecision = action.payload;
     },
@@ -190,6 +300,9 @@ const slice = createSlice({
     shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldUseCpuNoise = action.payload;
     },
+    setColorCompensation: (state, action: PayloadAction<boolean>) => {
+      state.colorCompensation = action.payload;
+    },
     positivePromptChanged: (state, action: PayloadAction<ParameterPositivePrompt>) => {
       state.positivePrompt = action.payload;
     },
@@ -198,11 +311,8 @@ const slice = createSlice({
       if (prompt.length === 0) {
         return;
       }
-      // Remove if already exists
-      state.positivePromptHistory = uniq(state.positivePromptHistory);
 
-      // Add to front
-      state.positivePromptHistory.unshift(prompt);
+      state.positivePromptHistory = [prompt, ...state.positivePromptHistory.filter((p) => p !== prompt)];
 
       if (state.positivePromptHistory.length > MAX_POSITIVE_PROMPT_HISTORY) {
         state.positivePromptHistory = state.positivePromptHistory.slice(0, MAX_POSITIVE_PROMPT_HISTORY);
@@ -242,7 +352,7 @@ const slice = createSlice({
     setRefinerStart: (state, action: PayloadAction<number>) => {
       state.refinerStart = action.payload;
     },
-    setInfillMethod: (state, action: PayloadAction<string>) => {
+    setInfillMethod: (state, action: PayloadAction<InfillMethod>) => {
       state.infillMethod = action.payload;
     },
     setInfillTileSize: (state, action: PayloadAction<number>) => {
@@ -270,7 +380,7 @@ const slice = createSlice({
     //#region Dimensions
     sizeRecalled: (state, action: PayloadAction<{ width: number; height: number }>) => {
       const { width, height } = action.payload;
-      const gridSize = getGridSize(state.model?.base);
+      const gridSize = getGridSize(state.model?.base as BaseModelType | undefined);
       state.dimensions.width = Math.max(roundDownToMultiple(width, gridSize), 64);
       state.dimensions.height = Math.max(roundDownToMultiple(height, gridSize), 64);
       state.dimensions.aspectRatio.value = state.dimensions.width / state.dimensions.height;
@@ -279,7 +389,7 @@ const slice = createSlice({
     },
     widthChanged: (state, action: PayloadAction<{ width: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
       const { width, updateAspectRatio, clamp } = action.payload;
-      const gridSize = getGridSize(state.model?.base);
+      const gridSize = getGridSize(state.model?.base as BaseModelType | undefined);
       state.dimensions.width = clamp ? Math.max(roundDownToMultiple(width, gridSize), 64) : width;
 
       if (state.dimensions.aspectRatio.isLocked) {
@@ -297,7 +407,7 @@ const slice = createSlice({
     },
     heightChanged: (state, action: PayloadAction<{ height: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
       const { height, updateAspectRatio, clamp } = action.payload;
-      const gridSize = getGridSize(state.model?.base);
+      const gridSize = getGridSize(state.model?.base as BaseModelType | undefined);
       state.dimensions.height = clamp ? Math.max(roundDownToMultiple(height, gridSize), 64) : height;
 
       if (state.dimensions.aspectRatio.isLocked) {
@@ -316,45 +426,30 @@ const slice = createSlice({
     aspectRatioLockToggled: (state) => {
       state.dimensions.aspectRatio.isLocked = !state.dimensions.aspectRatio.isLocked;
     },
-    aspectRatioIdChanged: (state, action: PayloadAction<{ id: AspectRatioID }>) => {
-      const { id } = action.payload;
+    aspectRatioIdChanged: (
+      state,
+      action: PayloadAction<{ id: AspectRatioID; fixedSize?: { width: number; height: number } }>
+    ) => {
+      const { id, fixedSize } = action.payload;
       state.dimensions.aspectRatio.id = id;
       if (id === 'Free') {
         state.dimensions.aspectRatio.isLocked = false;
-      } else if ((state.model?.base === 'imagen3' || state.model?.base === 'imagen4') && isImagenAspectRatioID(id)) {
-        const { width, height } = IMAGEN_ASPECT_RATIOS[id];
-        state.dimensions.width = width;
-        state.dimensions.height = height;
-        state.dimensions.aspectRatio.value = state.dimensions.width / state.dimensions.height;
-        state.dimensions.aspectRatio.isLocked = true;
-      } else if (state.model?.base === 'chatgpt-4o' && isChatGPT4oAspectRatioID(id)) {
-        const { width, height } = CHATGPT_ASPECT_RATIOS[id];
-        state.dimensions.width = width;
-        state.dimensions.height = height;
-        state.dimensions.aspectRatio.value = state.dimensions.width / state.dimensions.height;
-        state.dimensions.aspectRatio.isLocked = true;
-      } else if (state.model?.base === 'gemini-2.5' && isGemini2_5AspectRatioID(id)) {
-        const { width, height } = GEMINI_2_5_ASPECT_RATIOS[id];
-        state.dimensions.width = width;
-        state.dimensions.height = height;
-        state.dimensions.aspectRatio.value = state.dimensions.width / state.dimensions.height;
-        state.dimensions.aspectRatio.isLocked = true;
-      } else if (state.model?.base === 'flux-kontext' && isFluxKontextAspectRatioID(id)) {
-        const { width, height } = FLUX_KONTEXT_ASPECT_RATIOS[id];
-        state.dimensions.width = width;
-        state.dimensions.height = height;
-        state.dimensions.aspectRatio.value = state.dimensions.width / state.dimensions.height;
-        state.dimensions.aspectRatio.isLocked = true;
       } else {
         state.dimensions.aspectRatio.isLocked = true;
-        state.dimensions.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
-        const { width, height } = calculateNewSize(
-          state.dimensions.aspectRatio.value,
-          state.dimensions.width * state.dimensions.height,
-          state.model?.base
-        );
-        state.dimensions.width = width;
-        state.dimensions.height = height;
+        if (fixedSize) {
+          state.dimensions.aspectRatio.value = fixedSize.width / fixedSize.height;
+          state.dimensions.width = fixedSize.width;
+          state.dimensions.height = fixedSize.height;
+        } else {
+          state.dimensions.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
+          const { width, height } = calculateNewSize(
+            state.dimensions.aspectRatio.value,
+            state.dimensions.width * state.dimensions.height,
+            state.model?.base as BaseModelType | undefined
+          );
+          state.dimensions.width = width;
+          state.dimensions.height = height;
+        }
       }
     },
     dimensionsSwapped: (state) => {
@@ -368,7 +463,7 @@ const slice = createSlice({
         const { width, height } = calculateNewSize(
           state.dimensions.aspectRatio.value,
           state.dimensions.width * state.dimensions.height,
-          state.model?.base
+          state.model?.base as BaseModelType | undefined
         );
         state.dimensions.width = width;
         state.dimensions.height = height;
@@ -376,12 +471,12 @@ const slice = createSlice({
       }
     },
     sizeOptimized: (state) => {
-      const optimalDimension = getOptimalDimension(state.model?.base);
+      const optimalDimension = getOptimalDimension(state.model?.base as BaseModelType | undefined);
       if (state.dimensions.aspectRatio.isLocked) {
         const { width, height } = calculateNewSize(
           state.dimensions.aspectRatio.value,
           optimalDimension * optimalDimension,
-          state.model?.base
+          state.model?.base as BaseModelType | undefined
         );
         state.dimensions.width = width;
         state.dimensions.height = height;
@@ -392,19 +487,70 @@ const slice = createSlice({
       }
     },
     syncedToOptimalDimension: (state) => {
-      const optimalDimension = getOptimalDimension(state.model?.base);
+      const optimalDimension = getOptimalDimension(state.model?.base as BaseModelType | undefined);
 
-      if (!getIsSizeOptimal(state.dimensions.width, state.dimensions.height, state.model?.base)) {
+      if (
+        !getIsSizeOptimal(
+          state.dimensions.width,
+          state.dimensions.height,
+          state.model?.base as BaseModelType | undefined
+        )
+      ) {
         const bboxDims = calculateNewSize(
           state.dimensions.aspectRatio.value,
           optimalDimension * optimalDimension,
-          state.model?.base
+          state.model?.base as BaseModelType | undefined
         );
         state.dimensions.width = bboxDims.width;
         state.dimensions.height = bboxDims.height;
       }
     },
+    imageSizeChanged: (state, action: PayloadAction<string | null>) => {
+      state.imageSize = action.payload;
+    },
+    openaiQualityChanged: (state, action: PayloadAction<'auto' | 'high' | 'medium' | 'low'>) => {
+      state.openaiQuality = action.payload;
+    },
+    openaiBackgroundChanged: (state, action: PayloadAction<'auto' | 'transparent' | 'opaque'>) => {
+      state.openaiBackground = action.payload;
+    },
+    openaiInputFidelityChanged: (state, action: PayloadAction<'low' | 'high' | null>) => {
+      state.openaiInputFidelity = action.payload;
+    },
+    geminiTemperatureChanged: (state, action: PayloadAction<number | null>) => {
+      state.geminiTemperature = action.payload;
+    },
+    geminiThinkingLevelChanged: (state, action: PayloadAction<'minimal' | 'high' | null>) => {
+      state.geminiThinkingLevel = action.payload;
+    },
+    seedreamWatermarkChanged: (state, action: PayloadAction<boolean>) => {
+      state.seedreamWatermark = action.payload;
+    },
+    seedreamOptimizePromptChanged: (state, action: PayloadAction<boolean>) => {
+      state.seedreamOptimizePrompt = action.payload;
+    },
+    resolutionPresetSelected: (
+      state,
+      action: PayloadAction<{ imageSize: string; aspectRatio: string; width: number; height: number }>
+    ) => {
+      const { imageSize, aspectRatio, width, height } = action.payload;
+      state.imageSize = imageSize;
+      state.dimensions.width = width;
+      state.dimensions.height = height;
+      state.dimensions.aspectRatio.id = aspectRatio as AspectRatioID;
+      state.dimensions.aspectRatio.value = width / height;
+      state.dimensions.aspectRatio.isLocked = true;
+    },
     paramsReset: (state) => resetState(state),
+    paramsRecalled: (_state, action: PayloadAction<ParamsState>) => {
+      return action.payload;
+    },
+  },
+  extraReducers(builder) {
+    // Reset params state on logout to prevent user data leakage when switching users
+    builder.addCase(logout, () => {
+      return getInitialParamsState();
+    });
   },
 });
 
@@ -427,6 +573,9 @@ const hasModelClipSkip = (model: ParameterModel | null) => {
 };
 
 const getModelMaxClipSkip = (model: ParameterModel) => {
+  if (model.base === 'external') {
+    return undefined;
+  }
   if (model.base === 'sdxl') {
     // We don't support user-defined CLIP skip for SDXL because it doesn't do anything useful
     return 0;
@@ -448,6 +597,19 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.t5EncoderModel = oldState.t5EncoderModel;
   newState.clipEmbedModel = oldState.clipEmbedModel;
   newState.refinerModel = oldState.refinerModel;
+  newState.zImageVaeModel = oldState.zImageVaeModel;
+  newState.zImageQwen3EncoderModel = oldState.zImageQwen3EncoderModel;
+  newState.zImageQwen3SourceModel = oldState.zImageQwen3SourceModel;
+  newState.animaVaeModel = oldState.animaVaeModel;
+  newState.animaQwen3EncoderModel = oldState.animaQwen3EncoderModel;
+  newState.animaT5EncoderModel = oldState.animaT5EncoderModel;
+  newState.kleinVaeModel = oldState.kleinVaeModel;
+  newState.kleinQwen3EncoderModel = oldState.kleinQwen3EncoderModel;
+  newState.qwenImageComponentSource = oldState.qwenImageComponentSource;
+  newState.qwenImageVaeModel = oldState.qwenImageVaeModel;
+  newState.qwenImageQwenVLEncoderModel = oldState.qwenImageQwenVLEncoderModel;
+  newState.qwenImageQuantization = oldState.qwenImageQuantization;
+  newState.qwenImageShift = oldState.qwenImageShift;
   return newState;
 };
 
@@ -466,6 +628,15 @@ export const {
   setCfgRescaleMultiplier,
   setGuidance,
   setScheduler,
+  setFluxScheduler,
+  setFluxDypePreset,
+  setFluxDypeScale,
+  setFluxDypeExponent,
+  setZImageScheduler,
+  setZImageShift,
+  setZImageSeedVarianceEnabled,
+  setZImageSeedVarianceStrength,
+  setZImageSeedVarianceRandomizePercent,
   setUpscaleScheduler,
   setUpscaleCfgScale,
   setSeed,
@@ -481,8 +652,19 @@ export const {
   clipEmbedModelSelected,
   clipLEmbedModelSelected,
   clipGEmbedModelSelected,
+  zImageVaeModelSelected,
+  zImageQwen3EncoderModelSelected,
+  zImageQwen3SourceModelSelected,
+  kleinVaeModelSelected,
+  kleinQwen3EncoderModelSelected,
+  qwenImageComponentSourceSelected,
+  qwenImageVaeModelSelected,
+  qwenImageQwenVLEncoderModelSelected,
+  qwenImageQuantizationChanged,
+  qwenImageShiftChanged,
   setClipSkip,
   shouldUseCpuNoiseChanged,
+  setColorCompensation,
   positivePromptChanged,
   positivePromptAddedToHistory,
   promptRemovedFromHistory,
@@ -507,7 +689,21 @@ export const {
   sizeOptimized,
   syncedToOptimalDimension,
 
+  resolutionPresetSelected,
+  imageSizeChanged,
   paramsReset,
+  openaiQualityChanged,
+  openaiBackgroundChanged,
+  openaiInputFidelityChanged,
+  geminiTemperatureChanged,
+  geminiThinkingLevelChanged,
+  seedreamWatermarkChanged,
+  seedreamOptimizePromptChanged,
+  paramsRecalled,
+  animaVaeModelSelected,
+  animaQwen3EncoderModelSelected,
+  animaT5EncoderModelSelected,
+  setAnimaScheduler,
 } = slice.actions;
 
 export const paramsSliceConfig: SliceConfig<typeof slice> = {
@@ -531,6 +727,13 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         state.positivePromptHistory = [];
       }
 
+      if (state._version === 2) {
+        // v2 -> v3, add standalone Qwen Image VAE and Qwen VL encoder fields
+        state._version = 3;
+        state.qwenImageVaeModel = null;
+        state.qwenImageQwenVLEncoderModel = null;
+      }
+
       return zParamsState.parse(state);
     },
   },
@@ -544,19 +747,17 @@ export const selectIsSDXL = createParamsSelector((params) => params.model?.base 
 export const selectIsFLUX = createParamsSelector((params) => params.model?.base === 'flux');
 export const selectIsSD3 = createParamsSelector((params) => params.model?.base === 'sd-3');
 export const selectIsCogView4 = createParamsSelector((params) => params.model?.base === 'cogview4');
-export const selectIsImagen3 = createParamsSelector((params) => params.model?.base === 'imagen3');
-export const selectIsImagen4 = createParamsSelector((params) => params.model?.base === 'imagen4');
+export const selectIsZImage = createParamsSelector((params) => params.model?.base === 'z-image');
+export const selectIsAnima = createParamsSelector((params) => params.model?.base === 'anima');
+export const selectIsFlux2 = createParamsSelector((params) => params.model?.base === 'flux2');
+export const selectIsExternal = createParamsSelector((params) => params.model?.base === 'external');
+export const selectIsQwenImage = createParamsSelector((params) => params.model?.base === 'qwen-image');
 export const selectIsFluxKontext = createParamsSelector((params) => {
-  if (params.model?.base === 'flux-kontext') {
-    return true;
-  }
   if (params.model?.base === 'flux' && params.model?.name.toLowerCase().includes('kontext')) {
     return true;
   }
   return false;
 });
-export const selectIsChatGPT4o = createParamsSelector((params) => params.model?.base === 'chatgpt-4o');
-export const selectIsGemini2_5 = createParamsSelector((params) => params.model?.base === 'gemini-2.5');
 
 export const selectModel = createParamsSelector((params) => params.model);
 export const selectModelKey = createParamsSelector((params) => params.model?.key);
@@ -568,6 +769,20 @@ export const selectCLIPEmbedModel = createParamsSelector((params) => params.clip
 export const selectCLIPLEmbedModel = createParamsSelector((params) => params.clipLEmbedModel);
 
 export const selectCLIPGEmbedModel = createParamsSelector((params) => params.clipGEmbedModel);
+export const selectZImageVaeModel = createParamsSelector((params) => params.zImageVaeModel);
+export const selectZImageQwen3EncoderModel = createParamsSelector((params) => params.zImageQwen3EncoderModel);
+export const selectZImageQwen3SourceModel = createParamsSelector((params) => params.zImageQwen3SourceModel);
+export const selectAnimaVaeModel = createParamsSelector((params) => params.animaVaeModel);
+export const selectAnimaQwen3EncoderModel = createParamsSelector((params) => params.animaQwen3EncoderModel);
+export const selectAnimaT5EncoderModel = createParamsSelector((params) => params.animaT5EncoderModel);
+export const selectAnimaScheduler = createParamsSelector((params) => params.animaScheduler);
+export const selectKleinVaeModel = createParamsSelector((params) => params.kleinVaeModel);
+export const selectKleinQwen3EncoderModel = createParamsSelector((params) => params.kleinQwen3EncoderModel);
+export const selectQwenImageComponentSource = createParamsSelector((params) => params.qwenImageComponentSource);
+export const selectQwenImageVaeModel = createParamsSelector((params) => params.qwenImageVaeModel);
+export const selectQwenImageQwenVLEncoderModel = createParamsSelector((params) => params.qwenImageQwenVLEncoderModel);
+export const selectQwenImageQuantization = createParamsSelector((params) => params.qwenImageQuantization);
+export const selectQwenImageShift = createParamsSelector((params) => params.qwenImageShift);
 
 export const selectCFGScale = createParamsSelector((params) => params.cfgScale);
 export const selectGuidance = createParamsSelector((params) => params.guidance);
@@ -590,36 +805,103 @@ export const selectOptimizedDenoisingEnabled = createParamsSelector((params) => 
 export const selectPositivePrompt = createParamsSelector((params) => params.positivePrompt);
 export const selectNegativePrompt = createParamsSelector((params) => params.negativePrompt);
 export const selectNegativePromptWithFallback = createParamsSelector((params) => params.negativePrompt ?? '');
+export const selectModelConfig = createSelector(
+  selectModelConfigsQuery,
+  selectParamsSlice,
+  (modelConfigs, { model }) => {
+    if (!modelConfigs.data) {
+      return null;
+    }
+    if (!model) {
+      return null;
+    }
+    return (
+      (modelConfigsAdapterSelectors.selectById(modelConfigs.data, model.key) as
+        | AnyModelConfigWithExternal
+        | undefined) ?? null
+    );
+  }
+);
 export const selectHasNegativePrompt = createParamsSelector((params) => params.negativePrompt !== null);
-export const selectModelSupportsNegativePrompt = createSelector(
-  selectModel,
-  (model) => !!model && SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS.includes(model.base)
-);
-export const selectModelSupportsSeed = createSelector(
-  selectModel,
-  (model) => !!model && SUPPORTS_SEED_BASE_MODELS.includes(model.base)
-);
-export const selectModelSupportsRefImages = createSelector(
-  selectModel,
-  (model) => !!model && SUPPORTS_REF_IMAGES_BASE_MODELS.includes(model.base)
-);
-export const selectModelSupportsAspectRatio = createSelector(
-  selectModel,
-  (model) => !!model && SUPPORTS_ASPECT_RATIO_BASE_MODELS.includes(model.base)
-);
-export const selectModelSupportsPixelDimensions = createSelector(
-  selectModel,
-  (model) => !!model && SUPPORTS_PIXEL_DIMENSIONS_BASE_MODELS.includes(model.base)
-);
-export const selectIsApiBaseModel = createSelector(
-  selectModel,
-  (model) => !!model && API_BASE_MODELS.includes(model.base)
-);
+export const selectModelSupportsNegativePrompt = createSelector(selectModel, (model) => {
+  if (!model) {
+    return false;
+  }
+  if (model.base === 'external') {
+    return false;
+  }
+  return SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS.includes(model.base);
+});
+export const selectModelSupportsRefImages = createSelector(selectModel, selectModelConfig, (model, modelConfig) => {
+  if (!model) {
+    return false;
+  }
+  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
+    return hasExternalPanelControl(modelConfig, 'prompts', 'reference_images');
+  }
+  if (model.base === 'external') {
+    return false;
+  }
+  return SUPPORTS_REF_IMAGES_BASE_MODELS.includes(model.base);
+});
 export const selectModelSupportsOptimizedDenoising = createSelector(
   selectModel,
-  (model) => !!model && SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS.includes(model.base)
+  (model) => !!model && model.base !== 'external' && SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS.includes(model.base)
 );
+export const selectModelSupportsGuidance = createSelector(selectModel, (model) => {
+  if (!model) {
+    return false;
+  }
+  if (model.base === 'external') {
+    return false;
+  }
+  return true;
+});
+export const selectModelSupportsSeed = createSelector(selectModel, selectModelConfig, (model, modelConfig) => {
+  if (!model) {
+    return false;
+  }
+  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
+    return hasExternalPanelControl(modelConfig, 'image', 'seed');
+  }
+  return true;
+});
+export const selectModelSupportsSteps = createSelector(selectModel, (model) => {
+  if (!model) {
+    return false;
+  }
+  if (model.base === 'external') {
+    return false;
+  }
+  return true;
+});
+export const selectModelSupportsDimensions = createSelector(selectModel, selectModelConfig, (model, modelConfig) => {
+  if (!model) {
+    return false;
+  }
+  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
+    return hasExternalPanelControl(modelConfig, 'image', 'dimensions');
+  }
+  return true;
+});
+export const selectSeedControl = createSelector(selectModelConfig, (modelConfig) => {
+  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
+    return getExternalPanelControl(modelConfig, 'image', 'seed');
+  }
+  return null;
+});
 export const selectScheduler = createParamsSelector((params) => params.scheduler);
+export const selectFluxScheduler = createParamsSelector((params) => params.fluxScheduler);
+export const selectFluxDypePreset = createParamsSelector((params) => params.fluxDypePreset);
+export const selectFluxDypeScale = createParamsSelector((params) => params.fluxDypeScale);
+export const selectFluxDypeExponent = createParamsSelector((params) => params.fluxDypeExponent);
+export const selectZImageScheduler = createParamsSelector((params) => params.zImageScheduler);
+export const selectZImageShift = createParamsSelector((params) => params.zImageShift);
+export const selectZImageSeedVarianceEnabled = createParamsSelector((params) => params.zImageSeedVarianceEnabled);
+export const selectZImageSeedVarianceStrength = createParamsSelector((params) => params.zImageSeedVarianceStrength);
+export const selectZImageSeedVarianceRandomizePercent = createParamsSelector(
+  (params) => params.zImageSeedVarianceRandomizePercent
+);
 export const selectSeamlessXAxis = createParamsSelector((params) => params.seamlessXAxis);
 export const selectSeamlessYAxis = createParamsSelector((params) => params.seamlessYAxis);
 export const selectSeed = createParamsSelector((params) => params.seed);
@@ -627,6 +909,7 @@ export const selectShouldRandomizeSeed = createParamsSelector((params) => params
 export const selectVAEPrecision = createParamsSelector((params) => params.vaePrecision);
 export const selectIterations = createParamsSelector((params) => params.iterations);
 export const selectShouldUseCPUNoise = createParamsSelector((params) => params.shouldUseCpuNoise);
+export const selectColorCompensation = createParamsSelector((params) => params.colorCompensation);
 
 export const selectUpscaleScheduler = createParamsSelector((params) => params.upscaleScheduler);
 export const selectUpscaleCfgScale = createParamsSelector((params) => params.upscaleCfgScale);
@@ -650,24 +933,54 @@ export const selectHeight = createParamsSelector((params) => params.dimensions.h
 export const selectAspectRatioID = createParamsSelector((params) => params.dimensions.aspectRatio.id);
 export const selectAspectRatioValue = createParamsSelector((params) => params.dimensions.aspectRatio.value);
 export const selectAspectRatioIsLocked = createParamsSelector((params) => params.dimensions.aspectRatio.isLocked);
+export const selectAllowedAspectRatioIDs = createSelector(selectModelConfig, (modelConfig) => {
+  if (!modelConfig || !isExternalApiModelConfig(modelConfig)) {
+    return null;
+  }
+  const allowed = modelConfig.capabilities.allowed_aspect_ratios;
+  return allowed?.length ? allowed : null;
+});
+export const selectAspectRatioSizes = createSelector(selectModelConfig, (modelConfig) => {
+  if (!modelConfig || !isExternalApiModelConfig(modelConfig)) {
+    return null;
+  }
+  return modelConfig.capabilities.aspect_ratio_sizes ?? null;
+});
+export const selectResolutionPresets = createSelector(selectModelConfig, (modelConfig) => {
+  if (!modelConfig || !isExternalApiModelConfig(modelConfig)) {
+    return null;
+  }
+  return modelConfig.capabilities.resolution_presets ?? null;
+});
+export const selectHasFixedDimensionSizes = createSelector(
+  selectAspectRatioSizes,
+  selectResolutionPresets,
+  (sizes, presets) => sizes !== null || (presets !== null && presets.length > 0)
+);
+export const selectImageSize = createParamsSelector((params) => params.imageSize);
+export const selectOpenaiQuality = createParamsSelector((params) => params.openaiQuality);
+export const selectOpenaiBackground = createParamsSelector((params) => params.openaiBackground);
+export const selectOpenaiInputFidelity = createParamsSelector((params) => params.openaiInputFidelity);
+export const selectGeminiTemperature = createParamsSelector((params) => params.geminiTemperature);
+export const selectGeminiThinkingLevel = createParamsSelector((params) => params.geminiThinkingLevel);
+export const selectSeedreamWatermark = createParamsSelector((params) => params.seedreamWatermark);
+export const selectSeedreamOptimizePrompt = createParamsSelector((params) => params.seedreamOptimizePrompt);
+export const selectExternalProviderId = createSelector(selectModelConfig, (modelConfig) => {
+  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
+    return modelConfig.provider_id;
+  }
+  return null;
+});
 
-export const selectMainModelConfig = createSelector(
-  selectModelConfigsQuery,
-  selectParamsSlice,
-  (modelConfigs, { model }) => {
-    if (!modelConfigs.data) {
-      return null;
-    }
-    if (!model) {
-      return null;
-    }
-    const modelConfig = modelConfigsAdapterSelectors.selectById(modelConfigs.data, model.key);
-    if (!modelConfig) {
-      return null;
-    }
-    if (!isNonRefinerMainModelConfig(modelConfig)) {
-      return null;
-    }
+export const selectMainModelConfig = createSelector(selectModelConfig, (modelConfig) => {
+  if (!modelConfig) {
+    return null;
+  }
+  if (isExternalApiModelConfig(modelConfig)) {
     return modelConfig;
   }
-);
+  if (!isNonRefinerMainModelConfig(modelConfig)) {
+    return null;
+  }
+  return modelConfig;
+});

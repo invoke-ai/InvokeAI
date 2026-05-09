@@ -12,7 +12,7 @@ import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasState, RefImagesState } from 'features/controlLayers/store/types';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
-import { itemSelected } from 'features/gallery/store/gallerySlice';
+import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { fieldImageCollectionValueChanged, fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState } from 'features/nodes/store/types';
@@ -89,14 +89,12 @@ const handleDeletions = async (image_names: string[], store: AppStore) => {
     const newImageNames = data?.image_names.filter((name) => !deleted_images.includes(name)) || [];
     const newSelectedImage = newImageNames[index ?? 0] || null;
 
-    const galleryImageNames = state.gallery.selection.map((s) => s.id);
-
-    if (intersection(galleryImageNames, image_names).length > 0) {
+    if (intersection(state.gallery.selection, image_names).length > 0) {
       if (newSelectedImage) {
         // Some selected images were deleted, clear selection
-        dispatch(itemSelected({ type: 'image', id: newSelectedImage }));
+        dispatch(imageSelected(newSelectedImage));
       } else {
-        dispatch(itemSelected(null));
+        dispatch(imageSelected(null));
       }
     }
 
@@ -236,8 +234,11 @@ const deleteControlLayerImages = (state: RootState, dispatch: AppDispatch, image
 
 const deleteReferenceImages = (state: RootState, dispatch: AppDispatch, image_name: string) => {
   selectReferenceImageEntities(state).forEach((entity) => {
-    if (entity.config.image?.image_name === image_name) {
-      dispatch(refImageImageChanged({ id: entity.id, imageDTO: null }));
+    if (
+      entity.config.image?.original.image.image_name === image_name ||
+      entity.config.image?.crop?.image.image_name === image_name
+    ) {
+      dispatch(refImageImageChanged({ id: entity.id, croppableImage: null }));
     }
   });
 };
@@ -284,7 +285,10 @@ export const getImageUsage = (
 
   const isUpscaleImage = upscale.upscaleInitialImage?.image_name === image_name;
 
-  const isReferenceImage = refImages.entities.some(({ config }) => config.image?.image_name === image_name);
+  const isReferenceImage = refImages.entities.some(
+    ({ config }) =>
+      config.image?.original.image.image_name === image_name || config.image?.crop?.image.image_name === image_name
+  );
 
   const isRasterLayerImage = canvas.rasterLayers.entities.some(({ objects }) =>
     objects.some((obj) => obj.type === 'image' && 'image_name' in obj.image && obj.image.image_name === image_name)

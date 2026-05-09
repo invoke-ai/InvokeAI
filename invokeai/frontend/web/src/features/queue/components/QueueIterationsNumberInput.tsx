@@ -2,12 +2,10 @@ import { CompositeNumberInput } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { selectIterations, setIterations } from 'features/controlLayers/store/paramsSlice';
-import { selectIterationsConfig } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 
 export const QueueIterationsNumberInput = memo(() => {
   const iterations = useAppSelector(selectIterations);
-  const config = useAppSelector(selectIterationsConfig);
   const dispatch = useAppDispatch();
   const handleChange = useCallback(
     (v: number) => {
@@ -19,10 +17,10 @@ export const QueueIterationsNumberInput = memo(() => {
   return (
     <InformationalPopover feature="paramIterations">
       <CompositeNumberInput
-        step={config.coarseStep}
-        fineStep={config.fineStep}
+        step={1}
+        fineStep={1}
         min={1}
-        max={config.numberInputMax}
+        max={10000}
         onChange={handleChange}
         value={iterations}
         defaultValue={1}

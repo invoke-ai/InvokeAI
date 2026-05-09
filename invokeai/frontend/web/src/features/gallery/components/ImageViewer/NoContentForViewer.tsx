@@ -3,29 +3,34 @@ import { Alert, AlertDescription, AlertIcon, Button, Divider, Flex, Link, Spinne
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { InvokeLogoIcon } from 'common/components/InvokeLogoIcon';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import { LOADING_SYMBOL, useHasImages } from 'features/gallery/hooks/useHasImages';
 import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { selectIsLocal } from 'features/system/store/configSlice';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { PropsWithChildren } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiArrowSquareOutBold, PiImageBold } from 'react-icons/pi';
+import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
 import { useMainModels } from 'services/api/hooks/modelsByType';
 
 export const NoContentForViewer = memo(() => {
   const hasImages = useHasImages();
   const [mainModels, { data }] = useMainModels();
-  const isLocal = useAppSelector(selectIsLocal);
-  const isEnabled = useFeatureStatus('starterModels');
-  const activeTab = useAppSelector(selectActiveTab);
+  const { data: setupStatus } = useGetSetupStatusQuery();
+  const user = useAppSelector(selectCurrentUser);
   const { t } = useTranslation();
 
+  const isMultiuser = setupStatus?.multiuser_enabled ?? false;
+  const isAdmin = !isMultiuser || (user?.is_admin ?? false);
+  const adminEmail = setupStatus?.admin_email ?? null;
+
+  const modelsLoaded = data !== undefined;
+  const hasModels = mainModels.length > 0;
+
   const showStarterBundles = useMemo(() => {
-    return isEnabled && data && mainModels.length === 0;
-  }, [mainModels.length, data, isEnabled]);
+    return modelsLoaded && !hasModels && isAdmin;
+  }, [modelsLoaded, hasModels, isAdmin]);
 
   if (hasImages === LOADING_SYMBOL) {
     // Blank bg w/ a spinner. The new user experience components below have an invoke logo, but it's not centered.
@@ -43,11 +48,18 @@ export const NoContentForViewer = memo(() => {
     <Flex flexDir="column" gap={8} alignItems="center" textAlign="center" maxW="400px">
       <InvokeLogoIcon w={32} h={32} />
       <Flex flexDir="column" gap={4} alignItems="center" textAlign="center">
-        {isLocal ? <GetStartedLocal /> : activeTab === 'workflows' ? <GetStartedWorkflows /> : <GetStartedCommercial />}
-        {showStarterBundles && <StarterBundlesCallout />}
-        <Divider />
-        <GettingStartedVideosCallout />
-        {isLocal && <LowVRAMAlert />}
+        {isAdmin ? (
+          // Admin / single-user mode
+          <>
+            {modelsLoaded && hasModels ? <GetStartedWithModels /> : <GetStartedLocal />}
+            {showStarterBundles && <StarterBundlesCallout />}
+            <Divider />
+            <LowVRAMAlert />
+          </>
+        ) : (
+          // Non-admin user in multiuser mode
+          <>{modelsLoaded && hasModels ? <GetStartedWithModels /> : <GetStartedNonAdmin adminEmail={adminEmail} />}</>
+        )}
       </Flex>
     </Flex>
   );
@@ -56,9 +68,19 @@ export const NoContentForViewer = memo(() => {
 NoContentForViewer.displayName = 'NoContentForViewer';
 
 const LoadingSpinner = () => {
+  const { t } = useTranslation();
   return (
     <Flex position="relative" width="full" height="full" alignItems="center" justifyContent="center">
-      <Spinner label="Loading" color="grey" position="absolute" size="sm" width={8} height={8} right={4} bottom={4} />
+      <Spinner
+        label={t('common.loading')}
+        color="grey"
+        position="absolute"
+        size="sm"
+        width={8}
+        height={8}
+        right={4}
+        bottom={4}
+      />
     </Flex>
   );
 };
@@ -97,7 +119,7 @@ const GetStartedLocal = () => {
   );
 };
 
-const GetStartedCommercial = () => {
+const GetStartedWithModels = () => {
   return (
     <Text fontSize="md" color="base.200">
       <Trans i18nKey="newUserExperience.toGetStarted" components={{ StrongComponent }} />
@@ -105,25 +127,20 @@ const GetStartedCommercial = () => {
   );
 };
 
-const GetStartedWorkflows = () => {
-  return (
-    <Text fontSize="md" color="base.200">
-      <Trans i18nKey="newUserExperience.toGetStartedWorkflow" components={{ StrongComponent }} />
+const GetStartedNonAdmin = ({ adminEmail }: { adminEmail: string | null }) => {
+  const AdminEmailLink = adminEmail ? (
+    <Link href={`mailto:${adminEmail}`} color="base.50">
+      {adminEmail}
+    </Link>
+  ) : (
+    <Text as="span" color="base.50">
+      your administrator
     </Text>
   );
-};
 
-const GettingStartedVideosCallout = () => {
   return (
     <Text fontSize="md" color="base.200">
-      <Trans
-        i18nKey="newUserExperience.gettingStartedSeries"
-        components={{
-          LinkComponent: (
-            <ExternalLink href="https://www.youtube.com/playlist?list=PLvWK1Kc8iXGrQy8r9TYg6QdUuJ5MMx-ZO" />
-          ),
-        }}
-      />
+      <Trans i18nKey="newUserExperience.toGetStartedNonAdmin" components={{ StrongComponent, AdminEmailLink }} />
     </Text>
   );
 };
@@ -160,7 +177,7 @@ const LowVRAMAlert = () => {
         <Trans
           i18nKey="newUserExperience.lowVRAMMode"
           components={{
-            LinkComponent: <ExternalLink href="https://invoke-ai.github.io/InvokeAI/features/low-vram/" />,
+            LinkComponent: <ExternalLink href="https://invoke.ai/configuration/low-vram-mode/" />,
           }}
         />
       </AlertDescription>

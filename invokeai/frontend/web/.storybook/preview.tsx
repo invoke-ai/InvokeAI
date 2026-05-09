@@ -10,7 +10,6 @@ import { Provider } from 'react-redux';
 // @ts-ignore
 import translationEN from '../public/locales/en.json';
 import ThemeLocaleProvider from '../src/app/components/ThemeLocaleProvider';
-import { $baseUrl } from '../src/app/store/nanostores/baseUrl';
 import { createStore } from '../src/app/store/store';
 import { ReduxInit } from './ReduxInit';
 
@@ -28,7 +27,6 @@ i18n.use(initReactI18next).init({
 
 const store = createStore();
 $store.set(store);
-$baseUrl.set('http://localhost:9090');
 
 const preview: Preview = {
   decorators: [

@@ -1,8 +1,8 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
+  selectHasFixedDimensionSizes,
   selectHeight,
-  selectIsApiBaseModel,
   selectWidth,
   sizeOptimized,
 } from 'features/controlLayers/store/paramsSlice';
@@ -15,10 +15,10 @@ import { PiSparkleFill } from 'react-icons/pi';
 export const DimensionsSetOptimalSizeButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const isApiModel = useAppSelector(selectIsApiBaseModel);
   const width = useAppSelector(selectWidth);
   const height = useAppSelector(selectHeight);
   const optimalDimension = useAppSelector(selectOptimalDimension);
+  const hasFixedSizes = useAppSelector(selectHasFixedDimensionSizes);
   const isSizeTooSmall = useMemo(
     () => getIsSizeTooSmall(width, height, optimalDimension),
     [height, width, optimalDimension]
@@ -49,7 +49,7 @@ export const DimensionsSetOptimalSizeButton = memo(() => {
       size="sm"
       icon={<PiSparkleFill />}
       colorScheme={isSizeTooSmall || isSizeTooLarge ? 'warning' : 'base'}
-      isDisabled={isApiModel}
+      isDisabled={hasFixedSizes}
     />
   );
 });

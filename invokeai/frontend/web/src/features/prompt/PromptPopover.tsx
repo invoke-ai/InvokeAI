@@ -1,4 +1,4 @@
-import { Popover, PopoverAnchor, PopoverBody, PopoverContent } from '@invoke-ai/ui-library';
+import { Popover, PopoverAnchor, PopoverBody, PopoverContent, Portal } from '@invoke-ai/ui-library';
 import { PromptTriggerSelect } from 'features/prompt/PromptTriggerSelect';
 import type { PromptPopoverProps } from 'features/prompt/types';
 import { memo } from 'react';
@@ -18,18 +18,20 @@ export const PromptPopover = memo((props: PromptPopoverProps) => {
       isLazy
     >
       <PopoverAnchor>{children}</PopoverAnchor>
-      <PopoverContent
-        p={0}
-        insetBlockStart={-1}
-        shadow="dark-lg"
-        borderColor="invokeBlue.300"
-        borderWidth="2px"
-        borderStyle="solid"
-      >
-        <PopoverBody p={0} width={`calc(${width}px - 0.25rem)`}>
-          <PromptTriggerSelect onClose={onClose} onSelect={onSelect} />
-        </PopoverBody>
-      </PopoverContent>
+      <Portal>
+        <PopoverContent
+          p={0}
+          insetBlockStart={-1}
+          shadow="dark-lg"
+          borderColor="invokeBlue.300"
+          borderWidth="2px"
+          borderStyle="solid"
+        >
+          <PopoverBody p={0} width={`calc(${width}px - 0.25rem)`}>
+            <PromptTriggerSelect onClose={onClose} onSelect={onSelect} />
+          </PopoverBody>
+        </PopoverContent>
+      </Portal>
     </Popover>
   );
 });

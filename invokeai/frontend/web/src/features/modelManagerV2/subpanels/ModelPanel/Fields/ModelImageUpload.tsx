@@ -1,3 +1,4 @@
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, IconButton, Image } from '@invoke-ai/ui-library';
 import { dropzoneAccept } from 'common/hooks/useImageUploadButton';
 import { typedMemo } from 'common/util/typedMemo';
@@ -7,6 +8,21 @@ import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiUploadBold } from 'react-icons/pi';
 import { useDeleteModelImageMutation, useUpdateModelImageMutation } from 'services/api/endpoints/models';
+
+const sharedSx: SystemStyleObject = {
+  w: 108,
+  h: 108,
+  fontSize: 36,
+  borderRadius: 'base',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  bg: 'base.800',
+  borderWidth: '1px',
+  borderStyle: 'solid',
+  borderColor: 'base.700',
+  flexShrink: 0,
+};
 
 type Props = {
   model_key: string | null;
@@ -86,10 +102,9 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
           src={image}
           objectFit="cover"
           objectPosition="50% 50%"
-          height={108}
-          width={108}
           minWidth={108}
           borderRadius="base"
+          sx={sharedSx}
         />
         <IconButton
           position="absolute"
@@ -112,10 +127,9 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
         variant="ghost"
         aria-label={t('modelManager.uploadImage')}
         tooltip={t('modelManager.uploadImage')}
-        w={108}
-        h={108}
         fontSize={36}
         icon={<PiUploadBold />}
+        sx={sharedSx}
         isLoading={request.isLoading}
         {...getRootProps()}
       />

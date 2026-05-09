@@ -1,8 +1,6 @@
-import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening, RootState } from 'app/store/store';
 import { omit } from 'es-toolkit/compat';
-import { imageUploadedClientSide } from 'features/gallery/store/actions';
 import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { boardIdSelected, galleryViewChanged } from 'features/gallery/store/gallerySlice';
 import { toast } from 'features/toast/toast';
@@ -10,7 +8,6 @@ import { t } from 'i18next';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
-import { getCategories, getListImagesUrl } from 'services/api/util';
 const log = logger('gallery');
 
 /**
@@ -36,52 +33,20 @@ let lastUploadedToastTimeout: number | null = null;
 
 export const addImageUploadedFulfilledListener = (startAppListening: AppStartListening) => {
   startAppListening({
-    matcher: isAnyOf(imagesApi.endpoints.uploadImage.matchFulfilled, imageUploadedClientSide),
+    matcher: imagesApi.endpoints.uploadImage.matchFulfilled,
     effect: (action, { dispatch, getState }) => {
       let imageDTO: ImageDTO;
       let silent;
       let isFirstUploadOfBatch = true;
-
-      if (imageUploadedClientSide.match(action)) {
-        imageDTO = action.payload.imageDTO;
-        silent = action.payload.silent;
-        isFirstUploadOfBatch = action.payload.isFirstUploadOfBatch;
-      } else if (imagesApi.endpoints.uploadImage.matchFulfilled(action)) {
-        imageDTO = action.payload;
-        silent = action.meta.arg.originalArgs.silent;
-        isFirstUploadOfBatch = action.meta.arg.originalArgs.isFirstUploadOfBatch ?? true;
-      } else {
-        return;
-      }
+      imageDTO = action.payload;
+      silent = action.meta.arg.originalArgs.silent;
+      isFirstUploadOfBatch = action.meta.arg.originalArgs.isFirstUploadOfBatch ?? true;
 
       if (silent || imageDTO.is_intermediate) {
         // If the image is silent or intermediate, we don't want to show a toast
         return;
       }
 
-      if (imageUploadedClientSide.match(action)) {
-        const categories = getCategories(imageDTO);
-        const boardId = imageDTO.board_id ?? 'none';
-        dispatch(
-          imagesApi.util.invalidateTags([
-            {
-              type: 'ImageList',
-              id: getListImagesUrl({
-                board_id: boardId,
-                categories,
-              }),
-            },
-            {
-              type: 'Board',
-              id: boardId,
-            },
-            {
-              type: 'BoardImagesTotal',
-              id: boardId,
-            },
-          ])
-        );
-      }
       const state = getState();
 
       log.debug({ imageDTO }, 'Image uploaded');

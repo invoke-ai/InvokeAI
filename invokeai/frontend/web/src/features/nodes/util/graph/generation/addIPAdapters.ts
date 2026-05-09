@@ -58,7 +58,7 @@ const addIPAdapter = (id: string, ipAdapter: IPAdapterConfig, g: Graph, collecto
       begin_step_percent: beginEndStepPct[0],
       end_step_percent: beginEndStepPct[1],
       image: {
-        image_name: image.image_name,
+        image_name: image.crop?.image.image_name ?? image.original.image.image_name,
       },
     });
   } else {
@@ -77,7 +77,7 @@ const addIPAdapter = (id: string, ipAdapter: IPAdapterConfig, g: Graph, collecto
       begin_step_percent: beginEndStepPct[0],
       end_step_percent: beginEndStepPct[1],
       image: {
-        image_name: image.image_name,
+        image_name: image.crop?.image.image_name ?? image.original.image.image_name,
       },
     });
   }

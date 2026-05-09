@@ -127,6 +127,7 @@ describe('AppNavigationApi', () => {
 
   describe('Basic Connection', () => {
     it('should connect to app', () => {
+      expect(navigationApi.$isConnected.get()).toBe(false);
       navigationApi.connectToApp(mockAppApi);
 
       expect(navigationApi._app).not.toBeNull();
@@ -135,6 +136,7 @@ describe('AppNavigationApi', () => {
       expect(navigationApi._app?.storage.set).toBe(mockSetStorage);
       expect(navigationApi._app?.storage.get).toBe(mockGetStorage);
       expect(navigationApi._app?.storage.delete).toBe(mockDeleteStorage);
+      expect(navigationApi.$isConnected.get()).toBe(true);
     });
 
     it('should disconnect from app', () => {
@@ -142,6 +144,7 @@ describe('AppNavigationApi', () => {
       navigationApi.disconnectFromApp();
 
       expect(navigationApi._app).toBeNull();
+      expect(navigationApi.$isConnected.get()).toBe(false);
     });
   });
 

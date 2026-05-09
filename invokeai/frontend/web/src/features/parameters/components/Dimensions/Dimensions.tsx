@@ -1,11 +1,5 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
 import { Flex, FormControlGroup } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
-import {
-  selectModelSupportsAspectRatio,
-  selectModelSupportsPixelDimensions,
-} from 'features/controlLayers/store/paramsSlice';
-import { PixelDimensionsUnsupportedAlert } from 'features/parameters/components/PixelDimensionsUnsupportedAlert';
 import { memo } from 'react';
 
 import { DimensionsAspectRatioSelect } from './DimensionsAspectRatioSelect';
@@ -17,13 +11,6 @@ import { DimensionsSwapButton } from './DimensionsSwapButton';
 import { DimensionsWidth } from './DimensionsWidth';
 
 export const Dimensions = memo(() => {
-  const supportsAspectRatio = useAppSelector(selectModelSupportsAspectRatio);
-  const supportsPixelDimensions = useAppSelector(selectModelSupportsPixelDimensions);
-
-  if (!supportsAspectRatio) {
-    return null;
-  }
-
   return (
     <Flex gap={4} alignItems="center">
       <Flex gap={4} flexDirection="column" width="full">
@@ -31,20 +18,11 @@ export const Dimensions = memo(() => {
           <Flex gap={4}>
             <DimensionsAspectRatioSelect />
             <DimensionsSwapButton />
-            {supportsPixelDimensions && (
-              <>
-                <DimensionsLockAspectRatioButton />
-                <DimensionsSetOptimalSizeButton />
-              </>
-            )}
+            <DimensionsLockAspectRatioButton />
+            <DimensionsSetOptimalSizeButton />
           </Flex>
-          {supportsPixelDimensions && (
-            <>
-              <DimensionsWidth />
-              <DimensionsHeight />
-            </>
-          )}
-          {!supportsPixelDimensions && <PixelDimensionsUnsupportedAlert />}
+          <DimensionsWidth />
+          <DimensionsHeight />
         </FormControlGroup>
       </Flex>
       <Flex w="108px" h="108px" flexShrink={0} flexGrow={0} alignItems="center" justifyContent="center">

@@ -5,7 +5,7 @@ import torch
 from invokeai.backend.flux.model import FluxParams
 
 
-def is_state_dict_xlabs_controlnet(sd: Dict[str, Any]) -> bool:
+def is_state_dict_xlabs_controlnet(sd: dict[str | int, Any]) -> bool:
     """Is the state dict for an XLabs ControlNet model?
 
     This is intended to be a reasonably high-precision detector, but it is not guaranteed to have perfect precision.
@@ -25,7 +25,7 @@ def is_state_dict_xlabs_controlnet(sd: Dict[str, Any]) -> bool:
     return False
 
 
-def is_state_dict_instantx_controlnet(sd: Dict[str, Any]) -> bool:
+def is_state_dict_instantx_controlnet(sd: dict[str | int, Any]) -> bool:
     """Is the state dict for an InstantX ControlNet model?
 
     This is intended to be a reasonably high-precision detector, but it is not guaranteed to have perfect precision.

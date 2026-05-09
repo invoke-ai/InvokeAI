@@ -15,9 +15,10 @@ class BoardService(BoardServiceABC):
     def create(
         self,
         board_name: str,
+        user_id: str,
     ) -> BoardDTO:
-        board_record = self.__invoker.services.board_records.save(board_name)
-        return board_record_to_dto(board_record, None, 0, 0, 0)
+        board_record = self.__invoker.services.board_records.save(board_name, user_id)
+        return board_record_to_dto(board_record, None, 0, 0)
 
     def get_dto(self, board_id: str) -> BoardDTO:
         board_record = self.__invoker.services.board_records.get(board_id)
@@ -28,8 +29,7 @@ class BoardService(BoardServiceABC):
             cover_image_name = None
         image_count = self.__invoker.services.board_image_records.get_image_count_for_board(board_id)
         asset_count = self.__invoker.services.board_image_records.get_asset_count_for_board(board_id)
-        video_count = 0  # noop for OSS
-        return board_record_to_dto(board_record, cover_image_name, image_count, asset_count, video_count)
+        return board_record_to_dto(board_record, cover_image_name, image_count, asset_count)
 
     def update(
         self,
@@ -45,14 +45,15 @@ class BoardService(BoardServiceABC):
 
         image_count = self.__invoker.services.board_image_records.get_image_count_for_board(board_id)
         asset_count = self.__invoker.services.board_image_records.get_asset_count_for_board(board_id)
-        video_count = 0  # noop for OSS
-        return board_record_to_dto(board_record, cover_image_name, image_count, asset_count, video_count)
+        return board_record_to_dto(board_record, cover_image_name, image_count, asset_count)
 
     def delete(self, board_id: str) -> None:
         self.__invoker.services.board_records.delete(board_id)
 
     def get_many(
         self,
+        user_id: str,
+        is_admin: bool,
         order_by: BoardRecordOrderBy,
         direction: SQLiteDirection,
         offset: int = 0,
@@ -60,7 +61,7 @@ class BoardService(BoardServiceABC):
         include_archived: bool = False,
     ) -> OffsetPaginatedResults[BoardDTO]:
         board_records = self.__invoker.services.board_records.get_many(
-            order_by, direction, offset, limit, include_archived
+            user_id, is_admin, order_by, direction, offset, limit, include_archived
         )
         board_dtos = []
         for r in board_records.items:
@@ -72,15 +73,29 @@ class BoardService(BoardServiceABC):
 
             image_count = self.__invoker.services.board_image_records.get_image_count_for_board(r.board_id)
             asset_count = self.__invoker.services.board_image_records.get_asset_count_for_board(r.board_id)
-            video_count = 0  # noop for OSS
-            board_dtos.append(board_record_to_dto(r, cover_image_name, image_count, asset_count, video_count))
+
+            # For admin users, include owner username
+            owner_username = None
+            if is_admin:
+                owner = self.__invoker.services.users.get(r.user_id)
+                if owner:
+                    owner_username = owner.display_name or owner.email
+
+            board_dtos.append(board_record_to_dto(r, cover_image_name, image_count, asset_count, owner_username))
 
         return OffsetPaginatedResults[BoardDTO](items=board_dtos, offset=offset, limit=limit, total=len(board_dtos))
 
     def get_all(
-        self, order_by: BoardRecordOrderBy, direction: SQLiteDirection, include_archived: bool = False
+        self,
+        user_id: str,
+        is_admin: bool,
+        order_by: BoardRecordOrderBy,
+        direction: SQLiteDirection,
+        include_archived: bool = False,
     ) -> list[BoardDTO]:
-        board_records = self.__invoker.services.board_records.get_all(order_by, direction, include_archived)
+        board_records = self.__invoker.services.board_records.get_all(
+            user_id, is_admin, order_by, direction, include_archived
+        )
         board_dtos = []
         for r in board_records:
             cover_image = self.__invoker.services.image_records.get_most_recent_image_for_board(r.board_id)
@@ -91,7 +106,14 @@ class BoardService(BoardServiceABC):
 
             image_count = self.__invoker.services.board_image_records.get_image_count_for_board(r.board_id)
             asset_count = self.__invoker.services.board_image_records.get_asset_count_for_board(r.board_id)
-            video_count = 0  # noop for OSS
-            board_dtos.append(board_record_to_dto(r, cover_image_name, image_count, asset_count, video_count))
+
+            # For admin users, include owner username
+            owner_username = None
+            if is_admin:
+                owner = self.__invoker.services.users.get(r.user_id)
+                if owner:
+                    owner_username = owner.display_name or owner.email
+
+            board_dtos.append(board_record_to_dto(r, cover_image_name, image_count, asset_count, owner_username))
 
         return board_dtos

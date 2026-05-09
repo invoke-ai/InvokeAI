@@ -6,6 +6,7 @@ import {
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
+  Portal,
   Text,
   useDisclosure,
 } from '@invoke-ai/ui-library';
@@ -52,21 +53,23 @@ export const PostProcessingPopover = memo((props: Props) => {
           isDisabled={isDisabled}
         />
       </PopoverTrigger>
-      <PopoverContent>
-        <PopoverBody w={96}>
-          <Flex flexDirection="column" gap={4}>
-            <ParamPostProcessingModel />
-            {!postProcessingModel && <MissingModelWarning />}
-            <Button
-              size="sm"
-              isDisabled={isDisabled || !imageDTO || inProgress || !postProcessingModel}
-              onClick={handleClickUpscale}
-            >
-              {t('parameters.processImage')}
-            </Button>
-          </Flex>
-        </PopoverBody>
-      </PopoverContent>
+      <Portal>
+        <PopoverContent>
+          <PopoverBody w={96}>
+            <Flex flexDirection="column" gap={4}>
+              <ParamPostProcessingModel />
+              {!postProcessingModel && <MissingModelWarning />}
+              <Button
+                size="sm"
+                isDisabled={isDisabled || !imageDTO || inProgress || !postProcessingModel}
+                onClick={handleClickUpscale}
+              >
+                {t('parameters.processImage')}
+              </Button>
+            </Flex>
+          </PopoverBody>
+        </PopoverContent>
+      </Portal>
     </Popover>
   );
 });

@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   aspectRatioLockToggled,
   selectAspectRatioIsLocked,
-  selectIsApiBaseModel,
+  selectHasFixedDimensionSizes,
 } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +13,7 @@ export const DimensionsLockAspectRatioButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isLocked = useAppSelector(selectAspectRatioIsLocked);
-  const isApiModel = useAppSelector(selectIsApiBaseModel);
+  const hasFixedSizes = useAppSelector(selectHasFixedDimensionSizes);
 
   const onClick = useCallback(() => {
     dispatch(aspectRatioLockToggled());
@@ -27,7 +27,7 @@ export const DimensionsLockAspectRatioButton = memo(() => {
       variant={isLocked ? 'outline' : 'ghost'}
       size="sm"
       icon={isLocked ? <PiLockSimpleFill /> : <PiLockSimpleOpenBold />}
-      isDisabled={isApiModel}
+      isDisabled={hasFixedSizes}
     />
   );
 });

@@ -1,7 +1,6 @@
 import type { Selector } from '@reduxjs/toolkit';
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import { uniqBy } from 'es-toolkit/compat';
 import { getElement } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import type { NodesState } from 'features/nodes/store/types';
 import type { FieldInputInstance } from 'features/nodes/types/field';
@@ -22,7 +21,7 @@ const selectInvocationNode = (nodesSlice: NodesState, nodeId: string): Invocatio
   return node;
 };
 
-export const selectNodeData = (nodesSlice: NodesState, nodeId: string): InvocationNodeData => {
+const selectNodeData = (nodesSlice: NodesState, nodeId: string): InvocationNodeData => {
   const node = selectInvocationNode(nodesSlice, nodeId);
   return node.data;
 };
@@ -93,13 +92,6 @@ export const selectIsFormEmpty = createNodesSelector((workflow) => {
 export const selectFormInitialValues = createNodesSelector((workflow) => workflow.formFieldInitialValues);
 export const selectNodeFieldElements = createNodesSelector((workflow) =>
   Object.values(workflow.form.elements).filter(isNodeFieldElement)
-);
-export const selectWorkflowFormNodeFieldFieldIdentifiersDeduped = createSelector(
-  selectNodeFieldElements,
-  (nodeFieldElements) =>
-    uniqBy(nodeFieldElements, (el) => `${el.data.fieldIdentifier.nodeId}-${el.data.fieldIdentifier.fieldName}`).map(
-      (el) => el.data.fieldIdentifier
-    )
 );
 
 export const buildSelectElement = (id: string) => createNodesSelector((workflow) => workflow.form?.elements[id]);

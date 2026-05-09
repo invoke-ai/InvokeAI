@@ -2,7 +2,6 @@ import { Alert, AlertDescription, AlertIcon, AlertTitle } from '@invoke-ai/ui-li
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useDeferredModelLoadingInvocationProgressMessage } from 'features/controlLayers/hooks/useDeferredModelLoadingInvocationProgressMessage';
-import { selectIsLocal } from 'features/system/store/configSlice';
 import { selectSystemShouldShowInvocationProgressDetail } from 'features/system/store/systemSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -44,13 +43,8 @@ CanvasAlertsInvocationProgressContentCommercial.displayName = 'CanvasAlertsInvoc
 
 export const CanvasAlertsInvocationProgress = memo(() => {
   const shouldShowInvocationProgressDetail = useAppSelector(selectSystemShouldShowInvocationProgressDetail);
-  const isLocal = useAppSelector(selectIsLocal);
 
-  if (!isLocal) {
-    return <CanvasAlertsInvocationProgressContentCommercial />;
-  }
-
-  // OSS user setting
+  // user setting
   if (!shouldShowInvocationProgressDetail) {
     return null;
   }

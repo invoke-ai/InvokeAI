@@ -1,6 +1,8 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+
+export { getPrefixedId };
 import { selectSaveAllImagesToGallery } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
@@ -205,13 +207,17 @@ export const getInfill = (
   assert(false, 'Unknown infill method');
 };
 
-const CANVAS_OUTPUT_PREFIX = 'canvas_output';
+export const CANVAS_OUTPUT_PREFIX = 'canvas_output';
 
 export const isMainModelWithoutUnet = (modelLoader: Invocation<MainModelLoaderNodes>) => {
   return (
     modelLoader.type === 'flux_model_loader' ||
+    modelLoader.type === 'flux2_klein_model_loader' ||
     modelLoader.type === 'sd3_model_loader' ||
-    modelLoader.type === 'cogview4_model_loader'
+    modelLoader.type === 'cogview4_model_loader' ||
+    modelLoader.type === 'qwen_image_model_loader' ||
+    modelLoader.type === 'z_image_model_loader' ||
+    modelLoader.type === 'anima_model_loader'
   );
 };
 
@@ -235,17 +241,18 @@ export const getDenoisingStartAndEnd = (state: RootState): { denoising_start: nu
         denoising_end: 1,
       };
     }
-    case 'flux': {
-      if (model.variant === 'inpaint') {
+    case 'flux':
+    case 'flux2': {
+      if (model.base === 'flux' && model.variant === 'dev_fill') {
         // This is a FLUX Fill model - we always denoise fully
         return {
           denoising_start: 0,
           denoising_end: 1,
         };
       } else {
-        // We rescale the img2imgStrength (with exponent 0.2) to effectively use the entire range [0, 1] and make the scale
-        // more user-friendly for SD3.5. Without this, most of the 'change' is concentrated in the high denoise strength
-        // range (>0.9).
+        // FLUX.1 and FLUX.2 Klein: We rescale the img2imgStrength (with exponent 0.2) to effectively use the entire
+        // range [0, 1] and make the scale more user-friendly. Without this, most of the 'change' is concentrated in
+        // the high denoise strength range (>0.9).
         const exponent = optimizedDenoisingEnabled ? 0.2 : 1;
         return {
           denoising_start: 1 - denoisingStrength ** exponent,
@@ -253,9 +260,12 @@ export const getDenoisingStartAndEnd = (state: RootState): { denoising_start: nu
         };
       }
     }
+    case 'anima':
     case 'sd-1':
     case 'sd-2':
-    case 'cogview4': {
+    case 'cogview4':
+    case 'qwen-image':
+    case 'z-image': {
       return {
         denoising_start: 1 - denoisingStrength,
         denoising_end: 1,

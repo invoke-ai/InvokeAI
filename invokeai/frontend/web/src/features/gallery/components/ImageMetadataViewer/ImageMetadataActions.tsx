@@ -13,9 +13,9 @@ import {
   useCollectionMetadataDatum,
   useSingleMetadataDatum,
   useUnrecallableMetadataDatum,
-  VideoMetadataHandlers,
 } from 'features/metadata/parsing';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiArrowBendUpLeftBold } from 'react-icons/pi';
 
 type Props = {
@@ -45,6 +45,9 @@ export const ImageMetadataActions = memo((props: Props) => {
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.CFGScale} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.CFGRescaleMultiplier} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.Guidance} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.FluxDypePreset} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.FluxDypeScale} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.FluxDypeExponent} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.DenoisingStrength} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.SeamlessX} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.SeamlessY} />
@@ -55,36 +58,19 @@ export const ImageMetadataActions = memo((props: Props) => {
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerScheduler} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerDenoisingStart} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerSteps} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.QwenImageComponentSource} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.QwenImageQuantization} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.QwenImageShift} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.CanvasLayers} />
       <CollectionMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefImages} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.KleinVAEModel} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.KleinQwen3EncoderModel} />
       <CollectionMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.LoRAs} />
     </Flex>
   );
 });
 
 ImageMetadataActions.displayName = 'ImageMetadataActions';
-
-export const VideoMetadataActions = memo((props: Props) => {
-  const { metadata } = props;
-
-  if (!metadata || Object.keys(metadata).length === 0) {
-    return null;
-  }
-
-  return (
-    <Flex flexDir="column" ps={8}>
-      <UnrecallableMetadataDatum metadata={metadata} handler={VideoMetadataHandlers.GenerationMode} />
-      <SingleMetadataDatum metadata={metadata} handler={VideoMetadataHandlers.PositivePrompt} />
-      <SingleMetadataDatum metadata={metadata} handler={VideoMetadataHandlers.Seed} />
-      <SingleMetadataDatum metadata={metadata} handler={VideoMetadataHandlers.VideoAspectRatio} />
-      <SingleMetadataDatum metadata={metadata} handler={VideoMetadataHandlers.VideoDuration} />
-      <SingleMetadataDatum metadata={metadata} handler={VideoMetadataHandlers.VideoResolution} />
-      <SingleMetadataDatum metadata={metadata} handler={VideoMetadataHandlers.VideoModel} />
-    </Flex>
-  );
-});
-
-VideoMetadataActions.displayName = 'VideoMetadataActions';
 
 export const UnrecallableMetadataDatum = typedMemo(
   <T,>({ metadata, handler }: { metadata: unknown; handler: UnrecallableMetadataHandler<T> }) => {
@@ -132,6 +118,7 @@ SingleMetadataDatum.displayName = 'SingleMetadataDatum';
 
 const SingleMetadataParsed = typedMemo(
   <T,>({ data, handler }: { data: ParsedSuccessData<T>; handler: SingleMetadataHandler<T> }) => {
+    const { t } = useTranslation();
     const store = useAppStore();
 
     const { LabelComponent, ValueComponent } = handler;
@@ -143,7 +130,7 @@ const SingleMetadataParsed = typedMemo(
     return (
       <Flex gap={2}>
         <IconButton
-          aria-label="Recall Parameter"
+          aria-label={t('metadata.recallParameters')}
           icon={<PiArrowBendUpLeftBold />}
           size="xs"
           variant="ghost"
@@ -182,6 +169,7 @@ CollectionMetadataDatum.displayName = 'CollectionMetadataDatum';
 
 const CollectionMetadataParsed = typedMemo(
   <T extends any[]>({ value, handler }: { value: T[number]; handler: CollectionMetadataHandler<T> }) => {
+    const { t } = useTranslation();
     const store = useAppStore();
 
     const { LabelComponent, ValueComponent } = handler;
@@ -193,7 +181,7 @@ const CollectionMetadataParsed = typedMemo(
     return (
       <Flex gap={2}>
         <IconButton
-          aria-label="Recall Parameter"
+          aria-label={t('metadata.recallParameters')}
           icon={<PiArrowBendUpLeftBold />}
           size="xs"
           variant="ghost"

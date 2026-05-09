@@ -1,0 +1,56 @@
+---
+title: OpenAI
+---
+
+# :material-alpha-o-circle-outline: OpenAI
+
+Invoke supports OpenAI's image generation models — both the GPT Image family and the older DALL·E models — through the OpenAI API.
+
+## Getting an API Key
+
+1. Open the [OpenAI API Platform](https://platform.openai.com/api-keys) and sign in.
+2. Create a new secret API key.
+3. Make sure your account has billing set up — image endpoints are paid per request.
+
+## Configuration
+
+Add your key to `api_keys.yaml` in your Invoke root directory:
+
+```yaml
+external_openai_api_key: "sk-..."
+
+# Optional — use this to point at a compatible proxy or Azure OpenAI deployment
+external_openai_base_url: "https://api.openai.com"
+```
+
+Restart Invoke for the change to take effect.
+
+## Available Models
+
+| Model | Modes | Aspect Ratios | Batch | Notes |
+| --- | --- | --- | --- | --- |
+| **GPT Image 1.5** | txt2img, img2img, inpaint | 1:1, 3:2, 2:3 | up to 10 | Fastest and cheapest GPT Image model. |
+| **GPT Image 1** | txt2img, img2img, inpaint | 1:1, 3:2, 2:3 | up to 10 | Highest quality of the GPT Image family. |
+| **GPT Image 1 Mini** | txt2img, img2img, inpaint | 1:1, 3:2, 2:3 | up to 10 | ~80% cheaper than GPT Image 1. |
+| **DALL·E 3** | txt2img only | 1:1, 7:4, 4:7 | 1 | No reference-image / edit support. |
+| **DALL·E 2** | txt2img, img2img, inpaint | 1:1 | up to 10 | Square only. |
+
+## Provider-Specific Options
+
+For **GPT Image** models, Invoke surfaces two provider-specific options in the parameters panel:
+
+- **Quality** — `low`, `medium`, `high`, or `auto`. Higher quality costs more and takes longer.
+- **Background** — `auto`, `transparent`, or `opaque`. Use `transparent` for PNG output with an alpha channel.
+
+DALL·E 2 and DALL·E 3 do not expose these options.
+
+## How Requests Are Routed
+
+- Pure text-to-image requests hit `/v1/images/generations`.
+- Any request with an init image or reference images is sent to `/v1/images/edits` instead. This is done transparently — you don't need to pick an endpoint.
+
+## Tips
+
+- **Batching** on GPT Image and DALL·E 2 tops out at 10 per request. Larger batches are split into multiple API calls.
+- **Costs** can climb quickly with high-quality GPT Image generations. Start with GPT Image 1 Mini when iterating on prompts.
+- **Rate limits** from OpenAI surface as failed invocations — retry after a short wait.

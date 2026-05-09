@@ -2,13 +2,14 @@
 Test the model installer
 """
 
+import gc
 import platform
+import shutil
 import uuid
 from pathlib import Path
 from typing import Any, Dict
 
 import pytest
-from pydantic import ValidationError
 from pydantic_core import Url
 
 from invokeai.app.services.config import InvokeAIAppConfig
@@ -23,20 +24,23 @@ from invokeai.app.services.events.events_common import (
 )
 from invokeai.app.services.model_install import (
     HFModelSource,
+    ModelInstallService,
     ModelInstallServiceBase,
 )
 from invokeai.app.services.model_install.model_install_common import (
     InstallStatus,
+    InvalidModelConfigException,
     LocalModelSource,
     ModelInstallJob,
     URLModelSource,
 )
 from invokeai.app.services.model_records import ModelRecordChanges, UnknownModelException
-from invokeai.backend.model_manager.config import (
+from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
+from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
-    InvalidModelConfigException,
     ModelFormat,
     ModelRepoVariant,
+    ModelSourceType,
     ModelType,
 )
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
@@ -64,18 +68,14 @@ def test_registration_meta(mm2_installer: ModelInstallServiceBase, embedding_fil
     assert Path(model_record.path) == embedding_file
     assert Path(model_record.path).exists()
     assert model_record.base == BaseModelType("sd-1")
-    assert model_record.description is not None
+    assert model_record.description is None
     assert model_record.source is not None
     assert Path(model_record.source) == embedding_file
 
 
 def test_registration_meta_override_fail(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
-    key = None
-    with pytest.raises((ValidationError, InvalidModelConfigException)):
-        key = mm2_installer.register_path(
-            embedding_file, ModelRecordChanges(name="banana_sushi", type=ModelType("lora"))
-        )
-    assert key is None
+    with pytest.raises(InvalidModelConfigException):
+        mm2_installer.register_path(embedding_file, ModelRecordChanges(name="banana_sushi", type=ModelType("lora")))
 
 
 def test_registration_meta_override_succeed(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
@@ -95,7 +95,7 @@ def test_install(
     store = mm2_installer.record_store
     key = mm2_installer.install_path(embedding_file)
     model_record = store.get_model(key)
-    assert model_record.path.endswith("sd-1/embedding/test_embedding.safetensors")
+    assert model_record.path.endswith(f"{key}/test_embedding.safetensors")
     assert (mm2_app_config.models_path / model_record.path).exists()
     assert model_record.source == embedding_file.as_posix()
 
@@ -106,24 +106,28 @@ def test_rename(
     store = mm2_installer.record_store
     key = mm2_installer.install_path(embedding_file)
     model_record = store.get_model(key)
-    assert model_record.path.endswith("sd-1/embedding/test_embedding.safetensors")
-    store.update_model(key, ModelRecordChanges(name="new model name", base=BaseModelType("sd-2")))
-    new_model_record = mm2_installer.sync_model_path(key)
+    assert model_record.path.endswith(f"{key}/test_embedding.safetensors")
+    new_model_record = store.update_model(
+        key,
+        ModelRecordChanges(name="new model name", base=BaseModelType.StableDiffusion2),
+        allow_class_change=True,
+    )
     # Renaming the model record shouldn't rename the file
     assert new_model_record.name == "new model name"
-    assert new_model_record.path.endswith("sd-2/embedding/test_embedding.safetensors")
+    assert model_record.path.endswith(f"{key}/test_embedding.safetensors")
 
 
 @pytest.mark.parametrize(
-    "fixture_name,size,destination",
+    "fixture_name,size,key,destination",
     [
-        ("embedding_file", 15440, "sd-1/embedding/test_embedding.safetensors"),
-        ("diffusers_dir", 8241 if OS == "Windows" else 7907, "sdxl/main/test-diffusers-main"),  # EOL chars
+        ("embedding_file", 15440, "foo", "foo/test_embedding.safetensors"),
+        ("diffusers_dir", 8241 if OS == "Windows" else 7907, "bar", "bar"),  # EOL chars
     ],
 )
 def test_background_install(
     mm2_installer: ModelInstallServiceBase,
     fixture_name: str,
+    key: str,
     size: int,
     destination: str,
     mm2_app_config: InvokeAIAppConfig,
@@ -133,7 +137,7 @@ def test_background_install(
     path: Path = request.getfixturevalue(fixture_name)
     description = "Test of metadata assignment"
     source = LocalModelSource(path=path, inplace=False)
-    job = mm2_installer.import_model(source, config=ModelRecordChanges(description=description))
+    job = mm2_installer.import_model(source, config=ModelRecordChanges(key=key, description=description))
     assert job is not None
     assert isinstance(job, ModelInstallJob)
 
@@ -213,6 +217,50 @@ def test_inplace_install(
     assert Path(job.config_out.path).exists()
 
 
+def test_external_install(mm2_installer: ModelInstallServiceBase) -> None:
+    config = ModelRecordChanges(name="ChatGPT Image", description="External model", key="chatgpt_image")
+    job = mm2_installer.heuristic_import("external://openai/gpt-image-1", config=config)
+
+    mm2_installer.wait_for_installs()
+
+    assert job.status == InstallStatus.COMPLETED
+    assert job.config_out is not None
+    assert isinstance(job.config_out, ExternalApiModelConfig)
+    assert job.config_out.provider_id == "openai"
+    assert job.config_out.provider_model_id == "gpt-image-1"
+    assert job.config_out.base == BaseModelType.External
+    assert job.config_out.type == ModelType.ExternalImageGenerator
+    assert job.config_out.source_type == ModelSourceType.External
+
+
+def test_external_install_is_idempotent(mm2_installer: ModelInstallServiceBase) -> None:
+    first_job = mm2_installer.heuristic_import(
+        "external://openai/gpt-image-1",
+        config=ModelRecordChanges(name="Initial name"),
+    )
+    mm2_installer.wait_for_installs()
+
+    second_job = mm2_installer.heuristic_import(
+        "external://openai/gpt-image-1",
+        config=ModelRecordChanges(name="Updated name"),
+    )
+    mm2_installer.wait_for_installs()
+
+    assert first_job.status == InstallStatus.COMPLETED
+    assert second_job.status == InstallStatus.COMPLETED
+    assert first_job.config_out is not None
+    assert second_job.config_out is not None
+    assert first_job.config_out.key == second_job.config_out.key
+
+    external_models = mm2_installer.record_store.search_by_attr(
+        base_model=BaseModelType.External,
+        model_type=ModelType.ExternalImageGenerator,
+    )
+    assert len(external_models) == 1
+    assert isinstance(external_models[0], ExternalApiModelConfig)
+    assert external_models[0].name == "Updated name"
+
+
 def test_delete_install(
     mm2_installer: ModelInstallServiceBase, embedding_file: Path, mm2_app_config: InvokeAIAppConfig
 ) -> None:
@@ -221,6 +269,8 @@ def test_delete_install(
     model_record = store.get_model(key)
     assert (mm2_app_config.models_path / model_record.path).exists()
     assert not embedding_file.exists()
+    # ensure file handles are released on Windows
+    gc.collect()
     mm2_installer.delete(key)
     # after deletion, installed copy should not exist
     assert not (mm2_app_config.models_path / model_record.path).exists()
@@ -339,6 +389,67 @@ def test_huggingface_repo_id(mm2_installer: ModelInstallServiceBase, mm2_app_con
     print(downloading_events[-1])
     print(job.download_parts)
     assert job.total_bytes == sum(x["total_bytes"] for x in downloading_events[-1].parts)
+
+
+def test_restore_paused_hf_install_preserves_access_token(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+
+    access_token = "hf_test_access_token"
+    tmpdir = mm2_app_config.models_path / f"tmpinstall_resume_token_{uuid.uuid4().hex}"
+    tmpdir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        paused_job = ModelInstallJob(
+            id=99999,
+            source=HFModelSource(
+                repo_id="stabilityai/sdxl-turbo",
+                variant=ModelRepoVariant.Default,
+                access_token=access_token,
+            ),
+            config_in=ModelRecordChanges(),
+            local_path=tmpdir,
+        )
+        paused_job._install_tmpdir = tmpdir
+        paused_job.status = InstallStatus.PAUSED
+
+        mm2_installer._write_install_marker(paused_job, status=InstallStatus.PAUSED)
+
+        marker = mm2_installer._read_install_marker(tmpdir)
+        assert marker is not None
+        assert marker["access_token"] == access_token
+
+        restored_installer = ModelInstallService(
+            app_config=mm2_app_config,
+            record_store=mm2_installer.record_store,
+            download_queue=mm2_download_queue,
+            session=mm2_session,
+        )
+        restored_installer._restore_incomplete_installs()
+        restored_jobs = restored_installer.list_jobs()
+        assert len(restored_jobs) == 1
+
+        restored_job = restored_jobs[0]
+        assert restored_job.paused
+        assert isinstance(restored_job.source, HFModelSource)
+        assert restored_job.source.access_token == access_token
+
+        captured: dict[str, str | None] = {}
+
+        def _capture_resume(job: ModelInstallJob) -> None:
+            assert isinstance(job.source, HFModelSource)
+            captured["access_token"] = job.source.access_token
+
+        monkeypatch.setattr(restored_installer, "_resume_remote_download", _capture_resume)
+        restored_installer.resume_job(restored_job)
+        assert captured["access_token"] == access_token
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig) -> None:

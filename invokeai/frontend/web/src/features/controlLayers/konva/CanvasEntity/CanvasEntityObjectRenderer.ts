@@ -1,4 +1,3 @@
-import { $authToken } from 'app/store/nanostores/authToken';
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { SyncableMap } from 'common/util/SyncableMap/SyncableMap';
 import { throttle } from 'es-toolkit/compat';
@@ -9,7 +8,9 @@ import { CanvasObjectBrushLine } from 'features/controlLayers/konva/CanvasObject
 import { CanvasObjectBrushLineWithPressure } from 'features/controlLayers/konva/CanvasObject/CanvasObjectBrushLineWithPressure';
 import { CanvasObjectEraserLine } from 'features/controlLayers/konva/CanvasObject/CanvasObjectEraserLine';
 import { CanvasObjectEraserLineWithPressure } from 'features/controlLayers/konva/CanvasObject/CanvasObjectEraserLineWithPressure';
+import { CanvasObjectGradient } from 'features/controlLayers/konva/CanvasObject/CanvasObjectGradient';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
+import { CanvasObjectLasso } from 'features/controlLayers/konva/CanvasObject/CanvasObjectLasso';
 import { CanvasObjectRect } from 'features/controlLayers/konva/CanvasObject/CanvasObjectRect';
 import type { AnyObjectRenderer, AnyObjectState } from 'features/controlLayers/konva/CanvasObject/types';
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
@@ -38,7 +39,7 @@ function setFillPatternImage(shape: Konva.Shape, ...args: Parameters<typeof getP
   imageElement.onload = () => {
     shape.fillPatternImage(imageElement);
   };
-  imageElement.crossOrigin = $authToken.get() ? 'use-credentials' : 'anonymous';
+  imageElement.crossOrigin = 'anonymous';
   imageElement.src = getPatternSVG(...args);
   return imageElement;
 }
@@ -65,6 +66,11 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
    * This map can be used with React.useSyncExternalStore to sync the object renderers with a React component.
    */
   renderers = new SyncableMap<string, AnyObjectRenderer>();
+
+  /**
+   * Tracks the cache keys used when rasterizing this entity so they can be invalidated on demand.
+   */
+  rasterCacheKeys = new Set<string>();
 
   /**
    * A object containing singleton Konva nodes.
@@ -315,10 +321,6 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
   };
 
   updateOpacity = throttle(() => {
-    if (!this.parent.konva.layer.visible()) {
-      return;
-    }
-
     this.log.trace('Updating opacity');
 
     const opacity = this.parent.state.opacity;
@@ -397,6 +399,26 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       }
 
       didRender = renderer.update(objectState, force || isFirstRender);
+    } else if (objectState.type === 'lasso') {
+      assert(renderer instanceof CanvasObjectLasso || !renderer);
+
+      if (!renderer) {
+        renderer = new CanvasObjectLasso(objectState, this);
+        this.renderers.set(renderer.id, renderer);
+        this.konva.objectGroup.add(renderer.konva.group);
+      }
+
+      didRender = renderer.update(objectState, force || isFirstRender);
+    } else if (objectState.type === 'gradient') {
+      assert(renderer instanceof CanvasObjectGradient || !renderer);
+
+      if (!renderer) {
+        renderer = new CanvasObjectGradient(objectState, this);
+        this.renderers.set(renderer.id, renderer);
+        this.konva.objectGroup.add(renderer.konva.group);
+      }
+
+      didRender = renderer.update(objectState, force || isFirstRender);
     } else if (objectState.type === 'image') {
       assert(renderer instanceof CanvasObjectImage || !renderer);
 
@@ -422,16 +444,21 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
    * these visually transparent shapes in its calculation:
    *
    * - Eraser lines, which are normal lines with a globalCompositeOperation of 'destination-out'.
+   * - Subtracting lasso shapes, which use a globalCompositeOperation of 'destination-out'.
    * - Clipped portions of any shape.
    * - Images, which may have transparent areas.
    */
   needsPixelBbox = (): boolean => {
     let needsPixelBbox = false;
     for (const renderer of this.renderers.values()) {
-      const isEraserLine = renderer instanceof CanvasObjectEraserLine;
+      const isEraserLine =
+        renderer instanceof CanvasObjectEraserLine || renderer instanceof CanvasObjectEraserLineWithPressure;
+      const isSubtractingLasso =
+        renderer instanceof CanvasObjectLasso && renderer.state.compositeOperation === 'destination-out';
       const isImage = renderer instanceof CanvasObjectImage;
+      const imageIgnoresTransparency = isImage && renderer.state.usePixelBbox === false;
       const hasClip = renderer instanceof CanvasObjectBrushLine && renderer.state.clip;
-      if (isEraserLine || hasClip || isImage) {
+      if (isEraserLine || isSubtractingLasso || hasClip || (isImage && !imageIgnoresTransparency)) {
         needsPixelBbox = true;
         break;
       }
@@ -477,7 +504,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
   }): Promise<ImageDTO> => {
     const rasterizingAdapter = this.manager.stateApi.$rasterizingAdapter.get();
     if (rasterizingAdapter) {
-      assert(false, `Already rasterizing an entity: ${rasterizingAdapter.id}`);
+      await this.manager.stateApi.waitForRasterizationToFinish();
     }
 
     const { rect, replaceObjects, attrs, bg, ignoreCache } = {
@@ -494,6 +521,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     if (cachedImageName && !ignoreCache) {
       imageDTO = await getImageDTOSafe(cachedImageName);
       if (imageDTO) {
+        this.rasterCacheKeys.add(hash);
         this.log.trace({ rect, cachedImageName, imageDTO }, 'Using cached rasterized image');
         return imageDTO;
       }
@@ -525,6 +553,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
         replaceObjects,
       });
       this.manager.cache.imageNameCache.set(hash, imageDTO.image_name);
+      this.rasterCacheKeys.add(hash);
       return imageDTO;
     } catch (error) {
       this.log.error({ rasterizeArgs, error: serializeError(error as Error) }, 'Failed to rasterize entity');
@@ -534,37 +563,83 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     }
   };
 
-  cloneObjectGroup = (arg: { attrs?: GroupConfig } = {}): Konva.Group => {
-    const { attrs } = arg;
+  /**
+   * Invalidates all cached rasterizations for this entity by removing the cached image
+   * names from the image cache and clearing the tracked raster cache keys. This forces
+   * future rasterizations to regenerate images instead of using potentially stale
+   * cached versions.
+   */
+  invalidateRasterCache = () => {
+    if (this.rasterCacheKeys.size === 0) {
+      return;
+    }
+    for (const key of this.rasterCacheKeys) {
+      this.manager.cache.imageNameCache.delete(key);
+    }
+    this.rasterCacheKeys.clear();
+  };
+
+  cloneObjectGroup = (
+    arg: { attrs?: GroupConfig; cache?: { pixelRatio?: number; imageSmoothingEnabled?: boolean } } = {}
+  ): Konva.Group => {
+    const { attrs, cache } = arg;
     const clone = this.konva.objectGroup.clone();
     if (attrs) {
       clone.setAttrs(attrs);
     }
     if (clone.hasChildren()) {
-      clone.cache({ pixelRatio: 1, imageSmoothingEnabled: false });
+      const { pixelRatio = 1, imageSmoothingEnabled = false } = cache ?? {};
+      clone.cache({ pixelRatio, imageSmoothingEnabled });
     }
     return clone;
   };
 
-  getCanvas = (arg: { rect?: Rect; attrs?: GroupConfig; bg?: string } = {}): HTMLCanvasElement => {
-    const { rect, attrs, bg } = arg;
-    const clone = this.cloneObjectGroup({ attrs });
-    const canvas = konvaNodeToCanvas({ node: clone, rect, bg });
+  getCanvas = (
+    arg: {
+      rect?: Rect;
+      attrs?: GroupConfig;
+      bg?: string;
+      imageSmoothingEnabled?: boolean;
+      pixelRatio?: number;
+      cache?: { pixelRatio?: number; imageSmoothingEnabled?: boolean };
+    } = {}
+  ): HTMLCanvasElement => {
+    const { rect, attrs, bg, imageSmoothingEnabled, pixelRatio, cache } = arg;
+    const clone = this.cloneObjectGroup({ attrs, cache });
+    const canvas = konvaNodeToCanvas({ node: clone, rect, bg, imageSmoothingEnabled, pixelRatio });
     clone.destroy();
     return canvas;
   };
 
-  getBlob = async (arg: { rect?: Rect; attrs?: GroupConfig; bg?: string } = {}): Promise<Blob> => {
-    const { rect, attrs, bg } = arg;
-    const clone = this.cloneObjectGroup({ attrs });
-    const blob = await konvaNodeToBlob({ node: clone, rect, bg });
+  getBlob = async (
+    arg: {
+      rect?: Rect;
+      attrs?: GroupConfig;
+      bg?: string;
+      imageSmoothingEnabled?: boolean;
+      pixelRatio?: number;
+      cache?: { pixelRatio?: number; imageSmoothingEnabled?: boolean };
+    } = {}
+  ): Promise<Blob> => {
+    const { rect, attrs, bg, imageSmoothingEnabled, pixelRatio, cache } = arg;
+    const clone = this.cloneObjectGroup({ attrs, cache });
+    const blob = await konvaNodeToBlob({ node: clone, rect, bg, imageSmoothingEnabled, pixelRatio });
     return blob;
   };
 
-  getImageData = (arg: { rect?: Rect; attrs?: GroupConfig; bg?: string } = {}): ImageData => {
-    const { rect, attrs, bg } = arg;
-    const clone = this.cloneObjectGroup({ attrs });
-    const imageData = konvaNodeToImageData({ node: clone, rect, bg });
+  getImageData = (
+    arg: {
+      rect?: Rect;
+      attrs?: GroupConfig;
+      bg?: string;
+      imageSmoothingEnabled?: boolean;
+      pixelRatio?: number;
+      cache?: { pixelRatio?: number; imageSmoothingEnabled?: boolean };
+    } = {}
+  ): ImageData => {
+    const { rect, attrs, bg, imageSmoothingEnabled, pixelRatio, cache } = arg;
+    const clone = this.cloneObjectGroup({ attrs, cache });
+    const imageData = konvaNodeToImageData({ node: clone, rect, bg, imageSmoothingEnabled, pixelRatio });
     clone.destroy();
     return imageData;
   };

@@ -21,6 +21,7 @@ class IdealSizeOutput(BaseInvocationOutput):
     "ideal_size",
     title="Ideal Size - SD1.5, SDXL",
     tags=["latents", "math", "ideal_size"],
+    category="latents",
     version="1.0.6",
 )
 class IdealSizeInvocation(BaseInvocation):
@@ -46,7 +47,12 @@ class IdealSizeInvocation(BaseInvocation):
             dimension = 512
         elif unet_config.base == BaseModelType.StableDiffusion2:
             dimension = 768
-        elif unet_config.base in (BaseModelType.StableDiffusionXL, BaseModelType.Flux, BaseModelType.StableDiffusion3):
+        elif unet_config.base in (
+            BaseModelType.StableDiffusionXL,
+            BaseModelType.Flux,
+            BaseModelType.Flux2,
+            BaseModelType.StableDiffusion3,
+        ):
             dimension = 1024
         else:
             raise ValueError(f"Unsupported model type: {unet_config.base}")

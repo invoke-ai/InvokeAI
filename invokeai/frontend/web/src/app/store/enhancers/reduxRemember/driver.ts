@@ -1,8 +1,5 @@
 import { logger } from 'app/logging/logger';
 import { StorageError } from 'app/store/enhancers/reduxRemember/errors';
-import { $authToken } from 'app/store/nanostores/authToken';
-import { $projectId } from 'app/store/nanostores/projectId';
-import { $queueId } from 'app/store/nanostores/queueId';
 import type { UseStore } from 'idb-keyval';
 import { createStore as idbCreateStore, del as idbDel, get as idbGet } from 'idb-keyval';
 import type { Driver } from 'redux-remember';
@@ -19,22 +16,9 @@ const getUrl = (endpoint: 'get_by_key' | 'set_by_key' | 'delete', key?: string) 
     query['key'] = key;
   }
 
-  const path = buildV1Url(`client_state/${$queueId.get()}/${endpoint}`, query);
+  const path = buildV1Url(`client_state/default/${endpoint}`, query);
   const url = `${baseUrl}/${path}`;
   return url;
-};
-
-const getHeaders = () => {
-  const headers = new Headers();
-  const authToken = $authToken.get();
-  const projectId = $projectId.get();
-  if (authToken) {
-    headers.set('Authorization', `Bearer ${authToken}`);
-  }
-  if (projectId) {
-    headers.set('project-id', projectId);
-  }
-  return headers;
 };
 
 // Persistence happens per slice. To track when persistence is in progress, maintain a ref count, incrementing
@@ -84,11 +68,26 @@ const getIdbKey = (key: string) => {
   return `${IDB_STORAGE_PREFIX}${key}`;
 };
 
+// Helper to get auth headers for client_state requests
+const getAuthHeaders = (): Record<string, string> => {
+  const headers: Record<string, string> = {};
+  // Safe access to localStorage (not available in Node.js test environment)
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+  return headers;
+};
+
 const getItem = async (key: string) => {
   try {
     const url = getUrl('get_by_key', key);
-    const headers = getHeaders();
-    const res = await fetch(url, { method: 'GET', headers });
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) {
       throw new Error(`Response status: ${res.status}`);
     }
@@ -130,7 +129,6 @@ const getItem = async (key: string) => {
   } catch (originalError) {
     throw new StorageError({
       key,
-      projectId: $projectId.get(),
       originalError,
     });
   }
@@ -148,8 +146,11 @@ const setItem = async (key: string, value: string) => {
     }
     log.trace({ key, last: lastPersistedState.get(key), next: value }, `Persisting state for ${key}`);
     const url = getUrl('set_by_key', key);
-    const headers = getHeaders();
-    const res = await fetch(url, { method: 'POST', headers, body: value });
+    const res = await fetch(url, {
+      method: 'POST',
+      body: value,
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) {
       throw new Error(`Response status: ${res.status}`);
     }
@@ -160,7 +161,6 @@ const setItem = async (key: string, value: string) => {
     throw new StorageError({
       key,
       value,
-      projectId: $projectId.get(),
       originalError,
     });
   } finally {
@@ -178,8 +178,10 @@ export const clearStorage = async () => {
   try {
     persistRefCount++;
     const url = getUrl('delete');
-    const headers = getHeaders();
-    const res = await fetch(url, { method: 'POST', headers });
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) {
       throw new Error(`Response status: ${res.status}`);
     }

@@ -20,97 +20,60 @@ import {
   reparentElement,
 } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import { type NodesState, zNodesState } from 'features/nodes/store/types';
+import {
+  CONNECTOR_INPUT_HANDLE,
+  CONNECTOR_OUTPUT_HANDLE,
+  getConnectorOutputEdges,
+  resolveConnectorSource,
+} from 'features/nodes/store/util/connectorTopology';
+import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
   BoardFieldValue,
   BooleanFieldValue,
-  ChatGPT4oModelFieldValue,
-  CLIPEmbedModelFieldValue,
-  CLIPGEmbedModelFieldValue,
-  CLIPLEmbedModelFieldValue,
   ColorFieldValue,
-  ControlLoRAModelFieldValue,
-  ControlNetModelFieldValue,
   EnumFieldValue,
   FieldValue,
   FloatFieldValue,
   FloatGeneratorFieldValue,
-  FluxKontextModelFieldValue,
-  FluxReduxModelFieldValue,
-  FluxVAEModelFieldValue,
   ImageFieldCollectionValue,
   ImageFieldValue,
   ImageGeneratorFieldValue,
-  Imagen3ModelFieldValue,
-  Imagen4ModelFieldValue,
   IntegerFieldCollectionValue,
   IntegerFieldValue,
   IntegerGeneratorFieldValue,
-  IPAdapterModelFieldValue,
-  LLaVAModelFieldValue,
-  LoRAModelFieldValue,
-  MainModelFieldValue,
   ModelIdentifierFieldValue,
-  RunwayModelFieldValue,
   SchedulerFieldValue,
-  SDXLRefinerModelFieldValue,
-  SigLipModelFieldValue,
-  SpandrelImageToImageModelFieldValue,
   StatefulFieldValue,
   StringFieldCollectionValue,
   StringFieldValue,
   StringGeneratorFieldValue,
-  T2IAdapterModelFieldValue,
-  T5EncoderModelFieldValue,
-  VAEModelFieldValue,
-  Veo3ModelFieldValue,
+  StylePresetFieldValue,
 } from 'features/nodes/types/field';
 import {
   zBoardFieldValue,
   zBooleanFieldValue,
-  zChatGPT4oModelFieldValue,
-  zCLIPEmbedModelFieldValue,
-  zCLIPGEmbedModelFieldValue,
-  zCLIPLEmbedModelFieldValue,
   zColorFieldValue,
-  zControlLoRAModelFieldValue,
-  zControlNetModelFieldValue,
   zEnumFieldValue,
   zFloatFieldCollectionValue,
   zFloatFieldValue,
   zFloatGeneratorFieldValue,
-  zFluxKontextModelFieldValue,
-  zFluxReduxModelFieldValue,
-  zFluxVAEModelFieldValue,
   zImageFieldCollectionValue,
   zImageFieldValue,
   zImageGeneratorFieldValue,
-  zImagen3ModelFieldValue,
-  zImagen4ModelFieldValue,
   zIntegerFieldCollectionValue,
   zIntegerFieldValue,
   zIntegerGeneratorFieldValue,
-  zIPAdapterModelFieldValue,
-  zLLaVAModelFieldValue,
-  zLoRAModelFieldValue,
-  zMainModelFieldValue,
   zModelIdentifierFieldValue,
-  zRunwayModelFieldValue,
   zSchedulerFieldValue,
-  zSDXLRefinerModelFieldValue,
-  zSigLipModelFieldValue,
-  zSpandrelImageToImageModelFieldValue,
   zStatefulFieldValue,
   zStringFieldCollectionValue,
   zStringFieldValue,
   zStringGeneratorFieldValue,
-  zT2IAdapterModelFieldValue,
-  zT5EncoderModelFieldValue,
-  zVAEModelFieldValue,
-  zVeo3ModelFieldValue,
+  zStylePresetFieldValue,
 } from 'features/nodes/types/field';
-import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
-import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
+import type { AnyEdge, AnyNode, ConnectorNode } from 'features/nodes/types/invocation';
+import { isConnectorNode, isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
 import type {
   BuilderForm,
   ContainerElement,
@@ -147,7 +110,7 @@ export const getInitialWorkflow = (): Omit<NodesState, 'mode' | 'formFieldInitia
     tags: '',
     notes: '',
     exposedFields: [],
-    meta: { version: '3.0.0', category: 'user' },
+    meta: { version: '4.0.0', category: 'user' },
     form: getDefaultForm(),
     nodes: [],
     edges: [],
@@ -219,6 +182,33 @@ const slice = createSlice({
   initialState: getInitialState(),
   reducers: {
     nodesChanged: (state, action: PayloadAction<NodeChange<AnyNode>[]>) => {
+      const removedConnectorSpliceEdges: AnyEdge[] = action.payload.flatMap((change) => {
+        if (change.type !== 'remove') {
+          return [];
+        }
+
+        const node = state.nodes.find((candidate) => candidate.id === change.id);
+        if (!isConnectorNode(node)) {
+          return [];
+        }
+
+        const resolvedSource = resolveConnectorSource(node.id, state.nodes, state.edges);
+        if (!resolvedSource) {
+          return [];
+        }
+
+        return getConnectorOutputEdges(node.id, state.edges)
+          .filter((edge): edge is AnyEdge & { type: 'default'; targetHandle: string } => edge.type === 'default')
+          .map((edge) =>
+            connectionToEdge({
+              source: resolvedSource.nodeId,
+              sourceHandle: resolvedSource.fieldName,
+              target: edge.target,
+              targetHandle: edge.targetHandle,
+            })
+          );
+      });
+
       // TODO(psyche): The below TS issue was recently fixed upstream. Need to upgrade @xyflow/react and then we
       // should be able to remove this cast.
       //
@@ -249,6 +239,12 @@ const slice = createSlice({
         }
         if (edgeChanges.length > 0) {
           state.edges = applyEdgeChanges<AnyEdge>(edgeChanges, state.edges);
+        }
+        if (removedConnectorSpliceEdges.length > 0) {
+          state.edges = applyEdgeChanges<AnyEdge>(
+            removedConnectorSpliceEdges.map((edge) => ({ type: 'add', item: edge })),
+            state.edges
+          );
         }
       }
 
@@ -440,11 +436,40 @@ const slice = createSlice({
         }
       }
     },
+    connectorInserted: (
+      state,
+      action: PayloadAction<{
+        edgeId: string;
+        connector: ConnectorNode;
+      }>
+    ) => {
+      const { edgeId, connector } = action.payload;
+      const edge = state.edges.find((candidate) => candidate.id === edgeId);
+      if (!edge || edge.type !== 'default') {
+        return;
+      }
+      state.nodes.push({ ...SHARED_NODE_PROPERTIES, ...connector } as (typeof state.nodes)[number]);
+      state.edges = state.edges.filter((candidate) => candidate.id !== edgeId);
+      state.edges.push(
+        connectionToEdge({
+          source: edge.source,
+          sourceHandle: edge.sourceHandle ?? null,
+          target: connector.id,
+          targetHandle: CONNECTOR_INPUT_HANDLE,
+        }),
+        connectionToEdge({
+          source: connector.id,
+          sourceHandle: CONNECTOR_OUTPUT_HANDLE,
+          target: edge.target,
+          targetHandle: edge.targetHandle ?? null,
+        })
+      );
+    },
     nodeLabelChanged: (state, action: PayloadAction<{ nodeId: string; label: string }>) => {
       const { nodeId, label } = action.payload;
       const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
       const node = state.nodes?.[nodeIndex];
-      if (isInvocationNode(node) || isNotesNode(node)) {
+      if (isInvocationNode(node) || isNotesNode(node) || isConnectorNode(node)) {
         node.data.label = label;
       }
     },
@@ -484,6 +509,9 @@ const slice = createSlice({
     fieldBoardValueChanged: (state, action: FieldValueAction<BoardFieldValue>) => {
       fieldValueReducer(state, action, zBoardFieldValue);
     },
+    fieldStylePresetValueChanged: (state, action: FieldValueAction<StylePresetFieldValue>) => {
+      fieldValueReducer(state, action, zStylePresetFieldValue);
+    },
     fieldImageValueChanged: (state, action: FieldValueAction<ImageFieldValue>) => {
       fieldValueReducer(state, action, zImageFieldValue);
     },
@@ -493,80 +521,8 @@ const slice = createSlice({
     fieldColorValueChanged: (state, action: FieldValueAction<ColorFieldValue>) => {
       fieldValueReducer(state, action, zColorFieldValue);
     },
-    fieldMainModelValueChanged: (state, action: FieldValueAction<MainModelFieldValue>) => {
-      fieldValueReducer(state, action, zMainModelFieldValue);
-    },
     fieldModelIdentifierValueChanged: (state, action: FieldValueAction<ModelIdentifierFieldValue>) => {
       fieldValueReducer(state, action, zModelIdentifierFieldValue);
-    },
-    fieldRefinerModelValueChanged: (state, action: FieldValueAction<SDXLRefinerModelFieldValue>) => {
-      fieldValueReducer(state, action, zSDXLRefinerModelFieldValue);
-    },
-    fieldVaeModelValueChanged: (state, action: FieldValueAction<VAEModelFieldValue>) => {
-      fieldValueReducer(state, action, zVAEModelFieldValue);
-    },
-    fieldLoRAModelValueChanged: (state, action: FieldValueAction<LoRAModelFieldValue>) => {
-      fieldValueReducer(state, action, zLoRAModelFieldValue);
-    },
-    fieldLLaVAModelValueChanged: (state, action: FieldValueAction<LLaVAModelFieldValue>) => {
-      fieldValueReducer(state, action, zLLaVAModelFieldValue);
-    },
-    fieldControlNetModelValueChanged: (state, action: FieldValueAction<ControlNetModelFieldValue>) => {
-      fieldValueReducer(state, action, zControlNetModelFieldValue);
-    },
-    fieldIPAdapterModelValueChanged: (state, action: FieldValueAction<IPAdapterModelFieldValue>) => {
-      fieldValueReducer(state, action, zIPAdapterModelFieldValue);
-    },
-    fieldT2IAdapterModelValueChanged: (state, action: FieldValueAction<T2IAdapterModelFieldValue>) => {
-      fieldValueReducer(state, action, zT2IAdapterModelFieldValue);
-    },
-    fieldSpandrelImageToImageModelValueChanged: (
-      state,
-      action: FieldValueAction<SpandrelImageToImageModelFieldValue>
-    ) => {
-      fieldValueReducer(state, action, zSpandrelImageToImageModelFieldValue);
-    },
-    fieldT5EncoderValueChanged: (state, action: FieldValueAction<T5EncoderModelFieldValue>) => {
-      fieldValueReducer(state, action, zT5EncoderModelFieldValue);
-    },
-    fieldCLIPEmbedValueChanged: (state, action: FieldValueAction<CLIPEmbedModelFieldValue>) => {
-      fieldValueReducer(state, action, zCLIPEmbedModelFieldValue);
-    },
-    fieldCLIPLEmbedValueChanged: (state, action: FieldValueAction<CLIPLEmbedModelFieldValue>) => {
-      fieldValueReducer(state, action, zCLIPLEmbedModelFieldValue);
-    },
-    fieldCLIPGEmbedValueChanged: (state, action: FieldValueAction<CLIPGEmbedModelFieldValue>) => {
-      fieldValueReducer(state, action, zCLIPGEmbedModelFieldValue);
-    },
-    fieldControlLoRAModelValueChanged: (state, action: FieldValueAction<ControlLoRAModelFieldValue>) => {
-      fieldValueReducer(state, action, zControlLoRAModelFieldValue);
-    },
-    fieldFluxVAEModelValueChanged: (state, action: FieldValueAction<FluxVAEModelFieldValue>) => {
-      fieldValueReducer(state, action, zFluxVAEModelFieldValue);
-    },
-    fieldSigLipModelValueChanged: (state, action: FieldValueAction<SigLipModelFieldValue>) => {
-      fieldValueReducer(state, action, zSigLipModelFieldValue);
-    },
-    fieldFluxReduxModelValueChanged: (state, action: FieldValueAction<FluxReduxModelFieldValue>) => {
-      fieldValueReducer(state, action, zFluxReduxModelFieldValue);
-    },
-    fieldImagen3ModelValueChanged: (state, action: FieldValueAction<Imagen3ModelFieldValue>) => {
-      fieldValueReducer(state, action, zImagen3ModelFieldValue);
-    },
-    fieldImagen4ModelValueChanged: (state, action: FieldValueAction<Imagen4ModelFieldValue>) => {
-      fieldValueReducer(state, action, zImagen4ModelFieldValue);
-    },
-    fieldChatGPT4oModelValueChanged: (state, action: FieldValueAction<ChatGPT4oModelFieldValue>) => {
-      fieldValueReducer(state, action, zChatGPT4oModelFieldValue);
-    },
-    fieldVeo3ModelValueChanged: (state, action: FieldValueAction<Veo3ModelFieldValue>) => {
-      fieldValueReducer(state, action, zVeo3ModelFieldValue);
-    },
-    fieldRunwayModelValueChanged: (state, action: FieldValueAction<RunwayModelFieldValue>) => {
-      fieldValueReducer(state, action, zRunwayModelFieldValue);
-    },
-    fieldFluxKontextModelValueChanged: (state, action: FieldValueAction<FluxKontextModelFieldValue>) => {
-      fieldValueReducer(state, action, zFluxKontextModelFieldValue);
     },
     fieldEnumModelValueChanged: (state, action: FieldValueAction<EnumFieldValue>) => {
       fieldValueReducer(state, action, zEnumFieldValue);
@@ -683,7 +639,7 @@ const slice = createSlice({
       state.formFieldInitialValues = formFieldInitialValues;
     },
     workflowLoaded: (state, action: PayloadAction<WorkflowV3>) => {
-      const { nodes, edges, is_published: _is_published, ...workflowExtra } = action.payload;
+      const { nodes, edges, ...workflowExtra } = action.payload;
 
       const formFieldInitialValues = getFormFieldInitialValues(workflowExtra.form, nodes);
 
@@ -706,49 +662,28 @@ export const {
   fieldBoardValueChanged,
   fieldBooleanValueChanged,
   fieldColorValueChanged,
-  fieldControlNetModelValueChanged,
+  fieldStylePresetValueChanged,
   fieldEnumModelValueChanged,
   fieldImageValueChanged,
   fieldImageCollectionValueChanged,
-  fieldIPAdapterModelValueChanged,
-  fieldT2IAdapterModelValueChanged,
-  fieldSpandrelImageToImageModelValueChanged,
   fieldLabelChanged,
-  fieldLoRAModelValueChanged,
-  fieldLLaVAModelValueChanged,
   fieldModelIdentifierValueChanged,
-  fieldMainModelValueChanged,
   fieldIntegerValueChanged,
   fieldFloatValueChanged,
   fieldFloatCollectionValueChanged,
   fieldIntegerCollectionValueChanged,
-  fieldRefinerModelValueChanged,
   fieldSchedulerValueChanged,
   fieldStringValueChanged,
   fieldStringCollectionValueChanged,
-  fieldVaeModelValueChanged,
-  fieldT5EncoderValueChanged,
-  fieldCLIPEmbedValueChanged,
-  fieldCLIPLEmbedValueChanged,
-  fieldCLIPGEmbedValueChanged,
-  fieldControlLoRAModelValueChanged,
-  fieldFluxVAEModelValueChanged,
-  fieldSigLipModelValueChanged,
-  fieldFluxReduxModelValueChanged,
-  fieldImagen3ModelValueChanged,
-  fieldImagen4ModelValueChanged,
-  fieldChatGPT4oModelValueChanged,
-  fieldFluxKontextModelValueChanged,
   fieldFloatGeneratorValueChanged,
   fieldIntegerGeneratorValueChanged,
   fieldStringGeneratorValueChanged,
   fieldImageGeneratorValueChanged,
-  fieldVeo3ModelValueChanged,
-  fieldRunwayModelValueChanged,
   fieldDescriptionChanged,
   nodeEditorReset,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,
+  connectorInserted,
   nodeLabelChanged,
   nodeNotesChanged,
   nodesChanged,

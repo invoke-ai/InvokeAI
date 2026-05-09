@@ -24,11 +24,13 @@ import {
   selectSelectionMode,
   selectShouldAnimateEdges,
   selectShouldColorEdges,
+  selectShouldGroupNodesByCategory,
   selectShouldShouldValidateGraph,
   selectShouldShowEdgeLabels,
   selectShouldSnapToGrid,
   shouldAnimateEdgesChanged,
   shouldColorEdgesChanged,
+  shouldGroupNodesByCategoryChanged,
   shouldShowEdgeLabelsChanged,
   shouldSnapToGridChanged,
   shouldValidateGraphChanged,
@@ -50,6 +52,7 @@ const WorkflowEditorSettings = () => {
   const shouldAnimateEdges = useAppSelector(selectShouldAnimateEdges);
   const shouldShowEdgeLabels = useAppSelector(selectShouldShowEdgeLabels);
   const shouldValidateGraph = useAppSelector(selectShouldShouldValidateGraph);
+  const shouldGroupNodesByCategory = useAppSelector(selectShouldGroupNodesByCategory);
 
   const handleChangeShouldValidate = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -89,6 +92,13 @@ const WorkflowEditorSettings = () => {
   const handleChangeShouldShowEdgeLabels = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(shouldShowEdgeLabelsChanged(e.target.checked));
+    },
+    [dispatch]
+  );
+
+  const handleChangeShouldGroupNodesByCategory = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(shouldGroupNodesByCategoryChanged(e.target.checked));
     },
     [dispatch]
   );
@@ -143,6 +153,14 @@ const WorkflowEditorSettings = () => {
                   <Switch isChecked={shouldShowEdgeLabels} onChange={handleChangeShouldShowEdgeLabels} />
                 </Flex>
                 <FormHelperText>{t('nodes.showEdgeLabelsHelp')}</FormHelperText>
+              </FormControl>
+              <Divider />
+              <FormControl>
+                <Flex w="full">
+                  <FormLabel>{t('nodes.groupNodesByCategory')}</FormLabel>
+                  <Switch isChecked={shouldGroupNodesByCategory} onChange={handleChangeShouldGroupNodesByCategory} />
+                </Flex>
+                <FormHelperText>{t('nodes.groupNodesByCategoryHelp')}</FormHelperText>
               </FormControl>
               <Divider />
               <Heading size="sm" pt={4}>

@@ -12,6 +12,7 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
+    AnimaConditioningField,
     BoundingBoxField,
     CogView4ConditioningField,
     ColorField,
@@ -24,10 +25,11 @@ from invokeai.app.invocations.fields import (
     InputField,
     LatentsField,
     OutputField,
+    QwenImageConditioningField,
     SD3ConditioningField,
     TensorField,
     UIComponent,
-    VideoField,
+    ZImageConditioningField,
 )
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -290,30 +292,6 @@ class ImageCollectionInvocation(BaseInvocation):
 
 # endregion
 
-# region Video
-
-
-@invocation_output("video_output")
-class VideoOutput(BaseInvocationOutput):
-    """Base class for nodes that output a video"""
-
-    video: VideoField = OutputField(description="The output video")
-    width: int = OutputField(description="The width of the video in pixels")
-    height: int = OutputField(description="The height of the video in pixels")
-    duration_seconds: float = OutputField(description="The duration of the video in seconds")
-
-    @classmethod
-    def build(cls, video_id: str, width: int, height: int, duration_seconds: float) -> "VideoOutput":
-        return cls(
-            video=VideoField(video_id=video_id),
-            width=width,
-            height=height,
-            duration_seconds=duration_seconds,
-        )
-
-
-# endregion
-
 # region DenoiseMask
 
 
@@ -484,6 +462,39 @@ class CogView4ConditioningOutput(BaseInvocationOutput):
     @classmethod
     def build(cls, conditioning_name: str) -> "CogView4ConditioningOutput":
         return cls(conditioning=CogView4ConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("z_image_conditioning_output")
+class ZImageConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a Z-Image text conditioning tensor."""
+
+    conditioning: ZImageConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "ZImageConditioningOutput":
+        return cls(conditioning=ZImageConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("qwen_image_conditioning_output")
+class QwenImageConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a Qwen Image Edit conditioning tensor."""
+
+    conditioning: QwenImageConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "QwenImageConditioningOutput":
+        return cls(conditioning=QwenImageConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("anima_conditioning_output")
+class AnimaConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output an Anima text conditioning tensor."""
+
+    conditioning: AnimaConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "AnimaConditioningOutput":
+        return cls(conditioning=AnimaConditioningField(conditioning_name=conditioning_name))
 
 
 @invocation_output("conditioning_output")

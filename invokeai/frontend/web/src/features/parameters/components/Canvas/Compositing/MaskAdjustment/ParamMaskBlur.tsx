@@ -2,15 +2,23 @@ import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { selectMaskBlur, setMaskBlur } from 'features/controlLayers/store/paramsSlice';
-import { selectMaskBlurConfig } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+
+const CONSTRAINTS = {
+  initial: 16,
+  sliderMin: 0,
+  sliderMax: 128,
+  numberInputMin: 0,
+  numberInputMax: 512,
+  fineStep: 1,
+  coarseStep: 1,
+};
 
 const ParamMaskBlur = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const maskBlur = useAppSelector(selectMaskBlur);
-  const config = useAppSelector(selectMaskBlurConfig);
 
   const handleChange = useCallback(
     (v: number) => {
@@ -27,21 +35,21 @@ const ParamMaskBlur = () => {
       <CompositeSlider
         value={maskBlur}
         onChange={handleChange}
-        min={config.sliderMin}
-        max={config.sliderMax}
-        defaultValue={config.initial}
-        step={config.coarseStep}
-        fineStep={config.fineStep}
+        min={CONSTRAINTS.sliderMin}
+        max={CONSTRAINTS.sliderMax}
+        defaultValue={CONSTRAINTS.initial}
+        step={CONSTRAINTS.coarseStep}
+        fineStep={CONSTRAINTS.fineStep}
         marks
       />
       <CompositeNumberInput
         value={maskBlur}
         onChange={handleChange}
-        defaultValue={config.initial}
-        min={config.numberInputMin}
-        max={config.numberInputMax}
-        step={config.coarseStep}
-        fineStep={config.fineStep}
+        defaultValue={CONSTRAINTS.initial}
+        min={CONSTRAINTS.numberInputMin}
+        max={CONSTRAINTS.numberInputMax}
+        step={CONSTRAINTS.coarseStep}
+        fineStep={CONSTRAINTS.fineStep}
       />
     </FormControl>
   );

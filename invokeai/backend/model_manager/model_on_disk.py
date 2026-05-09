@@ -30,7 +30,8 @@ class ModelOnDisk:
         self.hash_algo = hash_algo
         # Having a cache helps users of ModelOnDisk (i.e. configs) to save state
         # This prevents redundant computations during matching and parsing
-        self.cache = {"_CACHED_STATE_DICTS": {}}
+        self._state_dict_cache: dict[Path, Any] = {}
+        self._metadata_cache: dict[Path, Any] = {}
 
     def hash(self) -> str:
         return ModelHash(algorithm=self.hash_algo).hash(self.path)
@@ -44,16 +45,21 @@ class ModelOnDisk:
         if self.path.is_file():
             return {self.path}
         extensions = {".safetensors", ".pt", ".pth", ".ckpt", ".bin", ".gguf"}
-        return {f for f in self.path.rglob("*") if f.suffix in extensions}
+        return {f for f in self.path.rglob("*") if f.suffix in extensions and f.is_file()}
 
     def metadata(self, path: Optional[Path] = None) -> dict[str, str]:
+        path = path or self.path
+        if path in self._metadata_cache:
+            return self._metadata_cache[path]
         try:
             with safe_open(self.path, framework="pt", device="cpu") as f:
                 metadata = f.metadata()
                 assert isinstance(metadata, dict)
-                return metadata
         except Exception:
-            return {}
+            metadata = {}
+
+        self._metadata_cache[path] = metadata
+        return metadata
 
     def repo_variant(self) -> Optional[ModelRepoVariant]:
         if self.path.is_file():
@@ -73,12 +79,13 @@ class ModelOnDisk:
         return ModelRepoVariant.Default
 
     def load_state_dict(self, path: Optional[Path] = None) -> StateDict:
-        sd_cache = self.cache["_CACHED_STATE_DICTS"]
-
-        if path in sd_cache:
-            return sd_cache[path]
+        if path in self._state_dict_cache:
+            return self._state_dict_cache[path]
 
         path = self.resolve_weight_file(path)
+
+        if path in self._state_dict_cache:
+            return self._state_dict_cache[path]
 
         with SilenceWarnings():
             if path.suffix.endswith((".ckpt", ".pt", ".pth", ".bin")):
@@ -111,7 +118,7 @@ class ModelOnDisk:
                 raise ValueError(f"Unrecognized model extension: {path.suffix}")
 
         state_dict = checkpoint.get("state_dict", checkpoint)
-        sd_cache[path] = state_dict
+        self._state_dict_cache[path] = state_dict
         return state_dict
 
     def resolve_weight_file(self, path: Optional[Path] = None) -> Path:

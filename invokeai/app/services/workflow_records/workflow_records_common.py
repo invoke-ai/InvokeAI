@@ -9,6 +9,9 @@ from invokeai.app.util.metaenum import MetaEnum
 
 __workflow_meta_version__ = semver.Version.parse("1.0.0")
 
+WORKFLOW_LIBRARY_DEFAULT_USER_ID = "system"
+"""Default user_id for workflows created in single-user mode or migrated from pre-multiuser databases."""
+
 
 class ExposedField(BaseModel):
     nodeId: str
@@ -26,12 +29,12 @@ class WorkflowRecordOrderBy(str, Enum, metaclass=MetaEnum):
     UpdatedAt = "updated_at"
     OpenedAt = "opened_at"
     Name = "name"
+    IsPublic = "is_public"
 
 
 class WorkflowCategory(str, Enum, metaclass=MetaEnum):
     User = "user"
     Default = "default"
-    Project = "project"
 
 
 class WorkflowMeta(BaseModel):
@@ -67,7 +70,6 @@ class WorkflowWithoutID(BaseModel):
     # This is typed as optional to prevent errors when pulling workflows from the DB. The frontend adds a default form if
     # it is None.
     form: dict[str, JsonValue] | None = Field(default=None, description="The form of the workflow.")
-    is_published: bool | None = Field(default=None, description="Whether the workflow is published or not.")
 
     model_config = ConfigDict(extra="ignore")
 
@@ -102,7 +104,8 @@ class WorkflowRecordDTOBase(BaseModel):
     opened_at: Optional[Union[datetime.datetime, str]] = Field(
         default=None, description="The opened timestamp of the workflow."
     )
-    is_published: bool | None = Field(default=None, description="Whether the workflow is published or not.")
+    user_id: str = Field(description="The id of the user who owns this workflow.")
+    is_public: bool = Field(description="Whether this workflow is shared with all users.")
 
 
 class WorkflowRecordDTO(WorkflowRecordDTOBase):

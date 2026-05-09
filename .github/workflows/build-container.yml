@@ -53,8 +53,10 @@ jobs:
           df -h
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo swapoff /mnt/swapfile
-          sudo rm -rf /mnt/swapfile
+          if [ -f /mnt/swapfile ]; then
+            sudo swapoff /mnt/swapfile
+            sudo rm -rf /mnt/swapfile
+          fi
           if [ -d /mnt ]; then
             sudo chmod -R 777 /mnt
             echo '{"data-root": "/mnt/docker-root"}' | sudo tee /etc/docker/daemon.json

@@ -12,10 +12,11 @@ from typing import Any, Dict, Generator, Optional, Tuple
 import torch
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
-)
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
+from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
+    CachedModelWithPartialLoad,
+)
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
 
@@ -57,7 +58,12 @@ class LoadedModelWithoutConfig:
 
     def __enter__(self) -> AnyModel:
         self._cache.lock(self._cache_record, None)
-        return self.model
+        try:
+            self.repair_required_tensors_on_device()
+            return self.model
+        except Exception:
+            self._cache.unlock(self._cache_record)
+            raise
 
     def __exit__(self, *args: Any, **kwargs: Any) -> None:
         self._cache.unlock(self._cache_record)
@@ -73,6 +79,7 @@ class LoadedModelWithoutConfig:
         """
         self._cache.lock(self._cache_record, working_mem_bytes)
         try:
+            self.repair_required_tensors_on_device()
             yield (self._cache_record.cached_model.get_cpu_state_dict(), self._cache_record.cached_model.model)
         finally:
             self._cache.unlock(self._cache_record)
@@ -82,6 +89,13 @@ class LoadedModelWithoutConfig:
         """Return the model without locking it."""
         return self._cache_record.cached_model.model
 
+    def repair_required_tensors_on_device(self) -> int:
+        """Repair required tensors that should be resident on the cached model's execution device."""
+        cached_model = self._cache_record.cached_model
+        if not isinstance(cached_model, CachedModelWithPartialLoad):
+            return 0
+        return cached_model.repair_required_tensors_on_compute_device()
+
 
 class LoadedModel(LoadedModelWithoutConfig):
     """Context manager object that mediates transfer from RAM<->VRAM."""
@@ -89,14 +103,6 @@ class LoadedModel(LoadedModelWithoutConfig):
     def __init__(self, config: Optional[AnyModelConfig], cache_record: CacheRecord, cache: ModelCache):
         super().__init__(cache_record=cache_record, cache=cache)
         self.config = config
-
-
-# TODO(MM2):
-# Some "intermediary" subclasses in the ModelLoaderBase class hierarchy define methods that their subclasses don't
-# know about. I think the problem may be related to this class being an ABC.
-#
-# For example, GenericDiffusersLoader defines `get_hf_load_class()`, and StableDiffusionDiffusersModel attempts to
-# call it. However, the method is not defined in the ABC, so it is not guaranteed to be implemented.
 
 
 class ModelLoaderBase(ABC):

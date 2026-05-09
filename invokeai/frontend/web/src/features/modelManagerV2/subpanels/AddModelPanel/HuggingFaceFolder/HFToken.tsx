@@ -8,8 +8,6 @@ import {
   FormLabel,
   Input,
 } from '@invoke-ai/ui-library';
-import { skipToken } from '@reduxjs/toolkit/query';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { toast } from 'features/toast/toast';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
@@ -24,8 +22,7 @@ import { assert } from 'tsafe';
 
 export const HFToken = () => {
   const { t } = useTranslation();
-  const isHFTokenEnabled = useFeatureStatus('hfToken');
-  const { currentData } = useGetHFTokenStatusQuery(isHFTokenEnabled ? undefined : skipToken);
+  const { currentData } = useGetHFTokenStatusQuery();
 
   const error = useMemo(() => {
     switch (currentData) {

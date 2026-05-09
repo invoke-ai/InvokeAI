@@ -12,7 +12,6 @@ from invokeai.app.services.download import DownloadQueueServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob, ModelSource
 from invokeai.app.services.model_records import ModelRecordChanges, ModelRecordServiceBase
-from invokeai.backend.model_manager import AnyModelConfig
 
 if TYPE_CHECKING:
     from invokeai.app.services.events.events_base import EventServiceBase
@@ -207,6 +206,22 @@ class ModelInstallServiceBase(ABC):
         """Cancel the indicated job."""
 
     @abstractmethod
+    def pause_job(self, job: ModelInstallJob) -> None:
+        """Pause the indicated job, preserving partial downloads."""
+
+    @abstractmethod
+    def resume_job(self, job: ModelInstallJob) -> None:
+        """Resume a previously paused job."""
+
+    @abstractmethod
+    def restart_failed(self, job: ModelInstallJob) -> None:
+        """Restart failed or non-resumable downloads for a job."""
+
+    @abstractmethod
+    def restart_file(self, job: ModelInstallJob, file_source: str) -> None:
+        """Restart a specific file download for a job."""
+
+    @abstractmethod
     def wait_for_job(self, job: ModelInstallJob, timeout: int = 0) -> ModelInstallJob:
         """Wait for the indicated job to reach a terminal state.
 
@@ -229,19 +244,6 @@ class ModelInstallServiceBase(ABC):
         :param timeout: Wait up to indicated number of seconds. Raise an Exception('timeout') if
         installs do not complete within the indicated time. A timeout of zero (the default)
         will block indefinitely until the installs complete.
-        """
-
-    @abstractmethod
-    def sync_model_path(self, key: str) -> AnyModelConfig:
-        """
-        Move model into the location indicated by its basetype, type and name.
-
-        Call this after updating a model's attributes in order to move
-        the model's path into the location indicated by its basetype, type and
-        name. Applies only to models whose paths are within the root `models_dir`
-        directory.
-
-        May raise an UnknownModelException.
         """
 
     @abstractmethod

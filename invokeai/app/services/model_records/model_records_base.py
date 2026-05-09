@@ -6,26 +6,34 @@ Abstract base class for storing and retrieving model configuration records.
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Set, Union
+from typing import Any, List, Optional, Set, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from invokeai.app.services.shared.pagination import PaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
-    ControlAdapterDefaultSettings,
-    LoraModelDefaultSettings,
-    MainModelDefaultSettings,
+from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
+from invokeai.backend.model_manager.configs.external_api import (
+    ExternalApiModelDefaultSettings,
+    ExternalModelCapabilities,
 )
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.configs.lora import LoraModelDefaultSettings
+from invokeai.backend.model_manager.configs.main import MainModelDefaultSettings
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ClipVariantType,
+    Flux2VariantType,
+    FluxVariantType,
     ModelFormat,
     ModelSourceType,
     ModelType,
     ModelVariantType,
+    Qwen3VariantType,
+    QwenImageVariantType,
     SchedulerPredictionType,
+    ZImageVariantType,
 )
 
 
@@ -53,6 +61,10 @@ class ModelRecordOrderBy(str, Enum):
     Base = "base"
     Name = "name"
     Format = "format"
+    Size = "size"
+    DateAdded = "created_at"
+    DateModified = "updated_at"
+    Path = "path"
 
 
 class ModelSummary(BaseModel):
@@ -74,6 +86,19 @@ class ModelRecordChanges(BaseModelExcludeNull):
     source: Optional[str] = Field(description="original source of the model", default=None)
     source_type: Optional[ModelSourceType] = Field(description="type of model source", default=None)
     source_api_response: Optional[str] = Field(description="metadata from remote source", default=None)
+    source_url: Optional[str] = Field(description="Optional URL for the model (e.g. download page)", default=None)
+
+    @field_validator("source_url", mode="before")
+    @classmethod
+    def validate_source_url(cls, v: Any) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        if not isinstance(v, str):
+            raise ValueError("source_url must be a string")
+        if not v.startswith(("https://", "http://")):
+            raise ValueError("source_url must be an http or https URL")
+        return v
+
     name: Optional[str] = Field(description="Name of the model.", default=None)
     path: Optional[str] = Field(description="Path to the model.", default=None)
     description: Optional[str] = Field(description="Model description", default=None)
@@ -84,13 +109,33 @@ class ModelRecordChanges(BaseModelExcludeNull):
     file_size: Optional[int] = Field(description="Size of model file", default=None)
     format: Optional[str] = Field(description="format of model file", default=None)
     trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
-    default_settings: Optional[MainModelDefaultSettings | LoraModelDefaultSettings | ControlAdapterDefaultSettings] = (
-        Field(description="Default settings for this model", default=None)
+    default_settings: Optional[
+        MainModelDefaultSettings
+        | LoraModelDefaultSettings
+        | ControlAdapterDefaultSettings
+        | ExternalApiModelDefaultSettings
+    ] = Field(description="Default settings for this model", default=None)
+
+    # External API model changes
+    provider_id: Optional[str] = Field(description="External provider identifier", default=None)
+    provider_model_id: Optional[str] = Field(description="External provider model identifier", default=None)
+    capabilities: Optional[ExternalModelCapabilities] = Field(
+        description="External model capabilities",
+        default=None,
     )
+    cpu_only: Optional[bool] = Field(description="Whether this model should run on CPU only", default=None)
 
     # Checkpoint-specific changes
     # TODO(MM2): Should we expose these? Feels footgun-y...
-    variant: Optional[ModelVariantType | ClipVariantType] = Field(description="The variant of the model.", default=None)
+    variant: Optional[
+        ModelVariantType
+        | ClipVariantType
+        | FluxVariantType
+        | Flux2VariantType
+        | ZImageVariantType
+        | QwenImageVariantType
+        | Qwen3VariantType
+    ] = Field(description="The variant of the model.", default=None)
     prediction_type: Optional[SchedulerPredictionType] = Field(
         description="The prediction type of the model.", default=None
     )
@@ -126,12 +171,26 @@ class ModelRecordServiceBase(ABC):
         pass
 
     @abstractmethod
-    def update_model(self, key: str, changes: ModelRecordChanges) -> AnyModelConfig:
+    def update_model(self, key: str, changes: ModelRecordChanges, allow_class_change: bool = False) -> AnyModelConfig:
         """
         Update the model, returning the updated version.
 
         :param key: Unique key for the model to be updated.
         :param changes: A set of changes to apply to this model. Changes are validated before being written.
+        :param allow_class_change: If True, allows changes that would change the model config class. For example,
+        changing a LoRA into a Main model. This does not disable validation, so the changes must still be valid.
+        """
+        pass
+
+    @abstractmethod
+    def replace_model(self, key: str, new_config: AnyModelConfig) -> AnyModelConfig:
+        """
+        Replace the model record entirely, returning the new record.
+
+        This is used when we re-identify a model and have a new config object.
+
+        :param key: Unique key for the model to be updated.
+        :param new_config: The new model config to write.
         """
         pass
 
@@ -159,7 +218,11 @@ class ModelRecordServiceBase(ABC):
 
     @abstractmethod
     def list_models(
-        self, page: int = 0, per_page: int = 10, order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default
+        self,
+        page: int = 0,
+        per_page: int = 10,
+        order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default,
+        direction: SQLiteDirection = SQLiteDirection.Ascending,
     ) -> PaginatedResults[ModelSummary]:
         """Return a paginated summary listing of each model in the database."""
         pass
@@ -196,6 +259,8 @@ class ModelRecordServiceBase(ABC):
         base_model: Optional[BaseModelType] = None,
         model_type: Optional[ModelType] = None,
         model_format: Optional[ModelFormat] = None,
+        order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default,
+        direction: SQLiteDirection = SQLiteDirection.Ascending,
     ) -> List[AnyModelConfig]:
         """
         Return models matching name, base and/or type.

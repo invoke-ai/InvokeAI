@@ -6,7 +6,6 @@ import { debounce } from 'es-toolkit/compat';
 import { selectIterations } from 'features/controlLayers/store/paramsSlice';
 import { selectDynamicPromptsIsLoading } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
-import { $isInPublishFlow, useIsWorkflowPublished } from 'features/nodes/components/sidePanel/workflow/publish';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState } from 'features/nodes/store/types';
 import type { BatchSizeResult } from 'features/nodes/util/node/resolveBatchValue';
@@ -18,6 +17,8 @@ import type { PropsWithChildren } from 'react';
 import { memo, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { enqueueMutationFixedCacheKeyOptions, useEnqueueBatchMutation } from 'services/api/endpoints/queue';
+import { useAutoAddBoard } from 'services/api/hooks/useAutoAddBoard';
+import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 type Props = TooltipProps & {
@@ -47,51 +48,32 @@ const TooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
     return <UpscaleTabTooltipContent prepend={prepend} />;
   }
 
-  if (activeTab === 'video') {
-    return <VideoTabTooltipContent prepend={prepend} />;
-  }
-
   return null;
 });
 TooltipContent.displayName = 'TooltipContent';
 
-const VideoTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
-  const isReady = useStore($isReadyToEnqueue);
-  const reasons = useStore($reasonsWhyCannotEnqueue);
-
-  return (
-    <Flex flexDir="column" gap={1}>
-      <IsReadyText isReady={isReady} prepend={prepend} />
-      <QueueCountPredictionCanvasOrUpscaleTab />
-      {reasons.length > 0 && (
-        <>
-          <StyledDivider />
-          <ReasonsList reasons={reasons} />
-        </>
-      )}
-      <StyledDivider />
-      <AddingToText />
-    </Flex>
-  );
-});
-VideoTabTooltipContent.displayName = 'VideoTabTooltipContent';
-
 const CanvasTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
   const isReady = useStore($isReadyToEnqueue);
   const reasons = useStore($reasonsWhyCannotEnqueue);
+  const autoAddBoard = useAutoAddBoard();
+  const { canWriteImages } = useBoardAccess(autoAddBoard);
 
   return (
     <Flex flexDir="column" gap={1}>
-      <IsReadyText isReady={isReady} prepend={prepend} />
+      <IsReadyText isReady={isReady && canWriteImages} prepend={prepend} />
       <QueueCountPredictionCanvasOrUpscaleTab />
-      {reasons.length > 0 && (
+      {(reasons.length > 0 || !canWriteImages) && (
         <>
           <StyledDivider />
-          <ReasonsList reasons={reasons} />
+          <ReasonsList reasons={reasons} canWriteImages={canWriteImages} />
         </>
       )}
-      <StyledDivider />
-      <AddingToText />
+      {canWriteImages && (
+        <>
+          <StyledDivider />
+          <AddingToText />
+        </>
+      )}
     </Flex>
   );
 });
@@ -100,15 +82,17 @@ CanvasTabTooltipContent.displayName = 'CanvasTabTooltipContent';
 const UpscaleTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
   const isReady = useStore($isReadyToEnqueue);
   const reasons = useStore($reasonsWhyCannotEnqueue);
+  const autoAddBoard = useAutoAddBoard();
+  const { canWriteImages } = useBoardAccess(autoAddBoard);
 
   return (
     <Flex flexDir="column" gap={1}>
-      <IsReadyText isReady={isReady} prepend={prepend} />
+      <IsReadyText isReady={isReady && canWriteImages} prepend={prepend} />
       <QueueCountPredictionCanvasOrUpscaleTab />
-      {reasons.length > 0 && (
+      {(reasons.length > 0 || !canWriteImages) && (
         <>
           <StyledDivider />
-          <ReasonsList reasons={reasons} />
+          <ReasonsList reasons={reasons} canWriteImages={canWriteImages} />
         </>
       )}
     </Flex>
@@ -200,8 +184,6 @@ const IsReadyText = memo(({ isReady, prepend }: { isReady: boolean; prepend: boo
   const { t } = useTranslation();
   const isLoadingDynamicPrompts = useAppSelector(selectDynamicPromptsIsLoading);
   const [_, enqueueMutation] = useEnqueueBatchMutation(enqueueMutationFixedCacheKeyOptions);
-  const isInPublishFlow = useStore($isInPublishFlow);
-  const isPublished = useIsWorkflowPublished();
 
   const text = useMemo(() => {
     if (enqueueMutation.isLoading) {
@@ -210,12 +192,6 @@ const IsReadyText = memo(({ isReady, prepend }: { isReady: boolean; prepend: boo
     if (isLoadingDynamicPrompts) {
       return t('dynamicPrompts.loading');
     }
-    if (isInPublishFlow) {
-      return t('workflows.builder.publishInProgress');
-    }
-    if (isPublished) {
-      return t('workflows.builder.publishedWorkflowIsLocked');
-    }
     if (isReady) {
       if (prepend) {
         return t('queue.queueFront');
@@ -223,18 +199,29 @@ const IsReadyText = memo(({ isReady, prepend }: { isReady: boolean; prepend: boo
       return t('queue.queueBack');
     }
     return t('queue.notReady');
-  }, [enqueueMutation.isLoading, isLoadingDynamicPrompts, isInPublishFlow, isPublished, isReady, t, prepend]);
+  }, [enqueueMutation.isLoading, isLoadingDynamicPrompts, isReady, t, prepend]);
 
   return <Text fontWeight="semibold">{text}</Text>;
 });
 IsReadyText.displayName = 'IsReadyText';
 
-const ReasonsList = memo(({ reasons }: { reasons: Reason[] }) => {
+const ReasonsList = memo(({ reasons, canWriteImages = true }: { reasons: Reason[]; canWriteImages?: boolean }) => {
+  const { t } = useTranslation();
+  const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
+  const autoAddBoardName = useBoardName(autoAddBoardId);
+
   return (
     <UnorderedList>
       {reasons.map((reason, i) => (
         <ReasonListItem key={`${reason.content}.${i}`} reason={reason} />
       ))}
+      {!canWriteImages && (
+        <ListItem>
+          <Text as="span">
+            {t('parameters.invoke.boardNotWritable', { boardName: autoAddBoardName || autoAddBoardId })}
+          </Text>
+        </ListItem>
+      )}
     </UnorderedList>
   );
 });

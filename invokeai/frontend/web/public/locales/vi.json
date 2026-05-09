@@ -56,9 +56,7 @@
         "locateInGalery": "Vị Trí Ở Thư Viện Ảnh",
         "deletedImagesCannotBeRestored": "Ảnh đã xóa không thể khôi phục lại.",
         "hideBoards": "Ẩn Bảng",
-        "movingVideosToBoard_other": "Di chuyển {{count}} video vào bảng:",
-        "viewBoards": "Xem Bảng",
-        "videosWithCount_other": "{{count}} video"
+        "viewBoards": "Xem Bảng"
     },
     "gallery": {
         "swapImages": "Đổi Hình Ảnh",
@@ -121,17 +119,12 @@
         "assets": "Tài Nguyên",
         "images": "Hình Ảnh",
         "useForPromptGeneration": "Dùng Để Tạo Sinh Lệnh",
-        "deleteVideo_other": "Xóa {{count}} Video",
-        "deleteVideoPermanent": "Video đã xóa không thể khôi phục lại.",
         "jump": "Nhảy Đến",
-        "noVideoSelected": "Không Có Video Được Chọn",
         "noImagesInGallery": "Không Có Ảnh Để Hiển Thị",
         "unableToLoad": "Không Thể Tải Thư Viện Ảnh",
         "selectAnImageToCompare": "Chọn Ảnh Để So Sánh",
         "openViewer": "Mở Trình Xem",
-        "closeViewer": "Đóng Trình Xem",
-        "videos": "Video",
-        "videosTab": "Video bạn tạo và được lưu trong Invoke."
+        "closeViewer": "Đóng Trình Xem"
     },
     "common": {
         "ipAdapter": "IP Adapter",
@@ -717,19 +710,12 @@
                 "title": "Chọn Tab Tạo Sinh",
                 "desc": "Chọn tab Tạo Sinh.",
                 "key": "1"
-            },
-            "selectVideoTab": {
-                "title": "Chọn Thẻ Video",
-                "desc": "Chọn thẻ Video."
             }
         },
         "searchHotkeys": "Tìm Phím tắt",
         "noHotkeysFound": "Không Tìm Thấy Phím Tắt",
         "clearSearch": "Làm Sạch Thanh Tìm Kiếm",
-        "hotkeys": "Phím Tắt",
-        "video": {
-            "title": "Video"
-        }
+        "hotkeys": "Phím Tắt"
     },
     "modelManager": {
         "modelConverted": "Model Đã Được Chuyển Đổi",
@@ -936,14 +922,8 @@
         "noMetaData": "Không tìm thấy metadata",
         "imageDimensions": "Kích Thước Ảnh",
         "clipSkip": "$t(parameters.clipSkip)",
-        "videoDetails": "Chi Tiết Video",
-        "noVideoDetails": "Không tìm thấy chi tiết video",
         "parsingFailed": "Lỗi Cú Pháp",
-        "recallParameter": "Gợi Nhớ {{label}}",
-        "videoModel": "Model",
-        "videoDuration": "Thời Lượng",
-        "videoAspectRatio": "Tỉ Lệ",
-        "videoResolution": "Độ Phân Giải"
+        "recallParameter": "Gợi Nhớ {{label}}"
     },
     "accordions": {
         "generation": {
@@ -1689,8 +1669,7 @@
             "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), chiều cao hộp giới hạn là {{height}}",
             "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), tỉ lệ chiều rộng hộp giới hạn là {{width}}",
             "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), tỉ lệ chiều cao hộp giới hạn là {{height}}",
-            "incompatibleLoRAs": "LoRA không tương thích bị thêm vào",
-            "videoIsDisabled": "Trình tạo sinh Video không được mở cho tài khoản {{accountType}}."
+            "incompatibleLoRAs": "LoRA không tương thích bị thêm vào"
         },
         "cfgScale": "Thang CFG",
         "useSeed": "Dùng Hạt Giống",
@@ -1757,12 +1736,7 @@
         "duration": "Thời Lượng",
         "downloadImage": "Tải Xuống Hình Ảnh",
         "images_withCount_other": "Hình Ảnh",
-        "videos_withCount_other": "Video",
-        "startingFrameImage": "Khung Hình Bắt Đầu",
-        "videoActions": "Hành Động Với Video",
-        "sendToVideo": "Gửi Vào Video",
         "showOptionsPanel": "Hiển Thị Bảng Bên Cạnh (O hoặc T)",
-        "video": "Video",
         "resolution": "Độ Phân Giải"
     },
     "dynamicPrompts": {
@@ -2479,8 +2453,7 @@
             "queue": "Queue (Hàng Đợi)",
             "workflows": "Workflow (Luồng Làm Việc)",
             "workflowsTab": "$t(common.tab) $t(ui.tabs.workflows)",
-            "generate": "Tạo Sinh",
-            "video": "Video"
+            "generate": "Tạo Sinh"
         },
         "launchpad": {
             "workflowsTitle": "Đi sâu hơn với Workflow.",
@@ -2558,23 +2531,13 @@
             "generate": {
                 "canvasCalloutTitle": "Đang tìm cách để điều khiển, chỉnh sửa, và làm lại ảnh?",
                 "canvasCalloutLink": "Vào Canvas cho nhiều tính năng hơn."
-            },
-            "videoTitle": "Tạo sinh video từ lệnh chữ.",
-            "video": {
-                "startingFrameCalloutTitle": "Thêm Khung Hình Bắt Đầu",
-                "startingFrameCalloutDesc": "Thêm ảnh nhằm điều khiển khung hình đầu của video."
-            },
-            "addStartingFrame": {
-                "title": "Thêm Khung Hình Bắt Đầu",
-                "description": "Thêm ảnh nhằm điều khiển khung hình đầu của video."
             }
         },
         "panels": {
             "launchpad": "Launchpad",
             "workflowEditor": "Trình Biên Tập Workflow",
             "imageViewer": "Trình Xem",
-            "canvas": "Canvas",
-            "video": "Video"
+            "canvas": "Canvas"
         }
     },
     "workflows": {
@@ -2753,12 +2716,6 @@
         ],
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng"
     },
-    "upsell": {
-        "professional": "Chuyên Nghiệp",
-        "inviteTeammates": "Thêm Đồng Đội",
-        "shareAccess": "Chia Sẻ Quyền Truy Cập",
-        "professionalUpsell": "Không có sẵn Phiên Bản Chuyên Nghiệp cho Invoke. Bấm vào đây hoặc đến invoke.com/pricing để thêm chi tiết."
-    },
     "supportVideos": {
         "supportVideos": "Video Hỗ Trợ",
         "gettingStarted": "Bắt Đầu Làm Quen",
@@ -2782,9 +2739,5 @@
     },
     "lora": {
         "weight": "Trọng Lượng"
-    },
-    "video": {
-        "noVideoSelected": "Không có video được chọn",
-        "selectFromGallery": "Chọn một video trong thư viện để xem"
     }
 }

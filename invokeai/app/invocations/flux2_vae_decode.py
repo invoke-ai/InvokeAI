@@ -1,0 +1,92 @@
+"""Flux2 Klein VAE Decode Invocation.
+
+Decodes latents to images using the FLUX.2 32-channel VAE (AutoencoderKLFlux2).
+"""
+
+import torch
+from einops import rearrange
+from PIL import Image
+
+from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
+from invokeai.app.invocations.fields import (
+    FieldDescriptions,
+    Input,
+    InputField,
+    LatentsField,
+    WithBoard,
+    WithMetadata,
+)
+from invokeai.app.invocations.model import VAEField
+from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.load.load_base import LoadedModel
+from invokeai.backend.util.devices import TorchDevice
+
+
+@invocation(
+    "flux2_vae_decode",
+    title="Latents to Image - FLUX2",
+    tags=["latents", "image", "vae", "l2i", "flux2", "klein"],
+    category="latents",
+    version="1.0.0",
+    classification=Classification.Prototype,
+)
+class Flux2VaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Generates an image from latents using FLUX.2 Klein's 32-channel VAE."""
+
+    latents: LatentsField = InputField(
+        description=FieldDescriptions.latents,
+        input=Input.Connection,
+    )
+    vae: VAEField = InputField(
+        description=FieldDescriptions.vae,
+        input=Input.Connection,
+    )
+
+    def _vae_decode(self, vae_info: LoadedModel, latents: torch.Tensor) -> Image.Image:
+        """Decode latents to image using FLUX.2 VAE.
+
+        Input latents should already be in the correct space after BN denormalization
+        was applied in the denoiser. The VAE expects (B, 32, H, W) format.
+        """
+        with vae_info.model_on_device() as (_, vae):
+            vae_dtype = next(iter(vae.parameters())).dtype
+            device = TorchDevice.choose_torch_device()
+            latents = latents.to(device=device, dtype=vae_dtype)
+
+            # Decode using diffusers API
+            decoded = vae.decode(latents, return_dict=False)[0]
+
+        # Convert from [-1, 1] to [0, 1] then to [0, 255] PIL image
+        img = (decoded / 2 + 0.5).clamp(0, 1)
+        img = rearrange(img[0], "c h w -> h w c")
+        img_np = (img * 255).byte().cpu().numpy()
+        # Explicitly create RGB image (not grayscale)
+        img_pil = Image.fromarray(img_np, mode="RGB")
+        return img_pil
+
+    @torch.no_grad()
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        latents = context.tensors.load(self.latents.latents_name)
+
+        # Log latent statistics for debugging black image issues
+        context.logger.debug(
+            f"FLUX.2 VAE decode input: shape={latents.shape}, "
+            f"min={latents.min().item():.4f}, max={latents.max().item():.4f}, "
+            f"mean={latents.mean().item():.4f}"
+        )
+
+        # Warn if input latents are all zeros or very small (would cause black images)
+        if latents.abs().max() < 1e-6:
+            context.logger.warning(
+                "FLUX.2 VAE decode received near-zero latents! This will cause black images. "
+                "The latent cache may be corrupted - try clearing the cache."
+            )
+
+        vae_info = context.models.load(self.vae.vae)
+        context.util.signal_progress("Running VAE")
+        image = self._vae_decode(vae_info=vae_info, latents=latents)
+
+        TorchDevice.empty_cache()
+        image_dto = context.images.save(image=image)
+        return ImageOutput.build(image_dto)

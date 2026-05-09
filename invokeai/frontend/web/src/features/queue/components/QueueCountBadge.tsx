@@ -1,19 +1,45 @@
 import { Badge, Portal } from '@invoke-ai/ui-library';
 import type { RefObject } from 'react';
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
+import type { components } from 'services/api/schema';
 
 type Props = {
   targetRef: RefObject<HTMLDivElement>;
 };
 
+type SessionQueueStatus = components['schemas']['SessionQueueStatus'];
+
+/**
+ * Calculates the appropriate badge text based on queue status.
+ * Returns null if badge should be hidden.
+ *
+ * In multiuser mode, the backend already scopes counts to the current user for non-admins,
+ * so pending + in_progress reflects the user's own queue items.
+ */
+const getBadgeText = (queueData: SessionQueueStatus | undefined): string | null => {
+  if (!queueData) {
+    return null;
+  }
+
+  const totalPending = queueData.pending + queueData.in_progress;
+
+  if (totalPending === 0) {
+    return null;
+  }
+
+  return totalPending.toString();
+};
+
 export const QueueCountBadge = memo(({ targetRef }: Props) => {
   const [badgePos, setBadgePos] = useState<{ x: string; y: string } | null>(null);
-  const { queueSize } = useGetQueueStatusQuery(undefined, {
+  const { queueData } = useGetQueueStatusQuery(undefined, {
     selectFromResult: (res) => ({
-      queueSize: res.data ? res.data.queue.pending + res.data.queue.in_progress : 0,
+      queueData: res.data?.queue,
     }),
   });
+
+  const badgeText = useMemo(() => getBadgeText(queueData), [queueData]);
 
   useEffect(() => {
     if (!targetRef.current) {
@@ -57,7 +83,7 @@ export const QueueCountBadge = memo(({ targetRef }: Props) => {
     };
   }, [targetRef]);
 
-  if (queueSize === 0) {
+  if (!badgeText) {
     return null;
   }
   if (!badgePos) {
@@ -75,7 +101,7 @@ export const QueueCountBadge = memo(({ targetRef }: Props) => {
         shadow="dark-lg"
         userSelect="none"
       >
-        {queueSize}
+        {badgeText}
       </Badge>
     </Portal>
   );

@@ -26,7 +26,6 @@ PresetDataValidator = TypeAdapter(PresetData)
 class PresetType(str, Enum, metaclass=MetaEnum):
     User = "user"
     Default = "default"
-    Project = "project"
 
 
 class StylePresetChanges(BaseModel, extra="forbid"):

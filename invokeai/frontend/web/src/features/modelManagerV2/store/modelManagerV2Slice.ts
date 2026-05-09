@@ -7,7 +7,13 @@ import { zModelType } from 'features/nodes/types/common';
 import { assert } from 'tsafe';
 import z from 'zod';
 
-const zFilterableModelType = zModelType.exclude(['onnx']).or(z.literal('refiner'));
+const zModelCategoryType = zModelType
+  .exclude(['onnx'])
+  .or(z.literal('refiner'))
+  .or(z.literal('external_image_generator'));
+export type ModelCategoryType = z.infer<typeof zModelCategoryType>;
+
+const zFilterableModelType = zModelCategoryType.or(z.literal('missing'));
 export type FilterableModelType = z.infer<typeof zFilterableModelType>;
 
 const zModelManagerState = z.object({
@@ -18,6 +24,11 @@ const zModelManagerState = z.object({
   filteredModelType: zFilterableModelType.nullable(),
   scanPath: z.string().optional(),
   shouldInstallInPlace: z.boolean(),
+  selectedModelKeys: z.array(z.string()),
+  orderBy: z
+    .enum(['default', 'name', 'type', 'base', 'size', 'created_at', 'updated_at', 'path', 'format'])
+    .default('name'),
+  sortDirection: z.enum(['asc', 'desc']).default('asc'),
 });
 
 type ModelManagerState = z.infer<typeof zModelManagerState>;
@@ -30,6 +41,9 @@ const getInitialState = (): ModelManagerState => ({
   searchTerm: '',
   scanPath: undefined,
   shouldInstallInPlace: true,
+  selectedModelKeys: [],
+  orderBy: 'name',
+  sortDirection: 'asc',
 });
 
 const slice = createSlice({
@@ -55,6 +69,26 @@ const slice = createSlice({
     shouldInstallInPlaceChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldInstallInPlace = action.payload;
     },
+    modelSelectionChanged: (state, action: PayloadAction<string[]>) => {
+      state.selectedModelKeys = action.payload;
+    },
+    toggleModelSelection: (state, action: PayloadAction<string>) => {
+      const index = state.selectedModelKeys.indexOf(action.payload);
+      if (index > -1) {
+        state.selectedModelKeys.splice(index, 1);
+      } else {
+        state.selectedModelKeys.push(action.payload);
+      }
+    },
+    clearModelSelection: (state) => {
+      state.selectedModelKeys = [];
+    },
+    setOrderBy: (state, action: PayloadAction<ModelManagerState['orderBy']>) => {
+      state.orderBy = action.payload;
+    },
+    setSortDirection: (state, action: PayloadAction<ModelManagerState['sortDirection']>) => {
+      state.sortDirection = action.payload;
+    },
   },
 });
 
@@ -65,6 +99,11 @@ export const {
   setSelectedModelMode,
   setScanPath,
   shouldInstallInPlaceChanged,
+  modelSelectionChanged,
+  toggleModelSelection,
+  clearModelSelection,
+  setOrderBy,
+  setSortDirection,
 } = slice.actions;
 
 export const modelManagerSliceConfig: SliceConfig<typeof slice> = {
@@ -79,7 +118,7 @@ export const modelManagerSliceConfig: SliceConfig<typeof slice> = {
       }
       return zModelManagerState.parse(state);
     },
-    persistDenylist: ['selectedModelKey', 'selectedModelMode', 'filteredModelType', 'searchTerm'],
+    persistDenylist: ['selectedModelKey', 'selectedModelMode', 'filteredModelType', 'searchTerm', 'selectedModelKeys'],
   },
 };
 
@@ -93,3 +132,6 @@ export const selectSelectedModelMode = createModelManagerSelector((modelManager)
 export const selectSearchTerm = createModelManagerSelector((mm) => mm.searchTerm);
 export const selectFilteredModelType = createModelManagerSelector((mm) => mm.filteredModelType);
 export const selectShouldInstallInPlace = createModelManagerSelector((mm) => mm.shouldInstallInPlace);
+export const selectSelectedModelKeys = createModelManagerSelector((mm) => mm.selectedModelKeys);
+export const selectOrderBy = createModelManagerSelector((mm) => mm.orderBy);
+export const selectSortDirection = createModelManagerSelector((mm) => mm.sortDirection);

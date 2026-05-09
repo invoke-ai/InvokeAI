@@ -6,7 +6,11 @@ import type {
   RefImageState,
 } from 'features/controlLayers/store/types';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
-import type { AnyModelConfig, MainModelConfig } from 'services/api/types';
+import {
+  type AnyModelConfigWithExternal,
+  isExternalApiModelConfig,
+  type MainOrExternalModelConfig,
+} from 'services/api/types';
 
 const WARNINGS = {
   UNSUPPORTED_MODEL: 'controlLayers.warnings.unsupportedModel',
@@ -28,7 +32,7 @@ type WarningTKey = (typeof WARNINGS)[keyof typeof WARNINGS];
 
 export const getRegionalGuidanceWarnings = (
   entity: CanvasRegionalGuidanceState,
-  model: MainModelConfig | null | undefined
+  model: MainOrExternalModelConfig | null | undefined
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
 
@@ -59,6 +63,27 @@ export const getRegionalGuidanceWarnings = (
       }
     }
 
+    if (model.base === 'z-image') {
+      // Z-Image has similar limitations to FLUX - no negative prompts via CFG by default
+      // Reference images (IP Adapters) are not supported for Z-Image
+      if (entity.referenceImages.length > 0) {
+        warnings.push(WARNINGS.RG_REFERENCE_IMAGES_NOT_SUPPORTED);
+      }
+      if (entity.autoNegative) {
+        warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
+      }
+    }
+
+    if (model.base === 'anima') {
+      // Reference images (IP Adapters) are not supported for Anima
+      if (entity.referenceImages.length > 0) {
+        warnings.push(WARNINGS.RG_REFERENCE_IMAGES_NOT_SUPPORTED);
+      }
+      if (entity.autoNegative) {
+        warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
+      }
+    }
+
     entity.referenceImages.forEach(({ config }) => {
       if (!config.model) {
         // No model selected
@@ -79,8 +104,8 @@ export const getRegionalGuidanceWarnings = (
 };
 
 export const areBasesCompatibleForRefImage = (
-  first?: ModelIdentifierField | AnyModelConfig | null,
-  second?: ModelIdentifierField | AnyModelConfig | null
+  first?: ModelIdentifierField | AnyModelConfigWithExternal | null,
+  second?: ModelIdentifierField | AnyModelConfigWithExternal | null
 ): boolean => {
   if (!first || !second) {
     return false;
@@ -101,12 +126,20 @@ export const areBasesCompatibleForRefImage = (
 
 export const getGlobalReferenceImageWarnings = (
   entity: RefImageState,
-  model: MainModelConfig | null | undefined
+  model: MainOrExternalModelConfig | null | undefined
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
 
   if (model) {
-    if (model.base === 'sd-3' || model.base === 'sd-2') {
+    if (isExternalApiModelConfig(model)) {
+      if (!entity.config.image) {
+        // No image selected
+        warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
+      }
+      return warnings;
+    }
+
+    if (model.base === 'sd-3' || model.base === 'sd-2' || model.base === 'anima') {
       // Unsupported model architecture
       warnings.push(WARNINGS.UNSUPPORTED_MODEL);
       return warnings;
@@ -114,17 +147,22 @@ export const getGlobalReferenceImageWarnings = (
 
     const { config } = entity;
 
-    if (!config.model) {
-      // No model selected
-      warnings.push(WARNINGS.IP_ADAPTER_NO_MODEL_SELECTED);
-    } else if (!areBasesCompatibleForRefImage(config.model, model)) {
-      // Supported model architecture but doesn't match
-      warnings.push(WARNINGS.IP_ADAPTER_INCOMPATIBLE_BASE_MODEL);
+    // FLUX.2 and Qwen Image Edit reference images don't require a model - it's built-in
+    if (config.type !== 'flux2_reference_image' && config.type !== 'qwen_image_reference_image') {
+      if (!('model' in config) || !config.model) {
+        // No model selected
+        warnings.push(WARNINGS.IP_ADAPTER_NO_MODEL_SELECTED);
+      } else if (!areBasesCompatibleForRefImage(config.model, model)) {
+        // Supported model architecture but doesn't match
+        warnings.push(WARNINGS.IP_ADAPTER_INCOMPATIBLE_BASE_MODEL);
+      }
     }
 
     if (!entity.config.image) {
-      // No image selected
-      warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
+      // No image selected - for Qwen Image Edit, an image is optional (txt2img works without one)
+      if (config.type !== 'qwen_image_reference_image') {
+        warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
+      }
     }
   }
 
@@ -133,7 +171,7 @@ export const getGlobalReferenceImageWarnings = (
 
 export const getControlLayerWarnings = (
   entity: CanvasControlLayerState,
-  model: MainModelConfig | null | undefined
+  model: MainOrExternalModelConfig | null | undefined
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
 
@@ -146,7 +184,7 @@ export const getControlLayerWarnings = (
     // No model selected
     warnings.push(WARNINGS.CONTROL_ADAPTER_NO_MODEL_SELECTED);
   } else if (model) {
-    if (model.base === 'sd-3' || model.base === 'sd-2') {
+    if (model.base === 'sd-3' || model.base === 'sd-2' || model.base === 'anima') {
       // Unsupported model architecture
       warnings.push(WARNINGS.UNSUPPORTED_MODEL);
     } else if (entity.controlAdapter.model.base !== model.base) {
@@ -154,7 +192,7 @@ export const getControlLayerWarnings = (
       warnings.push(WARNINGS.CONTROL_ADAPTER_INCOMPATIBLE_BASE_MODEL);
     } else if (
       model.base === 'flux' &&
-      model.variant === 'inpaint' &&
+      model.variant === 'dev_fill' &&
       entity.controlAdapter.model.type === 'control_lora'
     ) {
       // FLUX inpaint variants are FLUX Fill models - not compatible w/ Control LoRA
@@ -167,7 +205,7 @@ export const getControlLayerWarnings = (
 
 export const getRasterLayerWarnings = (
   _entity: CanvasRasterLayerState,
-  _model: MainModelConfig | null | undefined
+  _model: MainOrExternalModelConfig | null | undefined
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
 
@@ -178,7 +216,7 @@ export const getRasterLayerWarnings = (
 
 export const getInpaintMaskWarnings = (
   _entity: CanvasInpaintMaskState,
-  _model: MainModelConfig | null | undefined
+  _model: MainOrExternalModelConfig | null | undefined
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
 

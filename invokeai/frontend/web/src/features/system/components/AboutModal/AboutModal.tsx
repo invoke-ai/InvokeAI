@@ -17,7 +17,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { deepClone } from 'common/util/deepClone';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
-import { discordLink, githubLink, websiteLink } from 'features/system/store/constants';
+import { discordLink, githubLink } from 'features/system/store/constants';
 import InvokeLogoYellow from 'public/assets/images/invoke-tag-lrg.svg';
 import type { ReactElement } from 'react';
 import { cloneElement, memo, useMemo } from 'react';
@@ -82,7 +82,6 @@ const AboutModal = ({ children }: AboutModalProps) => {
                   </Grid>
                   <Heading fontSize="large">{t('common.aboutHeading')}</Heading>
                   <Text fontSize="sm">{t('common.aboutDesc')}</Text>
-                  <ExternalLink href={websiteLink} label={websiteLink} />
                 </Flex>
               </GridItem>
             </Grid>

@@ -108,7 +108,7 @@ const nodeFieldOverlaySx: SystemStyleObject = {
   },
 };
 
-export const NodeFieldElementOverlay = memo(({ nodeId }: { nodeId: string }) => {
+const NodeFieldElementOverlay = memo(({ nodeId }: { nodeId: string }) => {
   const mouseOverNode = useMouseOverNode(nodeId);
   const mouseOverFormField = useMouseOverFormField(nodeId);
 

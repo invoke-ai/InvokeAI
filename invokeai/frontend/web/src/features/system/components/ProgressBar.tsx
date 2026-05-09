@@ -4,13 +4,14 @@ import { useStore } from '@nanostores/react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
-import { $isConnected, $lastProgressEvent } from 'services/events/stores';
+import { $isConnected, $lastProgressEvent, $loadingModelsCount } from 'services/events/stores';
 
 const ProgressBar = (props: ProgressProps) => {
   const { t } = useTranslation();
   const { data: queueStatus } = useGetQueueStatusQuery();
   const isConnected = useStore($isConnected);
   const lastProgressEvent = useStore($lastProgressEvent);
+  const loadingModelsCount = useStore($loadingModelsCount);
   const value = useMemo(() => {
     if (!lastProgressEvent) {
       return 0;
@@ -21,6 +22,10 @@ const ProgressBar = (props: ProgressProps) => {
   const isIndeterminate = useMemo(() => {
     if (!isConnected) {
       return false;
+    }
+
+    if (loadingModelsCount > 0) {
+      return true;
     }
 
     if (!queueStatus?.queue.in_progress) {
@@ -40,7 +45,7 @@ const ProgressBar = (props: ProgressProps) => {
     }
 
     return false;
-  }, [isConnected, lastProgressEvent, queueStatus?.queue.in_progress]);
+  }, [isConnected, lastProgressEvent, queueStatus?.queue.in_progress, loadingModelsCount]);
 
   return (
     <Progress

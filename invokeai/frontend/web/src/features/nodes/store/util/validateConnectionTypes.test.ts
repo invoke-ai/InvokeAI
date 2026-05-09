@@ -219,6 +219,35 @@ describe(validateConnectionTypes.name, () => {
         );
         expect(r).toBe(true);
       });
+
+      it('should accept AnyField source to any SINGLE type', () => {
+        const r = validateConnectionTypes(
+          { name: 'AnyField', cardinality: 'SINGLE', batch: false },
+          { name: 'StringField', cardinality: 'SINGLE', batch: false }
+        );
+        expect(r).toBe(true);
+      });
+      it('should accept AnyField source to any SINGLE_OR_COLLECTION type', () => {
+        const r = validateConnectionTypes(
+          { name: 'AnyField', cardinality: 'SINGLE', batch: false },
+          { name: 'StringField', cardinality: 'SINGLE_OR_COLLECTION', batch: false }
+        );
+        expect(r).toBe(true);
+      });
+      it('should reject AnyField SINGLE source to COLLECTION target', () => {
+        const r = validateConnectionTypes(
+          { name: 'AnyField', cardinality: 'SINGLE', batch: false },
+          { name: 'StringField', cardinality: 'COLLECTION', batch: false }
+        );
+        expect(r).toBe(false);
+      });
+      it('should reject AnyField source when batch mismatches target', () => {
+        const r = validateConnectionTypes(
+          { name: 'AnyField', cardinality: 'SINGLE', batch: true },
+          { name: 'StringField', cardinality: 'SINGLE', batch: false }
+        );
+        expect(r).toBe(false);
+      });
     });
   });
 });

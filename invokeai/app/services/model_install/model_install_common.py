@@ -10,9 +10,15 @@ from typing_extensions import Annotated
 
 from invokeai.app.services.download import DownloadJob, MultiFileDownloadJob
 from invokeai.app.services.model_records import ModelRecordChanges
-from invokeai.backend.model_manager.config import AnyModelConfig
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant, ModelSourceType
+
+
+class InvalidModelConfigException(Exception):
+    """Raised when a model configuration is invalid."""
+
+    pass
 
 
 class InstallStatus(str, Enum):
@@ -22,6 +28,7 @@ class InstallStatus(str, Enum):
     DOWNLOADING = "downloading"  # downloading of model files in process
     DOWNLOADS_DONE = "downloads_done"  # downloading done, waiting to run
     RUNNING = "running"  # being processed
+    PAUSED = "paused"  # paused, can be resumed
     COMPLETED = "completed"  # finished running
     ERROR = "error"  # terminated with an error message
     CANCELLED = "cancelled"  # terminated with an error message
@@ -79,9 +86,12 @@ class LocalModelSource(StringLikeSource):
 
 class HFModelSource(StringLikeSource):
     """
-    A HuggingFace repo_id with optional variant, sub-folder and access token.
+    A HuggingFace repo_id with optional variant, sub-folder(s) and access token.
     Note that the variant option, if not provided to the constructor, will default to fp16, which is
     what people (almost) always want.
+
+    The subfolder can be a single path or multiple paths joined by '+' (e.g., "text_encoder+tokenizer").
+    When multiple subfolders are specified, all of them will be downloaded and combined into the model directory.
     """
 
     repo_id: str
@@ -96,6 +106,16 @@ class HFModelSource(StringLikeSource):
         if not re.match(r"^([.\w-]+/[.\w-]+)$", v):
             raise ValueError(f"{v}: invalid repo_id format")
         return v
+
+    @property
+    def subfolders(self) -> list[Path]:
+        """Return list of subfolders (supports '+' separated multiple subfolders)."""
+        if self.subfolder is None:
+            return []
+        subfolder_str = self.subfolder.as_posix()
+        if "+" in subfolder_str:
+            return [Path(s.strip()) for s in subfolder_str.split("+")]
+        return [self.subfolder]
 
     def __str__(self) -> str:
         """Return string version of repoid when string rep needed."""
@@ -119,12 +139,27 @@ class URLModelSource(StringLikeSource):
         return str(self.url)
 
 
-ModelSource = Annotated[Union[LocalModelSource, HFModelSource, URLModelSource], Field(discriminator="type")]
+class ExternalModelSource(StringLikeSource):
+    """An external provider model identifier."""
+
+    provider_id: str
+    provider_model_id: str
+    type: Literal["external"] = "external"
+
+    def __str__(self) -> str:
+        return f"external://{self.provider_id}/{self.provider_model_id}"
+
+
+ModelSource = Annotated[
+    Union[LocalModelSource, HFModelSource, URLModelSource, ExternalModelSource],
+    Field(discriminator="type"),
+]
 
 MODEL_SOURCE_TO_TYPE_MAP = {
     URLModelSource: ModelSourceType.Url,
     HFModelSource: ModelSourceType.HFRepoID,
     LocalModelSource: ModelSourceType.Path,
+    ExternalModelSource: ModelSourceType.External,
 }
 
 
@@ -166,6 +201,7 @@ class ModelInstallJob(BaseModel):
     _install_tmpdir: Optional[Path] = PrivateAttr(default=None)
     _multifile_job: Optional[MultiFileDownloadJob] = PrivateAttr(default=None)
     _exception: Optional[Exception] = PrivateAttr(default=None)
+    _resume_metadata: Optional[dict] = PrivateAttr(default=None)
 
     def set_error(self, e: Exception) -> None:
         """Record the error and traceback from an exception."""
@@ -212,6 +248,11 @@ class ModelInstallJob(BaseModel):
     def downloads_done(self) -> bool:
         """Return true if job's downloads ae done."""
         return self.status == InstallStatus.DOWNLOADS_DONE
+
+    @property
+    def paused(self) -> bool:
+        """Return true if job is paused."""
+        return self.status == InstallStatus.PAUSED
 
     @property
     def running(self) -> bool:

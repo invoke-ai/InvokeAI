@@ -2,7 +2,8 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
-import { isPlainObject } from 'es-toolkit';
+import { isPlainObject, uniq } from 'es-toolkit';
+import { logout } from 'features/auth/store/authSlice';
 import type { BoardRecordOrderBy } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -11,6 +12,7 @@ import {
   type ComparisonMode,
   type GalleryState,
   type GalleryView,
+  isVirtualBoardId,
   type OrderDir,
   zGalleryState,
 } from './types';
@@ -32,6 +34,8 @@ const getInitialState = (): GalleryState => ({
   comparisonMode: 'slider',
   comparisonFit: 'fill',
   shouldShowArchivedBoards: false,
+  showVirtualBoards: false,
+  virtualBoardsSectionOpen: true,
   boardsListOrderBy: 'created_at',
   boardsListOrderDir: 'DESC',
 });
@@ -40,7 +44,7 @@ const slice = createSlice({
   name: 'gallery',
   initialState: getInitialState(),
   reducers: {
-    itemSelected: (state, action: PayloadAction<{ type: 'image' | 'video'; id: string } | null>) => {
+    imageSelected: (state, action: PayloadAction<string | null>) => {
       const selectedItem = action.payload;
 
       if (!selectedItem) {
@@ -49,14 +53,8 @@ const slice = createSlice({
         state.selection = [selectedItem];
       }
     },
-    selectionChanged: (state, action: PayloadAction<{ type: 'image' | 'video'; id: string }[]>) => {
-      const uniqueById = new Map<string, { type: 'image' | 'video'; id: string }>();
-      for (const item of action.payload) {
-        if (!uniqueById.has(item.id)) {
-          uniqueById.set(item.id, item);
-        }
-      }
-      state.selection = Array.from(uniqueById.values());
+    selectionChanged: (state, action: PayloadAction<string[]>) => {
+      state.selection = uniq(action.payload);
     },
     imageToCompareChanged: (state, action: PayloadAction<string | null>) => {
       state.imageToCompare = action.payload;
@@ -108,6 +106,10 @@ const slice = createSlice({
         state.autoAddBoardId = 'none';
         return;
       }
+      // Virtual boards cannot be auto-add targets
+      if (isVirtualBoardId(action.payload)) {
+        return;
+      }
       state.autoAddBoardId = action.payload;
     },
     galleryViewChanged: (state, action: PayloadAction<GalleryView>) => {
@@ -122,8 +124,8 @@ const slice = createSlice({
     comparedImagesSwapped: (state) => {
       if (state.imageToCompare) {
         const oldSelection = state.selection;
-        state.selection = [{ type: 'image', id: state.imageToCompare }];
-        state.imageToCompare = oldSelection[0]?.id ?? null;
+        state.selection = [state.imageToCompare];
+        state.imageToCompare = oldSelection[0] ?? null;
       }
     },
     comparisonFitChanged: (state, action: PayloadAction<'contain' | 'fill'>) => {
@@ -131,6 +133,17 @@ const slice = createSlice({
     },
     shouldShowArchivedBoardsChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldShowArchivedBoards = action.payload;
+    },
+    showVirtualBoardsChanged: (state, action: PayloadAction<boolean>) => {
+      state.showVirtualBoards = action.payload;
+      // If virtual boards are hidden and a virtual board is selected, reset to 'none'
+      if (!action.payload && isVirtualBoardId(state.selectedBoardId)) {
+        state.selectedBoardId = 'none';
+        state.selection = [];
+      }
+    },
+    virtualBoardsSectionOpenChanged: (state, action: PayloadAction<boolean>) => {
+      state.virtualBoardsSectionOpen = action.payload;
     },
     starredFirstChanged: (state, action: PayloadAction<boolean>) => {
       state.starredFirst = action.payload;
@@ -148,10 +161,18 @@ const slice = createSlice({
       state.boardsListOrderDir = action.payload;
     },
   },
+  extraReducers(builder) {
+    // Clear board-related state on logout to prevent stale data when switching users
+    builder.addCase(logout, (state) => {
+      state.selectedBoardId = 'none';
+      state.autoAddBoardId = 'none';
+      state.boardSearchText = '';
+    });
+  },
 });
 
 export const {
-  itemSelected,
+  imageSelected,
   shouldAutoSwitchChanged,
   autoAssignBoardOnClickChanged,
   setGalleryImageMinimumWidth,
@@ -169,6 +190,8 @@ export const {
   orderDirChanged,
   starredFirstChanged,
   shouldShowArchivedBoardsChanged,
+  showVirtualBoardsChanged,
+  virtualBoardsSectionOpenChanged,
   searchTermChanged,
   boardsListOrderByChanged,
   boardsListOrderDirChanged,
@@ -186,8 +209,15 @@ export const gallerySliceConfig: SliceConfig<typeof slice> = {
       if (!('_version' in state)) {
         state._version = 1;
       }
+      // Add virtual boards fields if missing (added in virtual boards feature)
+      if (!('showVirtualBoards' in state)) {
+        state.showVirtualBoards = false;
+      }
+      if (!('virtualBoardsSectionOpen' in state)) {
+        state.virtualBoardsSectionOpen = true;
+      }
       return zGalleryState.parse(state);
     },
-    persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'imageToCompare'],
+    persistDenylist: ['selection', 'galleryView', 'imageToCompare'],
   },
 };

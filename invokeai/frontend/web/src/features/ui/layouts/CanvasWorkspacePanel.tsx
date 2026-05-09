@@ -5,6 +5,7 @@ import { CanvasAlertsInvocationProgress } from 'features/controlLayers/component
 import { CanvasAlertsPreserveMask } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsPreserveMask';
 import { CanvasAlertsSaveAllImagesToGallery } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSaveAllImagesToGallery';
 import { CanvasAlertsSelectedEntityStatus } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSelectedEntityStatus';
+import { CanvasAlertsTextSessionActive } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsTextSessionActive';
 import { CanvasBusySpinner } from 'features/controlLayers/components/CanvasBusySpinner';
 import { CanvasContextMenuGlobalMenuItems } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuGlobalMenuItems';
 import { CanvasContextMenuSelectedEntityMenuItems } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuSelectedEntityMenuItems';
@@ -14,6 +15,8 @@ import { CanvasHUD } from 'features/controlLayers/components/HUD/CanvasHUD';
 import { InvokeCanvasComponent } from 'features/controlLayers/components/InvokeCanvasComponent';
 import { SelectObject } from 'features/controlLayers/components/SelectObject/SelectObject';
 import { StagingAreaContextProvider } from 'features/controlLayers/components/StagingArea/context';
+import { CanvasTextOverlay } from 'features/controlLayers/components/Text/CanvasTextOverlay';
+import { PinnedFillColorPickerOverlay } from 'features/controlLayers/components/Tool/PinnedFillColorPickerOverlay';
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
@@ -79,6 +82,7 @@ export const CanvasWorkspacePanel = memo(() => {
             <Flex ref={ref} sx={canvasBgSx} data-dynamic-grid={dynamicGrid}>
               <InvokeCanvasComponent />
               <CanvasManagerProviderGate>
+                <CanvasTextOverlay />
                 <Flex
                   position="absolute"
                   flexDir="column"
@@ -88,9 +92,11 @@ export const CanvasWorkspacePanel = memo(() => {
                   gap={2}
                   alignItems="flex-start"
                 >
+                  <PinnedFillColorPickerOverlay />
                   {showHUD && <CanvasHUD />}
                   <CanvasAlertsSaveAllImagesToGallery />
                   <CanvasAlertsSelectedEntityStatus />
+                  <CanvasAlertsTextSessionActive />
                   <CanvasAlertsPreserveMask />
                   <CanvasAlertsInvocationProgress />
                   <CanvasAlertsBboxVisibility />

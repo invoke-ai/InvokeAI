@@ -5,6 +5,7 @@ import { Flex, Icon, Image } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { useMiddleClickOpenInNewTab } from 'common/hooks/useMiddleClickOpenInNewTab';
 import { uniq } from 'es-toolkit';
 import { multipleImageDndSource, singleImageDndSource } from 'features/dnd/dnd';
 import type { DndDragPreviewMultipleImageState } from 'features/dnd/DndDragPreviewMultipleImage';
@@ -46,7 +47,7 @@ const buildOnClick =
     if (imageNames.length === 0) {
       // For basic click without modifiers, we can still set selection
       if (!shiftKey && !ctrlKey && !metaKey && !altKey) {
-        dispatch(selectionChanged([{ type: 'image', id: imageName }]));
+        dispatch(selectionChanged([imageName]));
       }
       return;
     }
@@ -61,7 +62,7 @@ const buildOnClick =
       }
     } else if (shiftKey) {
       const rangeEndImageName = imageName;
-      const lastSelectedImage = selection.at(-1)?.id;
+      const lastSelectedImage = selection.at(-1);
       const lastClickedIndex = imageNames.findIndex((name) => name === lastSelectedImage);
       const currentClickedIndex = imageNames.findIndex((name) => name === rangeEndImageName);
       if (lastClickedIndex > -1 && currentClickedIndex > -1) {
@@ -72,16 +73,16 @@ const buildOnClick =
         if (currentClickedIndex < lastClickedIndex) {
           imagesToSelect.reverse();
         }
-        dispatch(selectionChanged(uniq(selection.concat(imagesToSelect.map((name) => ({ type: 'image', id: name }))))));
+        dispatch(selectionChanged(uniq(selection.concat(imagesToSelect))));
       }
     } else if (ctrlKey || metaKey) {
-      if (selection.some((n) => n.id === imageName) && selection.length > 1) {
-        dispatch(selectionChanged(uniq(selection.filter((n) => n.id !== imageName))));
+      if (selection.some((n) => n === imageName) && selection.length > 1) {
+        dispatch(selectionChanged(uniq(selection.filter((n) => n !== imageName))));
       } else {
-        dispatch(selectionChanged(uniq(selection.concat({ type: 'image', id: imageName }))));
+        dispatch(selectionChanged(uniq(selection.concat(imageName))));
       }
     } else {
-      dispatch(selectionChanged([{ type: 'image', id: imageName }]));
+      dispatch(selectionChanged([imageName]));
     }
   };
 
@@ -98,7 +99,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
   );
   const isSelectedForCompare = useAppSelector(selectIsSelectedForCompare);
   const selectIsSelected = useMemo(
-    () => createSelector(selectGallerySlice, (gallery) => gallery.selection.some((s) => s.id === imageDTO.image_name)),
+    () => createSelector(selectGallerySlice, (gallery) => gallery.selection.some((n) => n === imageDTO.image_name)),
     [imageDTO.image_name]
   );
   const isSelected = useAppSelector(selectIsSelected);
@@ -108,6 +109,25 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
     if (!element) {
       return;
     }
+
+    const monitorBinding = monitorForElements({
+      // This is a "global" drag start event, meaning that it is called for all drag events.
+      onDragStart: ({ source }) => {
+        // When we start dragging multiple images, set the dragging state to true if the dragged image is part of the
+        // selection. This is called for all drag events.
+        if (
+          multipleImageDndSource.typeGuard(source.data) &&
+          source.data.payload.image_names.includes(imageDTO.image_name)
+        ) {
+          setIsDragging(true);
+        }
+      },
+      onDrop: () => {
+        // Always set the dragging state to false when a drop event occurs.
+        setIsDragging(false);
+      },
+    });
+
     return combine(
       firefoxDndFix(element),
       draggable({
@@ -118,9 +138,9 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
 
           // When we have multiple images selected, and the dragged image is part of the selection, initiate a
           // multi-image drag.
-          if (selection.length > 1 && selection.some((s) => s.id === imageDTO.image_name)) {
+          if (selection.length > 1 && selection.some((n) => n === imageDTO.image_name)) {
             return multipleImageDndSource.getData({
-              image_names: selection.map((s) => s.id),
+              image_names: selection,
               board_id: boardId,
             });
           }
@@ -153,23 +173,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
           }
         },
       }),
-      monitorForElements({
-        // This is a "global" drag start event, meaning that it is called for all drag events.
-        onDragStart: ({ source }) => {
-          // When we start dragging multiple images, set the dragging state to true if the dragged image is part of the
-          // selection. This is called for all drag events.
-          if (
-            multipleImageDndSource.typeGuard(source.data) &&
-            source.data.payload.image_names.includes(imageDTO.image_name)
-          ) {
-            setIsDragging(true);
-          }
-        },
-        onDrop: () => {
-          // Always set the dragging state to false when a drop event occurs.
-          setIsDragging(false);
-        },
-      })
+      monitorBinding
     );
   }, [imageDTO, store]);
 
@@ -184,6 +188,9 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
   }, []);
 
   const onClick = useMemo(() => buildOnClick(imageDTO.image_name, store.dispatch, store.getState), [imageDTO, store]);
+  useMiddleClickOpenInNewTab(ref, imageDTO.image_url, {
+    requireDirectTarget: true,
+  });
 
   const onDoubleClick = useCallback<MouseEventHandler<HTMLDivElement>>(() => {
     store.dispatch(imageToCompareChanged(null));
@@ -217,7 +224,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
           maxH="full"
           borderRadius="base"
         />
-        <GalleryItemHoverIcons itemDTO={imageDTO} isHovered={isHovered} />
+        <GalleryItemHoverIcons imageDTO={imageDTO} isHovered={isHovered} />
       </Flex>
       {dragPreviewState?.type === 'multiple-image' ? createMultipleImageDragPreview(dragPreviewState) : null}
       {dragPreviewState?.type === 'single-image' ? createSingleImageDragPreview(dragPreviewState) : null}

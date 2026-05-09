@@ -4,16 +4,24 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import { bboxHeightChanged } from 'features/controlLayers/store/canvasSlice';
 import { selectGridSize, selectHeight, selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { useIsBboxSizeLocked } from 'features/parameters/components/Bbox/use-is-bbox-size-locked';
-import { selectHeightConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+
+const CONSTRAINTS = {
+  initial: 512,
+  sliderMin: 64,
+  sliderMax: 1536,
+  numberInputMin: 64,
+  numberInputMax: 4096,
+  fineStep: 8,
+  coarseStep: 64,
+};
 
 export const BboxHeight = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const height = useAppSelector(selectHeight);
-  const config = useAppSelector(selectHeightConfig);
   const isBboxSizeLocked = useIsBboxSizeLocked();
   const gridSize = useAppSelector(selectGridSize);
 
@@ -24,10 +32,7 @@ export const BboxHeight = memo(() => {
     [dispatch]
   );
 
-  const marks = useMemo(
-    () => [config.sliderMin, optimalDimension, config.sliderMax],
-    [config.sliderMin, config.sliderMax, optimalDimension]
-  );
+  const marks = useMemo(() => [CONSTRAINTS.sliderMin, optimalDimension, CONSTRAINTS.sliderMax], [optimalDimension]);
 
   return (
     <FormControl isDisabled={isBboxSizeLocked}>
@@ -38,9 +43,9 @@ export const BboxHeight = memo(() => {
         value={height}
         defaultValue={optimalDimension}
         onChange={onChange}
-        min={config.sliderMin}
-        max={config.sliderMax}
-        step={config.coarseStep}
+        min={CONSTRAINTS.sliderMin}
+        max={CONSTRAINTS.sliderMax}
+        step={CONSTRAINTS.coarseStep}
         fineStep={gridSize}
         marks={marks}
       />
@@ -48,9 +53,9 @@ export const BboxHeight = memo(() => {
         value={height}
         defaultValue={optimalDimension}
         onChange={onChange}
-        min={config.numberInputMin}
-        max={config.numberInputMax}
-        step={config.coarseStep}
+        min={CONSTRAINTS.numberInputMin}
+        max={CONSTRAINTS.numberInputMax}
+        step={CONSTRAINTS.coarseStep}
         fineStep={gridSize}
       />
     </FormControl>

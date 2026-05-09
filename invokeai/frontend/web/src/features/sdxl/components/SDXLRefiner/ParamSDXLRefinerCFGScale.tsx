@@ -2,19 +2,25 @@ import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { selectRefinerCFGScale, setRefinerCFGScale } from 'features/controlLayers/store/paramsSlice';
-import { selectCFGScaleConfig } from 'features/system/store/configSlice';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+
+const CONSTRAINTS = {
+  initial: 7,
+  sliderMin: 1,
+  sliderMax: 20,
+  numberInputMin: 1,
+  numberInputMax: 200,
+  fineStep: 0.1,
+  coarseStep: 0.5,
+};
+
+const MARKS = [CONSTRAINTS.sliderMin, Math.floor(CONSTRAINTS.sliderMax / 2), CONSTRAINTS.sliderMax];
 
 const ParamSDXLRefinerCFGScale = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const refinerCFGScale = useAppSelector(selectRefinerCFGScale);
-  const config = useAppSelector(selectCFGScaleConfig);
-  const marks = useMemo(
-    () => [config.sliderMin, Math.floor(config.sliderMax / 2), config.sliderMax],
-    [config.sliderMax, config.sliderMin]
-  );
 
   const onChange = useCallback((v: number) => dispatch(setRefinerCFGScale(v)), [dispatch]);
 
@@ -25,21 +31,21 @@ const ParamSDXLRefinerCFGScale = () => {
       </InformationalPopover>
       <CompositeSlider
         value={refinerCFGScale}
-        defaultValue={config.initial}
-        min={config.sliderMin}
-        max={config.sliderMax}
-        step={config.coarseStep}
-        fineStep={config.fineStep}
+        defaultValue={CONSTRAINTS.initial}
+        min={CONSTRAINTS.sliderMin}
+        max={CONSTRAINTS.sliderMax}
+        step={CONSTRAINTS.coarseStep}
+        fineStep={CONSTRAINTS.fineStep}
         onChange={onChange}
-        marks={marks}
+        marks={MARKS}
       />
       <CompositeNumberInput
         value={refinerCFGScale}
-        defaultValue={config.initial}
-        min={config.numberInputMin}
-        max={config.numberInputMax}
-        step={config.coarseStep}
-        fineStep={config.fineStep}
+        defaultValue={CONSTRAINTS.initial}
+        min={CONSTRAINTS.numberInputMin}
+        max={CONSTRAINTS.numberInputMax}
+        step={CONSTRAINTS.coarseStep}
+        fineStep={CONSTRAINTS.fineStep}
         onChange={onChange}
       />
     </FormControl>

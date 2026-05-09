@@ -21,6 +21,6 @@ export const zNodesState = z.object({
   nodes: z.array(zAnyNode),
   edges: z.array(zAnyEdge),
   formFieldInitialValues: z.record(z.string(), zStatefulFieldValue),
-  ...zWorkflowV3.omit({ nodes: true, edges: true, is_published: true }).shape,
+  ...zWorkflowV3.omit({ nodes: true, edges: true }).shape,
 });
 export type NodesState = z.infer<typeof zNodesState>;

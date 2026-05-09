@@ -1,10 +1,7 @@
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from invokeai.backend.model_manager.legacy_probe import CkptType
+from typing import Any
 
 
-def get_flux_in_channels_from_state_dict(state_dict: "CkptType") -> int | None:
+def get_flux_in_channels_from_state_dict(state_dict: dict[str | int, Any]) -> int | None:
     """Gets the in channels from the state dict."""
 
     # "Standard" FLUX models use "img_in.weight", but some community fine tunes use

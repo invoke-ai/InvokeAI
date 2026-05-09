@@ -18,14 +18,16 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 FLUX_CONTROL_TRANSFORMER_KEY_REGEX = r"(\w+\.)+(lora_A\.weight|lora_B\.weight|lora_B\.bias|scale)"
 
 
-def is_state_dict_likely_flux_control(state_dict: Dict[str, Any]) -> bool:
+def is_state_dict_likely_flux_control(state_dict: dict[str | int, Any]) -> bool:
     """Checks if the provided state dict is likely in the FLUX Control LoRA format.
 
     This is intended to be a high-precision detector, but it is not guaranteed to have perfect precision. (A
     perfect-precision detector would require checking all keys against a whitelist and verifying tensor shapes.)
     """
 
-    all_keys_match = all(re.match(FLUX_CONTROL_TRANSFORMER_KEY_REGEX, str(k)) for k in state_dict.keys())
+    all_keys_match = all(
+        re.match(FLUX_CONTROL_TRANSFORMER_KEY_REGEX, k) for k in state_dict.keys() if isinstance(k, str)
+    )
 
     # Check the shape of the img_in weight, because this layer shape is modified by FLUX control LoRAs.
     lora_a_weight = state_dict.get("img_in.lora_A.weight", None)

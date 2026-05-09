@@ -5,9 +5,8 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import type { GroupStatusMap } from 'common/components/Picker/Picker';
 import { loraAdded, selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
-import { selectBase } from 'features/controlLayers/store/paramsSlice';
+import { selectBase, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
-import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLoRAModels } from 'services/api/hooks/modelsByType';
@@ -24,14 +23,30 @@ const LoRASelect = () => {
   const addedLoRAModelKeys = useAppSelector(selectLoRAModelKeys);
 
   const currentBaseModel = useAppSelector(selectBase);
+  const currentMainModelConfig = useAppSelector(selectMainModelConfig);
 
-  // Filter to only show compatible LoRAs
+  // Filter to only show compatible LoRAs (by base model and variant)
   const compatibleLoRAs = useMemo(() => {
     if (!currentBaseModel) {
       return EMPTY_ARRAY;
     }
-    return modelConfigs.filter((model) => model.base === currentBaseModel);
-  }, [modelConfigs, currentBaseModel]);
+    return modelConfigs.filter((model) => {
+      if (model.base !== currentBaseModel) {
+        return false;
+      }
+      // For Flux2: filter by variant when both main model and LoRA have variant info
+      if (
+        currentMainModelConfig?.base === 'flux2' &&
+        'variant' in currentMainModelConfig &&
+        currentMainModelConfig.variant &&
+        'variant' in model &&
+        model.variant
+      ) {
+        return model.variant === currentMainModelConfig.variant;
+      }
+      return true;
+    });
+  }, [modelConfigs, currentBaseModel, currentMainModelConfig]);
 
   const getIsDisabled = useCallback(
     (model: LoRAModelConfig): boolean => {
@@ -69,11 +84,8 @@ const LoRASelect = () => {
       return undefined;
     }
 
-    // Determine the group ID for the current base model
-    const groupId = API_BASE_MODELS.includes(currentBaseModel) ? 'api' : currentBaseModel;
-
     // Return a map with only the current base model group enabled
-    return { [groupId]: true } satisfies GroupStatusMap;
+    return { [currentBaseModel]: true } satisfies GroupStatusMap;
   }, [currentBaseModel]);
 
   return (

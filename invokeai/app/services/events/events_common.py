@@ -16,8 +16,8 @@ from invokeai.app.services.session_queue.session_queue_common import (
 )
 from invokeai.app.services.shared.graph import AnyInvocation, AnyInvocationOutput
 from invokeai.app.util.misc import get_timestamp
-from invokeai.backend.model_manager import SubModelType
-from invokeai.backend.model_manager.config import AnyModelConfig
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.taxonomy import SubModelType
 
 if TYPE_CHECKING:
     from invokeai.app.services.download.download_base import DownloadJob
@@ -91,6 +91,7 @@ class QueueItemEventBase(QueueEventBase):
     batch_id: str = Field(description="The ID of the queue batch")
     origin: str | None = Field(default=None, description="The origin of the queue item")
     destination: str | None = Field(default=None, description="The destination of the queue item")
+    user_id: str = Field(default="system", description="The ID of the user who created the queue item")
 
 
 class InvocationEventBase(QueueItemEventBase):
@@ -117,6 +118,7 @@ class InvocationStartedEvent(InvocationEventBase):
             batch_id=queue_item.batch_id,
             origin=queue_item.origin,
             destination=queue_item.destination,
+            user_id=queue_item.user_id,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
@@ -152,6 +154,7 @@ class InvocationProgressEvent(InvocationEventBase):
             batch_id=queue_item.batch_id,
             origin=queue_item.origin,
             destination=queue_item.destination,
+            user_id=queue_item.user_id,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
@@ -179,6 +182,7 @@ class InvocationCompleteEvent(InvocationEventBase):
             batch_id=queue_item.batch_id,
             origin=queue_item.origin,
             destination=queue_item.destination,
+            user_id=queue_item.user_id,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
@@ -195,8 +199,6 @@ class InvocationErrorEvent(InvocationEventBase):
     error_type: str = Field(description="The error type")
     error_message: str = Field(description="The error message")
     error_traceback: str = Field(description="The error traceback")
-    user_id: Optional[str] = Field(default=None, description="The ID of the user who created the invocation")
-    project_id: Optional[str] = Field(default=None, description="The ID of the user who created the invocation")
 
     @classmethod
     def build(
@@ -213,14 +215,13 @@ class InvocationErrorEvent(InvocationEventBase):
             batch_id=queue_item.batch_id,
             origin=queue_item.origin,
             destination=queue_item.destination,
+            user_id=queue_item.user_id,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
             error_type=error_type,
             error_message=error_message,
             error_traceback=error_traceback,
-            user_id=getattr(queue_item, "user_id", None),
-            project_id=getattr(queue_item, "project_id", None),
         )
 
 
@@ -231,6 +232,10 @@ class QueueItemStatusChangedEvent(QueueItemEventBase):
     __event_name__ = "queue_item_status_changed"
 
     status: QUEUE_ITEM_STATUS = Field(description="The new status of the queue item")
+    status_sequence: int | None = Field(
+        default=None,
+        description="A monotonically increasing version for this queue item's visible status lifecycle",
+    )
     error_type: Optional[str] = Field(default=None, description="The error type, if any")
     error_message: Optional[str] = Field(default=None, description="The error message, if any")
     error_traceback: Optional[str] = Field(default=None, description="The error traceback, if any")
@@ -241,7 +246,6 @@ class QueueItemStatusChangedEvent(QueueItemEventBase):
     batch_status: BatchStatus = Field(description="The status of the batch")
     queue_status: SessionQueueStatus = Field(description="The status of the queue")
     session_id: str = Field(description="The ID of the session (aka graph execution state)")
-    credits: Optional[float] = Field(default=None, description="The total credits used for this queue item")
 
     @classmethod
     def build(
@@ -253,8 +257,10 @@ class QueueItemStatusChangedEvent(QueueItemEventBase):
             batch_id=queue_item.batch_id,
             origin=queue_item.origin,
             destination=queue_item.destination,
+            user_id=queue_item.user_id,
             session_id=queue_item.session_id,
             status=queue_item.status,
+            status_sequence=queue_item.status_sequence,
             error_type=queue_item.error_type,
             error_message=queue_item.error_message,
             error_traceback=queue_item.error_traceback,
@@ -264,7 +270,6 @@ class QueueItemStatusChangedEvent(QueueItemEventBase):
             completed_at=str(queue_item.completed_at) if queue_item.completed_at else None,
             batch_status=batch_status,
             queue_status=queue_status,
-            credits=queue_item.credits,
         )
 
 
@@ -281,9 +286,10 @@ class BatchEnqueuedEvent(QueueEventBase):
     )
     priority: int = Field(description="The priority of the batch")
     origin: str | None = Field(default=None, description="The origin of the batch")
+    user_id: str = Field(default="system", description="The ID of the user who enqueued the batch")
 
     @classmethod
-    def build(cls, enqueue_result: EnqueueBatchResult) -> "BatchEnqueuedEvent":
+    def build(cls, enqueue_result: EnqueueBatchResult, user_id: str = "system") -> "BatchEnqueuedEvent":
         return cls(
             queue_id=enqueue_result.queue_id,
             batch_id=enqueue_result.batch.batch_id,
@@ -291,6 +297,7 @@ class BatchEnqueuedEvent(QueueEventBase):
             enqueued=enqueue_result.enqueued,
             requested=enqueue_result.requested,
             priority=enqueue_result.priority,
+            user_id=user_id,
         )
 
 
@@ -385,6 +392,17 @@ class DownloadCancelledEvent(DownloadEventBase):
 
     @classmethod
     def build(cls, job: "DownloadJob") -> "DownloadCancelledEvent":
+        return cls(source=str(job.source))
+
+
+@payload_schema.register
+class DownloadPausedEvent(DownloadEventBase):
+    """Event model for download_paused"""
+
+    __event_name__ = "download_paused"
+
+    @classmethod
+    def build(cls, job: "DownloadJob") -> "DownloadPausedEvent":
         return cls(source=str(job.source))
 
 
@@ -546,11 +564,18 @@ class ModelInstallCompleteEvent(ModelEventBase):
     source: ModelSource = Field(description="Source of the model; local path, repo_id or url")
     key: str = Field(description="Model config record key")
     total_bytes: Optional[int] = Field(description="Size of the model (may be None for installation of a local path)")
+    config: AnyModelConfig = Field(description="The installed model's config")
 
     @classmethod
     def build(cls, job: "ModelInstallJob") -> "ModelInstallCompleteEvent":
         assert job.config_out is not None
-        return cls(id=job.id, source=job.source, key=(job.config_out.key), total_bytes=job.total_bytes)
+        return cls(
+            id=job.id,
+            source=job.source,
+            key=(job.config_out.key),
+            total_bytes=job.total_bytes,
+            config=job.config_out,
+        )
 
 
 @payload_schema.register
@@ -591,6 +616,7 @@ class BulkDownloadEventBase(EventBase):
     bulk_download_id: str = Field(description="The ID of the bulk image download")
     bulk_download_item_id: str = Field(description="The ID of the bulk image download item")
     bulk_download_item_name: str = Field(description="The name of the bulk image download item")
+    user_id: str = Field(default="system", description="The ID of the user who initiated the download")
 
 
 @payload_schema.register
@@ -601,12 +627,17 @@ class BulkDownloadStartedEvent(BulkDownloadEventBase):
 
     @classmethod
     def build(
-        cls, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
+        cls,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        user_id: str = "system",
     ) -> "BulkDownloadStartedEvent":
         return cls(
             bulk_download_id=bulk_download_id,
             bulk_download_item_id=bulk_download_item_id,
             bulk_download_item_name=bulk_download_item_name,
+            user_id=user_id,
         )
 
 
@@ -618,12 +649,17 @@ class BulkDownloadCompleteEvent(BulkDownloadEventBase):
 
     @classmethod
     def build(
-        cls, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
+        cls,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        user_id: str = "system",
     ) -> "BulkDownloadCompleteEvent":
         return cls(
             bulk_download_id=bulk_download_id,
             bulk_download_item_id=bulk_download_item_id,
             bulk_download_item_name=bulk_download_item_name,
+            user_id=user_id,
         )
 
 
@@ -637,11 +673,31 @@ class BulkDownloadErrorEvent(BulkDownloadEventBase):
 
     @classmethod
     def build(
-        cls, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str, error: str
+        cls,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        error: str,
+        user_id: str = "system",
     ) -> "BulkDownloadErrorEvent":
         return cls(
             bulk_download_id=bulk_download_id,
             bulk_download_item_id=bulk_download_item_id,
             bulk_download_item_name=bulk_download_item_name,
             error=error,
+            user_id=user_id,
         )
+
+
+@payload_schema.register
+class RecallParametersUpdatedEvent(QueueEventBase):
+    """Event model for recall_parameters_updated"""
+
+    __event_name__ = "recall_parameters_updated"
+
+    user_id: str = Field(description="The ID of the user whose recall parameters were updated")
+    parameters: dict[str, Any] = Field(description="The recall parameters that were updated")
+
+    @classmethod
+    def build(cls, queue_id: str, user_id: str, parameters: dict[str, Any]) -> "RecallParametersUpdatedEvent":
+        return cls(queue_id=queue_id, user_id=user_id, parameters=parameters)

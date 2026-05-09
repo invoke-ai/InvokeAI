@@ -9,6 +9,12 @@ import { z } from 'zod';
 const zAutoSwitchMode = z.enum(['off', 'switch_on_start', 'switch_on_finish']);
 export type AutoSwitchMode = z.infer<typeof zAutoSwitchMode>;
 
+const zTransformSmoothingMode = z.enum(['bilinear', 'bicubic', 'hamming', 'lanczos']);
+export type TransformSmoothingMode = z.infer<typeof zTransformSmoothingMode>;
+
+const zGradientType = z.enum(['linear', 'radial']);
+const zLassoMode = z.enum(['freehand', 'polygon']);
+
 const zCanvasSettingsState = z.object({
   /**
    * Whether to show HUD (Heads-Up Display) on the canvas.
@@ -86,6 +92,14 @@ const zCanvasSettingsState = z.object({
    */
   ruleOfThirds: z.boolean(),
   /**
+   * Whether to apply smoothing when rasterizing transformed layers.
+   */
+  transformSmoothingEnabled: z.boolean().default(false),
+  /**
+   * The resampling mode to use when smoothing transformed layers.
+   */
+  transformSmoothingMode: zTransformSmoothingMode.default('bicubic'),
+  /**
    * Whether to save all staging images to the gallery instead of keeping them as intermediate images.
    */
   saveAllImagesToGallery: z.boolean(),
@@ -93,6 +107,22 @@ const zCanvasSettingsState = z.object({
    * The auto-switch mode for the canvas staging area.
    */
   stagingAreaAutoSwitch: zAutoSwitchMode,
+  /**
+   * Whether the fill color picker UI is pinned (persistently shown in the canvas overlay).
+   */
+  fillColorPickerPinned: z.boolean(),
+  /**
+   * The gradient tool type.
+   */
+  gradientType: zGradientType.default('linear'),
+  /**
+   * Whether the gradient tool clips to the drag gesture.
+   */
+  gradientClipEnabled: z.boolean().default(true),
+  /**
+   * The lasso tool mode.
+   */
+  lassoMode: zLassoMode.default('freehand'),
 });
 
 type CanvasSettingsState = z.infer<typeof zCanvasSettingsState>;
@@ -118,6 +148,12 @@ const getInitialState = (): CanvasSettingsState => ({
   ruleOfThirds: false,
   saveAllImagesToGallery: false,
   stagingAreaAutoSwitch: 'switch_on_start',
+  fillColorPickerPinned: false,
+  transformSmoothingEnabled: false,
+  transformSmoothingMode: 'bicubic',
+  gradientType: 'linear',
+  gradientClipEnabled: true,
+  lassoMode: 'freehand',
 });
 
 const slice = createSlice({
@@ -191,11 +227,32 @@ const slice = createSlice({
     settingsSaveAllImagesToGalleryToggled: (state) => {
       state.saveAllImagesToGallery = !state.saveAllImagesToGallery;
     },
+    settingsTransformSmoothingEnabledToggled: (state) => {
+      state.transformSmoothingEnabled = !state.transformSmoothingEnabled;
+    },
+    settingsTransformSmoothingModeChanged: (
+      state,
+      action: PayloadAction<CanvasSettingsState['transformSmoothingMode']>
+    ) => {
+      state.transformSmoothingMode = action.payload;
+    },
     settingsStagingAreaAutoSwitchChanged: (
       state,
       action: PayloadAction<CanvasSettingsState['stagingAreaAutoSwitch']>
     ) => {
       state.stagingAreaAutoSwitch = action.payload;
+    },
+    settingsFillColorPickerPinnedSet: (state, action: PayloadAction<boolean>) => {
+      state.fillColorPickerPinned = action.payload;
+    },
+    settingsGradientTypeChanged: (state, action: PayloadAction<CanvasSettingsState['gradientType']>) => {
+      state.gradientType = action.payload;
+    },
+    settingsGradientClipToggled: (state) => {
+      state.gradientClipEnabled = !state.gradientClipEnabled;
+    },
+    settingsLassoModeChanged: (state, action: PayloadAction<CanvasSettingsState['lassoMode']>) => {
+      state.lassoMode = action.payload;
     },
   },
 });
@@ -222,7 +279,13 @@ export const {
   settingsPressureSensitivityToggled,
   settingsRuleOfThirdsToggled,
   settingsSaveAllImagesToGalleryToggled,
+  settingsTransformSmoothingEnabledToggled,
+  settingsTransformSmoothingModeChanged,
   settingsStagingAreaAutoSwitchChanged,
+  settingsFillColorPickerPinnedSet,
+  settingsGradientTypeChanged,
+  settingsGradientClipToggled,
+  settingsLassoModeChanged,
 } = slice.actions;
 
 export const canvasSettingsSliceConfig: SliceConfig<typeof slice> = {
@@ -237,6 +300,8 @@ export const canvasSettingsSliceConfig: SliceConfig<typeof slice> = {
 export const selectCanvasSettingsSlice = (s: RootState) => s.canvasSettings;
 const createCanvasSettingsSelector = <T>(selector: Selector<CanvasSettingsState, T>) =>
   createSelector(selectCanvasSettingsSlice, selector);
+
+export const selectFillColorPickerPinned = createCanvasSettingsSelector((s) => s.fillColorPickerPinned);
 
 export const selectPreserveMask = createCanvasSettingsSelector((settings) => settings.preserveMask);
 export const selectOutputOnlyMaskedRegions = createCanvasSettingsSelector(
@@ -256,3 +321,10 @@ export const selectPressureSensitivity = createCanvasSettingsSelector((settings)
 export const selectRuleOfThirds = createCanvasSettingsSelector((settings) => settings.ruleOfThirds);
 export const selectSaveAllImagesToGallery = createCanvasSettingsSelector((settings) => settings.saveAllImagesToGallery);
 export const selectStagingAreaAutoSwitch = createCanvasSettingsSelector((settings) => settings.stagingAreaAutoSwitch);
+export const selectTransformSmoothingEnabled = createCanvasSettingsSelector(
+  (settings) => settings.transformSmoothingEnabled
+);
+export const selectTransformSmoothingMode = createCanvasSettingsSelector((settings) => settings.transformSmoothingMode);
+export const selectGradientType = createCanvasSettingsSelector((settings) => settings.gradientType);
+export const selectGradientClipEnabled = createCanvasSettingsSelector((settings) => settings.gradientClipEnabled);
+export const selectLassoMode = createCanvasSettingsSelector((settings) => settings.lassoMode);

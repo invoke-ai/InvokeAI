@@ -44,9 +44,8 @@ const queryOptions = {
     if (!currentData) {
       return { serverWorkflowHash: null };
     }
-    const { is_published: _is_published, ...serverWorkflow } = currentData.workflow;
     return {
-      serverWorkflowHash: stableHash(serverWorkflow),
+      serverWorkflowHash: stableHash(currentData.workflow),
     };
   },
 } satisfies Parameters<typeof useGetWorkflowQuery>[1];

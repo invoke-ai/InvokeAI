@@ -1,10 +1,7 @@
 import { MenuDivider, MenuItem } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
-import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { imagesToChangeSelected, isModalOpenChanged } from 'features/changeBoardModal/store/slice';
 import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDownloadSimpleBold, PiFoldersBold, PiStarBold, PiStarFill, PiTrashSimpleBold } from 'react-icons/pi';
@@ -13,59 +10,63 @@ import {
   useStarImagesMutation,
   useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
+import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
+import { useSelectedBoard } from 'services/api/hooks/useSelectedBoard';
 
 const MultipleSelectionMenuItems = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const selection = useAppSelector((s) => s.gallery.selection);
-  const customStarUi = useStore($customStarUI);
   const deleteImageModal = useDeleteImageModalApi();
-
-  const isBulkDownloadEnabled = useFeatureStatus('bulkDownload');
+  const selectedBoard = useSelectedBoard();
+  const { canWriteImages } = useBoardAccess(selectedBoard);
 
   const [starImages] = useStarImagesMutation();
   const [unstarImages] = useUnstarImagesMutation();
   const [bulkDownload] = useBulkDownloadImagesMutation();
 
   const handleChangeBoard = useCallback(() => {
-    dispatch(imagesToChangeSelected(selection.map((s) => s.id)));
+    dispatch(imagesToChangeSelected(selection));
     dispatch(isModalOpenChanged(true));
   }, [dispatch, selection]);
 
   const handleDeleteSelection = useCallback(() => {
-    deleteImageModal.delete(selection.map((s) => s.id));
+    deleteImageModal.delete(selection);
   }, [deleteImageModal, selection]);
 
   const handleStarSelection = useCallback(() => {
-    starImages({ image_names: selection.map((s) => s.id) });
+    starImages({ image_names: selection });
   }, [starImages, selection]);
 
   const handleUnstarSelection = useCallback(() => {
-    unstarImages({ image_names: selection.map((s) => s.id) });
+    unstarImages({ image_names: selection });
   }, [unstarImages, selection]);
 
   const handleBulkDownload = useCallback(() => {
-    bulkDownload({ image_names: selection.map((s) => s.id) });
+    bulkDownload({ image_names: selection });
   }, [selection, bulkDownload]);
 
   return (
     <>
-      <MenuItem icon={customStarUi ? customStarUi.on.icon : <PiStarBold />} onClickCapture={handleUnstarSelection}>
-        {customStarUi ? customStarUi.off.text : `Unstar All`}
+      <MenuItem icon={<PiStarBold />} onClickCapture={handleUnstarSelection}>
+        Unstar All
       </MenuItem>
-      <MenuItem icon={customStarUi ? customStarUi.on.icon : <PiStarFill />} onClickCapture={handleStarSelection}>
-        {customStarUi ? customStarUi.on.text : `Star All`}
+      <MenuItem icon={<PiStarFill />} onClickCapture={handleStarSelection}>
+        Star All
       </MenuItem>
-      {isBulkDownloadEnabled && (
-        <MenuItem icon={<PiDownloadSimpleBold />} onClickCapture={handleBulkDownload}>
-          {t('gallery.downloadSelection')}
-        </MenuItem>
-      )}
-      <MenuItem icon={<PiFoldersBold />} onClickCapture={handleChangeBoard}>
+      <MenuItem icon={<PiDownloadSimpleBold />} onClickCapture={handleBulkDownload}>
+        {t('gallery.downloadSelection')}
+      </MenuItem>
+      <MenuItem icon={<PiFoldersBold />} onClickCapture={handleChangeBoard} isDisabled={!canWriteImages}>
         {t('boards.changeBoard')}
       </MenuItem>
       <MenuDivider />
-      <MenuItem color="error.300" icon={<PiTrashSimpleBold />} onClickCapture={handleDeleteSelection}>
+      <MenuItem
+        color="error.300"
+        icon={<PiTrashSimpleBold />}
+        onClickCapture={handleDeleteSelection}
+        isDisabled={!canWriteImages}
+      >
         {t('gallery.deleteSelection')}
       </MenuItem>
     </>

@@ -5,8 +5,8 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   type CanvasRegionalGuidanceState,
-  isFLUXReduxConfig,
-  isIPAdapterConfig,
+  isRegionalGuidanceFLUXReduxConfig,
+  isRegionalGuidanceIPAdapterConfig,
   type Rect,
 } from 'features/controlLayers/store/types';
 import { getRegionalGuidanceWarnings } from 'features/controlLayers/store/validators';
@@ -32,8 +32,22 @@ type AddRegionsArg = {
   g: Graph;
   bbox: Rect;
   model: MainModelConfig;
-  posCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'>;
-  negCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'> | null;
+  posCond: Invocation<
+    | 'compel'
+    | 'sdxl_compel_prompt'
+    | 'flux_text_encoder'
+    | 'flux2_klein_text_encoder'
+    | 'z_image_text_encoder'
+    | 'anima_text_encoder'
+  >;
+  negCond: Invocation<
+    | 'compel'
+    | 'sdxl_compel_prompt'
+    | 'flux_text_encoder'
+    | 'flux2_klein_text_encoder'
+    | 'z_image_text_encoder'
+    | 'anima_text_encoder'
+  > | null;
   posCondCollect: Invocation<'collect'>;
   negCondCollect: Invocation<'collect'> | null;
   ipAdapterCollect: Invocation<'collect'>;
@@ -71,6 +85,8 @@ export const addRegions = async ({
 }: AddRegionsArg): Promise<AddedRegionResult[]> => {
   const isSDXL = model.base === 'sdxl';
   const isFLUX = model.base === 'flux';
+  const isZImage = model.base === 'z-image';
+  const isAnima = model.base === 'anima';
 
   const validRegions = regions
     .filter((entity) => entity.isEnabled)
@@ -111,7 +127,9 @@ export const addRegions = async ({
     if (region.positivePrompt) {
       // The main positive conditioning node
       result.addedPositivePrompt = true;
-      let regionalPosCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'>;
+      let regionalPosCond: Invocation<
+        'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder' | 'z_image_text_encoder' | 'anima_text_encoder'
+      >;
       if (isSDXL) {
         regionalPosCond = g.addNode({
           type: 'sdxl_compel_prompt',
@@ -122,6 +140,18 @@ export const addRegions = async ({
       } else if (isFLUX) {
         regionalPosCond = g.addNode({
           type: 'flux_text_encoder',
+          id: getPrefixedId('prompt_region_positive_cond'),
+          prompt: region.positivePrompt,
+        });
+      } else if (isZImage) {
+        regionalPosCond = g.addNode({
+          type: 'z_image_text_encoder',
+          id: getPrefixedId('prompt_region_positive_cond'),
+          prompt: region.positivePrompt,
+        });
+      } else if (isAnima) {
+        regionalPosCond = g.addNode({
+          type: 'anima_text_encoder',
           id: getPrefixedId('prompt_region_positive_cond'),
           prompt: region.positivePrompt,
         });
@@ -155,6 +185,18 @@ export const addRegions = async ({
           clone.destination.node_id = regionalPosCond.id;
           g.addEdgeFromObj(clone);
         }
+      } else if (posCond.type === 'z_image_text_encoder') {
+        for (const edge of g.getEdgesTo(posCond, ['qwen3_encoder', 'mask'])) {
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalPosCond.id;
+          g.addEdgeFromObj(clone);
+        }
+      } else if (posCond.type === 'anima_text_encoder') {
+        for (const edge of g.getEdgesTo(posCond, ['qwen3_encoder', 't5_encoder', 'mask'])) {
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalPosCond.id;
+          g.addEdgeFromObj(clone);
+        }
       } else {
         assert(false, 'Unsupported positive conditioning node type.');
       }
@@ -166,7 +208,9 @@ export const addRegions = async ({
 
       // The main negative conditioning node
       result.addedNegativePrompt = true;
-      let regionalNegCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'>;
+      let regionalNegCond: Invocation<
+        'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder' | 'z_image_text_encoder' | 'anima_text_encoder'
+      >;
       if (isSDXL) {
         regionalNegCond = g.addNode({
           type: 'sdxl_compel_prompt',
@@ -177,6 +221,18 @@ export const addRegions = async ({
       } else if (isFLUX) {
         regionalNegCond = g.addNode({
           type: 'flux_text_encoder',
+          id: getPrefixedId('prompt_region_negative_cond'),
+          prompt: region.negativePrompt,
+        });
+      } else if (isZImage) {
+        regionalNegCond = g.addNode({
+          type: 'z_image_text_encoder',
+          id: getPrefixedId('prompt_region_negative_cond'),
+          prompt: region.negativePrompt,
+        });
+      } else if (isAnima) {
+        regionalNegCond = g.addNode({
+          type: 'anima_text_encoder',
           id: getPrefixedId('prompt_region_negative_cond'),
           prompt: region.negativePrompt,
         });
@@ -211,6 +267,18 @@ export const addRegions = async ({
           clone.destination.node_id = regionalNegCond.id;
           g.addEdgeFromObj(clone);
         }
+      } else if (negCond.type === 'z_image_text_encoder') {
+        for (const edge of g.getEdgesTo(negCond, ['qwen3_encoder', 'mask'])) {
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalNegCond.id;
+          g.addEdgeFromObj(clone);
+        }
+      } else if (negCond.type === 'anima_text_encoder') {
+        for (const edge of g.getEdgesTo(negCond, ['qwen3_encoder', 't5_encoder', 'mask'])) {
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalNegCond.id;
+          g.addEdgeFromObj(clone);
+        }
       } else {
         assert(false, 'Unsupported negative conditioning node type.');
       }
@@ -229,7 +297,9 @@ export const addRegions = async ({
       // Connect the OG mask image to the inverted mask-to-tensor node
       g.addEdge(maskToTensor, 'mask', invertTensorMask, 'mask');
       // Create the conditioning node. It's going to be connected to the negative cond collector, but it uses the positive prompt
-      let regionalPosCondInverted: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'>;
+      let regionalPosCondInverted: Invocation<
+        'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder' | 'z_image_text_encoder' | 'anima_text_encoder'
+      >;
       if (isSDXL) {
         regionalPosCondInverted = g.addNode({
           type: 'sdxl_compel_prompt',
@@ -240,6 +310,18 @@ export const addRegions = async ({
       } else if (isFLUX) {
         regionalPosCondInverted = g.addNode({
           type: 'flux_text_encoder',
+          id: getPrefixedId('prompt_region_positive_cond_inverted'),
+          prompt: region.positivePrompt,
+        });
+      } else if (isZImage) {
+        regionalPosCondInverted = g.addNode({
+          type: 'z_image_text_encoder',
+          id: getPrefixedId('prompt_region_positive_cond_inverted'),
+          prompt: region.positivePrompt,
+        });
+      } else if (isAnima) {
+        regionalPosCondInverted = g.addNode({
+          type: 'anima_text_encoder',
           id: getPrefixedId('prompt_region_positive_cond_inverted'),
           prompt: region.positivePrompt,
         });
@@ -273,13 +355,25 @@ export const addRegions = async ({
           clone.destination.node_id = regionalPosCondInverted.id;
           g.addEdgeFromObj(clone);
         }
+      } else if (posCond.type === 'z_image_text_encoder') {
+        for (const edge of g.getEdgesTo(posCond, ['qwen3_encoder', 'mask'])) {
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalPosCondInverted.id;
+          g.addEdgeFromObj(clone);
+        }
+      } else if (posCond.type === 'anima_text_encoder') {
+        for (const edge of g.getEdgesTo(posCond, ['qwen3_encoder', 't5_encoder', 'mask'])) {
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalPosCondInverted.id;
+          g.addEdgeFromObj(clone);
+        }
       } else {
         assert(false, 'Unsupported positive conditioning node type.');
       }
     }
 
     for (const { id, config } of region.referenceImages) {
-      if (isIPAdapterConfig(config)) {
+      if (isRegionalGuidanceIPAdapterConfig(config)) {
         assert(!isFLUX, 'Regional IP adapters are not supported for FLUX.');
 
         result.addedIPAdapters++;
@@ -304,7 +398,7 @@ export const addRegions = async ({
         // Connect the mask to the conditioning
         g.addEdge(maskToTensor, 'mask', ipAdapterNode, 'mask');
         g.addEdge(ipAdapterNode, 'ip_adapter', ipAdapterCollect, 'item');
-      } else if (isFLUXReduxConfig(config)) {
+      } else if (isRegionalGuidanceFLUXReduxConfig(config)) {
         assert(isFLUX, 'Regional FLUX Redux requires FLUX.');
         assert(fluxReduxCollect !== null, 'FLUX Redux collector is required.');
         result.addedFLUXReduxes++;

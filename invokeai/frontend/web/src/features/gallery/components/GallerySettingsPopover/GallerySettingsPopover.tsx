@@ -15,6 +15,7 @@ import AutoSwitchCheckbox from 'features/gallery/components/GallerySettingsPopov
 import ImageMinimumWidthSlider from 'features/gallery/components/GallerySettingsPopover/ImageMinimumWidthSlider';
 import ShowStarredFirstCheckbox from 'features/gallery/components/GallerySettingsPopover/ShowStarredFirstCheckbox';
 import SortDirectionCombobox from 'features/gallery/components/GallerySettingsPopover/SortDirectionCombobox';
+import UsePagedGalleryViewCheckbox from 'features/gallery/components/GallerySettingsPopover/UsePagedGalleryViewCheckbox';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiGearSixFill } from 'react-icons/pi';
@@ -46,6 +47,7 @@ export const GallerySettingsPopover = memo(() => {
               <Divider />
 
               <ImageMinimumWidthSlider />
+              <UsePagedGalleryViewCheckbox />
               <AutoSwitchCheckbox />
               <AlwaysShowImageSizeCheckbox />
 

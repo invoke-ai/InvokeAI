@@ -3,28 +3,70 @@ import type { AppStartListening } from 'app/store/store';
 import { bboxSyncedToOptimalDimension, rgRefImageModelChanged } from 'features/controlLayers/store/canvasSlice';
 import { buildSelectIsStaging, selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraIsEnabledChanged } from 'features/controlLayers/store/lorasSlice';
-import { modelChanged, syncedToOptimalDimension, vaeSelected } from 'features/controlLayers/store/paramsSlice';
-import { refImageModelChanged, selectReferenceImageEntities } from 'features/controlLayers/store/refImagesSlice';
+import {
+  animaQwen3EncoderModelSelected,
+  animaT5EncoderModelSelected,
+  animaVaeModelSelected,
+  aspectRatioIdChanged,
+  kleinQwen3EncoderModelSelected,
+  kleinVaeModelSelected,
+  modelChanged,
+  qwenImageComponentSourceSelected,
+  qwenImageQwenVLEncoderModelSelected,
+  qwenImageVaeModelSelected,
+  resolutionPresetSelected,
+  setZImageScheduler,
+  syncedToOptimalDimension,
+  vaeSelected,
+  zImageQwen3EncoderModelSelected,
+  zImageQwen3SourceModelSelected,
+  zImageVaeModelSelected,
+} from 'features/controlLayers/store/paramsSlice';
+import {
+  refImageConfigChanged,
+  refImageModelChanged,
+  selectReferenceImageEntities,
+} from 'features/controlLayers/store/refImagesSlice';
 import {
   selectAllEntitiesOfType,
   selectBboxModelBase,
   selectCanvasSlice,
 } from 'features/controlLayers/store/selectors';
-import { getEntityIdentifier } from 'features/controlLayers/store/types';
+import {
+  getEntityIdentifier,
+  isAspectRatioID,
+  isFlux2ReferenceImageConfig,
+  isQwenImageReferenceImageConfig,
+} from 'features/controlLayers/store/types';
+import {
+  initialFlux2ReferenceImage,
+  initialFluxKontextReferenceImage,
+  initialFLUXRedux,
+  initialIPAdapter,
+  initialQwenImageReferenceImage,
+} from 'features/controlLayers/store/util';
+import { SUPPORTS_REF_IMAGES_BASE_MODELS } from 'features/modelManagerV2/models';
+import { zModelIdentifierField } from 'features/nodes/types/common';
 import { modelSelected } from 'features/parameters/store/actions';
-import { SUPPORTS_REF_IMAGES_BASE_MODELS } from 'features/parameters/types/constants';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { selectGlobalRefImageModels, selectRegionalRefImageModels } from 'services/api/hooks/modelsByType';
-import type { AnyModelConfig } from 'services/api/types';
+import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import {
-  isChatGPT4oModelConfig,
-  isFluxKontextApiModelConfig,
-  isFluxKontextModelConfig,
-  isFluxReduxModelConfig,
-  isGemini2_5ModelConfig,
-} from 'services/api/types';
+  selectAnimaQwen3EncoderModels,
+  selectAnimaVAEModels,
+  selectFluxVAEModels,
+  selectGlobalRefImageModels,
+  selectQwen3EncoderModels,
+  selectQwenImageDiffusersModels,
+  selectQwenImageVAEModels,
+  selectQwenVLEncoderModels,
+  selectRegionalRefImageModels,
+  selectT5EncoderModels,
+  selectZImageDiffusersModels,
+} from 'services/api/hooks/modelsByType';
+import type { FLUXKontextModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig } from 'services/api/types';
+import { isExternalApiModelConfig, isFluxKontextModelConfig, isFluxReduxModelConfig } from 'services/api/types';
 
 const log = logger('models');
 
@@ -63,31 +105,240 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           modelsUpdatedDisabledOrCleared += 1;
         }
 
-        if (SUPPORTS_REF_IMAGES_BASE_MODELS.includes(newModel.base)) {
+        // handle incompatible Z-Image models - clear if switching away from z-image
+        const { zImageVaeModel, zImageQwen3EncoderModel, zImageQwen3SourceModel } = state.params;
+        if (newBase !== 'z-image') {
+          if (zImageVaeModel) {
+            dispatch(zImageVaeModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (zImageQwen3EncoderModel) {
+            dispatch(zImageQwen3EncoderModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (zImageQwen3SourceModel) {
+            dispatch(zImageQwen3SourceModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+        } else {
+          // Switching to Z-Image - set defaults if no valid configuration exists
+          const hasValidConfig = zImageQwen3SourceModel || (zImageVaeModel && zImageQwen3EncoderModel);
+
+          if (!hasValidConfig) {
+            // Prefer Qwen3 Source (Diffusers model) if available
+            const availableZImageDiffusers = selectZImageDiffusersModels(state);
+
+            if (availableZImageDiffusers.length > 0) {
+              const diffusersModel = availableZImageDiffusers[0];
+              if (diffusersModel) {
+                dispatch(
+                  zImageQwen3SourceModelSelected({
+                    key: diffusersModel.key,
+                    hash: diffusersModel.hash,
+                    name: diffusersModel.name,
+                    base: diffusersModel.base,
+                    type: diffusersModel.type,
+                  })
+                );
+              }
+            } else {
+              // Fallback: try to set Qwen3 Encoder + VAE
+              const availableQwen3Encoders = selectQwen3EncoderModels(state);
+              const availableFluxVAEs = selectFluxVAEModels(state);
+
+              if (availableQwen3Encoders.length > 0 && availableFluxVAEs.length > 0) {
+                const qwen3Encoder = availableQwen3Encoders[0];
+                const fluxVAE = availableFluxVAEs[0];
+
+                if (qwen3Encoder) {
+                  dispatch(
+                    zImageQwen3EncoderModelSelected({
+                      key: qwen3Encoder.key,
+                      name: qwen3Encoder.name,
+                      base: qwen3Encoder.base,
+                    })
+                  );
+                }
+                if (fluxVAE) {
+                  dispatch(
+                    zImageVaeModelSelected({
+                      key: fluxVAE.key,
+                      hash: fluxVAE.hash,
+                      name: fluxVAE.name,
+                      base: fluxVAE.base,
+                      type: fluxVAE.type,
+                    })
+                  );
+                }
+              }
+            }
+          }
+        }
+
+        // handle incompatible Anima models - clear if switching away from anima
+        const { animaVaeModel, animaQwen3EncoderModel, animaT5EncoderModel } = state.params;
+        if (newBase !== 'anima') {
+          if (animaVaeModel) {
+            dispatch(animaVaeModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (animaQwen3EncoderModel) {
+            dispatch(animaQwen3EncoderModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (animaT5EncoderModel) {
+            dispatch(animaT5EncoderModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+        } else {
+          // Switching to Anima - set defaults if no valid configuration exists
+          const hasValidConfig = animaVaeModel && animaQwen3EncoderModel && animaT5EncoderModel;
+
+          if (!hasValidConfig) {
+            const availableQwen3Encoders = selectAnimaQwen3EncoderModels(state);
+            const availableAnimaVAEs = selectAnimaVAEModels(state);
+            const availableT5Encoders = selectT5EncoderModels(state);
+
+            if (availableQwen3Encoders.length > 0 && availableAnimaVAEs.length > 0) {
+              const qwen3Encoder = availableQwen3Encoders[0];
+              const fluxVAE = availableAnimaVAEs[0];
+
+              if (qwen3Encoder && !animaQwen3EncoderModel) {
+                dispatch(
+                  animaQwen3EncoderModelSelected({
+                    key: qwen3Encoder.key,
+                    hash: qwen3Encoder.hash,
+                    name: qwen3Encoder.name,
+                    base: qwen3Encoder.base,
+                    type: qwen3Encoder.type,
+                  })
+                );
+              }
+              if (fluxVAE && !animaVaeModel) {
+                dispatch(
+                  animaVaeModelSelected({
+                    key: fluxVAE.key,
+                    hash: fluxVAE.hash,
+                    name: fluxVAE.name,
+                    base: fluxVAE.base,
+                    type: fluxVAE.type,
+                  })
+                );
+              }
+              const t5Encoder = availableT5Encoders[0];
+              if (t5Encoder && !animaT5EncoderModel) {
+                dispatch(
+                  animaT5EncoderModelSelected({
+                    key: t5Encoder.key,
+                    hash: t5Encoder.hash,
+                    name: t5Encoder.name,
+                    base: t5Encoder.base,
+                    type: t5Encoder.type,
+                  })
+                );
+              }
+            }
+          }
+        }
+
+        // handle incompatible FLUX.2 Klein models - clear if switching away from flux2
+        const { kleinVaeModel, kleinQwen3EncoderModel } = state.params;
+        if (newBase !== 'flux2') {
+          if (kleinVaeModel) {
+            dispatch(kleinVaeModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (kleinQwen3EncoderModel) {
+            dispatch(kleinQwen3EncoderModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+        }
+
+        // handle incompatible Qwen Image Edit component source - clear if switching away
+        const { qwenImageComponentSource, qwenImageVaeModel, qwenImageQwenVLEncoderModel } = state.params;
+        if (newBase !== 'qwen-image') {
+          if (qwenImageComponentSource) {
+            dispatch(qwenImageComponentSourceSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (qwenImageVaeModel) {
+            dispatch(qwenImageVaeModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (qwenImageQwenVLEncoderModel) {
+            dispatch(qwenImageQwenVLEncoderModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+        } else {
+          // Switching to Qwen Image - auto-default component source to a matching diffusers model
+          if (!qwenImageComponentSource) {
+            const availableQwenImageDiffusers = selectQwenImageDiffusersModels(state);
+
+            // Look up the new model's variant to match generate vs edit
+            const modelConfigsResult = selectModelConfigsQuery(state);
+            let selectedVariant: string | null = null;
+            if (modelConfigsResult.data) {
+              const newModelConfig = modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key);
+              if (newModelConfig && 'variant' in newModelConfig && typeof newModelConfig.variant === 'string') {
+                selectedVariant = newModelConfig.variant;
+              }
+            }
+
+            // Find a diffusers model matching the variant; if no variant on denoiser, prefer "generate" then "edit"
+            const variantToMatch = selectedVariant ?? 'generate';
+            const matchingModel = availableQwenImageDiffusers.find(
+              (m) => 'variant' in m && m.variant === variantToMatch
+            );
+            const fallbackModel = availableQwenImageDiffusers.find(
+              (m) => 'variant' in m && m.variant !== variantToMatch
+            );
+            const diffusersModel = matchingModel ?? fallbackModel ?? availableQwenImageDiffusers[0];
+
+            if (diffusersModel) {
+              dispatch(qwenImageComponentSourceSelected(zModelIdentifierField.parse(diffusersModel)));
+            }
+          }
+
+          // Auto-select standalone VAE and Qwen2.5-VL Encoder if available - this allows GGUF
+          // users to be ready-to-go after installing the starter pack without having to dig into
+          // Advanced. Only set if the user hasn't already chosen one.
+          if (!qwenImageVaeModel) {
+            const availableQwenImageVAEs = selectQwenImageVAEModels(state);
+            const vae = availableQwenImageVAEs[0];
+            if (vae) {
+              dispatch(qwenImageVaeModelSelected(zModelIdentifierField.parse(vae)));
+            }
+          }
+          if (!qwenImageQwenVLEncoderModel) {
+            const availableQwenVLEncoders = selectQwenVLEncoderModels(state);
+            // Prefer diffusers (folder) format over single-file checkpoints, since the latter
+            // can fail to load on some checkpoints.
+            const encoder =
+              availableQwenVLEncoders.find((m) => m.format === 'qwen_vl_encoder') ?? availableQwenVLEncoders[0];
+            if (encoder) {
+              dispatch(qwenImageQwenVLEncoderModelSelected(zModelIdentifierField.parse(encoder)));
+            }
+          }
+        }
+
+        if (newModel.base !== 'external' && SUPPORTS_REF_IMAGES_BASE_MODELS.includes(newModel.base)) {
           // Handle incompatible reference image models - switch to first compatible model, with some smart logic
           // to choose the best available model based on the new main model.
           const allRefImageModels = selectGlobalRefImageModels(state).filter(({ base }) => base === newBase);
 
-          let newGlobalRefImageModel = null;
+          let newGlobalRefImageModel: IPAdapterModelConfig | FLUXKontextModelConfig | FLUXReduxModelConfig | null =
+            null;
 
           // Certain models require the ref image model to be the same as the main model - others just need a matching
           // base. Helper to grab the first exact match or the first available model if no exact match is found.
-          const exactMatchOrFirst = <T extends AnyModelConfig>(candidates: T[]): T | null =>
-            candidates.find(({ key }) => key === newModel.key) ?? candidates[0] ?? null;
+          const exactMatchOrFirst = <T extends IPAdapterModelConfig | FLUXKontextModelConfig | FLUXReduxModelConfig>(
+            candidates: T[]
+          ): T | null => candidates.find(({ key }) => key === newModel.key) ?? candidates[0] ?? null;
 
           // The only way we can differentiate between FLUX and FLUX Kontext is to check for "kontext" in the name
           if (newModel.base === 'flux' && newModel.name.toLowerCase().includes('kontext')) {
             const fluxKontextDevModels = allRefImageModels.filter(isFluxKontextModelConfig);
             newGlobalRefImageModel = exactMatchOrFirst(fluxKontextDevModels);
-          } else if (newModel.base === 'chatgpt-4o') {
-            const chatGPT4oModels = allRefImageModels.filter(isChatGPT4oModelConfig);
-            newGlobalRefImageModel = exactMatchOrFirst(chatGPT4oModels);
-          } else if (newModel.base === 'gemini-2.5') {
-            const gemini2_5Models = allRefImageModels.filter(isGemini2_5ModelConfig);
-            newGlobalRefImageModel = exactMatchOrFirst(gemini2_5Models);
-          } else if (newModel.base === 'flux-kontext') {
-            const fluxKontextApiModels = allRefImageModels.filter(isFluxKontextApiModelConfig);
-            newGlobalRefImageModel = exactMatchOrFirst(fluxKontextApiModels);
           } else if (newModel.base === 'flux') {
             const fluxReduxModels = allRefImageModels.filter(isFluxReduxModelConfig);
             newGlobalRefImageModel = fluxReduxModels[0] ?? null;
@@ -98,6 +349,83 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           // All ref image entities are updated to use the same new model
           const refImageEntities = selectReferenceImageEntities(state);
           for (const entity of refImageEntities) {
+            if (newBase === 'flux2') {
+              // Switching TO FLUX.2 - convert any non-flux2 configs to flux2_reference_image
+              if (!isFlux2ReferenceImageConfig(entity.config)) {
+                dispatch(
+                  refImageConfigChanged({
+                    id: entity.id,
+                    config: { ...initialFlux2ReferenceImage },
+                  })
+                );
+                modelsUpdatedDisabledOrCleared += 1;
+              }
+              continue;
+            }
+
+            if (newBase === 'qwen-image') {
+              // Switching TO Qwen Image Edit - convert any non-qwen configs to qwen_image_reference_image
+              if (!isQwenImageReferenceImageConfig(entity.config)) {
+                dispatch(
+                  refImageConfigChanged({
+                    id: entity.id,
+                    config: { ...initialQwenImageReferenceImage },
+                  })
+                );
+                modelsUpdatedDisabledOrCleared += 1;
+              }
+              continue;
+            }
+
+            if (isFlux2ReferenceImageConfig(entity.config)) {
+              // Switching AWAY from FLUX.2 - convert flux2_reference_image to the appropriate config type
+              let newConfig;
+              if (newGlobalRefImageModel) {
+                const parsedModel = zModelIdentifierField.parse(newGlobalRefImageModel);
+                if (newModel.base === 'flux' && newModel.name.toLowerCase().includes('kontext')) {
+                  newConfig = { ...initialFluxKontextReferenceImage, model: parsedModel };
+                } else if (newGlobalRefImageModel.type === 'flux_redux') {
+                  newConfig = { ...initialFLUXRedux, model: parsedModel };
+                } else {
+                  newConfig = { ...initialIPAdapter, model: parsedModel };
+                  if (parsedModel.base === 'flux') {
+                    newConfig.clipVisionModel = 'ViT-L';
+                  }
+                }
+              } else {
+                // No compatible model found - fall back to an empty IP adapter config
+                newConfig = { ...initialIPAdapter };
+              }
+              dispatch(refImageConfigChanged({ id: entity.id, config: newConfig }));
+              modelsUpdatedDisabledOrCleared += 1;
+              continue;
+            }
+
+            if (isQwenImageReferenceImageConfig(entity.config)) {
+              // Switching AWAY from Qwen Image Edit - convert to the appropriate config type
+              let newConfig;
+              if (newGlobalRefImageModel) {
+                const parsedModel = zModelIdentifierField.parse(newGlobalRefImageModel);
+                if (newModel.base === 'flux' && newModel.name.toLowerCase().includes('kontext')) {
+                  newConfig = { ...initialFluxKontextReferenceImage, model: parsedModel };
+                } else if (newGlobalRefImageModel.type === 'flux_redux') {
+                  newConfig = { ...initialFLUXRedux, model: parsedModel };
+                } else {
+                  newConfig = { ...initialIPAdapter, model: parsedModel };
+                  if (parsedModel.base === 'flux') {
+                    newConfig.clipVisionModel = 'ViT-L';
+                  }
+                }
+              } else {
+                // No compatible model found - fall back to an empty IP adapter config
+                newConfig = { ...initialIPAdapter };
+              }
+              dispatch(refImageConfigChanged({ id: entity.id, config: newConfig }));
+              modelsUpdatedDisabledOrCleared += 1;
+              continue;
+            }
+
+            // Standard handling for non-flux2 configs
             const shouldUpdateModel =
               (entity.config.model && entity.config.model.base !== newBase) ||
               (!entity.config.model && newGlobalRefImageModel);
@@ -152,6 +480,82 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         }
       }
 
+      // Handle FLUX.2 Klein model changes within the same base (different variants need different encoders)
+      // Clear the Qwen3 encoder only when switching between different Klein variants
+      // (e.g., klein_4b needs qwen3_4b, klein_9b needs qwen3_8b)
+      if (newBase === 'flux2' && state.params.model?.base === 'flux2' && newModel.key !== state.params.model?.key) {
+        const { kleinQwen3EncoderModel } = state.params;
+        if (kleinQwen3EncoderModel) {
+          // Get model configs to compare variants
+          const modelConfigsResult = selectModelConfigsQuery(state);
+          if (modelConfigsResult.data) {
+            const oldModelConfig = modelConfigsAdapterSelectors.selectById(
+              modelConfigsResult.data,
+              state.params.model.key
+            );
+            const newModelConfig = modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key);
+
+            // Extract variants (only clear if variants are different)
+            const oldVariant = oldModelConfig && 'variant' in oldModelConfig ? oldModelConfig.variant : null;
+            const newVariant = newModelConfig && 'variant' in newModelConfig ? newModelConfig.variant : null;
+
+            if (oldVariant !== newVariant) {
+              dispatch(kleinQwen3EncoderModelSelected(null));
+              toast({
+                id: 'KLEIN_ENCODER_CLEARED',
+                title: t('toast.kleinEncoderCleared'),
+                description: t('toast.kleinEncoderClearedDescription'),
+                status: 'info',
+              });
+            }
+          }
+        }
+      }
+
+      // Handle Qwen Image model changes within the same base (variant may change between generate/edit)
+      // Auto-update the component source diffusers model to match the new variant
+      if (
+        newBase === 'qwen-image' &&
+        state.params.model?.base === 'qwen-image' &&
+        newModel.key !== state.params.model?.key
+      ) {
+        const modelConfigsResult = selectModelConfigsQuery(state);
+        if (modelConfigsResult.data) {
+          const newModelConfig = modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key);
+          const newVariant =
+            newModelConfig && 'variant' in newModelConfig && typeof newModelConfig.variant === 'string'
+              ? newModelConfig.variant
+              : 'generate';
+
+          const availableQwenImageDiffusers = selectQwenImageDiffusersModels(state);
+          const matchingModel = availableQwenImageDiffusers.find((m) => 'variant' in m && m.variant === newVariant);
+          const fallbackModel = availableQwenImageDiffusers.find((m) => 'variant' in m && m.variant !== newVariant);
+          const diffusersModel = matchingModel ?? fallbackModel ?? availableQwenImageDiffusers[0];
+
+          if (diffusersModel) {
+            dispatch(qwenImageComponentSourceSelected(zModelIdentifierField.parse(diffusersModel)));
+          }
+        }
+      }
+
+      // Handle Z-Image scheduler when switching to Z-Image Base (zbase) model
+      // LCM is not supported for undistilled models, so reset to euler
+      if (newBase === 'z-image' && state.params.zImageScheduler === 'lcm') {
+        const modelConfigsResult = selectModelConfigsQuery(state);
+        if (modelConfigsResult.data) {
+          const newModelConfig = modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key);
+          if (newModelConfig && 'variant' in newModelConfig && newModelConfig.variant === 'zbase') {
+            dispatch(setZImageScheduler('euler'));
+            toast({
+              id: 'ZIMAGE_SCHEDULER_RESET',
+              title: t('toast.schedulerReset'),
+              description: t('toast.schedulerResetZImageBase'),
+              status: 'info',
+            });
+          }
+        }
+      }
+
       dispatch(modelChanged({ model: newModel, previousModel: state.params.model }));
 
       const modelBase = selectBboxModelBase(state);
@@ -163,6 +567,34 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         if (!isStaging) {
           // Canvas tab only syncs if not staging
           dispatch(bboxSyncedToOptimalDimension());
+        }
+      }
+
+      // When switching to an external model, sync bbox to the model's first preset dimensions
+      if (newBase === 'external') {
+        const modelConfigsResult = selectModelConfigsQuery(getState());
+        if (modelConfigsResult.data) {
+          const newModelConfig = modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key);
+          if (newModelConfig && isExternalApiModelConfig(newModelConfig)) {
+            const { aspect_ratio_sizes, resolution_presets } = newModelConfig.capabilities;
+            if (resolution_presets && resolution_presets.length > 0) {
+              const firstPreset = resolution_presets[0]!;
+              dispatch(
+                resolutionPresetSelected({
+                  imageSize: firstPreset.image_size,
+                  aspectRatio: firstPreset.aspect_ratio,
+                  width: firstPreset.width,
+                  height: firstPreset.height,
+                })
+              );
+            } else if (aspect_ratio_sizes) {
+              const firstRatio = Object.keys(aspect_ratio_sizes)[0];
+              const firstSize = firstRatio ? aspect_ratio_sizes[firstRatio] : undefined;
+              if (firstRatio && firstSize && isAspectRatioID(firstRatio)) {
+                dispatch(aspectRatioIdChanged({ id: firstRatio, fixedSize: firstSize }));
+              }
+            }
+          }
         }
       }
     },

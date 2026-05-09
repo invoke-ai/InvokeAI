@@ -1,7 +1,7 @@
 import datetime
 import json
 from itertools import chain, product
-from typing import Generator, Literal, Optional, TypeAlias, Union, cast
+from typing import Generator, Literal, Optional, TypeAlias, Union
 
 from pydantic import (
     AliasChoices,
@@ -15,7 +15,6 @@ from pydantic import (
 )
 from pydantic_core import to_jsonable_python
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation
 from invokeai.app.invocations.fields import ImageField
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState, NodeNotFoundError
 from invokeai.app.services.workflow_records.workflow_records_common import (
@@ -137,20 +136,18 @@ class Batch(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def validate_batch_nodes_and_edges(cls, values):
-        batch_data_collection = cast(Optional[BatchDataCollection], values.data)
-        if batch_data_collection is None:
-            return values
-        graph = cast(Graph, values.graph)
-        for batch_data_list in batch_data_collection:
+    def validate_batch_nodes_and_edges(self):
+        if self.data is None:
+            return self
+        for batch_data_list in self.data:
             for batch_data in batch_data_list:
                 try:
-                    node = cast(BaseInvocation, graph.get_node(batch_data.node_path))
+                    node = self.graph.get_node(batch_data.node_path)
                 except NodeNotFoundError:
                     raise NodeNotFoundError(f"Node {batch_data.node_path} not found in graph")
                 if batch_data.field_name not in type(node).model_fields:
                     raise NodeNotFoundError(f"Field {batch_data.field_name} not found in node {batch_data.node_path}")
-        return values
+        return self
 
     @field_validator("graph")
     def validate_graph(cls, v: Graph):
@@ -173,6 +170,7 @@ class Batch(BaseModel):
 # region Queue Items
 
 DEFAULT_QUEUE_ID = "default"
+SYSTEM_USER_ID = "system"  # Default user_id for system-generated queue items
 
 QUEUE_ITEM_STATUS = Literal["pending", "in_progress", "completed", "failed", "canceled"]
 
@@ -221,6 +219,11 @@ class SessionQueueItem(BaseModel):
 
     item_id: int = Field(description="The identifier of the session queue item")
     status: QUEUE_ITEM_STATUS = Field(default="pending", description="The status of this queue item")
+    status_sequence: int | None = Field(
+        default=None,
+        # Fallback for rows serialized before migration_28 added the DB-level default of 0.
+        description="A monotonically increasing version for this queue item's visible status lifecycle",
+    )
     priority: int = Field(default=0, description="The priority of this queue item")
     batch_id: str = Field(description="The ID of the batch associated with this queue item")
     origin: str | None = Field(
@@ -246,21 +249,19 @@ class SessionQueueItem(BaseModel):
     started_at: Optional[Union[datetime.datetime, str]] = Field(description="When this queue item was started")
     completed_at: Optional[Union[datetime.datetime, str]] = Field(description="When this queue item was completed")
     queue_id: str = Field(description="The id of the queue with which this item is associated")
+    user_id: str = Field(default="system", description="The id of the user who created this queue item")
+    user_display_name: Optional[str] = Field(
+        default=None, description="The display name of the user who created this queue item, if available"
+    )
+    user_email: Optional[str] = Field(
+        default=None, description="The email of the user who created this queue item, if available"
+    )
     field_values: Optional[list[NodeFieldValue]] = Field(
         default=None, description="The field values that were used for this queue item"
     )
     retried_from_item_id: Optional[int] = Field(
         default=None, description="The item_id of the queue item that this item was retried from"
     )
-    is_api_validation_run: bool = Field(
-        default=False,
-        description="Whether this queue item is an API validation run.",
-    )
-    published_workflow_id: Optional[str] = Field(
-        default=None,
-        description="The ID of the published workflow associated with this queue item",
-    )
-    credits: Optional[float] = Field(default=None, description="The total credits used for this queue item")
     session: GraphExecutionState = Field(description="The fully-populated session to be executed")
     workflow: Optional[WorkflowWithoutID] = Field(
         default=None, description="The workflow associated with this queue item"
@@ -577,6 +578,7 @@ ValueToInsertTuple: TypeAlias = tuple[
     str | None,  # origin (optional)
     str | None,  # destination (optional)
     int | None,  # retried_from_item_id (optional, this is always None for new items)
+    str,  # user_id
 ]
 """A type alias for the tuple of values to insert into the session queue table.
 
@@ -585,7 +587,7 @@ ValueToInsertTuple: TypeAlias = tuple[
 
 
 def prepare_values_to_insert(
-    queue_id: str, batch: Batch, priority: int, max_new_queue_items: int
+    queue_id: str, batch: Batch, priority: int, max_new_queue_items: int, user_id: str = "system"
 ) -> list[ValueToInsertTuple]:
     """
     Given a batch, prepare the values to insert into the session queue table. The list of tuples can be used with an
@@ -596,6 +598,7 @@ def prepare_values_to_insert(
         batch: The batch to prepare the values for
         priority: The priority of the queue items
         max_new_queue_items: The maximum number of queue items to insert
+        user_id: The user ID who is creating these queue items
 
     Returns:
         A list of tuples to insert into the session queue table. Each tuple contains the following values:
@@ -609,6 +612,7 @@ def prepare_values_to_insert(
         - origin (optional)
         - destination (optional)
         - retried_from_item_id (optional, this is always None for new items)
+        - user_id
     """
 
     # A tuple is a fast and memory-efficient way to store the values to insert. Previously, we used a NamedTuple, but
@@ -638,6 +642,7 @@ def prepare_values_to_insert(
                 batch.origin,
                 batch.destination,
                 None,
+                user_id,
             )
         )
     return values_to_insert

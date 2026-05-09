@@ -1,7 +1,17 @@
 import { NUMPY_RAND_MAX } from 'app/constants';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { buildZodTypeGuard } from 'common/util/zodUtils';
-import { zModelIdentifierField, zSchedulerField } from 'features/nodes/types/common';
+import {
+  zAnimaSchedulerField,
+  zExternalModelIdentifierField,
+  zFluxDypeExponentField,
+  zFluxDypePresetField,
+  zFluxDypeScaleField,
+  zFluxSchedulerField,
+  zModelIdentifierField,
+  zSchedulerField,
+  zZImageSchedulerField,
+} from 'features/nodes/types/common';
 import { z } from 'zod';
 
 /**
@@ -39,6 +49,7 @@ export type ParameterSteps = z.infer<typeof zParameterSteps>;
 // #endregion
 
 // #region CFG scale parameter
+// CFG scale must be > 0. 1.0 means no CFG effect (matching FLUX/Z-Image convention).
 export const [zParameterCFGScale, isParameterCFGScale] = buildParameter(z.number().min(1));
 export type ParameterCFGScale = z.infer<typeof zParameterCFGScale>;
 // #endregion
@@ -58,6 +69,36 @@ export type ParameterCFGRescaleMultiplier = z.infer<typeof zParameterCFGRescaleM
 // #region Scheduler
 export const [zParameterScheduler, isParameterScheduler] = buildParameter(zSchedulerField);
 export type ParameterScheduler = z.infer<typeof zParameterScheduler>;
+// #endregion
+
+// #region Flux Scheduler
+export const [zParameterFluxScheduler, isParameterFluxScheduler] = buildParameter(zFluxSchedulerField);
+export type ParameterFluxScheduler = z.infer<typeof zParameterFluxScheduler>;
+// #endregion
+
+// #region Z-Image Scheduler
+export const [zParameterZImageScheduler, isParameterZImageScheduler] = buildParameter(zZImageSchedulerField);
+export type ParameterZImageScheduler = z.infer<typeof zParameterZImageScheduler>;
+// #endregion
+
+// #region Anima Scheduler
+export const [zParameterAnimaScheduler, isParameterAnimaScheduler] = buildParameter(zAnimaSchedulerField);
+export type ParameterAnimaScheduler = z.infer<typeof zParameterAnimaScheduler>;
+// #endregion
+
+// #region Flux DyPE Preset
+export const [zParameterFluxDypePreset, isParameterFluxDypePreset] = buildParameter(zFluxDypePresetField);
+export type ParameterFluxDypePreset = z.infer<typeof zParameterFluxDypePreset>;
+// #endregion
+
+// #region Flux DyPE Scale (magnitude λs)
+export const [zParameterFluxDypeScale, isParameterFluxDypeScale] = buildParameter(zFluxDypeScaleField);
+export type ParameterFluxDypeScale = z.infer<typeof zParameterFluxDypeScale>;
+// #endregion
+
+// #region Flux DyPE Exponent (decay speed λt)
+export const [zParameterFluxDypeExponent, isParameterFluxDypeExponent] = buildParameter(zFluxDypeExponentField);
+export type ParameterFluxDypeExponent = z.infer<typeof zParameterFluxDypeExponent>;
 // #endregion
 
 // #region seed
@@ -81,7 +122,7 @@ export const isParameterHeight = isParameterImageDimension;
 // #endregion
 
 // #region Model
-export const zParameterModel = zModelIdentifierField;
+export const zParameterModel = z.union([zModelIdentifierField, zExternalModelIdentifierField]);
 export type ParameterModel = z.infer<typeof zParameterModel>;
 // #endregion
 
@@ -133,6 +174,15 @@ export type ParameterSpandrelImageToImageModel = z.infer<typeof zParameterSpandr
 // #region Strength (l2l strength)
 export const [zParameterStrength, isParameterStrength] = buildParameter(z.number().min(0).max(1));
 export type ParameterStrength = z.infer<typeof zParameterStrength>;
+export const PARAMETER_STRENGTH_CONSTRAINTS = {
+  initial: 0.7,
+  sliderMin: 0,
+  sliderMax: 1,
+  numberInputMin: 0,
+  numberInputMax: 1,
+  fineStep: 0.01,
+  coarseStep: 0.05,
+};
 // #endregion
 
 // #region SeamlessX

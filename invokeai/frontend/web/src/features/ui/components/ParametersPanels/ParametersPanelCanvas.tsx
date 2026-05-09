@@ -2,10 +2,11 @@ import { Box, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import { selectIsApiBaseModel, selectIsCogView4, selectIsSDXL } from 'features/controlLayers/store/paramsSlice';
+import { selectIsCogView4, selectIsExternal, selectIsSDXL } from 'features/controlLayers/store/paramsSlice';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
 import { CompositingSettingsAccordion } from 'features/settingsAccordions/components/CompositingSettingsAccordion/CompositingSettingsAccordion';
+import { ExternalSettingsAccordion } from 'features/settingsAccordions/components/ExternalSettingsAccordion/ExternalSettingsAccordion';
 import { GenerationSettingsAccordion } from 'features/settingsAccordions/components/GenerationSettingsAccordion/GenerationSettingsAccordion';
 import { CanvasTabImageSettingsAccordion } from 'features/settingsAccordions/components/ImageSettingsAccordion/CanvasTabImageSettingsAccordion';
 import { RefinerSettingsAccordion } from 'features/settingsAccordions/components/RefinerSettingsAccordion/RefinerSettingsAccordion';
@@ -24,9 +25,8 @@ const overlayScrollbarsStyles: CSSProperties = {
 export const ParametersPanelCanvas = memo(() => {
   const isSDXL = useAppSelector(selectIsSDXL);
   const isCogview4 = useAppSelector(selectIsCogView4);
+  const isExternal = useAppSelector(selectIsExternal);
   const isStylePresetsMenuOpen = useStore($isStylePresetsMenuOpen);
-
-  const isApiModel = useAppSelector(selectIsApiBaseModel);
 
   return (
     <Flex w="full" h="full" flexDir="column" gap={2}>
@@ -45,9 +45,10 @@ export const ParametersPanelCanvas = memo(() => {
               <Prompts />
               <CanvasTabImageSettingsAccordion />
               <GenerationSettingsAccordion />
-              {!isApiModel && <CompositingSettingsAccordion />}
+              {!isExternal && <CompositingSettingsAccordion />}
               {isSDXL && <RefinerSettingsAccordion />}
-              {!isCogview4 && !isApiModel && <AdvancedSettingsAccordion />}
+              {!isCogview4 && !isExternal && <AdvancedSettingsAccordion />}
+              {isExternal && <ExternalSettingsAccordion />}
             </Flex>
           </OverlayScrollbarsComponent>
         </Box>

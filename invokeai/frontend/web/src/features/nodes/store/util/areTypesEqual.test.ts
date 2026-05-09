@@ -40,7 +40,7 @@ describe(areTypesEqual.name, () => {
       },
     };
     const targetType: FieldType = {
-      name: 'MainModelField',
+      name: 'StringField',
       cardinality: 'SINGLE',
       batch: false,
       originalType: {
@@ -54,7 +54,7 @@ describe(areTypesEqual.name, () => {
 
   it('should handle equal original source type and target type', () => {
     const sourceType: FieldType = {
-      name: 'MainModelField',
+      name: 'FloatField',
       cardinality: 'SINGLE',
       batch: false,
       originalType: {
@@ -78,7 +78,7 @@ describe(areTypesEqual.name, () => {
 
   it('should handle equal original source type and original target type', () => {
     const sourceType: FieldType = {
-      name: 'MainModelField',
+      name: 'IntegerField',
       cardinality: 'SINGLE',
       batch: false,
       originalType: {
@@ -88,7 +88,7 @@ describe(areTypesEqual.name, () => {
       },
     };
     const targetType: FieldType = {
-      name: 'LoRAModelField',
+      name: 'StringField',
       cardinality: 'SINGLE',
       batch: false,
       originalType: {

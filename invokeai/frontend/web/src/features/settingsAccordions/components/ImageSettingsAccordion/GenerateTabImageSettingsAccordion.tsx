@@ -6,8 +6,7 @@ import {
   selectAspectRatioID,
   selectAspectRatioIsLocked,
   selectHeight,
-  selectModelSupportsAspectRatio,
-  selectModelSupportsPixelDimensions,
+  selectModelSupportsDimensions,
   selectModelSupportsSeed,
   selectShouldRandomizeSeed,
   selectWidth,
@@ -26,38 +25,20 @@ const selectBadges = createMemoizedSelector(
     selectAspectRatioIsLocked,
     selectShouldRandomizeSeed,
     selectModelSupportsSeed,
-    selectModelSupportsAspectRatio,
-    selectModelSupportsPixelDimensions,
   ],
-  (
-    width,
-    height,
-    aspectRatioID,
-    aspectRatioIsLocked,
-    shouldRandomizeSeed,
-    modelSupportsSeed,
-    modelSupportsAspectRatio,
-    modelSupportsPixelDimensions
-  ) => {
+  (width, height, aspectRatioID, aspectRatioIsLocked, shouldRandomizeSeed, modelSupportsSeed) => {
     const badges: string[] = [];
 
-    if (modelSupportsPixelDimensions) {
-      badges.push(`${width}×${height}`);
+    badges.push(`${width}×${height}`);
+
+    badges.push(aspectRatioID);
+
+    if (aspectRatioIsLocked) {
+      badges.push('locked');
     }
 
-    if (modelSupportsAspectRatio) {
-      badges.push(aspectRatioID);
-
-      // If a model does not support pixel dimensions, the ratio is essentially always locked.
-      if (modelSupportsPixelDimensions && aspectRatioIsLocked) {
-        badges.push('locked');
-      }
-    }
-
-    if (modelSupportsSeed) {
-      if (!shouldRandomizeSeed) {
-        badges.push('Manual Seed');
-      }
+    if (modelSupportsSeed && !shouldRandomizeSeed) {
+      badges.push('Manual Seed');
     }
 
     if (badges.length === 0) {
@@ -71,15 +52,15 @@ const selectBadges = createMemoizedSelector(
 export const GenerateTabImageSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const badges = useAppSelector(selectBadges);
+  const modelSupportsDimensions = useAppSelector(selectModelSupportsDimensions);
+  const modelSupportsSeed = useAppSelector(selectModelSupportsSeed);
   const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } = useStandaloneAccordionToggle({
     id: 'image-settings-generate-tab',
     defaultIsOpen: true,
   });
-  const supportsSeed = useAppSelector(selectModelSupportsSeed);
-  const supportsAspectRatio = useAppSelector(selectModelSupportsAspectRatio);
 
-  if (!supportsAspectRatio && !supportsSeed) {
-    return;
+  if (!modelSupportsDimensions && !modelSupportsSeed) {
+    return null;
   }
 
   return (
@@ -90,8 +71,8 @@ export const GenerateTabImageSettingsAccordion = memo(() => {
       onToggle={onToggleAccordion}
     >
       <Flex px={4} pt={4} pb={4} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
-        {supportsAspectRatio && <Dimensions />}
-        {supportsSeed && <ParamSeed py={3} />}
+        {modelSupportsDimensions && <Dimensions />}
+        {modelSupportsSeed && <ParamSeed py={3} />}
       </Flex>
     </StandaloneAccordion>
   );

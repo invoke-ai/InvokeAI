@@ -6,15 +6,23 @@ import {
   selectInfillPatchmatchDownscaleSize,
   setInfillPatchmatchDownscaleSize,
 } from 'features/controlLayers/store/paramsSlice';
-import { selectInfillPatchmatchDownscaleSizeConfig } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+
+const CONSTRAINTS = {
+  initial: 1,
+  sliderMin: 1,
+  sliderMax: 10,
+  numberInputMin: 1,
+  numberInputMax: 10,
+  fineStep: 1,
+  coarseStep: 1,
+};
 
 const ParamInfillPatchmatchDownscaleSize = () => {
   const dispatch = useAppDispatch();
   const infillMethod = useAppSelector(selectInfillMethod);
   const infillPatchmatchDownscaleSize = useAppSelector(selectInfillPatchmatchDownscaleSize);
-  const config = useAppSelector(selectInfillPatchmatchDownscaleSizeConfig);
 
   const { t } = useTranslation();
 
@@ -34,20 +42,20 @@ const ParamInfillPatchmatchDownscaleSize = () => {
         value={infillPatchmatchDownscaleSize}
         onChange={handleChange}
         marks
-        defaultValue={config.initial}
-        min={config.sliderMin}
-        max={config.sliderMax}
-        step={config.coarseStep}
-        fineStep={config.fineStep}
+        defaultValue={CONSTRAINTS.initial}
+        min={CONSTRAINTS.sliderMin}
+        max={CONSTRAINTS.sliderMax}
+        step={CONSTRAINTS.coarseStep}
+        fineStep={CONSTRAINTS.fineStep}
       />
       <CompositeNumberInput
         value={infillPatchmatchDownscaleSize}
         onChange={handleChange}
-        defaultValue={config.initial}
-        min={config.numberInputMin}
-        max={config.numberInputMax}
-        step={config.coarseStep}
-        fineStep={config.fineStep}
+        defaultValue={CONSTRAINTS.initial}
+        min={CONSTRAINTS.numberInputMin}
+        max={CONSTRAINTS.numberInputMax}
+        step={CONSTRAINTS.coarseStep}
+        fineStep={CONSTRAINTS.fineStep}
       />
     </FormControl>
   );

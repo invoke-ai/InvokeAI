@@ -6,7 +6,7 @@ import { StarterBundleButton } from 'features/modelManagerV2/subpanels/AddModelP
 import { StarterBundleTooltipContentCompact } from 'features/modelManagerV2/subpanels/AddModelPanel/StarterModels/StarterBundleTooltipContentCompact';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiFolderOpenBold, PiLinkBold, PiStarBold } from 'react-icons/pi';
+import { PiFolderOpenBold, PiLinkBold, PiPlugBold, PiStarBold } from 'react-icons/pi';
 import { SiHuggingface } from 'react-icons/si';
 import { useGetStarterModelsQuery } from 'services/api/endpoints/models';
 
@@ -28,6 +28,10 @@ export const LaunchpadForm = memo(() => {
     setInstallModelsTabByName('scanFolder');
   }, []);
 
+  const navigateToExternalTab = useCallback(() => {
+    setInstallModelsTabByName('external');
+  }, []);
+
   const navigateToStarterModelsTab = useCallback(() => {
     setInstallModelsTabByName('starterModels');
   }, []);
@@ -35,7 +39,7 @@ export const LaunchpadForm = memo(() => {
   return (
     <Flex flexDir="column" height="100%" gap={3}>
       <ScrollableContent>
-        <Flex flexDir="column" gap={6} p={3}>
+        <Flex flexDir="column" gap={6} py={2}>
           {/* Welcome Section */}
           <Flex flexDir="column" gap={2} alignItems="flex-start">
             <Heading size="md">{t('modelManager.launchpad.welcome')}</Heading>
@@ -62,6 +66,12 @@ export const LaunchpadForm = memo(() => {
                 icon={PiFolderOpenBold}
                 title={t('modelManager.scanFolder')}
                 description={t('modelManager.launchpad.scanFolderDescription')}
+              />
+              <LaunchpadButton
+                onClick={navigateToExternalTab}
+                icon={PiPlugBold}
+                title={t('modelManager.externalProviders')}
+                description={t('modelManager.launchpad.externalDescription')}
               />
             </Grid>
           </Flex>

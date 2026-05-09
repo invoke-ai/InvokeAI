@@ -1,5 +1,4 @@
 import type { AlertStatus } from '@invoke-ai/ui-library';
-import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
@@ -8,17 +7,17 @@ import { withResult, withResultAsync } from 'common/util/result';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { positivePromptAddedToHistory, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
+import type { BaseModelType } from 'features/nodes/types/common';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
-import { buildChatGPT4oGraph } from 'features/nodes/util/graph/generation/buildChatGPT4oGraph';
+import { buildAnimaGraph } from 'features/nodes/util/graph/generation/buildAnimaGraph';
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
+import { buildExternalGraph } from 'features/nodes/util/graph/generation/buildExternalGraph';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
-import { buildFluxKontextGraph } from 'features/nodes/util/graph/generation/buildFluxKontextGraph';
-import { buildGemini2_5Graph } from 'features/nodes/util/graph/generation/buildGemini2_5Graph';
-import { buildImagen3Graph } from 'features/nodes/util/graph/generation/buildImagen3Graph';
-import { buildImagen4Graph } from 'features/nodes/util/graph/generation/buildImagen4Graph';
+import { buildQwenImageGraph } from 'features/nodes/util/graph/generation/buildQwenImageGraph';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Graph';
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
+import { buildZImageGraph } from 'features/nodes/util/graph/generation/buildZImageGraph';
 import { selectCanvasDestination } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
@@ -29,12 +28,9 @@ import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endp
 import { assert, AssertionError } from 'tsafe';
 
 const log = logger('generation');
-export const enqueueRequestedCanvas = createAction('app/enqueueRequestedCanvas');
 
 const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prepend: boolean) => {
   const { dispatch, getState } = store;
-
-  dispatch(enqueueRequestedCanvas());
 
   const state = getState();
 
@@ -60,20 +56,19 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
         return await buildSD1Graph(graphBuilderArg);
       case `sd-3`:
         return await buildSD3Graph(graphBuilderArg);
-      case `flux`:
+      case 'flux':
+      case 'flux2':
         return await buildFLUXGraph(graphBuilderArg);
       case 'cogview4':
         return await buildCogView4Graph(graphBuilderArg);
-      case 'imagen3':
-        return buildImagen3Graph(graphBuilderArg);
-      case 'imagen4':
-        return buildImagen4Graph(graphBuilderArg);
-      case 'chatgpt-4o':
-        return await buildChatGPT4oGraph(graphBuilderArg);
-      case 'flux-kontext':
-        return buildFluxKontextGraph(graphBuilderArg);
-      case 'gemini-2.5':
-        return buildGemini2_5Graph(graphBuilderArg);
+      case 'qwen-image':
+        return await buildQwenImageGraph(graphBuilderArg);
+      case 'z-image':
+        return await buildZImageGraph(graphBuilderArg);
+      case 'external':
+        return await buildExternalGraph(graphBuilderArg);
+      case 'anima':
+        return await buildAnimaGraph(graphBuilderArg);
       default:
         assert(false, `No graph builders for base ${base}`);
     }
@@ -106,7 +101,7 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
     prepareLinearUIBatch({
       state,
       g,
-      base,
+      base: base as BaseModelType,
       prepend,
       seedNode: seed,
       positivePromptNode: positivePrompt,

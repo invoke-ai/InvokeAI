@@ -1,0 +1,34 @@
+{
+  "name": "docs",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "generate-docs-data": "uv run python ../scripts/generate_docs_json.py",
+    "check-docs-data": "pnpm run generate-docs-data && git diff --exit-code -- src/generated",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/markdoc": "^1.0.3",
+    "@astrojs/starlight": "^0.38.2",
+    "@astrojs/starlight-markdoc": "^0.6.0",
+    "@fontsource-variable/inter": "^5.2.8",
+    "@fontsource-variable/roboto-mono": "^5.2.8",
+    "astro": "^6.1.4",
+    "mermaid": "^11.14.0",
+    "rehype-external-links": "^3.0.0",
+    "sharp": "^0.34.5",
+    "starlight-changelogs": "^0.5.0",
+    "starlight-contextual-menu": "^0.1.5",
+    "starlight-links-validator": "^0.21.0",
+    "starlight-llms-txt": "^0.8.0"
+  },
+  "devDependencies": {
+    "node-addon-api": "^8.7.0",
+    "node-gyp": "^12.2.0"
+  },
+  "packageManager": "pnpm@10.12.4"
+}

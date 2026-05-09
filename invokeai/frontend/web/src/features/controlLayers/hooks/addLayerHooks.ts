@@ -24,20 +24,22 @@ import {
 import type {
   CanvasEntityIdentifier,
   CanvasRegionalGuidanceState,
-  ChatGPT4oReferenceImageConfig,
   ControlLoRAConfig,
   ControlNetConfig,
+  Flux2ReferenceImageConfig,
   FluxKontextReferenceImageConfig,
-  Gemini2_5ReferenceImageConfig,
   IPAdapterConfig,
+  QwenImageReferenceImageConfig,
+  RegionalGuidanceIPAdapterConfig,
   T2IAdapterConfig,
 } from 'features/controlLayers/store/types';
 import {
-  initialChatGPT4oReferenceImage,
   initialControlNet,
+  initialFlux2ReferenceImage,
   initialFluxKontextReferenceImage,
-  initialGemini2_5ReferenceImage,
   initialIPAdapter,
+  initialQwenImageReferenceImage,
+  initialRegionalGuidanceIPAdapter,
   initialT2IAdapter,
 } from 'features/controlLayers/store/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
@@ -78,11 +80,7 @@ export const selectDefaultControlAdapter = createSelector(
 
 export const getDefaultRefImageConfig = (
   getState: AppGetState
-):
-  | IPAdapterConfig
-  | ChatGPT4oReferenceImageConfig
-  | FluxKontextReferenceImageConfig
-  | Gemini2_5ReferenceImageConfig => {
+): IPAdapterConfig | FluxKontextReferenceImageConfig | Flux2ReferenceImageConfig | QwenImageReferenceImageConfig => {
   const state = getState();
 
   const mainModelConfig = selectMainModelConfig(state);
@@ -90,21 +88,18 @@ export const getDefaultRefImageConfig = (
 
   const base = mainModelConfig?.base;
 
-  // For ChatGPT-4o, the ref image model is the model itself.
-  if (base === 'chatgpt-4o') {
-    const config = deepClone(initialChatGPT4oReferenceImage);
-    config.model = zModelIdentifierField.parse(mainModelConfig);
-    return config;
+  // FLUX.2 Klein has built-in reference image support - no model needed
+  if (base === 'flux2') {
+    return deepClone(initialFlux2ReferenceImage);
   }
 
-  if (base === 'flux-kontext' || (base === 'flux' && mainModelConfig?.name?.toLowerCase().includes('kontext'))) {
+  // Qwen Image Edit has built-in reference image support - no model needed
+  if (base === 'qwen-image') {
+    return deepClone(initialQwenImageReferenceImage);
+  }
+
+  if (base === 'flux' && mainModelConfig?.name?.toLowerCase().includes('kontext')) {
     const config = deepClone(initialFluxKontextReferenceImage);
-    config.model = zModelIdentifierField.parse(mainModelConfig);
-    return config;
-  }
-
-  if (base === 'gemini-2.5') {
-    const config = deepClone(initialGemini2_5ReferenceImage);
     config.model = zModelIdentifierField.parse(mainModelConfig);
     return config;
   }
@@ -125,7 +120,7 @@ export const getDefaultRefImageConfig = (
   return config;
 };
 
-export const getDefaultRegionalGuidanceRefImageConfig = (getState: AppGetState): IPAdapterConfig => {
+export const getDefaultRegionalGuidanceRefImageConfig = (getState: AppGetState): RegionalGuidanceIPAdapterConfig => {
   // Regional guidance ref images do not support ChatGPT-4o, so we always return the IP Adapter config.
   const state = getState();
 
@@ -138,7 +133,7 @@ export const getDefaultRegionalGuidanceRefImageConfig = (getState: AppGetState):
   const modelConfig = ipAdapterModelConfigs.find((m) => m.base === base);
 
   // Clone the initial IP Adapter config and set the model if available.
-  const config = deepClone(initialIPAdapter);
+  const config = deepClone(initialRegionalGuidanceIPAdapter);
 
   if (modelConfig) {
     config.model = zModelIdentifierField.parse(modelConfig);

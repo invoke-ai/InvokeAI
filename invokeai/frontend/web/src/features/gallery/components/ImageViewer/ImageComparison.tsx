@@ -40,7 +40,7 @@ ImageComparisonContent.displayName = 'ImageComparisonContent';
 
 export const ImageComparison = memo(() => {
   const lastSelectedItem = useAppSelector(selectLastSelectedItem);
-  const lastSelectedImageDTO = useImageDTO(lastSelectedItem?.id);
+  const lastSelectedImageDTO = useImageDTO(lastSelectedItem);
   const comparisonImageDTO = useImageDTO(useAppSelector(selectImageToCompare));
 
   const [rect, setRect] = useState<DOMRect | null>(null);

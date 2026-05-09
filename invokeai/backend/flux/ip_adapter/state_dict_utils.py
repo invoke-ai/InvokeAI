@@ -1,11 +1,11 @@
-from typing import Any, Dict
+from typing import Any
 
 import torch
 
 from invokeai.backend.flux.ip_adapter.xlabs_ip_adapter_flux import XlabsIpAdapterParams
 
 
-def is_state_dict_xlabs_ip_adapter(sd: Dict[str, Any]) -> bool:
+def is_state_dict_xlabs_ip_adapter(sd: dict[str | int, Any]) -> bool:
     """Is the state dict for an XLabs FLUX IP-Adapter model?
 
     This is intended to be a reasonably high-precision detector, but it is not guaranteed to have perfect precision.
@@ -27,7 +27,7 @@ def is_state_dict_xlabs_ip_adapter(sd: Dict[str, Any]) -> bool:
     return False
 
 
-def infer_xlabs_ip_adapter_params_from_state_dict(state_dict: dict[str, torch.Tensor]) -> XlabsIpAdapterParams:
+def infer_xlabs_ip_adapter_params_from_state_dict(state_dict: dict[str | int, torch.Tensor]) -> XlabsIpAdapterParams:
     num_double_blocks = 0
     context_dim = 0
     hidden_dim = 0

@@ -9,12 +9,10 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField, OutputField, UIType
+from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField, OutputField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
-)
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 
 
@@ -24,8 +22,9 @@ class ModelIdentifierField(BaseModel):
     name: str = Field(description="The model's name")
     base: BaseModelType = Field(description="The model's base model type")
     type: ModelType = Field(description="The model's type")
-    submodel_type: Optional[SubModelType] = Field(
-        description="The submodel to load, if this is a main model", default=None
+    submodel_type: SubModelType | None = Field(
+        description="The submodel to load, if this is a main model",
+        default=None,
     )
 
     @classmethod
@@ -71,6 +70,21 @@ class T5EncoderField(BaseModel):
 class GlmEncoderField(BaseModel):
     tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
     text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+
+
+class QwenVLEncoderField(BaseModel):
+    """Field for Qwen2.5-VL encoder used by Qwen Image Edit models."""
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+
+
+class Qwen3EncoderField(BaseModel):
+    """Field for Qwen3 text encoder used by Z-Image models."""
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+    loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
 
 
 class VAEField(BaseModel):
@@ -145,7 +159,7 @@ class ModelIdentifierInvocation(BaseInvocation):
 
 @invocation(
     "main_model_loader",
-    title="Main Model - SD1.5",
+    title="Main Model - SD1.5, SD2",
     tags=["model"],
     category="model",
     version="1.0.4",
@@ -153,7 +167,11 @@ class ModelIdentifierInvocation(BaseInvocation):
 class MainModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""
 
-    model: ModelIdentifierField = InputField(description=FieldDescriptions.main_model, ui_type=UIType.MainModel)
+    model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.main_model,
+        ui_model_base=[BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2],
+        ui_model_type=ModelType.Main,
+    )
     # TODO: precision?
 
     def invoke(self, context: InvocationContext) -> ModelLoaderOutput:
@@ -187,7 +205,10 @@ class LoRALoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
 
     lora: ModelIdentifierField = InputField(
-        description=FieldDescriptions.lora_model, title="LoRA", ui_type=UIType.LoRAModel
+        description=FieldDescriptions.lora_model,
+        title="LoRA",
+        ui_model_base=BaseModelType.StableDiffusion1,
+        ui_model_type=ModelType.LoRA,
     )
     weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
     unet: Optional[UNetField] = InputField(
@@ -250,7 +271,9 @@ class LoRASelectorInvocation(BaseInvocation):
     """Selects a LoRA model and weight."""
 
     lora: ModelIdentifierField = InputField(
-        description=FieldDescriptions.lora_model, title="LoRA", ui_type=UIType.LoRAModel
+        description=FieldDescriptions.lora_model,
+        title="LoRA",
+        ui_model_type=ModelType.LoRA,
     )
     weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
 
@@ -332,7 +355,10 @@ class SDXLLoRALoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
 
     lora: ModelIdentifierField = InputField(
-        description=FieldDescriptions.lora_model, title="LoRA", ui_type=UIType.LoRAModel
+        description=FieldDescriptions.lora_model,
+        title="LoRA",
+        ui_model_base=BaseModelType.StableDiffusionXL,
+        ui_model_type=ModelType.LoRA,
     )
     weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
     unet: Optional[UNetField] = InputField(
@@ -473,13 +499,27 @@ class SDXLLoRACollectionLoader(BaseInvocation):
 
 
 @invocation(
-    "vae_loader", title="VAE Model - SD1.5, SDXL, SD3, FLUX", tags=["vae", "model"], category="model", version="1.0.4"
+    "vae_loader",
+    title="VAE Model - SD1.5, SD2, SDXL, SD3, FLUX",
+    tags=["vae", "model"],
+    category="model",
+    version="1.0.4",
 )
 class VAELoaderInvocation(BaseInvocation):
     """Loads a VAE model, outputting a VaeLoaderOutput"""
 
     vae_model: ModelIdentifierField = InputField(
-        description=FieldDescriptions.vae_model, title="VAE", ui_type=UIType.VAEModel
+        description=FieldDescriptions.vae_model,
+        title="VAE",
+        ui_model_base=[
+            BaseModelType.StableDiffusion1,
+            BaseModelType.StableDiffusion2,
+            BaseModelType.StableDiffusionXL,
+            BaseModelType.StableDiffusion3,
+            BaseModelType.Flux,
+            BaseModelType.Flux2,
+        ],
+        ui_model_type=ModelType.VAE,
     )
 
     def invoke(self, context: InvocationContext) -> VAEOutput:
@@ -544,7 +584,7 @@ class SeamlessModeInvocation(BaseInvocation):
         return SeamlessModeOutput(unet=unet, vae=vae)
 
 
-@invocation("freeu", title="Apply FreeU - SD1.5, SDXL", tags=["freeu"], category="unet", version="1.0.2")
+@invocation("freeu", title="Apply FreeU - SD1.5, SDXL", tags=["freeu"], category="model", version="1.0.2")
 class FreeUInvocation(BaseInvocation):
     """
     Applies FreeU to the UNet. Suggested values (b1/b2/s1/s2):

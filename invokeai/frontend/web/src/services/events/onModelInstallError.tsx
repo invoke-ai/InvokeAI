@@ -1,9 +1,8 @@
 import { Button, ExternalLink, Spinner, Text } from '@invoke-ai/ui-library';
-import { skipToken } from '@reduxjs/toolkit/query';
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { discordLink, githubIssuesLink } from 'features/system/store/constants';
 import { toast, toastApi } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { t } from 'i18next';
@@ -40,6 +39,9 @@ const getHFTokenStatus = async (dispatch: AppDispatch): Promise<S['HFTokenStatus
   }
 };
 
+/**
+ * Handles model install error events by logging the error, displaying appropriate toast notifications.
+ */
 export const buildOnModelInstallError = (getState: AppGetState, dispatch: AppDispatch) => {
   return async (data: S['ModelInstallErrorEvent']) => {
     log.error({ data }, 'Model install error');
@@ -72,7 +74,7 @@ export const buildOnModelInstallError = (getState: AppGetState, dispatch: AppDis
               {t('modelManager.urlUnauthorizedErrorMessage')}
               <ExternalLink
                 label={t('modelManager.urlUnauthorizedErrorMessage2')}
-                href="https://invoke-ai.github.io/InvokeAI/configuration/#model-marketplace-api-keys"
+                href="https://invoke.ai/configuration/invokeai-yaml/#model-marketplace-api-keys"
               />
             </Text>
           ),
@@ -144,8 +146,7 @@ export const buildOnModelInstallError = (getState: AppGetState, dispatch: AppDis
 };
 
 const HFUnauthorizedToastDescription = () => {
-  const isEnabled = useFeatureStatus('hfToken');
-  const { data } = useGetHFTokenStatusQuery(isEnabled ? undefined : skipToken);
+  const { data } = useGetHFTokenStatusQuery();
 
   const { t } = useTranslation();
 
@@ -189,5 +190,28 @@ const HFUnauthorizedToastDescription = () => {
         {t('modelManager.modelManager')}.
       </Button>
     </Text>
+  );
+};
+
+export const DiscordLink = () => {
+  const { t: tFunc } = useTranslation();
+  return (
+    <ExternalLink
+      fontWeight="semibold"
+      href={discordLink}
+      display="inline-flex"
+      label={tFunc('supportVideos.discord')}
+    />
+  );
+};
+export const GitHubIssuesLink = () => {
+  const { t: tFunc } = useTranslation();
+  return (
+    <ExternalLink
+      fontWeight="semibold"
+      href={githubIssuesLink}
+      display="inline-flex"
+      label={tFunc('supportVideos.github')}
+    />
   );
 };

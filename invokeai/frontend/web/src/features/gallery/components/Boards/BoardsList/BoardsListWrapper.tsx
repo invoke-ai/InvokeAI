@@ -2,9 +2,7 @@ import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element';
 import { autoScrollForExternal } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/external';
 import { Box } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import { selectAllowPrivateBoards } from 'features/system/store/configSelectors';
 import type { OverlayScrollbarsComponentRef } from 'overlayscrollbars-react';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
@@ -18,7 +16,6 @@ const overlayScrollbarsStyles: CSSProperties = {
 };
 
 export const BoardsListWrapper = memo(() => {
-  const allowPrivateBoards = useAppSelector(selectAllowPrivateBoards);
   const [os, osRef] = useState<OverlayScrollbarsComponentRef | null>(null);
   useEffect(() => {
     const osInstance = os?.osInstance();
@@ -48,8 +45,7 @@ export const BoardsListWrapper = memo(() => {
           style={overlayScrollbarsStyles}
           options={overlayScrollbarsParams.options}
         >
-          {allowPrivateBoards && <BoardsList isPrivate={true} />}
-          <BoardsList isPrivate={false} />
+          <BoardsList />
         </OverlayScrollbarsComponent>
       </Box>
     </Box>

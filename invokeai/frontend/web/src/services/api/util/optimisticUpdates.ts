@@ -1,5 +1,5 @@
 import type { OrderDir } from 'features/gallery/store/types';
-import type { GetImageNamesResult, GetVideoIdsResult, ImageDTO, VideoDTO } from 'services/api/types';
+import type { GetImageNamesResult, ImageDTO } from 'services/api/types';
 
 /**
  * Calculates the optimal insertion position for a new image in the names list.
@@ -54,63 +54,6 @@ export function insertImageIntoNamesResult(
   return {
     image_names: newImageNames,
     starred_count: starredFirst && imageDTO.starred ? currentResult.starred_count + 1 : currentResult.starred_count,
-    total_count: currentResult.total_count + 1,
-  };
-}
-
-/**
- * Calculates the optimal insertion position for a new image in the names list.
- * For starred_first=true: starred images go to position 0, unstarred go after all starred images
- * For starred_first=false: all new images go to position 0 (newest first)
- */
-function calculateVideoInsertionPosition(
-  videoDTO: VideoDTO,
-  starredFirst: boolean,
-  starredCount: number,
-  orderDir: OrderDir = 'DESC'
-): number {
-  if (!starredFirst) {
-    // When starred_first is false, insertion depends on order direction
-    return orderDir === 'DESC' ? 0 : Number.MAX_SAFE_INTEGER;
-  }
-
-  // When starred_first is true
-  if (videoDTO.starred) {
-    // Starred images: beginning for desc, after existing starred for asc
-    return orderDir === 'DESC' ? 0 : starredCount;
-  }
-
-  // Unstarred images go after all starred images
-  return orderDir === 'DESC' ? starredCount : Number.MAX_SAFE_INTEGER;
-}
-
-/**
- * Optimistically inserts a new image into the ImageNamesResult at the correct position
- */
-export function insertVideoIntoGetVideoIdsResult(
-  currentResult: GetVideoIdsResult,
-  videoDTO: VideoDTO,
-  starredFirst: boolean,
-  orderDir: OrderDir = 'DESC'
-): GetVideoIdsResult {
-  // Don't insert if the image is already in the list
-  if (currentResult.video_ids.includes(videoDTO.video_id)) {
-    return currentResult;
-  }
-
-  const insertPosition = calculateVideoInsertionPosition(videoDTO, starredFirst, currentResult.starred_count, orderDir);
-
-  const newVideoIds = [...currentResult.video_ids];
-  // Handle MAX_SAFE_INTEGER by pushing to end
-  if (insertPosition >= newVideoIds.length) {
-    newVideoIds.push(videoDTO.video_id);
-  } else {
-    newVideoIds.splice(insertPosition, 0, videoDTO.video_id);
-  }
-
-  return {
-    video_ids: newVideoIds,
-    starred_count: starredFirst && videoDTO.starred ? currentResult.starred_count + 1 : currentResult.starred_count,
     total_count: currentResult.total_count + 1,
   };
 }

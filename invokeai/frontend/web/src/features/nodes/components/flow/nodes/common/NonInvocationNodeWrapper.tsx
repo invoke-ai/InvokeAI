@@ -1,7 +1,6 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Box, useGlobalMenuClose } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { useZoomToNode } from 'features/nodes/hooks/useZoomToNode';
@@ -17,13 +16,14 @@ type NonInvocationNodeWrapperProps = PropsWithChildren & {
   nodeId: string;
   selected: boolean;
   width?: ChakraProps['w'];
+  borderRadius?: ChakraProps['borderRadius'];
+  withChrome?: boolean;
 };
 
 const NonInvocationNodeWrapper = (props: NonInvocationNodeWrapperProps) => {
-  const { nodeId, width, children, selected } = props;
+  const { nodeId, width, children, selected, borderRadius = 'base', withChrome = true } = props;
   const mouseOverNode = useMouseOverNode(nodeId);
   const zoomToNode = useZoomToNode(nodeId);
-  const isLocked = useIsWorkflowEditorLocked();
 
   const executionState = useNodeExecutionState(nodeId);
   const isInProgress = executionState?.status === zNodeStatus.enum.IN_PROGRESS;
@@ -64,15 +64,15 @@ const NonInvocationNodeWrapper = (props: NonInvocationNodeWrapperProps) => {
       onMouseOut={mouseOverNode.handleMouseOut}
       className={DRAG_HANDLE_CLASSNAME}
       sx={containerSx}
+      borderRadius={borderRadius}
       width={width || NODE_WIDTH}
       opacity={opacity}
-      data-is-editor-locked={isLocked}
       data-is-selected={selected}
     >
-      <Box sx={shadowsSx} />
-      <Box sx={inProgressSx} data-is-in-progress={isInProgress} />
+      {withChrome && <Box sx={shadowsSx} />}
+      {withChrome && <Box sx={inProgressSx} data-is-in-progress={isInProgress} />}
       {children}
-      <Box className="node-selection-overlay" />
+      {withChrome && <Box className="node-selection-overlay" />}
     </Box>
   );
 };

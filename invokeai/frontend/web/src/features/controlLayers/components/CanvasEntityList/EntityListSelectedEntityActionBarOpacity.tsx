@@ -12,6 +12,7 @@ import {
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
+  Portal,
 } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -131,7 +132,9 @@ export const EntityListSelectedEntityActionBarOpacity = memo(() => {
   return (
     <Popover>
       <FormControl w="min-content" gap={2} isDisabled={selectedEntityIdentifier === null}>
-        <FormLabel m={0}>{t('controlLayers.opacity')}</FormLabel>
+        <FormLabel m={0} mt={1}>
+          {t('controlLayers.opacity')}
+        </FormLabel>
         <PopoverAnchor>
           <NumberInput
             display="flex"
@@ -152,7 +155,7 @@ export const EntityListSelectedEntityActionBarOpacity = memo(() => {
             <NumberInputField paddingInlineEnd={7} _focusVisible={{ zIndex: 0 }} title="" />
             <PopoverTrigger>
               <IconButton
-                aria-label="open-slider"
+                aria-label={t('common.openSlider')}
                 icon={<PiCaretDownBold />}
                 size="sm"
                 variant="link"
@@ -165,22 +168,24 @@ export const EntityListSelectedEntityActionBarOpacity = memo(() => {
           </NumberInput>
         </PopoverAnchor>
       </FormControl>
-      <PopoverContent w={200} pt={0} pb={2} px={4}>
-        <PopoverArrow />
-        <PopoverBody>
-          <CompositeSlider
-            min={0}
-            max={100}
-            value={localOpacity}
-            onChange={onChangeSlider}
-            defaultValue={sliderDefaultValue}
-            marks={marks}
-            formatValue={formatSliderValue}
-            alwaysShowMarks
-            isDisabled={selectedEntityIdentifier === null}
-          />
-        </PopoverBody>
-      </PopoverContent>
+      <Portal>
+        <PopoverContent w={200} pt={0} pb={2} px={4}>
+          <PopoverArrow />
+          <PopoverBody>
+            <CompositeSlider
+              min={0}
+              max={100}
+              value={localOpacity}
+              onChange={onChangeSlider}
+              defaultValue={sliderDefaultValue}
+              marks={marks}
+              formatValue={formatSliderValue}
+              alwaysShowMarks
+              isDisabled={selectedEntityIdentifier === null}
+            />
+          </PopoverBody>
+        </PopoverContent>
+      </Portal>
     </Popover>
   );
 });

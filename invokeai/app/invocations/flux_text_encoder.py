@@ -17,7 +17,7 @@ from invokeai.app.invocations.model import CLIPField, T5EncoderField
 from invokeai.app.invocations.primitives import FluxConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.modules.conditioner import HFEncoder
-from invokeai.backend.model_manager import ModelFormat
+from invokeai.backend.model_manager.taxonomy import ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_CLIP_PREFIX, FLUX_LORA_T5_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -28,7 +28,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Condit
     "flux_text_encoder",
     title="Prompt - FLUX",
     tags=["prompt", "conditioning", "flux"],
-    category="conditioning",
+    category="prompt",
     version="1.1.2",
 )
 class FluxTextEncoderInvocation(BaseInvocation):
@@ -58,6 +58,12 @@ class FluxTextEncoderInvocation(BaseInvocation):
         # scoped. This ensures that the T5 model can be freed and gc'd before loading the CLIP model (if necessary).
         t5_embeddings = self._t5_encode(context)
         clip_embeddings = self._clip_encode(context)
+
+        # Move embeddings to CPU for storage to save VRAM
+        # They will be moved to the appropriate device when used by the denoiser
+        t5_embeddings = t5_embeddings.detach().to("cpu")
+        clip_embeddings = clip_embeddings.detach().to("cpu")
+
         conditioning_data = ConditioningFieldData(
             conditionings=[FLUXConditioningInfo(clip_embeds=clip_embeddings, t5_embeds=t5_embeddings)]
         )

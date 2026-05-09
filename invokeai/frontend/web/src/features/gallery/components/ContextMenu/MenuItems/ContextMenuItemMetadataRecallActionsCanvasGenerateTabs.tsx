@@ -1,6 +1,6 @@
 import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
-import { useItemDTOContext } from 'features/gallery/contexts/ItemDTOContext';
+import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { useRecallAll } from 'features/gallery/hooks/useRecallAllImageMetadata';
 import { useRecallCLIPSkip } from 'features/gallery/hooks/useRecallCLIPSkip';
 import { useRecallDimensions } from 'features/gallery/hooks/useRecallDimensions';
@@ -17,21 +17,19 @@ import {
   PiQuotesBold,
   PiRulerBold,
 } from 'react-icons/pi';
-import type { ImageDTO } from 'services/api/types';
 
 export const ContextMenuItemMetadataRecallActionsCanvasGenerateTabs = memo(() => {
   const { t } = useTranslation();
   const subMenu = useSubMenu();
 
-  const itemDTO = useItemDTOContext();
+  const imageDTO = useImageDTOContext();
 
-  // TODO: Implement video recall metadata actions
-  const recallAll = useRecallAll(itemDTO as ImageDTO);
-  const recallRemix = useRecallRemix(itemDTO as ImageDTO);
-  const recallPrompts = useRecallPrompts(itemDTO as ImageDTO);
-  const recallSeed = useRecallSeed(itemDTO as ImageDTO);
-  const recallDimensions = useRecallDimensions(itemDTO as ImageDTO);
-  const recallCLIPSkip = useRecallCLIPSkip(itemDTO as ImageDTO);
+  const recallAll = useRecallAll(imageDTO);
+  const recallRemix = useRecallRemix(imageDTO);
+  const recallPrompts = useRecallPrompts(imageDTO);
+  const recallSeed = useRecallSeed(imageDTO);
+  const recallDimensions = useRecallDimensions(imageDTO);
+  const recallCLIPSkip = useRecallCLIPSkip(imageDTO);
 
   return (
     <MenuItem {...subMenu.parentMenuItemProps} icon={<PiArrowBendUpLeftBold />}>

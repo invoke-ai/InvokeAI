@@ -1,10 +1,11 @@
 # Initially pulled from https://github.com/black-forest-labs/flux
 
 from dataclasses import dataclass
-from typing import Dict, Literal
+from typing import Literal
 
 from invokeai.backend.flux.model import FluxParams
 from invokeai.backend.flux.modules.autoencoder import AutoEncoderParams
+from invokeai.backend.model_manager.taxonomy import AnyVariant, Flux2VariantType, FluxVariantType
 
 
 @dataclass
@@ -41,30 +42,41 @@ PREFERED_KONTEXT_RESOLUTIONS = [
 ]
 
 
-max_seq_lengths: Dict[str, Literal[256, 512]] = {
-    "flux-dev": 512,
-    "flux-dev-fill": 512,
-    "flux-schnell": 256,
+_flux_max_seq_lengths: dict[AnyVariant, Literal[256, 512]] = {
+    FluxVariantType.Dev: 512,
+    FluxVariantType.DevFill: 512,
+    FluxVariantType.Schnell: 256,
+    Flux2VariantType.Klein4B: 512,
+    Flux2VariantType.Klein9B: 512,
 }
 
 
-ae_params = {
-    "flux": AutoEncoderParams(
-        resolution=256,
-        in_channels=3,
-        ch=128,
-        out_ch=3,
-        ch_mult=[1, 2, 4, 4],
-        num_res_blocks=2,
-        z_channels=16,
-        scale_factor=0.3611,
-        shift_factor=0.1159,
-    )
-}
+def get_flux_max_seq_length(variant: AnyVariant):
+    try:
+        return _flux_max_seq_lengths[variant]
+    except KeyError:
+        raise ValueError(f"Unknown variant for FLUX max seq len: {variant}")
 
 
-params = {
-    "flux-dev": FluxParams(
+_flux_ae_params = AutoEncoderParams(
+    resolution=256,
+    in_channels=3,
+    ch=128,
+    out_ch=3,
+    ch_mult=[1, 2, 4, 4],
+    num_res_blocks=2,
+    z_channels=16,
+    scale_factor=0.3611,
+    shift_factor=0.1159,
+)
+
+
+def get_flux_ae_params() -> AutoEncoderParams:
+    return _flux_ae_params
+
+
+_flux_transformer_params: dict[AnyVariant, FluxParams] = {
+    FluxVariantType.Dev: FluxParams(
         in_channels=64,
         vec_in_dim=768,
         context_in_dim=4096,
@@ -78,7 +90,7 @@ params = {
         qkv_bias=True,
         guidance_embed=True,
     ),
-    "flux-schnell": FluxParams(
+    FluxVariantType.Schnell: FluxParams(
         in_channels=64,
         vec_in_dim=768,
         context_in_dim=4096,
@@ -92,7 +104,7 @@ params = {
         qkv_bias=True,
         guidance_embed=False,
     ),
-    "flux-dev-fill": FluxParams(
+    FluxVariantType.DevFill: FluxParams(
         in_channels=384,
         out_channels=64,
         vec_in_dim=768,
@@ -107,4 +119,77 @@ params = {
         qkv_bias=True,
         guidance_embed=True,
     ),
+    # Flux2 Klein 4B uses Qwen3 4B text encoder with stacked embeddings from layers [9, 18, 27]
+    # The context_in_dim is 3 * hidden_size of Qwen3 (3 * 2560 = 7680)
+    Flux2VariantType.Klein4B: FluxParams(
+        in_channels=64,
+        vec_in_dim=2560,  # Qwen3-4B hidden size (used for pooled output)
+        context_in_dim=7680,  # 3 layers * 2560 = 7680 for Qwen3-4B
+        hidden_size=3072,
+        mlp_ratio=4.0,
+        num_heads=24,
+        depth=19,
+        depth_single_blocks=38,
+        axes_dim=[16, 56, 56],
+        theta=10_000,
+        qkv_bias=True,
+        guidance_embed=False,
+    ),
+    # Flux2 Klein 4B Base is the undistilled foundation model. It shares the same
+    # architecture as Klein 4B (distilled) and reports guidance_embeds=False in its
+    # HF transformer config - classical CFG (external negative pass) is the guidance mechanism.
+    Flux2VariantType.Klein4BBase: FluxParams(
+        in_channels=64,
+        vec_in_dim=2560,  # Qwen3-4B hidden size (used for pooled output)
+        context_in_dim=7680,  # 3 layers * 2560 = 7680 for Qwen3-4B
+        hidden_size=3072,
+        mlp_ratio=4.0,
+        num_heads=24,
+        depth=19,
+        depth_single_blocks=38,
+        axes_dim=[16, 56, 56],
+        theta=10_000,
+        qkv_bias=True,
+        guidance_embed=False,
+    ),
+    # Flux2 Klein 9B uses Qwen3 8B text encoder with stacked embeddings from layers [9, 18, 27]
+    # The context_in_dim is 3 * hidden_size of Qwen3 (3 * 4096 = 12288)
+    Flux2VariantType.Klein9B: FluxParams(
+        in_channels=64,
+        vec_in_dim=4096,  # Qwen3-8B hidden size (used for pooled output)
+        context_in_dim=12288,  # 3 layers * 4096 = 12288 for Qwen3-8B
+        hidden_size=3072,
+        mlp_ratio=4.0,
+        num_heads=24,
+        depth=19,
+        depth_single_blocks=38,
+        axes_dim=[16, 56, 56],
+        theta=10_000,
+        qkv_bias=True,
+        guidance_embed=False,
+    ),
+    # Flux2 Klein 9B Base is the undistilled foundation model. It shares the same
+    # architecture as Klein 9B (distilled) and reports guidance_embeds=False in its
+    # HF transformer config - the guidance scalar is inert for all Klein variants.
+    Flux2VariantType.Klein9BBase: FluxParams(
+        in_channels=64,
+        vec_in_dim=4096,  # Qwen3-8B hidden size (used for pooled output)
+        context_in_dim=12288,  # 3 layers * 4096 = 12288 for Qwen3-8B
+        hidden_size=3072,
+        mlp_ratio=4.0,
+        num_heads=24,
+        depth=19,
+        depth_single_blocks=38,
+        axes_dim=[16, 56, 56],
+        theta=10_000,
+        qkv_bias=True,
+        guidance_embed=False,
+    ),
 }
+
+
+def get_flux_transformers_params(variant: AnyVariant):
+    try:
+        return _flux_transformer_params[variant]
+    except KeyError:
+        raise ValueError(f"Unknown variant for FLUX transformer params: {variant}")

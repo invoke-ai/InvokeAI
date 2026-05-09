@@ -1,0 +1,58 @@
+---
+title: External Models
+---
+
+# :material-cloud-outline: External Models
+
+External models let you generate images in Invoke by calling third-party image generation APIs instead of running a model locally. This is useful when:
+
+- You don't have the GPU or VRAM to run a model locally.
+- You want access to closed-source models (e.g. GPT Image, Gemini).
+- You need a specific provider capability (very high resolutions, fast batches, bilingual text rendering, etc.).
+
+External models appear in the model picker alongside locally installed models. Generations are routed to the provider's API, billed against your provider account, and the resulting images are imported back into Invoke like any other generation.
+
+## Supported Providers
+
+- [Google Gemini](gemini.md) — Gemini 2.5 Flash Image, Gemini 3 Pro Image Preview, Gemini 3.1 Flash Image Preview
+- [OpenAI](openai.md) — GPT Image 1 / 1.5 / 1-mini, DALL·E 3, DALL·E 2
+
+## Configuring API Keys
+
+External provider credentials are stored in a dedicated `api_keys.yaml` file alongside `invokeai.yaml` in your Invoke root directory.
+
+```yaml
+# api_keys.yaml
+external_gemini_api_key: "your-gemini-api-key"
+external_openai_api_key: "your-openai-api-key"
+
+# Optional: override the provider base URL (e.g. for a compatible proxy or regional endpoint)
+external_gemini_base_url: "https://generativelanguage.googleapis.com"
+external_openai_base_url: "https://api.openai.com"
+```
+
+Restart Invoke after editing `api_keys.yaml` so the new values are picked up.
+
+!!! warning "Keep your keys private"
+    `api_keys.yaml` contains secrets. Do not commit it to version control and do not share it with other users of your machine.
+
+## Installing External Models
+
+External models are listed in the starter models dialog under their provider. Install them like any other starter model — Invoke records a model reference but does not download weights (there are no weights to download).
+
+Once installed, external models show up everywhere a model can be selected. Choose one, set the usual parameters (prompt, dimensions, num images, etc.), and invoke as normal.
+
+## Capabilities and Settings Visibility
+
+Each external model declares its own **capabilities** — for example:
+
+- Which generation modes it supports (`txt2img`, `img2img`, `inpaint`).
+- Whether it accepts reference images, and how many.
+- Which aspect ratios and resolutions it allows.
+- Whether it supports a negative prompt, seed, or batch size > 1.
+
+Invoke uses these capabilities to drive the UI: only the settings a given model actually supports will be shown in the parameters panel. If a field you expect is missing, it's because the selected model does not support it.
+
+## Costs and Rate Limits
+
+External providers charge for each request. Check the provider's pricing page before running large batches. Rate-limit errors from the provider are surfaced in Invoke as generation failures — wait a moment and try again, or lower your concurrent batch size.

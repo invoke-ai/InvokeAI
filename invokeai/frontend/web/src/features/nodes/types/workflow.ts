@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import type { FieldType } from './field';
 import { zFieldIdentifier } from './field';
-import { zInvocationNodeData, zNotesNodeData } from './invocation';
+import { zConnectorNodeData, zInvocationNodeData, zNotesNodeData } from './invocation';
 
 // #region Workflow misc
 const zXYPosition = z
@@ -14,7 +14,7 @@ const zXYPosition = z
   .default({ x: 0, y: 0 });
 export type XYPosition = z.infer<typeof zXYPosition>;
 
-const zWorkflowCategory = z.enum(['user', 'default', 'project']);
+const zWorkflowCategory = z.enum(['user', 'default']);
 export type WorkflowCategory = z.infer<typeof zWorkflowCategory>;
 // #endregion
 
@@ -31,7 +31,13 @@ const zWorkflowNotesNode = z.object({
   data: zNotesNodeData,
   position: zXYPosition,
 });
-const zWorkflowNode = z.union([zWorkflowInvocationNode, zWorkflowNotesNode]);
+const zWorkflowConnectorNode = z.object({
+  id: z.string().trim().min(1),
+  type: z.literal('connector'),
+  data: zConnectorNodeData,
+  position: zXYPosition,
+});
+const zWorkflowNode = z.union([zWorkflowInvocationNode, zWorkflowNotesNode, zWorkflowConnectorNode]);
 
 type WorkflowInvocationNode = z.infer<typeof zWorkflowInvocationNode>;
 
@@ -377,11 +383,10 @@ export const zWorkflowV3 = z.object({
   exposedFields: z.array(zFieldIdentifier),
   meta: z.object({
     category: zWorkflowCategory.default('user'),
-    version: z.literal('3.0.0'),
+    version: z.literal('4.0.0'),
   }),
   // Use the validated form schema!
   form: zValidatedBuilderForm,
-  is_published: z.boolean().nullish(),
 });
 export type WorkflowV3 = z.infer<typeof zWorkflowV3>;
 // #endregion

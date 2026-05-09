@@ -1,9 +1,10 @@
 import { Button, Flex, Heading, SimpleGrid } from '@invoke-ai/ui-library';
 import { useControlAdapterModelDefaultSettings } from 'features/modelManagerV2/hooks/useControlAdapterModelDefaultSettings';
+import { useIsModelManagerEnabled } from 'features/modelManagerV2/hooks/useIsModelManagerEnabled';
 import { DefaultPreprocessor } from 'features/modelManagerV2/subpanels/ModelPanel/ControlAdapterModelDefaultSettings/DefaultPreprocessor';
 import type { FormField } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/MainModelDefaultSettings';
 import { toast } from 'features/toast/toast';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +22,7 @@ type Props = {
 
 export const ControlAdapterModelDefaultSettings = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
+  const canManageModels = useIsModelManagerEnabled();
 
   const defaultSettingsDefaults = useControlAdapterModelDefaultSettings(modelConfig);
 
@@ -29,6 +31,10 @@ export const ControlAdapterModelDefaultSettings = memo(({ modelConfig }: Props) 
   const { handleSubmit, control, formState, reset } = useForm<ControlAdapterModelDefaultSettingsFormData>({
     defaultValues: defaultSettingsDefaults,
   });
+
+  useEffect(() => {
+    reset(defaultSettingsDefaults);
+  }, [defaultSettingsDefaults, reset]);
 
   const onSubmit = useCallback<SubmitHandler<ControlAdapterModelDefaultSettingsFormData>>(
     (data) => {
@@ -66,16 +72,18 @@ export const ControlAdapterModelDefaultSettings = memo(({ modelConfig }: Props) 
     <>
       <Flex gap="4" justifyContent="space-between" w="full" pb={4}>
         <Heading fontSize="md">{t('modelManager.defaultSettings')}</Heading>
-        <Button
-          size="sm"
-          leftIcon={<PiCheckBold />}
-          colorScheme="invokeYellow"
-          isDisabled={!formState.isDirty}
-          onClick={handleSubmit(onSubmit)}
-          isLoading={isLoadingUpdateModel}
-        >
-          {t('common.save')}
-        </Button>
+        {canManageModels && (
+          <Button
+            size="sm"
+            leftIcon={<PiCheckBold />}
+            colorScheme="invokeYellow"
+            isDisabled={!formState.isDirty}
+            onClick={handleSubmit(onSubmit)}
+            isLoading={isLoadingUpdateModel}
+          >
+            {t('common.save')}
+          </Button>
+        )}
       </Flex>
 
       <SimpleGrid columns={2} gap={8}>

@@ -1,8 +1,7 @@
 import { CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/SettingToggle';
-import { selectCFGRescaleMultiplierConfig } from 'features/system/store/configSlice';
+import { CONSTRAINTS } from 'features/parameters/components/Advanced/ParamCFGRescaleMultiplier';
 import { memo, useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
@@ -15,12 +14,7 @@ type DefaultCfgRescaleMultiplierType = MainModelDefaultSettingsFormData['cfgResc
 export const DefaultCfgRescaleMultiplier = memo((props: UseControllerProps<MainModelDefaultSettingsFormData>) => {
   const { field } = useController(props);
 
-  const config = useAppSelector(selectCFGRescaleMultiplierConfig);
   const { t } = useTranslation();
-  const marks = useMemo(
-    () => [config.sliderMin, Math.floor(config.sliderMax / 2), config.sliderMax],
-    [config.sliderMax, config.sliderMin]
-  );
 
   const onChange = useCallback(
     (v: number) => {
@@ -53,20 +47,20 @@ export const DefaultCfgRescaleMultiplier = memo((props: UseControllerProps<MainM
       <Flex w="full" gap={4}>
         <CompositeSlider
           value={value}
-          min={config.sliderMin}
-          max={config.sliderMax}
-          step={config.coarseStep}
-          fineStep={config.fineStep}
+          min={CONSTRAINTS.sliderMin}
+          max={CONSTRAINTS.sliderMax}
+          step={CONSTRAINTS.coarseStep}
+          fineStep={CONSTRAINTS.fineStep}
           onChange={onChange}
-          marks={marks}
           isDisabled={isDisabled}
+          marks
         />
         <CompositeNumberInput
           value={value}
-          min={config.numberInputMin}
-          max={config.numberInputMax}
-          step={config.coarseStep}
-          fineStep={config.fineStep}
+          min={CONSTRAINTS.numberInputMin}
+          max={CONSTRAINTS.numberInputMax}
+          step={CONSTRAINTS.coarseStep}
+          fineStep={CONSTRAINTS.fineStep}
           onChange={onChange}
           isDisabled={isDisabled}
         />

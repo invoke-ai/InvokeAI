@@ -1,4 +1,3 @@
-import { useIsWorkflowPublished } from 'features/nodes/components/sidePanel/workflow/publish';
 import { useBuildWorkflowFast } from 'features/nodes/util/workflow/buildWorkflow';
 import { saveWorkflowAs } from 'features/workflowLibrary/components/SaveWorkflowAsDialog';
 import { isLibraryWorkflow, useSaveLibraryWorkflow } from 'features/workflowLibrary/hooks/useSaveLibraryWorkflow';
@@ -11,18 +10,17 @@ import { useCallback } from 'react';
  */
 export const useSaveOrSaveAsWorkflow = () => {
   const buildWorkflow = useBuildWorkflowFast();
-  const isPublished = useIsWorkflowPublished();
   const { saveWorkflow } = useSaveLibraryWorkflow();
 
   const saveOrSaveAsWorkflow = useCallback(() => {
     const workflow = buildWorkflow();
 
-    if (isLibraryWorkflow(workflow) && !isPublished) {
+    if (isLibraryWorkflow(workflow)) {
       saveWorkflow(workflow);
     } else {
       saveWorkflowAs(workflow);
     }
-  }, [buildWorkflow, isPublished, saveWorkflow]);
+  }, [buildWorkflow, saveWorkflow]);
 
   return saveOrSaveAsWorkflow;
 };

@@ -1,15 +1,16 @@
 import { GlobalImageHotkeys } from 'app/components/GlobalImageHotkeys';
 import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
 import { CanvasPasteModal } from 'features/controlLayers/components/CanvasPasteModal';
+import { CanvasWorkflowIntegrationModal } from 'features/controlLayers/components/CanvasWorkflowIntegration/CanvasWorkflowIntegrationModal';
+import { LoadCanvasProjectConfirmationAlertDialog } from 'features/controlLayers/components/LoadCanvasProjectConfirmationAlertDialog';
+import { SaveCanvasProjectDialog } from 'features/controlLayers/components/SaveCanvasProjectDialog';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { CropImageModal } from 'features/cropper/components/CropImageModal';
 import { DeleteImageModal } from 'features/deleteImageModal/components/DeleteImageModal';
-import { DeleteVideoModal } from 'features/deleteVideoModal/components/DeleteVideoModal';
 import { FullscreenDropzone } from 'features/dnd/FullscreenDropzone';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
 import { ImageContextMenu } from 'features/gallery/components/ContextMenu/ImageContextMenu';
-import { VideoContextMenu } from 'features/gallery/components/ContextMenu/VideoContextMenu';
-import { ShareWorkflowModal } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/ShareWorkflowModal';
 import { WorkflowLibraryModal } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/WorkflowLibraryModal';
 import { CancelAllExceptCurrentQueueItemConfirmationAlertDialog } from 'features/queue/components/CancelAllExceptCurrentQueueItemConfirmationAlertDialog';
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
@@ -33,7 +34,6 @@ export const GlobalModalIsolator = memo(() => {
   return (
     <>
       <DeleteImageModal />
-      <DeleteVideoModal />
       <ChangeBoardModal />
       <DynamicPromptsModal />
       <StylePresetModal />
@@ -45,19 +45,21 @@ export const GlobalModalIsolator = memo(() => {
       <LoadWorkflowConfirmationAlertDialog />
       <DeleteStylePresetDialog />
       <DeleteWorkflowDialog />
-      <ShareWorkflowModal />
       <RefreshAfterResetModal />
       <DeleteBoardModal />
       <GlobalImageHotkeys />
       <ImageContextMenu />
-      <VideoContextMenu />
       <FullscreenDropzone />
       <VideosModal />
       <SaveWorkflowAsDialog />
       <CanvasManagerProviderGate>
         <CanvasPasteModal />
+        <CanvasWorkflowIntegrationModal />
       </CanvasManagerProviderGate>
+      <SaveCanvasProjectDialog />
+      <LoadCanvasProjectConfirmationAlertDialog />
       <LoadWorkflowFromGraphModal />
+      <CropImageModal />
     </>
   );
 });

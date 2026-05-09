@@ -5,7 +5,6 @@ import { StylePresetExportButton } from 'features/stylePresets/components/StyleP
 import { StylePresetImportButton } from 'features/stylePresets/components/StylePresetImportButton';
 import { StylePresetPromptPreviewToggle } from 'features/stylePresets/components/StylePresetPromptPreviewToggle';
 import { selectStylePresetSearchTerm } from 'features/stylePresets/store/stylePresetSlice';
-import { selectAllowPrivateStylePresets } from 'features/system/store/configSlice';
 import { useTranslation } from 'react-i18next';
 import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePresets';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
@@ -16,7 +15,6 @@ import StylePresetSearch from './StylePresetSearch';
 
 export const StylePresetMenu = () => {
   const searchTerm = useAppSelector(selectStylePresetSearchTerm);
-  const allowPrivateStylePresets = useAppSelector(selectAllowPrivateStylePresets);
   const { data } = useListStylePresetsQuery(undefined, {
     selectFromResult: ({ data }) => {
       const filteredData =
@@ -33,8 +31,6 @@ export const StylePresetMenu = () => {
         ) => {
           if (preset.type === 'default') {
             acc.defaultPresets.push(preset);
-          } else if (preset.type === 'project') {
-            acc.sharedPresets.push(preset);
           } else {
             acc.presets.push(preset);
           }
@@ -64,9 +60,6 @@ export const StylePresetMenu = () => {
       </Flex>
 
       <StylePresetList title={t('stylePresets.myTemplates')} data={data.presets} />
-      {allowPrivateStylePresets && (
-        <StylePresetList title={t('stylePresets.sharedTemplates')} data={data.sharedPresets} />
-      )}
       <StylePresetList title={t('stylePresets.defaultTemplates')} data={data.defaultPresets} />
     </Flex>
   );

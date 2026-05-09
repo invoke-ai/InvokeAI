@@ -2,6 +2,7 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Icon, Image, Text, Tooltip } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import type { AddImageToBoardDndTargetData } from 'features/dnd/dnd';
 import { addImageToBoardDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
@@ -15,11 +16,11 @@ import {
   selectSelectedBoardId,
 } from 'features/gallery/store/gallerySelectors';
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArchiveBold, PiImageSquare } from 'react-icons/pi';
+import { PiArchiveBold, PiGlobeBold, PiImageSquare, PiShareNetworkBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
 import type { BoardDTO } from 'services/api/types';
 
 const _hover: SystemStyleObject = {
@@ -37,7 +38,7 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
-  const isVideoEnabled = useFeatureStatus('video');
+  const currentUser = useAppSelector(selectCurrentUser);
   const onClick = useCallback(() => {
     if (selectedBoardId !== board.board_id) {
       dispatch(boardIdSelected({ boardId: board.board_id }));
@@ -56,10 +57,13 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
     () => ({
       image_count: board.image_count,
       asset_count: board.asset_count,
-      video_count: board.video_count,
     }),
     [board]
   );
+
+  const showOwner = currentUser?.is_admin && board.owner_username;
+
+  const { canWriteImages } = useBoardAccess(board);
 
   return (
     <Box position="relative" w="full" h={12}>
@@ -88,22 +92,45 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
               h="full"
             >
               <CoverImage board={board} />
-              <Flex flex={1}>
+              <Flex flex={1} direction="column" minW={0}>
                 <BoardEditableTitle board={board} isSelected={isSelected} />
+                {showOwner && (
+                  <Text fontSize="xs" color="base.500" noOfLines={1}>
+                    {board.owner_username}
+                  </Text>
+                )}
               </Flex>
               {autoAddBoardId === board.board_id && <AutoAddBadge />}
               {board.archived && <Icon as={PiArchiveBold} fill="base.300" />}
+              {board.board_visibility === 'shared' && (
+                <Tooltip label={t('boards.visibilityBadgeShared')}>
+                  <span>
+                    <Icon as={PiShareNetworkBold} fill="blue.300" />
+                  </span>
+                </Tooltip>
+              )}
+              {board.board_visibility === 'public' && (
+                <Tooltip label={t('boards.visibilityBadgePublic')}>
+                  <span>
+                    <Icon as={PiGlobeBold} fill="green.300" />
+                  </span>
+                </Tooltip>
+              )}
               <Flex justifyContent="flex-end">
                 <Text variant="subtext">
-                  {board.image_count} | {isVideoEnabled && `${board.video_count} | `}
-                  {board.asset_count}
+                  {board.image_count} | {board.asset_count}
                 </Text>
               </Flex>
             </Flex>
           </Tooltip>
         )}
       </BoardContextMenu>
-      <DndDropTarget dndTarget={addImageToBoardDndTarget} dndTargetData={dndTargetData} label={t('gallery.move')} />
+      <DndDropTarget
+        dndTarget={addImageToBoardDndTarget}
+        dndTargetData={dndTargetData}
+        label={t('gallery.move')}
+        isDisabled={!canWriteImages}
+      />
     </Box>
   );
 };

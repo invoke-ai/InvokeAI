@@ -1,5 +1,4 @@
-import { useStore } from '@nanostores/react';
-import { $loggingOverrides, configureLogging } from 'app/logging/logger';
+import { configureLogging } from 'app/logging/logger';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import {
@@ -20,24 +19,11 @@ import { useLayoutEffect } from 'react';
 export const useSyncLoggingConfig = () => {
   useAssertSingleton('useSyncLoggingConfig');
 
-  const loggingOverrides = useStore($loggingOverrides);
-
   const logLevel = useAppSelector(selectSystemLogLevel);
   const logNamespaces = useAppSelector(selectSystemLogNamespaces);
   const logIsEnabled = useAppSelector(selectSystemLogIsEnabled);
 
   useLayoutEffect(() => {
-    configureLogging(
-      loggingOverrides?.logIsEnabled ?? logIsEnabled,
-      loggingOverrides?.logLevel ?? logLevel,
-      loggingOverrides?.logNamespaces ?? logNamespaces
-    );
-  }, [
-    logIsEnabled,
-    logLevel,
-    logNamespaces,
-    loggingOverrides?.logIsEnabled,
-    loggingOverrides?.logLevel,
-    loggingOverrides?.logNamespaces,
-  ]);
+    configureLogging(logIsEnabled, logLevel, logNamespaces);
+  }, [logIsEnabled, logLevel, logNamespaces]);
 };

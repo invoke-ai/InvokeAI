@@ -6,9 +6,8 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 export const containerSx: SystemStyleObject = {
   h: 'full',
   position: 'relative',
-  borderRadius: 'base',
   transitionProperty: 'none',
-  cursor: 'grab',
+  cursor: 'pointer',
   '--border-color': 'var(--invoke-colors-base-500)',
   '--border-color-selected': 'var(--invoke-colors-blue-300)',
   '--header-bg-color': 'var(--invoke-colors-base-900)',
@@ -30,7 +29,7 @@ export const containerSx: SystemStyleObject = {
     insetInlineEnd: 0,
     bottom: 0,
     insetInlineStart: 0,
-    borderRadius: 'base',
+    borderRadius: 'inherit',
     transitionProperty: 'none',
     pointerEvents: 'none',
     shadow: '0 0 0 1px var(--border-color)',
@@ -56,12 +55,6 @@ export const containerSx: SystemStyleObject = {
     display: 'block',
     shadow: '0 0 0 2px var(--border-color-selected)',
   },
-  '&[data-is-editor-locked="true"]': {
-    '& *': {
-      cursor: 'not-allowed',
-      pointerEvents: 'none',
-    },
-  },
 };
 
 export const shadowsSx: SystemStyleObject = {
@@ -70,7 +63,7 @@ export const shadowsSx: SystemStyleObject = {
   insetInlineEnd: 0,
   bottom: 0,
   insetInlineStart: 0,
-  borderRadius: 'base',
+  borderRadius: 'inherit',
   pointerEvents: 'none',
   zIndex: -1,
   shadow: 'var(--invoke-shadows-xl), var(--invoke-shadows-base), var(--invoke-shadows-base)',
@@ -82,7 +75,7 @@ export const inProgressSx: SystemStyleObject = {
   insetInlineEnd: 0,
   bottom: 0,
   insetInlineStart: 0,
-  borderRadius: 'md',
+  borderRadius: 'inherit',
   pointerEvents: 'none',
   transitionProperty: 'none',
   opacity: 0.7,

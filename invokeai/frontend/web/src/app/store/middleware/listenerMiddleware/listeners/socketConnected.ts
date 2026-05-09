@@ -1,7 +1,6 @@
 import { objectEquals } from '@observ33r/object-equals';
 import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
-import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import type { AppStartListening } from 'app/store/store';
 import { atom } from 'nanostores';
 import { api } from 'services/api';
@@ -16,12 +15,14 @@ export const socketConnected = createAction('socket/connected');
 export const addSocketConnectedEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketConnected,
-    effect: async (action, { dispatch, getState, cancelActiveListeners, delay }) => {
+    effect: async (action, { dispatch, getState }) => {
       /**
        * The rest of this listener has recovery logic for when the socket disconnects and reconnects.
        *
-       * We need to re-fetch if something has changed while we were disconnected. In practice, the only
-       * thing that could change while disconnected is a queue item finishes processing.
+       * We need to re-fetch if something has changed while we were disconnected.
+       *
+       * Session queue status is one proxy for disconnected changes. Model installs need explicit recovery
+       * as well because they can transition to paused during backend shutdown while the socket is down.
        *
        * The queue status is a proxy for this - if the queue status has changed, we need to re-fetch
        * the queries that may have changed while we were disconnected.
@@ -41,22 +42,22 @@ export const addSocketConnectedEventListener = (startAppListening: AppStartListe
         dispatch(api.util.resetApiState());
       }
 
+      // Always re-sync model installs on reconnect.
+      dispatch(
+        modelsApi.endpoints.listModelInstalls.initiate(undefined, {
+          forceRefetch: true,
+          subscribe: false,
+        })
+      );
+
       // Else, we need to compare the last-known queue status with the current queue status, re-fetching
       // everything if it has changed.
-
-      if ($baseUrl.get()) {
-        // If we have a baseUrl (e.g. not localhost), we need to debounce the re-fetch to not hammer server
-        cancelActiveListeners();
-        // Add artificial jitter to the debounce
-        await delay(1000 + Math.random() * 1000);
-      }
-
       const prevQueueStatusData = selectQueueStatus(getState()).data;
 
       try {
         // Fetch the queue status again
         const queueStatusRequest = dispatch(
-          await queueApi.endpoints.getQueueStatus.initiate(undefined, {
+          queueApi.endpoints.getQueueStatus.initiate(undefined, {
             forceRefetch: true,
             subscribe: false,
           })

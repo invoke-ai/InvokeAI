@@ -5,22 +5,22 @@ import { GalleryItemSizeBadge } from 'features/gallery/components/ImageGrid/Gall
 import { GalleryItemStarIconButton } from 'features/gallery/components/ImageGrid/GalleryItemStarIconButton';
 import { selectAlwaysShouldImageSizeBadge } from 'features/gallery/store/gallerySelectors';
 import { memo } from 'react';
-import type { ImageDTO, VideoDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 
 type Props = {
-  itemDTO: ImageDTO | VideoDTO;
+  imageDTO: ImageDTO;
   isHovered: boolean;
 };
 
-export const GalleryItemHoverIcons = memo(({ itemDTO, isHovered }: Props) => {
+export const GalleryItemHoverIcons = memo(({ imageDTO, isHovered }: Props) => {
   const alwaysShowImageSizeBadge = useAppSelector(selectAlwaysShouldImageSizeBadge);
 
   return (
     <>
-      {(isHovered || alwaysShowImageSizeBadge) && <GalleryItemSizeBadge itemDTO={itemDTO} />}
-      {(isHovered || itemDTO.starred) && <GalleryItemStarIconButton itemDTO={itemDTO} />}
-      {isHovered && <GalleryItemDeleteIconButton itemDTO={itemDTO} />}
-      {isHovered && <GalleryItemOpenInViewerIconButton itemDTO={itemDTO} />}
+      {(isHovered || alwaysShowImageSizeBadge) && <GalleryItemSizeBadge imageDTO={imageDTO} />}
+      {(isHovered || imageDTO.starred) && <GalleryItemStarIconButton imageDTO={imageDTO} />}
+      {isHovered && <GalleryItemDeleteIconButton imageDTO={imageDTO} />}
+      {isHovered && <GalleryItemOpenInViewerIconButton imageDTO={imageDTO} />}
     </>
   );
 });

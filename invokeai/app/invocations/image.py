@@ -21,7 +21,7 @@ from invokeai.app.invocations.fields import (
     WithBoard,
     WithMetadata,
 )
-from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.invocations.primitives import ImageOutput, StringOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import SEED_MAX
@@ -197,7 +197,7 @@ class ImagePasteInvocation(BaseInvocation, WithMetadata, WithBoard):
     "tomask",
     title="Mask from Alpha",
     tags=["image", "mask"],
-    category="image",
+    category="mask",
     version="1.2.2",
 )
 class MaskFromAlphaInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -582,10 +582,29 @@ class ImageWatermarkInvocation(BaseInvocation, WithMetadata, WithBoard):
 
 
 @invocation(
+    "decode_watermark",
+    title="Decode Invisible Watermark",
+    tags=["image", "watermark"],
+    category="image",
+    version="1.0.0",
+)
+class DecodeInvisibleWatermarkInvocation(BaseInvocation):
+    """Decode an invisible watermark from an image."""
+
+    image: ImageField = InputField(description="The image to decode the watermark from")
+    length: int = InputField(default=8, description="The expected watermark length in bytes")
+
+    def invoke(self, context: InvocationContext) -> StringOutput:
+        image = context.images.get_pil(self.image.image_name)
+        watermark = InvisibleWatermark.decode_watermark(image, self.length)
+        return StringOutput(value=watermark)
+
+
+@invocation(
     "mask_edge",
     title="Mask Edge",
     tags=["image", "mask", "inpaint"],
-    category="image",
+    category="mask",
     version="1.2.2",
 )
 class MaskEdgeInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -624,7 +643,7 @@ class MaskEdgeInvocation(BaseInvocation, WithMetadata, WithBoard):
     "mask_combine",
     title="Combine Masks",
     tags=["image", "mask", "multiply"],
-    category="image",
+    category="mask",
     version="1.2.2",
 )
 class MaskCombineInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -649,102 +668,104 @@ class MaskCombineInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Color Correct",
     tags=["image", "color"],
     category="image",
-    version="1.2.2",
+    version="2.0.0",
 )
 class ColorCorrectInvocation(BaseInvocation, WithMetadata, WithBoard):
     """
-    Shifts the colors of a target image to match the reference image, optionally
-    using a mask to only color-correct certain regions of the target image.
+    Matches the color histogram of a base image to a reference image, optionally
+    using a mask to only color-correct certain regions of the base image.
     """
 
-    image: ImageField = InputField(description="The image to color-correct")
-    reference: ImageField = InputField(description="Reference image for color-correction")
-    mask: Optional[ImageField] = InputField(default=None, description="Mask to use when applying color-correction")
-    mask_blur_radius: float = InputField(default=8, description="Mask blur radius")
+    base_image: ImageField = InputField(description="The image to color-correct")
+    color_reference: ImageField = InputField(description="Reference image for color-correction")
+    mask: Optional[ImageField] = InputField(default=None, description="Optional mask to limit color correction area")
+    colorspace: Literal["RGB", "YCbCr", "YCbCr-Chroma", "YCbCr-Luma"] = InputField(
+        default="RGB", description="Colorspace in which to apply histogram matching", title="Color Space"
+    )
+
+    def _match_histogram_channel(self, source: numpy.ndarray, reference: numpy.ndarray) -> numpy.ndarray:
+        """Match histogram of source channel to reference channel using cumulative distribution functions."""
+        # Compute histograms
+        source_hist, _ = numpy.histogram(source.flatten(), bins=256, range=(0, 256))
+        reference_hist, _ = numpy.histogram(reference.flatten(), bins=256, range=(0, 256))
+
+        # Compute cumulative distribution functions
+        source_cdf = source_hist.cumsum()
+        reference_cdf = reference_hist.cumsum()
+
+        # Normalize CDFs (avoid division by zero)
+        if source_cdf[-1] > 0:
+            source_cdf = source_cdf / source_cdf[-1]
+        if reference_cdf[-1] > 0:
+            reference_cdf = reference_cdf / reference_cdf[-1]
+
+        # Create lookup table using linear interpolation
+        lookup_table = numpy.interp(source_cdf, reference_cdf, numpy.arange(256))
+
+        # Apply lookup table to source image
+        return lookup_table[source].astype(numpy.uint8)
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        pil_init_mask = None
+        # Load images as RGBA
+        base_image = context.images.get_pil(self.base_image.image_name, "RGBA")
+
+        # Store original alpha channel
+        original_alpha = base_image.getchannel("A")
+
+        # Convert to working colorspace
+        if self.colorspace == "RGB":
+            base_array = numpy.asarray(base_image.convert("RGB"), dtype=numpy.uint8)
+            ref_rgb = context.images.get_pil(self.color_reference.image_name, "RGB")
+            ref_array = numpy.asarray(ref_rgb, dtype=numpy.uint8)
+            channels_to_match = [0, 1, 2]  # R, G, B
+        else:
+            # Convert to YCbCr colorspace
+            base_ycbcr = base_image.convert("YCbCr")
+            ref_ycbcr = context.images.get_pil(self.color_reference.image_name, "YCbCr")
+
+            base_array = numpy.asarray(base_ycbcr, dtype=numpy.uint8)
+            ref_array = numpy.asarray(ref_ycbcr, dtype=numpy.uint8)
+
+            # Determine which channels to match based on mode
+            if self.colorspace == "YCbCr":
+                channels_to_match = [0, 1, 2]  # Y, Cb, Cr
+            elif self.colorspace == "YCbCr-Chroma":
+                channels_to_match = [1, 2]  # Cb, Cr only
+            else:  # YCbCr-Luma
+                channels_to_match = [0]  # Y only
+
+        # Apply histogram matching to selected channels
+        corrected_array = base_array.copy()
+        for channel_idx in channels_to_match:
+            corrected_array[:, :, channel_idx] = self._match_histogram_channel(
+                base_array[:, :, channel_idx], ref_array[:, :, channel_idx]
+            )
+
+        # Convert back to RGB if we were in YCbCr
+        if self.colorspace != "RGB":
+            corrected_image = Image.fromarray(corrected_array, mode="YCbCr").convert("RGB")
+        else:
+            corrected_image = Image.fromarray(corrected_array, mode="RGB")
+
+        # Apply mask if provided (white = original, black = result)
         if self.mask is not None:
-            pil_init_mask = context.images.get_pil(self.mask.image_name).convert("L")
-
-        init_image = context.images.get_pil(self.reference.image_name)
-
-        result = context.images.get_pil(self.image.image_name).convert("RGBA")
-
-        # if init_image is None or init_mask is None:
-        #    return result
-
-        # Get the original alpha channel of the mask if there is one.
-        # Otherwise it is some other black/white image format ('1', 'L' or 'RGB')
-        # pil_init_mask = (
-        #    init_mask.getchannel("A")
-        #    if init_mask.mode == "RGBA"
-        #    else init_mask.convert("L")
-        # )
-        pil_init_image = init_image.convert("RGBA")  # Add an alpha channel if one doesn't exist
-
-        # Build an image with only visible pixels from source to use as reference for color-matching.
-        init_rgb_pixels = numpy.asarray(init_image.convert("RGB"), dtype=numpy.uint8)
-        init_a_pixels = numpy.asarray(pil_init_image.getchannel("A"), dtype=numpy.uint8)
-        init_mask_pixels = numpy.asarray(pil_init_mask, dtype=numpy.uint8)
-
-        # Get numpy version of result
-        np_image = numpy.asarray(result.convert("RGB"), dtype=numpy.uint8)
-
-        # Mask and calculate mean and standard deviation
-        mask_pixels = init_a_pixels * init_mask_pixels > 0
-        np_init_rgb_pixels_masked = init_rgb_pixels[mask_pixels, :]
-        np_image_masked = np_image[mask_pixels, :]
-
-        if np_init_rgb_pixels_masked.size > 0:
-            init_means = np_init_rgb_pixels_masked.mean(axis=0)
-            init_std = np_init_rgb_pixels_masked.std(axis=0)
-            gen_means = np_image_masked.mean(axis=0)
-            gen_std = np_image_masked.std(axis=0)
-
-            # Color correct
-            np_matched_result = np_image.copy()
-            np_matched_result[:, :, :] = (
-                (
-                    (
-                        (np_matched_result[:, :, :].astype(numpy.float32) - gen_means[None, None, :])
-                        / gen_std[None, None, :]
-                    )
-                    * init_std[None, None, :]
-                    + init_means[None, None, :]
-                )
-                .clip(0, 255)
-                .astype(numpy.uint8)
-            )
-            matched_result = Image.fromarray(np_matched_result, mode="RGB")
+            # Load mask as grayscale
+            mask_image = context.images.get_pil(self.mask.image_name, "L")
+            # Start with corrected image, paste base image where mask is white
+            result = corrected_image.copy()
+            if mask_image.size != result.size:
+                raise ValueError("Mask size must match base image size.")
+            else:
+                result.paste(base_image.convert("RGB"), mask=mask_image)
         else:
-            matched_result = Image.fromarray(np_image, mode="RGB")
+            result = corrected_image
 
-        # Blur the mask out (into init image) by specified amount
-        if self.mask_blur_radius > 0:
-            nm = numpy.asarray(pil_init_mask, dtype=numpy.uint8)
-            inverted_nm = 255 - nm
-            dilation_size = int(round(self.mask_blur_radius) + 20)
-            dilating_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (dilation_size, dilation_size))
-            inverted_dilated_nm = cv2.dilate(inverted_nm, dilating_kernel)
-            dilated_nm = 255 - inverted_dilated_nm
-            nmd = cv2.erode(
-                dilated_nm,
-                kernel=numpy.ones((3, 3), dtype=numpy.uint8),
-                iterations=int(self.mask_blur_radius / 2),
-            )
-            pmd = Image.fromarray(nmd, mode="L")
-            blurred_init_mask = pmd.filter(ImageFilter.BoxBlur(self.mask_blur_radius))
-        else:
-            blurred_init_mask = pil_init_mask
+        # Convert to RGBA and restore original alpha
+        result = result.convert("RGBA")
+        result.putalpha(original_alpha)
 
-        multiplied_blurred_init_mask = ImageChops.multiply(blurred_init_mask, result.split()[-1])
-
-        # Paste original on color-corrected generation (using blurred mask)
-        matched_result.paste(init_image, (0, 0), mask=multiplied_blurred_init_mask)
-
-        image_dto = context.images.save(image=matched_result)
-
+        # Save and return
+        image_dto = context.images.save(image=result)
         return ImageOutput.build(image_dto)
 
 
@@ -953,7 +974,7 @@ class ImageChannelMultiplyInvocation(BaseInvocation, WithMetadata, WithBoard):
     "save_image",
     title="Save Image",
     tags=["primitives", "image"],
-    category="primitives",
+    category="image",
     version="1.2.2",
     use_cache=False,
 )
@@ -974,7 +995,7 @@ class SaveImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     "canvas_paste_back",
     title="Canvas Paste Back",
     tags=["image", "combine"],
-    category="image",
+    category="canvas",
     version="1.0.1",
 )
 class CanvasPasteBackInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -1011,7 +1032,7 @@ class CanvasPasteBackInvocation(BaseInvocation, WithMetadata, WithBoard):
     "mask_from_id",
     title="Mask from Segmented Image",
     tags=["image", "mask", "id"],
-    category="image",
+    category="mask",
     version="1.0.1",
 )
 class MaskFromIDInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -1048,7 +1069,7 @@ class MaskFromIDInvocation(BaseInvocation, WithMetadata, WithBoard):
     "canvas_v2_mask_and_crop",
     title="Canvas V2 Mask and Crop",
     tags=["image", "mask", "id"],
-    category="image",
+    category="canvas",
     version="1.0.0",
     classification=Classification.Deprecated,
 )
@@ -1089,7 +1110,7 @@ class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
 
 
 @invocation(
-    "expand_mask_with_fade", title="Expand Mask with Fade", tags=["image", "mask"], category="image", version="1.0.1"
+    "expand_mask_with_fade", title="Expand Mask with Fade", tags=["image", "mask"], category="mask", version="1.0.1"
 )
 class ExpandMaskWithFadeInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Expands a mask with a fade effect. The mask uses black to indicate areas to keep from the generated image and white for areas to discard.
@@ -1178,7 +1199,7 @@ class ExpandMaskWithFadeInvocation(BaseInvocation, WithMetadata, WithBoard):
     "apply_mask_to_image",
     title="Apply Mask to Image",
     tags=["image", "mask", "blend"],
-    category="image",
+    category="mask",
     version="1.0.0",
 )
 class ApplyMaskToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -1353,7 +1374,7 @@ class PasteImageIntoBoundingBoxInvocation(BaseInvocation, WithMetadata, WithBoar
     "flux_kontext_image_prep",
     title="FLUX Kontext Image Prep",
     tags=["image", "concatenate", "flux", "kontext"],
-    category="image",
+    category="conditioning",
     version="1.0.0",
 )
 class FluxKontextConcatenateImagesInvocation(BaseInvocation, WithMetadata, WithBoard):

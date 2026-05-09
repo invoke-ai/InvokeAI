@@ -5,36 +5,30 @@ import type { MouseEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleFill } from 'react-icons/pi';
-import { useDeleteVideosMutation } from 'services/api/endpoints/videos';
-import { type ImageDTO, isImageDTO, type VideoDTO } from 'services/api/types';
+import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
+import { useSelectedBoard } from 'services/api/hooks/useSelectedBoard';
+import type { ImageDTO } from 'services/api/types';
 
 type Props = {
-  itemDTO: ImageDTO | VideoDTO;
+  imageDTO: ImageDTO;
 };
 
-export const GalleryItemDeleteIconButton = memo(({ itemDTO }: Props) => {
+export const GalleryItemDeleteIconButton = memo(({ imageDTO }: Props) => {
   const shift = useShiftModifier();
   const { t } = useTranslation();
   const deleteImageModal = useDeleteImageModalApi();
-  const [deleteVideos] = useDeleteVideosMutation();
+  const selectedBoard = useSelectedBoard();
+  const { canWriteImages } = useBoardAccess(selectedBoard);
 
   const onClick = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
-      if (!itemDTO) {
-        return;
-      }
-      if (isImageDTO(itemDTO)) {
-        deleteImageModal.delete([itemDTO.image_name]);
-      } else {
-        // TODO: Add confirm on delete and video usage functionality
-        deleteVideos({ video_ids: [itemDTO.video_id] });
-      }
+      deleteImageModal.delete([imageDTO.image_name]);
     },
-    [deleteImageModal, deleteVideos, itemDTO]
+    [deleteImageModal, imageDTO]
   );
 
-  if (!shift) {
+  if (!shift || !canWriteImages) {
     return null;
   }
 

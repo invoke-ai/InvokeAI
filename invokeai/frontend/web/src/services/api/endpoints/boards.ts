@@ -3,7 +3,6 @@ import queryString from 'query-string';
 import type {
   BoardDTO,
   CreateBoardArg,
-  GetVideoIdsResult,
   ImageCategory,
   ListBoardsArgs,
   OffsetPaginatedResults_ImageDTO_,
@@ -13,7 +12,6 @@ import { getListImagesUrl } from 'services/api/util';
 
 import type { ApiTagDescription } from '..';
 import { api, buildV1Url, LIST_TAG } from '..';
-import { buildVideosUrl } from './videos';
 
 /**
  * Builds an endpoint URL for the boards router
@@ -97,26 +95,15 @@ export const boardsApi = api.injectEndpoints({
       },
     }),
 
-    getBoardVideosTotal: build.query<{ total: number }, string | undefined>({
-      query: (board_id) => ({
-        url: buildVideosUrl('ids', { board_id: board_id ?? 'none' }),
-        method: 'GET',
-      }),
-      providesTags: (result, error, arg) => [{ type: 'BoardVideosTotal', id: arg ?? 'none' }, 'FetchOnReconnect'],
-      transformResponse: (response: GetVideoIdsResult) => {
-        return { total: response.total_count };
-      },
-    }),
-
     /**
      * Boards Mutations
      */
 
     createBoard: build.mutation<BoardDTO, CreateBoardArg>({
-      query: ({ board_name, is_private }) => ({
+      query: ({ board_name }) => ({
         url: buildBoardsUrl(),
         method: 'POST',
-        params: { board_name, is_private },
+        params: { board_name },
       }),
       invalidatesTags: [{ type: 'Board', id: LIST_TAG }],
     }),
@@ -145,7 +132,6 @@ export const {
   useListAllBoardsQuery,
   useGetBoardImagesTotalQuery,
   useGetBoardAssetsTotalQuery,
-  useGetBoardVideosTotalQuery,
   useCreateBoardMutation,
   useUpdateBoardMutation,
   useListAllImageNamesForBoardQuery,

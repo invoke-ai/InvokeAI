@@ -47,6 +47,7 @@ from pathlib import Path
 from typing import List, Optional, Union
 
 import pydantic
+from pydantic import ValidationError
 
 from invokeai.app.services.model_records.model_records_base import (
     DuplicateModelException,
@@ -57,12 +58,35 @@ from invokeai.app.services.model_records.model_records_base import (
     UnknownModelException,
 )
 from invokeai.app.services.shared.pagination import PaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
-    ModelConfigFactory,
-)
+from invokeai.backend.model_manager.configs.base import Config_Base
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
+
+
+def _construct_config_for_type(fields: dict, target_type: ModelType) -> AnyModelConfig:
+    """Try every config class whose `type` default matches `target_type` and return the first that validates.
+
+    Used when changing a model's type via the update endpoint: the existing record's `format`/`variant`
+    fields belong to the old class and may not have a discriminator match in the new type space, so we
+    fall back to constructing each candidate class directly with whatever fields it accepts.
+    """
+    last_error: Exception | None = None
+    for candidate_class in Config_Base.CONFIG_CLASSES:
+        type_field = candidate_class.model_fields.get("type")
+        if type_field is None or type_field.default != target_type:
+            continue
+        try:
+            return candidate_class(**fields)  # type: ignore[return-value]
+        except ValidationError as e:
+            last_error = e
+    if last_error is not None:
+        raise last_error
+    raise ValidationError.from_exception_data(
+        f"No model config class found for type={target_type!r}",
+        line_errors=[],
+    )
 
 
 class ModelRecordServiceSQL(ModelRecordServiceBase):
@@ -137,15 +161,52 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             if cursor.rowcount == 0:
                 raise UnknownModelException("model not found")
 
-    def update_model(self, key: str, changes: ModelRecordChanges) -> AnyModelConfig:
+    def update_model(self, key: str, changes: ModelRecordChanges, allow_class_change: bool = False) -> AnyModelConfig:
         with self._db.transaction() as cursor:
             record = self.get_model(key)
 
-            # Model configs use pydantic's `validate_assignment`, so each change is validated by pydantic.
-            for field_name in changes.model_fields_set:
-                setattr(record, field_name, getattr(changes, field_name))
+            if allow_class_change:
+                # The changes may cause the model config class to change. To handle this, we need to construct the new
+                # class from scratch rather than trying to modify the existing instance in place.
+                #
+                # 1. Convert the existing record to a dict
+                # 2. Apply the changes to the dict
+                # 3. Attempt to create a new model config from the updated dict
 
-            json_serialized = record.model_dump_json()
+                # 1. Convert the existing record to a dict
+                record_as_dict = record.model_dump()
+
+                # 2. Apply the changes to the dict
+                for field_name in changes.model_fields_set:
+                    record_as_dict[field_name] = getattr(changes, field_name)
+
+                # 3. Attempt to create a new model config from the updated dict.
+                #
+                # When the model type is being changed, the previous record's `format` and `variant` likely
+                # belong to the old config class and won't validate against the new one (e.g. switching a
+                # Qwen3 encoder to a Text LLM keeps format=qwen3_encoder, which has no matching discriminator
+                # under text_llm). If the initial validation fails and the type changed, retry with stale
+                # format/variant fields stripped so the new class can apply its own defaults.
+                type_changed = "type" in changes.model_fields_set and changes.type != record.type
+                try:
+                    record = ModelConfigFactory.from_dict(record_as_dict)
+                except ValidationError:
+                    if not type_changed:
+                        raise
+                    fallback_dict = dict(record_as_dict)
+                    for stale_field in ("format", "variant"):
+                        if stale_field not in changes.model_fields_set:
+                            fallback_dict.pop(stale_field, None)
+                    record = _construct_config_for_type(fallback_dict, changes.type)
+
+                # If we get this far, the updated model config is valid, so we can save it to the database.
+                json_serialized = record.model_dump_json()
+            else:
+                # We are not allowing the model config class to change, so we can just update the existing instance in
+                # place. If the changes are invalid for the existing class, an exception will be raised by pydantic.
+                for field_name in changes.model_fields_set:
+                    setattr(record, field_name, getattr(changes, field_name))
+                json_serialized = record.model_dump_json()
 
             cursor.execute(
                 """--sql
@@ -161,6 +222,23 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         return self.get_model(key)
 
+    def replace_model(self, key: str, new_config: AnyModelConfig) -> AnyModelConfig:
+        if key != new_config.key:
+            raise ValueError("key does not match new_config.key")
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                UPDATE models
+                SET
+                    config=?
+                WHERE id=?;
+                """,
+                (new_config.model_dump_json(), key),
+            )
+            if cursor.rowcount == 0:
+                raise UnknownModelException("model not found")
+        return self.get_model(key)
+
     def get_model(self, key: str) -> AnyModelConfig:
         """
         Retrieve the ModelConfigBase instance for the indicated model.
@@ -172,7 +250,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
-                SELECT config, strftime('%s',updated_at) FROM models
+                SELECT config FROM models
                 WHERE id=?;
                 """,
                 (key,),
@@ -180,14 +258,14 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             rows = cursor.fetchone()
         if not rows:
             raise UnknownModelException("model not found")
-        model = ModelConfigFactory.make_config(json.loads(rows[0]), timestamp=rows[1])
+        model = ModelConfigFactory.from_dict(json.loads(rows[0]))
         return model
 
     def get_model_by_hash(self, hash: str) -> AnyModelConfig:
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
-                SELECT config, strftime('%s',updated_at) FROM models
+                SELECT config FROM models
                 WHERE hash=?;
                 """,
                 (hash,),
@@ -195,7 +273,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             rows = cursor.fetchone()
         if not rows:
             raise UnknownModelException("model not found")
-        model = ModelConfigFactory.make_config(json.loads(rows[0]), timestamp=rows[1])
+        model = ModelConfigFactory.from_dict(json.loads(rows[0]))
         return model
 
     def exists(self, key: str) -> bool:
@@ -222,6 +300,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         model_type: Optional[ModelType] = None,
         model_format: Optional[ModelFormat] = None,
         order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default,
+        direction: SQLiteDirection = SQLiteDirection.Ascending,
     ) -> List[AnyModelConfig]:
         """
         Return models matching name, base and/or type.
@@ -231,18 +310,24 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         :param model_type: Filter by type of model (optional)
         :param model_format: Filter by model format (e.g. "diffusers") (optional)
         :param order_by: Result order
+        :param direction: Result direction
 
         If none of the optional filters are passed, will return all
         models in the database.
         """
         with self._db.transaction() as cursor:
             assert isinstance(order_by, ModelRecordOrderBy)
+            order_dir = "DESC" if direction == SQLiteDirection.Descending else "ASC"
             ordering = {
-                ModelRecordOrderBy.Default: "type, base, name, format",
+                ModelRecordOrderBy.Default: f"type {order_dir}, base COLLATE NOCASE {order_dir}, name COLLATE NOCASE {order_dir}, format",
                 ModelRecordOrderBy.Type: "type",
-                ModelRecordOrderBy.Base: "base",
-                ModelRecordOrderBy.Name: "name",
+                ModelRecordOrderBy.Base: "base COLLATE NOCASE",
+                ModelRecordOrderBy.Name: "name COLLATE NOCASE",
                 ModelRecordOrderBy.Format: "format",
+                ModelRecordOrderBy.Size: "IFNULL(json_extract(config, '$.file_size'), 0)",
+                ModelRecordOrderBy.DateAdded: "created_at",
+                ModelRecordOrderBy.DateModified: "updated_at",
+                ModelRecordOrderBy.Path: "path",
             }
 
             where_clause: list[str] = []
@@ -263,10 +348,10 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
             cursor.execute(
                 f"""--sql
-                SELECT config, strftime('%s',updated_at)
+                SELECT config
                 FROM models
                 {where}
-                ORDER BY {ordering[order_by]} -- using ? to bind doesn't work here for some reason;
+                ORDER BY {ordering[order_by]} {order_dir} -- using ? to bind doesn't work here for some reason;
                 """,
                 tuple(bindings),
             )
@@ -276,15 +361,20 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         results: list[AnyModelConfig] = []
         for row in result:
             try:
-                model_config = ModelConfigFactory.make_config(json.loads(row[0]), timestamp=row[1])
-            except pydantic.ValidationError:
+                model_config = ModelConfigFactory.from_dict(json.loads(row[0]))
+            except pydantic.ValidationError as e:
                 # We catch this error so that the app can still run if there are invalid model configs in the database.
                 # One reason that an invalid model config might be in the database is if someone had to rollback from a
                 # newer version of the app that added a new model type.
                 row_data = f"{row[0][:64]}..." if len(row[0]) > 64 else row[0]
+                try:
+                    name = json.loads(row[0]).get("name", "<unknown>")
+                except Exception:
+                    name = "<unknown>"
                 self._logger.warning(
-                    f"Found an invalid model config in the database. Ignoring this model. ({row_data})"
+                    f"Skipping invalid model config in the database with name {name}. Ignoring this model. ({row_data})"
                 )
+                self._logger.warning(f"Validation error: {e}")
             else:
                 results.append(model_config)
 
@@ -295,12 +385,12 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
-                SELECT config, strftime('%s',updated_at) FROM models
+                SELECT config FROM models
                 WHERE path=?;
                 """,
                 (str(path),),
             )
-            results = [ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in cursor.fetchall()]
+            results = [ModelConfigFactory.from_dict(json.loads(x[0])) for x in cursor.fetchall()]
         return results
 
     def search_by_hash(self, hash: str) -> List[AnyModelConfig]:
@@ -308,26 +398,35 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
-                SELECT config, strftime('%s',updated_at) FROM models
+                SELECT config FROM models
                 WHERE hash=?;
                 """,
                 (hash,),
             )
-            results = [ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in cursor.fetchall()]
+            results = [ModelConfigFactory.from_dict(json.loads(x[0])) for x in cursor.fetchall()]
         return results
 
     def list_models(
-        self, page: int = 0, per_page: int = 10, order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default
+        self,
+        page: int = 0,
+        per_page: int = 10,
+        order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default,
+        direction: SQLiteDirection = SQLiteDirection.Ascending,
     ) -> PaginatedResults[ModelSummary]:
         """Return a paginated summary listing of each model in the database."""
         with self._db.transaction() as cursor:
             assert isinstance(order_by, ModelRecordOrderBy)
+            order_dir = "DESC" if direction == SQLiteDirection.Descending else "ASC"
             ordering = {
-                ModelRecordOrderBy.Default: "type, base, name, format",
+                ModelRecordOrderBy.Default: f"type {order_dir}, base COLLATE NOCASE {order_dir}, name COLLATE NOCASE {order_dir}, format",
                 ModelRecordOrderBy.Type: "type",
-                ModelRecordOrderBy.Base: "base",
-                ModelRecordOrderBy.Name: "name",
+                ModelRecordOrderBy.Base: "base COLLATE NOCASE",
+                ModelRecordOrderBy.Name: "name COLLATE NOCASE",
                 ModelRecordOrderBy.Format: "format",
+                ModelRecordOrderBy.Size: "IFNULL(json_extract(config, '$.file_size'), 0)",
+                ModelRecordOrderBy.DateAdded: "created_at",
+                ModelRecordOrderBy.DateModified: "updated_at",
+                ModelRecordOrderBy.Path: "path",
             }
 
             # Lock so that the database isn't updated while we're doing the two queries.
@@ -345,7 +444,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 f"""--sql
                 SELECT config
                 FROM models
-                ORDER BY {ordering[order_by]} -- using ? to bind doesn't work here for some reason
+                ORDER BY {ordering[order_by]} {order_dir} -- using ? to bind doesn't work here for some reason
                 LIMIT ?
                 OFFSET ?;
                 """,

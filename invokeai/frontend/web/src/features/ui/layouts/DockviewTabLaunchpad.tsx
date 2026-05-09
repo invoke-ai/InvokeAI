@@ -10,12 +10,12 @@ import { useTranslation } from 'react-i18next';
 import type { IconType } from 'react-icons';
 import {
   PiBoundingBoxBold,
+  PiCircuitryBold,
   PiCubeBold,
   PiFlowArrowBold,
   PiFrameCornersBold,
   PiQueueBold,
   PiTextAaBold,
-  PiVideoBold,
 } from 'react-icons/pi';
 
 import type { DockviewPanelParameters } from './auto-layout-context';
@@ -26,8 +26,8 @@ const TAB_ICONS: Record<TabName, IconType> = {
   upscaling: PiFrameCornersBold,
   workflows: PiFlowArrowBold,
   models: PiCubeBold,
+  customNodes: PiCircuitryBold,
   queue: PiQueueBold,
-  video: PiVideoBold,
 };
 
 export const DockviewTabLaunchpad = memo((props: IDockviewPanelHeaderProps<DockviewPanelParameters>) => {

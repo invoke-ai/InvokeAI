@@ -32,6 +32,13 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.controlnet.instantx_controlnet_flux import InstantXControlNetFlux
 from invokeai.backend.flux.controlnet.xlabs_controlnet_flux import XLabsControlNetFlux
 from invokeai.backend.flux.denoise import denoise
+from invokeai.backend.flux.dype.presets import (
+    DYPE_PRESET_LABELS,
+    DYPE_PRESET_OFF,
+    DyPEPreset,
+    get_dype_config_from_preset,
+)
+from invokeai.backend.flux.extensions.dype_extension import DyPEExtension
 from invokeai.backend.flux.extensions.instantx_controlnet_extension import InstantXControlNetExtension
 from invokeai.backend.flux.extensions.kontext_extension import KontextExtension
 from invokeai.backend.flux.extensions.regional_prompting_extension import RegionalPromptingExtension
@@ -47,8 +54,9 @@ from invokeai.backend.flux.sampling_utils import (
     pack,
     unpack,
 )
+from invokeai.backend.flux.schedulers import FLUX_SCHEDULER_LABELS, FLUX_SCHEDULER_MAP, FLUX_SCHEDULER_NAME_VALUES
 from invokeai.backend.flux.text_conditioning import FluxReduxConditioning, FluxTextConditioning
-from invokeai.backend.model_manager.taxonomy import ModelFormat, ModelVariantType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, FluxVariantType, ModelFormat, ModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -62,8 +70,8 @@ from invokeai.backend.util.devices import TorchDevice
     "flux_denoise",
     title="FLUX Denoise",
     tags=["image", "flux"],
-    category="image",
-    version="4.1.0",
+    category="latents",
+    version="4.5.1",
 )
 class FluxDenoiseInvocation(BaseInvocation):
     """Run denoising process with a FLUX transformer model."""
@@ -132,6 +140,12 @@ class FluxDenoiseInvocation(BaseInvocation):
     num_steps: int = InputField(
         default=4, description="Number of diffusion steps. Recommended values are schnell: 4, dev: 50."
     )
+    scheduler: FLUX_SCHEDULER_NAME_VALUES = InputField(
+        default="euler",
+        description="Scheduler (sampler) for the denoising process. 'euler' is fast and standard. "
+        "'heun' is 2nd-order (better quality, 2x slower). 'lcm' is optimized for few steps.",
+        ui_choice_labels=FLUX_SCHEDULER_LABELS,
+    )
     guidance: float = InputField(
         default=4.0,
         description="The guidance strength. Higher values adhere more strictly to the prompt, and will produce less diverse images. FLUX dev only, ignored for schnell.",
@@ -157,6 +171,31 @@ class FluxDenoiseInvocation(BaseInvocation):
         default=None,
         description="FLUX Kontext conditioning (reference image).",
         input=Input.Connection,
+    )
+
+    # DyPE (Dynamic Position Extrapolation) for high-resolution generation
+    dype_preset: DyPEPreset = InputField(
+        default=DYPE_PRESET_OFF,
+        description=(
+            "DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. "
+            "'area' enables automatically based on image area. '4k' uses optimized settings for 4K output."
+        ),
+        ui_order=100,
+        ui_choice_labels=DYPE_PRESET_LABELS,
+    )
+    dype_scale: Optional[float] = InputField(
+        default=None,
+        ge=0.0,
+        le=8.0,
+        description="DyPE magnitude (λs). Higher values = stronger extrapolation. Only used when dype_preset is not 'off'.",
+        ui_order=101,
+    )
+    dype_exponent: Optional[float] = InputField(
+        default=None,
+        ge=0.0,
+        le=1000.0,
+        description="DyPE decay speed (λt). Controls transition from low to high frequency detail. Only used when dype_preset is not 'off'.",
+        ui_order=102,
     )
 
     @torch.no_grad()
@@ -232,7 +271,14 @@ class FluxDenoiseInvocation(BaseInvocation):
         )
 
         transformer_config = context.models.get_config(self.transformer.transformer)
-        is_schnell = "schnell" in getattr(transformer_config, "config_path", "")
+        assert (
+            transformer_config.base in (BaseModelType.Flux, BaseModelType.Flux2)
+            and transformer_config.type is ModelType.Main
+        )
+        # Schnell is only for FLUX.1, FLUX.2 Klein behaves like Dev (with guidance)
+        is_schnell = (
+            transformer_config.base is BaseModelType.Flux and transformer_config.variant is FluxVariantType.Schnell
+        )
 
         # Calculate the timestep schedule.
         timesteps = get_schedule(
@@ -240,6 +286,12 @@ class FluxDenoiseInvocation(BaseInvocation):
             image_seq_len=packed_h * packed_w,
             shift=not is_schnell,
         )
+
+        # Create scheduler if not using default euler
+        scheduler = None
+        if self.scheduler in FLUX_SCHEDULER_MAP:
+            scheduler_class = FLUX_SCHEDULER_MAP[self.scheduler]
+            scheduler = scheduler_class(num_train_timesteps=1000)
 
         # Clip the timesteps schedule based on denoising_start and denoising_end.
         timesteps = clip_timestep_schedule_fractional(timesteps, self.denoising_start, self.denoising_end)
@@ -277,7 +329,7 @@ class FluxDenoiseInvocation(BaseInvocation):
 
         # Prepare the extra image conditioning tensor (img_cond) for either FLUX structural control or FLUX Fill.
         img_cond: torch.Tensor | None = None
-        is_flux_fill = transformer_config.variant == ModelVariantType.Inpaint  # type: ignore
+        is_flux_fill = transformer_config.variant is FluxVariantType.DevFill
         if is_flux_fill:
             img_cond = self._prep_flux_fill_img_cond(
                 context, device=TorchDevice.choose_torch_device(), dtype=inference_dtype
@@ -408,6 +460,30 @@ class FluxDenoiseInvocation(BaseInvocation):
                 kontext_extension.ensure_batch_size(x.shape[0])
                 img_cond_seq, img_cond_seq_ids = kontext_extension.kontext_latents, kontext_extension.kontext_ids
 
+            # Prepare DyPE extension for high-resolution generation
+            dype_extension: DyPEExtension | None = None
+            dype_config = get_dype_config_from_preset(
+                preset=self.dype_preset,
+                width=self.width,
+                height=self.height,
+                custom_scale=self.dype_scale,
+                custom_exponent=self.dype_exponent,
+            )
+            if dype_config is not None:
+                dype_extension = DyPEExtension(
+                    config=dype_config,
+                    target_height=self.height,
+                    target_width=self.width,
+                )
+                context.logger.info(
+                    f"DyPE enabled: resolution={self.width}x{self.height}, preset={self.dype_preset}, "
+                    f"scale={dype_config.dype_scale:.2f}, "
+                    f"exponent={dype_config.dype_exponent:.2f}, start_sigma={dype_config.dype_start_sigma:.2f}, "
+                    f"base_resolution={dype_config.base_resolution}"
+                )
+            else:
+                context.logger.debug(f"DyPE disabled: resolution={self.width}x{self.height}, preset={self.dype_preset}")
+
             x = denoise(
                 model=transformer,
                 img=x,
@@ -425,6 +501,8 @@ class FluxDenoiseInvocation(BaseInvocation):
                 img_cond=img_cond,
                 img_cond_seq=img_cond_seq,
                 img_cond_seq_ids=img_cond_seq_ids,
+                dype_extension=dype_extension,
+                scheduler=scheduler,
             )
 
         x = unpack(x.float(), self.height, self.width)

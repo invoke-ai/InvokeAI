@@ -2249,12 +2249,6 @@
         "toGetStartedLocal": "Pour commencer, assurez-vous de télécharger ou d'importer des modèles nécessaires pour exécuter Invoke. Ensuite, saisissez le prompt dans la boîte et cliquez sur <StrongComponent>Invoke</StrongComponent> pour générer votre première image. Sélectionnez un template de prompt pour améliorer les résultats. Vous pouvez choisir de sauvegarder vos images directement sur <StrongComponent>Galerie</StrongComponent> ou les modifier sur la <StrongComponent>Toile</StrongComponent>.",
         "lowVRAMMode": "Pour de meilleures performances, suivez notre <LinkComponent>guide Low VRAM</LinkComponent>."
     },
-    "upsell": {
-        "shareAccess": "Partager l'accès",
-        "inviteTeammates": "Inviter des collègues",
-        "professionalUpsell": "Disponible dans l'édition professionnelle d'Invoke. Cliquez ici ou visitez invoke.com/pricing pour plus de détails.",
-        "professional": "Professionnel"
-    },
     "supportVideos": {
         "watch": "Regarder",
         "gettingStarted": "Commencer",

@@ -1,115 +1,122 @@
-import { createSelector, type Selector } from '@reduxjs/toolkit';
+import type { Selector } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import type { RootState } from 'app/store/store';
 import { useMemo } from 'react';
 import {
   modelConfigsAdapterSelectors,
+  selectMissingModelsQuery,
   selectModelConfigsQuery,
+  useGetMissingModelsQuery,
   useGetModelConfigsQuery,
 } from 'services/api/endpoints/models';
-import type { AnyModelConfig } from 'services/api/types';
+import type { AnyModelConfig, AnyModelConfigWithExternal, MainOrExternalModelConfig } from 'services/api/types';
 import {
-  isChatGPT4oModelConfig,
-  isCLIPEmbedModelConfig,
-  isCLIPVisionModelConfig,
-  isCogView4MainModelModelConfig,
+  isAnimaQwen3EncoderModelConfig,
+  isAnimaVAEModelConfig,
+  isCLIPEmbedModelConfigOrSubmodel,
   isControlLayerModelConfig,
-  isControlLoRAModelConfig,
   isControlNetModelConfig,
-  isFluxKontextApiModelConfig,
+  isExternalApiModelConfig,
+  isFlux1VAEModelConfig,
+  isFlux2DiffusersMainModelConfig,
+  isFlux2VAEModelConfig,
   isFluxKontextModelConfig,
-  isFluxMainModelModelConfig,
   isFluxReduxModelConfig,
   isFluxVAEModelConfig,
-  isGemini2_5ModelConfig,
-  isImagen3ModelConfig,
-  isImagen4ModelConfig,
   isIPAdapterModelConfig,
   isLLaVAModelConfig,
   isLoRAModelConfig,
-  isNonRefinerMainModelConfig,
-  isNonSDXLMainModelConfig,
+  isMainOrExternalModelConfig,
+  isQwen3EncoderModelConfig,
+  isQwenImageDiffusersMainModelConfig,
+  isQwenImageVAEModelConfig,
+  isQwenVLEncoderModelConfig,
   isRefinerMainModelModelConfig,
-  isRunwayModelConfig,
-  isSD3MainModelModelConfig,
-  isSDXLMainModelModelConfig,
-  isSigLipModelConfig,
   isSpandrelImageToImageModelConfig,
-  isT2IAdapterModelConfig,
-  isT5EncoderModelConfig,
+  isT5EncoderModelConfigOrSubmodel,
+  isTextLLMModelConfig,
   isTIModelConfig,
-  isVAEModelConfig,
-  isVeo3ModelConfig,
-  isVideoModelConfig,
+  isVAEModelConfigOrSubmodel,
+  isZImageDiffusersMainModelConfig,
 } from 'services/api/types';
 
-type ModelHookArgs = { excludeSubmodels?: boolean };
-
 const buildModelsHook =
-  <T extends AnyModelConfig>(
-    typeGuard: (config: AnyModelConfig, excludeSubmodels?: boolean) => config is T,
-    excludeSubmodels?: boolean
-  ) =>
+  <T extends AnyModelConfig>(typeGuard: (config: AnyModelConfig) => config is T) =>
   (filter: (config: T) => boolean = () => true) => {
     const result = useGetModelConfigsQuery(undefined);
+    const { data: missingModelsData } = useGetMissingModelsQuery();
+
     const modelConfigs = useMemo(() => {
       if (!result.data) {
         return EMPTY_ARRAY;
       }
 
-      return modelConfigsAdapterSelectors
-        .selectAll(result.data)
-        .filter((config) => typeGuard(config, excludeSubmodels))
+      // Get set of missing model keys to exclude from selection
+      const missingModelKeys = new Set(
+        modelConfigsAdapterSelectors.selectAll(missingModelsData ?? { ids: [], entities: {} }).map((m) => m.key)
+      );
+
+      return (modelConfigsAdapterSelectors.selectAll(result.data) as AnyModelConfigWithExternal[])
+        .filter((config): config is T => {
+          if (isExternalApiModelConfig(config)) {
+            return false;
+          }
+          return typeGuard(config as AnyModelConfig);
+        })
+        .filter((config) => !missingModelKeys.has(config.key))
         .filter(filter);
-    }, [filter, result.data]);
+    }, [filter, result.data, missingModelsData]);
 
     return [modelConfigs, result] as const;
   };
-export const useMainModels = buildModelsHook(isNonRefinerMainModelConfig);
-export const useNonSDXLMainModels = buildModelsHook(isNonSDXLMainModelConfig);
+
+export const useMainModels = (filter: (config: MainOrExternalModelConfig) => boolean = () => true) => {
+  const result = useGetModelConfigsQuery(undefined);
+  const { data: missingModelsData } = useGetMissingModelsQuery();
+
+  const modelConfigs = useMemo(() => {
+    if (!result.data) {
+      return EMPTY_ARRAY;
+    }
+
+    const missingModelKeys = new Set(
+      modelConfigsAdapterSelectors.selectAll(missingModelsData ?? { ids: [], entities: {} }).map((m) => m.key)
+    );
+
+    return (modelConfigsAdapterSelectors.selectAll(result.data) as AnyModelConfigWithExternal[])
+      .filter((config): config is MainOrExternalModelConfig => isMainOrExternalModelConfig(config))
+      .filter((config) => !missingModelKeys.has(config.key) || isExternalApiModelConfig(config))
+      .filter(filter);
+  }, [filter, result.data, missingModelsData]);
+
+  return [modelConfigs, result] as const;
+};
+
 export const useRefinerModels = buildModelsHook(isRefinerMainModelModelConfig);
-export const useFluxModels = buildModelsHook(isFluxMainModelModelConfig);
-export const useSD3Models = buildModelsHook(isSD3MainModelModelConfig);
-export const useCogView4Models = buildModelsHook(isCogView4MainModelModelConfig);
-export const useSDXLModels = buildModelsHook(isSDXLMainModelModelConfig);
 export const useLoRAModels = buildModelsHook(isLoRAModelConfig);
-export const useControlLoRAModel = buildModelsHook(isControlLoRAModelConfig);
 export const useControlLayerModels = buildModelsHook(isControlLayerModelConfig);
 export const useControlNetModels = buildModelsHook(isControlNetModelConfig);
-export const useT2IAdapterModels = buildModelsHook(isT2IAdapterModelConfig);
-export const useT5EncoderModels = (args?: ModelHookArgs) =>
-  buildModelsHook(isT5EncoderModelConfig, args?.excludeSubmodels)();
-export const useCLIPEmbedModels = (args?: ModelHookArgs) =>
-  buildModelsHook(isCLIPEmbedModelConfig, args?.excludeSubmodels)();
+export const useT5EncoderModels = () => buildModelsHook(isT5EncoderModelConfigOrSubmodel)();
+export const useCLIPEmbedModels = () => buildModelsHook(isCLIPEmbedModelConfigOrSubmodel)();
 export const useSpandrelImageToImageModels = buildModelsHook(isSpandrelImageToImageModelConfig);
-export const useIPAdapterModels = buildModelsHook(isIPAdapterModelConfig);
 export const useEmbeddingModels = buildModelsHook(isTIModelConfig);
-export const useVAEModels = (args?: ModelHookArgs) => buildModelsHook(isVAEModelConfig, args?.excludeSubmodels)();
-export const useFluxVAEModels = (args?: ModelHookArgs) =>
-  buildModelsHook(isFluxVAEModelConfig, args?.excludeSubmodels)();
-export const useCLIPVisionModels = buildModelsHook(isCLIPVisionModelConfig);
-export const useSigLipModels = buildModelsHook(isSigLipModelConfig);
-export const useFluxReduxModels = buildModelsHook(isFluxReduxModelConfig);
+export const useVAEModels = () => buildModelsHook(isVAEModelConfigOrSubmodel)();
+export const useFlux1VAEModels = () => buildModelsHook(isFlux1VAEModelConfig)();
+export const useFlux2VAEModels = () => buildModelsHook(isFlux2VAEModelConfig)();
+export const useAnimaVAEModels = () => buildModelsHook(isAnimaVAEModelConfig)();
+export const useAnimaQwen3EncoderModels = () => buildModelsHook(isAnimaQwen3EncoderModelConfig)();
+export const useZImageDiffusersModels = () => buildModelsHook(isZImageDiffusersMainModelConfig)();
+export const useFlux2DiffusersModels = () => buildModelsHook(isFlux2DiffusersMainModelConfig)();
+export const useQwenImageDiffusersModels = () => buildModelsHook(isQwenImageDiffusersMainModelConfig)();
+export const useQwenImageVAEModels = () => buildModelsHook(isQwenImageVAEModelConfig)();
+export const useQwenVLEncoderModels = () => buildModelsHook(isQwenVLEncoderModelConfig)();
+export const useQwen3EncoderModels = () => buildModelsHook(isQwen3EncoderModelConfig)();
 export const useGlobalReferenceImageModels = buildModelsHook(
-  (config) =>
-    isIPAdapterModelConfig(config) ||
-    isFluxReduxModelConfig(config) ||
-    isChatGPT4oModelConfig(config) ||
-    isFluxKontextApiModelConfig(config) ||
-    isFluxKontextModelConfig(config) ||
-    isGemini2_5ModelConfig(config)
+  (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config) || isFluxKontextModelConfig(config)
 );
 export const useRegionalReferenceImageModels = buildModelsHook(
   (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config)
 );
-export const useLLaVAModels = buildModelsHook(isLLaVAModelConfig);
-export const useImagen3Models = buildModelsHook(isImagen3ModelConfig);
-export const useImagen4Models = buildModelsHook(isImagen4ModelConfig);
-export const useChatGPT4oModels = buildModelsHook(isChatGPT4oModelConfig);
-export const useFluxKontextModels = buildModelsHook(isFluxKontextApiModelConfig);
-export const useVeo3Models = buildModelsHook(isVeo3ModelConfig);
-export const useRunwayModels = buildModelsHook(isRunwayModelConfig);
-export const useVideoModels = buildModelsHook(isVideoModelConfig);
 
 const buildModelsSelector =
   <T extends AnyModelConfig>(typeGuard: (config: AnyModelConfig) => config is T): Selector<RootState, T[]> =>
@@ -118,50 +125,34 @@ const buildModelsSelector =
     if (!result.data) {
       return EMPTY_ARRAY;
     }
-    return modelConfigsAdapterSelectors.selectAll(result.data).filter(typeGuard);
+
+    // Get set of missing model keys to exclude from selection
+    const missingResult = selectMissingModelsQuery(state);
+    const missingModelKeys = new Set(
+      modelConfigsAdapterSelectors.selectAll(missingResult.data ?? { ids: [], entities: {} }).map((m) => m.key)
+    );
+
+    return modelConfigsAdapterSelectors
+      .selectAll(result.data)
+      .filter(typeGuard)
+      .filter((config) => !missingModelKeys.has(config.key));
   };
-// export const selectSDMainModels = buildModelsSelector(isNonRefinerNonFluxMainModelConfig);
-// export const selectMainModels = buildModelsSelector(isNonRefinerMainModelConfig);
-// export const selectNonSDXLMainModels = buildModelsSelector(isNonSDXLMainModelConfig);
-// export const selectRefinerModels = buildModelsSelector(isRefinerMainModelModelConfig);
-// export const selectFluxModels = buildModelsSelector(isFluxMainModelModelConfig);
-// export const selectSDXLModels = buildModelsSelector(isSDXLMainModelModelConfig);
-// export const selectLoRAModels = buildModelsSelector(isLoRAModelConfig);
-// export const selectControlNetAndT2IAdapterModels = buildModelsSelector(isControlNetOrT2IAdapterModelConfig);
-// export const selectControlNetModels = buildModelsSelector(isControlNetModelConfig);
-// export const selectT2IAdapterModels = buildModelsSelector(isT2IAdapterModelConfig);
-// export const selectT5EncoderModels = buildModelsSelector(isT5EncoderModelConfig);
-// export const selectClipEmbedModels = buildModelsSelector(isClipEmbedModelConfig);
-// export const selectSpandrelImageToImageModels = buildModelsSelector(isSpandrelImageToImageModelConfig);
 export const selectIPAdapterModels = buildModelsSelector(isIPAdapterModelConfig);
-// export const selectEmbeddingModels = buildModelsSelector(isTIModelConfig);
-// export const selectVAEModels = buildModelsSelector(isVAEModelConfig);
-// export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
 export const selectGlobalRefImageModels = buildModelsSelector(
-  (config) =>
-    isIPAdapterModelConfig(config) ||
-    isFluxReduxModelConfig(config) ||
-    isChatGPT4oModelConfig(config) ||
-    isFluxKontextApiModelConfig(config) ||
-    isFluxKontextModelConfig(config) ||
-    isGemini2_5ModelConfig(config)
+  (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config) || isFluxKontextModelConfig(config)
 );
 export const selectRegionalRefImageModels = buildModelsSelector(
   (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config)
 );
-
-export const buildSelectModelConfig = <T extends AnyModelConfig>(
-  key: string,
-  typeGuard: (config: AnyModelConfig) => config is T
-): Selector<RootState, T | null> =>
-  createSelector(selectModelConfigsQuery, (result) => {
-    if (!result.data) {
-      return null;
-    }
-    return (
-      modelConfigsAdapterSelectors
-        .selectAll(result.data)
-        .filter(typeGuard)
-        .find((m) => m.key === key) ?? null
-    );
-  });
+export const selectAnimaQwen3EncoderModels = buildModelsSelector(isAnimaQwen3EncoderModelConfig);
+export const selectQwen3EncoderModels = buildModelsSelector(isQwen3EncoderModelConfig);
+export const selectQwenImageDiffusersModels = buildModelsSelector(isQwenImageDiffusersMainModelConfig);
+export const selectQwenImageVAEModels = buildModelsSelector(isQwenImageVAEModelConfig);
+export const selectQwenVLEncoderModels = buildModelsSelector(isQwenVLEncoderModelConfig);
+export const selectZImageDiffusersModels = buildModelsSelector(isZImageDiffusersMainModelConfig);
+export const selectFlux2DiffusersModels = buildModelsSelector(isFlux2DiffusersMainModelConfig);
+export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
+export const selectAnimaVAEModels = buildModelsSelector(isAnimaVAEModelConfig);
+export const selectT5EncoderModels = buildModelsSelector(isT5EncoderModelConfigOrSubmodel);
+export const useTextLLMModels = () => buildModelsHook(isTextLLMModelConfig)();
+export const useLlavaModels = () => buildModelsHook(isLLaVAModelConfig)();

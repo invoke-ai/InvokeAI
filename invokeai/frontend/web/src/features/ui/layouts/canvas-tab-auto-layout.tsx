@@ -2,7 +2,7 @@ import type { DockviewApi, GridviewApi, IDockviewReactProps, IGridviewReactProps
 import { DockviewReact, GridviewReact, LayoutPriority, Orientation } from 'dockview';
 import { CanvasLayersPanel } from 'features/controlLayers/components/CanvasLayersPanelContent';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
-import { GalleryPanel } from 'features/gallery/components/Gallery';
+import { GalleryPanel } from 'features/gallery/components/GalleryPanel';
 import { ImageViewerPanel } from 'features/gallery/components/ImageViewer/ImageViewerPanel';
 import { FloatingCanvasLeftPanelButtons } from 'features/ui/components/FloatingLeftPanelButtons';
 import { FloatingRightPanelButtons } from 'features/ui/components/FloatingRightPanelButtons';

@@ -1,7 +1,7 @@
 import type { DockviewApi, GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
 import { DockviewReact, GridviewReact, LayoutPriority, Orientation } from 'dockview';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
-import { GalleryPanel } from 'features/gallery/components/Gallery';
+import { GalleryPanel } from 'features/gallery/components/GalleryPanel';
 import { ImageViewerPanel } from 'features/gallery/components/ImageViewer/ImageViewerPanel';
 import NodeEditor from 'features/nodes/components/NodeEditor';
 import WorkflowsTabLeftPanel from 'features/nodes/components/sidePanel/WorkflowsTabLeftPanel';

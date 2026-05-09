@@ -19,10 +19,8 @@ from invokeai.app.services.model_records.model_records_base import UnknownModelE
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.util.step_callback import diffusion_step_callback
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
-    ModelConfigBase,
-)
+from invokeai.backend.model_manager.configs.base import Config_Base
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
@@ -74,7 +72,7 @@ class InvocationContextInterface:
 
 class BoardsInterface(InvocationContextInterface):
     def create(self, board_name: str) -> BoardDTO:
-        """Creates a board.
+        """Creates a board for the current user.
 
         Args:
             board_name: The name of the board to create.
@@ -82,7 +80,8 @@ class BoardsInterface(InvocationContextInterface):
         Returns:
             The created board DTO.
         """
-        return self._services.boards.create(board_name)
+        user_id = self._data.queue_item.user_id
+        return self._services.boards.create(board_name, user_id)
 
     def get_dto(self, board_id: str) -> BoardDTO:
         """Gets a board DTO.
@@ -96,13 +95,14 @@ class BoardsInterface(InvocationContextInterface):
         return self._services.boards.get_dto(board_id)
 
     def get_all(self) -> list[BoardDTO]:
-        """Gets all boards.
+        """Gets all boards accessible to the current user.
 
         Returns:
-            A list of all boards.
+            A list of all boards accessible to the current user.
         """
+        user_id = self._data.queue_item.user_id
         return self._services.boards.get_all(
-            order_by=BoardRecordOrderBy.CreatedAt, direction=SQLiteDirection.Descending
+            user_id, order_by=BoardRecordOrderBy.CreatedAt, direction=SQLiteDirection.Descending
         )
 
     def add_image_to_board(self, board_id: str, image_name: str) -> None:
@@ -230,6 +230,7 @@ class ImagesInterface(InvocationContextInterface):
             graph=graph_,
             session_id=self._data.queue_item.session_id,
             node_id=self._data.invocation.id,
+            user_id=self._data.queue_item.user_id,
         )
 
     def get_pil(self, image_name: str, mode: IMAGE_MODES | None = None) -> Image:
@@ -387,6 +388,8 @@ class ModelsInterface(InvocationContextInterface):
             submodel_type = submodel_type or identifier.submodel_type
             model = self._services.model_manager.store.get_model(identifier.key)
 
+        self._raise_if_external(model)
+
         message = f"Loading model {model.name}"
         if submodel_type:
             message += f" ({submodel_type.value})"
@@ -416,11 +419,17 @@ class ModelsInterface(InvocationContextInterface):
         if len(configs) > 1:
             raise ValueError(f"More than one model found with name {name}, base {base}, and type {type}")
 
+        self._raise_if_external(configs[0])
         message = f"Loading model {name}"
         if submodel_type:
             message += f" ({submodel_type.value})"
         self._util.signal_progress(message)
         return self._services.model_manager.load.load_model(configs[0], submodel_type)
+
+    @staticmethod
+    def _raise_if_external(model: AnyModelConfig) -> None:
+        if model.base == BaseModelType.External or model.format == ModelFormat.ExternalApi:
+            raise ValueError("External API models cannot be loaded from disk")
 
     def get_config(self, identifier: Union[str, "ModelIdentifierField"]) -> AnyModelConfig:
         """Get a model's config.
@@ -558,7 +567,7 @@ class ModelsInterface(InvocationContextInterface):
             The absolute path to the model.
         """
 
-        model_path = Path(config_or_path.path) if isinstance(config_or_path, ModelConfigBase) else Path(config_or_path)
+        model_path = Path(config_or_path.path) if isinstance(config_or_path, Config_Base) else Path(config_or_path)
 
         if model_path.is_absolute():
             return model_path.resolve()
@@ -629,6 +638,21 @@ class UtilInterface(InvocationContextInterface):
             signal_progress=self.signal_progress,
             intermediate_state=intermediate_state,
             base_model=BaseModelType.Flux,
+            is_canceled=self.is_canceled,
+        )
+
+    def flux2_step_callback(self, intermediate_state: PipelineIntermediateState) -> None:
+        """
+        The step callback for FLUX.2 Klein models (32-channel VAE).
+
+        Args:
+            intermediate_state: The intermediate state of the diffusion pipeline.
+        """
+
+        diffusion_step_callback(
+            signal_progress=self.signal_progress,
+            intermediate_state=intermediate_state,
+            base_model=BaseModelType.Flux2,
             is_canceled=self.is_canceled,
         )
 

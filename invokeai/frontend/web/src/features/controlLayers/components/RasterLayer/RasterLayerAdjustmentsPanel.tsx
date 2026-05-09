@@ -90,7 +90,7 @@ export const RasterLayerAdjustmentsPanel = memo(() => {
     }
     const rect = adapter.transformer.getRelativeRect();
     try {
-      await adapter.renderer.rasterize({ rect, replaceObjects: true });
+      await adapter.renderer.rasterize({ rect, replaceObjects: true, attrs: { opacity: 1 } });
       // Clear adjustments after baking
       dispatch(rasterLayerAdjustmentsSet({ entityIdentifier, adjustments: null }));
     } catch {

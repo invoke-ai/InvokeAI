@@ -32,7 +32,12 @@ import type {
   RefImageState,
   RegionalGuidanceRefImageState,
 } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject, imageDTOToImageWithDims, initialControlNet } from 'features/controlLayers/store/util';
+import {
+  imageDTOToCroppableImage,
+  imageDTOToImageObject,
+  imageDTOToImageWithDims,
+  initialControlNet,
+} from 'features/controlLayers/store/util';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import type { BoardId } from 'features/gallery/store/types';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
@@ -40,7 +45,7 @@ import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { serializeError } from 'serialize-error';
-import type { ImageDTO } from 'services/api/types';
+import { type ImageDTO, isExternalApiModelConfig } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
 const log = logger('canvas');
@@ -85,7 +90,7 @@ const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave, wit
       metadata.negative_prompt = selectNegativePrompt(state);
       metadata.seed = selectSeed(state);
       const model = selectMainModelConfig(state);
-      if (model) {
+      if (model && !isExternalApiModelConfig(model)) {
         metadata.model = Graph.getModelMetadataField(model);
       }
     }
@@ -209,7 +214,7 @@ export const useNewGlobalReferenceImageFromBbox = () => {
       const overrides: Partial<RefImageState> = {
         config: {
           ...getDefaultRefImageConfig(getState),
-          image: imageDTOToImageWithDims(imageDTO),
+          image: imageDTOToCroppableImage(imageDTO),
         },
       };
       dispatch(refImageAdded({ overrides }));
@@ -312,7 +317,7 @@ export const usePullBboxIntoGlobalReferenceImage = (id: string) => {
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO, _: Rect) => {
-      dispatch(refImageImageChanged({ id, imageDTO }));
+      dispatch(refImageImageChanged({ id, croppableImage: imageDTOToCroppableImage(imageDTO) }));
     };
 
     return {

@@ -1,17 +1,30 @@
-import { Badge, Box, Flex, IconButton, Text } from '@invoke-ai/ui-library';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { Badge, Flex, Text } from '@invoke-ai/ui-library';
 import { negate } from 'es-toolkit/compat';
 import { flattenStarterModel, useBuildModelInstallArg } from 'features/modelManagerV2/hooks/useBuildModelsToInstall';
 import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
+import { ModelResultItemActions } from 'features/modelManagerV2/subpanels/AddModelPanel/ModelResultItemActions';
 import ModelBaseBadge from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiPlusBold } from 'react-icons/pi';
 import type { StarterModel } from 'services/api/types';
+
+const starterModelResultItemSx: SystemStyleObject = {
+  alignItems: 'start',
+  justifyContent: 'space-between',
+  w: '100%',
+  py: 2,
+  px: 1,
+  gap: 2,
+  borderBottomWidth: '1px',
+  borderColor: 'base.700',
+};
 
 type Props = {
   starterModel: StarterModel;
 };
+
 export const StarterModelsResultItem = memo(({ starterModel }: Props) => {
   const { t } = useTranslation();
   const { getIsInstalled, buildModelInstallArg } = useBuildModelInstallArg();
@@ -40,22 +53,16 @@ export const StarterModelsResultItem = memo(({ starterModel }: Props) => {
   }, [modelsToInstall, installModel, t]);
 
   return (
-    <Flex alignItems="center" justifyContent="space-between" w="100%" gap={3}>
+    <Flex sx={starterModelResultItemSx}>
       <Flex fontSize="sm" flexDir="column">
-        <Flex gap={3}>
+        <Text fontWeight="semibold">{starterModel.name}</Text>
+        <Text variant="subtext">{starterModel.description}</Text>
+        <Flex gap={1} py={1} alignItems="center">
           <Badge h="min-content">{starterModel.type.replaceAll('_', ' ')}</Badge>
           <ModelBaseBadge base={starterModel.base} />
-          <Text fontWeight="semibold">{starterModel.name}</Text>
         </Flex>
-        <Text variant="subtext">{starterModel.description}</Text>
       </Flex>
-      <Box>
-        {isInstalled ? (
-          <Badge>{t('common.installed')}</Badge>
-        ) : (
-          <IconButton aria-label={t('modelManager.install')} icon={<PiPlusBold />} onClick={onClick} size="sm" />
-        )}
-      </Box>
+      <ModelResultItemActions handleInstall={onClick} isInstalled={isInstalled} />
     </Flex>
   );
 });

@@ -9,7 +9,7 @@ export const toastApi = createStandaloneToast({
 }).toast;
 
 // Slightly modified version of UseToastOptions
-export type ToastConfig = Omit<UseToastOptions, 'id'> & {
+type ToastConfig = Omit<UseToastOptions, 'id'> & {
   // Only string - Chakra allows numbers
   id?: string;
 };

@@ -7,9 +7,7 @@ import type {
   TagDescription,
 } from '@reduxjs/toolkit/query/react';
 import { buildCreateApi, coreModule, fetchBaseQuery, reactHooksModule } from '@reduxjs/toolkit/query/react';
-import { $authToken } from 'app/store/nanostores/authToken';
-import { $baseUrl } from 'app/store/nanostores/baseUrl';
-import { $projectId } from 'app/store/nanostores/projectId';
+import { sessionExpiredLogout } from 'features/auth/store/authSlice';
 import queryString from 'query-string';
 import stableHash from 'stable-hash';
 
@@ -19,7 +17,6 @@ const tagTypes = [
   'Board',
   'BoardImagesTotal',
   'BoardAssetsTotal',
-  'BoardVideosTotal',
   'HFTokenStatus',
   'Image',
   'ImageNameList',
@@ -42,6 +39,7 @@ const tagTypes = [
   'ModelInstalls',
   'ModelRelationships',
   'ModelScanFolderResults',
+  'OrphanedModels',
   'T2IAdapterModel',
   'MainModel',
   'VaeModel',
@@ -51,40 +49,54 @@ const tagTypes = [
   'LoRAModel',
   'SDXLRefinerModel',
   'Workflow',
+  'WorkflowTags',
   'WorkflowTagCounts',
   'WorkflowCategoryCounts',
   'StylePreset',
   'Schema',
   'QueueCountsByDestination',
-  'Video',
-  'VideoMetadata',
-  'VideoList',
-  'VideoIdList',
-  'VideoCollectionCounts',
-  'VideoCollection',
   // This is invalidated on reconnect. It should be used for queries that have changing data,
   // especially related to the queue and generation.
   'FetchOnReconnect',
   'ClientState',
+  'UserList',
+  'CustomNodePacks',
+  'VirtualBoards',
 ] as const;
 export type ApiTagDescription = TagDescription<(typeof tagTypes)[number]>;
 export const LIST_TAG = 'LIST';
 export const LIST_ALL_TAG = 'LIST_ALL';
 
 export const getBaseUrl = (): string => {
-  const baseUrl = $baseUrl.get();
-  return baseUrl || window.location.href.replace(/\/$/, '');
+  return window.location.origin;
 };
 
-const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = (args, api, extraOptions) => {
-  const authToken = $authToken.get();
-  const projectId = $projectId.get();
+const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (
+  args,
+  api,
+  extraOptions
+) => {
   const isOpenAPIRequest =
     (args instanceof Object && args.url.includes('openapi.json')) ||
     (typeof args === 'string' && args.includes('openapi.json'));
 
+  const isAuthEndpoint =
+    (args instanceof Object &&
+      typeof args.url === 'string' &&
+      (args.url.includes('/auth/login') || args.url.includes('/auth/setup'))) ||
+    (typeof args === 'string' && (args.includes('/auth/login') || args.includes('/auth/setup')));
+
+  const token = localStorage.getItem('auth_token');
+
   const fetchBaseQueryArgs: FetchBaseQueryArgs = {
     baseUrl: getBaseUrl(),
+    prepareHeaders: (headers) => {
+      // Add auth token to all requests except setup and login
+      if (token && !isAuthEndpoint) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+      return headers;
+    },
   };
 
   // When fetching the openapi.json, we need to remove circular references from the JSON.
@@ -92,23 +104,27 @@ const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryE
     fetchBaseQueryArgs.jsonReplacer = getCircularReplacer();
   }
 
-  // openapi.json isn't protected by authorization, but all other requests need to include the auth token and project id.
-  if (!isOpenAPIRequest) {
-    fetchBaseQueryArgs.prepareHeaders = (headers) => {
-      if (authToken) {
-        headers.set('Authorization', `Bearer ${authToken}`);
-      }
-      if (projectId) {
-        headers.set('project-id', projectId);
-      }
-
-      return headers;
-    };
-  }
-
   const rawBaseQuery = fetchBaseQuery(fetchBaseQueryArgs);
 
-  return rawBaseQuery(args, api, extraOptions);
+  const result = await rawBaseQuery(args, api, extraOptions);
+
+  // If we sent an auth token but got 401, the token is invalid/expired.
+  // Only trigger session expiry when we actually sent a token — unauthenticated
+  // requests (e.g. client_state queries during page load) should not cause logout.
+  if (result.error && result.error.status === 401 && !isAuthEndpoint && token) {
+    api.dispatch(sessionExpiredLogout());
+  }
+
+  // Sliding window token refresh: if the server returned a refreshed token,
+  // update localStorage so subsequent requests use the new expiry.
+  if (!result.error && result.meta?.response) {
+    const refreshedToken = result.meta.response.headers.get('X-Refreshed-Token');
+    if (refreshedToken) {
+      localStorage.setItem('auth_token', refreshedToken);
+    }
+  }
+
+  return result;
 };
 
 const createLruSelector = createSelectorCreator({

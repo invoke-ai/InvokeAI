@@ -3,8 +3,6 @@ import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { type WorkflowMode, zWorkflowMode } from 'features/nodes/store/types';
-import type { WorkflowCategory } from 'features/nodes/types/workflow';
-import { atom, computed } from 'nanostores';
 import {
   type SQLiteDirection,
   type WorkflowRecordOrderBy,
@@ -13,7 +11,7 @@ import {
 } from 'services/api/types';
 import z from 'zod';
 
-const zWorkflowLibraryView = z.enum(['recent', 'yours', 'private', 'shared', 'defaults', 'published']);
+const zWorkflowLibraryView = z.enum(['recent', 'yours', 'shared', 'defaults']);
 export type WorkflowLibraryView = z.infer<typeof zWorkflowLibraryView>;
 
 const zWorkflowLibraryState = z.object({
@@ -57,6 +55,9 @@ const slice = createSlice({
       if (action.payload === 'recent') {
         state.orderBy = 'opened_at';
         state.direction = 'DESC';
+      } else if (action.payload === 'shared') {
+        state.orderBy = 'name';
+        state.direction = 'ASC';
       }
     },
     workflowLibraryTagToggled: (state, action: PayloadAction<string>) => {
@@ -105,11 +106,8 @@ export const selectWorkflowLibraryDirection = createWorkflowLibrarySelector(({ d
 export const selectWorkflowLibrarySelectedTags = createWorkflowLibrarySelector(({ selectedTags }) => selectedTags);
 export const selectWorkflowLibraryView = createWorkflowLibrarySelector(({ view }) => view);
 
-export const DEFAULT_WORKFLOW_LIBRARY_CATEGORIES = ['user', 'default'] satisfies WorkflowCategory[];
-export const $workflowLibraryCategoriesOptions = atom<WorkflowCategory[]>(DEFAULT_WORKFLOW_LIBRARY_CATEGORIES);
-
 export type WorkflowTagCategory = { categoryTKey: string; tags: Array<{ label: string; recommended?: boolean }> };
-export const DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES: WorkflowTagCategory[] = [
+export const WORKFLOW_LIBRARY_TAG_CATEGORIES: WorkflowTagCategory[] = [
   {
     categoryTKey: 'Industry',
     tags: [{ label: 'Architecture' }, { label: 'Fashion' }, { label: 'Game Dev' }, { label: 'Food' }],
@@ -124,18 +122,13 @@ export const DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES: WorkflowTagCategory[] = [
   },
   { categoryTKey: 'Tech Showcase', tags: [{ label: 'Control' }, { label: 'Reference Image' }] },
 ];
-export const $workflowLibraryTagCategoriesOptions = atom<WorkflowTagCategory[]>(
-  DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES
-);
-export const $workflowLibraryTagOptions = computed($workflowLibraryTagCategoriesOptions, (tagCategories) =>
-  tagCategories.flatMap(({ tags }) => tags)
-);
+export const WORKFLOW_LIBRARY_TAGS = WORKFLOW_LIBRARY_TAG_CATEGORIES.flatMap(({ tags }) => tags);
 
-export type WorkflowSortOption = 'opened_at' | 'created_at' | 'updated_at' | 'name';
-export const DEFAULT_WORKFLOW_LIBRARY_SORT_OPTIONS: WorkflowSortOption[] = [
+type WorkflowSortOption = 'opened_at' | 'created_at' | 'updated_at' | 'name' | 'is_public';
+export const WORKFLOW_LIBRARY_SORT_OPTIONS: WorkflowSortOption[] = [
   'opened_at',
   'created_at',
   'updated_at',
   'name',
+  'is_public',
 ];
-export const $workflowLibrarySortOptions = atom<WorkflowSortOption[]>(DEFAULT_WORKFLOW_LIBRARY_SORT_OPTIONS);

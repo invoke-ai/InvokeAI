@@ -13,7 +13,7 @@ const zXYPosition = z
 
 const zDimension = z.number().gt(0).nullish();
 
-const zWorkflowCategory = z.enum(['user', 'default', 'project']);
+const zWorkflowCategory = z.enum(['user', 'default']);
 // #endregion
 
 // #region Workflow Nodes
