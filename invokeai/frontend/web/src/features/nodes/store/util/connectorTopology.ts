@@ -106,8 +106,10 @@ export const resolveConnectorSourceFieldType = (
 };
 
 /**
- * Input field types from outgoing edges: invocation inputs, or chained connectors until one resolves.
- * `sinkWalkVisited` breaks cycles when following connector → connector → … → invocation.
+ * Downstream field type when the connector input is unwired: scans {@link getConnectorOutputEdges} in order.
+ * Uses each target invocation’s input field type, or recurses through connector chains via
+ * {@link resolveConnectorDisplayFieldType} until a type is found.
+ * `sinkWalkVisited` prevents cycles along that chain.
  */
 export const resolveConnectorSinkFieldType = (
   connectorId: string,
@@ -147,7 +149,10 @@ export const resolveConnectorSinkFieldType = (
   return null;
 };
 
-/** Upstream output type when wired; otherwise downstream input type from an outgoing edge (connector chrome / edges). */
+/**
+ * Unified field type for connector chrome, edge coloring, and connection validation helpers:
+ * {@link resolveConnectorSourceFieldType} when upstream is wired, else {@link resolveConnectorSinkFieldType}.
+ */
 export const resolveConnectorDisplayFieldType = (
   connectorId: string,
   nodes: AnyNode[],

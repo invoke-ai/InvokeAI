@@ -33,7 +33,7 @@ import { PiDotOutlineFill } from 'react-icons/pi';
 
 const CONNECTOR_NODE_SIZE = 35;
 
-/** Passthrough type label when the connector does not yet resolve to a concrete field (matches pending-connection AnyField). */
+/** AnyField-shaped fallback for tooltips when display type is unknown; same shape as connector stubs in `useConnection`. */
 const CONNECTOR_FALLBACK_FIELD_TYPE = {
   name: 'AnyField',
   cardinality: 'SINGLE',
