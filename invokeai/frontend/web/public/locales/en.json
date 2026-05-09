@@ -3385,11 +3385,11 @@
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
             "New model types: Qwen Image, Qwen Image Edit, Anima.",
-	    "Support for hosted models: Gemini (Nano Banana), GPT Image, Qwen, Seedream, Wan",
-	    "Private and shared image boards and workflows in multiuser mode",
-	    "Canvas lasso tool, save/restore function, and the ability to hide those pesky preview tiles",
-	    "Custom node manager",
-	    "Redesigned download queue",
+            "Support for hosted models: Gemini (Nano Banana), GPT Image, Qwen, Seedream, Wan",
+            "Private and shared image boards and workflows in multiuser mode",
+            "Canvas lasso tool, save/restore function, and the ability to hide those pesky preview tiles",
+            "Custom node manager",
+            "Redesigned download queue"
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
