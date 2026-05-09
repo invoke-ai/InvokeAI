@@ -103,6 +103,7 @@ from invokeai.backend.model_manager.configs.t2i_adapter import (
 )
 from invokeai.backend.model_manager.configs.t5_encoder import T5Encoder_BnBLLMint8_Config, T5Encoder_T5Encoder_Config
 from invokeai.backend.model_manager.configs.text_llm import TextLLM_Diffusers_Config
+from invokeai.backend.model_manager.configs.wan_t5_encoder import WanT5Encoder_WanT5Encoder_Config
 from invokeai.backend.model_manager.configs.textual_inversion import (
     TI_File_SD1_Config,
     TI_File_SD2_Config,
@@ -120,9 +121,11 @@ from invokeai.backend.model_manager.configs.vae import (
     VAE_Checkpoint_SD1_Config,
     VAE_Checkpoint_SD2_Config,
     VAE_Checkpoint_SDXL_Config,
+    VAE_Checkpoint_Wan_Config,
     VAE_Diffusers_Flux2_Config,
     VAE_Diffusers_SD1_Config,
     VAE_Diffusers_SDXL_Config,
+    VAE_Diffusers_Wan_Config,
 )
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import (
@@ -201,12 +204,18 @@ AnyModelConfig = Annotated[
         Annotated[VAE_Checkpoint_SDXL_Config, VAE_Checkpoint_SDXL_Config.get_tag()],
         Annotated[VAE_Checkpoint_FLUX_Config, VAE_Checkpoint_FLUX_Config.get_tag()],
         Annotated[VAE_Checkpoint_Flux2_Config, VAE_Checkpoint_Flux2_Config.get_tag()],
+        # IMPORTANT: VAE_Checkpoint_Wan_Config must be checked BEFORE QwenImage —
+        # both share the AutoencoderKLWan architecture and the Wan config relies
+        # on a filename heuristic to claim 16-channel files; ordering here lets
+        # Wan win when the filename suggests it.
+        Annotated[VAE_Checkpoint_Wan_Config, VAE_Checkpoint_Wan_Config.get_tag()],
         Annotated[VAE_Checkpoint_QwenImage_Config, VAE_Checkpoint_QwenImage_Config.get_tag()],
         Annotated[VAE_Checkpoint_Anima_Config, VAE_Checkpoint_Anima_Config.get_tag()],
         # VAE - diffusers format
         Annotated[VAE_Diffusers_SD1_Config, VAE_Diffusers_SD1_Config.get_tag()],
         Annotated[VAE_Diffusers_SDXL_Config, VAE_Diffusers_SDXL_Config.get_tag()],
         Annotated[VAE_Diffusers_Flux2_Config, VAE_Diffusers_Flux2_Config.get_tag()],
+        Annotated[VAE_Diffusers_Wan_Config, VAE_Diffusers_Wan_Config.get_tag()],
         # ControlNet - checkpoint format
         Annotated[ControlNet_Checkpoint_SD1_Config, ControlNet_Checkpoint_SD1_Config.get_tag()],
         Annotated[ControlNet_Checkpoint_SD2_Config, ControlNet_Checkpoint_SD2_Config.get_tag()],
@@ -253,6 +262,8 @@ AnyModelConfig = Annotated[
         # Qwen VL Encoder (Qwen2.5-VL multimodal encoder for Qwen Image)
         Annotated[QwenVLEncoder_Diffusers_Config, QwenVLEncoder_Diffusers_Config.get_tag()],
         Annotated[QwenVLEncoder_Checkpoint_Config, QwenVLEncoder_Checkpoint_Config.get_tag()],
+        # Wan T5 Encoder (UMT5-XXL for Wan 2.2)
+        Annotated[WanT5Encoder_WanT5Encoder_Config, WanT5Encoder_WanT5Encoder_Config.get_tag()],
         # TI - file format
         Annotated[TI_File_SD1_Config, TI_File_SD1_Config.get_tag()],
         Annotated[TI_File_SD2_Config, TI_File_SD2_Config.get_tag()],

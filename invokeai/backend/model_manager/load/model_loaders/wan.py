@@ -1,11 +1,11 @@
 """Loader registrations for Wan 2.2 image-generation models.
 
-Phase 1 scope:
-- Diffusers-format Wan 2.2 (TI2V-5B fully; A14B Transformer-only).
-- Submodels handled: Transformer, VAE, TextEncoder, Tokenizer, Scheduler.
-
-Phase 2 will add ``Transformer2`` to support A14B's dual-expert MoE.
-Phase 4 will add a GGUFQuantized loader for community single-file transformers.
+Currently covers:
+- Main: Diffusers format (T2V-A14B with dual experts via Transformer +
+  Transformer2 submodels, plus TI2V-5B). Phase 4 will add a GGUFQuantized loader.
+- WanT5Encoder: standalone UMT5-XXL encoder folder (``text_encoder/`` +
+  ``tokenizer/`` subdirs, or a flat ``text_encoder/`` folder).
+- VAE: handled in ``vae.py`` (registered for type=VAE generically).
 """
 
 from pathlib import Path
@@ -15,6 +15,7 @@ import torch
 
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.model_manager.taxonomy import (
@@ -80,3 +81,53 @@ class WanDiffusersModel(GenericDiffusersLoader):
                 raise
 
         return result
+
+
+@ModelLoaderRegistry.register(
+    base=BaseModelType.Any, type=ModelType.WanT5Encoder, format=ModelFormat.WanT5Encoder
+)
+class WanT5EncoderLoader(ModelLoader):
+    """Loader for the standalone Wan UMT5-XXL encoder.
+
+    Accepts two on-disk layouts:
+    1. Parent dir with ``text_encoder/`` (and typically ``tokenizer/``) subdirs —
+       what ``Wan-AI/Wan2.2-T2V-A14B::text_encoder+tokenizer`` produces.
+    2. A flat ``text_encoder/`` folder with ``config.json`` declaring
+       ``model_type: umt5`` directly at the root. In this case the tokenizer
+       is loaded from the same folder via ``AutoTokenizer.from_pretrained``.
+    """
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if submodel_type is None:
+            raise ValueError("A submodel type (Tokenizer or TextEncoder) must be provided.")
+
+        root = Path(config.path)
+        nested_text_encoder = root / "text_encoder"
+        nested_tokenizer = root / "tokenizer"
+
+        if submodel_type == SubModelType.TextEncoder:
+            from transformers import UMT5EncoderModel
+
+            target = nested_text_encoder if nested_text_encoder.exists() else root
+            return UMT5EncoderModel.from_pretrained(
+                str(target),
+                torch_dtype=torch.bfloat16,
+                local_files_only=True,
+            )
+        if submodel_type == SubModelType.Tokenizer:
+            from transformers import AutoTokenizer
+
+            # Prefer a sibling tokenizer/ directory; fall back to the encoder dir
+            # itself, which is normal for "flat" downloads.
+            target = nested_tokenizer if nested_tokenizer.exists() else (
+                nested_text_encoder if nested_text_encoder.exists() else root
+            )
+            return AutoTokenizer.from_pretrained(str(target), local_files_only=True)
+
+        raise ValueError(
+            f"Unsupported submodel type for WanT5Encoder: {submodel_type.value if submodel_type else 'None'}"
+        )

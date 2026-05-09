@@ -44,16 +44,19 @@ class WanModelLoaderOutput(BaseInvocationOutput):
 class WanModelLoaderInvocation(BaseInvocation):
     """Loads a Wan 2.2 model, outputting its submodels.
 
-    Diffusers-format only for now; the transformer(s), VAE, and UMT5-XXL encoder
-    are pulled from the main model's submodel folders.
+    Components can be mixed and matched, mirroring the Qwen Image loader pattern:
 
-    For Wan 2.2 A14B (dual-expert MoE) the loader emits both ``transformer`` (the
-    high-noise expert at ``transformer/``) and ``transformer_low_noise`` (the
-    low-noise expert at ``transformer_2/``), along with the model's recorded
-    ``boundary_ratio`` for the denoise loop's expert swap.
+    - Transformer(s) always come from the main model. For A14B that's both
+      ``transformer/`` (high-noise) and ``transformer_2/`` (low-noise); for
+      TI2V-5B it's the single ``transformer/``.
+    - VAE: standalone Wan VAE > main (if Diffusers) > Component Source (Diffusers).
+    - UMT5-XXL encoder: standalone Wan T5 encoder > main (if Diffusers) >
+      Component Source (Diffusers).
 
-    The standalone VAE picker is forward-compatibility wiring for Phase 3 (where
-    it becomes required for GGUF transformers).
+    The Component Source slot lets users supply a Diffusers Wan main model purely
+    for VAE / encoder extraction when the actual transformer is in a single-file
+    format (GGUF in Phase 4). Together, the standalone VAE + standalone encoder
+    let a GGUF transformer run without a full ~30 GB Diffusers install.
     """
 
     model: ModelIdentifierField = InputField(
@@ -66,12 +69,33 @@ class WanModelLoaderInvocation(BaseInvocation):
 
     vae_model: Optional[ModelIdentifierField] = InputField(
         default=None,
-        description="Standalone Wan VAE model. If not set, the VAE is loaded from the main "
-        "model (when in Diffusers format).",
+        description="Standalone Wan VAE model. If not set, the VAE is loaded from the main model "
+        "(when in Diffusers format) or from the Component Source.",
         input=Input.Direct,
         ui_model_base=BaseModelType.Wan,
         ui_model_type=ModelType.VAE,
         title="VAE",
+    )
+
+    wan_t5_encoder_model: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="Standalone Wan UMT5-XXL encoder. If not set, the encoder is loaded from the main "
+        "model (when in Diffusers format) or from the Component Source.",
+        input=Input.Direct,
+        ui_model_type=ModelType.WanT5Encoder,
+        title="Wan T5 Encoder",
+    )
+
+    component_source: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="Diffusers Wan main model to extract VAE and/or encoder from. "
+        "Use this if you don't have separate VAE/encoder models. "
+        "Ignored for any submodel that is provided separately.",
+        input=Input.Direct,
+        ui_model_base=BaseModelType.Wan,
+        ui_model_type=ModelType.Main,
+        ui_model_format=ModelFormat.Diffusers,
+        title="Component Source (Diffusers)",
     )
 
     def invoke(self, context: InvocationContext) -> WanModelLoaderOutput:
@@ -92,27 +116,37 @@ class WanModelLoaderInvocation(BaseInvocation):
             if recorded is not None:
                 boundary_ratio = float(recorded)
 
-        # VAE: standalone override > main (if Diffusers).
+        # VAE: standalone override > main (if Diffusers) > component source.
         if self.vae_model is not None:
             vae = self.vae_model.model_copy(update={"submodel_type": SubModelType.VAE})
         elif main_is_diffusers:
             vae = self.model.model_copy(update={"submodel_type": SubModelType.VAE})
+        elif self.component_source is not None:
+            self._validate_component_source_format(context, self.component_source)
+            vae = self.component_source.model_copy(update={"submodel_type": SubModelType.VAE})
         else:
             raise ValueError(
-                "No source for VAE. Either set 'VAE' to a standalone Wan VAE model, "
-                "or use a Diffusers Wan main model."
+                "No source for VAE. Either set 'VAE' to a standalone Wan VAE, "
+                "or set 'Component Source' to a Diffusers Wan main model."
             )
 
-        # Tokenizer + text encoder: only from the main model in Phase 1.
-        # Phase 3 will add a standalone WanT5Encoder picker so GGUF mains can run
-        # without a Diffusers Wan checkpoint installed.
-        if not main_is_diffusers:
+        # Tokenizer + text encoder: standalone override > main (if Diffusers) > component source.
+        if self.wan_t5_encoder_model is not None:
+            tokenizer = self.wan_t5_encoder_model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
+            text_encoder = self.wan_t5_encoder_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
+        elif main_is_diffusers:
+            tokenizer = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
+            text_encoder = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
+        elif self.component_source is not None:
+            self._validate_component_source_format(context, self.component_source)
+            tokenizer = self.component_source.model_copy(update={"submodel_type": SubModelType.Tokenizer})
+            text_encoder = self.component_source.model_copy(update={"submodel_type": SubModelType.TextEncoder})
+        else:
             raise ValueError(
-                "Only Diffusers-format Wan models are supported in this build. "
-                "Standalone Wan T5 encoders will be supported in a future release."
+                "No source for Wan T5 encoder. "
+                "Either set 'Wan T5 Encoder' to a standalone UMT5-XXL encoder, "
+                "or set 'Component Source' to a Diffusers Wan main model."
             )
-        tokenizer = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
-        text_encoder = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
 
         return WanModelLoaderOutput(
             transformer=WanTransformerField(
@@ -123,3 +157,12 @@ class WanModelLoaderInvocation(BaseInvocation):
             wan_t5_encoder=WanT5EncoderField(tokenizer=tokenizer, text_encoder=text_encoder),
             vae=VAEField(vae=vae),
         )
+
+    @staticmethod
+    def _validate_component_source_format(context: InvocationContext, model: ModelIdentifierField) -> None:
+        source_config = context.models.get_config(model)
+        if source_config.format != ModelFormat.Diffusers:
+            raise ValueError(
+                f"The Component Source model must be in Diffusers format. "
+                f"The selected model '{source_config.name}' is in {source_config.format.value} format."
+            )

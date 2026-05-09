@@ -22,6 +22,7 @@ import {
   isTIModelConfig,
   isUnknownModelConfig,
   isVAEModelConfig,
+  isWanT5EncoderModelConfig,
 } from 'services/api/types';
 import { objectEntries } from 'tsafe';
 
@@ -83,6 +84,11 @@ const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
     category: 'qwen_vl_encoder',
     i18nKey: 'modelManager.qwenVLEncoder',
     filter: isQwenVLEncoderModelConfig,
+  },
+  wan_t5_encoder: {
+    category: 'wan_t5_encoder',
+    i18nKey: 'modelManager.wanT5Encoder',
+    filter: isWanT5EncoderModelConfig,
   },
   control_lora: {
     category: 'control_lora',
@@ -164,6 +170,7 @@ export const MODEL_BASE_TO_COLOR: Record<BaseModelType, string> = {
   'z-image': 'cyan',
   external: 'orange',
   anima: 'invokePurple',
+  wan: 'cyan',
   unknown: 'red',
 };
 
@@ -186,6 +193,7 @@ export const MODEL_TYPE_TO_LONG_NAME: Record<ModelType, string> = {
   t5_encoder: 'T5 Encoder',
   qwen3_encoder: 'Qwen3 Encoder',
   qwen_vl_encoder: 'Qwen2.5-VL Encoder',
+  wan_t5_encoder: 'Wan T5 Encoder',
   clip_embed: 'CLIP Embed',
   siglip: 'SigLIP',
   flux_redux: 'FLUX Redux',
@@ -211,6 +219,7 @@ export const MODEL_BASE_TO_LONG_NAME: Record<BaseModelType, string> = {
   'z-image': 'Z-Image',
   external: 'External',
   anima: 'Anima',
+  wan: 'Wan 2.2',
   unknown: 'Unknown',
 };
 
@@ -231,6 +240,7 @@ export const MODEL_BASE_TO_SHORT_NAME: Record<BaseModelType, string> = {
   'z-image': 'Z-Image',
   external: 'External',
   anima: 'Anima',
+  wan: 'Wan',
   unknown: 'Unknown',
 };
 
@@ -251,6 +261,8 @@ export const MODEL_VARIANT_TO_LONG_NAME: Record<AnyModelVariant, string> = {
   gigantic: 'CLIP G',
   generate: 'Qwen Image',
   edit: 'Qwen Image Edit',
+  t2v_a14b: 'Wan 2.2 T2V A14B',
+  ti2v_5b: 'Wan 2.2 TI2V 5B',
   qwen3_4b: 'Qwen3 4B',
   qwen3_8b: 'Qwen3 8B',
   qwen3_06b: 'Qwen3 0.6B',
@@ -270,6 +282,7 @@ export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
   t5_encoder: 'T5 Encoder',
   qwen3_encoder: 'Qwen3 Encoder',
   qwen_vl_encoder: 'Qwen2.5-VL Encoder',
+  wan_t5_encoder: 'Wan T5 Encoder (UMT5-XXL)',
   bnb_quantized_int8b: 'BNB Quantized (int8b)',
   bnb_quantized_nf4b: 'BNB Quantized (nf4b)',
   gguf_quantized: 'GGUF Quantized',

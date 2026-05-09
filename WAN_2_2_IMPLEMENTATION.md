@@ -146,7 +146,7 @@ For Phase 1 (single transformer):
 
 ### Open questions
 
-- Does `WanPipeline` use `FlowMatchEulerDiscreteScheduler`? Confirm against `Wan-AI/Wan2.2-TI2V-5B/scheduler/scheduler_config.json`.
+- Does `WanPipeline` use `FlowMatchEulerDiscreteScheduler`? Confirm against `Wan-AI/Wan2.2-TI2V-5B-Diffusers/scheduler/scheduler_config.json`.
 - New `WanT5EncoderConfig` rather than reuse of `T5Encoder_T5Encoder_Config`? **Yes** — UMT5-XXL is not bit-compatible with T5-XXL. See Phase 3.
 - Does `WanTransformer3DModel` accept attention mask through `attention_kwargs`?
 
@@ -496,16 +496,16 @@ Inpaint = image-to-image with denoise mask. `RectifiedFlowInpaintExtension` alre
 - `invokeai/backend/model_manager/starter_models.py` — append `# region Wan` block:
   ```python
   wan_t5_encoder = StarterModel(name="Wan T5 Encoder (UMT5-XXL)",
-      base=BaseModelType.Any, source="Wan-AI/Wan2.2-T2V-A14B::text_encoder+tokenizer",
+      base=BaseModelType.Any, source="Wan-AI/Wan2.2-T2V-A14B-Diffusers::text_encoder+tokenizer",
       type=ModelType.WanT5Encoder, format=ModelFormat.WanT5Encoder, ...)
   wan_vae = StarterModel(name="Wan VAE",
-      base=BaseModelType.Wan, source="Wan-AI/Wan2.2-T2V-A14B::vae/diffusion_pytorch_model.safetensors",
+      base=BaseModelType.Wan, source="Wan-AI/Wan2.2-T2V-A14B-Diffusers::vae/diffusion_pytorch_model.safetensors",
       type=ModelType.VAE, format=ModelFormat.Checkpoint, ...)
   wan_vae_2_2 = StarterModel(name="Wan2.2 VAE",
-      base=BaseModelType.Wan, source="Wan-AI/Wan2.2-TI2V-5B::vae/...",
+      base=BaseModelType.Wan, source="Wan-AI/Wan2.2-TI2V-5B-Diffusers::vae/...",
       type=ModelType.VAE, ...)
   wan_t2v_a14b = StarterModel(name="Wan 2.2 T2V A14B",
-      base=BaseModelType.Wan, source="Wan-AI/Wan2.2-T2V-A14B",
+      base=BaseModelType.Wan, source="Wan-AI/Wan2.2-T2V-A14B-Diffusers",
       type=ModelType.Main, variant=WanVariantType.T2V_A14B, ...)
   wan_t2v_a14b_high_q4 = StarterModel(name="Wan 2.2 T2V A14B High Noise (Q4_K_M)",
       base=BaseModelType.Wan,
@@ -513,7 +513,7 @@ Inpaint = image-to-image with denoise mask. `RectifiedFlowInpaintExtension` alre
       ..., dependencies=[wan_t5_encoder, wan_vae])
   wan_t2v_a14b_low_q4 = ...
   wan_ti2v_5b = StarterModel(name="Wan 2.2 TI2V 5B",
-      base=BaseModelType.Wan, source="Wan-AI/Wan2.2-TI2V-5B",
+      base=BaseModelType.Wan, source="Wan-AI/Wan2.2-TI2V-5B-Diffusers",
       variant=WanVariantType.TI2V_5B, ...)
   ```
 - Verify each `source` URL exists before merge.

@@ -179,10 +179,8 @@ ANIMA_LATENT_RGB_FACTORS = [
 
 ANIMA_LATENT_RGB_BIAS = [-0.1835, -0.0868, -0.3360]
 
-# Wan 2.2 A14B uses the standard 16-channel Wan VAE (same as Anima / Qwen Image).
-# Wan 2.2 TI2V-5B uses Wan2.2-VAE with 48 latent channels — for now we slice the
-# first 16 channels for the preview. TODO: generate dedicated 48-channel factors via
-# scripts/generate_vae_linear_approximation.py once we have a TI2V-5B model on hand.
+# Wan 2.2 A14B uses the standard 16-channel Wan VAE.
+# Factors come from ComfyUI's Wan21 latent_format (same VAE as A14B).
 WAN_LATENT_RGB_FACTORS = [
     [-0.1299, -0.1692, 0.2932],
     [0.0671, 0.0406, 0.0442],
@@ -203,6 +201,61 @@ WAN_LATENT_RGB_FACTORS = [
 ]
 
 WAN_LATENT_RGB_BIAS = [-0.1835, -0.0868, -0.3360]
+
+# Wan 2.2 TI2V-5B uses Wan2.2-VAE with 48 latent channels and 16x spatial downscale.
+# Factors come from ComfyUI's Wan22 latent_format.
+WAN22_LATENT_RGB_FACTORS = [
+    [0.0119, 0.0103, 0.0046],
+    [-0.1062, -0.0504, 0.0165],
+    [0.0140, 0.0409, 0.0491],
+    [-0.0813, -0.0677, 0.0607],
+    [0.0656, 0.0851, 0.0808],
+    [0.0264, 0.0463, 0.0912],
+    [0.0295, 0.0326, 0.0590],
+    [-0.0244, -0.0270, 0.0025],
+    [0.0443, -0.0102, 0.0288],
+    [-0.0465, -0.0090, -0.0205],
+    [0.0359, 0.0236, 0.0082],
+    [-0.0776, 0.0854, 0.1048],
+    [0.0564, 0.0264, 0.0561],
+    [0.0006, 0.0594, 0.0418],
+    [-0.0319, -0.0542, -0.0637],
+    [-0.0268, 0.0024, 0.0260],
+    [0.0539, 0.0265, 0.0358],
+    [-0.0359, -0.0312, -0.0287],
+    [-0.0285, -0.1032, -0.1237],
+    [0.1041, 0.0537, 0.0622],
+    [-0.0086, -0.0374, -0.0051],
+    [0.0390, 0.0670, 0.2863],
+    [0.0069, 0.0144, 0.0082],
+    [0.0006, -0.0167, 0.0079],
+    [0.0313, -0.0574, -0.0232],
+    [-0.1454, -0.0902, -0.0481],
+    [0.0714, 0.0827, 0.0447],
+    [-0.0304, -0.0574, -0.0196],
+    [0.0401, 0.0384, 0.0204],
+    [-0.0758, -0.0297, -0.0014],
+    [0.0568, 0.1307, 0.1372],
+    [-0.0055, -0.0310, -0.0380],
+    [0.0239, -0.0305, 0.0325],
+    [-0.0663, -0.0673, -0.0140],
+    [-0.0416, -0.0047, -0.0023],
+    [0.0166, 0.0112, -0.0093],
+    [-0.0211, 0.0011, 0.0331],
+    [0.1833, 0.1466, 0.2250],
+    [-0.0368, 0.0370, 0.0295],
+    [-0.3441, -0.3543, -0.2008],
+    [-0.0479, -0.0489, -0.0420],
+    [-0.0660, -0.0153, 0.0800],
+    [-0.0101, 0.0068, 0.0156],
+    [-0.0690, -0.0452, -0.0927],
+    [-0.0145, 0.0041, 0.0015],
+    [0.0421, 0.0451, 0.0373],
+    [0.0504, -0.0483, -0.0356],
+    [-0.0837, 0.0168, 0.0055],
+]
+
+WAN22_LATENT_RGB_BIAS = [0.0317, -0.0878, -0.1388]
 
 
 def sample_to_lowres_estimated_image(
@@ -296,12 +349,14 @@ def diffusion_step_callback(
         latent_rgb_factors = ANIMA_LATENT_RGB_FACTORS
         latent_rgb_bias = ANIMA_LATENT_RGB_BIAS
     elif base_model == BaseModelType.Wan:
-        latent_rgb_factors = WAN_LATENT_RGB_FACTORS
-        latent_rgb_bias = WAN_LATENT_RGB_BIAS
-        # TI2V-5B latents have 48 channels; slice the first 16 as a degraded preview
-        # until proper 48-channel factors are generated.
-        if sample.shape[-3] > 16:
-            sample = sample[..., :16, :, :]
+        # A14B (16-ch standard Wan VAE, 8x spatial) vs TI2V-5B (48-ch Wan2.2-VAE,
+        # 16x spatial). The latent channel count uniquely identifies the variant.
+        if sample.shape[-3] == 48:
+            latent_rgb_factors = WAN22_LATENT_RGB_FACTORS
+            latent_rgb_bias = WAN22_LATENT_RGB_BIAS
+        else:
+            latent_rgb_factors = WAN_LATENT_RGB_FACTORS
+            latent_rgb_bias = WAN_LATENT_RGB_BIAS
     else:
         raise ValueError(f"Unsupported base model: {base_model}")
 
@@ -319,8 +374,13 @@ def diffusion_step_callback(
         latent_rgb_bias=latent_rgb_bias_torch,
     )
 
-    width = image.width * 8
-    height = image.height * 8
+    # Spatial downscale ratio: 8x is the SD/SDXL/FLUX/Wan-A14B default;
+    # Wan TI2V-5B's Wan2.2-VAE uses 16x.
+    spatial_scale = 8
+    if base_model == BaseModelType.Wan and sample.shape[-3] == 48:
+        spatial_scale = 16
+    width = image.width * spatial_scale
+    height = image.height * spatial_scale
     percentage = calc_percentage(intermediate_state)
 
     signal_progress("Denoising", percentage, image, (width, height))

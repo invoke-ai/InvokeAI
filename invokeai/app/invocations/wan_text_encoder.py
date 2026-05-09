@@ -16,8 +16,12 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     WanConditioningInfo,
 )
 
-# Matches the diffusers WanPipeline default — Wan was trained at this prompt length.
-WAN_T5_MAX_SEQ_LEN = 226
+# Wan models are trained with 512-token text sequences (matches the
+# upstream config.json's ``text_len: 512`` and the WanPipeline.__call__
+# default). Diffusers' ``_get_t5_prompt_embeds`` has a stale 226 default
+# that gets overridden by ``__call__``; using 512 here matches the actual
+# pipeline behaviour.
+WAN_T5_MAX_SEQ_LEN = 512
 
 
 @invocation(
@@ -61,27 +65,26 @@ class WanTextEncoderInvocation(BaseInvocation):
 
     def _encode(self, context: InvocationContext) -> tuple[torch.Tensor, torch.Tensor | None]:
         from diffusers.pipelines.wan.pipeline_wan import prompt_clean
-        from transformers import AutoTokenizer, UMT5EncoderModel
+        from transformers import UMT5EncoderModel
 
         cleaned = prompt_clean(self.prompt)
 
-        # The tokenizer is small enough to load directly from disk without going
-        # through the model cache.
-        tokenizer_config = context.models.get_config(self.wan_t5_encoder.tokenizer)
-        tokenizer_path = context.models.get_absolute_path(tokenizer_config)
-        tokenizer = AutoTokenizer.from_pretrained(str(tokenizer_path), local_files_only=True)
+        # Tokenizer + text encoder both routed through the model cache so the
+        # registered loaders handle the nested-vs-flat directory layout for us
+        # (main-model layout: <root>/tokenizer/ + <root>/text_encoder/;
+        # standalone WanT5Encoder layout may also be flat).
+        tokenizer_info = context.models.load(self.wan_t5_encoder.tokenizer)
+        with tokenizer_info.model_on_device() as (_, tokenizer):
+            text_inputs = tokenizer(
+                [cleaned],
+                padding="max_length",
+                max_length=WAN_T5_MAX_SEQ_LEN,
+                truncation=True,
+                add_special_tokens=True,
+                return_attention_mask=True,
+                return_tensors="pt",
+            )
 
-        text_inputs = tokenizer(
-            [cleaned],
-            padding="max_length",
-            max_length=WAN_T5_MAX_SEQ_LEN,
-            truncation=True,
-            add_special_tokens=True,
-            return_attention_mask=True,
-            return_tensors="pt",
-        )
-
-        # Load the text encoder via the model cache.
         text_encoder_info = context.models.load(self.wan_t5_encoder.text_encoder)
         with text_encoder_info.model_on_device() as (_, text_encoder):
             assert isinstance(text_encoder, UMT5EncoderModel)

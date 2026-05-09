@@ -10,6 +10,7 @@ from invokeai.backend.model_manager.configs.vae import (
     VAE_Checkpoint_Anima_Config,
     VAE_Checkpoint_Config_Base,
     VAE_Checkpoint_QwenImage_Config,
+    VAE_Checkpoint_Wan_Config,
 )
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
@@ -39,6 +40,8 @@ class VAELoader(GenericDiffusersLoader):
                 config.path,
                 torch_dtype=self._torch_dtype,
             )
+        elif isinstance(config, VAE_Checkpoint_Wan_Config):
+            return self._load_wan_vae(config)
         elif isinstance(config, VAE_Checkpoint_QwenImage_Config):
             return self._load_qwen_image_vae(config)
         elif isinstance(config, VAE_Checkpoint_Config_Base):
@@ -48,6 +51,34 @@ class VAELoader(GenericDiffusersLoader):
             )
         else:
             return super()._load_model(config, submodel_type)
+
+    def _load_wan_vae(self, config: VAE_Checkpoint_Wan_Config) -> AnyModel:
+        """Load a Wan 2.2 VAE from a single safetensors file.
+
+        Builds ``AutoencoderKLWan`` with ``z_dim`` taken from the config so
+        TI2V-5B's 48-channel Wan2.2-VAE constructs correctly. Mirrors the
+        QwenImage VAE single-file path: init empty, then ``load_state_dict``.
+        """
+        import accelerate
+        from diffusers.models.autoencoders.autoencoder_kl_wan import AutoencoderKLWan
+        from safetensors.torch import load_file
+
+        sd = load_file(config.path)
+
+        if self._torch_dtype is not None:
+            for k in list(sd.keys()):
+                if sd[k].is_floating_point():
+                    sd[k] = sd[k].to(self._torch_dtype)
+
+        new_sd_size = sum(t.nelement() * t.element_size() for t in sd.values())
+        self._ram_cache.make_room(new_sd_size)
+
+        with accelerate.init_empty_weights():
+            model = AutoencoderKLWan(z_dim=config.latent_channels)
+
+        model.load_state_dict(sd, strict=True, assign=True)
+        model.eval()
+        return model
 
     def _load_qwen_image_vae(self, config: VAE_Checkpoint_QwenImage_Config) -> AnyModel:
         """Load a Qwen Image VAE from a single safetensors file.

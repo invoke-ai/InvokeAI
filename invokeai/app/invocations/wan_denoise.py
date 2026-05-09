@@ -22,11 +22,9 @@ The transformer call signature mirrors Diffusers' ``WanPipeline``:
     )[0]
 """
 
-from __future__ import annotations
-
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Callable, Iterator, Optional
+from typing import Any, Callable, Iterator, Optional
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -183,9 +181,10 @@ class WanDenoiseInvocation(BaseInvocation):
     )
     guidance_scale_low_noise: Optional[float] = InputField(
         default=None,
-        ge=1.0,
+        ge=0.0,
         description="Optional separate CFG scale for the low-noise expert (Wan 2.2 A14B only). "
-        "If unset, the primary 'Guidance Scale' is reused. Ignored for TI2V-5B.",
+        "Values below 1.0 (including 0) fall back to the primary 'Guidance Scale'. "
+        "Ignored for TI2V-5B.",
         title="Guidance Scale (Low Noise)",
     )
     width: int = InputField(default=1024, multiple_of=8, description="Width of the generated image.")
@@ -240,10 +239,17 @@ class WanDenoiseInvocation(BaseInvocation):
             sigmas = sigmas[start_idx : end_idx + 1]
         total_steps = len(timesteps)
 
+        # Latents stay in fp32 throughout the denoise loop to avoid accumulating
+        # bf16 quantization across the scheduler's small per-step deltas. We
+        # cast to bf16 only when calling the transformer, matching Diffusers'
+        # WanPipeline (which calls ``prepare_latents(..., dtype=torch.float32)``
+        # then ``latent_model_input = latents.to(transformer_dtype)``).
+        latent_dtype = torch.float32
+
         # Load init latents (img2img) and convert 4D → 5D.
         init_latents_5d: torch.Tensor | None = None
         if self.latents is not None:
-            loaded = context.tensors.load(self.latents.latents_name).to(device=device, dtype=inference_dtype)
+            loaded = context.tensors.load(self.latents.latents_name).to(device=device, dtype=latent_dtype)
             if loaded.ndim == 4:
                 loaded = loaded.unsqueeze(2)
             init_latents_5d = loaded
@@ -264,7 +270,7 @@ class WanDenoiseInvocation(BaseInvocation):
             width=self.width,
             spatial_scale_factor=spatial_scale,
             device=device,
-            dtype=inference_dtype,
+            dtype=latent_dtype,
             seed=self.seed,
         )
 
@@ -324,19 +330,22 @@ class WanDenoiseInvocation(BaseInvocation):
                 # low-noise below. Single-transformer models always use HIGH.
                 if low_info is not None and float(t) < float(boundary_timestep):
                     active_label = _ExpertSwapper.LOW
-                    active_cfg = (
-                        self.guidance_scale_low_noise
-                        if self.guidance_scale_low_noise is not None
-                        else self.guidance_scale
-                    )
+                    # Treat None or values below 1.0 (incl. the FE's default 0)
+                    # as "use the primary guidance_scale".
+                    low_cfg = self.guidance_scale_low_noise
+                    active_cfg = low_cfg if (low_cfg is not None and low_cfg >= 1.0) else self.guidance_scale
                 else:
                     active_label = _ExpertSwapper.HIGH
                     active_cfg = self.guidance_scale
 
                 transformer = swapper.get(active_label)
 
+                # Cast latents to the transformer's dtype only for the forward
+                # pass; keep the scheduler-level latents in fp32.
+                latent_model_input = latents.to(dtype=inference_dtype)
+
                 noise_pred_cond = transformer(
-                    hidden_states=latents,
+                    hidden_states=latent_model_input,
                     timestep=timestep,
                     encoder_hidden_states=pos_cond.prompt_embeds.unsqueeze(0),
                     attention_kwargs=None,
@@ -345,7 +354,7 @@ class WanDenoiseInvocation(BaseInvocation):
 
                 if do_cfg and neg_cond is not None:
                     noise_pred_uncond = transformer(
-                        hidden_states=latents,
+                        hidden_states=latent_model_input,
                         timestep=timestep,
                         encoder_hidden_states=neg_cond.prompt_embeds.unsqueeze(0),
                         attention_kwargs=None,
@@ -379,19 +388,41 @@ class WanDenoiseInvocation(BaseInvocation):
         return latents.squeeze(2)
 
     def _build_scheduler(self, context: InvocationContext, device: torch.device):
-        """Construct ``FlowMatchEulerDiscreteScheduler`` for this run.
+        """Construct the scheduler matching the model's on-disk ``scheduler_config.json``.
 
-        Loads the model's on-disk scheduler config when available so per-model
-        ``shift`` settings are honoured; falls back to defaults otherwise.
+        Wan model variants ship different schedulers — e.g. TI2V-5B uses
+        ``UniPCMultistepScheduler`` with ``flow_shift=5.0``, while the
+        standard A14B reference uses ``FlowMatchEulerDiscreteScheduler``.
+        We dispatch on ``_class_name`` so the noise schedule matches what the
+        model was trained against. Falls back to ``FlowMatchEulerDiscreteScheduler``
+        defaults when no on-disk config is available.
         """
+        import json
+
+        import diffusers
         from diffusers import FlowMatchEulerDiscreteScheduler
 
         scheduler_dir = _scheduler_path_for_transformer(context, self.transformer)
-        if scheduler_dir is not None:
-            return FlowMatchEulerDiscreteScheduler.from_pretrained(
-                str(scheduler_dir), local_files_only=True
-            )
-        return FlowMatchEulerDiscreteScheduler()
+        if scheduler_dir is None:
+            return FlowMatchEulerDiscreteScheduler()
+
+        # Read the on-disk class name and instantiate that class. Diffusers'
+        # SchedulerMixin.from_pretrained does class dispatch internally, but
+        # only when called from the abstract base; calling a concrete subclass
+        # silently builds the wrong type. Resolve it explicitly.
+        config_path = scheduler_dir / "scheduler_config.json"
+        try:
+            with config_path.open("r", encoding="utf-8") as f:
+                cfg = json.load(f)
+            class_name = cfg.get("_class_name")
+            scheduler_cls = getattr(diffusers, class_name, None) if class_name else None
+        except (OSError, json.JSONDecodeError):
+            scheduler_cls = None
+
+        if scheduler_cls is None:
+            scheduler_cls = FlowMatchEulerDiscreteScheduler
+
+        return scheduler_cls.from_pretrained(str(scheduler_dir), local_files_only=True)
 
     def _load_conditioning(
         self,
