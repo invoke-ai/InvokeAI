@@ -23,6 +23,13 @@ host: "192.168.1.1"
 port: 8080
 """
 
+v4_0_2_config = """
+schema_version: "4.0.2"
+
+host: "192.168.1.1"
+port: 8080
+"""
+
 invalid_v5_config = """
 schema_version: 5.0.0
 
@@ -147,6 +154,19 @@ def test_failed_migrate_backup(tmp_path: Path, patch_rootdir: None):
     assert temp_config_file.with_suffix(".yaml.bak").read_text() == v3_config_with_bad_values
     assert temp_config_file.exists()
     assert temp_config_file.read_text() == v3_config_with_bad_values
+
+
+def test_migrate_v4_0_2_to_4_0_3_config(tmp_path: Path, patch_rootdir: None):
+    """Test that a v4.0.2 config is migrated to v4.0.3 (image subfolder support)."""
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text(v4_0_2_config)
+
+    config = load_and_migrate_config(temp_config_file)
+    assert config.schema_version == "4.0.3"
+    assert config.host == "192.168.1.1"
+    assert config.port == 8080
+    # image_subfolder_strategy should have its default value
+    assert config.image_subfolder_strategy == "flat"
 
 
 def test_bails_on_invalid_config(tmp_path: Path, patch_rootdir: None):
