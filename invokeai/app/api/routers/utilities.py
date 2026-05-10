@@ -180,10 +180,8 @@ def _infer_font_style(style_name: str, file_stem: str, italic_flag: bool) -> str
     return "normal"
 
 
-def _get_font_metadata(font_file: Path) -> tuple[str, str, int, str]:
-    fallback_family = font_file.stem
-    fallback_label = font_file.stem.replace("_", " ").replace("-", " ").strip() or font_file.stem
-
+def _get_font_metadata(font_file: Path) -> tuple[str, str, int, str] | None:
+    ttfont_error: Exception | None = None
     try:
         with TTFont(font_file.as_posix(), lazy=True) as font:
             family_name = (_get_name_table_value(font, (16, 1)) or "").strip()
@@ -204,34 +202,33 @@ def _get_font_metadata(font_file: Path) -> tuple[str, str, int, str]:
                     _infer_font_weight(style_name, font_file.stem, weight_class),
                     _infer_font_style(style_name, font_file.stem, italic_flag),
                 )
-    except Exception:
-        pass
+    except Exception as e:
+        ttfont_error = e
 
     try:
         font = ImageFont.truetype(font_file.as_posix(), size=16)
         family_name, style_name = font.getname()
         family_name = family_name.strip()
         style_name = style_name.strip()
-        if not family_name:
+        if family_name:
             return (
-                fallback_family,
-                fallback_label,
+                family_name,
+                family_name,
                 _infer_font_weight(style_name, font_file.stem, None),
                 _infer_font_style(style_name, font_file.stem, False),
             )
-        return (
-            family_name,
-            family_name,
-            _infer_font_weight(style_name, font_file.stem, None),
-            _infer_font_style(style_name, font_file.stem, False),
+    except Exception as e:
+        logger.warning(
+            "Skipping font file %s: unable to read font metadata with fontTools or Pillow (%s, %s)",
+            font_file,
+            type(ttfont_error).__name__ if ttfont_error else "no-fontTools-error",
+            type(e).__name__,
+            exc_info=e,
         )
-    except Exception:
-        return (
-            fallback_family,
-            fallback_label,
-            _infer_font_weight("", font_file.stem, None),
-            _infer_font_style("", font_file.stem, False),
-        )
+        return None
+
+    logger.warning("Skipping font file %s: missing font family metadata", font_file)
+    return None
 
 
 def _resolve_font_request_path(font_path: str) -> Path:
@@ -272,7 +269,10 @@ async def list_user_fonts(_current_user: CurrentUserOrDefault) -> UserFontsRespo
         if not font_file.is_file() or font_file.suffix.lower() not in SUPPORTED_FONT_EXTENSIONS:
             continue
         relative = font_file.relative_to(fonts_dir).as_posix()
-        family, _label, weight, style = _get_font_metadata(font_file)
+        metadata = _get_font_metadata(font_file)
+        if metadata is None:
+            continue
+        family, _label, weight, style = metadata
         family_key = family.strip().lower()
         family_candidates.setdefault(family_key, []).append((font_file, relative, family, weight, style))
 

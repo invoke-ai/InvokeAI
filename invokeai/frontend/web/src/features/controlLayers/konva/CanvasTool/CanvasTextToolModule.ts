@@ -19,6 +19,7 @@ import {
   type TextMeasureConfig,
 } from 'features/controlLayers/text/textRenderer';
 import { type TextSessionStatus, transitionTextSessionStatus } from 'features/controlLayers/text/textSessionMachine';
+import { awaitUserFontReady } from 'features/controlLayers/text/textUserFonts';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -361,6 +362,8 @@ export class CanvasTextToolModule extends CanvasModuleBase {
     textSettings: CanvasTextSettingsState,
     color: RgbaColor
   ) => {
+    await awaitUserFontReady(textSettings.fontId);
+
     if (typeof document !== 'undefined' && document.fonts?.load) {
       const fontSpec = buildFontDescriptor({
         fontFamily: getFontStackById(textSettings.fontId),

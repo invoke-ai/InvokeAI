@@ -18,6 +18,7 @@ import {
   Text,
   Tooltip,
 } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { GroupBase } from 'chakra-react-select';
 import { selectAuthToken } from 'features/auth/store/authSlice';
@@ -45,7 +46,12 @@ import {
   TEXT_MIN_FONT_SIZE,
   type TextFontId,
 } from 'features/controlLayers/text/textConstants';
-import { buildCustomTextFontStacks, syncUserFontFaces } from 'features/controlLayers/text/textUserFonts';
+import {
+  $userFontReadyStates,
+  buildCustomTextFontStacks,
+  primeUserFontReadiness,
+  syncUserFontFaces,
+} from 'features/controlLayers/text/textUserFonts';
 import type { FocusEvent, KeyboardEvent, MouseEvent } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -88,10 +94,16 @@ const FontSelect = () => {
   const authToken = useAppSelector(selectAuthToken);
   const { data: userFonts } = useListUserFontsQuery();
   const loadedUserFontFacesRef = useRef<Map<string, FontFace>>(new Map());
+  const autoRetryAttemptsRef = useRef(0);
+  const userFontReadyStates = useStore($userFontReadyStates);
+  const [fontSyncVersion, setFontSyncVersion] = useState(0);
   const userFontsLabel = t('controlLayers.text.customFonts');
   const builtInFontsLabel = t('controlLayers.text.builtInFonts');
   const missingFontLabel = t('controlLayers.text.missingFont');
   const customFontStacks = useMemo(() => buildCustomTextFontStacks(userFonts ?? []), [userFonts]);
+  const hasUserFontErrors = useMemo(() => {
+    return (userFonts ?? []).some((font) => userFontReadyStates[font.id] === 'error');
+  }, [userFontReadyStates, userFonts]);
 
   useEffect(() => {
     setCustomTextFontStacks(customFontStacks);
@@ -115,6 +127,8 @@ const FontSelect = () => {
     if (typeof document === 'undefined' || typeof FontFace === 'undefined') {
       return;
     }
+
+    primeUserFontReadiness(userFonts ?? [], loadedUserFontFacesRef.current);
     let isCancelled = false;
 
     void (async () => {
@@ -136,13 +150,52 @@ const FontSelect = () => {
     return () => {
       isCancelled = true;
     };
-  }, [authToken, customFontStacks, userFonts]);
+  }, [authToken, customFontStacks, fontSyncVersion, userFonts]);
+
+  useEffect(() => {
+    if (!hasUserFontErrors) {
+      autoRetryAttemptsRef.current = 0;
+      return;
+    }
+    if (typeof window === 'undefined' || autoRetryAttemptsRef.current >= 2) {
+      return;
+    }
+
+    const delayMs = autoRetryAttemptsRef.current === 0 ? 1000 : 3000;
+    const timeout = window.setTimeout(() => {
+      autoRetryAttemptsRef.current += 1;
+      setFontSyncVersion((version) => version + 1);
+    }, delayMs);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [fontSyncVersion, hasUserFontErrors]);
+
+  useEffect(() => {
+    if (!hasUserFontErrors || typeof window === 'undefined') {
+      return;
+    }
+
+    const retry = () => {
+      setFontSyncVersion((version) => version + 1);
+    };
+
+    window.addEventListener('focus', retry);
+    window.addEventListener('online', retry);
+
+    return () => {
+      window.removeEventListener('focus', retry);
+      window.removeEventListener('online', retry);
+    };
+  }, [hasUserFontErrors]);
 
   const options = useMemo(() => {
     const customOptions: ComboboxOption[] = (userFonts ?? []).map((font) => {
       return {
         value: font.id,
         label: truncateLabel(font.label),
+        isDisabled: userFontReadyStates[font.id] !== 'ready',
       };
     });
     const builtInOptions: ComboboxOption[] = TEXT_FONT_STACKS.map(({ id, label, stack }) => {
@@ -163,7 +216,7 @@ const FontSelect = () => {
       },
       { label: builtInFontsLabel, options: builtInOptions },
     ] as GroupBase<ComboboxOption>[];
-  }, [builtInFontsLabel, userFonts, userFontsLabel]);
+  }, [builtInFontsLabel, userFontReadyStates, userFonts, userFontsLabel]);
   const selectedOption = useMemo(() => {
     const firstOption = options[0];
     const flattened =

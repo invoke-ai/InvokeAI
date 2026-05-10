@@ -108,11 +108,15 @@ def test_get_user_font_file_requires_auth(
 
 
 def test_list_user_fonts_allows_authenticated_access(
-    admin_token: str, client: TestClient, invokeai_root_dir: Path
+    admin_token: str, client: TestClient, invokeai_root_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     fonts_dir = invokeai_root_dir / "Fonts"
     fonts_dir.mkdir(parents=True, exist_ok=True)
     (fonts_dir / "MyFont.ttf").write_bytes(b"not-a-real-font")
+    monkeypatch.setattr(
+        "invokeai.app.api.routers.utilities._get_font_metadata",
+        lambda _font_file: ("My Font", "My Font", 400, "normal"),
+    )
 
     response = client.get("/api/v1/utilities/fonts", headers={"Authorization": f"Bearer {admin_token}"})
 
@@ -120,6 +124,24 @@ def test_list_user_fonts_allows_authenticated_access(
     data = response.json()
     assert len(data["fonts"]) == 1
     assert data["fonts"][0]["id"] == "user:MyFont.ttf"
+
+
+def test_list_user_fonts_skips_malformed_fonts_and_logs_warning(
+    admin_token: str,
+    client: TestClient,
+    invokeai_root_dir: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    fonts_dir = invokeai_root_dir / "Fonts"
+    fonts_dir.mkdir(parents=True, exist_ok=True)
+    (fonts_dir / "BrokenFont.ttf").write_bytes(b"not-a-real-font")
+
+    with caplog.at_level("WARNING"):
+        response = client.get("/api/v1/utilities/fonts", headers={"Authorization": f"Bearer {admin_token}"})
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["fonts"] == []
+    assert "Skipping font file" in caplog.text
 
 
 def test_get_user_font_file_rejects_symlink(

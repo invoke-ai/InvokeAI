@@ -1,7 +1,14 @@
 import type { UserFont } from 'services/api/endpoints/utilities';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { buildCustomTextFontStacks, getUserFontFaceKey, syncUserFontFaces } from './textUserFonts';
+import {
+  awaitUserFontReady,
+  buildCustomTextFontStacks,
+  clearUserFontRegistryForTests,
+  getUserFontFaceKey,
+  isUserFontReady,
+  syncUserFontFaces,
+} from './textUserFonts';
 
 describe('textUserFonts', () => {
   const face = {
@@ -19,6 +26,10 @@ describe('textUserFonts', () => {
     url: '/api/v1/utilities/fonts/Fonts/MyFont-Regular.ttf',
     faces: [face],
   };
+
+  afterEach(() => {
+    clearUserFontRegistryForTests();
+  });
 
   it('builds custom font stacks from user fonts', () => {
     expect(buildCustomTextFontStacks([font])).toEqual([
@@ -74,5 +85,100 @@ describe('textUserFonts', () => {
     expect(deletedFaces).toEqual([staleFace]);
     expect(loadedFontFaces.get(faceKey)).toBe(loadedFace);
     expect(loadedFontFaces.has('stale|400|normal|/stale.ttf')).toBe(false);
+  });
+
+  it('tracks custom font readiness until all faces load', async () => {
+    const loadedFontFaces = new Map<string, object>();
+    const loadedFace = { family: 'My Font' };
+    let resolveFetch: ((response: { ok: boolean; arrayBuffer: () => Promise<ArrayBuffer> }) => void) | undefined;
+    const fetchFn = vi.fn(
+      () =>
+        new Promise<{ ok: boolean; arrayBuffer: () => Promise<ArrayBuffer> }>((resolve) => {
+          resolveFetch = resolve;
+        })
+    );
+    const fontFaceCtor = vi.fn().mockImplementation(() => ({
+      load: () => Promise.resolve(loadedFace),
+    }));
+
+    const syncPromise = syncUserFontFaces({
+      fonts: [font],
+      token: null,
+      loadedFontFaces,
+      fontFaceSet: {
+        add: () => undefined,
+        delete: () => true,
+      },
+      fontFaceCtor,
+      fetchFn,
+    });
+
+    expect(isUserFontReady(font.id)).toBe(false);
+
+    const readyPromise = awaitUserFontReady(font.id);
+    let isReadyResolved = false;
+    void readyPromise.then(() => {
+      isReadyResolved = true;
+    });
+
+    await Promise.resolve();
+    expect(isReadyResolved).toBe(false);
+
+    resolveFetch?.({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+    });
+
+    await syncPromise;
+    await readyPromise;
+
+    expect(isUserFontReady(font.id)).toBe(true);
+  });
+
+  it('allows a later sync to recover from an initial load failure', async () => {
+    const loadedFontFaces = new Map<string, object>();
+    const loadedFace = { family: 'My Font' };
+    const fetchFn = vi
+      .fn<() => Promise<{ ok: boolean; arrayBuffer: () => Promise<ArrayBuffer> }>>()
+      .mockResolvedValueOnce({
+        ok: false,
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+      });
+    const fontFaceCtor = vi.fn().mockImplementation(() => ({
+      load: () => Promise.resolve(loadedFace),
+    }));
+
+    await syncUserFontFaces({
+      fonts: [font],
+      token: null,
+      loadedFontFaces,
+      fontFaceSet: {
+        add: () => undefined,
+        delete: () => true,
+      },
+      fontFaceCtor,
+      fetchFn,
+    });
+
+    expect(isUserFontReady(font.id)).toBe(false);
+
+    await syncUserFontFaces({
+      fonts: [font],
+      token: null,
+      loadedFontFaces,
+      fontFaceSet: {
+        add: () => undefined,
+        delete: () => true,
+      },
+      fontFaceCtor,
+      fetchFn,
+    });
+
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(isUserFontReady(font.id)).toBe(true);
   });
 });
