@@ -19,6 +19,8 @@ import { DeleteStylePresetDialog } from 'features/stylePresets/components/Delete
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
 import RefreshAfterResetModal from 'features/system/components/SettingsModal/RefreshAfterResetModal';
 import { VideosModal } from 'features/system/components/VideosModal/VideosModal';
+import { DeleteSystemPromptDialog } from 'features/systemPrompts/components/DeleteSystemPromptDialog';
+import { SystemPromptsModal } from 'features/systemPrompts/components/SystemPromptsModal';
 import { DeleteWorkflowDialog } from 'features/workflowLibrary/components/DeleteLibraryWorkflowConfirmationAlertDialog';
 import { LoadWorkflowConfirmationAlertDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import { LoadWorkflowFromGraphModal } from 'features/workflowLibrary/components/LoadWorkflowFromGraphModal/LoadWorkflowFromGraphModal';
@@ -44,6 +46,8 @@ export const GlobalModalIsolator = memo(() => {
       <NewWorkflowConfirmationAlertDialog />
       <LoadWorkflowConfirmationAlertDialog />
       <DeleteStylePresetDialog />
+      <SystemPromptsModal />
+      <DeleteSystemPromptDialog />
       <DeleteWorkflowDialog />
       <RefreshAfterResetModal />
       <DeleteBoardModal />

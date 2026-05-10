@@ -2540,6 +2540,58 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system_prompts/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List System Prompts
+         * @description Lists all system prompts.
+         */
+        get: operations["list_system_prompts"];
+        put?: never;
+        /**
+         * Create System Prompt
+         * @description Creates a new system prompt.
+         */
+        post: operations["create_system_prompt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/system_prompts/i/{system_prompt_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get System Prompt
+         * @description Gets a system prompt by id.
+         */
+        get: operations["get_system_prompt"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete System Prompt
+         * @description Deletes a system prompt.
+         */
+        delete: operations["delete_system_prompt"];
+        options?: never;
+        head?: never;
+        /**
+         * Update System Prompt
+         * @description Updates a system prompt.
+         */
+        patch: operations["update_system_prompt"];
+        trace?: never;
+    };
     "/api/v1/client_state/{queue_id}/get_by_key": {
         parameters: {
             query?: never;
@@ -28979,6 +29031,62 @@ export type components = {
              */
             type: "sub";
         };
+        /** SystemPromptChanges */
+        SystemPromptChanges: {
+            /**
+             * Name
+             * @description The new name.
+             */
+            name?: string | null;
+            /**
+             * Content
+             * @description The new content.
+             */
+            content?: string | null;
+        };
+        /** SystemPromptRecordDTO */
+        SystemPromptRecordDTO: {
+            /**
+             * Name
+             * @description The name of the system prompt.
+             */
+            name: string;
+            /**
+             * Content
+             * @description The system prompt content.
+             */
+            content: string;
+            /**
+             * Id
+             * @description The system prompt ID.
+             */
+            id: string;
+            /**
+             * Created At
+             * Format: date-time
+             * @description When the system prompt was created.
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             * @description When the system prompt was last updated.
+             */
+            updated_at: string;
+        };
+        /** SystemPromptWithoutId */
+        SystemPromptWithoutId: {
+            /**
+             * Name
+             * @description The name of the system prompt.
+             */
+            name: string;
+            /**
+             * Content
+             * @description The system prompt content.
+             */
+            content: string;
+        };
         /** T2IAdapterField */
         T2IAdapterField: {
             /** @description The T2I-Adapter image prompt. */
@@ -37811,6 +37919,159 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_system_prompts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemPromptRecordDTO"][];
+                };
+            };
+        };
+    };
+    create_system_prompt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SystemPromptWithoutId"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemPromptRecordDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_system_prompt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the system prompt to get */
+                system_prompt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemPromptRecordDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_system_prompt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the system prompt to delete */
+                system_prompt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_system_prompt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the system prompt to update */
+                system_prompt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SystemPromptChanges"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemPromptRecordDTO"];
                 };
             };
             /** @description Validation Error */
