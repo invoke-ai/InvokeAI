@@ -92,7 +92,7 @@ async def parse_dynamicprompts(
 
 def _get_fonts_dir() -> Path:
     root = ApiDependencies.invoker.services.configuration.root_path
-    return root / "Fonts"
+    return root / "fonts"
 
 
 def _path_has_symlink_component(path: Path, boundary: Path) -> bool:

@@ -86,7 +86,7 @@ def admin_token(setup_jwt_secret: None, enable_multiuser: Invoker, client: TestC
 
 
 def test_list_user_fonts_requires_auth(enable_multiuser: Invoker, client: TestClient, invokeai_root_dir: Path) -> None:
-    fonts_dir = invokeai_root_dir / "Fonts"
+    fonts_dir = invokeai_root_dir / "fonts"
     fonts_dir.mkdir(parents=True, exist_ok=True)
     (fonts_dir / "MyFont.ttf").write_bytes(b"not-a-real-font")
 
@@ -98,7 +98,7 @@ def test_list_user_fonts_requires_auth(enable_multiuser: Invoker, client: TestCl
 def test_get_user_font_file_requires_auth(
     enable_multiuser: Invoker, client: TestClient, invokeai_root_dir: Path
 ) -> None:
-    fonts_dir = invokeai_root_dir / "Fonts"
+    fonts_dir = invokeai_root_dir / "fonts"
     fonts_dir.mkdir(parents=True, exist_ok=True)
     (fonts_dir / "MyFont.ttf").write_bytes(b"not-a-real-font")
 
@@ -110,7 +110,7 @@ def test_get_user_font_file_requires_auth(
 def test_list_user_fonts_allows_authenticated_access(
     admin_token: str, client: TestClient, invokeai_root_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    fonts_dir = invokeai_root_dir / "Fonts"
+    fonts_dir = invokeai_root_dir / "fonts"
     fonts_dir.mkdir(parents=True, exist_ok=True)
     (fonts_dir / "MyFont.ttf").write_bytes(b"not-a-real-font")
     monkeypatch.setattr(
@@ -132,7 +132,7 @@ def test_list_user_fonts_skips_malformed_fonts_and_logs_warning(
     invokeai_root_dir: Path,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    fonts_dir = invokeai_root_dir / "Fonts"
+    fonts_dir = invokeai_root_dir / "fonts"
     fonts_dir.mkdir(parents=True, exist_ok=True)
     (fonts_dir / "BrokenFont.ttf").write_bytes(b"not-a-real-font")
 
@@ -147,7 +147,7 @@ def test_list_user_fonts_skips_malformed_fonts_and_logs_warning(
 def test_get_user_font_file_rejects_symlink(
     admin_token: str, client: TestClient, invokeai_root_dir: Path, tmp_path: Path
 ) -> None:
-    fonts_dir = invokeai_root_dir / "Fonts"
+    fonts_dir = invokeai_root_dir / "fonts"
     fonts_dir.mkdir(parents=True, exist_ok=True)
     outside_file = tmp_path / "outside.ttf"
     outside_file.write_bytes(b"outside-font")
@@ -166,7 +166,7 @@ def test_get_user_font_file_rejects_symlink(
 def test_list_user_fonts_skips_symlinked_files(
     admin_token: str, client: TestClient, invokeai_root_dir: Path, tmp_path: Path
 ) -> None:
-    fonts_dir = invokeai_root_dir / "Fonts"
+    fonts_dir = invokeai_root_dir / "fonts"
     fonts_dir.mkdir(parents=True, exist_ok=True)
     outside_file = tmp_path / "outside.ttf"
     outside_file.write_bytes(b"outside-font")

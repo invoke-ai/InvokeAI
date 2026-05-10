@@ -270,8 +270,8 @@ def test_get_config_writing(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch
     assert config.config_file_path == config_file_path
     assert config_file_path.exists()
     assert example_file_path.exists()
-    assert (tmp_path / "Fonts").exists()
-    assert (tmp_path / "Fonts" / "README.txt").exists()
+    assert (tmp_path / "fonts").exists()
+    assert (tmp_path / "fonts" / "README.txt").exists()
 
     # The example file should have the default values
     example_file_content = example_file_path.read_text()
@@ -293,7 +293,7 @@ def test_ensure_fonts_dir_logs_warning_on_oserror(
     patch_rootdir: None, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
 ):
     original_mkdir = Path.mkdir
-    fonts_path = tmp_path / "Fonts"
+    fonts_path = tmp_path / "fonts"
 
     def mock_mkdir(self: Path, *args: Any, **kwargs: Any) -> None:
         if self == fonts_path:
@@ -305,7 +305,7 @@ def test_ensure_fonts_dir_logs_warning_on_oserror(
     with caplog.at_level("WARNING"):
         ensure_fonts_dir(tmp_path)
 
-    assert "Unable to initialize Fonts directory" in caplog.text
+    assert "Unable to initialize fonts directory" in caplog.text
 
 
 def test_get_config_reads_external_api_keys_file(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):

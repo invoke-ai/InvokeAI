@@ -12,18 +12,18 @@ import {
 
 describe('textUserFonts', () => {
   const face = {
-    path: 'Fonts/MyFont-Regular.ttf',
-    url: '/api/v1/utilities/fonts/Fonts/MyFont-Regular.ttf',
+    path: 'fonts/MyFont-Regular.ttf',
+    url: '/api/v1/utilities/fonts/fonts/MyFont-Regular.ttf',
     weight: 400,
     style: 'normal' as const,
   };
 
   const font: UserFont = {
-    id: 'user:Fonts/MyFont-Regular.ttf',
+    id: 'user:fonts/MyFont-Regular.ttf',
     family: 'My Font',
     label: 'My Font',
-    path: 'Fonts/MyFont-Regular.ttf',
-    url: '/api/v1/utilities/fonts/Fonts/MyFont-Regular.ttf',
+    path: 'fonts/MyFont-Regular.ttf',
+    url: '/api/v1/utilities/fonts/fonts/MyFont-Regular.ttf',
     faces: [face],
   };
 

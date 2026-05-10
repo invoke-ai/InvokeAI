@@ -604,7 +604,7 @@ def load_external_api_keys(api_keys_file_path: Path) -> dict[str, str]:
 
 
 def ensure_fonts_dir(root_path: Path) -> None:
-    fonts_path = root_path / "Fonts"
+    fonts_path = root_path / "fonts"
     fonts_readme_path = fonts_path / "README.txt"
 
     try:
@@ -617,7 +617,7 @@ def ensure_fonts_dir(root_path: Path) -> None:
                     "Supported formats: .ttf, .otf, .woff, .woff2\n"
                 )
     except OSError:
-        logger.warning("Unable to initialize Fonts directory at %s", fonts_path, exc_info=True)
+        logger.warning("Unable to initialize fonts directory at %s", fonts_path, exc_info=True)
 
 
 @lru_cache(maxsize=1)
