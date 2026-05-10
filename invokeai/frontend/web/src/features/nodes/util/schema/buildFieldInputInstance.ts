@@ -13,6 +13,7 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   SchedulerField: 'dpmpp_3m_k',
   StringField: '',
   StylePresetField: undefined,
+  SystemPromptField: undefined,
   FloatGeneratorField: undefined,
   IntegerGeneratorField: undefined,
   StringGeneratorField: undefined,
