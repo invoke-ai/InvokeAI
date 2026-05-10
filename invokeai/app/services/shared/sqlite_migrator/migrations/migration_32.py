@@ -18,7 +18,16 @@ Sources of the seeded prompts:
 import sqlite3
 
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
-from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT
+
+# Inlined verbatim from invokeai.backend.text_llm_pipeline.DEFAULT_SYSTEM_PROMPT.
+# Migrations must stay free of heavy ML imports (torch, transformers); pulling that module in here
+# would force the entire ML stack to load before sqlite migrations can run.
+# Keep this string in sync with text_llm_pipeline.DEFAULT_SYSTEM_PROMPT.
+_INVOKEAI_DEFAULT = (
+    "You are an expert prompt writer for AI image generation. "
+    "Given a brief description, expand it into a detailed, vivid prompt suitable for generating high-quality images. "
+    "Only output the expanded prompt, nothing else."
+)
 
 _FLUX2 = """You are an expert prompt engineer for FLUX.2 by Black Forest Labs. Rewrite user prompts to be more descriptive while strictly preserving their core subject and intent.
 
@@ -236,7 +245,7 @@ Output only the final English prompt — no JSON wrapper, no preamble, no explan
 DEFAULT_SYSTEM_PROMPTS: list[tuple[str, str, str]] = [
     # Mirrors text_llm_pipeline.DEFAULT_SYSTEM_PROMPT — the same fallback the backend applies
     # when no system_prompt is supplied — so users can pick it explicitly from the UI.
-    ("0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0000", "Default", DEFAULT_SYSTEM_PROMPT),
+    ("0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0000", "Default", _INVOKEAI_DEFAULT),
     ("0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0001", "FLUX.2 Prompt Enhancement", _FLUX2),
     ("0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0002", "HunyuanImage 3.0 Recaption Expert", _HUNYUAN),
     ("0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0003", "Qwen-Image Edit Enhancer", _QWEN_EDIT),
@@ -265,7 +274,19 @@ class Migration32Callback:
             );
             """
         )
-       cursor.execute(
+        # Backfill columns when an earlier revision of this migration left the table without them
+        # (e.g. a dev DB where the schema was created before the multi-user columns landed).
+        cursor.execute("PRAGMA table_info(system_prompts);")
+        existing_columns = {row[1] for row in cursor.fetchall()}
+        if "user_id" not in existing_columns:
+            cursor.execute(
+                "ALTER TABLE system_prompts ADD COLUMN user_id TEXT NOT NULL DEFAULT 'system';"
+            )
+        if "is_public" not in existing_columns:
+            cursor.execute(
+                "ALTER TABLE system_prompts ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT FALSE;"
+            )
+        cursor.execute(
             """--sql
             CREATE TRIGGER IF NOT EXISTS tg_system_prompts_updated_at
             AFTER UPDATE
