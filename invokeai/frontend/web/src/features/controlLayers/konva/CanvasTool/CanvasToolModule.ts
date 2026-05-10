@@ -784,8 +784,13 @@ export class CanvasToolModule extends CanvasModuleBase {
   /**
    * We want to reset any "quick-switch" tool selection on window blur. Fixes an issue where you alt-tab out of the app
    * and the color picker tool is still active when you come back.
+   *
+   * Bbox hold is also a temporary override, but unlike view/color-picker it may have an active Konva drag/transform in
+   * flight. Stop that interaction before clearing temporary hotkeys so the bbox cannot get stuck half-active after
+   * focus returns.
    */
   onWindowBlur = () => {
+    this.tools.bbox.stopInteraction();
     this.clearTemporaryToolHotkeys();
   };
 
