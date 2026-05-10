@@ -18,6 +18,7 @@ Sources of the seeded prompts:
 import sqlite3
 
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
+from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT
 
 _FLUX2 = """You are an expert prompt engineer for FLUX.2 by Black Forest Labs. Rewrite user prompts to be more descriptive while strictly preserving their core subject and intent.
 
@@ -233,6 +234,9 @@ Output only the final English prompt — no JSON wrapper, no preamble, no explan
 
 
 DEFAULT_SYSTEM_PROMPTS: list[tuple[str, str, str]] = [
+    # Mirrors text_llm_pipeline.DEFAULT_SYSTEM_PROMPT — the same fallback the backend applies
+    # when no system_prompt is supplied — so users can pick it explicitly from the UI.
+    ("0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0000", "Default", DEFAULT_SYSTEM_PROMPT),
     ("0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0001", "FLUX.2 Prompt Enhancement", _FLUX2),
     ("0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0002", "HunyuanImage 3.0 Recaption Expert", _HUNYUAN),
     ("0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0003", "Qwen-Image Edit Enhancer", _QWEN_EDIT),
@@ -261,7 +265,7 @@ class Migration32Callback:
             );
             """
         )
-        cursor.execute(
+       cursor.execute(
             """--sql
             CREATE TRIGGER IF NOT EXISTS tg_system_prompts_updated_at
             AFTER UPDATE
