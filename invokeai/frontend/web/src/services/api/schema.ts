@@ -2549,13 +2549,13 @@ export type paths = {
         };
         /**
          * List System Prompts
-         * @description Lists all system prompts.
+         * @description Lists system prompts visible to the current user (own + public).
          */
         get: operations["list_system_prompts"];
         put?: never;
         /**
          * Create System Prompt
-         * @description Creates a new system prompt.
+         * @description Creates a new system prompt owned by the current user.
          */
         post: operations["create_system_prompt"];
         delete?: never;
@@ -2580,14 +2580,14 @@ export type paths = {
         post?: never;
         /**
          * Delete System Prompt
-         * @description Deletes a system prompt.
+         * @description Deletes a system prompt. Only the owner or an admin may delete.
          */
         delete: operations["delete_system_prompt"];
         options?: never;
         head?: never;
         /**
          * Update System Prompt
-         * @description Updates a system prompt.
+         * @description Updates a system prompt. Only the owner or an admin may update.
          */
         patch: operations["update_system_prompt"];
         trace?: never;
@@ -29043,6 +29043,11 @@ export type components = {
              * @description The new content.
              */
             content?: string | null;
+            /**
+             * Is Public
+             * @description Whether the prompt is shared with all users.
+             */
+            is_public?: boolean | null;
         };
         /** SystemPromptRecordDTO */
         SystemPromptRecordDTO: {
@@ -29061,6 +29066,16 @@ export type components = {
              * @description The system prompt ID.
              */
             id: string;
+            /**
+             * User Id
+             * @description The owning user id ('system' for built-in defaults).
+             */
+            user_id: string;
+            /**
+             * Is Public
+             * @description Whether the prompt is shared with all users.
+             */
+            is_public: boolean;
             /**
              * Created At
              * Format: date-time

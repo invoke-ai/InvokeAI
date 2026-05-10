@@ -279,13 +279,9 @@ class Migration32Callback:
         cursor.execute("PRAGMA table_info(system_prompts);")
         existing_columns = {row[1] for row in cursor.fetchall()}
         if "user_id" not in existing_columns:
-            cursor.execute(
-                "ALTER TABLE system_prompts ADD COLUMN user_id TEXT NOT NULL DEFAULT 'system';"
-            )
+            cursor.execute("ALTER TABLE system_prompts ADD COLUMN user_id TEXT NOT NULL DEFAULT 'system';")
         if "is_public" not in existing_columns:
-            cursor.execute(
-                "ALTER TABLE system_prompts ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT FALSE;"
-            )
+            cursor.execute("ALTER TABLE system_prompts ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT FALSE;")
         cursor.execute(
             """--sql
             CREATE TRIGGER IF NOT EXISTS tg_system_prompts_updated_at

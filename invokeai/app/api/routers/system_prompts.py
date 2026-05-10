@@ -91,9 +91,7 @@ async def update_system_prompt(
             raise HTTPException(status_code=403, detail="Not authorized to update this system prompt")
     user_id = None if current_user.is_admin else current_user.user_id
     try:
-        return ApiDependencies.invoker.services.system_prompt_records.update(
-            system_prompt_id, changes, user_id=user_id
-        )
+        return ApiDependencies.invoker.services.system_prompt_records.update(system_prompt_id, changes, user_id=user_id)
     except SystemPromptNotFoundError:
         raise HTTPException(status_code=404, detail="System prompt not found")
 

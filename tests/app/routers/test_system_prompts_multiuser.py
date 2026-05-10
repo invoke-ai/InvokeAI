@@ -9,7 +9,6 @@ Verifies:
 
 import logging
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 from fastapi import status
@@ -191,9 +190,7 @@ def test_user2_does_not_see_user1_private_prompt(client: TestClient, user1_token
     assert p["id"] not in user2_ids
 
 
-def test_user2_sees_user1_public_prompt(
-    client: TestClient, user1_token: str, user2_token: str
-):
+def test_user2_sees_user1_public_prompt(client: TestClient, user1_token: str, user2_token: str):
     created = _create_prompt(client, user1_token, name="user1 created")
     # flip to public via PATCH
     r = client.patch(
