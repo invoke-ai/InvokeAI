@@ -54,6 +54,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_LyCORIS_SD1_Config,
     LoRA_LyCORIS_SD2_Config,
     LoRA_LyCORIS_SDXL_Config,
+    LoRA_LyCORIS_Wan_Config,
     LoRA_LyCORIS_ZImage_Config,
     LoRA_OMI_FLUX_Config,
     LoRA_OMI_SDXL_Config,
@@ -239,6 +240,14 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_LyCORIS_FLUX_Config, LoRA_LyCORIS_FLUX_Config.get_tag()],
         Annotated[LoRA_LyCORIS_ZImage_Config, LoRA_LyCORIS_ZImage_Config.get_tag()],
         Annotated[LoRA_LyCORIS_QwenImage_Config, LoRA_LyCORIS_QwenImage_Config.get_tag()],
+        # Wan must come BEFORE Anima: Anima's probe only checks for the bare
+        # ``cross_attn``/``self_attn`` substring (it doesn't require Cosmos
+        # DiT's ``_proj`` suffix or ``mlp``/``adaln_modulation``), so a Wan
+        # native PEFT LoRA (``diffusion_model.blocks.X.cross_attn.k...``)
+        # would otherwise match Anima first. Wan's probe is strictly more
+        # restrictive — it rejects Anima's ``_proj`` suffix via the
+        # anti-pattern — so trying Wan first is safe for both directions.
+        Annotated[LoRA_LyCORIS_Wan_Config, LoRA_LyCORIS_Wan_Config.get_tag()],
         Annotated[LoRA_LyCORIS_Anima_Config, LoRA_LyCORIS_Anima_Config.get_tag()],
         # LoRA - OMI format
         Annotated[LoRA_OMI_SDXL_Config, LoRA_OMI_SDXL_Config.get_tag()],

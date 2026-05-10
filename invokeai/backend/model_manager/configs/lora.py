@@ -36,6 +36,11 @@ from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     has_cosmos_dit_peft_keys,
 )
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
+from invokeai.backend.patches.lora_conversions.wan_lora_constants import (
+    has_non_wan_architecture_keys,
+    has_wan_kohya_keys,
+    has_wan_peft_keys,
+)
 
 
 class LoraModelDefaultSettings(BaseModel):
@@ -928,6 +933,85 @@ class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             return BaseModelType.Anima
 
         raise NotAMatchError("model does not look like an Anima LoRA")
+
+
+class LoRA_LyCORIS_Wan_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for Wan 2.2 LoRA models in LyCORIS format.
+
+    Wan LoRAs target ``WanTransformer3DModel`` blocks. The Wan 2.2 A14B family
+    is dual-expert (high-noise + low-noise) — LoRAs are typically trained
+    against one expert. ``expert`` records which one so the model loader
+    invocation can wire it to the correct ``loras`` / ``loras_low_noise`` list.
+    Many LoRAs are expert-agnostic (TI2V-5B family, or community LoRAs that
+    just don't tag the expert) — these get ``expert=None`` and are applied to
+    both experts by default.
+    """
+
+    base: Literal[BaseModelType.Wan] = Field(default=BaseModelType.Wan)
+    expert: Literal["high", "low"] | None = Field(
+        default=None,
+        description="For Wan 2.2 A14B dual-expert LoRAs: 'high' targets the high-noise expert, "
+        "'low' targets the low-noise expert. None means the LoRA is expert-agnostic "
+        "(TI2V-5B, or community LoRAs without explicit tagging) and is applied to both.",
+    )
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        """Wan LoRAs target attn1/attn2/ffn.net (diffusers form) or self_attn/cross_attn/ffn.N (native form)."""
+        state_dict = mod.load_state_dict()
+        str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+
+        has_wan_keys = has_wan_kohya_keys(str_keys) or has_wan_peft_keys(str_keys)
+        has_lora_suffix = state_dict_has_any_keys_ending_with(
+            state_dict,
+            {
+                "lora_A.weight",
+                "lora_B.weight",
+                "lora_down.weight",
+                "lora_up.weight",
+                "dora_scale",
+                ".lokr_w1",
+                ".lokr_w2",
+            },
+        )
+
+        # Reject if any non-Wan architecture signature is present. Without this
+        # guard a Wan LoRA could be falsely identified by Anima (cross_attn /
+        # self_attn name collision) or vice versa.
+        if has_wan_keys and has_lora_suffix and not has_non_wan_architecture_keys(str_keys):
+            return
+
+        raise NotAMatchError("model does not match Wan LoRA heuristics")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        state_dict = mod.load_state_dict()
+        str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+
+        if (
+            (has_wan_kohya_keys(str_keys) or has_wan_peft_keys(str_keys))
+            and not has_non_wan_architecture_keys(str_keys)
+        ):
+            return BaseModelType.Wan
+
+        raise NotAMatchError("model does not look like a Wan LoRA")
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        # Run the base-class probe (file-check, lora-suffix, base detection).
+        instance = super().from_model_on_disk(mod, override_fields)
+
+        # Auto-detect the expert tag from the filename if the user didn't
+        # override it. ``high_noise`` / ``low_noise`` / hyphenated / concatenated
+        # variants — mirrors the GGUF transformer probe's heuristic.
+        if instance.expert is None:
+            name = mod.path.stem.lower()
+            if any(s in name for s in ("high_noise", "high-noise", "highnoise")):
+                instance.expert = "high"
+            elif any(s in name for s in ("low_noise", "low-noise", "lownoise")):
+                instance.expert = "low"
+
+        return instance
 
 
 class ControlAdapter_Config_Base(ABC, BaseModel):

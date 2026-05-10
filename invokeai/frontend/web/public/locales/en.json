@@ -1367,6 +1367,7 @@
         "qwenImageQuantizationNone": "None (bf16)",
         "qwenImageQuantizationInt8": "8-bit (int8)",
         "qwenImageQuantizationNf4": "4-bit (nf4)",
+        "wanT5Encoder": "Wan2.2 T5 Encoder",
         "upcastAttention": "Upcast Attention",
         "uploadImage": "Upload Image",
         "urlOrLocalPath": "URL or Local Path",

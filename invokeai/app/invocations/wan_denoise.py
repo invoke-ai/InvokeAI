@@ -24,7 +24,7 @@ The transformer call signature mirrors Diffusers' ``WanPipeline``:
 
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Any, Callable, Iterator, Optional
+from typing import Any, Callable, Iterable, Iterator, Optional, Tuple
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -40,15 +40,24 @@ from invokeai.app.invocations.fields import (
     LatentsField,
     WanConditioningField,
 )
-from invokeai.app.invocations.model import WanTransformerField
+from invokeai.app.invocations.model import LoRAField, WanTransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.taxonomy import BaseModelType, WanVariantType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, WanVariantType
+from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.lora_conversions.wan_lora_constants import WAN_LORA_TRANSFORMER_PREFIX
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import WanConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.wan.sampling_utils import get_spatial_scale_factor, make_noise
+
+# Type alias: a factory that produces a fresh iterator of (LoRA patch, weight)
+# pairs each time it is called. We need fresh iterators because the patcher
+# consumes the iterator once per ``apply_smart_model_patches`` invocation, and
+# the expert may be swapped (and re-entered) multiple times in a render.
+LoRAIteratorFactory = Callable[[], Iterable[Tuple[ModelPatchRaw, float]]]
 
 
 def _resolve_variant(context: InvocationContext, transformer_field: WanTransformerField) -> WanVariantType:
@@ -75,22 +84,43 @@ def _scheduler_path_for_transformer(context: InvocationContext, transformer_fiel
 
 
 class _ExpertSwapper:
-    """Manages GPU residency of one or two Wan transformer experts.
+    """Manages GPU residency and LoRA patching of one or two Wan transformer experts.
 
     Both experts are kept in the model cache (system RAM); only one is on
     device at a time. ``get(label)`` returns the model for the requested label,
-    swapping GPU residency when the label changes. The first ``get`` call also
-    enters the underlying ``model_on_device`` context for the requested expert.
+    swapping GPU residency when the label changes and applying that expert's
+    LoRA patches via ``LayerPatcher.apply_smart_model_patches``.
+
+    Ordering on swap: exit the active expert's LoRA context (restores weights)
+    -> exit ``model_on_device`` (returns expert to RAM) -> enter the new
+    expert's device context -> apply the new expert's LoRAs. This mirrors the
+    pattern used by ``flux_denoise``/``anima_denoise`` but adds the extra
+    context layer needed for dual experts.
     """
 
     HIGH = "high"
     LOW = "low"
 
-    def __init__(self, high_info: Any, low_info: Any | None) -> None:
+    def __init__(
+        self,
+        high_info: Any,
+        low_info: Any | None,
+        inference_dtype: torch.dtype,
+        high_lora_factory: LoRAIteratorFactory | None = None,
+        low_lora_factory: LoRAIteratorFactory | None = None,
+        high_is_quantized: bool = False,
+        low_is_quantized: bool = False,
+    ) -> None:
         self._high_info = high_info
         self._low_info = low_info
+        self._inference_dtype = inference_dtype
+        self._high_lora_factory = high_lora_factory
+        self._low_lora_factory = low_lora_factory
+        self._high_is_quantized = high_is_quantized
+        self._low_is_quantized = low_is_quantized
         self._active_label: str | None = None
-        self._active_ctx: Any | None = None
+        self._active_device_ctx: Any | None = None
+        self._active_lora_ctx: Any | None = None
         self._active_model: Any | None = None
 
     def get(self, label: str) -> Any:
@@ -106,18 +136,44 @@ class _ExpertSwapper:
         self._release()
 
         info = self._high_info if label == self.HIGH else self._low_info
-        ctx = info.model_on_device()
-        _cached, model = ctx.__enter__()
+        device_ctx = info.model_on_device()
+        cached_weights, model = device_ctx.__enter__()
+
+        # Apply LoRA patches for this expert. GGUF transformers need sidecar
+        # patching since direct patching of GGMLTensors isn't supported.
+        lora_factory = (
+            self._high_lora_factory if label == self.HIGH else self._low_lora_factory
+        )
+        is_quantized = (
+            self._high_is_quantized if label == self.HIGH else self._low_is_quantized
+        )
+        lora_ctx: Any | None = None
+        if lora_factory is not None:
+            lora_ctx = LayerPatcher.apply_smart_model_patches(
+                model=model,
+                patches=lora_factory(),
+                prefix=WAN_LORA_TRANSFORMER_PREFIX,
+                dtype=self._inference_dtype,
+                cached_weights=cached_weights,
+                force_sidecar_patching=is_quantized,
+            )
+            lora_ctx.__enter__()
+
         self._active_label = label
-        self._active_ctx = ctx
+        self._active_device_ctx = device_ctx
+        self._active_lora_ctx = lora_ctx
         self._active_model = model
         return model
 
     def _release(self) -> None:
-        if self._active_ctx is not None:
-            self._active_ctx.__exit__(None, None, None)
+        # LoRA context first so weights are restored before the model leaves GPU.
+        if self._active_lora_ctx is not None:
+            self._active_lora_ctx.__exit__(None, None, None)
+        if self._active_device_ctx is not None:
+            self._active_device_ctx.__exit__(None, None, None)
         self._active_label = None
-        self._active_ctx = None
+        self._active_device_ctx = None
+        self._active_lora_ctx = None
         self._active_model = None
 
     def close(self) -> None:
@@ -319,8 +375,34 @@ class WanDenoiseInvocation(BaseInvocation):
             self.transformer.boundary_ratio * num_train_timesteps if low_info is not None else None
         )
 
+        # LoRA wiring. The high-noise expert uses ``transformer.loras``; the
+        # low-noise expert uses ``transformer.loras_low_noise``, falling back
+        # to the primary list if empty (matches the WanTransformerField semantics).
+        # Quantized (GGUF) experts force sidecar patching so GGMLTensor weights
+        # aren't touched directly.
+        high_loras = self.transformer.loras
+        low_loras = self.transformer.loras_low_noise or self.transformer.loras
+        high_is_quantized = high_info.config.format == ModelFormat.GGUFQuantized
+        low_is_quantized = (
+            low_info.config.format == ModelFormat.GGUFQuantized if low_info is not None else False
+        )
+
+        def high_lora_factory() -> Iterable[Tuple[ModelPatchRaw, float]]:
+            return self._lora_iterator(context, high_loras)
+
+        def low_lora_factory() -> Iterable[Tuple[ModelPatchRaw, float]]:
+            return self._lora_iterator(context, low_loras)
+
         with ExitStack() as exit_stack:
-            swapper = _ExpertSwapper(high_info, low_info)
+            swapper = _ExpertSwapper(
+                high_info=high_info,
+                low_info=low_info,
+                inference_dtype=inference_dtype,
+                high_lora_factory=high_lora_factory if high_loras else None,
+                low_lora_factory=low_lora_factory if low_loras else None,
+                high_is_quantized=high_is_quantized,
+                low_is_quantized=low_is_quantized,
+            )
             exit_stack.callback(swapper.close)
 
             for step_idx, t in enumerate(tqdm(timesteps, desc="Denoising (Wan 2.2)", total=total_steps)):
@@ -463,6 +545,19 @@ class WanDenoiseInvocation(BaseInvocation):
 
         return step_callback
 
-    def _lora_iterator(self, context: InvocationContext) -> Iterator:
-        # Phase 5 will populate this with the actual LoRA application path.
-        return iter([])
+    def _lora_iterator(
+        self, context: InvocationContext, loras: list[LoRAField]
+    ) -> Iterator[Tuple[ModelPatchRaw, float]]:
+        """Yield (ModelPatchRaw, weight) pairs for the given LoRA list.
+
+        The caller passes either ``transformer.loras`` (high-noise expert) or
+        ``transformer.loras_low_noise`` (low-noise expert) — the fallback to
+        the primary list when low-noise is empty is handled at the call site.
+        """
+        for lora_field in loras:
+            lora_info = context.models.load(lora_field.lora)
+            assert isinstance(lora_info.model, ModelPatchRaw), (
+                f"Wan LoRA model must be ModelPatchRaw, got {type(lora_info.model).__name__}"
+            )
+            yield (lora_info.model, lora_field.weight)
+            del lora_info

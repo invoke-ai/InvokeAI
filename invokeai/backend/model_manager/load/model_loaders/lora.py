@@ -22,6 +22,7 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.patches.lora_conversions.anima_lora_conversion_utils import lora_model_from_anima_state_dict
+from invokeai.backend.patches.lora_conversions.wan_lora_conversion_utils import lora_model_from_wan_state_dict
 from invokeai.backend.patches.lora_conversions.flux_aitoolkit_lora_conversion_utils import (
     is_state_dict_likely_in_flux_aitoolkit_format,
     lora_model_from_flux_aitoolkit_state_dict,
@@ -170,6 +171,10 @@ class LoRALoader(ModelLoader):
         elif self._model_base == BaseModelType.Anima:
             # Anima LoRAs use Kohya-style or diffusers PEFT format targeting Cosmos DiT blocks.
             model = lora_model_from_anima_state_dict(state_dict=state_dict, alpha=None)
+        elif self._model_base == BaseModelType.Wan:
+            # Wan LoRAs use Kohya / diffusers PEFT / native PEFT formats targeting
+            # WanTransformer3DModel attention (attn1/attn2) and FFN blocks.
+            model = lora_model_from_wan_state_dict(state_dict=state_dict, alpha=None)
         else:
             raise ValueError(f"Unsupported LoRA base model: {self._model_base}")
 
