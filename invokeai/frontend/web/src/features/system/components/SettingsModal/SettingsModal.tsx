@@ -74,7 +74,7 @@ const formatOptionalInteger = (value: number | null | undefined) => {
   return String(value);
 };
 
-const SettingsModal = (props: { children: ReactElement }) => {
+const SettingsModal = (props: { children: ReactElement<{ onClick?: () => void }> }) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 

@@ -30,8 +30,8 @@ importers:
         specifier: github:invoke-ai/ui-library#v0.0.48
         version: https://codeload.github.com/invoke-ai/ui-library/tar.gz/78ddd0a1670af523cfcac186849deb23bd07d419(@chakra-ui/system@2.6.2(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react@19.2.6))(react@19.2.6))(@fontsource-variable/inter@5.2.8)(@types/react@19.2.14)(i18next@25.7.3(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
       '@nanostores/react':
-        specifier: ^1.0.0
-        version: 1.0.0(nanostores@1.1.0)(react@19.2.6)
+        specifier: ^1.1.0
+        version: 1.1.0(nanostores@1.3.0)(react@19.2.6)
       '@observ33r/object-equals':
         specifier: ^1.1.6
         version: 1.1.6
@@ -108,8 +108,8 @@ importers:
         specifier: ^5.1.6
         version: 5.1.6
       nanostores:
-        specifier: ^1.1.0
-        version: 1.1.0
+        specifier: ^1.3.0
+        version: 1.3.0
       new-github-issue-url:
         specifier: ^1.1.0
         version: 1.1.0
@@ -132,8 +132,8 @@ importers:
         specifier: ^19.2.6
         version: 19.2.6
       react-colorful:
-        specifier: ^5.6.1
-        version: 5.6.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+        specifier: ^5.7.0
+        version: 5.7.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       react-dom:
         specifier: ^19.2.6
         version: 19.2.6(react@19.2.6)
@@ -978,11 +978,11 @@ packages:
       '@types/react': '>=16'
       react: '>=16'
 
-  '@nanostores/react@1.0.0':
-    resolution: {integrity: sha512-eDduyNy+lbQJMg6XxZ/YssQqF6b4OXMFEZMYKPJCCmBevp1lg0g+4ZRi94qGHirMtsNfAWKNwsjOhC+q1gvC+A==}
+  '@nanostores/react@1.1.0':
+    resolution: {integrity: sha512-MbH35fjhcf7LAubYX5vhOChYUfTLzNLqH/mBGLVsHkcvjy0F8crO1WQwdmQ2xKbAmtpalDa2zBt3Hlg5kqr8iw==}
     engines: {node: ^20.0.0 || >=22.0.0}
     peerDependencies:
-      nanostores: ^0.9.0 || ^0.10.0 || ^0.11.0 || ^1.0.0
+      nanostores: ^1.2.0
       react: '>=18.0.0'
 
   '@napi-rs/wasm-runtime@1.1.0':
@@ -3548,8 +3548,8 @@ packages:
     engines: {node: ^18 || >=20}
     hasBin: true
 
-  nanostores@1.1.0:
-    resolution: {integrity: sha512-yJBmDJr18xy47dbNVlHcgdPrulSn1nhSE6Ns9vTG+Nx9VPT6iV1MD6aQFp/t52zpf82FhLLTXAXr30NuCnxvwA==}
+  nanostores@1.3.0:
+    resolution: {integrity: sha512-XPUa/jz+P1oJvN9VBxw4L9MtdFfaH3DAryqPssqhb2kXjmb9npz0dly6rCsgFWOPr4Yg9mTfM3MDZgZZ+7A3lA==}
     engines: {node: ^20.0.0 || >=22.0.0}
 
   natural-compare@1.4.0:
@@ -3798,8 +3798,8 @@ packages:
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0 || ^19.0.0-rc
 
-  react-colorful@5.6.1:
-    resolution: {integrity: sha512-1exovf0uGTGyq5mXQT0zgQ80uvj2PCwvF8zY1RN9/vbJVSjSo3fsB/4L3ObbF7u70NduSiK4xu4Y6q1MHoUGEw==}
+  react-colorful@5.7.0:
+    resolution: {integrity: sha512-fuesYIemttah97XmsIHmz4OORDHiSFzyc9HMAIrCHJou2jaRQmL8cFJ76K4zQhhj8jzwOBlOi4BaGTjjOZCfTg==}
     peerDependencies:
       react: '>=16.8.0'
       react-dom: '>=16.8.0'
@@ -5568,12 +5568,12 @@ snapshots:
       '@emotion/react': 11.14.0(@types/react@19.2.14)(react@19.2.6)
       '@emotion/styled': 11.14.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react@19.2.6)
       '@fontsource-variable/inter': 5.2.8
-      '@nanostores/react': 1.0.0(nanostores@1.1.0)(react@19.2.6)
+      '@nanostores/react': 1.1.0(nanostores@1.3.0)(react@19.2.6)
       chakra-react-select: 4.10.1(@chakra-ui/react@2.10.9(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(framer-motion@10.18.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.6))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       es-toolkit: 1.46.1
       framer-motion: 10.18.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       math-expression-evaluator: 2.0.7
-      nanostores: 1.1.0
+      nanostores: 1.3.0
       overlayscrollbars: 2.12.0
       overlayscrollbars-react: 0.5.6(overlayscrollbars@2.12.0)(react@19.2.6)
       react: 19.2.6
@@ -5631,9 +5631,9 @@ snapshots:
       '@types/react': 19.2.14
       react: 19.2.6
 
-  '@nanostores/react@1.0.0(nanostores@1.1.0)(react@19.2.6)':
+  '@nanostores/react@1.1.0(nanostores@1.3.0)(react@19.2.6)':
     dependencies:
-      nanostores: 1.1.0
+      nanostores: 1.3.0
       react: 19.2.6
 
   '@napi-rs/wasm-runtime@1.1.0':
@@ -8263,7 +8263,7 @@ snapshots:
 
   nanoid@5.1.6: {}
 
-  nanostores@1.1.0: {}
+  nanostores@1.3.0: {}
 
   natural-compare@1.4.0: {}
 
@@ -8538,7 +8538,7 @@ snapshots:
       '@babel/runtime': 7.28.4
       react: 19.2.6
 
-  react-colorful@5.6.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
+  react-colorful@5.7.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
     dependencies:
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)

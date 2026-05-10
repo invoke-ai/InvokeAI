@@ -1,5 +1,7 @@
 import type { DockviewApi, GridviewApi } from 'dockview';
 import { DockviewApi as MockedDockviewApi, DockviewPanel, GridviewPanel } from 'dockview';
+import type { Serializable, TabName } from 'features/ui/store/uiTypes';
+import type { Mock } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { NavigationAppApi } from './navigation-api';
@@ -90,11 +92,11 @@ const createMockDockPanel = () => {
 
 describe('AppNavigationApi', () => {
   let navigationApi: NavigationApi;
-  let mockSetAppTab: ReturnType<typeof vi.fn>;
-  let mockGetAppTab: ReturnType<typeof vi.fn>;
-  let mockSetStorage: ReturnType<typeof vi.fn>;
-  let mockGetStorage: ReturnType<typeof vi.fn>;
-  let mockDeleteStorage: ReturnType<typeof vi.fn>;
+  let mockSetAppTab: Mock<(tab: TabName) => void>;
+  let mockGetAppTab: Mock<() => TabName>;
+  let mockSetStorage: Mock<(id: string, state: Serializable) => void>;
+  let mockGetStorage: Mock<(id: string) => Serializable | undefined>;
+  let mockDeleteStorage: Mock<(id: string) => void>;
   let mockAppApi: NavigationAppApi;
 
   beforeEach(() => {
@@ -546,15 +548,7 @@ describe('AppNavigationApi', () => {
       expect(mockPanel.api.setActive).toHaveBeenCalledOnce();
     });
 
-    it('should return false when no active tab', async () => {
-      mockGetAppTab.mockReturnValue(null);
-
-      const result = await navigationApi.focusPanelInActiveTab(SETTINGS_PANEL_ID);
-
-      expect(result).toBe(false);
-    });
-
-    it('should work without app connection', async () => {
+    it('should return false without app connection', async () => {
       navigationApi.disconnectFromApp();
 
       const result = await navigationApi.focusPanelInActiveTab(SETTINGS_PANEL_ID);
@@ -648,8 +642,8 @@ describe('AppNavigationApi', () => {
       expect(mockPanel.api.setSize).toHaveBeenCalledWith({ width: 0 });
     });
 
-    it('should return false when no active tab', () => {
-      mockGetAppTab.mockReturnValue(null);
+    it('should return false without app connection', () => {
+      navigationApi.disconnectFromApp();
 
       const result = navigationApi.toggleLeftPanel();
 
@@ -710,8 +704,8 @@ describe('AppNavigationApi', () => {
       expect(mockPanel.api.setSize).toHaveBeenCalledWith({ width: 0 });
     });
 
-    it('should return false when no active tab', () => {
-      mockGetAppTab.mockReturnValue(null);
+    it('should return false without app connection', () => {
+      navigationApi.disconnectFromApp();
 
       const result = navigationApi.toggleRightPanel();
 
@@ -834,8 +828,8 @@ describe('AppNavigationApi', () => {
       });
     });
 
-    it('should return false when no active tab', () => {
-      mockGetAppTab.mockReturnValue(null);
+    it('should return false without app connection', () => {
+      navigationApi.disconnectFromApp();
 
       const result = navigationApi.toggleLeftAndRightPanels();
 
@@ -895,8 +889,8 @@ describe('AppNavigationApi', () => {
       expect(rightPanel.api.setSize).toHaveBeenCalledWith({ width: RIGHT_PANEL_MIN_SIZE_PX });
     });
 
-    it('should return false when no active tab', () => {
-      mockGetAppTab.mockReturnValue(null);
+    it('should return false without app connection', () => {
+      navigationApi.disconnectFromApp();
 
       const result = navigationApi.resetLeftAndRightPanels();
 
@@ -1197,8 +1191,8 @@ describe('AppNavigationApi', () => {
       expect(mockViewerPanel.api.setActive).not.toHaveBeenCalled();
     });
 
-    it('should return false when no active tab', async () => {
-      mockGetAppTab.mockReturnValue(null);
+    it('should return false without app connection', async () => {
+      navigationApi.disconnectFromApp();
 
       const result = await navigationApi.toggleViewerPanel();
 
