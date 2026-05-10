@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { workflowsApi } from 'services/api/endpoints/workflows';
 import type { paths } from 'services/api/schema';
 
@@ -23,82 +23,91 @@ interface UseFilteredWorkflowsResult {
  */
 export function useFilteredWorkflows(workflows: WorkflowListItem[]): UseFilteredWorkflowsResult {
   const dispatch = useAppDispatch();
-  const [filteredWorkflows, setFilteredWorkflows] = useState<WorkflowListItem[]>([]);
+  const workflowIds = useMemo(() => workflows.map((workflow) => workflow.workflow_id), [workflows]);
+  const [filteredWorkflowIds, setFilteredWorkflowIds] = useState<Set<string>>(() => new Set());
   const [isFiltering, setIsFiltering] = useState(false);
 
-  const filterWorkflows = useCallback(async () => {
-    if (workflows.length === 0) {
-      setFilteredWorkflows([]);
-      return;
-    }
-
-    setIsFiltering(true);
-
-    try {
-      // Load all workflows in parallel and check for ImageFields
-      const workflowChecks = await Promise.all(
-        workflows.map(async (workflow) => {
-          try {
-            // Fetch the full workflow data using dispatch
-            const result = await dispatch(
-              workflowsApi.endpoints.getWorkflow.initiate(workflow.workflow_id, {
-                subscribe: false,
-                forceRefetch: false,
-              })
-            );
-
-            // Get the data from the result
-            const data = 'data' in result ? result.data : undefined;
-
-            const hasImageField = workflowHasImageField(data);
-
-            log.debug(
-              { workflowId: workflow.workflow_id, name: workflow.name, hasImageField },
-              'Checked workflow for ImageField'
-            );
-
-            // Clean up the subscription
-            if ('unsubscribe' in result && typeof result.unsubscribe === 'function') {
-              result.unsubscribe();
-            }
-
-            return {
-              workflow,
-              hasImageField,
-            };
-          } catch (error) {
-            log.error(
-              {
-                error: error instanceof Error ? error.message : String(error),
-                workflowId: workflow.workflow_id,
-              },
-              'Error checking workflow for ImageField'
-            );
-            return {
-              workflow,
-              hasImageField: false,
-            };
-          }
-        })
-      );
-
-      // Filter to only include workflows with ImageFields
-      const filtered = workflowChecks.filter((check) => check.hasImageField).map((check) => check.workflow);
-
-      log.debug({ totalWorkflows: workflows.length, filteredCount: filtered.length }, 'Filtered workflows');
-
-      setFilteredWorkflows(filtered);
-    } catch (error) {
-      log.error({ error: error instanceof Error ? error.message : String(error) }, 'Error filtering workflows');
-      setFilteredWorkflows([]);
-    } finally {
-      setIsFiltering(false);
-    }
-  }, [workflows, dispatch]);
+  const filteredWorkflows = useMemo(
+    () => workflows.filter((workflow) => filteredWorkflowIds.has(workflow.workflow_id)),
+    [filteredWorkflowIds, workflows]
+  );
 
   useEffect(() => {
-    filterWorkflows();
-  }, [filterWorkflows]);
+    let isCancelled = false;
+
+    const filterWorkflows = async () => {
+      if (workflows.length === 0) {
+        setFilteredWorkflowIds(new Set());
+        return;
+      }
+
+      setIsFiltering(true);
+
+      try {
+        const filteredWorkflowIds = new Set<string>();
+
+        await Promise.all(
+          workflows.map(async (workflow) => {
+            try {
+              const result = await dispatch(
+                workflowsApi.endpoints.getWorkflow.initiate(workflow.workflow_id, {
+                  subscribe: false,
+                  forceRefetch: false,
+                })
+              );
+              const data = 'data' in result ? result.data : undefined;
+              const hasImageField = workflowHasImageField(data);
+
+              log.debug(
+                { workflowId: workflow.workflow_id, name: workflow.name, hasImageField },
+                'Checked workflow for ImageField'
+              );
+
+              if ('unsubscribe' in result && typeof result.unsubscribe === 'function') {
+                result.unsubscribe();
+              }
+
+              if (hasImageField) {
+                filteredWorkflowIds.add(workflow.workflow_id);
+              }
+            } catch (error) {
+              log.error(
+                {
+                  error: error instanceof Error ? error.message : String(error),
+                  workflowId: workflow.workflow_id,
+                },
+                'Error checking workflow for ImageField'
+              );
+            }
+          })
+        );
+
+        log.debug(
+          { totalWorkflows: workflows.length, filteredCount: filteredWorkflowIds.size },
+          'Filtered workflows'
+        );
+
+        if (!isCancelled) {
+          setFilteredWorkflowIds(filteredWorkflowIds);
+        }
+      } catch (error) {
+        log.error({ error: error instanceof Error ? error.message : String(error) }, 'Error filtering workflows');
+        if (!isCancelled) {
+          setFilteredWorkflowIds(new Set());
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsFiltering(false);
+        }
+      }
+    };
+
+    void filterWorkflows();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [dispatch, workflowIds, workflows]);
 
   return {
     filteredWorkflows,
