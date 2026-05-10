@@ -50,7 +50,7 @@ export default [
       ...typescriptEslint.configs.recommended.rules,
       ...pluginReact.configs.recommended.rules,
       ...pluginReact.configs['jsx-runtime'].rules,
-      ...pluginReactHooks.configs.recommended.rules,
+      ...pluginReactHooks.configs['recommended-latest'].rules,
       ...pluginStorybook.configs.recommended.rules,
 
       'react/jsx-no-bind': [
