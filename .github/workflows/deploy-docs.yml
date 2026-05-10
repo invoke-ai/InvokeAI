@@ -76,7 +76,7 @@ jobs:
       - name: setup uv
         uses: astral-sh/setup-uv@v8.1.0
         with:
-          version: '0.6.10'
+          version: '0.11.12'
           enable-cache: true
           python-version: '3.11'
 
@@ -88,13 +88,13 @@ jobs:
       # generate_docs_json.py only needs the invokeai package importable
       # (pydantic + invokeai.app/backend). Skip the [test] extra to keep CI fast.
       - name: install python dependencies
-        run: uv pip install --editable .
+        run: uv sync --frozen
 
       # Node (needed for docs build)
       - name: setup node
         uses: actions/setup-node@v6
         with:
-          node-version: '22.12.0'
+          node-version: '22'
 
       - name: setup pnpm
         uses: pnpm/action-setup@v6
@@ -121,7 +121,7 @@ jobs:
       # Upload artifact for deploy (main branch only)
       - name: upload pages artifact
         if: github.ref == 'refs/heads/main'
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: docs/dist
 
@@ -139,4 +139,4 @@ jobs:
     steps:
       - name: deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
