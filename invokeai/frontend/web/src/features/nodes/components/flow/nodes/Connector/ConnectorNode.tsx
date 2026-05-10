@@ -110,25 +110,14 @@ const ConnectorPassthroughHandle = memo(
         'data-is-connection-start-field': isConnectionInProgress ? isConnectionStartField : false,
         'data-is-connection-valid': isConnectionInProgress ? connectionError === null : false,
       };
-    }, [
-      connectionError,
-      displayFieldType,
-      isConnectionInProgress,
-      isConnectionStartField,
-    ]);
+    }, [connectionError, displayFieldType, isConnectionInProgress, isConnectionStartField]);
 
     const innerBackgroundColor =
       displayFieldType !== null && displayFieldType.cardinality !== 'SINGLE' ? 'base.900' : fieldColor;
 
     return (
       <Tooltip label={tooltipLabel} placement="start" openDelay={HANDLE_TOOLTIP_OPEN_DELAY}>
-        <Handle
-          className={NO_DRAG_CLASS}
-          type={rfHandleType}
-          id={handleId}
-          position={position}
-          style={hitboxStyle}
-        >
+        <Handle className={NO_DRAG_CLASS} type={rfHandleType} id={handleId} position={position} style={hitboxStyle}>
           <Box {...innerProps} backgroundColor={innerBackgroundColor} borderColor={fieldColor} />
         </Handle>
       </Tooltip>
