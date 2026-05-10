@@ -23,9 +23,7 @@ def _make_invocation(prompt_id: str = "test-id") -> TextLLMWithPresetInvocation:
         id="test-node",
         prompt="a cat",
         system_prompt=SystemPromptField(system_prompt_id=prompt_id),
-        text_llm_model=ModelIdentifierField(
-            key="dummy", hash="x", name="dummy", base="any", type="text_llm"
-        ),
+        text_llm_model=ModelIdentifierField(key="dummy", hash="x", name="dummy", base="any", type="text_llm"),
         max_tokens=50,
     )
 
