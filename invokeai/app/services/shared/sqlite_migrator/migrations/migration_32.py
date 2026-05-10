@@ -254,6 +254,8 @@ class Migration32Callback:
                 id TEXT NOT NULL PRIMARY KEY,
                 name TEXT NOT NULL,
                 content TEXT NOT NULL,
+                user_id TEXT NOT NULL DEFAULT 'system',
+                is_public BOOLEAN NOT NULL DEFAULT FALSE,
                 created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                 updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW'))
             );
@@ -271,12 +273,15 @@ class Migration32Callback:
             """
         )
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_system_prompts_name ON system_prompts(name);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_system_prompts_user_id ON system_prompts(user_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_system_prompts_is_public ON system_prompts(is_public);")
 
     def _seed_default_system_prompts(self, cursor: sqlite3.Cursor) -> None:
+        # Seeded defaults are owned by the 'system' user and shared with everyone (is_public=TRUE).
         cursor.executemany(
             """--sql
-            INSERT OR IGNORE INTO system_prompts (id, name, content)
-            VALUES (?, ?, ?);
+            INSERT OR IGNORE INTO system_prompts (id, name, content, user_id, is_public)
+            VALUES (?, ?, ?, 'system', TRUE);
             """,
             DEFAULT_SYSTEM_PROMPTS,
         )

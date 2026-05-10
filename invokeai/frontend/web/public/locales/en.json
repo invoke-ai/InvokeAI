@@ -3209,7 +3209,10 @@
         "promptDeleted": "System prompt deleted",
         "unableToDeletePrompt": "Unable to delete system prompt",
         "unableToSavePrompt": "Unable to save system prompt",
-        "noPromptsYet": "No system prompts yet. Create one to get started."
+        "noPromptsYet": "No system prompts yet. Create one to get started.",
+        "systemBadge": "System",
+        "sharedBadge": "Shared",
+        "shareWithEveryone": "Share with everyone (visible to all users)"
     },
     "stylePresets": {
         "active": "Active",
