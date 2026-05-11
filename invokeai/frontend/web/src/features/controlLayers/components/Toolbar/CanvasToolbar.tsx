@@ -93,21 +93,24 @@ export const CanvasToolbar = memo(() => {
         )}
         {isTextSelected ? <TextToolOptions /> : showToolWithPicker && <ToolWidthPicker />}
       </ToolOptionsRowContainer>
-      <Flex alignItems="center" h="full" flexShrink={0}>
-        <CanvasToolbarScale />
-        <CanvasToolbarResetViewButton />
-        <CanvasToolbarFitBboxToLayersButton />
-        <CanvasToolbarFitBboxToMasksButton />
-      </Flex>
-      <Divider orientation="vertical" flexShrink={0} />
-      <Flex alignItems="center" h="full" flexShrink={0}>
-        <CanvasToolbarProjectMenuButton />
-        <CanvasToolbarSaveToGalleryButton />
-        <CanvasToolbarSnapshotMenuButton />
-        <CanvasToolbarUndoButton />
-        <CanvasToolbarRedoButton />
-        <CanvasToolbarNewSessionMenuButton />
-        <CanvasSettingsPopover />
+      <Box flex="1 1 auto" minW={0} />
+      <Flex alignItems="center" h="full" flexShrink={0} ms="auto">
+        <Flex alignItems="center" h="full" flexShrink={0}>
+          <CanvasToolbarScale />
+          <CanvasToolbarResetViewButton />
+          <CanvasToolbarFitBboxToLayersButton />
+          <CanvasToolbarFitBboxToMasksButton />
+        </Flex>
+        <Divider orientation="vertical" flexShrink={0} />
+        <Flex alignItems="center" h="full" flexShrink={0}>
+          <CanvasToolbarProjectMenuButton />
+          <CanvasToolbarSaveToGalleryButton />
+          <CanvasToolbarSnapshotMenuButton />
+          <CanvasToolbarUndoButton />
+          <CanvasToolbarRedoButton />
+          <CanvasToolbarNewSessionMenuButton />
+          <CanvasSettingsPopover />
+        </Flex>
       </Flex>
     </Flex>
   );
