@@ -4,6 +4,7 @@ from typing import Literal, Optional
 
 import cv2
 import numpy
+import torch
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
 from invokeai.app.invocations.baseinvocation import (
@@ -25,8 +26,39 @@ from invokeai.app.invocations.primitives import ImageOutput, StringOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import SEED_MAX
+from invokeai.backend.image_util.color_conversion import (
+    linear_srgb_from_oklab,
+    linear_srgb_from_oklch,
+    linear_srgb_from_srgb,
+    oklab_from_linear_srgb,
+    oklch_from_oklab,
+    srgb_from_linear_srgb,
+)
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.safety_checker import SafetyChecker
+
+
+def _extract_alpha_channel(image: Image.Image) -> Image.Image | None:
+    if image.mode in ("RGBA", "LA", "PA"):
+        return image.getchannel("A")
+    return None
+
+
+def _restore_original_mode(image: Image.Image, mode: str, alpha_channel: Image.Image | None) -> Image.Image:
+    if alpha_channel is None:
+        return image.convert(mode)
+
+    if mode == "RGBA":
+        image = image.convert("RGB")
+    elif mode == "LA":
+        image = image.convert("L")
+    elif mode == "PA":
+        image = image.convert("P")
+    else:
+        return image.convert(mode)
+
+    image.putalpha(alpha_channel)
+    return image
 
 
 @invocation("show_image", title="Show Image", tags=["image"], category="image", version="1.0.1")
@@ -373,7 +405,7 @@ class UnsharpMaskInvocation(BaseInvocation, WithMetadata, WithBoard):
         image = context.images.get_pil(self.image.image_name)
         mode = image.mode
 
-        alpha_channel = image.getchannel("A") if mode == "RGBA" else None
+        alpha_channel = _extract_alpha_channel(image)
         image = image.convert("RGB")
         image_blurred = self.array_from_pil(image.filter(ImageFilter.GaussianBlur(radius=self.radius)))
 
@@ -395,6 +427,53 @@ class UnsharpMaskInvocation(BaseInvocation, WithMetadata, WithBoard):
             width=image.width,
             height=image.height,
         )
+
+
+@invocation(
+    "unsharp_mask_oklab",
+    title="Unsharp Mask (Oklab)",
+    tags=["image", "unsharp_mask", "oklab"],
+    category="image",
+    version="1.0.0",
+)
+class OklabUnsharpMaskInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Applies an unsharp mask filter to an image in the Oklab color space"""
+
+    image: ImageField = InputField(description="The image to use")
+    radius: float = InputField(gt=0, description="Unsharp mask radius", default=2)
+    strength: float = InputField(ge=0, description="Unsharp mask strength", default=50)
+
+    def pil_from_tensor(self, tensor: torch.Tensor) -> Image.Image:
+        array = torch.clamp(tensor, 0.0, 1.0).permute(1, 2, 0).cpu().numpy()
+        return Image.fromarray((array * 255).astype("uint8"))
+
+    def tensor_from_pil(self, img: Image.Image) -> torch.Tensor:
+        return torch.from_numpy(numpy.array(img, dtype=numpy.float32) / 255.0).permute(2, 0, 1)
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name)
+        mode = image.mode
+
+        alpha_channel = _extract_alpha_channel(image)
+        image = image.convert("RGB")
+
+        image_blurred = self.tensor_from_pil(image.filter(ImageFilter.GaussianBlur(radius=self.radius)))
+        image_tensor = self.tensor_from_pil(image)
+
+        image_oklab = oklab_from_linear_srgb(linear_srgb_from_srgb(image_tensor))
+        image_blurred_oklab = oklab_from_linear_srgb(linear_srgb_from_srgb(image_blurred))
+
+        image_oklab[0, ...] += (image_oklab[0, ...] - image_blurred_oklab[0, ...]) * (self.strength / 100.0)
+        image_oklab = torch.clamp(image_oklab, -1.0, 1.0)
+
+        image = _restore_original_mode(
+            self.pil_from_tensor(srgb_from_linear_srgb(linear_srgb_from_oklab(image_oklab))),
+            mode,
+            alpha_channel,
+        )
+
+        image_dto = context.images.save(image=image)
+        return ImageOutput.build(image_dto)
 
 
 PIL_RESAMPLING_MODES = Literal[
@@ -799,6 +878,47 @@ class ImageHueAdjustmentInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         image_dto = context.images.save(image=pil_image)
 
+        return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "img_hue_adjust_oklch",
+    title="Adjust Image Hue (Oklch)",
+    tags=["image", "hue", "oklch"],
+    category="image",
+    version="1.0.0",
+)
+class OklchImageHueAdjustmentInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Adjusts the hue of an image in Oklch space."""
+
+    image: ImageField = InputField(description="The image to adjust")
+    hue: int = InputField(default=0, description="The degrees by which to rotate the hue, 0-360")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name)
+        mode = image.mode
+        alpha_channel = _extract_alpha_channel(image)
+
+        rgb = torch.from_numpy(numpy.asarray(image.convert("RGB"), dtype=numpy.float32) / 255.0).permute(2, 0, 1)
+        oklch = oklch_from_oklab(oklab_from_linear_srgb(linear_srgb_from_srgb(rgb)))
+        oklch[2, ...] = (oklch[2, ...] + self.hue) % 360.0
+
+        image = _restore_original_mode(
+            Image.fromarray(
+                (
+                    torch.clamp(srgb_from_linear_srgb(linear_srgb_from_oklch(oklch)), 0.0, 1.0)
+                    .permute(1, 2, 0)
+                    .cpu()
+                    .numpy()
+                    * 255.0
+                ).astype(numpy.uint8),
+                mode="RGB",
+            ),
+            mode,
+            alpha_channel,
+        )
+
+        image_dto = context.images.save(image=image)
         return ImageOutput.build(image_dto)
 
 
