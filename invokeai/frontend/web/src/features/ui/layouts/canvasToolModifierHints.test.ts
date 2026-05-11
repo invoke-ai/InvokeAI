@@ -32,14 +32,14 @@ describe('getCanvasToolModifierHintIds', () => {
 
   it('adds polygon snapping for polygon lasso', () => {
     expect(getCanvasToolModifierHintIds(buildArgs({ tool: 'lasso', lassoMode: 'polygon' }))).toEqual([
-      'modSubtractMask',
+      'modErase',
       'shiftSnap45Degrees',
       'spacePan',
     ]);
   });
 
   it('omits polygon snapping for freehand lasso', () => {
-    expect(getCanvasToolModifierHintIds(buildArgs({ tool: 'lasso' }))).toEqual(['modSubtractMask', 'spacePan']);
+    expect(getCanvasToolModifierHintIds(buildArgs({ tool: 'lasso' }))).toEqual(['modErase', 'spacePan']);
   });
 
   it('switches the bbox aspect-ratio hint based on lock state', () => {
@@ -70,14 +70,14 @@ describe('getCanvasToolModifierHintIds', () => {
 
   it('shows idle rect and oval shapes hints', () => {
     expect(getCanvasToolModifierHintIds(buildArgs({ tool: 'rect', shapeType: 'rect' }))).toEqual([
-      'modSubtractMask',
+      'modErase',
       'shiftLockAspectRatio',
       'spacePan',
       'altPickColor',
     ]);
 
     expect(getCanvasToolModifierHintIds(buildArgs({ tool: 'rect', shapeType: 'oval' }))).toEqual([
-      'modSubtractMask',
+      'modErase',
       'shiftLockAspectRatio',
       'spacePan',
       'altPickColor',
@@ -87,16 +87,16 @@ describe('getCanvasToolModifierHintIds', () => {
   it('shows active rect and oval drag hints', () => {
     expect(
       getCanvasToolModifierHintIds(buildArgs({ tool: 'rect', shapeType: 'rect', isPrimaryPointerDown: true }))
-    ).toEqual(['modSubtractMask', 'shiftLockAspectRatio', 'altScaleFromCenter', 'spaceMoveShape']);
+    ).toEqual(['modErase', 'shiftLockAspectRatio', 'altScaleFromCenter', 'spaceMoveShape']);
 
     expect(
       getCanvasToolModifierHintIds(buildArgs({ tool: 'rect', shapeType: 'oval', isPrimaryPointerDown: true }))
-    ).toEqual(['modSubtractMask', 'shiftLockAspectRatio', 'altScaleFromCenter', 'spaceMoveShape']);
+    ).toEqual(['modErase', 'shiftLockAspectRatio', 'altScaleFromCenter', 'spaceMoveShape']);
   });
 
   it('shows polygon shape hints', () => {
     expect(getCanvasToolModifierHintIds(buildArgs({ tool: 'rect', shapeType: 'polygon' }))).toEqual([
-      'modSubtractMask',
+      'modErase',
       'shiftSnap45Degrees',
       'spacePan',
       'altPickColor',
@@ -105,13 +105,13 @@ describe('getCanvasToolModifierHintIds', () => {
 
   it('omits alt color-picker hint during an active freehand stroke', () => {
     expect(getCanvasToolModifierHintIds(buildArgs({ tool: 'rect', shapeType: 'freehand' }))).toEqual([
-      'modSubtractMask',
+      'modErase',
       'spacePan',
       'altPickColor',
     ]);
 
     expect(
       getCanvasToolModifierHintIds(buildArgs({ tool: 'rect', shapeType: 'freehand', isPrimaryPointerDown: true }))
-    ).toEqual(['modSubtractMask', 'spacePan']);
+    ).toEqual(['modErase', 'spacePan']);
   });
 });

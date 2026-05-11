@@ -14,7 +14,7 @@ type CanvasToolModifierHintId =
   | 'shiftStraightLine'
   | 'modWheelResizeBrush'
   | 'modWheelResizeEraser'
-  | 'modSubtractMask'
+  | 'modErase'
   | 'shiftSnap45Degrees'
   | 'shiftLockAspectRatio'
   | 'shiftUnlockAspectRatio'
@@ -66,10 +66,10 @@ const HINTS: Record<CanvasToolModifierHintId, CanvasToolModifierHint> = {
     keys: ['mod', 'wheel'],
     labelKey: 'controlLayers.modifierHints.labels.resizeEraser',
   },
-  modSubtractMask: {
-    id: 'modSubtractMask',
+  modErase: {
+    id: 'modErase',
     keys: ['mod'],
-    labelKey: 'controlLayers.modifierHints.labels.subtractMask',
+    labelKey: 'controlLayers.modifierHints.labels.erase',
   },
   shiftSnap45Degrees: {
     id: 'shiftSnap45Degrees',
@@ -156,7 +156,7 @@ export const getCanvasToolModifierHintIds = ({
     brush: () => ['shiftStraightLine', 'modWheelResizeBrush', ...SHARED_HINT_IDS],
     eraser: () => ['shiftStraightLine', 'modWheelResizeEraser', 'spacePan'],
     lasso: ({ lassoMode: lm }) =>
-      lm === 'polygon' ? ['modSubtractMask', 'shiftSnap45Degrees', 'spacePan'] : ['modSubtractMask', 'spacePan'],
+      lm === 'polygon' ? ['modErase', 'shiftSnap45Degrees', 'spacePan'] : ['modErase', 'spacePan'],
     bbox: ({ bboxAspectRatioLocked: locked }) => [
       locked ? 'shiftUnlockAspectRatio' : 'shiftLockAspectRatio',
       'altScaleFromCenter',
@@ -172,18 +172,18 @@ export const getCanvasToolModifierHintIds = ({
     gradient: () => [...SHARED_HINT_IDS],
     rect: ({ shapeType: st, isPrimaryPointerDown: pointerDown }) => {
       if (st === 'polygon') {
-        return ['modSubtractMask', 'shiftSnap45Degrees', 'spacePan', 'altPickColor'];
+        return ['modErase', 'shiftSnap45Degrees', 'spacePan', 'altPickColor'];
       }
 
       if (st === 'freehand') {
         return shouldQuickSwitchToColorPickerOnAlt('rect', st, pointerDown)
-          ? ['modSubtractMask', 'spacePan', 'altPickColor']
-          : ['modSubtractMask', 'spacePan'];
+          ? ['modErase', 'spacePan', 'altPickColor']
+          : ['modErase', 'spacePan'];
       }
 
       return shouldTranslateShapeDragOnSpace('rect', st, pointerDown, pointerDown)
-        ? ['modSubtractMask', 'shiftLockAspectRatio', 'altScaleFromCenter', 'spaceMoveShape']
-        : ['modSubtractMask', 'shiftLockAspectRatio', 'spacePan', 'altPickColor'];
+        ? ['modErase', 'shiftLockAspectRatio', 'altScaleFromCenter', 'spaceMoveShape']
+        : ['modErase', 'shiftLockAspectRatio', 'spacePan', 'altPickColor'];
     },
   };
 

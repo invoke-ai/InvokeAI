@@ -60,9 +60,12 @@ export const CanvasToolbar = memo(() => {
   return (
     <Flex
       w="full"
+      minW={0}
       gap={2}
+      flexWrap="nowrap"
       alignItems="center"
       px={2}
+      overflow="hidden"
       sx={{
         '& svg': {
           width: '16px',
@@ -70,7 +73,7 @@ export const CanvasToolbar = memo(() => {
         },
       }}
     >
-      <ToolOptionsRowContainer gap={4} alignItems="center" h="full">
+      <ToolOptionsRowContainer gap={4} alignItems="center" h="full" w="auto" flex="0 0 auto">
         <ToolFillColorPicker />
         {isShapeSelected && (
           <Box ms={2} mt="-2px" display="flex" alignItems="center" gap={2}>
@@ -90,14 +93,14 @@ export const CanvasToolbar = memo(() => {
         )}
         {isTextSelected ? <TextToolOptions /> : showToolWithPicker && <ToolWidthPicker />}
       </ToolOptionsRowContainer>
-      <Flex alignItems="center" h="full">
+      <Flex alignItems="center" h="full" flexShrink={0}>
         <CanvasToolbarScale />
         <CanvasToolbarResetViewButton />
         <CanvasToolbarFitBboxToLayersButton />
         <CanvasToolbarFitBboxToMasksButton />
       </Flex>
-      <Divider orientation="vertical" />
-      <Flex alignItems="center" h="full">
+      <Divider orientation="vertical" flexShrink={0} />
+      <Flex alignItems="center" h="full" flexShrink={0}>
         <CanvasToolbarProjectMenuButton />
         <CanvasToolbarSaveToGalleryButton />
         <CanvasToolbarSnapshotMenuButton />
