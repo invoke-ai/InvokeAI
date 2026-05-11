@@ -1,6 +1,7 @@
 # Copyright (c) 2024, Lincoln D. Stein and the InvokeAI Development Team
 """Default implementation of model loading in InvokeAI."""
 
+import re
 from logging import Logger
 from pathlib import Path
 from typing import Optional
@@ -20,6 +21,35 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.util.devices import TorchDevice
+
+# Layer classes that benefit from FP8 storage. Mirrors diffusers'
+# `_GO_LC_SUPPORTED_PYTORCH_LAYERS` so the plain-nn.Module fallback path makes the same
+# precision/quality trade-offs as the ModelMixin path. Notably excludes norm and embedding
+# wrapper modules — those are handled by their direct param types (Embedding is included
+# but pos_embed/patch_embed are filtered by `_FP8_DEFAULT_SKIP_PATTERNS`).
+_FP8_SUPPORTED_PYTORCH_LAYERS: tuple[type[torch.nn.Module], ...] = (
+    torch.nn.Linear,
+    torch.nn.Conv1d,
+    torch.nn.Conv2d,
+    torch.nn.Conv3d,
+    torch.nn.ConvTranspose1d,
+    torch.nn.ConvTranspose2d,
+    torch.nn.ConvTranspose3d,
+    torch.nn.Embedding,
+)
+
+# Module-path regexes (matched against `named_modules()` dotted paths) for precision-sensitive
+# layers that should never be cast to FP8. Mirrors diffusers' `DEFAULT_SKIP_MODULES_PATTERN`
+# — without these, FLUX RMSNorm.scale and similar tiny learned scalars get crushed to FP8 and
+# inference quality degrades. Includes anything named `norm`, position/patch embeddings, and
+# the in/out projection of transformer blocks.
+_FP8_DEFAULT_SKIP_PATTERNS: tuple[str, ...] = (
+    "pos_embed",
+    "patch_embed",
+    "norm",
+    r"^proj_in$",
+    r"^proj_out$",
+)
 
 
 # TO DO: The loader is not thread safe!
@@ -210,14 +240,19 @@ class ModelLoader(ModelLoaderBase):
 
     @staticmethod
     def _apply_fp8_to_nn_module(model: torch.nn.Module, storage_dtype: torch.dtype, compute_dtype: torch.dtype) -> None:
-        """Apply FP8 layerwise casting to a plain nn.Module by wrapping forward in a try/finally.
+        """Apply FP8 layerwise casting to a plain nn.Module.
 
-        A pre-hook/post-hook pair is not exception-safe: `register_forward_hook` only fires on a
-        successful forward, so an exception would leave parameters in `compute_dtype` and silently
-        defeat the FP8 storage savings (and make cache size accounting stale). Wrapping `forward`
-        directly guarantees the storage-dtype cast runs even when forward raises.
+        Mirrors diffusers' `apply_layerwise_casting` semantics: only the layer classes in
+        `_FP8_SUPPORTED_PYTORCH_LAYERS` are cast, and modules whose dotted path matches any of
+        `_FP8_DEFAULT_SKIP_PATTERNS` (norm, pos_embed, patch_embed, proj_in/out) are skipped.
+        Without the skip list, precision-sensitive tiny learned scalars (e.g. FLUX RMSNorm.scale)
+        get crushed to FP8 and quality degrades noticeably.
         """
-        for module in model.modules():
+        for module_name, module in model.named_modules():
+            if not isinstance(module, _FP8_SUPPORTED_PYTORCH_LAYERS):
+                continue
+            if any(re.search(pattern, module_name) for pattern in _FP8_DEFAULT_SKIP_PATTERNS):
+                continue
             params = list(module.parameters(recurse=False))
             if not params:
                 continue
@@ -231,13 +266,24 @@ class ModelLoader(ModelLoaderBase):
     def _wrap_forward_with_fp8_cast(
         module: torch.nn.Module, storage_dtype: torch.dtype, compute_dtype: torch.dtype
     ) -> None:
-        original_forward = module.forward
+        """Wrap `module.forward` in a try/finally that casts to compute dtype on entry and back
+        to storage dtype on exit (even when forward raises — `register_forward_hook` only fires
+        on success, which would silently leave params in compute dtype).
+
+        Critically: the wrapper dispatches to `type(module).forward(module, ...)` rather than
+        capturing the bound method up front. `ModelCache.put()` later swaps the class of
+        `nn.Linear` and friends to `CustomLinear` etc. via `apply_custom_layers_to_model`, which
+        shares the original `__dict__` (so our instance `forward` survives the swap and shadows
+        the new class method). Looking up `type(module).forward` at call time means CustomLinear's
+        LoRA-patch-aware forward is honored after the swap; otherwise FP8 + LoRA silently bypassed
+        the patch path.
+        """
 
         def forward(*args: object, **kwargs: object) -> object:
             for p in module.parameters(recurse=False):
                 p.data = p.data.to(compute_dtype)
             try:
-                return original_forward(*args, **kwargs)
+                return type(module).forward(module, *args, **kwargs)
             finally:
                 for p in module.parameters(recurse=False):
                     p.data = p.data.to(storage_dtype)

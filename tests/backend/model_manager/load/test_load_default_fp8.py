@@ -7,6 +7,11 @@ Covers:
 - `_wrap_forward_with_fp8_cast` is exception-safe: if forward raises, the storage-dtype
   cast still runs and parameters end up in fp8 (previously the post-hook path silently
   left params in compute dtype, defeating the storage savings).
+- `_wrap_forward_with_fp8_cast` routes through `type(module).forward` so a later
+  `__class__` swap (Linear → CustomLinear for LoRA-patch handling in `ModelCache.put`)
+  is honored. Without this, FP8 + LoRA silently bypassed the patch path.
+- `_apply_fp8_to_nn_module` skips precision-sensitive layers (norm, pos_embed, etc.)
+  so FLUX RMSNorm.scale and friends aren't crushed to FP8.
 """
 
 from logging import getLogger
@@ -153,3 +158,131 @@ def test_apply_fp8_to_nn_module_uses_wrapper():
     with patch.object(ModelLoader, "_wrap_forward_with_fp8_cast") as mock_wrap:
         ModelLoader._apply_fp8_to_nn_module(module, torch.float16, torch.float32)
     mock_wrap.assert_called_once_with(module, torch.float16, torch.float32)
+
+
+def test_apply_fp8_to_nn_module_skips_norm_modules():
+    """Modules whose path matches `norm` must not be cast — diffusers' `enable_layerwise_casting`
+    does the same. FLUX RMSNorm.scale is the canonical example: a tiny learned scalar that
+    breaks badly in FP8.
+    """
+
+    class _Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.norm1 = torch.nn.LayerNorm(4)
+            self.linear = torch.nn.Linear(4, 4)
+
+    storage_dtype = torch.float16
+    compute_dtype = torch.float32
+    model = _Model()
+    for p in model.parameters():
+        p.data = p.data.to(compute_dtype)
+
+    ModelLoader._apply_fp8_to_nn_module(model, storage_dtype, compute_dtype)
+
+    # Linear params get cast to storage dtype.
+    assert model.linear.weight.dtype == storage_dtype
+    # Norm params stay in compute dtype — they must not be cast.
+    assert model.norm1.weight.dtype == compute_dtype
+    assert model.norm1.bias.dtype == compute_dtype
+
+
+def test_apply_fp8_to_nn_module_skips_pos_embed_and_proj_in_out():
+    """Position embeddings and the in/out projection of transformer blocks are also on the
+    diffusers default skip list — they're precision-sensitive.
+    """
+
+    class _Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.pos_embed = torch.nn.Linear(4, 4)
+            self.proj_in = torch.nn.Linear(4, 4)
+            self.proj_out = torch.nn.Linear(4, 4)
+            self.attn = torch.nn.Linear(4, 4)
+
+    storage_dtype = torch.float16
+    compute_dtype = torch.float32
+    model = _Model()
+    for p in model.parameters():
+        p.data = p.data.to(compute_dtype)
+
+    ModelLoader._apply_fp8_to_nn_module(model, storage_dtype, compute_dtype)
+
+    assert model.attn.weight.dtype == storage_dtype
+    assert model.pos_embed.weight.dtype == compute_dtype
+    assert model.proj_in.weight.dtype == compute_dtype
+    assert model.proj_out.weight.dtype == compute_dtype
+
+
+def test_apply_fp8_to_nn_module_skips_unsupported_layer_types():
+    """Only the layer classes in `_FP8_SUPPORTED_PYTORCH_LAYERS` are cast — matches diffusers'
+    behavior. A custom RMSNorm-style module with a raw Parameter must be left alone, otherwise
+    its learned scalar gets clobbered.
+    """
+
+    class _ScaleModule(torch.nn.Module):
+        """Mimics FLUX RMSNorm — a tiny learned scalar that must not be cast to FP8."""
+
+        def __init__(self):
+            super().__init__()
+            self.scale = torch.nn.Parameter(torch.ones(4))
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return x * self.scale
+
+    class _Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.rms = _ScaleModule()
+            self.linear = torch.nn.Linear(4, 4)
+
+    storage_dtype = torch.float16
+    compute_dtype = torch.float32
+    model = _Model()
+    for p in model.parameters():
+        p.data = p.data.to(compute_dtype)
+
+    ModelLoader._apply_fp8_to_nn_module(model, storage_dtype, compute_dtype)
+
+    assert model.linear.weight.dtype == storage_dtype
+    # Critical: the RMS-style scalar lives on a custom module type, not in the supported list.
+    assert model.rms.scale.dtype == compute_dtype
+
+
+def test_wrap_forward_honors_class_swap_for_lora_patches():
+    """`ModelCache.put()` later swaps `nn.Linear.__class__` to `CustomLinear` (the InvokeAI
+    LoRA-patch-aware variant) via `apply_custom_layers_to_model`. That swap shares the original
+    `__dict__`, so an instance-level `forward` attribute set by FP8 wrapping survives and would
+    shadow `CustomLinear.forward` — silently bypassing LoRA patch dispatch.
+
+    The wrapper must dispatch via `type(module).forward(module, ...)` so the post-swap class
+    method is the one that actually runs.
+    """
+    calls: list[str] = []
+
+    class _OriginalClass(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.weight = torch.nn.Parameter(torch.zeros(4))
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            calls.append("original")
+            return x + self.weight
+
+    class _ReplacementClass(_OriginalClass):
+        """Stands in for CustomLinear: a forward override added post-construction."""
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            calls.append("replacement")
+            return x + self.weight * 2
+
+    module = _OriginalClass()
+    ModelLoader._wrap_forward_with_fp8_cast(module, torch.float16, torch.float32)
+
+    # Simulate ModelCache.put → apply_custom_layers_to_model swapping the class.
+    module.__class__ = _ReplacementClass
+
+    module(torch.zeros(4, dtype=torch.float32))
+
+    # If the wrapper had captured the bound method up front, this would be ["original"].
+    assert calls == ["replacement"]
