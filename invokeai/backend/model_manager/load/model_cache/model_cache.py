@@ -866,3 +866,27 @@ class ModelCache:
         """Delete cache_entry from the cache if it exists. No exception is thrown if it doesn't exist."""
         self._cache_stack = [key for key in self._cache_stack if key != cache_entry.key]
         self._cached_models.pop(cache_entry.key, None)
+
+    @synchronized
+    def drop_model(self, model_key: str) -> int:
+        """Drop all unlocked cache entries belonging to a model.
+
+        Cache keys are `<model_key>` or `<model_key>:<submodel>` (see `get_model_cache_key`),
+        so a single model may have multiple entries. Locked entries are skipped so this is
+        safe to call while inference is running; the next load after the locks release will
+        rebuild them.
+
+        Returns the number of entries dropped.
+        """
+        prefix = f"{model_key}:"
+        matching_entries = [
+            entry
+            for key, entry in self._cached_models.items()
+            if (key == model_key or key.startswith(prefix)) and not entry.is_locked
+        ]
+        for entry in matching_entries:
+            self._delete_cache_entry(entry)
+        if matching_entries:
+            gc.collect()
+            TorchDevice.empty_cache()
+        return len(matching_entries)

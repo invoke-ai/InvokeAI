@@ -141,6 +141,12 @@ class ModelLoader(ModelLoaderBase):
         if hasattr(config, "type") and config.type == ModelType.VAE:
             return False
 
+        # LoRAs (including ControlLoRA) are excluded — they are not run as a standalone forward pass,
+        # they are patched into a base model, so the layerwise-casting hooks would never fire. The
+        # toggle is also hidden in the UI for ControlLoRA; this guard handles legacy persisted values.
+        if hasattr(config, "type") and config.type in (ModelType.LoRA, ModelType.ControlLoRa):
+            return False
+
         # Don't apply FP8 to text encoders, tokenizers, schedulers, VAEs, etc.
         _excluded_submodel_types = {
             SubModelType.TextEncoder,
@@ -204,34 +210,39 @@ class ModelLoader(ModelLoaderBase):
 
     @staticmethod
     def _apply_fp8_to_nn_module(model: torch.nn.Module, storage_dtype: torch.dtype, compute_dtype: torch.dtype) -> None:
-        """Apply FP8 layerwise casting to a plain nn.Module using forward hooks."""
+        """Apply FP8 layerwise casting to a plain nn.Module by wrapping forward in a try/finally.
+
+        A pre-hook/post-hook pair is not exception-safe: `register_forward_hook` only fires on a
+        successful forward, so an exception would leave parameters in `compute_dtype` and silently
+        defeat the FP8 storage savings (and make cache size accounting stale). Wrapping `forward`
+        directly guarantees the storage-dtype cast runs even when forward raises.
+        """
         for module in model.modules():
             params = list(module.parameters(recurse=False))
             if not params:
                 continue
 
-            # Convert this module's own parameters to FP8 storage dtype
             for param in params:
                 param.data = param.data.to(storage_dtype)
 
-            # Pre-hook: cast to compute dtype before forward
-            def _make_pre_hook(dt: torch.dtype):
-                def hook(mod: torch.nn.Module, _args: object) -> None:
-                    for p in mod.parameters(recurse=False):
-                        p.data = p.data.to(dt)
+            ModelLoader._wrap_forward_with_fp8_cast(module, storage_dtype, compute_dtype)
 
-                return hook
+    @staticmethod
+    def _wrap_forward_with_fp8_cast(
+        module: torch.nn.Module, storage_dtype: torch.dtype, compute_dtype: torch.dtype
+    ) -> None:
+        original_forward = module.forward
 
-            # Post-hook: cast back to storage dtype after forward
-            def _make_post_hook(dt: torch.dtype):
-                def hook(mod: torch.nn.Module, _args: object, _output: object) -> None:
-                    for p in mod.parameters(recurse=False):
-                        p.data = p.data.to(dt)
+        def forward(*args: object, **kwargs: object) -> object:
+            for p in module.parameters(recurse=False):
+                p.data = p.data.to(compute_dtype)
+            try:
+                return original_forward(*args, **kwargs)
+            finally:
+                for p in module.parameters(recurse=False):
+                    p.data = p.data.to(storage_dtype)
 
-                return hook
-
-            module.register_forward_pre_hook(_make_pre_hook(compute_dtype))
-            module.register_forward_hook(_make_post_hook(storage_dtype))
+        module.forward = forward  # type: ignore[method-assign]
 
     # This needs to be implemented in the subclass
     def _load_model(

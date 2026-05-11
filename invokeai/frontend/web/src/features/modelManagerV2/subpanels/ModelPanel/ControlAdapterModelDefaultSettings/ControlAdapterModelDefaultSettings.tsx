@@ -91,7 +91,7 @@ export const ControlAdapterModelDefaultSettings = memo(({ modelConfig }: Props) 
 
       <SimpleGrid columns={2} gap={8}>
         <DefaultPreprocessor control={control} name="preprocessor" />
-        <DefaultFp8StorageControlAdapter control={control} name="fp8Storage" />
+        {modelConfig.type !== 'control_lora' && <DefaultFp8StorageControlAdapter control={control} name="fp8Storage" />}
       </SimpleGrid>
     </>
   );
