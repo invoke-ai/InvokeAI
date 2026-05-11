@@ -28,6 +28,7 @@ from invokeai.backend.model_manager.taxonomy import (
     FluxLoRAFormat,
     ModelFormat,
     ModelType,
+    WanLoRAVariantType,
     ZImageVariantType,
 )
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length
@@ -39,6 +40,7 @@ from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
 )
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
 from invokeai.backend.patches.lora_conversions.wan_lora_constants import (
+    detect_wan_lora_variant,
     has_non_wan_architecture_keys,
     has_wan_kohya_keys,
     has_wan_peft_keys,
@@ -965,6 +967,14 @@ class LoRA_LyCORIS_Wan_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         "'low' targets the low-noise expert. None means the LoRA is expert-agnostic "
         "(TI2V-5B, or community LoRAs without explicit tagging) and is applied to both.",
     )
+    variant: WanLoRAVariantType | None = Field(
+        default=None,
+        description="The Wan model family this LoRA targets, detected from its inner-dim "
+        "(5120 -> A14B, 3072 -> TI2V-5B). A14B LoRAs are incompatible with TI2V-5B mains "
+        "(and vice versa) — they crash with a shape mismatch in the layer patcher. The "
+        "linear-view graph builder filters LoRAs on variant when building the LoRA "
+        "collection. None means the LoRA's inner-dim couldn't be identified.",
+    )
 
     @classmethod
     def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
@@ -1021,6 +1031,11 @@ class LoRA_LyCORIS_Wan_Config(LoRA_LyCORIS_Config_Base, Config_Base):
                 instance.expert = "high"
             elif any(s in name for s in ("low_noise", "low-noise", "lownoise")):
                 instance.expert = "low"
+
+        # Auto-detect the model-family variant from inner_dim in the state
+        # dict. The override field skips this if the user has set it.
+        if instance.variant is None:
+            instance.variant = detect_wan_lora_variant(mod.load_state_dict())
 
         return instance
 

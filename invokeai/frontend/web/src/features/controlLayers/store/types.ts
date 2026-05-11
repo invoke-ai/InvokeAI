@@ -395,6 +395,15 @@ const zQwenImageReferenceImageConfig = z.object({
 });
 export type QwenImageReferenceImageConfig = z.infer<typeof zQwenImageReferenceImageConfig>;
 
+// Wan 2.2 I2V uses the model's own VAE to encode a single reference image -
+// no separate adapter model needed. Only consumed by the I2V variant of Wan
+// 2.2 (A14B). T2V / TI2V variants ignore the ref image at graph build time.
+const zWanReferenceImageConfig = z.object({
+  type: z.literal('wan_reference_image'),
+  image: zCroppableImageWithDims.nullable(),
+});
+export type WanReferenceImageConfig = z.infer<typeof zWanReferenceImageConfig>;
+
 const zCanvasEntityBase = z.object({
   id: zId,
   name: zName,
@@ -411,6 +420,7 @@ export const zRefImageState = z.object({
     zFluxKontextReferenceImageConfig,
     zFlux2ReferenceImageConfig,
     zQwenImageReferenceImageConfig,
+    zWanReferenceImageConfig,
   ]),
 });
 export type RefImageState = z.infer<typeof zRefImageState>;
@@ -431,6 +441,9 @@ export const isFlux2ReferenceImageConfig = (config: RefImageState['config']): co
 export const isQwenImageReferenceImageConfig = (
   config: RefImageState['config']
 ): config is QwenImageReferenceImageConfig => config.type === 'qwen_image_reference_image';
+
+export const isWanReferenceImageConfig = (config: RefImageState['config']): config is WanReferenceImageConfig =>
+  config.type === 'wan_reference_image';
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
 export type FillStyle = z.infer<typeof zFillStyle>;
@@ -820,6 +833,13 @@ export const zParamsState = z.object({
   qwenImageQwenVLEncoderModel: zModelIdentifierField.nullable(), // Optional: Standalone Qwen2.5-VL encoder
   qwenImageQuantization: z.enum(['none', 'int8', 'nf4']), // BitsAndBytes quantization for Qwen VL encoder
   qwenImageShift: z.number().nullable(), // Sigma schedule shift override (e.g. 3.0 for Lightning LoRAs)
+  // Wan 2.2 model components — A14B GGUF needs a paired second-expert transformer
+  // plus a Diffusers source for VAE/T5 unless standalone VAE/encoder models are wired.
+  wanTransformerLowNoise: zParameterModel.nullable(), // A14B GGUF only: second-expert transformer
+  wanComponentSource: zParameterModel.nullable(), // Diffusers Wan model providing VAE + UMT5-XXL
+  wanVaeModel: zParameterVAEModel.nullable(), // Optional: Standalone Wan VAE checkpoint
+  wanT5EncoderModel: zModelIdentifierField.nullable(), // Optional: Standalone UMT5-XXL encoder
+  wanGuidanceScaleLowNoise: z.number().nullable(), // Optional: separate CFG for low-noise expert (A14B). null = same as primary
   // Z-Image Seed Variance Enhancer settings
   zImageSeedVarianceEnabled: z.boolean(),
   zImageSeedVarianceStrength: z.number().min(0).max(2),
@@ -905,6 +925,11 @@ export const getInitialParamsState = (): ParamsState => ({
   qwenImageQwenVLEncoderModel: null,
   qwenImageQuantization: 'none' as const,
   qwenImageShift: null,
+  wanTransformerLowNoise: null,
+  wanComponentSource: null,
+  wanVaeModel: null,
+  wanT5EncoderModel: null,
+  wanGuidanceScaleLowNoise: null,
   zImageSeedVarianceEnabled: false,
   zImageSeedVarianceStrength: 0.1,
   zImageSeedVarianceRandomizePercent: 50,

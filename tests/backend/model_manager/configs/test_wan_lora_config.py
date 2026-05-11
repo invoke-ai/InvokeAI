@@ -179,6 +179,13 @@ class TestProbeAcceptance:
             "lora_unet_blocks_0_attn1_to_q.lora_up.weight": _t((5120, 128)),
         }
 
+    def _wan_ti2v5b_sd(self) -> dict:
+        """A TI2V-5B LoRA — inner_dim 3072, not 5120."""
+        return {
+            "transformer.blocks.0.attn1.to_q.lora_A.weight": _t((64, 3072)),
+            "transformer.blocks.0.attn1.to_q.lora_B.weight": _t((3072, 64)),
+        }
+
     def test_accepts_diffusers_wan(self):
         with TemporaryDirectory() as tmp:
             f = Path(tmp) / "my-wan-lora.safetensors"
@@ -190,6 +197,7 @@ class TestProbeAcceptance:
             assert cfg.base == BaseModelType.Wan
             assert cfg.format == ModelFormat.LyCORIS
             assert cfg.expert is None
+            assert cfg.variant == "a14b"  # 5120-dim state dict
 
     def test_accepts_native_wan(self):
         with TemporaryDirectory() as tmp:
@@ -252,6 +260,48 @@ class TestProbeAcceptance:
                 _overrides(f, "untagged"),
             )
             assert cfg.expert is None
+
+    def test_variant_detected_as_5b_when_inner_dim_3072(self):
+        """TI2V-5B LoRAs have inner_dim 3072. Detector must classify them as
+        '5b' so the FE filter doesn't route them to an A14B main and crash."""
+        with TemporaryDirectory() as tmp:
+            f = Path(tmp) / "ti2v5b-lora.safetensors"
+            f.touch()
+            cfg = LoRA_LyCORIS_Wan_Config.from_model_on_disk(
+                _make_mod(f, self._wan_ti2v5b_sd()),
+                _overrides(f, "ti2v5b"),
+            )
+            assert cfg.base == BaseModelType.Wan
+            assert cfg.variant == "5b"
+
+    def test_variant_none_when_unrecognised_inner_dim(self):
+        """A future Wan family or a LoRA touching only ffn at non-attn dims
+        should map to variant=None rather than mis-classify."""
+        with TemporaryDirectory() as tmp:
+            f = Path(tmp) / "future-wan.safetensors"
+            f.touch()
+            # Only an ffn LoRA — no attn weight to read inner_dim from.
+            # Also a non-5120, non-3072 dim that would otherwise mis-classify.
+            sd = {
+                "transformer.blocks.0.ffn.net.0.proj.lora_A.weight": _t((128, 4096)),
+                "transformer.blocks.0.ffn.net.0.proj.lora_B.weight": _t((11008, 128)),
+            }
+            cfg = LoRA_LyCORIS_Wan_Config.from_model_on_disk(_make_mod(f, sd), _overrides(f, "future"))
+            assert cfg.variant is None
+
+    def test_explicit_variant_override_wins(self):
+        with TemporaryDirectory() as tmp:
+            f = Path(tmp) / "manual.safetensors"
+            f.touch()
+            overrides = _overrides(f, "manual")
+            overrides["variant"] = "5b"
+            # State dict is 5120-dim (auto-detect would say "a14b") but the
+            # explicit override should stick.
+            cfg = LoRA_LyCORIS_Wan_Config.from_model_on_disk(
+                _make_mod(f, self._wan_diffusers_sd()),
+                overrides,
+            )
+            assert cfg.variant == "5b"
 
     def test_rejects_anima_lora(self):
         with TemporaryDirectory() as tmp:

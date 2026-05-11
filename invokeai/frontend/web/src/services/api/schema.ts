@@ -7543,7 +7543,7 @@ export type components = {
              * @description The generation mode that output this image
              * @default null
              */
-            generation_mode?: ("txt2img" | "img2img" | "inpaint" | "outpaint" | "sdxl_txt2img" | "sdxl_img2img" | "sdxl_inpaint" | "sdxl_outpaint" | "flux_txt2img" | "flux_img2img" | "flux_inpaint" | "flux_outpaint" | "flux2_txt2img" | "flux2_img2img" | "flux2_inpaint" | "flux2_outpaint" | "sd3_txt2img" | "sd3_img2img" | "sd3_inpaint" | "sd3_outpaint" | "cogview4_txt2img" | "cogview4_img2img" | "cogview4_inpaint" | "cogview4_outpaint" | "z_image_txt2img" | "z_image_img2img" | "z_image_inpaint" | "z_image_outpaint" | "qwen_image_txt2img" | "qwen_image_img2img" | "qwen_image_inpaint" | "qwen_image_outpaint" | "anima_txt2img" | "anima_img2img" | "anima_inpaint" | "anima_outpaint") | null;
+            generation_mode?: ("txt2img" | "img2img" | "inpaint" | "outpaint" | "sdxl_txt2img" | "sdxl_img2img" | "sdxl_inpaint" | "sdxl_outpaint" | "flux_txt2img" | "flux_img2img" | "flux_inpaint" | "flux_outpaint" | "flux2_txt2img" | "flux2_img2img" | "flux2_inpaint" | "flux2_outpaint" | "sd3_txt2img" | "sd3_img2img" | "sd3_inpaint" | "sd3_outpaint" | "cogview4_txt2img" | "cogview4_img2img" | "cogview4_inpaint" | "cogview4_outpaint" | "z_image_txt2img" | "z_image_img2img" | "z_image_inpaint" | "z_image_outpaint" | "qwen_image_txt2img" | "qwen_image_img2img" | "qwen_image_inpaint" | "qwen_image_outpaint" | "anima_txt2img" | "anima_img2img" | "anima_inpaint" | "anima_outpaint" | "wan_txt2img" | "wan_img2img" | "wan_inpaint" | "wan_outpaint" | "wan_i2v") | null;
             /**
              * Positive Prompt
              * @description The positive prompt parameter
@@ -19117,6 +19117,8 @@ export type components = {
              * @description For Wan 2.2 A14B dual-expert LoRAs: 'high' targets the high-noise expert, 'low' targets the low-noise expert. None means the LoRA is expert-agnostic (TI2V-5B, or community LoRAs without explicit tagging) and is applied to both.
              */
             expert: ("high" | "low") | null;
+            /** @description The Wan model family this LoRA targets, detected from its inner-dim (5120 -> A14B, 3072 -> TI2V-5B). A14B LoRAs are incompatible with TI2V-5B mains (and vice versa) — they crash with a shape mismatch in the layer patcher. The linear-view graph builder filters LoRAs on variant when building the LoRA collection. None means the LoRA's inner-dim couldn't be identified. */
+            variant: components["schemas"]["WanLoRAVariantType"] | null;
         };
         /**
          * LoRA_LyCORIS_ZImage_Config
@@ -24059,7 +24061,7 @@ export type components = {
              * Variant
              * @description The variant of the model.
              */
-            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["ZImageVariantType"] | components["schemas"]["QwenImageVariantType"] | components["schemas"]["WanVariantType"] | components["schemas"]["Qwen3VariantType"] | null;
+            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["ZImageVariantType"] | components["schemas"]["QwenImageVariantType"] | components["schemas"]["WanVariantType"] | components["schemas"]["WanLoRAVariantType"] | components["schemas"]["Qwen3VariantType"] | null;
             /** @description The prediction type of the model. */
             prediction_type?: components["schemas"]["SchedulerPredictionType"] | null;
             /**
@@ -28676,7 +28678,7 @@ export type components = {
             type: components["schemas"]["ModelType"];
             format?: components["schemas"]["ModelFormat"] | null;
             /** Variant */
-            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["ZImageVariantType"] | components["schemas"]["QwenImageVariantType"] | components["schemas"]["WanVariantType"] | components["schemas"]["Qwen3VariantType"] | null;
+            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["ZImageVariantType"] | components["schemas"]["QwenImageVariantType"] | components["schemas"]["WanVariantType"] | components["schemas"]["WanLoRAVariantType"] | components["schemas"]["Qwen3VariantType"] | null;
             /**
              * Is Installed
              * @default false
@@ -28721,7 +28723,7 @@ export type components = {
             type: components["schemas"]["ModelType"];
             format?: components["schemas"]["ModelFormat"] | null;
             /** Variant */
-            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["ZImageVariantType"] | components["schemas"]["QwenImageVariantType"] | components["schemas"]["WanVariantType"] | components["schemas"]["Qwen3VariantType"] | null;
+            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["ZImageVariantType"] | components["schemas"]["QwenImageVariantType"] | components["schemas"]["WanVariantType"] | components["schemas"]["WanLoRAVariantType"] | components["schemas"]["Qwen3VariantType"] | null;
             /**
              * Is Installed
              * @default false
@@ -29241,7 +29243,7 @@ export type components = {
             path_or_prefix: string;
             model_type: components["schemas"]["ModelType"];
             /** Variant */
-            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["ZImageVariantType"] | components["schemas"]["QwenImageVariantType"] | components["schemas"]["WanVariantType"] | components["schemas"]["Qwen3VariantType"] | null;
+            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["ZImageVariantType"] | components["schemas"]["QwenImageVariantType"] | components["schemas"]["WanVariantType"] | components["schemas"]["WanLoRAVariantType"] | components["schemas"]["Qwen3VariantType"] | null;
         };
         /**
          * Subtract Integers
@@ -32429,6 +32431,17 @@ export type components = {
              */
             type: "wan_lora_loader_output";
         };
+        /**
+         * WanLoRAVariantType
+         * @description Wan 2.2 LoRA variants, identifying which model family a LoRA targets.
+         *
+         *     Detected from the LoRA's inner attention dim: A14B has ``inner_dim=5120``,
+         *     TI2V-5B has ``inner_dim=3072``. A14B and 5B LoRAs are NOT interchangeable —
+         *     applying one against the wrong main model crashes in the layer patcher
+         *     with a tensor-shape error.
+         * @enum {string}
+         */
+        WanLoRAVariantType: "a14b" | "5b";
         /**
          * Main Model - Wan 2.2
          * @description Loads a Wan 2.2 model, outputting its submodels.

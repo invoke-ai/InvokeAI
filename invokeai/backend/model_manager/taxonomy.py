@@ -191,6 +191,22 @@ class WanVariantType(str, Enum):
     """Wan 2.2 TI2V-5B - smaller single-transformer model with Wan2.2-VAE (48 latent channels)."""
 
 
+class WanLoRAVariantType(str, Enum):
+    """Wan 2.2 LoRA variants, identifying which model family a LoRA targets.
+
+    Detected from the LoRA's inner attention dim: A14B has ``inner_dim=5120``,
+    TI2V-5B has ``inner_dim=3072``. A14B and 5B LoRAs are NOT interchangeable —
+    applying one against the wrong main model crashes in the layer patcher
+    with a tensor-shape error.
+    """
+
+    A14B = "a14b"
+    """Targets a Wan 2.2 A14B main (T2V or I2V, inner_dim=5120)."""
+
+    Wan5B = "5b"
+    """Targets the Wan 2.2 TI2V-5B main (inner_dim=3072)."""
+
+
 class Qwen3VariantType(str, Enum):
     """Qwen3 text encoder variants based on model size."""
 
@@ -276,6 +292,7 @@ AnyVariant: TypeAlias = Union[
     ZImageVariantType,
     QwenImageVariantType,
     WanVariantType,
+    WanLoRAVariantType,
     Qwen3VariantType,
 ]
 variant_type_adapter = TypeAdapter[
@@ -286,6 +303,7 @@ variant_type_adapter = TypeAdapter[
     | ZImageVariantType
     | QwenImageVariantType
     | WanVariantType
+    | WanLoRAVariantType
     | Qwen3VariantType
 ](
     ModelVariantType
@@ -295,5 +313,6 @@ variant_type_adapter = TypeAdapter[
     | ZImageVariantType
     | QwenImageVariantType
     | WanVariantType
+    | WanLoRAVariantType
     | Qwen3VariantType
 )

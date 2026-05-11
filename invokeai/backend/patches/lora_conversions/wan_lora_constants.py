@@ -22,6 +22,8 @@
 
 import re
 
+from invokeai.backend.model_manager.taxonomy import WanLoRAVariantType
+
 # Prefix for Wan transformer LoRA layers in the ModelPatchRaw layer dict.
 # Same convention as Anima / QwenImage — the LayerPatcher uses this prefix to
 # resolve patches against the loaded transformer's parameter paths.
@@ -93,6 +95,65 @@ def has_wan_peft_keys(str_keys: list[str]) -> bool:
         if _PEFT_WAN_NATIVE_RE.search(k) is not None:
             return True
     return False
+
+
+def detect_wan_lora_variant(state_dict: dict) -> WanLoRAVariantType | None:
+    """Inspect a Wan LoRA state dict and guess which model family it targets.
+
+    A14B has inner_dim=5120; TI2V-5B has inner_dim=3072. Every transformer
+    block's ``attn1.to_q`` (or native ``self_attn.q``) LoRA pair has weights
+    shaped against the inner dim — ``lora_up.weight`` is ``[inner_dim, rank]``
+    and ``lora_down.weight`` is ``[rank, inner_dim]``. The larger dim of
+    either is the inner dim.
+
+    Returns:
+        ``WanLoRAVariantType.A14B`` if inner_dim == 5120,
+        ``WanLoRAVariantType.Wan5B`` if inner_dim == 3072,
+        ``None`` if no recognisable attn weight is found or inner_dim is
+        ambiguous (e.g. LoRA that only patches FFN at non-standard rank).
+    """
+    # Probe several common key shapes — diffusers PEFT (lora_A/lora_B),
+    # native Kohya naming (lora_up/lora_down), with or without a
+    # diffusion_model/transformer prefix, in diffusers or native attn
+    # naming. The first matching tensor is enough.
+    candidate_suffixes = (
+        # diffusers PEFT
+        ".attn1.to_q.lora_A.weight",
+        ".attn1.to_q.lora_B.weight",
+        ".self_attn.q.lora_A.weight",
+        ".self_attn.q.lora_B.weight",
+        # native (Kohya) PEFT
+        ".attn1.to_q.lora_up.weight",
+        ".attn1.to_q.lora_down.weight",
+        ".self_attn.q.lora_up.weight",
+        ".self_attn.q.lora_down.weight",
+    )
+    kohya_substrings = (
+        "_attn1_to_q.lora_up.weight",
+        "_attn1_to_q.lora_down.weight",
+        "_self_attn_q.lora_up.weight",
+        "_self_attn_q.lora_down.weight",
+    )
+
+    for key, tensor in state_dict.items():
+        if not isinstance(key, str):
+            continue
+        match_suffix = any(key.endswith(suffix) for suffix in candidate_suffixes)
+        match_kohya = any(needle in key for needle in kohya_substrings)
+        if not (match_suffix or match_kohya):
+            continue
+        shape = getattr(tensor, "shape", None)
+        if shape is None or len(shape) < 2:
+            continue
+        inner_dim = max(int(shape[0]), int(shape[1]))
+        if inner_dim == 5120:
+            return WanLoRAVariantType.A14B
+        if inner_dim == 3072:
+            return WanLoRAVariantType.Wan5B
+        # Any other inner_dim is uncharted — bail rather than guess.
+        return None
+
+    return None
 
 
 def has_non_wan_architecture_keys(str_keys: list[str]) -> bool:

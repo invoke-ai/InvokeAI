@@ -264,8 +264,12 @@ class WanDenoiseInvocation(BaseInvocation):
         "Ignored for TI2V-5B.",
         title="Guidance Scale (Low Noise)",
     )
-    width: int = InputField(default=1024, multiple_of=8, description="Width of the generated image.")
-    height: int = InputField(default=1024, multiple_of=8, description="Height of the generated image.")
+    # Wan transformer has ``patch_size=(1, 2, 2)``: combined with the VAE's
+    # 8x spatial scale, generated H/W must be a multiple of 16 (not just 8)
+    # or the patch round-trip lands off-by-one and the scheduler step fails
+    # with a spatial-dim mismatch.
+    width: int = InputField(default=1024, multiple_of=16, description="Width of the generated image.")
+    height: int = InputField(default=1024, multiple_of=16, description="Height of the generated image.")
     steps: int = InputField(default=40, gt=0, description="Number of denoising steps.")
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
 

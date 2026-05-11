@@ -48,14 +48,16 @@ class WanRefImageEncoderInvocation(BaseInvocation):
     vae: VAEField = InputField(
         description=FieldDescriptions.vae, input=Input.Connection, title="VAE"
     )
+    # Must match wan_denoise's width/height. multiple_of=16 (not 8) because
+    # Wan's transformer patch_size=(1, 2, 2) needs latent H/W to be even.
     width: int = InputField(
         default=1024,
-        multiple_of=8,
+        multiple_of=16,
         description="Width to resize the reference image to (must match denoise width).",
     )
     height: int = InputField(
         default=1024,
-        multiple_of=8,
+        multiple_of=16,
         description="Height to resize the reference image to (must match denoise height).",
     )
 

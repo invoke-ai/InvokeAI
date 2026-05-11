@@ -168,6 +168,9 @@ export const zFlux2VariantType = z.enum(['klein_4b', 'klein_4b_base', 'klein_9b'
 export const zZImageVariantType = z.enum(['turbo', 'zbase']);
 const zQwenImageVariantType = z.enum(['generate', 'edit']);
 const zWanVariantType = z.enum(['t2v_a14b', 'i2v_a14b', 'ti2v_5b']);
+/** Wan LoRA variant — identifies which model FAMILY (inner_dim) a LoRA
+ *  targets. A14B = inner_dim 5120 (both T2V and I2V), 5B = inner_dim 3072. */
+const zWanLoRAVariantType = z.enum(['a14b', '5b']);
 export const zQwen3VariantType = z.enum(['qwen3_4b', 'qwen3_8b', 'qwen3_06b']);
 export const zAnyModelVariant = z.union([
   zModelVariantType,
@@ -177,6 +180,7 @@ export const zAnyModelVariant = z.union([
   zZImageVariantType,
   zQwenImageVariantType,
   zWanVariantType,
+  zWanLoRAVariantType,
   zQwen3VariantType,
 ]);
 export type AnyModelVariant = z.infer<typeof zAnyModelVariant>;

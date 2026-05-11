@@ -264,6 +264,8 @@ export const MODEL_VARIANT_TO_LONG_NAME: Record<AnyModelVariant, string> = {
   t2v_a14b: 'Wan 2.2 T2V A14B',
   i2v_a14b: 'Wan 2.2 I2V A14B',
   ti2v_5b: 'Wan 2.2 TI2V 5B',
+  a14b: 'Wan 2.2 A14B LoRA',
+  '5b': 'Wan 2.2 5B LoRA',
   qwen3_4b: 'Qwen3 4B',
   qwen3_8b: 'Qwen3 8B',
   qwen3_06b: 'Qwen3 0.6B',
@@ -292,7 +294,7 @@ export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
 
 export const SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS: BaseModelType[] = ['flux', 'sd-3', 'z-image'];
 
-export const SUPPORTS_REF_IMAGES_BASE_MODELS: BaseModelType[] = ['sd-1', 'sdxl', 'flux', 'flux2', 'qwen-image'];
+export const SUPPORTS_REF_IMAGES_BASE_MODELS: BaseModelType[] = ['sd-1', 'sdxl', 'flux', 'flux2', 'qwen-image', 'wan'];
 
 export const SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS: BaseModelType[] = [
   'sd-1',
@@ -303,4 +305,5 @@ export const SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS: BaseModelType[] = [
   'sd-3',
   'z-image',
   'anima',
+  'wan',
 ];
