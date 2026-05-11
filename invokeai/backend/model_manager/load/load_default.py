@@ -266,29 +266,38 @@ class ModelLoader(ModelLoaderBase):
     def _wrap_forward_with_fp8_cast(
         module: torch.nn.Module, storage_dtype: torch.dtype, compute_dtype: torch.dtype
     ) -> None:
-        """Wrap `module.forward` in a try/finally that casts to compute dtype on entry and back
-        to storage dtype on exit (even when forward raises — `register_forward_hook` only fires
-        on success, which would silently leave params in compute dtype).
+        """Register pre/post forward hooks that cast params to compute dtype on entry and back
+        to storage dtype on exit.
 
-        Critically: the wrapper dispatches to `type(module).forward(module, ...)` rather than
-        capturing the bound method up front. `ModelCache.put()` later swaps the class of
-        `nn.Linear` and friends to `CustomLinear` etc. via `apply_custom_layers_to_model`, which
-        shares the original `__dict__` (so our instance `forward` survives the swap and shadows
-        the new class method). Looking up `type(module).forward` at call time means CustomLinear's
-        LoRA-patch-aware forward is honored after the swap; otherwise FP8 + LoRA silently bypassed
-        the patch path.
+        We use hooks (rather than overriding `module.forward`) for two reasons:
+
+        1. **Correct dispatch after `apply_custom_layers_to_model`.** `ModelCache.put()` calls
+           `apply_custom_layers_to_model`, which creates a NEW `CustomLinear` instance and
+           shares the original `Linear.__dict__` (see `wrap_custom_layer`). Anything stored in
+           that dict — including an instance-level `forward` attribute — gets carried over to
+           the new object. An overridden `forward` would close over the OLD instance, so calls
+           to the new `CustomLinear` would silently route to `Linear.forward(old_instance, ...)`
+           and bypass the LoRA-patch-aware branch in `CustomLinear.forward`. Hooks, by contrast,
+           live in `_forward_hooks` / `_forward_pre_hooks` and are dispatched by
+           `nn.Module.__call__` with the *actual* called instance — so they run on the new
+           `CustomLinear` and the class's `forward` is still resolved normally.
+
+        2. **Exception safety.** `register_forward_hook(..., always_call=True)` fires the
+           post-hook even when `forward` raises. The plain pre-hook/post-hook pair without
+           `always_call` would leave params in compute dtype on exception, defeating FP8
+           storage savings and making cache size accounting stale.
         """
 
-        def forward(*args: object, **kwargs: object) -> object:
-            for p in module.parameters(recurse=False):
+        def pre_hook(mod: torch.nn.Module, _args: object) -> None:
+            for p in mod.parameters(recurse=False):
                 p.data = p.data.to(compute_dtype)
-            try:
-                return type(module).forward(module, *args, **kwargs)
-            finally:
-                for p in module.parameters(recurse=False):
-                    p.data = p.data.to(storage_dtype)
 
-        module.forward = forward  # type: ignore[method-assign]
+        def post_hook(mod: torch.nn.Module, _args: object, _output: object) -> None:
+            for p in mod.parameters(recurse=False):
+                p.data = p.data.to(storage_dtype)
+
+        module.register_forward_pre_hook(pre_hook)
+        module.register_forward_hook(post_hook, always_call=True)
 
     # This needs to be implemented in the subclass
     def _load_model(

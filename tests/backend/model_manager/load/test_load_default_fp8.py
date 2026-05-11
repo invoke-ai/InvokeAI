@@ -4,12 +4,11 @@ Covers:
 - `_should_use_fp8` excludes ControlLoRA (the LoRA loader never runs the layerwise
   casting helper, and a LoRA isn't a standalone forward module — so a persisted
   `fp8_storage=true` must be a no-op).
-- `_wrap_forward_with_fp8_cast` is exception-safe: if forward raises, the storage-dtype
-  cast still runs and parameters end up in fp8 (previously the post-hook path silently
-  left params in compute dtype, defeating the storage savings).
-- `_wrap_forward_with_fp8_cast` routes through `type(module).forward` so a later
-  `__class__` swap (Linear → CustomLinear for LoRA-patch handling in `ModelCache.put`)
-  is honored. Without this, FP8 + LoRA silently bypassed the patch path.
+- `_wrap_forward_with_fp8_cast` uses pre/post hooks with `always_call=True`, so it is
+  exception-safe AND survives `apply_custom_layers_to_model`'s instance swap. Without
+  hooks, an instance-level `forward` override would be carried into the new CustomLinear
+  via the shared `__dict__` and silently bypass `CustomLinear.forward` — breaking LoRA
+  patch dispatch for FP8 checkpoint models.
 - `_apply_fp8_to_nn_module` skips precision-sensitive layers (norm, pos_embed, etc.)
   so FLUX RMSNorm.scale and friends aren't crushed to FP8.
 """
@@ -22,6 +21,12 @@ import pytest
 import torch
 
 from invokeai.backend.model_manager.load.load_default import ModelLoader
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_linear import (
+    CustomLinear,
+)
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
+    apply_custom_layers_to_model,
+)
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
 
@@ -151,8 +156,8 @@ def test_wrap_forward_casts_to_compute_then_back_on_success():
 
 
 def test_apply_fp8_to_nn_module_uses_wrapper():
-    """`_apply_fp8_to_nn_module` should delegate cleanup to `_wrap_forward_with_fp8_cast`
-    rather than rely on the pre-hook/post-hook pair (which is not exception-safe).
+    """`_apply_fp8_to_nn_module` should delegate per-module wrapping to
+    `_wrap_forward_with_fp8_cast`, which encapsulates the hook registration.
     """
     module = torch.nn.Linear(4, 4)
     with patch.object(ModelLoader, "_wrap_forward_with_fp8_cast") as mock_wrap:
@@ -249,40 +254,72 @@ def test_apply_fp8_to_nn_module_skips_unsupported_layer_types():
     assert model.rms.scale.dtype == compute_dtype
 
 
-def test_wrap_forward_honors_class_swap_for_lora_patches():
-    """`ModelCache.put()` later swaps `nn.Linear.__class__` to `CustomLinear` (the InvokeAI
-    LoRA-patch-aware variant) via `apply_custom_layers_to_model`. That swap shares the original
-    `__dict__`, so an instance-level `forward` attribute set by FP8 wrapping survives and would
-    shadow `CustomLinear.forward` — silently bypassing LoRA patch dispatch.
+def test_wrap_forward_reaches_custom_linear_after_apply_custom_layers():
+    """Production order: `_load_model` applies FP8 wrapping, THEN `ModelCache.put()` calls
+    `apply_custom_layers_to_model` which constructs a NEW `CustomLinear` object via
+    `CustomLinear.__new__` and points its `__dict__` at the original `Linear.__dict__`
+    (see `wrap_custom_layer`). The new object is installed on the parent in place of the
+    original Linear.
 
-    The wrapper must dispatch via `type(module).forward(module, ...)` so the post-swap class
-    method is the one that actually runs.
+    An instance-level `forward` override would be carried into the new CustomLinear via the
+    shared dict but would close over the OLD Linear instance — so calls to the new
+    CustomLinear would silently route to `Linear.forward(old_instance, ...)` and bypass
+    `CustomLinear.forward`, where LoRA/ControlLoRA patches are applied. This is the bug a
+    reviewer reproduced on a fresh worktree.
+
+    Hooks fix this because `nn.Module._call_impl` dispatches them with the *actual* called
+    instance, and `self.forward(...)` is resolved by normal class lookup — reaching
+    `CustomLinear.forward`. This test exercises the production wrapping path (real
+    `apply_custom_layers_to_model`) and asserts CustomLinear.forward is reached by attaching
+    a sentinel patch list and observing that the patch-aware branch runs.
     """
-    calls: list[str] = []
 
-    class _OriginalClass(torch.nn.Module):
+    class Parent(torch.nn.Module):
         def __init__(self):
             super().__init__()
-            self.weight = torch.nn.Parameter(torch.zeros(4))
+            self.child = torch.nn.Linear(4, 4, bias=False)
 
-        def forward(self, x: torch.Tensor) -> torch.Tensor:
-            calls.append("original")
-            return x + self.weight
+    parent = Parent()
+    original_linear = parent.child
 
-    class _ReplacementClass(_OriginalClass):
-        """Stands in for CustomLinear: a forward override added post-construction."""
+    ModelLoader._wrap_forward_with_fp8_cast(original_linear, torch.float16, torch.float32)
 
-        def forward(self, x: torch.Tensor) -> torch.Tensor:
-            calls.append("replacement")
-            return x + self.weight * 2
+    apply_custom_layers_to_model(parent)
+    new_child = parent.child
 
-    module = _OriginalClass()
-    ModelLoader._wrap_forward_with_fp8_cast(module, torch.float16, torch.float32)
+    # Sanity: production wrapping replaced the child with a NEW CustomLinear instance.
+    assert isinstance(new_child, CustomLinear)
+    assert new_child is not original_linear
 
-    # Simulate ModelCache.put → apply_custom_layers_to_model swapping the class.
-    module.__class__ = _ReplacementClass
+    # Attach a sentinel patch so CustomLinear.forward routes through the LoRA-aware branch
+    # (see custom_linear.py: `if len(self._patches_and_weights) > 0`). If that branch fires,
+    # our FP8 wrapping is correctly dispatched through CustomLinear.forward.
+    patch_was_invoked = {"hit": False}
 
-    module(torch.zeros(4, dtype=torch.float32))
+    class _SentinelPatch:
+        def __init__(self):
+            self.hit = patch_was_invoked
 
-    # If the wrapper had captured the bound method up front, this would be ["original"].
-    assert calls == ["replacement"]
+        def __call__(self, *_args, **_kwargs):  # not actually called
+            pass
+
+    # Patch the CustomLinear's patch-handling branch to record that it was reached.
+    original_patch_branch = CustomLinear._autocast_forward_with_patches
+
+    def tracked_patch_branch(self, input):
+        patch_was_invoked["hit"] = True
+        # Return a same-shape tensor so the outer caller doesn't choke.
+        return torch.zeros_like(input @ self.weight.t())
+
+    new_child._patches_and_weights = [(_SentinelPatch(), 1.0)]
+    try:
+        CustomLinear._autocast_forward_with_patches = tracked_patch_branch
+        _ = new_child(torch.zeros(1, 4, dtype=torch.float32))
+    finally:
+        CustomLinear._autocast_forward_with_patches = original_patch_branch
+        new_child._patches_and_weights = []
+
+    assert patch_was_invoked["hit"] is True, (
+        "FP8-wrapped forward did not reach CustomLinear.forward — LoRA/ControlLoRA patches "
+        "would be silently bypassed on FP8 checkpoint models."
+    )
