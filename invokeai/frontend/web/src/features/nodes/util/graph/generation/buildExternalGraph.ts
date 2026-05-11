@@ -24,6 +24,7 @@ import { assert } from 'tsafe';
 
 const EXTERNAL_PROVIDER_NODE_TYPES = {
   alibabacloud: 'alibabacloud_image_generation',
+  custom_openai_images: 'custom_openai_images_generation',
   gemini: 'gemini_image_generation',
   openai: 'openai_image_generation',
   seedream: 'seedream_image_generation',
@@ -76,7 +77,7 @@ export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBui
   };
 
   // Provider-specific options
-  if (model.provider_id === 'openai') {
+  if (model.provider_id === 'openai' || model.provider_id === 'custom_openai_images') {
     externalNode.quality = params.openaiQuality;
     externalNode.background = params.openaiBackground;
     if (params.openaiInputFidelity) {

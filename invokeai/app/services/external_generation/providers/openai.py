@@ -21,7 +21,7 @@ from invokeai.app.services.external_generation.image_utils import decode_image_b
 class OpenAIProvider(ExternalProvider):
     provider_id = "openai"
 
-    _GPT_IMAGE_MODELS = {"gpt-image-1", "gpt-image-1.5", "gpt-image-1-mini"}
+    _GPT_IMAGE_MODELS = {"gpt-image-1", "gpt-image-1.5", "gpt-image-1-mini", "gpt-image-2"}
 
     def is_configured(self) -> bool:
         return bool(self._app_config.external_openai_api_key)

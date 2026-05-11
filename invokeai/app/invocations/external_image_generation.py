@@ -239,6 +239,59 @@ class OpenAIImageGenerationInvocation(BaseExternalImageGenerationInvocation):
 
 
 @invocation(
+    "custom_openai_images_generation",
+    title="Custom OpenAI Images-compatible Generation",
+    tags=["external", "generation", "openai-compatible"],
+    category="image",
+    version="1.0.0",
+)
+class CustomOpenAIImagesGenerationInvocation(BaseExternalImageGenerationInvocation):
+    """Generate images using a custom OpenAI Images-compatible external model."""
+
+    provider_id = "custom_openai_images"
+
+    model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.main_model,
+        ui_model_base=[BaseModelType.External],
+        ui_model_type=[ModelType.ExternalImageGenerator],
+        ui_model_format=[ModelFormat.ExternalApi],
+        ui_model_provider_id=["custom_openai_images"],
+    )
+
+    mode: ExternalGenerationMode = InputField(default="txt2img", description="Generation mode.", ui_hidden=True)
+    init_image: ImageField | None = InputField(
+        default=None, description="Init image (use reference_images instead)", ui_hidden=True
+    )
+    mask_image: ImageField | None = InputField(default=None, description="Mask image for inpaint", ui_hidden=True)
+
+    quality: Literal["auto", "high", "medium", "low"] = InputField(default="auto", description="Output image quality")
+    background: Literal["auto", "transparent", "opaque"] = InputField(
+        default="auto", description="Background transparency handling"
+    )
+    input_fidelity: Literal["low", "high"] | None = InputField(
+        default=None, description="Fidelity to source images (edits only)"
+    )
+
+    def _build_provider_options(self) -> dict[str, Any]:
+        options: dict[str, Any] = {
+            "quality": self.quality,
+            "background": self.background,
+        }
+        if self.input_fidelity is not None:
+            options["input_fidelity"] = self.input_fidelity
+        return options
+
+    def _build_output_provider_metadata(self) -> dict[str, Any]:
+        metadata: dict[str, Any] = {
+            "custom_openai_images_quality": self.quality,
+            "custom_openai_images_background": self.background,
+        }
+        if self.input_fidelity is not None:
+            metadata["custom_openai_images_input_fidelity"] = self.input_fidelity
+        return metadata
+
+
+@invocation(
     "gemini_image_generation",
     title="Gemini Image Generation",
     tags=["external", "generation", "gemini"],
