@@ -614,3 +614,167 @@ class TestWanDenoiseRefImage:
         inv = self._make_inv_with_ref(ref_field, width=64, height=64)
         with pytest.raises(ValueError, match="must match denoise dimensions"):
             inv._run_diffusion(ctx)
+
+
+class TestWanDenoiseInpaint:
+    """Phase 8: ``denoise_mask`` (inpaint) wiring via ``RectifiedFlowInpaintExtension``.
+
+    User-side mask convention (matches Anima / Flux): 1.0 = preserve,
+    0.0 = regenerate. After ``_prep_inpaint_mask`` inverts, the extension
+    sees: 0.0 = preserve, 1.0 = regenerate.
+
+    With the synthetic zero-output transformer, the scheduler step is a
+    no-op (noise_pred=0 → latents unchanged). The init latents are placed
+    into the preserved regions at every step via the extension's merge
+    function; the regenerated regions stay as the original noise tensor
+    because the model never updates them.
+    """
+
+    def _build_inpaint_context(
+        self,
+        transformer: _ZeroTransformer,
+        variant: WanVariantType,
+        model_root: Path,
+        init_latents: torch.Tensor,
+        mask: torch.Tensor,
+    ) -> MagicMock:
+        ctx = _build_context(
+            transformer,
+            variant=variant,
+            model_root=model_root,
+            pos_cond=_make_conditioning(),
+            neg_cond=None,
+        )
+
+        # tensors.load needs to return different tensors for the init-latents
+        # and the mask, dispatched by the name field.
+        def _load_tensor(name: str) -> torch.Tensor:
+            if name == "init":
+                return init_latents
+            if name == "mask":
+                return mask
+            raise KeyError(name)
+
+        ctx.tensors.load.side_effect = _load_tensor
+        return ctx
+
+    def test_preserved_region_matches_init_exactly(self, fake_model_root: Path) -> None:
+        from invokeai.app.invocations.fields import DenoiseMaskField, LatentsField
+
+        transformer = _ZeroTransformer()
+        # 64x64 image -> 8x8 latents at scale 8 (T2V-A14B family).
+        # Init latents: fixed value 0.5 so the preserved region is detectable.
+        init_latents = torch.full((1, 16, 8, 8), 0.5)
+        # Mask: 8x8 spatial mask, half-1 (preserve left), half-0 (regenerate right).
+        # User-side convention: 1 = preserve, 0 = regenerate.
+        mask = torch.zeros(1, 1, 8, 8)
+        mask[..., :, :4] = 1.0  # left half preserved
+
+        ctx = self._build_inpaint_context(
+            transformer,
+            variant=WanVariantType.T2V_A14B,
+            model_root=fake_model_root,
+            init_latents=init_latents,
+            mask=mask,
+        )
+
+        inv = WanDenoiseInvocation(
+            id="test",
+            transformer=_wan_transformer_field(),
+            positive_conditioning=WanConditioningField(conditioning_name="pos"),
+            negative_conditioning=None,
+            latents=LatentsField(latents_name="init"),
+            denoise_mask=DenoiseMaskField(mask_name="mask", masked_latents_name=None, gradient=False),
+            width=64,
+            height=64,
+            steps=4,
+            guidance_scale=1.0,
+            denoising_start=0.0,
+            denoising_end=1.0,
+            seed=42,
+        )
+
+        out = inv._run_diffusion(ctx)  # [B, C, H_lat, W_lat]
+        assert out.shape == (1, 16, 8, 8)
+
+        # Preserved (left) half: must exactly match the init latents at t_prev=0
+        # (final step's merge produces noised_init = noise*0 + 1*init = init).
+        assert torch.allclose(out[..., :, :4], torch.full_like(out[..., :, :4], 0.5)), (
+            "Preserved region must equal init latents at the end of denoise"
+        )
+
+        # Regenerated (right) half: model never changed anything (zero transformer)
+        # so this region stays equal to the original noise, NOT to init.
+        # Assert it's *not* equal to init — concrete proof the regions are
+        # being handled separately.
+        assert not torch.allclose(out[..., :, 4:], torch.full_like(out[..., :, 4:], 0.5)), (
+            "Regenerated region should NOT equal init — extension must route it through the model path"
+        )
+
+    def test_inpaint_requires_init_latents(self, fake_model_root: Path) -> None:
+        """Providing a mask without init latents must raise — there's nothing
+        to merge back into the preserved regions."""
+        from invokeai.app.invocations.fields import DenoiseMaskField
+
+        transformer = _ZeroTransformer()
+        mask = torch.ones(1, 1, 8, 8)
+        ctx = self._build_inpaint_context(
+            transformer,
+            variant=WanVariantType.T2V_A14B,
+            model_root=fake_model_root,
+            init_latents=torch.zeros(1, 16, 8, 8),  # unused
+            mask=mask,
+        )
+
+        inv = WanDenoiseInvocation(
+            id="test",
+            transformer=_wan_transformer_field(),
+            positive_conditioning=WanConditioningField(conditioning_name="pos"),
+            negative_conditioning=None,
+            latents=None,  # missing — error
+            denoise_mask=DenoiseMaskField(mask_name="mask", masked_latents_name=None, gradient=False),
+            width=64,
+            height=64,
+            steps=2,
+            guidance_scale=1.0,
+            seed=42,
+        )
+
+        with pytest.raises(ValueError, match="img2img inpainting"):
+            inv._run_diffusion(ctx)
+
+    def test_no_mask_path_is_unchanged(self, fake_model_root: Path) -> None:
+        """Without a denoise_mask, the loop behaves as before — sanity check
+        that adding the inpaint extension didn't introduce a regression on
+        the non-inpaint codepath."""
+        from invokeai.app.invocations.fields import LatentsField
+
+        transformer = _ZeroTransformer()
+        init_latents = torch.full((1, 16, 8, 8), 0.3)
+        ctx = self._build_inpaint_context(
+            transformer,
+            variant=WanVariantType.T2V_A14B,
+            model_root=fake_model_root,
+            init_latents=init_latents,
+            mask=torch.zeros(1, 1, 8, 8),  # unused — no mask wired
+        )
+
+        inv = WanDenoiseInvocation(
+            id="test",
+            transformer=_wan_transformer_field(),
+            positive_conditioning=WanConditioningField(conditioning_name="pos"),
+            negative_conditioning=None,
+            latents=LatentsField(latents_name="init"),
+            denoise_mask=None,  # no mask
+            width=64,
+            height=64,
+            steps=4,
+            guidance_scale=1.0,
+            denoising_start=0.5,  # img2img-style partial denoise
+            denoising_end=1.0,
+            seed=42,
+        )
+
+        out = inv._run_diffusion(ctx)
+        assert out.shape == (1, 16, 8, 8)
+        assert torch.isfinite(out).all()

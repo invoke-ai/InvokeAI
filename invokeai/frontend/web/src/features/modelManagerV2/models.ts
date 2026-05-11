@@ -262,6 +262,7 @@ export const MODEL_VARIANT_TO_LONG_NAME: Record<AnyModelVariant, string> = {
   generate: 'Qwen Image',
   edit: 'Qwen Image Edit',
   t2v_a14b: 'Wan 2.2 T2V A14B',
+  i2v_a14b: 'Wan 2.2 I2V A14B',
   ti2v_5b: 'Wan 2.2 TI2V 5B',
   qwen3_4b: 'Qwen3 4B',
   qwen3_8b: 'Qwen3 8B',
