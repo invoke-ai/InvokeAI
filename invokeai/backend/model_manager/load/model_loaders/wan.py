@@ -273,11 +273,28 @@ class WanGGUFCheckpointModel(ModelLoader):
             text_shape = text_w.tensor_shape if isinstance(text_w, GGMLTensor) else text_w.shape
             text_dim = int(text_shape[1])
 
+        # out_channels is read from proj_out.weight directly rather than assumed
+        # equal to in_channels: I2V-A14B has in_channels=36 (16 noise + 16
+        # ref-image latents + 4 mask, concatenated by the denoise loop) but
+        # out_channels=16 (only the noise prediction comes back). proj_out is
+        # ``nn.Linear(inner_dim, out_channels * prod(patch_size))`` and
+        # patch_size is (1, 2, 2) → prod = 4 for the Wan 2.2 family.
+        proj_out_w = sd.get("proj_out.weight")
+        if proj_out_w is None:
+            raise RuntimeError("GGUF state dict missing proj_out.weight after prefix strip")
+        proj_out_shape = proj_out_w.tensor_shape if isinstance(proj_out_w, GGMLTensor) else proj_out_w.shape
+        out_channels = int(proj_out_shape[0]) // 4
+
+        # Layer count fallback (only triggers if the auto-count loop above
+        # found zero blocks, which shouldn't happen for a valid GGUF). T2V/I2V
+        # A14B have 40 layers; TI2V-5B has 30.
+        layer_count_fallback = 30 if config.variant == WanVariantType.TI2V_5B else 40
+
         model_config: dict = {
             "patch_size": (1, 2, 2),
             "in_channels": in_channels,
-            "out_channels": in_channels,
-            "num_layers": num_layers if num_layers > 0 else (40 if config.variant == WanVariantType.T2V_A14B else 30),
+            "out_channels": out_channels,
+            "num_layers": num_layers if num_layers > 0 else layer_count_fallback,
             "attention_head_dim": attention_head_dim,
             "num_attention_heads": num_attention_heads,
             "ffn_dim": ffn_dim,

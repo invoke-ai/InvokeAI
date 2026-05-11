@@ -30,6 +30,7 @@ from invokeai.app.invocations.fields import (
     TensorField,
     UIComponent,
     WanConditioningField,
+    WanRefImageConditioningField,
     ZImageConditioningField,
 )
 from invokeai.app.services.images.images_common import ImageDTO
@@ -507,6 +508,24 @@ class WanConditioningOutput(BaseInvocationOutput):
     @classmethod
     def build(cls, conditioning_name: str) -> "WanConditioningOutput":
         return cls(conditioning=WanConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("wan_ref_image_output")
+class WanRefImageOutput(BaseInvocationOutput):
+    """Output of a Wan 2.2 reference-image VAE-encoder."""
+
+    ref_image: WanRefImageConditioningField = OutputField(
+        description="VAE-latent reference-image conditioning for Wan 2.2 I2V.",
+        title="Reference Image",
+    )
+
+    @classmethod
+    def build(cls, condition_tensor_name: str, width: int, height: int) -> "WanRefImageOutput":
+        return cls(
+            ref_image=WanRefImageConditioningField(
+                condition_tensor_name=condition_tensor_name, width=width, height=height
+            )
+        )
 
 
 @invocation_output("conditioning_output")

@@ -39,6 +39,7 @@ from invokeai.app.invocations.fields import (
     InputField,
     LatentsField,
     WanConditioningField,
+    WanRefImageConditioningField,
 )
 from invokeai.app.invocations.model import LoRAField, WanTransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
@@ -92,10 +93,18 @@ class _ExpertSwapper:
     LoRA patches via ``LayerPatcher.apply_smart_model_patches``.
 
     Ordering on swap: exit the active expert's LoRA context (restores weights)
-    -> exit ``model_on_device`` (returns expert to RAM) -> enter the new
-    expert's device context -> apply the new expert's LoRAs. This mirrors the
-    pattern used by ``flux_denoise``/``anima_denoise`` but adds the extra
-    context layer needed for dual experts.
+    -> exit ``model_on_device`` (returns expert to RAM) -> load the new expert
+    (fresh handle) -> enter its device context -> apply its LoRAs. This
+    mirrors the pattern used by ``flux_denoise``/``anima_denoise`` but adds
+    the extra context layer needed for dual experts.
+
+    Model handles are obtained lazily inside ``get()`` rather than cached at
+    construction. With dual ~9 GB GGUF experts plus a UMT5-XXL encoder
+    competing for the RAM cache, holding both ``LoadedModel`` handles upfront
+    can leave one of them stale by the time the swap happens — InvokeAI's
+    model cache emits a ``has already been dropped from the RAM cache``
+    warning and reloads from disk per swap. See issue #7513 for the broader
+    pattern.
     """
 
     HIGH = "high"
@@ -103,16 +112,18 @@ class _ExpertSwapper:
 
     def __init__(
         self,
-        high_info: Any,
-        low_info: Any | None,
+        context: InvocationContext,
+        high_model: Any,
+        low_model: Any | None,
         inference_dtype: torch.dtype,
         high_lora_factory: LoRAIteratorFactory | None = None,
         low_lora_factory: LoRAIteratorFactory | None = None,
         high_is_quantized: bool = False,
         low_is_quantized: bool = False,
     ) -> None:
-        self._high_info = high_info
-        self._low_info = low_info
+        self._context = context
+        self._high_model = high_model
+        self._low_model = low_model
         self._inference_dtype = inference_dtype
         self._high_lora_factory = high_lora_factory
         self._low_lora_factory = low_lora_factory
@@ -126,7 +137,7 @@ class _ExpertSwapper:
     def get(self, label: str) -> Any:
         if label not in (self.HIGH, self.LOW):
             raise ValueError(f"Unknown expert label: {label!r}")
-        if label == self.LOW and self._low_info is None:
+        if label == self.LOW and self._low_model is None:
             raise ValueError("Low-noise expert was requested but is not available.")
         if label == self._active_label:
             assert self._active_model is not None
@@ -135,7 +146,10 @@ class _ExpertSwapper:
         # Release current GPU residency before bringing the other expert on device.
         self._release()
 
-        info = self._high_info if label == self.HIGH else self._low_info
+        # Load the requested expert lazily so its ``LoadedModel`` handle is
+        # always fresh — see class docstring for the cache-eviction reasoning.
+        model_id = self._high_model if label == self.HIGH else self._low_model
+        info = self._context.models.load(model_id)
         device_ctx = info.model_on_device()
         cached_weights, model = device_ctx.__enter__()
 
@@ -213,6 +227,13 @@ class WanDenoiseInvocation(BaseInvocation):
         default=None, description=FieldDescriptions.negative_cond, input=Input.Connection
     )
 
+    ref_image: Optional[WanRefImageConditioningField] = InputField(
+        default=None,
+        description=FieldDescriptions.wan_ref_image,
+        input=Input.Connection,
+        title="Reference Image",
+    )
+
     latents: Optional[LatentsField] = InputField(
         default=None,
         description=FieldDescriptions.latents,
@@ -278,6 +299,28 @@ class WanDenoiseInvocation(BaseInvocation):
             assert self.negative_conditioning is not None
             neg_cond = self._load_conditioning(
                 context, self.negative_conditioning, device=device, dtype=inference_dtype
+            )
+
+        # Reference-image conditioning (Wan 2.2 I2V-A14B only). The condition
+        # tensor is 20 channels (4 mask + 16 VAE-encoded image latents); it
+        # gets concatenated to the 16-channel noise latents each step,
+        # yielding the 36-channel input the I2V transformer expects.
+        ref_condition: torch.Tensor | None = None
+        if self.ref_image is not None:
+            if variant != WanVariantType.I2V_A14B:
+                raise ValueError(
+                    f"Reference-image conditioning is only supported by the Wan 2.2 I2V variant. "
+                    f"The selected transformer is {variant.value!r}. Remove the Reference Image input "
+                    "or load an I2V model."
+                )
+            if self.ref_image.width != self.width or self.ref_image.height != self.height:
+                raise ValueError(
+                    f"Reference-image dimensions ({self.ref_image.width}x{self.ref_image.height}) must "
+                    f"match denoise dimensions ({self.width}x{self.height})."
+                )
+            ref_condition = (
+                context.tensors.load(self.ref_image.condition_tensor_name)
+                .to(device=device, dtype=inference_dtype)
             )
 
         # Schedule timesteps. set_timesteps populates scheduler.timesteps and
@@ -361,18 +404,27 @@ class WanDenoiseInvocation(BaseInvocation):
         step_callback = self._build_step_callback(context)
 
         # Resolve experts and the boundary timestep that triggers the MoE swap.
-        high_info = context.models.load(self.transformer.transformer)
-        low_info = (
-            context.models.load(self.transformer.transformer_low_noise)
-            if self.transformer.transformer_low_noise is not None
-            else None
-        )
+        #
+        # We deliberately do NOT call ``context.models.load(...)`` for the
+        # transformer experts here — that would put both ~9 GB GGUF handles
+        # in the model cache concurrently. With UMT5-XXL (~10 GB) competing
+        # for the same cache, the LRU policy can drop one of them by the
+        # time the denoise loop swaps in, producing the
+        # "has already been dropped from the RAM cache" warning and forcing
+        # a disk reload per swap. The swapper calls ``models.load`` lazily
+        # inside each ``get()`` instead, so handles are always fresh.
+        #
+        # The config metadata (variant / format) is fine to read upfront —
+        # ``get_config`` doesn't touch the weights cache.
+        high_model = self.transformer.transformer
+        low_model = self.transformer.transformer_low_noise
+        low_config = context.models.get_config(low_model) if low_model is not None else None
         # FlowMatchEulerDiscreteScheduler stores num_train_timesteps in its config
         # (default 1000). Diffusers' WanPipeline computes:
         #   boundary_timestep = boundary_ratio * num_train_timesteps
         num_train_timesteps = int(scheduler.config.num_train_timesteps)
         boundary_timestep = (
-            self.transformer.boundary_ratio * num_train_timesteps if low_info is not None else None
+            self.transformer.boundary_ratio * num_train_timesteps if low_model is not None else None
         )
 
         # LoRA wiring. The high-noise expert uses ``transformer.loras``; the
@@ -382,9 +434,10 @@ class WanDenoiseInvocation(BaseInvocation):
         # aren't touched directly.
         high_loras = self.transformer.loras
         low_loras = self.transformer.loras_low_noise or self.transformer.loras
-        high_is_quantized = high_info.config.format == ModelFormat.GGUFQuantized
+        high_config = context.models.get_config(high_model)
+        high_is_quantized = high_config.format == ModelFormat.GGUFQuantized
         low_is_quantized = (
-            low_info.config.format == ModelFormat.GGUFQuantized if low_info is not None else False
+            low_config.format == ModelFormat.GGUFQuantized if low_config is not None else False
         )
 
         def high_lora_factory() -> Iterable[Tuple[ModelPatchRaw, float]]:
@@ -395,8 +448,9 @@ class WanDenoiseInvocation(BaseInvocation):
 
         with ExitStack() as exit_stack:
             swapper = _ExpertSwapper(
-                high_info=high_info,
-                low_info=low_info,
+                context=context,
+                high_model=high_model,
+                low_model=low_model,
                 inference_dtype=inference_dtype,
                 high_lora_factory=high_lora_factory if high_loras else None,
                 low_lora_factory=low_lora_factory if low_loras else None,
@@ -410,7 +464,7 @@ class WanDenoiseInvocation(BaseInvocation):
 
                 # Pick the active expert: high-noise for t >= boundary_timestep,
                 # low-noise below. Single-transformer models always use HIGH.
-                if low_info is not None and float(t) < float(boundary_timestep):
+                if low_model is not None and float(t) < float(boundary_timestep):
                     active_label = _ExpertSwapper.LOW
                     # Treat None or values below 1.0 (incl. the FE's default 0)
                     # as "use the primary guidance_scale".
@@ -425,6 +479,12 @@ class WanDenoiseInvocation(BaseInvocation):
                 # Cast latents to the transformer's dtype only for the forward
                 # pass; keep the scheduler-level latents in fp32.
                 latent_model_input = latents.to(dtype=inference_dtype)
+
+                # For I2V, concatenate the ref-image condition (4-ch mask + 16-ch
+                # image latents) along the channel dim, producing the 36-channel
+                # input the I2V transformer's patch_embedding expects.
+                if ref_condition is not None:
+                    latent_model_input = torch.cat([latent_model_input, ref_condition], dim=1)
 
                 noise_pred_cond = transformer(
                     hidden_states=latent_model_input,

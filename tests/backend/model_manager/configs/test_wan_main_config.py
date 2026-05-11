@@ -32,6 +32,25 @@ def _build_ti2v_5b_layout(root: Path) -> None:
     _write_json(root / "vae" / "config.json", {"_class_name": "AutoencoderKLWan", "z_dim": 48})
 
 
+def _build_i2v_a14b_layout(root: Path) -> None:
+    """Wan-AI/Wan2.2-I2V-A14B: dual transformers, z_dim=16, transformer in_channels=36.
+
+    The Wan 2.2 I2V transformer concatenates noise latents (16) + ref-image
+    latents (16) + first-frame mask (4) along the channel dim, so its
+    ``in_channels`` is 36 vs 16 for T2V.
+    """
+    _write_json(root / "model_index.json", {"_class_name": "WanImageToVideoPipeline"})
+    _write_json(
+        root / "transformer" / "config.json",
+        {"_class_name": "WanTransformer3DModel", "in_channels": 36, "image_dim": None},
+    )
+    _write_json(
+        root / "transformer_2" / "config.json",
+        {"_class_name": "WanTransformer3DModel", "in_channels": 36, "image_dim": None},
+    )
+    _write_json(root / "vae" / "config.json", {"_class_name": "AutoencoderKLWan", "z_dim": 16})
+
+
 def _build_overrides(model_path: Path, name: str) -> dict:
     return {
         "hash": "test-hash",
@@ -63,6 +82,29 @@ class TestWanDiffusersIdentification:
             assert cfg.format == ModelFormat.Diffusers
             assert cfg.variant == WanVariantType.T2V_A14B
             assert cfg.has_dual_expert is True
+
+    def test_i2v_a14b_detected_from_in_channels_36(self) -> None:
+        """I2V-A14B has the same dual-expert + z_dim=16 layout as T2V, but its
+        transformer's ``in_channels`` is 36 (16 noise + 16 ref-image latents +
+        4 first-frame mask). That's the canonical Wan 2.2 differentiator."""
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp) / "Wan2.2-I2V-A14B"
+            _build_i2v_a14b_layout(root)
+
+            cfg = Main_Diffusers_Wan_Config.from_model_on_disk(_make_mod(root), _build_overrides(root, "I2V"))
+
+            assert cfg.variant == WanVariantType.I2V_A14B
+            assert cfg.has_dual_expert is True
+
+    def test_t2v_a14b_kept_when_in_channels_is_16(self) -> None:
+        """A14B layout with ``in_channels=16`` resolves to T2V (not I2V)."""
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp) / "Wan2.2-T2V-A14B"
+            _build_a14b_layout(root)
+
+            cfg = Main_Diffusers_Wan_Config.from_model_on_disk(_make_mod(root), _build_overrides(root, "T2V"))
+
+            assert cfg.variant == WanVariantType.T2V_A14B
 
     def test_ti2v_5b_detected_from_z_dim(self) -> None:
         with TemporaryDirectory() as tmp:

@@ -19,7 +19,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from invokeai.app.invocations.fields import WanConditioningField
+from invokeai.app.invocations.fields import WanConditioningField, WanRefImageConditioningField
 from invokeai.app.invocations.model import WanTransformerField
 from invokeai.app.invocations.wan_denoise import WanDenoiseInvocation
 from invokeai.backend.model_manager.taxonomy import WanVariantType
@@ -64,7 +64,14 @@ class _ZeroTransformer(nn.Module):
         )
         # Record the timestep (t.expand(B) → take first element).
         self.timesteps_seen.append(float(timestep.flatten()[0].item()))
-        out = torch.zeros_like(hidden_states)
+        # Real Wan I2V transformer has in_channels=36 (16 noise + 20 ref-image
+        # condition) but out_channels=16. T2V is 16/16 and TI2V-5B is 48/48 —
+        # both have matching in/out. Mirror that by only collapsing the I2V
+        # input width back to 16 channels.
+        out_shape = list(hidden_states.shape)
+        if out_shape[1] == 36:
+            out_shape[1] = 16
+        out = torch.zeros(out_shape, dtype=hidden_states.dtype, device=hidden_states.device)
         if return_dict:
             return type("Out", (), {"sample": out})
         return (out,)
@@ -480,3 +487,130 @@ class TestWanDenoiseHeavy:
 
     def test_real_ti2v_5b_runs(self) -> None:
         pytest.skip("Heavy test stub — implement once a TI2V-5B checkpoint is installable.")
+
+
+class TestWanDenoiseRefImage:
+    """Phase 7: VAE-latent reference-image conditioning for I2V-A14B.
+
+    The denoise loop must concatenate the 20-channel condition tensor to the
+    16-channel noise latents at every transformer call, producing 36-channel
+    input. Variant gate must fast-fail when ref_image is wired to a non-I2V
+    transformer."""
+
+    def _build_ctx_with_condition(
+        self,
+        transformer: _ZeroTransformer,
+        variant: WanVariantType,
+        model_root: Path,
+        condition_tensor: torch.Tensor | None,
+    ) -> MagicMock:
+        ctx = _build_context(
+            transformer,
+            variant=variant,
+            model_root=model_root,
+            pos_cond=_make_conditioning(),
+            neg_cond=None,
+        )
+        if condition_tensor is not None:
+            ctx.tensors.load.return_value = condition_tensor
+        return ctx
+
+    def _make_inv_with_ref(
+        self,
+        ref_field: "WanRefImageConditioningField | None",
+        *,
+        width: int = 64,
+        height: int = 64,
+    ) -> WanDenoiseInvocation:
+        return WanDenoiseInvocation(
+            id="test",
+            transformer=_wan_transformer_field(dual=True),
+            positive_conditioning=WanConditioningField(conditioning_name="pos"),
+            negative_conditioning=None,
+            ref_image=ref_field,
+            width=width,
+            height=height,
+            steps=3,
+            guidance_scale=1.0,
+            seed=42,
+        )
+
+    def test_ref_image_concatenated_to_36_channels(self, fake_model_root: Path) -> None:
+        """I2V_A14B + ref_image → transformer sees [B, 36, T, H/8, W/8]."""
+        transformer = _ZeroTransformer()
+        # Build the 20-channel condition tensor the encoder would have saved:
+        # 4-ch first-frame mask + 16-ch VAE-encoded image latents.
+        # At 64x64 → 8x8 latent spatial dims.
+        condition = torch.zeros(1, 20, 1, 8, 8)
+        ctx = self._build_ctx_with_condition(
+            transformer, WanVariantType.I2V_A14B, fake_model_root, condition
+        )
+
+        ref_field = WanRefImageConditioningField(
+            condition_tensor_name="condition", width=64, height=64
+        )
+        inv = self._make_inv_with_ref(ref_field)
+        inv._run_diffusion(ctx)
+
+        assert len(transformer.calls) == 3
+        # Every call's hidden_states must have 36 channels (16 noise + 20 condition).
+        for h_shape, *_ in transformer.calls:
+            assert h_shape == (1, 36, 1, 8, 8), f"expected 36-channel input, got {h_shape}"
+
+    def test_no_ref_image_keeps_16_channels(self, fake_model_root: Path) -> None:
+        """Without ref_image → transformer sees [B, 16, T, H/8, W/8] as before."""
+        transformer = _ZeroTransformer()
+        ctx = self._build_ctx_with_condition(
+            transformer, WanVariantType.I2V_A14B, fake_model_root, condition_tensor=None
+        )
+
+        inv = self._make_inv_with_ref(ref_field=None)
+        inv._run_diffusion(ctx)
+
+        for h_shape, *_ in transformer.calls:
+            assert h_shape == (1, 16, 1, 8, 8), f"expected unchanged 16-channel input, got {h_shape}"
+
+    def test_variant_gate_rejects_ref_image_on_t2v(self, fake_model_root: Path) -> None:
+        """T2V_A14B + ref_image must raise — fast-fail before doing any work."""
+        transformer = _ZeroTransformer()
+        condition = torch.zeros(1, 20, 1, 8, 8)
+        ctx = self._build_ctx_with_condition(
+            transformer, WanVariantType.T2V_A14B, fake_model_root, condition
+        )
+
+        ref_field = WanRefImageConditioningField(
+            condition_tensor_name="condition", width=64, height=64
+        )
+        inv = self._make_inv_with_ref(ref_field)
+        with pytest.raises(ValueError, match="only supported by the Wan 2.2 I2V variant"):
+            inv._run_diffusion(ctx)
+
+    def test_variant_gate_rejects_ref_image_on_ti2v(self, fake_model_root: Path) -> None:
+        """TI2V-5B + ref_image must raise — TI2V uses a different image path."""
+        transformer = _ZeroTransformer()
+        condition = torch.zeros(1, 20, 1, 8, 8)
+        ctx = self._build_ctx_with_condition(
+            transformer, WanVariantType.TI2V_5B, fake_model_root, condition
+        )
+
+        ref_field = WanRefImageConditioningField(
+            condition_tensor_name="condition", width=64, height=64
+        )
+        inv = self._make_inv_with_ref(ref_field)
+        with pytest.raises(ValueError, match="only supported by the Wan 2.2 I2V variant"):
+            inv._run_diffusion(ctx)
+
+    def test_dim_mismatch_raises(self, fake_model_root: Path) -> None:
+        """If the encoder's width/height differ from denoise's, fail clearly."""
+        transformer = _ZeroTransformer()
+        condition = torch.zeros(1, 20, 1, 8, 8)
+        ctx = self._build_ctx_with_condition(
+            transformer, WanVariantType.I2V_A14B, fake_model_root, condition
+        )
+
+        ref_field = WanRefImageConditioningField(
+            condition_tensor_name="condition", width=512, height=512
+        )
+        inv = self._make_inv_with_ref(ref_field, width=64, height=64)
+        with pytest.raises(ValueError, match="must match denoise dimensions"):
+            inv._run_diffusion(ctx)

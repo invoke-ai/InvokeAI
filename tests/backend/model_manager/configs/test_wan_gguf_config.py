@@ -49,6 +49,17 @@ def _wan_ti2v_state_dict() -> dict:
     }
 
 
+def _wan_i2v_a14b_state_dict() -> dict:
+    """Wan 2.2 I2V-A14B GGUF: same shape as T2V except patch_embedding has 36
+    input channels (16 noise + 16 ref-image latents + 4 first-frame mask)."""
+    return {
+        "patch_embedding.weight": _ggml((5120, 36, 1, 2, 2)),
+        "condition_embedder.text_embedder.linear_1.weight": _ggml((5120, 4096)),
+        "blocks.0.attn1.to_q.weight": _ggml((5120, 5120)),
+        "blocks.0.ffn.net.0.proj.weight": _ggml((13824, 5120)),
+    }
+
+
 def _wan_a14b_native_state_dict() -> dict:
     """Synthetic Wan A14B GGUF state dict using the native upstream key layout
     (text_embedding/self_attn/cross_attn/ffn.0 — what QuantStack and ComfyUI ship)."""
@@ -124,6 +135,13 @@ class TestVariantDetection:
     def test_ti2v_from_48ch(self):
         sd = _wan_ti2v_state_dict()
         assert _detect_wan_gguf_variant(sd) == WanVariantType.TI2V_5B
+
+    def test_i2v_a14b_from_36ch(self):
+        """Wan 2.2 I2V has the same A14B architecture as T2V but with
+        in_channels=36 because the ref-image latents and first-frame mask are
+        concatenated to the noise along the channel dim before patch embedding."""
+        sd = _wan_i2v_a14b_state_dict()
+        assert _detect_wan_gguf_variant(sd) == WanVariantType.I2V_A14B
 
     def test_unknown_channel_count_returns_none(self):
         sd = {"patch_embedding.weight": _ggml((1, 32, 1, 2, 2))}

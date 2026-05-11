@@ -240,13 +240,12 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_LyCORIS_FLUX_Config, LoRA_LyCORIS_FLUX_Config.get_tag()],
         Annotated[LoRA_LyCORIS_ZImage_Config, LoRA_LyCORIS_ZImage_Config.get_tag()],
         Annotated[LoRA_LyCORIS_QwenImage_Config, LoRA_LyCORIS_QwenImage_Config.get_tag()],
-        # Wan must come BEFORE Anima: Anima's probe only checks for the bare
-        # ``cross_attn``/``self_attn`` substring (it doesn't require Cosmos
-        # DiT's ``_proj`` suffix or ``mlp``/``adaln_modulation``), so a Wan
-        # native PEFT LoRA (``diffusion_model.blocks.X.cross_attn.k...``)
-        # would otherwise match Anima first. Wan's probe is strictly more
-        # restrictive — it rejects Anima's ``_proj`` suffix via the
-        # anti-pattern — so trying Wan first is safe for both directions.
+        # Wan and Anima both target ``blocks.X`` shapes; their LoRA probes are
+        # mutually exclusive — Wan rejects Anima's ``_proj``/``mlp``/
+        # ``adaln_modulation`` markers, Anima requires at least one of those
+        # markers (see ``has_cosmos_dit_*_keys_strict``). Order between these
+        # two doesn't affect correctness; mutual exclusivity is locked in by
+        # ``test_wan_lora_probe_independence.py``.
         Annotated[LoRA_LyCORIS_Wan_Config, LoRA_LyCORIS_Wan_Config.get_tag()],
         Annotated[LoRA_LyCORIS_Anima_Config, LoRA_LyCORIS_Anima_Config.get_tag()],
         # LoRA - OMI format

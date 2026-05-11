@@ -281,64 +281,55 @@ class TestProbeAcceptance:
                 LoRA_LyCORIS_Wan_Config.from_model_on_disk(_make_mod(f, sd), _overrides(f, "flux"))
 
 
-class TestFactoryOrdering:
-    """Regression: native-PEFT Wan LoRAs share the ``cross_attn``/``self_attn``
-    substring with Anima/Cosmos DiT. Anima's probe matches on the bare substring
-    (it doesn't require Anima's ``_proj`` suffix or ``mlp``/``adaln_modulation``),
-    so a Wan LoRA would be mis-tagged as Anima unless Wan's probe runs first
-    in the AnyModelConfig union — or unless Anima's probe gets tightened.
+class TestProbeMutualExclusivity:
+    """Regression: Anima's probe must REJECT Wan-native LoRA keys, so probing
+    is correct regardless of which config the factory iterates first.
 
-    This test pins the order by importing the union and asserting Wan appears
-    before Anima in the LyCORIS section.
-    """
+    ``Config_Base.CONFIG_CLASSES`` is a ``set``, so iteration order is
+    non-deterministic across Python process restarts. Probes therefore need
+    to be mutually exclusive at the per-config level — see also
+    ``test_wan_lora_probe_independence.py`` for the broader cross-architecture
+    coverage."""
 
-    def test_wan_appears_before_anima_in_lora_union(self):
-        from typing import get_args
-
-        from invokeai.backend.model_manager.configs.factory import AnyModelConfig
-        from invokeai.backend.model_manager.configs.lora import (
-            LoRA_LyCORIS_Anima_Config,
-            LoRA_LyCORIS_Wan_Config,
-        )
-
-        # AnyModelConfig is an Annotated[Union[...], Discriminator(...)] — the
-        # first arg of get_args is the Union itself.
-        union_type = get_args(AnyModelConfig)[0]
-        union_members = get_args(union_type)
-
-        def _index_of(cls) -> int:
-            for i, m in enumerate(union_members):
-                # Each member is Annotated[ConfigClass, Tag(...)]; first get_args is the class.
-                if get_args(m)[0] is cls:
-                    return i
-            raise AssertionError(f"{cls.__name__} not in union")
-
-        wan_idx = _index_of(LoRA_LyCORIS_Wan_Config)
-        anima_idx = _index_of(LoRA_LyCORIS_Anima_Config)
-        assert wan_idx < anima_idx, (
-            f"LoRA_LyCORIS_Wan_Config must come before LoRA_LyCORIS_Anima_Config in "
-            f"the AnyModelConfig union (Wan at {wan_idx}, Anima at {anima_idx}). "
-            "Otherwise Anima's cross_attn/self_attn substring match will steal Wan LoRAs."
-        )
-
-    def test_anima_would_have_matched_a_wan_native_lora(self):
-        """Sanity check: confirm that Anima's probe DOES match a Wan native LoRA
-        if asked directly. This is why ordering matters — Wan must run first."""
+    def test_anima_rejects_wan_native_lora(self):
+        """Wan native LoRAs (``diffusion_model.blocks.X.self_attn.q.lora_*``)
+        used to false-positive on Anima's probe because Anima accepted any
+        ``cross_attn``/``self_attn`` substring. Anima now requires
+        Cosmos-DiT-exclusive markers (``mlp``, ``adaln_modulation``, or the
+        ``_proj`` attention suffix), so a Wan LoRA — which has none of those —
+        is correctly rejected."""
         from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_Anima_Config
 
         with TemporaryDirectory() as tmp:
             f = Path(tmp) / "wan_native_lora.safetensors"
             f.touch()
-            # Realistic Wan native PEFT keys: this is what lightx2v's Lightning
-            # LoRAs and most ComfyUI-trained Wan LoRAs look like.
+            # Realistic Wan native PEFT keys — what lightx2v's Lightning
+            # distillations and most ComfyUI-trained Wan LoRAs look like.
             sd = {
                 "diffusion_model.blocks.0.self_attn.q.lora_A.weight": _t((128, 5120)),
                 "diffusion_model.blocks.0.self_attn.q.lora_B.weight": _t((5120, 128)),
                 "diffusion_model.blocks.0.cross_attn.k.lora_A.weight": _t((128, 5120)),
                 "diffusion_model.blocks.0.cross_attn.k.lora_B.weight": _t((5120, 128)),
             }
-            # Anima's probe (today) erroneously accepts these. If this assertion
-            # ever flips, Anima's probe got tightened and the Wan-first ordering
-            # constraint is no longer required (but it's still safe to keep).
-            cfg = LoRA_LyCORIS_Anima_Config.from_model_on_disk(_make_mod(f, sd), _overrides(f, "anima-false-positive"))
-            assert cfg.base == BaseModelType.Anima  # NB: a false positive; protected against by ordering
+            with pytest.raises(NotAMatchError, match="Anima LoRA"):
+                LoRA_LyCORIS_Anima_Config.from_model_on_disk(
+                    _make_mod(f, sd), _overrides(f, "wan-native-lora")
+                )
+
+    def test_wan_rejects_anima_lora(self):
+        """Mirror direction: a real Anima LoRA must not be matched by Wan.
+        Wan's anti-patterns already cover ``_proj`` suffix, ``mlp``, and
+        ``adaln_modulation``."""
+        with TemporaryDirectory() as tmp:
+            f = Path(tmp) / "anima_lora.safetensors"
+            f.touch()
+            sd = {
+                "transformer.blocks.0.self_attn.q_proj.lora_A.weight": _t((128, 4096)),
+                "transformer.blocks.0.self_attn.q_proj.lora_B.weight": _t((4096, 128)),
+                "transformer.blocks.0.mlp.layer1.lora_A.weight": _t((128, 4096)),
+                "transformer.blocks.0.mlp.layer1.lora_B.weight": _t((4096, 128)),
+            }
+            with pytest.raises(NotAMatchError, match="Wan LoRA"):
+                LoRA_LyCORIS_Wan_Config.from_model_on_disk(
+                    _make_mod(f, sd), _overrides(f, "anima-lora")
+                )

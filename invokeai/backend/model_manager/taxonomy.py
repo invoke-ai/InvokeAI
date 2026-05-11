@@ -172,14 +172,20 @@ class QwenImageVariantType(str, Enum):
 class WanVariantType(str, Enum):
     """Wan 2.2 model variants.
 
-    Both variants are used for image generation at num_frames=1. They differ in
-    architecture: A14B is a Mixture-of-Experts model with two transformer experts
-    (high-noise and low-noise) totalling ~28B params; TI2V-5B is a single ~5B
-    transformer with a higher-compression VAE (z_dim=48).
+    All variants are used for image generation at num_frames=1. The A14B family
+    is a Mixture-of-Experts (high-noise + low-noise) totalling ~28B params; the
+    T2V sub-variant takes text only, while the I2V sub-variant additionally
+    conditions on a reference image (encoded by the VAE and concatenated to the
+    noise latents along the channel dim — its transformer has ``in_channels=36``
+    instead of ``16``). TI2V-5B is a single ~5B transformer with a
+    higher-compression VAE (z_dim=48).
     """
 
     T2V_A14B = "t2v_a14b"
-    """Wan 2.2 T2V-A14B - dual-expert MoE flagship (high-noise + low-noise transformers, standard 16-channel Wan VAE)."""
+    """Wan 2.2 T2V-A14B - dual-expert MoE (text only, 16-channel Wan VAE, transformer in_channels=16)."""
+
+    I2V_A14B = "i2v_a14b"
+    """Wan 2.2 I2V-A14B - dual-expert MoE with VAE-latent reference-image conditioning (transformer in_channels=36)."""
 
     TI2V_5B = "ti2v_5b"
     """Wan 2.2 TI2V-5B - smaller single-transformer model with Wan2.2-VAE (48 latent channels)."""

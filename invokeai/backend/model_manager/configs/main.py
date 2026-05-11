@@ -1434,12 +1434,18 @@ def _is_native_wan_layout(state_dict: dict[str | int, Any]) -> bool:
 
 
 def _detect_wan_gguf_variant(state_dict: dict[str | int, Any]) -> WanVariantType | None:
-    """Determine A14B vs TI2V-5B from the GGUF state dict.
+    """Determine A14B (T2V vs I2V) vs TI2V-5B from the GGUF state dict.
 
-    ``patch_embedding.weight`` has shape ``[inner_dim, in_channels, T, H, W]``
-    where ``in_channels`` is the latent channel count: 16 for the standard Wan
-    VAE (A14B family) or 48 for Wan2.2-VAE (TI2V-5B). Returns None if the
-    tensor isn't found or the channel count is unrecognised.
+    ``patch_embedding.weight`` has shape ``[inner_dim, in_channels, T, H, W]``;
+    ``in_channels`` uniquely identifies the Wan 2.2 variant:
+
+    - 16 → T2V-A14B (noise latents only).
+    - 36 → I2V-A14B (16 noise + 16 ref-image latents + 4 first-frame mask,
+      concatenated along the channel dim — see diffusers
+      ``WanImageToVideoPipeline.prepare_latents``).
+    - 48 → TI2V-5B (Wan2.2-VAE z_dim=48).
+
+    Returns None if the tensor is missing or the channel count is unrecognised.
     """
     candidates = (
         "patch_embedding.weight",
@@ -1455,6 +1461,8 @@ def _detect_wan_gguf_variant(state_dict: dict[str | int, Any]) -> WanVariantType
             in_channels = int(shape[1])
             if in_channels == 16:
                 return WanVariantType.T2V_A14B
+            if in_channels == 36:
+                return WanVariantType.I2V_A14B
             if in_channels == 48:
                 return WanVariantType.TI2V_5B
             return None
@@ -1593,10 +1601,21 @@ class Main_Diffusers_Wan_Config(Diffusers_Config_Base, Main_Config_Base, Config_
     def _detect_wan_variant(cls, mod: ModelOnDisk, has_dual_expert: bool) -> WanVariantType:
         """Detect Wan variant from transformer + VAE config.
 
-        - A14B: dual transformer experts, standard Wan VAE (z_dim=16).
+        - T2V-A14B: dual transformer experts, standard Wan VAE (z_dim=16),
+          transformer ``in_channels=16`` (text-only conditioning).
+        - I2V-A14B: dual transformer experts, standard Wan VAE,
+          transformer ``in_channels=36`` (text + VAE-encoded reference image
+          + first-frame mask concatenated along the channel dim).
         - TI2V-5B: single transformer, Wan2.2-VAE (z_dim=48).
         """
         if has_dual_expert:
+            # Disambiguate T2V vs I2V via the transformer's input channel count.
+            # Wan 2.2 I2V uses VAE-latent concatenation: 16 noise + 16 ref-image
+            # latents + 4 first-frame mask = 36. (Wan 2.1 I2V used CLIP-vision
+            # via ``image_dim``; that mechanism is absent in Wan 2.2.)
+            in_channels = cls._transformer_in_channels(mod)
+            if in_channels == 36:
+                return WanVariantType.I2V_A14B
             return WanVariantType.T2V_A14B
 
         # Single-transformer model: distinguish TI2V-5B from any future single-expert
@@ -1615,6 +1634,24 @@ class Main_Diffusers_Wan_Config(Diffusers_Config_Base, Main_Config_Base, Config_
         if "5b" in name or "ti2v" in name:
             return WanVariantType.TI2V_5B
         return WanVariantType.T2V_A14B
+
+    @staticmethod
+    def _transformer_in_channels(mod: ModelOnDisk) -> int | None:
+        """Read ``in_channels`` from ``transformer/config.json``.
+
+        For Wan 2.2 A14B, this is the canonical discriminator between T2V
+        (``in_channels=16``) and I2V (``in_channels=36``). Returns None if the
+        config can't be read.
+        """
+        try:
+            transformer_config = get_config_dict_or_raise(mod.path / "transformer" / "config.json")
+        except NotAMatchError:
+            return None
+        value = transformer_config.get("in_channels")
+        try:
+            return int(value) if value is not None else None
+        except (TypeError, ValueError):
+            return None
 
 
 class Main_Checkpoint_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):

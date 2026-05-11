@@ -33,7 +33,9 @@ from invokeai.backend.model_manager.taxonomy import (
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     has_cosmos_dit_kohya_keys,
+    has_cosmos_dit_kohya_keys_strict,
     has_cosmos_dit_peft_keys,
+    has_cosmos_dit_peft_keys_strict,
 )
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
 from invokeai.backend.patches.lora_conversions.wan_lora_constants import (
@@ -890,16 +892,23 @@ class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         Anima LoRAs have keys like:
         - lora_unet_blocks_0_cross_attn_k_proj.lora_down.weight (Kohya format)
         - diffusion_model.blocks.0.cross_attn.k_proj.lora_A.weight (diffusers PEFT format)
-        - transformer.blocks.0.cross_attn.k_proj.lora_A.weight (diffusers PEFT format)
+        - transformer.blocks.0.mlp.layer_0.lora_A.weight (Anima-only MLP layer)
 
-        Detection requires Cosmos DiT-specific subcomponent names (cross_attn,
-        self_attn, mlp, adaln_modulation) to avoid false-positives on other
-        architectures that also use ``blocks`` in their paths.
+        Uses the **strict** Cosmos-DiT detectors, which require an
+        Anima-exclusive subcomponent name (``mlp``, ``adaln_modulation``, or
+        ``_proj``-suffixed attention). The loose detectors would also accept
+        Wan-native LoRAs (which use ``cross_attn``/``self_attn`` too but with
+        bare ``.q``/``.k``/``.v``/``.o`` rather than ``_proj``), so they're not
+        safe for first-match-wins probing — see the regression tests in
+        ``test_wan_lora_probe_independence.py``.
         """
         state_dict = mod.load_state_dict()
         str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
 
-        has_cosmos_keys = has_cosmos_dit_kohya_keys(str_keys) or has_cosmos_dit_peft_keys(str_keys)
+        has_cosmos_keys = (
+            has_cosmos_dit_kohya_keys_strict(str_keys)
+            or has_cosmos_dit_peft_keys_strict(str_keys)
+        )
 
         # Also check for LoRA/LoKR weight suffixes
         has_lora_suffix = state_dict_has_any_keys_ending_with(
@@ -922,14 +931,16 @@ class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
-        """Anima LoRAs target Cosmos DiT blocks (blocks.X.cross_attn, blocks.X.self_attn, etc.).
+        """Anima LoRAs target Cosmos DiT blocks (blocks.X.mlp, blocks.X.adaln_modulation,
+        blocks.X.cross_attn.q_proj, etc.).
 
-        Uses Cosmos DiT-specific subcomponent names to avoid false-positives.
+        Uses the strict Cosmos-DiT detectors to be mutually exclusive with
+        Wan-LoRA detection — see ``_validate_looks_like_lora`` for rationale.
         """
         state_dict = mod.load_state_dict()
         str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
 
-        if has_cosmos_dit_kohya_keys(str_keys) or has_cosmos_dit_peft_keys(str_keys):
+        if has_cosmos_dit_kohya_keys_strict(str_keys) or has_cosmos_dit_peft_keys_strict(str_keys):
             return BaseModelType.Anima
 
         raise NotAMatchError("model does not look like an Anima LoRA")
