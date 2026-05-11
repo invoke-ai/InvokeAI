@@ -2873,6 +2873,39 @@
             "polygon": "Polygon",
             "polygonHint": "Click to add points, click the first point to close."
         },
+        "modifierHints": {
+            "keys": {
+                "control": "Ctrl",
+                "command": "Cmd",
+                "option": "Option",
+                "alt": "Alt",
+                "shift": "Shift",
+                "space": "Space",
+                "wheel": "Wheel",
+                "arrows": "Arrows",
+                "enter": "Enter",
+                "esc": "Esc"
+            },
+            "labels": {
+                "pan": "Pan",
+                "pickColor": "Pick color",
+                "straightLine": "Straight line",
+                "resizeBrush": "Resize brush",
+                "resizeEraser": "Resize eraser",
+                "subtractMask": "Subtract mask",
+                "snap45Degrees": "Snap to 45deg",
+                "lockAspectRatio": "Lock ratio",
+                "unlockAspectRatio": "Unlock ratio",
+                "scaleFromCenter": "Scale from center",
+                "fineGrid": "Fine grid",
+                "commitText": "Commit",
+                "newLine": "New line",
+                "cancelText": "Cancel",
+                "dragText": "Drag text",
+                "snapRotation": "Snap rotation",
+                "nudgeSelection": "Nudge selection"
+            }
+        },
         "tool": {
             "brush": "Brush",
             "eraser": "Eraser",
