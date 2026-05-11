@@ -1,8 +1,9 @@
 import { get } from 'es-toolkit/compat';
 import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from 'features/nodes/store/util/connectorTopology';
-import { img_resize, main_model_loader } from 'features/nodes/store/util/testUtils';
+import { buildNode, img_resize, main_model_loader } from 'features/nodes/store/util/testUtils';
+import type { InvocationTemplate } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
-import { getDefaultForm } from 'features/nodes/types/workflow';
+import { getDefaultForm, isWorkflowInvocationNode } from 'features/nodes/types/workflow';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
 import { describe, expect, it } from 'vitest';
 
@@ -106,6 +107,102 @@ describe('validateWorkflow', () => {
     new Promise((resolve) => {
       resolve(false);
     });
+  const noise: InvocationTemplate = {
+    title: 'Create Latent Noise',
+    type: 'noise',
+    version: '1.1.0',
+    tags: ['latents', 'noise'],
+    description: 'Generates latent noise for supported denoiser architectures.',
+    outputType: 'noise_output',
+    inputs: {
+      noise_type: {
+        name: 'noise_type',
+        title: 'Noise Type',
+        required: false,
+        description: 'Architecture-specific noise type.',
+        fieldKind: 'input',
+        input: 'any',
+        ui_hidden: false,
+        type: { name: 'EnumField', cardinality: 'SINGLE', batch: false },
+        default: 'SD',
+        options: ['SD', 'FLUX', 'FLUX.2', 'SD3', 'CogView4', 'Z-Image', 'Anima'],
+      },
+      seed: {
+        name: 'seed',
+        title: 'Seed',
+        required: false,
+        description: 'Seed',
+        fieldKind: 'input',
+        input: 'any',
+        ui_hidden: false,
+        type: { name: 'IntegerField', cardinality: 'SINGLE', batch: false },
+        default: 0,
+      },
+      width: {
+        name: 'width',
+        title: 'Width',
+        required: false,
+        description: 'Width',
+        fieldKind: 'input',
+        input: 'any',
+        ui_hidden: false,
+        type: { name: 'IntegerField', cardinality: 'SINGLE', batch: false },
+        default: 512,
+      },
+      height: {
+        name: 'height',
+        title: 'Height',
+        required: false,
+        description: 'Height',
+        fieldKind: 'input',
+        input: 'any',
+        ui_hidden: false,
+        type: { name: 'IntegerField', cardinality: 'SINGLE', batch: false },
+        default: 512,
+      },
+      use_cpu: {
+        name: 'use_cpu',
+        title: 'Use CPU',
+        required: false,
+        description: 'Use CPU for noise generation',
+        fieldKind: 'input',
+        input: 'any',
+        ui_hidden: false,
+        type: { name: 'BooleanField', cardinality: 'SINGLE', batch: false },
+        default: true,
+      },
+    },
+    outputs: {
+      noise: {
+        fieldKind: 'output',
+        name: 'noise',
+        title: 'Noise',
+        description: 'Noise output',
+        type: { name: 'LatentsField', cardinality: 'SINGLE', batch: false },
+        ui_hidden: false,
+      },
+      width: {
+        fieldKind: 'output',
+        name: 'width',
+        title: 'Width',
+        description: 'Width output',
+        type: { name: 'IntegerField', cardinality: 'SINGLE', batch: false },
+        ui_hidden: false,
+      },
+      height: {
+        fieldKind: 'output',
+        name: 'height',
+        title: 'Height',
+        description: 'Height output',
+        type: { name: 'IntegerField', cardinality: 'SINGLE', batch: false },
+        ui_hidden: false,
+      },
+    },
+    useCache: true,
+    nodePack: 'invokeai',
+    classification: 'stable',
+    category: 'latents',
+  };
   it('should reset images that are inaccessible', async () => {
     const validationResult = await validateWorkflow({
       workflow: getWorkflow(),
@@ -163,6 +260,44 @@ describe('validateWorkflow', () => {
 
     expect(validationResult.workflow.edges).toEqual([]);
     expect(validationResult.warnings.length).toBe(1);
+  });
+
+  it('should migrate universal_noise nodes to noise and drop the removed transformer input', async () => {
+    const workflow = getWorkflow();
+    const noiseNode = buildNode(noise);
+    const noiseTypeInput = noiseNode.data.inputs.noise_type;
+    if (!noiseTypeInput) {
+      throw new Error('Missing noise_type input');
+    }
+    noiseNode.data.type = 'universal_noise';
+    noiseNode.data.version = '1.0.0';
+    noiseTypeInput.value = 'FLUX';
+    noiseNode.data.inputs.transformer = {
+      name: 'transformer',
+      label: '',
+      description: '',
+      value: { key: 'transformer-key', hash: 'hash', name: 'name', base: 'sd-3', type: 'main' },
+    } as never;
+    workflow.nodes = [noiseNode];
+
+    const validationResult = await validateWorkflow({
+      workflow,
+      templates: { noise },
+      checkImageAccess: resolveTrue,
+      checkBoardAccess: resolveTrue,
+      checkModelAccess: resolveTrue,
+    });
+
+    expect(validationResult.warnings).toEqual([]);
+    const migratedNode = validationResult.workflow.nodes[0];
+    expect(isWorkflowInvocationNode(migratedNode)).toBe(true);
+    if (!isWorkflowInvocationNode(migratedNode)) {
+      throw new Error('Expected invocation node');
+    }
+    expect(migratedNode.data.type).toBe('noise');
+    expect(migratedNode.data.version).toBe('1.1.0');
+    expect(get(validationResult.workflow, 'nodes[0].data.inputs.noise_type.value')).toBe('FLUX');
+    expect(get(validationResult.workflow, 'nodes[0].data.inputs.transformer')).toBeUndefined();
   });
 
   it('should delete connector edges with missing endpoints', async () => {

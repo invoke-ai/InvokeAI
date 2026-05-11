@@ -21,9 +21,9 @@ from invokeai.app.invocations.fields import (
     LatentsField,
     ZImageConditioningField,
 )
+from invokeai.app.invocations.latent_noise import validate_noise_tensor_shape
 from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
-from invokeai.app.invocations.universal_noise import validate_noise_tensor_shape
 from invokeai.app.invocations.z_image_control import ZImageControlField
 from invokeai.app.invocations.z_image_image_to_latents import ZImageImageToLatentsInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext

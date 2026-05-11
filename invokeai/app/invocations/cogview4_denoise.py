@@ -18,9 +18,9 @@ from invokeai.app.invocations.fields import (
     WithBoard,
     WithMetadata,
 )
+from invokeai.app.invocations.latent_noise import validate_noise_tensor_shape
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
-from invokeai.app.invocations.universal_noise import validate_noise_tensor_shape
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.model_manager.taxonomy import BaseModelType

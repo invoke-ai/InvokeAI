@@ -1,56 +1,17 @@
-# Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654) & the InvokeAI Team
-
-
 import torch
 from pydantic import field_validator
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import FieldDescriptions, InputField, LatentsField, OutputField
+from invokeai.app.invocations.latent_noise import (
+    LatentNoiseType,
+    generate_noise_tensor,
+    validate_noise_dimensions,
+)
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import SEED_MAX
 from invokeai.backend.util.devices import TorchDevice
-
-"""
-Utilities
-"""
-
-
-def get_noise(
-    width: int,
-    height: int,
-    device: torch.device,
-    seed: int = 0,
-    latent_channels: int = 4,
-    downsampling_factor: int = 8,
-    use_cpu: bool = True,
-    perlin: float = 0.0,
-):
-    """Generate noise for a given image size."""
-    noise_device_type = "cpu" if use_cpu else device.type
-
-    # limit noise to only the diffusion image channels, not the mask channels
-    input_channels = min(latent_channels, 4)
-    generator = torch.Generator(device=noise_device_type).manual_seed(seed)
-
-    noise_tensor = torch.randn(
-        [
-            1,
-            input_channels,
-            height // downsampling_factor,
-            width // downsampling_factor,
-        ],
-        dtype=TorchDevice.choose_torch_dtype(device=device),
-        device=noise_device_type,
-        generator=generator,
-    ).to("cpu")
-
-    return noise_tensor
-
-
-"""
-Nodes
-"""
 
 
 @invocation_output("noise_output")
@@ -65,8 +26,8 @@ class NoiseOutput(BaseInvocationOutput):
     def build(cls, latents_name: str, latents: torch.Tensor, seed: int) -> "NoiseOutput":
         return cls(
             noise=LatentsField(latents_name=latents_name, seed=seed),
-            width=latents.size()[3] * LATENT_SCALE_FACTOR,
-            height=latents.size()[2] * LATENT_SCALE_FACTOR,
+            width=latents.shape[-1] * LATENT_SCALE_FACTOR,
+            height=latents.shape[-2] * LATENT_SCALE_FACTOR,
         )
 
 
@@ -75,10 +36,12 @@ class NoiseOutput(BaseInvocationOutput):
     title="Create Latent Noise",
     tags=["latents", "noise"],
     category="latents",
-    version="1.0.3",
+    version="1.1.0",
 )
 class NoiseInvocation(BaseInvocation):
-    """Generates latent noise."""
+    """Generates latent noise for supported denoiser architectures."""
+
+    noise_type: LatentNoiseType = InputField(default="SD", description="Architecture-specific noise type.")
 
     seed: int = InputField(
         default=0,
@@ -109,11 +72,14 @@ class NoiseInvocation(BaseInvocation):
         return v % (SEED_MAX + 1)
 
     def invoke(self, context: InvocationContext) -> NoiseOutput:
-        noise = get_noise(
+        validate_noise_dimensions(self.noise_type, self.width, self.height)
+        noise = generate_noise_tensor(
+            noise_type=self.noise_type,
             width=self.width,
             height=self.height,
             device=TorchDevice.choose_torch_device(),
             seed=self.seed,
+            dtype=TorchDevice.choose_torch_dtype(),
             use_cpu=self.use_cpu,
         )
         name = context.tensors.save(tensor=noise)

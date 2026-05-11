@@ -21,9 +21,9 @@ from invokeai.app.invocations.fields import (
     InputField,
     LatentsField,
 )
+from invokeai.app.invocations.latent_noise import validate_noise_tensor_shape
 from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
-from invokeai.app.invocations.universal_noise import validate_noise_tensor_shape
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.flux.schedulers import FLUX_SCHEDULER_LABELS, FLUX_SCHEDULER_MAP, FLUX_SCHEDULER_NAME_VALUES

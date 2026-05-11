@@ -34,9 +34,9 @@ from invokeai.app.invocations.fields import (
     InputField,
     LatentsField,
 )
+from invokeai.app.invocations.latent_noise import validate_noise_tensor_shape
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
-from invokeai.app.invocations.universal_noise import validate_noise_tensor_shape
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.anima.anima_transformer_patch import patch_anima_for_regional_prompting
 from invokeai.backend.anima.conditioning_data import AnimaRegionalTextConditioning, AnimaTextConditioning

@@ -78,6 +78,24 @@ const migrateV3toV4 = (workflowToMigrate: WorkflowV3): WorkflowV3 => {
   return zWorkflowV3.parse(workflowToMigrate);
 };
 
+const migrateUniversalNoiseNode = (workflowToMigrate: WorkflowV3): WorkflowV3 => {
+  for (const node of workflowToMigrate.nodes) {
+    if (node.type !== 'invocation') {
+      continue;
+    }
+    if (node.data.type !== 'universal_noise') {
+      continue;
+    }
+
+    node.data.type = 'noise';
+    // Force the normal node update flow to apply the new template defaults and
+    // drop stale fields such as the removed transformer input.
+    node.data.version = '1.0.0';
+  }
+
+  return workflowToMigrate;
+};
+
 /**
  * Parses a workflow and migrates it to the latest version if necessary.
  *
@@ -105,6 +123,8 @@ export const parseAndMigrateWorkflow = (data: unknown): WorkflowV3 => {
   if (get(workflow, 'meta.version') === '3.0.0') {
     workflow = migrateV3toV4(workflow as WorkflowV3);
   }
+
+  workflow = migrateUniversalNoiseNode(workflow as WorkflowV3);
 
   // We should now have a V3 workflow
   const migratedWorkflow = zWorkflowV3.parse(workflow);

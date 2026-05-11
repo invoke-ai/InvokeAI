@@ -597,10 +597,10 @@ def get_noise_newmodel(
         dtype=dtype,
     )
 
-# If the architecture supports external noise, also extend
-# invokeai/app/invocations/universal_noise.py when the tensor contract can be
-# represented there. Only create a dedicated noise invocation when
-# Universal Noise cannot express the architecture cleanly.
+# If the architecture supports external noise, extend the standard
+# invokeai/app/invocations/noise.py node when the tensor contract can be
+# represented there. Only create a dedicated noise invocation when the
+# standard noise node cannot express the architecture cleanly.
 
 def pack_newmodel(x: torch.Tensor) -> torch.Tensor:
     """Pack latents for transformer input.
@@ -725,8 +725,8 @@ NEWMODEL_SCHEDULER_MAP = {
 ### Backend Sampling and Denoise Checklist
 
 - [ ] Noise generation (`get_noise_newmodel()`)
-- [ ] Extend `invokeai/app/invocations/universal_noise.py` when the
-      architecture's noise tensor contract fits there
+- [ ] Extend `invokeai/app/invocations/noise.py` when the architecture's
+      noise tensor contract fits the standard architecture selector
 - [ ] Pack/unpack functions (if transformer-based)
 - [ ] Schedule generation (`get_schedule_newmodel()`)
 - [ ] Position ID generation (if needed)
@@ -1259,19 +1259,19 @@ export const NewModelSchedulerSelect = () => {
 - [ ] Validate external noise shape against the architecture's expected
       latent shape
 - [ ] Preserve existing behavior when `noise` is not connected
-- [ ] Extend `Universal Noise` when the architecture's latent noise contract
-      can be represented there
+- [ ] Extend the standard `noise` invocation when the architecture's latent
+      noise contract can be represented there
 - [ ] Add a dedicated architecture-compatible noise invocation only when
-      `Universal Noise` cannot support the architecture cleanly
+      the standard `noise` invocation cannot support the architecture cleanly
 
 If your model supports external noise, the denoise invocation should accept
 it as an optional input rather than replacing the existing seed-driven path.
-When possible, wire the architecture into `Universal Noise` instead of
-creating a separate noise node. Only create a dedicated noise invocation if
-the architecture has a noise tensor contract that `Universal Noise` cannot
-express cleanly. When external noise is connected, validate rank, channel
-count, and spatial shape before blending it with init latents or using it as
-the initial latent state.
+When possible, wire the architecture into the standard `noise` invocation's
+architecture selector instead of creating a separate noise node. Only create
+a dedicated noise invocation if the architecture has a noise tensor contract
+that the standard `noise` invocation cannot express cleanly. When external
+noise is connected, validate rank, channel count, and spatial shape before
+blending it with init latents or using it as the initial latent state.
 
 ---
 
@@ -1305,9 +1305,9 @@ For a **minimal txt2img integration**, the following files are required:
 4. `src/features/nodes/util/graph/generation/addOutpaint.ts`
 
 If the architecture supports external noise, also extend
-`invokeai/app/invocations/universal_noise.py` when possible and keep the
-denoise invocation's `noise` input optional so existing generated workflows
-continue to work without modification.
+`invokeai/app/invocations/noise.py` when possible and keep the denoise
+invocation's `noise` input optional so existing generated workflows continue
+to work without modification.
 
 ---
 

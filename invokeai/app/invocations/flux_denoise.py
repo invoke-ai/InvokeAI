@@ -26,9 +26,9 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.flux_controlnet import FluxControlNetField
 from invokeai.app.invocations.flux_vae_encode import FluxVaeEncodeInvocation
 from invokeai.app.invocations.ip_adapter import IPAdapterField
+from invokeai.app.invocations.latent_noise import validate_noise_tensor_shape
 from invokeai.app.invocations.model import ControlLoRAField, LoRAField, TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
-from invokeai.app.invocations.universal_noise import validate_noise_tensor_shape
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.controlnet.instantx_controlnet_flux import InstantXControlNetFlux
 from invokeai.backend.flux.controlnet.xlabs_controlnet_flux import XLabsControlNetFlux
