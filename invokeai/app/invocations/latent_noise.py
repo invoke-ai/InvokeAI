@@ -1,11 +1,8 @@
-import math
 from typing import Literal
 
 import torch
 
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
-from invokeai.backend.flux.sampling_utils import get_noise as get_flux_noise
-from invokeai.backend.flux2.sampling_utils import get_noise_flux2
 from invokeai.backend.util.devices import TorchDevice
 
 LatentNoiseType = Literal["SD", "FLUX", "FLUX.2", "SD3", "CogView4", "Z-Image", "Anima"]
@@ -30,9 +27,9 @@ def get_expected_noise_shape(
     if noise_type == "SD":
         return (1, 4, height // LATENT_SCALE_FACTOR, width // LATENT_SCALE_FACTOR)
     if noise_type == "FLUX":
-        return (1, 16, 2 * math.ceil(height / 16), 2 * math.ceil(width / 16))
+        return (1, 16, height // LATENT_SCALE_FACTOR, width // LATENT_SCALE_FACTOR)
     if noise_type == "FLUX.2":
-        return (1, 32, 2 * math.ceil(height / 16), 2 * math.ceil(width / 16))
+        return (1, 32, height // LATENT_SCALE_FACTOR, width // LATENT_SCALE_FACTOR)
     if noise_type == "SD3":
         return (1, 16, height // LATENT_SCALE_FACTOR, width // LATENT_SCALE_FACTOR)
     if noise_type == "CogView4":
@@ -76,32 +73,24 @@ def generate_noise_tensor(
             generator=torch.Generator(device=rand_device).manual_seed(seed),
         ).to("cpu")
     if noise_type == "FLUX":
-        if use_cpu:
-            return get_flux_noise(num_samples=1, height=height, width=width, device=device, dtype=dtype, seed=seed).to(
-                "cpu"
-            )
         return torch.randn(
             1,
             16,
-            2 * math.ceil(height / 16),
-            2 * math.ceil(width / 16),
-            device=device,
-            dtype=dtype,
-            generator=torch.Generator(device=device).manual_seed(seed),
+            height // LATENT_SCALE_FACTOR,
+            width // LATENT_SCALE_FACTOR,
+            device=rand_device,
+            dtype=rand_dtype,
+            generator=torch.Generator(device=rand_device).manual_seed(seed),
         ).to("cpu")
     if noise_type == "FLUX.2":
-        if use_cpu:
-            return get_noise_flux2(num_samples=1, height=height, width=width, device=device, dtype=dtype, seed=seed).to(
-                "cpu"
-            )
         return torch.randn(
             1,
             32,
-            2 * math.ceil(height / 16),
-            2 * math.ceil(width / 16),
-            device=device,
-            dtype=dtype,
-            generator=torch.Generator(device=device).manual_seed(seed),
+            height // LATENT_SCALE_FACTOR,
+            width // LATENT_SCALE_FACTOR,
+            device=rand_device,
+            dtype=rand_dtype,
+            generator=torch.Generator(device=rand_device).manual_seed(seed),
         ).to("cpu")
     if noise_type == "SD3":
         return torch.randn(

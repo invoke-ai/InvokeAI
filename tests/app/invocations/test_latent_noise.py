@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 import torch
@@ -88,18 +88,14 @@ def test_noise_invocation_is_deterministic_for_identical_inputs():
 def test_generate_noise_tensor_honors_use_cpu_false_for_flux_variants(noise_type: str, expected_shape):
     from invokeai.app.invocations.latent_noise import generate_noise_tensor
 
-    with (
-        patch("invokeai.app.invocations.latent_noise.get_flux_noise", side_effect=AssertionError("cpu helper called")),
-        patch("invokeai.app.invocations.latent_noise.get_noise_flux2", side_effect=AssertionError("cpu helper called")),
-    ):
-        noise = generate_noise_tensor(
-            noise_type=noise_type,
-            width=64,
-            height=64,
-            seed=0,
-            device=torch.device("cpu"),
-            dtype=torch.float32,
-            use_cpu=False,
-        )
+    noise = generate_noise_tensor(
+        noise_type=noise_type,
+        width=64,
+        height=64,
+        seed=0,
+        device=torch.device("cpu"),
+        dtype=torch.float32,
+        use_cpu=False,
+    )
 
     assert noise.shape == expected_shape

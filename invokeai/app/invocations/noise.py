@@ -7,7 +7,6 @@ from invokeai.app.invocations.fields import FieldDescriptions, InputField, Laten
 from invokeai.app.invocations.latent_noise import (
     LatentNoiseType,
     generate_noise_tensor,
-    validate_noise_dimensions,
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import SEED_MAX
@@ -72,7 +71,6 @@ class NoiseInvocation(BaseInvocation):
         return v % (SEED_MAX + 1)
 
     def invoke(self, context: InvocationContext) -> NoiseOutput:
-        validate_noise_dimensions(self.noise_type, self.width, self.height)
         noise = generate_noise_tensor(
             noise_type=self.noise_type,
             width=self.width,
