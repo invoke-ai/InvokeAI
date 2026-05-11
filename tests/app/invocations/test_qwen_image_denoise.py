@@ -59,3 +59,62 @@ class TestPackUnpackLatents:
         packed = torch.randn(1, 70 * 59, 64)
         unpacked = QwenImageDenoiseInvocation._unpack_latents(packed, 140, 118)
         assert unpacked.shape == (1, 16, 140, 118)
+
+
+class TestAlignRefLatentDims:
+    """Test reference latent dim alignment for 2x2 packing."""
+
+    def test_even_dims_unchanged(self):
+        assert QwenImageDenoiseInvocation._align_ref_latent_dims(96, 64) == (96, 64)
+
+    def test_odd_dims_trimmed_to_even(self):
+        assert QwenImageDenoiseInvocation._align_ref_latent_dims(97, 65) == (96, 64)
+        assert QwenImageDenoiseInvocation._align_ref_latent_dims(150, 151) == (150, 150)
+
+    def test_minimum_aligned_dims(self):
+        assert QwenImageDenoiseInvocation._align_ref_latent_dims(2, 2) == (2, 2)
+        assert QwenImageDenoiseInvocation._align_ref_latent_dims(3, 2) == (2, 2)
+
+    def test_raises_on_zero_dim(self):
+        with pytest.raises(ValueError, match="spatial dims must be >= 2"):
+            QwenImageDenoiseInvocation._align_ref_latent_dims(0, 64)
+        with pytest.raises(ValueError, match="spatial dims must be >= 2"):
+            QwenImageDenoiseInvocation._align_ref_latent_dims(64, 0)
+
+    def test_raises_on_one_dim(self):
+        """A 1-pixel latent aligns to 0 and must be rejected."""
+        with pytest.raises(ValueError, match="spatial dims must be >= 2"):
+            QwenImageDenoiseInvocation._align_ref_latent_dims(1, 64)
+        with pytest.raises(ValueError, match="spatial dims must be >= 2"):
+            QwenImageDenoiseInvocation._align_ref_latent_dims(64, 1)
+
+
+class TestBuildImgShapes:
+    """Test img_shapes construction. Regression test for the ghosting/doubling bug
+    where ref and noisy segments shared identical spatial RoPE positions."""
+
+    def test_txt2img_single_segment(self):
+        """No reference latent → single segment for the noisy latent only."""
+        result = QwenImageDenoiseInvocation._build_img_shapes(64, 64)
+        assert result == [[(1, 32, 32)]]
+
+    def test_edit_uses_distinct_ref_dims(self):
+        """Edit-mode img_shapes must place ref segment at the ref's OWN dims, not
+        the noisy dims. Identical dims caused the ghosting artifact."""
+        noisy_h, noisy_w = 64, 64
+        ref_h, ref_w = 96, 64
+        result = QwenImageDenoiseInvocation._build_img_shapes(noisy_h, noisy_w, ref_h, ref_w)
+        assert result == [[(1, 32, 32), (1, 48, 32)]]
+        # The bug was that both segments had the same shape:
+        assert result[0][0] != result[0][1]
+
+    def test_edit_matches_diffusers_layout(self):
+        """Structure must match diffusers QwenImageEditPipeline (single batch,
+        nested list of (frame, h//2, w//2) tuples)."""
+        result = QwenImageDenoiseInvocation._build_img_shapes(80, 112, 128, 96)
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert isinstance(result[0], list)
+        assert len(result[0]) == 2
+        assert result[0][0] == (1, 40, 56)
+        assert result[0][1] == (1, 64, 48)
