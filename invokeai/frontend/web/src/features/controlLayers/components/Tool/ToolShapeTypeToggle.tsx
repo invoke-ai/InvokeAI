@@ -17,8 +17,8 @@ export const ToolShapeTypeToggle = memo(() => {
 
   const rectLabel = t('controlLayers.shape.rect', { defaultValue: 'Rect' });
   const ovalLabel = t('controlLayers.shape.oval', { defaultValue: 'Oval' });
-  const polygonLabel = t('controlLayers.shape.polygon', { defaultValue: 'Polygon' });
-  const freehandLabel = t('controlLayers.shape.freehand', { defaultValue: 'Freehand' });
+  const polygonLabel = t('controlLayers.lasso.polygon', { defaultValue: 'Polygon' });
+  const freehandLabel = t('controlLayers.lasso.freehand', { defaultValue: 'Freehand' });
 
   return (
     <ButtonGroup isAttached size="sm">
