@@ -33,6 +33,22 @@ export default defineConfig({
       editLink: {
         baseUrl: 'https://github.com/invoke-ai/InvokeAI/edit/main/docs',
       },
+      head: isGhPages
+        ? [
+            {
+              tag: 'script',
+              attrs: {
+                async: true,
+                src: 'https://plausible.tracking.events/js/pa-BHcumuOemKz4XIQeWkTn4.js',
+              },
+            },
+            {
+              tag: 'script',
+              content:
+                'window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};plausible.init()',
+            },
+          ]
+        : [],
       defaultLocale: 'root',
       locales: {
         root: {
