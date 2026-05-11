@@ -6,7 +6,7 @@ from typing import (
     Self,
 )
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from invokeai.backend.model_manager.configs.base import (
     Config_Base,
@@ -39,8 +39,16 @@ from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is
 
 
 class LoraModelDefaultSettings(BaseModel):
-    weight: float | None = Field(default=None, ge=-1, le=2, description="Default weight for this model")
+    weight: float | None = Field(default=None, description="Default weight for this model")
+    weight_min: float | None = Field(default=None, description="Minimum weight slider value for this model")
+    weight_max: float | None = Field(default=None, description="Maximum weight slider value for this model")
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def _validate_weight_bounds(self) -> "LoraModelDefaultSettings":
+        if self.weight_min is not None and self.weight_max is not None and self.weight_min >= self.weight_max:
+            raise ValueError("weight_min must be less than weight_max")
+        return self
 
 
 class LoRA_Config_Base(ABC, BaseModel):

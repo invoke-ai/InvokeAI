@@ -1004,6 +1004,10 @@
     },
     "lora": {
         "weight": "Weight",
+        "startingWeight": "Starting Weight",
+        "weightMin": "Min Weight",
+        "weightMax": "Max Weight",
+        "weightMinMustBeLessThanMax": "Min weight must be less than max weight",
         "removeLoRA": "Remove LoRA"
     },
     "metadata": {
