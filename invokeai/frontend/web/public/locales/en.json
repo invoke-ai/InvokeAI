@@ -2892,6 +2892,7 @@
             },
             "labels": {
                 "pan": "Pan",
+                "moveShape": "Move shape",
                 "pickColor": "Pick color",
                 "straightLine": "Straight line",
                 "resizeBrush": "Resize brush",

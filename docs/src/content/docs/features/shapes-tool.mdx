@@ -1,0 +1,96 @@
+---
+title: Shapes Tool
+description: Learn how to draw filled shapes on raster and inpaint mask layers with the Shapes tool.
+lastUpdated: 2026-05-11
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+The Shapes tool is a general-purpose filled-shape drawing tool for the canvas. It replaces the old Rectangle tool and
+adds four shape modes under a single toolbar button:
+
+- **Rect**
+- **Oval**
+- **Polygon**
+- **Freehand**
+
+You can activate the Shapes tool from the canvas toolbar or with the default hotkey <kbd>U</kbd>.
+
+## Where Shapes Draws
+
+Shapes always draws into the **active raster target**:
+
+- On a regular raster layer, Shapes adds filled pixels to that layer.
+- On an active inpaint mask layer, Shapes draws directly into the mask.
+
+:::note
+Shapes overlaps with some Lasso workflows on mask layers, but the tools are not identical. Lasso is still the more
+specialized masking tool and can create a new mask layer automatically when one does not already exist.
+:::
+
+## Common Behavior
+
+- Shapes preview live while you draw.
+- The fill color uses the current active color.
+- The active color's alpha is respected when adding pixels.
+- Hold <kbd>Ctrl</kbd> on Windows/Linux or <kbd>Cmd</kbd> on macOS to switch to **subtractive** mode and cut pixels
+  out of the active layer.
+- In subtractive mode, alpha is ignored and the shape fully clears pixels.
+- Press <kbd>Esc</kbd> to cancel the current shape session.
+
+:::tip
+When subtractive mode is active, the canvas cursor shows a small minus badge so you can tell at a glance that the next
+shape will erase instead of fill.
+:::
+
+## Shape Modes
+
+<CardGrid>
+  <Card title="Rect">
+    Drag to draw a rectangle. Hold <kbd>Shift</kbd> to constrain to a square. Hold <kbd>Alt</kbd> to draw from the
+    center instead of from a corner.
+  </Card>
+  <Card title="Oval">
+    Drag to draw an ellipse. Hold <kbd>Shift</kbd> to constrain to a perfect circle. Hold <kbd>Alt</kbd> to draw from
+    the center.
+  </Card>
+  <Card title="Polygon">
+    Click to place vertices. Click the first point to close and commit the shape. Hold <kbd>Shift</kbd> to snap the
+    pending edge to horizontal, vertical, and 45 degree angles.
+  </Card>
+  <Card title="Freehand">
+    Click and drag to sketch a filled freehand contour. Release the pointer to commit the shape.
+  </Card>
+</CardGrid>
+
+## Moving and Panning During Drawing
+
+The Shapes tool supports different <kbd>Space</kbd> behavior depending on the current mode:
+
+- **Rect / Oval:** While the pointer is still down, hold <kbd>Space</kbd> to move the uncommitted shape instead of
+  resizing it. Release <kbd>Space</kbd> to continue resizing.
+- **Polygon / Freehand:** Hold <kbd>Space</kbd> during an active session to pan the viewport without discarding the
+  unfinished shape.
+
+This is especially useful when drawing large shapes that extend beyond the current viewport.
+
+## Color Picking While Using Shapes
+
+The <kbd>Alt</kbd> key behaves differently depending on the active Shapes mode:
+
+- **Rect / Oval:** Before you start dragging, <kbd>Alt</kbd> can be used for the temporary color-picker quick-switch.
+  Once a drag is active, <kbd>Alt</kbd> is reserved for drawing from the center.
+- **Polygon:** <kbd>Alt</kbd> remains available for the temporary color-picker quick-switch between vertex placements.
+- **Freehand:** <kbd>Alt</kbd> is available before the stroke starts, but not during an active stroke.
+
+## Practical Examples
+
+- Use **Rect** or **Oval** to block in clean mask regions quickly.
+- Use **Polygon** when you need straight edges and deliberate corner placement.
+- Use **Freehand** for irregular organic regions.
+- Use **subtractive mode** to cut holes back out of an existing raster or mask layer.
+
+## Summary
+
+The Shapes tool is the fastest way to add filled geometric or freeform regions to canvas layers. Use it for structured
+fills, mask authoring, and precise subtractive edits without switching away from the current raster target.

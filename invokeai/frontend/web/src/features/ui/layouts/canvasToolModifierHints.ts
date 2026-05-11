@@ -1,9 +1,15 @@
+import {
+  shouldQuickSwitchToColorPickerOnAlt,
+  shouldTranslateShapeDragOnSpace,
+} from 'features/controlLayers/konva/CanvasTool/toolHotkeys';
 import type { Tool } from 'features/controlLayers/store/types';
 
+type ShapeType = 'rect' | 'oval' | 'polygon' | 'freehand';
 type CanvasToolModifierHintKey = 'mod' | 'shift' | 'alt' | 'space' | 'wheel' | 'arrows' | 'enter' | 'esc';
 
 type CanvasToolModifierHintId =
   | 'spacePan'
+  | 'spaceMoveShape'
   | 'altPickColor'
   | 'shiftStraightLine'
   | 'modWheelResizeBrush'
@@ -34,6 +40,11 @@ const HINTS: Record<CanvasToolModifierHintId, CanvasToolModifierHint> = {
     id: 'spacePan',
     keys: ['space'],
     labelKey: 'controlLayers.modifierHints.labels.pan',
+  },
+  spaceMoveShape: {
+    id: 'spaceMoveShape',
+    keys: ['space'],
+    labelKey: 'controlLayers.modifierHints.labels.moveShape',
   },
   altPickColor: {
     id: 'altPickColor',
@@ -120,8 +131,10 @@ const HINTS: Record<CanvasToolModifierHintId, CanvasToolModifierHint> = {
 type GetCanvasToolModifierHintsArg = {
   tool: Tool;
   lassoMode: 'freehand' | 'polygon';
+  shapeType: ShapeType;
   bboxAspectRatioLocked: boolean;
   hasActiveTextSession: boolean;
+  isPrimaryPointerDown: boolean;
 };
 
 const mapHintIdsToHints = (hintIds: readonly CanvasToolModifierHintId[]): CanvasToolModifierHint[] =>
@@ -130,8 +143,10 @@ const mapHintIdsToHints = (hintIds: readonly CanvasToolModifierHintId[]): Canvas
 export const getCanvasToolModifierHintIds = ({
   tool,
   lassoMode,
+  shapeType,
   bboxAspectRatioLocked,
   hasActiveTextSession,
+  isPrimaryPointerDown,
 }: GetCanvasToolModifierHintsArg): CanvasToolModifierHintId[] => {
   // Resolver map: each tool returns the relevant hint ids based on the provided args.
   const TOOL_HINT_RESOLVERS: Record<
@@ -155,7 +170,21 @@ export const getCanvasToolModifierHintIds = ({
     view: () => ['altPickColor'],
     colorPicker: () => ['spacePan'],
     gradient: () => [...SHARED_HINT_IDS],
-    rect: () => [...SHARED_HINT_IDS],
+    rect: ({ shapeType: st, isPrimaryPointerDown: pointerDown }) => {
+      if (st === 'polygon') {
+        return ['modSubtractMask', 'shiftSnap45Degrees', 'spacePan', 'altPickColor'];
+      }
+
+      if (st === 'freehand') {
+        return shouldQuickSwitchToColorPickerOnAlt('rect', st, pointerDown)
+          ? ['modSubtractMask', 'spacePan', 'altPickColor']
+          : ['modSubtractMask', 'spacePan'];
+      }
+
+      return shouldTranslateShapeDragOnSpace('rect', st, pointerDown, pointerDown)
+        ? ['modSubtractMask', 'shiftLockAspectRatio', 'altScaleFromCenter', 'spaceMoveShape']
+        : ['modSubtractMask', 'shiftLockAspectRatio', 'spacePan', 'altPickColor'];
+    },
   };
 
   const resolver = TOOL_HINT_RESOLVERS[tool];
@@ -163,7 +192,9 @@ export const getCanvasToolModifierHintIds = ({
   if (!resolver) {
     return [];
   }
-  return Array.from(resolver({ tool, lassoMode, bboxAspectRatioLocked, hasActiveTextSession }));
+  return Array.from(
+    resolver({ tool, lassoMode, shapeType, bboxAspectRatioLocked, hasActiveTextSession, isPrimaryPointerDown })
+  );
 };
 
 export const getCanvasToolModifierHints = (args: GetCanvasToolModifierHintsArg): CanvasToolModifierHint[] =>
