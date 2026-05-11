@@ -1,5 +1,6 @@
+import math
 from contextlib import ExitStack
-from typing import Callable, Iterator, Optional, Tuple
+from typing import Callable, ClassVar, Iterator, Optional, Tuple
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -211,6 +212,37 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             shapes.append((1, ref_latent_height // 2, ref_latent_width // 2))
         return [shapes]
 
+    # diffusers' QwenImageEdit(Plus)Pipeline VAE_IMAGE_SIZE = 1024 * 1024 pixels;
+    # ref images are resized to this area (preserving aspect, snapped to multiples
+    # of 32) before VAE encoding. We mirror this clamp in latent space so direct
+    # backend callers — whose i2l may not pass explicit width/height — don't feed
+    # the transformer an out-of-distribution reference sequence length (which
+    # also causes a VRAM spike for large inputs).
+    _REF_TARGET_PIXEL_AREA: ClassVar[int] = 1024 * 1024
+    _VAE_SCALE_FACTOR: ClassVar[int] = 8
+
+    @classmethod
+    def _maybe_clamp_ref_latent_size(cls, ref_latents: torch.Tensor) -> torch.Tensor:
+        """Bilinear-downscale the reference latent if it exceeds diffusers'
+        VAE_IMAGE_SIZE budget.
+
+        Returns the latent unchanged if it's already within budget.
+        """
+        _, _, rh, rw = ref_latents.shape
+        target_cells = cls._REF_TARGET_PIXEL_AREA // (cls._VAE_SCALE_FACTOR**2)
+        if rh * rw <= target_cells:
+            return ref_latents
+        aspect = rw / rh
+        target_w_px = math.sqrt(cls._REF_TARGET_PIXEL_AREA * aspect)
+        target_h_px = target_w_px / aspect
+        target_w_px = max(32, round(target_w_px / 32) * 32)
+        target_h_px = max(32, round(target_h_px / 32) * 32)
+        target_rh = target_h_px // cls._VAE_SCALE_FACTOR
+        target_rw = target_w_px // cls._VAE_SCALE_FACTOR
+        return torch.nn.functional.interpolate(
+            ref_latents, size=(target_rh, target_rw), mode="bilinear", antialias=False
+        )
+
     def _run_diffusion(self, context: InvocationContext):
         inference_dtype = torch.bfloat16
         device = TorchDevice.choose_torch_device()
@@ -371,6 +403,11 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         ref_latent_width = latent_width
         if use_ref_latents:
             if ref_latents is not None:
+                # Defense-in-depth: backend callers (direct API, older graph JSON)
+                # may wire qwen_image_i2l without explicit width/height, producing
+                # a native-resolution reference latent. Clamp here so the
+                # transformer always sees an in-distribution sequence length.
+                ref_latents = self._maybe_clamp_ref_latent_size(ref_latents)
                 _, _, rh, rw = ref_latents.shape
                 ref_latent_height, ref_latent_width = self._align_ref_latent_dims(rh, rw)
                 if ref_latent_height != rh or ref_latent_width != rw:
