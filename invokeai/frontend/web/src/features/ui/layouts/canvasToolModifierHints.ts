@@ -133,35 +133,37 @@ export const getCanvasToolModifierHintIds = ({
   bboxAspectRatioLocked,
   hasActiveTextSession,
 }: GetCanvasToolModifierHintsArg): CanvasToolModifierHintId[] => {
-  switch (tool) {
-    case 'brush':
-      return ['shiftStraightLine', 'modWheelResizeBrush', ...SHARED_HINT_IDS];
-    case 'eraser':
-      return ['shiftStraightLine', 'modWheelResizeEraser', 'spacePan'];
-    case 'lasso':
-      return lassoMode === 'polygon'
-        ? ['modSubtractMask', 'shiftSnap45Degrees', 'spacePan']
-        : ['modSubtractMask', 'spacePan'];
-    case 'bbox':
-      return [
-        bboxAspectRatioLocked ? 'shiftUnlockAspectRatio' : 'shiftLockAspectRatio',
-        'altScaleFromCenter',
-        'modFineGrid',
-      ];
-    case 'move':
-      return ['arrowKeysNudgeSelection', ...SHARED_HINT_IDS];
-    case 'text':
-      return hasActiveTextSession
+  // Resolver map: each tool returns the relevant hint ids based on the provided args.
+  const TOOL_HINT_RESOLVERS: Record<
+    Tool,
+    (args: GetCanvasToolModifierHintsArg) => readonly CanvasToolModifierHintId[]
+  > = {
+    brush: () => ['shiftStraightLine', 'modWheelResizeBrush', ...SHARED_HINT_IDS],
+    eraser: () => ['shiftStraightLine', 'modWheelResizeEraser', 'spacePan'],
+    lasso: ({ lassoMode: lm }) =>
+      lm === 'polygon' ? ['modSubtractMask', 'shiftSnap45Degrees', 'spacePan'] : ['modSubtractMask', 'spacePan'],
+    bbox: ({ bboxAspectRatioLocked: locked }) => [
+      locked ? 'shiftUnlockAspectRatio' : 'shiftLockAspectRatio',
+      'altScaleFromCenter',
+      'modFineGrid',
+    ],
+    move: () => ['arrowKeysNudgeSelection', ...SHARED_HINT_IDS],
+    text: ({ hasActiveTextSession: active }) =>
+      active
         ? ['enterCommitText', 'shiftEnterNewLine', 'escCancelText', 'modDragText', 'shiftSnapRotation']
-        : [...SHARED_HINT_IDS];
-    case 'view':
-      return ['altPickColor'];
-    case 'colorPicker':
-      return ['spacePan'];
-    case 'gradient':
-    case 'rect':
-      return [...SHARED_HINT_IDS];
+        : [...SHARED_HINT_IDS],
+    view: () => ['altPickColor'],
+    colorPicker: () => ['spacePan'],
+    gradient: () => [...SHARED_HINT_IDS],
+    rect: () => [...SHARED_HINT_IDS],
+  };
+
+  const resolver = TOOL_HINT_RESOLVERS[tool];
+  // Guard at runtime: if a resolver is missing, return an empty array instead of throwing.
+  if (!resolver) {
+    return [];
   }
+  return Array.from(resolver({ tool, lassoMode, bboxAspectRatioLocked, hasActiveTextSession }));
 };
 
 export const getCanvasToolModifierHints = (args: GetCanvasToolModifierHintsArg): CanvasToolModifierHint[] =>
