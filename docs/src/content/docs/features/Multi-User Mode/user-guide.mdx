@@ -50,7 +50,7 @@ Now:
 <Steps>
 1. Enter your email address (this will be your login name)
 2. Create a display name (this will be the name other users see)
-3. Choose a strong password. The following criteria are required with `strict_password_checking_enabled: true`.
+3. Choose a strong password. The following criteria are required with `strict_password_checking: true`.
     - At least 8 characters long
     - Contains uppercase letters
     - Contains lowercase letters
@@ -59,14 +59,14 @@ Now:
 5. Click **Create Administrator Account**
 </Steps>
 
-With `strict_password_checking_enabled` disabled, you'll be warned if you choose a
+With `strict_password_checking` disabled, you'll be warned if you choose a
 weak password, but not prevented from doing so.
 
 You'll now be taken to a login screen and can enter the credentials you just created.
 
 ### Adding and Modifying Users
 
-If you are logged in as Administrator, you can add additional users. Click on the small "person silhouette" icon at the bottom left of the main Invoke screen and select "User Management:"
+If you are logged in as Administrator, you can add additional users. Click on the small "person silhouette" icon at the bottom left of the main Invoke screen and select "User Management"
 
 ![Administrator Menu](./assets/admin-add-user-1.png)
 
@@ -166,7 +166,7 @@ Administrators can see and manage all users' image boards and their contents reg
 
 ### Going From Multi-User to Single-User Mode
 
-If an InvokeAI instance was in multiuser mode and then restarted in single user mode (by setting `multiuser: false` in the configuration file), all users' boards will be consolidated in one place. Any images that were in "Uncategorized" will be merged together into a single Uncategorized board. If, at a later date, the server is restarted in multi-user mode, the boards and images will be separated and restored to their owners.
+If an InvokeAI instance was in multiuser mode and then restarted in single user mode (by setting `multiuser: false` in the configuration file), all users' boards will be consolidated in one place. Any images that were in "Uncategorized" will be merged together into a single Uncategorized board. If, at a later date, the server is restarted in multi-user mode, the boards and images will be assigned to the internal 'system' user. Admins can access this legacy content, and will not be restored to original owners.
 
 ### Workflows
 
