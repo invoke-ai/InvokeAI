@@ -728,7 +728,7 @@ Authorization: Bearer <admin_token>
 **Response:**
 
 ```json
-{
+[
   {
     "user_id": "abc123",
     "email": "user@example.com",
@@ -739,7 +739,7 @@ Authorization: Bearer <admin_token>
     "updated_at": "2024-04-25T17:23:00Z",
     "last_login_at": "2024-01-15T15:30:00Z"
   }
-}
+]
 ```
 
 #### Create User
@@ -802,9 +802,22 @@ Authorization: Bearer <admin_token>
 
 **Response:**
 
+Returns `204 No Content` on success.
+
+On an error, it returns `422 Unprocessable Content` and  the following JSON:
+
 ```json
 {
-  "success": true
+  "detail": [
+    {
+      "loc": [
+        "string",
+        0
+      ],
+      "msg": "string",
+      "type": "string"
+    }
+  ]
 }
 ```
 
@@ -845,7 +858,7 @@ The `board_visibility` field will be one of:
 - `shared` -- read/write to the owner and administrator, read-only to everyone else
 - `public` -- read/write by everyone
 
-#### List One Boards
+#### Get One Board
 
 **Endpoint:** `GET /api/v1/boards/{board_id}`
 
@@ -1007,9 +1020,9 @@ multiuser: true
 
 ```python
 def is_multiuser_enabled(base_url):
-    """Check if multi-user mode is enabled (authentication required)."""
-    response = requests.get(f"{base_url}/api/v1/boards/")
-    return response.status_code == 401  # 401 = auth required
+     response = requests.get(f"{base_url}/api/v1/auth/status")
+     response.raise_for_status()
+     return response.json()["multiuser_enabled"]
 
 # Example usage
 base_url = "http://localhost:9090"
