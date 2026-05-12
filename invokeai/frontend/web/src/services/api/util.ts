@@ -19,9 +19,6 @@ export const getListImagesUrl = (queryArgs: ListImagesArgs) =>
 export const getListVideosUrl = (queryArgs: ListVideosArgs) =>
   buildV1Url(`videos/?${queryString.stringify(queryArgs, { arrayFormat: 'none' })}`);
 
-/**
- * Helper to create the url for the polymorphic listGalleryItems endpoint.
- * @knipignore Consumed by gallery.ts endpoints; will be wired into the gallery UI in Phase 4.
- */
+// Helper to create the url for the polymorphic listGalleryItems endpoint.
 export const getListGalleryItemsUrl = (queryArgs: ListGalleryItemsArgs) =>
   buildV1Url(`gallery/items/?${queryString.stringify(queryArgs, { arrayFormat: 'none' })}`);

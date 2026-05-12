@@ -484,7 +484,6 @@ export const {
   useStarImagesMutation,
   useUnstarImagesMutation,
   useBulkDownloadImagesMutation,
-  useGetImageNamesQuery,
   useGetImageDTOsByNamesMutation,
 } = imagesApi;
 

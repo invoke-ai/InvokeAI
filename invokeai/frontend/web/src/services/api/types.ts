@@ -686,11 +686,8 @@ export type GalleryItemNamesResult = S['GalleryItemNamesResult'];
 /** @knipignore Consumed by gallery wiring in Phase 4. */
 export type OffsetPaginatedResults_GalleryItem_ = S['OffsetPaginatedResults_GalleryItem_'];
 export type ListGalleryItemsArgs = NonNullable<paths['/api/v1/gallery/items/']['get']['parameters']['query']>;
-/** @knipignore Consumed by gallery wiring in Phase 4. */
 export type ListGalleryItemsResponse =
   paths['/api/v1/gallery/items/']['get']['responses']['200']['content']['application/json'];
-/** @knipignore Consumed by gallery wiring in Phase 4. */
 export type GetGalleryItemNamesArgs = NonNullable<paths['/api/v1/gallery/items/names']['get']['parameters']['query']>;
-/** @knipignore Consumed by gallery wiring in Phase 4. */
 export type GetGalleryItemNamesResult =
   paths['/api/v1/gallery/items/names']['get']['responses']['200']['content']['application/json'];

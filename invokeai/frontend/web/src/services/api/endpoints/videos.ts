@@ -29,11 +29,8 @@ const buildVideosUrl = (path: string = '', query?: Parameters<typeof buildV1Url>
   buildV1Url(`videos/${path}`, query);
 
 /**
- * Video RTK Query endpoints — parallel to imagesApi. Only `useUploadVideoMutation` /
- * `uploadVideos` are consumed today (by useImageUploadButton). The remaining hooks land
- * here ready for the gallery integration in Phase 4-5.
- *
- * @knipignore Multi-phase rollout; consumers land in Phase 4+.
+ * Video RTK Query endpoints — parallel to imagesApi. Used by the gallery (Phase 4) and the
+ * viewer / linear flows that land in later phases.
  */
 export const videosApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -266,10 +263,11 @@ export const videosApi = api.injectEndpoints({
   }),
 });
 
-// Hooks consumed today.
-export const { useUploadVideoMutation, useGetVideoDTOQuery } = videosApi;
+// Hooks consumed by Phase 3 (upload) and Phase 4 (gallery grid).
+export const { useUploadVideoMutation, useGetVideoDTOQuery, useStarVideosMutation, useUnstarVideosMutation } =
+  videosApi;
 
-/** @knipignore Multi-phase rollout; the gallery (Phase 4-5) consumes these hooks. */
+/** @knipignore Lands with the viewer (Phase 5) and the workflow nodes (Phase 6). */
 export const {
   useListVideosQuery,
   useGetVideoMetadataQuery,
@@ -277,8 +275,6 @@ export const {
   useDeleteVideoMutation,
   useDeleteVideosMutation,
   useChangeVideoIsIntermediateMutation,
-  useStarVideosMutation,
-  useUnstarVideosMutation,
   useAddVideoToBoardMutation,
   useRemoveVideoFromBoardMutation,
 } = videosApi;
@@ -328,7 +324,6 @@ export const uploadVideos = async (args: UploadVideoArg[]): Promise<VideoDTO[]> 
   return results.filter((r): r is PromiseFulfilledResult<VideoDTO> => r.status === 'fulfilled').map((r) => r.value);
 };
 
-/** @knipignore Multi-phase rollout; consumed by Phase 5 viewer code. */
 export const useVideoDTO = (videoName: string | null | undefined) => {
   const { currentData: videoDTO } = useGetVideoDTOQuery(videoName ?? skipToken);
   return videoDTO ?? null;
