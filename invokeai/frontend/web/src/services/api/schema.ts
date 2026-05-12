@@ -6510,6 +6510,11 @@ export type components = {
         ControlAdapterDefaultSettings: {
             /** Preprocessor */
             preprocessor: string | null;
+            /**
+             * Fp8 Storage
+             * @description Store weights in FP8 to reduce VRAM usage (~50% savings). Weights are cast to compute dtype during inference.
+             */
+            fp8_storage?: boolean | null;
         };
         /** ControlField */
         ControlField: {
@@ -19492,6 +19497,11 @@ export type components = {
              * @description Whether this model should run on CPU only
              */
             cpu_only?: boolean | null;
+            /**
+             * Fp8 Storage
+             * @description Store weights in FP8 to reduce VRAM usage (~50% savings). Weights are cast to compute dtype during inference.
+             */
+            fp8_storage?: boolean | null;
         };
         /**
          * Main Model - SD1.5, SD2

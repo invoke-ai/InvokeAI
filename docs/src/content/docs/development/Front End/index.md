@@ -127,5 +127,5 @@ In some situations, we may want to test types. For example, if you use `zod` to 
 [openapi-typescript]: https://github.com/openapi-ts/openapi-typescript
 [schema.ts]: https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/frontend/web/src/services/api/schema.ts
 [conventional commits]: https://www.conventionalcommits.org/en/v1.0.0/
-[Workflows - Design and Implementation]: ./workflows.md
-[State Management]: ./state-management.md
+[Workflows - Design and Implementation]: ./workflows/
+[State Management]: ./state-management/
