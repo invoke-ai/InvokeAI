@@ -14,25 +14,21 @@ with ``num_frames=1`` and ``expand_timesteps=False`` (the defaults for
 single-frame image generation).
 """
 
-from PIL import Image
 import torch
 import torchvision.transforms.functional as TF
 from diffusers.models.autoencoders import AutoencoderKLWan
+from PIL import Image
 
 # Wan 2.2 VAE temporal scale factor — single frame still consumes a 4-position
 # slice of the mask tensor, which is why the mask contributes 4 channels.
 _WAN_VAE_TEMPORAL_SCALE = 4
 
 
-def preprocess_reference_image(
-    image: Image.Image, width: int, height: int
-) -> torch.Tensor:
+def preprocess_reference_image(image: Image.Image, width: int, height: int) -> torch.Tensor:
     """Resize a PIL image to (width, height) and return a normalised [-1, 1]
     tensor of shape ``[1, 3, 1, height, width]`` ready for ``AutoencoderKLWan.encode``."""
     if width % 8 != 0 or height % 8 != 0:
-        raise ValueError(
-            f"Reference-image dimensions must be multiples of 8 (got {width}x{height})."
-        )
+        raise ValueError(f"Reference-image dimensions must be multiples of 8 (got {width}x{height}).")
     resized = image.convert("RGB").resize((width, height), Image.LANCZOS)
     # [0, 1] CHW float tensor.
     pixel = TF.to_tensor(resized)
@@ -61,9 +57,7 @@ def encode_reference_image_to_condition(
     expects.
     """
     vae_dtype = next(iter(vae.parameters())).dtype
-    pixel = preprocess_reference_image(image, width=width, height=height).to(
-        device=device, dtype=vae_dtype
-    )
+    pixel = preprocess_reference_image(image, width=width, height=height).to(device=device, dtype=vae_dtype)
 
     with torch.inference_mode():
         encoded = vae.encode(pixel, return_dict=False)[0]
@@ -72,16 +66,8 @@ def encode_reference_image_to_condition(
         # Normalise against the VAE's per-channel mean/std, matching diffusers'
         # ``WanImageToVideoPipeline.prepare_latents`` (lines 440-459). Note the
         # multiplication by 1/std == division by std.
-        latents_mean = (
-            torch.tensor(vae.config.latents_mean)
-            .view(1, -1, 1, 1, 1)
-            .to(latents.device, latents.dtype)
-        )
-        latents_std = (
-            torch.tensor(vae.config.latents_std)
-            .view(1, -1, 1, 1, 1)
-            .to(latents.device, latents.dtype)
-        )
+        latents_mean = torch.tensor(vae.config.latents_mean).view(1, -1, 1, 1, 1).to(latents.device, latents.dtype)
+        latents_std = torch.tensor(vae.config.latents_std).view(1, -1, 1, 1, 1).to(latents.device, latents.dtype)
         latent_condition = (latents - latents_mean) / latents_std
 
     latent_condition = latent_condition.to(dtype=dtype)
@@ -90,8 +76,6 @@ def encode_reference_image_to_condition(
     # (i.e., conditioned). After the temporal-scale expansion the mask is
     # 4 channels of ones at [1, T_lat=1, H_lat, W_lat].
     _, _, t_lat, h_lat, w_lat = latent_condition.shape
-    mask = torch.ones(
-        1, _WAN_VAE_TEMPORAL_SCALE, t_lat, h_lat, w_lat, device=device, dtype=dtype
-    )
+    mask = torch.ones(1, _WAN_VAE_TEMPORAL_SCALE, t_lat, h_lat, w_lat, device=device, dtype=dtype)
 
     return torch.cat([mask, latent_condition], dim=1)

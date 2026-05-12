@@ -66,9 +66,7 @@ def _resolve_variant(context: InvocationContext, transformer_field: WanTransform
     config = context.models.get_config(transformer_field.transformer)
     variant = getattr(config, "variant", None)
     if not isinstance(variant, WanVariantType):
-        raise ValueError(
-            f"Could not determine Wan variant from model {config.name!r}: variant is {variant!r}."
-        )
+        raise ValueError(f"Could not determine Wan variant from model {config.name!r}: variant is {variant!r}.")
     return variant
 
 
@@ -155,12 +153,8 @@ class _ExpertSwapper:
 
         # Apply LoRA patches for this expert. GGUF transformers need sidecar
         # patching since direct patching of GGMLTensors isn't supported.
-        lora_factory = (
-            self._high_lora_factory if label == self.HIGH else self._low_lora_factory
-        )
-        is_quantized = (
-            self._high_is_quantized if label == self.HIGH else self._low_is_quantized
-        )
+        lora_factory = self._high_lora_factory if label == self.HIGH else self._low_lora_factory
+        is_quantized = self._high_is_quantized if label == self.HIGH else self._low_is_quantized
         lora_ctx: Any | None = None
         if lora_factory is not None:
             lora_ctx = LayerPatcher.apply_smart_model_patches(
@@ -294,9 +288,7 @@ class WanDenoiseInvocation(BaseInvocation):
 
         scheduler = self._build_scheduler(context, device)
 
-        pos_cond = self._load_conditioning(
-            context, self.positive_conditioning, device=device, dtype=inference_dtype
-        )
+        pos_cond = self._load_conditioning(context, self.positive_conditioning, device=device, dtype=inference_dtype)
         do_cfg = self.guidance_scale != 1.0 and self.negative_conditioning is not None
         neg_cond: WanConditioningInfo | None = None
         if do_cfg:
@@ -322,9 +314,8 @@ class WanDenoiseInvocation(BaseInvocation):
                     f"Reference-image dimensions ({self.ref_image.width}x{self.ref_image.height}) must "
                     f"match denoise dimensions ({self.width}x{self.height})."
                 )
-            ref_condition = (
-                context.tensors.load(self.ref_image.condition_tensor_name)
-                .to(device=device, dtype=inference_dtype)
+            ref_condition = context.tensors.load(self.ref_image.condition_tensor_name).to(
+                device=device, dtype=inference_dtype
             )
 
         # Schedule timesteps. set_timesteps populates scheduler.timesteps and
@@ -427,9 +418,7 @@ class WanDenoiseInvocation(BaseInvocation):
         # (default 1000). Diffusers' WanPipeline computes:
         #   boundary_timestep = boundary_ratio * num_train_timesteps
         num_train_timesteps = int(scheduler.config.num_train_timesteps)
-        boundary_timestep = (
-            self.transformer.boundary_ratio * num_train_timesteps if low_model is not None else None
-        )
+        boundary_timestep = self.transformer.boundary_ratio * num_train_timesteps if low_model is not None else None
 
         # LoRA wiring. The high-noise expert uses ``transformer.loras``; the
         # low-noise expert uses ``transformer.loras_low_noise``, falling back
@@ -440,9 +429,7 @@ class WanDenoiseInvocation(BaseInvocation):
         low_loras = self.transformer.loras_low_noise or self.transformer.loras
         high_config = context.models.get_config(high_model)
         high_is_quantized = high_config.format == ModelFormat.GGUFQuantized
-        low_is_quantized = (
-            low_config.format == ModelFormat.GGUFQuantized if low_config is not None else False
-        )
+        low_is_quantized = low_config.format == ModelFormat.GGUFQuantized if low_config is not None else False
 
         def high_lora_factory() -> Iterable[Tuple[ModelPatchRaw, float]]:
             return self._lora_iterator(context, high_loras)
@@ -515,9 +502,7 @@ class WanDenoiseInvocation(BaseInvocation):
                 if inpaint_extension is not None:
                     sigma_prev = float(sigmas[step_idx + 1])
                     latents_4d = latents.squeeze(2)
-                    latents_4d = inpaint_extension.merge_intermediate_latents_with_init_latents(
-                        latents_4d, sigma_prev
-                    )
+                    latents_4d = inpaint_extension.merge_intermediate_latents_with_init_latents(latents_4d, sigma_prev)
                     latents = latents_4d.unsqueeze(2)
 
                 step_callback(

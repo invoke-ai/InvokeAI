@@ -27,7 +27,6 @@ from invokeai.backend.patches.lora_conversions.wan_lora_constants import (
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
-
 # Kohya layer-name regex: lora_unet_blocks_<idx>_<rest>
 _KOHYA_KEY_REGEX = re.compile(r"lora_unet_blocks_(\d+)_(.*)")
 
@@ -105,9 +104,7 @@ _PEFT_PREFIXES_TO_STRIP: tuple[str, ...] = (
 )
 
 
-def lora_model_from_wan_state_dict(
-    state_dict: Dict[str, torch.Tensor], alpha: float | None = None
-) -> ModelPatchRaw:
+def lora_model_from_wan_state_dict(state_dict: Dict[str, torch.Tensor], alpha: float | None = None) -> ModelPatchRaw:
     """Convert any supported Wan LoRA state dict into a ``ModelPatchRaw``.
 
     Detects Kohya vs PEFT layouts and dispatches accordingly. Layer paths in
@@ -174,7 +171,7 @@ def _strip_peft_prefix(layer_key: str) -> str:
     """Strip ``transformer.``, ``diffusion_model.``, ``base_model.model.transformer.`` if present."""
     for prefix in _PEFT_PREFIXES_TO_STRIP:
         if layer_key.startswith(prefix):
-            return layer_key[len(prefix):]
+            return layer_key[len(prefix) :]
     return layer_key
 
 
@@ -198,9 +195,7 @@ def _native_layer_path_to_diffusers(path: str) -> str | None:
     return augmented.rstrip(".")
 
 
-def _normalize_lora_param_names(
-    layer_dict: dict[str, torch.Tensor], alpha: float | None
-) -> dict[str, torch.Tensor]:
+def _normalize_lora_param_names(layer_dict: dict[str, torch.Tensor], alpha: float | None) -> dict[str, torch.Tensor]:
     """Map PEFT-style ``lora_A``/``lora_B`` to ``lora_down``/``lora_up``.
 
     Kohya-style ``lora_down``/``lora_up`` pass through unchanged.

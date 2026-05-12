@@ -163,10 +163,7 @@ def _unwrap_unquantized_to_compute_dtype(state_dict: dict) -> dict:
     """
     unwrapped: dict = {}
     for key, value in state_dict.items():
-        if (
-            isinstance(value, GGMLTensor)
-            and value._ggml_quantization_type in TORCH_COMPATIBLE_QTYPES
-        ):
+        if isinstance(value, GGMLTensor) and value._ggml_quantization_type in TORCH_COMPATIBLE_QTYPES:
             # GGMLTensor.get_dequantized_tensor() already casts to compute_dtype.
             unwrapped[key] = value.get_dequantized_tensor()
         else:
@@ -219,8 +216,7 @@ class WanGGUFCheckpointModel(ModelLoader):
         for prefix in ("model.diffusion_model.", "diffusion_model."):
             if any(isinstance(k, str) and k.startswith(prefix) for k in sd.keys()):
                 sd = {
-                    (k[len(prefix):] if isinstance(k, str) and k.startswith(prefix) else k): v
-                    for k, v in sd.items()
+                    (k[len(prefix) :] if isinstance(k, str) and k.startswith(prefix) else k): v for k, v in sd.items()
                 }
                 break
 
@@ -308,9 +304,7 @@ class WanGGUFCheckpointModel(ModelLoader):
         return model
 
 
-@ModelLoaderRegistry.register(
-    base=BaseModelType.Any, type=ModelType.WanT5Encoder, format=ModelFormat.WanT5Encoder
-)
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.WanT5Encoder, format=ModelFormat.WanT5Encoder)
 class WanT5EncoderLoader(ModelLoader):
     """Loader for the standalone Wan UMT5-XXL encoder.
 
@@ -348,8 +342,10 @@ class WanT5EncoderLoader(ModelLoader):
 
             # Prefer a sibling tokenizer/ directory; fall back to the encoder dir
             # itself, which is normal for "flat" downloads.
-            target = nested_tokenizer if nested_tokenizer.exists() else (
-                nested_text_encoder if nested_text_encoder.exists() else root
+            target = (
+                nested_tokenizer
+                if nested_tokenizer.exists()
+                else (nested_text_encoder if nested_text_encoder.exists() else root)
             )
             return AutoTokenizer.from_pretrained(str(target), local_files_only=True)
 

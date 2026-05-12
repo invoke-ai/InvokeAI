@@ -52,9 +52,7 @@ class WanImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
     @staticmethod
     def vae_encode(vae_info: LoadedModel, image_tensor: torch.Tensor) -> torch.Tensor:
         if not isinstance(vae_info.model, AutoencoderKLWan):
-            raise TypeError(
-                f"Expected AutoencoderKLWan for Wan VAE, got {type(vae_info.model).__name__}."
-            )
+            raise TypeError(f"Expected AutoencoderKLWan for Wan VAE, got {type(vae_info.model).__name__}.")
 
         estimated_working_memory = estimate_vae_working_memory_flux(
             operation="encode",

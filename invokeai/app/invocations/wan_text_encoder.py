@@ -56,9 +56,7 @@ class WanTextEncoderInvocation(BaseInvocation):
         attention_mask = attention_mask.detach().to("cpu") if attention_mask is not None else None
 
         conditioning_data = ConditioningFieldData(
-            conditionings=[
-                WanConditioningInfo(prompt_embeds=prompt_embeds, prompt_attention_mask=attention_mask)
-            ]
+            conditionings=[WanConditioningInfo(prompt_embeds=prompt_embeds, prompt_attention_mask=attention_mask)]
         )
         conditioning_name = context.conditioning.save(conditioning_data)
         return WanConditioningOutput.build(conditioning_name)

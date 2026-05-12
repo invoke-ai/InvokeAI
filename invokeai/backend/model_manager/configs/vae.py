@@ -290,8 +290,7 @@ class VAE_Checkpoint_Wan_Config(Checkpoint_Config_Base, Config_Base):
         latent_channels: int = z_dim
         if latent_channels == 16 and not _filename_suggests_wan(mod):
             raise NotAMatchError(
-                "16-channel AutoencoderKLWan VAE without 'wan' in filename — "
-                "deferring to Qwen Image VAE config."
+                "16-channel AutoencoderKLWan VAE without 'wan' in filename — deferring to Qwen Image VAE config."
             )
 
         explicit = override_fields.pop("latent_channels", None)

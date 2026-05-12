@@ -12,7 +12,6 @@ from invokeai.app.invocations.wan_lora_loader import (
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
-
 # --------------------------------------------------------------------------
 # _resolve_target — pure function, no mocks needed.
 # --------------------------------------------------------------------------
@@ -77,27 +76,21 @@ def _make_context(lora_expert: str | None) -> MagicMock:
 
 class TestSingleLoaderRouting:
     def test_auto_untagged_goes_to_both(self):
-        inv = WanLoRALoaderInvocation(
-            id="inv-1", lora=_make_lora_field(), transformer=_make_transformer_field()
-        )
+        inv = WanLoRALoaderInvocation(id="inv-1", lora=_make_lora_field(), transformer=_make_transformer_field())
         out = inv.invoke(_make_context(lora_expert=None))
         assert out.transformer is not None
         assert len(out.transformer.loras) == 1
         assert len(out.transformer.loras_low_noise) == 1
 
     def test_auto_high_tag_goes_to_primary_only(self):
-        inv = WanLoRALoaderInvocation(
-            id="inv-1", lora=_make_lora_field(), transformer=_make_transformer_field()
-        )
+        inv = WanLoRALoaderInvocation(id="inv-1", lora=_make_lora_field(), transformer=_make_transformer_field())
         out = inv.invoke(_make_context(lora_expert="high"))
         assert out.transformer is not None
         assert len(out.transformer.loras) == 1
         assert len(out.transformer.loras_low_noise) == 0
 
     def test_auto_low_tag_goes_to_low_only(self):
-        inv = WanLoRALoaderInvocation(
-            id="inv-1", lora=_make_lora_field(), transformer=_make_transformer_field()
-        )
+        inv = WanLoRALoaderInvocation(id="inv-1", lora=_make_lora_field(), transformer=_make_transformer_field())
         out = inv.invoke(_make_context(lora_expert="low"))
         assert out.transformer is not None
         assert len(out.transformer.loras) == 0
@@ -129,9 +122,7 @@ class TestSingleLoaderRouting:
     def test_unknown_lora_raises(self):
         ctx = _make_context(lora_expert=None)
         ctx.models.exists.return_value = False
-        inv = WanLoRALoaderInvocation(
-            id="inv-1", lora=_make_lora_field(), transformer=_make_transformer_field()
-        )
+        inv = WanLoRALoaderInvocation(id="inv-1", lora=_make_lora_field(), transformer=_make_transformer_field())
         with pytest.raises(ValueError, match="Unknown lora"):
             inv.invoke(ctx)
 
@@ -140,9 +131,7 @@ class TestSingleLoaderRouting:
         transformer = _make_transformer_field()
         transformer.loras.append(existing)
 
-        inv = WanLoRALoaderInvocation(
-            id="inv-1", lora=_make_lora_field(key="dup"), transformer=transformer
-        )
+        inv = WanLoRALoaderInvocation(id="inv-1", lora=_make_lora_field(key="dup"), transformer=transformer)
         with pytest.raises(ValueError, match="already applied to primary"):
             inv.invoke(_make_context(lora_expert="high"))
 
@@ -151,9 +140,7 @@ class TestSingleLoaderRouting:
         transformer = _make_transformer_field()
         transformer.loras_low_noise.append(existing)
 
-        inv = WanLoRALoaderInvocation(
-            id="inv-1", lora=_make_lora_field(key="dup"), transformer=transformer
-        )
+        inv = WanLoRALoaderInvocation(id="inv-1", lora=_make_lora_field(key="dup"), transformer=transformer)
         with pytest.raises(ValueError, match="already applied to low-noise"):
             inv.invoke(_make_context(lora_expert="low"))
 
@@ -204,14 +191,10 @@ class TestCollectionLoaderRouting:
 
     def test_rejects_non_wan_base(self):
         wrong_base_lora = LoRAField(
-            lora=ModelIdentifierField(
-                key="not-wan", hash="h", name="n", base=BaseModelType.Flux, type=ModelType.LoRA
-            ),
+            lora=ModelIdentifierField(key="not-wan", hash="h", name="n", base=BaseModelType.Flux, type=ModelType.LoRA),
             weight=0.5,
         )
-        inv = WanLoRACollectionLoader(
-            id="inv-1", loras=[wrong_base_lora], transformer=_make_transformer_field()
-        )
+        inv = WanLoRACollectionLoader(id="inv-1", loras=[wrong_base_lora], transformer=_make_transformer_field())
         ctx = MagicMock()
         ctx.models.exists.return_value = True
         with pytest.raises(ValueError, match="not Wan 2.2"):
@@ -235,9 +218,7 @@ class TestCollectionLoaderRouting:
         assert len(out.transformer.loras) == 1
 
     def test_no_loras_returns_clean_copy(self):
-        inv = WanLoRACollectionLoader(
-            id="inv-1", loras=None, transformer=_make_transformer_field()
-        )
+        inv = WanLoRACollectionLoader(id="inv-1", loras=None, transformer=_make_transformer_field())
         out = inv.invoke(MagicMock())
         assert out.transformer is not None
         assert len(out.transformer.loras) == 0

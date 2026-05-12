@@ -53,7 +53,22 @@ class TestMakeNoise:
         assert noise.shape == (1, 48, 1, 64, 64)
 
     def test_seed_is_deterministic(self) -> None:
-        kwargs = dict(
+        kwargs = {
+            "batch_size": 1,
+            "latent_channels": 16,
+            "height": 256,
+            "width": 256,
+            "spatial_scale_factor": 8,
+            "device": torch.device("cpu"),
+            "dtype": torch.float32,
+            "seed": 123,
+        }
+        a = make_noise(**kwargs)
+        b = make_noise(**kwargs)
+        assert torch.allclose(a, b)
+
+    def test_seed_changes_output(self) -> None:
+        a = make_noise(
             batch_size=1,
             latent_channels=16,
             height=256,
@@ -61,19 +76,16 @@ class TestMakeNoise:
             spatial_scale_factor=8,
             device=torch.device("cpu"),
             dtype=torch.float32,
-            seed=123,
-        )
-        a = make_noise(**kwargs)
-        b = make_noise(**kwargs)
-        assert torch.allclose(a, b)
-
-    def test_seed_changes_output(self) -> None:
-        a = make_noise(
-            batch_size=1, latent_channels=16, height=256, width=256, spatial_scale_factor=8,
-            device=torch.device("cpu"), dtype=torch.float32, seed=1,
+            seed=1,
         )
         b = make_noise(
-            batch_size=1, latent_channels=16, height=256, width=256, spatial_scale_factor=8,
-            device=torch.device("cpu"), dtype=torch.float32, seed=2,
+            batch_size=1,
+            latent_channels=16,
+            height=256,
+            width=256,
+            spatial_scale_factor=8,
+            device=torch.device("cpu"),
+            dtype=torch.float32,
+            seed=2,
         )
         assert not torch.allclose(a, b)

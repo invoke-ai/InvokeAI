@@ -178,8 +178,7 @@ def test_wan_loras_only_match_wan(label: str, sd_builder) -> None:
     assert wan_ok, f"Wan probe must accept {label}; got {wan_result}"
     assert wan_result.base == BaseModelType.Wan
     assert not anima_ok, (
-        f"Anima probe must reject {label} so probing is order-independent. "
-        f"Instead it accepted: {anima_result}"
+        f"Anima probe must reject {label} so probing is order-independent. Instead it accepted: {anima_result}"
     )
 
 
@@ -203,8 +202,7 @@ def test_anima_loras_only_match_anima(label: str, sd_builder) -> None:
     assert anima_ok, f"Anima probe must accept {label}; got {anima_result}"
     assert anima_result.base == BaseModelType.Anima
     assert not wan_ok, (
-        f"Wan probe must reject {label} so probing is order-independent. "
-        f"Instead it accepted: {wan_result}"
+        f"Wan probe must reject {label} so probing is order-independent. Instead it accepted: {wan_result}"
     )
 
 

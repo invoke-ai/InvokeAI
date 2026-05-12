@@ -45,9 +45,7 @@ class WanRefImageEncoderInvocation(BaseInvocation):
     """
 
     image: ImageField = InputField(description="Reference image to condition on.")
-    vae: VAEField = InputField(
-        description=FieldDescriptions.vae, input=Input.Connection, title="VAE"
-    )
+    vae: VAEField = InputField(description=FieldDescriptions.vae, input=Input.Connection, title="VAE")
     # Must match wan_denoise's width/height. multiple_of=16 (not 8) because
     # Wan's transformer patch_size=(1, 2, 2) needs latent H/W to be even.
     width: int = InputField(
@@ -71,9 +69,7 @@ class WanRefImageEncoderInvocation(BaseInvocation):
 
         with vae_info.model_on_device() as (_, vae):
             if not isinstance(vae, AutoencoderKLWan):
-                raise TypeError(
-                    f"Reference-image encoder requires AutoencoderKLWan, got {type(vae).__name__}."
-                )
+                raise TypeError(f"Reference-image encoder requires AutoencoderKLWan, got {type(vae).__name__}.")
             context.util.signal_progress("VAE-encoding reference image")
             condition = encode_reference_image_to_condition(
                 image=pil_image,
@@ -86,6 +82,4 @@ class WanRefImageEncoderInvocation(BaseInvocation):
 
         condition = condition.detach().to("cpu")
         name = context.tensors.save(tensor=condition)
-        return WanRefImageOutput.build(
-            condition_tensor_name=name, width=self.width, height=self.height
-        )
+        return WanRefImageOutput.build(condition_tensor_name=name, width=self.width, height=self.height)

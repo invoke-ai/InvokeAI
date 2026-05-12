@@ -14,8 +14,8 @@ so we can verify the swapper hands back the right model and routes the right
 LoRA factory at each step.
 """
 
-from typing import Iterable, Iterator, Tuple
-from unittest.mock import MagicMock, patch
+from typing import Iterable, Tuple
+from unittest.mock import patch
 
 import torch
 import torch.nn as nn
@@ -341,8 +341,7 @@ def test_lazy_load_per_swap_not_upfront():
             low_lora_factory=_make_factory(log, "LOW"),
         )
         assert ctx.models.load_calls == [], (
-            "Swapper must not call models.load until get() is invoked — "
-            "see issue #7513 for cache-eviction rationale."
+            "Swapper must not call models.load until get() is invoked — see issue #7513 for cache-eviction rationale."
         )
 
         # First get(HIGH): loads HIGH only.
