@@ -2,17 +2,15 @@
 title: Google Gemini
 ---
 
-import { Steps } from '@astrojs/starlight/components'
+# :material-google: Google Gemini
 
 Invoke supports Google's Gemini image generation models through the Gemini API. This provider is a good fit if you want high-quality text-to-image and reference-based image edits without running a local model.
 
 ## Getting an API Key
 
-<Steps>
 1. Open [Google AI Studio](https://aistudio.google.com/) and sign in with your Google account.
 2. Generate a new API key.
 3. Note the key — it will only be shown once.
-</Steps>
 
 ## Configuration
 
@@ -43,8 +41,6 @@ Gemini exposes a **temperature** control in the parameters panel. Lower values m
 
 ## Tips
 
-<Steps>
-1. Reference images are sent directly to the API as inlined PNG data. Large references increase request latency and cost — crop tightly where possible.
-2. Aspect ratios are mapped to the closest Gemini-supported ratio. For Gemini 3 models, use the resolution presets to stay at the provider's native output sizes and avoid unnecessary rescaling.
-3. Pricing varies by model and region. Check Google's documentation before running large batches.
-</Steps>
+- **Reference images** are sent directly to the API as inlined PNG data. Large references increase request latency and cost — crop tightly where possible.
+- **Aspect ratios** are mapped to the closest Gemini-supported ratio. For Gemini 3 models, use the resolution presets to stay at the provider's native output sizes and avoid unnecessary rescaling.
+- **Pricing** varies by model and region. Check Google's documentation before running large batches.

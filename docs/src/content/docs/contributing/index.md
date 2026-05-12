@@ -26,11 +26,11 @@ We receive many issues and requests for help from users. We're limited in bandwi
 
 ## Documentation
 
-If you’d like to help with documentation, please see our [contributing guide](/contributing/).
+If you’d like to help with documentation, please see our [documentation guide](contribution_guides/documentation.md).
 
 ## Translation
 
-If you'd like to help with translation, please see our [translation guide](/contributing/translations/).
+If you'd like to help with translation, please see our [translation guide](contribution_guides/translation.md).
 
 ## Tutorials
 
@@ -38,7 +38,7 @@ Please reach out to @hipsterusername on [Discord](https://discord.gg/ZmtBAhwWhy)
 
 ## Contributors
 
-This project is a combined effort of dedicated people from across the world. [Check out the list of all these amazing people](/contributing/contributors/). We thank them for their time, hard work and effort.
+This project is a combined effort of dedicated people from across the world. [Check out the list of all these amazing people](contributors.md). We thank them for their time, hard work and effort.
 
 ## Code of Conduct
 
