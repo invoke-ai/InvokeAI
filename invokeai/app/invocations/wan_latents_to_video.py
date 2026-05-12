@@ -74,6 +74,12 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         with vae_info.model_on_device() as (_, vae):
             assert isinstance(vae, AutoencoderKLWan)
+            _, _, t_lat, h_lat, w_lat = latents.shape
+            t_pixel = (t_lat - 1) * 4 + 1
+            context.logger.info(
+                f"Running Wan VAE decode: {t_lat} latent frames -> {t_pixel} pixel frames "
+                f"at {w_lat * 8}x{h_lat * 8}"
+            )
             context.util.signal_progress("Running Wan VAE decode (video)")
 
             vae_dtype = next(iter(vae.parameters())).dtype
@@ -119,6 +125,10 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
         tmp.close()
         tmp_path = Path(tmp.name)
         try:
+            context.logger.info(
+                f"Encoding MP4: {num_frames} frames @ {self.fps} fps ({duration:.2f}s) "
+                f"at {width}x{height} via libx264"
+            )
             context.util.signal_progress(f"Encoding MP4 ({num_frames} frames @ {self.fps} fps)")
             iio.imwrite(
                 tmp_path,
@@ -127,6 +137,10 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
                 codec="libx264",
                 fps=self.fps,
             )
+            encoded_bytes = tmp_path.stat().st_size
+            context.logger.info(
+                f"MP4 encode complete: {encoded_bytes / 1024:.1f} KB"
+            )
             video_dto = context.videos.save(
                 source_path=tmp_path,
                 width=width,
@@ -134,6 +148,7 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
                 duration=duration,
                 fps=float(self.fps),
             )
+            context.logger.info(f"Saved video: {video_dto.video_name}")
             return VideoOutput.build(video_dto)
         finally:
             # If save() moved the file this is a no-op; if it failed earlier, we
