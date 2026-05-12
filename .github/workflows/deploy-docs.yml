@@ -118,6 +118,11 @@ jobs:
           DEPLOY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_target || github.ref == 'refs/heads/main' && 'ghpages' || 'custom' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: verify gh-pages output
+        if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.deploy_target == 'ghpages')
+        run: pnpm run check-ghpages-output
+        working-directory: docs
+
       # Upload artifact for deploy (main branch only)
       - name: upload pages artifact
         if: github.ref == 'refs/heads/main'
