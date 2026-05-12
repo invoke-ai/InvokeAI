@@ -139,6 +139,7 @@ class Flux2VAEDiffusersLoader(ModelLoader):
             local_files_only=True,
         )
 
+        model = self._apply_fp8_layerwise_casting(model, config, submodel_type)
         return model
 
 
@@ -232,6 +233,7 @@ class Flux2VAELoader(ModelLoader):
             vae_dtype = self._torch_dtype
         model.to(vae_dtype)
 
+        model = self._apply_fp8_layerwise_casting(model, config, submodel_type)
         return model
 
     def _convert_flux2_vae_bfl_to_diffusers(self, sd: dict) -> dict:
@@ -516,7 +518,9 @@ class FluxCheckpointModel(ModelLoader):
 
         match submodel_type:
             case SubModelType.Transformer:
-                return self._load_from_singlefile(config)
+                model = self._load_from_singlefile(config)
+                model = self._apply_fp8_layerwise_casting(model, config, submodel_type)
+                return model
 
         raise ValueError(
             f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
@@ -670,6 +674,7 @@ class FluxDiffusersModel(GenericDiffusersLoader):
             else:
                 raise e
 
+        result = self._apply_fp8_layerwise_casting(result, config, submodel_type)
         return result
 
 
@@ -746,6 +751,7 @@ class Flux2DiffusersModel(GenericDiffusersLoader):
                         if guidance_emb.linear_2.bias is not None:
                             guidance_emb.linear_2.bias.data.zero_()
 
+        result = self._apply_fp8_layerwise_casting(result, config, submodel_type)
         return result
 
 
@@ -763,7 +769,9 @@ class Flux2CheckpointModel(ModelLoader):
 
         match submodel_type:
             case SubModelType.Transformer:
-                return self._load_from_singlefile(config)
+                model = self._load_from_singlefile(config)
+                model = self._apply_fp8_layerwise_casting(model, config, submodel_type)
+                return model
 
         raise ValueError(
             f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
