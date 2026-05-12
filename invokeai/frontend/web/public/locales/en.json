@@ -1126,6 +1126,7 @@
         "convertToDiffusersHelpText5": "Please make sure you have enough disk space. Models generally vary between 2GB-7GB in size.",
         "convertToDiffusersHelpText6": "Do you wish to convert this model?",
         "cpuOnly": "CPU Only",
+        "fp8Storage": "FP8 Storage (Save VRAM)",
         "runOnCpu": "Run text encoder model on CPU only",
         "noDefaultSettings": "No default settings configured for this model. Visit the Model Manager to add default settings.",
         "defaultSettings": "Default Settings",
@@ -2388,6 +2389,13 @@
             "paragraphs": [
                 "When enabled, only the text encoder component will run on CPU instead of GPU.",
                 "This saves VRAM for the denoiser while only slightly impacting performance. The conditioning outputs are automatically moved to GPU for the denoiser."
+            ]
+        },
+        "fp8Storage": {
+            "heading": "FP8 Storage",
+            "paragraphs": [
+                "Stores model weights in FP8 format in VRAM, reducing memory usage by approximately 50% compared to FP16.",
+                "During inference, weights are cast layer-by-layer to the compute precision (FP16/BF16), so image quality is preserved. Works on all CUDA GPUs."
             ]
         }
     },
