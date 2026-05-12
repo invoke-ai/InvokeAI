@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.backend.image_util.controlnet_processor import process_controlnet_image
 from invokeai.backend.model_manager.taxonomy import ModelType
 
@@ -436,6 +437,7 @@ async def update_recall_parameters(
         # are cleared.  In non-strict mode (default) they would be left as-is.
     """
     logger = ApiDependencies.invoker.services.logger
+    assert_image_move_maintenance_inactive()
 
     # Validate image access before processing — prevents information leakage
     # (dimensions) and derived-image minting via ControlNet preprocessors.

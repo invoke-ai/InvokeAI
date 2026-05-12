@@ -12,6 +12,7 @@ from PIL import Image
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
 from invokeai.app.services.image_records.image_records_common import ImageCategory
+from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.util.thumbnails import make_thumbnail
 
@@ -58,6 +59,10 @@ class ImageMoveJobAlreadyRunning(Exception):
     pass
 
 
+class ImageMoveQueueActive(Exception):
+    pass
+
+
 BACKGROUND_SHUTDOWN_ERROR = "Image move service stopped while background operation was running"
 
 
@@ -78,6 +83,10 @@ class ImageMoveService:
         self._future: Future | None = None
         self._future_operation: ImageMoveBackgroundOperation | None = None
         self._last_background_error: str | None = None
+        self._invoker = None
+
+    def start(self, invoker) -> None:
+        self._invoker = invoker
 
     def stop(self, *args, **kwargs) -> None:
         with self._future_lock:
@@ -87,7 +96,7 @@ class ImageMoveService:
         self._executor.shutdown(wait=False, cancel_futures=False)
 
     def start_background_move_all(self) -> ImageMoveBackgroundStatus:
-        return self._start_background_operation("move_all", self.move_all_images)
+        return self._start_background_operation("move_all", self.move_all_images, require_idle_queue=True)
 
     def start_background_recovery(self) -> ImageMoveBackgroundStatus:
         return self._start_background_operation("recovery", self.startup_recovery)
@@ -97,17 +106,50 @@ class ImageMoveService:
             self._refresh_finished_future_locked()
             return self._build_background_status_locked()
 
-    def _start_background_operation(self, operation: ImageMoveBackgroundOperation, target) -> ImageMoveBackgroundStatus:
+    def is_maintenance_active(self) -> bool:
         with self._future_lock:
             self._refresh_finished_future_locked()
-            if self._future is not None and not self._future.done():
+            is_running = self._future is not None and not self._future.done()
+            operation_reserved = self._future_operation is not None
+        return operation_reserved or is_running or self._get_active_job_id() is not None
+
+    def _assert_no_active_queue_work(self) -> None:
+        if self._invoker is None:
+            return
+        session_queue = getattr(self._invoker.services, "session_queue", None)
+        if session_queue is None:
+            return
+        queue_status = session_queue.get_queue_status(DEFAULT_QUEUE_ID)
+        if queue_status.pending > 0 or queue_status.in_progress > 0:
+            raise ImageMoveQueueActive("Cannot start image move while queue work is active")
+
+    def _start_background_operation(
+        self,
+        operation: ImageMoveBackgroundOperation,
+        target,
+        require_idle_queue: bool = False,
+    ) -> ImageMoveBackgroundStatus:
+        with self._future_lock:
+            self._refresh_finished_future_locked()
+            if self._future_operation is not None or (self._future is not None and not self._future.done()):
                 raise ImageMoveJobAlreadyRunning("An image move job is already running")
             active_job_id = self._get_active_job_id()
             if operation != "recovery" and active_job_id is not None:
                 raise ImageMoveJobAlreadyRunning("An image move job is already active")
             self._last_background_error = None
             self._future_operation = operation
-            self._future = self._executor.submit(self._run_background_operation, operation, target)
+
+        try:
+            if require_idle_queue:
+                self._assert_no_active_queue_work()
+            future = self._executor.submit(self._run_background_operation, operation, target)
+        except Exception:
+            with self._future_lock:
+                self._future_operation = None
+            raise
+
+        with self._future_lock:
+            self._future = future
             return self._build_background_status_locked()
 
     def _run_background_operation(self, operation: ImageMoveBackgroundOperation, target) -> None:

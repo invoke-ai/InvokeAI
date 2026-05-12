@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, model_validator
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.extract_metadata_from_image import extract_metadata_from_image
+from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
@@ -173,6 +174,8 @@ async def upload_image(
     ),
 ) -> ImageDTO:
     """Uploads an image for the current user"""
+    assert_image_move_maintenance_inactive()
+
     # If uploading into a board, verify the user has write access.
     # Public boards allow uploads from any authenticated user.
     if board_id is not None:
@@ -275,6 +278,7 @@ async def delete_image(
     image_name: str = Path(description="The name of the image to delete"),
 ) -> DeleteImagesResult:
     """Deletes an image"""
+    assert_image_move_maintenance_inactive()
     _assert_image_owner(image_name, current_user)
 
     deleted_images: set[str] = set()
@@ -301,6 +305,7 @@ async def clear_intermediates(
     current_user: CurrentUserOrDefault,
 ) -> int:
     """Clears all intermediates. Requires admin."""
+    assert_image_move_maintenance_inactive()
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Only admins can clear all intermediates")
 
@@ -335,6 +340,7 @@ async def update_image(
     image_changes: ImageRecordChanges = Body(description="The changes to apply to the image"),
 ) -> ImageDTO:
     """Updates an image"""
+    assert_image_move_maintenance_inactive()
     _assert_image_owner(image_name, current_user)
 
     try:
@@ -434,6 +440,8 @@ async def get_image_full(
     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
     providing security through unguessability.
     """
+    assert_image_move_maintenance_inactive()
+
     try:
         path = ApiDependencies.invoker.services.images.get_path(image_name)
         with open(path, "rb") as f:
@@ -467,6 +475,8 @@ async def get_image_thumbnail(
     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
     providing security through unguessability.
     """
+    assert_image_move_maintenance_inactive()
+
     try:
         path = ApiDependencies.invoker.services.images.get_path(image_name, thumbnail=True)
         with open(path, "rb") as f:
@@ -550,6 +560,8 @@ async def delete_images_from_list(
     current_user: CurrentUserOrDefault,
     image_names: list[str] = Body(description="The list of names of images to delete", embed=True),
 ) -> DeleteImagesResult:
+    assert_image_move_maintenance_inactive()
+
     try:
         deleted_images: set[str] = set()
         affected_boards: set[str] = set()
@@ -580,6 +592,7 @@ async def delete_uncategorized_images(
     current_user: CurrentUserOrDefault,
 ) -> DeleteImagesResult:
     """Deletes all uncategorized images owned by the current user (or all if admin)"""
+    assert_image_move_maintenance_inactive()
 
     image_names = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
         board_id="none", categories=None, is_intermediate=None
@@ -616,6 +629,8 @@ async def star_images_in_list(
     current_user: CurrentUserOrDefault,
     image_names: list[str] = Body(description="The list of names of images to star", embed=True),
 ) -> StarredImagesResult:
+    assert_image_move_maintenance_inactive()
+
     try:
         starred_images: set[str] = set()
         affected_boards: set[str] = set()
@@ -646,6 +661,8 @@ async def unstar_images_in_list(
     current_user: CurrentUserOrDefault,
     image_names: list[str] = Body(description="The list of names of images to unstar", embed=True),
 ) -> UnstarredImagesResult:
+    assert_image_move_maintenance_inactive()
+
     try:
         unstarred_images: set[str] = set()
         affected_boards: set[str] = set()
@@ -693,6 +710,8 @@ async def download_images_from_list(
         default=None, description="The board from which image should be downloaded", embed=True
     ),
 ) -> ImagesDownloaded:
+    assert_image_move_maintenance_inactive()
+
     if (image_names is None or len(image_names) == 0) and board_id is None:
         raise HTTPException(status_code=400, detail="No images or board id specified.")
 

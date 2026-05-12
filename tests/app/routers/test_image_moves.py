@@ -14,7 +14,7 @@ from invokeai.app.services.boards.boards_default import BoardService
 from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
 from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import ClientStatePersistenceSqlite
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.image_moves.image_moves_default import ImageMoveJobAlreadyRunning
+from invokeai.app.services.image_moves.image_moves_default import ImageMoveJobAlreadyRunning, ImageMoveQueueActive
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
 from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
@@ -142,6 +142,16 @@ def test_start_image_move_rejects_overlapping_background_job(client: TestClient,
 
     assert response.status_code == status.HTTP_409_CONFLICT
     assert response.json()["detail"] == "already running"
+
+
+def test_start_image_move_rejects_active_queue_work(client: TestClient, mock_invoker: Invoker) -> None:
+    image_moves = mock_invoker.services.image_moves
+    image_moves.start_background_move_all.side_effect = ImageMoveQueueActive("queue work is active")
+
+    response = client.post("/api/v1/image_moves/start")
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert response.json()["detail"] == "queue work is active"
 
 
 def test_force_recovery_returns_accepted(client: TestClient, mock_invoker: Invoker) -> None:

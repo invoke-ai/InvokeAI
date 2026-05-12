@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import BackgroundTasks
@@ -64,6 +65,75 @@ def prepare_download_images_test(monkeypatch: Any, mock_invoker: Invoker) -> Non
         return None
 
     monkeypatch.setattr(BackgroundTasks, "add_task", mock_add_task)
+
+
+def prepare_image_maintenance_test(monkeypatch: Any, mock_invoker: Invoker) -> None:
+    mock_deps = MockApiDependencies(mock_invoker)
+    mock_invoker.services.image_moves = MagicMock()
+    mock_invoker.services.image_moves.is_maintenance_active.return_value = True
+    monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers.image_move_maintenance.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "json_body"),
+    [
+        ("get", "/api/v1/images/i/test.png/full", None),
+        ("head", "/api/v1/images/i/test.png/full", None),
+        ("get", "/api/v1/images/i/test.png/thumbnail", None),
+        ("delete", "/api/v1/images/i/test.png", None),
+        ("delete", "/api/v1/images/intermediates", None),
+        ("delete", "/api/v1/images/uncategorized", None),
+        ("patch", "/api/v1/images/i/test.png", {"starred": True}),
+        ("post", "/api/v1/images/delete", {"image_names": ["test.png"]}),
+        ("post", "/api/v1/images/star", {"image_names": ["test.png"]}),
+        ("post", "/api/v1/images/unstar", {"image_names": ["test.png"]}),
+        ("post", "/api/v1/images/download", {"image_names": ["test.png"]}),
+    ],
+)
+def test_image_operations_are_blocked_during_image_move_maintenance(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, method: str, path: str, json_body: dict | None
+) -> None:
+    prepare_image_maintenance_test(monkeypatch, mock_invoker)
+
+    if json_body is not None:
+        response = getattr(client, method)(path, json=json_body)
+    else:
+        response = getattr(client, method)(path)
+
+    assert response.status_code == 409
+    if method != "head":
+        assert response.json()["detail"] == "Image storage maintenance is active"
+
+
+def test_image_upload_is_blocked_during_image_move_maintenance(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    prepare_image_maintenance_test(monkeypatch, mock_invoker)
+
+    response = client.post(
+        "/api/v1/images/upload",
+        params={"image_category": "general", "is_intermediate": False},
+        files={"file": ("test.png", b"not-read-during-maintenance", "image/png")},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Image storage maintenance is active"
+
+
+def test_image_to_prompt_is_blocked_during_image_move_maintenance(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    prepare_image_maintenance_test(monkeypatch, mock_invoker)
+
+    response = client.post(
+        "/api/v1/utilities/image-to-prompt",
+        json={"image_name": "test.png", "model_key": "model-key", "instruction": "describe"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Image storage maintenance is active"
 
 
 def test_download_images_with_empty_image_list_and_no_board_id(

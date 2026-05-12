@@ -9,6 +9,7 @@ from invokeai.app.services.image_moves.image_moves_default import (
     ImageMoveBackgroundStatus,
     ImageMoveJob,
     ImageMoveJobAlreadyRunning,
+    ImageMoveQueueActive,
     MoveJobState,
 )
 
@@ -65,7 +66,7 @@ def _status_to_response(service_status: ImageMoveBackgroundStatus | dict) -> Ima
 async def start_image_move(_: AdminUserOrDefault) -> ImageMoveStatusResponse:
     try:
         return _status_to_response(_get_image_move_service().start_background_move_all())
-    except ImageMoveJobAlreadyRunning as e:
+    except (ImageMoveJobAlreadyRunning, ImageMoveQueueActive) as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 

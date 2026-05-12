@@ -13,6 +13,7 @@ from pyparsing import ParseException
 from transformers import AutoProcessor, AutoTokenizer, LlavaOnevisionForConditionalGeneration, LlavaOnevisionProcessor
 
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.backend.llava_onevision_pipeline import LlavaOnevisionPipeline
@@ -201,6 +202,8 @@ def _run_image_to_prompt(image_name: str, model_key: str, instruction: str) -> s
 )
 async def image_to_prompt(body: ImageToPromptRequest) -> ImageToPromptResponse:
     """Generate a descriptive prompt from an image using a vision-language model."""
+    assert_image_move_maintenance_inactive()
+
     try:
         prompt = await asyncio.to_thread(
             _run_image_to_prompt,
