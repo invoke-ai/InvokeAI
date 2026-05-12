@@ -16,12 +16,23 @@ import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { uploadImages } from 'services/api/endpoints/images';
+import { uploadVideos } from 'services/api/endpoints/videos';
 import { useBoardName } from 'services/api/hooks/useBoardName';
-import type { UploadImageArg } from 'services/api/types';
+import type { UploadImageArg, UploadVideoArg } from 'services/api/types';
 import { z } from 'zod';
 
 const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpg', 'image/jpeg', 'image/webp'];
-const ACCEPTED_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp'];
+const ACCEPTED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-matroska'];
+const ACCEPTED_IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp'];
+const ACCEPTED_VIDEO_EXTENSIONS = ['.mp4', '.webm', '.mov', '.mkv'];
+
+const isVideoFile = (file: File): boolean => {
+  if (file.type && ACCEPTED_VIDEO_TYPES.includes(file.type.toLowerCase())) {
+    return true;
+  }
+  const lower = file.name.toLowerCase();
+  return ACCEPTED_VIDEO_EXTENSIONS.some((ext) => lower.endsWith(ext));
+};
 
 // const MAX_IMAGE_SIZE = 4; //In MegaBytes
 // const sizeInMB = (sizeInBytes: number, decimalsNum = 2) => {
@@ -39,13 +50,18 @@ const zUploadFile = z
   // )
   .refine(
     (file) => {
-      return ACCEPTED_IMAGE_TYPES.includes(file.type.toLowerCase());
+      const type = file.type.toLowerCase();
+      return ACCEPTED_IMAGE_TYPES.includes(type) || ACCEPTED_VIDEO_TYPES.includes(type);
     },
     { message: `File type is not supported` }
   )
   .refine(
     (file) => {
-      return ACCEPTED_FILE_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext));
+      const lower = file.name.toLowerCase();
+      return (
+        ACCEPTED_IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext)) ||
+        ACCEPTED_VIDEO_EXTENSIONS.some((ext) => lower.endsWith(ext))
+      );
     },
     { message: `File extension is not supported` }
   );
@@ -86,25 +102,49 @@ export const FullscreenDropzone = memo(() => {
 
       const focusedRegion = getFocusedRegion();
 
-      // While on the canvas tab and when pasting a single image, canvas may want to create a new layer. Let it handle
-      // the paste event.
-      const [firstImageFile] = files;
-      if (focusedRegion === 'canvas' && activeTab === 'canvas' && files.length === 1 && firstImageFile) {
-        setFileToPaste(firstImageFile);
+      // While on the canvas tab and when pasting a single image (not a video — the canvas can't
+      // host videos), canvas may want to create a new layer. Let it handle the paste event.
+      const [firstFile] = files;
+      if (
+        focusedRegion === 'canvas' &&
+        activeTab === 'canvas' &&
+        files.length === 1 &&
+        firstFile &&
+        !isVideoFile(firstFile)
+      ) {
+        setFileToPaste(firstFile);
         return;
       }
 
       const autoAddBoardId = selectAutoAddBoardId(getState());
+      const boardId = autoAddBoardId === 'none' ? undefined : autoAddBoardId;
 
-      const uploadArgs: UploadImageArg[] = files.map((file, i) => ({
-        file,
-        image_category: 'user',
-        is_intermediate: false,
-        board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-        isFirstUploadOfBatch: i === 0,
-      }));
+      // Split files by media type so each batch goes through its own uploader. Image and video
+      // uploaders are independent — they each update their own RTK cache + invalidate the gallery.
+      const imageFiles = files.filter((f) => !isVideoFile(f));
+      const videoFiles = files.filter((f) => isVideoFile(f));
 
-      uploadImages(uploadArgs);
+      if (imageFiles.length > 0) {
+        const imageUploadArgs: UploadImageArg[] = imageFiles.map((file, i) => ({
+          file,
+          image_category: 'user',
+          is_intermediate: false,
+          board_id: boardId,
+          isFirstUploadOfBatch: i === 0,
+        }));
+        uploadImages(imageUploadArgs);
+      }
+
+      if (videoFiles.length > 0) {
+        const videoUploadArgs: UploadVideoArg[] = videoFiles.map((file, i) => ({
+          file,
+          video_category: 'user',
+          is_intermediate: false,
+          board_id: boardId,
+          isFirstUploadOfBatch: i === 0,
+        }));
+        uploadVideos(videoUploadArgs);
+      }
     },
     [activeTab, t]
   );
