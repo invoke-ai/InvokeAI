@@ -281,7 +281,6 @@ export const {
 
 /**
  * Imperative helper to fetch a VideoDTO. Mirrors `getImageDTOSafe`.
- * @knipignore Multi-phase rollout; consumed by Phase 5 viewer code.
  */
 export const getVideoDTOSafe = async (
   video_name: string,
