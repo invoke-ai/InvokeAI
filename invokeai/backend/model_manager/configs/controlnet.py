@@ -54,6 +54,10 @@ MODEL_NAME_TO_PREPROCESSOR = {
 class ControlAdapterDefaultSettings(BaseModel):
     # This could be narrowed to controlnet processor nodes, but they change. Leaving this a string is safer.
     preprocessor: str | None
+    fp8_storage: bool | None = Field(
+        default=None,
+        description="Store weights in FP8 to reduce VRAM usage (~50% savings). Weights are cast to compute dtype during inference.",
+    )
     model_config = ConfigDict(extra="forbid")
 
     @classmethod
