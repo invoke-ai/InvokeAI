@@ -15,6 +15,7 @@ from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
+from invokeai.app.services.videos.videos_common import VideoDTO
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
@@ -290,6 +291,89 @@ class ImagesInterface(InvocationContextInterface):
             The local path of the image or thumbnail.
         """
         return Path(self._services.images.get_path(image_name, thumbnail))
+
+
+class VideosInterface(InvocationContextInterface):
+    """Save and look up videos produced by invocations.
+
+    Mirrors :class:`ImagesInterface` but consumes a path to an already-encoded
+    MP4 (or other supported container) rather than an in-memory PIL image —
+    video encoding is the caller's responsibility (e.g. the
+    ``wan_latents_to_video`` node uses ``imageio[ffmpeg]``).
+    """
+
+    def __init__(self, services: InvocationServices, data: InvocationContextData, util: "UtilInterface") -> None:
+        super().__init__(services, data)
+        self._util = util
+
+    def save(
+        self,
+        source_path: Path,
+        width: int,
+        height: int,
+        duration: float,
+        fps: Optional[float] = None,
+        board_id: Optional[str] = None,
+        image_category: ImageCategory = ImageCategory.GENERAL,
+        metadata: Optional[MetadataField] = None,
+    ) -> VideoDTO:
+        """Save a video produced by an invocation. The file at ``source_path`` is moved into
+        the videos output folder; the caller should treat the path as consumed after this
+        returns.
+
+        ``board_id`` falls back to the invocation's :class:`WithBoard` mixin if unset, and
+        ``metadata`` falls back to the :class:`WithMetadata` mixin. Both can be overridden
+        explicitly. ``image_category`` reuses the image enum since the gallery's category
+        filter is shared between kinds.
+        """
+
+        self._util.signal_progress("Saving video")
+
+        metadata_ = None
+        if metadata:
+            metadata_ = metadata.model_dump_json()
+        elif isinstance(self._data.invocation, WithMetadata) and self._data.invocation.metadata:
+            metadata_ = self._data.invocation.metadata.model_dump_json()
+
+        board_id_ = None
+        if board_id:
+            board_id_ = board_id
+        elif isinstance(self._data.invocation, WithBoard) and self._data.invocation.board:
+            board_id_ = self._data.invocation.board.board_id
+
+        workflow_ = None
+        if self._data.queue_item.workflow:
+            workflow_ = self._data.queue_item.workflow.model_dump_json()
+
+        graph_ = None
+        if self._data.queue_item.session.graph:
+            graph_ = self._data.queue_item.session.graph.model_dump_json()
+
+        return self._services.videos.create(
+            source_path=source_path,
+            width=width,
+            height=height,
+            duration=duration,
+            fps=fps,
+            is_intermediate=self._data.invocation.is_intermediate,
+            video_category=image_category,
+            board_id=board_id_,
+            metadata=metadata_,
+            video_origin=ResourceOrigin.INTERNAL,
+            workflow=workflow_,
+            graph=graph_,
+            session_id=self._data.queue_item.session_id,
+            node_id=self._data.invocation.id,
+            user_id=self._data.queue_item.user_id,
+        )
+
+    def get_dto(self, video_name: str) -> VideoDTO:
+        """Get a video DTO by name."""
+        return self._services.videos.get_dto(video_name)
+
+    def get_path(self, video_name: str, thumbnail: bool = False) -> Path:
+        """Get the on-disk path to a video file or its WebP thumbnail."""
+        return Path(self._services.videos.get_path(video_name, thumbnail=thumbnail))
 
 
 class TensorsInterface(InvocationContextInterface):
@@ -736,6 +820,7 @@ class InvocationContext:
     def __init__(
         self,
         images: ImagesInterface,
+        videos: VideosInterface,
         tensors: TensorsInterface,
         conditioning: ConditioningInterface,
         models: ModelsInterface,
@@ -748,6 +833,8 @@ class InvocationContext:
     ) -> None:
         self.images = images
         """Methods to save, get and update images and their metadata."""
+        self.videos = videos
+        """Methods to save and get videos produced by invocations."""
         self.tensors = tensors
         """Methods to save and get tensors, including image, noise, masks, and masked images."""
         self.conditioning = conditioning
@@ -790,10 +877,12 @@ def build_invocation_context(
     conditioning = ConditioningInterface(services=services, data=data)
     models = ModelsInterface(services=services, data=data, util=util)
     images = ImagesInterface(services=services, data=data, util=util)
+    videos = VideosInterface(services=services, data=data, util=util)
     boards = BoardsInterface(services=services, data=data)
 
     ctx = InvocationContext(
         images=images,
+        videos=videos,
         logger=logger,
         config=config,
         tensors=tensors,

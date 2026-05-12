@@ -243,6 +243,12 @@ class ImageField(BaseModel):
     image_name: str = Field(description="The name of the image")
 
 
+class VideoField(BaseModel):
+    """A video primitive field"""
+
+    video_name: str = Field(description="The name of the video")
+
+
 class BoardField(BaseModel):
     """A board primitive field"""
 
@@ -385,13 +391,21 @@ class WanRefImageConditioningField(BaseModel):
     to the 16-channel noise latents along the channel dim each step, producing
     the 36-channel input the I2V-A14B transformer expects.
 
-    Also carries the spatial dims used to encode the image, so the denoise
-    node can sanity-check that the user's width/height match.
+    Also carries the spatial dims and frame count used to encode the image so
+    the denoise node can sanity-check the user's width/height/num_frames — a
+    latent temporal-dim mismatch is hard to debug from the downstream error.
     """
 
-    condition_tensor_name: str = Field(description="Name of the saved [1, 20, 1, H/8, W/8] condition tensor.")
+    condition_tensor_name: str = Field(
+        description="Name of the saved [1, 20, T_lat, H/8, W/8] condition tensor."
+    )
     width: int = Field(description="Image width used during VAE encoding (matches denoise width).")
     height: int = Field(description="Image height used during VAE encoding (matches denoise height).")
+    num_frames: int = Field(
+        default=1,
+        description="Pixel-frame count the condition was built for. 1 for single-frame I2V "
+        "(image output), 81+ for video.",
+    )
 
 
 class ConditioningField(BaseModel):

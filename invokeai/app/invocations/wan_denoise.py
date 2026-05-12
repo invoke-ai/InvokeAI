@@ -322,6 +322,15 @@ class WanDenoiseInvocation(BaseInvocation):
                     f"Reference-image dimensions ({self.ref_image.width}x{self.ref_image.height}) must "
                     f"match denoise dimensions ({self.width}x{self.height})."
                 )
+            if self.ref_image.num_frames > 1:
+                # The image denoise produces single-frame output; concatenating a multi-frame
+                # condition to a single-frame noise tensor mismatches the temporal dim and the
+                # downstream tensor-shape error would be unhelpful.
+                raise ValueError(
+                    f"This denoise node produces a single-frame image but the reference image was "
+                    f"encoded for {self.ref_image.num_frames} frames. Use the Denoise Video - Wan 2.2 "
+                    "node for video I2V, or set num_frames=1 on the Reference Image node."
+                )
             ref_condition = (
                 context.tensors.load(self.ref_image.condition_tensor_name)
                 .to(device=device, dtype=inference_dtype)

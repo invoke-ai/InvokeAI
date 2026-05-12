@@ -44,8 +44,14 @@ def make_noise(
     device: torch.device,
     dtype: torch.dtype,
     seed: int,
+    num_latent_frames: int = 1,
 ) -> torch.Tensor:
-    """Generate Wan-shaped noise: ``[B, C, 1, H/s, W/s]``.
+    """Generate Wan-shaped noise: ``[B, C, T_lat, H/s, W/s]``.
+
+    For single-frame image generation the default ``num_latent_frames=1`` yields
+    a temporal dim of 1 (matching the original behaviour). Video generation
+    passes the latent-space frame count computed from the pixel-frame count via
+    :func:`num_latent_frames_for` (or directly).
 
     Mirrors Anima's ``_get_noise``: noise is generated on CPU (deterministic
     across CUDA / ROCm / MPS) and moved to ``device`` afterwards.
@@ -53,10 +59,24 @@ def make_noise(
     return torch.randn(
         batch_size,
         latent_channels,
-        1,  # T = 1 for image generation
+        num_latent_frames,
         height // spatial_scale_factor,
         width // spatial_scale_factor,
         device="cpu",
         dtype=torch.float32,
         generator=torch.Generator(device="cpu").manual_seed(seed),
     ).to(device=device, dtype=dtype)
+
+
+# Wan 2.2 VAE temporal compression ratio. 4 pixel-frames collapse to 1 latent-
+# temporal slice (this is also why the I2V conditioning mask has 4 channels).
+WAN_VAE_TEMPORAL_SCALE_FACTOR = 4
+
+
+def num_latent_frames_for(num_frames: int, vae_scale_factor_temporal: int = WAN_VAE_TEMPORAL_SCALE_FACTOR) -> int:
+    """Convert a pixel-frame count to latent-frame count for the Wan VAE.
+
+    Matches Diffusers ``WanPipeline.prepare_latents``: ``(num_frames - 1) // s + 1``
+    (e.g. ``81 -> 21`` for the standard Wan VAE).
+    """
+    return (num_frames - 1) // vae_scale_factor_temporal + 1
