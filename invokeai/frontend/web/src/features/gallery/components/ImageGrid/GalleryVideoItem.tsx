@@ -3,6 +3,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { uniq } from 'es-toolkit';
+import { useVideoContextMenu } from 'features/gallery/components/ContextMenu/VideoContextMenu';
 import { selectAlwaysShouldImageSizeBadge } from 'features/gallery/store/gallerySelectors';
 import { selectGallerySlice, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -120,6 +121,9 @@ export const GalleryVideoItem = memo(({ videoDTO }: Props) => {
     () => ({ width: videoDTO.width, height: videoDTO.height }),
     [videoDTO.width, videoDTO.height]
   );
+
+  // Right-click / long-press context menu (delete, change board, download).
+  useVideoContextMenu(videoDTO, ref);
 
   return (
     <Flex
