@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.session_processor.session_processor_base import SessionProcessorBase
     from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
     from invokeai.app.services.board_video_records.board_video_records_base import BoardVideoRecordStorageBase
+    from invokeai.app.services.gallery.gallery_base import GalleryServiceABC
     from invokeai.app.services.urls.urls_base import UrlServiceBase
     from invokeai.app.services.users.users_base import UserServiceBase
     from invokeai.app.services.video_files.video_files_base import VideoFileStorageBase
@@ -87,6 +88,7 @@ class InvocationServices:
         video_files: "VideoFileStorageBase",
         video_records: "VideoRecordStorageBase",
         board_video_records: "BoardVideoRecordStorageBase",
+        gallery: "GalleryServiceABC",
     ):
         self.board_images = board_images
         self.board_image_records = board_image_records
@@ -123,3 +125,4 @@ class InvocationServices:
         self.video_files = video_files
         self.video_records = video_records
         self.board_video_records = board_video_records
+        self.gallery = gallery

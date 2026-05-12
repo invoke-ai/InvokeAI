@@ -120,6 +120,7 @@ def mock_services() -> InvocationServices:
         video_files=None,  # type: ignore
         video_records=None,  # type: ignore
         board_video_records=None,  # type: ignore
+        gallery=None,  # type: ignore
     )
 
 

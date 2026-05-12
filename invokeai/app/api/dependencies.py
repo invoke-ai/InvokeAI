@@ -50,6 +50,7 @@ from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.app.services.style_preset_images.style_preset_images_disk import StylePresetImageFileStorageDisk
 from invokeai.app.services.style_preset_records.style_preset_records_sqlite import SqliteStylePresetRecordsStorage
 from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
+from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
 from invokeai.app.services.urls.urls_default import LocalUrlService
 from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.video_files.video_files_disk import DiskVideoFileStorage
@@ -140,6 +141,7 @@ class ApiDependencies:
         video_records = SqliteVideoRecordStorage(db=db)
         videos = VideoService()
         board_video_records = SqliteBoardVideoRecordStorage(db=db)
+        gallery = SqliteGalleryService(db=db)
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
         tensors = ObjectSerializerForwardCache(
             ObjectSerializerDisk[torch.Tensor](
@@ -235,6 +237,7 @@ class ApiDependencies:
             video_files=video_files,
             video_records=video_records,
             board_video_records=board_video_records,
+            gallery=gallery,
         )
 
         ApiDependencies.invoker = Invoker(services)
