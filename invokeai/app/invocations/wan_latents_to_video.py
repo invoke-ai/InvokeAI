@@ -109,9 +109,10 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
         num_frames = len(frames_list)
         duration = num_frames / float(self.fps)
 
-        # Encode to a temporary MP4 via imageio[ffmpeg], then hand the file off
-        # to the video service. ``ffmpeg_params=['-pix_fmt', 'yuv420p']`` keeps
-        # the output compatible with broadly-supported browser playback.
+        # Encode to a temporary MP4 via imageio's FFMPEG plugin (backed by the
+        # bundled imageio-ffmpeg binary). libx264 + yuv420p is the default for
+        # this plugin, which is what we want for broadly-compatible browser
+        # playback — no need to override.
         tmp = tempfile.NamedTemporaryFile(
             prefix="invokeai_wan_video_", suffix=".mp4", delete=False
         )
@@ -122,10 +123,9 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
             iio.imwrite(
                 tmp_path,
                 frames_list,
-                plugin="pyav",
+                plugin="FFMPEG",
                 codec="libx264",
                 fps=self.fps,
-                pixel_format="yuv420p",
             )
             video_dto = context.videos.save(
                 source_path=tmp_path,
