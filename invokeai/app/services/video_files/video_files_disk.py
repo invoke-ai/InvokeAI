@@ -12,6 +12,7 @@ from invokeai.app.services.video_files.video_files_common import (
 )
 from invokeai.app.util.thumbnails import make_thumbnail
 from invokeai.app.util.video_thumbnails import extract_video_frame, get_video_thumbnail_name
+from invokeai.backend.util.logging import InvokeAILogger
 
 
 class DiskVideoFileStorage(VideoFileStorageBase):
@@ -38,6 +39,7 @@ class DiskVideoFileStorage(VideoFileStorageBase):
         workflow: Optional[str] = None,
         graph: Optional[str] = None,
     ) -> None:
+        logger = InvokeAILogger.get_logger()
         try:
             self.__validate_storage_folders()
             video_path = self.get_path(video_name, video_subfolder=video_subfolder)
@@ -52,15 +54,29 @@ class DiskVideoFileStorage(VideoFileStorageBase):
                     Path(source_path).unlink(missing_ok=True)
                 except Exception:
                     pass
+            logger.info(f"Video file written: {video_path}")
 
             thumbnail_name = get_video_thumbnail_name(video_name)
             thumbnail_path = self.get_path(thumbnail_name, thumbnail=True, video_subfolder=video_subfolder)
             thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
 
-            frame = extract_video_frame(video_path, frame_index=0)
+            # Thumbnail extraction is best-effort — if both imageio and cv2 fail, we still want
+            # the video record + file in place and the invocation to complete. A missing
+            # thumbnail leaves the gallery with a broken-image placeholder for that item, which
+            # is annoying but not fatal.
+            try:
+                frame = extract_video_frame(video_path, frame_index=0)
+            except Exception as e:
+                logger.warning(f"Thumbnail extraction raised for {video_name}: {e}")
+                frame = None
             if frame is not None:
                 thumbnail = make_thumbnail(frame, thumbnail_size)
                 thumbnail.save(thumbnail_path, "WEBP")
+                logger.info(f"Thumbnail written: {thumbnail_path}")
+            else:
+                logger.warning(
+                    f"Could not extract a thumbnail frame for {video_name}; gallery thumbnail will be missing."
+                )
 
             if metadata is not None or workflow is not None or graph is not None:
                 sidecar_path = self.__get_sidecar_path(video_name, video_subfolder=video_subfolder)
@@ -72,6 +88,7 @@ class DiskVideoFileStorage(VideoFileStorageBase):
                 }
                 with open(sidecar_path, "w", encoding="utf-8") as f:
                     json.dump(sidecar, f)
+                logger.info(f"Sidecar written: {sidecar_path}")
         except Exception as e:
             raise VideoFileSaveException from e
 
