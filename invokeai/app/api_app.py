@@ -30,6 +30,7 @@ from invokeai.app.api.routers import (
     session_queue,
     style_presets,
     utilities,
+    videos,
     virtual_boards,
     workflows,
 )
@@ -177,6 +178,7 @@ app.include_router(utilities.utilities_router, prefix="/api")
 app.include_router(model_manager.model_manager_router, prefix="/api")
 app.include_router(download_queue.download_queue_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
+app.include_router(videos.videos_router, prefix="/api")
 app.include_router(boards.boards_router, prefix="/api")
 app.include_router(board_images.board_images_router, prefix="/api")
 app.include_router(virtual_boards.virtual_boards_router, prefix="/api")

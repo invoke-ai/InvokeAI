@@ -36,8 +36,12 @@ if TYPE_CHECKING:
     from invokeai.app.services.names.names_base import NameServiceBase
     from invokeai.app.services.session_processor.session_processor_base import SessionProcessorBase
     from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
+    from invokeai.app.services.board_video_records.board_video_records_base import BoardVideoRecordStorageBase
     from invokeai.app.services.urls.urls_base import UrlServiceBase
     from invokeai.app.services.users.users_base import UserServiceBase
+    from invokeai.app.services.video_files.video_files_base import VideoFileStorageBase
+    from invokeai.app.services.video_records.video_records_base import VideoRecordStorageBase
+    from invokeai.app.services.videos.videos_base import VideoServiceABC
     from invokeai.app.services.workflow_records.workflow_records_base import WorkflowRecordsStorageBase
     from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_base import WorkflowThumbnailServiceBase
     from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
@@ -79,6 +83,10 @@ class InvocationServices:
         workflow_thumbnails: "WorkflowThumbnailServiceBase",
         client_state_persistence: "ClientStatePersistenceABC",
         users: "UserServiceBase",
+        videos: "VideoServiceABC",
+        video_files: "VideoFileStorageBase",
+        video_records: "VideoRecordStorageBase",
+        board_video_records: "BoardVideoRecordStorageBase",
     ):
         self.board_images = board_images
         self.board_image_records = board_image_records
@@ -111,3 +119,7 @@ class InvocationServices:
         self.workflow_thumbnails = workflow_thumbnails
         self.client_state_persistence = client_state_persistence
         self.users = users
+        self.videos = videos
+        self.video_files = video_files
+        self.video_records = video_records
+        self.board_video_records = board_video_records

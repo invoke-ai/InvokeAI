@@ -69,6 +69,10 @@ def mock_services() -> InvocationServices:
         model_relationships=None,  # type: ignore
         client_state_persistence=ClientStatePersistenceSqlite(db=db),
         users=UserService(db),
+        videos=None,  # type: ignore
+        video_files=None,  # type: ignore
+        video_records=None,  # type: ignore
+        board_video_records=None,  # type: ignore
     )
 
 

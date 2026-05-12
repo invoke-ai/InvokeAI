@@ -49,8 +49,12 @@ from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessi
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.app.services.style_preset_images.style_preset_images_disk import StylePresetImageFileStorageDisk
 from invokeai.app.services.style_preset_records.style_preset_records_sqlite import SqliteStylePresetRecordsStorage
+from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
 from invokeai.app.services.urls.urls_default import LocalUrlService
 from invokeai.app.services.users.users_default import UserService
+from invokeai.app.services.video_files.video_files_disk import DiskVideoFileStorage
+from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
+from invokeai.app.services.videos.videos_default import VideoService
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_disk import WorkflowThumbnailFileStorageDisk
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
@@ -108,6 +112,7 @@ class ApiDependencies:
             raise ValueError("Output folder is not set")
 
         image_files = DiskImageFileStorage(f"{output_folder}/images")
+        video_files = DiskVideoFileStorage(f"{output_folder}/videos")
 
         model_images_folder = config.models_path
         style_presets_folder = config.style_presets_path
@@ -132,6 +137,9 @@ class ApiDependencies:
         bulk_download = BulkDownloadService()
         image_records = SqliteImageRecordStorage(db=db)
         images = ImageService()
+        video_records = SqliteVideoRecordStorage(db=db)
+        videos = VideoService()
+        board_video_records = SqliteBoardVideoRecordStorage(db=db)
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
         tensors = ObjectSerializerForwardCache(
             ObjectSerializerDisk[torch.Tensor](
@@ -223,6 +231,10 @@ class ApiDependencies:
             workflow_thumbnails=workflow_thumbnails,
             client_state_persistence=client_state_persistence,
             users=users,
+            videos=videos,
+            video_files=video_files,
+            video_records=video_records,
+            board_video_records=board_video_records,
         )
 
         ApiDependencies.invoker = Invoker(services)
