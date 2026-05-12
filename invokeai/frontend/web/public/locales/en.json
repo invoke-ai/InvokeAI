@@ -1021,6 +1021,8 @@
         "openaiQuality": "OpenAI Quality",
         "openaiBackground": "OpenAI Background",
         "openaiInputFidelity": "OpenAI Input Fidelity",
+        "seedreamWatermark": "Seedream Watermark",
+        "seedreamOptimizePrompt": "Seedream Optimize Prompt",
         "guidance": "Guidance",
         "height": "Height",
         "imageDetails": "Image Details",
@@ -1124,6 +1126,7 @@
         "convertToDiffusersHelpText5": "Please make sure you have enough disk space. Models generally vary between 2GB-7GB in size.",
         "convertToDiffusersHelpText6": "Do you wish to convert this model?",
         "cpuOnly": "CPU Only",
+        "fp8Storage": "FP8 Storage (Save VRAM)",
         "runOnCpu": "Run text encoder model on CPU only",
         "noDefaultSettings": "No default settings configured for this model. Visit the Model Manager to add default settings.",
         "defaultSettings": "Default Settings",
@@ -1336,6 +1339,7 @@
         "typePhraseHere": "Type phrase here",
         "t5Encoder": "T5 Encoder",
         "qwen3Encoder": "Qwen3 Encoder",
+        "qwenVLEncoder": "Qwen2.5-VL Encoder",
         "animaVae": "VAE",
         "animaVaePlaceholder": "Select Anima-compatible VAE",
         "animaQwen3Encoder": "Qwen3 0.6B Encoder",
@@ -1355,7 +1359,11 @@
         "flux2KleinQwen3EncoderPlaceholder": "From diffusers model",
         "flux2KleinQwen3EncoderNoModelPlaceholder": "No diffusers model available",
         "qwenImageComponentSource": "VAE/Encoder Source (Diffusers)",
-        "qwenImageComponentSourcePlaceholder": "Required for GGUF models",
+        "qwenImageComponentSourcePlaceholder": "GGUF models require this unless a standalone VAE & Encoder is installed",
+        "qwenImageVae": "VAE",
+        "qwenImageVaePlaceholder": "From VAE/Encoder Source",
+        "qwenImageQwenVLEncoder": "Qwen2.5-VL Encoder",
+        "qwenImageQwenVLEncoderPlaceholder": "From VAE/Encoder Source",
         "qwenImageQuantization": "Encoder Quantization",
         "qwenImageQuantizationNone": "None (bf16)",
         "qwenImageQuantizationInt8": "8-bit (int8)",
@@ -1793,6 +1801,13 @@
         "enableNSFWChecker": "Enable NSFW Checker",
         "general": "General",
         "generation": "Generation",
+        "imageSubfolderStrategy": "Image Subfolder Strategy",
+        "imageSubfolderStrategyDate": "Date",
+        "imageSubfolderStrategyFlat": "Flat",
+        "imageSubfolderStrategyHash": "Hash",
+        "imageSubfolderStrategySaveFailed": "Failed to save Image Subfolder Strategy",
+        "imageSubfolderStrategyType": "Type",
+        "imageSubfolderStrategyUnknown": "Unknown ({{strategy}})",
         "maxQueueHistory": "Max Queue History",
         "maxQueueHistorySaveFailed": "Failed to save Max Queue History",
         "models": "Models",
@@ -2375,6 +2390,13 @@
                 "When enabled, only the text encoder component will run on CPU instead of GPU.",
                 "This saves VRAM for the denoiser while only slightly impacting performance. The conditioning outputs are automatically moved to GPU for the denoiser."
             ]
+        },
+        "fp8Storage": {
+            "heading": "FP8 Storage",
+            "paragraphs": [
+                "Stores model weights in FP8 format in VRAM, reducing memory usage by approximately 50% compared to FP16.",
+                "During inference, weights are cast layer-by-layer to the compute precision (FP16/BF16), so image quality is preserved. Works on all CUDA GPUs."
+            ]
         }
     },
     "workflows": {
@@ -2858,6 +2880,39 @@
             "freehand": "Freehand",
             "polygon": "Polygon",
             "polygonHint": "Click to add points, click the first point to close."
+        },
+        "modifierHints": {
+            "keys": {
+                "control": "Ctrl",
+                "command": "Cmd",
+                "option": "Option",
+                "alt": "Alt",
+                "shift": "Shift",
+                "space": "Space",
+                "wheel": "Wheel",
+                "arrows": "Arrows",
+                "enter": "Enter",
+                "esc": "Esc"
+            },
+            "labels": {
+                "pan": "Pan",
+                "pickColor": "Pick color",
+                "straightLine": "Straight line",
+                "resizeBrush": "Resize brush",
+                "resizeEraser": "Resize eraser",
+                "subtractMask": "Subtract mask",
+                "snap45Degrees": "Snap to 45deg",
+                "lockAspectRatio": "Lock ratio",
+                "unlockAspectRatio": "Unlock ratio",
+                "scaleFromCenter": "Scale from center",
+                "fineGrid": "Fine grid",
+                "commitText": "Commit",
+                "newLine": "New line",
+                "cancelText": "Cancel",
+                "dragText": "Drag text",
+                "snapRotation": "Snap rotation",
+                "nudgeSelection": "Nudge selection"
+            }
         },
         "tool": {
             "brush": "Brush",
