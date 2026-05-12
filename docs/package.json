@@ -7,25 +7,24 @@
     "start": "astro dev",
     "generate-docs-data": "uv run python ../scripts/generate_docs_json.py",
     "check-docs-data": "pnpm run generate-docs-data && git diff --exit-code -- src/generated",
-    "check-ghpages-output": "node ./scripts/verify-ghpages-output.mjs",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/markdoc": "^1.0.4",
-    "@astrojs/starlight": "^0.39.2",
+    "@astrojs/markdoc": "^1.0.3",
+    "@astrojs/starlight": "^0.38.2",
     "@astrojs/starlight-markdoc": "^0.6.0",
     "@fontsource-variable/inter": "^5.2.8",
-    "@fontsource-variable/roboto-mono": "^5.2.9",
-    "astro": "^6.3.1",
-    "mermaid": "^11.15.0",
+    "@fontsource-variable/roboto-mono": "^5.2.8",
+    "astro": "^6.1.4",
+    "mermaid": "^11.14.0",
     "rehype-external-links": "^3.0.0",
     "sharp": "^0.34.5",
     "starlight-changelogs": "^0.5.0",
     "starlight-contextual-menu": "^0.1.5",
-    "starlight-links-validator": "^0.24.0",
-    "starlight-llms-txt": "^0.8.1"
+    "starlight-links-validator": "^0.21.0",
+    "starlight-llms-txt": "^0.8.0"
   },
   "devDependencies": {
     "node-addon-api": "^8.7.0",

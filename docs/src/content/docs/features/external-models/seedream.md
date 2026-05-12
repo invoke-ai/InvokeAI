@@ -2,17 +2,15 @@
 title: BytePlus Seedream
 ---
 
-import { Steps } from '@astrojs/starlight/components'
+# :material-image-sync-outline: BytePlus Seedream
 
 Invoke supports BytePlus's **Seedream** image generation family through the BytePlus Ark API. Seedream is a strong fit for 2K/4K generations and multi-reference image composition.
 
 ## Getting an API Key
 
-<Steps>
 1. Open the [BytePlus Console](https://console.byteplus.com/) and sign in.
 2. Enable the **Ark** (model serving) product.
 3. Create an API key with access to the Seedream models you plan to use.
-</Steps>
 
 ## Configuration
 
@@ -38,9 +36,7 @@ Restart Invoke for the change to take effect.
 
 The 4.x / 5.x models are batch-capable and accept up to 14 reference images per request.
 
-:::note[Model IDs]
-BytePlus uses date-stamped model IDs (e.g. `seedream-5-0-260128`). When BytePlus releases a new dated revision, the starter model IDs in Invoke need to be updated. Seedream 3.0 T2I (`seedream-3-0-t2i-250415`) was deprecated by BytePlus and replaced by Seedream 4.0.
-:::
+> **Note on model IDs:** BytePlus uses date-stamped model IDs (e.g. `seedream-5-0-260128`). When BytePlus releases a new dated revision, the starter model IDs in Invoke need to be updated. Seedream 3.0 T2I (`seedream-3-0-t2i-250415`) was deprecated by BytePlus and replaced by Seedream 4.0.
 
 ### Supported Aspect Ratios
 
@@ -61,8 +57,6 @@ Seedream exposes two provider-specific toggles in the parameters panel:
 
 ## Tips
 
-<Steps>
-1. For multi-image composition (e.g. character + product), Seedream 4.5 is a good default.
-2. When running large batches (`num_images > 1` on 4.x / 5.x), Invoke uses the `sequential_image_generation` API flag — each image is returned as it completes.
-3. Set `external_seedream_base_url` if you need to route through a region-specific Ark endpoint.
-</Steps>
+- For multi-image composition (e.g. character + product), Seedream 4.5 is a good default.
+- When running large batches (`num_images > 1` on 4.x / 5.x), Invoke uses the `sequential_image_generation` API flag — each image is returned as it completes.
+- Set `external_seedream_base_url` if you need to route through a region-specific Ark endpoint.

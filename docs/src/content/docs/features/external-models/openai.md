@@ -2,17 +2,15 @@
 title: OpenAI
 ---
 
-import { Steps } from '@astrojs/starlight/components'
+# :material-alpha-o-circle-outline: OpenAI
 
 Invoke supports OpenAI's image generation models — both the GPT Image family and the older DALL·E models — through the OpenAI API.
 
 ## Getting an API Key
 
-<Steps>
 1. Open the [OpenAI API Platform](https://platform.openai.com/api-keys) and sign in.
 2. Create a new secret API key.
 3. Make sure your account has billing set up — image endpoints are paid per request.
-</Steps>
 
 ## Configuration
 
@@ -53,8 +51,6 @@ DALL·E 2 and DALL·E 3 do not expose these options.
 
 ## Tips
 
-<Steps>
-1. Batching on GPT Image and DALL·E 2 tops out at 10 per request. Larger batches are split into multiple API calls.
-2. Costs can climb quickly with high-quality GPT Image generations. Start with GPT Image 1 Mini when iterating on prompts.
-3. Rate limits from OpenAI surface as failed invocations — retry after a short wait.
-</Steps>
+- **Batching** on GPT Image and DALL·E 2 tops out at 10 per request. Larger batches are split into multiple API calls.
+- **Costs** can climb quickly with high-quality GPT Image generations. Start with GPT Image 1 Mini when iterating on prompts.
+- **Rate limits** from OpenAI surface as failed invocations — retry after a short wait.
