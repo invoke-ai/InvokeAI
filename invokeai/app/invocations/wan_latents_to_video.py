@@ -10,8 +10,6 @@ The VAE expands the temporal dim by 4× during decode minus the initial offset:
 ``T_pixel = (T_lat - 1) * 4 + 1`` (e.g. T_lat=21 → 81 pixel frames).
 """
 
-from __future__ import annotations
-
 import tempfile
 from pathlib import Path
 
