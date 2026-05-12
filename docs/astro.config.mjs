@@ -6,132 +6,19 @@ import starlight from '@astrojs/starlight';
 import starlightLinksValidator from 'starlight-links-validator';
 import starlightLlmsText from 'starlight-llms-txt';
 import starlightChangelogs, { makeChangelogsSidebarLinks } from 'starlight-changelogs';
-// import starlightContextualMenu from 'starlight-contextual-menu';
+import { rehypePrefixBaseToRootLinks } from './plugins/rehype-prefix-base-to-root-links.mjs';
+import starlightContextualMenu from 'starlight-contextual-menu';
 
 // Deployment target: 'custom' (default, custom domain at invoke.ai) or 'ghpages'
 // (GitHub Pages project URL at invoke-ai.github.io/InvokeAI). Drive site/base from this
 // so the same source can be deployed to either target.
 const deployTarget = process.env.DEPLOY_TARGET ?? 'custom';
 const isGhPages = deployTarget === 'ghpages';
+const base = isGhPages ? '/InvokeAI' : '';
+const withBase = (/** @type {string} */ path) => (isGhPages ? `${base}${path}` : path);
 
-// https://astro.build/config
-export default defineConfig({
-  site: isGhPages ? 'https://invoke-ai.github.io' : 'https://invoke.ai',
-  base: isGhPages ? '/InvokeAI' : undefined,
-  integrations: [
-    starlight({
-      // Content
-      title: {
-        en: 'InvokeAI Documentation',
-      },
-      logo: {
-        src: './src/assets/invoke-icon-wide.svg',
-        alt: 'InvokeAI Logo',
-        replacesTitle: true,
-      },
-      favicon: 'favicon.svg',
-      editLink: {
-        baseUrl: 'https://github.com/invoke-ai/InvokeAI/edit/main/docs',
-      },
-      defaultLocale: 'root',
-      locales: {
-        root: {
-          label: 'English',
-          lang: 'en',
-        },
-      },
-      social: [
-        {
-          icon: 'github',
-          label: 'GitHub',
-          href: 'https://github.com/invoke-ai/InvokeAI',
-        },
-        {
-          icon: 'discord',
-          label: 'Discord',
-          href: 'https://discord.gg/ZmtBAhwWhy',
-        },
-        {
-          icon: 'youtube',
-          label: 'YouTube',
-          href: 'https://www.youtube.com/@invokeai',
-        },
-      ],
-      tableOfContents: {
-        maxHeadingLevel: 4,
-      },
-      customCss: [
-        '@fontsource-variable/inter',
-        '@fontsource-variable/roboto-mono',
-        './src/styles/custom.css',
-      ],
-      sidebar: [
-        {
-          label: 'Start Here',
-          autogenerate: { directory: 'start-here' },
-        },
-        {
-          label: 'Configuration',
-          autogenerate: { directory: 'configuration' },
-        },
-        {
-          label: 'Concepts',
-          autogenerate: { directory: 'concepts' },
-        },
-        {
-          label: 'Features',
-          autogenerate: { directory: 'features' },
-        },
-       {
-          label: 'Development',
-          autogenerate: { directory: 'development', collapsed: true },
-          collapsed: true,
-        },
-        {
-          label: 'Contributing',
-          autogenerate: { directory: 'contributing' },
-          collapsed: true,
-        },
-        {
-          label: 'Troubleshooting',
-          autogenerate: { directory: 'troubleshooting' },
-          collapsed: true,
-        },
-        {
-          label: 'Releases',
-          collapsed: true,
-          items: [
-            ...makeChangelogsSidebarLinks([
-              {
-                type: 'recent',
-                base: 'releases',
-              }
-            ])
-          ]
-        }
-      ],
-      components: {
-        ThemeProvider: './src/lib/components/ForceDarkTheme.astro',
-        ThemeSelect: './src/lib/components/EmptyComponent.astro',
-        Footer: './src/lib/components/Footer.astro',
-        PageFrame: './src/layouts/PageFrameExtended.astro',
-      },
-      plugins: [
-        starlightLinksValidator({
-          errorOnRelativeLinks: false,
-          errorOnLocalLinks: false,
-        }),
-        starlightLlmsText(),
-        starlightChangelogs(),
-        // starlightContextualMenu({
-        //   actions: [
-        //     'copy', 'view', 'chatgpt', 'claude'
-        //   ]
-        // }),
-      ]
-    }),
-  ],
-  redirects: {
+const redirects = Object.fromEntries(
+  Object.entries({
     '/CODE_OF_CONDUCT': '/contributing/code-of-conduct',
     '/RELEASE': '/development/process/release-process',
     '/installation': '/start-here/installation',
@@ -168,5 +55,165 @@ export default defineConfig({
     '/contributing/frontend': '/development/front-end',
     '/contributing/frontend/state-management': '/development/front-end/state-management',
     '/contributing/frontend/workflows': '/development/front-end/workflows',
-  }
+  }).map(([from, to]) => [from, withBase(to)]),
+);
+
+// https://astro.build/config
+export default defineConfig({
+  site: isGhPages ? 'https://invoke-ai.github.io' : 'https://invoke.ai',
+  base: base || undefined,
+  markdown: {
+    rehypePlugins: [[rehypePrefixBaseToRootLinks, { base }]],
+  },
+  integrations: [
+    starlight({
+      // Content
+      title: {
+        en: 'InvokeAI Documentation',
+      },
+      logo: {
+        src: './src/assets/invoke-icon-wide.svg',
+        alt: 'InvokeAI Logo',
+        replacesTitle: true,
+      },
+      favicon: 'favicon.svg',
+      editLink: {
+        baseUrl: 'https://github.com/invoke-ai/InvokeAI/edit/main/docs',
+      },
+      head: isGhPages
+        ? [
+            {
+              tag: 'script',
+              attrs: {
+                async: true,
+                src: 'https://plausible.tracking.events/js/pa-BHcumuOemKz4XIQeWkTn4.js',
+              },
+            },
+            {
+              tag: 'script',
+              content:
+                'window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};plausible.init()',
+            },
+          ]
+        : [],
+      defaultLocale: 'root',
+      locales: {
+        root: {
+          label: 'English',
+          lang: 'en',
+        },
+      },
+      social: [
+        {
+          icon: 'github',
+          label: 'GitHub',
+          href: 'https://github.com/invoke-ai/InvokeAI',
+        },
+        {
+          icon: 'discord',
+          label: 'Discord',
+          href: 'https://discord.gg/ZmtBAhwWhy',
+        },
+        {
+          icon: 'youtube',
+          label: 'YouTube',
+          href: 'https://www.youtube.com/@invokeai',
+        },
+      ],
+      tableOfContents: {
+        maxHeadingLevel: 4,
+      },
+      customCss: [
+        '@fontsource-variable/inter',
+        '@fontsource-variable/roboto-mono',
+        './src/styles/custom.css',
+      ],
+      sidebar: [
+        {
+          label: 'Start Here',
+          items: [{
+            autogenerate: { directory: 'start-here' },
+          }],
+        },
+        {
+          label: 'Configuration',
+          items: [{
+            autogenerate: { directory: 'configuration' },
+          }],
+        },
+        {
+          label: 'Concepts',
+          items: [{
+            autogenerate: { directory: 'concepts' },
+          }],
+        },
+        {
+          label: 'Features',
+          items: [{
+            autogenerate: { directory: 'features' },
+          }],
+        },
+        {
+          label: 'Workflows',
+          items: [{
+            autogenerate: { directory: 'workflows' },
+          }],
+          collapsed: true,
+        },
+        {
+          label: 'Development',
+          items: [{
+            autogenerate: { directory: 'development', collapsed: true },
+          }],
+          collapsed: true,
+        },
+        {
+          label: 'Contributing',
+          items: [{
+            autogenerate: { directory: 'contributing' },
+          }],
+          collapsed: true,
+        },
+        {
+          label: 'Troubleshooting',
+          items: [{
+            autogenerate: { directory: 'troubleshooting' },
+          }],
+          collapsed: true,
+        },
+        {
+          label: 'Releases',
+          collapsed: true,
+          items: [
+            ...makeChangelogsSidebarLinks([
+              {
+                type: 'recent',
+                base: 'releases',
+              }
+            ])
+          ]
+        }
+      ],
+      components: {
+        ThemeProvider: './src/lib/components/ForceDarkTheme.astro',
+        ThemeSelect: './src/lib/components/EmptyComponent.astro',
+        Footer: './src/lib/components/Footer.astro',
+        PageFrame: './src/layouts/PageFrameExtended.astro',
+      },
+      plugins: [
+        starlightLinksValidator({
+          errorOnRelativeLinks: false,
+          errorOnLocalLinks: false,
+        }),
+        starlightLlmsText(),
+        starlightChangelogs(),
+        starlightContextualMenu({
+          actions: [
+            'copy', 'view', 'chatgpt', 'claude'
+          ]
+        }),
+      ]
+    }),
+  ],
+  redirects,
 });

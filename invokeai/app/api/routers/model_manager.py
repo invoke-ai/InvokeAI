@@ -437,7 +437,17 @@ async def update_model_record(
     logger = ApiDependencies.invoker.services.logger
     record_store = ApiDependencies.invoker.services.model_manager.store
     try:
+        previous_config = record_store.get_model(key)
         config = record_store.update_model(key, changes=changes, allow_class_change=True)
+        # Settings that change how the model loads (e.g. fp8_storage, cpu_only) are baked into the cached
+        # nn.Module at load time, so toggling them on a cached model is otherwise silently a no-op until
+        # the entry is evicted. Drop any unlocked cached entries for this model so the next load rebuilds.
+        if _load_settings_changed(previous_config, config):
+            dropped = ApiDependencies.invoker.services.model_manager.load.ram_cache.drop_model(key)
+            if dropped:
+                logger.info(
+                    f"Dropped {dropped} cached entr{'y' if dropped == 1 else 'ies'} for model {key} after settings change."
+                )
         config = prepare_model_config_for_response(config, ApiDependencies)
         logger.info(f"Updated model: {key}")
     except UnknownModelException as e:
@@ -446,6 +456,26 @@ async def update_model_record(
         logger.error(str(e))
         raise HTTPException(status_code=409, detail=str(e))
     return config
+
+
+_LOAD_AFFECTING_SETTINGS: tuple[str, ...] = ("fp8_storage", "cpu_only")
+
+
+def _load_settings_changed(previous: AnyModelConfig, updated: AnyModelConfig) -> bool:
+    """Return True if any setting that influences how the model is loaded changed.
+
+    Such settings are read by the loader during `_load_model` and baked into the resulting
+    nn.Module, so a cached entry built under the old value must be evicted for the change
+    to take effect.
+    """
+    if getattr(previous, "cpu_only", None) != getattr(updated, "cpu_only", None):
+        return True
+    previous_settings = getattr(previous, "default_settings", None)
+    updated_settings = getattr(updated, "default_settings", None)
+    for field in _LOAD_AFFECTING_SETTINGS:
+        if getattr(previous_settings, field, None) != getattr(updated_settings, field, None):
+            return True
+    return False
 
 
 @model_manager_router.get(

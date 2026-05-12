@@ -98,11 +98,7 @@ multiuser: true   # Enable multi-user mode (requires authentication)
 strict_password_checking: true  # Enforce uppercase/lowercase/number requirements
 ```
 
-JWT secrets are generated automatically and stored in the
-database. You can hard-code a secret as shown above for
-development/testing purposes. Session lifetimes default to 24 hours by
-default, or 7 days when the user selects "Remember me", unless
-manually overridden in `invokeai.yaml` as shown above.
+JWT secrets are generated automatically and stored in the database. Session lifetimes default to 24 hours, or 7 days when the user selects "Remember me". See Secret Key Management below if you need to rotate the JWT secret.
 
 :::caution[Mode Switching Behavior]
 **Switching to Single-User Mode:** If boards or images were created in multi-user mode, they will all be combined into a single unified view when switching to single-user mode.
