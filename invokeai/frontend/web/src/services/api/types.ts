@@ -642,3 +642,55 @@ export type UploadImageArg = {
 
 export type ImageUploadEntryResponse = S['ImageUploadEntry'];
 export type ImageUploadEntryRequest = paths['/api/v1/images/']['post']['requestBody']['content']['application/json'];
+
+// Videos
+export type VideoDTO = S['VideoDTO'];
+/** @knipignore Used by Phase 4+ video gallery mutations. */
+export type VideoRecordChanges = S['VideoRecordChanges'];
+/** @knipignore Used by listVideos RTK response typing; surfaced in Phase 4+. */
+export type OffsetPaginatedResults_VideoDTO_ = S['OffsetPaginatedResults_VideoDTO_'];
+export type ListVideosArgs = NonNullable<paths['/api/v1/videos/']['get']['parameters']['query']>;
+export type ListVideosResponse = paths['/api/v1/videos/']['get']['responses']['200']['content']['application/json'];
+export type GetVideoNamesArgs = NonNullable<paths['/api/v1/videos/names']['get']['parameters']['query']>;
+export type GetVideoNamesResult =
+  paths['/api/v1/videos/names']['get']['responses']['200']['content']['application/json'];
+
+export type UploadVideoArg = {
+  /** The MP4 (or other accepted video) file to upload. */
+  file: File;
+  /** The category of video to upload. Reuses the image category enum. */
+  video_category: ImageCategory;
+  /** Whether the uploaded video is an intermediate (intermediates are not shown in the gallery). */
+  is_intermediate: boolean;
+  /** The session with which to associate the uploaded video, if any. */
+  session_id?: string;
+  /** The board to add the video to, if any. */
+  board_id?: string;
+  /** Metadata JSON to attach to the video record. */
+  metadata?: JsonObject;
+  /** Suppress the upload toast / gallery navigation side effects. */
+  silent?: boolean;
+  /** Whether this is the first upload of a batch (used by toast logic). */
+  isFirstUploadOfBatch?: boolean;
+};
+
+// Polymorphic gallery items (images + videos). Consumed by the gallery wiring in Phase 4.
+/** @knipignore Consumed by gallery wiring in Phase 4. */
+export type GalleryItem = S['GalleryItem'];
+/** @knipignore Consumed by gallery wiring in Phase 4. */
+export type GalleryItemKind = S['GalleryItemKind'];
+/** @knipignore Consumed by gallery wiring in Phase 4. */
+export type GalleryItemRef = S['GalleryItemRef'];
+/** @knipignore Consumed by gallery wiring in Phase 4. */
+export type GalleryItemNamesResult = S['GalleryItemNamesResult'];
+/** @knipignore Consumed by gallery wiring in Phase 4. */
+export type OffsetPaginatedResults_GalleryItem_ = S['OffsetPaginatedResults_GalleryItem_'];
+export type ListGalleryItemsArgs = NonNullable<paths['/api/v1/gallery/items/']['get']['parameters']['query']>;
+/** @knipignore Consumed by gallery wiring in Phase 4. */
+export type ListGalleryItemsResponse =
+  paths['/api/v1/gallery/items/']['get']['responses']['200']['content']['application/json'];
+/** @knipignore Consumed by gallery wiring in Phase 4. */
+export type GetGalleryItemNamesArgs = NonNullable<paths['/api/v1/gallery/items/names']['get']['parameters']['query']>;
+/** @knipignore Consumed by gallery wiring in Phase 4. */
+export type GetGalleryItemNamesResult =
+  paths['/api/v1/gallery/items/names']['get']['responses']['200']['content']['application/json'];

@@ -1361,6 +1361,280 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/videos/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Video
+         * @description Uploads a video for the current user.
+         */
+        post: operations["upload_video"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/i/{video_name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Video Dto */
+        get: operations["get_video_dto"];
+        put?: never;
+        post?: never;
+        /** Delete Video */
+        delete: operations["delete_video"];
+        options?: never;
+        head?: never;
+        /** Update Video */
+        patch: operations["update_video"];
+        trace?: never;
+    };
+    "/api/v1/videos/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Delete Videos From List */
+        post: operations["delete_videos_from_list"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/i/{video_name}/metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Video Metadata */
+        get: operations["get_video_metadata"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/i/{video_name}/full": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Video Full
+         * @description Serves the video file with HTTP Range support so HTML5 <video> seek/scrub works.
+         *
+         *     Like the image equivalent, this endpoint is intentionally unauthenticated because browsers
+         *     load videos via <video src> tags which cannot send Bearer tokens. Video names are UUIDs,
+         *     providing security through unguessability.
+         */
+        get: operations["get_video_full"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        /**
+         * Get Video Full
+         * @description Serves the video file with HTTP Range support so HTML5 <video> seek/scrub works.
+         *
+         *     Like the image equivalent, this endpoint is intentionally unauthenticated because browsers
+         *     load videos via <video src> tags which cannot send Bearer tokens. Video names are UUIDs,
+         *     providing security through unguessability.
+         */
+        head: operations["get_video_full_head"];
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/i/{video_name}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Video Thumbnail
+         * @description Returns the first-frame WebP thumbnail of a video. Unauthenticated; UUIDs provide unguessability.
+         */
+        get: operations["get_video_thumbnail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/i/{video_name}/urls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Video Urls */
+        get: operations["get_video_urls"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Video Dtos
+         * @description Gets a list of video DTOs for the current user.
+         */
+        get: operations["list_video_dtos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Video Names
+         * @description Gets ordered list of video names with metadata for optimistic updates.
+         */
+        get: operations["get_video_names"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/star": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Star Videos In List */
+        post: operations["star_videos_in_list"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/unstar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unstar Videos In List */
+        post: operations["unstar_videos_in_list"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Video To Board */
+        post: operations["add_video_to_board"];
+        /** Remove Video From Board */
+        delete: operations["remove_video_from_board"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gallery/items/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Gallery Items
+         * @description Returns a paginated, time-sorted stream of polymorphic gallery items (images + videos).
+         */
+        get: operations["list_gallery_items"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gallery/items/names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Gallery Item Names
+         * @description Returns an ordered (kind, name) list — used to drive virtualized gallery selection.
+         */
+        get: operations["get_gallery_item_names"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/boards/": {
         parameters: {
             query?: never;
@@ -4169,6 +4443,14 @@ export type components = {
              */
             image_names: string[];
         };
+        /** Body_delete_videos_from_list */
+        Body_delete_videos_from_list: {
+            /**
+             * Video Names
+             * @description The list of names of videos to delete
+             */
+            video_names: string[];
+        };
         /** Body_do_hf_login */
         Body_do_hf_login: {
             /**
@@ -4292,6 +4574,14 @@ export type components = {
              */
             image_names: string[];
         };
+        /** Body_remove_video_from_board */
+        Body_remove_video_from_board: {
+            /**
+             * Video Name
+             * @description The name of the video to remove from its board
+             */
+            video_name: string;
+        };
         /** Body_set_workflow_thumbnail */
         Body_set_workflow_thumbnail: {
             /**
@@ -4309,6 +4599,14 @@ export type components = {
              */
             image_names: string[];
         };
+        /** Body_star_videos_in_list */
+        Body_star_videos_in_list: {
+            /**
+             * Video Names
+             * @description The list of names of videos to star
+             */
+            video_names: string[];
+        };
         /** Body_unstar_images_in_list */
         Body_unstar_images_in_list: {
             /**
@@ -4316,6 +4614,14 @@ export type components = {
              * @description The list of names of images to unstar
              */
             image_names: string[];
+        };
+        /** Body_unstar_videos_in_list */
+        Body_unstar_videos_in_list: {
+            /**
+             * Video Names
+             * @description The list of names of videos to unstar
+             */
+            video_names: string[];
         };
         /** Body_update_model_image */
         Body_update_model_image: {
@@ -4366,6 +4672,19 @@ export type components = {
             /**
              * Metadata
              * @description The metadata to associate with the image, must be a stringified JSON dict
+             */
+            metadata?: string | null;
+        };
+        /** Body_upload_video */
+        Body_upload_video: {
+            /**
+             * File
+             * Format: binary
+             */
+            file: Blob;
+            /**
+             * Metadata
+             * @description The metadata to associate with the video, must be a stringified JSON dict
              */
             metadata?: string | null;
         };
@@ -8229,6 +8548,19 @@ export type components = {
                 [key: string]: string;
             };
         };
+        /** DeleteVideosResult */
+        DeleteVideosResult: {
+            /**
+             * Affected Boards
+             * @description The ids of boards affected by the operation
+             */
+            affected_boards: string[];
+            /**
+             * Deleted Videos
+             * @description The names of the videos that were deleted
+             */
+            deleted_videos: string[];
+        };
         /**
          * Denoise - SD1.5, SDXL
          * @description Denoises noisy latents to decodable images
@@ -12033,6 +12365,113 @@ export type components = {
              * @constant
              */
             type: "freeu";
+        };
+        /**
+         * GalleryItem
+         * @description A gallery item — either an image or a video, with shared fields and a discriminator.
+         *
+         *     Frontend code should dispatch on `kind` to render image- vs video-specific UI.
+         */
+        GalleryItem: {
+            /** @description Whether the item is an image or video. */
+            kind: components["schemas"]["GalleryItemKind"];
+            /**
+             * Name
+             * @description The unique name of the image or video.
+             */
+            name: string;
+            /**
+             * Full Url
+             * @description URL to the full-resolution image PNG or the full-quality video MP4.
+             */
+            full_url: string;
+            /**
+             * Thumbnail Url
+             * @description URL to the static (WebP) thumbnail.
+             */
+            thumbnail_url: string;
+            /**
+             * Width
+             * @description The width of the item in pixels.
+             */
+            width: number;
+            /**
+             * Height
+             * @description The height of the item in pixels.
+             */
+            height: number;
+            /** @description The category of the item (images and videos share the same enum). */
+            category: components["schemas"]["ImageCategory"];
+            /**
+             * Starred
+             * @description Whether the item is starred.
+             */
+            starred: boolean;
+            /**
+             * Is Intermediate
+             * @description Whether the item is an intermediate output.
+             */
+            is_intermediate: boolean;
+            /**
+             * Board Id
+             * @description Owning board id, if any.
+             */
+            board_id?: string | null;
+            /**
+             * Created At
+             * @description The created timestamp of the item.
+             */
+            created_at: string;
+            /**
+             * Duration
+             * @description Video duration in seconds. None for images.
+             */
+            duration?: number | null;
+            /**
+             * Fps
+             * @description Video frames per second. None for images.
+             */
+            fps?: number | null;
+        };
+        /**
+         * GalleryItemKind
+         * @description Discriminator for polymorphic gallery items.
+         * @enum {string}
+         */
+        GalleryItemKind: "image" | "video";
+        /**
+         * GalleryItemNamesResult
+         * @description Ordered list of gallery item references plus counts for optimistic UI.
+         */
+        GalleryItemNamesResult: {
+            /**
+             * Items
+             * @description Ordered list of (kind, name) references.
+             */
+            items: components["schemas"]["GalleryItemRef"][];
+            /**
+             * Starred Count
+             * @description Number of starred items (when starred_first=True).
+             */
+            starred_count: number;
+            /**
+             * Total Count
+             * @description Total number of items matching the query.
+             */
+            total_count: number;
+        };
+        /**
+         * GalleryItemRef
+         * @description A thin reference to a gallery item — used for ordered name lists.
+         */
+        GalleryItemRef: {
+            /** @description Whether the item is an image or video. */
+            kind: components["schemas"]["GalleryItemKind"];
+            /**
+             * Name
+             * @description The unique name of the image or video.
+             */
+            name: string;
         };
         /**
          * Gemini Image Generation
@@ -24381,6 +24820,29 @@ export type components = {
              */
             items: components["schemas"]["BoardDTO"][];
         };
+        /** OffsetPaginatedResults[GalleryItem] */
+        OffsetPaginatedResults_GalleryItem_: {
+            /**
+             * Limit
+             * @description Limit of items to get
+             */
+            limit: number;
+            /**
+             * Offset
+             * @description Offset from which to retrieve items
+             */
+            offset: number;
+            /**
+             * Total
+             * @description Total number of items in result
+             */
+            total: number;
+            /**
+             * Items
+             * @description Items
+             */
+            items: components["schemas"]["GalleryItem"][];
+        };
         /** OffsetPaginatedResults[ImageDTO] */
         OffsetPaginatedResults_ImageDTO_: {
             /**
@@ -24403,6 +24865,29 @@ export type components = {
              * @description Items
              */
             items: components["schemas"]["ImageDTO"][];
+        };
+        /** OffsetPaginatedResults[VideoDTO] */
+        OffsetPaginatedResults_VideoDTO_: {
+            /**
+             * Limit
+             * @description Limit of items to get
+             */
+            limit: number;
+            /**
+             * Offset
+             * @description Offset from which to retrieve items
+             */
+            offset: number;
+            /**
+             * Total
+             * @description Total number of items in result
+             */
+            total: number;
+            /**
+             * Items
+             * @description Items
+             */
+            items: components["schemas"]["VideoDTO"][];
         };
         /**
          * Unsharp Mask (Oklab)
@@ -28774,6 +29259,19 @@ export type components = {
              */
             starred_images: string[];
         };
+        /** StarredVideosResult */
+        StarredVideosResult: {
+            /**
+             * Affected Boards
+             * @description The ids of boards affected by the operation
+             */
+            affected_boards: string[];
+            /**
+             * Starred Videos
+             * @description The names of the videos that were starred
+             */
+            starred_videos: string[];
+        };
         /** StarterModel */
         StarterModel: {
             /** Description */
@@ -31013,6 +31511,19 @@ export type components = {
              */
             unstarred_images: string[];
         };
+        /** UnstarredVideosResult */
+        UnstarredVideosResult: {
+            /**
+             * Affected Boards
+             * @description The ids of boards affected by the operation
+             */
+            affected_boards: string[];
+            /**
+             * Unstarred Videos
+             * @description The names of the videos that were unstarred
+             */
+            unstarred_videos: string[];
+        };
         /**
          * UpdateAppGenerationSettingsRequest
          * @description Writable generation-related app settings.
@@ -32129,6 +32640,182 @@ export type components = {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** VideoBoardArg */
+        VideoBoardArg: {
+            /**
+             * Board Id
+             * @description The id of the board to add or remove the video from
+             */
+            board_id: string;
+            /**
+             * Video Name
+             * @description The name of the video to add to / remove from the board
+             */
+            video_name: string;
+        };
+        /**
+         * VideoDTO
+         * @description Deserialized video record, enriched for the frontend.
+         */
+        VideoDTO: {
+            /**
+             * Video Name
+             * @description The unique name of the video.
+             */
+            video_name: string;
+            /**
+             * Video Url
+             * @description The URL of the video file (MP4).
+             */
+            video_url: string;
+            /**
+             * Thumbnail Url
+             * @description The URL of the video's first-frame thumbnail (WebP).
+             */
+            thumbnail_url: string;
+            /** @description The origin of the video. */
+            video_origin: components["schemas"]["ResourceOrigin"];
+            /** @description The category of the video (reuses ImageCategory). */
+            video_category: components["schemas"]["ImageCategory"];
+            /**
+             * Width
+             * @description The pixel width of the video.
+             */
+            width: number;
+            /**
+             * Height
+             * @description The pixel height of the video.
+             */
+            height: number;
+            /**
+             * Duration
+             * @description The duration of the video in seconds.
+             */
+            duration: number;
+            /**
+             * Fps
+             * @description The frames-per-second of the video, if known.
+             */
+            fps?: number | null;
+            /**
+             * Created At
+             * @description The created timestamp of the video.
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * @description The updated timestamp of the video.
+             */
+            updated_at: string;
+            /**
+             * Deleted At
+             * @description The deleted timestamp of the video.
+             */
+            deleted_at?: string | null;
+            /**
+             * Is Intermediate
+             * @description Whether this is an intermediate video.
+             */
+            is_intermediate: boolean;
+            /**
+             * Session Id
+             * @description The session ID that produced this video, if any.
+             */
+            session_id?: string | null;
+            /**
+             * Node Id
+             * @description The node ID that produced this video, if any.
+             */
+            node_id?: string | null;
+            /**
+             * Starred
+             * @description Whether this video is starred.
+             */
+            starred: boolean;
+            /**
+             * Has Workflow
+             * @description Whether this video has a workflow associated.
+             */
+            has_workflow: boolean;
+            /**
+             * Video Subfolder
+             * @description The subfolder where the video is stored on disk.
+             * @default
+             */
+            video_subfolder?: string;
+            /**
+             * Board Id
+             * @description The id of the board the video belongs to, if one exists.
+             */
+            board_id?: string | null;
+        };
+        /**
+         * VideoNamesResult
+         * @description Response containing ordered video names with metadata for optimistic updates.
+         */
+        VideoNamesResult: {
+            /**
+             * Video Names
+             * @description Ordered list of video names
+             */
+            video_names: string[];
+            /**
+             * Starred Count
+             * @description Number of starred videos (when starred_first=True)
+             */
+            starred_count: number;
+            /**
+             * Total Count
+             * @description Total number of videos matching the query
+             */
+            total_count: number;
+        };
+        /**
+         * VideoRecordChanges
+         * @description Allowed mutations on a video record.
+         */
+        VideoRecordChanges: {
+            /** @description The video's new category. */
+            video_category?: components["schemas"]["ImageCategory"] | null;
+            /**
+             * Session Id
+             * @description The video's new session ID.
+             */
+            session_id?: string | null;
+            /**
+             * Is Intermediate
+             * @description The video's new `is_intermediate` flag.
+             */
+            is_intermediate?: boolean | null;
+            /**
+             * Starred
+             * @description The video's new `starred` state.
+             */
+            starred?: boolean | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * VideoUrlsDTO
+         * @description The URLs for a video and its thumbnail.
+         */
+        VideoUrlsDTO: {
+            /**
+             * Video Name
+             * @description The unique name of the video.
+             */
+            video_name: string;
+            /**
+             * Video Url
+             * @description The URL of the video file (MP4).
+             */
+            video_url: string;
+            /**
+             * Thumbnail Url
+             * @description The URL of the video's first-frame thumbnail (WebP).
+             */
+            thumbnail_url: string;
         };
         /**
          * VirtualSubBoardDTO
@@ -36764,6 +37451,694 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImageDTO"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_video: {
+        parameters: {
+            query: {
+                /** @description The category of the video */
+                video_category: components["schemas"]["ImageCategory"];
+                /** @description Whether this is an intermediate video */
+                is_intermediate: boolean;
+                /** @description The board to add this video to, if any */
+                board_id?: string | null;
+                /** @description The session ID associated with this upload, if any */
+                session_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_video"];
+            };
+        };
+        responses: {
+            /** @description The video was uploaded successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoDTO"];
+                };
+            };
+            /** @description Video upload failed */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_video_dto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The name of video to get */
+                video_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_video: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The name of the video to delete */
+                video_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteVideosResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_video: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The name of the video to update */
+                video_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VideoRecordChanges"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_videos_from_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_delete_videos_from_list"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteVideosResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_video_metadata: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The name of video to get */
+                video_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetadataField"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_video_full: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The name of video file to get */
+                video_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Return the full video file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "video/mp4": unknown;
+                };
+            };
+            /** @description Return a byte-range of the video file */
+            206: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "video/mp4": unknown;
+                };
+            };
+            /** @description Video not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_video_full_head: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The name of video file to get */
+                video_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Return the full video file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "video/mp4": unknown;
+                };
+            };
+            /** @description Video not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_video_thumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The name of thumbnail file to get */
+                video_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Return the video thumbnail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/webp": unknown;
+                };
+            };
+            /** @description Video not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_video_urls: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The name of the video whose URL to get */
+                video_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoUrlsDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_video_dtos: {
+        parameters: {
+            query?: {
+                /** @description The origin of videos to list. */
+                video_origin?: components["schemas"]["ResourceOrigin"] | null;
+                /** @description The categories of video to include. */
+                categories?: components["schemas"]["ImageCategory"][] | null;
+                /** @description Whether to list intermediate videos. */
+                is_intermediate?: boolean | null;
+                /** @description The board id to filter by. Use 'none' to find videos without a board. */
+                board_id?: string | null;
+                /** @description The page offset */
+                offset?: number;
+                /** @description The number of videos per page */
+                limit?: number;
+                /** @description The order of sort */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description Whether to sort by starred videos first */
+                starred_first?: boolean;
+                /** @description The term to search for */
+                search_term?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OffsetPaginatedResults_VideoDTO_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_video_names: {
+        parameters: {
+            query?: {
+                /** @description The origin of videos to list. */
+                video_origin?: components["schemas"]["ResourceOrigin"] | null;
+                /** @description The categories of video to include. */
+                categories?: components["schemas"]["ImageCategory"][] | null;
+                /** @description Whether to list intermediate videos. */
+                is_intermediate?: boolean | null;
+                /** @description The board id to filter by. Use 'none' to find videos without a board. */
+                board_id?: string | null;
+                /** @description The order of sort */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description Whether to sort by starred videos first */
+                starred_first?: boolean;
+                /** @description The term to search for */
+                search_term?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoNamesResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    star_videos_in_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_star_videos_in_list"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StarredVideosResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unstar_videos_in_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_unstar_videos_in_list"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnstarredVideosResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_video_to_board: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VideoBoardArg"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_video_from_board: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_remove_video_from_board"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_gallery_items: {
+        parameters: {
+            query?: {
+                /** @description The origin of items to list. */
+                origin?: components["schemas"]["ResourceOrigin"] | null;
+                /** @description The categories to include. Shared between images and videos. */
+                categories?: components["schemas"]["ImageCategory"][] | null;
+                /** @description Whether to list intermediate items. */
+                is_intermediate?: boolean | null;
+                /** @description The board id to filter by. Use 'none' to find items without a board. */
+                board_id?: string | null;
+                /** @description The page offset */
+                offset?: number;
+                /** @description The number of items per page */
+                limit?: number;
+                /** @description The order of sort */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description Whether to sort by starred items first */
+                starred_first?: boolean;
+                /** @description The term to search for */
+                search_term?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OffsetPaginatedResults_GalleryItem_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_gallery_item_names: {
+        parameters: {
+            query?: {
+                /** @description The origin of items to list. */
+                origin?: components["schemas"]["ResourceOrigin"] | null;
+                /** @description The categories to include. Shared between images and videos. */
+                categories?: components["schemas"]["ImageCategory"][] | null;
+                /** @description Whether to list intermediate items. */
+                is_intermediate?: boolean | null;
+                /** @description The board id to filter by. Use 'none' to find items without a board. */
+                board_id?: string | null;
+                /** @description The order of sort */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description Whether to sort by starred items first */
+                starred_first?: boolean;
+                /** @description The term to search for */
+                search_term?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryItemNamesResult"];
                 };
             };
             /** @description Validation Error */
