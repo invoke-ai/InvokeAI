@@ -313,6 +313,12 @@ The current queue-visible implementation uses the following lifecycle contract:
   to sockets that are also joined to `user:system`
 - the saved-workflow node picker queries owned/default workflows and public shared workflows separately, merges them by
   workflow id, and fetches additional pages as the combobox menu reaches the end
+- queue status events must preserve user isolation:
+  - `QueueItemStatusChangedEvent.queue_status` may keep global aggregate counts
+  - embedded current-item identifiers (`item_id`, `session_id`, `batch_id`) must only be present when the current
+    in-progress item belongs to the event owner, or when the status is being built for an admin/global context
+  - workflow-call child enqueue events use the same owner-aware redaction as ordinary status transitions, even though
+    they do not pass through `_set_queue_item_status`
 
 This is now part of the intended user-facing contract, even though the orchestration still lives in
 `WorkflowCallCoordinator`.
@@ -453,17 +459,17 @@ Retry behavior:
 
 Return values should be explicit.
 
-Recommended model:
+Implemented model:
 
-- introduce a workflow return node analogous in concept to Canvas Output
-- the child workflow declares named return values through explicit key/value return members
+- `workflow_return` is the explicit return node for callable workflows
+- the child workflow declares named return values through explicit `workflow_return_value` key/value return members
 - each return member has a stable string key and a connected value
 - when the workflow is run independently, the return node has no caller-visible effect
 - when the workflow is run via `call_saved_workflow`, the named return map becomes the return value of the call
 - `call_saved_workflow` exposes that named return map to the parent workflow
 
-Only one workflow return node may exist per workflow. That rule should be enforced in both the frontend editor and in
-Python validation/runtime code.
+Only one workflow return node may exist per workflow. That rule is enforced in both the frontend editor and in Python
+validation/runtime code.
 
 Do not infer child outputs from arbitrary terminal nodes. That is too ambiguous and too brittle.
 
@@ -556,36 +562,38 @@ Next runtime work still needed:
 - if support expands beyond the currently supported direct and generator-backed batch shapes, route those new child
   workflow execution shapes through machinery that can honor ordinary Invoke batch semantics
 
-## Suggested Runtime Components
+## Runtime Components
 
 ### CallSavedWorkflowRuntime
 
-A dedicated runtime helper for this node type should be introduced. Responsibilities:
+Call-specific runtime behavior currently lives in `WorkflowCallCoordinator` and `WorkflowCallQueueLifecycle`.
+Responsibilities:
 
 - load and validate the selected child workflow record
 - validate runtime access rights
 - extract callable inputs from the child workflow definition
 - build child execution arguments from the parent node state
-- launch dependent execution
+- launch dependent child queue rows
 - collect declared returns
 - map returned values back to the parent node outputs
 
 ### Workflow Return Node
 
-A dedicated child-workflow return node should be introduced. Responsibilities:
+The dedicated child-workflow return nodes are implemented. Responsibilities:
 
 - define the return interface of the called workflow
-- accept collected named key/value return members representing the workflow result
+- build named key/value return members with `workflow_return_value`
+- accept either one named return member or a collected list of return members with `workflow_return`
 - provide that named values map back to the parent call site when invoked through `call_saved_workflow`
 - remain inert from a caller perspective when the workflow is run independently
 - guarantee that only one such node exists per workflow
 - behave as a normal node in the editor, with singularity enforced by both frontend and Python validation/runtime code
 
-This should likely become the canonical reusable return mechanism for any future subworkflow call behavior.
+This should remain the canonical reusable return mechanism for any future subworkflow call behavior.
 
 ### Execution Relationship Tracking
 
-Session/runtime state will likely need to record:
+Session/runtime state records:
 
 - parent execution waiting on child execution
 - child execution belonging to a parent node call site
@@ -609,10 +617,11 @@ The intended runtime flow is:
 1. The parent `call_saved_workflow` node is completed with that returned named value map.
 1. The parent graph resumes.
 
-## Named Return Implementation Plan
+## Named Return Implementation Status
 
-This is the next planned feature slice. Development should proceed test-first and keep documentation updated as each
-stage lands.
+Named returns are implemented for backend invocation behavior, caller-side extraction, runtime propagation, and batch
+aggregation. Remaining work is limited to incremental frontend UX cleanup and any future expansion of supported batch
+shapes.
 
 ### Stage 1: Backend Return Contract
 
@@ -705,8 +714,9 @@ Tests first:
 
 ### Stage 5: Frontend Schema, UI, And Docs
 
-Status: partially implemented. Schema/type generation includes the backend nodes and fields; editor-specific UX cleanup
-is still pending.
+Status: mostly implemented. Schema/type generation includes the backend nodes and fields; editor connection coverage and
+localized UI strings are in place for the current node wiring. Future UX cleanup should be driven by concrete user
+testing rather than added as speculative work.
 
 Goal:
 
