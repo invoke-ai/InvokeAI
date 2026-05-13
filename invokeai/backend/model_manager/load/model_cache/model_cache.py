@@ -477,6 +477,26 @@ class ModelCache:
             f"Unlocked model {cache_entry.key} (Type: {cache_entry.cached_model.model.__class__.__name__})"
         )
 
+        # If `drop_model()` marked this entry stale (e.g. settings changed while a generation
+        # was using it), evict now so the next load rebuilds with the new settings rather than
+        # silently reusing the pre-change cached module.
+        if cache_entry.is_stale and not cache_entry.is_locked and cache_entry.key in self._cached_models:
+            bytes_freed = cache_entry.cached_model.total_bytes()
+            self._delete_cache_entry(cache_entry)
+            if self.stats:
+                self.stats.cleared = (self.stats.cleared or 0) + 1
+            snapshot = self._get_cache_snapshot()
+            for cb in self._on_cache_models_cleared_callbacks:
+                cb(
+                    models_cleared=1,
+                    bytes_requested=0,
+                    bytes_freed=bytes_freed,
+                    cache_snapshot=snapshot,
+                )
+            gc.collect()
+            TorchDevice.empty_cache()
+            self._logger.debug(f"Evicted stale cache entry {cache_entry.key} after unlock.")
+
     def _load_locked_model(self, cache_entry: CacheRecord, working_mem_bytes: Optional[int] = None) -> None:
         """Helper function for self.lock(). Loads a locked model into VRAM."""
         start_time = time.time()
@@ -866,3 +886,46 @@ class ModelCache:
         """Delete cache_entry from the cache if it exists. No exception is thrown if it doesn't exist."""
         self._cache_stack = [key for key in self._cache_stack if key != cache_entry.key]
         self._cached_models.pop(cache_entry.key, None)
+
+    @synchronized
+    def drop_model(self, model_key: str) -> int:
+        """Drop all cache entries belonging to a model so the next load rebuilds them.
+
+        Cache keys are `<model_key>` or `<model_key>:<submodel>` (see `get_model_cache_key`),
+        so a single model may have multiple entries. Locked entries are marked `is_stale` and
+        evicted by `unlock()` as soon as the last lock releases — without that, a setting
+        toggled during an in-flight generation would survive on the locked entry and quietly
+        get reused by the next generation.
+
+        Returns the number of entries immediately dropped (locked entries that are only marked
+        stale do not count).
+        """
+        prefix = f"{model_key}:"
+        matching: list[CacheRecord] = [
+            entry for key, entry in self._cached_models.items() if key == model_key or key.startswith(prefix)
+        ]
+
+        dropped: list[CacheRecord] = []
+        bytes_freed = 0
+        for entry in matching:
+            if entry.is_locked:
+                entry.is_stale = True
+                continue
+            bytes_freed += entry.cached_model.total_bytes()
+            self._delete_cache_entry(entry)
+            dropped.append(entry)
+
+        if dropped:
+            if self.stats:
+                self.stats.cleared = len(dropped)
+            snapshot = self._get_cache_snapshot()
+            for cb in self._on_cache_models_cleared_callbacks:
+                cb(
+                    models_cleared=len(dropped),
+                    bytes_requested=0,
+                    bytes_freed=bytes_freed,
+                    cache_snapshot=snapshot,
+                )
+            gc.collect()
+            TorchDevice.empty_cache()
+        return len(dropped)
