@@ -95,6 +95,11 @@ class WanRefImageEncoderInvocation(BaseInvocation):
             context.util.signal_progress(
                 "VAE-encoding reference image" + (f" ({self.num_frames} frames)" if self.num_frames > 1 else "")
             )
+            # Free cached allocator blocks left over from earlier nodes (denoise expert
+            # swaps in particular can leave the cache fragmented in ways that look like
+            # free VRAM but fail a single large contiguous request). Mirrors the
+            # pattern used in wan_latents_to_image.py / wan_latents_to_video.py.
+            TorchDevice.empty_cache()
             if self.num_frames <= 1:
                 condition = encode_reference_image_to_condition(
                     image=pil_image,
@@ -116,6 +121,10 @@ class WanRefImageEncoderInvocation(BaseInvocation):
                 )
 
         condition = condition.detach().to("cpu")
+        # Release this node's VAE-encode intermediates before the next node tries to
+        # partial-load the denoise transformer — the OOM we saw in PR #9163 review
+        # was the I2V expert load racing against still-cached encode activations.
+        TorchDevice.empty_cache()
         name = context.tensors.save(tensor=condition)
         return WanRefImageOutput.build(
             condition_tensor_name=name,
