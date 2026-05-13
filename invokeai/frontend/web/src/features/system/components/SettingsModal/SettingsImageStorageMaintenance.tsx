@@ -2,7 +2,7 @@ import { Button, Flex, FormControl, FormLabel, Text } from '@invoke-ai/ui-librar
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectCurrentUser } from 'features/auth/store/authSlice';
 import { toast } from 'features/toast/toast';
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, LIST_TAG } from 'services/api';
 import { useGetRuntimeConfigQuery } from 'services/api/endpoints/appInfo';
@@ -42,18 +42,20 @@ const getJobStateKey = (state: S['ImageMoveJobResponse']['state'] | undefined) =
   return 'settings.imageStorageMaintenanceStateNone';
 };
 
+const invalidatedImageMoveJobIds = new Set<number>();
+
 export const SettingsImageStorageMaintenance = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const currentUser = useAppSelector(selectCurrentUser);
   const { data: runtimeConfig } = useGetRuntimeConfigQuery();
-  const canAccess = runtimeConfig ? !runtimeConfig.config.multiuser || currentUser?.is_admin : false;
+  const canAccess = runtimeConfig ? !runtimeConfig.config.multiuser || Boolean(currentUser?.is_admin) : false;
   const [startImageMove, startImageMoveState] = useStartImageMoveMutation();
   const [startImageMoveRecovery, startImageMoveRecoveryState] = useStartImageMoveRecoveryMutation();
-  const lastInvalidatedJobIdRef = useRef<number | null>(null);
+  const [shouldPollStatus, setShouldPollStatus] = useState(false);
   const { data: status, isFetching } = useGetImageMoveStatusQuery(undefined, {
     skip: !canAccess,
-    pollingInterval: canAccess ? 2000 : 0,
+    pollingInterval: shouldPollStatus ? 2000 : 0,
   });
 
   const isRunning = status?.is_running ?? false;
@@ -62,13 +64,17 @@ export const SettingsImageStorageMaintenance = memo(() => {
   const isBusy = isRunning || startImageMoveState.isLoading || startImageMoveRecoveryState.isLoading;
 
   useEffect(() => {
+    setShouldPollStatus(canAccess && isRunning);
+  }, [canAccess, isRunning]);
+
+  useEffect(() => {
     if (!latestJob || latestJob.state !== 'committed' || isRunning) {
       return;
     }
-    if (lastInvalidatedJobIdRef.current === latestJob.id) {
+    if (invalidatedImageMoveJobIds.has(latestJob.id)) {
       return;
     }
-    lastInvalidatedJobIdRef.current = latestJob.id;
+    invalidatedImageMoveJobIds.add(latestJob.id);
     dispatch(
       api.util.invalidateTags([
         'Image',
@@ -98,8 +104,10 @@ export const SettingsImageStorageMaintenance = memo(() => {
 
   const onStart = useCallback(async () => {
     try {
+      setShouldPollStatus(true);
       await startImageMove().unwrap();
     } catch {
+      setShouldPollStatus(false);
       toast({
         id: 'IMAGE_STORAGE_MAINTENANCE_START_FAILED',
         title: t('settings.imageStorageMaintenanceStartFailed'),
@@ -110,8 +118,10 @@ export const SettingsImageStorageMaintenance = memo(() => {
 
   const onRecover = useCallback(async () => {
     try {
+      setShouldPollStatus(true);
       await startImageMoveRecovery().unwrap();
     } catch {
+      setShouldPollStatus(false);
       toast({
         id: 'IMAGE_STORAGE_MAINTENANCE_RECOVERY_FAILED',
         title: t('settings.imageStorageMaintenanceRecoveryFailed'),
@@ -145,7 +155,9 @@ export const SettingsImageStorageMaintenance = memo(() => {
         </Button>
       </Flex>
       <Text variant="subtext">{statusText}</Text>
-      {latestJob?.error_message ? <Text variant="subtext">{latestJob.error_message}</Text> : null}
+      {latestJob?.error_message || status?.last_error ? (
+        <Text variant="subtext">{latestJob?.error_message || status?.last_error}</Text>
+      ) : null}
     </FormControl>
   );
 });

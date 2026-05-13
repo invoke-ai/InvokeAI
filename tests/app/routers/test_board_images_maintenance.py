@@ -5,6 +5,8 @@ from fastapi.testclient import TestClient
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
+from invokeai.app.services.board_records.board_records_common import BoardVisibility
+from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.invoker import Invoker
 
 
@@ -48,3 +50,37 @@ def test_board_image_mutations_are_blocked_during_image_move_maintenance(
 
     assert response.status_code == 409
     assert response.json()["detail"] == "Image storage maintenance is active"
+
+
+def test_delete_board_with_images_is_blocked_during_image_move_maintenance(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_invoker: Invoker,
+    client: TestClient,
+) -> None:
+    mock_deps = MockApiDependencies(mock_invoker)
+    mock_invoker.services.image_moves = MagicMock()
+    mock_invoker.services.image_moves.is_maintenance_active.return_value = True
+    mock_invoker.services.images.delete_images_on_board = MagicMock()
+    mock_invoker.services.boards.get_dto = MagicMock(
+        return_value=BoardDTO(
+            board_id="board-id",
+            board_name="Board",
+            user_id="system",
+            created_at="2024-01-01 00:00:00.000",
+            updated_at="2024-01-01 00:00:00.000",
+            archived=False,
+            board_visibility=BoardVisibility.Private,
+            cover_image_name=None,
+            image_count=0,
+            asset_count=0,
+        )
+    )
+    monkeypatch.setattr("invokeai.app.api.routers.boards.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers.image_move_maintenance.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
+
+    response = client.delete("/api/v1/boards/board-id?include_images=true")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Image storage maintenance is active"
+    mock_invoker.services.images.delete_images_on_board.assert_not_called()

@@ -437,11 +437,11 @@ async def update_recall_parameters(
         # are cleared.  In non-strict mode (default) they would be left as-is.
     """
     logger = ApiDependencies.invoker.services.logger
-    assert_image_move_maintenance_inactive()
 
-    # Validate image access before processing — prevents information leakage
+    # Validate image access before processing - prevents information leakage
     # (dimensions) and derived-image minting via ControlNet preprocessors.
     _assert_recall_image_access(parameters, current_user)
+    assert_image_move_maintenance_inactive()
 
     try:
         # In strict mode, include all parameters so the frontend clears anything

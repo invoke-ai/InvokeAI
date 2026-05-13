@@ -1,3 +1,4 @@
+import os
 import threading
 from pathlib import Path
 from shutil import copy2
@@ -9,7 +10,6 @@ from PIL import Image
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_moves.image_moves_default import (
-    BACKGROUND_SHUTDOWN_ERROR,
     ImageMoveQueueActive,
     ImageMoveService,
 )
@@ -91,6 +91,12 @@ def _job_item_states(service: ImageMoveService, job_id: int) -> dict[str, str]:
         return {row["image_name"]: row["state"] for row in cursor.fetchall()}
 
 
+def _job_states(service: ImageMoveService) -> dict[int, str]:
+    with service._db.transaction() as cursor:
+        cursor.execute("SELECT id, state FROM image_subfolder_move_jobs ORDER BY id;")
+        return {row["id"]: row["state"] for row in cursor.fetchall()}
+
+
 def test_move_all_images_uses_created_at_for_date_strategy(tmp_path: Path) -> None:
     service, records = _service(tmp_path, strategy="date")
     image_name = "image-a.png"
@@ -165,7 +171,30 @@ def test_missing_non_intermediate_source_file_still_fails(tmp_path: Path) -> Non
     )
 
     with pytest.raises(FileNotFoundError, match="Source image does not exist"):
-        service.move_all_images()
+        service.plan_batch(last_image_name="", limit=100)
+
+
+def test_move_all_images_continues_after_missing_non_intermediate_source_file(tmp_path: Path) -> None:
+    service, records = _service(tmp_path, strategy="date")
+    missing_image_name = "missing-general.png"
+    valid_image_name = "valid-general.png"
+    _save_record(
+        records,
+        image_name=missing_image_name,
+        subfolder="",
+        created_at="2024-02-04 04:05:06.000",
+        is_intermediate=False,
+    )
+    _save_image(service, records, valid_image_name, "", "2024-02-05 04:05:06.000", "blue")
+
+    result = service.move_all_images()
+
+    assert result.errors == 1
+    assert result.committed == 1
+    assert records.get(missing_image_name).image_subfolder == ""
+    assert records.get(valid_image_name).image_subfolder == "2024/02/05"
+    assert "error" in _job_states(service).values()
+    assert "committed" in _job_states(service).values()
 
 
 def test_recovery_treats_missing_intermediate_source_file_as_success(tmp_path: Path) -> None:
@@ -224,6 +253,26 @@ def test_cleanup_empty_source_directories_after_move(tmp_path: Path) -> None:
     assert not old_thumb_parent.exists()
     assert service.image_files.image_root.exists()
     assert service.image_files.thumbnail_root.exists()
+
+
+@pytest.mark.skipif(not hasattr(os, "symlink"), reason="symlinks are not supported on this platform")
+def test_cleanup_empty_source_directories_stays_within_symlinked_root(tmp_path: Path) -> None:
+    service, _records = _service(tmp_path, strategy="date")
+    real_root = tmp_path / "real-root"
+    linked_root = tmp_path / "linked-root"
+    sibling = tmp_path / "sibling"
+    real_root.mkdir()
+    sibling.mkdir()
+    linked_root.symlink_to(real_root, target_is_directory=True)
+    nested = linked_root / "old" / "nested"
+    nested.mkdir(parents=True)
+
+    service._remove_empty_parents(nested, linked_root)
+
+    assert real_root.exists()
+    assert linked_root.exists()
+    assert sibling.exists()
+    assert not (real_root / "old").exists()
 
 
 def test_startup_recovery_cleans_empty_source_directories(tmp_path: Path) -> None:
@@ -437,7 +486,7 @@ def test_background_worker_error_is_exposed_in_status(tmp_path: Path) -> None:
     assert status.last_error == "background failed"
 
 
-def test_stop_records_error_message_for_active_background_job(tmp_path: Path) -> None:
+def test_stop_waits_for_active_background_job_without_recording_error(tmp_path: Path) -> None:
     service, records = _service(tmp_path, strategy="date")
     image_name = "image-background-stop.png"
     _save_image(service, records, image_name, "", "2024-03-05 05:06:07.000", "purple")
@@ -449,15 +498,16 @@ def test_stop_records_error_message_for_active_background_job(tmp_path: Path) ->
 
     service._start_background_operation("recovery", wait_for_shutdown)
 
-    try:
-        service.stop()
+    stop_thread = threading.Thread(target=service.stop)
+    stop_thread.start()
+    assert stop_thread.is_alive()
 
-        assert service.get_job(job_id).error_message == BACKGROUND_SHUTDOWN_ERROR
-        assert service.get_background_status().last_error == BACKGROUND_SHUTDOWN_ERROR
-    finally:
-        release_worker.set()
-        assert service._future is not None
-        service._future.result(timeout=5)
+    release_worker.set()
+    stop_thread.join(timeout=5)
+
+    assert not stop_thread.is_alive()
+    assert service.get_job(job_id).error_message is None
+    assert service.get_background_status().last_error is None
 
 
 def test_startup_recovery_completes_partial_multi_image_move(tmp_path: Path) -> None:

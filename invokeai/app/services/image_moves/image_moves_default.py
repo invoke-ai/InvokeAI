@@ -64,9 +64,6 @@ class ImageMoveQueueActive(Exception):
     pass
 
 
-BACKGROUND_SHUTDOWN_ERROR = "Image move service stopped while background operation was running"
-
-
 class ImageMoveService:
     def __init__(
         self,
@@ -102,11 +99,7 @@ class ImageMoveService:
         self._session_queue = session_queue
 
     def stop(self, *args, **kwargs) -> None:
-        with self._future_lock:
-            is_running = self._future is not None and not self._future.done()
-        if is_running:
-            self._record_background_error(BACKGROUND_SHUTDOWN_ERROR)
-        self._executor.shutdown(wait=False, cancel_futures=False)
+        self._executor.shutdown(wait=True, cancel_futures=False)
 
     def start_background_move_all(self) -> ImageMoveBackgroundStatus:
         return self._start_background_operation("move_all", self.move_all_images, require_idle_queue=True)
@@ -212,7 +205,10 @@ class ImageMoveService:
         errors = recovered.errors
 
         while True:
-            moves = self.plan_batch(last_image_name=last_image_name, limit=100)
+            moves, plan_errors = self._plan_batch(
+                last_image_name=last_image_name, limit=100, record_missing_errors=True
+            )
+            errors += plan_errors
             if not moves:
                 next_name = self._next_image_name(last_image_name)
                 if next_name is None:
@@ -262,6 +258,12 @@ class ImageMoveService:
         return ImageMoveResult(committed=committed, errors=errors)
 
     def plan_batch(self, last_image_name: str, limit: int) -> list[PlannedImageMove]:
+        moves, _errors = self._plan_batch(last_image_name=last_image_name, limit=limit, record_missing_errors=False)
+        return moves
+
+    def _plan_batch(
+        self, last_image_name: str, limit: int, record_missing_errors: bool
+    ) -> tuple[list[PlannedImageMove], int]:
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
@@ -304,8 +306,11 @@ class ImageMoveService:
                     ),
                 )
             )
+        errors = 0
+        if record_missing_errors:
+            moves, errors = self._record_missing_source_errors(moves)
         self.preflight_moves(moves)
-        return moves
+        return moves, errors
 
     def create_move_job(self, moves: Sequence[PlannedImageMove]) -> int:
         if not moves:
@@ -355,6 +360,44 @@ class ImageMoveService:
             )
             return job_id
 
+    def create_error_move_job(self, move: PlannedImageMove, message: str) -> int:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                "INSERT INTO image_subfolder_move_jobs (state, error_message) VALUES ('error', ?);",
+                (message,),
+            )
+            job_id = cast(int, cursor.lastrowid)
+            cursor.execute(
+                """--sql
+                INSERT INTO image_subfolder_move_items (
+                    job_id,
+                    image_name,
+                    old_subfolder,
+                    new_subfolder,
+                    is_intermediate,
+                    old_path,
+                    new_path,
+                    old_thumbnail_path,
+                    new_thumbnail_path,
+                    state,
+                    error_message
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'error', ?);
+                """,
+                (
+                    job_id,
+                    move.image_name,
+                    move.old_subfolder,
+                    move.new_subfolder,
+                    int(move.is_intermediate),
+                    str(move.old_path),
+                    str(move.new_path),
+                    str(move.old_thumbnail_path),
+                    str(move.new_thumbnail_path),
+                    message,
+                ),
+            )
+            return job_id
+
     def preflight_moves(self, moves: Sequence[PlannedImageMove]) -> None:
         destinations: set[Path] = set()
         thumbnail_destinations: set[Path] = set()
@@ -380,6 +423,19 @@ class ImageMoveService:
                 if move.new_thumbnail_path.exists():
                     raise FileExistsError(f"Destination thumbnail already exists: {move.new_thumbnail_path}")
                 self._assert_same_filesystem(move.old_thumbnail_path, move.new_thumbnail_path)
+
+    def _record_missing_source_errors(self, moves: Sequence[PlannedImageMove]) -> tuple[list[PlannedImageMove], int]:
+        remaining_moves: list[PlannedImageMove] = []
+        errors = 0
+        for move in moves:
+            if move.old_path.exists() or move.is_intermediate:
+                remaining_moves.append(move)
+                continue
+            message = f"Source image does not exist: {move.old_path}"
+            self.create_error_move_job(move, message)
+            self._logger.error(message)
+            errors += 1
+        return remaining_moves, errors
 
     def perform_filesystem_moves(self, job_id: int) -> None:
         self._set_job_state(job_id, "moving")

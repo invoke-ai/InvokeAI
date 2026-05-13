@@ -278,8 +278,8 @@ async def delete_image(
     image_name: str = Path(description="The name of the image to delete"),
 ) -> DeleteImagesResult:
     """Deletes an image"""
-    assert_image_move_maintenance_inactive()
     _assert_image_owner(image_name, current_user)
+    assert_image_move_maintenance_inactive()
 
     deleted_images: set[str] = set()
     affected_boards: set[str] = set()
@@ -305,9 +305,9 @@ async def clear_intermediates(
     current_user: CurrentUserOrDefault,
 ) -> int:
     """Clears all intermediates. Requires admin."""
-    assert_image_move_maintenance_inactive()
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Only admins can clear all intermediates")
+    assert_image_move_maintenance_inactive()
 
     try:
         count_deleted = ApiDependencies.invoker.services.images.delete_intermediates()
@@ -340,8 +340,8 @@ async def update_image(
     image_changes: ImageRecordChanges = Body(description="The changes to apply to the image"),
 ) -> ImageDTO:
     """Updates an image"""
-    assert_image_move_maintenance_inactive()
     _assert_image_owner(image_name, current_user)
+    assert_image_move_maintenance_inactive()
 
     try:
         return ApiDependencies.invoker.services.images.update(image_name, image_changes)
@@ -397,8 +397,8 @@ async def get_image_workflow(
     current_user: CurrentUserOrDefault,
     image_name: str = Path(description="The name of image whose workflow to get"),
 ) -> WorkflowAndGraphResponse:
-    assert_image_move_maintenance_inactive()
     _assert_image_read_access(image_name, current_user)
+    assert_image_move_maintenance_inactive()
 
     try:
         workflow = ApiDependencies.invoker.services.images.get_workflow(image_name)
@@ -439,7 +439,8 @@ async def get_image_full(
 
     This endpoint is intentionally unauthenticated because browsers load images
     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
-    providing security through unguessability.
+    providing security through unguessability. Returns 409 while image storage
+    maintenance is active.
     """
     assert_image_move_maintenance_inactive()
 
@@ -474,7 +475,8 @@ async def get_image_thumbnail(
 
     This endpoint is intentionally unauthenticated because browsers load images
     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
-    providing security through unguessability.
+    providing security through unguessability. Returns 409 while image storage
+    maintenance is active.
     """
     assert_image_move_maintenance_inactive()
 
