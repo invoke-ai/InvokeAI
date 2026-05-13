@@ -1198,7 +1198,8 @@ export type paths = {
          *
          *     This endpoint is intentionally unauthenticated because browsers load images
          *     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
-         *     providing security through unguessability.
+         *     providing security through unguessability. Returns 409 while image storage
+         *     maintenance is active.
          */
         get: operations["get_image_full"];
         put?: never;
@@ -1211,7 +1212,8 @@ export type paths = {
          *
          *     This endpoint is intentionally unauthenticated because browsers load images
          *     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
-         *     providing security through unguessability.
+         *     providing security through unguessability. Returns 409 while image storage
+         *     maintenance is active.
          */
         head: operations["get_image_full_head"];
         patch?: never;
@@ -1230,7 +1232,8 @@ export type paths = {
          *
          *     This endpoint is intentionally unauthenticated because browsers load images
          *     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
-         *     providing security through unguessability.
+         *     providing security through unguessability. Returns 409 while image storage
+         *     maintenance is active.
          */
         get: operations["get_image_thumbnail"];
         put?: never;
