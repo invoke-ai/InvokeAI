@@ -397,6 +397,7 @@ async def get_image_workflow(
     current_user: CurrentUserOrDefault,
     image_name: str = Path(description="The name of image whose workflow to get"),
 ) -> WorkflowAndGraphResponse:
+    assert_image_move_maintenance_inactive()
     _assert_image_read_access(image_name, current_user)
 
     try:

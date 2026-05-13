@@ -129,6 +129,30 @@ def test_cleanup_empty_source_directories_after_move(tmp_path: Path) -> None:
     assert service.image_files.thumbnail_root.exists()
 
 
+def test_startup_recovery_cleans_empty_source_directories(tmp_path: Path) -> None:
+    service, records = _service(tmp_path, strategy="date")
+    image_name = "image-recovery-cleanup.png"
+    old_subfolder = "old/recovery"
+    _save_image(service, records, image_name, old_subfolder, "2024-11-13 01:02:03.000", "green")
+    moves = service.plan_batch(last_image_name="", limit=100)
+    job_id = service.create_move_job(moves)
+    move = moves[0]
+    old_parent = service.image_files.get_path(image_name, image_subfolder=old_subfolder).parent
+    old_thumb_parent = service.image_files.get_path(image_name, thumbnail=True, image_subfolder=old_subfolder).parent
+    move.new_path.parent.mkdir(parents=True, exist_ok=True)
+    move.new_thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
+    move.old_path.replace(move.new_path)
+    move.old_thumbnail_path.replace(move.new_thumbnail_path)
+
+    recovered = service.startup_recovery()
+
+    assert recovered.committed == 1
+    assert recovered.errors == 0
+    assert not old_parent.exists()
+    assert not old_thumb_parent.exists()
+    assert service.get_job(job_id).state == "committed"
+
+
 def test_preflight_rejects_active_uncommitted_job_for_same_image(tmp_path: Path) -> None:
     service, records = _service(tmp_path, strategy="date")
     image_name = "image-d.png"

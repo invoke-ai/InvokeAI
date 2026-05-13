@@ -82,6 +82,7 @@ def prepare_image_maintenance_test(monkeypatch: Any, mock_invoker: Invoker) -> N
         ("get", "/api/v1/images/i/test.png/full", None),
         ("head", "/api/v1/images/i/test.png/full", None),
         ("get", "/api/v1/images/i/test.png/thumbnail", None),
+        ("get", "/api/v1/images/i/test.png/workflow", None),
         ("delete", "/api/v1/images/i/test.png", None),
         ("delete", "/api/v1/images/intermediates", None),
         ("delete", "/api/v1/images/uncategorized", None),

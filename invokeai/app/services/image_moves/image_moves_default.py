@@ -249,6 +249,7 @@ class ImageMoveService:
         for job_id in job_ids:
             try:
                 self.complete_partial_filesystem_moves(job_id)
+                self.cleanup_empty_source_dirs(job_id)
                 self.commit_database_updates(job_id)
                 committed += len(self._get_items(job_id))
             except Exception as e:
