@@ -263,7 +263,13 @@ export const buildOnInvocationComplete = (
       return;
     }
 
-    // Force the polymorphic gallery list to refetch so the new video shows up.
+    // Force the polymorphic gallery list to refetch so the new video shows up. Note: this is
+    // a tag invalidation, not an optimistic insert (the image path has a `insertImageIntoNamesResult`
+    // helper, but the polymorphic `GetGalleryItemNamesResult` has a different shape and we don't
+    // have an equivalent yet). The viewer selection below applies immediately, so the user sees
+    // their video right away; the *gallery grid* scroll-to-selection is delayed by one refetch
+    // because `useKeepSelectedImageInView` re-runs when `imageNames` updates and only then can
+    // it find the new name in the list. Worth a follow-up if the scroll lag becomes noticeable.
     dispatch(galleryApi.util.invalidateTags(['GalleryItemNameList', 'GalleryItemList']));
 
     const autoSwitch = selectAutoSwitch(getState());
