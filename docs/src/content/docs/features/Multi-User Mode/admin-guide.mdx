@@ -147,7 +147,7 @@ scripts.
 
 #### **Via the Web Frontend:**
 
-Please see the Multi-User Guide's section on [Adding and Modifying Users](../user-guide#adding-and-modifying-users)
+Please see the Multi-User Guide's section on [Adding and Modifying Users](./user-guide#adding-and-modifying-users)
 for a walk-through.
 
 #### **Via Command Line Scripts:**
@@ -190,23 +190,24 @@ If no arguments are provided, the script will run in interactive mode.
 ```
 
 :::danger[Data Loss]
-Be aware that deleting a user permanently removes all their
-content and settings, and will remove their access to the boards and images they have created.
-However, their physical image files will continue to reside in `outputs/images` until a gallery maintenance script is
-run to remove orphan images.
-Back up the database first if recovery might be needed.
+Deleting a user removes the user record and cascades to their sessions, board shares, sent
+invitations, and per-user client state. It does **not** delete the boards, images, workflows, queue
+items, or style presets they created — those rows remain in the database, owned by a user_id that no
+longer exists, and will not appear in any user's gallery. Physical image files in `outputs/images`
+are also left in place until a gallery maintenance script is run to remove orphan images.
+
+If you want their content gone as well, reassign or delete it before deleting the user. Back up the
+database first if recovery might be needed.
 :::
 
 ### Viewing User Activity
 
 **Queue Management:**
 
-<Steps>
-1. Navigate to **Admin** → **Queue Overview**
-2. View all users' active and pending generations
-3. Filter by user
-4. Cancel stuck or problematic tasks
-</Steps>
+There is no separate admin-only queue view. When signed in as an administrator, the regular queue
+panel automatically shows every user's queue items (each item is labelled with the submitting user's
+display name or email), and you can cancel or clear any of them. There is no built-in UI to filter
+the queue by user; use your browser's find-in-page to scan by name if needed.
 
 ## Model Management
 

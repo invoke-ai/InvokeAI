@@ -210,11 +210,9 @@ class InvokeAIClient:
     def create_board(self, board_name):
         """Create a new board."""
         url = f"{self.base_url}/api/v1/boards/"
-        payload = {"board_name": board_name}
-
         response = requests.post(
             url,
-            json=payload,
+            params={"board_name": board_name},
             headers=self._get_headers()
         )
         response.raise_for_status()
@@ -338,10 +336,11 @@ class InvokeAIClient {
   }
 
   async createBoard(boardName) {
-    const response = await fetch(`${this.baseUrl}/api/v1/boards/`, {
+    const url = new URL(`${this.baseUrl}/api/v1/boards/`);
+    url.searchParams.set('board_name', boardName);
+    const response = await fetch(url, {
       method: 'POST',
       headers: this.getHeaders(),
-      body: JSON.stringify({ board_name: boardName }),
     });
 
     if (!response.ok) {
@@ -499,12 +498,8 @@ curl -X GET http://localhost:9090/api/v1/boards/ \
 **Create Board:**
 
 ```bash
-curl -X POST http://localhost:9090/api/v1/boards/ \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "board_name": "My API Board"
-  }'
+curl -X POST "http://localhost:9090/api/v1/boards/?board_name=My%20API%20Board" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ## API Endpoint Changes
@@ -516,6 +511,11 @@ All endpoints now require authentication except:
 - `GET /api/v1/auth/status` — Check whether multi-user setup is required
 - `POST /api/v1/auth/setup` — Initial admin setup
 - `POST /api/v1/auth/login` — User login
+- `GET /api/v1/images/i/{image_name}/full` — Full-resolution image file
+- `GET /api/v1/images/i/{image_name}/thumbnail` — Image thumbnail
+- `GET /api/v1/workflows/i/{workflow_id}/thumbnail` — Workflow thumbnail
+
+The image and thumbnail endpoints are intentionally unauthenticated because browsers load these resources via `<img src>` tags, which cannot send `Authorization` headers. Security relies on the fact that image and workflow IDs are UUIDs and therefore unguessable.
 
 ### User-Scoped Resources
 
@@ -641,15 +641,32 @@ Occurs when:
 
 **Request:** No parameters
 
-**Response:**
+**Response (initial setup not yet complete):**
 ```json
 {
   "setup_required": true,
   "multiuser_enabled": true,
   "strict_password_checking": true,
-  "admin_email": "string"
+  "admin_email": "admin@example.com"
 }
 ```
+
+**Response (setup already complete, or multiuser disabled):**
+```json
+{
+  "setup_required": false,
+  "multiuser_enabled": true,
+  "strict_password_checking": true,
+  "admin_email": null
+}
+```
+
+:::note
+`admin_email` is only populated while `setup_required` is `true` (to help locate the pre-seeded
+administrator account during initial setup). Once an admin has been created — and whenever
+multiuser mode is disabled — it is returned as `null` to avoid leaking administrator identity on
+public deployments.
+:::
 
 
 #### Setup Administrator
