@@ -1,1 +1,7 @@
-{}
+{
+    "accessibility": {
+        "about": "About",
+        "createIssue": "Create Issue",
+        "submitSupportTicket": "Submit Support Ticket"
+    }
+}
