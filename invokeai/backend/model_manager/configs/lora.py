@@ -907,10 +907,7 @@ class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         state_dict = mod.load_state_dict()
         str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
 
-        has_cosmos_keys = (
-            has_cosmos_dit_kohya_keys_strict(str_keys)
-            or has_cosmos_dit_peft_keys_strict(str_keys)
-        )
+        has_cosmos_keys = has_cosmos_dit_kohya_keys_strict(str_keys) or has_cosmos_dit_peft_keys_strict(str_keys)
 
         # Also check for LoRA/LoKR weight suffixes
         has_lora_suffix = state_dict_has_any_keys_ending_with(
@@ -1009,9 +1006,8 @@ class LoRA_LyCORIS_Wan_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         state_dict = mod.load_state_dict()
         str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
 
-        if (
-            (has_wan_kohya_keys(str_keys) or has_wan_peft_keys(str_keys))
-            and not has_non_wan_architecture_keys(str_keys)
+        if (has_wan_kohya_keys(str_keys) or has_wan_peft_keys(str_keys)) and not has_non_wan_architecture_keys(
+            str_keys
         ):
             return BaseModelType.Wan
 

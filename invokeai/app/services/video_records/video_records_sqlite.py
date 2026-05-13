@@ -165,7 +165,9 @@ class SqliteVideoRecordStorage(VideoRecordStorageBase):
                 query_params.append(f"%{search_term.lower()}%")
 
             if starred_first:
-                query_pagination = f" ORDER BY videos.starred DESC, videos.created_at {order_dir.value} LIMIT ? OFFSET ? "
+                query_pagination = (
+                    f" ORDER BY videos.starred DESC, videos.created_at {order_dir.value} LIMIT ? OFFSET ? "
+                )
             else:
                 query_pagination = f" ORDER BY videos.created_at {order_dir.value} LIMIT ? OFFSET ? "
 

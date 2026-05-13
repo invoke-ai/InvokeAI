@@ -396,9 +396,7 @@ class WanRefImageConditioningField(BaseModel):
     latent temporal-dim mismatch is hard to debug from the downstream error.
     """
 
-    condition_tensor_name: str = Field(
-        description="Name of the saved [1, 20, T_lat, H/8, W/8] condition tensor."
-    )
+    condition_tensor_name: str = Field(description="Name of the saved [1, 20, T_lat, H/8, W/8] condition tensor.")
     width: int = Field(description="Image width used during VAE encoding (matches denoise width).")
     height: int = Field(description="Image height used during VAE encoding (matches denoise height).")
     num_frames: int = Field(

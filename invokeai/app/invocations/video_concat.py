@@ -113,9 +113,7 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
         if len(self.videos) < 2:
             raise ValueError("video_concat requires at least two input videos.")
 
-        paths: list[Path] = [
-            context.videos.get_path(v.video_name) for v in self.videos
-        ]
+        paths: list[Path] = [context.videos.get_path(v.video_name) for v in self.videos]
 
         # Probe inputs up front: enforce matching dims and pick the default output fps.
         probes = [probe_video(p) for p in paths]
@@ -167,9 +165,7 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
         )
         context.util.signal_progress(f"Encoding MP4 ({num_frames} frames @ {output_fps:.2f} fps)")
 
-        tmp = tempfile.NamedTemporaryFile(
-            prefix="invokeai_video_concat_", suffix=".mp4", delete=False
-        )
+        tmp = tempfile.NamedTemporaryFile(prefix="invokeai_video_concat_", suffix=".mp4", delete=False)
         tmp.close()
         tmp_path = Path(tmp.name)
         try:

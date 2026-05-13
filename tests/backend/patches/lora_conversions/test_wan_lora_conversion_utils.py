@@ -66,9 +66,7 @@ class TestPEFTPathConversion:
         assert _strip_peft_prefix("diffusion_model.blocks.0.self_attn.q") == "blocks.0.self_attn.q"
 
     def test_strip_base_model_prefix(self):
-        assert _strip_peft_prefix(
-            "base_model.model.transformer.blocks.0.attn1.to_q"
-        ) == "blocks.0.attn1.to_q"
+        assert _strip_peft_prefix("base_model.model.transformer.blocks.0.attn1.to_q") == "blocks.0.attn1.to_q"
 
     def test_no_prefix_unchanged(self):
         assert _strip_peft_prefix("blocks.0.attn1.to_q") == "blocks.0.attn1.to_q"
@@ -99,10 +97,7 @@ class TestLoRAModelFromStateDict:
     """End-to-end conversion: state dict -> ModelPatchRaw."""
 
     def test_diffusers_peft_with_transformer_prefix(self):
-        sd = {
-            f"transformer.blocks.0.attn1.to_q.{k}": v
-            for k, v in _ab_pair(5120, 5120).items()
-        }
+        sd = {f"transformer.blocks.0.attn1.to_q.{k}": v for k, v in _ab_pair(5120, 5120).items()}
         patch = lora_model_from_wan_state_dict(sd)
         expected_key = f"{WAN_LORA_TRANSFORMER_PREFIX}blocks.0.attn1.to_q"
         assert expected_key in patch.layers
@@ -113,51 +108,33 @@ class TestLoRAModelFromStateDict:
         assert f"{WAN_LORA_TRANSFORMER_PREFIX}blocks.5.attn2.to_k" in patch.layers
 
     def test_native_peft_diffusion_model_prefix(self):
-        sd = {
-            f"diffusion_model.blocks.0.self_attn.q.{k}": v
-            for k, v in _ab_pair(5120, 5120).items()
-        }
+        sd = {f"diffusion_model.blocks.0.self_attn.q.{k}": v for k, v in _ab_pair(5120, 5120).items()}
         patch = lora_model_from_wan_state_dict(sd)
         # native self_attn.q must be rewritten to attn1.to_q
         assert f"{WAN_LORA_TRANSFORMER_PREFIX}blocks.0.attn1.to_q" in patch.layers
 
     def test_native_peft_cross_attn_to_attn2(self):
-        sd = {
-            f"diffusion_model.blocks.3.cross_attn.o.{k}": v
-            for k, v in _ab_pair(5120, 5120).items()
-        }
+        sd = {f"diffusion_model.blocks.3.cross_attn.o.{k}": v for k, v in _ab_pair(5120, 5120).items()}
         patch = lora_model_from_wan_state_dict(sd)
         assert f"{WAN_LORA_TRANSFORMER_PREFIX}blocks.3.attn2.to_out.0" in patch.layers
 
     def test_native_peft_ffn_to_diffusers(self):
-        sd = {
-            f"diffusion_model.blocks.0.ffn.0.{k}": v
-            for k, v in _ab_pair(5120, 13824).items()
-        }
+        sd = {f"diffusion_model.blocks.0.ffn.0.{k}": v for k, v in _ab_pair(5120, 13824).items()}
         patch = lora_model_from_wan_state_dict(sd)
         assert f"{WAN_LORA_TRANSFORMER_PREFIX}blocks.0.ffn.net.0.proj" in patch.layers
 
     def test_kohya_diffusers_naming(self):
-        sd = {
-            f"lora_unet_blocks_0_attn1_to_q.{k}": v
-            for k, v in _down_up_pair(5120, 5120).items()
-        }
+        sd = {f"lora_unet_blocks_0_attn1_to_q.{k}": v for k, v in _down_up_pair(5120, 5120).items()}
         patch = lora_model_from_wan_state_dict(sd)
         assert f"{WAN_LORA_TRANSFORMER_PREFIX}blocks.0.attn1.to_q" in patch.layers
 
     def test_kohya_native_naming(self):
-        sd = {
-            f"lora_unet_blocks_0_self_attn_q.{k}": v
-            for k, v in _down_up_pair(5120, 5120).items()
-        }
+        sd = {f"lora_unet_blocks_0_self_attn_q.{k}": v for k, v in _down_up_pair(5120, 5120).items()}
         patch = lora_model_from_wan_state_dict(sd)
         assert f"{WAN_LORA_TRANSFORMER_PREFIX}blocks.0.attn1.to_q" in patch.layers
 
     def test_kohya_ffn_native_naming(self):
-        sd = {
-            f"lora_unet_blocks_0_ffn_0.{k}": v
-            for k, v in _down_up_pair(5120, 13824).items()
-        }
+        sd = {f"lora_unet_blocks_0_ffn_0.{k}": v for k, v in _down_up_pair(5120, 13824).items()}
         patch = lora_model_from_wan_state_dict(sd)
         assert f"{WAN_LORA_TRANSFORMER_PREFIX}blocks.0.ffn.net.0.proj" in patch.layers
 
@@ -189,10 +166,7 @@ class TestLoRAModelFromStateDict:
         assert layer is not None
 
     def test_unknown_kohya_submodule_is_skipped_silently(self):
-        sd = {
-            f"lora_unet_blocks_0_unknown_thing.{k}": v
-            for k, v in _down_up_pair(5120, 5120).items()
-        }
+        sd = {f"lora_unet_blocks_0_unknown_thing.{k}": v for k, v in _down_up_pair(5120, 5120).items()}
         patch = lora_model_from_wan_state_dict(sd)
         assert len(patch.layers) == 0
 

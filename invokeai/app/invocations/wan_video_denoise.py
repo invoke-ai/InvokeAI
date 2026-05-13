@@ -169,9 +169,7 @@ class WanVideoDenoiseInvocation(BaseInvocation):
         )
         scheduler = scheduler_builder(proxy, context, device)
 
-        pos_cond = self._load_conditioning(
-            context, self.positive_conditioning, device=device, dtype=inference_dtype
-        )
+        pos_cond = self._load_conditioning(context, self.positive_conditioning, device=device, dtype=inference_dtype)
         do_cfg = self.guidance_scale != 1.0 and self.negative_conditioning is not None
         neg_cond: WanConditioningInfo | None = None
         if do_cfg:
@@ -202,9 +200,8 @@ class WanVideoDenoiseInvocation(BaseInvocation):
                     f"num_frames ({self.num_frames}). Re-run the Reference Image - Wan 2.2 node with "
                     f"num_frames={self.num_frames}."
                 )
-            ref_condition = (
-                context.tensors.load(self.ref_image.condition_tensor_name)
-                .to(device=device, dtype=inference_dtype)
+            ref_condition = context.tensors.load(self.ref_image.condition_tensor_name).to(
+                device=device, dtype=inference_dtype
             )
 
         scheduler.set_timesteps(num_inference_steps=self.steps, device=device)
@@ -246,17 +243,13 @@ class WanVideoDenoiseInvocation(BaseInvocation):
         low_model = self.transformer.transformer_low_noise
         low_config = context.models.get_config(low_model) if low_model is not None else None
         num_train_timesteps = int(scheduler.config.num_train_timesteps)
-        boundary_timestep = (
-            self.transformer.boundary_ratio * num_train_timesteps if low_model is not None else None
-        )
+        boundary_timestep = self.transformer.boundary_ratio * num_train_timesteps if low_model is not None else None
 
         high_loras = self.transformer.loras
         low_loras = self.transformer.loras_low_noise or self.transformer.loras
         high_config = context.models.get_config(high_model)
         high_is_quantized = high_config.format == ModelFormat.GGUFQuantized
-        low_is_quantized = (
-            low_config.format == ModelFormat.GGUFQuantized if low_config is not None else False
-        )
+        low_is_quantized = low_config.format == ModelFormat.GGUFQuantized if low_config is not None else False
 
         def high_lora_factory() -> Iterable[Tuple[ModelPatchRaw, float]]:
             return proxy._lora_iterator(context, high_loras)

@@ -68,17 +68,14 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         vae_info = context.models.load(self.vae.vae)
         if not isinstance(vae_info.model, AutoencoderKLWan):
-            raise TypeError(
-                f"Expected AutoencoderKLWan for Wan VAE, got {type(vae_info.model).__name__}."
-            )
+            raise TypeError(f"Expected AutoencoderKLWan for Wan VAE, got {type(vae_info.model).__name__}.")
 
         with vae_info.model_on_device() as (_, vae):
             assert isinstance(vae, AutoencoderKLWan)
             _, _, t_lat, h_lat, w_lat = latents.shape
             t_pixel = (t_lat - 1) * 4 + 1
             context.logger.info(
-                f"Running Wan VAE decode: {t_lat} latent frames -> {t_pixel} pixel frames "
-                f"at {w_lat * 8}x{h_lat * 8}"
+                f"Running Wan VAE decode: {t_lat} latent frames -> {t_pixel} pixel frames at {w_lat * 8}x{h_lat * 8}"
             )
             context.util.signal_progress("Running Wan VAE decode (video)")
 
@@ -119,15 +116,12 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
         # bundled imageio-ffmpeg binary). libx264 + yuv420p is the default for
         # this plugin, which is what we want for broadly-compatible browser
         # playback — no need to override.
-        tmp = tempfile.NamedTemporaryFile(
-            prefix="invokeai_wan_video_", suffix=".mp4", delete=False
-        )
+        tmp = tempfile.NamedTemporaryFile(prefix="invokeai_wan_video_", suffix=".mp4", delete=False)
         tmp.close()
         tmp_path = Path(tmp.name)
         try:
             context.logger.info(
-                f"Encoding MP4: {num_frames} frames @ {self.fps} fps ({duration:.2f}s) "
-                f"at {width}x{height} via libx264"
+                f"Encoding MP4: {num_frames} frames @ {self.fps} fps ({duration:.2f}s) at {width}x{height} via libx264"
             )
             context.util.signal_progress(f"Encoding MP4 ({num_frames} frames @ {self.fps} fps)")
             iio.imwrite(
@@ -138,9 +132,7 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
                 fps=self.fps,
             )
             encoded_bytes = tmp_path.stat().st_size
-            context.logger.info(
-                f"MP4 encode complete: {encoded_bytes / 1024:.1f} KB"
-            )
+            context.logger.info(f"MP4 encode complete: {encoded_bytes / 1024:.1f} KB")
             video_dto = context.videos.save(
                 source_path=tmp_path,
                 width=width,

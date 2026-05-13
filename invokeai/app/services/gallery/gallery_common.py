@@ -37,9 +37,7 @@ class GalleryItem(BaseModelExcludeNull):
     thumbnail_url: str = Field(description="URL to the static (WebP) thumbnail.")
     width: int = Field(description="The width of the item in pixels.")
     height: int = Field(description="The height of the item in pixels.")
-    category: ImageCategory = Field(
-        description="The category of the item (images and videos share the same enum)."
-    )
+    category: ImageCategory = Field(description="The category of the item (images and videos share the same enum).")
     starred: bool = Field(description="Whether the item is starred.")
     is_intermediate: bool = Field(description="Whether the item is an intermediate output.")
     board_id: Optional[str] = Field(default=None, description="Owning board id, if any.")

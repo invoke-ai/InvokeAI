@@ -46,9 +46,7 @@ _COSMOS_DIT_EXCLUSIVE_SUBCOMPONENTS_RE = (
     r"(?:cross|self)_attn[._](?:[qkv]_proj|output_proj))"
 )
 
-_KOHYA_ANIMA_STRICT_RE = re.compile(
-    r"lora_unet_(llm_adapter_)?blocks_\d+_" + _COSMOS_DIT_EXCLUSIVE_SUBCOMPONENTS_RE
-)
+_KOHYA_ANIMA_STRICT_RE = re.compile(r"lora_unet_(llm_adapter_)?blocks_\d+_" + _COSMOS_DIT_EXCLUSIVE_SUBCOMPONENTS_RE)
 _PEFT_ANIMA_STRICT_RE = re.compile(
     r"(diffusion_model|transformer|base_model\.model\.transformer)\.blocks\.\d+\."
     + _COSMOS_DIT_EXCLUSIVE_SUBCOMPONENTS_RE

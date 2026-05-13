@@ -132,24 +132,15 @@ class TestArchitectureGuards:
     @pytest.mark.parametrize(
         "label, keys",
         [
-            ("anima_kohya_q_proj",
-             ["lora_unet_blocks_0_cross_attn_q_proj.lora_down.weight"]),
-            ("anima_peft_mlp",
-             ["transformer.blocks.0.mlp.layer1.lora_A.weight"]),
-            ("anima_peft_adaln",
-             ["transformer.blocks.0.adaln_modulation.linear.lora_A.weight"]),
-            ("anima_peft_self_attn_q_proj",
-             ["transformer.blocks.0.self_attn.q_proj.lora_A.weight"]),
-            ("qwen_image",
-             ["transformer_blocks.0.attn.to_q.lora_A.weight"]),
-            ("flux_kohya_double",
-             ["lora_unet_double_blocks_0_img_attn_qkv.lora_down.weight"]),
-            ("flux_kohya_single",
-             ["lora_unet_single_blocks_0_linear1.lora_down.weight"]),
-            ("flux_diffusers_single_transformer",
-             ["transformer.single_transformer_blocks.0.attn.to_q.lora_A.weight"]),
-            ("z_image",
-             ["diffusion_model.layers.0.attn.to_q.lora_A.weight"]),
+            ("anima_kohya_q_proj", ["lora_unet_blocks_0_cross_attn_q_proj.lora_down.weight"]),
+            ("anima_peft_mlp", ["transformer.blocks.0.mlp.layer1.lora_A.weight"]),
+            ("anima_peft_adaln", ["transformer.blocks.0.adaln_modulation.linear.lora_A.weight"]),
+            ("anima_peft_self_attn_q_proj", ["transformer.blocks.0.self_attn.q_proj.lora_A.weight"]),
+            ("qwen_image", ["transformer_blocks.0.attn.to_q.lora_A.weight"]),
+            ("flux_kohya_double", ["lora_unet_double_blocks_0_img_attn_qkv.lora_down.weight"]),
+            ("flux_kohya_single", ["lora_unet_single_blocks_0_linear1.lora_down.weight"]),
+            ("flux_diffusers_single_transformer", ["transformer.single_transformer_blocks.0.attn.to_q.lora_A.weight"]),
+            ("z_image", ["diffusion_model.layers.0.attn.to_q.lora_A.weight"]),
         ],
     )
     def test_non_wan_archs_are_flagged(self, label: str, keys: list[str]):
@@ -362,9 +353,7 @@ class TestProbeMutualExclusivity:
                 "diffusion_model.blocks.0.cross_attn.k.lora_B.weight": _t((5120, 128)),
             }
             with pytest.raises(NotAMatchError, match="Anima LoRA"):
-                LoRA_LyCORIS_Anima_Config.from_model_on_disk(
-                    _make_mod(f, sd), _overrides(f, "wan-native-lora")
-                )
+                LoRA_LyCORIS_Anima_Config.from_model_on_disk(_make_mod(f, sd), _overrides(f, "wan-native-lora"))
 
     def test_wan_rejects_anima_lora(self):
         """Mirror direction: a real Anima LoRA must not be matched by Wan.
@@ -380,6 +369,4 @@ class TestProbeMutualExclusivity:
                 "transformer.blocks.0.mlp.layer1.lora_B.weight": _t((4096, 128)),
             }
             with pytest.raises(NotAMatchError, match="Wan LoRA"):
-                LoRA_LyCORIS_Wan_Config.from_model_on_disk(
-                    _make_mod(f, sd), _overrides(f, "anima-lora")
-                )
+                LoRA_LyCORIS_Wan_Config.from_model_on_disk(_make_mod(f, sd), _overrides(f, "anima-lora"))

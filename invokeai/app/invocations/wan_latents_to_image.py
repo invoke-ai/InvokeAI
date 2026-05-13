@@ -51,9 +51,7 @@ class WanLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         vae_info = context.models.load(self.vae.vae)
         if not isinstance(vae_info.model, AutoencoderKLWan):
-            raise TypeError(
-                f"Expected AutoencoderKLWan for Wan VAE, got {type(vae_info.model).__name__}."
-            )
+            raise TypeError(f"Expected AutoencoderKLWan for Wan VAE, got {type(vae_info.model).__name__}.")
 
         estimated_working_memory = estimate_vae_working_memory_flux(
             operation="decode",

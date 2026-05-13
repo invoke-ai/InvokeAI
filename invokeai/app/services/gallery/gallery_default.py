@@ -159,10 +159,7 @@ class SqliteGalleryService(GalleryServiceABC):
             if starred_first:
                 starred_count = sum(1 for r in rows if r["starred"])
 
-        refs = [
-            GalleryItemRef(kind=GalleryItemKind(row["kind"]), name=row["name"])
-            for row in rows
-        ]
+        refs = [GalleryItemRef(kind=GalleryItemKind(row["kind"]), name=row["name"]) for row in rows]
         return GalleryItemNamesResult(items=refs, starred_count=starred_count, total_count=len(refs))
 
     def _build_half(
@@ -227,10 +224,7 @@ class SqliteGalleryService(GalleryServiceABC):
                 f"{fps_expr} AS fps"
             )
 
-        from_clause = (
-            f"FROM {base_table} "
-            f"LEFT JOIN {join_table} ON {join_table}.{name_col} = {base_table}.{name_col}"
-        )
+        from_clause = f"FROM {base_table} LEFT JOIN {join_table} ON {join_table}.{name_col} = {base_table}.{name_col}"
 
         conditions = ""
         params: list[Union[int, str, bool]] = []

@@ -136,9 +136,7 @@ class WanModelLoaderInvocation(BaseInvocation):
         if main_is_diffusers:
             transformer = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
             if getattr(main_config, "has_dual_expert", False):
-                transformer_low_noise = self.model.model_copy(
-                    update={"submodel_type": SubModelType.Transformer2}
-                )
+                transformer_low_noise = self.model.model_copy(update={"submodel_type": SubModelType.Transformer2})
                 recorded = getattr(main_config, "boundary_ratio", None)
                 if recorded is not None:
                     boundary_ratio = float(recorded)
@@ -153,9 +151,7 @@ class WanModelLoaderInvocation(BaseInvocation):
                         f"'Transformer (Low Noise)' must be a GGUF-format Wan model. "
                         f"'{low_config.name}' is in {low_config.format.value} format."
                     )
-                low_id = self.transformer_low_noise_model.model_copy(
-                    update={"submodel_type": SubModelType.Transformer}
-                )
+                low_id = self.transformer_low_noise_model.model_copy(update={"submodel_type": SubModelType.Transformer})
                 low_expert = getattr(low_config, "expert", "none")
 
                 # Make sure 'transformer' is the high-noise expert and
@@ -172,10 +168,7 @@ class WanModelLoaderInvocation(BaseInvocation):
                 # A14B without a paired low-noise GGUF will produce degraded
                 # quality (only the high-noise expert runs). Warn but don't
                 # abort — TI2V-5B GGUFs are single-expert and totally fine.
-                if (
-                    getattr(main_config, "variant", None)
-                    and main_config.variant.value == "t2v_a14b"
-                ):
+                if getattr(main_config, "variant", None) and main_config.variant.value == "t2v_a14b":
                     context.logger.warning(
                         "A14B GGUF main was provided without a paired 'Transformer (Low Noise)'. "
                         "Only the high-noise expert will run; image quality will be reduced."

@@ -37,8 +37,7 @@ class VideoFrameExtractInvocation(BaseInvocation, WithMetadata, WithBoard):
     video: VideoField = InputField(description="The video to extract a frame from.")
     frame_index: int = InputField(
         default=-1,
-        description="Index of the frame to extract. 0 = first frame, -1 = last frame, "
-        "-2 = second-to-last, etc.",
+        description="Index of the frame to extract. 0 = first frame, -1 = last frame, -2 = second-to-last, etc.",
     )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -56,20 +55,14 @@ class VideoFrameExtractInvocation(BaseInvocation, WithMetadata, WithBoard):
                 )
             n_frames = int(round(duration * fps))
             if n_frames <= 0:
-                raise ValueError(
-                    f"Video {self.video.video_name} has no decodable frames (probed {n_frames})."
-                )
+                raise ValueError(f"Video {self.video.video_name} has no decodable frames (probed {n_frames}).")
             index = n_frames + index
             if index < 0:
-                raise ValueError(
-                    f"frame_index {self.frame_index} is out of range for a {n_frames}-frame video."
-                )
+                raise ValueError(f"frame_index {self.frame_index} is out of range for a {n_frames}-frame video.")
 
         frame = extract_video_frame(video_path, frame_index=index)
         if frame is None:
-            raise ValueError(
-                f"Failed to extract frame {index} from {self.video.video_name}."
-            )
+            raise ValueError(f"Failed to extract frame {index} from {self.video.video_name}.")
 
         image_dto = context.images.save(image=frame)
         return ImageOutput.build(image_dto=image_dto)

@@ -71,9 +71,7 @@ class TestWanT5EncoderProbe:
             _write_encoder_config(root / "config.json", "t5")
 
             with pytest.raises(NotAMatchError, match="not 'umt5'"):
-                WanT5Encoder_WanT5Encoder_Config.from_model_on_disk(
-                    _make_mod(root), _build_overrides(root, "t5-xxl")
-                )
+                WanT5Encoder_WanT5Encoder_Config.from_model_on_disk(_make_mod(root), _build_overrides(root, "t5-xxl"))
 
     def test_rejects_full_pipeline(self):
         """A folder with model_index.json or transformer/ is a full pipeline, not an encoder."""
@@ -95,6 +93,4 @@ class TestWanT5EncoderProbe:
             root.mkdir()
 
             with pytest.raises(NotAMatchError, match="no encoder config"):
-                WanT5Encoder_WanT5Encoder_Config.from_model_on_disk(
-                    _make_mod(root), _build_overrides(root, "empty")
-                )
+                WanT5Encoder_WanT5Encoder_Config.from_model_on_disk(_make_mod(root), _build_overrides(root, "empty"))

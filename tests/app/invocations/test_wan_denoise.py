@@ -183,9 +183,7 @@ def _force_cpu(monkeypatch):
     from invokeai.backend.util.devices import TorchDevice
 
     monkeypatch.setattr(TorchDevice, "choose_torch_device", classmethod(lambda cls: torch.device("cpu")))
-    monkeypatch.setattr(
-        TorchDevice, "choose_bfloat16_safe_dtype", classmethod(lambda cls, device=None: torch.float32)
-    )
+    monkeypatch.setattr(TorchDevice, "choose_bfloat16_safe_dtype", classmethod(lambda cls, device=None: torch.float32))
 
 
 def _wan_transformer_field(*, dual: bool = False, boundary_ratio: float = 0.875) -> WanTransformerField:
@@ -542,13 +540,9 @@ class TestWanDenoiseRefImage:
         # 4-ch first-frame mask + 16-ch VAE-encoded image latents.
         # At 64x64 → 8x8 latent spatial dims.
         condition = torch.zeros(1, 20, 1, 8, 8)
-        ctx = self._build_ctx_with_condition(
-            transformer, WanVariantType.I2V_A14B, fake_model_root, condition
-        )
+        ctx = self._build_ctx_with_condition(transformer, WanVariantType.I2V_A14B, fake_model_root, condition)
 
-        ref_field = WanRefImageConditioningField(
-            condition_tensor_name="condition", width=64, height=64
-        )
+        ref_field = WanRefImageConditioningField(condition_tensor_name="condition", width=64, height=64)
         inv = self._make_inv_with_ref(ref_field)
         inv._run_diffusion(ctx)
 
@@ -574,13 +568,9 @@ class TestWanDenoiseRefImage:
         """T2V_A14B + ref_image must raise — fast-fail before doing any work."""
         transformer = _ZeroTransformer()
         condition = torch.zeros(1, 20, 1, 8, 8)
-        ctx = self._build_ctx_with_condition(
-            transformer, WanVariantType.T2V_A14B, fake_model_root, condition
-        )
+        ctx = self._build_ctx_with_condition(transformer, WanVariantType.T2V_A14B, fake_model_root, condition)
 
-        ref_field = WanRefImageConditioningField(
-            condition_tensor_name="condition", width=64, height=64
-        )
+        ref_field = WanRefImageConditioningField(condition_tensor_name="condition", width=64, height=64)
         inv = self._make_inv_with_ref(ref_field)
         with pytest.raises(ValueError, match="only supported by the Wan 2.2 I2V variant"):
             inv._run_diffusion(ctx)
@@ -589,13 +579,9 @@ class TestWanDenoiseRefImage:
         """TI2V-5B + ref_image must raise — TI2V uses a different image path."""
         transformer = _ZeroTransformer()
         condition = torch.zeros(1, 20, 1, 8, 8)
-        ctx = self._build_ctx_with_condition(
-            transformer, WanVariantType.TI2V_5B, fake_model_root, condition
-        )
+        ctx = self._build_ctx_with_condition(transformer, WanVariantType.TI2V_5B, fake_model_root, condition)
 
-        ref_field = WanRefImageConditioningField(
-            condition_tensor_name="condition", width=64, height=64
-        )
+        ref_field = WanRefImageConditioningField(condition_tensor_name="condition", width=64, height=64)
         inv = self._make_inv_with_ref(ref_field)
         with pytest.raises(ValueError, match="only supported by the Wan 2.2 I2V variant"):
             inv._run_diffusion(ctx)
@@ -604,13 +590,9 @@ class TestWanDenoiseRefImage:
         """If the encoder's width/height differ from denoise's, fail clearly."""
         transformer = _ZeroTransformer()
         condition = torch.zeros(1, 20, 1, 8, 8)
-        ctx = self._build_ctx_with_condition(
-            transformer, WanVariantType.I2V_A14B, fake_model_root, condition
-        )
+        ctx = self._build_ctx_with_condition(transformer, WanVariantType.I2V_A14B, fake_model_root, condition)
 
-        ref_field = WanRefImageConditioningField(
-            condition_tensor_name="condition", width=512, height=512
-        )
+        ref_field = WanRefImageConditioningField(condition_tensor_name="condition", width=512, height=512)
         inv = self._make_inv_with_ref(ref_field, width=64, height=64)
         with pytest.raises(ValueError, match="must match denoise dimensions"):
             inv._run_diffusion(ctx)

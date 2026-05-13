@@ -73,12 +73,10 @@ _KOHYA_WAN_RE = re.compile(
 # PEFT format: <prefix>.blocks.<idx>.<wan_submodule>
 # Prefix may be empty, "transformer.", "diffusion_model.", or "base_model.model.transformer."
 _PEFT_WAN_DIFFUSERS_RE = re.compile(
-    r"(?:^|(?:diffusion_model|transformer|base_model\.model\.transformer)\.)blocks\.\d+\."
-    + _WAN_DIFFUSERS_SUBMODULES
+    r"(?:^|(?:diffusion_model|transformer|base_model\.model\.transformer)\.)blocks\.\d+\." + _WAN_DIFFUSERS_SUBMODULES
 )
 _PEFT_WAN_NATIVE_RE = re.compile(
-    r"(?:^|(?:diffusion_model|transformer|base_model\.model\.transformer)\.)blocks\.\d+\."
-    + _WAN_NATIVE_SUBMODULES
+    r"(?:^|(?:diffusion_model|transformer|base_model\.model\.transformer)\.)blocks\.\d+\." + _WAN_NATIVE_SUBMODULES
 )
 
 
