@@ -3,9 +3,9 @@
 Wan's transformer ``patch_size=(1, 2, 2)`` combined with the VAE's 8x spatial
 compression requires pixel dimensions to be multiples of 16 (see
 ``wan_ref_image_encoder.py``). This node takes a source image's W×H and a
-target short-side (e.g. 720 for "720p") and returns the scaled, snapped
-(width, height) that can be fed directly into ``wan_ref_image_encoder`` and
-the matching ``wan_denoise`` inputs.
+target short-side preset (480p / 720p / 1080p) and returns the scaled,
+snapped (width, height) that can be fed directly into ``wan_ref_image_encoder``
+and the matching ``wan_denoise`` inputs.
 """
 
 import math
@@ -16,21 +16,37 @@ from invokeai.app.invocations.fields import InputField
 from invokeai.app.invocations.ideal_size import IdealSizeOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 
+WanTargetResolution = Literal["480p", "720p", "1080p"]
+
+# Short-side pixel count for each preset. "p" notation is by convention the *short*
+# dimension in modern video (so a portrait 720p video is 720 wide × 1280 tall).
+WAN_TARGET_RESOLUTION_PX: dict[str, int] = {
+    "480p": 480,
+    "720p": 720,
+    "1080p": 1080,
+}
+
+WAN_TARGET_RESOLUTION_LABELS: dict[str, str] = {
+    "480p": "480p (Wan native)",
+    "720p": "720p (Wan native, default)",
+    "1080p": "1080p (extrapolated — not a Wan training size)",
+}
+
 
 @invocation(
     "wan_i2v_ideal_dimensions",
     title="Wan 2.2 I2V Ideal Dimensions",
     tags=["wan", "video", "dimensions", "math"],
     category="video",
-    version="1.0.0",
+    version="1.1.0",
 )
 class WanI2VIdealDimensionsInvocation(BaseInvocation):
-    """Compute Wan I2V-compatible (width, height) for a target short-side resolution.
+    """Compute Wan I2V-compatible (width, height) for a chosen resolution preset.
 
-    Scales the input W×H so the shorter side equals ``target_short_side``, then snaps
-    each dimension to a multiple of 16 (Wan's pixel-grid constraint). Wire from
-    ``Image Primitive``'s width/height outputs and into ``wan_ref_image_encoder`` /
-    ``wan_denoise``.
+    Scales the input W×H so the shorter side equals the chosen preset (480 / 720 /
+    1080 px), then snaps each dimension to a multiple of 16 (Wan's pixel-grid
+    constraint). Wire from ``Image Primitive``'s width/height outputs and into
+    ``wan_ref_image_encoder`` / ``wan_denoise``.
     """
 
     width: int = InputField(
@@ -43,13 +59,14 @@ class WanI2VIdealDimensionsInvocation(BaseInvocation):
         gt=0,
         description="Source image height in pixels.",
     )
-    target_short_side: int = InputField(
-        default=720,
-        ge=16,
+    target_resolution: WanTargetResolution = InputField(
+        default="720p",
         description=(
-            "The short side of the output dimensions in pixels. Common Wan values: "
-            "480 (Wan 480p) and 720 (Wan 720p)."
+            "Short-side resolution preset. 480p and 720p are Wan 2.2's native training "
+            "resolutions; 1080p works but is extrapolation and costs ~2.25x the memory "
+            "of 720p."
         ),
+        ui_choice_labels=WAN_TARGET_RESOLUTION_LABELS,
     )
     rounding: Literal["nearest", "floor", "ceiling"] = InputField(
         default="nearest",
@@ -65,7 +82,8 @@ class WanI2VIdealDimensionsInvocation(BaseInvocation):
         if short <= 0:
             raise ValueError("Source dimensions must be positive.")
 
-        scale = self.target_short_side / short
+        target_short_side = WAN_TARGET_RESOLUTION_PX[self.target_resolution]
+        scale = target_short_side / short
         raw_w = self.width * scale
         raw_h = self.height * scale
 
