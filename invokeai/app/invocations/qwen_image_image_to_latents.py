@@ -83,7 +83,9 @@ class QwenImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard)
         if self.width is not None and self.height is not None:
             image = image.convert("RGB").resize((self.width, self.height), resample=PILImage.LANCZOS)
 
-        image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
+        # multiple_of=16 ensures the post-VAE latents (vae_scale_factor=8) have even
+        # spatial dims, which the transformer's 2x2 patch packing requires.
+        image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"), multiple_of=16)
         if image_tensor.dim() == 3:
             image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
 
