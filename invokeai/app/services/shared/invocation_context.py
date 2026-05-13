@@ -15,10 +15,10 @@ from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
-from invokeai.app.services.videos.videos_common import VideoDTO
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.videos.videos_common import VideoDTO
 from invokeai.app.util.step_callback import diffusion_step_callback
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig

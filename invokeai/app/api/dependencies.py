@@ -10,6 +10,7 @@ from invokeai.app.services.auth.token_service import set_jwt_secret
 from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
 from invokeai.app.services.board_images.board_images_default import BoardImagesService
 from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
 from invokeai.app.services.boards.boards_default import BoardService
 from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
 from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import ClientStatePersistenceSqlite
@@ -24,6 +25,7 @@ from invokeai.app.services.external_generation.providers import (
     SeedreamProvider,
 )
 from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
+from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
@@ -49,8 +51,6 @@ from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessi
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.app.services.style_preset_images.style_preset_images_disk import StylePresetImageFileStorageDisk
 from invokeai.app.services.style_preset_records.style_preset_records_sqlite import SqliteStylePresetRecordsStorage
-from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
-from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
 from invokeai.app.services.urls.urls_default import LocalUrlService
 from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.video_files.video_files_disk import DiskVideoFileStorage

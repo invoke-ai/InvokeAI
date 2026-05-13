@@ -28,9 +28,9 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import WanTransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.wan_denoise import (
+    WanDenoiseInvocation,
     _ExpertSwapper,
     _resolve_variant,
-    WanDenoiseInvocation,
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, WanVariantType

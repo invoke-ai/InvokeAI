@@ -105,7 +105,6 @@ from invokeai.backend.model_manager.configs.t2i_adapter import (
 )
 from invokeai.backend.model_manager.configs.t5_encoder import T5Encoder_BnBLLMint8_Config, T5Encoder_T5Encoder_Config
 from invokeai.backend.model_manager.configs.text_llm import TextLLM_Diffusers_Config
-from invokeai.backend.model_manager.configs.wan_t5_encoder import WanT5Encoder_WanT5Encoder_Config
 from invokeai.backend.model_manager.configs.textual_inversion import (
     TI_File_SD1_Config,
     TI_File_SD2_Config,
@@ -129,6 +128,7 @@ from invokeai.backend.model_manager.configs.vae import (
     VAE_Diffusers_SDXL_Config,
     VAE_Diffusers_Wan_Config,
 )
+from invokeai.backend.model_manager.configs.wan_t5_encoder import WanT5Encoder_WanT5Encoder_Config
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,

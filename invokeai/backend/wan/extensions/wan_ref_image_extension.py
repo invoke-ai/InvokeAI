@@ -14,10 +14,10 @@ with ``num_frames=1`` and ``expand_timesteps=False`` (the defaults for
 single-frame image generation).
 """
 
-from PIL import Image
 import torch
 import torchvision.transforms.functional as TF
 from diffusers.models.autoencoders import AutoencoderKLWan
+from PIL import Image
 
 # Wan 2.2 VAE temporal scale factor — single frame still consumes a 4-position
 # slice of the mask tensor, which is why the mask contributes 4 channels.

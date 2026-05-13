@@ -27,7 +27,6 @@ from invokeai.backend.patches.lora_conversions.wan_lora_constants import (
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
-
 # Kohya layer-name regex: lora_unet_blocks_<idx>_<rest>
 _KOHYA_KEY_REGEX = re.compile(r"lora_unet_blocks_(\d+)_(.*)")
 

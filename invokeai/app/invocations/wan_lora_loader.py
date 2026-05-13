@@ -12,7 +12,6 @@ from invokeai.app.invocations.model import LoRAField, ModelIdentifierField, WanT
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
-
 # Target option for routing a LoRA to one or both Wan A14B expert lists.
 #
 # - ``auto``: read the LoRA config's ``expert`` field (set by the probe / from

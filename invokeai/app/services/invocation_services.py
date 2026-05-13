@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.board_image_records.board_image_records_base import BoardImageRecordStorageBase
     from invokeai.app.services.board_images.board_images_base import BoardImagesServiceABC
     from invokeai.app.services.board_records.board_records_base import BoardRecordStorageBase
+    from invokeai.app.services.board_video_records.board_video_records_base import BoardVideoRecordStorageBase
     from invokeai.app.services.boards.boards_base import BoardServiceABC
     from invokeai.app.services.bulk_download.bulk_download_base import BulkDownloadBase
     from invokeai.app.services.client_state_persistence.client_state_persistence_base import ClientStatePersistenceABC
@@ -22,6 +23,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.download import DownloadQueueServiceBase
     from invokeai.app.services.events.events_base import EventServiceBase
     from invokeai.app.services.external_generation.external_generation_base import ExternalGenerationServiceBase
+    from invokeai.app.services.gallery.gallery_base import GalleryServiceABC
     from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
     from invokeai.app.services.image_records.image_records_base import ImageRecordStorageBase
     from invokeai.app.services.images.images_base import ImageServiceABC
@@ -36,8 +38,6 @@ if TYPE_CHECKING:
     from invokeai.app.services.names.names_base import NameServiceBase
     from invokeai.app.services.session_processor.session_processor_base import SessionProcessorBase
     from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
-    from invokeai.app.services.board_video_records.board_video_records_base import BoardVideoRecordStorageBase
-    from invokeai.app.services.gallery.gallery_base import GalleryServiceABC
     from invokeai.app.services.urls.urls_base import UrlServiceBase
     from invokeai.app.services.users.users_base import UserServiceBase
     from invokeai.app.services.video_files.video_files_base import VideoFileStorageBase
