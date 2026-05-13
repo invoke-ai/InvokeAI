@@ -84,9 +84,21 @@ class ImageMoveService:
         self._future_operation: ImageMoveBackgroundOperation | None = None
         self._last_background_error: str | None = None
         self._invoker = None
+        self._session_queue = None
 
     def start(self, invoker) -> None:
         self._invoker = invoker
+        self._session_queue = getattr(invoker.services, "session_queue", None)
+        result = self.startup_recovery()
+        if result.committed > 0 or result.errors > 0:
+            self._logger.info(
+                "Image move startup recovery completed: committed=%s, errors=%s",
+                result.committed,
+                result.errors,
+            )
+
+    def set_session_queue(self, session_queue) -> None:
+        self._session_queue = session_queue
 
     def stop(self, *args, **kwargs) -> None:
         with self._future_lock:
@@ -106,6 +118,9 @@ class ImageMoveService:
             self._refresh_finished_future_locked()
             return self._build_background_status_locked()
 
+    def get_active_job_id(self) -> int | None:
+        return self._get_active_job_id()
+
     def is_maintenance_active(self) -> bool:
         with self._future_lock:
             self._refresh_finished_future_locked()
@@ -114,14 +129,17 @@ class ImageMoveService:
         return operation_reserved or is_running or self._get_active_job_id() is not None
 
     def _assert_no_active_queue_work(self) -> None:
-        if self._invoker is None:
-            return
-        session_queue = getattr(self._invoker.services, "session_queue", None)
+        session_queue = self._session_queue
+        if session_queue is None and self._invoker is not None:
+            session_queue = getattr(self._invoker.services, "session_queue", None)
         if session_queue is None:
             return
         queue_status = session_queue.get_queue_status(DEFAULT_QUEUE_ID)
         if queue_status.pending > 0 or queue_status.in_progress > 0:
             raise ImageMoveQueueActive("Cannot start image move while queue work is active")
+
+    def assert_no_active_queue_work(self) -> None:
+        self._assert_no_active_queue_work()
 
     def _start_background_operation(
         self,

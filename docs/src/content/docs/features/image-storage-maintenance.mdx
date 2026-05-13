@@ -13,7 +13,13 @@ Image storage maintenance is available from the in-application Settings panel.
 
 Administrators can start image moves, force recovery, and inspect move job details. If multi-user mode is disabled, the single local user has the same access. Non-admin users in multi-user mode cannot run or inspect image move jobs.
 
-The same move implementation is also available through an external Python maintenance script for administrators who need to run startup recovery or start an image move outside the web UI.
+The same move implementation is also available through `scripts/image_storage_maintenance.py` for administrators who need to inspect status, run startup recovery, or start an image move outside the web UI:
+
+```bash
+python scripts/image_storage_maintenance.py status --root /path/to/invokeai
+python scripts/image_storage_maintenance.py recover --root /path/to/invokeai
+python scripts/image_storage_maintenance.py move --root /path/to/invokeai
+```
 
 ## Maintenance Mode
 

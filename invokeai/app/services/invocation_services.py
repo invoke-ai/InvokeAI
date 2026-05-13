@@ -101,6 +101,7 @@ class InvocationServices:
         self.external_generation = external_generation
         self.performance_statistics = performance_statistics
         self.session_queue = session_queue
+        self.image_moves = image_moves
         self.session_processor = session_processor
         self.invocation_cache = invocation_cache
         self.names = names
@@ -113,4 +114,3 @@ class InvocationServices:
         self.workflow_thumbnails = workflow_thumbnails
         self.client_state_persistence = client_state_persistence
         self.users = users
-        self.image_moves = image_moves

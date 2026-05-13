@@ -192,6 +192,33 @@ def test_background_recovery_can_start_when_journal_job_is_active(tmp_path: Path
     assert service.get_job(job_id).state == "committed"
 
 
+def test_start_runs_recovery_before_normal_operation(tmp_path: Path) -> None:
+    service, records = _service(tmp_path, strategy="date")
+    image_name = "image-startup-recovery.png"
+    _save_image(service, records, image_name, "", "2024-03-05 05:06:07.000", "purple")
+    job_id = service.create_move_job(service.plan_batch(last_image_name="", limit=100))
+    service.perform_filesystem_moves(job_id)
+
+    service.start(MagicMock())
+
+    assert records.get(image_name).image_subfolder == "2024/03/05"
+    assert service.get_job(job_id).state == "committed"
+    assert service.is_maintenance_active() is False
+
+
+def test_start_leaves_maintenance_active_when_recovery_remains_incomplete(tmp_path: Path) -> None:
+    service, records = _service(tmp_path, strategy="date")
+    image_name = "image-startup-recovery-retry.png"
+    _save_image(service, records, image_name, "", "2024-03-05 05:06:07.000", "purple")
+    service.create_move_job(service.plan_batch(last_image_name="", limit=100))
+
+    with patch.object(service, "complete_partial_filesystem_moves", side_effect=OSError("temporary failure")):
+        service.start(MagicMock())
+
+    assert records.get(image_name).image_subfolder == ""
+    assert service.is_maintenance_active() is True
+
+
 @pytest.mark.parametrize(("pending", "in_progress"), [(1, 0), (0, 1)])
 def test_background_move_rejects_active_queue_work(tmp_path: Path, pending: int, in_progress: int) -> None:
     service, _records = _service(tmp_path, strategy="date")
@@ -267,14 +294,20 @@ def test_maintenance_is_active_while_background_job_or_uncommitted_journal_exist
 
 def test_background_worker_error_is_exposed_in_status(tmp_path: Path) -> None:
     service, _records = _service(tmp_path, strategy="date")
+    started_worker = threading.Event()
+    release_worker = threading.Event()
 
     def raise_error() -> None:
+        started_worker.set()
+        release_worker.wait(timeout=5)
         raise RuntimeError("background failed")
 
     status = service._start_background_operation("move_all", raise_error)
+    assert started_worker.wait(timeout=5) is True
     assert status.is_running is True
 
     assert service._future is not None
+    release_worker.set()
     service._future.result(timeout=5)
 
     status = service.get_background_status()
