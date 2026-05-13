@@ -110,3 +110,52 @@ class TestEncodeReferenceImageToCondition:
             image=img, vae=vae, width=64, height=64, device=torch.device("cpu"), dtype=torch.bfloat16
         )
         assert cond.dtype == torch.bfloat16
+
+
+class TestEncodeReferenceImageToTI2VCondition:
+    """TI2V-5B's condition tensor is a single 48-channel latent frame (no mask
+    channels) at the Wan2.2-VAE's 16x spatial scale. The denoise loop blends
+    this with the noise via a first_frame_mask at each step.
+    """
+
+    def test_shape_at_64x64(self):
+        from invokeai.backend.wan.extensions.wan_ref_image_extension import (
+            encode_reference_image_to_ti2v_condition,
+        )
+
+        img = Image.new("RGB", (64, 64))
+        vae = _make_fake_vae(z_dim=48, spatial_scale=16, temporal_scale=4)
+        cond = encode_reference_image_to_ti2v_condition(
+            image=img, vae=vae, width=64, height=64, device=torch.device("cpu"), dtype=torch.float32
+        )
+        # [1, 48, 1, 4, 4] — single latent frame at H/16, W/16.
+        assert cond.shape == (1, 48, 1, 4, 4)
+
+    def test_shape_at_832x480(self):
+        # Common Wan video resolution: latent 30x52 single frame.
+        from invokeai.backend.wan.extensions.wan_ref_image_extension import (
+            encode_reference_image_to_ti2v_condition,
+        )
+
+        img = Image.new("RGB", (832, 480))
+        vae = _make_fake_vae(z_dim=48, spatial_scale=16, temporal_scale=4)
+        cond = encode_reference_image_to_ti2v_condition(
+            image=img, vae=vae, width=832, height=480, device=torch.device("cpu"), dtype=torch.float32
+        )
+        assert cond.shape == (1, 48, 1, 30, 52)
+
+    def test_no_mask_channels(self):
+        # Distinguishing feature vs A14B: no leading 4-ch mask. All 48 channels
+        # are latent content. With latents_mean=0 and latents_std=1, encoded zeros
+        # stay zero (the function returns latents straight through).
+        from invokeai.backend.wan.extensions.wan_ref_image_extension import (
+            encode_reference_image_to_ti2v_condition,
+        )
+
+        img = Image.new("RGB", (64, 64))
+        vae = _make_fake_vae(z_dim=48, spatial_scale=16, temporal_scale=4)
+        cond = encode_reference_image_to_ti2v_condition(
+            image=img, vae=vae, width=64, height=64, device=torch.device("cpu"), dtype=torch.float32
+        )
+        # Fake VAE.encode returns zero latents; normalized zeros stay zero.
+        assert torch.equal(cond, torch.zeros_like(cond))

@@ -25,6 +25,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.wan.extensions.wan_ref_image_extension import (
     encode_reference_image_to_condition,
+    encode_reference_image_to_ti2v_condition,
     encode_reference_image_to_video_condition,
 )
 
@@ -100,7 +101,33 @@ class WanRefImageEncoderInvocation(BaseInvocation):
             # free VRAM but fail a single large contiguous request). Mirrors the
             # pattern used in wan_latents_to_image.py / wan_latents_to_video.py.
             TorchDevice.empty_cache()
-            if self.num_frames <= 1:
+            # Pick the encoder path by VAE z_dim: 48 means the Wan 2.2-VAE (TI2V-5B),
+            # which uses a single-frame 48-channel condition that the denoise loop
+            # blends with the noisy latents at every step (expand_timesteps path).
+            # 16 means the standard Wan VAE (A14B), which uses the 20-channel
+            # mask + latent condition concatenated to noise along the channel dim.
+            is_ti2v_5b = getattr(vae.config, "z_dim", 16) == 48
+            if is_ti2v_5b:
+                # TI2V-5B I2V needs latent H/W to be even for the transformer
+                # patch_size=(1,2,2), so pixel dims must be multiples of 32
+                # (16x VAE * 2 transformer patch). A14B's 8x VAE only needed
+                # multiples of 16.
+                if self.width % 32 != 0 or self.height % 32 != 0:
+                    raise ValueError(
+                        f"TI2V-5B I2V requires width and height to be multiples of 32 "
+                        f"(got {self.width}x{self.height}). The Wan 2.2-VAE uses 16x "
+                        f"spatial compression and the transformer adds a 2x patch on "
+                        f"top, so pixel dims must divide by 32 for the patchify step."
+                    )
+                condition = encode_reference_image_to_ti2v_condition(
+                    image=pil_image,
+                    vae=vae,
+                    width=self.width,
+                    height=self.height,
+                    device=device,
+                    dtype=target_dtype,
+                )
+            elif self.num_frames <= 1:
                 condition = encode_reference_image_to_condition(
                     image=pil_image,
                     vae=vae,

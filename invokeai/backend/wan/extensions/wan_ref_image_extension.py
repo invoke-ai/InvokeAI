@@ -38,6 +38,43 @@ def preprocess_reference_image(image: Image.Image, width: int, height: int) -> t
     return pixel.unsqueeze(0).unsqueeze(2)
 
 
+def encode_reference_image_to_ti2v_condition(
+    image: Image.Image,
+    vae: AutoencoderKLWan,
+    width: int,
+    height: int,
+    device: torch.device,
+    dtype: torch.dtype,
+) -> torch.Tensor:
+    """Build the TI2V-5B-style reference condition tensor.
+
+    Returns shape ``[1, 48, 1, height // 16, width // 16]`` — single VAE-encoded
+    latent frame of the reference image, normalised against the VAE's
+    per-channel mean/std. TI2V-5B does **not** use the A14B 4-channel mask;
+    the mask is built inline in the denoise loop (``expand_timesteps`` path)
+    and used to blend this condition with the noisy latents at each step:
+    ``(1 - mask) * condition + mask * latents``.
+
+    Mirrors :class:`diffusers.WanImageToVideoPipeline.prepare_latents` lines
+    423-466 with ``expand_timesteps=True``.
+
+    Wan 2.2-VAE has 16x spatial compression (vs A14B's 8x), so the latent
+    dims are ``height // 16`` and ``width // 16``.
+    """
+    vae_dtype = next(iter(vae.parameters())).dtype
+    pixel = preprocess_reference_image(image, width=width, height=height).to(device=device, dtype=vae_dtype)
+
+    with torch.inference_mode():
+        encoded = vae.encode(pixel, return_dict=False)[0]
+        latents = encoded.sample()  # [1, 48, 1, H_lat, W_lat]
+
+        latents_mean = torch.tensor(vae.config.latents_mean).view(1, -1, 1, 1, 1).to(latents.device, latents.dtype)
+        latents_std = torch.tensor(vae.config.latents_std).view(1, -1, 1, 1, 1).to(latents.device, latents.dtype)
+        latent_condition = (latents - latents_mean) / latents_std
+
+    return latent_condition.to(dtype=dtype)
+
+
 def encode_reference_image_to_condition(
     image: Image.Image,
     vae: AutoencoderKLWan,
