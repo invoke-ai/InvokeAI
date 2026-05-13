@@ -8,6 +8,7 @@ import { CanvasObjectEraserLine } from 'features/controlLayers/konva/CanvasObjec
 import { CanvasObjectEraserLineWithPressure } from 'features/controlLayers/konva/CanvasObject/CanvasObjectEraserLineWithPressure';
 import { CanvasObjectGradient } from 'features/controlLayers/konva/CanvasObject/CanvasObjectGradient';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
+import { CanvasObjectLasso } from 'features/controlLayers/konva/CanvasObject/CanvasObjectLasso';
 import { CanvasObjectRect } from 'features/controlLayers/konva/CanvasObject/CanvasObjectRect';
 import type { AnyObjectRenderer, AnyObjectState } from 'features/controlLayers/konva/CanvasObject/types';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
@@ -153,6 +154,15 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
       }
 
       didRender = this.renderer.update(this.state, true);
+    } else if (this.state.type === 'lasso') {
+      assert(this.renderer instanceof CanvasObjectLasso || !this.renderer);
+
+      if (!this.renderer) {
+        this.renderer = new CanvasObjectLasso(this.state, this);
+        this.konva.group.add(this.renderer.konva.group);
+      }
+
+      didRender = this.renderer.update(this.state, true);
     } else if (this.state.type === 'gradient') {
       assert(this.renderer instanceof CanvasObjectGradient || !this.renderer);
 
@@ -246,6 +256,9 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
           break;
         case 'rect':
           this.manager.stateApi.addRect({ entityIdentifier, rect: this.state });
+          break;
+        case 'lasso':
+          this.manager.stateApi.addLasso({ entityIdentifier, lasso: this.state });
           break;
         case 'gradient':
           this.manager.stateApi.addGradient({ entityIdentifier, gradient: this.state });

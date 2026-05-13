@@ -5,6 +5,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { nodeIsOpenChanged } from 'features/nodes/store/nodesSlice';
 import { NO_DRAG_CLASS, NO_FIT_ON_DOUBLE_CLICK_CLASS } from 'features/nodes/types/constants';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiCaretUpBold } from 'react-icons/pi';
 
 interface Props {
@@ -22,6 +23,7 @@ const iconSx: SystemStyleObject = {
 };
 
 const NodeCollapseButton = ({ nodeId, isOpen }: Props) => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const updateNodeInternals = useUpdateNodeInternals();
 
@@ -34,7 +36,7 @@ const NodeCollapseButton = ({ nodeId, isOpen }: Props) => {
     <IconButton
       className={`${NO_DRAG_CLASS} ${NO_FIT_ON_DOUBLE_CLICK_CLASS}`}
       onClick={handleClick}
-      aria-label="Minimize"
+      aria-label={t('common.minimize')}
       minW={8}
       w={8}
       h={8}

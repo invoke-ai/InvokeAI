@@ -24,6 +24,7 @@ import type {
   CanvasEntityIdentifier,
   CanvasEntityState,
   CanvasEntityType,
+  CompositeOperation,
   GenerationMode,
   Rect,
 } from 'features/controlLayers/store/types';
@@ -45,8 +46,9 @@ type CompositingOptions = {
   /**
    * The global composite operation to use when compositing each entity.
    * See: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/globalCompositeOperation
+   * Invoke supports a subset of these modes for raster and control layer combinations.
    */
-  globalCompositeOperation?: GlobalCompositeOperation;
+  globalCompositeOperation?: CompositeOperation;
 };
 
 /**
@@ -226,12 +228,16 @@ export class CanvasCompositorModule extends CanvasModuleBase {
 
     ctx.imageSmoothingEnabled = false;
 
-    if (compositingOptions?.globalCompositeOperation) {
-      ctx.globalCompositeOperation = compositingOptions.globalCompositeOperation;
-    }
-
     for (const adapter of adapters) {
       this.log.debug({ entityIdentifier: adapter.entityIdentifier }, 'Drawing entity to composite canvas');
+      // Set composite operation for this specific layer
+      // Priority: 1) Per-layer setting, 2) Global compositing option, 3) Default 'source-over'
+      const layerCompositeOp =
+        adapter.state.type === 'raster_layer' || adapter.state.type === 'control_layer'
+          ? adapter.state.globalCompositeOperation
+          : undefined;
+      ctx.globalCompositeOperation = layerCompositeOp || compositingOptions?.globalCompositeOperation || 'source-over';
+
       const adapterCanvas = adapter.getCanvas(rect);
       ctx.drawImage(adapterCanvas, 0, 0);
     }
@@ -391,6 +397,59 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       default:
         assert<Equals<typeof type, never>>(false, 'Unsupported type for merge');
     }
+
+    toast({ id: 'MERGE_LAYERS_TOAST', title: t('controlLayers.mergeVisibleOk'), status: 'success', withCount: false });
+
+    return result.value;
+  };
+
+  /**
+   * Performs a boolean merge specifically for raster layers.
+   * Creates a new raster layer with the composite result and disables the source layers instead of deleting them.
+   */
+  mergeBooleanRasterLayers = async (
+    below: CanvasEntityIdentifier<'raster_layer'>,
+    top: CanvasEntityIdentifier<'raster_layer'>,
+    disableSources = true
+  ): Promise<ImageDTO | null> => {
+    toast({ id: 'MERGE_LAYERS_TOAST', title: t('controlLayers.mergingLayers'), withCount: false });
+
+    const adapters = this.manager.getAdapters([below, top]);
+    assert(adapters.length === 2, 'Failed to get adapters for boolean merge');
+
+    const rect = this.getRectOfAdapters(adapters);
+
+    const compositingOptions: CompositingOptions = {
+      globalCompositeOperation: 'source-over',
+    };
+
+    const result = await withResultAsync(() =>
+      this.getCompositeImageDTO(adapters, rect, { is_intermediate: true }, compositingOptions)
+    );
+
+    if (result.isErr()) {
+      this.log.error({ error: serializeError(result.error) }, 'Failed to boolean merge raster layers');
+      toast({
+        id: 'MERGE_LAYERS_TOAST',
+        title: t('controlLayers.mergeVisibleError'),
+        status: 'error',
+        withCount: false,
+      });
+      return null;
+    }
+
+    // Add new raster layer while disabling the merged sources
+    const addEntityArg = {
+      isSelected: true,
+      overrides: {
+        objects: [imageDTOToImageObject(result.value)],
+        position: { x: Math.floor(rect.x), y: Math.floor(rect.y) },
+      },
+      mergedEntitiesToDisable: disableSources ? [below.id, top.id] : [],
+      addAfter: top.id,
+    };
+
+    this.manager.stateApi.addRasterLayer(addEntityArg);
 
     toast({ id: 'MERGE_LAYERS_TOAST', title: t('controlLayers.mergeVisibleOk'), status: 'success', withCount: false });
 

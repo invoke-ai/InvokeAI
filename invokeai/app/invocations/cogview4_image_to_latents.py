@@ -27,7 +27,7 @@ from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory
     "cogview4_i2l",
     title="Image to Latents - CogView4",
     tags=["image", "latents", "vae", "i2l", "cogview4"],
-    category="image",
+    category="latents",
     version="1.0.0",
     classification=Classification.Prototype,
 )

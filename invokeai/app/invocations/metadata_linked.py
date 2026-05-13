@@ -621,7 +621,7 @@ class LatentsMetaOutput(LatentsOutput, MetadataOutput):
     "denoise_latents_meta",
     title=f"{DenoiseLatentsInvocation.UIConfig.title} + Metadata",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
-    category="latents",
+    category="metadata",
     version="1.1.1",
 )
 class DenoiseLatentsMetaInvocation(DenoiseLatentsInvocation, WithMetadata):
@@ -686,7 +686,7 @@ class DenoiseLatentsMetaInvocation(DenoiseLatentsInvocation, WithMetadata):
     "flux_denoise_meta",
     title=f"{FluxDenoiseInvocation.UIConfig.title} + Metadata",
     tags=["flux", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
-    category="latents",
+    category="metadata",
     version="1.0.1",
 )
 class FluxDenoiseLatentsMetaInvocation(FluxDenoiseInvocation, WithMetadata):
@@ -734,7 +734,7 @@ class FluxDenoiseLatentsMetaInvocation(FluxDenoiseInvocation, WithMetadata):
     "z_image_denoise_meta",
     title=f"{ZImageDenoiseInvocation.UIConfig.title} + Metadata",
     tags=["z-image", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
-    category="latents",
+    category="metadata",
     version="1.0.0",
 )
 class ZImageDenoiseMetaInvocation(ZImageDenoiseInvocation, WithMetadata):

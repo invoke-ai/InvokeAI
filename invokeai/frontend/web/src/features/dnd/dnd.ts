@@ -97,6 +97,16 @@ export const multipleImageDndSource: DndSource<MultipleImageDndSourceData> = {
 };
 //#endregion
 
+//#region Single Reference Image (reorder)
+const _singleRefImage = buildTypeAndKey('single-ref-image');
+type SingleRefImageDndSourceData = DndData<typeof _singleRefImage.type, typeof _singleRefImage.key, { id: string }>;
+export const singleRefImageDndSource: DndSource<SingleRefImageDndSourceData> = {
+  ..._singleRefImage,
+  typeGuard: buildTypeGuard(_singleRefImage.key),
+  getData: buildGetData(_singleRefImage.key, _singleRefImage.type),
+};
+//#endregion
+
 const _singleCanvasEntity = buildTypeAndKey('single-canvas-entity');
 type SingleCanvasEntityDndSourceData = DndData<
   typeof _singleCanvasEntity.type,
@@ -434,6 +444,49 @@ export const replaceCanvasEntityObjectsWithImageDndTarget: DndTarget<
 //#endregion
 
 //#region Add To Board
+/**
+ * Check whether the current user can move images out of their source board.
+ * Returns false if the source board is a shared board not owned by the current user
+ * (and the user is not an admin). In that case, images can be viewed/used but not moved.
+ */
+const canMoveFromSourceBoard = (sourceBoardId: BoardId, getState: AppGetState): boolean => {
+  const state = getState();
+  // In single-user mode (no auth), always allow
+  const currentUser = state.auth?.user;
+  if (!currentUser) {
+    return true;
+  }
+  // Admins can always move
+  if (currentUser.is_admin) {
+    return true;
+  }
+  // "Uncategorized" (none) — user's own uncategorized images, allow
+  if (sourceBoardId === 'none') {
+    return true;
+  }
+  // Look up the board from the RTK Query cache
+  const boardsQueryState = state.api?.queries;
+  if (boardsQueryState) {
+    for (const query of Object.values(boardsQueryState)) {
+      if (query?.data && Array.isArray(query.data)) {
+        const board = (query.data as Array<{ board_id: string; user_id?: string; board_visibility?: string }>).find(
+          (b) => b.board_id === sourceBoardId
+        );
+        if (board) {
+          // Owner can always move
+          if (board.user_id === currentUser.user_id) {
+            return true;
+          }
+          // Non-owner can only move from public boards
+          return board.board_visibility === 'public';
+        }
+      }
+    }
+  }
+  // Board not found in cache — allow by default to avoid blocking legitimate operations
+  return true;
+};
+
 const _addToBoard = buildTypeAndKey('add-to-board');
 export type AddImageToBoardDndTargetData = DndData<
   typeof _addToBoard.type,
@@ -447,16 +500,23 @@ export const addImageToBoardDndTarget: DndTarget<
   ..._addToBoard,
   typeGuard: buildTypeGuard(_addToBoard.key),
   getData: buildGetData(_addToBoard.key, _addToBoard.type),
-  isValid: ({ sourceData, targetData }) => {
+  isValid: ({ sourceData, targetData, getState }) => {
     if (singleImageDndSource.typeGuard(sourceData)) {
       const currentBoard = sourceData.payload.imageDTO.board_id ?? 'none';
       const destinationBoard = targetData.payload.boardId;
-      return currentBoard !== destinationBoard;
+      if (currentBoard === destinationBoard) {
+        return false;
+      }
+      // Don't allow moving images from shared boards the user doesn't own
+      return canMoveFromSourceBoard(currentBoard, getState);
     }
     if (multipleImageDndSource.typeGuard(sourceData)) {
       const currentBoard = sourceData.payload.board_id;
       const destinationBoard = targetData.payload.boardId;
-      return currentBoard !== destinationBoard;
+      if (currentBoard === destinationBoard) {
+        return false;
+      }
+      return canMoveFromSourceBoard(currentBoard, getState);
     }
     return false;
   },
@@ -491,15 +551,22 @@ export const removeImageFromBoardDndTarget: DndTarget<
   ..._removeFromBoard,
   typeGuard: buildTypeGuard(_removeFromBoard.key),
   getData: buildGetData(_removeFromBoard.key, _removeFromBoard.type),
-  isValid: ({ sourceData }) => {
+  isValid: ({ sourceData, getState }) => {
     if (singleImageDndSource.typeGuard(sourceData)) {
       const currentBoard = sourceData.payload.imageDTO.board_id ?? 'none';
-      return currentBoard !== 'none';
+      if (currentBoard === 'none') {
+        return false;
+      }
+      // Don't allow removing images from shared boards the user doesn't own
+      return canMoveFromSourceBoard(currentBoard, getState);
     }
 
     if (multipleImageDndSource.typeGuard(sourceData)) {
       const currentBoard = sourceData.payload.board_id;
-      return currentBoard !== 'none';
+      if (currentBoard === 'none') {
+        return false;
+      }
+      return canMoveFromSourceBoard(currentBoard, getState);
     }
 
     return false;

@@ -133,9 +133,6 @@ class DefaultSessionRunner(SessionRunnerBase):
 
                 self._on_after_run_node(invocation, queue_item, output)
 
-        except KeyboardInterrupt:
-            # TODO(psyche): This is expected to be caught in the main thread. Do we need to catch this here?
-            pass
         except CanceledException:
             # A CanceledException is raised during the denoising step callback if the cancel event is set. We don't need
             # to do any handling here, and no error should be set - just pass and the cancellation will be handled
@@ -355,6 +352,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self._thread = Thread(
             name="session_processor",
             target=self._process,
+            daemon=True,
             kwargs={
                 "stop_event": self._stop_event,
                 "poll_now_event": self._poll_now_event,
@@ -366,6 +364,14 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
     def stop(self, *args, **kwargs) -> None:
         self._stop_event.set()
+        # Cancel any in-progress generation so that long-running nodes (e.g. denoising) stop at
+        # the next step boundary instead of running to completion. Without this, the generation
+        # thread may still be executing CUDA operations when Python teardown begins, which can
+        # cause a C++ std::terminate() crash ("terminate called without an active exception").
+        self._cancel_event.set()
+        # Wake the thread if it is sleeping in poll_now_event.wait() or blocked in resume_event.wait() (paused).
+        self._poll_now_event.set()
+        self._resume_event.set()
 
     def _poll_now(self) -> None:
         self._poll_now_event.set()

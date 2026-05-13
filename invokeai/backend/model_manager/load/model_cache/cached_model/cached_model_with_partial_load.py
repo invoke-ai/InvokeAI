@@ -149,6 +149,27 @@ class CachedModelWithPartialLoad:
         """Unload all weights from VRAM."""
         return self.partial_unload_from_vram(self.total_bytes())
 
+    @torch.no_grad()
+    def repair_required_tensors_on_compute_device(self) -> int:
+        """Repair required non-autocast tensors that were left off the compute device.
+
+        This can happen if an interrupted run leaves the model in a partially inconsistent state. Any repaired device
+        movement invalidates the cached VRAM accounting.
+        """
+        cur_state_dict = self._model.state_dict()
+        keys_to_repair = {
+            key
+            for key in self._keys_in_modules_that_do_not_support_autocast
+            if cur_state_dict[key].device.type != self._compute_device.type
+        }
+        if len(keys_to_repair) == 0:
+            return 0
+
+        self._load_state_dict_with_device_conversion(cur_state_dict, keys_to_repair, self._compute_device)
+        self._move_non_persistent_buffers_to_device(self._compute_device)
+        self._cur_vram_bytes = None
+        return len(keys_to_repair)
+
     def _load_state_dict_with_device_conversion(
         self, state_dict: dict[str, torch.Tensor], keys_to_convert: set[str], target_device: torch.device
     ):

@@ -9,12 +9,18 @@ import { StagingAreaToolbarNextButton } from 'features/controlLayers/components/
 import { StagingAreaToolbarPrevButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarPrevButton';
 import { StagingAreaToolbarSaveSelectedToGalleryButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarSaveSelectedToGalleryButton';
 import { StagingAreaToolbarToggleShowResultsButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarToggleShowResultsButton';
+import { StagingAreaToolbarToggleThumbnailsButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarToggleThumbnailsButton';
 import { memo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 import { StagingAreaAutoSwitchButtons } from './StagingAreaAutoSwitchButtons';
 
-export const StagingAreaToolbar = memo(() => {
+type Props = {
+  areThumbnailsVisible: boolean;
+  onToggleThumbnails: () => void;
+};
+
+export const StagingAreaToolbar = memo(({ areThumbnailsVisible, onToggleThumbnails }: Props) => {
   const ctx = useStagingAreaContext();
 
   useHotkeys('meta+left', ctx.selectFirst, { preventDefault: true });
@@ -22,6 +28,12 @@ export const StagingAreaToolbar = memo(() => {
 
   return (
     <Flex gap={2}>
+      <ButtonGroup borderRadius="base" shadow="dark-lg">
+        <StagingAreaToolbarToggleThumbnailsButton
+          areThumbnailsVisible={areThumbnailsVisible}
+          onToggle={onToggleThumbnails}
+        />
+      </ButtonGroup>
       <ButtonGroup borderRadius="base" shadow="dark-lg">
         <StagingAreaToolbarPrevButton />
         <StagingAreaToolbarImageCountButton />

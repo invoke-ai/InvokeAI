@@ -10,7 +10,7 @@ import {
   getPrefixedId,
 } from 'features/controlLayers/konva/util';
 import { selectBboxOverlay } from 'features/controlLayers/store/canvasSettingsSlice';
-import { selectModel } from 'features/controlLayers/store/paramsSlice';
+import { selectHasFixedDimensionSizes, selectModel } from 'features/controlLayers/store/paramsSlice';
 import { selectBbox } from 'features/controlLayers/store/selectors';
 import type { Coordinate, Rect, Tool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
@@ -191,6 +191,9 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
     // Listen for the model changing - some model types constraint the bbox to a certain size or aspect ratio.
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectModel, this.render));
 
+    // Listen for fixed dimension sizes changes - external models may lock bbox resizing
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectHasFixedDimensionSizes, this.render));
+
     // Update on busy state changes
     this.subscriptions.add(this.manager.$isBusy.listen(this.render));
 
@@ -244,6 +247,10 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
 
   getEnabledAnchors = (tool: Tool): string[] => {
     if (tool !== 'bbox') {
+      return NO_ANCHORS;
+    }
+    // External models with fixed dimension presets don't allow free bbox resizing
+    if (this.manager.stateApi.runSelector(selectHasFixedDimensionSizes)) {
       return NO_ANCHORS;
     }
     return ALL_ANCHORS;

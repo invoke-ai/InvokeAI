@@ -4,6 +4,7 @@ from typing import Literal, Optional
 
 import cv2
 import numpy
+import torch
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
 from invokeai.app.invocations.baseinvocation import (
@@ -21,12 +22,43 @@ from invokeai.app.invocations.fields import (
     WithBoard,
     WithMetadata,
 )
-from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.invocations.primitives import ImageOutput, StringOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import SEED_MAX
+from invokeai.backend.image_util.color_conversion import (
+    linear_srgb_from_oklab,
+    linear_srgb_from_oklch,
+    linear_srgb_from_srgb,
+    oklab_from_linear_srgb,
+    oklch_from_oklab,
+    srgb_from_linear_srgb,
+)
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.safety_checker import SafetyChecker
+
+
+def _extract_alpha_channel(image: Image.Image) -> Image.Image | None:
+    if image.mode in ("RGBA", "LA", "PA"):
+        return image.getchannel("A")
+    return None
+
+
+def _restore_original_mode(image: Image.Image, mode: str, alpha_channel: Image.Image | None) -> Image.Image:
+    if alpha_channel is None:
+        return image.convert(mode)
+
+    if mode == "RGBA":
+        image = image.convert("RGB")
+    elif mode == "LA":
+        image = image.convert("L")
+    elif mode == "PA":
+        image = image.convert("P")
+    else:
+        return image.convert(mode)
+
+    image.putalpha(alpha_channel)
+    return image
 
 
 @invocation("show_image", title="Show Image", tags=["image"], category="image", version="1.0.1")
@@ -197,7 +229,7 @@ class ImagePasteInvocation(BaseInvocation, WithMetadata, WithBoard):
     "tomask",
     title="Mask from Alpha",
     tags=["image", "mask"],
-    category="image",
+    category="mask",
     version="1.2.2",
 )
 class MaskFromAlphaInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -373,7 +405,7 @@ class UnsharpMaskInvocation(BaseInvocation, WithMetadata, WithBoard):
         image = context.images.get_pil(self.image.image_name)
         mode = image.mode
 
-        alpha_channel = image.getchannel("A") if mode == "RGBA" else None
+        alpha_channel = _extract_alpha_channel(image)
         image = image.convert("RGB")
         image_blurred = self.array_from_pil(image.filter(ImageFilter.GaussianBlur(radius=self.radius)))
 
@@ -395,6 +427,53 @@ class UnsharpMaskInvocation(BaseInvocation, WithMetadata, WithBoard):
             width=image.width,
             height=image.height,
         )
+
+
+@invocation(
+    "unsharp_mask_oklab",
+    title="Unsharp Mask (Oklab)",
+    tags=["image", "unsharp_mask", "oklab"],
+    category="image",
+    version="1.0.0",
+)
+class OklabUnsharpMaskInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Applies an unsharp mask filter to an image in the Oklab color space"""
+
+    image: ImageField = InputField(description="The image to use")
+    radius: float = InputField(gt=0, description="Unsharp mask radius", default=2)
+    strength: float = InputField(ge=0, description="Unsharp mask strength", default=50)
+
+    def pil_from_tensor(self, tensor: torch.Tensor) -> Image.Image:
+        array = torch.clamp(tensor, 0.0, 1.0).permute(1, 2, 0).cpu().numpy()
+        return Image.fromarray((array * 255).astype("uint8"))
+
+    def tensor_from_pil(self, img: Image.Image) -> torch.Tensor:
+        return torch.from_numpy(numpy.array(img, dtype=numpy.float32) / 255.0).permute(2, 0, 1)
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name)
+        mode = image.mode
+
+        alpha_channel = _extract_alpha_channel(image)
+        image = image.convert("RGB")
+
+        image_blurred = self.tensor_from_pil(image.filter(ImageFilter.GaussianBlur(radius=self.radius)))
+        image_tensor = self.tensor_from_pil(image)
+
+        image_oklab = oklab_from_linear_srgb(linear_srgb_from_srgb(image_tensor))
+        image_blurred_oklab = oklab_from_linear_srgb(linear_srgb_from_srgb(image_blurred))
+
+        image_oklab[0, ...] += (image_oklab[0, ...] - image_blurred_oklab[0, ...]) * (self.strength / 100.0)
+        image_oklab = torch.clamp(image_oklab, -1.0, 1.0)
+
+        image = _restore_original_mode(
+            self.pil_from_tensor(srgb_from_linear_srgb(linear_srgb_from_oklab(image_oklab))),
+            mode,
+            alpha_channel,
+        )
+
+        image_dto = context.images.save(image=image)
+        return ImageOutput.build(image_dto)
 
 
 PIL_RESAMPLING_MODES = Literal[
@@ -582,10 +661,29 @@ class ImageWatermarkInvocation(BaseInvocation, WithMetadata, WithBoard):
 
 
 @invocation(
+    "decode_watermark",
+    title="Decode Invisible Watermark",
+    tags=["image", "watermark"],
+    category="image",
+    version="1.0.0",
+)
+class DecodeInvisibleWatermarkInvocation(BaseInvocation):
+    """Decode an invisible watermark from an image."""
+
+    image: ImageField = InputField(description="The image to decode the watermark from")
+    length: int = InputField(default=8, description="The expected watermark length in bytes")
+
+    def invoke(self, context: InvocationContext) -> StringOutput:
+        image = context.images.get_pil(self.image.image_name)
+        watermark = InvisibleWatermark.decode_watermark(image, self.length)
+        return StringOutput(value=watermark)
+
+
+@invocation(
     "mask_edge",
     title="Mask Edge",
     tags=["image", "mask", "inpaint"],
-    category="image",
+    category="mask",
     version="1.2.2",
 )
 class MaskEdgeInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -624,7 +722,7 @@ class MaskEdgeInvocation(BaseInvocation, WithMetadata, WithBoard):
     "mask_combine",
     title="Combine Masks",
     tags=["image", "mask", "multiply"],
-    category="image",
+    category="mask",
     version="1.2.2",
 )
 class MaskCombineInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -780,6 +878,47 @@ class ImageHueAdjustmentInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         image_dto = context.images.save(image=pil_image)
 
+        return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "img_hue_adjust_oklch",
+    title="Adjust Image Hue (Oklch)",
+    tags=["image", "hue", "oklch"],
+    category="image",
+    version="1.0.0",
+)
+class OklchImageHueAdjustmentInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Adjusts the hue of an image in Oklch space."""
+
+    image: ImageField = InputField(description="The image to adjust")
+    hue: int = InputField(default=0, description="The degrees by which to rotate the hue, 0-360")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name)
+        mode = image.mode
+        alpha_channel = _extract_alpha_channel(image)
+
+        rgb = torch.from_numpy(numpy.asarray(image.convert("RGB"), dtype=numpy.float32) / 255.0).permute(2, 0, 1)
+        oklch = oklch_from_oklab(oklab_from_linear_srgb(linear_srgb_from_srgb(rgb)))
+        oklch[2, ...] = (oklch[2, ...] + self.hue) % 360.0
+
+        image = _restore_original_mode(
+            Image.fromarray(
+                (
+                    torch.clamp(srgb_from_linear_srgb(linear_srgb_from_oklch(oklch)), 0.0, 1.0)
+                    .permute(1, 2, 0)
+                    .cpu()
+                    .numpy()
+                    * 255.0
+                ).astype(numpy.uint8),
+                mode="RGB",
+            ),
+            mode,
+            alpha_channel,
+        )
+
+        image_dto = context.images.save(image=image)
         return ImageOutput.build(image_dto)
 
 
@@ -955,7 +1094,7 @@ class ImageChannelMultiplyInvocation(BaseInvocation, WithMetadata, WithBoard):
     "save_image",
     title="Save Image",
     tags=["primitives", "image"],
-    category="primitives",
+    category="image",
     version="1.2.2",
     use_cache=False,
 )
@@ -976,7 +1115,7 @@ class SaveImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     "canvas_paste_back",
     title="Canvas Paste Back",
     tags=["image", "combine"],
-    category="image",
+    category="canvas",
     version="1.0.1",
 )
 class CanvasPasteBackInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -1013,7 +1152,7 @@ class CanvasPasteBackInvocation(BaseInvocation, WithMetadata, WithBoard):
     "mask_from_id",
     title="Mask from Segmented Image",
     tags=["image", "mask", "id"],
-    category="image",
+    category="mask",
     version="1.0.1",
 )
 class MaskFromIDInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -1050,7 +1189,7 @@ class MaskFromIDInvocation(BaseInvocation, WithMetadata, WithBoard):
     "canvas_v2_mask_and_crop",
     title="Canvas V2 Mask and Crop",
     tags=["image", "mask", "id"],
-    category="image",
+    category="canvas",
     version="1.0.0",
     classification=Classification.Deprecated,
 )
@@ -1091,7 +1230,7 @@ class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
 
 
 @invocation(
-    "expand_mask_with_fade", title="Expand Mask with Fade", tags=["image", "mask"], category="image", version="1.0.1"
+    "expand_mask_with_fade", title="Expand Mask with Fade", tags=["image", "mask"], category="mask", version="1.0.1"
 )
 class ExpandMaskWithFadeInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Expands a mask with a fade effect. The mask uses black to indicate areas to keep from the generated image and white for areas to discard.
@@ -1180,7 +1319,7 @@ class ExpandMaskWithFadeInvocation(BaseInvocation, WithMetadata, WithBoard):
     "apply_mask_to_image",
     title="Apply Mask to Image",
     tags=["image", "mask", "blend"],
-    category="image",
+    category="mask",
     version="1.0.0",
 )
 class ApplyMaskToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -1355,7 +1494,7 @@ class PasteImageIntoBoundingBoxInvocation(BaseInvocation, WithMetadata, WithBoar
     "flux_kontext_image_prep",
     title="FLUX Kontext Image Prep",
     tags=["image", "concatenate", "flux", "kontext"],
-    category="image",
+    category="conditioning",
     version="1.0.0",
 )
 class FluxKontextConcatenateImagesInvocation(BaseInvocation, WithMetadata, WithBoard):

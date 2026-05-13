@@ -11,17 +11,17 @@
 # installation and configuration
 /pyproject.toml  @lstein @blessedcoolant  
 /docker/  @lstein @blessedcoolant
-/scripts/  @lstein  
-/installer/ @lstein   
-/invokeai/assets @lstein   
-/invokeai/configs @lstein  
+/scripts/  @lstein  @blessedcoolant  
+/installer/ @lstein   @blessedcoolant  
+/invokeai/assets @lstein   @blessedcoolant  
+/invokeai/configs @lstein  @blessedcoolant  
 /invokeai/version @lstein @blessedcoolant  
 
 # web ui
 /invokeai/frontend @blessedcoolant  @lstein  @dunkeroni  
 
 # generation, model management, postprocessing
-/invokeai/backend  @lstein @blessedcoolant @dunkeroni @JPPhoto
+/invokeai/backend  @lstein @blessedcoolant @dunkeroni @JPPhoto  @Pfannkuchensack 
 
 # front ends
 /invokeai/frontend/CLI @lstein  

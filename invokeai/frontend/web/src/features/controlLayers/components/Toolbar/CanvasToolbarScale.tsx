@@ -20,6 +20,7 @@ import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerP
 import { snapToNearest } from 'features/controlLayers/konva/util';
 import type { KeyboardEvent } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold, PiMagnifyingGlassMinusBold, PiMagnifyingGlassPlusBold } from 'react-icons/pi';
 
 function formatPct(v: number | string) {
@@ -77,6 +78,7 @@ const inputFieldSx = {
 } satisfies SystemStyleObject;
 
 export const CanvasToolbarScale = memo(() => {
+  const { t } = useTranslation();
   const canvasManager = useCanvasManager();
   const scale = useStore(canvasManager.stage.$scale);
   const [localScale, setLocalScale] = useState(scale * 100);
@@ -143,7 +145,7 @@ export const CanvasToolbarScale = memo(() => {
             <NumberInputField title="" sx={inputFieldSx} />
             <PopoverTrigger>
               <IconButton
-                aria-label="open-slider"
+                aria-label={t('common.openSlider')}
                 icon={<PiCaretDownBold />}
                 size="sm"
                 variant="link"
@@ -182,6 +184,7 @@ CanvasToolbarScale.displayName = 'CanvasToolbarScale';
 const SCALE_SNAPS = [0.1, 0.15, 0.2, 0.25, 0.5, 0.75, 1, 1.5, 2, 2.5, 5, 7.5, 10, 15, 20];
 
 const ZoomOutButton = memo(() => {
+  const { t } = useTranslation();
   const canvasManager = useCanvasManager();
   const scale = useStore(canvasManager.stage.$scale);
   const onClick = useCallback(() => {
@@ -197,7 +200,7 @@ const ZoomOutButton = memo(() => {
     <IconButton
       onClick={onClick}
       icon={<PiMagnifyingGlassMinusBold />}
-      aria-label="Zoom out"
+      aria-label={t('common.zoomOut')}
       variant="link"
       alignSelf="stretch"
       isDisabled={scale <= canvasManager.stage.config.MIN_SCALE}
@@ -207,6 +210,7 @@ const ZoomOutButton = memo(() => {
 ZoomOutButton.displayName = 'ZoomOutButton';
 
 const ZoomInButton = memo(() => {
+  const { t } = useTranslation();
   const canvasManager = useCanvasManager();
   const scale = useStore(canvasManager.stage.$scale);
   const onClick = useCallback(() => {
@@ -219,7 +223,7 @@ const ZoomInButton = memo(() => {
     <IconButton
       onClick={onClick}
       icon={<PiMagnifyingGlassPlusBold />}
-      aria-label="Zoom out"
+      aria-label={t('common.zoomIn')}
       variant="link"
       alignSelf="stretch"
       isDisabled={scale >= canvasManager.stage.config.MAX_SCALE}

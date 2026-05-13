@@ -15,7 +15,7 @@ import {
   useCanvasManagerSafe,
 } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useRefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
-import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
+import { selectIsFLUX, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import {
   refImageFLUXReduxImageInfluenceChanged,
   refImageImageChanged,
@@ -34,7 +34,12 @@ import type {
   FLUXReduxImageInfluence as FLUXReduxImageInfluenceType,
   IPMethodV2,
 } from 'features/controlLayers/store/types';
-import { isFlux2ReferenceImageConfig, isFLUXReduxConfig, isIPAdapterConfig } from 'features/controlLayers/store/types';
+import {
+  isFlux2ReferenceImageConfig,
+  isFLUXReduxConfig,
+  isIPAdapterConfig,
+  isQwenImageReferenceImageConfig,
+} from 'features/controlLayers/store/types';
 import type { SetGlobalReferenceImageDndTargetData } from 'features/dnd/dnd';
 import { setGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -45,6 +50,7 @@ import type {
   FLUXReduxModelConfig,
   IPAdapterModelConfig,
 } from 'services/api/types';
+import { isExternalApiModelConfig } from 'services/api/types';
 
 import { RefImageImage } from './RefImageImage';
 
@@ -60,6 +66,7 @@ const RefImageSettingsContent = memo(() => {
   const selectConfig = useMemo(() => buildSelectConfig(id), [id]);
   const config = useAppSelector(selectConfig);
   const tab = useAppSelector(selectActiveTab);
+  const mainModelConfig = useAppSelector(selectMainModelConfig);
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {
@@ -120,9 +127,11 @@ const RefImageSettingsContent = memo(() => {
   );
 
   const isFLUX = useAppSelector(selectIsFLUX);
+  const isExternalModel = !!mainModelConfig && isExternalApiModelConfig(mainModelConfig);
 
-  // FLUX.2 Klein has built-in reference image support - no model selector needed
-  const showModelSelector = !isFlux2ReferenceImageConfig(config);
+  // FLUX.2 Klein, Qwen Image Edit and external API models do not require a ref image model selection.
+  const showModelSelector =
+    !isFlux2ReferenceImageConfig(config) && !isQwenImageReferenceImageConfig(config) && !isExternalModel;
 
   return (
     <Flex flexDir="column" gap={2} position="relative" w="full">
@@ -150,14 +159,14 @@ const RefImageSettingsContent = memo(() => {
         </Flex>
       )}
       <Flex gap={2} w="full">
-        {isIPAdapterConfig(config) && (
+        {isIPAdapterConfig(config) && !isExternalModel && (
           <Flex flexDir="column" gap={2} w="full">
             {!isFLUX && <IPAdapterMethod method={config.method} onChange={onChangeIPMethod} />}
             <Weight weight={config.weight} onChange={onChangeWeight} />
             <BeginEndStepPct beginEndStepPct={config.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
           </Flex>
         )}
-        {isFLUXReduxConfig(config) && (
+        {isFLUXReduxConfig(config) && !isExternalModel && (
           <Flex flexDir="column" gap={2} w="full" alignItems="flex-start">
             <FLUXReduxImageInfluence
               imageInfluence={config.imageInfluence ?? 'lowest'}

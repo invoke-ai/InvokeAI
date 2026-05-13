@@ -11,7 +11,7 @@ export const ToolGradientButton = memo(() => {
   // clicking selects the gradient tool; mode switching is handled in the top toolbar
   const handleClick = useCallback(() => selectGradient(), [selectGradient]);
 
-  const gradientLabel = t('controlLayers.tool.gradient', { defaultValue: 'Gradient' });
+  const gradientLabel = t('controlLayers.tool.gradient');
 
   return (
     <Tooltip label={gradientLabel} placement="end">

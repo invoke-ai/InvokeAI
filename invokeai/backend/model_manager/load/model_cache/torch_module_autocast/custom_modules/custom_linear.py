@@ -9,6 +9,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
+from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 
 
 def linear_lora_forward(input: torch.Tensor, lora_layer: LoRALayer, lora_weight: float) -> torch.Tensor:
@@ -57,28 +58,47 @@ def autocast_linear_forward_sidecar_patches(
 
     # Finally, apply any remaining patches.
     if len(unprocessed_patches_and_weights) > 0:
+        weight, bias = orig_module._cast_weight_bias_for_input(input)
         # Prepare the original parameters for the patch aggregation.
-        orig_params = {"weight": orig_module.weight, "bias": orig_module.bias}
+        orig_params = {"weight": weight, "bias": bias}
         # Filter out None values.
         orig_params = {k: v for k, v in orig_params.items() if v is not None}
 
         aggregated_param_residuals = orig_module._aggregate_patch_parameters(
             unprocessed_patches_and_weights, orig_params=orig_params, device=input.device
         )
-        output += torch.nn.functional.linear(
-            input, aggregated_param_residuals["weight"], aggregated_param_residuals.get("bias", None)
-        )
+        residual_weight = orig_module._cast_tensor_for_input(aggregated_param_residuals["weight"], input)
+        residual_bias = orig_module._cast_tensor_for_input(aggregated_param_residuals.get("bias", None), input)
+        assert residual_weight is not None
+        output += torch.nn.functional.linear(input, residual_weight, residual_bias)
 
     return output
 
 
 class CustomLinear(torch.nn.Linear, CustomModuleMixin):
+    def _cast_tensor_for_input(self, tensor: torch.Tensor | None, input: torch.Tensor) -> torch.Tensor | None:
+        tensor = cast_to_device(tensor, input.device)
+        if (
+            tensor is not None
+            and input.is_floating_point()
+            and tensor.is_floating_point()
+            and not isinstance(tensor, GGMLTensor)
+            and tensor.dtype != input.dtype
+        ):
+            tensor = tensor.to(dtype=input.dtype)
+        return tensor
+
+    def _cast_weight_bias_for_input(self, input: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor | None]:
+        weight = self._cast_tensor_for_input(self.weight, input)
+        bias = self._cast_tensor_for_input(self.bias, input)
+        assert weight is not None
+        return weight, bias
+
     def _autocast_forward_with_patches(self, input: torch.Tensor) -> torch.Tensor:
         return autocast_linear_forward_sidecar_patches(self, input, self._patches_and_weights)
 
     def _autocast_forward(self, input: torch.Tensor) -> torch.Tensor:
-        weight = cast_to_device(self.weight, input.device)
-        bias = cast_to_device(self.bias, input.device)
+        weight, bias = self._cast_weight_bias_for_input(input)
         return torch.nn.functional.linear(input, weight, bias)
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
@@ -86,5 +106,16 @@ class CustomLinear(torch.nn.Linear, CustomModuleMixin):
             return self._autocast_forward_with_patches(input)
         elif self._device_autocasting_enabled:
             return self._autocast_forward(input)
+        elif input.is_floating_point() and (
+            (self.weight.is_floating_point() and self.weight.dtype != input.dtype)
+            or (
+                self.bias is not None
+                and self.bias.is_floating_point()
+                and not isinstance(self.bias, GGMLTensor)
+                and self.bias.dtype != input.dtype
+            )
+        ):
+            weight, bias = self._cast_weight_bias_for_input(input)
+            return torch.nn.functional.linear(input, weight, bias)
         else:
             return super().forward(input)

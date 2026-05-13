@@ -1,5 +1,6 @@
 import { Button, Flex, Heading, SimpleGrid } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { useIsModelManagerEnabled } from 'features/modelManagerV2/hooks/useIsModelManagerEnabled';
 import { useMainModelDefaultSettings } from 'features/modelManagerV2/hooks/useMainModelDefaultSettings';
 import { selectSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { DefaultHeight } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/DefaultHeight';
@@ -7,7 +8,7 @@ import { DefaultWidth } from 'features/modelManagerV2/subpanels/ModelPanel/MainM
 import type { ParameterScheduler } from 'features/parameters/types/parameterSchemas';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { toast } from 'features/toast/toast';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +18,7 @@ import type { MainModelConfig } from 'services/api/types';
 
 import { DefaultCfgRescaleMultiplier } from './DefaultCfgRescaleMultiplier';
 import { DefaultCfgScale } from './DefaultCfgScale';
+import { DefaultFp8Storage } from './DefaultFp8Storage';
 import { DefaultGuidance } from './DefaultGuidance';
 import { DefaultScheduler } from './DefaultScheduler';
 import { DefaultSteps } from './DefaultSteps';
@@ -38,6 +40,7 @@ export type MainModelDefaultSettingsFormData = {
   width: FormField<number>;
   height: FormField<number>;
   guidance: FormField<number>;
+  fp8Storage: FormField<boolean>;
 };
 
 type Props = {
@@ -46,10 +49,15 @@ type Props = {
 
 export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
   const selectedModelKey = useAppSelector(selectSelectedModelKey);
+  const canManageModels = useIsModelManagerEnabled();
   const { t } = useTranslation();
 
   const isFluxFamily = useMemo(() => {
     return ['flux', 'flux2'].includes(modelConfig.base);
+  }, [modelConfig]);
+
+  const isZImage = useMemo(() => {
+    return modelConfig.base === 'z-image';
   }, [modelConfig]);
 
   const defaultSettingsDefaults = useMainModelDefaultSettings(modelConfig);
@@ -62,6 +70,10 @@ export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
   const { handleSubmit, control, formState, reset } = useForm<MainModelDefaultSettingsFormData>({
     defaultValues: defaultSettingsDefaults,
   });
+
+  useEffect(() => {
+    reset(defaultSettingsDefaults);
+  }, [defaultSettingsDefaults, reset]);
 
   const onSubmit = useCallback<SubmitHandler<MainModelDefaultSettingsFormData>>(
     (data) => {
@@ -79,6 +91,7 @@ export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
         width: data.width.isEnabled ? data.width.value : null,
         height: data.height.isEnabled ? data.height.value : null,
         guidance: data.guidance.isEnabled ? data.guidance.value : null,
+        fp8_storage: data.fp8Storage.isEnabled ? data.fp8Storage.value : null,
       };
 
       updateModel({
@@ -111,16 +124,18 @@ export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
     <>
       <Flex gap="4" justifyContent="space-between" w="full" pb={4}>
         <Heading fontSize="md">{t('modelManager.defaultSettings')}</Heading>
-        <Button
-          size="sm"
-          leftIcon={<PiCheckBold />}
-          colorScheme="invokeYellow"
-          isDisabled={!formState.isDirty}
-          onClick={handleSubmit(onSubmit)}
-          isLoading={isLoadingUpdateModel}
-        >
-          {t('common.save')}
-        </Button>
+        {canManageModels && (
+          <Button
+            size="sm"
+            leftIcon={<PiCheckBold />}
+            colorScheme="invokeYellow"
+            isDisabled={!formState.isDirty}
+            onClick={handleSubmit(onSubmit)}
+            isLoading={isLoadingUpdateModel}
+          >
+            {t('common.save')}
+          </Button>
+        )}
       </Flex>
 
       <SimpleGrid columns={2} gap={8}>
@@ -133,6 +148,7 @@ export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
         {!isFluxFamily && <DefaultCfgRescaleMultiplier control={control} name="cfgRescaleMultiplier" />}
         <DefaultWidth control={control} optimalDimension={optimalDimension} />
         <DefaultHeight control={control} optimalDimension={optimalDimension} />
+        {!isZImage && <DefaultFp8Storage control={control} name="fp8Storage" />}
       </SimpleGrid>
     </>
   );

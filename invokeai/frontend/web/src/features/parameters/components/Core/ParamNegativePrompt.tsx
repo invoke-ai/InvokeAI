@@ -4,6 +4,10 @@ import { usePersistedTextAreaSize } from 'common/hooks/usePersistedTextareaSize'
 import { negativePromptChanged, selectNegativePromptWithFallback } from 'features/controlLayers/store/paramsSlice';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
+import {
+  PROMPT_RESIZE_HANDLE_HEIGHT_PX,
+  PromptResizeHandle,
+} from 'features/parameters/components/Prompts/PromptResizeHandle';
 import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModePrompt';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
@@ -21,6 +25,8 @@ const persistOptions: Parameters<typeof usePersistedTextAreaSize>[2] = {
   trackWidth: false,
   trackHeight: true,
 };
+
+const NEGATIVE_PROMPT_MIN_HEIGHT = 28;
 
 export const ParamNegativePrompt = memo(() => {
   const dispatch = useAppDispatch();
@@ -61,7 +67,7 @@ export const ParamNegativePrompt = memo(() => {
 
   return (
     <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
-      <Box pos="relative" w="full">
+      <Box pos="relative" w="full" pb={`${PROMPT_RESIZE_HANDLE_HEIGHT_PX}px`}>
         <Textarea
           className="negative-prompt-textarea"
           name="negativePrompt"
@@ -70,14 +76,16 @@ export const ParamNegativePrompt = memo(() => {
           onChange={onChange}
           onKeyDown={onKeyDown}
           variant="darkFilled"
-          minH={28}
           borderTopWidth={24} // This prevents the prompt from being hidden behind the header
           paddingInlineEnd={10}
           paddingInlineStart={3}
           paddingTop={0}
           paddingBottom={3}
+          resize="none"
+          minH={NEGATIVE_PROMPT_MIN_HEIGHT}
           fontFamily="mono"
           fontSize="0.82rem"
+          sx={{ '&::-webkit-resizer': { display: 'none' } }}
         />
         <PromptOverlayButtonWrapper>
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
@@ -90,6 +98,7 @@ export const ParamNegativePrompt = memo(() => {
             label={`${t('parameters.negativePromptPlaceholder')} (${t('stylePresets.preview')})`}
           />
         )}
+        <PromptResizeHandle textareaRef={textareaRef} minHeight={NEGATIVE_PROMPT_MIN_HEIGHT} />
       </Box>
     </PromptPopover>
   );

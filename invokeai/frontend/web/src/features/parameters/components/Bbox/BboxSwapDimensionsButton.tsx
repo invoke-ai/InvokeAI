@@ -1,7 +1,8 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { bboxDimensionsSwapped } from 'features/controlLayers/store/canvasSlice';
 import { useCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { selectHasFixedDimensionSizes } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsDownUpBold } from 'react-icons/pi';
@@ -10,6 +11,7 @@ export const BboxSwapDimensionsButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isStaging = useCanvasIsStaging();
+  const hasFixedSizes = useAppSelector(selectHasFixedDimensionSizes);
   const onClick = useCallback(() => {
     dispatch(bboxDimensionsSwapped());
   }, [dispatch]);
@@ -21,7 +23,7 @@ export const BboxSwapDimensionsButton = memo(() => {
       variant="ghost"
       size="sm"
       icon={<PiArrowsDownUpBold />}
-      isDisabled={isStaging}
+      isDisabled={isStaging || hasFixedSizes}
     />
   );
 });

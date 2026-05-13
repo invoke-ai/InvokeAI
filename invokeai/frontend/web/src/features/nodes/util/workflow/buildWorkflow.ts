@@ -5,7 +5,7 @@ import { parseify } from 'common/util/serialize';
 import { pick } from 'es-toolkit/compat';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState } from 'features/nodes/store/types';
-import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
+import { isConnectorNode, isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { zWorkflowV3 } from 'features/nodes/types/workflow';
 import i18n from 'i18n';
@@ -40,6 +40,9 @@ export const buildWorkflowFast = (nodesState: NodesState): WorkflowV3 => {
 
   for (const node of nodes) {
     if (isInvocationNode(node) && node.type) {
+      const { id, type, data, position } = node;
+      newWorkflow.nodes.push({ id, type, data, position });
+    } else if (isConnectorNode(node) && node.type) {
       const { id, type, data, position } = node;
       newWorkflow.nodes.push({ id, type, data, position });
     } else if (isNotesNode(node) && node.type) {

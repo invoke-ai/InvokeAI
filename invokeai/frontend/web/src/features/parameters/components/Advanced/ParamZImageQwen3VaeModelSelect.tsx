@@ -9,7 +9,7 @@ import {
   zImageQwen3SourceModelSelected,
   zImageVaeModelSelected,
 } from 'features/controlLayers/store/paramsSlice';
-import { zModelIdentifierField } from 'features/nodes/types/common';
+import { type ModelIdentifierField, zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFlux1VAEModels, useQwen3EncoderModels, useZImageDiffusersModels } from 'services/api/hooks/modelsByType';
@@ -136,7 +136,7 @@ const ParamZImageQwen3SourceModelSelect = memo(() => {
   const { options, value, onChange, noOptionsMessage } = useModelCombobox({
     modelConfigs,
     onChange: _onChange,
-    selectedModel: zImageQwen3SourceModel,
+    selectedModel: zImageQwen3SourceModel as ModelIdentifierField | null,
     isLoading,
   });
 

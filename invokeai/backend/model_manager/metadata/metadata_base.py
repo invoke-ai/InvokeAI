@@ -17,7 +17,7 @@ remote repo.
 from pathlib import Path
 from typing import List, Literal, Optional, Union
 
-from huggingface_hub import configure_http_backend, hf_hub_url
+from huggingface_hub import hf_hub_url
 from pydantic import BaseModel, Field, TypeAdapter
 from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
@@ -111,7 +111,6 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
         full-precision model is returned.
         """
         session = session or Session()
-        configure_http_backend(backend_factory=lambda: session)  # used in testing
 
         paths = filter_files([x.path for x in self.files], variant, subfolder, subfolders)  #  all files in the model
 

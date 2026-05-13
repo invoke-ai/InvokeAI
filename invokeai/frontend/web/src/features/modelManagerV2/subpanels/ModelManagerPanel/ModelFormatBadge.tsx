@@ -15,10 +15,12 @@ const FORMAT_NAME_MAP: Record<ModelFormat, string> = {
   embedding_folder: 'embedding',
   t5_encoder: 't5_encoder',
   qwen3_encoder: 'qwen3_encoder',
+  qwen_vl_encoder: 'qwen_vl_encoder',
   bnb_quantized_int8b: 'bnb_quantized_int8b',
   bnb_quantized_nf4b: 'quantized',
   gguf_quantized: 'gguf',
   omi: 'omi',
+  external_api: 'external_api',
   unknown: 'unknown',
   olive: 'olive',
   onnx: 'onnx',
@@ -34,12 +36,14 @@ const FORMAT_COLOR_MAP: Record<ModelFormat, string> = {
   embedding_folder: 'base',
   t5_encoder: 'base',
   qwen3_encoder: 'base',
+  qwen_vl_encoder: 'base',
   bnb_quantized_int8b: 'base',
   bnb_quantized_nf4b: 'base',
   gguf_quantized: 'base',
   unknown: 'red',
   olive: 'base',
   onnx: 'base',
+  external_api: 'base',
 };
 
 const ModelFormatBadge = ({ format }: Props) => {

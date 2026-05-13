@@ -7,7 +7,7 @@ import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMul
 import { merge } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
-import { modelChanged } from 'features/controlLayers/store/paramsSlice';
+import { aspectRatioIdChanged, modelChanged, resolutionPresetSelected } from 'features/controlLayers/store/paramsSlice';
 import {
   selectAllEntities,
   selectAllEntitiesOfType,
@@ -21,6 +21,7 @@ import type {
   CanvasMetadata,
   ChannelName,
   ChannelPoints,
+  CompositeOperation,
   ControlLoRAConfig,
   EntityMovedByPayload,
   FillStyle,
@@ -30,6 +31,7 @@ import type {
   RgbColor,
   SimpleAdjustmentsConfig,
 } from 'features/controlLayers/store/types';
+import { isAspectRatioID } from 'features/controlLayers/store/types';
 import {
   calculateNewSize,
   getScaledBoundingBoxDimensions,
@@ -65,6 +67,7 @@ import type {
   EntityEraserLineAddedPayload,
   EntityGradientAddedPayload,
   EntityIdentifierPayload,
+  EntityLassoAddedPayload,
   EntityMovedToPayload,
   EntityRasterizedPayload,
   EntityRectAddedPayload,
@@ -97,6 +100,12 @@ import {
   initialZImageControl,
   makeDefaultRasterLayerAdjustments,
 } from './util';
+
+const resetInpaintMasksHiddenIfEmpty = (state: CanvasState) => {
+  if (state.inpaintMasks.entities.length === 0) {
+    state.inpaintMasks.isHidden = false;
+  }
+};
 
 const slice = createSlice({
   name: 'canvas',
@@ -194,6 +203,32 @@ const slice = createSlice({
       }
       layer.adjustments.collapsed = !layer.adjustments.collapsed;
     },
+    rasterLayerGlobalCompositeOperationChanged: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<{ globalCompositeOperation?: CompositeOperation }, 'raster_layer'>>
+    ) => {
+      const { entityIdentifier, globalCompositeOperation } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
+      if (!layer) {
+        return;
+      }
+      if (globalCompositeOperation === undefined) {
+        delete layer.globalCompositeOperation;
+      } else {
+        layer.globalCompositeOperation = globalCompositeOperation;
+      }
+    },
+    rasterLayerIsTransparencyLockedToggled: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<void, 'raster_layer'>>
+    ) => {
+      const { entityIdentifier } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
+      if (!layer) {
+        return;
+      }
+      layer.isTransparencyLocked = !layer.isTransparencyLocked;
+    },
     rasterLayerAdded: {
       reducer: (
         state,
@@ -203,16 +238,35 @@ const slice = createSlice({
           isSelected?: boolean;
           isBookmarked?: boolean;
           mergedEntitiesToDelete?: string[];
+          mergedEntitiesToDisable?: string[];
           addAfter?: string;
         }>
       ) => {
-        const { id, overrides, isSelected, isBookmarked, mergedEntitiesToDelete = [], addAfter } = action.payload;
+        const {
+          id,
+          overrides,
+          isSelected,
+          isBookmarked,
+          mergedEntitiesToDelete = [],
+          mergedEntitiesToDisable = [],
+          addAfter,
+        } = action.payload;
         const entityState = getRasterLayerState(id, overrides);
 
         const index = addAfter
           ? state.rasterLayers.entities.findIndex((e) => e.id === addAfter) + 1
           : state.rasterLayers.entities.length;
         state.rasterLayers.entities.splice(index, 0, entityState);
+
+        // For boolean operations we may want to disable the source layers instead of deleting them
+        if (mergedEntitiesToDisable.length > 0) {
+          for (const idToDisable of mergedEntitiesToDisable) {
+            const entity = state.rasterLayers.entities.find((e) => e.id === idToDisable);
+            if (entity) {
+              entity.isEnabled = false;
+            }
+          }
+        }
 
         if (mergedEntitiesToDelete.length > 0) {
           state.rasterLayers.entities = state.rasterLayers.entities.filter(
@@ -222,7 +276,8 @@ const slice = createSlice({
 
         const entityIdentifier = getEntityIdentifier(entityState);
 
-        if (isSelected || mergedEntitiesToDelete.length > 0) {
+        // When sources were either deleted OR disabled, select the new merged layer
+        if (isSelected || mergedEntitiesToDelete.length > 0 || mergedEntitiesToDisable.length > 0) {
           state.selectedEntityIdentifier = entityIdentifier;
         }
 
@@ -235,6 +290,7 @@ const slice = createSlice({
         isSelected?: boolean;
         isBookmarked?: boolean;
         mergedEntitiesToDelete?: string[];
+        mergedEntitiesToDisable?: string[];
         addAfter?: string;
       }) => ({
         payload: { ...payload, id: getPrefixedId('raster_layer') },
@@ -1024,6 +1080,7 @@ const slice = createSlice({
             (entity) => !mergedEntitiesToDelete.includes(entity.id)
           );
         }
+        resetInpaintMasksHiddenIfEmpty(state);
         const entityIdentifier = getEntityIdentifier(entityState);
 
         if (isSelected || mergedEntitiesToDelete.length > 0) {
@@ -1095,6 +1152,7 @@ const slice = createSlice({
         if (replace) {
           // Remove the inpaint mask
           state.inpaintMasks.entities = state.inpaintMasks.entities.filter((layer) => layer.id !== entityIdentifier.id);
+          resetInpaintMasksHiddenIfEmpty(state);
         }
 
         // Add the new regional guidance
@@ -1242,21 +1300,31 @@ const slice = createSlice({
       state.bbox.aspectRatio.isLocked = !state.bbox.aspectRatio.isLocked;
       syncScaledSize(state);
     },
-    bboxAspectRatioIdChanged: (state, action: PayloadAction<{ id: AspectRatioID }>) => {
-      const { id } = action.payload;
+    bboxAspectRatioIdChanged: (
+      state,
+      action: PayloadAction<{ id: AspectRatioID; fixedSize?: { width: number; height: number } }>
+    ) => {
+      const { id, fixedSize } = action.payload;
       state.bbox.aspectRatio.id = id;
       if (id === 'Free') {
         state.bbox.aspectRatio.isLocked = false;
       } else {
         state.bbox.aspectRatio.isLocked = true;
-        state.bbox.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
-        const { width, height } = calculateNewSize(
-          state.bbox.aspectRatio.value,
-          state.bbox.rect.width * state.bbox.rect.height,
-          state.bbox.modelBase
-        );
-        state.bbox.rect.width = width;
-        state.bbox.rect.height = height;
+        if (fixedSize) {
+          // External models provide fixed dimensions for each aspect ratio
+          state.bbox.aspectRatio.value = fixedSize.width / fixedSize.height;
+          state.bbox.rect.width = fixedSize.width;
+          state.bbox.rect.height = fixedSize.height;
+        } else {
+          state.bbox.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
+          const { width, height } = calculateNewSize(
+            state.bbox.aspectRatio.value,
+            state.bbox.rect.width * state.bbox.rect.height,
+            state.bbox.modelBase
+          );
+          state.bbox.rect.width = width;
+          state.bbox.rect.height = height;
+        }
       }
 
       syncScaledSize(state);
@@ -1511,6 +1579,17 @@ const slice = createSlice({
       // re-render it (reference equality check). I don't like this behaviour.
       entity.objects.push({ ...rect });
     },
+    entityLassoAdded: (state, action: PayloadAction<EntityLassoAddedPayload>) => {
+      const { entityIdentifier, lasso } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      }
+
+      // TODO(psyche): If we add the object without splatting, the renderer will see it as the same object and not
+      // re-render it (reference equality check). I don't like this behaviour.
+      entity.objects.push({ ...lasso });
+    },
     entityGradientAdded: (state, action: PayloadAction<EntityGradientAddedPayload>) => {
       const { entityIdentifier, gradient } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
@@ -1553,6 +1632,7 @@ const slice = createSlice({
           break;
       }
 
+      resetInpaintMasksHiddenIfEmpty(state);
       state.selectedEntityIdentifier = selectedEntityIdentifier;
     },
     entityArrangedForwardOne: (state, action: PayloadAction<EntityIdentifierPayload>) => {
@@ -1641,6 +1721,7 @@ const slice = createSlice({
           break;
         case 'inpaint_mask':
           state.inpaintMasks.isHidden = !state.inpaintMasks.isHidden;
+          resetInpaintMasksHiddenIfEmpty(state);
           break;
         case 'regional_guidance':
           state.regionalGuidance.isHidden = !state.regionalGuidance.isHidden;
@@ -1649,13 +1730,16 @@ const slice = createSlice({
     },
     allNonRasterLayersIsHiddenToggled: (state) => {
       const hasVisibleNonRasterLayers =
-        !state.controlLayers.isHidden || !state.inpaintMasks.isHidden || !state.regionalGuidance.isHidden;
+        (state.controlLayers.entities.length > 0 && !state.controlLayers.isHidden) ||
+        (state.inpaintMasks.entities.length > 0 && !state.inpaintMasks.isHidden) ||
+        (state.regionalGuidance.entities.length > 0 && !state.regionalGuidance.isHidden);
 
       const shouldHide = hasVisibleNonRasterLayers;
 
       state.controlLayers.isHidden = shouldHide;
       state.inpaintMasks.isHidden = shouldHide;
       state.regionalGuidance.isHidden = shouldHide;
+      resetInpaintMasksHiddenIfEmpty(state);
     },
     allEntitiesDeleted: (state) => {
       // Deleting all entities is equivalent to resetting the state for each entity type
@@ -1671,6 +1755,58 @@ const slice = createSlice({
       state.inpaintMasks.entities = inpaintMasks;
       state.rasterLayers.entities = rasterLayers;
       state.regionalGuidance.entities = regionalGuidance;
+      resetInpaintMasksHiddenIfEmpty(state);
+      return state;
+    },
+    canvasProjectRecalled: (
+      state,
+      action: PayloadAction<{
+        rasterLayers: CanvasRasterLayerState[];
+        controlLayers: CanvasControlLayerState[];
+        inpaintMasks: CanvasInpaintMaskState[];
+        regionalGuidance: CanvasRegionalGuidanceState[];
+        bbox: CanvasState['bbox'];
+        selectedEntityIdentifier: CanvasState['selectedEntityIdentifier'];
+        bookmarkedEntityIdentifier: CanvasState['bookmarkedEntityIdentifier'];
+      }>
+    ) => {
+      const {
+        rasterLayers,
+        controlLayers,
+        inpaintMasks,
+        regionalGuidance,
+        bbox,
+        selectedEntityIdentifier,
+        bookmarkedEntityIdentifier,
+      } = action.payload;
+      state.rasterLayers.entities = rasterLayers;
+      state.controlLayers.entities = controlLayers;
+      state.inpaintMasks.entities = inpaintMasks;
+      state.regionalGuidance.entities = regionalGuidance;
+      // Preserve the current modelBase to avoid desync with the currently selected model
+      // (same pattern as canvasSnapshotRestored and resetState).
+      const currentModelBase = state.bbox.modelBase;
+      state.bbox = bbox;
+      state.bbox.modelBase = currentModelBase;
+      syncScaledSize(state);
+      state.selectedEntityIdentifier = selectedEntityIdentifier;
+      state.bookmarkedEntityIdentifier = bookmarkedEntityIdentifier;
+      return state;
+    },
+    canvasSnapshotRestored: (state, action: PayloadAction<CanvasState>) => {
+      const snapshot = action.payload;
+      state.controlLayers = snapshot.controlLayers;
+      state.inpaintMasks = snapshot.inpaintMasks;
+      state.rasterLayers = snapshot.rasterLayers;
+      state.regionalGuidance = snapshot.regionalGuidance;
+      // Restore bbox from snapshot but preserve the current modelBase to avoid desync
+      // with the currently selected model (same pattern as resetState).
+      const currentModelBase = state.bbox.modelBase;
+      state.bbox = snapshot.bbox;
+      state.bbox.modelBase = currentModelBase;
+      syncScaledSize(state);
+      state.selectedEntityIdentifier = snapshot.selectedEntityIdentifier;
+      state.bookmarkedEntityIdentifier = snapshot.bookmarkedEntityIdentifier;
       return state;
     },
     canvasUndo: () => {},
@@ -1707,6 +1843,29 @@ const slice = createSlice({
         syncScaledSize(state);
       }
     });
+    // Sync bbox when external model resolution preset is selected (aspect_ratio_sizes)
+    builder.addCase(aspectRatioIdChanged, (state, action) => {
+      const { id, fixedSize } = action.payload;
+      // Only sync when fixedSize is provided (external models with aspect_ratio_sizes)
+      if (fixedSize) {
+        state.bbox.rect.width = fixedSize.width;
+        state.bbox.rect.height = fixedSize.height;
+        state.bbox.aspectRatio.value = fixedSize.width / fixedSize.height;
+        state.bbox.aspectRatio.id = id;
+        state.bbox.aspectRatio.isLocked = true;
+        syncScaledSize(state);
+      }
+    });
+    // Sync bbox when external model resolution preset is selected (resolution_presets)
+    builder.addCase(resolutionPresetSelected, (state, action) => {
+      const { width, height, aspectRatio } = action.payload;
+      state.bbox.rect.width = width;
+      state.bbox.rect.height = height;
+      state.bbox.aspectRatio.value = width / height;
+      state.bbox.aspectRatio.id = isAspectRatioID(aspectRatio) ? aspectRatio : 'Free';
+      state.bbox.aspectRatio.isLocked = true;
+      syncScaledSize(state);
+    });
   },
 });
 
@@ -1731,6 +1890,8 @@ const resetState = (state: CanvasState) => {
 
 export const {
   canvasMetadataRecalled,
+  canvasSnapshotRestored,
+  canvasProjectRecalled,
   canvasUndo,
   canvasRedo,
   canvasClearHistory,
@@ -1750,6 +1911,7 @@ export const {
   entityBrushLineAdded,
   entityEraserLineAdded,
   entityRectAdded,
+  entityLassoAdded,
   entityGradientAdded,
   // Raster layer adjustments
   rasterLayerAdjustmentsSet,
@@ -1760,6 +1922,8 @@ export const {
   rasterLayerAdjustmentsCollapsedToggled,
   rasterLayerAdjustmentsSimpleUpdated,
   rasterLayerAdjustmentsCurvesUpdated,
+  rasterLayerGlobalCompositeOperationChanged,
+  rasterLayerIsTransparencyLockedToggled,
   entityDeleted,
   entityArrangedForwardOne,
   entityArrangedToFront,
@@ -1791,7 +1955,7 @@ export const {
   rasterLayerConvertedToRegionalGuidance,
   // Control layers
   controlLayerAdded,
-  // controlLayerRecalled,
+  controlLayerRecalled,
   controlLayerConvertedToRasterLayer,
   controlLayerConvertedToInpaintMask,
   controlLayerConvertedToRegionalGuidance,
@@ -1855,6 +2019,10 @@ const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
     if (!action.type.startsWith(slice.name)) {
       return false;
     }
+    // Snapshot restore and project load replace the canvas state and should not be undoable
+    if (action.type === canvasSnapshotRestored.type || action.type === canvasProjectRecalled.type) {
+      return false;
+    }
     // Throttle rapid actions of the same type
     filter = actionsThrottlingFilter(action);
     return filter;
@@ -1875,7 +2043,13 @@ export const canvasSliceConfig: SliceConfig<typeof slice> = {
   },
 };
 
-const doNotGroupMatcher = isAnyOf(entityBrushLineAdded, entityEraserLineAdded, entityRectAdded, entityGradientAdded);
+const doNotGroupMatcher = isAnyOf(
+  entityBrushLineAdded,
+  entityEraserLineAdded,
+  entityRectAdded,
+  entityLassoAdded,
+  entityGradientAdded
+);
 
 // Store rapid actions of the same type at most once every x time.
 // See: https://github.com/omnidan/redux-undo/blob/master/examples/throttled-drag/util/undoFilter.js

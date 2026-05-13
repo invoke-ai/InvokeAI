@@ -41,7 +41,7 @@ class GradientMaskOutput(BaseInvocationOutput):
     "create_gradient_mask",
     title="Create Gradient Mask",
     tags=["mask", "denoise"],
-    category="latents",
+    category="mask",
     version="1.3.0",
 )
 class CreateGradientMaskInvocation(BaseInvocation):

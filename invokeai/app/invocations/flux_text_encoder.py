@@ -28,7 +28,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Condit
     "flux_text_encoder",
     title="Prompt - FLUX",
     tags=["prompt", "conditioning", "flux"],
-    category="conditioning",
+    category="prompt",
     version="1.1.2",
 )
 class FluxTextEncoderInvocation(BaseInvocation):

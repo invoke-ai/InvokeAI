@@ -22,6 +22,13 @@ host: "192.168.1.1"
 port: 8080
 """
 
+v4_0_2_config = """
+schema_version: "4.0.2"
+
+host: "192.168.1.1"
+port: 8080
+"""
+
 invalid_v5_config = """
 schema_version: 5.0.0
 
@@ -148,6 +155,19 @@ def test_failed_migrate_backup(tmp_path: Path, patch_rootdir: None):
     assert temp_config_file.read_text() == v3_config_with_bad_values
 
 
+def test_migrate_v4_0_2_to_4_0_3_config(tmp_path: Path, patch_rootdir: None):
+    """Test that a v4.0.2 config is migrated to v4.0.3 (image subfolder support)."""
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text(v4_0_2_config)
+
+    config = load_and_migrate_config(temp_config_file)
+    assert config.schema_version == "4.0.3"
+    assert config.host == "192.168.1.1"
+    assert config.port == 8080
+    # image_subfolder_strategy should have its default value
+    assert config.image_subfolder_strategy == "flat"
+
+
 def test_bails_on_invalid_config(tmp_path: Path, patch_rootdir: None):
     """Test reading configuration from a file."""
     temp_config_file = tmp_path / "temp_invokeai.yaml"
@@ -263,6 +283,41 @@ def test_get_config_writing(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch
     assert "host" not in config_file_content
 
     # Undo our change to the singleton class
+    InvokeAIArgs.did_parse = False
+
+
+def test_get_config_reads_external_api_keys_file(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    """Test that API keys are loaded from the dedicated api_keys.yaml file."""
+    InvokeAIArgs.did_parse = True
+    monkeypatch.setenv("INVOKEAI_ROOT", str(tmp_path))
+    (tmp_path / "invokeai.yaml").write_text("schema_version: 4.0.2\n")
+    (tmp_path / "api_keys.yaml").write_text("external_openai_api_key: openai-key\n")
+
+    get_config.cache_clear()
+    config = get_config()
+    get_config.cache_clear()
+
+    assert config.external_openai_api_key == "openai-key"
+
+    InvokeAIArgs.did_parse = False
+
+
+def test_get_config_env_vars_override_external_api_keys_file(
+    patch_rootdir: None, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    """Test that environment variables override values from api_keys.yaml."""
+    InvokeAIArgs.did_parse = True
+    monkeypatch.setenv("INVOKEAI_ROOT", str(tmp_path))
+    monkeypatch.setenv("INVOKEAI_EXTERNAL_OPENAI_API_KEY", "env-openai-key")
+    (tmp_path / "invokeai.yaml").write_text("schema_version: 4.0.2\n")
+    (tmp_path / "api_keys.yaml").write_text("external_openai_api_key: file-openai-key\n")
+
+    get_config.cache_clear()
+    config = get_config()
+    get_config.cache_clear()
+
+    assert config.external_openai_api_key == "env-openai-key"
+
     InvokeAIArgs.did_parse = False
 
 

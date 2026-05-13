@@ -181,6 +181,7 @@ export const GalleryImageGridPaged = memo(() => {
       <Flex w="full" h="full">
         <GalleryImageGridContent
           imageNames={pageImageNames}
+          navigationImageNames={imageNames}
           isLoading={false}
           queryArgs={queryArgs}
           rootRef={gridRootRef}

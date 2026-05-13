@@ -42,6 +42,7 @@ const QueueListHeader = () => {
         alignItems="center"
       />
       <QueueListHeaderColumn displayName={t('queue.batch')} ps={0.5} w={COLUMN_WIDTHS.batchId} alignItems="center" />
+      <QueueListHeaderColumn displayName={t('queue.user')} ps={0.5} w={COLUMN_WIDTHS.user} alignItems="center" />
       <QueueListHeaderColumn
         displayName={t('queue.batchFieldValues')}
         ps={0.5}

@@ -10,6 +10,31 @@ import { api, buildV1Url } from '..';
  */
 const buildUtilitiesUrl = (path: string = '') => buildV1Url(`utilities/${path}`);
 
+// Types for expand-prompt and image-to-prompt endpoints.
+// These will use generated schema types once schema.ts is regenerated.
+type ExpandPromptRequest = {
+  prompt: string;
+  model_key: string;
+  max_tokens?: number;
+  system_prompt?: string | null;
+};
+
+type ExpandPromptResponse = {
+  expanded_prompt: string;
+  error?: string | null;
+};
+
+type ImageToPromptRequest = {
+  image_name: string;
+  model_key: string;
+  instruction?: string;
+};
+
+type ImageToPromptResponse = {
+  prompt: string;
+  error?: string | null;
+};
+
 export const utilitiesApi = api.injectEndpoints({
   endpoints: (build) => ({
     dynamicPrompts: build.query<
@@ -25,5 +50,21 @@ export const utilitiesApi = api.injectEndpoints({
       // disconnected.
       providesTags: ['FetchOnReconnect'],
     }),
+    expandPrompt: build.mutation<ExpandPromptResponse, ExpandPromptRequest>({
+      query: (arg) => ({
+        url: buildUtilitiesUrl('expand-prompt'),
+        body: arg,
+        method: 'POST',
+      }),
+    }),
+    imageToPrompt: build.mutation<ImageToPromptResponse, ImageToPromptRequest>({
+      query: (arg) => ({
+        url: buildUtilitiesUrl('image-to-prompt'),
+        body: arg,
+        method: 'POST',
+      }),
+    }),
   }),
 });
+
+export const { useExpandPromptMutation, useImageToPromptMutation } = utilitiesApi;

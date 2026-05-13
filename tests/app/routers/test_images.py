@@ -52,7 +52,9 @@ def test_download_images_from_board_id_empty_image_name_list(
 
 
 def prepare_download_images_test(monkeypatch: Any, mock_invoker: Invoker) -> None:
-    monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", MockApiDependencies(mock_invoker))
+    mock_deps = MockApiDependencies(mock_invoker)
+    monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
     monkeypatch.setattr(
         "invokeai.app.api.routers.images.ApiDependencies.invoker.services.bulk_download.generate_item_id",
         lambda arg: "test",
@@ -79,7 +81,9 @@ def test_get_bulk_download_image(tmp_path: Path, monkeypatch: Any, mock_invoker:
     mock_file.write_text("contents")
 
     monkeypatch.setattr(mock_invoker.services.bulk_download, "get_path", lambda x: str(mock_file))
-    monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", MockApiDependencies(mock_invoker))
+    mock_deps = MockApiDependencies(mock_invoker)
+    monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
 
     def mock_add_task(*args, **kwargs):
         return None
@@ -93,7 +97,9 @@ def test_get_bulk_download_image(tmp_path: Path, monkeypatch: Any, mock_invoker:
 
 
 def test_get_bulk_download_image_not_found(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
-    monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", MockApiDependencies(mock_invoker))
+    mock_deps = MockApiDependencies(mock_invoker)
+    monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
 
     def mock_add_task(*args, **kwargs):
         return None
@@ -112,7 +118,9 @@ def test_get_bulk_download_image_image_deleted_after_response(
     mock_file.write_text("contents")
 
     monkeypatch.setattr(mock_invoker.services.bulk_download, "get_path", lambda x: str(mock_file))
-    monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", MockApiDependencies(mock_invoker))
+    mock_deps = MockApiDependencies(mock_invoker)
+    monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
 
     client.get("/api/v1/images/download/test.zip")
 
