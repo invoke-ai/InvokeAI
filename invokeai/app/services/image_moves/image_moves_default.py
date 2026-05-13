@@ -780,7 +780,10 @@ class ImageMoveService:
         except OSError as e:
             self._logger.debug("Unable to fsync directory: %s: %s", path, e)
         finally:
-            os.close(dir_fd)
+            try:
+                os.close(dir_fd)
+            except OSError as e:
+                self._logger.debug("Unable to close directory fsync handle: %s: %s", path, e)
 
     def _is_unrecoverable_error(self, error: Exception) -> bool:
         return isinstance(error, RuntimeError) and (

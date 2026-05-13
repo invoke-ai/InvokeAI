@@ -263,7 +263,10 @@ def test_cleanup_empty_source_directories_stays_within_symlinked_root(tmp_path: 
     sibling = tmp_path / "sibling"
     real_root.mkdir()
     sibling.mkdir()
-    linked_root.symlink_to(real_root, target_is_directory=True)
+    try:
+        linked_root.symlink_to(real_root, target_is_directory=True)
+    except OSError as e:
+        pytest.skip(f"symlink creation is not available: {e}")
     nested = linked_root / "old" / "nested"
     nested.mkdir(parents=True)
 
@@ -671,3 +674,20 @@ def test_successful_filesystem_move_fsyncs_files_and_directories(tmp_path: Path)
     fsync_dir.assert_any_call(moved.old_path.parent)
     fsync_dir.assert_any_call(moved.new_thumbnail_path.parent)
     fsync_dir.assert_any_call(moved.old_thumbnail_path.parent)
+
+
+def test_fsync_dir_ignores_platform_close_failures(tmp_path: Path) -> None:
+    service, _records = _service(tmp_path, strategy="date")
+
+    with (
+        patch("invokeai.app.services.image_moves.image_moves_default.os.open", return_value=123),
+        patch(
+            "invokeai.app.services.image_moves.image_moves_default.os.fsync",
+            side_effect=OSError(9, "Bad file descriptor"),
+        ),
+        patch(
+            "invokeai.app.services.image_moves.image_moves_default.os.close",
+            side_effect=OSError(9, "Bad file descriptor"),
+        ),
+    ):
+        service._fsync_dir(tmp_path)

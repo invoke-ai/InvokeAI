@@ -174,8 +174,6 @@ async def upload_image(
     ),
 ) -> ImageDTO:
     """Uploads an image for the current user"""
-    assert_image_move_maintenance_inactive()
-
     # If uploading into a board, verify the user has write access.
     # Public boards allow uploads from any authenticated user.
     if board_id is not None:
@@ -191,6 +189,8 @@ async def upload_image(
             and board.board_visibility != BoardVisibility.Public
         ):
             raise HTTPException(status_code=403, detail="Not authorized to upload to this board")
+
+    assert_image_move_maintenance_inactive()
 
     if not file.content_type or not file.content_type.startswith("image"):
         raise HTTPException(status_code=415, detail="Not an image")
@@ -563,7 +563,12 @@ async def delete_images_from_list(
     current_user: CurrentUserOrDefault,
     image_names: list[str] = Body(description="The list of names of images to delete", embed=True),
 ) -> DeleteImagesResult:
-    assert_image_move_maintenance_inactive()
+    try:
+        assert_image_move_maintenance_inactive()
+    except HTTPException:
+        for image_name in image_names:
+            _assert_image_owner(image_name, current_user)
+        raise
 
     try:
         deleted_images: set[str] = set()
@@ -632,7 +637,12 @@ async def star_images_in_list(
     current_user: CurrentUserOrDefault,
     image_names: list[str] = Body(description="The list of names of images to star", embed=True),
 ) -> StarredImagesResult:
-    assert_image_move_maintenance_inactive()
+    try:
+        assert_image_move_maintenance_inactive()
+    except HTTPException:
+        for image_name in image_names:
+            _assert_image_owner(image_name, current_user)
+        raise
 
     try:
         starred_images: set[str] = set()
@@ -664,7 +674,12 @@ async def unstar_images_in_list(
     current_user: CurrentUserOrDefault,
     image_names: list[str] = Body(description="The list of names of images to unstar", embed=True),
 ) -> UnstarredImagesResult:
-    assert_image_move_maintenance_inactive()
+    try:
+        assert_image_move_maintenance_inactive()
+    except HTTPException:
+        for image_name in image_names:
+            _assert_image_owner(image_name, current_user)
+        raise
 
     try:
         unstarred_images: set[str] = set()
@@ -713,8 +728,6 @@ async def download_images_from_list(
         default=None, description="The board from which image should be downloaded", embed=True
     ),
 ) -> ImagesDownloaded:
-    assert_image_move_maintenance_inactive()
-
     if (image_names is None or len(image_names) == 0) and board_id is None:
         raise HTTPException(status_code=400, detail="No images or board id specified.")
 
@@ -726,6 +739,8 @@ async def download_images_from_list(
     if image_names:
         for name in image_names:
             _assert_image_read_access(name, current_user)
+
+    assert_image_move_maintenance_inactive()
 
     bulk_download_item_id: str = ApiDependencies.invoker.services.bulk_download.generate_item_id(board_id)
 

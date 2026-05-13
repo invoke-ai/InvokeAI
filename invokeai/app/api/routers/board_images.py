@@ -64,9 +64,9 @@ async def add_image_to_board(
     image_name: str = Body(description="The name of the image to add"),
 ) -> AddImagesToBoardResult:
     """Creates a board_image"""
-    assert_image_move_maintenance_inactive()
     _assert_board_write_access(board_id, current_user)
     _assert_image_direct_owner(image_name, current_user)
+    assert_image_move_maintenance_inactive()
     try:
         added_images: set[str] = set()
         affected_boards: set[str] = set()
@@ -98,12 +98,11 @@ async def remove_image_from_board(
     image_name: str = Body(description="The name of the image to remove", embed=True),
 ) -> RemoveImagesFromBoardResult:
     """Removes an image from its board, if it had one"""
-    assert_image_move_maintenance_inactive()
-
     try:
         old_board_id = ApiDependencies.invoker.services.images.get_dto(image_name).board_id or "none"
         if old_board_id != "none":
             _assert_board_write_access(old_board_id, current_user)
+        assert_image_move_maintenance_inactive()
         removed_images: set[str] = set()
         affected_boards: set[str] = set()
         ApiDependencies.invoker.services.board_images.remove_image_from_board(image_name=image_name)
@@ -136,8 +135,14 @@ async def add_images_to_board(
     image_names: list[str] = Body(description="The names of the images to add", embed=True),
 ) -> AddImagesToBoardResult:
     """Adds a list of images to a board"""
-    assert_image_move_maintenance_inactive()
     _assert_board_write_access(board_id, current_user)
+    try:
+        assert_image_move_maintenance_inactive()
+    except HTTPException:
+        for image_name in image_names:
+            _assert_image_direct_owner(image_name, current_user)
+        raise
+
     try:
         added_images: set[str] = set()
         affected_boards: set[str] = set()
@@ -183,7 +188,14 @@ async def remove_images_from_board(
     image_names: list[str] = Body(description="The names of the images to remove", embed=True),
 ) -> RemoveImagesFromBoardResult:
     """Removes a list of images from their board, if they had one"""
-    assert_image_move_maintenance_inactive()
+    try:
+        assert_image_move_maintenance_inactive()
+    except HTTPException:
+        for image_name in image_names:
+            old_board_id = ApiDependencies.invoker.services.images.get_dto(image_name).board_id or "none"
+            if old_board_id != "none":
+                _assert_board_write_access(old_board_id, current_user)
+        raise
 
     try:
         removed_images: set[str] = set()

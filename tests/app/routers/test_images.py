@@ -7,8 +7,10 @@ import pytest
 from fastapi import BackgroundTasks
 from fastapi.testclient import TestClient
 
+from invokeai.app.api.auth_dependencies import get_current_user_or_default
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
+from invokeai.app.services.auth.token_service import TokenData
 from invokeai.app.services.board_records.board_records_common import BoardRecord
 from invokeai.app.services.invoker import Invoker
 
@@ -71,6 +73,8 @@ def prepare_image_maintenance_test(monkeypatch: Any, mock_invoker: Invoker) -> N
     mock_deps = MockApiDependencies(mock_invoker)
     mock_invoker.services.image_moves = MagicMock()
     mock_invoker.services.image_moves.is_maintenance_active.return_value = True
+    monkeypatch.setattr(mock_invoker.services.image_records, "get_user_id", MagicMock(return_value="system"))
+    monkeypatch.setattr(mock_invoker.services.board_image_records, "get_board_for_image", MagicMock(return_value=None))
     monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers.image_move_maintenance.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
@@ -106,6 +110,25 @@ def test_image_operations_are_blocked_during_image_move_maintenance(
     assert response.status_code == 409
     if method != "head":
         assert response.json()["detail"] == "Image storage maintenance is active"
+
+
+def test_image_mutation_checks_access_before_image_move_maintenance(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    prepare_image_maintenance_test(monkeypatch, mock_invoker)
+    monkeypatch.setattr(mock_invoker.services.image_records, "get_user_id", MagicMock(return_value="other-user"))
+
+    async def current_user_override() -> TokenData:
+        return TokenData(user_id="request-user", email="request-user@example.com", is_admin=False)
+
+    app.dependency_overrides[get_current_user_or_default] = current_user_override
+    try:
+        response = client.delete("/api/v1/images/i/test.png")
+
+        assert response.status_code == 403
+        mock_invoker.services.image_moves.is_maintenance_active.assert_not_called()
+    finally:
+        app.dependency_overrides.pop(get_current_user_or_default, None)
 
 
 def test_image_upload_is_blocked_during_image_move_maintenance(
