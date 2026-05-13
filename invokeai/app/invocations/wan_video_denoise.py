@@ -39,6 +39,7 @@ from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineInterme
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import WanConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.wan.sampling_utils import (
+    get_default_latent_channels,
     get_spatial_scale_factor,
     make_noise,
     num_latent_frames_for,
@@ -74,7 +75,12 @@ class WanVideoDenoiseInvocation(BaseInvocation):
     """
 
     transformer: WanTransformerField = InputField(
-        description="Wan transformer field (T2V-A14B or I2V-A14B; optionally dual-expert metadata).",
+        description=(
+            "Wan transformer field. Supported: T2V-A14B and I2V-A14B (dual-expert with "
+            "optional reference image), and TI2V-5B (single-expert, text-to-video only — "
+            "TI2V-5B image-to-video uses a different conditioning scheme not yet implemented "
+            "in this node)."
+        ),
         input=Input.Connection,
         title="Transformer",
     )
@@ -147,14 +153,6 @@ class WanVideoDenoiseInvocation(BaseInvocation):
         inference_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
 
         variant = _resolve_variant(context, self.transformer)
-        if variant == WanVariantType.TI2V_5B:
-            # TI2V-5B has a different VAE (spatial 16x, 48 latent channels)
-            # and a different temporal compression. Out of scope for the
-            # minimal video path; the user can extend later.
-            raise ValueError(
-                "Wan 2.2 TI2V-5B is not supported by the video denoise node yet. "
-                "Use a T2V-A14B or I2V-A14B transformer for video generation."
-            )
         spatial_scale = get_spatial_scale_factor(variant)
 
         # Reuse the image denoise's scheduler construction so we pick up whatever
@@ -183,6 +181,17 @@ class WanVideoDenoiseInvocation(BaseInvocation):
         # (single-frame) or its video counterpart (multi-frame).
         ref_condition: torch.Tensor | None = None
         if self.ref_image is not None:
+            if variant == WanVariantType.TI2V_5B:
+                # TI2V-5B uses a fundamentally different I2V conditioning scheme
+                # (diffusers' ``expand_timesteps`` path: blend with first_frame_mask
+                # and per-position timestep gating, see pipeline_wan_i2v.py:757-764).
+                # T2V with TI2V-5B works without the ref image; I2V will be a
+                # separate node or path once implemented.
+                raise ValueError(
+                    "Wan 2.2 TI2V-5B image-to-video is not yet supported by this node. "
+                    "TI2V-5B works for text-to-video here (remove the Reference Image "
+                    "input). For image-to-video, use the I2V-A14B model."
+                )
             if variant != WanVariantType.I2V_A14B:
                 raise ValueError(
                     f"Reference-image conditioning is only supported by the Wan 2.2 I2V variant. "
@@ -211,7 +220,8 @@ class WanVideoDenoiseInvocation(BaseInvocation):
         # fp32 latents through the loop; cast to inference_dtype only when
         # calling the transformer (same as wan_denoise).
         latent_dtype = torch.float32
-        latent_channels = 16  # A14B default; TI2V-5B is excluded above.
+        # 48 for TI2V-5B (Wan 2.2-VAE z_dim=48), 16 for A14B variants.
+        latent_channels = get_default_latent_channels(variant)
         t_lat = num_latent_frames_for(self.num_frames)
 
         latents = make_noise(
