@@ -1,8 +1,14 @@
 import { Flex } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
+import { useAppSelector } from 'app/store/storeHooks';
+import { selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { VideoDTO } from 'services/api/types';
 
+import { useImageViewerContext } from './context';
 import { NoContentForViewer } from './NoContentForViewer';
+import { ProgressImage } from './ProgressImage2';
+import { ProgressIndicator } from './ProgressIndicator2';
 import { VideoPlayButtonOverlay } from './VideoPlayButtonOverlay';
 
 type Props = {
@@ -21,11 +27,21 @@ type Props = {
  *
  * Changing the selected video swaps the element via `key={videoName}`, which discards the
  * old playback state cleanly.
+ *
+ * Mirrors CurrentImagePreview's progress overlay so denoise previews from a new render
+ * appear on top of the previously-loaded video. Without this, a freshly generated render's
+ * progress images had nowhere to display whenever a video was the last-selected gallery
+ * item (and the user only saw the static first-frame still until the new video finished).
  */
 export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   const videoName = videoDTO?.video_name ?? null;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
+  const { $progressEvent, $progressImage } = useImageViewerContext();
+  const progressEvent = useStore($progressEvent);
+  const progressImage = useStore($progressImage);
+  const withProgress = shouldShowProgressInViewer && progressImage !== null;
 
   // Whenever the selected video changes, drop back to the idle still + play overlay.
   useEffect(() => {
@@ -63,7 +79,15 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
           background: 'black',
         }}
       />
-      {!isPlaying && <VideoPlayButtonOverlay onClick={handlePlay} />}
+      {!isPlaying && !withProgress && <VideoPlayButtonOverlay onClick={handlePlay} />}
+      {withProgress && (
+        <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center" bg="base.900">
+          <ProgressImage progressImage={progressImage} />
+          {progressEvent && (
+            <ProgressIndicator progressEvent={progressEvent} position="absolute" top={6} right={6} size={8} />
+          )}
+        </Flex>
+      )}
     </Flex>
   );
 });
