@@ -6,6 +6,7 @@ from typing import Optional
 
 from fastapi import Body, HTTPException, Query, Request, Response, UploadFile
 from fastapi import Path as PathParam
+from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
@@ -42,6 +43,12 @@ ACCEPTED_VIDEO_EXTENSIONS = (".mp4",)
 
 # Per-chunk size for HTTP Range responses (1 MB)
 RANGE_CHUNK_SIZE = 1024 * 1024
+
+# Upload streaming chunk size (1 MB) and a coarse per-upload size cap. The cap is generous
+# because Wan-generated MP4s for long sequences can run into the hundreds of megabytes;
+# the goal is to prevent a single client from exhausting RAM, not to be a content policy.
+UPLOAD_CHUNK_SIZE = 1024 * 1024
+MAX_UPLOAD_SIZE = 1024 * 1024 * 1024  # 1 GB
 
 
 def _assert_video_owner(video_name: str, current_user: CurrentUserOrDefault) -> None:
@@ -180,11 +187,21 @@ async def upload_video(
         raise HTTPException(status_code=415, detail="Not a supported video file")
 
     # Stream the upload to a tmp file so we can probe and then hand its path to the service.
+    # Reading the full body into memory first risked exhausting RAM on multi-GB uploads;
+    # chunk-stream instead and enforce a hard size cap.
     tmp = tempfile.NamedTemporaryFile(prefix="invokeai_upload_", suffix=".mp4", delete=False)
     tmp_path = Path(tmp.name)
     try:
-        contents = await file.read()
-        tmp.write(contents)
+        total = 0
+        while chunk := await file.read(UPLOAD_CHUNK_SIZE):
+            total += len(chunk)
+            if total > MAX_UPLOAD_SIZE:
+                tmp.close()
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Video upload exceeds maximum size ({MAX_UPLOAD_SIZE} bytes)",
+                )
+            tmp.write(chunk)
         tmp.close()
 
         try:
@@ -406,12 +423,13 @@ async def get_video_full(
         )
 
     if range_header is None:
-        with open(path, "rb") as f:
-            content = f.read()
-        return Response(
-            content,
+        # Stream the file via sendfile() rather than reading it into RAM — multi-GB
+        # MP4 downloads (clients without Range, CLI tools, CDN edge fetches) would
+        # otherwise allocate a multi-GB Python bytes object per request.
+        return FileResponse(
+            path,
             media_type="video/mp4",
-            headers={**common_headers, "Content-Length": str(file_size)},
+            headers=common_headers,
         )
 
     parsed = _parse_range_header(range_header, file_size)
@@ -456,11 +474,11 @@ async def get_video_thumbnail(
     """Returns the first-frame WebP thumbnail of a video. Unauthenticated; UUIDs provide unguessability."""
     try:
         path = ApiDependencies.invoker.services.videos.get_path(video_name, thumbnail=True)
-        with open(path, "rb") as f:
-            content = f.read()
-        response = Response(content, media_type="image/webp")
-        response.headers["Cache-Control"] = f"max-age={VIDEO_MAX_AGE}"
-        return response
+        return FileResponse(
+            path,
+            media_type="image/webp",
+            headers={"Cache-Control": f"max-age={VIDEO_MAX_AGE}"},
+        )
     except Exception:
         raise HTTPException(status_code=404)
 
