@@ -689,9 +689,7 @@ def test_admin_can_change_any_board_visibility(client: TestClient, admin_token: 
 # ---------------------------------------------------------------------------
 
 
-def test_delete_board_with_include_images_cascades_videos(
-    client: TestClient, mock_invoker: Invoker, user1_token: str
-):
+def test_delete_board_with_include_images_cascades_videos(client: TestClient, mock_invoker: Invoker, user1_token: str):
     """include_images=true must also call delete_videos_on_board (not image-only)."""
     create = client.post(
         "/api/v1/boards/?board_name=Cascade+Test+Board",

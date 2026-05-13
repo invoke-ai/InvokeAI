@@ -150,9 +150,7 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
             for i, frames in enumerate(clip_frames):
                 # Each non-edge clip uses transition_frames from both its head and tail.
                 head_need = 0 if i == 0 else (tf if self.transition == "crossfade" else head_half)
-                tail_need = (
-                    0 if i == len(clip_frames) - 1 else (tf if self.transition == "crossfade" else tail_half)
-                )
+                tail_need = 0 if i == len(clip_frames) - 1 else (tf if self.transition == "crossfade" else tail_half)
                 if head_need + tail_need > len(frames):
                     raise ValueError(
                         f"Clip {i} has {len(frames)} frames but the requested transitions need "

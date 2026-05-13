@@ -73,9 +73,7 @@ class TestPostconditions:
         ],
     )
     @pytest.mark.parametrize("rounding", ["nearest", "floor", "ceiling"])
-    def test_output_dims_are_multiples_of_16(
-        self, w: int, h: int, target: str, rounding: str
-    ) -> None:
+    def test_output_dims_are_multiples_of_16(self, w: int, h: int, target: str, rounding: str) -> None:
         ow, oh = _resolve(w, h, target=target, rounding=rounding)
         assert ow % 16 == 0
         assert oh % 16 == 0
@@ -130,5 +128,7 @@ class TestInputValidation:
 
         with pytest.raises(ValidationError):
             WanI2VIdealDimensionsInvocation(
-                width=1920, height=1080, target_resolution="2160p"  # type: ignore[arg-type]
+                width=1920,
+                height=1080,
+                target_resolution="2160p",  # type: ignore[arg-type]
             )

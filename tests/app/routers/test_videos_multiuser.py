@@ -164,9 +164,7 @@ def test_get_video_names_forbidden_for_other_users_private_board(
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
-def test_owner_can_list_videos_on_their_private_board(
-    client: TestClient, user1_private_board: str, user1_token: str
-):
+def test_owner_can_list_videos_on_their_private_board(client: TestClient, user1_private_board: str, user1_token: str):
     response = client.get(
         f"/api/v1/videos/?board_id={user1_private_board}",
         headers={"Authorization": f"Bearer {user1_token}"},
@@ -174,9 +172,7 @@ def test_owner_can_list_videos_on_their_private_board(
     assert response.status_code == status.HTTP_200_OK
 
 
-def test_admin_can_list_videos_on_any_private_board(
-    client: TestClient, user1_private_board: str, admin_token: str
-):
+def test_admin_can_list_videos_on_any_private_board(client: TestClient, user1_private_board: str, admin_token: str):
     response = client.get(
         f"/api/v1/videos/?board_id={user1_private_board}",
         headers={"Authorization": f"Bearer {admin_token}"},
@@ -189,9 +185,7 @@ def test_admin_can_list_videos_on_any_private_board(
 # ---------------------------------------------------------------------------
 
 
-def test_list_video_dtos_no_board_id_succeeds_for_any_authed_user(
-    client: TestClient, user2_token: str
-):
+def test_list_video_dtos_no_board_id_succeeds_for_any_authed_user(client: TestClient, user2_token: str):
     """The route allows omitted board_id (the SQL layer filters by user_id) — no 403 here."""
     response = client.get(
         "/api/v1/videos/",
@@ -200,9 +194,7 @@ def test_list_video_dtos_no_board_id_succeeds_for_any_authed_user(
     assert response.status_code == status.HTTP_200_OK
 
 
-def test_list_video_dtos_none_board_succeeds_for_any_authed_user(
-    client: TestClient, user2_token: str
-):
+def test_list_video_dtos_none_board_succeeds_for_any_authed_user(client: TestClient, user2_token: str):
     response = client.get(
         "/api/v1/videos/?board_id=none",
         headers={"Authorization": f"Bearer {user2_token}"},
