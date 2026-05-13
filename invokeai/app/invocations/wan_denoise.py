@@ -82,6 +82,34 @@ def _scheduler_path_for_transformer(context: InvocationContext, transformer_fiel
     return None
 
 
+def _default_scheduler_for_variant(variant: WanVariantType):
+    """Build a variant-appropriate scheduler when no on-disk config is available.
+
+    Standalone GGUF / single-file installs don't ship a ``scheduler/`` directory,
+    so we have to reconstruct the scheduler from variant knowledge. Values are
+    verbatim from each variant's ``scheduler/scheduler_config.json`` in the
+    matching ``Wan-AI/Wan2.2-*-Diffusers`` repo.
+    """
+    from diffusers import FlowMatchEulerDiscreteScheduler, UniPCMultistepScheduler
+
+    if variant == WanVariantType.TI2V_5B:
+        # Wan-AI/Wan2.2-TI2V-5B-Diffusers/scheduler/scheduler_config.json. The
+        # combination of flow_prediction + use_flow_sigmas + flow_shift=5.0 is
+        # what differentiates this from a generic UniPC schedule; without it
+        # samples drift on this model.
+        return UniPCMultistepScheduler(
+            num_train_timesteps=1000,
+            solver_order=2,
+            prediction_type="flow_prediction",
+            flow_shift=5.0,
+            use_flow_sigmas=True,
+            solver_type="bh2",
+            final_sigmas_type="zero",
+        )
+    # A14B variants ship FlowMatchEulerDiscreteScheduler at default settings.
+    return FlowMatchEulerDiscreteScheduler()
+
+
 class _ExpertSwapper:
     """Manages GPU residency and LoRA patching of one or two Wan transformer experts.
 
@@ -534,8 +562,12 @@ class WanDenoiseInvocation(BaseInvocation):
         ``UniPCMultistepScheduler`` with ``flow_shift=5.0``, while the
         standard A14B reference uses ``FlowMatchEulerDiscreteScheduler``.
         We dispatch on ``_class_name`` so the noise schedule matches what the
-        model was trained against. Falls back to ``FlowMatchEulerDiscreteScheduler``
-        defaults when no on-disk config is available.
+        model was trained against. When no on-disk config is available
+        (standalone GGUF / single-file installs that don't ship a
+        ``scheduler/`` directory), fall back to a variant-aware default —
+        TI2V-5B gets its UniPC scheduler with the right flow params instead
+        of the generic FlowMatchEuler, which otherwise produces drifty
+        samples for that model.
         """
         import json
 
@@ -544,7 +576,8 @@ class WanDenoiseInvocation(BaseInvocation):
 
         scheduler_dir = _scheduler_path_for_transformer(context, self.transformer)
         if scheduler_dir is None:
-            return FlowMatchEulerDiscreteScheduler()
+            variant = _resolve_variant(context, self.transformer)
+            return _default_scheduler_for_variant(variant)
 
         # Read the on-disk class name and instantiate that class. Diffusers'
         # SchedulerMixin.from_pretrained does class dispatch internally, but

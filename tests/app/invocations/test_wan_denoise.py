@@ -760,3 +760,31 @@ class TestWanDenoiseInpaint:
         out = inv._run_diffusion(ctx)
         assert out.shape == (1, 16, 8, 8)
         assert torch.isfinite(out).all()
+
+
+class TestDefaultSchedulerForVariant:
+    """``_default_scheduler_for_variant`` returns the right class + config when no
+    on-disk ``scheduler/`` directory exists (the standalone GGUF / single-file case).
+    """
+
+    def test_ti2v_5b_returns_unipc_with_flow_config(self) -> None:
+        from diffusers import UniPCMultistepScheduler
+
+        from invokeai.app.invocations.wan_denoise import _default_scheduler_for_variant
+
+        s = _default_scheduler_for_variant(WanVariantType.TI2V_5B)
+        assert isinstance(s, UniPCMultistepScheduler)
+        # The combination below is what makes this a "Wan flow" UniPC rather than a
+        # generic UniPC schedule — wrong values here drift on TI2V-5B samples.
+        assert s.config.flow_shift == 5.0
+        assert s.config.prediction_type == "flow_prediction"
+        assert s.config.use_flow_sigmas is True
+        assert s.config.solver_type == "bh2"
+
+    def test_a14b_variants_return_flow_match_euler(self) -> None:
+        from diffusers import FlowMatchEulerDiscreteScheduler
+
+        from invokeai.app.invocations.wan_denoise import _default_scheduler_for_variant
+
+        for v in (WanVariantType.T2V_A14B, WanVariantType.I2V_A14B):
+            assert isinstance(_default_scheduler_for_variant(v), FlowMatchEulerDiscreteScheduler)
