@@ -158,6 +158,11 @@ class SqliteVideoRecordStorage(VideoRecordStorageBase):
             elif board_id is not None:
                 query_conditions += " AND board_videos.board_id = ? "
                 query_params.append(board_id)
+            elif user_id is not None and not is_admin:
+                # No board_id supplied — still enforce per-user isolation so
+                # non-admin callers cannot enumerate other users' videos.
+                query_conditions += " AND videos.user_id = ? "
+                query_params.append(user_id)
 
             if search_term:
                 query_conditions += " AND (videos.metadata LIKE ? OR videos.created_at LIKE ?) "
@@ -307,6 +312,11 @@ class SqliteVideoRecordStorage(VideoRecordStorageBase):
             elif board_id is not None:
                 query_conditions += " AND board_videos.board_id = ? "
                 query_params.append(board_id)
+            elif user_id is not None and not is_admin:
+                # No board_id supplied — still enforce per-user isolation so
+                # non-admin callers cannot enumerate other users' videos.
+                query_conditions += " AND videos.user_id = ? "
+                query_params.append(user_id)
 
             if search_term:
                 query_conditions += " AND (videos.metadata LIKE ? OR videos.created_at LIKE ?) "

@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers.images import _assert_board_read_access
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
@@ -63,6 +64,43 @@ def _assert_video_owner(video_name: str, current_user: CurrentUserOrDefault) -> 
             pass
 
     raise HTTPException(status_code=403, detail="Not authorized to modify this video")
+
+
+def _assert_video_direct_owner(video_name: str, current_user: CurrentUserOrDefault) -> None:
+    """Raise 403 if the current user is not the direct owner of the video.
+
+    Intentionally stricter than _assert_video_owner: board-ownership and public-board
+    fallbacks are NOT honored. Mirrors _assert_image_direct_owner in board_images.py —
+    board-move operations need to verify the *original* owner, otherwise a user could
+    move someone else's video onto their own board via the board-owner branch.
+    """
+    if current_user.is_admin:
+        return
+    owner = ApiDependencies.invoker.services.video_records.get_user_id(video_name)
+    if owner is not None and owner == current_user.user_id:
+        return
+    raise HTTPException(status_code=403, detail="Not authorized to move this video")
+
+
+def _assert_board_write_access(board_id: str, current_user: CurrentUserOrDefault) -> None:
+    """Raise 403 if the current user may not mutate the given board.
+
+    Mirrors _assert_board_write_access in board_images.py: admins and the board owner
+    may write; public boards accept contributions from any user.
+    """
+    from invokeai.app.services.board_records.board_records_common import BoardVisibility
+
+    try:
+        board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Board not found")
+    if current_user.is_admin:
+        return
+    if board.user_id == current_user.user_id:
+        return
+    if board.board_visibility == BoardVisibility.Public:
+        return
+    raise HTTPException(status_code=403, detail="Not authorized to modify this board")
 
 
 def _assert_video_read_access(video_name: str, current_user: CurrentUserOrDefault) -> None:
@@ -456,6 +494,10 @@ async def list_video_dtos(
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
 ) -> OffsetPaginatedResults[VideoDTO]:
     """Gets a list of video DTOs for the current user."""
+    # Validate that the caller can read from this board. "none" is handled by the SQL layer.
+    if board_id is not None and board_id != "none":
+        _assert_board_read_access(board_id, current_user)
+
     return ApiDependencies.invoker.services.videos.get_many(
         offset,
         limit,
@@ -486,6 +528,10 @@ async def get_video_names(
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
 ) -> VideoNamesResult:
     """Gets ordered list of video names with metadata for optimistic updates."""
+    # Validate that the caller can read from this board. "none" is handled by the SQL layer.
+    if board_id is not None and board_id != "none":
+        _assert_board_read_access(board_id, current_user)
+
     try:
         return ApiDependencies.invoker.services.videos.get_video_names(
             starred_first=starred_first,
@@ -560,7 +606,8 @@ async def add_video_to_board(
     current_user: CurrentUserOrDefault,
     arg: VideoBoardArg = Body(),
 ) -> VideoDTO:
-    _assert_video_owner(arg.video_name, current_user)
+    _assert_board_write_access(arg.board_id, current_user)
+    _assert_video_direct_owner(arg.video_name, current_user)
     try:
         ApiDependencies.invoker.services.board_video_records.add_video_to_board(
             board_id=arg.board_id, video_name=arg.video_name
@@ -579,7 +626,10 @@ async def remove_video_from_board(
     current_user: CurrentUserOrDefault,
     video_name: str = Body(description="The name of the video to remove from its board", embed=True),
 ) -> VideoDTO:
-    _assert_video_owner(video_name, current_user)
+    _assert_video_direct_owner(video_name, current_user)
+    old_board_id = ApiDependencies.invoker.services.board_video_records.get_board_for_video(video_name)
+    if old_board_id is not None:
+        _assert_board_write_access(old_board_id, current_user)
     try:
         ApiDependencies.invoker.services.board_video_records.remove_video_from_board(video_name=video_name)
         return ApiDependencies.invoker.services.videos.get_dto(video_name)

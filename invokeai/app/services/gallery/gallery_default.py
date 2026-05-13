@@ -252,6 +252,11 @@ class SqliteGalleryService(GalleryServiceABC):
         elif board_id is not None:
             conditions += f" AND {join_table}.board_id = ? "
             params.append(board_id)
+        elif user_id is not None and not is_admin:
+            # No board_id supplied — still enforce per-user isolation so
+            # non-admin callers cannot enumerate other users' items.
+            conditions += f" AND {base_table}.user_id = ? "
+            params.append(user_id)
 
         if search_term:
             conditions += f" AND ({base_table}.metadata LIKE ? OR {base_table}.created_at LIKE ?) "
