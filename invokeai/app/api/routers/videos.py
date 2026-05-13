@@ -18,7 +18,9 @@ from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.video_records.video_records_common import VideoNamesResult, VideoRecordChanges
 from invokeai.app.services.videos.videos_common import (
+    AddVideosToBoardResult,
     DeleteVideosResult,
+    RemoveVideosFromBoardResult,
     StarredVideosResult,
     UnstarredVideosResult,
     VideoDTO,
@@ -600,19 +602,27 @@ class VideoBoardArg(BaseModel):
 @videos_router.post(
     "/board",
     operation_id="add_video_to_board",
-    response_model=VideoDTO,
+    response_model=AddVideosToBoardResult,
 )
 async def add_video_to_board(
     current_user: CurrentUserOrDefault,
     arg: VideoBoardArg = Body(),
-) -> VideoDTO:
+) -> AddVideosToBoardResult:
     _assert_board_write_access(arg.board_id, current_user)
     _assert_video_direct_owner(arg.video_name, current_user)
     try:
+        # Capture the source board BEFORE mutating so the frontend can invalidate both
+        # the old and new board caches. Mirrors add_image_to_board.
+        old_board_id = (
+            ApiDependencies.invoker.services.board_video_records.get_board_for_video(arg.video_name) or "none"
+        )
         ApiDependencies.invoker.services.board_video_records.add_video_to_board(
             board_id=arg.board_id, video_name=arg.video_name
         )
-        return ApiDependencies.invoker.services.videos.get_dto(arg.video_name)
+        return AddVideosToBoardResult(
+            added_videos=[arg.video_name],
+            affected_boards=list({arg.board_id, old_board_id}),
+        )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to add video to board")
 
@@ -620,18 +630,21 @@ async def add_video_to_board(
 @videos_router.delete(
     "/board",
     operation_id="remove_video_from_board",
-    response_model=VideoDTO,
+    response_model=RemoveVideosFromBoardResult,
 )
 async def remove_video_from_board(
     current_user: CurrentUserOrDefault,
     video_name: str = Body(description="The name of the video to remove from its board", embed=True),
-) -> VideoDTO:
+) -> RemoveVideosFromBoardResult:
     _assert_video_direct_owner(video_name, current_user)
     old_board_id = ApiDependencies.invoker.services.board_video_records.get_board_for_video(video_name)
     if old_board_id is not None:
         _assert_board_write_access(old_board_id, current_user)
     try:
         ApiDependencies.invoker.services.board_video_records.remove_video_from_board(video_name=video_name)
-        return ApiDependencies.invoker.services.videos.get_dto(video_name)
+        return RemoveVideosFromBoardResult(
+            removed_videos=[video_name],
+            affected_boards=list({old_board_id or "none", "none"}),
+        )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to remove video from board")

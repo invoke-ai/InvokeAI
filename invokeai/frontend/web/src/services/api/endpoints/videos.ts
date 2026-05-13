@@ -222,7 +222,7 @@ export const videosApi = api.injectEndpoints({
     }),
 
     addVideoToBoard: build.mutation<
-      VideoDTO,
+      paths['/api/v1/videos/board']['post']['responses']['200']['content']['application/json'],
       paths['/api/v1/videos/board']['post']['requestBody']['content']['application/json']
     >({
       query: (body) => ({
@@ -230,19 +230,19 @@ export const videosApi = api.injectEndpoints({
         method: 'POST',
         body,
       }),
-      invalidatesTags: (result, error, arg) => {
+      invalidatesTags: (result) => {
         if (!result) {
           return [];
         }
         return [
-          ...getTagsToInvalidateForVideoMutation([result.video_name]),
-          ...getTagsToInvalidateForBoardAffectingMutation([arg.board_id, 'none']),
+          ...getTagsToInvalidateForVideoMutation(result.added_videos),
+          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
         ];
       },
     }),
 
     removeVideoFromBoard: build.mutation<
-      VideoDTO,
+      paths['/api/v1/videos/board']['delete']['responses']['200']['content']['application/json'],
       paths['/api/v1/videos/board']['delete']['requestBody']['content']['application/json']
     >({
       query: (body) => ({
@@ -255,8 +255,8 @@ export const videosApi = api.injectEndpoints({
           return [];
         }
         return [
-          ...getTagsToInvalidateForVideoMutation([result.video_name]),
-          ...getTagsToInvalidateForBoardAffectingMutation([result.board_id ?? 'none']),
+          ...getTagsToInvalidateForVideoMutation(result.removed_videos),
+          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
         ];
       },
     }),
