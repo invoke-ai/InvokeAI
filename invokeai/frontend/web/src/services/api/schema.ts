@@ -3118,6 +3118,19 @@ export type components = {
              */
             type: "add";
         };
+        /** AddVideosToBoardResult */
+        AddVideosToBoardResult: {
+            /**
+             * Affected Boards
+             * @description The ids of boards affected by the operation
+             */
+            affected_boards: string[];
+            /**
+             * Added Videos
+             * @description The video names that were added to the board
+             */
+            added_videos: string[];
+        };
         /**
          * AdminUserCreateRequest
          * @description Request body for admin to create a new user.
@@ -8499,6 +8512,16 @@ export type components = {
              * @description The names of the images that were deleted.
              */
             deleted_images: string[];
+            /**
+             * Deleted Board Videos
+             * @description The video names of the board-videos relationships that were deleted.
+             */
+            deleted_board_videos?: string[];
+            /**
+             * Deleted Videos
+             * @description The names of the videos that were deleted.
+             */
+            deleted_videos?: string[];
         };
         /**
          * DeleteByDestinationResult
@@ -27283,6 +27306,19 @@ export type components = {
              */
             removed_images: string[];
         };
+        /** RemoveVideosFromBoardResult */
+        RemoveVideosFromBoardResult: {
+            /**
+             * Affected Boards
+             * @description The ids of boards affected by the operation
+             */
+            affected_boards: string[];
+            /**
+             * Removed Videos
+             * @description The video names that were removed from their board
+             */
+            removed_videos: string[];
+        };
         /**
          * Resize Latents
          * @description Resizes latents to explicit width/height (in pixels). Provided dimensions are floor-divided by 8.
@@ -32680,8 +32716,10 @@ export type components = {
          *       consumes ``transition_frames`` from both adjacent clips, so total length is
          *       ``sum(inputs) - transition_frames * (n - 1)``.
          *     * ``fade_through_black`` — A fades to black, then B fades in from black. Each boundary
-         *       consumes ``transition_frames / 2`` from both adjacent clips and emits
-         *       ``transition_frames`` output frames, so total length equals the sum of inputs.
+         *       consumes ``transition_frames // 2`` frames from the preceding clip's tail and the
+         *       remainder (``transition_frames - transition_frames // 2``) from the next clip's head,
+         *       so the total emitted is exactly ``transition_frames`` per boundary — even for odd
+         *       ``transition_frames`` — and the overall length equals the sum of inputs.
          *
          *     All inputs must share the same pixel dimensions. Output frame rate defaults to the
          *     first input's fps; override with ``fps`` to force a specific rate (the frames are not
@@ -38426,7 +38464,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["VideoDTO"];
+                    "application/json": components["schemas"]["AddVideosToBoardResult"];
                 };
             };
             /** @description Validation Error */
@@ -38459,7 +38497,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["VideoDTO"];
+                    "application/json": components["schemas"]["RemoveVideosFromBoardResult"];
                 };
             };
             /** @description Validation Error */

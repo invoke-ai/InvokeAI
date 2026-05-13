@@ -76,15 +76,42 @@ class VideoFrameExtractInvocation(BaseInvocation, WithMetadata, WithBoard):
 
 
 def _decoder_frame_count(video_path) -> int | None:
-    """Return the exact decoded frame count, or None if the FFMPEG plugin can't determine it.
+    """Return the exact decoded frame count, or None if neither backend can determine it.
 
-    Querying improps avoids the duration*fps approximation that bites VFR uploads.
+    Tries imageio's improps first (works for a handful of codecs that expose nframes in
+    container metadata). For libx264 streams imageio reports ``inf``, so we fall through
+    to cv2's ``CAP_PROP_FRAME_COUNT`` which reads the actual packet count. Both sources
+    are preferred over the ``duration * fps`` estimate used by the legacy code path,
+    which can overshoot by one on VFR uploads or containers with imprecise metadata.
     """
+    import math
+
     try:
         props = iio.improps(video_path, plugin="FFMPEG")
     except Exception:
+        props = None
+    shape = getattr(props, "shape", None) if props is not None else None
+    if shape:
+        n = shape[0]
+        if not (isinstance(n, float) and not math.isfinite(n)):
+            try:
+                return int(n)
+            except (TypeError, ValueError, OverflowError):
+                pass
+
+    # Fallback: cv2 reads libx264 frame counts exactly. We only import cv2 here because
+    # it's a heavy module and the improps path covers other codecs without paying that cost.
+    try:
+        import cv2
+
+        capture = cv2.VideoCapture(str(video_path))
+        if not capture.isOpened():
+            capture.release()
+            return None
+        try:
+            count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+        finally:
+            capture.release()
+        return count if count > 0 else None
+    except Exception:
         return None
-    shape = getattr(props, "shape", None)
-    if not shape:
-        return None
-    return int(shape[0])
