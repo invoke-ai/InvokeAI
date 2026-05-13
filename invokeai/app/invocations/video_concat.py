@@ -80,8 +80,10 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
       consumes ``transition_frames`` from both adjacent clips, so total length is
       ``sum(inputs) - transition_frames * (n - 1)``.
     * ``fade_through_black`` — A fades to black, then B fades in from black. Each boundary
-      consumes ``transition_frames / 2`` from both adjacent clips and emits
-      ``transition_frames`` output frames, so total length equals the sum of inputs.
+      consumes ``transition_frames // 2`` frames from the preceding clip's tail and the
+      remainder (``transition_frames - transition_frames // 2``) from the next clip's head,
+      so the total emitted is exactly ``transition_frames`` per boundary — even for odd
+      ``transition_frames`` — and the overall length equals the sum of inputs.
 
     All inputs must share the same pixel dimensions. Output frame rate defaults to the
     first input's fps; override with ``fps`` to force a specific rate (the frames are not
@@ -140,10 +142,17 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Validate transition windows fit within the surrounding clips.
         if self.transition != "cut" and self.transition_frames > 0:
             tf = self.transition_frames
+            # For fade_through_black, split tf asymmetrically so an odd tf still emits exactly
+            # tf frames (per the docstring contract). tail_half is consumed from the previous
+            # clip's tail (the fade-out), head_half from the next clip's head (the fade-in).
+            tail_half = tf // 2
+            head_half = tf - tail_half
             for i, frames in enumerate(clip_frames):
                 # Each non-edge clip uses transition_frames from both its head and tail.
-                head_need = 0 if i == 0 else (tf if self.transition == "crossfade" else tf // 2)
-                tail_need = 0 if i == len(clip_frames) - 1 else (tf if self.transition == "crossfade" else tf // 2)
+                head_need = 0 if i == 0 else (tf if self.transition == "crossfade" else head_half)
+                tail_need = (
+                    0 if i == len(clip_frames) - 1 else (tf if self.transition == "crossfade" else tail_half)
+                )
                 if head_need + tail_need > len(frames):
                     raise ValueError(
                         f"Clip {i} has {len(frames)} frames but the requested transitions need "
@@ -210,18 +219,21 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
                     output.extend(_crossfade(a_tail, b_head))
             return output
 
-        # fade_through_black: each boundary consumes tf // 2 from each side and emits tf
-        # frames of "fade out + fade in" — preserving total length when tf is even.
-        half = tf // 2
-        if half == 0:
+        # fade_through_black: each boundary emits exactly `tf` frames. To preserve that
+        # contract for odd tf, the fade-out (consumed from clip[i] tail) gets tf // 2 frames
+        # and the fade-in (consumed from clip[i+1] head) gets the remainder. Even tf is
+        # symmetric as before.
+        tail_half = tf // 2
+        head_half = tf - tail_half
+        if tail_half == 0 and head_half == 0:
             return [f for frames in clip_frames for f in frames]
         output_ftb: list[np.ndarray] = []
         for i, frames in enumerate(clip_frames):
-            head_trim = 0 if i == 0 else half
-            tail_trim = 0 if i == len(clip_frames) - 1 else half
+            head_trim = 0 if i == 0 else head_half
+            tail_trim = 0 if i == len(clip_frames) - 1 else tail_half
             output_ftb.extend(frames[head_trim : len(frames) - tail_trim])
             if i < len(clip_frames) - 1:
-                a_tail = frames[len(frames) - tail_trim :]
-                b_head = clip_frames[i + 1][:half]
+                a_tail = frames[len(frames) - tail_trim :] if tail_trim else []
+                b_head = clip_frames[i + 1][:head_half] if head_half else []
                 output_ftb.extend(_fade_through_black(a_tail, b_head))
         return output_ftb

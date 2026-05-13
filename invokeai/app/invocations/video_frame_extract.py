@@ -6,6 +6,8 @@ externally to get a video longer than the model's single-shot frame budget.
 Also useful as a general-purpose video-to-image step.
 """
 
+import imageio.v3 as iio
+
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import (
     InputField,
@@ -44,16 +46,21 @@ class VideoFrameExtractInvocation(BaseInvocation, WithMetadata, WithBoard):
         video_path = context.videos.get_path(self.video.video_name)
 
         # Resolve negative indices against the actual frame count rather than
-        # trusting imageio plugins to accept index=-1 uniformly.
+        # trusting imageio plugins to accept index=-1 uniformly. Use the decoder's
+        # frame count (iio.improps) when available — duration*fps can be off-by-one
+        # for VFR uploads or containers with approximate metadata, causing
+        # frame_index=-1 to point past the final frame.
         index = self.frame_index
         if index < 0:
-            _, _, duration, fps = probe_video(video_path)
-            if not fps or duration <= 0:
-                raise ValueError(
-                    f"Cannot resolve negative frame index for video {self.video.video_name}: "
-                    f"probe returned duration={duration}, fps={fps}."
-                )
-            n_frames = int(round(duration * fps))
+            n_frames = _decoder_frame_count(video_path)
+            if n_frames is None:
+                _, _, duration, fps = probe_video(video_path)
+                if not fps or duration <= 0:
+                    raise ValueError(
+                        f"Cannot resolve negative frame index for video {self.video.video_name}: "
+                        f"probe returned duration={duration}, fps={fps}."
+                    )
+                n_frames = int(round(duration * fps))
             if n_frames <= 0:
                 raise ValueError(f"Video {self.video.video_name} has no decodable frames (probed {n_frames}).")
             index = n_frames + index
@@ -66,3 +73,18 @@ class VideoFrameExtractInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         image_dto = context.images.save(image=frame)
         return ImageOutput.build(image_dto=image_dto)
+
+
+def _decoder_frame_count(video_path) -> int | None:
+    """Return the exact decoded frame count, or None if the FFMPEG plugin can't determine it.
+
+    Querying improps avoids the duration*fps approximation that bites VFR uploads.
+    """
+    try:
+        props = iio.improps(video_path, plugin="FFMPEG")
+    except Exception:
+        return None
+    shape = getattr(props, "shape", None)
+    if not shape:
+        return None
+    return int(shape[0])
