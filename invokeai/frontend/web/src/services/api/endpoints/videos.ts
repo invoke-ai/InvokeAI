@@ -263,20 +263,23 @@ export const videosApi = api.injectEndpoints({
   }),
 });
 
-// Hooks consumed by Phase 3 (upload) and Phase 4 (gallery grid).
-export const { useUploadVideoMutation, useGetVideoDTOQuery, useStarVideosMutation, useUnstarVideosMutation } =
-  videosApi;
+export const {
+  useUploadVideoMutation,
+  useGetVideoDTOQuery,
+  useStarVideosMutation,
+  useUnstarVideosMutation,
+  useDeleteVideoMutation,
+  useAddVideoToBoardMutation,
+  useRemoveVideoFromBoardMutation,
+} = videosApi;
 
-/** @knipignore Lands with the viewer (Phase 5) and the workflow nodes (Phase 6). */
+/** @knipignore Reserved for follow-up phases (bulk delete / intermediate toggle / video-only views). */
 export const {
   useListVideosQuery,
   useGetVideoMetadataQuery,
   useGetVideoNamesQuery,
-  useDeleteVideoMutation,
   useDeleteVideosMutation,
   useChangeVideoIsIntermediateMutation,
-  useAddVideoToBoardMutation,
-  useRemoveVideoFromBoardMutation,
 } = videosApi;
 
 /**
