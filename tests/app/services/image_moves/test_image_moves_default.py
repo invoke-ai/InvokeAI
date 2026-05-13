@@ -691,3 +691,15 @@ def test_fsync_dir_ignores_platform_close_failures(tmp_path: Path) -> None:
         ),
     ):
         service._fsync_dir(tmp_path)
+
+
+def test_fsync_file_ignores_platform_fsync_failures(tmp_path: Path) -> None:
+    service, _records = _service(tmp_path, strategy="date")
+    path = tmp_path / "image.png"
+    path.write_bytes(b"test")
+
+    with patch(
+        "invokeai.app.services.image_moves.image_moves_default.os.fsync",
+        side_effect=OSError(9, "Bad file descriptor"),
+    ):
+        service._fsync_file(path)

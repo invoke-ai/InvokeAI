@@ -766,8 +766,11 @@ class ImageMoveService:
         return current
 
     def _fsync_file(self, path: Path) -> None:
-        with path.open("rb") as file:
-            os.fsync(file.fileno())
+        try:
+            with path.open("rb") as file:
+                os.fsync(file.fileno())
+        except OSError as e:
+            self._logger.debug("Unable to fsync file: %s: %s", path, e)
 
     def _fsync_dir(self, path: Path) -> None:
         try:
