@@ -1,5 +1,6 @@
 import { Flex, Icon } from '@invoke-ai/ui-library';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiPlayFill } from 'react-icons/pi';
 
 type Props = {
@@ -11,6 +12,7 @@ type Props = {
  * swaps the preview into HTML5 video playback (see CurrentVideoPreview).
  */
 export const VideoPlayButtonOverlay = memo(({ onClick }: Props) => {
+  const { t } = useTranslation();
   return (
     <Flex
       position="absolute"
@@ -19,7 +21,7 @@ export const VideoPlayButtonOverlay = memo(({ onClick }: Props) => {
       transform="translate(-50%, -50%)"
       as="button"
       onClick={onClick}
-      aria-label="Play video"
+      aria-label={t('gallery.playVideo')}
       alignItems="center"
       justifyContent="center"
       bg="blackAlpha.500"
