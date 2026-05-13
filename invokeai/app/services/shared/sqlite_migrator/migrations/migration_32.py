@@ -25,6 +25,7 @@ class Migration32Callback:
                 image_name TEXT NOT NULL REFERENCES images(image_name),
                 old_subfolder TEXT NOT NULL,
                 new_subfolder TEXT NOT NULL,
+                is_intermediate BOOLEAN NOT NULL DEFAULT FALSE,
                 old_path TEXT,
                 new_path TEXT,
                 old_thumbnail_path TEXT,

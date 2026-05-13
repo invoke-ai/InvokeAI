@@ -26,6 +26,7 @@ class PlannedImageMove:
     image_name: str
     old_subfolder: str
     new_subfolder: str
+    is_intermediate: bool
     old_path: Path
     new_path: Path
     old_thumbnail_path: Path
@@ -292,6 +293,7 @@ class ImageMoveService:
                     image_name=image_name,
                     old_subfolder=old_subfolder,
                     new_subfolder=new_subfolder,
+                    is_intermediate=bool(row["is_intermediate"]),
                     old_path=self.image_files.get_path(image_name, image_subfolder=old_subfolder),
                     new_path=self.image_files.get_path(image_name, image_subfolder=new_subfolder),
                     old_thumbnail_path=self.image_files.get_path(
@@ -328,12 +330,13 @@ class ImageMoveService:
                     image_name,
                     old_subfolder,
                     new_subfolder,
+                    is_intermediate,
                     old_path,
                     new_path,
                     old_thumbnail_path,
                     new_thumbnail_path,
                     state
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'planned');
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'planned');
                 """,
                 [
                     (
@@ -341,6 +344,7 @@ class ImageMoveService:
                         move.image_name,
                         move.old_subfolder,
                         move.new_subfolder,
+                        int(move.is_intermediate),
                         str(move.old_path),
                         str(move.new_path),
                         str(move.old_thumbnail_path),
@@ -356,7 +360,9 @@ class ImageMoveService:
         thumbnail_destinations: set[Path] = set()
         for move in moves:
             if not move.old_path.exists():
-                raise FileNotFoundError(f"Source image does not exist: {move.old_path}")
+                if not move.is_intermediate:
+                    raise FileNotFoundError(f"Source image does not exist: {move.old_path}")
+                continue
             if move.new_path.exists():
                 raise FileExistsError(f"Destination image already exists: {move.new_path}")
             if move.old_path == move.new_path:
@@ -399,6 +405,16 @@ class ImageMoveService:
             if old_exists and new_exists:
                 raise RuntimeError(f"Both old and new image files exist for {item.image_name}")
             if not old_exists and not new_exists:
+                if item.is_intermediate:
+                    self._mark_missing_intermediate_moved(
+                        job_id=job_id,
+                        image_name=item.image_name,
+                        old_path=old_path,
+                        new_path=new_path,
+                        old_thumbnail_path=old_thumbnail_path,
+                        new_thumbnail_path=new_thumbnail_path,
+                    )
+                    continue
                 raise RuntimeError(f"Neither old nor new image file exists for {item.image_name}")
             if old_exists:
                 new_path.parent.mkdir(parents=True, exist_ok=True)
@@ -562,7 +578,7 @@ class ImageMoveService:
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
-                SELECT image_name, old_subfolder, new_subfolder
+                SELECT image_name, old_subfolder, new_subfolder, is_intermediate
                 FROM image_subfolder_move_items
                 WHERE job_id = ?
                 ORDER BY image_name;
@@ -575,6 +591,7 @@ class ImageMoveService:
                 image_name=row["image_name"],
                 old_subfolder=row["old_subfolder"],
                 new_subfolder=row["new_subfolder"],
+                is_intermediate=bool(row["is_intermediate"]),
                 old_path=self.image_files.get_path(row["image_name"], image_subfolder=row["old_subfolder"]),
                 new_path=self.image_files.get_path(row["image_name"], image_subfolder=row["new_subfolder"]),
                 old_thumbnail_path=self.image_files.get_path(
@@ -651,6 +668,22 @@ class ImageMoveService:
                 self._fsync_dir(thumbnail_path.parent)
             finally:
                 temp_path.unlink(missing_ok=True)
+
+    def _mark_missing_intermediate_moved(
+        self,
+        job_id: int,
+        image_name: str,
+        old_path: Path,
+        new_path: Path,
+        old_thumbnail_path: Path,
+        new_thumbnail_path: Path,
+    ) -> None:
+        for path in (old_thumbnail_path, new_thumbnail_path):
+            if path.exists():
+                path.unlink()
+                self._fsync_dir(path.parent)
+        self.image_files.evict_cache_paths([old_path, new_path, old_thumbnail_path, new_thumbnail_path])
+        self.mark_item_moved(job_id, image_name)
 
     def _remove_empty_parents(self, start: Path, root: Path) -> None:
         root = root.resolve()

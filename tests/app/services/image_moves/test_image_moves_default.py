@@ -29,7 +29,13 @@ def _build_db(tmp_path: Path) -> SqliteDatabase:
     return init_db(config=config, logger=logger, image_files=image_files)
 
 
-def _save_record(records: SqliteImageRecordStorage, image_name: str, subfolder: str, created_at: str) -> None:
+def _save_record(
+    records: SqliteImageRecordStorage,
+    image_name: str,
+    subfolder: str,
+    created_at: str,
+    is_intermediate: bool = False,
+) -> None:
     records.save(
         image_name=image_name,
         image_origin=ResourceOrigin.INTERNAL,
@@ -37,6 +43,7 @@ def _save_record(records: SqliteImageRecordStorage, image_name: str, subfolder: 
         width=16,
         height=16,
         has_workflow=False,
+        is_intermediate=is_intermediate,
         image_subfolder=subfolder,
     )
     with records._db.transaction() as cursor:
@@ -50,8 +57,15 @@ def _save_image(
     subfolder: str,
     created_at: str,
     color: str,
+    is_intermediate: bool = False,
 ) -> None:
-    _save_record(records, image_name=image_name, subfolder=subfolder, created_at=created_at)
+    _save_record(
+        records,
+        image_name=image_name,
+        subfolder=subfolder,
+        created_at=created_at,
+        is_intermediate=is_intermediate,
+    )
     service.image_files.save(Image.new("RGB", (16, 16), color), image_name=image_name, image_subfolder=subfolder)
 
 
@@ -91,6 +105,89 @@ def test_move_all_images_uses_created_at_for_date_strategy(tmp_path: Path) -> No
     assert record.image_subfolder == "2024/02/03"
     assert service.image_files.get_path(image_name, image_subfolder="2024/02/03").exists()
     assert not service.image_files.get_path(image_name, image_subfolder="").exists()
+
+
+def test_missing_intermediate_source_file_is_treated_as_success(tmp_path: Path) -> None:
+    service, records = _service(tmp_path, strategy="date")
+    image_name = "missing-intermediate.png"
+    _save_record(
+        records,
+        image_name=image_name,
+        subfolder="",
+        created_at="2024-02-04 04:05:06.000",
+        is_intermediate=True,
+    )
+
+    result = service.move_all_images()
+
+    assert result.planned == 1
+    assert result.committed == 1
+    assert result.errors == 0
+    record = records.get(image_name)
+    assert record.image_subfolder == "2024/02/04"
+    assert service.get_latest_job().state == "committed"
+
+
+def test_missing_intermediate_source_file_removes_orphaned_thumbnail(tmp_path: Path) -> None:
+    service, records = _service(tmp_path, strategy="date")
+    image_name = "missing-intermediate-with-thumbnail.png"
+    old_subfolder = "old/intermediate"
+    _save_image(
+        service,
+        records,
+        image_name=image_name,
+        subfolder=old_subfolder,
+        created_at="2024-02-04 04:05:06.000",
+        color="red",
+        is_intermediate=True,
+    )
+    old_path = service.image_files.get_path(image_name, image_subfolder=old_subfolder)
+    old_thumbnail_path = service.image_files.get_path(image_name, thumbnail=True, image_subfolder=old_subfolder)
+    assert old_thumbnail_path.exists()
+    old_path.unlink()
+
+    result = service.move_all_images()
+
+    assert result.committed == 1
+    assert not old_thumbnail_path.exists()
+    assert records.get(image_name).image_subfolder == "2024/02/04"
+
+
+def test_missing_non_intermediate_source_file_still_fails(tmp_path: Path) -> None:
+    service, records = _service(tmp_path, strategy="date")
+    image_name = "missing-general.png"
+    _save_record(
+        records,
+        image_name=image_name,
+        subfolder="",
+        created_at="2024-02-04 04:05:06.000",
+        is_intermediate=False,
+    )
+
+    with pytest.raises(FileNotFoundError, match="Source image does not exist"):
+        service.move_all_images()
+
+
+def test_recovery_treats_missing_intermediate_source_file_as_success(tmp_path: Path) -> None:
+    service, records = _service(tmp_path, strategy="date")
+    image_name = "missing-intermediate-recovery.png"
+    _save_record(
+        records,
+        image_name=image_name,
+        subfolder="",
+        created_at="2024-02-05 04:05:06.000",
+        is_intermediate=True,
+    )
+    moves = service.plan_batch(last_image_name="", limit=100)
+    job_id = service.create_move_job(moves)
+
+    recovered = service.startup_recovery()
+
+    assert recovered.committed == 1
+    assert recovered.errors == 0
+    assert records.get(image_name).image_subfolder == "2024/02/05"
+    assert service.get_job(job_id).state == "committed"
+    assert _job_item_states(service, job_id) == {image_name: "committed"}
 
 
 def test_startup_recovery_commits_after_files_moved_but_db_not_updated(tmp_path: Path) -> None:
