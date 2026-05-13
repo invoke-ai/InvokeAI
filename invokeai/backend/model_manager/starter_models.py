@@ -2025,19 +2025,29 @@ anima_bundle: list[StarterModel] = [
     t5_base_encoder,
 ]
 
-# Wan 2.2 starter bundle — A14B T2V at Q4_K_M and Q8_0 (high+low expert pairs),
-# plus the Lightning LoRA pair for 4-step inference, plus the standalone A14B
-# VAE and UMT5-XXL encoder so GGUF mains have everything they need without
-# the user pulling a full Diffusers Wan.
-wan_bundle: list[StarterModel] = [
+# Wan 2.2 starter bundles. Split into T2V and I2V so users only pay for the
+# capability they need: a 12 GB card can install just the T2V bundle and have
+# both text-to-video (T2V-A14B) and a low-VRAM image-to-video option (via
+# TI2V-5B, which handles both modes in one ~3.4 GB model). The I2V bundle adds
+# the heavier I2V-A14B path for users with more headroom. Q8 variants and full
+# Diffusers builds stay available as a-la-carte starters.
+wan_t2v_bundle: list[StarterModel] = [
     wan_22_t5_encoder,
     wan_22_a14b_vae,
+    wan_22_5b_vae,
+    wan_22_ti2v_5b_gguf_q4_k_m,
     wan_22_t2v_a14b_gguf_q4_k_m,
     wan_22_t2v_a14b_low_gguf_q4_k_m,
-    wan_22_t2v_a14b_gguf_q8_0,
-    wan_22_t2v_a14b_low_gguf_q8_0,
     wan_22_t2v_lightning_high,
     wan_22_t2v_lightning_low,
+]
+wan_i2v_bundle: list[StarterModel] = [
+    wan_22_t5_encoder,
+    wan_22_a14b_vae,
+    wan_22_i2v_a14b_gguf_q4_k_m,
+    wan_22_i2v_a14b_low_gguf_q4_k_m,
+    wan_22_i2v_lightning_high,
+    wan_22_i2v_lightning_low,
 ]
 
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {
@@ -2048,7 +2058,8 @@ STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.ZImage: StarterModelBundle(name="Z-Image Turbo", models=zimage_bundle),
     BaseModelType.QwenImage: StarterModelBundle(name="Qwen Image", models=qwen_image_bundle),
     BaseModelType.Anima: StarterModelBundle(name="Anima", models=anima_bundle),
-    BaseModelType.Wan: StarterModelBundle(name="Wan 2.2", models=wan_bundle),
+    "wan_t2v": StarterModelBundle(name="Wan 2.2 Text-to-Video", models=wan_t2v_bundle),
+    "wan_i2v": StarterModelBundle(name="Wan 2.2 Image-to-Video", models=wan_i2v_bundle),
 }
 
 assert len(STARTER_MODELS) == len({m.source for m in STARTER_MODELS}), "Duplicate starter models"
