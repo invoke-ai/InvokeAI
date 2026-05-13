@@ -16,13 +16,14 @@ import {
   setComparisonImage,
   setGlobalReferenceImage,
   setNodeImageFieldImage,
+  setNodeVideoFieldVideo,
   setRegionalGuidanceReferenceImage,
   setUpscaleInitialImage,
 } from 'features/imageActions/actions';
 import { fieldImageCollectionValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectFieldInputInstanceSafe, selectNodesSlice } from 'features/nodes/store/selectors';
 import { type FieldIdentifier, isImageFieldCollectionInputInstance } from 'features/nodes/types/field';
-import type { ImageDTO } from 'services/api/types';
+import type { ImageDTO, VideoDTO } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
 const log = logger('dnd');
@@ -80,6 +81,16 @@ export const singleImageDndSource: DndSource<SingleImageDndSourceData> = {
   ..._singleImage,
   typeGuard: buildTypeGuard(_singleImage.key),
   getData: buildGetData(_singleImage.key, _singleImage.type),
+};
+//#endregion
+
+//#region Single Video
+const _singleVideo = buildTypeAndKey('single-video');
+type SingleVideoDndSourceData = DndData<typeof _singleVideo.type, typeof _singleVideo.key, { videoDTO: VideoDTO }>;
+export const singleVideoDndSource: DndSource<SingleVideoDndSourceData> = {
+  ..._singleVideo,
+  typeGuard: buildTypeGuard(_singleVideo.key),
+  getData: buildGetData(_singleVideo.key, _singleVideo.type),
 };
 //#endregion
 
@@ -269,6 +280,32 @@ export const setNodeImageFieldImageDndTarget: DndTarget<SetNodeImageFieldImageDn
       const { imageDTO } = sourceData.payload;
       const { fieldIdentifier } = targetData.payload;
       setNodeImageFieldImage({ fieldIdentifier, imageDTO, dispatch });
+    },
+  };
+//#endregion
+
+//#region Set Node Video Field Video
+const _setNodeVideoFieldVideo = buildTypeAndKey('set-node-video-field-video');
+export type SetNodeVideoFieldVideoDndTargetData = DndData<
+  typeof _setNodeVideoFieldVideo.type,
+  typeof _setNodeVideoFieldVideo.key,
+  { fieldIdentifier: FieldIdentifier }
+>;
+export const setNodeVideoFieldVideoDndTarget: DndTarget<SetNodeVideoFieldVideoDndTargetData, SingleVideoDndSourceData> =
+  {
+    ..._setNodeVideoFieldVideo,
+    typeGuard: buildTypeGuard(_setNodeVideoFieldVideo.key),
+    getData: buildGetData(_setNodeVideoFieldVideo.key, _setNodeVideoFieldVideo.type),
+    isValid: ({ sourceData }) => {
+      if (singleVideoDndSource.typeGuard(sourceData)) {
+        return true;
+      }
+      return false;
+    },
+    handler: ({ sourceData, targetData, dispatch }) => {
+      const { videoDTO } = sourceData.payload;
+      const { fieldIdentifier } = targetData.payload;
+      setNodeVideoFieldVideo({ fieldIdentifier, videoDTO, dispatch });
     },
   };
 //#endregion
@@ -592,6 +629,7 @@ export const dndTargets = [
   setRegionalGuidanceReferenceImageDndTarget,
   setUpscaleInitialImageDndTarget,
   setNodeImageFieldImageDndTarget,
+  setNodeVideoFieldVideoDndTarget,
   addImagesToNodeImageFieldCollectionDndTarget,
   setComparisonImageDndTarget,
   newCanvasEntityFromImageDndTarget,

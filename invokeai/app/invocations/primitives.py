@@ -576,6 +576,27 @@ class VideoOutput(BaseInvocationOutput):
         )
 
 
+@invocation(
+    "video",
+    title="Video Primitive",
+    tags=["primitives", "video"],
+    category="primitives",
+    version="1.0.0",
+)
+class VideoInvocation(BaseInvocation):
+    """A video primitive value. Drop a video onto the field to make it available as an input
+    to downstream nodes (e.g. Frame from Video, Concatenate Videos)."""
+
+    video: VideoField = InputField(description="The video to load")
+
+    # Return annotation is a real class (not a forward-ref string) because a previous
+    # `from __future__ import annotations` left wan_l2v with a stringified annotation
+    # and crashed the output-class registry on startup (commit cac366229a).
+    def invoke(self, context: InvocationContext) -> VideoOutput:
+        video_dto = context.videos.get_dto(self.video.video_name)
+        return VideoOutput.build(video_dto=video_dto)
+
+
 @invocation_output("conditioning_collection_output")
 class ConditioningCollectionOutput(BaseInvocationOutput):
     """Base class for nodes that output a collection of conditioning tensors"""

@@ -35,14 +35,14 @@ import {
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import type { BoardId } from 'features/gallery/store/types';
-import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
+import { fieldImageValueChanged, fieldVideoValueChanged } from 'features/nodes/store/nodesSlice';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
 import { imageDTOToFile, imagesApi, uploadImage } from 'services/api/endpoints/images';
-import type { ImageDTO } from 'services/api/types';
+import type { ImageDTO, VideoDTO } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
@@ -73,6 +73,15 @@ export const setNodeImageFieldImage = (arg: {
 }) => {
   const { imageDTO, fieldIdentifier, dispatch } = arg;
   dispatch(fieldImageValueChanged({ ...fieldIdentifier, value: imageDTO }));
+};
+
+export const setNodeVideoFieldVideo = (arg: {
+  videoDTO: VideoDTO;
+  fieldIdentifier: FieldIdentifier;
+  dispatch: AppDispatch;
+}) => {
+  const { videoDTO, fieldIdentifier, dispatch } = arg;
+  dispatch(fieldVideoValueChanged({ ...fieldIdentifier, value: videoDTO }));
 };
 
 export const setComparisonImage = (arg: { image_name: string; dispatch: AppDispatch }) => {
