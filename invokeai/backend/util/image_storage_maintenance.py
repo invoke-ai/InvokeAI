@@ -64,6 +64,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         service = build_image_move_service(root=args.root, config_file=args.config_file)
+        # TODO: Add an interprocess guard so this script cannot run image moves while Invoke is active.
         if args.operation == "status":
             requires_attention = _print_status(service)
             return 1 if requires_attention else 0
