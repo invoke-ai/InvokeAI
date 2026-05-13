@@ -1,11 +1,11 @@
-import os
 import re
 import tempfile
 import traceback
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Body, HTTPException, Path as PathParam, Query, Request, Response, UploadFile
+from fastapi import Body, HTTPException, Query, Request, Response, UploadFile
+from fastapi import Path as PathParam
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
@@ -30,8 +30,12 @@ videos_router = APIRouter(prefix="/v1/videos", tags=["videos"])
 # Videos are immutable; set a high max-age (1 year)
 VIDEO_MAX_AGE = 31536000
 
-ACCEPTED_VIDEO_MIME_PREFIXES = ("video/",)
-ACCEPTED_VIDEO_EXTENSIONS = (".mp4", ".mov", ".webm", ".mkv")
+# MP4 only — the names service emits `{uuid}.mp4` unconditionally and we don't transcode on
+# upload. Accepting .mov/.webm/.mkv here previously caused those containers to be stored
+# under a .mp4 name and served with the .mp4 MIME type, which silently broke playback in
+# browsers when the container did not match.
+ACCEPTED_VIDEO_MIME_PREFIXES = ("video/mp4",)
+ACCEPTED_VIDEO_EXTENSIONS = (".mp4",)
 
 # Per-chunk size for HTTP Range responses (1 MB)
 RANGE_CHUNK_SIZE = 1024 * 1024
@@ -136,13 +140,7 @@ async def upload_video(
         raise HTTPException(status_code=415, detail="Not a supported video file")
 
     # Stream the upload to a tmp file so we can probe and then hand its path to the service.
-    suffix = ".mp4"
-    if file.filename:
-        ext = os.path.splitext(file.filename)[1].lower()
-        if ext in ACCEPTED_VIDEO_EXTENSIONS:
-            suffix = ext
-
-    tmp = tempfile.NamedTemporaryFile(prefix="invokeai_upload_", suffix=suffix, delete=False)
+    tmp = tempfile.NamedTemporaryFile(prefix="invokeai_upload_", suffix=".mp4", delete=False)
     tmp_path = Path(tmp.name)
     try:
         contents = await file.read()
