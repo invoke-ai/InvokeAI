@@ -38,7 +38,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
-  const { $progressEvent, $progressImage } = useImageViewerContext();
+  const { $progressEvent, $progressImage, onLoadImage } = useImageViewerContext();
   const progressEvent = useStore($progressEvent);
   const progressImage = useStore($progressImage);
   const withProgress = shouldShowProgressInViewer && progressImage !== null;
@@ -54,6 +54,27 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
     // play() here keeps the user gesture wired to playback without waiting for React.
     void videoRef.current?.play();
   }, []);
+
+  // Analogous to <DndImage onLoad={onLoadImage}> in the image viewer: clear any stale
+  // denoise progress overlay once the new video's metadata is in. Without this, the
+  // ImageViewerContext atom stays set after a video render (there's no image load to
+  // trigger its clear), so the overlay sticks over the freshly-selected video forever.
+  //
+  // Also force a first-frame paint via a near-zero seek. With preload="metadata" some
+  // browsers populate dimensions/duration but don't actually decode and display the first
+  // video frame until playback or a seek — the element just shows its black background.
+  // Setting currentTime to 0.0001 nudges the decoder to paint without measurably advancing.
+  const handleLoadedMetadata = useCallback(() => {
+    onLoadImage();
+    const el = videoRef.current;
+    if (el && !isPlaying && el.currentTime === 0) {
+      try {
+        el.currentTime = 0.0001;
+      } catch {
+        // Some browsers throw if metadata isn't fully ready yet; harmless.
+      }
+    }
+  }, [isPlaying, onLoadImage]);
 
   if (!videoDTO) {
     return <NoContentForViewer />;
@@ -71,6 +92,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
         muted={!isPlaying}
         playsInline
         controls={isPlaying}
+        onLoadedMetadata={handleLoadedMetadata}
         style={{
           maxWidth: '100%',
           maxHeight: '100%',
