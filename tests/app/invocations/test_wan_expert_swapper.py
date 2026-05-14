@@ -360,3 +360,54 @@ def test_lazy_load_per_swap_not_upfront():
         assert ctx.models.load_calls == ["high", "low", "high"]
 
         swapper.close()
+
+
+def test_empty_cache_called_on_swap():
+    """Regression: each expert swap must trigger ``TorchDevice.empty_cache()`` so
+    the next ``partial_load_to_vram`` sees an un-fragmented allocator.
+
+    A14B users reported the low-noise expert ending up far more CPU-resident than
+    the high-noise one — the previous expert's freed blocks stayed pinned in the
+    PyTorch caching allocator across the swap, and partial_load decided there
+    wasn't room for as much of the incoming expert as there actually was."""
+    log: list[str] = []
+    high_nn = nn.Linear(1, 1)
+    low_nn = nn.Linear(1, 1)
+    ctx = _FakeContext(
+        {"high": _FakeInfo("HIGH", high_nn, log), "low": _FakeInfo("LOW", low_nn, log)},
+        log,
+    )
+
+    stub, _ = _stub_lora_context_manager(log)
+    with (
+        patch(
+            "invokeai.app.invocations.wan_denoise.LayerPatcher.apply_smart_model_patches",
+            side_effect=stub,
+        ),
+        patch("invokeai.app.invocations.wan_denoise.TorchDevice.empty_cache") as empty_cache_mock,
+    ):
+        swapper = _ExpertSwapper(
+            context=ctx,
+            high_model="high",
+            low_model="low",
+            inference_dtype=torch.bfloat16,
+            high_lora_factory=_make_factory(log, "HIGH"),
+            low_lora_factory=_make_factory(log, "LOW"),
+        )
+        swapper.get(_ExpertSwapper.HIGH)
+        first_call_count = empty_cache_mock.call_count
+        assert first_call_count >= 1, "empty_cache should run on the initial expert load too"
+
+        swapper.get(_ExpertSwapper.LOW)
+        assert empty_cache_mock.call_count > first_call_count, (
+            "empty_cache must be called on each HIGH→LOW (or LOW→HIGH) swap"
+        )
+
+        # Same-label re-get is a no-op; empty_cache must NOT be re-invoked.
+        before_no_op = empty_cache_mock.call_count
+        swapper.get(_ExpertSwapper.LOW)
+        assert empty_cache_mock.call_count == before_no_op, (
+            "Re-getting the active expert must short-circuit before empty_cache."
+        )
+
+        swapper.close()

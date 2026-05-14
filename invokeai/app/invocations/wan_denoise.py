@@ -172,6 +172,15 @@ class _ExpertSwapper:
         # Release current GPU residency before bringing the other expert on device.
         self._release()
 
+        # Hand the PyTorch allocator a clean slate before the next partial_load_to_vram
+        # decides how much of the incoming expert can be GPU-resident. The previous
+        # expert's freed blocks stay pinned in the caching allocator until empty_cache
+        # is called, so partial_load sees fragmented free space and offloads layers it
+        # could otherwise have kept on device — A14B users observed the low-noise
+        # transformer ending up far more CPU-resident than the high-noise one purely
+        # because of leftover reservations from the previous swap.
+        TorchDevice.empty_cache()
+
         # Load the requested expert lazily so its ``LoadedModel`` handle is
         # always fresh — see class docstring for the cache-eviction reasoning.
         model_id = self._high_model if label == self.HIGH else self._low_model
