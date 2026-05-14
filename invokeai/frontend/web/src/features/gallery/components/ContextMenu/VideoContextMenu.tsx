@@ -1,12 +1,15 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Menu, MenuButton, MenuList, Portal, useGlobalMenuClose } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { useAppSelector } from 'app/store/storeHooks';
 import { IconMenuItemGroup } from 'common/components/IconMenuItem';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { ContextMenuItemChangeBoardVideo } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemChangeBoardVideo';
 import { ContextMenuItemDeleteVideo } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemDeleteVideo';
 import { ContextMenuItemDownloadVideo } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemDownloadVideo';
+import MultipleSelectionMenuItemsVideos from 'features/gallery/components/ContextMenu/MultipleSelectionMenuItemsVideos';
 import { VideoDTOContextProvider } from 'features/gallery/contexts/VideoDTOContext';
+import { selectSelectionCount } from 'features/gallery/store/gallerySelectors';
 import { map } from 'nanostores';
 import type { RefObject } from 'react';
 import { memo, useCallback, useEffect, useRef } from 'react';
@@ -91,8 +94,16 @@ VideoContextMenu.displayName = 'VideoContextMenu';
 
 const MenuContent = memo(() => {
   const state = useStore($videoContextMenuState);
+  const selectionCount = useAppSelector(selectSelectionCount);
   if (!state.videoDTO) {
     return null;
+  }
+  if (selectionCount > 1) {
+    return (
+      <MenuList visibility="visible">
+        <MultipleSelectionMenuItemsVideos />
+      </MenuList>
+    );
   }
   return (
     <MenuList visibility="visible">
