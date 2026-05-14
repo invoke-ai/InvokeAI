@@ -12,6 +12,7 @@ import { CanvasShapeToolModule } from 'features/controlLayers/konva/CanvasTool/C
 import { CanvasTextToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasTextToolModule';
 import { CanvasViewToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasViewToolModule';
 import {
+  getToolToCancelOnEscape,
   shouldPreserveSuspendableShapesSession,
   shouldQuickSwitchToColorPickerOnAlt,
   shouldTranslateShapeDragOnSpace,
@@ -709,13 +710,24 @@ export class CanvasToolModule extends CanvasModuleBase {
     if (e.key === KEY_ESCAPE) {
       // Cancel shape drawing on escape
       e.preventDefault();
+      const tool = this.$tool.get();
+      const toolToCancel = getToolToCancelOnEscape(
+        tool,
+        this.$toolBuffer.get(),
+        this.tools.lasso.hasActiveSession(),
+        this.tools.rect.hasSuspendableSession()
+      );
+
       this.manager.stateApi.$spaceKey.set(false);
       this.tools.rect.stopDragTranslation();
-      if (this.$tool.get() === 'rect') {
+      if (toolToCancel === 'rect') {
         this.tools.rect.cancel();
       }
-      if (this.$tool.get() === 'lasso') {
+      if (toolToCancel === 'lasso') {
         this.tools.lasso.reset();
+      }
+      if (toolToCancel && tool !== toolToCancel) {
+        this.revertToolBuffer();
       }
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
       if (

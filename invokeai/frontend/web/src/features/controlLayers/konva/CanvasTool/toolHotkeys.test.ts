@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  getToolToCancelOnEscape,
   shouldPreserveSuspendableShapesSession,
   shouldQuickSwitchToColorPickerOnAlt,
   shouldTranslateShapeDragOnSpace,
@@ -48,5 +49,22 @@ describe('tool hotkeys', () => {
     expect(shouldPreserveSuspendableShapesSession('brush', 'rect', true)).toBe(false);
     expect(shouldPreserveSuspendableShapesSession('view', null, true)).toBe(false);
     expect(shouldPreserveSuspendableShapesSession('colorPicker', 'rect', false)).toBe(false);
+  });
+
+  it('cancels the active drawing tool directly on escape', () => {
+    expect(getToolToCancelOnEscape('rect', null, false, false)).toBe('rect');
+    expect(getToolToCancelOnEscape('lasso', null, false, false)).toBe('lasso');
+  });
+
+  it('cancels preserved drawing sessions while temporarily switched away', () => {
+    expect(getToolToCancelOnEscape('view', 'lasso', true, false)).toBe('lasso');
+    expect(getToolToCancelOnEscape('view', 'rect', false, true)).toBe('rect');
+    expect(getToolToCancelOnEscape('colorPicker', 'rect', false, true)).toBe('rect');
+  });
+
+  it('does not cancel unrelated buffered tools on escape', () => {
+    expect(getToolToCancelOnEscape('view', 'lasso', false, false)).toBeNull();
+    expect(getToolToCancelOnEscape('colorPicker', 'lasso', true, false)).toBeNull();
+    expect(getToolToCancelOnEscape('view', 'brush', false, true)).toBeNull();
   });
 });

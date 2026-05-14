@@ -42,3 +42,24 @@ export const shouldTranslateShapeDragOnSpace = (
 
   return shapeType === 'rect' || shapeType === 'oval';
 };
+
+export const getToolToCancelOnEscape = (
+  tool: Tool,
+  toolBuffer: Tool | null,
+  hasActiveLassoSession: boolean,
+  hasSuspendableShapeSession: boolean
+): Tool | null => {
+  if (tool === 'rect' || tool === 'lasso') {
+    return tool;
+  }
+
+  if (tool === 'view' && toolBuffer === 'lasso' && hasActiveLassoSession) {
+    return 'lasso';
+  }
+
+  if ((tool === 'view' || tool === 'colorPicker') && toolBuffer === 'rect' && hasSuspendableShapeSession) {
+    return 'rect';
+  }
+
+  return null;
+};
