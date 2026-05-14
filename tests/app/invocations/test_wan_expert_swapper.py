@@ -44,11 +44,34 @@ class _FakeModelOnDevice:
         return False
 
 
+class _FakeCachedModel:
+    """Stand-in for ``CachedModelWithPartialLoad``: records full_unload_from_vram calls."""
+
+    def __init__(self, label: str, log: list[str]) -> None:
+        self._label = label
+        self._log = log
+        self.unload_calls = 0
+
+    def full_unload_from_vram(self) -> int:
+        self._log.append(f"full-unload:{self._label}")
+        self.unload_calls += 1
+        return 0
+
+
+class _FakeCacheRecord:
+    def __init__(self, cached_model: _FakeCachedModel) -> None:
+        self.cached_model = cached_model
+
+
 class _FakeInfo:
+    """Mirrors the runtime ``LoadedModel`` enough for the swapper to reach
+    ``info._cache_record.cached_model.full_unload_from_vram()`` on swap."""
+
     def __init__(self, label: str, model: nn.Module, log: list[str]) -> None:
         self._label = label
         self._model = model
         self._log = log
+        self._cache_record = _FakeCacheRecord(_FakeCachedModel(label, log))
 
     def model_on_device(self):
         return _FakeModelOnDevice(self._label, self._model, self._log)
@@ -204,9 +227,12 @@ def test_lifecycle_dual_expert_swap():
         "device-enter:HIGH",
         "lora-factory-call:HIGH",
         "lora-enter",
-        # swap to LOW: LoRA out -> device out -> models.load -> device in -> LoRA in
+        # swap to LOW: LoRA out -> device out -> force-unload HIGH -> models.load LOW
+        # -> device in -> LoRA in. The full-unload step shoves HIGH's weights off GPU
+        # before the cache decides how much room LOW gets.
         "lora-exit",
         "device-exit:HIGH",
+        "full-unload:HIGH",
         "models.load:low",
         "device-enter:LOW",
         "lora-factory-call:LOW",
@@ -410,4 +436,85 @@ def test_empty_cache_called_on_swap():
             "Re-getting the active expert must short-circuit before empty_cache."
         )
 
+        swapper.close()
+
+
+def test_outgoing_expert_force_unloaded_from_vram():
+    """Regression: on swap, the previous expert's weights must be explicitly forced
+    off VRAM via ``cached_model.full_unload_from_vram()``.
+
+    A14B users observed the high-noise transformer continuing to occupy ~9 GB of
+    VRAM during the low-noise step, because the cache's automatic offload heuristic
+    underestimated how much room the new expert needed when workspace memory from
+    the previous denoise step was still allocated. The swapper sidesteps that by
+    invoking full_unload_from_vram on the outgoing expert directly."""
+    log: list[str] = []
+    high_info = _FakeInfo("HIGH", nn.Linear(1, 1), log)
+    low_info = _FakeInfo("LOW", nn.Linear(1, 1), log)
+    ctx = _FakeContext({"high": high_info, "low": low_info}, log)
+
+    stub, _ = _stub_lora_context_manager(log)
+    with patch(
+        "invokeai.app.invocations.wan_denoise.LayerPatcher.apply_smart_model_patches",
+        side_effect=stub,
+    ):
+        swapper = _ExpertSwapper(
+            context=ctx,
+            high_model="high",
+            low_model="low",
+            inference_dtype=torch.bfloat16,
+            high_lora_factory=_make_factory(log, "HIGH"),
+            low_lora_factory=_make_factory(log, "LOW"),
+        )
+        # Initial load: nothing to unload yet.
+        swapper.get(_ExpertSwapper.HIGH)
+        assert high_info._cache_record.cached_model.unload_calls == 0
+        assert low_info._cache_record.cached_model.unload_calls == 0
+
+        # Swap to LOW: HIGH must be force-unloaded; LOW is the incoming expert and
+        # must not be unloaded.
+        swapper.get(_ExpertSwapper.LOW)
+        assert high_info._cache_record.cached_model.unload_calls == 1
+        assert low_info._cache_record.cached_model.unload_calls == 0
+
+        # Swap back to HIGH: LOW must now be force-unloaded.
+        swapper.get(_ExpertSwapper.HIGH)
+        assert low_info._cache_record.cached_model.unload_calls == 1
+
+        swapper.close()
+
+
+def test_force_unload_failure_does_not_break_swap():
+    """If full_unload_from_vram raises (e.g. cache evicted the entry between unlock
+    and now), the swap must still succeed. Reaching into a private attribute is the
+    pragmatic choice today; this test pins the defensive try/except so a future
+    refactor of LoadedModel doesn't break swap reliability."""
+    log: list[str] = []
+
+    class _RaisingCachedModel:
+        def full_unload_from_vram(self):
+            raise RuntimeError("cache evicted me between unlock and unload")
+
+    raising_high = _FakeInfo("HIGH", nn.Linear(1, 1), log)
+    raising_high._cache_record = _FakeCacheRecord(_RaisingCachedModel())
+    low_info = _FakeInfo("LOW", nn.Linear(1, 1), log)
+    ctx = _FakeContext({"high": raising_high, "low": low_info}, log)
+
+    stub, _ = _stub_lora_context_manager(log)
+    with patch(
+        "invokeai.app.invocations.wan_denoise.LayerPatcher.apply_smart_model_patches",
+        side_effect=stub,
+    ):
+        swapper = _ExpertSwapper(
+            context=ctx,
+            high_model="high",
+            low_model="low",
+            inference_dtype=torch.bfloat16,
+            high_lora_factory=_make_factory(log, "HIGH"),
+            low_lora_factory=_make_factory(log, "LOW"),
+        )
+        swapper.get(_ExpertSwapper.HIGH)
+        # Should not raise even though the outgoing expert's full_unload throws.
+        model = swapper.get(_ExpertSwapper.LOW)
+        assert model is low_info._model
         swapper.close()

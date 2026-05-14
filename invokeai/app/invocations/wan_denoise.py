@@ -156,6 +156,7 @@ class _ExpertSwapper:
         self._high_is_quantized = high_is_quantized
         self._low_is_quantized = low_is_quantized
         self._active_label: str | None = None
+        self._active_info: Any | None = None
         self._active_device_ctx: Any | None = None
         self._active_lora_ctx: Any | None = None
         self._active_model: Any | None = None
@@ -169,16 +170,42 @@ class _ExpertSwapper:
             assert self._active_model is not None
             return self._active_model
 
+        # Capture the outgoing expert's cache record before _release() drops our handle.
+        # We need it to force-unload below.
+        outgoing_cached_model = None
+        if self._active_info is not None:
+            # ``LoadedModel`` exposes its cache_record only via a private attribute. There
+            # is no public ``unload_from_vram`` on the LoadedModel today, and we don't want
+            # to take on a broader backend refactor in this fix; tolerate AttributeError
+            # so a future refactor doesn't break the swap.
+            outgoing_cached_model = getattr(self._active_info, "_cache_record", None)
+            if outgoing_cached_model is not None:
+                outgoing_cached_model = getattr(outgoing_cached_model, "cached_model", None)
+
         # Release current GPU residency before bringing the other expert on device.
         self._release()
 
-        # Hand the PyTorch allocator a clean slate before the next partial_load_to_vram
-        # decides how much of the incoming expert can be GPU-resident. The previous
-        # expert's freed blocks stay pinned in the caching allocator until empty_cache
-        # is called, so partial_load sees fragmented free space and offloads layers it
-        # could otherwise have kept on device — A14B users observed the low-noise
-        # transformer ending up far more CPU-resident than the high-noise one purely
-        # because of leftover reservations from the previous swap.
+        # Force the outgoing expert off GPU. The model cache's automatic offload
+        # (inside lock() -> _offload_unlocked_models) decides how much to free based on
+        # ``torch.cuda.memory_allocated()`` minus a 3 GB working-memory budget. With Wan
+        # 81-frame video the intermediate activations from the previous denoise step are
+        # still allocated alongside the just-unlocked high-noise expert, so the cache
+        # underestimates how much room the new expert really needs and partial-loads
+        # most of its layers to CPU. The user-visible symptom: log line "Loaded model
+        # ... VRAM: 2381 MB (25.9%)" instead of ~100% for the incoming expert.
+        #
+        # Sidestep the heuristic by explicitly unloading every weight of the outgoing
+        # expert to RAM. This is safe even if the cache evicted the entry between unlock
+        # and now — the cached_model object still owns the tensors.
+        if outgoing_cached_model is not None:
+            try:
+                outgoing_cached_model.full_unload_from_vram()
+            except Exception:
+                pass
+
+        # Hand the PyTorch allocator a clean slate before partial_load_to_vram measures
+        # free space — the freed blocks stay pinned in the caching allocator until
+        # empty_cache is called.
         TorchDevice.empty_cache()
 
         # Load the requested expert lazily so its ``LoadedModel`` handle is
@@ -205,6 +232,7 @@ class _ExpertSwapper:
             lora_ctx.__enter__()
 
         self._active_label = label
+        self._active_info = info
         self._active_device_ctx = device_ctx
         self._active_lora_ctx = lora_ctx
         self._active_model = model
@@ -217,6 +245,7 @@ class _ExpertSwapper:
         if self._active_device_ctx is not None:
             self._active_device_ctx.__exit__(None, None, None)
         self._active_label = None
+        self._active_info = None
         self._active_device_ctx = None
         self._active_lora_ctx = None
         self._active_model = None
