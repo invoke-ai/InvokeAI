@@ -3,7 +3,7 @@ import { logger } from 'app/logging/logger';
 import { useAppStore } from 'app/store/storeHooks';
 import { useGetNodesNeedUpdate } from 'features/nodes/hooks/useGetNodesNeedUpdate';
 import { $templates, nodesChanged } from 'features/nodes/store/nodesSlice';
-import { selectNodes } from 'features/nodes/store/selectors';
+import { selectEdges, selectNodes } from 'features/nodes/store/selectors';
 import { NodeUpdateError } from 'features/nodes/types/error';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { getNeedsUpdate, updateNode } from 'features/nodes/util/node/nodeUpdate';
@@ -20,6 +20,7 @@ const useUpdateNodes = () => {
 
   const updateNodes = useCallback(() => {
     const nodes = selectNodes(store.getState());
+    const edges = selectEdges(store.getState());
     const templates = $templates.get();
 
     let unableToUpdateCount = 0;
@@ -35,7 +36,12 @@ const useUpdateNodes = () => {
         return;
       }
       try {
-        const updatedNode = updateNode(node, template);
+        const connectedInputNames = new Set(
+          edges.flatMap((edge) =>
+            edge.type === 'default' && edge.target === node.id && edge.targetHandle ? [edge.targetHandle] : []
+          )
+        );
+        const updatedNode = updateNode(node, template, { connectedInputNames });
         store.dispatch(
           nodesChanged([
             { type: 'remove', id: updatedNode.id },

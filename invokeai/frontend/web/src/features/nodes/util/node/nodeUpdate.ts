@@ -7,6 +7,10 @@ import { zParsedSemver } from 'features/nodes/types/semver';
 
 import { buildInvocationNode } from './buildInvocationNode';
 
+type UpdateNodeOptions = {
+  connectedInputNames?: Set<string>;
+};
+
 export const getNeedsUpdate = (data: InvocationNodeData, template: InvocationTemplate): boolean => {
   if (data.type !== template.type) {
     return true;
@@ -29,6 +33,26 @@ const getMayUpdateNode = (node: InvocationNode, template: InvocationTemplate): b
   return satisfies(node.data.version, `^${templateMajor}`);
 };
 
+const migrateImageCollectionInputValues = (node: InvocationNode, options?: UpdateNodeOptions) => {
+  if (node.data.type !== 'image_collection') {
+    return;
+  }
+
+  const collection = node.data.inputs.collection;
+  const images = node.data.inputs.images;
+  if (!collection || !images || !Array.isArray(collection.value)) {
+    return;
+  }
+  if (Array.isArray(images.value) && images.value.length > 0) {
+    return;
+  }
+
+  if (!options?.connectedInputNames?.has('collection')) {
+    images.value = collection.value;
+  }
+  collection.value = [];
+};
+
 /**
  * Updates a node to the latest version of its template:
  * - Create a new node data object with the latest version of the template.
@@ -40,7 +64,11 @@ const getMayUpdateNode = (node: InvocationNode, template: InvocationTemplate): b
  * @param template The invocation template to update to.
  * @throws {NodeUpdateError} If the node is not an invocation node.
  */
-export const updateNode = (node: InvocationNode, template: InvocationTemplate): InvocationNode => {
+export const updateNode = (
+  node: InvocationNode,
+  template: InvocationTemplate,
+  options?: UpdateNodeOptions
+): InvocationNode => {
   const mayUpdate = getMayUpdateNode(node, template);
 
   if (!mayUpdate || node.data.type !== template.type) {
@@ -56,6 +84,7 @@ export const updateNode = (node: InvocationNode, template: InvocationTemplate): 
   const clone = deepClone(node);
   clone.data.version = template.version;
   defaultsDeep(clone, defaults); // mutates!
+  migrateImageCollectionInputValues(clone, options);
 
   // Remove any fields that are not in the template
   clone.data.inputs = pick(clone.data.inputs, keys(defaults.data.inputs));
