@@ -15,9 +15,17 @@ if TYPE_CHECKING:
     from invokeai.app.services.board_image_records.board_image_records_base import BoardImageRecordStorageBase
     from invokeai.app.services.board_images.board_images_base import BoardImagesServiceABC
     from invokeai.app.services.board_records.board_records_base import BoardRecordStorageBase
+    from invokeai.app.services.board_canvas_project_records.board_canvas_project_records_base import (
+        BoardCanvasProjectRecordStorageBase,
+    )
     from invokeai.app.services.board_video_records.board_video_records_base import BoardVideoRecordStorageBase
     from invokeai.app.services.boards.boards_base import BoardServiceABC
     from invokeai.app.services.bulk_download.bulk_download_base import BulkDownloadBase
+    from invokeai.app.services.canvas_project_files.canvas_project_files_base import CanvasProjectFileStorageBase
+    from invokeai.app.services.canvas_project_records.canvas_project_records_base import (
+        CanvasProjectRecordStorageBase,
+    )
+    from invokeai.app.services.canvas_projects.canvas_projects_base import CanvasProjectServiceABC
     from invokeai.app.services.client_state_persistence.client_state_persistence_base import ClientStatePersistenceABC
     from invokeai.app.services.config import InvokeAIAppConfig
     from invokeai.app.services.download import DownloadQueueServiceBase
@@ -89,6 +97,10 @@ class InvocationServices:
         video_records: "VideoRecordStorageBase",
         board_video_records: "BoardVideoRecordStorageBase",
         gallery: "GalleryServiceABC",
+        canvas_projects: "CanvasProjectServiceABC",
+        canvas_project_files: "CanvasProjectFileStorageBase",
+        canvas_project_records: "CanvasProjectRecordStorageBase",
+        board_canvas_project_records: "BoardCanvasProjectRecordStorageBase",
     ):
         self.board_images = board_images
         self.board_image_records = board_image_records
@@ -126,3 +138,7 @@ class InvocationServices:
         self.video_records = video_records
         self.board_video_records = board_video_records
         self.gallery = gallery
+        self.canvas_projects = canvas_projects
+        self.canvas_project_files = canvas_project_files
+        self.canvas_project_records = canvas_project_records
+        self.board_canvas_project_records = board_canvas_project_records

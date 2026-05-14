@@ -1,7 +1,8 @@
 import { useAppStore } from 'app/store/storeHooks';
-import { isVideoName } from 'features/gallery/store/types';
+import { isCanvasProjectName, isVideoName } from 'features/gallery/store/types';
 import { useCallback, useEffect, useState } from 'react';
 import type { ListRange } from 'react-virtuoso';
+import { canvasProjectsApi } from 'services/api/endpoints/canvasProjects';
 import { imagesApi, useGetImageDTOsByNamesMutation } from 'services/api/endpoints/images';
 import { videosApi } from 'services/api/endpoints/videos';
 import { useThrottledCallback } from 'use-debounce';
@@ -57,7 +58,9 @@ export const useRangeBasedImageFetching = ({
 
       // Images — bulk fetch via the existing batch endpoint.
       const cachedImageNames = imagesApi.util.selectCachedArgsForQuery(state, 'getImageDTO');
-      const uncachedImageNames = getUncachedNames(allNames, cachedImageNames, ranges).filter((n) => !isVideoName(n));
+      const uncachedImageNames = getUncachedNames(allNames, cachedImageNames, ranges).filter(
+        (n) => !isVideoName(n) && !isCanvasProjectName(n)
+      );
       if (uncachedImageNames.length > 0) {
         getImageDTOsByNames({ image_names: uncachedImageNames });
       }
@@ -68,6 +71,16 @@ export const useRangeBasedImageFetching = ({
       const uncachedVideoNames = getUncachedNames(allNames, cachedVideoNames, ranges).filter((n) => isVideoName(n));
       for (const videoName of uncachedVideoNames) {
         store.dispatch(videosApi.endpoints.getVideoDTO.initiate(videoName));
+      }
+
+      // Canvas projects — same pattern as videos. List is small enough that per-item fetches
+      // are fine; bulk endpoint can come later if it becomes a hotspot.
+      const cachedProjectNames = canvasProjectsApi.util.selectCachedArgsForQuery(state, 'getCanvasProjectDTO');
+      const uncachedProjectNames = getUncachedNames(allNames, cachedProjectNames, ranges).filter((n) =>
+        isCanvasProjectName(n)
+      );
+      for (const projectName of uncachedProjectNames) {
+        store.dispatch(canvasProjectsApi.endpoints.getCanvasProjectDTO.initiate(projectName));
       }
 
       setPendingRanges([]);

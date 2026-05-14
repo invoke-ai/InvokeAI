@@ -6,6 +6,7 @@ import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors'
 import { memo } from 'react';
 
 import { CurrentImageButtons } from './CurrentImageButtons';
+import { LoadCanvasProjectButton } from './LoadCanvasProjectButton';
 import { ToggleProgressButton } from './ToggleProgressButton';
 
 export const ImageViewerToolbar = memo(() => {
@@ -15,12 +16,14 @@ export const ImageViewerToolbar = memo(() => {
   // Videos don't carry workflows or recallable metadata yet — the action row + metadata viewer
   // toggle are image-specific. We still show the progress button (it's media-agnostic).
   const showImageActions = galleryItem?.kind === 'image';
+  const showProjectActions = galleryItem?.kind === 'canvas_project';
 
   return (
     <Flex w="full" justifyContent="center" h={8}>
       <ToggleProgressButton />
       <Spacer />
       {showImageActions && <CurrentImageButtons imageDTO={galleryItem.dto} />}
+      {showProjectActions && <LoadCanvasProjectButton projectDTO={galleryItem.dto} />}
       <Spacer />
       {showImageActions && <ToggleMetadataViewerButton />}
     </Flex>

@@ -8,10 +8,12 @@ import { imageDTOToCroppableImage } from 'features/controlLayers/store/util';
 import { selectComparisonImages } from 'features/gallery/components/ImageViewer/common';
 import type { BoardId } from 'features/gallery/store/types';
 import {
+  addCanvasProjectToBoard,
   addImagesToBoard,
   addVideoToBoard,
   createNewCanvasEntityFromImage,
   newCanvasFromImage,
+  removeCanvasProjectFromBoard,
   removeImagesFromBoard,
   removeVideoFromBoard,
   replaceCanvasEntityObjectsWithImage,
@@ -25,7 +27,7 @@ import {
 import { fieldImageCollectionValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectFieldInputInstanceSafe, selectNodesSlice } from 'features/nodes/store/selectors';
 import { type FieldIdentifier, isImageFieldCollectionInputInstance } from 'features/nodes/types/field';
-import type { ImageDTO, VideoDTO } from 'services/api/types';
+import type { CanvasProjectDTO, ImageDTO, VideoDTO } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
 const log = logger('dnd');
@@ -93,6 +95,20 @@ export const singleVideoDndSource: DndSource<SingleVideoDndSourceData> = {
   ..._singleVideo,
   typeGuard: buildTypeGuard(_singleVideo.key),
   getData: buildGetData(_singleVideo.key, _singleVideo.type),
+};
+//#endregion
+
+//#region Single Canvas Project
+const _singleCanvasProject = buildTypeAndKey('single-canvas-project');
+type SingleCanvasProjectDndSourceData = DndData<
+  typeof _singleCanvasProject.type,
+  typeof _singleCanvasProject.key,
+  { projectDTO: CanvasProjectDTO }
+>;
+export const singleCanvasProjectDndSource: DndSource<SingleCanvasProjectDndSourceData> = {
+  ..._singleCanvasProject,
+  typeGuard: buildTypeGuard(_singleCanvasProject.key),
+  getData: buildGetData(_singleCanvasProject.key, _singleCanvasProject.type),
 };
 //#endregion
 
@@ -534,7 +550,7 @@ export type AddImageToBoardDndTargetData = DndData<
 >;
 export const addImageToBoardDndTarget: DndTarget<
   AddImageToBoardDndTargetData,
-  SingleImageDndSourceData | MultipleImageDndSourceData | SingleVideoDndSourceData
+  SingleImageDndSourceData | MultipleImageDndSourceData | SingleVideoDndSourceData | SingleCanvasProjectDndSourceData
 > = {
   ..._addToBoard,
   typeGuard: buildTypeGuard(_addToBoard.key),
@@ -569,6 +585,15 @@ export const addImageToBoardDndTarget: DndTarget<
       // through the mutation rather than blocking the drop preemptively.
       return canMoveFromSourceBoard(currentBoard, getState);
     }
+    if (singleCanvasProjectDndSource.typeGuard(sourceData)) {
+      const currentBoard = sourceData.payload.projectDTO.board_id ?? 'none';
+      const destinationBoard = targetData.payload.boardId;
+      if (currentBoard === destinationBoard) {
+        return false;
+      }
+      // Same permission model as videos — backend enforces _assert_project_direct_owner.
+      return canMoveFromSourceBoard(currentBoard, getState);
+    }
     return false;
   },
   handler: ({ sourceData, targetData, dispatch }) => {
@@ -589,6 +614,12 @@ export const addImageToBoardDndTarget: DndTarget<
       const { boardId } = targetData.payload;
       addVideoToBoard({ video_name: videoDTO.video_name, boardId, dispatch });
     }
+
+    if (singleCanvasProjectDndSource.typeGuard(sourceData)) {
+      const { projectDTO } = sourceData.payload;
+      const { boardId } = targetData.payload;
+      addCanvasProjectToBoard({ project_name: projectDTO.project_name, boardId, dispatch });
+    }
   },
 };
 
@@ -603,7 +634,7 @@ export type RemoveImageFromBoardDndTargetData = DndData<
 >;
 export const removeImageFromBoardDndTarget: DndTarget<
   RemoveImageFromBoardDndTargetData,
-  SingleImageDndSourceData | MultipleImageDndSourceData | SingleVideoDndSourceData
+  SingleImageDndSourceData | MultipleImageDndSourceData | SingleVideoDndSourceData | SingleCanvasProjectDndSourceData
 > = {
   ..._removeFromBoard,
   typeGuard: buildTypeGuard(_removeFromBoard.key),
@@ -634,6 +665,14 @@ export const removeImageFromBoardDndTarget: DndTarget<
       return canMoveFromSourceBoard(currentBoard, getState);
     }
 
+    if (singleCanvasProjectDndSource.typeGuard(sourceData)) {
+      const currentBoard = sourceData.payload.projectDTO.board_id ?? 'none';
+      if (currentBoard === 'none') {
+        return false;
+      }
+      return canMoveFromSourceBoard(currentBoard, getState);
+    }
+
     return false;
   },
   handler: ({ sourceData, dispatch }) => {
@@ -650,6 +689,11 @@ export const removeImageFromBoardDndTarget: DndTarget<
     if (singleVideoDndSource.typeGuard(sourceData)) {
       const { videoDTO } = sourceData.payload;
       removeVideoFromBoard({ video_name: videoDTO.video_name, dispatch });
+    }
+
+    if (singleCanvasProjectDndSource.typeGuard(sourceData)) {
+      const { projectDTO } = sourceData.payload;
+      removeCanvasProjectFromBoard({ project_name: projectDTO.project_name, dispatch });
     }
   },
 };

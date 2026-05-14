@@ -15,6 +15,11 @@ class UrlServiceBase(ABC):
         pass
 
     @abstractmethod
+    def get_canvas_project_url(self, project_name: str, thumbnail: bool = False) -> str:
+        """Gets the URL for a canvas project ZIP (.invk) or its preview thumbnail (WebP)."""
+        pass
+
+    @abstractmethod
     def get_model_image_url(self, model_key: str) -> str:
         """Gets the URL for a model image"""
         pass

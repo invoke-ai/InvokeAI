@@ -532,6 +532,9 @@
         "deleteVideo_one": "Delete Video",
         "deleteVideo_other": "Delete {{count}} Videos",
         "deleteVideoConfirmation": "Delete this video?",
+        "deleteCanvasProject_one": "Delete Canvas Project",
+        "deleteCanvasProject_other": "Delete {{count}} Canvas Projects",
+        "deleteCanvasProjectConfirmation": "Delete this canvas project?",
         "playVideo": "Play video",
         "displayBoardSearch": "Board Search",
         "displaySearch": "Image Search",
@@ -3176,6 +3179,7 @@
             "project": "Project",
             "saveProject": "Save Canvas Project",
             "loadProject": "Load Canvas Project",
+            "loadProjectFromFile": "Load Canvas Project from File",
             "saveSuccess": "Project Saved",
             "saveSuccessDesc": "Saved project with {{count}} images",
             "saveError": "Failed to Save Project",
@@ -3183,7 +3187,14 @@
             "loadSuccessDesc": "Canvas state restored from project file",
             "loadError": "Failed to Load Project",
             "loadWarning": "Loading a project will replace your current canvas, including all layers, masks, reference images, and generation parameters. This action cannot be undone.",
-            "projectName": "Project Name"
+            "projectName": "Project Name",
+            "saveDestination": "Save Destination",
+            "downloadAsFile": "Download as File",
+            "board": "Board",
+            "updateExisting": "Update Existing Project",
+            "createNew": "Create New Project",
+            "updateSuccess": "Project Updated",
+            "updateError": "Failed to Update Project"
         },
         "stagingArea": {
             "accept": "Accept",

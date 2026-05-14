@@ -12,7 +12,7 @@ import {
   selectSelectionCount,
 } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
-import { isVideoName } from 'features/gallery/store/types';
+import { isCanvasProjectName, isVideoName } from 'features/gallery/store/types';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
@@ -29,12 +29,14 @@ import type {
   VirtuosoGridHandle,
 } from 'react-virtuoso';
 import { VirtuosoGrid } from 'react-virtuoso';
+import { canvasProjectsApi } from 'services/api/endpoints/canvasProjects';
 import { imagesApi, useImageDTO, useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
 import { useStarVideosMutation, useUnstarVideosMutation, useVideoDTO, videosApi } from 'services/api/endpoints/videos';
 import { useDebounce } from 'use-debounce';
 
 import { getItemIndex } from './getItemIndex';
 import { getItemsPerRow } from './getItemsPerRow';
+import { GalleryCanvasProjectItem } from './ImageGrid/GalleryCanvasProjectItem';
 import { GalleryImage, GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
 import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
 import { GalleryVideoItem } from './ImageGrid/GalleryVideoItem';
@@ -61,16 +63,29 @@ type GridContext = {
  */
 const ImageAtPosition = memo(({ imageName }: { index: number; imageName: string }) => {
   const isVideo = isVideoName(imageName);
+  const isCanvasProject = isCanvasProjectName(imageName);
 
-  // Always call both hooks (React rules of hooks) — the irrelevant one is just a no-op subscription.
-  const imageState = imagesApi.endpoints.getImageDTO.useQueryState(isVideo ? '' : imageName);
-  imagesApi.endpoints.getImageDTO.useQuerySubscription(isVideo ? '' : imageName, {
-    skip: isVideo || imageState.isUninitialized,
+  // Always call all three hooks (React rules of hooks) — the irrelevant ones are no-op subscriptions.
+  const imageState = imagesApi.endpoints.getImageDTO.useQueryState(isVideo || isCanvasProject ? '' : imageName);
+  imagesApi.endpoints.getImageDTO.useQuerySubscription(isVideo || isCanvasProject ? '' : imageName, {
+    skip: isVideo || isCanvasProject || imageState.isUninitialized,
   });
   const videoState = videosApi.endpoints.getVideoDTO.useQueryState(isVideo ? imageName : '');
   videosApi.endpoints.getVideoDTO.useQuerySubscription(isVideo ? imageName : '', {
     skip: !isVideo || videoState.isUninitialized,
   });
+  const projectState = canvasProjectsApi.endpoints.getCanvasProjectDTO.useQueryState(isCanvasProject ? imageName : '');
+  canvasProjectsApi.endpoints.getCanvasProjectDTO.useQuerySubscription(isCanvasProject ? imageName : '', {
+    skip: !isCanvasProject || projectState.isUninitialized,
+  });
+
+  if (isCanvasProject) {
+    const projectDTO = projectState.currentData;
+    if (!projectDTO) {
+      return <GalleryImagePlaceholder data-item-id={imageName} />;
+    }
+    return <GalleryCanvasProjectItem projectDTO={projectDTO} />;
+  }
 
   if (isVideo) {
     const videoDTO = videoState.currentData;

@@ -26,6 +26,15 @@ class LocalUrlService(UrlServiceBase):
 
         return f"{self._base_url}/videos/i/{video_basename}/full"
 
+    def get_canvas_project_url(self, project_name: str, thumbnail: bool = False) -> str:
+        project_basename = os.path.basename(project_name)
+
+        # These paths are determined by the routes in invokeai/app/api/routers/canvas_projects.py
+        if thumbnail:
+            return f"{self._base_url}/canvas_projects/i/{project_basename}/thumbnail"
+
+        return f"{self._base_url}/canvas_projects/i/{project_basename}/full"
+
     def get_model_image_url(self, model_key: str) -> str:
         return f"{self._base_url_v2}/models/i/{model_key}/image"
 

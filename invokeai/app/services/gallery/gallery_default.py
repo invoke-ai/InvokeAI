@@ -66,6 +66,16 @@ class SqliteGalleryService(GalleryServiceABC):
             user_id=user_id,
             is_admin=is_admin,
         )
+        project_half, project_params, project_count_query = self._build_half(
+            kind="canvas_project",
+            origin=origin,
+            categories=categories,
+            is_intermediate=is_intermediate,
+            board_id=board_id,
+            search_term=search_term,
+            user_id=user_id,
+            is_admin=is_admin,
+        )
 
         if starred_first:
             order_clause = f"ORDER BY starred DESC, created_at {order_dir.value}"
@@ -77,6 +87,8 @@ class SqliteGalleryService(GalleryServiceABC):
             {image_half}
             UNION ALL
             {video_half}
+            UNION ALL
+            {project_half}
         )
         {order_clause}
         LIMIT ? OFFSET ?
@@ -84,13 +96,15 @@ class SqliteGalleryService(GalleryServiceABC):
         """
 
         with self._db.transaction() as cursor:
-            cursor.execute(union_query, image_params + video_params + [limit, offset])
+            cursor.execute(union_query, image_params + video_params + project_params + [limit, offset])
             rows = cast(list[sqlite3.Row], cursor.fetchall())
 
             cursor.execute(image_count_query, image_params)
             image_count = cast(int, cursor.fetchone()[0])
             cursor.execute(video_count_query, video_params)
             video_count = cast(int, cursor.fetchone()[0])
+            cursor.execute(project_count_query, project_params)
+            project_count = cast(int, cursor.fetchone()[0])
 
         urls = self.__invoker.services.urls
         items = [self._row_to_item(row, urls) for row in rows]
@@ -98,7 +112,7 @@ class SqliteGalleryService(GalleryServiceABC):
             items=items,
             offset=offset,
             limit=limit,
-            total=image_count + video_count,
+            total=image_count + video_count + project_count,
         )
 
     def list_item_names(
@@ -135,6 +149,17 @@ class SqliteGalleryService(GalleryServiceABC):
             is_admin=is_admin,
             names_only=True,
         )
+        project_half, project_params, _ = self._build_half(
+            kind="canvas_project",
+            origin=origin,
+            categories=categories,
+            is_intermediate=is_intermediate,
+            board_id=board_id,
+            search_term=search_term,
+            user_id=user_id,
+            is_admin=is_admin,
+            names_only=True,
+        )
 
         if starred_first:
             order_clause = f"ORDER BY starred DESC, created_at {order_dir.value}"
@@ -146,13 +171,15 @@ class SqliteGalleryService(GalleryServiceABC):
             {image_half}
             UNION ALL
             {video_half}
+            UNION ALL
+            {project_half}
         )
         {order_clause}
         ;
         """
 
         with self._db.transaction() as cursor:
-            cursor.execute(union_query, image_params + video_params)
+            cursor.execute(union_query, image_params + video_params + project_params)
             rows = cast(list[sqlite3.Row], cursor.fetchall())
 
             starred_count = 0
@@ -183,6 +210,11 @@ class SqliteGalleryService(GalleryServiceABC):
         `names_only=True` selects only `kind`, `name`, `starred`, `created_at` (the minimum needed
         for ordering + the counts result).
         """
+        # Canvas projects have no `category` column — they're conceptually GENERAL — and no
+        # `metadata` column. We project literals to keep the UNION shape-compatible and skip the
+        # category filter / metadata search on this half.
+        is_canvas_project = kind == "canvas_project"
+
         if kind == "image":
             base_table = "images"
             join_table = "board_images"
@@ -191,6 +223,8 @@ class SqliteGalleryService(GalleryServiceABC):
             origin_col = "image_origin"
             duration_expr = "NULL"
             fps_expr = "NULL"
+            image_count_expr = "NULL"
+            category_select = f"{base_table}.{category_col}"
         elif kind == "video":
             base_table = "videos"
             join_table = "board_videos"
@@ -199,6 +233,19 @@ class SqliteGalleryService(GalleryServiceABC):
             origin_col = "video_origin"
             duration_expr = f"{base_table}.duration"
             fps_expr = f"{base_table}.fps"
+            image_count_expr = "NULL"
+            category_select = f"{base_table}.{category_col}"
+        elif kind == "canvas_project":
+            base_table = "canvas_projects"
+            join_table = "board_canvas_projects"
+            name_col = "project_name"
+            origin_col = "project_origin"
+            duration_expr = "NULL"
+            fps_expr = "NULL"
+            image_count_expr = f"{base_table}.image_count"
+            # Canvas projects don't have a category column — emit a literal so the UNION matches.
+            category_select = f"'{ImageCategory.GENERAL.value}'"
+            category_col = None  # unused, projects bypass the category filter
         else:
             raise ValueError(f"Unknown kind: {kind}")
 
@@ -215,13 +262,14 @@ class SqliteGalleryService(GalleryServiceABC):
                 f"{base_table}.{name_col} AS name, "
                 f"{base_table}.width AS width, "
                 f"{base_table}.height AS height, "
-                f"{base_table}.{category_col} AS category, "
+                f"{category_select} AS category, "
                 f"{base_table}.starred AS starred, "
                 f"{base_table}.is_intermediate AS is_intermediate, "
                 f"{join_table}.board_id AS board_id, "
                 f"{base_table}.created_at AS created_at, "
                 f"{duration_expr} AS duration, "
-                f"{fps_expr} AS fps"
+                f"{fps_expr} AS fps, "
+                f"{image_count_expr} AS image_count"
             )
 
         from_clause = f"FROM {base_table} LEFT JOIN {join_table} ON {join_table}.{name_col} = {base_table}.{name_col}"
@@ -233,12 +281,18 @@ class SqliteGalleryService(GalleryServiceABC):
             conditions += f" AND {base_table}.{origin_col} = ? "
             params.append(origin.value)
 
-        if categories is not None:
+        if categories is not None and category_col is not None:
+            # Canvas projects don't carry a category — when callers filter by category, they
+            # implicitly exclude projects unless GENERAL is in the list. Make that explicit.
             category_strings = [c.value for c in set(categories)]
             placeholders = ",".join("?" * len(category_strings))
             conditions += f" AND {base_table}.{category_col} IN ( {placeholders} ) "
             for c in category_strings:
                 params.append(c)
+        elif categories is not None and is_canvas_project:
+            # GENERAL not in categories → exclude all canvas projects.
+            if ImageCategory.GENERAL not in set(categories):
+                conditions += " AND 1=0 "
 
         if is_intermediate is not None:
             conditions += f" AND {base_table}.is_intermediate = ? "
@@ -259,7 +313,11 @@ class SqliteGalleryService(GalleryServiceABC):
             params.append(user_id)
 
         if search_term:
-            conditions += f" AND ({base_table}.metadata LIKE ? OR {base_table}.created_at LIKE ?) "
+            if is_canvas_project:
+                # No `metadata` column on canvas_projects — search the `name` field instead.
+                conditions += f" AND ({base_table}.name LIKE ? OR {base_table}.created_at LIKE ?) "
+            else:
+                conditions += f" AND ({base_table}.metadata LIKE ? OR {base_table}.created_at LIKE ?) "
             params.append(f"%{search_term.lower()}%")
             params.append(f"%{search_term.lower()}%")
 
@@ -270,16 +328,21 @@ class SqliteGalleryService(GalleryServiceABC):
     def _row_to_item(self, row: sqlite3.Row, urls) -> GalleryItem:
         kind = GalleryItemKind(row["kind"])
         name = row["name"]
+        duration: Optional[float] = None
+        fps: Optional[float] = None
+        image_count: Optional[int] = None
         if kind == GalleryItemKind.IMAGE:
             full_url = urls.get_image_url(name)
             thumbnail_url = urls.get_image_url(name, thumbnail=True)
-            duration = None
-            fps = None
-        else:
+        elif kind == GalleryItemKind.VIDEO:
             full_url = urls.get_video_url(name)
             thumbnail_url = urls.get_video_url(name, thumbnail=True)
             duration = row["duration"]
             fps = row["fps"]
+        else:
+            full_url = urls.get_canvas_project_url(name)
+            thumbnail_url = urls.get_canvas_project_url(name, thumbnail=True)
+            image_count = row["image_count"]
         return GalleryItem(
             kind=kind,
             name=name,
@@ -294,4 +357,5 @@ class SqliteGalleryService(GalleryServiceABC):
             created_at=row["created_at"],
             duration=duration,
             fps=fps,
+            image_count=image_count,
         )

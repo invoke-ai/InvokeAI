@@ -4,7 +4,13 @@ import { logger } from 'app/logging/logger';
 import { getStore } from 'app/store/nanostores/store';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { parseify } from 'common/util/serialize';
-import { dndTargets, multipleImageDndSource, singleImageDndSource, singleVideoDndSource } from 'features/dnd/dnd';
+import {
+  dndTargets,
+  multipleImageDndSource,
+  singleCanvasProjectDndSource,
+  singleImageDndSource,
+  singleVideoDndSource,
+} from 'features/dnd/dnd';
 import { useEffect } from 'react';
 
 const log = logger('dnd');
@@ -22,7 +28,8 @@ export const useDndMonitor = () => {
           if (
             !singleImageDndSource.typeGuard(sourceData) &&
             !multipleImageDndSource.typeGuard(sourceData) &&
-            !singleVideoDndSource.typeGuard(sourceData)
+            !singleVideoDndSource.typeGuard(sourceData) &&
+            !singleCanvasProjectDndSource.typeGuard(sourceData)
           ) {
             return false;
           }

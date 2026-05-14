@@ -1,29 +1,39 @@
-import { isVideoName } from 'features/gallery/store/types';
+import { isCanvasProjectName, isVideoName } from 'features/gallery/store/types';
+import { useGetCanvasProjectDTOQuery } from 'services/api/endpoints/canvasProjects';
 import { useImageDTO } from 'services/api/endpoints/images';
 import { useVideoDTO } from 'services/api/endpoints/videos';
-import type { ImageDTO, VideoDTO } from 'services/api/types';
+import type { CanvasProjectDTO, ImageDTO, VideoDTO } from 'services/api/types';
 
 /**
- * Resolves either an ImageDTO or a VideoDTO based on a polymorphic name. The kind is derived
- * from the filename extension — the backend names images `<uuid>.png` and videos `<uuid>.mp4`,
- * so we can dispatch without an extra fetch.
+ * Resolves either an ImageDTO, VideoDTO or CanvasProjectDTO based on a polymorphic name. The kind
+ * is derived from the filename pattern — images are `<uuid>.png`, videos `<uuid>.mp4`, canvas
+ * projects bare UUIDs (no extension) — so we can dispatch without an extra fetch.
  *
- * Both underlying RTK Query hooks are always called (React rule-of-hooks), but only the relevant
- * one is given a real name; the other receives `null` and short-circuits via `skipToken`.
+ * All underlying RTK Query hooks are always called (React rule-of-hooks); only the relevant one
+ * gets a real name, the others receive `null` / `skipToken` and short-circuit.
  */
 /** @knipignore Re-exported for callers that destructure the hook return into named locals. */
-export type GalleryItemDTO = { kind: 'image'; dto: ImageDTO } | { kind: 'video'; dto: VideoDTO };
+export type GalleryItemDTO =
+  | { kind: 'image'; dto: ImageDTO }
+  | { kind: 'video'; dto: VideoDTO }
+  | { kind: 'canvas_project'; dto: CanvasProjectDTO };
 
 export const useGalleryItemDTO = (name: string | null | undefined): GalleryItemDTO | null => {
   const isVideo = name ? isVideoName(name) : false;
-  const imageName = name && !isVideo ? name : null;
+  const isCanvasProject = name ? isCanvasProjectName(name) : false;
+  const imageName = name && !isVideo && !isCanvasProject ? name : null;
   const videoName = name && isVideo ? name : null;
+  const projectName = name && isCanvasProject ? name : null;
 
   const imageDTO = useImageDTO(imageName);
   const videoDTO = useVideoDTO(videoName);
+  const { data: projectDTO } = useGetCanvasProjectDTOQuery(projectName ?? '', { skip: !projectName });
 
   if (!name) {
     return null;
+  }
+  if (isCanvasProject) {
+    return projectDTO ? { kind: 'canvas_project', dto: projectDTO } : null;
   }
   if (isVideo) {
     return videoDTO ? { kind: 'video', dto: videoDTO } : null;

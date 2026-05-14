@@ -1,4 +1,4 @@
-"""Polymorphic gallery types: images and videos appearing in a single time-sorted stream."""
+"""Polymorphic gallery types: images, videos and canvas projects in a single time-sorted stream."""
 
 import datetime
 from enum import Enum
@@ -16,35 +16,40 @@ class GalleryItemKind(str, Enum, metaclass=MetaEnum):
 
     IMAGE = "image"
     VIDEO = "video"
+    CANVAS_PROJECT = "canvas_project"
 
 
 class GalleryItemRef(BaseModel):
     """A thin reference to a gallery item — used for ordered name lists."""
 
-    kind: GalleryItemKind = Field(description="Whether the item is an image or video.")
-    name: str = Field(description="The unique name of the image or video.")
+    kind: GalleryItemKind = Field(description="Whether the item is an image, video or canvas project.")
+    name: str = Field(description="The unique name of the image, video or canvas project.")
 
 
 class GalleryItem(BaseModelExcludeNull):
-    """A gallery item — either an image or a video, with shared fields and a discriminator.
+    """A gallery item — image, video or canvas project, with shared fields and a discriminator.
 
-    Frontend code should dispatch on `kind` to render image- vs video-specific UI.
+    Frontend code should dispatch on `kind` to render kind-specific UI.
     """
 
-    kind: GalleryItemKind = Field(description="Whether the item is an image or video.")
-    name: str = Field(description="The unique name of the image or video.")
-    full_url: str = Field(description="URL to the full-resolution image PNG or the full-quality video MP4.")
+    kind: GalleryItemKind = Field(description="Whether the item is an image, video or canvas project.")
+    name: str = Field(description="The unique name of the image, video or canvas project.")
+    full_url: str = Field(description="URL to the full-resolution image PNG, video MP4 or canvas project .invk ZIP.")
     thumbnail_url: str = Field(description="URL to the static (WebP) thumbnail.")
     width: int = Field(description="The width of the item in pixels.")
     height: int = Field(description="The height of the item in pixels.")
-    category: ImageCategory = Field(description="The category of the item (images and videos share the same enum).")
+    category: ImageCategory = Field(description="The category of the item (canvas projects always GENERAL).")
     starred: bool = Field(description="Whether the item is starred.")
     is_intermediate: bool = Field(description="Whether the item is an intermediate output.")
     board_id: Optional[str] = Field(default=None, description="Owning board id, if any.")
     created_at: Union[datetime.datetime, str] = Field(description="The created timestamp of the item.")
-    # Video-only fields. None for images.
-    duration: Optional[float] = Field(default=None, description="Video duration in seconds. None for images.")
-    fps: Optional[float] = Field(default=None, description="Video frames per second. None for images.")
+    # Video-only fields. None for images and canvas projects.
+    duration: Optional[float] = Field(default=None, description="Video duration in seconds. None for non-videos.")
+    fps: Optional[float] = Field(default=None, description="Video frames per second. None for non-videos.")
+    # Canvas-project-only field. None for images and videos.
+    image_count: Optional[int] = Field(
+        default=None, description="Number of embedded images in a canvas project. None for non-projects."
+    )
 
 
 class GalleryItemNamesResult(BaseModel):

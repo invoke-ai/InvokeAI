@@ -46,6 +46,21 @@ export const getTagsToInvalidateForBoardAffectingMutation = (affected_boards: st
       type: 'BoardVideosTotal',
       id: board_id,
     });
+
+    tags.push({
+      type: 'BoardCanvasProjectsTotal',
+      id: board_id,
+    });
+  }
+
+  return tags;
+};
+
+export const getTagsToInvalidateForCanvasProjectMutation = (project_names: string[]): ApiTagDescription[] => {
+  const tags: ApiTagDescription[] = [];
+
+  for (const project_name of project_names) {
+    tags.push({ type: 'CanvasProject', id: project_name });
   }
 
   return tags;

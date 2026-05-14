@@ -51,8 +51,14 @@ export const getDateFromVirtualBoardId = (id: string): string => id.replace(VIRT
 
 /**
  * The polymorphic gallery treats selection as `string[]` of names. The kind is recoverable from
- * the filename extension since the backend names images with `.png` and videos with `.mp4` (see
- * SimpleNameService). Centralizing the discriminator here so callers don't have to know about
- * the extension contract.
+ * the filename pattern since the backend names images with `.png`, videos with `.mp4` (see
+ * SimpleNameService), and canvas projects with a bare UUID (no extension). Centralizing the
+ * discriminator here so callers don't have to know about the extension contract.
  */
 export const isVideoName = (name: string): boolean => name.toLowerCase().endsWith('.mp4');
+
+// UUID v4 pattern — bare UUIDs are canvas-project names (no extension). Images and videos always
+// carry an extension, so checking the absence of a `.` is also a valid discriminator. We use the
+// UUID pattern explicitly to defend against future name schemes.
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const isCanvasProjectName = (name: string): boolean => UUID_PATTERN.test(name);

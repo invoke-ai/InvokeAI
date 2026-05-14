@@ -41,6 +41,7 @@ import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSli
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
+import { canvasProjectsApi } from 'services/api/endpoints/canvasProjects';
 import { imageDTOToFile, imagesApi, uploadImage } from 'services/api/endpoints/images';
 import { videosApi } from 'services/api/endpoints/videos';
 import type { ImageDTO, VideoDTO } from 'services/api/types';
@@ -348,5 +349,21 @@ export const addVideoToBoard = (arg: { video_name: string; boardId: BoardId; dis
 export const removeVideoFromBoard = (arg: { video_name: string; dispatch: AppDispatch }) => {
   const { video_name, dispatch } = arg;
   dispatch(videosApi.endpoints.removeVideoFromBoard.initiate({ video_name }, { track: false }));
+  dispatch(selectionChanged([]));
+};
+
+// Single-canvas-project counterparts. The canvas projects router only exposes single-project
+// add/remove endpoints (POST/DELETE /api/v1/board_canvas_projects/), matching the video pattern.
+export const addCanvasProjectToBoard = (arg: { project_name: string; boardId: BoardId; dispatch: AppDispatch }) => {
+  const { project_name, boardId, dispatch } = arg;
+  dispatch(
+    canvasProjectsApi.endpoints.addCanvasProjectToBoard.initiate({ project_name, board_id: boardId }, { track: false })
+  );
+  dispatch(selectionChanged([]));
+};
+
+export const removeCanvasProjectFromBoard = (arg: { project_name: string; dispatch: AppDispatch }) => {
+  const { project_name, dispatch } = arg;
+  dispatch(canvasProjectsApi.endpoints.removeCanvasProjectFromBoard.initiate({ project_name }, { track: false }));
   dispatch(selectionChanged([]));
 };

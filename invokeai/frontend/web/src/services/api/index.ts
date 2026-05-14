@@ -68,6 +68,10 @@ const tagTypes = [
   'VideoMetadata',
   'VideoNameList',
   'BoardVideosTotal',
+  // Canvas project tags (parallel to Image/Video tags).
+  'CanvasProject',
+  'CanvasProjectList',
+  'BoardCanvasProjectsTotal',
   // Polymorphic gallery list (images + videos interleaved by created_at).
   'GalleryItemList',
   'GalleryItemNameList',

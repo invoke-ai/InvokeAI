@@ -655,6 +655,54 @@ export type GetVideoNamesArgs = NonNullable<paths['/api/v1/videos/names']['get']
 export type GetVideoNamesResult =
   paths['/api/v1/videos/names']['get']['responses']['200']['content']['application/json'];
 
+// Canvas Projects (.invk)
+export type CanvasProjectDTO = S['CanvasProjectDTO'];
+export type CanvasProjectRecordChanges = S['CanvasProjectRecordChanges'];
+export type OffsetPaginatedResults_CanvasProjectDTO_ = S['OffsetPaginatedResults_CanvasProjectDTO_'];
+export type ListCanvasProjectsArgs = NonNullable<paths['/api/v1/canvas_projects/']['get']['parameters']['query']>;
+export type ListCanvasProjectsResponse =
+  paths['/api/v1/canvas_projects/']['get']['responses']['200']['content']['application/json'];
+
+export type UploadCanvasProjectArg = {
+  /** The `.invk` (ZIP) file to upload. */
+  file: File;
+  /** The user-facing project name. */
+  name: string;
+  /** App version captured at save time. */
+  app_version: string;
+  /** Bbox width at save time. */
+  width: number;
+  /** Bbox height at save time. */
+  height: number;
+  /** Number of embedded image files. */
+  image_count: number;
+  /** Optional WebP preview thumbnail. */
+  thumbnail?: Blob;
+  /** Optional board id to attach the project to. */
+  board_id?: string;
+  /** Whether the project is an intermediate (defaults to false). */
+  is_intermediate?: boolean;
+};
+
+export type ReplaceCanvasProjectFileArg = {
+  /** The target project to update. UUID — keeps board assignment and starred state. */
+  project_name: string;
+  /** The replacement `.invk` (ZIP) file. */
+  file: File;
+  /** Optional new user-facing project name. */
+  name?: string;
+  /** App version captured at save time. */
+  app_version: string;
+  /** Bbox width at save time. */
+  width: number;
+  /** Bbox height at save time. */
+  height: number;
+  /** Number of embedded image files. */
+  image_count: number;
+  /** Optional replacement WebP preview. Omit to keep the existing thumbnail. */
+  thumbnail?: Blob;
+};
+
 export type UploadVideoArg = {
   /** The MP4 (or other accepted video) file to upload. */
   file: File;

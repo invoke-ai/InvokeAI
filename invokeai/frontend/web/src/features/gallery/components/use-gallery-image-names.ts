@@ -8,16 +8,18 @@ import { useGetGalleryItemNamesQuery } from 'services/api/endpoints/gallery';
 import { useGetVirtualBoardImageNamesByDateQuery } from 'services/api/endpoints/virtual_boards';
 import { useDebounce } from 'use-debounce';
 
+type GalleryItemRef = { kind: 'image' | 'video' | 'canvas_project'; name: string };
+
 const selectFromGalleryItemNamesResult = ({
   currentData,
   isLoading,
   isFetching,
 }: {
-  currentData?: { items: { kind: 'image' | 'video'; name: string }[] };
+  currentData?: { items: GalleryItemRef[] };
   isLoading: boolean;
   isFetching: boolean;
 }) => ({
-  items: currentData?.items ?? (EMPTY_ARRAY as { kind: 'image' | 'video'; name: string }[]),
+  items: currentData?.items ?? (EMPTY_ARRAY as GalleryItemRef[]),
   isLoading,
   isFetching,
 });

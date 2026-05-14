@@ -26,6 +26,7 @@ import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import type { MouseEvent, MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PiImageBold } from 'react-icons/pi';
+import { galleryApi } from 'services/api/endpoints/gallery';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
@@ -35,12 +36,38 @@ interface Props {
   imageDTO: ImageDTO;
 }
 
+/**
+ * Returns the most recently cached polymorphic gallery item names (images + videos + canvas
+ * projects interleaved). Used as a fallback when the image-only name list can't satisfy a
+ * shift-click range (e.g. the previously selected item is a video or canvas project).
+ */
+const selectCachedGalleryItemNames = (state: ReturnType<AppGetState>): string[] => {
+  const entries = galleryApi.util.selectInvalidatedBy(state, ['GalleryItemNameList']);
+  for (const entry of entries) {
+    if (entry.endpointName !== 'getGalleryItemNames') {
+      continue;
+    }
+    const data = galleryApi.endpoints.getGalleryItemNames.select(entry.originalArgs)(state).data;
+    if (data) {
+      return data.items.map((ref) => ref.name);
+    }
+  }
+  return [];
+};
+
 const buildOnClick =
   (imageName: string, dispatch: AppDispatch, getState: AppGetState) => (e: MouseEvent<HTMLDivElement>) => {
     const { shiftKey, ctrlKey, metaKey, altKey } = e;
     const state = getState();
     const queryArgs = selectGetImageNamesQueryArgs(state);
-    const imageNames = imagesApi.endpoints.getImageNames.select(queryArgs)(state).data?.image_names ?? [];
+    const imageOnlyNames = imagesApi.endpoints.getImageNames.select(queryArgs)(state).data?.image_names ?? [];
+    const selection = state.gallery.selection;
+    // For shift-range, fall back to the polymorphic list when the previous selection contains
+    // a video or canvas project — otherwise the image-only list can't bridge across kinds.
+    const lastSelectedItem = selection.at(-1);
+    const needsPolymorphicList =
+      lastSelectedItem !== undefined && lastSelectedItem !== imageName && !imageOnlyNames.includes(lastSelectedItem);
+    const imageNames = needsPolymorphicList ? selectCachedGalleryItemNames(state) : imageOnlyNames;
 
     // If we don't have the image names cached, we can't perform selection operations
     // This can happen if the user clicks on an image before the names are loaded
@@ -51,8 +78,6 @@ const buildOnClick =
       }
       return;
     }
-
-    const selection = state.gallery.selection;
 
     if (altKey) {
       if (state.gallery.imageToCompare === imageName) {
