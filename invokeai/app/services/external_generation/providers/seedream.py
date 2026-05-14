@@ -3,6 +3,7 @@ from __future__ import annotations
 import requests
 
 from invokeai.app.services.external_generation.errors import (
+    ExternalProviderCapabilityError,
     ExternalProviderRateLimitError,
     ExternalProviderRequestError,
 )
@@ -22,6 +23,11 @@ _SEEDREAM_BATCH_PREFIXES = (
     "seedream-4-0",
     "seedream-5-0",
 )
+
+# Seedream batch endpoint accepts up to 15 total images counting both inputs (reference + init)
+# and outputs combined. Hitting this only after the API call wastes a request and produces a
+# confusing 400, so we enforce it locally for batch-capable models.
+_SEEDREAM_BATCH_MAX_TOTAL_IMAGES = 15
 
 
 class SeedreamProvider(ExternalProvider):
@@ -43,6 +49,15 @@ class SeedreamProvider(ExternalProvider):
 
         model_id = request.model.provider_model_id
         is_batch_model = any(model_id.startswith(prefix) for prefix in _SEEDREAM_BATCH_PREFIXES)
+
+        if is_batch_model:
+            input_image_count = len(request.reference_images) + (1 if request.init_image is not None else 0)
+            total_images = input_image_count + request.num_images
+            if total_images > _SEEDREAM_BATCH_MAX_TOTAL_IMAGES:
+                raise ExternalProviderCapabilityError(
+                    f"{request.model.name} supports at most {_SEEDREAM_BATCH_MAX_TOTAL_IMAGES} images total "
+                    f"(reference + init + output), got {total_images}"
+                )
 
         opts = request.provider_options or {}
 
@@ -99,6 +114,7 @@ class SeedreamProvider(ExternalProvider):
             raise ExternalProviderRequestError("Seedream response payload was not a JSON object")
 
         generated_images: list[ExternalGeneratedImage] = []
+        item_errors: list[dict[str, object]] = []
         data_items = body.get("data")
         if not isinstance(data_items, list):
             raise ExternalProviderRequestError("Seedream response payload missing image data")
@@ -106,8 +122,11 @@ class SeedreamProvider(ExternalProvider):
         for item in data_items:
             if not isinstance(item, dict):
                 continue
-            # Items may be error objects for failed images in batch
+            # Items may be error objects for failed images in batch — collect rather than discard
+            # so partial-failure causes (e.g., content filter) are visible to the caller.
             if "error" in item:
+                error_payload = item["error"]
+                item_errors.append(error_payload if isinstance(error_payload, dict) else {"message": str(error_payload)})
                 continue
             encoded = item.get("b64_json")
             if not encoded:
@@ -116,12 +135,28 @@ class SeedreamProvider(ExternalProvider):
             generated_images.append(ExternalGeneratedImage(image=image, seed=request.seed))
 
         if not generated_images:
+            if item_errors:
+                first = item_errors[0]
+                message = first.get("message") if isinstance(first, dict) else None
+                raise ExternalProviderRequestError(
+                    f"Seedream returned no images. Provider reported: {message or item_errors}"
+                )
             raise ExternalProviderRequestError("Seedream response contained no images")
+
+        provider_metadata: dict[str, object] = {"model": model_id}
+        if item_errors:
+            provider_metadata["partial_failures"] = item_errors
+            self._logger.warning(
+                "Seedream returned %d image(s) with %d partial failure(s): %s",
+                len(generated_images),
+                len(item_errors),
+                item_errors,
+            )
 
         return ExternalGenerationResult(
             images=generated_images,
             seed_used=request.seed,
-            provider_metadata={"model": model_id},
+            provider_metadata=provider_metadata,
         )
 
 

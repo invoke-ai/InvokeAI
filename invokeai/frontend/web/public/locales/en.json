@@ -1746,6 +1746,13 @@
         "staged": "Staged",
         "resolution": "Resolution",
         "imageSize": "Image Size",
+        "quality": "Quality",
+        "background": "Background",
+        "inputFidelity": "Input Fidelity",
+        "temperature": "Temperature",
+        "thinkingLevel": "Thinking Level",
+        "watermark": "Watermark",
+        "optimizePrompt": "Optimize Prompt",
         "modelDisabledForTrial": "Generating with {{modelName}} is not available on trial accounts. Visit your <LinkComponent>account settings</LinkComponent> to upgrade."
     },
     "dynamicPrompts": {
