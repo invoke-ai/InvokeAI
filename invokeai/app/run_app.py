@@ -1,3 +1,22 @@
+import os
+
+# Suppress the HuggingFace tokenizers fork-after-parallelism warning. The Rust
+# ``tokenizers`` library warms a thread pool the first time a tokenizer is used
+# (e.g. the UMT5 / T5 text encoder during Wan / FLUX / SD3 conditioning), then
+# complains every time we fork() afterwards — which we do, on every MP4 encode,
+# because imageio's FFMPEG plugin shells out to ffmpeg via subprocess.Popen.
+# The warning is harmless (the child correctly falls back to single-threaded
+# tokenization before exec()) but it spams the log on every video generation.
+#
+# This MUST execute before any HF library is imported. The pyproject console-script
+# (``invokeai-web = invokeai.app.run_app:run_app``) reaches this module first via
+# ``from invokeai.app.run_app import run_app``, so setting the env var at module
+# level — not inside ``run_app()`` — guarantees it lands before any transitive HF
+# import. Use ``setdefault`` so anyone who explicitly exports ``true`` upstream
+# keeps their value.
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
+
 def get_app():
     """Import the app and event loop. We wrap this in a function to more explicitly control when it happens, because
     importing from api_app does a bunch of stuff - it's more like calling a function than importing a module.
@@ -10,22 +29,9 @@ def get_app():
 def run_app() -> None:
     """The main entrypoint for the app."""
     import asyncio
-    import os
     import sys
     import threading
     import traceback
-
-    # Suppress the HuggingFace tokenizers fork-after-parallelism warning. The Rust
-    # ``tokenizers`` library warms a thread pool the first time a tokenizer is used
-    # (e.g. the UMT5 / T5 text encoder during Wan / FLUX / SD3 conditioning), then
-    # complains every time we fork() afterwards — which we do, on every MP4 encode,
-    # because imageio's FFMPEG plugin shells out to ffmpeg via subprocess.Popen.
-    # The warning is harmless (the child correctly falls back to single-threaded
-    # tokenization before exec()), but it spams the log on every video generation.
-    # Setting the env var BEFORE any HF library import keeps the thread pool from
-    # warming up in the first place, so the fork detector stays quiet. Use
-    # ``setdefault`` so anyone who explicitly sets ``true`` upstream keeps their value.
-    os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
     from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 
