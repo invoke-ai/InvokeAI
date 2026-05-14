@@ -531,7 +531,7 @@
         "deleteImagePermanent": "Deleted images cannot be restored.",
         "deleteVideo_one": "Delete Video",
         "deleteVideo_other": "Delete {{count}} Videos",
-        "deleteVideoConfirmation": "Delete this video?",
+        "deleteVideoPermanent": "Deleted videos cannot be restored.",
         "playVideo": "Play video",
         "displayBoardSearch": "Board Search",
         "displaySearch": "Image Search",

@@ -1,23 +1,22 @@
 import { IconMenuItem } from 'common/components/IconMenuItem';
+import { useDeleteVideoModalApi } from 'features/deleteVideoModal/store/state';
 import { useVideoDTOContext } from 'features/gallery/contexts/VideoDTOContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';
-import { useDeleteVideoMutation } from 'services/api/endpoints/videos';
 
 export const ContextMenuItemDeleteVideo = memo(() => {
   const { t } = useTranslation();
   const videoDTO = useVideoDTOContext();
-  const [deleteVideo] = useDeleteVideoMutation();
+  const deleteVideoModal = useDeleteVideoModalApi();
 
-  const onClick = useCallback(() => {
-    // Confirm-then-delete via the native dialog. Videos can't be referenced from canvas/nodes/
-    // refs the way images can, so the image modal's usage analysis is unnecessary; a one-step
-    // confirm matches "minimal" scope.
-    if (window.confirm(t('gallery.deleteVideoConfirmation'))) {
-      deleteVideo({ video_name: videoDTO.video_name });
+  const onClick = useCallback(async () => {
+    try {
+      await deleteVideoModal.delete([videoDTO.video_name]);
+    } catch {
+      // noop — user canceled the confirm dialog.
     }
-  }, [deleteVideo, t, videoDTO.video_name]);
+  }, [deleteVideoModal, videoDTO.video_name]);
 
   return (
     <IconMenuItem
