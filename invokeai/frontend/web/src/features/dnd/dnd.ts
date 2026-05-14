@@ -9,9 +9,11 @@ import { selectComparisonImages } from 'features/gallery/components/ImageViewer/
 import type { BoardId } from 'features/gallery/store/types';
 import {
   addImagesToBoard,
+  addVideoToBoard,
   createNewCanvasEntityFromImage,
   newCanvasFromImage,
   removeImagesFromBoard,
+  removeVideoFromBoard,
   replaceCanvasEntityObjectsWithImage,
   setComparisonImage,
   setGlobalReferenceImage,
@@ -532,7 +534,7 @@ export type AddImageToBoardDndTargetData = DndData<
 >;
 export const addImageToBoardDndTarget: DndTarget<
   AddImageToBoardDndTargetData,
-  SingleImageDndSourceData | MultipleImageDndSourceData
+  SingleImageDndSourceData | MultipleImageDndSourceData | SingleVideoDndSourceData
 > = {
   ..._addToBoard,
   typeGuard: buildTypeGuard(_addToBoard.key),
@@ -555,6 +557,18 @@ export const addImageToBoardDndTarget: DndTarget<
       }
       return canMoveFromSourceBoard(currentBoard, getState);
     }
+    if (singleVideoDndSource.typeGuard(sourceData)) {
+      const currentBoard = sourceData.payload.videoDTO.board_id ?? 'none';
+      const destinationBoard = targetData.payload.boardId;
+      if (currentBoard === destinationBoard) {
+        return false;
+      }
+      // Same source-board permission check as images. Backend additionally
+      // enforces _assert_video_direct_owner — a stricter check the client can't
+      // perform without each video's owner, so we let those failures bubble up
+      // through the mutation rather than blocking the drop preemptively.
+      return canMoveFromSourceBoard(currentBoard, getState);
+    }
     return false;
   },
   handler: ({ sourceData, targetData, dispatch }) => {
@@ -568,6 +582,12 @@ export const addImageToBoardDndTarget: DndTarget<
       const { image_names } = sourceData.payload;
       const { boardId } = targetData.payload;
       addImagesToBoard({ image_names, boardId, dispatch });
+    }
+
+    if (singleVideoDndSource.typeGuard(sourceData)) {
+      const { videoDTO } = sourceData.payload;
+      const { boardId } = targetData.payload;
+      addVideoToBoard({ video_name: videoDTO.video_name, boardId, dispatch });
     }
   },
 };
@@ -583,7 +603,7 @@ export type RemoveImageFromBoardDndTargetData = DndData<
 >;
 export const removeImageFromBoardDndTarget: DndTarget<
   RemoveImageFromBoardDndTargetData,
-  SingleImageDndSourceData | MultipleImageDndSourceData
+  SingleImageDndSourceData | MultipleImageDndSourceData | SingleVideoDndSourceData
 > = {
   ..._removeFromBoard,
   typeGuard: buildTypeGuard(_removeFromBoard.key),
@@ -606,6 +626,14 @@ export const removeImageFromBoardDndTarget: DndTarget<
       return canMoveFromSourceBoard(currentBoard, getState);
     }
 
+    if (singleVideoDndSource.typeGuard(sourceData)) {
+      const currentBoard = sourceData.payload.videoDTO.board_id ?? 'none';
+      if (currentBoard === 'none') {
+        return false;
+      }
+      return canMoveFromSourceBoard(currentBoard, getState);
+    }
+
     return false;
   },
   handler: ({ sourceData, dispatch }) => {
@@ -617,6 +645,11 @@ export const removeImageFromBoardDndTarget: DndTarget<
     if (multipleImageDndSource.typeGuard(sourceData)) {
       const { image_names } = sourceData.payload;
       removeImagesFromBoard({ image_names, dispatch });
+    }
+
+    if (singleVideoDndSource.typeGuard(sourceData)) {
+      const { videoDTO } = sourceData.payload;
+      removeVideoFromBoard({ video_name: videoDTO.video_name, dispatch });
     }
   },
 };
