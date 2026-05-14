@@ -34064,8 +34064,14 @@ export type components = {
          *       :func:`encode_reference_image_to_video_condition` upstream — the
          *       ``ref_image`` field on this node carries a tensor of shape
          *       ``[1, 20, T_lat, H_lat, W_lat]`` instead of ``[1, 20, 1, ...]``.
-         *     * Inpaint / img2img are not supported — out of scope for the minimal
-         *       video path. The base ``WanDenoiseInvocation`` still handles those.
+         *     * No ``denoising_start`` / ``denoising_end`` / initial-latents inputs.
+         *       The image denoise node uses those for img2img (noise injection on an
+         *       existing latent), but image-conditioned video generation flows through
+         *       the reference-frame conditioning mechanism instead — the first frame
+         *       drives subsequent frames at every step, so a partial-schedule run from
+         *       an initial latent has no analogue here. Run the schedule from t=1
+         *       to t=0 every time. The base ``WanDenoiseInvocation`` still handles
+         *       the img2img case for stills.
          */
         WanVideoDenoiseInvocation: {
             /**
