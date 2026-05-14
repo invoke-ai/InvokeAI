@@ -162,6 +162,17 @@ export const buildOnInvocationComplete = (
       dispatch(imagesApi.util.invalidateTags(['VirtualBoards']));
     }
 
+    // The optimistic updates above only touch the image-only ``getImageNames`` cache. The
+    // gallery grid actually subscribes to the polymorphic ``getGalleryItemNames`` endpoint
+    // (which interleaves images and videos by created_at), so without invalidating its tag
+    // a freshly generated image never appears in the grid until the user reloads — even
+    // though it lands correctly in board totals, image DTO cache, etc. Mirrors the same
+    // invalidation in addVideosToGallery below. A future optimization could insert into the
+    // polymorphic cache shape directly, but the refetch cost is a single HTTP round-trip.
+    if (imageDTOs.length > 0) {
+      dispatch(galleryApi.util.invalidateTags(['GalleryItemNameList', 'GalleryItemList']));
+    }
+
     const autoSwitch = selectAutoSwitch(getState());
 
     if (!autoSwitch) {
