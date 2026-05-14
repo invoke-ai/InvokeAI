@@ -87,9 +87,7 @@ def test_select_bounding_box_empty_label_priority_keeps_default_behavior() -> No
 
 def test_debug_bbox_text_uses_width_height_and_score() -> None:
     assert _format_selected_bbox(_bbox(96, 80, 160, 144, 0.8123)) == "bbox 96,80 64x64 score 0.81"
-    assert _format_selected_bbox(_bbox(96, 80, 160, 144, 0.8123, "face")) == (
-        "bbox 96,80 64x64 score 0.81 label face"
-    )
+    assert _format_selected_bbox(_bbox(96, 80, 160, 144, 0.8123, "face")) == ("bbox 96,80 64x64 score 0.81 label face")
     assert _format_selected_bbox(None) == "bbox none"
 
 

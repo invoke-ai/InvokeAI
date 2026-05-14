@@ -802,14 +802,8 @@ export const FaceDetailerSettingsAccordion = memo(() => {
     ],
     [t]
   );
-  const dinoModelOptions = useMemo<ComboboxOption[]>(
-    () => getDetailerDinoModelOptions(t),
-    [t]
-  );
-  const samModelOptions = useMemo<ComboboxOption[]>(
-    () => getDetailerSamModelOptions(t),
-    [t]
-  );
+  const dinoModelOptions = useMemo<ComboboxOption[]>(() => getDetailerDinoModelOptions(t), [t]);
+  const samModelOptions = useMemo<ComboboxOption[]>(() => getDetailerSamModelOptions(t), [t]);
   const colorCorrectModeOptions = useMemo<ComboboxOption[]>(
     () => [
       { label: t('parameters.faceDetailer.colorCorrectModes.off'), value: 'off' },

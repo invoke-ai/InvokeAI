@@ -77,7 +77,8 @@ const PERSON_RUNTIME_PRESETS: Record<
   },
 };
 
-const getNormalizedTargetPrompt = (targetPrompt: string) => targetPrompt.trim().toLocaleLowerCase().replace(/\s+/g, ' ');
+const getNormalizedTargetPrompt = (targetPrompt: string) =>
+  targetPrompt.trim().toLocaleLowerCase().replace(/\s+/g, ' ');
 
 export const getDetailerTargetProfile = (targetPrompt: string): DetailerTargetProfile =>
   PERSON_TARGET_PROMPTS.has(getNormalizedTargetPrompt(targetPrompt)) ? 'person' : 'localized';

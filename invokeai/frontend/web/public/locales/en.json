@@ -1130,6 +1130,7 @@
         "convertToDiffusersHelpText5": "Please make sure you have enough disk space. Models generally vary between 2GB-7GB in size.",
         "convertToDiffusersHelpText6": "Do you wish to convert this model?",
         "cpuOnly": "CPU Only",
+        "fp8Storage": "FP8 Storage (Save VRAM)",
         "runOnCpu": "Run text encoder model on CPU only",
         "noDefaultSettings": "No default settings configured for this model. Visit the Model Manager to add default settings.",
         "defaultSettings": "Default Settings",
@@ -1917,6 +1918,13 @@
         "enableNSFWChecker": "Enable NSFW Checker",
         "general": "General",
         "generation": "Generation",
+        "imageSubfolderStrategy": "Image Subfolder Strategy",
+        "imageSubfolderStrategyDate": "Date",
+        "imageSubfolderStrategyFlat": "Flat",
+        "imageSubfolderStrategyHash": "Hash",
+        "imageSubfolderStrategySaveFailed": "Failed to save Image Subfolder Strategy",
+        "imageSubfolderStrategyType": "Type",
+        "imageSubfolderStrategyUnknown": "Unknown ({{strategy}})",
         "maxQueueHistory": "Max Queue History",
         "maxQueueHistorySaveFailed": "Failed to save Max Queue History",
         "models": "Models",
@@ -2263,11 +2271,15 @@
         },
         "detailerDinoModel": {
             "heading": "DINO Model",
-            "paragraphs": ["GroundingDINO model used to find target boxes. Larger models may improve detection and run slower."]
+            "paragraphs": [
+                "GroundingDINO model used to find target boxes. Larger models may improve detection and run slower."
+            ]
         },
         "detailerSamModel": {
             "heading": "SAM Model",
-            "paragraphs": ["Segmentation model used to create the target mask. Larger models may improve masks and run slower."]
+            "paragraphs": [
+                "Segmentation model used to create the target mask. Larger models may improve masks and run slower."
+            ]
         },
         "detailerTargetSize": {
             "heading": "Target Size",
@@ -2601,6 +2613,13 @@
             "paragraphs": [
                 "When enabled, only the text encoder component will run on CPU instead of GPU.",
                 "This saves VRAM for the denoiser while only slightly impacting performance. The conditioning outputs are automatically moved to GPU for the denoiser."
+            ]
+        },
+        "fp8Storage": {
+            "heading": "FP8 Storage",
+            "paragraphs": [
+                "Stores model weights in FP8 format in VRAM, reducing memory usage by approximately 50% compared to FP16.",
+                "During inference, weights are cast layer-by-layer to the compute precision (FP16/BF16), so image quality is preserved. Works on all CUDA GPUs."
             ]
         }
     },
@@ -3085,6 +3104,39 @@
             "freehand": "Freehand",
             "polygon": "Polygon",
             "polygonHint": "Click to add points, click the first point to close."
+        },
+        "modifierHints": {
+            "keys": {
+                "control": "Ctrl",
+                "command": "Cmd",
+                "option": "Option",
+                "alt": "Alt",
+                "shift": "Shift",
+                "space": "Space",
+                "wheel": "Wheel",
+                "arrows": "Arrows",
+                "enter": "Enter",
+                "esc": "Esc"
+            },
+            "labels": {
+                "pan": "Pan",
+                "pickColor": "Pick color",
+                "straightLine": "Straight line",
+                "resizeBrush": "Resize brush",
+                "resizeEraser": "Resize eraser",
+                "subtractMask": "Subtract mask",
+                "snap45Degrees": "Snap to 45deg",
+                "lockAspectRatio": "Lock ratio",
+                "unlockAspectRatio": "Unlock ratio",
+                "scaleFromCenter": "Scale from center",
+                "fineGrid": "Fine grid",
+                "commitText": "Commit",
+                "newLine": "New line",
+                "cancelText": "Cancel",
+                "dragText": "Drag text",
+                "snapRotation": "Snap rotation",
+                "nudgeSelection": "Nudge selection"
+            }
         },
         "tool": {
             "brush": "Brush",

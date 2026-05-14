@@ -684,10 +684,7 @@ type DetailerSettingsMetadata = {
 
 type DetailerSettingsValuePart = { type: 'i18n'; key: string } | { type: 'text'; value: string };
 
-const DETAILER_DETECTOR_METADATA_I18N_KEYS: Record<
-  NonNullable<DetailerSettingsMetadata['detector']>,
-  string
-> = {
+const DETAILER_DETECTOR_METADATA_I18N_KEYS: Record<NonNullable<DetailerSettingsMetadata['detector']>, string> = {
   'grounding-dino-sam': 'parameters.faceDetailer.detectors.groundedSam',
   mediapipe: 'parameters.faceDetailer.detectors.mediapipe',
 };
@@ -749,7 +746,11 @@ const DetailerSettings: SingleMetadataHandler<DetailerSettingsMetadata> = {
   type: 'DetailerSettings',
   parse: (metadata, _store) => {
     const enabled = zParamsState.shape.detailerEnabled.parse(getProperty(metadata, 'detailer_enabled'));
-    const targetProfile = parseOptionalMetadataField(metadata, 'detailer_target_profile', z.enum(['localized', 'person']));
+    const targetProfile = parseOptionalMetadataField(
+      metadata,
+      'detailer_target_profile',
+      z.enum(['localized', 'person'])
+    );
     // Older Body/person metadata only stored effective runtime values. Avoid recalling those into visible sliders.
     const canUseRuntimeDetailerValues = targetProfile !== 'person';
 
@@ -757,7 +758,11 @@ const DetailerSettings: SingleMetadataHandler<DetailerSettingsMetadata> = {
       enabled,
       detector: parseOptionalMetadataField(metadata, 'detailer_detector', zParamsState.shape.detailerDetector),
       quality: parseOptionalMetadataField(metadata, 'detailer_quality', zParamsState.shape.detailerQuality),
-      targetPrompt: parseOptionalMetadataField(metadata, 'detailer_target_prompt', zParamsState.shape.detailerTargetPrompt),
+      targetPrompt: parseOptionalMetadataField(
+        metadata,
+        'detailer_target_prompt',
+        zParamsState.shape.detailerTargetPrompt
+      ),
       faceSelection: parseOptionalMetadataField(
         metadata,
         'detailer_face_selection',
@@ -791,9 +796,17 @@ const DetailerSettings: SingleMetadataHandler<DetailerSettingsMetadata> = {
         schema: zParamsState.shape.detailerMaxProcessSize,
         canUseRuntime: canUseRuntimeDetailerValues,
       }),
-      cropPadding: parseOptionalMetadataField(metadata, 'detailer_crop_padding', zParamsState.shape.detailerCropPadding),
+      cropPadding: parseOptionalMetadataField(
+        metadata,
+        'detailer_crop_padding',
+        zParamsState.shape.detailerCropPadding
+      ),
       maskExpand: parseOptionalMetadataField(metadata, 'detailer_mask_expand', zParamsState.shape.detailerMaskExpand),
-      maskFeather: parseOptionalMetadataField(metadata, 'detailer_mask_feather', zParamsState.shape.detailerMaskFeather),
+      maskFeather: parseOptionalMetadataField(
+        metadata,
+        'detailer_mask_feather',
+        zParamsState.shape.detailerMaskFeather
+      ),
       denoiseMaskExpand: parseStoredOrRuntimeDetailerField({
         metadata,
         storedKey: 'detailer_param_denoise_mask_expand',

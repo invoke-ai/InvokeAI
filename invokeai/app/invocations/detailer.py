@@ -285,7 +285,9 @@ def _prepare_denoise_mask(mask: ImageType, mask_expand: int, mask_contract: int 
     )
 
 
-def _prepare_paste_alpha_mask(mask: ImageType, mask_expand: int, mask_feather: int, mask_contract: int = 0) -> ImageType:
+def _prepare_paste_alpha_mask(
+    mask: ImageType, mask_expand: int, mask_feather: int, mask_contract: int = 0
+) -> ImageType:
     # The detailer paste invocation uses normal alpha semantics: white pastes, black preserves.
     return _prepare_binary_mask(
         mask=mask, mask_expand=mask_expand, mask_feather=mask_feather, mask_contract=mask_contract
@@ -482,7 +484,9 @@ def _fit_into(image: ImageType, max_width: int, max_height: int) -> ImageType:
     return image.resize((width, height), resample=Image.Resampling.LANCZOS)
 
 
-def _draw_text_lines(draw: ImageDraw.ImageDraw, xy: tuple[int, int], lines: list[str], fill: tuple[int, int, int, int]) -> None:
+def _draw_text_lines(
+    draw: ImageDraw.ImageDraw, xy: tuple[int, int], lines: list[str], fill: tuple[int, int, int, int]
+) -> None:
     x, y = xy
     for line in lines:
         draw.text((x, y), line, fill=fill)
@@ -637,11 +641,7 @@ def _get_detail_delta_lines(processed_crop: ImageType, detailed_crop: ImageType,
     detail_np = np.array(detail, dtype=np.float32)
     delta = detail_np - crop_np
     mean_rgb_delta = delta[edit_region].mean(axis=0)
-    luma_delta = (
-        mean_rgb_delta[0] * 0.2126
-        + mean_rgb_delta[1] * 0.7152
-        + mean_rgb_delta[2] * 0.0722
-    )
+    luma_delta = mean_rgb_delta[0] * 0.2126 + mean_rgb_delta[1] * 0.7152 + mean_rgb_delta[2] * 0.0722
 
     return [
         f"luma delta {luma_delta:+.1f}",
