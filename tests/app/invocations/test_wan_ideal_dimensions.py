@@ -94,9 +94,10 @@ class TestPostconditions:
         # which is ~1.1% at 720 short.
         assert abs(output_aspect - input_aspect) / input_aspect < 0.012
 
-    def test_output_dims_never_zero(self) -> None:
-        # Pathologically small input shouldn't return 0×0 even at the smallest preset.
-        ow, oh = _resolve(8, 8, target="480p", rounding="floor")
+    def test_smallest_valid_input_still_snaps_to_16_grid(self) -> None:
+        # 16×16 is the minimum input the guard accepts. The downstream clamp ensures
+        # the output is at least 16×16 even when the floor rounding would zero it.
+        ow, oh = _resolve(16, 16, target="480p", rounding="floor")
         assert ow >= 16
         assert oh >= 16
 
@@ -122,6 +123,15 @@ class TestInputValidation:
 
         with pytest.raises(ValidationError):
             WanI2VIdealDimensionsInvocation(width=720, height=-1)
+
+    def test_input_smaller_than_pixel_grid_rejected(self) -> None:
+        # If the longer side is below the 16-px Wan grid, the floor-rounding output
+        # would silently disconnect from the requested aspect ratio (clamped to
+        # 16×16 regardless of the source's actual shape). Fail fast instead.
+        with pytest.raises(ValueError, match="smaller than the Wan pixel grid"):
+            _resolve(8, 8, target="480p", rounding="floor")
+        with pytest.raises(ValueError, match="smaller than the Wan pixel grid"):
+            _resolve(15, 15, target="720p", rounding="nearest")
 
     def test_unknown_resolution_rejected(self) -> None:
         from pydantic import ValidationError

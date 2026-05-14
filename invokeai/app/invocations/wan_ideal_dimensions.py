@@ -83,6 +83,17 @@ class WanI2VIdealDimensionsInvocation(BaseInvocation):
             raise ValueError("Source dimensions must be positive.")
 
         target_short_side = WAN_TARGET_RESOLUTION_PX[self.target_resolution]
+        # Reject sources so narrow that the scaled long side is still under one Wan
+        # pixel grid (16 px). The downstream clamp to ``max(w, 16)`` would otherwise
+        # silently return 16×16, which has no relation to the requested aspect ratio
+        # — better to fail fast and have the workflow author fix the inputs.
+        long_side = max(self.width, self.height)
+        if long_side < 16:
+            raise ValueError(
+                f"Source longer side ({long_side}px) is smaller than the Wan pixel grid (16px). "
+                "Use an input image at least 16px on its longer side."
+            )
+
         scale = target_short_side / short
         raw_w = self.width * scale
         raw_h = self.height * scale
@@ -97,7 +108,9 @@ class WanI2VIdealDimensionsInvocation(BaseInvocation):
             w = round(raw_w / 16) * 16
             h = round(raw_h / 16) * 16
 
-        # Guard against zero from extreme inputs (e.g. floor of <16 raw value).
+        # Belt-and-suspenders clamp against floor-of-<16 — should be unreachable now
+        # that the long_side guard above runs first, but keeps the contract that the
+        # returned dimensions are always valid Wan inputs.
         w = max(w, 16)
         h = max(h, 16)
         return IdealSizeOutput(width=w, height=h)

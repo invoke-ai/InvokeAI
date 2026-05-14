@@ -17,6 +17,7 @@ LoRA factory at each step.
 from typing import Iterable, Tuple
 from unittest.mock import patch
 
+import pytest
 import torch
 import torch.nn as nn
 
@@ -482,6 +483,50 @@ def test_outgoing_expert_force_unloaded_from_vram():
         assert low_info._cache_record.cached_model.unload_calls == 1
 
         swapper.close()
+
+
+def test_device_context_released_when_lora_enter_raises():
+    """Regression: if the LoRA patcher's ``__enter__`` raises, the device context
+    must still be released on the next swap or close.
+
+    Earlier shape stashed ``self._active_device_ctx`` only after the LoRA enter
+    succeeded, so an exception there left the device context entered but
+    unreachable — ``_release`` saw ``None`` and walked away, leaving 8–9 GB of
+    GGUF expert weights pinned to GPU until the model cache LRU evicted them."""
+    log: list[str] = []
+    high_nn = nn.Linear(1, 1)
+    ctx = _FakeContext({"high": _FakeInfo("HIGH", high_nn, log)}, log)
+
+    class _RaisingLoraStub:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def __enter__(self):
+            raise RuntimeError("LoRA patcher blew up")
+
+        def __exit__(self, *_args):
+            return False
+
+    with patch(
+        "invokeai.app.invocations.wan_denoise.LayerPatcher.apply_smart_model_patches",
+        side_effect=lambda **_kwargs: _RaisingLoraStub(),
+    ):
+        swapper = _ExpertSwapper(
+            context=ctx,
+            high_model="high",
+            low_model=None,
+            inference_dtype=torch.bfloat16,
+            high_lora_factory=_make_factory(log, "HIGH"),
+            low_lora_factory=None,
+        )
+        with pytest.raises(RuntimeError, match="LoRA patcher blew up"):
+            swapper.get(_ExpertSwapper.HIGH)
+        # close() must succeed and must call the device context's __exit__ so
+        # the model leaves GPU. If the device context were unreachable,
+        # device-exit:HIGH would be missing from the log.
+        swapper.close()
+
+    assert "device-exit:HIGH" in log, "device context must be exited even if LoRA enter raised"
 
 
 def test_force_unload_failure_does_not_break_swap():

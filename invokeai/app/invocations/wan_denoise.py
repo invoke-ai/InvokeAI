@@ -215,6 +215,17 @@ class _ExpertSwapper:
         device_ctx = info.model_on_device()
         cached_weights, model = device_ctx.__enter__()
 
+        # Stash the device-context state immediately. If anything below fails (most
+        # likely the LoRA patcher), the surrounding ExitStack will eventually call
+        # ``swapper.close() -> _release()`` to clean up, and ``_release`` needs to
+        # see the device context to exit it. Without this early stash the expert's
+        # weights stay GPU-resident (8-9 GB for GGUF experts) until the cache's LRU
+        # finally evicts them, masquerading as a memory leak.
+        self._active_label = label
+        self._active_info = info
+        self._active_device_ctx = device_ctx
+        self._active_model = model
+
         # Apply LoRA patches for this expert. GGUF transformers need sidecar
         # patching since direct patching of GGMLTensors isn't supported.
         lora_factory = self._high_lora_factory if label == self.HIGH else self._low_lora_factory
@@ -231,11 +242,7 @@ class _ExpertSwapper:
             )
             lora_ctx.__enter__()
 
-        self._active_label = label
-        self._active_info = info
-        self._active_device_ctx = device_ctx
         self._active_lora_ctx = lora_ctx
-        self._active_model = model
         return model
 
     def _release(self) -> None:

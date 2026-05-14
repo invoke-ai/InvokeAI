@@ -159,9 +159,13 @@ export const videosApi = api.injectEndpoints({
         if (!result) {
           return [];
         }
+        // ``starred_first=true`` gallery queries are cached under the LIST_TAG-scoped
+        // ``VideoList`` tag, so without this invalidation the freshly-starred video
+        // stays in its original position until some other mutation refetches the list.
         return [
           ...getTagsToInvalidateForVideoMutation(result.starred_videos),
           ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
+          { type: 'VideoList', id: LIST_TAG },
         ];
       },
     }),
@@ -182,6 +186,7 @@ export const videosApi = api.injectEndpoints({
         return [
           ...getTagsToInvalidateForVideoMutation(result.unstarred_videos),
           ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
+          { type: 'VideoList', id: LIST_TAG },
         ];
       },
     }),

@@ -249,20 +249,25 @@ async def delete_video(
 ) -> DeleteVideosResult:
     _assert_video_owner(video_name, current_user)
 
-    deleted_videos: set[str] = set()
-    affected_boards: set[str] = set()
+    # Let service-level failures surface as 500s rather than swallowing them and returning a
+    # success-shaped response. A previous version of this handler caught everything and
+    # returned an empty ``deleted_videos`` list with HTTP 200; the frontend treated that as
+    # success, dropped the item from its cache, and the video stayed on disk — a silent
+    # data-consistency failure that only became visible on the next page reload.
     try:
         video_dto = ApiDependencies.invoker.services.videos.get_dto(video_name)
-        board_id = video_dto.board_id or "none"
-        ApiDependencies.invoker.services.videos.delete(video_name)
-        deleted_videos.add(video_name)
-        affected_boards.add(board_id)
     except Exception:
-        pass
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    board_id = video_dto.board_id or "none"
+    try:
+        ApiDependencies.invoker.services.videos.delete(video_name)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to delete video")
 
     return DeleteVideosResult(
-        deleted_videos=list(deleted_videos),
-        affected_boards=list(affected_boards),
+        deleted_videos=[video_name],
+        affected_boards=[board_id],
     )
 
 
