@@ -417,16 +417,26 @@ describe('AppNavigationApi', () => {
     });
 
     it('should handle custom timeout', async () => {
-      const start = Date.now();
-      const waitPromise = navigationApi.waitForPanel('generate', SETTINGS_PANEL_ID, 200);
+      vi.useFakeTimers();
 
-      await expect(waitPromise).rejects.toThrow(/Panel .* registration timed out after 200ms/);
+      try {
+        const waitPromise = navigationApi.waitForPanel('generate', SETTINGS_PANEL_ID, 200);
+        let isSettled = false;
+        void waitPromise.catch(() => {
+          isSettled = true;
+        });
 
-      const elapsed = Date.now() - start;
-      // TODO(psyche): Use vitest's fake timeres
-      // Allow some margin for timer resolution
-      expect(elapsed).toBeGreaterThanOrEqual(190);
-      expect(elapsed).toBeLessThan(210);
+        const assertion = expect(waitPromise).rejects.toThrow(/Panel .* registration timed out after 200ms/);
+
+        await vi.advanceTimersByTimeAsync(199);
+        expect(isSettled).toBe(false);
+
+        await vi.advanceTimersByTimeAsync(1);
+        await assertion;
+      } finally {
+        vi.clearAllTimers();
+        vi.useRealTimers();
+      }
     });
   });
 

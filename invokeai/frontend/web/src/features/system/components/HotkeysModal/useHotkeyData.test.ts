@@ -41,4 +41,35 @@ describe('buildHotkeysData', () => {
     expect(mergeVisible.defaultHotkeys).toEqual(['mod+shift+e']);
     expect(mergeVisible.hotkeys).toEqual(['alt+shift+m']);
   });
+
+  it('registers bracket tool-width hotkeys as layout-independent physical keys', () => {
+    const hotkeysData = buildHotkeysData(t, {});
+    const decrementToolWidth = hotkeysData.canvas.hotkeys.decrementToolWidth;
+    const incrementToolWidth = hotkeysData.canvas.hotkeys.incrementToolWidth;
+    const starImage = hotkeysData.gallery.hotkeys.starImage;
+
+    expect(decrementToolWidth).toBeDefined();
+    expect(incrementToolWidth).toBeDefined();
+    expect(starImage).toBeDefined();
+    if (!decrementToolWidth || !incrementToolWidth || !starImage) {
+      throw new Error('Expected layout-sensitive punctuation hotkeys to be registered');
+    }
+
+    expect(decrementToolWidth.defaultHotkeys).toEqual(['bracketleft']);
+    expect(decrementToolWidth.hotkeys).toEqual(['bracketleft']);
+    expect(incrementToolWidth.defaultHotkeys).toEqual(['bracketright']);
+    expect(incrementToolWidth.hotkeys).toEqual(['bracketright']);
+    expect(starImage.defaultHotkeys).toEqual(['period']);
+    expect(starImage.hotkeys).toEqual(['period']);
+  });
+
+  it('canonicalizes legacy bracket overrides from persisted custom hotkeys', () => {
+    const hotkeysData = buildHotkeysData(t, {
+      'canvas.decrementToolWidth': ['['],
+      'canvas.incrementToolWidth': [']'],
+    });
+
+    expect(hotkeysData.canvas.hotkeys.decrementToolWidth?.hotkeys).toEqual(['bracketleft']);
+    expect(hotkeysData.canvas.hotkeys.incrementToolWidth?.hotkeys).toEqual(['bracketright']);
+  });
 });
