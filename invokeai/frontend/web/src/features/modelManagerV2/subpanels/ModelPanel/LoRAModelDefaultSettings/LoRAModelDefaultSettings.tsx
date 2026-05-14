@@ -1,4 +1,5 @@
 import { Button, Flex, Heading, SimpleGrid } from '@invoke-ai/ui-library';
+import { DEFAULT_LORA_WEIGHT_CONFIG } from 'features/controlLayers/store/lorasSlice';
 import { useIsModelManagerEnabled } from 'features/modelManagerV2/hooks/useIsModelManagerEnabled';
 import { useLoRAModelDefaultSettings } from 'features/modelManagerV2/hooks/useLoRAModelDefaultSettings';
 import { DefaultWeight } from 'features/modelManagerV2/subpanels/ModelPanel/LoRAModelDefaultSettings/DefaultWeight';
@@ -44,8 +45,15 @@ export const LoRAModelDefaultSettings = memo(({ modelConfig }: Props) => {
     (data) => {
       const weightMin = data.weightMin.isEnabled ? data.weightMin.value : null;
       const weightMax = data.weightMax.isEnabled ? data.weightMax.value : null;
+      const weight = data.weight.isEnabled ? data.weight.value : null;
 
-      if (weightMin !== null && weightMax !== null && weightMin >= weightMax) {
+      // Compute effective bounds the same way LoRACard does when rendering the slider,
+      // so partial bounds (only min or only max) get validated against the fallback
+      // default for the other side.
+      const effectiveMin = weightMin ?? DEFAULT_LORA_WEIGHT_CONFIG.sliderMin;
+      const effectiveMax = weightMax ?? DEFAULT_LORA_WEIGHT_CONFIG.sliderMax;
+
+      if (effectiveMin >= effectiveMax) {
         setError('weightMin', { type: 'manual', message: t('lora.weightMinMustBeLessThanMax') });
         toast({
           id: 'DEFAULT_SETTINGS_SAVE_FAILED',
@@ -55,8 +63,18 @@ export const LoRAModelDefaultSettings = memo(({ modelConfig }: Props) => {
         return;
       }
 
+      if (weight !== null && (weight < effectiveMin || weight > effectiveMax)) {
+        setError('weight', { type: 'manual', message: t('lora.weightOutOfRange') });
+        toast({
+          id: 'DEFAULT_SETTINGS_SAVE_FAILED',
+          title: t('lora.weightOutOfRange'),
+          status: 'error',
+        });
+        return;
+      }
+
       const body = {
-        weight: data.weight.isEnabled ? data.weight.value : null,
+        weight,
         weight_min: weightMin,
         weight_max: weightMax,
       };
