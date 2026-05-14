@@ -10,11 +10,11 @@ import { firefoxDndFix } from 'features/dnd/util';
 import { useVideoContextMenu } from 'features/gallery/components/ContextMenu/VideoContextMenu';
 import { selectAlwaysShouldImageSizeBadge } from 'features/gallery/store/gallerySelectors';
 import { selectGallerySlice, selectionChanged } from 'features/gallery/store/gallerySlice';
+import { selectCachedGalleryItemNames } from 'features/gallery/store/selectCachedGalleryItemNames';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import type { MouseEvent, MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { galleryApi } from 'services/api/endpoints/gallery';
 import type { VideoDTO } from 'services/api/types';
 
 import { galleryItemContainerSX } from './galleryItemContainerSX';
@@ -78,26 +78,6 @@ const buildOnClick =
       dispatch(selectionChanged([videoName]));
     }
   };
-
-/**
- * Returns the names of the currently-cached gallery item list (whichever query args were last
- * used). For most sessions there is exactly one active list, so iterating cache entries is fine.
- */
-const selectCachedGalleryItemNames = (state: ReturnType<AppGetState>): string[] => {
-  const entries = galleryApi.util.selectInvalidatedBy(state, ['GalleryItemNameList']);
-  // selectInvalidatedBy returns subscription entries; for the polymorphic names list we just need
-  // any one match. Fall back to scanning the API state directly for robustness.
-  for (const entry of entries) {
-    if (entry.endpointName !== 'getGalleryItemNames') {
-      continue;
-    }
-    const data = galleryApi.endpoints.getGalleryItemNames.select(entry.originalArgs)(state).data;
-    if (data) {
-      return data.items.map((ref) => ref.name);
-    }
-  }
-  return [];
-};
 
 export const GalleryVideoItem = memo(({ videoDTO }: Props) => {
   const store = useAppStore();
