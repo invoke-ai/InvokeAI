@@ -10,7 +10,9 @@ import { DeleteImageModal } from 'features/deleteImageModal/components/DeleteIma
 import { FullscreenDropzone } from 'features/dnd/FullscreenDropzone';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
+import { CanvasProjectContextMenu } from 'features/gallery/components/ContextMenu/CanvasProjectContextMenu';
 import { ImageContextMenu } from 'features/gallery/components/ContextMenu/ImageContextMenu';
+import { VideoContextMenu } from 'features/gallery/components/ContextMenu/VideoContextMenu';
 import { WorkflowLibraryModal } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/WorkflowLibraryModal';
 import { CancelAllExceptCurrentQueueItemConfirmationAlertDialog } from 'features/queue/components/CancelAllExceptCurrentQueueItemConfirmationAlertDialog';
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
@@ -49,6 +51,8 @@ export const GlobalModalIsolator = memo(() => {
       <DeleteBoardModal />
       <GlobalImageHotkeys />
       <ImageContextMenu />
+      <VideoContextMenu />
+      <CanvasProjectContextMenu />
       <FullscreenDropzone />
       <VideosModal />
       <SaveWorkflowAsDialog />

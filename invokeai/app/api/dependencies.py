@@ -10,6 +10,10 @@ from invokeai.app.services.auth.token_service import set_jwt_secret
 from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
 from invokeai.app.services.board_images.board_images_default import BoardImagesService
 from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+from invokeai.app.services.board_canvas_project_records.board_canvas_project_records_sqlite import (
+    SqliteBoardCanvasProjectRecordStorage,
+)
+from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
 from invokeai.app.services.boards.boards_default import BoardService
 from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
 from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import ClientStatePersistenceSqlite
@@ -24,6 +28,7 @@ from invokeai.app.services.external_generation.providers import (
     SeedreamProvider,
 )
 from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
+from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
@@ -51,6 +56,14 @@ from invokeai.app.services.style_preset_images.style_preset_images_disk import S
 from invokeai.app.services.style_preset_records.style_preset_records_sqlite import SqliteStylePresetRecordsStorage
 from invokeai.app.services.urls.urls_default import LocalUrlService
 from invokeai.app.services.users.users_default import UserService
+from invokeai.app.services.canvas_project_files.canvas_project_files_disk import DiskCanvasProjectFileStorage
+from invokeai.app.services.canvas_project_records.canvas_project_records_sqlite import (
+    SqliteCanvasProjectRecordStorage,
+)
+from invokeai.app.services.canvas_projects.canvas_projects_default import CanvasProjectService
+from invokeai.app.services.video_files.video_files_disk import DiskVideoFileStorage
+from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
+from invokeai.app.services.videos.videos_default import VideoService
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_disk import WorkflowThumbnailFileStorageDisk
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
@@ -62,6 +75,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     QwenImageConditioningInfo,
     SD3ConditioningInfo,
     SDXLConditioningInfo,
+    WanConditioningInfo,
     ZImageConditioningInfo,
 )
 from invokeai.backend.util.logging import InvokeAILogger
@@ -107,6 +121,8 @@ class ApiDependencies:
             raise ValueError("Output folder is not set")
 
         image_files = DiskImageFileStorage(f"{output_folder}/images")
+        video_files = DiskVideoFileStorage(f"{output_folder}/videos")
+        canvas_project_files = DiskCanvasProjectFileStorage(f"{output_folder}/canvas_projects")
 
         model_images_folder = config.models_path
         style_presets_folder = config.style_presets_path
@@ -131,6 +147,13 @@ class ApiDependencies:
         bulk_download = BulkDownloadService()
         image_records = SqliteImageRecordStorage(db=db)
         images = ImageService()
+        video_records = SqliteVideoRecordStorage(db=db)
+        videos = VideoService()
+        board_video_records = SqliteBoardVideoRecordStorage(db=db)
+        canvas_project_records = SqliteCanvasProjectRecordStorage(db=db)
+        canvas_projects = CanvasProjectService()
+        board_canvas_project_records = SqliteBoardCanvasProjectRecordStorage(db=db)
+        gallery = SqliteGalleryService(db=db)
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
         tensors = ObjectSerializerForwardCache(
             ObjectSerializerDisk[torch.Tensor](
@@ -152,6 +175,7 @@ class ApiDependencies:
                     ZImageConditioningInfo,
                     QwenImageConditioningInfo,
                     AnimaConditioningInfo,
+                    WanConditioningInfo,
                 ],
                 ephemeral=True,
             ),
@@ -221,6 +245,15 @@ class ApiDependencies:
             workflow_thumbnails=workflow_thumbnails,
             client_state_persistence=client_state_persistence,
             users=users,
+            videos=videos,
+            video_files=video_files,
+            video_records=video_records,
+            board_video_records=board_video_records,
+            gallery=gallery,
+            canvas_projects=canvas_projects,
+            canvas_project_files=canvas_project_files,
+            canvas_project_records=canvas_project_records,
+            board_canvas_project_records=board_canvas_project_records,
         )
 
         ApiDependencies.invoker = Invoker(services)

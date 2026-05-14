@@ -35,14 +35,16 @@ import {
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import type { BoardId } from 'features/gallery/store/types';
-import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
+import { fieldImageValueChanged, fieldVideoValueChanged } from 'features/nodes/store/nodesSlice';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
+import { canvasProjectsApi } from 'services/api/endpoints/canvasProjects';
 import { imageDTOToFile, imagesApi, uploadImage } from 'services/api/endpoints/images';
-import type { ImageDTO } from 'services/api/types';
+import { videosApi } from 'services/api/endpoints/videos';
+import type { ImageDTO, VideoDTO } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
@@ -73,6 +75,15 @@ export const setNodeImageFieldImage = (arg: {
 }) => {
   const { imageDTO, fieldIdentifier, dispatch } = arg;
   dispatch(fieldImageValueChanged({ ...fieldIdentifier, value: imageDTO }));
+};
+
+export const setNodeVideoFieldVideo = (arg: {
+  videoDTO: VideoDTO;
+  fieldIdentifier: FieldIdentifier;
+  dispatch: AppDispatch;
+}) => {
+  const { videoDTO, fieldIdentifier, dispatch } = arg;
+  dispatch(fieldVideoValueChanged({ ...fieldIdentifier, value: videoDTO }));
 };
 
 export const setComparisonImage = (arg: { image_name: string; dispatch: AppDispatch }) => {
@@ -321,5 +332,38 @@ export const addImagesToBoard = (arg: { image_names: string[]; boardId: BoardId;
 export const removeImagesFromBoard = (arg: { image_names: string[]; dispatch: AppDispatch }) => {
   const { image_names, dispatch } = arg;
   dispatch(imagesApi.endpoints.removeImagesFromBoard.initiate({ image_names }, { track: false }));
+  dispatch(selectionChanged([]));
+};
+
+// Single-video counterparts to addImagesToBoard / removeImagesFromBoard. The video router
+// only exposes single-video endpoints today (POST/DELETE /api/v1/videos/board), so the
+// callers loop per video. Backend permissions: add requires _assert_board_write_access
+// (admin/owner/public dest) AND _assert_video_direct_owner; remove requires
+// _assert_video_direct_owner plus write access on the *source* board.
+export const addVideoToBoard = (arg: { video_name: string; boardId: BoardId; dispatch: AppDispatch }) => {
+  const { video_name, boardId, dispatch } = arg;
+  dispatch(videosApi.endpoints.addVideoToBoard.initiate({ video_name, board_id: boardId }, { track: false }));
+  dispatch(selectionChanged([]));
+};
+
+export const removeVideoFromBoard = (arg: { video_name: string; dispatch: AppDispatch }) => {
+  const { video_name, dispatch } = arg;
+  dispatch(videosApi.endpoints.removeVideoFromBoard.initiate({ video_name }, { track: false }));
+  dispatch(selectionChanged([]));
+};
+
+// Single-canvas-project counterparts. The canvas projects router only exposes single-project
+// add/remove endpoints (POST/DELETE /api/v1/board_canvas_projects/), matching the video pattern.
+export const addCanvasProjectToBoard = (arg: { project_name: string; boardId: BoardId; dispatch: AppDispatch }) => {
+  const { project_name, boardId, dispatch } = arg;
+  dispatch(
+    canvasProjectsApi.endpoints.addCanvasProjectToBoard.initiate({ project_name, board_id: boardId }, { track: false })
+  );
+  dispatch(selectionChanged([]));
+};
+
+export const removeCanvasProjectFromBoard = (arg: { project_name: string; dispatch: AppDispatch }) => {
+  const { project_name, dispatch } = arg;
+  dispatch(canvasProjectsApi.endpoints.removeCanvasProjectFromBoard.initiate({ project_name }, { track: false }));
   dispatch(selectionChanged([]));
 };

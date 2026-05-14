@@ -10,7 +10,8 @@ import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { PiUploadBold } from 'react-icons/pi';
 import { uploadImages, useUploadImageMutation } from 'services/api/endpoints/images';
-import type { ImageDTO } from 'services/api/types';
+import { uploadVideos, useUploadVideoMutation } from 'services/api/endpoints/videos';
+import type { ImageDTO, VideoDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 import type { SetOptional } from 'type-fest';
 
@@ -24,6 +25,18 @@ export const dropzoneAccept: Accept = {
   'image/png': ['.png'].reduce(addUpperCaseReducer, [] as string[]),
   'image/jpeg': ['.jpg', '.jpeg', '.png'].reduce(addUpperCaseReducer, [] as string[]),
   'image/webp': ['.webp'].reduce(addUpperCaseReducer, [] as string[]),
+  'video/mp4': ['.mp4'].reduce(addUpperCaseReducer, [] as string[]),
+  'video/webm': ['.webm'].reduce(addUpperCaseReducer, [] as string[]),
+  'video/quicktime': ['.mov'].reduce(addUpperCaseReducer, [] as string[]),
+};
+
+/** Returns true when the file looks like a video (by MIME or by extension). */
+const isVideoFile = (file: File): boolean => {
+  if (file.type && file.type.startsWith('video/')) {
+    return true;
+  }
+  const name = file.name.toLowerCase();
+  return name.endsWith('.mp4') || name.endsWith('.webm') || name.endsWith('.mov') || name.endsWith('.mkv');
 };
 
 type UseImageUploadButtonArgs =
@@ -31,6 +44,8 @@ type UseImageUploadButtonArgs =
       isDisabled?: boolean;
       allowMultiple: false;
       onUpload?: (imageDTO: ImageDTO) => void;
+      /** Called when a single dropped file is a video (parallel to onUpload for images). */
+      onUploadVideo?: (videoDTO: VideoDTO) => void;
       onUploadStarted?: (files: File) => void;
       onError?: (error: unknown) => void;
     }
@@ -38,6 +53,7 @@ type UseImageUploadButtonArgs =
       isDisabled?: boolean;
       allowMultiple: true;
       onUpload?: (imageDTOs: ImageDTO[]) => void;
+      onUploadVideo?: (videoDTOs: VideoDTO[]) => void;
       onUploadStarted?: (files: File[]) => void;
       onError?: (error: unknown) => void;
     };
@@ -65,6 +81,7 @@ const log = logger('gallery');
  */
 export const useImageUploadButton = ({
   onUpload,
+  onUploadVideo,
   isDisabled,
   allowMultiple,
   onUploadStarted,
@@ -72,6 +89,7 @@ export const useImageUploadButton = ({
 }: UseImageUploadButtonArgs) => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const [uploadImage, request] = useUploadImageMutation();
+  const [uploadVideo] = useUploadVideoMutation();
   const { t } = useTranslation();
 
   const onDropAccepted = useCallback(
@@ -90,32 +108,68 @@ export const useImageUploadButton = ({
           const file = files[0];
           assert(file !== undefined); // should never happen
           onUploadStarted?.(file);
-          const imageDTO = await uploadImage({
-            file,
-            image_category: 'user',
-            is_intermediate: false,
-            board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-            silent: true,
-          }).unwrap();
-          if (onUpload) {
-            onUpload(imageDTO);
-          }
-        } else {
-          onUploadStarted?.(files);
 
-          let imageDTOs: ImageDTO[] = [];
-          imageDTOs = await uploadImages(
-            files.map((file, i) => ({
+          if (isVideoFile(file)) {
+            const videoDTO = await uploadVideo({
+              file,
+              video_category: 'user',
+              is_intermediate: false,
+              board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+              silent: true,
+            }).unwrap();
+            // Cast: TS narrows onUploadVideo by the allowMultiple discriminator above.
+            (onUploadVideo as ((dto: VideoDTO) => void) | undefined)?.(videoDTO);
+          } else {
+            const imageDTO = await uploadImage({
               file,
               image_category: 'user',
               is_intermediate: false,
               board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-              silent: false,
-              isFirstUploadOfBatch: i === 0,
-            }))
-          );
-          if (onUpload) {
-            onUpload(imageDTOs);
+              silent: true,
+            }).unwrap();
+            (onUpload as ((dto: ImageDTO) => void) | undefined)?.(imageDTO);
+          }
+        } else {
+          onUploadStarted?.(files);
+
+          // Split the dropped files into images and videos and upload each set through
+          // its own batch helper so a single drop can include a mix.
+          const imageFiles = files.filter((f) => !isVideoFile(f));
+          const videoFiles = files.filter((f) => isVideoFile(f));
+
+          let imageDTOs: ImageDTO[] = [];
+          if (imageFiles.length > 0) {
+            imageDTOs = await uploadImages(
+              imageFiles.map((file, i) => ({
+                file,
+                image_category: 'user',
+                is_intermediate: false,
+                board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+                silent: false,
+                isFirstUploadOfBatch: i === 0,
+              }))
+            );
+          }
+
+          let videoDTOs: VideoDTO[] = [];
+          if (videoFiles.length > 0) {
+            videoDTOs = await uploadVideos(
+              videoFiles.map((file, i) => ({
+                file,
+                video_category: 'user',
+                is_intermediate: false,
+                board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+                silent: false,
+                isFirstUploadOfBatch: i === 0,
+              }))
+            );
+          }
+
+          if (imageDTOs.length > 0) {
+            (onUpload as ((dtos: ImageDTO[]) => void) | undefined)?.(imageDTOs);
+          }
+          if (videoDTOs.length > 0) {
+            (onUploadVideo as ((dtos: VideoDTO[]) => void) | undefined)?.(videoDTOs);
           }
         }
       } catch (error) {
@@ -127,7 +181,7 @@ export const useImageUploadButton = ({
         });
       }
     },
-    [allowMultiple, onUploadStarted, uploadImage, autoAddBoardId, onUpload, onError, t]
+    [allowMultiple, onUploadStarted, uploadImage, uploadVideo, autoAddBoardId, onUpload, onUploadVideo, onError, t]
   );
 
   const onDropRejected = useCallback(

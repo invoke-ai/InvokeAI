@@ -9,3 +9,13 @@ class NameServiceBase(ABC):
     def create_image_name(self) -> str:
         """Creates a name for an image."""
         pass
+
+    @abstractmethod
+    def create_video_name(self) -> str:
+        """Creates a name for a video."""
+        pass
+
+    @abstractmethod
+    def create_canvas_project_name(self) -> str:
+        """Creates a name (UUID, no extension) for a canvas project."""
+        pass

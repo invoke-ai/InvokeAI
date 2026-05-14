@@ -311,6 +311,19 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
+  if (model?.base === 'wan' && model.format === 'gguf_quantized') {
+    // GGUF Wan mains carry only the transformer; VAE + UMT5-XXL encoder must
+    // come from either standalone models or the Component Source (Diffusers).
+    // The low-noise A14B partner expert is optional — if omitted, the loader
+    // will use the high-noise expert for the whole schedule (lower quality
+    // but still produces an image).
+    const hasVaeSource = params.wanVaeModel !== null || params.wanComponentSource !== null;
+    const hasEncoderSource = params.wanT5EncoderModel !== null || params.wanComponentSource !== null;
+    if (!hasVaeSource || !hasEncoderSource) {
+      reasons.push({ content: i18n.t('parameters.invoke.noWanComponentSourceSelected') });
+    }
+  }
+
   if (model?.base === 'z-image') {
     // Check if VAE source is available (either separate VAE or Qwen3 Source)
     const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
@@ -771,6 +784,19 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     const hasEncoderSource = params.qwenImageQwenVLEncoderModel !== null || params.qwenImageComponentSource !== null;
     if (!hasVaeSource || !hasEncoderSource) {
       reasons.push({ content: i18n.t('parameters.invoke.noQwenImageComponentSourceSelected') });
+    }
+  }
+
+  if (model?.base === 'wan' && model.format === 'gguf_quantized') {
+    // GGUF Wan mains carry only the transformer; VAE + UMT5-XXL encoder must
+    // come from either standalone models or the Component Source (Diffusers).
+    // The low-noise A14B partner expert is optional — if omitted, the loader
+    // will use the high-noise expert for the whole schedule (lower quality
+    // but still produces an image).
+    const hasVaeSource = params.wanVaeModel !== null || params.wanComponentSource !== null;
+    const hasEncoderSource = params.wanT5EncoderModel !== null || params.wanComponentSource !== null;
+    if (!hasVaeSource || !hasEncoderSource) {
+      reasons.push({ content: i18n.t('parameters.invoke.noWanComponentSourceSelected') });
     }
   }
 

@@ -17,7 +17,26 @@ export const MainModelPicker = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const activeTab = useAppSelector(selectActiveTab);
-  const [modelConfigs] = useMainModels();
+  const [allModelConfigs] = useMainModels();
+  // Low-noise Wan GGUFs belong in the Transformer (Low Noise) slot of the
+  // Wan advanced section, not as a primary main. Filter them out of the main
+  // model dropdown so users can't accidentally wire them backwards.
+  const modelConfigs = useMemo(
+    () =>
+      allModelConfigs.filter((c) => {
+        if (
+          c.type === 'main' &&
+          c.base === 'wan' &&
+          c.format === 'gguf_quantized' &&
+          'expert' in c &&
+          c.expert === 'low'
+        ) {
+          return false;
+        }
+        return true;
+      }),
+    [allModelConfigs]
+  );
   const selectedModelConfig = useSelectedModelConfig();
   const onChange = useCallback(
     (modelConfig: AnyModelConfigWithExternal) => {

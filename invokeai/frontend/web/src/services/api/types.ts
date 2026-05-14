@@ -101,6 +101,7 @@ type FLUX2ModelConfig = Extract<InternalAnyModelConfig, { type: 'main'; base: 'f
 export type AnyFLUXModelConfig = FLUXModelConfig | FLUX2ModelConfig;
 export type ControlLoRAModelConfig = Extract<InternalAnyModelConfig, { type: 'control_lora' }>;
 export type LoRAModelConfig = Extract<InternalAnyModelConfig, { type: 'lora' }>;
+type WanLoRAModelConfig = Extract<InternalAnyModelConfig, { type: 'lora'; base: 'wan' }>;
 export type VAEModelConfig = Extract<InternalAnyModelConfig, { type: 'vae' }>;
 export type ControlNetModelConfig = Extract<InternalAnyModelConfig, { type: 'controlnet' }>;
 export type IPAdapterModelConfig = Extract<InternalAnyModelConfig, { type: 'ip_adapter' }>;
@@ -117,6 +118,7 @@ export type T5EncoderBnbQuantizedLlmInt8bModelConfig = Extract<
 >;
 export type Qwen3EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen3_encoder' }>;
 export type QwenVLEncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen_vl_encoder' }>;
+export type WanT5EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'wan_t5_encoder' }>;
 export type SpandrelImageToImageModelConfig = Extract<InternalAnyModelConfig, { type: 'spandrel_image_to_image' }>;
 export type CheckpointModelConfig = Extract<InternalAnyModelConfig, { type: 'main'; format: 'checkpoint' }>;
 export type CLIPVisionModelConfig = Extract<InternalAnyModelConfig, { type: 'clip_vision' }>;
@@ -321,6 +323,13 @@ export const isQwenImageVAEModelConfig = (
   );
 };
 
+export const isWanVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {
+  return (
+    (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
+    config.base === 'wan'
+  );
+};
+
 export const isControlNetModelConfig = (config: AnyModelConfig): config is ControlNetModelConfig => {
   return config.type === 'controlnet';
 };
@@ -377,6 +386,10 @@ export const isAnimaQwen3EncoderModelConfig = (config: AnyModelConfig): config i
 
 export const isQwenVLEncoderModelConfig = (config: AnyModelConfig): config is QwenVLEncoderModelConfig => {
   return config.type === 'qwen_vl_encoder';
+};
+
+export const isWanT5EncoderModelConfig = (config: AnyModelConfig): config is WanT5EncoderModelConfig => {
+  return config.type === 'wan_t5_encoder';
 };
 
 export const isCLIPEmbedModelConfigOrSubmodel = (
@@ -484,6 +497,23 @@ export const isFlux2DiffusersMainModelConfig = (config: AnyModelConfig): config 
 
 export const isQwenImageDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'qwen-image' && config.format === 'diffusers';
+};
+
+export const isWanDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'wan' && config.format === 'diffusers';
+};
+
+/** Wan GGUF main models marked as the low-noise expert (the second half
+ *  of the A14B MoE pair). Suitable for the Transformer (Low Noise) picker;
+ *  also used to filter low-noise GGUFs out of the primary main dropdown. */
+export const isWanGGUFLowNoiseMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return (
+    config.type === 'main' && config.base === 'wan' && config.format === 'gguf_quantized' && config.expert === 'low'
+  );
+};
+
+export const isWanLoRAModelConfig = (config: AnyModelConfig): config is WanLoRAModelConfig => {
+  return config.type === 'lora' && config.base === 'wan';
 };
 
 export const isTIModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
@@ -612,3 +642,100 @@ export type UploadImageArg = {
 
 export type ImageUploadEntryResponse = S['ImageUploadEntry'];
 export type ImageUploadEntryRequest = paths['/api/v1/images/']['post']['requestBody']['content']['application/json'];
+
+// Videos
+export type VideoDTO = S['VideoDTO'];
+/** @knipignore Used by Phase 4+ video gallery mutations. */
+export type VideoRecordChanges = S['VideoRecordChanges'];
+/** @knipignore Used by listVideos RTK response typing; surfaced in Phase 4+. */
+export type OffsetPaginatedResults_VideoDTO_ = S['OffsetPaginatedResults_VideoDTO_'];
+export type ListVideosArgs = NonNullable<paths['/api/v1/videos/']['get']['parameters']['query']>;
+export type ListVideosResponse = paths['/api/v1/videos/']['get']['responses']['200']['content']['application/json'];
+export type GetVideoNamesArgs = NonNullable<paths['/api/v1/videos/names']['get']['parameters']['query']>;
+export type GetVideoNamesResult =
+  paths['/api/v1/videos/names']['get']['responses']['200']['content']['application/json'];
+
+// Canvas Projects (.invk)
+export type CanvasProjectDTO = S['CanvasProjectDTO'];
+export type CanvasProjectRecordChanges = S['CanvasProjectRecordChanges'];
+export type OffsetPaginatedResults_CanvasProjectDTO_ = S['OffsetPaginatedResults_CanvasProjectDTO_'];
+export type ListCanvasProjectsArgs = NonNullable<paths['/api/v1/canvas_projects/']['get']['parameters']['query']>;
+export type ListCanvasProjectsResponse =
+  paths['/api/v1/canvas_projects/']['get']['responses']['200']['content']['application/json'];
+
+export type UploadCanvasProjectArg = {
+  /** The `.invk` (ZIP) file to upload. */
+  file: File;
+  /** The user-facing project name. */
+  name: string;
+  /** App version captured at save time. */
+  app_version: string;
+  /** Bbox width at save time. */
+  width: number;
+  /** Bbox height at save time. */
+  height: number;
+  /** Number of embedded image files. */
+  image_count: number;
+  /** Optional WebP preview thumbnail. */
+  thumbnail?: Blob;
+  /** Optional board id to attach the project to. */
+  board_id?: string;
+  /** Whether the project is an intermediate (defaults to false). */
+  is_intermediate?: boolean;
+};
+
+export type ReplaceCanvasProjectFileArg = {
+  /** The target project to update. UUID — keeps board assignment and starred state. */
+  project_name: string;
+  /** The replacement `.invk` (ZIP) file. */
+  file: File;
+  /** Optional new user-facing project name. */
+  name?: string;
+  /** App version captured at save time. */
+  app_version: string;
+  /** Bbox width at save time. */
+  width: number;
+  /** Bbox height at save time. */
+  height: number;
+  /** Number of embedded image files. */
+  image_count: number;
+  /** Optional replacement WebP preview. Omit to keep the existing thumbnail. */
+  thumbnail?: Blob;
+};
+
+export type UploadVideoArg = {
+  /** The MP4 (or other accepted video) file to upload. */
+  file: File;
+  /** The category of video to upload. Reuses the image category enum. */
+  video_category: ImageCategory;
+  /** Whether the uploaded video is an intermediate (intermediates are not shown in the gallery). */
+  is_intermediate: boolean;
+  /** The session with which to associate the uploaded video, if any. */
+  session_id?: string;
+  /** The board to add the video to, if any. */
+  board_id?: string;
+  /** Metadata JSON to attach to the video record. */
+  metadata?: JsonObject;
+  /** Suppress the upload toast / gallery navigation side effects. */
+  silent?: boolean;
+  /** Whether this is the first upload of a batch (used by toast logic). */
+  isFirstUploadOfBatch?: boolean;
+};
+
+// Polymorphic gallery items (images + videos). Consumed by the gallery wiring in Phase 4.
+/** @knipignore Consumed by gallery wiring in Phase 4. */
+export type GalleryItem = S['GalleryItem'];
+/** @knipignore Consumed by gallery wiring in Phase 4. */
+export type GalleryItemKind = S['GalleryItemKind'];
+/** @knipignore Consumed by gallery wiring in Phase 4. */
+export type GalleryItemRef = S['GalleryItemRef'];
+/** @knipignore Consumed by gallery wiring in Phase 4. */
+export type GalleryItemNamesResult = S['GalleryItemNamesResult'];
+/** @knipignore Consumed by gallery wiring in Phase 4. */
+export type OffsetPaginatedResults_GalleryItem_ = S['OffsetPaginatedResults_GalleryItem_'];
+export type ListGalleryItemsArgs = NonNullable<paths['/api/v1/gallery/items/']['get']['parameters']['query']>;
+export type ListGalleryItemsResponse =
+  paths['/api/v1/gallery/items/']['get']['responses']['200']['content']['application/json'];
+export type GetGalleryItemNamesArgs = NonNullable<paths['/api/v1/gallery/items/names']['get']['parameters']['query']>;
+export type GetGalleryItemNamesResult =
+  paths['/api/v1/gallery/items/names']['get']['responses']['200']['content']['application/json'];

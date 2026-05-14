@@ -32,6 +32,7 @@ import type {
   QwenImageReferenceImageConfig,
   RegionalGuidanceIPAdapterConfig,
   T2IAdapterConfig,
+  WanReferenceImageConfig,
 } from 'features/controlLayers/store/types';
 import {
   initialControlNet,
@@ -41,6 +42,7 @@ import {
   initialQwenImageReferenceImage,
   initialRegionalGuidanceIPAdapter,
   initialT2IAdapter,
+  initialWanReferenceImage,
 } from 'features/controlLayers/store/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { useCallback } from 'react';
@@ -80,7 +82,12 @@ export const selectDefaultControlAdapter = createSelector(
 
 export const getDefaultRefImageConfig = (
   getState: AppGetState
-): IPAdapterConfig | FluxKontextReferenceImageConfig | Flux2ReferenceImageConfig | QwenImageReferenceImageConfig => {
+):
+  | IPAdapterConfig
+  | FluxKontextReferenceImageConfig
+  | Flux2ReferenceImageConfig
+  | QwenImageReferenceImageConfig
+  | WanReferenceImageConfig => {
   const state = getState();
 
   const mainModelConfig = selectMainModelConfig(state);
@@ -96,6 +103,11 @@ export const getDefaultRefImageConfig = (
   // Qwen Image Edit has built-in reference image support - no model needed
   if (base === 'qwen-image') {
     return deepClone(initialQwenImageReferenceImage);
+  }
+
+  // Wan 2.2 I2V uses the main model's own VAE - no adapter model needed
+  if (base === 'wan') {
+    return deepClone(initialWanReferenceImage);
   }
 
   if (base === 'flux' && mainModelConfig?.name?.toLowerCase().includes('kontext')) {
