@@ -5,12 +5,17 @@ import { createSelector } from '@reduxjs/toolkit';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { uniq } from 'es-toolkit';
-import { singleVideoDndSource } from 'features/dnd/dnd';
+import { multipleVideoDndSource, singleVideoDndSource } from 'features/dnd/dnd';
 import { firefoxDndFix } from 'features/dnd/util';
 import { useVideoContextMenu } from 'features/gallery/components/ContextMenu/VideoContextMenu';
-import { selectAlwaysShouldImageSizeBadge } from 'features/gallery/store/gallerySelectors';
+import {
+  selectAlwaysShouldImageSizeBadge,
+  selectSelectedBoardId,
+  selectSelection,
+} from 'features/gallery/store/gallerySelectors';
 import { selectGallerySlice, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { selectCachedGalleryItemNames } from 'features/gallery/store/selectCachedGalleryItemNames';
+import { isVideoName } from 'features/gallery/store/types';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import type { MouseEvent, MouseEventHandler } from 'react';
@@ -120,10 +125,28 @@ export const GalleryVideoItem = memo(({ videoDTO }: Props) => {
       firefoxDndFix(element),
       draggable({
         element,
-        getInitialData: () => singleVideoDndSource.getData({ videoDTO }, videoDTO.video_name),
+        getInitialData: () => {
+          // When the dragged video is part of a multi-selection, send the whole selection so a
+          // bulk move-to-board fires for every selected item. Mixed selections (videos + images)
+          // ride along in the same payload: the board drop handler splits them and dispatches
+          // both mutations. Without this, only the single dragged video would move.
+          const state = store.getState();
+          const selection = selectSelection(state);
+          const boardId = selectSelectedBoardId(state);
+          if (selection.length > 1 && selection.includes(videoDTO.video_name)) {
+            const video_names = selection.filter(isVideoName);
+            const image_names = selection.filter((n) => !isVideoName(n));
+            return multipleVideoDndSource.getData({
+              video_names,
+              image_names,
+              board_id: boardId,
+            });
+          }
+          return singleVideoDndSource.getData({ videoDTO }, videoDTO.video_name);
+        },
       })
     );
-  }, [videoDTO]);
+  }, [videoDTO, store]);
 
   return (
     <Flex

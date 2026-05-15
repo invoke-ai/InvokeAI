@@ -4,7 +4,13 @@ import { logger } from 'app/logging/logger';
 import { getStore } from 'app/store/nanostores/store';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { parseify } from 'common/util/serialize';
-import { dndTargets, multipleImageDndSource, singleImageDndSource, singleVideoDndSource } from 'features/dnd/dnd';
+import {
+  dndTargets,
+  multipleImageDndSource,
+  multipleVideoDndSource,
+  singleImageDndSource,
+  singleVideoDndSource,
+} from 'features/dnd/dnd';
 import { useEffect } from 'react';
 
 const log = logger('dnd');
@@ -18,11 +24,14 @@ export const useDndMonitor = () => {
         canMonitor: ({ source }) => {
           const sourceData = source.data;
 
-          // Check for allowed sources
+          // Check for allowed sources. Without multipleVideoDndSource here, multi-video
+          // drags would be ignored at the global monitor level — the drop would silently
+          // do nothing because the handler never fires.
           if (
             !singleImageDndSource.typeGuard(sourceData) &&
             !multipleImageDndSource.typeGuard(sourceData) &&
-            !singleVideoDndSource.typeGuard(sourceData)
+            !singleVideoDndSource.typeGuard(sourceData) &&
+            !multipleVideoDndSource.typeGuard(sourceData)
           ) {
             return false;
           }

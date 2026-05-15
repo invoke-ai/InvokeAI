@@ -9,11 +9,13 @@ import { selectComparisonImages } from 'features/gallery/components/ImageViewer/
 import type { BoardId } from 'features/gallery/store/types';
 import {
   addImagesToBoard,
+  addVideosToBoard,
   addVideoToBoard,
   createNewCanvasEntityFromImage,
   newCanvasFromImage,
   removeImagesFromBoard,
   removeVideoFromBoard,
+  removeVideosFromBoard,
   replaceCanvasEntityObjectsWithImage,
   setComparisonImage,
   setGlobalReferenceImage,
@@ -97,16 +99,36 @@ export const singleVideoDndSource: DndSource<SingleVideoDndSourceData> = {
 //#endregion
 
 //#region Multiple Image
+// `image_names` is the primary payload (used by the drag preview heading and the image-field
+// collection drop target). `video_names` rides along so that mixed selections dragged from an
+// image thumbnail still move the videos to the board — the board drop handler dispatches both
+// mutations when both arrays are populated.
 const _multipleImage = buildTypeAndKey('multiple-image');
 export type MultipleImageDndSourceData = DndData<
   typeof _multipleImage.type,
   typeof _multipleImage.key,
-  { image_names: string[]; board_id: BoardId }
+  { image_names: string[]; video_names: string[]; board_id: BoardId }
 >;
 export const multipleImageDndSource: DndSource<MultipleImageDndSourceData> = {
   ..._multipleImage,
   typeGuard: buildTypeGuard(_multipleImage.key),
   getData: buildGetData(_multipleImage.key, _multipleImage.type),
+};
+//#endregion
+
+//#region Multiple Video
+// Symmetric to MultipleImageDndSourceData: `video_names` is the primary payload, `image_names`
+// rides along for mixed selections dragged from a video thumbnail.
+const _multipleVideo = buildTypeAndKey('multiple-video');
+type MultipleVideoDndSourceData = DndData<
+  typeof _multipleVideo.type,
+  typeof _multipleVideo.key,
+  { video_names: string[]; image_names: string[]; board_id: BoardId }
+>;
+export const multipleVideoDndSource: DndSource<MultipleVideoDndSourceData> = {
+  ..._multipleVideo,
+  typeGuard: buildTypeGuard(_multipleVideo.key),
+  getData: buildGetData(_multipleVideo.key, _multipleVideo.type),
 };
 //#endregion
 
@@ -534,7 +556,7 @@ export type AddImageToBoardDndTargetData = DndData<
 >;
 export const addImageToBoardDndTarget: DndTarget<
   AddImageToBoardDndTargetData,
-  SingleImageDndSourceData | MultipleImageDndSourceData | SingleVideoDndSourceData
+  SingleImageDndSourceData | MultipleImageDndSourceData | SingleVideoDndSourceData | MultipleVideoDndSourceData
 > = {
   ..._addToBoard,
   typeGuard: buildTypeGuard(_addToBoard.key),
@@ -569,6 +591,14 @@ export const addImageToBoardDndTarget: DndTarget<
       // through the mutation rather than blocking the drop preemptively.
       return canMoveFromSourceBoard(currentBoard, getState);
     }
+    if (multipleVideoDndSource.typeGuard(sourceData)) {
+      const currentBoard = sourceData.payload.board_id;
+      const destinationBoard = targetData.payload.boardId;
+      if (currentBoard === destinationBoard) {
+        return false;
+      }
+      return canMoveFromSourceBoard(currentBoard, getState);
+    }
     return false;
   },
   handler: ({ sourceData, targetData, dispatch }) => {
@@ -579,15 +609,31 @@ export const addImageToBoardDndTarget: DndTarget<
     }
 
     if (multipleImageDndSource.typeGuard(sourceData)) {
-      const { image_names } = sourceData.payload;
+      const { image_names, video_names } = sourceData.payload;
       const { boardId } = targetData.payload;
-      addImagesToBoard({ image_names, boardId, dispatch });
+      if (image_names.length > 0) {
+        addImagesToBoard({ image_names, boardId, dispatch });
+      }
+      if (video_names.length > 0) {
+        addVideosToBoard({ video_names, boardId, dispatch });
+      }
     }
 
     if (singleVideoDndSource.typeGuard(sourceData)) {
       const { videoDTO } = sourceData.payload;
       const { boardId } = targetData.payload;
       addVideoToBoard({ video_name: videoDTO.video_name, boardId, dispatch });
+    }
+
+    if (multipleVideoDndSource.typeGuard(sourceData)) {
+      const { video_names, image_names } = sourceData.payload;
+      const { boardId } = targetData.payload;
+      if (video_names.length > 0) {
+        addVideosToBoard({ video_names, boardId, dispatch });
+      }
+      if (image_names.length > 0) {
+        addImagesToBoard({ image_names, boardId, dispatch });
+      }
     }
   },
 };
@@ -603,7 +649,7 @@ export type RemoveImageFromBoardDndTargetData = DndData<
 >;
 export const removeImageFromBoardDndTarget: DndTarget<
   RemoveImageFromBoardDndTargetData,
-  SingleImageDndSourceData | MultipleImageDndSourceData | SingleVideoDndSourceData
+  SingleImageDndSourceData | MultipleImageDndSourceData | SingleVideoDndSourceData | MultipleVideoDndSourceData
 > = {
   ..._removeFromBoard,
   typeGuard: buildTypeGuard(_removeFromBoard.key),
@@ -634,6 +680,14 @@ export const removeImageFromBoardDndTarget: DndTarget<
       return canMoveFromSourceBoard(currentBoard, getState);
     }
 
+    if (multipleVideoDndSource.typeGuard(sourceData)) {
+      const currentBoard = sourceData.payload.board_id;
+      if (currentBoard === 'none') {
+        return false;
+      }
+      return canMoveFromSourceBoard(currentBoard, getState);
+    }
+
     return false;
   },
   handler: ({ sourceData, dispatch }) => {
@@ -643,13 +697,28 @@ export const removeImageFromBoardDndTarget: DndTarget<
     }
 
     if (multipleImageDndSource.typeGuard(sourceData)) {
-      const { image_names } = sourceData.payload;
-      removeImagesFromBoard({ image_names, dispatch });
+      const { image_names, video_names } = sourceData.payload;
+      if (image_names.length > 0) {
+        removeImagesFromBoard({ image_names, dispatch });
+      }
+      if (video_names.length > 0) {
+        removeVideosFromBoard({ video_names, dispatch });
+      }
     }
 
     if (singleVideoDndSource.typeGuard(sourceData)) {
       const { videoDTO } = sourceData.payload;
       removeVideoFromBoard({ video_name: videoDTO.video_name, dispatch });
+    }
+
+    if (multipleVideoDndSource.typeGuard(sourceData)) {
+      const { video_names, image_names } = sourceData.payload;
+      if (video_names.length > 0) {
+        removeVideosFromBoard({ video_names, dispatch });
+      }
+      if (image_names.length > 0) {
+        removeImagesFromBoard({ image_names, dispatch });
+      }
     }
   },
 };

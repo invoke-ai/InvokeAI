@@ -350,3 +350,23 @@ export const removeVideoFromBoard = (arg: { video_name: string; dispatch: AppDis
   dispatch(videosApi.endpoints.removeVideoFromBoard.initiate({ video_name }, { track: false }));
   dispatch(selectionChanged([]));
 };
+
+// Bulk helpers. No batch endpoint exists for the video router yet, so we fan out per-video over
+// the existing singular mutation — same pattern the change-board modal already uses. Callers
+// (drag-and-drop bulk move-to-board, future bulk actions) get to share the selection-clear and
+// keep their wiring symmetrical with the image-side helpers.
+export const addVideosToBoard = (arg: { video_names: string[]; boardId: BoardId; dispatch: AppDispatch }) => {
+  const { video_names, boardId, dispatch } = arg;
+  for (const video_name of video_names) {
+    dispatch(videosApi.endpoints.addVideoToBoard.initiate({ video_name, board_id: boardId }, { track: false }));
+  }
+  dispatch(selectionChanged([]));
+};
+
+export const removeVideosFromBoard = (arg: { video_names: string[]; dispatch: AppDispatch }) => {
+  const { video_names, dispatch } = arg;
+  for (const video_name of video_names) {
+    dispatch(videosApi.endpoints.removeVideoFromBoard.initiate({ video_name }, { track: false }));
+  }
+  dispatch(selectionChanged([]));
+};

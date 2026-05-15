@@ -1,5 +1,8 @@
 import type { AppGetState } from 'app/store/store';
 import { galleryApi } from 'services/api/endpoints/gallery';
+import type { GetGalleryItemNamesArgs } from 'services/api/types';
+
+import { selectGetImageNamesQueryArgs } from './gallerySelectors';
 
 /**
  * Returns the names (in display order) of the currently-cached gallery item list.
@@ -7,20 +10,37 @@ import { galleryApi } from 'services/api/endpoints/gallery';
  * The grid renders via the polymorphic ``getGalleryItemNames`` endpoint, which returns a
  * mixed image+video list. Range-selection click handlers (shift-click for ranges, ctrl-click
  * for discontiguous selection) need that ordered list to compute the items between two
- * clicks. Reading from the older image-only ``getImageNames`` cache would silently fail on
- * any board with videos and, since that cache is no longer the grid's source of truth,
- * fail on image-only boards too once the cache evicts.
+ * clicks.
  *
- * For most sessions there is exactly one active list at a time. We scan the RTK Query
- * subscriptions invalidated by ``GalleryItemNameList`` and return the first hit.
+ * We look up the cache entry whose args match the gallery's current query args. RTK Query
+ * keeps recently-used entries warm (60s default ``keepUnusedDataFor``), so after a board
+ * switch the cache contains entries for every board the user has visited this session.
+ * Falling back to "the first invalidated entry" — the previous behaviour — silently picked
+ * a stale board's list, which manifested as shift-click range selection failing at random
+ * until the user did anything that invalidated ``GalleryItemNameList`` (move, delete) and
+ * forced a refetch.
  */
 export const selectCachedGalleryItemNames = (state: ReturnType<AppGetState>): string[] => {
+  const args = selectGetImageNamesQueryArgs(state);
+  // Exact match: the entry the grid is actively subscribed to. This is the common case.
+  const exact = galleryApi.endpoints.getGalleryItemNames.select(args)(state).data;
+  if (exact) {
+    return exact.items.map((ref) => ref.name);
+  }
+  // Debounce window: the grid hook debounces its args by ~300ms, so for a moment after the
+  // user changes a filter the cache key may not match Redux yet. Best-effort fallback to any
+  // cached entry on the same board so range selection still feels responsive — but do not
+  // silently fall back to an unrelated board's entry, which was the bug.
   const entries = galleryApi.util.selectInvalidatedBy(state, ['GalleryItemNameList']);
   for (const entry of entries) {
     if (entry.endpointName !== 'getGalleryItemNames') {
       continue;
     }
-    const data = galleryApi.endpoints.getGalleryItemNames.select(entry.originalArgs)(state).data;
+    const entryArgs = entry.originalArgs as GetGalleryItemNamesArgs | undefined;
+    if (!entryArgs || entryArgs.board_id !== args.board_id) {
+      continue;
+    }
+    const data = galleryApi.endpoints.getGalleryItemNames.select(entryArgs)(state).data;
     if (data) {
       return data.items.map((ref) => ref.name);
     }

@@ -18,6 +18,7 @@ import { GalleryItemHoverIcons } from 'features/gallery/components/ImageGrid/Gal
 import { selectSelectedBoardId, selectSelection } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectGallerySlice, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { selectCachedGalleryItemNames } from 'features/gallery/store/selectCachedGalleryItemNames';
+import { isVideoName } from 'features/gallery/store/types';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import type { MouseEvent, MouseEventHandler } from 'react';
@@ -132,11 +133,17 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
           const selection = selectSelection(store.getState());
           const boardId = selectSelectedBoardId(store.getState());
 
-          // When we have multiple images selected, and the dragged image is part of the selection, initiate a
-          // multi-image drag.
+          // When we have multiple items selected, and the dragged image is part of the
+          // selection, initiate a multi-drag. Mixed selections (images + videos) ride along in
+          // the same payload: the board drop handler splits them and dispatches both mutations.
+          // Without filtering, video names would land in `image_names` and the image router
+          // would 404 on each one.
           if (selection.length > 1 && selection.some((n) => n === imageDTO.image_name)) {
+            const image_names = selection.filter((n) => !isVideoName(n));
+            const video_names = selection.filter(isVideoName);
             return multipleImageDndSource.getData({
-              image_names: selection,
+              image_names,
+              video_names,
               board_id: boardId,
             });
           }
