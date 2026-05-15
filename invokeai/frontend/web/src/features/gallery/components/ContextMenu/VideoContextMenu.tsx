@@ -1,12 +1,12 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
-import { Menu, MenuButton, MenuList, Portal, useGlobalMenuClose } from '@invoke-ai/ui-library';
+import { Menu, MenuButton, MenuDivider, MenuList, Portal, useGlobalMenuClose } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import { IconMenuItemGroup } from 'common/components/IconMenuItem';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { ContextMenuItemChangeBoardVideo } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemChangeBoardVideo';
 import { ContextMenuItemDeleteVideo } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemDeleteVideo';
 import { ContextMenuItemDownloadVideo } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemDownloadVideo';
+import { ContextMenuItemOpenInNewTabVideo } from 'features/gallery/components/ContextMenu/MenuItems/ContextMenuItemOpenInNewTabVideo';
 import MultipleSelectionMenuItemsVideos from 'features/gallery/components/ContextMenu/MultipleSelectionMenuItemsVideos';
 import { VideoDTOContextProvider } from 'features/gallery/contexts/VideoDTOContext';
 import { selectSelectionCount } from 'features/gallery/store/gallerySelectors';
@@ -108,11 +108,11 @@ const MenuContent = memo(() => {
   return (
     <MenuList visibility="visible">
       <VideoDTOContextProvider value={state.videoDTO}>
-        <IconMenuItemGroup>
-          <ContextMenuItemDownloadVideo />
-          <ContextMenuItemDeleteVideo />
-        </IconMenuItemGroup>
+        <ContextMenuItemOpenInNewTabVideo />
+        <ContextMenuItemDownloadVideo />
         <ContextMenuItemChangeBoardVideo />
+        <MenuDivider />
+        <ContextMenuItemDeleteVideo />
       </VideoDTOContextProvider>
     </MenuList>
   );

@@ -1,4 +1,4 @@
-import { IconMenuItem } from 'common/components/IconMenuItem';
+import { MenuItem } from '@invoke-ai/ui-library';
 import { useDownloadItem } from 'common/hooks/useDownloadImage';
 import { useVideoDTOContext } from 'features/gallery/contexts/VideoDTOContext';
 import { memo, useCallback } from 'react';
@@ -15,12 +15,9 @@ export const ContextMenuItemDownloadVideo = memo(() => {
   }, [downloadItem, videoDTO]);
 
   return (
-    <IconMenuItem
-      icon={<PiDownloadSimpleBold />}
-      aria-label={t('gallery.download')}
-      tooltip={t('gallery.download')}
-      onClick={onClick}
-    />
+    <MenuItem icon={<PiDownloadSimpleBold />} onClickCapture={onClick}>
+      {t('gallery.download')}
+    </MenuItem>
   );
 });
 

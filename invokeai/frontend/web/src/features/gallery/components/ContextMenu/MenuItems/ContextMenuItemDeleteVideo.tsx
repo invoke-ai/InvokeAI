@@ -1,5 +1,5 @@
+import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { IconMenuItem } from 'common/components/IconMenuItem';
 import { useDeleteVideoModalApi } from 'features/deleteVideoModal/store/state';
 import { useVideoDTOContext } from 'features/gallery/contexts/VideoDTOContext';
 import { selectSelection } from 'features/gallery/store/gallerySelectors';
@@ -35,13 +35,9 @@ export const ContextMenuItemDeleteVideo = memo(() => {
   }, [deleteVideoModal, targetVideoNames]);
 
   return (
-    <IconMenuItem
-      icon={<PiTrashSimpleBold />}
-      onClickCapture={onClick}
-      aria-label={label}
-      tooltip={label}
-      isDestructive
-    />
+    <MenuItem color="error.300" icon={<PiTrashSimpleBold />} onClickCapture={onClick}>
+      {label}
+    </MenuItem>
   );
 });
 

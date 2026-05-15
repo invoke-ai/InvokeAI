@@ -27,3 +27,35 @@ export const selectCachedGalleryItemNames = (state: ReturnType<AppGetState>): st
   }
   return [];
 };
+
+/**
+ * Given the ordered gallery list, the index of the currently-displayed item in that list,
+ * and the set of names being deleted, return the name that should be selected after the
+ * deletion completes — preferring the immediate predecessor, falling back to the immediate
+ * successor, and returning null if every remaining item was also deleted.
+ *
+ * Used by the image and video delete flows so that clearing the displayed item from the
+ * Viewer lands on an adjacent gallery item instead of the empty-state placeholder.
+ */
+export const pickSelectionAfterDelete = (
+  galleryItemNames: string[],
+  deletedIndex: number,
+  deletedNames: Set<string>
+): string | null => {
+  if (deletedIndex < 0) {
+    return null;
+  }
+  for (let i = deletedIndex - 1; i >= 0; i--) {
+    const name = galleryItemNames[i];
+    if (name && !deletedNames.has(name)) {
+      return name;
+    }
+  }
+  for (let i = deletedIndex + 1; i < galleryItemNames.length; i++) {
+    const name = galleryItemNames[i];
+    if (name && !deletedNames.has(name)) {
+      return name;
+    }
+  }
+  return null;
+};

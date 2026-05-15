@@ -2,7 +2,12 @@ import { useStore } from '@nanostores/react';
 import type { AppStore } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
 import { intersection } from 'es-toolkit/compat';
+import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
+import {
+  pickSelectionAfterDelete,
+  selectCachedGalleryItemNames,
+} from 'features/gallery/store/selectCachedGalleryItemNames';
 import { selectSystemShouldConfirmOnDelete } from 'features/system/store/systemSlice';
 import { atom } from 'nanostores';
 import { useMemo } from 'react';
@@ -47,6 +52,15 @@ const deleteVideosWithDialog = async (video_names: string[], store: AppStore): P
 
 const handleDeletions = async (video_names: string[], store: AppStore) => {
   const { dispatch, getState } = store;
+
+  // Snapshot the polymorphic gallery list and the currently-displayed item *before* the
+  // delete fires; once the network call resolves the cache will already have shifted.
+  const stateBefore = getState();
+  const galleryItemNames = selectCachedGalleryItemNames(stateBefore);
+  const lastSelected = selectLastSelectedItem(stateBefore);
+  const lastSelectedIndex =
+    lastSelected && video_names.includes(lastSelected) ? galleryItemNames.indexOf(lastSelected) : -1;
+
   // The backend exposes single-video DELETE today; loop here so the API surface for callers
   // stays "give me a list, I'll handle it" and a future bulk endpoint can be slotted in
   // without touching call sites.
@@ -59,11 +73,15 @@ const handleDeletions = async (video_names: string[], store: AppStore) => {
     }
   }
 
-  // Clear the deleted videos from the current selection so the viewer doesn't try to
-  // resolve a name that no longer has a DTO.
-  const state = getState();
-  if (intersection(state.gallery.selection, video_names).length > 0) {
-    dispatch(imageSelected(null));
+  // If anything in the active selection was deleted, advance to a still-living neighbour
+  // (prev > next) so the Viewer doesn't drop to its empty-state placeholder.
+  const stateAfter = getState();
+  if (intersection(stateAfter.gallery.selection, video_names).length > 0) {
+    const replacement =
+      lastSelectedIndex >= 0
+        ? pickSelectionAfterDelete(galleryItemNames, lastSelectedIndex, new Set(video_names))
+        : null;
+    dispatch(imageSelected(replacement));
   }
 };
 

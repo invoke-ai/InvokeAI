@@ -537,6 +537,8 @@
         "deleteVideo_other": "Delete {{count}} Videos",
         "deleteVideoPermanent": "Deleted videos cannot be restored.",
         "playVideo": "Play video",
+        "closeVideoPlayer": "Close video player",
+        "copyVideoFrame": "Copy Frame",
         "displayBoardSearch": "Board Search",
         "displaySearch": "Image Search",
         "download": "Download",
