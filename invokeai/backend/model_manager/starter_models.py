@@ -1545,11 +1545,11 @@ anima_vae = StarterModel(
     format=ModelFormat.Checkpoint,
 )
 
-anima_preview3 = StarterModel(
-    name="Anima Preview 3",
+anima_base = StarterModel(
+    name="Anima Base 1.0",
     base=BaseModelType.Anima,
-    source="https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/diffusion_models/anima-preview3-base.safetensors",
-    description="Anima Preview 3 - 2B parameter anime-focused text-to-image model built on Cosmos Predict2 DiT. ~4.5GB",
+    source="https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/diffusion_models/anima-base-v1.0.safetensors",
+    description="Anima Base 1.0 - 2B parameter anime-focused text-to-image model built on Cosmos Predict2 DiT. ~4.5GB",
     type=ModelType.Main,
     format=ModelFormat.Checkpoint,
     dependencies=[anima_qwen3_encoder, anima_vae, t5_base_encoder],
@@ -1688,7 +1688,7 @@ STARTER_MODELS: list[StarterModel] = [
     alibabacloud_qwen_image_max,
     alibabacloud_wan26_t2i,
     alibabacloud_qwen_image_edit_max,
-    anima_preview3,
+    anima_base,
     anima_qwen3_encoder,
     anima_vae,
 ]
@@ -1775,7 +1775,7 @@ qwen_image_bundle: list[StarterModel] = [
 ]
 
 anima_bundle: list[StarterModel] = [
-    anima_preview3,
+    anima_base,
     anima_qwen3_encoder,
     anima_vae,
     t5_base_encoder,
