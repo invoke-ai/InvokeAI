@@ -947,7 +947,10 @@
         "maxImageHeight": "Altezza massima dell'immagine",
         "numImages": "Numero di immagini",
         "textLLM": "LLM testuale",
-        "sourceUrl": "URL di origine"
+        "sourceUrl": "URL di origine",
+        "fp8Storage": "Archiviazione FP8 (Risparmia VRAM)",
+        "qwenImageVaePlaceholder": "Dalla sorgente VAE/Encoder",
+        "qwenImageQwenVLEncoderPlaceholder": "Dalla sorgente VAE/Encoder"
     },
     "parameters": {
         "images": "Immagini",
@@ -1135,7 +1138,12 @@
         "externalProviders": "Fornitori esterni",
         "externalProviderConfigured": "Configurato",
         "externalProviderNotConfigured": "Chiave API necessaria",
-        "externalProviderNotConfiguredHint": "Aggiungi la tua chiave API in Gestione Modello o nella configurazione del server per abilitare questo provider."
+        "externalProviderNotConfiguredHint": "Aggiungi la tua chiave API in Gestione Modello o nella configurazione del server per abilitare questo provider.",
+        "imageSubfolderStrategy": "Strategia per le sottocartelle delle immagini",
+        "imageSubfolderStrategyDate": "Data",
+        "imageSubfolderStrategySaveFailed": "Impossibile salvare la strategia della sottocartella Immagine",
+        "imageSubfolderStrategyType": "Tipo",
+        "imageSubfolderStrategyUnknown": "({{strategy}}) sconosciuta"
     },
     "toast": {
         "uploadFailed": "Caricamento fallito",
@@ -2170,6 +2178,13 @@
                 "Ciò consente di risparmiare VRAM per il denoiser, con un impatto minimo sulle prestazioni. Le uscite di condizionamento vengono automaticamente trasferite alla GPU per il denoiser."
             ],
             "heading": "Solo CPU"
+        },
+        "fp8Storage": {
+            "heading": "Archiviazione FP8",
+            "paragraphs": [
+                "Memorizza i pesi del modello in formato FP8 nella VRAM, riducendo l'utilizzo della memoria di circa il 50% rispetto a FP16.",
+                "Durante l'inferenza, i pesi vengono convertiti strato per strato alla precisione di calcolo (FP16/BF16), preservando così la qualità dell'immagine. Funziona su tutte le GPU CUDA."
+            ]
         }
     },
     "sdxl": {
@@ -3073,6 +3088,33 @@
             "overwriteSnapshotTitle": "Sovrascrivere l'istantanea?",
             "overwriteSnapshotMessage": "Esiste già un'istantanea denominata \"{{name}}\". Si desidera sovrascriverla?",
             "overwrite": "Sovrascrivi"
+        },
+        "modifierHints": {
+            "keys": {
+                "option": "Opzione",
+                "shift": "Maiusc",
+                "space": "Spazio",
+                "wheel": "Rotellina",
+                "arrows": "Frecce",
+                "enter": "Invio"
+            },
+            "labels": {
+                "pan": "Panoramica",
+                "pickColor": "Scegli il colore",
+                "straightLine": "Linea retta",
+                "resizeBrush": "Ridimensiona il pennello",
+                "resizeEraser": "Ridimensiona la gomma",
+                "snap45Degrees": "Ruota di 45 gradi",
+                "lockAspectRatio": "Blocca le proporzioni",
+                "unlockAspectRatio": "Sblocca le proporzioni",
+                "scaleFromCenter": "Scala dal centro",
+                "fineGrid": "Griglia fine",
+                "commitText": "Conferma",
+                "newLine": "Nuova linea",
+                "cancelText": "Annulla",
+                "dragText": "Trascina il testo",
+                "snapRotation": "Rotazione a scatto"
+            }
         }
     },
     "ui": {
