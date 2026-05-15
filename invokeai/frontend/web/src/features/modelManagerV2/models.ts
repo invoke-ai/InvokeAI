@@ -1,6 +1,7 @@
 import type { AnyModelVariant, BaseModelType, ModelFormat, ModelType } from 'features/nodes/types/common';
 import {
   type AnyModelConfig,
+  isAnimaQwen3EncoderModelConfig,
   isCLIPEmbedModelConfig,
   isCLIPVisionModelConfig,
   isControlLoRAModelConfig,
@@ -77,7 +78,7 @@ const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
   qwen3_encoder: {
     category: 'qwen3_encoder',
     i18nKey: 'modelManager.qwen3Encoder',
-    filter: isQwen3EncoderModelConfig,
+    filter: (config) => isQwen3EncoderModelConfig(config) || isAnimaQwen3EncoderModelConfig(config),
   },
   qwen_vl_encoder: {
     category: 'qwen_vl_encoder',
