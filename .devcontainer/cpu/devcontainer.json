@@ -1,0 +1,65 @@
+{
+    "$schema": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.schema.json",
+    "name": "InvokeAI (CPU-only)",
+    "build": {
+        "dockerfile": "../Containerfile"
+    },
+
+    "mounts": [
+        // If you have existing invokeai directory you want mounted in to the container:
+        // {"type": "bind", "source": "/EXAMPLE/InvokeAI", "target": "/invokeai"},
+        // If instead you want to persist data to a docker volume:
+        {"type": "volume", "source": "InvokeAIData", "target": "/invokeai"}
+        // ⚠️ NOTICE: If you do not mount something to /invokeai, all your data goes away when the container does.
+        // If you have a huggingface models directory you want to use:
+        // {"type": "bind", "source": "/EXAMPLE/huggingface", "target": "/invokeai/.cache/huggingface"}
+    ],
+
+    "forwardPorts": [
+        9090
+    ],
+    "portsAttributes": {
+        "9090": {
+            "label": "InvokeAI server",
+            "protocol": "http"
+         },
+        "5173": {
+            "label": "vite"
+        },
+        "6006": {
+            "label": "Storybook"
+        }
+    },
+    "containerEnv": {
+        "HF_HOME": "/invokeai/.cache/huggingface",
+        "INVOKEAI_ROOT": "/invokeai",
+        // For additonal dependencies of custom nodes
+        "PYTHONPATH": "/invokeai/node-deps/",
+        // Keep the uv cache in the workspace so it's on the same filesystem as the default venv location.
+        "UV_CACHE_DIR": "${containerWorkspaceFolder}/.devcontainer/.uv_cache",
+        "UV_COMPILE_BYTECODE": "1",
+        "UV_PYTHON": "3.12"
+    },
+
+    "onCreateCommand": {
+        "pnpm": "sudo adduser $( id -un ) pnpm",
+        // uv sync will ensure there's a venv in postCreate, but maybe if we do it earlier vscode will stop complaining about being unable to find python?
+        "uv": "sh .devcontainer/install-python.sh"
+    },
+    // Parallel execution is nice in theory, but has a UX problem in vscode:
+    // It doesn't show output until it is done. Downloading torch takes long enough that we would like to be able to see what's going on,
+    // so stick with a single command.
+    "postCreateCommand": "sh .devcontainer/post-create.sh cpu",
+
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "charliermarsh.ruff",
+                "dbaeumer.vscode-eslint",
+                "esbenp.prettier-vscode",
+                "ms-python.python",
+                "vitest.explorer"
+            ]
+        }
+    }
+}
