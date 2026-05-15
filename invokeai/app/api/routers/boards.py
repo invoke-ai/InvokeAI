@@ -124,20 +124,27 @@ async def delete_board(
     if not current_user.is_admin and board.user_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Not authorized to delete this board")
 
+    # Admins delete everything on the board; regular owners only delete their own
+    # contributions so that contributions from other users to a public/shared board
+    # are preserved (they cascade to "uncategorized" via FK on board_videos / board_images).
+    cascade_user_id: Optional[str] = None if current_user.is_admin else current_user.user_id
+
     try:
         if include_images is True:
             deleted_images = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
                 board_id=board_id,
                 categories=None,
                 is_intermediate=None,
+                user_id=cascade_user_id,
             )
             deleted_videos = ApiDependencies.invoker.services.board_video_records.get_all_board_video_names_for_board(
                 board_id=board_id,
                 categories=None,
                 is_intermediate=None,
+                user_id=cascade_user_id,
             )
-            ApiDependencies.invoker.services.images.delete_images_on_board(board_id=board_id)
-            ApiDependencies.invoker.services.videos.delete_videos_on_board(board_id=board_id)
+            ApiDependencies.invoker.services.images.delete_images_on_board(board_id=board_id, user_id=cascade_user_id)
+            ApiDependencies.invoker.services.videos.delete_videos_on_board(board_id=board_id, user_id=cascade_user_id)
             ApiDependencies.invoker.services.boards.delete(board_id=board_id)
             return DeleteBoardResult(
                 board_id=board_id,

@@ -263,10 +263,12 @@ class VideoService(VideoServiceABC):
             self.__invoker.services.logger.error("Problem deleting video record and file")
             raise e
 
-    def delete_videos_on_board(self, board_id: str) -> None:
+    def delete_videos_on_board(self, board_id: str, user_id: Optional[str] = None) -> None:
         try:
+            # When ``user_id`` is set the lookup filters to videos owned by that user so the
+            # cascade doesn't destroy other users' contributions to a public/shared board.
             video_names = self.__invoker.services.board_video_records.get_all_board_video_names_for_board(
-                board_id, categories=None, is_intermediate=None
+                board_id, categories=None, is_intermediate=None, user_id=user_id
             )
             for video_name in video_names:
                 try:

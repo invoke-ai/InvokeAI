@@ -34,6 +34,7 @@ class SqliteBoardVideoRecordStorage(BoardVideoRecordStorageBase):
         board_id: str,
         categories: list[ImageCategory] | None,
         is_intermediate: bool | None,
+        user_id: Optional[str] = None,
     ) -> list[str]:
         with self._db.transaction() as cursor:
             params: list[str | bool] = []
@@ -59,6 +60,10 @@ class SqliteBoardVideoRecordStorage(BoardVideoRecordStorageBase):
             if is_intermediate is not None:
                 stmt += " AND videos.is_intermediate = ? "
                 params.append(is_intermediate)
+
+            if user_id is not None:
+                stmt += " AND videos.user_id = ? "
+                params.append(user_id)
 
             stmt += ";"
             cursor.execute(stmt, params)

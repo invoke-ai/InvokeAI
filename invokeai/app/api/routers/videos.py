@@ -276,6 +276,10 @@ async def delete_videos_from_list(
     current_user: CurrentUserOrDefault,
     video_names: list[str] = Body(description="The list of names of videos to delete", embed=True),
 ) -> DeleteVideosResult:
+    # Skip — but do not re-raise — auth failures so a foreign name mid-batch doesn't
+    # discard the response payload for items the caller had already legitimately deleted.
+    # Without this, the client cache never learns about the partial successes and the
+    # already-deleted records reappear in the UI until the next full refresh.
     deleted_videos: set[str] = set()
     affected_boards: set[str] = set()
     for video_name in video_names:
@@ -287,7 +291,7 @@ async def delete_videos_from_list(
             deleted_videos.add(video_name)
             affected_boards.add(board_id)
         except HTTPException:
-            raise
+            continue
         except Exception:
             pass
     return DeleteVideosResult(

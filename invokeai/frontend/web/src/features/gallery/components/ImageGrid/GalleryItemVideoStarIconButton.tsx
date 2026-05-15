@@ -1,5 +1,6 @@
 import { DndImageIcon } from 'features/dnd/DndImageIcon';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiStarBold, PiStarFill } from 'react-icons/pi';
 import { useStarVideosMutation, useUnstarVideosMutation } from 'services/api/endpoints/videos';
 import type { VideoDTO } from 'services/api/types';
@@ -9,6 +10,7 @@ type Props = {
 };
 
 export const GalleryItemVideoStarIconButton = memo(({ videoDTO }: Props) => {
+  const { t } = useTranslation();
   const [starVideos] = useStarVideosMutation();
   const [unstarVideos] = useUnstarVideosMutation();
 
@@ -24,7 +26,7 @@ export const GalleryItemVideoStarIconButton = memo(({ videoDTO }: Props) => {
     <DndImageIcon
       onClick={toggleStarredState}
       icon={videoDTO.starred ? <PiStarFill /> : <PiStarBold />}
-      tooltip={videoDTO.starred ? 'Unstar' : 'Star'}
+      tooltip={videoDTO.starred ? t('gallery.unstarVideo', { count: 1 }) : t('gallery.starVideo', { count: 1 })}
       position="absolute"
       top={2}
       insetInlineEnd={2}

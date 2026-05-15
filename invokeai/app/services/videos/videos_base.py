@@ -126,8 +126,13 @@ class VideoServiceABC(ABC):
         pass
 
     @abstractmethod
-    def delete_videos_on_board(self, board_id: str) -> None:
-        """Deletes all videos on a board."""
+    def delete_videos_on_board(self, board_id: str, user_id: Optional[str] = None) -> None:
+        """Deletes all videos on a board.
+
+        When ``user_id`` is provided, only videos owned by that user are deleted (other users'
+        contributions to a public/shared board are preserved). Pass ``None`` for the admin
+        path to delete every video on the board regardless of uploader.
+        """
         pass
 
     @abstractmethod

@@ -668,6 +668,11 @@ class TestImageMutationAuth:
     def test_non_owner_cannot_batch_delete_image(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
     ):
+        """Batch delete tolerates foreign items by skipping them in-loop and returning the
+        per-item delete list to the client. Previously the route re-raised the first 403,
+        dropping any partial successes — see PR #9163 review (finding 3). The non-owner
+        must still not destroy the image; only the response shape changes.
+        """
         user1 = mock_invoker.services.users.get_by_email("user1@test.com")
         assert user1 is not None
         _save_image(mock_invoker, "user1-batch-del", user1.user_id)
@@ -677,7 +682,12 @@ class TestImageMutationAuth:
             json={"image_names": ["user1-batch-del"]},
             headers=_auth(user2_token),
         )
-        assert r.status_code == status.HTTP_403_FORBIDDEN
+        assert r.status_code == status.HTTP_200_OK
+        body = r.json()
+        # Auth failure must not advertise the foreign image as deleted, and the underlying
+        # record must still exist.
+        assert body["deleted_images"] == []
+        mock_invoker.services.image_records.get("user1-batch-del")
 
     def test_non_owner_can_delete_image_from_public_board(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str

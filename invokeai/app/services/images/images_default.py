@@ -291,12 +291,15 @@ class ImageService(ImageServiceABC):
             self.__invoker.services.logger.error("Problem deleting image record and file")
             raise e
 
-    def delete_images_on_board(self, board_id: str):
+    def delete_images_on_board(self, board_id: str, user_id: Optional[str] = None):
         try:
+            # When ``user_id`` is set the lookup filters to images owned by that user so the
+            # cascade doesn't destroy other users' contributions to a public/shared board.
             image_names = self.__invoker.services.board_image_records.get_all_board_image_names_for_board(
                 board_id,
                 categories=None,
                 is_intermediate=None,
+                user_id=user_id,
             )
             for image_name in image_names:
                 try:

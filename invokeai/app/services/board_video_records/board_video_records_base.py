@@ -23,8 +23,13 @@ class BoardVideoRecordStorageBase(ABC):
         board_id: str,
         categories: list[ImageCategory] | None,
         is_intermediate: bool | None,
+        user_id: Optional[str] = None,
     ) -> list[str]:
-        """Gets all board videos for a board, as a list of the video names."""
+        """Gets all board videos for a board, as a list of the video names.
+
+        When ``user_id`` is provided, results are restricted to videos owned by that user;
+        pass ``None`` for the admin path (no per-user restriction).
+        """
         pass
 
     @abstractmethod
