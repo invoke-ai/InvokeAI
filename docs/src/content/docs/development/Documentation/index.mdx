@@ -196,6 +196,30 @@ To render the image, you'd just use a relative path in your markdown.
 ![Alt text here](./assets/demonstration.webp)
 ```
 
+### Adding Translations
+
+Currently, the documentation is only available in English. If you wish to add translations for other languages, we've already laid the ground work for you to do so.
+
+Firstly, add a new folder within the `src/content/i18n` directory, and create your translated version of the markdown file into the same path as the original.
+
+For example:
+
+<FileTree>
+  - src/
+    - content/
+      - docs/
+        - start-here/
+          - installation.mdx
+      - i18n/
+        - zh-CN Country code here
+          - start-here/
+            - installation.mdx
+</FileTree>
+
+We recommend simply copy/pasting the file and rewriting the text from there.
+
+Learn more about the intricacies of translating Astro Starlight docs [here](https://starlight.astro.build/guides/i18n).
+
 ## Running a Build
 
 Modifications to the docs may run fine on your machine, but as we've learned the hard way, GitHub pages flips that expectation completely. So, we've added some ways to ensure things work as expected before deploying.
