@@ -175,6 +175,27 @@ Learn more about what frontmatter is and how to use it in your pages in the [Sta
 
 Once you have some basic frontmatter defined, you should be able to see it reflected in the sidebar and the page title.
 
+### Adding Images
+
+We encourage adding imagery to your docs for creating a more engaging and visual experience for viewers. To add images, we prefer you to utilize an `assets` directory within the concerning category.
+
+<FileTree>
+  - features/
+    - instant-bananas/
+      - **assets/**
+        - **demonstration.webp**
+        - **foobar.avif**
+      - index.mdx
+</FileTree>
+
+The Astro image optimizer/renderer is quite flexible with image formats and sizes, but we'd prefer stored images to be at reasonable sizes (not 4k), and using optimized formats (webp, avif, jpeg).
+
+To render the image, you'd just use a relative path in your markdown.
+
+```md title="index.mdx"
+![Alt text here](./assets/demonstration.webp)
+```
+
 ## Running a Build
 
 Modifications to the docs may run fine on your machine, but as we've learned the hard way, GitHub pages flips that expectation completely. So, we've added some ways to ensure things work as expected before deploying.
