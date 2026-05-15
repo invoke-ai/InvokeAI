@@ -4830,7 +4830,7 @@
       "head": {
         "tags": ["images"],
         "summary": "Get Image Full",
-        "description": "Gets a full-resolution image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability.",
+        "description": "Gets a full-resolution image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability. Returns 409 while image storage\nmaintenance is active.",
         "operationId": "get_image_full_head",
         "parameters": [
           {
@@ -4870,7 +4870,7 @@
       "get": {
         "tags": ["images"],
         "summary": "Get Image Full",
-        "description": "Gets a full-resolution image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability.",
+        "description": "Gets a full-resolution image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability. Returns 409 while image storage\nmaintenance is active.",
         "operationId": "get_image_full",
         "parameters": [
           {
@@ -4912,7 +4912,7 @@
       "get": {
         "tags": ["images"],
         "summary": "Get Image Thumbnail",
-        "description": "Gets a thumbnail image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability.",
+        "description": "Gets a thumbnail image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability. Returns 409 while image storage\nmaintenance is active.",
         "operationId": "get_image_thumbnail",
         "parameters": [
           {
@@ -16848,6 +16848,18 @@
               }
             ],
             "title": "Preprocessor"
+          },
+          "fp8_storage": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fp8 Storage",
+            "description": "Store weights in FP8 to reduce VRAM usage (~50% savings). Weights are cast to compute dtype during inference."
           }
         },
         "additionalProperties": false,
@@ -29024,6 +29036,12 @@
                   "$ref": "#/components/schemas/NormalMapInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/OklabUnsharpMaskInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/OklchImageHueAdjustmentInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/OpenAIImageGenerationInvocation"
                 },
                 {
@@ -36593,6 +36611,12 @@
                 "$ref": "#/components/schemas/NormalMapInvocation"
               },
               {
+                "$ref": "#/components/schemas/OklabUnsharpMaskInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/OklchImageHueAdjustmentInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/OpenAIImageGenerationInvocation"
               },
               {
@@ -37713,6 +37737,12 @@
                 "$ref": "#/components/schemas/NormalMapInvocation"
               },
               {
+                "$ref": "#/components/schemas/OklabUnsharpMaskInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/OklchImageHueAdjustmentInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/OpenAIImageGenerationInvocation"
               },
               {
@@ -38282,6 +38312,9 @@
           "img_hue_adjust": {
             "$ref": "#/components/schemas/ImageOutput"
           },
+          "img_hue_adjust_oklch": {
+            "$ref": "#/components/schemas/ImageOutput"
+          },
           "img_ilerp": {
             "$ref": "#/components/schemas/ImageOutput"
           },
@@ -38684,6 +38717,9 @@
           "unsharp_mask": {
             "$ref": "#/components/schemas/ImageOutput"
           },
+          "unsharp_mask_oklab": {
+            "$ref": "#/components/schemas/ImageOutput"
+          },
           "vae_loader": {
             "$ref": "#/components/schemas/VAEOutput"
           },
@@ -38826,6 +38862,7 @@
           "img_conv",
           "img_crop",
           "img_hue_adjust",
+          "img_hue_adjust_oklch",
           "img_ilerp",
           "img_lerp",
           "img_mul",
@@ -38960,6 +38997,7 @@
           "tiled_multi_diffusion_denoise_latents",
           "tomask",
           "unsharp_mask",
+          "unsharp_mask_oklab",
           "vae_loader",
           "z_image_control",
           "z_image_denoise",
@@ -39587,6 +39625,12 @@
               },
               {
                 "$ref": "#/components/schemas/NormalMapInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/OklabUnsharpMaskInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/OklchImageHueAdjustmentInvocation"
               },
               {
                 "$ref": "#/components/schemas/OpenAIImageGenerationInvocation"
@@ -40465,6 +40509,12 @@
               },
               {
                 "$ref": "#/components/schemas/NormalMapInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/OklabUnsharpMaskInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/OklchImageHueAdjustmentInvocation"
               },
               {
                 "$ref": "#/components/schemas/OpenAIImageGenerationInvocation"
@@ -46875,6 +46925,18 @@
             ],
             "title": "Cpu Only",
             "description": "Whether this model should run on CPU only"
+          },
+          "fp8_storage": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fp8 Storage",
+            "description": "Store weights in FP8 to reduce VRAM usage (~50% savings). Weights are cast to compute dtype during inference."
           }
         },
         "additionalProperties": false,
@@ -57353,6 +57415,228 @@
         "type": "object",
         "required": ["limit", "offset", "total", "items"],
         "title": "OffsetPaginatedResults[ImageDTO]"
+      },
+      "OklabUnsharpMaskInvocation": {
+        "category": "image",
+        "class": "invocation",
+        "classification": "stable",
+        "description": "Applies an unsharp mask filter to an image in the Oklab color space",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image to use",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "radius": {
+            "default": 2,
+            "description": "Unsharp mask radius",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 2,
+            "orig_required": false,
+            "title": "Radius",
+            "type": "number"
+          },
+          "strength": {
+            "default": 50,
+            "description": "Unsharp mask strength",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 0,
+            "orig_default": 50,
+            "orig_required": false,
+            "title": "Strength",
+            "type": "number"
+          },
+          "type": {
+            "const": "unsharp_mask_oklab",
+            "default": "unsharp_mask_oklab",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "unsharp_mask", "oklab"],
+        "title": "Unsharp Mask (Oklab)",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
+      },
+      "OklchImageHueAdjustmentInvocation": {
+        "category": "image",
+        "class": "invocation",
+        "classification": "stable",
+        "description": "Adjusts the hue of an image in Oklch space.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image to adjust",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "hue": {
+            "default": 0,
+            "description": "The degrees by which to rotate the hue, 0-360",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Hue",
+            "type": "integer"
+          },
+          "type": {
+            "const": "img_hue_adjust_oklch",
+            "default": "img_hue_adjust_oklch",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "hue", "oklch"],
+        "title": "Adjust Image Hue (Oklch)",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
       },
       "OpenAIImageGenerationInvocation": {
         "category": "image",
