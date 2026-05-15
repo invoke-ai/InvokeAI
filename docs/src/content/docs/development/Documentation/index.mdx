@@ -1,0 +1,269 @@
+---
+title: Documentation
+lastUpdated: 2026-05-14
+---
+
+import { Steps, Tabs, TabItem, FileTree } from '@astrojs/starlight/components'
+
+The Invoke AI website, including its documentation are all contained within the `docs` directory.
+
+## Prerequisites
+
+The documentation is built using [Astro Starlight](https://starlight.astro.build/). It's suggested you familiarize yourself with the following technologies before getting started:
+
+<Steps>
+  1. [Markdown](https://www.markdownguide.org/) - a lightweight markup language for creating formatted text.
+  2. [MDX](https://mdxjs.com/) - a superset of Markdown that allows you to use React components in your content.
+  3. [Astro](https://astro.build/) - a modern static site builder that supports MDX and other front-end technologies.
+  4. [Starlight](https://starlight.astro.build/) - a theme for Astro that provides a clean and modern documentation experience.
+  5. [Vite](https://vitejs.dev/) - a fast development server and build tool for modern web projects.
+</Steps>
+
+Markdown powers the content of every page on the website (including the homepage), with additional help from [MDX](https://mdxjs.com/) to make the pages more interactive with imported React components.
+
+## Navigating the Documentation
+
+The documentation is organized into a file tree structure. It should be very familiar to anyone who has built modern web applications.
+
+<FileTree>
+  - docs/
+    - dist/ production build output
+    - public/ non-optimized, public assets
+    - src/ main source code
+      - assets/ optimized assets
+      - config/ astro/starlight configs
+      - content/ markdown pages and content
+        - docs/ documentation content
+        - i18n/ internationalized content
+      - generated/ generated json files for dynamic content
+      - layouts/ components used to wrap pages
+      - lib/ utility functions and shared code
+        - components/ reusable, custom components
+      - pages/ non-documentation pages
+      - styles/ global styles and themes
+</FileTree>
+
+## Development
+
+If you've ever worked within a react, astro or similar node-based library or framework, you should feel familiar with most of the setup here.
+
+If you're adding a feature, new behavior or etc. that changes how users expect Invoke to work, we expect you to deliver your PR with associated docs to support it. To get started, follow the steps below.
+
+### Dev Environment
+
+There are 2 main ways to get your development environment set up for documentation:
+
+<Tabs syncKey="docsDevMethod">
+  <TabItem label="Make">
+    Invoke's makefile makes it easy to set up your development environment for documentation in only a couple of commands. You can run these from the root of the repository.
+
+    <Steps>
+      1. First, install the required dependencies.
+
+          ```sh
+          make docs-install
+          ```
+
+      2. Next, run the development server.
+
+          ```sh
+          make docs-dev
+          ```
+
+      3. Open your browser and navigate to `http://localhost:4321` to view the documentation.
+    </Steps>
+  </TabItem>
+
+  <TabItem label="Manual">
+    If you prefer good ol' fashioned `cd` and `pnpm` commands, you can set up your development environment manually.
+
+    <Steps>
+      1. First, cd into the docs directory.
+
+          ```sh
+          cd docs
+          ```
+
+      2. Next, install the required dependencies.
+
+          ```sh
+          pnpm install
+          ```
+
+      3. Run the development server.
+
+          ```sh
+          pnpm dev
+          ```
+
+      4. Open your browser and navigate to `http://localhost:4321` to view the documentation.
+    </Steps>
+  </TabItem>
+</Tabs>
+
+If there's another local server running on port `4321` prior to running this, then use the port specified in the output.
+
+### Adding Pages
+
+Located within the `src/content/docs/` directory, this is where the documentation pages are stored and organized by category. These categories are file-based and are mirrored to the sidebar navigation.
+
+:::caution
+Do not place your docs content contributions outside of the `content` directory, it will not be seen.
+:::
+
+If you wish to add a new sub category to document a feature or a behavior, simply create a new directory within the relevant top-level category directory.
+
+For example, if we wanted to document a new feature called "Instant Bananas", we would create a new directory within `src/content/docs/features/` like so:
+
+`src/content/docs/`
+<FileTree>
+  - concepts/
+  - configuration/
+  - contributing/
+  - development/
+  - features/
+    - **instant-bananas/**
+      - **index.md** Write your documentation here
+      - **requirements.mdx** You can add more pages in this directory
+  - start-here/
+  - troubleshooting/
+  - workflows/
+</FileTree>
+
+The way you organize your added pages dictates how the URL structure is generated for your documentation pages. In this example, the url for the `index.md` page would be `https://invoke.ai/features/instant-bananas/`, and the url for the `requirements.mdx` page would be `https://invoke.ai/features/instant-bananas/requirements/`.
+
+If you wish to add a top-level category, then one additional step is required for the category to appear in the sidebar.
+
+Within the `src/config/sidebar.ts` file, you'll need to add a new sidebar category object to the array, since the fine-grained control over top-level categories needs to be a bit more explicit.
+
+```diff lang="js"
+const sidebar = [
+  // ...
+  {
+    label: 'Concepts',
+    items: [
+      {
+        autogenerate: { directory: 'concepts' },
+      },
+    ],
+  },
++  {
++    label: 'A New Category',
++    items: [
++      {
++        autogenerate: { directory: 'new-category' },
++      },
++    ],
++  },
+  {
+    label: 'Features',
+    items: [
+      {
+        autogenerate: { directory: 'features' },
+      },
+    ],
+  },
+  // ...
+]
+```
+
+### Page Metadata
+
+Before your page becomes available, you will need to add frontmatter to define the page's metadata such as its title, description, last update date, sidebar position, and etc.
+
+Learn more about what frontmatter is and how to use it in your pages in the [Starlight Documentation](https://starlight.astro.build/reference/frontmatter/).
+
+Once you have some basic frontmatter defined, you should be able to see it reflected in the sidebar and the page title.
+
+## Running a Build
+
+Modifications to the docs may run fine on your machine, but as we've learned the hard way, GitHub pages flips that expectation completely. So, we've added some ways to ensure things work as expected before deploying.
+
+Just like with the dev environment, you can build the docs one of two ways:
+
+<Tabs syncKey="docsDevMethod">
+  <TabItem label="Make">
+    Invoke's makefile makes it easy to build the documentation in only a single command. You can run it from the root of the repository.
+
+    <Steps>
+      1. First, run the build command.
+
+          ```sh
+          make docs-build
+          ```
+
+      2. Finally, preview the output.
+
+          ```sh
+          make docs-preview
+          ```
+    </Steps>
+
+    And that's it.
+
+    :::tip[Deploy Target]
+      The make command here sets the `DEPLOY_TARGET` environment variable to `custom`, so that the final output matches what you'd expect from the final deployment to https://invoke.ai.
+
+      If you'd rather set a different deploy target, use the manual method.
+    :::
+
+  </TabItem>
+  <TabItem label="Manual">
+    If you prefer good ol' fashioned `cd` and `pnpm` commands, or to have granular control over environment variables, you can run the following:
+
+    <Steps>
+      1. First, cd into the `docs` directory.
+
+          ```sh
+          cd docs
+          ```
+
+      2. Next run the build command.
+
+          ```sh
+          pnpm run build
+          ```
+
+      3. Finally, preview the build.
+
+          ```sh
+          pnpm run preview
+          ```
+
+          The preview url will be available on the same port as the dev server.
+    </Steps>
+
+  </TabItem>
+</Tabs>
+
+## Generated Files
+
+The Invoke API is always evolving, and quite large. Documenting all this by hand would be wildly impractical, so there's a script we've set up to pull all that data and generate relevant json files into `generated` directory.
+
+These files are used for the [YAML Config](/configuration/invokeai-yaml) and [API Development](/development/guides/api-development) pages. If you're adding a feature that changes the yaml config, or the api then make sure to run `pnpm run generate-docs-data` to ensure tests pass, and that the docs are accurate in accordance to your updates.
+
+## Testing
+
+The docs contain tests for the following:
+
+| Test | Description | Runs on... |
+| -- | -- | -- |
+| Link Checker | Checks for invalid, malformed or misdirected internal link URLs | Dev Server, Build, Deploy |
+| Verify Deployment Output | Check to ensure the asset and page paths have the expected base paths dependent on deploy targets | Build, Deploy |
+| Check Docs Data | Checks to ensure the generated files are accurate | Deploy |
+
+## GitHub Actions
+
+Once you've submitted your updated docs, either via pull request or a main push to your own fork, the `deploy-docs` action will run.
+
+The `deploy-docs` action will install the necessary dependencies, run a build, test and serve the docs on github pages. Any failing deployments will require fixing before deploying.
+
+## Troubleshooting
+
+#### All the styles are missing and the links are wrong, what happened?
+
+This commonly happens when the base path and the deploy target are mismatched, check those first and then run your build again.
+
+#### Redirects aren't working on the production deployment, but they work locally, why?
+
+Because GitHub Pages' SSR environment is lackluster, and thus doesn't handle backend redirects. We included a redirects configuration just in case GitHub ever grows a conscience, or if the docs ever get deployed someplace else.
