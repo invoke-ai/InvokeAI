@@ -1,6 +1,7 @@
 import { Button, Flex, Heading, SimpleGrid } from '@invoke-ai/ui-library';
 import { useControlAdapterModelDefaultSettings } from 'features/modelManagerV2/hooks/useControlAdapterModelDefaultSettings';
 import { useIsModelManagerEnabled } from 'features/modelManagerV2/hooks/useIsModelManagerEnabled';
+import { DefaultFp8StorageControlAdapter } from 'features/modelManagerV2/subpanels/ModelPanel/ControlAdapterModelDefaultSettings/DefaultFp8StorageControlAdapter';
 import { DefaultPreprocessor } from 'features/modelManagerV2/subpanels/ModelPanel/ControlAdapterModelDefaultSettings/DefaultPreprocessor';
 import type { FormField } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/MainModelDefaultSettings';
 import { toast } from 'features/toast/toast';
@@ -14,6 +15,7 @@ import type { ControlLoRAModelConfig, ControlNetModelConfig, T2IAdapterModelConf
 
 export type ControlAdapterModelDefaultSettingsFormData = {
   preprocessor: FormField<string>;
+  fp8Storage: FormField<boolean>;
 };
 
 type Props = {
@@ -40,6 +42,7 @@ export const ControlAdapterModelDefaultSettings = memo(({ modelConfig }: Props) 
     (data) => {
       const body = {
         preprocessor: data.preprocessor.isEnabled ? data.preprocessor.value : null,
+        fp8_storage: data.fp8Storage.isEnabled ? data.fp8Storage.value : null,
       };
 
       updateModel({
@@ -88,6 +91,7 @@ export const ControlAdapterModelDefaultSettings = memo(({ modelConfig }: Props) 
 
       <SimpleGrid columns={2} gap={8}>
         <DefaultPreprocessor control={control} name="preprocessor" />
+        {modelConfig.type !== 'control_lora' && <DefaultFp8StorageControlAdapter control={control} name="fp8Storage" />}
       </SimpleGrid>
     </>
   );

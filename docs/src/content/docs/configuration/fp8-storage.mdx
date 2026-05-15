@@ -1,0 +1,89 @@
+---
+title: FP8 Storage
+sidebar:
+  order: 3
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+FP8 Storage cuts a model's VRAM footprint roughly in half by keeping weights on the GPU in 8-bit floating-point format (`float8_e4m3fn`). During inference, each layer's weights are cast on-the-fly back up to the compute precision (FP16/BF16), then cast back to FP8 after the forward pass — so quality is largely preserved.
+
+It pairs well with [Low-VRAM mode](/configuration/low-vram-mode/): low-VRAM mode streams layers between RAM and VRAM, while FP8 Storage shrinks the layers themselves.
+
+## Requirements
+
+- **Nvidia GPU on Windows or Linux.** FP8 Storage uses CUDA tensor types and is silently disabled on CPU and MPS.
+- **CUDA 12.x and recent PyTorch.** The `float8_e4m3fn` dtype was added in PyTorch 2.1 — InvokeAI's bundled versions satisfy this.
+
+There is no hardware requirement for FP8 *compute* — InvokeAI casts back to FP16/BF16 for math. This means FP8 Storage works on GPUs that do not natively support FP8 matmul (e.g. RTX 30-series), at a small per-step throughput cost.
+
+## Enabling FP8 Storage
+
+FP8 Storage is a **per-model setting**, configured from the Model Manager:
+
+<Steps>
+1. Open the **Model Manager**.
+2. Select a model (Main, ControlNet, or T2I-Adapter).
+3. Under **Default Settings**, toggle **FP8 Storage (Save VRAM)**.
+4. Click **Save**.
+</Steps>
+
+The setting takes effect on the next load. If the model is already in the cache, InvokeAI evicts the cached copy automatically so the new setting applies — even if a generation is currently using the model (the eviction is deferred until the generation finishes).
+
+:::tip[When to enable]
+  Enable FP8 Storage on large models that don't fit comfortably in VRAM — FLUX dev/Klein, large SDXL checkpoints, ControlNet-XL adapters. For smaller SD1 / SD2 models, the savings are negligible and not worth the small precision trade-off.
+:::
+
+## What FP8 Storage applies to
+
+FP8 Storage is **only** applied to layers where the precision trade-off is acceptable:
+
+| Model type                    | FP8 applied?                           |
+| ----------------------------- | -------------------------------------- |
+| Main models (SD1, SD2, SDXL)  | Yes                                    |
+| FLUX.1 / FLUX.2 Klein         | Yes                                    |
+| ControlNet, T2I-Adapter       | Yes                                    |
+| VAE                           | No — visible decode-quality regression |
+| Text encoders, tokenizers     | No — small models, no benefit          |
+| Z-Image (any variant)         | No — dtype mismatch with skipped layers|
+| LoRA, ControlLoRA             | No — patched into base, not run alone  |
+
+Within a supported model, **norm layers, position/patch embeddings, and `proj_in`/`proj_out` are skipped** so precision-sensitive tiny learned scalars (e.g. FLUX `RMSNorm.scale`) aren't crushed to FP8. This mirrors the diffusers default skip list.
+
+## Quality trade-offs
+
+FP8 Storage is **near-lossless** for most workloads because:
+
+- Norms and embeddings (the precision-sensitive layers) are skipped.
+- The actual matmul still happens in FP16/BF16 — FP8 is only the on-GPU storage format.
+
+That said, some artifacts have been reported on:
+
+- **VAEs** — never cast (the toggle has no effect on VAE submodels).
+- **Heavy LoRA stacks** — patching is unaffected, but very precision-sensitive LoRAs may show slight drift. Compare a side-by-side if your workflow depends on subtle LoRA behavior.
+
+If you see unexpected quality regressions, disable FP8 Storage on the affected model and re-run.
+
+## Combining with Low-VRAM mode and quantized models
+
+- **FP8 + partial loading**: fully supported. FP8 Storage shrinks the layers; partial loading streams them between RAM and VRAM as needed. Use both on tight VRAM budgets.
+- **FP8 + GGUF / NF4 / int8 quantized checkpoints**: these formats already have their own storage precision. FP8 Storage is not applied on top — the toggle is silently a no-op for quantized formats, since the loader returns a different module type.
+
+## Troubleshooting
+
+### "I toggled FP8 Storage but VRAM usage didn't change"
+
+The cache eviction is immediate for idle models, but **deferred until the next unlock** if the model is mid-generation. Wait for the current generation to finish, then start a new one — the next load will use the new setting.
+
+If VRAM still hasn't dropped:
+
+- Check the InvokeAI log for `FP8 layerwise casting enabled for <model name>`. If the line isn't there, the model is on the exclusion list (VAE, text encoder, Z-Image, LoRA — see table above).
+- Confirm you are on CUDA. FP8 Storage is silently disabled on CPU and MPS.
+
+### Quality regression on a specific model
+
+Disable FP8 Storage for that model in Model Manager and reload. If quality is restored, the model has FP8-sensitive layers that fall outside the default skip list. Please open an issue with the model name and a side-by-side comparison.
+
+### "RuntimeError: ... float8_e4m3fn ..."
+
+You're on a PyTorch version that predates FP8 support. Reinstall InvokeAI using the official launcher — the bundled torch version supports FP8.
