@@ -5,75 +5,10 @@ import { useTranslation } from 'react-i18next';
 import { PiDownloadSimpleBold } from 'react-icons/pi';
 import type { AnyModelConfigWithExternal } from 'services/api/types';
 
+import { buildExportData, fetchImageAsDataUrl, sanitizeFilename } from './modelSettingsIO';
+
 type Props = {
   modelConfig: AnyModelConfigWithExternal;
-};
-
-const buildExportData = (modelConfig: AnyModelConfigWithExternal): Record<string, unknown> => {
-  const data: Record<string, unknown> = {};
-
-  if ('name' in modelConfig && typeof modelConfig.name === 'string' && modelConfig.name.length > 0) {
-    data.name = modelConfig.name;
-  }
-
-  if (
-    'description' in modelConfig &&
-    typeof modelConfig.description === 'string' &&
-    modelConfig.description.length > 0
-  ) {
-    data.description = modelConfig.description;
-  }
-
-  if ('source_url' in modelConfig && typeof modelConfig.source_url === 'string' && modelConfig.source_url.length > 0) {
-    data.source_url = modelConfig.source_url;
-  }
-
-  if (
-    'default_settings' in modelConfig &&
-    modelConfig.default_settings !== undefined &&
-    modelConfig.default_settings !== null
-  ) {
-    data.default_settings = modelConfig.default_settings;
-  }
-
-  if (
-    'trigger_phrases' in modelConfig &&
-    modelConfig.trigger_phrases !== undefined &&
-    modelConfig.trigger_phrases !== null
-  ) {
-    data.trigger_phrases = modelConfig.trigger_phrases;
-  }
-
-  if ('cpu_only' in modelConfig && modelConfig.cpu_only !== null) {
-    data.cpu_only = modelConfig.cpu_only;
-  }
-
-  return data;
-};
-
-const sanitizeFilename = (name: string): string => {
-  return name.replace(/[<>:"/\\|?*]/g, '_');
-};
-
-const fetchImageAsDataUrl = async (url: string): Promise<string | null> => {
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      return null;
-    }
-    const blob = await response.blob();
-    if (!blob.type.startsWith('image/')) {
-      return null;
-    }
-    return await new Promise<string | null>((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return null;
-  }
 };
 
 export const ModelSettingsExportButton = memo(({ modelConfig }: Props) => {
