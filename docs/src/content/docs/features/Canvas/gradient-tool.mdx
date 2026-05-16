@@ -1,0 +1,75 @@
+---
+title: Gradient Tool
+description: Learn how to paint linear and radial gradients on canvas raster layers.
+lastUpdated: 2026-05-16
+sidebar:
+  order: 4
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+The Gradient tool paints a smooth transition between your current foreground and background colors on the canvas.
+
+You can activate the Gradient tool from the canvas toolbar.
+
+## Where Gradient Draws
+
+Gradient only draws into the **active raster layer**:
+
+- It does not draw into inpaint masks.
+- It does not draw into other non-raster layer types.
+- The result is always clipped to the current **generation bounding box**.
+
+If a raster layer is not selected, the tool is unavailable.
+
+## Common Behavior
+
+- Click and drag to define the gradient.
+- Release the pointer to commit the gradient.
+- Press <kbd>Esc</kbd> to discard the in-progress gradient.
+- Hold <kbd>Alt</kbd> to temporarily switch to the color picker.
+- Hold <kbd>Space</kbd> to temporarily switch to panning.
+
+The Gradient tool uses the current **FG/BG color pair**:
+
+- The **active** color swatch becomes the start color.
+- The **inactive** color swatch becomes the end color.
+
+## Gradient Modes
+
+<CardGrid>
+  <Card title="Linear">
+    Click and drag to set the gradient direction. The drag defines the transition from the start color to the end
+    color.
+  </Card>
+  <Card title="Radial">
+    Click to place the center, then drag outward to set the radius. The gradient fades from the start color at the
+    center to the end color toward the outside.
+  </Card>
+</CardGrid>
+
+## Clip Gradient
+
+The toolbar includes a **Clip Gradient** toggle:
+
+- **Enabled:** Limits the gradient to the dragged region.
+- **Disabled:** Lets the gradient extend across the full current bounding box.
+
+In practice:
+
+- A clipped **linear** gradient is limited to the span you dragged.
+- A clipped **radial** gradient is limited to the circle you dragged out.
+- With clipping disabled, both modes can be used to wash the entire bbox with a full gradient transition.
+
+## Practical Examples
+
+- Use **Linear** for sky fades, shadow ramps, and broad directional lighting.
+- Use **Radial** for vignettes, glows, spotlights, and soft falloff around a focal point.
+- Disable **Clip Gradient** when you want a full-bbox color transition.
+- Keep **Clip Gradient** enabled when you only want to affect a localized area.
+
+## Summary
+
+The Gradient tool is a raster-only canvas tool for painting linear and radial color transitions. Use it when you want
+soft blends between your FG and BG colors, and use **Clip Gradient** to decide whether the effect stays local or fills
+the full bbox.
