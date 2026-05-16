@@ -1,0 +1,112 @@
+# Runs OpenAPI schema quality checks.
+# Checked-in OpenAPI schema should match the generated server schema.
+#
+# Checks for changes to files before running the checks.
+# If always_run is true, always runs the checks.
+
+name: 'openapi checks'
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    types:
+      - 'ready_for_review'
+      - 'opened'
+      - 'synchronize'
+  merge_group:
+  workflow_dispatch:
+    inputs:
+      always_run:
+        description: 'Always run the checks'
+        required: true
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      always_run:
+        description: 'Always run the checks'
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  openapi-checks:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15 # expected run time: <5 min
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: Free up more disk space on the runner
+        # https://github.com/actions/runner-images/issues/2840#issuecomment-1284059930
+        run: |
+          echo "----- Free space before cleanup"
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          if [ -f /mnt/swapfile ]; then
+            sudo swapoff /mnt/swapfile
+            sudo rm -rf /mnt/swapfile
+          fi
+          echo "----- Free space after cleanup"
+          df -h
+
+      - name: check for changed files
+        if: ${{ inputs.always_run != true }}
+        id: changed-files
+        # Pinned to the _hash_ for v45.0.9 to prevent supply-chain attacks.
+        # See:
+        # - CVE-2025-30066
+        # - https://www.stepsecurity.io/blog/harden-runner-detection-tj-actions-changed-files-action-is-compromised
+        # - https://github.com/tj-actions/changed-files/issues/2463
+        uses: tj-actions/changed-files@a284dc1814e3fd07f2e34267fc8f81227ed29fb8
+        with:
+          files_yaml: |
+            src:
+              - 'pyproject.toml'
+              - 'invokeai/**'
+
+      - name: setup uv
+        if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: '0.6.10'
+          enable-cache: true
+          python-version: '3.11'
+
+      - name: setup python
+        if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: install dependencies
+        if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
+        env:
+          UV_INDEX: ${{ matrix.extra-index-url }}
+        run: uv pip install --editable .
+
+      - name: install frontend dependencies
+        if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
+        uses: ./.github/actions/install-frontend-deps
+
+      - name: copy schema
+        if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
+        run: cp invokeai/frontend/web/openapi.json invokeai/frontend/web/openapi_orig.json
+        shell: bash
+
+      - name: generate schema
+        if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
+        run: cd invokeai/frontend/web && uv run ../../../scripts/generate_openapi_schema.py > openapi.json && pnpm prettier --write openapi.json
+        shell: bash
+
+      - name: compare files
+        if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
+        run: |
+          if ! diff invokeai/frontend/web/openapi.json invokeai/frontend/web/openapi_orig.json; then
+            echo "Files are different!";
+            exit 1;
+          fi
+        shell: bash
