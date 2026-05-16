@@ -44,6 +44,19 @@
   margin-right: 0px !important;
 }
 
+.dockview-theme-invoke .dv-tabs-and-actions-container > .dv-scrollable,
+.dockview-theme-invoke .dv-tabs-and-actions-container > .dv-tabs-container {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dockview-theme-invoke .dv-tabs-and-actions-container .dv-right-actions-container {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
 .dv-groupview-floating {
   border-radius: var(--invoke-space-2);
   border-width: 1px;

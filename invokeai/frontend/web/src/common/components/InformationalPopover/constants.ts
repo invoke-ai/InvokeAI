@@ -77,7 +77,8 @@ export type Feature =
   | 'tileOverlap'
   | 'optimizedDenoising'
   | 'fluxDevLicense'
-  | 'cpuOnly';
+  | 'cpuOnly'
+  | 'fp8Storage';
 
 export type PopoverData = PopoverProps & {
   image?: string;
