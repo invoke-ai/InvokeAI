@@ -126,7 +126,9 @@ class SeedreamProvider(ExternalProvider):
             # so partial-failure causes (e.g., content filter) are visible to the caller.
             if "error" in item:
                 error_payload = item["error"]
-                item_errors.append(error_payload if isinstance(error_payload, dict) else {"message": str(error_payload)})
+                item_errors.append(
+                    error_payload if isinstance(error_payload, dict) else {"message": str(error_payload)}
+                )
                 continue
             encoded = item.get("b64_json")
             if not encoded:
