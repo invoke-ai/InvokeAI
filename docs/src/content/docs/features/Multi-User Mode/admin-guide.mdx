@@ -1,0 +1,642 @@
+---
+title: Multi-User Administrator Guide
+description: How to set up and manage a multi-user InvokeAI installation.
+sidebar:
+  order: 4
+---
+
+import { Steps } from '@astrojs/starlight/components'
+
+## Overview
+
+This guide is for administrators managing a multi-user InvokeAI
+installation. It covers initial setup, user management, security best
+practices, and troubleshooting.
+
+## Prerequisites
+
+Before enabling multi-user support, ensure you have:
+
+- InvokeAI installed and running
+- Access to the server filesystem (for initial setup)
+- Understanding of your deployment environment
+- Backup of your existing data (recommended)
+
+## Initial Setup
+
+### Activating Multiuser Mode
+
+To put InvokeAI into multiuser mode, you will need to add the option `multiuser: true` to its configuration file. This file is located at `INVOKEAI_ROOT/invokeai.yaml`. With the InvokeAI backend halted, add the new configuration option to the end of the file with a text editor so that it looks like this:
+
+```yaml
+# Internal metadata - do not edit:
+schema_version: 4.0.2
+
+# Enable/disable multi-user mode
+multiuser: true
+```
+
+Then restart the InvokeAI server backend from the command line or using the launcher.
+
+:::note[Reverting to single-user mode]
+If at any time you wish to revert to single-user mode, simply comment out the `multiuser` line, or change "true" to "false". Then restart the server. Because of the way that browsers cache pages, users with open InvokeAI sessions may need to force-refresh their browsers.
+:::
+
+### First Administrator Account
+
+When InvokeAI starts for the first time in multi-user mode, you'll see the **Administrator Setup** dialog.
+
+**Setup Steps:**
+
+<Steps>
+1. **Email Address**: Enter a valid email address (this becomes your username)
+
+    - Example: `admin@example.com` or `admin@localhost` for testing
+    - Must be a valid email format
+    - Cannot be changed later without database access
+
+2. **Display Name**: Enter a friendly name
+
+    - Example: "System Administrator" or your real name
+    - Can be changed later in your profile
+    - Visible to other users in shared contexts
+
+3. **Password**: Create a strong administrator password
+
+    - **Minimum requirements:**
+
+        - At least 8 characters long
+        - Contains uppercase letters (A-Z)
+        - Contains lowercase letters (a-z)
+        - Contains numbers (0-9)
+
+    - **Recommended:**
+
+        - Use 12+ characters
+        - Include special characters (!@#$%^&*)
+        - Use a password manager to generate and store
+        - Don't reuse passwords from other services
+
+4. **Confirm Password**: Re-enter the password
+
+5. Click **Create Administrator Account**
+</Steps>
+
+:::caution[Important]
+Store these credentials securely! The first administrator account can reset the password to something new, but cannot retrieve a lost one.
+:::
+
+### Configuration
+
+InvokeAI can run in single-user or multi-user mode, controlled by the `multiuser` configuration option in `invokeai.yaml`:
+
+```yaml
+# Enable/disable multi-user mode
+multiuser: true   # Enable multi-user mode (requires authentication)
+
+# Optional password policy
+strict_password_checking: true  # Enforce uppercase/lowercase/number requirements
+```
+
+JWT secrets are generated automatically and stored in the database. Session lifetimes default to 24 hours, or 7 days when the user selects "Remember me". See Secret Key Management below if you need to rotate the JWT secret.
+
+:::caution[Mode Switching Behavior]
+**Switching to Single-User Mode:** If boards or images were created in multi-user mode, they will all be combined into a single unified view when switching to single-user mode.
+
+**Switching to Multi-User Mode:** Legacy boards and images created under single-user mode will be owned by an internal user named "system." Only the Administrator will have access to these legacy assets. A utility to migrate these legacy assets to another user will be part of a future release.
+:::
+
+### Migration from Single-User
+
+When upgrading from a single-user installation or switching modes:
+
+<Steps>
+1. **Automatic Migration**: The database will automatically migrate to multi-user schema when multi-user mode is first enabled
+2. **Legacy Data Ownership**: Existing data (boards, images, workflows) created in single-user mode is assigned to an internal user named "system"
+3. **Administrator Access**: Only administrators will have access to legacy "system"-owned assets when in multi-user mode
+4. **No Data Loss**: All existing content is preserved
+</Steps>
+
+**Migration Process:**
+
+```bash
+# Backup your database first
+cp databases/invokeai.db databases/invokeai.db.backup
+
+# Enable multi-user mode in invokeai.yaml
+# multiuser: true
+
+# Start InvokeAI (migration happens automatically)
+invokeai-web
+
+# Complete the administrator setup dialog
+# Legacy data will be owned by "system" user
+```
+
+:::note[Legacy Asset Migration]
+A utility to migrate legacy "system"-owned assets to specific user accounts will be available in a future release. Until then, administrators can access and manage all legacy content.
+:::
+
+## User Management
+
+### Creating Users
+
+Administrators can create and modify users (including other
+administrators) via a built-in web interface or using command-line
+scripts.
+
+#### **Via the Web Frontend:**
+
+Please see the Multi-User Guide's section on [Adding and Modifying Users](./user-guide#adding-and-modifying-users)
+for a walk-through.
+
+#### **Via Command Line Scripts:**
+
+##### Command-line User Management Scripts
+
+Administrators can also use a series of command-line scripts to add, modify, or delete users. If you use the launcher, click the ">" icon to enter the command-line interface. Otherwise, if you are a native command-line user, activate the InvokeAI environment from your terminal.
+
+All command-line arguments are optional. The scripts will prompt you to provide any missing arguments.
+
+The commands are:
+
+| Name               |   Function    | Example CLI Usage  |
+|--------------------|---------------|--------------------|
+|**invoke-useradd**  | add a user    | `invoke-useradd --email user@example.com --name "Example User" --password "badpassword"` |
+|**invoke-usermod**  | modify a user | `invoke-usermod --email user@example.com --name "Mr. Example User" --password "8adsf2**%"` |
+|**invoke-userdel**  | delete a user | `invoke-userdel --email user@example.com --force` |
+|**invoke-userlist** | list all users| `invoke-userlist` |
+
+Pass the `--help` argument to get the usage of each script. For example:
+
+```bash
+> invoke-useradd --help
+usage: invoke-useradd [-h] [--root ROOT] [--email EMAIL] [--password PASSWORD] [--name NAME] [--admin]
+
+Add a user to the InvokeAI database
+
+options:
+  -h, --help            show this help message and exit
+  --root ROOT, -r ROOT  Path to the InvokeAI root directory. If omitted, the root is resolved in this order: the $INVOKEAI_ROOT environment
+                        variable, the active virtual environment's parent directory, or $HOME/invokeai.
+  --email EMAIL, -e EMAIL
+                        User email address
+  --password PASSWORD, -p PASSWORD
+                        User password
+  --name NAME, -n NAME  User display name (optional)
+  --admin, -a           Make user an administrator
+
+If no arguments are provided, the script will run in interactive mode.
+```
+
+:::danger[Data Loss]
+Deleting a user removes the user record and cascades to their sessions, board shares, sent
+invitations, and per-user client state. It does **not** delete the boards, images, workflows, queue
+items, or style presets they created — those rows remain in the database, owned by a user_id that no
+longer exists, and will not appear in any user's gallery. Physical image files in `outputs/images`
+are also left in place until a gallery maintenance script is run to remove orphan images.
+
+If you want their content gone as well, reassign or delete it before deleting the user. Back up the
+database first if recovery might be needed.
+:::
+
+### Viewing User Activity
+
+**Queue Management:**
+
+There is no separate admin-only queue view. When signed in as an administrator, the regular queue
+panel automatically shows every user's queue items (each item is labelled with the submitting user's
+display name or email), and you can cancel or clear any of them. There is no built-in UI to filter
+the queue by user; use your browser's find-in-page to scan by name if needed.
+
+## Model Management
+
+As an administrator, you have full access to the [Model
+Manager](/concepts/models) and can install, edit and delete
+models just as in single-user mode. Unprivileged users, however, can
+view the models previously installed, but cannot add or modify them.
+
+## Security
+
+:::note[Strict Password Checking]
+It is recommended that you enable strict password checking.  This will
+force all users to select good passwords that follow the
+"minimal requirements" below. Do this by adding `strict_password_checking` to
+the `invokeai.yaml` configuration file:
+
+```
+strict_password_checking: true
+```
+:::
+
+### Password Policies
+
+**Minimal Requirements:**
+
+- Minimum 8 characters
+- Must contain uppercase letters
+- Must contain lowercase letters
+- Must contain numbers
+
+If `strict_password_checking` is active (recommended), then these
+minimal requirements will be enforced and users will not be able to
+proceed until they have picked a password that satisfies
+them. Otherwise, the user will simply be warned when they use a weak
+password.
+
+**Recommended Policies:**
+
+- Require 12+ character passwords
+- Include special characters
+- Implement password rotation every 90 days
+- Prevent password reuse
+
+### Session Management
+
+**Session Security and Token Management:**
+
+This system uses stateless JWT tokens with HMAC signatures to identify users after they provide their initial credentials. The tokens will persist for 24 hours by default, or for 7 days if the user clicks the "Remember me" checkbox at login. Expired tokens are automatically rejected and the user will have to log in again.
+
+At the client side, tokens are stored in browser localStorage. Logging out clears them. No server-side session storage is required.
+
+The tokens include the user's ID, email, and admin status, along with an HMAC signature.
+
+### Secret Key Management
+
+**Important:** The JWT secret key must be kept confidential.
+
+To generate tokens, each InvokeAI instance has a distinct secret JWT
+key that must be kept confidential. The key is stored in the
+`app_settings` table of the InvokeAI database within a field value
+named `jwt_secret`.
+
+The secret key is automatically generated during database creation or
+migration. If you wish to change the key, you may generate a
+replacement using either of these commands:
+
+```bash
+# Python
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+
+# OpenSSL
+openssl rand -base64 32
+```
+
+Then cut and paste the printed secret into this Sqlite3 command:
+
+```bash
+sqlite3 INVOKE_ROOT/databases/invokeai.db 'update app_settings set value="THE_SECRET" where key="jwt_secret"'
+```
+
+(replace INVOKE_ROOT with your InvokeAI root directory and THE_SECRET with the new secret).
+
+After this, restart the server. All logged in users will be logged out and will need to provide their usernames and passwords again.
+
+### Hosting a Shared InvokeAI Instance
+
+The multiuser feature allows you to run an InvokeAI backend that can be accessed by your friends and family across your home network. It is also possible to host a backend that is accessible over the Internet.
+
+By default, InvokeAI runs on `localhost`, IP address `127.0.0.1`, which is only accessible to browsers running on the same machine as the backend. To make the backend accessible to any machine on your home or work LAN, add the line `host: 0.0.0.0` to the InvokeAI configuration file, usually stored at `INVOKE_ROOT/invokeai.yaml`.
+
+Here is a minimal example.
+
+```yaml
+# Internal metadata - do not edit:
+schema_version: 4.0.2
+
+# Put user settings here - see https://invoke-ai.github.io/InvokeAI/configuration/:
+multiuser: true
+host: 0.0.0.0
+```
+
+After relaunching the backend you will be able to reach the server from other machines on the LAN using the server machine's IP address or hostname and port 9090.
+
+#### Making InvokeAI Accessible to the Internet
+
+:::danger[Use at your own risk]
+The InvokeAI team has done its best to make the software free of exploitable bugs, but the software has not undergone a rigorous security audit or intrusion testing. Use at your own risk.
+:::
+
+It is also possible to create a (semi) public server accessible from the Internet. The details of how to do this depend very much on your home or corporate router/firewall system and are beyond the scope of this document.
+
+If you expose InvokeAI to the Internet, there are a number of precautions to take. Here is a brief list of recommended network security practices.
+
+**HTTPS Configuration:**
+
+For internet deployments, always use HTTPS:
+
+```nginx
+# Use a reverse proxy like nginx or Traefik
+# Example nginx configuration:
+
+server {
+    listen 443 ssl http2;
+    server_name invoke.example.com;
+
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location / {
+        proxy_pass http://localhost:9090;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # WebSocket support
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
+**Firewall Rules:**
+
+It is best to restrict access to trusted networks and remote IP addresses, or use a VPN to connect to your home network. Rate limit connections to InvokeAI's authentication endpoint `http://your.host:9090/api/v1/auth/login`.
+
+**Backup and Recovery:**
+
+It is always a good idea to periodically backup your InvokeAI database and images, but especially
+so if the server is publicly accessible to the Internet.
+
+**Manual Backup:**
+
+```bash
+# Stop InvokeAI
+# Copy database file
+cd INVOKE_ROOT
+cp databases/invokeai.db databases/invokeai.db.$(date +%Y%m%d)
+
+# Or create compressed backup
+tar -czf invokeai_backup_$(date +%Y%m%d).tar.gz databases/
+```
+
+**Automated Backup Script:**
+
+```bash
+#!/bin/bash
+# backup_invokeai.sh
+
+INVOKE_ROOT="/path/to/invoke_root"
+BACKUP_DIR="/path/to/backups"
+DB_PATH="$INVOKE_ROOT/databases/invokeai.db"
+DATE=$(date +%Y%m%d_%H%M%S)
+
+# Create backup directory
+mkdir -p "$BACKUP_DIR"
+
+# Copy database
+cp "$DB_PATH" "$BACKUP_DIR/invokeai_$DATE.db"
+
+# Keep only last 30 days
+find "$BACKUP_DIR" -name "invokeai_*.db" -mtime +30 -delete
+
+echo "Backup completed: invokeai_$DATE.db"
+```
+
+**Schedule with cron:**
+
+```bash
+# Edit crontab
+crontab -e
+
+# Add daily backup at 2 AM
+0 2 * * * /path/to/backup_invokeai.sh
+```
+
+**Restore from Backup:**
+
+```bash
+# Stop InvokeAI
+# Replace current database with backup
+cd INVOKE_ROOT
+cp databases/invokeai.db databases/invokeai.db.old  # Save current
+cp databases/invokeai_backup.db databases/invokeai.db
+
+# Restart InvokeAI
+invokeai-web
+```
+
+**Disaster Recovery — Complete System Backup:**
+
+Include these directories/files:
+
+- `databases/` — All database files
+- `models/` — Installed models (if locally stored)
+- `outputs/` — Generated images
+- `invokeai.yaml` — Configuration file
+- Any custom scripts or modifications
+
+**Recovery Process:**
+
+<Steps>
+1. Install InvokeAI on new system
+2. Restore configuration file
+3. Restore database directory
+4. Restore models and outputs
+5. Verify file permissions
+6. Start InvokeAI and test
+</Steps>
+
+## Troubleshooting
+
+### User Cannot Login
+
+**Symptom:** User reports unable to log in
+
+**Diagnosis:**
+
+1. Verify account exists and is active
+
+   ```bash
+   sqlite3 databases/invokeai.db "SELECT * FROM users WHERE email = 'user@example.com';"
+   ```
+
+2. Check password (have user try resetting)
+3. Verify account is active (`is_active = 1`)
+4. Check for account lockout (if implemented)
+
+**Solutions:**
+
+- Reset user password
+- Reactivate disabled account
+- Verify email address is correct
+- Check system logs for auth errors
+
+### Database Locked Errors
+
+**Symptom:** "Database is locked" errors
+
+**Causes:**
+
+- Concurrent write operations
+- Long-running transactions
+- Backup process accessing database
+- File system issues
+
+**Solutions:**
+
+```bash
+# Check for locks
+fuser databases/invokeai.db
+
+# Increase timeout (in config)
+# Or switch to WAL mode:
+sqlite3 databases/invokeai.db "PRAGMA journal_mode=WAL;"
+```
+
+### Forgotten Admin Password
+
+**Recovery Process:**
+
+<Steps>
+1. Stop InvokeAI
+2. Direct database access:
+
+   ```bash
+   sqlite3 databases/invokeai.db
+   ```
+
+3. Reset admin password (requires password hash):
+
+   ```sql
+   -- Generate hash first using Python:
+   -- from passlib.context import CryptContext
+   -- pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+   -- print(pwd_context.hash("NewPassword123"))
+
+   UPDATE users
+   SET password_hash = '$2b$12$...'
+   WHERE email = 'admin@example.com';
+   ```
+
+4. Restart InvokeAI
+</Steps>
+
+:::note[Alternative Step 3]
+Remove the admin from the database entirely in order
+to trigger the setup process when InvokeAI restarts:
+
+```sql
+DELETE FROM users
+WHERE email = 'admin@example.com';
+```
+:::
+
+
+### Performance Issues
+
+**Symptom:** Slow generation or UI
+
+**Diagnosis:**
+
+<Steps>
+1. Check active generation count
+2. Review resource usage (CPU/GPU/RAM)
+3. Check database size and performance
+4. Review network latency
+</Steps>
+
+**Solutions:**
+
+- Limit concurrent generations
+- Increase hardware resources
+- Optimize database (`VACUUM`, `ANALYZE`)
+- Add indexes for slow queries
+- Consider load balancing
+
+### Migration Failures
+
+**Symptom:** Database migration fails on upgrade
+
+**Prevention:**
+
+- Always backup before upgrading
+- Test migration on copy of database
+- Review migration logs
+
+**Recovery:**
+
+```bash
+# Restore backup
+cp databases/invokeai.db.backup databases/invokeai.db
+
+# Try migration again with verbose logging
+invokeai-web --log-level DEBUG
+```
+
+## Configuration Reference
+
+### Complete Configuration Example for a Public Site
+
+```yaml
+# invokeai.yaml - Multi-user configuration
+
+# Internal metadata - do not edit:
+schema_version: 4.0.2
+
+# Put user settings here
+multiuser: true
+
+# Server
+host: "0.0.0.0"
+port: 9090
+
+# Performance
+enable_partial_loading: true
+precision: float16
+pytorch_cuda_alloc_conf: "backend:cudaMallocAsync"
+hashing_algorithm: blake3_multi
+```
+
+## Frequently Asked Questions
+
+### How many users can InvokeAI support?
+
+The backend will support dozens of concurrent users. However, because the image generation queue is single-threaded, image generation tasks are processed on a first-come, first-serve basis. This means that a user may have to wait for all the other users' image generation jobs to complete before their generation job starts to execute.
+
+A future version of InvokeAI may support concurrent execution on systems with multiple GPUs/graphics cards.
+
+### Can I integrate with existing authentication systems?
+
+OAuth2/OpenID Connect support is planned for a future release. Currently, InvokeAI uses its own authentication system.
+
+### How do I audit user actions?
+
+Full audit logging is planned for a future release. Currently, you can:
+
+- Monitor the generation queue
+- Review database changes
+- Check application logs
+
+### Can users have different model access?
+
+Currently all users can view and use all installed models. Per-user
+model access is a possible enhancement. Please let the development
+team know if you want this feature.
+
+### How do I handle user data when they leave?
+
+Best practice:
+
+<Steps>
+1. Deactivate the account first
+2. Transfer ownership of shared boards
+3. After transition period, delete the account
+4. Or keep the account deactivated for audit purposes
+</Steps>
+
+### What's the licensing impact of multi-user mode?
+
+InvokeAI remains under its existing license. Multi-user mode does not change licensing terms.
+
+## Getting Help
+
+### Support
+
+- **General Documentation**: [InvokeAI Docs](https://invoke.ai/)
+- **User Guide**: [For Users](/features/multi-user-mode/user-guide/)
+- **API Guide**: [For Developers](/features/multi-user-mode/api-guide/)
+- **Discord**: [Join Community](https://discord.gg/ZmtBAhwWhy)
+- **GitHub Issues**: [Report Problems](https://github.com/invoke-ai/InvokeAI/issues)
