@@ -2,6 +2,7 @@ import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import { zMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
 import {
+  zParameterAnimaScheduler,
   zParameterCanvasCoherenceMode,
   zParameterCFGRescaleMultiplier,
   zParameterCFGScale,
@@ -259,6 +260,7 @@ const zCanvasRectState = z.object({
   type: z.literal('rect'),
   rect: zRect,
   color: zRgbaColor,
+  compositeOperation: z.enum(['source-over', 'destination-out']).default('source-over'),
 });
 export type CanvasRectState = z.infer<typeof zCanvasRectState>;
 
@@ -275,6 +277,28 @@ const zCanvasLassoState = z.object({
   compositeOperation: zCanvasLassoCompositeOperation.default('source-over'),
 });
 export type CanvasLassoState = z.infer<typeof zCanvasLassoState>;
+
+const zCanvasOvalState = z.object({
+  id: zId,
+  type: z.literal('oval'),
+  rect: zRect,
+  color: zRgbaColor,
+  compositeOperation: z.enum(['source-over', 'destination-out']).default('source-over'),
+});
+export type CanvasOvalState = z.infer<typeof zCanvasOvalState>;
+
+const zCanvasPolygonState = z.object({
+  id: zId,
+  type: z.literal('polygon'),
+  points: zPoints,
+  color: zRgbaColor,
+  compositeOperation: z.enum(['source-over', 'destination-out']).default('source-over'),
+  previewPoint: zCoordinate.optional(),
+});
+export type CanvasPolygonState = z.infer<typeof zCanvasPolygonState>;
+
+const zCanvasShapeState = z.union([zCanvasRectState, zCanvasOvalState, zCanvasPolygonState]);
+type CanvasShapeState = z.infer<typeof zCanvasShapeState>;
 
 // Gradient state includes clip metadata so the tool can optionally clip to drag gesture.
 const zCanvasLinearGradientState = z.object({
@@ -324,7 +348,7 @@ const zCanvasObjectState = z.union([
   zCanvasImageState,
   zCanvasBrushLineState,
   zCanvasEraserLineState,
-  zCanvasRectState,
+  zCanvasShapeState,
   zCanvasLassoState,
   zCanvasBrushLineWithPressureState,
   zCanvasEraserLineWithPressureState,
@@ -749,7 +773,7 @@ export const zInfillMethod = z.enum(['patchmatch', 'lama', 'cv2', 'color', 'tile
 export type InfillMethod = z.infer<typeof zInfillMethod>;
 
 export const zParamsState = z.object({
-  _version: z.literal(2),
+  _version: z.literal(3),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -809,12 +833,14 @@ export const zParamsState = z.object({
   animaVaeModel: zParameterVAEModel.nullable(), // Optional: Separate QwenImage/FLUX VAE for Anima
   animaQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 0.6B Encoder for Anima
   animaT5EncoderModel: zModelIdentifierField.nullable(), // T5-XXL tokenizer for Anima LLM Adapter
-  animaScheduler: z.enum(['euler', 'heun', 'lcm']).default('euler'),
+  animaScheduler: zParameterAnimaScheduler,
   // Flux2 Klein model components - uses Qwen3 instead of CLIP+T5
   kleinVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE for Klein
   kleinQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder for Klein
   // Qwen Image Edit model components - GGUF transformer needs a Diffusers source for VAE/encoder
   qwenImageComponentSource: zParameterModel.nullable(), // Diffusers model providing VAE + text encoder
+  qwenImageVaeModel: zParameterVAEModel.nullable(), // Optional: Standalone Qwen Image VAE checkpoint
+  qwenImageQwenVLEncoderModel: zModelIdentifierField.nullable(), // Optional: Standalone Qwen2.5-VL encoder
   qwenImageQuantization: z.enum(['none', 'int8', 'nf4']), // BitsAndBytes quantization for Qwen VL encoder
   qwenImageShift: z.number().nullable(), // Sigma schedule shift override (e.g. 3.0 for Lightning LoRAs)
   // Z-Image Seed Variance Enhancer settings
@@ -836,7 +862,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 2,
+  _version: 3,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -898,6 +924,8 @@ export const getInitialParamsState = (): ParamsState => ({
   kleinVaeModel: null,
   kleinQwen3EncoderModel: null,
   qwenImageComponentSource: null,
+  qwenImageVaeModel: null,
+  qwenImageQwenVLEncoderModel: null,
   qwenImageQuantization: 'none' as const,
   qwenImageShift: null,
   zImageSeedVarianceEnabled: false,
@@ -1015,8 +1043,8 @@ export type EntityBrushLineAddedPayload = EntityIdentifierPayload<{
 export type EntityEraserLineAddedPayload = EntityIdentifierPayload<{
   eraserLine: CanvasEraserLineState | CanvasEraserLineWithPressureState;
 }>;
-export type EntityRectAddedPayload = EntityIdentifierPayload<{ rect: CanvasRectState }>;
 export type EntityLassoAddedPayload = EntityIdentifierPayload<{ lasso: CanvasLassoState }>;
+export type EntityShapeAddedPayload = EntityIdentifierPayload<{ shape: CanvasShapeState }>;
 export type EntityGradientAddedPayload = EntityIdentifierPayload<{ gradient: CanvasGradientState }>;
 export type EntityRasterizedPayload = EntityIdentifierPayload<{
   imageObject: CanvasImageState;

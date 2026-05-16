@@ -114,6 +114,25 @@ Most common algorithms are supported, like `md5`, `sha256`, and `sha512`. These 
 
 These options set the paths of various directories and files used by InvokeAI. Any user-defined paths should be absolute paths.
 
+#### Image Subfolder Strategy
+
+By default, generated images are stored in a single flat directory under `outputs/images/`. The `image_subfolder_strategy` setting lets you organize newly-created images into subfolders automatically. You can edit this setting in `invokeai.yaml` or, as an admin user, in the Settings panel.
+
+```yaml
+image_subfolder_strategy: flat # default value
+```
+
+Available strategies:
+
+| Strategy | Example Path                           | Description                                                                                       |
+| -------- | -------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `flat`   | `outputs/images/abc123.png`            | Store images directly in the images directory.                                                    |
+| `date`   | `outputs/images/2026/03/17/abc123.png` | Organize images by creation date.                                                                 |
+| `type`   | `outputs/images/general/abc123.png`    | Organize images by image category.                                                                |
+| `hash`   | `outputs/images/ab/abc123.png`         | Use the first two characters of the image UUID for filesystem performance with large collections. |
+
+Changing this setting only affects newly-created images. Existing images remain in their current locations.
+
 #### Logging
 
 Several different log handler destinations are available, and multiple destinations are supported by providing a list:

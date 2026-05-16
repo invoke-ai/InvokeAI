@@ -17,6 +17,11 @@ class CacheRecord:
     # Model in memory.
     cached_model: CachedModelWithPartialLoad | CachedModelOnlyFullLoad
     _locks: int = 0
+    # Set by ModelCache.drop_model() when the entry was locked at invalidation time.
+    # ModelCache.unlock() evicts the entry as soon as the last lock releases so a setting
+    # change (e.g. fp8_storage toggled during an in-flight generation) takes effect on the
+    # next load instead of silently being ignored.
+    is_stale: bool = False
 
     def lock(self) -> None:
         """Lock this record."""

@@ -33,6 +33,25 @@ REGEX_TO_BASE: dict[str, BaseModelType] = {
 }
 
 
+def _is_qwen_image_vae(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict is a Qwen Image VAE (AutoencoderKLQwenImage).
+
+    Qwen Image VAE can be identified by:
+    1. Diffusers-format encoder/decoder keys (`encoder.conv_in`, `decoder.conv_in`)
+    2. 5-dimensional convolution weights (3D causal convolutions vs. standard 2D conv in SD/SDXL/FLUX VAEs)
+    3. 16-dimensional latent space (z_dim=16)
+    """
+    decoder_conv_in_key = "decoder.conv_in.weight"
+    if decoder_conv_in_key not in state_dict:
+        return False
+    weight = state_dict[decoder_conv_in_key]
+    shape = getattr(weight, "shape", None)
+    if shape is None or len(shape) != 5:
+        return False
+    # z_dim is the input channel dim of decoder.conv_in
+    return shape[1] == 16
+
+
 def _is_flux2_vae(state_dict: dict[str | int, Any]) -> bool:
     """Check if state dict is a FLUX.2 VAE (AutoencoderKLFlux2).
 
@@ -93,6 +112,10 @@ class VAE_Checkpoint_Config_Base(Checkpoint_Config_Base):
         # Exclude FLUX.2 VAEs - they have their own config class
         if _is_flux2_vae(state_dict):
             raise NotAMatchError("model is a FLUX.2 VAE, not a standard VAE")
+
+        # Exclude Qwen Image VAEs - they have their own config class
+        if _is_qwen_image_vae(state_dict):
+            raise NotAMatchError("model is a Qwen Image VAE, not a standard VAE")
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
@@ -173,6 +196,26 @@ class VAE_Checkpoint_Flux2_Config(Checkpoint_Config_Base, Config_Base):
         state_dict = mod.load_state_dict()
         if not _is_flux2_vae(state_dict):
             raise NotAMatchError("state dict does not look like a FLUX.2 VAE")
+
+
+class VAE_Checkpoint_QwenImage_Config(Checkpoint_Config_Base, Config_Base):
+    """Model config for Qwen Image VAE checkpoint models (AutoencoderKLQwenImage)."""
+
+    type: Literal[ModelType.VAE] = Field(default=ModelType.VAE)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    base: Literal[BaseModelType.QwenImage] = Field(default=BaseModelType.QwenImage)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        state_dict = mod.load_state_dict()
+        if not _is_qwen_image_vae(state_dict):
+            raise NotAMatchError("state dict does not look like a Qwen Image VAE")
+
+        return cls(**override_fields)
 
 
 def _has_anima_vae_keys(state_dict: dict[str | int, Any]) -> bool:
