@@ -4,26 +4,25 @@ import type { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/ko
 import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityObjectRenderer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import type { CanvasRectState } from 'features/controlLayers/store/types';
+import type { CanvasOvalState } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
-export class CanvasObjectRect extends CanvasModuleBase {
-  readonly type = 'object_rect';
+export class CanvasObjectOval extends CanvasModuleBase {
+  readonly type = 'object_oval';
   readonly id: string;
   readonly path: string[];
   readonly parent: CanvasEntityObjectRenderer | CanvasEntityBufferObjectRenderer;
   readonly manager: CanvasManager;
   readonly log: Logger;
 
-  state: CanvasRectState;
+  state: CanvasOvalState;
   konva: {
     group: Konva.Group;
-    rect: Konva.Rect;
+    ellipse: Konva.Ellipse;
   };
-  isFirstRender: boolean = false;
 
-  constructor(state: CanvasRectState, parent: CanvasEntityObjectRenderer | CanvasEntityBufferObjectRenderer) {
+  constructor(state: CanvasOvalState, parent: CanvasEntityObjectRenderer | CanvasEntityBufferObjectRenderer) {
     super();
     this.id = state.id;
     this.parent = parent;
@@ -35,24 +34,28 @@ export class CanvasObjectRect extends CanvasModuleBase {
 
     this.konva = {
       group: new Konva.Group({ name: `${this.type}:group`, listening: false }),
-      rect: new Konva.Rect({ name: `${this.type}:rect`, listening: false, perfectDrawEnabled: false }),
+      ellipse: new Konva.Ellipse({
+        name: `${this.type}:ellipse`,
+        listening: false,
+        radiusX: 0,
+        radiusY: 0,
+        perfectDrawEnabled: false,
+      }),
     };
-    this.konva.group.add(this.konva.rect);
+    this.konva.group.add(this.konva.ellipse);
     this.state = state;
   }
 
-  update(state: CanvasRectState, force = false): boolean {
+  update(state: CanvasOvalState, force = false): boolean {
     if (force || this.state !== state) {
-      this.isFirstRender = false;
-
-      this.log.trace({ state }, 'Updating rect');
+      this.log.trace({ state }, 'Updating oval');
       const { rect, color, compositeOperation } = state;
       const fill = compositeOperation === 'destination-out' ? 'rgba(255,255,255,1)' : rgbaColorToString(color);
-      this.konva.rect.setAttrs({
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height,
+      this.konva.ellipse.setAttrs({
+        x: rect.x + rect.width / 2,
+        y: rect.y + rect.height / 2,
+        radiusX: rect.width / 2,
+        radiusY: rect.height / 2,
         fill,
         globalCompositeOperation: compositeOperation,
       });
@@ -64,7 +67,7 @@ export class CanvasObjectRect extends CanvasModuleBase {
   }
 
   setVisibility(isVisible: boolean): void {
-    this.log.trace({ isVisible }, 'Setting rect visibility');
+    this.log.trace({ isVisible }, 'Setting oval visibility');
     this.konva.group.visible(isVisible);
   }
 
@@ -79,7 +82,6 @@ export class CanvasObjectRect extends CanvasModuleBase {
       type: this.type,
       path: this.path,
       parent: this.parent.id,
-      isFirstRender: this.isFirstRender,
       state: deepClone(this.state),
     };
   };
