@@ -58,13 +58,13 @@ export class CanvasObjectEraserLineWithPressure extends CanvasModuleBase {
   update(state: CanvasEraserLineWithPressureState, force = false): boolean {
     if (force || this.state !== state) {
       this.log.trace({ state }, 'Updating eraser line with pressure');
-      const { points, strokeWidth } = state;
+      const { points, strokeWidth, pressureAffectsWidth } = state;
       this.konva.line.setAttrs({
         data: getSVGPathDataFromPoints(points, {
           size: strokeWidth / 2,
           simulatePressure: false,
           last: true,
-          thinning: 1,
+          thinning: pressureAffectsWidth ? 1 : 0,
         }),
       });
       this.state = state;

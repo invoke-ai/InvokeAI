@@ -1,6 +1,7 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { getShouldUsePressureForBrush } from 'features/controlLayers/konva/pressure';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
 import {
   alignCoordForTool,
@@ -216,14 +217,20 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
       selectedEntity.state.type === 'raster_layer' && selectedEntity.state.isTransparencyLocked;
     const globalCompositeOperation = isTransparencyLocked ? 'source-atop' : undefined;
 
-    if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
-      // If the pen is down and pressure sensitivity is enabled, add the point with pressure
+    const shouldUsePressure =
+      e.evt.pointerType === 'pen' &&
+      getShouldUsePressureForBrush(settings.pressureAffectsWidth, settings.pressureAffectsOpacity);
+
+    if (shouldUsePressure) {
+      // If the pen is down and pressure input is enabled, add the point with pressure
       await selectedEntity.bufferRenderer.setBuffer({
         id: getPrefixedId('brush_line_with_pressure'),
         type: 'brush_line_with_pressure',
         points: [alignedPoint.x, alignedPoint.y, e.evt.pressure],
         strokeWidth: settings.brushWidth,
         color: this.manager.stateApi.getCurrentColor(),
+        pressureAffectsWidth: settings.pressureAffectsWidth,
+        pressureAffectsOpacity: settings.pressureAffectsOpacity,
         clip: this.parent.getClip(selectedEntity.state),
         globalCompositeOperation,
       });
@@ -280,7 +287,11 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
       selectedEntity.state.type === 'raster_layer' && selectedEntity.state.isTransparencyLocked;
     const globalCompositeOperation = isTransparencyLocked ? 'source-atop' : undefined;
 
-    if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
+    const shouldUsePressure =
+      e.evt.pointerType === 'pen' &&
+      getShouldUsePressureForBrush(settings.pressureAffectsWidth, settings.pressureAffectsOpacity);
+
+    if (shouldUsePressure) {
       // We need to get the last point of the last line to create a straight line if shift is held
       const lastLinePoint = getLastPointOfLastLineWithPressure(
         selectedEntity.state.objects,
@@ -313,6 +324,8 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
         points,
         strokeWidth: settings.brushWidth,
         color: this.manager.stateApi.getCurrentColor(),
+        pressureAffectsWidth: settings.pressureAffectsWidth,
+        pressureAffectsOpacity: settings.pressureAffectsOpacity,
         // When shift is held, the line may extend beyond the clip region. Clip only if we are clipping to bbox. If we
         // are clipping to stage, we don't need to clip at all.
         clip: isShiftDraw && !settings.clipToBbox ? null : this.parent.getClip(selectedEntity.state),
@@ -426,8 +439,8 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
 
     bufferState.points.push(alignedPoint.x, alignedPoint.y);
 
-    // Add pressure if the pen is down and pressure sensitivity is enabled
-    if (bufferState.type === 'brush_line_with_pressure' && settings.pressureSensitivity) {
+    // Preserve pressure data for the full stroke even if the settings change mid-draw.
+    if (bufferState.type === 'brush_line_with_pressure') {
       bufferState.points.push(e.evt.pressure);
     }
 
