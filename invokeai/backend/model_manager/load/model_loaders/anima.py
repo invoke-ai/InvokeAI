@@ -102,6 +102,14 @@ class AnimaCheckpointModel(ModelLoader):
                 mlp_ratio=4.0,
                 crossattn_emb_channels=1024,
                 pos_emb_cls="rope3d",
+                # Anima reuses the Cosmos-Predict2 2B Text2Image DiT, which trains with
+                # rope_scale=(t=1.0, h=4.0, w=4.0). The NTK-scaled spatial RoPE base is
+                # mandatory; omitting it (theta=10000 on all axes) shifts every step's
+                # velocity ~7% off and compounds into degraded images. Matches diffusers
+                # CosmosTransformer3DModel rope_scale via *_extrapolation_ratio.
+                rope_h_extrapolation_ratio=4.0,
+                rope_w_extrapolation_ratio=4.0,
+                rope_t_extrapolation_ratio=1.0,
                 use_adaln_lora=True,
                 adaln_lora_dim=256,
                 extra_per_block_abs_pos_emb=False,
