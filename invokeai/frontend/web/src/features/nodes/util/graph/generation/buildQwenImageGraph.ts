@@ -51,6 +51,27 @@ export const shouldUseCfg = (cfgScale: number | number[]): boolean => {
   return cfgScale.some((value) => value > 1);
 };
 
+/**
+ * Compute the target dimensions for the VAE-encoded reference image, matching
+ * diffusers' `calculate_dimensions(VAE_IMAGE_SIZE=1024*1024, aspect_ratio)` used
+ * by QwenImageEditPipeline / QwenImageEditPlusPipeline. The reference is resized
+ * so its area is ~1024² while preserving aspect ratio, with each dimension
+ * snapped to a multiple of 32 (the model was trained at this scale; feeding it a
+ * much larger reference produces a sequence length it was not trained on).
+ */
+const QWEN_IMAGE_EDIT_REF_TARGET_AREA = 1024 * 1024;
+export const calculateQwenImageEditRefDimensions = (
+  width: number,
+  height: number
+): { width: number; height: number } => {
+  const ratio = width / height;
+  let w = Math.sqrt(QWEN_IMAGE_EDIT_REF_TARGET_AREA * ratio);
+  let h = w / ratio;
+  w = Math.max(32, Math.round(w / 32) * 32);
+  h = Math.max(32, Math.round(h / 32) * 32);
+  return { width: w, height: h };
+};
+
 export const buildQwenImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
   const { generationMode, state, manager } = arg;
 
@@ -175,15 +196,18 @@ export const buildQwenImageGraph = async (arg: GraphBuilderArg): Promise<GraphBu
     // Also VAE-encode the first reference image as latents for the denoising transformer.
     // The transformer expects [noisy_patches ; ref_patches] in its sequence.
     const firstConfig = validRefImageConfigs[0]!;
-    const firstImgField = zImageField.parse(
-      firstConfig.config.image?.crop?.image ?? firstConfig.config.image?.original.image
-    );
-    // Don't force-resize the reference image to the output dimensions — that would
-    // distort the aspect ratio when they differ. The I2L encodes at the image's
-    // native size; the denoise node handles dimension mismatches via interpolation.
+    const firstImage = firstConfig.config.image?.crop?.image ?? firstConfig.config.image?.original.image;
+    const firstImgField = zImageField.parse(firstImage);
+    // Resize the reference image to ~1024² area preserving aspect ratio, matching the
+    // diffusers QwenImageEdit(Plus)Pipeline's VAE_IMAGE_SIZE. The denoise node uses
+    // the reference latent's own dimensions for RoPE, so the ref segment is encoded
+    // at the resolution the model was trained on rather than the source image's
+    // native size.
+    const refDims = firstImage ? calculateQwenImageEditRefDimensions(firstImage.width, firstImage.height) : undefined;
     const refI2l = g.addNode({
       type: 'qwen_image_i2l',
       id: getPrefixedId('qwen_ref_i2l'),
+      ...(refDims ? { width: refDims.width, height: refDims.height } : {}),
     });
     const refImageNode = g.addNode({
       type: 'image',

@@ -115,8 +115,14 @@ jobs:
         run: pnpm build
         working-directory: docs
         env:
-          DEPLOY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_target || github.ref == 'refs/heads/main' && 'ghpages' || 'custom' }}
+          DEPLOY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_target || 'custom' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: verify deploy output
+        run: pnpm run check-deploy-output
+        working-directory: docs
+        env:
+          DEPLOY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_target || 'custom' }}
 
       # Upload artifact for deploy (main branch only)
       - name: upload pages artifact
