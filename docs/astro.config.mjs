@@ -30,6 +30,8 @@ const redirects = Object.fromEntries(
     '/installation/requirements': '/start-here/system-requirements',
     '/configuration': '/configuration/invokeai-yaml',
     '/features/low-vram/': '/configuration/low-vram-mode/',
+    '/features/lasso-tool': '/features/canvas/lasso-tool',
+    '/features/shapes-tool': '/features/canvas/shapes-tool',
     '/faq': '/troubleshooting/faq',
     '/help/SAMPLER_CONVERGENCE': '/concepts/parameters',
     '/help/diffusion': '/concepts/diffusion',
