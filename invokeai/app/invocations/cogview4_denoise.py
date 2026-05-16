@@ -247,7 +247,9 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             init_latents = init_latents.to(device=device, dtype=inference_dtype)
 
         # Generate initial latent noise.
-        noise = self._prepare_noise_tensor(context, inference_dtype, device)
+        num_channels_latents = transformer_info.model.config.in_channels  # type: ignore
+        assert isinstance(num_channels_latents, int)
+        noise = self._prepare_noise_tensor(context, num_channels_latents, inference_dtype, device)
 
         # Prepare input latent image.
         if init_latents is not None:
@@ -351,7 +353,7 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         return latents
 
     def _prepare_noise_tensor(
-        self, context: InvocationContext, inference_dtype: torch.dtype, device: torch.device
+        self, context: InvocationContext, num_channels_latents: int, inference_dtype: torch.dtype, device: torch.device
     ) -> torch.Tensor:
         if self.noise is not None:
             noise = context.tensors.load(self.noise.latents_name).to(device=device, dtype=inference_dtype)
