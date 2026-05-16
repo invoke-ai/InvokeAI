@@ -20,7 +20,10 @@ def validate_noise_dimensions(noise_type: LatentNoiseType, width: int, height: i
 
 
 def get_expected_noise_shape(
-    noise_type: LatentNoiseType, width: int, height: int,) -> tuple[int, ...]:
+    noise_type: LatentNoiseType,
+    width: int,
+    height: int,
+) -> tuple[int, ...]:
     validate_noise_dimensions(noise_type, width, height)
 
     if noise_type == "SD":
@@ -40,8 +43,7 @@ def get_expected_noise_shape(
     raise ValueError(f"Unsupported noise type: {noise_type}")
 
 
-def validate_noise_tensor_shape(
-    noise: torch.Tensor, noise_type: LatentNoiseType, width: int, height: int) -> None:
+def validate_noise_tensor_shape(noise: torch.Tensor, noise_type: LatentNoiseType, width: int, height: int) -> None:
     expected_shape = get_expected_noise_shape(noise_type, width, height)
     if tuple(noise.shape) != expected_shape:
         raise ValueError(f"Expected noise with shape {expected_shape}, got {tuple(noise.shape)}")
