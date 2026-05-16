@@ -861,7 +861,8 @@ const ZImageShift: SingleMetadataHandler<number | null> = {
       }
       return Promise.resolve(null);
     }
-    if (raw === null) {
+    // null or the 'auto' sentinel (written by the graph builder when shift is auto) recall as auto.
+    if (raw === null || raw === 'auto') {
       return Promise.resolve(null);
     }
     const parsed = z.number().min(0).max(10).parse(raw);
