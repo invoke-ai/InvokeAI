@@ -52,6 +52,10 @@ class MainModelDefaultSettings(BaseModel):
     height: int | None = Field(default=None, multiple_of=8, ge=64, description="Default height for this model")
     guidance: float | None = Field(default=None, ge=1, description="Default Guidance for this model")
     cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
+    fp8_storage: bool | None = Field(
+        default=None,
+        description="Store weights in FP8 to reduce VRAM usage (~50% savings). Weights are cast to compute dtype during inference.",
+    )
 
     model_config = ConfigDict(extra="forbid")
 
