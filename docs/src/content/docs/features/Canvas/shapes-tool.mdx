@@ -2,6 +2,8 @@
 title: Shapes Tool
 description: Learn how to draw filled shapes on raster and inpaint mask layers with the Shapes tool.
 lastUpdated: 2026-05-11
+sidebar:
+  order: 1
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
@@ -25,14 +27,15 @@ Shapes always draws into the **active raster target**:
 
 :::note
 Shapes overlaps with some Lasso workflows on mask layers, but the tools are not identical. Lasso is still the more
-specialized masking tool and can create a new mask layer automatically when one does not already exist.
+specialized masking tool and can create a new mask layer automatically when one does not already exist. See the
+[Lasso tool guide](./lasso-tool/) for mask-specific behavior.
 :::
 
 ## Common Behavior
 
 - Shapes preview live while you draw.
 - The fill color uses the current active color.
-- The active color's alpha is respected when adding pixels.
+- On a raster layer, the active color's alpha is respected when adding pixels.
 - Hold <kbd>Ctrl</kbd> on Windows/Linux or <kbd>Cmd</kbd> on macOS to switch to **subtractive** mode and cut pixels
   out of the active layer.
 - In subtractive mode, alpha is ignored and the shape fully clears pixels.
@@ -85,10 +88,10 @@ The <kbd>Alt</kbd> key behaves differently depending on the active Shapes mode:
 
 ## Practical Examples
 
-- Use **Rect** or **Oval** to block in clean mask regions quickly.
+- Use **Rect** or **Oval** to quickly add clean filled regions.
 - Use **Polygon** when you need straight edges and deliberate corner placement.
 - Use **Freehand** for irregular organic regions.
-- Use **subtractive mode** to cut holes back out of an existing raster or mask layer.
+- Use **subtractive mode** to cut holes back out of an existing filled region.
 
 ## Summary
 
