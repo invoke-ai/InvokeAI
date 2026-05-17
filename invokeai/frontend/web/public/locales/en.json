@@ -731,6 +731,10 @@
                 "title": "Shapes Tool",
                 "desc": "Select the shapes tool."
             },
+            "selectPathTool": {
+                "title": "Path Tool",
+                "desc": "Select the path tool."
+            },
             "selectLassoTool": {
                 "title": "Lasso Tool",
                 "desc": "Select the lasso tool."
@@ -2675,12 +2679,14 @@
         "addImageNoise": "Add $t(controlLayers.imageNoise)",
         "addRasterLayer": "Add $t(controlLayers.rasterLayer)",
         "addControlLayer": "Add $t(controlLayers.controlLayer)",
+        "addVectorLayer": "Add $t(controlLayers.vectorLayer)",
         "addInpaintMask": "Add $t(controlLayers.inpaintMask)",
         "addRegionalGuidance": "Add $t(controlLayers.regionalGuidance)",
         "addGlobalReferenceImage": "Add $t(controlLayers.globalReferenceImage)",
         "addDenoiseLimit": "Add $t(controlLayers.denoiseLimit)",
         "rasterLayer": "Raster Layer",
         "controlLayer": "Control Layer",
+        "vectorLayer": "Vector Layer",
         "inpaintMask": "Inpaint Mask",
         "invertMask": "Invert Mask",
         "invertRegion": "Invert Region",
@@ -2731,6 +2737,8 @@
         "rasterLayer_withCount_other": "Raster Layers",
         "controlLayer_withCount_one": "$t(controlLayers.controlLayer)",
         "controlLayer_withCount_other": "Control Layers",
+        "vectorLayer_withCount_one": "$t(controlLayers.vectorLayer)",
+        "vectorLayer_withCount_other": "Vector Layers",
         "inpaintMask_withCount_one": "$t(controlLayers.inpaintMask)",
         "inpaintMask_withCount_other": "Inpaint Masks",
         "regionalGuidance_withCount_one": "$t(controlLayers.regionalGuidance)",
@@ -2740,11 +2748,13 @@
         "opacity": "Opacity",
         "regionalGuidance_withCount_hidden": "Regional Guidance ({{count}} hidden)",
         "controlLayers_withCount_hidden": "Control Layers ({{count}} hidden)",
+        "vectorLayers_withCount_hidden": "Vector Layers ({{count}} hidden)",
         "rasterLayers_withCount_hidden": "Raster Layers ({{count}} hidden)",
         "globalReferenceImages_withCount_hidden": "Global Reference Images ({{count}} hidden)",
         "inpaintMasks_withCount_hidden": "Inpaint Masks ({{count}} hidden)",
         "regionalGuidance_withCount_visible": "Regional Guidance ({{count}})",
         "controlLayers_withCount_visible": "Control Layers ({{count}})",
+        "vectorLayers_withCount_visible": "Vector Layers ({{count}})",
         "rasterLayers_withCount_visible": "Raster Layers ({{count}})",
         "globalReferenceImages_withCount_visible": "Global Reference Images ({{count}})",
         "inpaintMasks_withCount_visible": "Inpaint Masks ({{count}})",
@@ -2762,6 +2772,7 @@
         "copyRegionalGuidanceTo": "Copy $t(controlLayers.regionalGuidance) To",
         "newRasterLayer": "New $t(controlLayers.rasterLayer)",
         "newControlLayer": "New $t(controlLayers.controlLayer)",
+        "newVectorLayer": "New $t(controlLayers.vectorLayer)",
         "newInpaintMask": "New $t(controlLayers.inpaintMask)",
         "newRegionalGuidance": "New $t(controlLayers.regionalGuidance)",
         "pasteTo": "Paste To",
@@ -2876,6 +2887,11 @@
             "radial": "Radial",
             "clip": "Clip Gradient"
         },
+        "vectorEdit": {
+            "title": "Edit Vector Layer",
+            "discard": "Discard",
+            "traceAll": "Trace All Paths"
+        },
         "lasso": {
             "freehand": "Freehand",
             "polygon": "Polygon",
@@ -2912,17 +2928,24 @@
                 "scaleFromCenter": "Scale from center",
                 "fineGrid": "Fine grid",
                 "commitText": "Commit",
+                "finishPath": "Finish path",
+                "acceptPathEdit": "Accept edits",
                 "newLine": "New line",
                 "cancelText": "Cancel",
+                "cancelPath": "Cancel path",
+                "discardPathEdit": "Discard edits",
                 "dragText": "Drag text",
                 "snapRotation": "Snap rotation",
-                "nudgeSelection": "Nudge selection"
+                "nudgeSelection": "Nudge selection",
+                "insertPathPoint": "Insert point",
+                "deletePathPoint": "Delete point"
             }
         },
         "tool": {
             "brush": "Brush",
             "eraser": "Eraser",
             "shapes": "Shapes",
+            "path": "Path",
             "rectangle": "Rectangle",
             "lasso": "Lasso",
             "gradient": "Gradient",

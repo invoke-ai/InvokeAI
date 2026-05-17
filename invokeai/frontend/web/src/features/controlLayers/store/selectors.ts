@@ -12,6 +12,7 @@ import type {
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
   CanvasState,
+  CanvasVectorLayerState,
 } from 'features/controlLayers/store/types';
 import type { BaseModelType } from 'features/nodes/types/common';
 import { getGridSize, getOptimalDimension } from 'features/parameters/util/optimalDimension';
@@ -38,13 +39,22 @@ const createCanvasSelector = <T>(selector: Selector<CanvasState, T>) => createSe
 const selectEntityCountAll = createCanvasSelector((canvas) => {
   return (
     canvas.regionalGuidance.entities.length +
+    canvas.vectorLayers.entities.length +
     canvas.rasterLayers.entities.length +
     canvas.controlLayers.entities.length +
     canvas.inpaintMasks.entities.length
   );
 });
 
-const isVisibleEntity = (entity: CanvasEntityState) => entity.isEnabled && entity.objects.length > 0;
+const isVisibleEntity = (entity: CanvasEntityState) => {
+  if (!entity.isEnabled) {
+    return false;
+  }
+  if (entity.type === 'vector_layer') {
+    return entity.paths.length > 0;
+  }
+  return entity.objects.length > 0;
+};
 
 export const selectRasterLayerEntities = createCanvasSelector((canvas) => canvas.rasterLayers.entities);
 export const selectActiveRasterLayerEntities = createSelector(selectRasterLayerEntities, (entities) =>
@@ -53,6 +63,11 @@ export const selectActiveRasterLayerEntities = createSelector(selectRasterLayerE
 
 export const selectControlLayerEntities = createCanvasSelector((canvas) => canvas.controlLayers.entities);
 export const selectActiveControlLayerEntities = createSelector(selectControlLayerEntities, (entities) =>
+  entities.filter(isVisibleEntity)
+);
+
+export const selectVectorLayerEntities = createCanvasSelector((canvas) => canvas.vectorLayers.entities);
+export const selectActiveVectorLayerEntities = createSelector(selectVectorLayerEntities, (entities) =>
   entities.filter(isVisibleEntity)
 );
 
@@ -106,6 +121,9 @@ export function selectEntity<T extends CanvasEntityIdentifier>(
     case 'control_layer':
       entity = state.controlLayers.entities.find((entity) => entity.id === id);
       break;
+    case 'vector_layer':
+      entity = state.vectorLayers.entities.find((entity) => entity.id === id);
+      break;
     case 'inpaint_mask':
       entity = state.inpaintMasks.entities.find((entity) => entity.id === id);
       break;
@@ -136,6 +154,10 @@ export function selectEntityIdentifierBelowThisOne<T extends CanvasEntityIdentif
     }
     case 'control_layer': {
       entities = state.controlLayers.entities;
+      break;
+    }
+    case 'vector_layer': {
+      entities = state.vectorLayers.entities;
       break;
     }
     case 'inpaint_mask': {
@@ -194,6 +216,9 @@ export function selectAllEntitiesOfType<T extends CanvasEntityState['type']>(
     case 'control_layer':
       entities = state.controlLayers.entities;
       break;
+    case 'vector_layer':
+      entities = state.vectorLayers.entities;
+      break;
     case 'inpaint_mask':
       entities = state.inpaintMasks.entities;
       break;
@@ -214,6 +239,7 @@ export function selectAllEntities(state: CanvasState): CanvasEntityState[] {
   return [
     ...state.inpaintMasks.entities.toReversed(),
     ...state.regionalGuidance.entities.toReversed(),
+    ...state.vectorLayers.entities.toReversed(),
     ...state.controlLayers.entities.toReversed(),
     ...state.rasterLayers.entities.toReversed(),
   ];
@@ -286,6 +312,7 @@ export const selectSelectedEntityFill = createSelector(
 
 const selectRasterLayersIsHidden = createCanvasSelector((canvas) => canvas.rasterLayers.isHidden);
 const selectControlLayersIsHidden = createCanvasSelector((canvas) => canvas.controlLayers.isHidden);
+const selectVectorLayersIsHidden = createCanvasSelector((canvas) => canvas.vectorLayers.isHidden);
 const selectInpaintMasksIsHidden = createCanvasSelector((canvas) => canvas.inpaintMasks.isHidden);
 const selectRegionalGuidanceIsHidden = createCanvasSelector((canvas) => canvas.regionalGuidance.isHidden);
 
@@ -298,6 +325,8 @@ export const getSelectIsTypeHidden = (type: CanvasEntityType) => {
       return selectRasterLayersIsHidden;
     case 'control_layer':
       return selectControlLayersIsHidden;
+    case 'vector_layer':
+      return selectVectorLayersIsHidden;
     case 'inpaint_mask':
       return selectInpaintMasksIsHidden;
     case 'regional_guidance':
@@ -331,6 +360,9 @@ export const buildSelectHasObjects = (entityIdentifier: CanvasEntityIdentifier) 
     if (!entity) {
       return false;
     }
+    if (entity.type === 'vector_layer') {
+      return entity.paths.length > 0;
+    }
     return entity.objects.length > 0;
   });
 };
@@ -349,6 +381,7 @@ export const selectCanvasMetadata = createSelector(
   (canvas): { canvas_v2_metadata: CanvasMetadata } => {
     const canvas_v2_metadata: CanvasMetadata = {
       controlLayers: selectAllEntitiesOfType(canvas, 'control_layer'),
+      vectorLayers: selectAllEntitiesOfType(canvas, 'vector_layer'),
       inpaintMasks: selectAllEntitiesOfType(canvas, 'inpaint_mask'),
       rasterLayers: selectAllEntitiesOfType(canvas, 'raster_layer'),
       regionalGuidance: selectAllEntitiesOfType(canvas, 'regional_guidance'),
@@ -363,8 +396,14 @@ export const selectCanvasMetadata = createSelector(
  */
 export const selectNonRasterLayersIsHidden = createSelector(selectCanvasSlice, (canvas) => {
   const areControlLayersEffectivelyHidden = canvas.controlLayers.entities.length === 0 || canvas.controlLayers.isHidden;
+  const areVectorLayersEffectivelyHidden = canvas.vectorLayers.entities.length === 0 || canvas.vectorLayers.isHidden;
   const areInpaintMasksEffectivelyHidden = canvas.inpaintMasks.entities.length === 0 || canvas.inpaintMasks.isHidden;
   const areRegionalGuidanceEffectivelyHidden =
     canvas.regionalGuidance.entities.length === 0 || canvas.regionalGuidance.isHidden;
-  return areControlLayersEffectivelyHidden && areInpaintMasksEffectivelyHidden && areRegionalGuidanceEffectivelyHidden;
+  return (
+    areControlLayersEffectivelyHidden &&
+    areVectorLayersEffectivelyHidden &&
+    areInpaintMasksEffectivelyHidden &&
+    areRegionalGuidanceEffectivelyHidden
+  );
 });

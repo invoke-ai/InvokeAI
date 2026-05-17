@@ -3,6 +3,7 @@ import type {
   CanvasInpaintMaskState,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
+  CanvasVectorLayerState,
   RefImageState,
 } from 'features/controlLayers/store/types';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
@@ -221,6 +222,15 @@ export const getInpaintMaskWarnings = (
   const warnings: WarningTKey[] = [];
 
   // There are no warnings at the moment for inpaint masks.
+
+  return warnings;
+};
+
+export const getVectorLayerWarnings = (
+  _entity: CanvasVectorLayerState,
+  _model: MainOrExternalModelConfig | null | undefined
+): WarningTKey[] => {
+  const warnings: WarningTKey[] = [];
 
   return warnings;
 };

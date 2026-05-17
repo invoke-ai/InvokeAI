@@ -9,6 +9,7 @@ const buildArgs = (overrides: Partial<Parameters<typeof getCanvasToolModifierHin
   bboxAspectRatioLocked: false,
   hasActiveTextSession: false,
   isPrimaryPointerDown: false,
+  isEditingPathSession: false,
   ...overrides,
 });
 
@@ -53,6 +54,27 @@ describe('getCanvasToolModifierHintIds', () => {
       'shiftUnlockAspectRatio',
       'altScaleFromCenter',
       'modFineGrid',
+    ]);
+  });
+
+  it('shows path tool hints', () => {
+    expect(getCanvasToolModifierHintIds(buildArgs({ tool: 'path' }))).toEqual([
+      'shiftSnap45Degrees',
+      'enterFinishPath',
+      'escCancelPath',
+      'spacePan',
+      'altPickColor',
+    ]);
+  });
+
+  it('shows edit hints for path tool while editing a vector layer', () => {
+    expect(getCanvasToolModifierHintIds(buildArgs({ tool: 'path', isEditingPathSession: true }))).toEqual([
+      'shiftInsertPathPoint',
+      'modDeletePathPoint',
+      'enterAcceptPathEdit',
+      'escDiscardPathEdit',
+      'spacePan',
+      'altPickColor',
     ]);
   });
 

@@ -80,9 +80,11 @@ export const setComparisonImage = (arg: { image_name: string; dispatch: AppDispa
   dispatch(imageToCompareChanged(image_name));
 };
 
+export type SupportedCanvasImageEntityType = Exclude<CanvasEntityType, 'vector_layer'>;
+
 export const createNewCanvasEntityFromImage = async (arg: {
   imageDTO: ImageDTO;
-  type: CanvasEntityType | 'regional_guidance_with_reference_image';
+  type: SupportedCanvasImageEntityType | 'regional_guidance_with_reference_image';
   withResize?: boolean;
   dispatch: AppDispatch;
   getState: AppGetState;
@@ -165,7 +167,7 @@ export const createNewCanvasEntityFromImage = async (arg: {
  */
 export const newCanvasFromImage = async (arg: {
   imageDTO: ImageDTO;
-  type: CanvasEntityType | 'regional_guidance_with_reference_image';
+  type: SupportedCanvasImageEntityType | 'regional_guidance_with_reference_image';
   withResize?: boolean;
   withInpaintMask?: boolean;
   dispatch: AppDispatch;

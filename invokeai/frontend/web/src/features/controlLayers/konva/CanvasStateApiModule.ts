@@ -30,6 +30,9 @@ import {
   inpaintMaskAdded,
   rasterLayerAdded,
   rgAdded,
+  vectorLayerAdded,
+  vectorLayerPathsReplaced,
+  vectorPathAdded,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSessionSlice } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
@@ -39,6 +42,7 @@ import {
   selectGridSize,
 } from 'features/controlLayers/store/selectors';
 import type {
+  CanvasEntityIdentifier,
   CanvasState,
   EntityBrushLineAddedPayload,
   EntityEraserLineAddedPayload,
@@ -51,6 +55,7 @@ import type {
   EntityShapeAddedPayload,
   Rect,
   RgbaColor,
+  CanvasBezierPathState,
 } from 'features/controlLayers/store/types';
 import { RGBA_BLACK } from 'features/controlLayers/store/types';
 import { zImageOutput } from 'features/nodes/types/common';
@@ -203,6 +208,30 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    */
   addControlLayer = (arg: Param0<typeof controlLayerAdded>) => {
     this.store.dispatch(controlLayerAdded(arg));
+  };
+
+  /**
+   * Adds a vector layer to the canvas, pushing state to redux.
+   */
+  addVectorLayer = (arg: Param0<typeof vectorLayerAdded>) => {
+    this.store.dispatch(vectorLayerAdded(arg));
+  };
+
+  /**
+   * Adds a bezier path to a vector layer, pushing state to redux.
+   */
+  addVectorPath = (arg: { entityIdentifier: CanvasEntityIdentifier<'vector_layer'>; path: CanvasBezierPathState }) => {
+    this.store.dispatch(vectorPathAdded(arg));
+  };
+
+  /**
+   * Replaces all bezier paths on a vector layer, pushing state to redux.
+   */
+  replaceVectorPaths = (arg: {
+    entityIdentifier: CanvasEntityIdentifier<'vector_layer'>;
+    paths: CanvasBezierPathState[];
+  }) => {
+    this.store.dispatch(vectorLayerPathsReplaced(arg));
   };
 
   /**
@@ -422,6 +451,13 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    */
   getControlLayersState = () => {
     return this.getCanvasState().controlLayers;
+  };
+
+  /**
+   * Gets the vector layers state from redux.
+   */
+  getVectorLayersState = () => {
+    return this.getCanvasState().vectorLayers;
   };
 
   /**

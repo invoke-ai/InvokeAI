@@ -206,14 +206,19 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
       return;
     }
 
+    if (selectedEntity.state.type === 'vector_layer') {
+      return;
+    }
+
+    const selectedEntityState = selectedEntity.state;
     const settings = this.manager.stateApi.getSettings();
 
-    const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
+    const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntityState.position);
     const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
 
     // When transparency is locked on a raster layer, use 'source-atop' to only paint on existing opaque pixels
     const isTransparencyLocked =
-      selectedEntity.state.type === 'raster_layer' && selectedEntity.state.isTransparencyLocked;
+      selectedEntityState.type === 'raster_layer' && selectedEntityState.isTransparencyLocked;
     const globalCompositeOperation = isTransparencyLocked ? 'source-atop' : undefined;
 
     if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
@@ -224,7 +229,7 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
         points: [alignedPoint.x, alignedPoint.y, e.evt.pressure],
         strokeWidth: settings.brushWidth,
         color: this.manager.stateApi.getCurrentColor(),
-        clip: this.parent.getClip(selectedEntity.state),
+        clip: this.parent.getClip(selectedEntityState),
         globalCompositeOperation,
       });
     } else {
@@ -235,7 +240,7 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
         points: [alignedPoint.x, alignedPoint.y],
         strokeWidth: settings.brushWidth,
         color: this.manager.stateApi.getCurrentColor(),
-        clip: this.parent.getClip(selectedEntity.state),
+        clip: this.parent.getClip(selectedEntityState),
         globalCompositeOperation,
       });
     }
@@ -270,20 +275,25 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
       selectedEntity.bufferRenderer.commitBuffer();
     }
 
+    if (selectedEntity.state.type === 'vector_layer') {
+      return;
+    }
+
+    const selectedEntityState = selectedEntity.state;
     const settings = this.manager.stateApi.getSettings();
 
-    const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
+    const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntityState.position);
     const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
 
     // When transparency is locked on a raster layer, use 'source-atop' to only paint on existing opaque pixels
     const isTransparencyLocked =
-      selectedEntity.state.type === 'raster_layer' && selectedEntity.state.isTransparencyLocked;
+      selectedEntityState.type === 'raster_layer' && selectedEntityState.isTransparencyLocked;
     const globalCompositeOperation = isTransparencyLocked ? 'source-atop' : undefined;
 
     if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
       // We need to get the last point of the last line to create a straight line if shift is held
       const lastLinePoint = getLastPointOfLastLineWithPressure(
-        selectedEntity.state.objects,
+        selectedEntityState.objects,
         'brush_line_with_pressure'
       );
 
@@ -315,11 +325,11 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
         color: this.manager.stateApi.getCurrentColor(),
         // When shift is held, the line may extend beyond the clip region. Clip only if we are clipping to bbox. If we
         // are clipping to stage, we don't need to clip at all.
-        clip: isShiftDraw && !settings.clipToBbox ? null : this.parent.getClip(selectedEntity.state),
+        clip: isShiftDraw && !settings.clipToBbox ? null : this.parent.getClip(selectedEntityState),
         globalCompositeOperation,
       });
     } else {
-      const lastLinePoint = getLastPointOfLastLine(selectedEntity.state.objects, 'brush_line');
+      const lastLinePoint = getLastPointOfLastLine(selectedEntityState.objects, 'brush_line');
 
       let points: number[];
       let isShiftDraw = false;
@@ -341,7 +351,7 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
         color: this.manager.stateApi.getCurrentColor(),
         // When shift is held, the line may extend beyond the clip region. Clip only if we are clipping to bbox. If we
         // are clipping to stage, we don't need to clip at all.
-        clip: isShiftDraw && !settings.clipToBbox ? null : this.parent.getClip(selectedEntity.state),
+        clip: isShiftDraw && !settings.clipToBbox ? null : this.parent.getClip(selectedEntityState),
         globalCompositeOperation,
       });
     }

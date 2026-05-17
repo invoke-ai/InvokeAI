@@ -17,6 +17,7 @@ import {
   setGlobalReferenceImage,
   setNodeImageFieldImage,
   setRegionalGuidanceReferenceImage,
+  type SupportedCanvasImageEntityType,
   setUpscaleInitialImage,
 } from 'features/imageActions/actions';
 import { fieldImageCollectionValueChanged } from 'features/nodes/store/nodesSlice';
@@ -362,7 +363,7 @@ type NewCanvasEntityFromImageDndTargetData = DndData<
   typeof _newCanvasEntity.type,
   typeof _newCanvasEntity.key,
   {
-    type: CanvasEntityType | 'regional_guidance_with_reference_image';
+    type: SupportedCanvasImageEntityType | 'regional_guidance_with_reference_image';
     withResize?: boolean;
   }
 >;
@@ -393,7 +394,7 @@ type NewCanvasFromImageDndTargetData = DndData<
   typeof _newCanvas.type,
   typeof _newCanvas.key,
   {
-    type: CanvasEntityType | 'regional_guidance_with_reference_image';
+    type: SupportedCanvasImageEntityType | 'regional_guidance_with_reference_image';
     withResize?: boolean;
     withInpaintMask?: boolean;
   }
