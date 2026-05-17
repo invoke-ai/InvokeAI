@@ -396,7 +396,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
     def _run_diffusion(self, context: InvocationContext) -> torch.Tensor:
         device = TorchDevice.choose_torch_device()
-        inference_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
+        inference_dtype = TorchDevice.choose_anima_inference_dtype(device)
 
         if self.denoising_start >= self.denoising_end:
             raise ValueError(
