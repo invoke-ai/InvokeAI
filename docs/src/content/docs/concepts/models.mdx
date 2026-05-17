@@ -54,3 +54,65 @@ In this situation, you may need to provide some additional information to identi
 :::
 
 [set up in the config file]: ../../configuration/invokeai-yaml
+
+## Editing model metadata
+
+Every model has an editable **Source URL** field alongside its name and description. Use it to record where a model came from — for example a Civitai or HuggingFace page — independent of how it was originally installed. The URL is editable from the model's **Edit** view and appears as a clickable link in the model header once set. Models without a URL simply hide the field.
+
+This is purely metadata: the URL has no effect on loading and is not used to refresh or reinstall the model. It is mainly useful for going back to the model's documentation, license, or example prompts later.
+
+## Bulk actions in the Model Manager
+
+The Model Manager supports multi-selection for batch operations.
+
+- **Select multiple models** by clicking with **Ctrl** (Windows / Linux) or **Cmd** (macOS) held, or by using the checkboxes on each row. A sticky header at the top shows the current selection count and is always visible while you scroll.
+- Open the **Actions** dropdown for the selection. The available actions are:
+  - **Delete Models** — removes every selected model in a single confirmation step. Partial failures (e.g. permission issues) are reported per-model in the result toast.
+  - **Reidentify Models** — re-probes every selected model, updating fields that depend on the file contents (type, base, format, variant, etc.). This is the bulk version of the per-model reidentify action.
+
+:::caution[Reidentify resets custom settings]
+Reidentifying a model re-derives its configuration from the file on disk. Any custom settings you've adjusted on those models — default settings, descriptions, trigger phrases — may be overwritten. The confirmation modal warns you about this before running.
+:::
+
+Both actions handle partial failures: if some models succeed and others fail, the toast lists succeeded and failed counts and the list view updates immediately for the ones that worked.
+
+## Finding orphaned models
+
+If a model file is deleted or moved outside the Model Manager, its database entry sticks around. To find these orphaned entries:
+
+1. Open the Model Manager.
+2. Open the **type filter** dropdown and pick **Missing Files**.
+3. The list now shows only models whose files are no longer present on disk. Each one also displays a **Missing Files** badge in its row.
+
+Orphaned models are automatically excluded from selection dropdowns (main model, LoRA, VAE, etc.), so you cannot accidentally pick one for generation. Use the [bulk delete action](#bulk-actions-in-the-model-manager) to clean them out in one step.
+
+## Exporting and Importing Model Settings
+
+Each installed model has an **Export Settings** and **Import Settings** action in the Model Manager. Use these to back up a model's configuration, move it to another install, or share a curated setup with someone else.
+
+### What gets exported
+
+The exported `.json` file captures the configuration you have set on the model, not the model weights themselves:
+
+- `default_settings` — steps, CFG / guidance, scheduler, dimensions, FP8 storage toggle, VAE precision, etc.
+- `trigger_phrases` — for LoRAs and similar.
+- `cpu_only` — for encoder-type models.
+- `name`, `description`, `source_url` — the model's identifying metadata.
+- `cover_image` — the model's thumbnail, embedded as a base64 data URL.
+
+Fields you have not set are omitted from the file. The format is forward and backward compatible: older clients ignore newer fields, and a file produced by a newer version still imports cleanly into an older one (it just skips the fields it does not understand).
+
+### Importing
+
+Importing applies the JSON to the currently selected model:
+
+- `default_settings`, `trigger_phrases`, `cpu_only`, `name`, `description`, and `source_url` are applied via the normal model update path. Any field that the target model type does not support (e.g. `cpu_only` on a model that has no such setting) is listed in a "skipped" toast — everything else still applies.
+- `cover_image` is uploaded and set as the model's thumbnail.
+
+Imports are validated before they run. The file is rejected if `source_url` is not an `http(s)://` URL or if `cover_image` is not a valid image data URL — so a malformed or hand-edited file cannot quietly poison a model's configuration.
+
+### Typical workflows
+
+- **Back up a model you've spent time tuning** so you can restore its settings after a reinstall, or roll back after experimenting.
+- **Copy settings between two installs of the same model** — e.g. between a desktop and a workstation.
+- **Share a curated setup** (name, description, thumbnail, default steps / CFG / scheduler, trigger phrases) for a model you have configured well.

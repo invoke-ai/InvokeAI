@@ -17,6 +17,22 @@ It pairs well with [Low-VRAM mode](/configuration/low-vram-mode/): low-VRAM mode
 
 There is no hardware requirement for FP8 *compute* — InvokeAI casts back to FP16/BF16 for math. This means FP8 Storage works on GPUs that do not natively support FP8 matmul (e.g. RTX 30-series), at a small per-step throughput cost.
 
+## Hardware support tiers
+
+Because InvokeAI's FP8 path uses `enable_layerwise_casting` — storage in FP8, compute in BF16/FP16 — the practical benefit of toggling FP8 Storage depends on what your GPU can do natively. There are three tiers:
+
+### RTX 30-series and older Ampere workstation cards — VRAM win only
+
+The toggle works as advertised: the UNet / transformer drops by roughly 50% on the GPU. Per-step latency is the same or marginally slower because every forward pass adds an FP8 → BF16 cast on entry and a BF16 → FP8 cast on exit. This is the **largest target group**: 3090 owners squeezing FLUX into 24 GB benefit the most.
+
+### RTX 40-series, RTX 50-series, and Hopper — VRAM win today, compute win possible later
+
+These GPUs have native FP8 tensor cores. The toggle still buys you the same ~50% VRAM reduction today, because the forward pass still runs in BF16 under `enable_layerwise_casting`. If InvokeAI later wires up a true FP8 matmul path (e.g. via `torchao`), the same toggle will *also* unlock compute speedups on this hardware. Until then, treat the benefit as "VRAM only, same as Ampere".
+
+### Pre-Ampere Nvidia, MPS, and CPU — no-op
+
+FP8 Storage is silently disabled on anything that is not CUDA, and it is not meaningful on pre-Ampere CUDA cards either. On CPU PyTorch *technically* supports FP8 dtypes, but the cast operations are software-emulated and end up costing more than the memory savings buy back, so InvokeAI does not apply FP8 Storage on CPU. If you toggle it on unsupported hardware, the loader logs nothing and returns the model unchanged — the UI may also grey the toggle out or show a "not supported on this hardware" note.
+
 ## Enabling FP8 Storage
 
 FP8 Storage is a **per-model setting**, configured from the Model Manager:
