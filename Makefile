@@ -16,6 +16,7 @@ help:
 	@echo "frontend-build           Build the frontend for localhost:9090"
 	@echo "frontend-test            Run the frontend test suite once"
 	@echo "frontend-dev             Run the frontend in developer mode on localhost:5173"
+	@echo "frontend-openapi         Generate the OpenAPI schema"
 	@echo "frontend-typegen         Generate types for the frontend from the OpenAPI schema"
 	@echo "frontend-lint            Run frontend checks and fixable lint/format steps"
 	@echo "wheel                    Build the wheel for the current version"
@@ -66,6 +67,11 @@ frontend-test:
 frontend-dev:
 	cd invokeai/frontend/web && pnpm dev
 
+frontend-openapi:
+	cd invokeai/frontend/web && \
+	python ../../../scripts/generate_openapi_schema.py > openapi.json && \
+	pnpm prettier --write openapi.json
+
 frontend-typegen:
 	cd invokeai/frontend/web && python ../../../scripts/generate_openapi_schema.py | pnpm typegen
 
@@ -91,4 +97,5 @@ openapi:
 # Serve the mkdocs site w/ live reload
 .PHONY: docs
 docs:
-	mkdocs serve
+	cd docs && pnpm install && \
+	pnpm run dev
