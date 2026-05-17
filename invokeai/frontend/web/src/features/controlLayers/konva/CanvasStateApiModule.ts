@@ -42,6 +42,7 @@ import {
   selectGridSize,
 } from 'features/controlLayers/store/selectors';
 import type {
+  CanvasBezierPathState,
   CanvasEntityIdentifier,
   CanvasState,
   EntityBrushLineAddedPayload,
@@ -55,7 +56,6 @@ import type {
   EntityShapeAddedPayload,
   Rect,
   RgbaColor,
-  CanvasBezierPathState,
 } from 'features/controlLayers/store/types';
 import { RGBA_BLACK } from 'features/controlLayers/store/types';
 import { zImageOutput } from 'features/nodes/types/common';

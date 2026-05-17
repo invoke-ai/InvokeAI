@@ -19,8 +19,8 @@ import {
   vectorPathAdded,
 } from './canvasSlice';
 import { buildSelectHasObjects, selectAllEntities, selectCanvasMetadata } from './selectors';
-import { getVectorLayerState } from './util';
 import { getInitialCanvasState, zCanvasMetadata, zCanvasState } from './types';
+import { getVectorLayerState } from './util';
 
 describe('vector layer integration', () => {
   const { reducer } = canvasSliceConfig.slice;
@@ -163,7 +163,10 @@ describe('vector layer integration', () => {
     const state = getInitialCanvasState();
     state.vectorLayers.entities.push(vectorLayer);
 
-    const result = reducer(state, entityDuplicated({ entityIdentifier: { id: 'vector-layer-a', type: 'vector_layer' } }));
+    const result = reducer(
+      state,
+      entityDuplicated({ entityIdentifier: { id: 'vector-layer-a', type: 'vector_layer' } })
+    );
 
     expect(result.vectorLayers.entities).toHaveLength(2);
     expect(result.vectorLayers.entities[1]).toMatchObject({
@@ -225,7 +228,13 @@ describe('vector layer integration', () => {
       objects: [],
       opacity: 1,
       position: { x: 0, y: 0 },
-      controlAdapter: { type: 'controlnet', model: null, weight: 0.75, beginEndStepPct: [0, 0.75], controlMode: 'balanced' },
+      controlAdapter: {
+        type: 'controlnet',
+        model: null,
+        weight: 0.75,
+        beginEndStepPct: [0, 0.75],
+        controlMode: 'balanced',
+      },
     });
     state.vectorLayers.entities.push(
       getVectorLayerState('vector-a', {

@@ -70,7 +70,11 @@ export const anchorsToBezierPoints = (anchors: Coordinate[]): CanvasBezierPointS
   }));
 };
 
-export const evaluateBezierSegment = (from: RenderableBezierPoint, to: RenderableBezierPoint, t: number): Coordinate => {
+export const evaluateBezierSegment = (
+  from: RenderableBezierPoint,
+  to: RenderableBezierPoint,
+  t: number
+): Coordinate => {
   const p0 = from.anchor;
   const p1 = from.outHandle ?? from.anchor;
   const p2 = to.inHandle ?? to.anchor;

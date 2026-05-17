@@ -13,19 +13,21 @@ export const CanvasEntityMenuItemsRunWorkflow = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext();
+  const onClick = useCallback(() => {
+    if (entityIdentifier.type === 'vector_layer') {
+      return;
+    }
+
+    const sourceEntityIdentifier: CanvasWorkflowSourceEntityIdentifier = {
+      id: entityIdentifier.id,
+      type: entityIdentifier.type,
+    };
+    dispatch(canvasWorkflowIntegrationOpened({ sourceEntityIdentifier }));
+  }, [dispatch, entityIdentifier]);
 
   if (entityIdentifier.type === 'vector_layer') {
     return null;
   }
-
-  const sourceEntityIdentifier: CanvasWorkflowSourceEntityIdentifier = {
-    id: entityIdentifier.id,
-    type: entityIdentifier.type,
-  };
-
-  const onClick = useCallback(() => {
-    dispatch(canvasWorkflowIntegrationOpened({ sourceEntityIdentifier }));
-  }, [dispatch, sourceEntityIdentifier]);
 
   return (
     <MenuItem onClick={onClick} icon={<PiFlowArrowBold />}>

@@ -14,15 +14,7 @@ export const VectorLayerEditFooter = memo(() => {
   }
 
   return (
-    <Flex
-      bg="base.800"
-      borderRadius="base"
-      p={4}
-      minW={420}
-      flexDir="column"
-      gap={4}
-      shadow="dark-lg"
-    >
+    <Flex bg="base.800" borderRadius="base" p={4} minW={420} flexDir="column" gap={4} shadow="dark-lg">
       <Heading size="md" color="base.300" userSelect="none">
         {t('controlLayers.vectorEdit.title')}
       </Heading>

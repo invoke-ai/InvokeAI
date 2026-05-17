@@ -15,11 +15,11 @@ import {
   selectRegionalGuidanceReferenceImage,
 } from 'features/controlLayers/store/selectors';
 import type {
+  CanvasBezierPathState,
   CanvasEntityStateFromType,
   CanvasEntityType,
   CanvasInpaintMaskState,
   CanvasMetadata,
-  CanvasBezierPathState,
   ChannelName,
   ChannelPoints,
   CompositeOperation,
@@ -1502,7 +1502,7 @@ const slice = createSlice({
       if (newEntity.name) {
         newEntity.name = `${newEntity.name} (Copy)`;
       }
-        switch (newEntity.type) {
+      switch (newEntity.type) {
         case 'raster_layer': {
           newEntity.id = getPrefixedId('raster_layer');
           const newEntityIndex = state.rasterLayers.entities.findIndex((e) => e.id === entityIdentifier.id) + 1;
@@ -1515,32 +1515,34 @@ const slice = createSlice({
           state.controlLayers.entities.splice(newEntityIndex, 0, newEntity);
           break;
         }
-          case 'regional_guidance': {
-            newEntity.id = getPrefixedId('regional_guidance');
-            for (const refImage of newEntity.referenceImages) {
-              refImage.id = getPrefixedId('regional_guidance_ip_adapter');
-            }
-            const newEntityIndex = state.regionalGuidance.entities.findIndex((e) => e.id === entityIdentifier.id) + 1;
-            state.regionalGuidance.entities.splice(newEntityIndex, 0, newEntity);
-            break;
+        case 'regional_guidance': {
+          newEntity.id = getPrefixedId('regional_guidance');
+          for (const refImage of newEntity.referenceImages) {
+            refImage.id = getPrefixedId('regional_guidance_ip_adapter');
           }
-          case 'inpaint_mask': {
-            newEntity.id = getPrefixedId('inpaint_mask');
-            const newEntityIndex = state.inpaintMasks.entities.findIndex((e) => e.id === entityIdentifier.id) + 1;
-            state.inpaintMasks.entities.splice(newEntityIndex, 0, newEntity);
-            break;
-          }
-          case 'vector_layer': {
-            newEntity.id = getPrefixedId('vector_layer');
-            newEntity.paths = newEntity.paths.map((path): CanvasBezierPathState => ({
+          const newEntityIndex = state.regionalGuidance.entities.findIndex((e) => e.id === entityIdentifier.id) + 1;
+          state.regionalGuidance.entities.splice(newEntityIndex, 0, newEntity);
+          break;
+        }
+        case 'inpaint_mask': {
+          newEntity.id = getPrefixedId('inpaint_mask');
+          const newEntityIndex = state.inpaintMasks.entities.findIndex((e) => e.id === entityIdentifier.id) + 1;
+          state.inpaintMasks.entities.splice(newEntityIndex, 0, newEntity);
+          break;
+        }
+        case 'vector_layer': {
+          newEntity.id = getPrefixedId('vector_layer');
+          newEntity.paths = newEntity.paths.map(
+            (path): CanvasBezierPathState => ({
               ...path,
               id: getPrefixedId('bezier_path'),
-            }));
-            const newEntityIndex = state.vectorLayers.entities.findIndex((e) => e.id === entityIdentifier.id) + 1;
-            state.vectorLayers.entities.splice(newEntityIndex, 0, newEntity);
-            break;
-          }
+            })
+          );
+          const newEntityIndex = state.vectorLayers.entities.findIndex((e) => e.id === entityIdentifier.id) + 1;
+          state.vectorLayers.entities.splice(newEntityIndex, 0, newEntity);
+          break;
         }
+      }
 
       state.selectedEntityIdentifier = getEntityIdentifier(newEntity);
     },

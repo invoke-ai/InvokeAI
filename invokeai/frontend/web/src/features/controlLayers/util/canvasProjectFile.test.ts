@@ -1,6 +1,5 @@
-import { describe, expect, it } from 'vitest';
-
 import { getInitialCanvasState } from 'features/controlLayers/store/types';
+import { describe, expect, it } from 'vitest';
 
 import { parseCanvasProjectState } from './canvasProjectFile';
 

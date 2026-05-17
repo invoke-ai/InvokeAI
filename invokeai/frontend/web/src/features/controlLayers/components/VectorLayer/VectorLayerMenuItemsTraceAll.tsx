@@ -2,8 +2,8 @@ import { MenuItem } from '@invoke-ai/ui-library';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useEntityAdapterSafe } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import type { CanvasBrushLineState, CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import type { CanvasBrushLineState, CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { approximateBezierPath } from 'features/controlLayers/util/bezierPath';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,14 +14,13 @@ export const VectorLayerMenuItemsTraceAll = memo(() => {
   const canvasManager = useCanvasManager();
   const entityIdentifier = useEntityIdentifierContext('vector_layer');
   const adapter = useEntityAdapterSafe(entityIdentifier);
-
-  if (!adapter || adapter.state.type !== 'vector_layer') {
-    return null;
-  }
-
-  const { paths, position } = adapter.state;
-
   const onClick = useCallback(() => {
+    if (!adapter || adapter.state.type !== 'vector_layer') {
+      return;
+    }
+
+    const { paths, position } = adapter.state;
+
     const editSession = canvasManager.tool.tools.path.$editSession.get();
     if (
       editSession &&
@@ -63,7 +62,13 @@ export const VectorLayerMenuItemsTraceAll = memo(() => {
         objects,
       } satisfies Partial<CanvasRasterLayerState>,
     });
-  }, [adapter.entityIdentifier.id, adapter.entityIdentifier.type, canvasManager, paths, position]);
+  }, [adapter, canvasManager]);
+
+  if (!adapter || adapter.state.type !== 'vector_layer') {
+    return null;
+  }
+
+  const { paths } = adapter.state;
 
   return (
     <MenuItem onClick={onClick} icon={<PiWaveSineBold />} isDisabled={paths.length === 0}>

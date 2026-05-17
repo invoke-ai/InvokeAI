@@ -6,10 +6,10 @@ const VECTOR_PATH_STROKE = 'rgba(90, 175, 255, 1)';
 const VECTOR_PATH_STROKE_WIDTH = 1.5;
 
 export class CanvasEntityVectorLayerRenderer extends CanvasEntityObjectRenderer {
-  render = async (): Promise<boolean> => {
+  render = (): Promise<boolean> => {
     if (this.parent.state.type !== 'vector_layer') {
       this.konva.objectGroup.destroyChildren();
-      return false;
+      return Promise.resolve(false);
     }
 
     this.konva.objectGroup.destroyChildren();
@@ -43,7 +43,7 @@ export class CanvasEntityVectorLayerRenderer extends CanvasEntityObjectRenderer 
     }
 
     this.syncKonvaCache(didRender);
-    return didRender;
+    return Promise.resolve(didRender);
   };
 
   needsPixelBbox = (): boolean => {

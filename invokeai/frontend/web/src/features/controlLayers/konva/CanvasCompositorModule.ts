@@ -400,7 +400,12 @@ export class CanvasCompositorModule extends CanvasModuleBase {
         break;
       case 'vector_layer':
         this.log.warn('Merging into a vector layer is not supported');
-        toast({ id: 'MERGE_LAYERS_TOAST', title: t('controlLayers.mergeVisibleError'), status: 'error', withCount: false });
+        toast({
+          id: 'MERGE_LAYERS_TOAST',
+          title: t('controlLayers.mergeVisibleError'),
+          status: 'error',
+          withCount: false,
+        });
         return null;
       default:
         assert<Equals<typeof type, never>>(false, 'Unsupported type for merge');

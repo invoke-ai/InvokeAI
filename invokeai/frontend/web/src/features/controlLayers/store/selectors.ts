@@ -12,7 +12,6 @@ import type {
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
   CanvasState,
-  CanvasVectorLayerState,
 } from 'features/controlLayers/store/types';
 import type { BaseModelType } from 'features/nodes/types/common';
 import { getGridSize, getOptimalDimension } from 'features/parameters/util/optimalDimension';

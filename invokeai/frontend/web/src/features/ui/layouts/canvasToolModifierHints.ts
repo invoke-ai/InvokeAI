@@ -203,7 +203,14 @@ export const getCanvasToolModifierHintIds = ({
     move: () => ['arrowKeysNudgeSelection', ...SHARED_HINT_IDS],
     path: ({ isEditingPathSession }) =>
       isEditingPathSession
-        ? ['shiftInsertPathPoint', 'modDeletePathPoint', 'enterAcceptPathEdit', 'escDiscardPathEdit', 'spacePan', 'altPickColor']
+        ? [
+            'shiftInsertPathPoint',
+            'modDeletePathPoint',
+            'enterAcceptPathEdit',
+            'escDiscardPathEdit',
+            'spacePan',
+            'altPickColor',
+          ]
         : ['shiftSnap45Degrees', 'enterFinishPath', 'escCancelPath', 'spacePan', 'altPickColor'],
     text: ({ hasActiveTextSession: active }) =>
       active

@@ -440,7 +440,6 @@ const zCanvasEntityBase = z.object({
 });
 
 const zBezierPointType = z.enum(['smooth', 'corner']);
-export type BezierPointType = z.infer<typeof zBezierPointType>;
 
 const zCanvasBezierPointState = z.object({
   anchor: zCoordinate,

@@ -3,12 +3,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
 import { addCoords, floorCoord, getPrefixedId, offsetCoord } from 'features/controlLayers/konva/util';
-import type {
-  CanvasBezierPathState,
-  CanvasBezierPointState,
-  CanvasEntityIdentifier,
-  Coordinate,
-} from 'features/controlLayers/store/types';
+import type { CanvasBezierPathState, CanvasEntityIdentifier, Coordinate } from 'features/controlLayers/store/types';
 import { getBezierPathState } from 'features/controlLayers/store/util';
 import {
   anchorsToBezierPoints,
@@ -759,13 +754,17 @@ export class CanvasPathToolModule extends CanvasModuleBase {
       const outHandle = normalizeHandle(bezierPoint.anchor, point);
       bezierPoint.type = 'smooth';
       bezierPoint.outHandle = outHandle;
-      bezierPoint.inHandle = outHandle ? normalizeHandle(bezierPoint.anchor, mirrorHandle(bezierPoint.anchor, outHandle)) : null;
+      bezierPoint.inHandle = outHandle
+        ? normalizeHandle(bezierPoint.anchor, mirrorHandle(bezierPoint.anchor, outHandle))
+        : null;
     } else {
       bezierPoint[session.dragTarget.type] = normalizeHandle(bezierPoint.anchor, point);
       if (bezierPoint.type === 'smooth') {
         const oppositeHandleType = session.dragTarget.type === 'inHandle' ? 'outHandle' : 'inHandle';
         const handle = bezierPoint[session.dragTarget.type];
-        bezierPoint[oppositeHandleType] = handle ? normalizeHandle(bezierPoint.anchor, mirrorHandle(bezierPoint.anchor, handle)) : null;
+        bezierPoint[oppositeHandleType] = handle
+          ? normalizeHandle(bezierPoint.anchor, mirrorHandle(bezierPoint.anchor, handle))
+          : null;
       }
     }
 
@@ -810,7 +809,11 @@ export class CanvasPathToolModule extends CanvasModuleBase {
         if (distance > hitRadius) {
           continue;
         }
-        if (!bestHit || distance < bestHit.distance || (distance === bestHit.distance && pathOrder > bestHit.pathOrder)) {
+        if (
+          !bestHit ||
+          distance < bestHit.distance ||
+          (distance === bestHit.distance && pathOrder > bestHit.pathOrder)
+        ) {
           bestHit = { pathId: path.id, pointIndex, distance, pathOrder };
         }
       }
@@ -873,7 +876,11 @@ export class CanvasPathToolModule extends CanvasModuleBase {
       if (!hit || hit.distance > hitTolerance) {
         continue;
       }
-      if (!bestHit || hit.distance < bestHit.distance || (hit.distance === bestHit.distance && pathOrder > bestHit.pathOrder)) {
+      if (
+        !bestHit ||
+        hit.distance < bestHit.distance ||
+        (hit.distance === bestHit.distance && pathOrder > bestHit.pathOrder)
+      ) {
         bestHit = { pathId: path.id, distance: hit.distance, pathOrder };
       }
     }

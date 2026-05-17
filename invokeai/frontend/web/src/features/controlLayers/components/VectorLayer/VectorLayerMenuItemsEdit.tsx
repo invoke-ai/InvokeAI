@@ -13,17 +13,17 @@ export const VectorLayerMenuItemsEdit = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('vector_layer');
   const adapter = useEntityAdapterSafe(entityIdentifier);
   const editSession = useStore(canvasManager.tool.tools.path.$editSession);
+  const onClick = useCallback(() => {
+    canvasManager.tool.tools.path.startEdit(entityIdentifier);
+  }, [canvasManager.tool.tools.path, entityIdentifier]);
 
   if (!adapter || adapter.state.type !== 'vector_layer') {
     return null;
   }
 
   const isEditingThisLayer =
-    editSession?.entityIdentifier.id === entityIdentifier.id && editSession.entityIdentifier.type === entityIdentifier.type;
-
-  const onClick = useCallback(() => {
-    canvasManager.tool.tools.path.startEdit(entityIdentifier);
-  }, [canvasManager.tool.tools.path, entityIdentifier]);
+    editSession?.entityIdentifier.id === entityIdentifier.id &&
+    editSession.entityIdentifier.type === entityIdentifier.type;
 
   return (
     <MenuItem

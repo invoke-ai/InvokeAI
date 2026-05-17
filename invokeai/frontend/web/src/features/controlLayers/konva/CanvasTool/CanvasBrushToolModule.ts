@@ -292,10 +292,7 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
 
     if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
       // We need to get the last point of the last line to create a straight line if shift is held
-      const lastLinePoint = getLastPointOfLastLineWithPressure(
-        selectedEntityState.objects,
-        'brush_line_with_pressure'
-      );
+      const lastLinePoint = getLastPointOfLastLineWithPressure(selectedEntityState.objects, 'brush_line_with_pressure');
 
       let points: number[];
 
