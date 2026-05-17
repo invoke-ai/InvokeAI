@@ -118,7 +118,7 @@ class AnimaCheckpointModel(ModelLoader):
 
         # Determine safe dtype
         target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        model_dtype = TorchDevice.choose_anima_inference_dtype(target_device)
 
         # Handle memory management
         new_sd_size = sum(ten.nelement() * model_dtype.itemsize for ten in sd.values())
