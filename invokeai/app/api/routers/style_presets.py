@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse
 from PIL import Image
 from pydantic import BaseModel, Field
 
+from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.model_manager import IMAGE_MAX_AGE
 from invokeai.app.services.style_preset_images.style_preset_images_common import StylePresetImageFileNotFoundException
@@ -44,6 +45,7 @@ style_presets_router = APIRouter(prefix="/v1/style_presets", tags=["style_preset
     },
 )
 async def get_style_preset(
+    current_user: CurrentUserOrDefault,
     style_preset_id: str = Path(description="The style preset to get"),
 ) -> StylePresetRecordWithImage:
     """Gets a style preset"""
@@ -63,11 +65,26 @@ async def get_style_preset(
     },
 )
 async def update_style_preset(
+    current_user: CurrentUserOrDefault,
     image: Optional[UploadFile] = File(description="The image file to upload", default=None),
     style_preset_id: str = Path(description="The id of the style preset to update"),
     data: str = Form(description="The data of the style preset to update"),
 ) -> StylePresetRecordWithImage:
     """Updates a style preset"""
+    # Validate the data payload BEFORE any image-state mutation so a malformed
+    # request can't leave the preset image partially updated.
+    try:
+        parsed_data = json.loads(data)
+        validated_data = StylePresetFormData(**parsed_data)
+
+        name = validated_data.name
+        type = validated_data.type
+        positive_prompt = validated_data.positive_prompt
+        negative_prompt = validated_data.negative_prompt
+
+    except (json.JSONDecodeError, pydantic.ValidationError):
+        raise HTTPException(status_code=400, detail="Invalid preset data")
+
     if image is not None:
         if not image.content_type or not image.content_type.startswith("image"):
             raise HTTPException(status_code=415, detail="Not an image")
@@ -90,18 +107,6 @@ async def update_style_preset(
         except StylePresetImageFileNotFoundException:
             pass
 
-    try:
-        parsed_data = json.loads(data)
-        validated_data = StylePresetFormData(**parsed_data)
-
-        name = validated_data.name
-        type = validated_data.type
-        positive_prompt = validated_data.positive_prompt
-        negative_prompt = validated_data.negative_prompt
-
-    except pydantic.ValidationError:
-        raise HTTPException(status_code=400, detail="Invalid preset data")
-
     preset_data = PresetData(positive_prompt=positive_prompt, negative_prompt=negative_prompt)
     changes = StylePresetChanges(name=name, preset_data=preset_data, type=type)
 
@@ -117,6 +122,7 @@ async def update_style_preset(
     operation_id="delete_style_preset",
 )
 async def delete_style_preset(
+    current_user: CurrentUserOrDefault,
     style_preset_id: str = Path(description="The style preset to delete"),
 ) -> None:
     """Deletes a style preset"""
@@ -136,6 +142,7 @@ async def delete_style_preset(
     },
 )
 async def create_style_preset(
+    current_user: CurrentUserOrDefault,
     image: Optional[UploadFile] = File(description="The image file to upload", default=None),
     data: str = Form(description="The data of the style preset to create"),
 ) -> StylePresetRecordWithImage:
@@ -150,7 +157,7 @@ async def create_style_preset(
         positive_prompt = validated_data.positive_prompt
         negative_prompt = validated_data.negative_prompt
 
-    except pydantic.ValidationError:
+    except (json.JSONDecodeError, pydantic.ValidationError):
         raise HTTPException(status_code=400, detail="Invalid preset data")
 
     preset_data = PresetData(positive_prompt=positive_prompt, negative_prompt=negative_prompt)
@@ -185,7 +192,7 @@ async def create_style_preset(
         200: {"model": list[StylePresetRecordWithImage]},
     },
 )
-async def list_style_presets() -> list[StylePresetRecordWithImage]:
+async def list_style_presets(current_user: CurrentUserOrDefault) -> list[StylePresetRecordWithImage]:
     """Gets a page of style presets"""
     style_presets_with_image: list[StylePresetRecordWithImage] = []
     style_presets = ApiDependencies.invoker.services.style_preset_records.get_many()
@@ -210,6 +217,7 @@ async def list_style_presets() -> list[StylePresetRecordWithImage]:
     status_code=200,
 )
 async def get_style_preset_image(
+    current_user: CurrentUserOrDefault,
     style_preset_id: str = Path(description="The id of the style preset image to get"),
 ) -> FileResponse:
     """Gets an image file that previews the model"""
@@ -235,7 +243,7 @@ async def get_style_preset_image(
     responses={200: {"content": {"text/csv": {}}, "description": "A CSV file with the requested data."}},
     status_code=200,
 )
-async def export_style_presets():
+async def export_style_presets(current_user: AdminUserOrDefault):
     # Create an in-memory stream to store the CSV data
     output = io.StringIO()
     writer = csv.writer(output)
@@ -262,7 +270,10 @@ async def export_style_presets():
     "/import",
     operation_id="import_style_presets",
 )
-async def import_style_presets(file: UploadFile = File(description="The file to import")):
+async def import_style_presets(
+    current_user: AdminUserOrDefault,
+    file: UploadFile = File(description="The file to import"),
+):
     try:
         style_presets = await parse_presets_from_file(file)
         ApiDependencies.invoker.services.style_preset_records.create_many(style_presets)
