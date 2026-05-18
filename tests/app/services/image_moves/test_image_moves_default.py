@@ -238,6 +238,26 @@ def test_startup_recovery_commits_after_files_moved_but_db_not_updated(tmp_path:
     assert service.get_job(job_id).state == "committed"
 
 
+def test_status_reports_unplanned_images_after_recovery(tmp_path: Path) -> None:
+    service, records = _service(tmp_path, strategy="date")
+    _save_image(service, records, "image-recovered.png", "", "2024-02-03 04:05:06.000", "red")
+    _save_image(service, records, "image-unplanned.png", "", "2024-02-04 04:05:06.000", "blue")
+    moves = service.plan_batch(last_image_name="", limit=1)
+    job_id = service.create_move_job(moves)
+    service.perform_filesystem_moves(job_id)
+
+    recovered = service.startup_recovery()
+    status = service.get_background_status()
+
+    assert recovered.committed == 1
+    assert records.get("image-recovered.png").image_subfolder == "2024/02/03"
+    assert records.get("image-unplanned.png").image_subfolder == ""
+    assert status.active_job_id is None
+    assert status.latest_job is not None
+    assert status.latest_job.state == "committed"
+    assert status.needs_move_count == 1
+
+
 def test_cleanup_empty_source_directories_after_move(tmp_path: Path) -> None:
     service, records = _service(tmp_path, strategy="date")
     image_name = "image-c.png"

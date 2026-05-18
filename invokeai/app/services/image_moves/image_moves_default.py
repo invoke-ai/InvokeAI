@@ -54,6 +54,7 @@ class ImageMoveBackgroundStatus:
     active_job_id: int | None
     latest_job: ImageMoveJob | None
     last_error: str | None
+    needs_move_count: int
 
 
 class ImageMoveJobAlreadyRunning(Exception):
@@ -195,6 +196,7 @@ class ImageMoveService:
             active_job_id=self._get_active_job_id(),
             latest_job=latest_job,
             last_error=self._last_background_error,
+            needs_move_count=self.count_images_needing_move(),
         )
 
     def move_all_images(self) -> ImageMoveResult:
@@ -260,6 +262,30 @@ class ImageMoveService:
     def plan_batch(self, last_image_name: str, limit: int) -> list[PlannedImageMove]:
         moves, _errors = self._plan_batch(last_image_name=last_image_name, limit=limit, record_missing_errors=False)
         return moves
+
+    def count_images_needing_move(self) -> int:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT image_name, image_subfolder, image_category, is_intermediate, created_at
+                FROM images
+                WHERE deleted_at IS NULL;
+                """
+            )
+            rows = cursor.fetchall()
+
+        count = 0
+        for row in rows:
+            old_subfolder = cast(str, row["image_subfolder"] or "")
+            new_subfolder = self._get_new_subfolder(
+                image_name=cast(str, row["image_name"]),
+                image_category=ImageCategory(row["image_category"]),
+                is_intermediate=bool(row["is_intermediate"]),
+                created_at=row["created_at"],
+            )
+            if new_subfolder != old_subfolder:
+                count += 1
+        return count
 
     def _plan_batch(
         self, last_image_name: str, limit: int, record_missing_errors: bool

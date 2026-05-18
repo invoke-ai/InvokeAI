@@ -1854,6 +1854,8 @@
         "imageStorageMaintenanceStateMoving": "Moving",
         "imageStorageMaintenanceStateNone": "No jobs",
         "imageStorageMaintenanceStatePlanned": "Planned",
+        "imageStorageMaintenanceStatusIncomplete_one": "{{count}} image still needs moving",
+        "imageStorageMaintenanceStatusIncomplete_other": "{{count}} images still need moving",
         "imageStorageMaintenanceStatusIdle": "Status: {{state}}",
         "imageStorageMaintenanceStatusNeedsRecovery": "Recovery needed for job {{jobId}}",
         "imageStorageMaintenanceStatusRunning": "Running: {{operation}}",

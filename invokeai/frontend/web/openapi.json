@@ -33544,10 +33544,15 @@
             ],
             "title": "Last Error",
             "description": "The last background worker error, if any."
+          },
+          "needs_move_count": {
+            "type": "integer",
+            "title": "Needs Move Count",
+            "description": "The number of images that do not match the current subfolder strategy."
           }
         },
         "type": "object",
-        "required": ["is_running"],
+        "required": ["is_running", "needs_move_count"],
         "title": "ImageMoveStatusResponse"
       },
       "ImageMultiplyInvocation": {

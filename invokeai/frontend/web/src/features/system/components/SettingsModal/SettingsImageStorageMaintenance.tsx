@@ -60,6 +60,7 @@ export const SettingsImageStorageMaintenance = memo(() => {
 
   const isRunning = status?.is_running ?? false;
   const latestJob = status?.latest_job;
+  const needsMoveCount = status?.needs_move_count ?? 0;
   const hasActiveJob = status?.active_job_id !== null && status?.active_job_id !== undefined;
   const isBusy = isRunning || startImageMoveState.isLoading || startImageMoveRecoveryState.isLoading;
 
@@ -99,8 +100,11 @@ export const SettingsImageStorageMaintenance = memo(() => {
     if (isRunning) {
       return t('settings.imageStorageMaintenanceStatusRunning', { operation: t(getOperationKey(status.operation)) });
     }
+    if (needsMoveCount > 0) {
+      return t('settings.imageStorageMaintenanceStatusIncomplete', { count: needsMoveCount });
+    }
     return t('settings.imageStorageMaintenanceStatusIdle', { state: t(getJobStateKey(latestJob?.state)) });
-  }, [hasActiveJob, isRunning, latestJob?.state, status, t]);
+  }, [hasActiveJob, isRunning, latestJob?.state, needsMoveCount, status, t]);
 
   const onStart = useCallback(async () => {
     try {

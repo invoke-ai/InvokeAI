@@ -100,6 +100,7 @@ def _status_payload(is_running: bool = True, operation: str = "move_all") -> dic
         "active_job_id": None,
         "latest_job": None,
         "last_error": None,
+        "needs_move_count": 0,
     }
 
 
@@ -173,6 +174,7 @@ def test_image_move_status_uses_service_status(client: TestClient, mock_invoker:
 
     assert response.status_code == status.HTTP_200_OK
     assert response.json()["is_running"] is False
+    assert response.json()["needs_move_count"] == 0
     image_moves.get_background_status.assert_called_once_with()
 
 

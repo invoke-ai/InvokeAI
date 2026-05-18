@@ -30,6 +30,7 @@ class ImageMoveStatusResponse(BaseModel):
     active_job_id: int | None = Field(default=None, description="The active journal job id, if any.")
     latest_job: ImageMoveJobResponse | None = Field(default=None, description="The latest journal job, if any.")
     last_error: str | None = Field(default=None, description="The last background worker error, if any.")
+    needs_move_count: int = Field(description="The number of images that do not match the current subfolder strategy.")
 
 
 def _get_image_move_service():
@@ -54,6 +55,7 @@ def _status_to_response(service_status: ImageMoveBackgroundStatus | dict) -> Ima
         active_job_id=service_status.active_job_id,
         latest_job=_job_to_response(service_status.latest_job),
         last_error=service_status.last_error,
+        needs_move_count=service_status.needs_move_count,
     )
 
 

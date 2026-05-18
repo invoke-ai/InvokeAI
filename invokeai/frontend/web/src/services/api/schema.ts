@@ -14401,6 +14401,11 @@ export type components = {
              * @description The last background worker error, if any.
              */
             last_error?: string | null;
+            /**
+             * Needs Move Count
+             * @description The number of images that do not match the current subfolder strategy.
+             */
+            needs_move_count: number;
         };
         /**
          * Multiply Images
