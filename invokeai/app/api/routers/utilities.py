@@ -108,9 +108,7 @@ def _run_expand_prompt(
         raise ValueError(f"Model '{model_key}' is not a TextLLM model (got {model_config.type})")
 
     if task_id is not None:
-        events.emit_llm_task_progress(
-            task_id=task_id, user_id=user_id, phase="loading_model", message="Loading model"
-        )
+        events.emit_llm_task_progress(task_id=task_id, user_id=user_id, phase="loading_model", message="Loading model")
 
     with _model_load_lock:
         loaded_model = model_manager.load.load_model(model_config)
@@ -219,9 +217,7 @@ def _run_image_to_prompt(
         raise ValueError(f"Model '{model_key}' is not a LLaVA OneVision model (got {model_config.type})")
 
     if task_id is not None:
-        events.emit_llm_task_progress(
-            task_id=task_id, user_id=user_id, phase="loading_model", message="Loading model"
-        )
+        events.emit_llm_task_progress(task_id=task_id, user_id=user_id, phase="loading_model", message="Loading model")
 
     with _model_load_lock:
         loaded_model = model_manager.load.load_model(model_config)
