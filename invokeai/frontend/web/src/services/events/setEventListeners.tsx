@@ -38,11 +38,10 @@ import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi } from 'services/api/endpoints/queue';
+import { clearCompletedInvocationKeysForQueueItem } from 'services/events/invocationTracking';
 import {
-  clearCompletedInvocationKeysForQueueItem,
-  shouldIgnoreFinishedQueueItemInvocationEvent,
-} from 'services/events/invocationTracking';
-import {
+  getCompletedInvocationIdsFromCompletedSession,
+  getNodeExecutionStatesFromCompletedSession,
   getUpdatedNodeExecutionStateOnInvocationError,
   getUpdatedNodeExecutionStateOnInvocationProgress,
   getUpdatedNodeExecutionStateOnInvocationStarted,
@@ -50,6 +49,11 @@ import {
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import { buildOnModelInstallError, DiscordLink, GitHubIssuesLink } from 'services/events/onModelInstallError';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
+import {
+  createWorkflowExecutionState,
+  transitionWorkflowExecutionState,
+  type WorkflowExecutionState,
+} from 'services/events/workflowExecutionState';
 import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
 
@@ -72,10 +76,18 @@ const selectModelInstalls = modelsApi.endpoints.listModelInstalls.select();
 export const setEventListeners = ({ socket, store, setIsConnected }: SetEventListenersArg) => {
   const { dispatch, getState } = store;
 
-  // We can have race conditions where we receive a progress event for a queue item that has already finished. Easiest
-  // way to handle this is to keep track of finished queue items in a cache and ignore progress events for those.
-  const finishedQueueItemIds = new LRUCache<number, boolean>({ max: 100 });
+  const workflowExecutionStates = new LRUCache<number, WorkflowExecutionState>({ max: 100 });
   const completedInvocationKeysByItemId = new Map<number, Set<string>>();
+
+  const transitionWorkflowEvent = (
+    itemId: number,
+    event: Parameters<typeof transitionWorkflowExecutionState>[1]
+  ): boolean => {
+    const state = workflowExecutionStates.get(itemId) ?? createWorkflowExecutionState();
+    const transition = transitionWorkflowExecutionState(state, event);
+    workflowExecutionStates.set(itemId, transition.state);
+    return transition.shouldApply;
+  };
 
   socket.on('connect', () => {
     log.debug('Connected');
@@ -113,7 +125,13 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('invocation_started', (data) => {
-    if (shouldIgnoreFinishedQueueItemInvocationEvent('invocation_started', finishedQueueItemIds, data.item_id)) {
+    if (
+      !transitionWorkflowEvent(data.item_id, {
+        type: 'invocation_started',
+        itemId: data.item_id,
+        invocationId: data.invocation.id,
+      })
+    ) {
       return;
     }
     const { invocation_source_id, invocation } = data;
@@ -130,7 +148,13 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('invocation_progress', (data) => {
-    if (shouldIgnoreFinishedQueueItemInvocationEvent('invocation_progress', finishedQueueItemIds, data.item_id)) {
+    if (
+      !transitionWorkflowEvent(data.item_id, {
+        type: 'invocation_progress',
+        itemId: data.item_id,
+        invocationId: data.invocation.id,
+      })
+    ) {
       log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
       return;
     }
@@ -163,6 +187,15 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('invocation_error', (data) => {
+    if (
+      !transitionWorkflowEvent(data.item_id, {
+        type: 'invocation_error',
+        itemId: data.item_id,
+        invocationId: data.invocation.id,
+      })
+    ) {
+      return;
+    }
     const { invocation_source_id, invocation } = data;
     log.error({ data } as JsonObject, `Invocation error (${invocation.type}, ${invocation_source_id})`);
     const nes = $nodeExecutionStates.get()[invocation_source_id];
@@ -177,7 +210,18 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   const onInvocationComplete = buildOnInvocationComplete(getState, dispatch, completedInvocationKeysByItemId);
-  socket.on('invocation_complete', onInvocationComplete);
+  socket.on('invocation_complete', (data) => {
+    if (
+      !transitionWorkflowEvent(data.item_id, {
+        type: 'invocation_complete',
+        itemId: data.item_id,
+        invocationId: data.invocation.id,
+      })
+    ) {
+      return;
+    }
+    onInvocationComplete(data);
+  });
 
   socket.on('model_load_started', (data) => {
     const { config, submodel_type } = data;
@@ -389,8 +433,13 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('queue_item_status_changed', (data) => {
-    if (finishedQueueItemIds.has(data.item_id)) {
-      log.trace({ data }, `Received event for already-finished queue item ${data.item_id}`);
+    if (
+      !transitionWorkflowEvent(data.item_id, {
+        type: 'queue_item_status_changed',
+        itemId: data.item_id,
+        status: data.status,
+      })
+    ) {
       return;
     }
 
@@ -403,6 +452,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       error_type,
       error_message,
       destination,
+      origin,
       started_at,
       updated_at,
       completed_at,
@@ -477,7 +527,6 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         $nodeExecutionStates.setKey(clone.nodeId, clone);
       });
     } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
-      finishedQueueItemIds.set(item_id, true);
       clearCompletedInvocationKeysForQueueItem(completedInvocationKeysByItemId, item_id);
       if (status === 'failed' && error_type) {
         toast({
@@ -491,6 +540,30 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       }
       // If the queue item is completed, failed, or cancelled, we want to clear the last progress event
       $lastProgressEvent.set(null);
+
+      if (status === 'completed' && origin === 'workflows') {
+        const req = dispatch(
+          queueApi.endpoints.getQueueItem.initiate(item_id, { forceRefetch: true, subscribe: false })
+        );
+        req
+          .unwrap()
+          .then((queueItem) => {
+            if (queueItem.status !== 'completed') {
+              return;
+            }
+            transitionWorkflowEvent(item_id, {
+              type: 'completed_session_reconciled',
+              itemId: item_id,
+              completedInvocationIds: getCompletedInvocationIdsFromCompletedSession(queueItem.session),
+            });
+            for (const nodeExecutionState of getNodeExecutionStatesFromCompletedSession(queueItem.session)) {
+              upsertExecutionState(nodeExecutionState.nodeId, nodeExecutionState);
+            }
+          })
+          .catch((error) => {
+            log.debug({ error }, `Unable to reconcile completed workflow queue item ${item_id}`);
+          });
+      }
     }
   });
 
