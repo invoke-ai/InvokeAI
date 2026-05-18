@@ -140,7 +140,12 @@ vi.mock('services/api/types', async () => {
   };
 });
 
-import { buildQwenImageGraph, isQwenImageEditModel, shouldUseCfg } from './buildQwenImageGraph';
+import {
+  buildQwenImageGraph,
+  calculateQwenImageEditRefDimensions,
+  isQwenImageEditModel,
+  shouldUseCfg,
+} from './buildQwenImageGraph';
 
 describe('isQwenImageEditModel', () => {
   afterEach(() => {
@@ -413,5 +418,82 @@ describe('buildQwenImageGraph', () => {
     expect(hasReferenceCollectionNode).toBe(false);
     expect(hasReferenceImagesEdge).toBe(false);
     expect(hasReferenceLatentsEdge).toBe(false);
+  });
+});
+
+describe('calculateQwenImageEditRefDimensions', () => {
+  // Cross-checked against diffusers' calculate_dimensions(1024*1024, ratio)
+  // (see pipeline_qwenimage_edit.py / pipeline_qwenimage_edit_plus.py).
+  it('produces ~1024² area for a square input', () => {
+    const result = calculateQwenImageEditRefDimensions(512, 512);
+    expect(result).toEqual({ width: 1024, height: 1024 });
+  });
+
+  it('preserves aspect ratio for landscape inputs', () => {
+    expect(calculateQwenImageEditRefDimensions(1600, 1200)).toEqual({ width: 1184, height: 896 });
+    expect(calculateQwenImageEditRefDimensions(1920, 1080)).toEqual({ width: 1376, height: 768 });
+  });
+
+  it('preserves aspect ratio for portrait inputs', () => {
+    expect(calculateQwenImageEditRefDimensions(1200, 1600)).toEqual({ width: 896, height: 1184 });
+    expect(calculateQwenImageEditRefDimensions(1080, 1920)).toEqual({ width: 768, height: 1376 });
+  });
+
+  it('snaps dimensions to multiples of 32', () => {
+    const { width, height } = calculateQwenImageEditRefDimensions(1600, 1200);
+    expect(width % 32).toBe(0);
+    expect(height % 32).toBe(0);
+  });
+
+  it('clamps to a minimum of 32 for extreme aspect ratios', () => {
+    // 50000x100 has aspect ratio 500:1 — height would round to 0 without the clamp.
+    const { width, height } = calculateQwenImageEditRefDimensions(50000, 100);
+    expect(height).toBeGreaterThanOrEqual(32);
+    expect(width).toBeGreaterThanOrEqual(32);
+    expect(width % 32).toBe(0);
+    expect(height % 32).toBe(0);
+  });
+
+  it('passes computed dims as width/height to the reference i2l node', async () => {
+    const { selectMainModelConfig } = await import('features/controlLayers/store/paramsSlice');
+    const editModel = { ...model, variant: 'edit' };
+    vi.mocked(selectMainModelConfig).mockReturnValue(editModel as never);
+
+    const { fetchModelConfigWithTypeGuard } = await import('features/metadata/util/modelFetchingHelpers');
+    vi.mocked(fetchModelConfigWithTypeGuard).mockResolvedValue(editModel as never);
+
+    const { selectRefImagesSlice } = await import('features/controlLayers/store/refImagesSlice');
+    vi.mocked(selectRefImagesSlice).mockReturnValue({
+      entities: [
+        {
+          id: 'ref-image-1',
+          isEnabled: true,
+          config: {
+            type: 'qwen_image_reference_image',
+            image: { original: { image: { image_name: 'ref.png', width: 1600, height: 1200 } } },
+          },
+        },
+      ],
+    } as never);
+
+    const { g } = await buildQwenImageGraph({
+      generationMode: 'txt2img',
+      manager: null,
+      state: {
+        system: { shouldUseNSFWChecker: false, shouldUseWatermarker: false },
+      } as never,
+    });
+
+    const graph = g.getGraph();
+    const refI2lNodeId = Object.keys(graph.nodes).find((id) => id.startsWith('qwen_ref_i2l:'));
+    expect(refI2lNodeId).toBeDefined();
+    const refI2lNode = graph.nodes[refI2lNodeId!] as { width?: number; height?: number };
+    expect(refI2lNode.width).toBe(1184);
+    expect(refI2lNode.height).toBe(896);
+
+    // Restore mocks
+    vi.mocked(selectMainModelConfig).mockReturnValue(model as never);
+    vi.mocked(fetchModelConfigWithTypeGuard).mockResolvedValue(model as never);
+    vi.mocked(selectRefImagesSlice).mockReturnValue(refImagesSlice as never);
   });
 });

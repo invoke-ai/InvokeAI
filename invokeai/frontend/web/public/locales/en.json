@@ -728,8 +728,8 @@
                 "desc": "Select the move tool."
             },
             "selectRectTool": {
-                "title": "Rect Tool",
-                "desc": "Select the rect tool."
+                "title": "Shapes Tool",
+                "desc": "Select the shapes tool."
             },
             "selectLassoTool": {
                 "title": "Lasso Tool",
@@ -2881,6 +2881,10 @@
             "polygon": "Polygon",
             "polygonHint": "Click to add points, click the first point to close."
         },
+        "shape": {
+            "rect": "Rect",
+            "oval": "Oval"
+        },
         "modifierHints": {
             "keys": {
                 "control": "Ctrl",
@@ -2896,11 +2900,12 @@
             },
             "labels": {
                 "pan": "Pan",
+                "moveShape": "Move shape",
                 "pickColor": "Pick color",
                 "straightLine": "Straight line",
                 "resizeBrush": "Resize brush",
                 "resizeEraser": "Resize eraser",
-                "subtractMask": "Subtract mask",
+                "erase": "Erase",
                 "snap45Degrees": "Snap to 45deg",
                 "lockAspectRatio": "Lock ratio",
                 "unlockAspectRatio": "Unlock ratio",
@@ -2917,6 +2922,7 @@
         "tool": {
             "brush": "Brush",
             "eraser": "Eraser",
+            "shapes": "Shapes",
             "rectangle": "Rectangle",
             "lasso": "Lasso",
             "gradient": "Gradient",
