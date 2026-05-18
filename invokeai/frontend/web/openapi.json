@@ -10921,6 +10921,22 @@
             "orig_default": null,
             "orig_required": false
           },
+          "noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Noise tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
           "denoise_mask": {
             "anyOf": [
               {
@@ -11117,7 +11133,7 @@
         "tags": ["image", "anima"],
         "title": "Denoise - Anima",
         "type": "object",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -15925,6 +15941,22 @@
             "orig_default": null,
             "orig_required": false
           },
+          "noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Noise tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
           "denoise_mask": {
             "anyOf": [
               {
@@ -16086,7 +16118,7 @@
         "tags": ["image", "cogview4"],
         "title": "Denoise - CogView4",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -24671,7 +24703,7 @@
         }
       },
       "Flux2DenoiseInvocation": {
-        "category": "image",
+        "category": "latents",
         "class": "invocation",
         "classification": "prototype",
         "description": "Run denoising process with a FLUX.2 Klein transformer model.\n\nThis node is designed for FLUX.2 Klein models which use Qwen3 as the text encoder.\nIt does not support ControlNet, IP-Adapters, or regional prompting.",
@@ -24712,6 +24744,22 @@
             ],
             "default": null,
             "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Noise tensor",
             "field_kind": "input",
             "input": "connection",
             "orig_default": null,
@@ -26161,6 +26209,22 @@
             "orig_default": null,
             "orig_required": false
           },
+          "noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Noise tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
           "denoise_mask": {
             "anyOf": [
               {
@@ -26592,7 +26656,7 @@
         "tags": ["image", "flux"],
         "title": "FLUX Denoise",
         "type": "object",
-        "version": "4.5.1",
+        "version": "4.6.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -26655,6 +26719,22 @@
             ],
             "default": null,
             "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Noise tensor",
             "field_kind": "input",
             "input": "connection",
             "orig_default": null,
@@ -57695,7 +57775,7 @@
         "category": "latents",
         "class": "invocation",
         "classification": "stable",
-        "description": "Generates latent noise.",
+        "description": "Generates latent noise for supported denoiser architectures.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -57721,6 +57801,17 @@
             "field_kind": "node_attribute",
             "title": "Use Cache",
             "type": "boolean"
+          },
+          "noise_type": {
+            "default": "SD",
+            "description": "Architecture-specific noise type.",
+            "enum": ["SD", "FLUX", "FLUX.2", "SD3", "CogView4", "Z-Image", "Anima"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "SD",
+            "orig_required": false,
+            "title": "Noise Type",
+            "type": "string"
           },
           "seed": {
             "default": 0,
@@ -57780,7 +57871,7 @@
         "tags": ["latents", "noise"],
         "title": "Create Latent Noise",
         "type": "object",
-        "version": "1.0.3",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/NoiseOutput"
         }
@@ -62777,6 +62868,22 @@
             "orig_default": null,
             "orig_required": false
           },
+          "noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Noise tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
           "denoise_mask": {
             "anyOf": [
               {
@@ -62938,7 +63045,7 @@
         "tags": ["image", "sd3"],
         "title": "Denoise - SD3",
         "type": "object",
-        "version": "1.1.1",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -72895,6 +73002,22 @@
             "orig_default": null,
             "orig_required": false
           },
+          "noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Noise tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
           "denoise_mask": {
             "anyOf": [
               {
@@ -73138,7 +73261,7 @@
         "tags": ["image", "z-image"],
         "title": "Denoise - Z-Image",
         "type": "object",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -73201,6 +73324,22 @@
             ],
             "default": null,
             "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Noise tensor",
             "field_kind": "input",
             "input": "connection",
             "orig_default": null,
@@ -73449,7 +73588,7 @@
         "tags": ["z-image", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - Z-Image + Metadata",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
