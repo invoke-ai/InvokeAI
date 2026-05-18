@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from pyparsing import ParseException
 from transformers import AutoProcessor, AutoTokenizer, LlavaOnevisionForConditionalGeneration, LlavaOnevisionProcessor
 
+from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
@@ -71,6 +72,9 @@ class ExpandPromptRequest(BaseModel):
     model_key: str
     max_tokens: int = Field(default=300, ge=1, le=2048)
     system_prompt: str | None = None
+    task_id: str | None = Field(
+        default=None, description="Client-supplied task ID used to correlate socket progress events to this request"
+    )
 
 
 class ExpandPromptResponse(BaseModel):
@@ -87,13 +91,26 @@ def _resolve_model_path(model_config_path: str) -> Path:
     return (base_models_path / model_path).resolve()
 
 
-def _run_expand_prompt(prompt: str, model_key: str, max_tokens: int, system_prompt: str | None) -> str:
+def _run_expand_prompt(
+    prompt: str,
+    model_key: str,
+    max_tokens: int,
+    system_prompt: str | None,
+    task_id: str | None,
+    user_id: str,
+) -> str:
     """Run text LLM inference synchronously (called from thread)."""
     model_manager = ApiDependencies.invoker.services.model_manager
+    events = ApiDependencies.invoker.services.events
     model_config = model_manager.store.get_model(model_key)
 
     if model_config.type != ModelType.TextLLM:
         raise ValueError(f"Model '{model_key}' is not a TextLLM model (got {model_config.type})")
+
+    if task_id is not None:
+        events.emit_llm_task_progress(
+            task_id=task_id, user_id=user_id, phase="loading_model", message="Loading model"
+        )
 
     with _model_load_lock:
         loaded_model = model_manager.load.load_model(model_config)
@@ -104,12 +121,28 @@ def _run_expand_prompt(prompt: str, model_key: str, max_tokens: int, system_prom
 
         pipeline = TextLLMPipeline(model, tokenizer)
         model_device = next(model.parameters()).device
+
+        progress_callback = None
+        if task_id is not None:
+
+            def progress_callback(current: int, total: int) -> None:
+                events.emit_llm_task_progress(
+                    task_id=task_id,
+                    user_id=user_id,
+                    phase="generating",
+                    message="Generating",
+                    percentage=(current / total) if total > 0 else None,
+                    current_tokens=current,
+                    total_tokens=total,
+                )
+
         output = pipeline.run(
             prompt=prompt,
             system_prompt=system_prompt or DEFAULT_SYSTEM_PROMPT,
             max_new_tokens=max_tokens,
             device=model_device,
             dtype=TorchDevice.choose_torch_dtype(),
+            progress_callback=progress_callback,
         )
 
     return output
@@ -122,8 +155,9 @@ def _run_expand_prompt(prompt: str, model_key: str, max_tokens: int, system_prom
         200: {"model": ExpandPromptResponse},
     },
 )
-async def expand_prompt(body: ExpandPromptRequest) -> ExpandPromptResponse:
+async def expand_prompt(body: ExpandPromptRequest, current_user: CurrentUserOrDefault) -> ExpandPromptResponse:
     """Expand a brief prompt into a detailed image generation prompt using a text LLM."""
+    events = ApiDependencies.invoker.services.events
     try:
         expanded = await asyncio.to_thread(
             _run_expand_prompt,
@@ -131,13 +165,23 @@ async def expand_prompt(body: ExpandPromptRequest) -> ExpandPromptResponse:
             body.model_key,
             body.max_tokens,
             body.system_prompt,
+            body.task_id,
+            current_user.user_id,
         )
+        if body.task_id is not None:
+            events.emit_llm_task_complete(task_id=body.task_id, user_id=current_user.user_id)
         return ExpandPromptResponse(expanded_prompt=expanded)
     except UnknownModelException:
+        if body.task_id is not None:
+            events.emit_llm_task_error(task_id=body.task_id, user_id=current_user.user_id, error="Model not found")
         raise HTTPException(status_code=404, detail=f"Model '{body.model_key}' not found")
     except ValueError as e:
+        if body.task_id is not None:
+            events.emit_llm_task_error(task_id=body.task_id, user_id=current_user.user_id, error=str(e))
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
+        if body.task_id is not None:
+            events.emit_llm_task_error(task_id=body.task_id, user_id=current_user.user_id, error=str(e))
         logger.error(f"Error expanding prompt: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -149,6 +193,9 @@ class ImageToPromptRequest(BaseModel):
     image_name: str
     model_key: str
     instruction: str = "Describe this image in detail for use as an AI image generation prompt."
+    task_id: str | None = Field(
+        default=None, description="Client-supplied task ID used to correlate socket progress events to this request"
+    )
 
 
 class ImageToPromptResponse(BaseModel):
@@ -156,13 +203,25 @@ class ImageToPromptResponse(BaseModel):
     error: str | None = None
 
 
-def _run_image_to_prompt(image_name: str, model_key: str, instruction: str) -> str:
+def _run_image_to_prompt(
+    image_name: str,
+    model_key: str,
+    instruction: str,
+    task_id: str | None,
+    user_id: str,
+) -> str:
     """Run LLaVA OneVision inference synchronously (called from thread)."""
     model_manager = ApiDependencies.invoker.services.model_manager
+    events = ApiDependencies.invoker.services.events
     model_config = model_manager.store.get_model(model_key)
 
     if model_config.type != ModelType.LlavaOnevision:
         raise ValueError(f"Model '{model_key}' is not a LLaVA OneVision model (got {model_config.type})")
+
+    if task_id is not None:
+        events.emit_llm_task_progress(
+            task_id=task_id, user_id=user_id, phase="loading_model", message="Loading model"
+        )
 
     with _model_load_lock:
         loaded_model = model_manager.load.load_model(model_config)
@@ -182,11 +241,27 @@ def _run_image_to_prompt(image_name: str, model_key: str, instruction: str) -> s
 
         pipeline = LlavaOnevisionPipeline(model, processor)
         model_device = next(model.parameters()).device
+
+        progress_callback = None
+        if task_id is not None:
+
+            def progress_callback(current: int, total: int) -> None:
+                events.emit_llm_task_progress(
+                    task_id=task_id,
+                    user_id=user_id,
+                    phase="generating",
+                    message="Generating",
+                    percentage=(current / total) if total > 0 else None,
+                    current_tokens=current,
+                    total_tokens=total,
+                )
+
         output = pipeline.run(
             prompt=instruction,
             images=[image],
             device=model_device,
             dtype=TorchDevice.choose_torch_dtype(),
+            progress_callback=progress_callback,
         )
 
     return output
@@ -199,22 +274,35 @@ def _run_image_to_prompt(image_name: str, model_key: str, instruction: str) -> s
         200: {"model": ImageToPromptResponse},
     },
 )
-async def image_to_prompt(body: ImageToPromptRequest) -> ImageToPromptResponse:
+async def image_to_prompt(body: ImageToPromptRequest, current_user: CurrentUserOrDefault) -> ImageToPromptResponse:
     """Generate a descriptive prompt from an image using a vision-language model."""
+    events = ApiDependencies.invoker.services.events
     try:
         prompt = await asyncio.to_thread(
             _run_image_to_prompt,
             body.image_name,
             body.model_key,
             body.instruction,
+            body.task_id,
+            current_user.user_id,
         )
+        if body.task_id is not None:
+            events.emit_llm_task_complete(task_id=body.task_id, user_id=current_user.user_id)
         return ImageToPromptResponse(prompt=prompt)
     except UnknownModelException:
+        if body.task_id is not None:
+            events.emit_llm_task_error(task_id=body.task_id, user_id=current_user.user_id, error="Model not found")
         raise HTTPException(status_code=404, detail=f"Model '{body.model_key}' not found")
     except ImageFileNotFoundException:
+        if body.task_id is not None:
+            events.emit_llm_task_error(task_id=body.task_id, user_id=current_user.user_id, error="Image not found")
         raise HTTPException(status_code=404, detail=f"Image '{body.image_name}' not found")
     except (ValueError, TypeError) as e:
+        if body.task_id is not None:
+            events.emit_llm_task_error(task_id=body.task_id, user_id=current_user.user_id, error=str(e))
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
+        if body.task_id is not None:
+            events.emit_llm_task_error(task_id=body.task_id, user_id=current_user.user_id, error=str(e))
         logger.error(f"Error generating prompt from image: {e}")
         raise HTTPException(status_code=500, detail=str(e))

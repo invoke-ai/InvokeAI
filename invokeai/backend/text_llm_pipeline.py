@@ -1,11 +1,17 @@
+import threading
+from typing import Callable
+
 import torch
-from transformers import PreTrainedModel, PreTrainedTokenizerBase
+from transformers import PreTrainedModel, PreTrainedTokenizerBase, TextIteratorStreamer
 
 DEFAULT_SYSTEM_PROMPT = (
     "You are an expert prompt writer for AI image generation. "
     "Given a brief description, expand it into a detailed, vivid prompt suitable for generating high-quality images. "
     "Only output the expanded prompt, nothing else."
 )
+
+
+ProgressCallback = Callable[[int, int], None]
 
 
 class TextLLMPipeline:
@@ -22,6 +28,7 @@ class TextLLMPipeline:
         max_new_tokens: int = 300,
         device: torch.device = torch.device("cpu"),
         dtype: torch.dtype = torch.float16,
+        progress_callback: ProgressCallback | None = None,
     ) -> str:
         # Build messages for chat template if supported, otherwise use raw prompt.
         if hasattr(self._tokenizer, "apply_chat_template") and self._tokenizer.chat_template is not None:
@@ -33,24 +40,51 @@ class TextLLMPipeline:
                 messages, tokenize=False, add_generation_prompt=True
             )
         else:
-            # Fallback for models without chat template
             if system_prompt:
                 formatted_prompt = f"{system_prompt}\n\nUser: {prompt}\nAssistant:"
             else:
                 formatted_prompt = prompt
 
         inputs = self._tokenizer(formatted_prompt, return_tensors="pt").to(device=device)
-        output = self._model.generate(
+
+        streamer = TextIteratorStreamer(self._tokenizer, skip_prompt=True, skip_special_tokens=True)
+        generation_kwargs = dict(
             **inputs,
             max_new_tokens=max_new_tokens,
             do_sample=True,
             temperature=0.7,
             top_p=0.9,
+            streamer=streamer,
         )
 
-        # Decode only the newly generated tokens (exclude the input prompt tokens).
-        input_length = inputs["input_ids"].shape[1]
-        generated_tokens = output[0][input_length:]
-        response = self._tokenizer.decode(generated_tokens, skip_special_tokens=True).strip()
+        # model.generate blocks until done; run it in a thread so we can consume the
+        # streamer iteratively and emit progress.
+        generation_error: list[BaseException] = []
 
-        return response
+        def _generate() -> None:
+            try:
+                self._model.generate(**generation_kwargs)
+            except BaseException as e:
+                generation_error.append(e)
+
+        thread = threading.Thread(target=_generate, daemon=True)
+        thread.start()
+
+        chunks: list[str] = []
+        token_count = 0
+        for chunk in streamer:
+            if not chunk:
+                continue
+            chunks.append(chunk)
+            # The streamer yields decoded text chunks rather than individual tokens.
+            # Re-tokenizing each chunk to count tokens is expensive; instead approximate
+            # by re-tokenizing the accumulated text. This is exact enough for a progress bar.
+            token_count = len(self._tokenizer.encode("".join(chunks), add_special_tokens=False))
+            if progress_callback is not None:
+                progress_callback(min(token_count, max_new_tokens), max_new_tokens)
+
+        thread.join()
+        if generation_error:
+            raise generation_error[0]
+
+        return "".join(chunks).strip()

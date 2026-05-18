@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, ClassVar, Coroutine, Generic, Optional, Protocol, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Coroutine, Generic, Literal, Optional, Protocol, TypeAlias, TypeVar
 
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.registry.payload_schema import registry as payload_schema
@@ -687,6 +687,51 @@ class BulkDownloadErrorEvent(BulkDownloadEventBase):
             error=error,
             user_id=user_id,
         )
+
+
+class LLMTaskEventBase(EventBase):
+    """Base class for LLM utility task events (expand-prompt, image-to-prompt).
+
+    These events are correlated to a specific HTTP request via a client-supplied
+    task_id and routed privately to the originating user so partial prompt content
+    is not broadcast.
+    """
+
+    task_id: str = Field(description="Client-supplied task ID correlating events to a single request")
+    user_id: str = Field(default="system", description="ID of the user who initiated the task")
+
+
+@payload_schema.register
+class LLMTaskProgressEvent(LLMTaskEventBase):
+    """Event model for llm_task_progress"""
+
+    __event_name__ = "llm_task_progress"
+
+    phase: Literal["loading_model", "generating"] = Field(description="Which phase of the task is in progress")
+    message: str = Field(description="A short message describing the current phase")
+    percentage: float | None = Field(
+        default=None, ge=0, le=1, description="Progress fraction in [0, 1]; omit for indeterminate progress"
+    )
+    current_tokens: int | None = Field(default=None, description="Number of tokens generated so far (generating phase)")
+    total_tokens: int | None = Field(
+        default=None, description="Max tokens the request will generate (generating phase)"
+    )
+
+
+@payload_schema.register
+class LLMTaskCompleteEvent(LLMTaskEventBase):
+    """Event model for llm_task_complete"""
+
+    __event_name__ = "llm_task_complete"
+
+
+@payload_schema.register
+class LLMTaskErrorEvent(LLMTaskEventBase):
+    """Event model for llm_task_error"""
+
+    __event_name__ = "llm_task_error"
+
+    error: str = Field(description="The error message")
 
 
 @payload_schema.register
