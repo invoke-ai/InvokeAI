@@ -1811,7 +1811,7 @@ const hasMetadataByHandlers = async (arg: {
       }
     }
   }
-  return true;
+  return require === 'all';
 };
 
 const recallImageDimensions = async (metadata: unknown, store: AppStore) => {
