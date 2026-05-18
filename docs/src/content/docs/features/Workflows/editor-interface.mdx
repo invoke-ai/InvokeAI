@@ -73,6 +73,10 @@ The screenshots below aren't examples of complete functioning node graphs, but r
     ### Create Latent Noise
     An initial noise tensor is necessary for the latent diffusion process. As a result, the Denoising node requires a noise node input.
 
+    The standard **Create Latent Noise** node now includes a **Noise Type** selector for architecture-specific latent
+    shapes. Leave it at **SD** for classic 4-channel Stable Diffusion workflows, or switch it to the architecture that
+    matches the downstream denoiser when working with models like FLUX, FLUX.2, SD3, CogView4, Z-Image, or Anima.
+
     ![Create Latent Noise](./assets/groupsnoise.png)
 
     ### Text Prompt Conditioning
