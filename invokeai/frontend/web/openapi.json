@@ -6544,6 +6544,11 @@
         "tags": ["app"],
         "summary": "Set External Provider Config",
         "operationId": "set_external_provider_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "provider_id",
@@ -6595,6 +6600,11 @@
         "tags": ["app"],
         "summary": "Reset External Provider Config",
         "operationId": "reset_external_provider_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "provider_id",
