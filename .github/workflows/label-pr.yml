@@ -10,9 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: label PRs
-        uses: actions/labeler@v5
+        uses: actions/labeler@v6
         with:
           configuration-path: .github/pr_labels.yml
