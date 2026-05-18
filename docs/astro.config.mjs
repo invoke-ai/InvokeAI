@@ -14,6 +14,7 @@ import starlightContextualMenu from 'starlight-contextual-menu';
 // so the same source can be deployed to either target.
 const deployTarget = process.env.DEPLOY_TARGET ?? 'custom';
 const isGhPages = deployTarget === 'ghpages';
+const enableAnalytics = process.env.ENABLE_ANALYTICS === 'true';
 const base = isGhPages ? '/InvokeAI' : '';
 const withBase = (/** @type {string} */ path) => (isGhPages ? `${base}${path}` : path);
 
@@ -82,22 +83,23 @@ export default defineConfig({
       editLink: {
         baseUrl: 'https://github.com/invoke-ai/InvokeAI/edit/main/docs',
       },
-      head: isGhPages
-        ? [
-            {
-              tag: 'script',
-              attrs: {
-                async: true,
-                src: 'https://plausible.tracking.events/js/pa-BHcumuOemKz4XIQeWkTn4.js',
+      head:
+        enableAnalytics && !isGhPages
+          ? [
+              {
+                tag: 'script',
+                attrs: {
+                  async: true,
+                  src: 'https://plausible.tracking.events/js/pa-BHcumuOemKz4XIQeWkTn4.js',
+                },
               },
-            },
-            {
-              tag: 'script',
-              content:
-                'window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};plausible.init()',
-            },
-          ]
-        : [],
+              {
+                tag: 'script',
+                content:
+                  'window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};plausible.init()',
+              },
+            ]
+          : [],
       defaultLocale: 'root',
       locales: {
         root: {
