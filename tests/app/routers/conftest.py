@@ -66,14 +66,24 @@ def enable_multiuser(monkeypatch: Any, mock_invoker: Invoker):
 
     Replaces None-valued services with MagicMocks so that routes can run end-to-end.
     """
+    from invokeai.app.services.style_preset_records.style_preset_records_sqlite import (
+        SqliteStylePresetRecordsStorage,
+    )
+
     mock_invoker.services.configuration.multiuser = True
 
     # Replace services that are None in the default mock_services with MagicMocks.
     mock_invoker.services.download_queue = MagicMock()
-    mock_invoker.services.style_preset_records = MagicMock()
     mock_invoker.services.style_preset_image_files = MagicMock()
     mock_invoker.services.model_relationships = MagicMock()
     mock_invoker.services.model_manager = MagicMock()
+
+    # Style preset records uses a real SQLite-backed storage on the same in-memory
+    # database that image_records was wired up against. This lets cross-user tests
+    # exercise the actual filter SQL instead of asserting on MagicMock calls.
+    mock_invoker.services.style_preset_records = SqliteStylePresetRecordsStorage(
+        db=mock_invoker.services.image_records._db
+    )
 
     # Required by board_image_records-touching helpers in some tests.
     if mock_invoker.services.board_images is None:

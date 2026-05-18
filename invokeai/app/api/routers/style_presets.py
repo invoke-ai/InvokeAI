@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.model_manager import IMAGE_MAX_AGE
+from invokeai.app.services.auth.token_service import TokenData
 from invokeai.app.services.style_preset_images.style_preset_images_common import StylePresetImageFileNotFoundException
 from invokeai.app.services.style_preset_records.style_preset_records_common import (
     InvalidPresetImportDataError,
@@ -20,6 +21,7 @@ from invokeai.app.services.style_preset_records.style_preset_records_common impo
     PresetType,
     StylePresetChanges,
     StylePresetNotFoundError,
+    StylePresetRecordDTO,
     StylePresetRecordWithImage,
     StylePresetWithoutId,
     UnsupportedFileTypeError,
@@ -32,9 +34,41 @@ class StylePresetFormData(BaseModel):
     positive_prompt: str = Field(description="Positive prompt")
     negative_prompt: str = Field(description="Negative prompt")
     type: PresetType = Field(description="Preset type")
+    is_public: bool = Field(default=False, description="Whether the preset is visible to other users")
 
 
 style_presets_router = APIRouter(prefix="/v1/style_presets", tags=["style_presets"])
+
+
+def _assert_preset_read(record: StylePresetRecordDTO, current_user: TokenData) -> None:
+    """Allow read access if admin, owner, default preset, or public preset."""
+    if current_user.is_admin:
+        return
+    if record.type == PresetType.Default:
+        return
+    if record.is_public:
+        return
+    if record.user_id == current_user.user_id:
+        return
+    raise HTTPException(status_code=403, detail="Not authorized to access this style preset")
+
+
+def _assert_preset_write(record: StylePresetRecordDTO, current_user: TokenData) -> None:
+    """Allow write access only for admin or owner. Defaults are immutable for non-admins."""
+    if current_user.is_admin:
+        return
+    if record.type == PresetType.Default:
+        raise HTTPException(status_code=403, detail="Default style presets cannot be modified")
+    if record.user_id == current_user.user_id:
+        return
+    raise HTTPException(status_code=403, detail="Not authorized to modify this style preset")
+
+
+def _load_record_or_404(style_preset_id: str) -> StylePresetRecordDTO:
+    try:
+        return ApiDependencies.invoker.services.style_preset_records.get(style_preset_id)
+    except StylePresetNotFoundError:
+        raise HTTPException(status_code=404, detail="Style preset not found")
 
 
 @style_presets_router.get(
@@ -49,12 +83,10 @@ async def get_style_preset(
     style_preset_id: str = Path(description="The style preset to get"),
 ) -> StylePresetRecordWithImage:
     """Gets a style preset"""
-    try:
-        image = ApiDependencies.invoker.services.style_preset_image_files.get_url(style_preset_id)
-        style_preset = ApiDependencies.invoker.services.style_preset_records.get(style_preset_id)
-        return StylePresetRecordWithImage(image=image, **style_preset.model_dump())
-    except StylePresetNotFoundError:
-        raise HTTPException(status_code=404, detail="Style preset not found")
+    record = _load_record_or_404(style_preset_id)
+    _assert_preset_read(record, current_user)
+    image = ApiDependencies.invoker.services.style_preset_image_files.get_url(style_preset_id)
+    return StylePresetRecordWithImage(image=image, **record.model_dump())
 
 
 @style_presets_router.patch(
@@ -81,9 +113,13 @@ async def update_style_preset(
         type = validated_data.type
         positive_prompt = validated_data.positive_prompt
         negative_prompt = validated_data.negative_prompt
+        is_public = validated_data.is_public
 
     except (json.JSONDecodeError, pydantic.ValidationError):
         raise HTTPException(status_code=400, detail="Invalid preset data")
+
+    record = _load_record_or_404(style_preset_id)
+    _assert_preset_write(record, current_user)
 
     if image is not None:
         if not image.content_type or not image.content_type.startswith("image"):
@@ -108,7 +144,7 @@ async def update_style_preset(
             pass
 
     preset_data = PresetData(positive_prompt=positive_prompt, negative_prompt=negative_prompt)
-    changes = StylePresetChanges(name=name, preset_data=preset_data, type=type)
+    changes = StylePresetChanges(name=name, preset_data=preset_data, type=type, is_public=is_public)
 
     style_preset_image = ApiDependencies.invoker.services.style_preset_image_files.get_url(style_preset_id)
     style_preset = ApiDependencies.invoker.services.style_preset_records.update(
@@ -126,6 +162,9 @@ async def delete_style_preset(
     style_preset_id: str = Path(description="The style preset to delete"),
 ) -> None:
     """Deletes a style preset"""
+    record = _load_record_or_404(style_preset_id)
+    _assert_preset_write(record, current_user)
+
     try:
         ApiDependencies.invoker.services.style_preset_image_files.delete(style_preset_id)
     except StylePresetImageFileNotFoundException:
@@ -156,13 +195,20 @@ async def create_style_preset(
         type = validated_data.type
         positive_prompt = validated_data.positive_prompt
         negative_prompt = validated_data.negative_prompt
+        is_public = validated_data.is_public
 
     except (json.JSONDecodeError, pydantic.ValidationError):
         raise HTTPException(status_code=400, detail="Invalid preset data")
 
+    # Only admins may create default-typed presets — they're the shipped catalog.
+    if type == PresetType.Default and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only admins can create default presets")
+
     preset_data = PresetData(positive_prompt=positive_prompt, negative_prompt=negative_prompt)
-    style_preset = StylePresetWithoutId(name=name, preset_data=preset_data, type=type)
-    new_style_preset = ApiDependencies.invoker.services.style_preset_records.create(style_preset=style_preset)
+    style_preset = StylePresetWithoutId(name=name, preset_data=preset_data, type=type, is_public=is_public)
+    new_style_preset = ApiDependencies.invoker.services.style_preset_records.create(
+        style_preset=style_preset, user_id=current_user.user_id
+    )
 
     if image is not None:
         if not image.content_type or not image.content_type.startswith("image"):
@@ -193,9 +239,12 @@ async def create_style_preset(
     },
 )
 async def list_style_presets(current_user: CurrentUserOrDefault) -> list[StylePresetRecordWithImage]:
-    """Gets a page of style presets"""
+    """Gets the style presets visible to the current user."""
     style_presets_with_image: list[StylePresetRecordWithImage] = []
-    style_presets = ApiDependencies.invoker.services.style_preset_records.get_many()
+    style_presets = ApiDependencies.invoker.services.style_preset_records.get_many(
+        user_id=current_user.user_id,
+        is_admin=current_user.is_admin,
+    )
     for preset in style_presets:
         image = ApiDependencies.invoker.services.style_preset_image_files.get_url(preset.id)
         style_preset_with_image = StylePresetRecordWithImage(image=image, **preset.model_dump())
@@ -221,6 +270,8 @@ async def get_style_preset_image(
     style_preset_id: str = Path(description="The id of the style preset image to get"),
 ) -> FileResponse:
     """Gets an image file that previews the model"""
+    record = _load_record_or_404(style_preset_id)
+    _assert_preset_read(record, current_user)
 
     try:
         path = ApiDependencies.invoker.services.style_preset_image_files.get_path(style_preset_id)
@@ -244,14 +295,17 @@ async def get_style_preset_image(
     status_code=200,
 )
 async def export_style_presets(current_user: AdminUserOrDefault):
-    # Create an in-memory stream to store the CSV data
+    # Admin-only export covers every user preset.
     output = io.StringIO()
     writer = csv.writer(output)
 
-    # Write the header
     writer.writerow(["name", "prompt", "negative_prompt"])
 
-    style_presets = ApiDependencies.invoker.services.style_preset_records.get_many(type=PresetType.User)
+    style_presets = ApiDependencies.invoker.services.style_preset_records.get_many(
+        type=PresetType.User,
+        user_id=current_user.user_id,
+        is_admin=True,
+    )
 
     for preset in style_presets:
         writer.writerow([preset.name, preset.preset_data.positive_prompt, preset.preset_data.negative_prompt])
@@ -276,7 +330,9 @@ async def import_style_presets(
 ):
     try:
         style_presets = await parse_presets_from_file(file)
-        ApiDependencies.invoker.services.style_preset_records.create_many(style_presets)
+        ApiDependencies.invoker.services.style_preset_records.create_many(
+            style_presets, user_id=current_user.user_id
+        )
     except InvalidPresetImportDataError as e:
         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
         raise HTTPException(status_code=400, detail=str(e))
