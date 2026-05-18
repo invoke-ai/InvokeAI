@@ -2471,7 +2471,7 @@ export type paths = {
         };
         /**
          * List Style Presets
-         * @description Gets a page of style presets
+         * @description Gets the style presets visible to the current user.
          */
         get: operations["list_style_presets"];
         put?: never;
@@ -29032,10 +29032,21 @@ export type components = {
             /** @description The type of style preset */
             type: components["schemas"]["PresetType"];
             /**
+             * Is Public
+             * @description Whether the preset is visible to other users.
+             * @default false
+             */
+            is_public?: boolean;
+            /**
              * Id
              * @description The style preset ID.
              */
             id: string;
+            /**
+             * User Id
+             * @description The user who owns this style preset.
+             */
+            user_id: string;
             /**
              * Image
              * @description The path for image
