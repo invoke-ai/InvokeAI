@@ -4,7 +4,19 @@ Note: This conftest intentionally does NOT redefine `mock_services` / `mock_invo
 to avoid shadowing the project-level fixtures in `tests/conftest.py`. Instead, the
 `enable_multiuser` fixture below injects MagicMock services for the routers that
 have no real backing service in the default mock_services (download_queue,
-style_preset_records, style_preset_image_files, model_relationships, model_manager).
+style_preset_image_files, model_relationships, model_manager).
+
+WARNING for future authors: `enable_multiuser` *unconditionally* replaces several
+services on `mock_invoker.services` with MagicMocks. If you add a router test that
+expects the real service (e.g. a SQLite-backed implementation), you must restore
+that service in your own fixture before the request — otherwise your test will
+pass against a MagicMock that accepts every call. `style_preset_records` is wired
+up to a real SQLite storage here because cross-user filtering needs real SQL.
+
+WARNING for new routers: every router that calls `ApiDependencies.invoker.services`
+must be added to `_PATCHED_API_DEPENDENCIES_MODULES` below, or its routes will hit
+the un-patched singleton and fail with `AttributeError: type object
+'ApiDependencies' has no attribute 'invoker'`.
 
 Existing test files that define their own `enable_multiuser` / `admin_token` / etc.
 fixtures locally are NOT affected — pytest's local-shadows-conftest rule applies.
@@ -29,6 +41,22 @@ class MockApiDependencies(ApiDependencies):
 
     def __init__(self, invoker: Invoker) -> None:
         self.invoker = invoker
+
+
+# Every module that reads `ApiDependencies.invoker.services` must be patched here
+# so the in-test invoker is reachable. Add new routers / shared helpers to this
+# list when they start touching ApiDependencies.
+_PATCHED_API_DEPENDENCIES_MODULES = (
+    "invokeai.app.api.auth_dependencies",
+    "invokeai.app.api.routers.auth",
+    "invokeai.app.api.routers.download_queue",
+    "invokeai.app.api.routers.style_presets",
+    "invokeai.app.api.routers.model_relationships",
+    "invokeai.app.api.routers.utilities",
+    "invokeai.app.api.routers.virtual_boards",
+    "invokeai.app.api.routers.images",
+    "invokeai.app.api.routers._access",
+)
 
 
 @pytest.fixture
@@ -92,16 +120,8 @@ def enable_multiuser(monkeypatch: Any, mock_invoker: Invoker):
         mock_invoker.services.board_images = mock_board_images
 
     mock_deps = MockApiDependencies(mock_invoker)
-    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
-    monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", mock_deps)
-    monkeypatch.setattr("invokeai.app.api.routers.download_queue.ApiDependencies", mock_deps)
-    monkeypatch.setattr("invokeai.app.api.routers.style_presets.ApiDependencies", mock_deps)
-    monkeypatch.setattr("invokeai.app.api.routers.model_relationships.ApiDependencies", mock_deps)
-    monkeypatch.setattr("invokeai.app.api.routers.utilities.ApiDependencies", mock_deps)
-    monkeypatch.setattr("invokeai.app.api.routers.virtual_boards.ApiDependencies", mock_deps)
-    # The image read-access helper used by utilities.image_to_prompt lives in
-    # routers/images.py and reads ApiDependencies via that module.
-    monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
+    for module_path in _PATCHED_API_DEPENDENCIES_MODULES:
+        monkeypatch.setattr(f"{module_path}.ApiDependencies", mock_deps)
     yield
 
 

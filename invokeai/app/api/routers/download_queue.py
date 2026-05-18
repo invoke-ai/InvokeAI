@@ -35,8 +35,7 @@ def _validate_dest(dest: str) -> str:
     if posix.is_absolute() or windows.is_absolute():
         raise HTTPException(status_code=400, detail="Download destination must be a relative path.")
 
-    parts = set(posix.parts) | set(windows.parts)
-    if ".." in parts:
+    if ".." in posix.parts or ".." in windows.parts:
         raise HTTPException(status_code=400, detail="Download destination must not contain '..' segments.")
 
     return dest
