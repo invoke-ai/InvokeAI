@@ -1335,6 +1335,7 @@ alibabacloud_qwen_image_edit_max = StarterModel(
         supports_negative_prompt=False,
         supports_reference_images=True,
         supports_seed=True,
+        max_reference_images=3,
         max_images_per_request=4,
         allowed_aspect_ratios=QWEN_IMAGE_2_ALLOWED_ASPECT_RATIOS,
         aspect_ratio_sizes={
