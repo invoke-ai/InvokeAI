@@ -1750,6 +1750,34 @@
         "staged": "Staged",
         "resolution": "Resolution",
         "imageSize": "Image Size",
+        "quality": "Quality",
+        "qualityOptions": {
+            "auto": "Auto",
+            "high": "High",
+            "medium": "Medium",
+            "low": "Low"
+        },
+        "background": "Background",
+        "backgroundOptions": {
+            "auto": "Auto",
+            "transparent": "Transparent",
+            "opaque": "Opaque"
+        },
+        "inputFidelity": "Input Fidelity",
+        "inputFidelityOptions": {
+            "default": "Default",
+            "low": "Low",
+            "high": "High"
+        },
+        "temperature": "Temperature",
+        "thinkingLevel": "Thinking Level",
+        "thinkingLevelOptions": {
+            "default": "Default",
+            "minimal": "Minimal",
+            "high": "High"
+        },
+        "watermark": "Watermark",
+        "optimizePrompt": "Optimize Prompt",
         "modelDisabledForTrial": "Generating with {{modelName}} is not available on trial accounts. Visit your <LinkComponent>account settings</LinkComponent> to upgrade."
     },
     "dynamicPrompts": {
