@@ -8,7 +8,7 @@
         "back": "戻る",
         "statusDisconnected": "切断済",
         "cancel": "キャンセル",
-        "accept": "確定",
+        "accept": "採用",
         "img2img": "img2img",
         "loading": "ロード中",
         "githubLabel": "Github",
@@ -36,7 +36,7 @@
         "green": "G",
         "blue": "B",
         "alpha": "α",
-        "outpaint": "outpaint",
+        "outpaint": "アウトペイント",
         "unknown": "不明",
         "updated": "更新済",
         "add": "追加",
@@ -47,7 +47,7 @@
         "red": "R",
         "or": "または",
         "checkpoint": "Checkpoint",
-        "direction": "方向",
+        "direction": "順序",
         "simple": "シンプル",
         "save": "保存",
         "saveAs": "名前をつけて保存",
@@ -64,7 +64,7 @@
         "installed": "インストール済み",
         "outputs": "アウトプット",
         "unknownError": "未知のエラー",
-        "orderBy": "並び順:",
+        "orderBy": "表示順:",
         "enabled": "有効",
         "positivePrompt": "ポジティブプロンプト",
         "negativePrompt": "ネガティブプロンプト",
@@ -112,7 +112,7 @@
         "label": "ラベル",
         "saveChanges": "変更を保存",
         "error_withCount_other": "{{count}} 個のエラー",
-        "noMatches": "合致しません",
+        "noMatches": "一致したものがありません",
         "model_withCount_other": "{{count}}個のモデル",
         "noOptions": "オプションがありません",
         "search": "検索",
@@ -149,7 +149,8 @@
         "toggleRgbHex": "RGB/16進数を切り替え",
         "unpin": "ピンを外す",
         "zoomIn": "ズームイン",
-        "zoomOut": "ズームアウト"
+        "zoomOut": "ズームアウト",
+        "json": "JSON"
     },
     "gallery": {
         "galleryImageSize": "画像のサイズ",
@@ -187,25 +188,25 @@
         "swapImages": "画像を入れ替える",
         "stretchToFit": "画面に合わせる",
         "exitCompare": "比較を終了する",
-        "compareHelp1": "<Kbd>Alt</Kbd> キーを押しながらギャラリー画像をクリックするか、矢印キーを使用して比較画像を変更します。",
+        "compareHelp1": "<Kbd>Alt</Kbd> キーを押しながらギャラリーの画像をクリックするか、矢印キーを使用して比較する画像を変更します。",
         "compareHelp3": "<Kbd>C</Kbd>を押して、比較した画像を入れ替えます。",
         "compareHelp4": "<Kbd>[Z</Kbd>]または<Kbd>[Esc</Kbd>]を押して終了します。",
         "compareHelp2": "<Kbd>M</Kbd> キーを押して比較モードを切り替えます。",
         "move": "移動",
         "exitSearch": "画像検索を終了",
         "oldestFirst": "最古から",
-        "showStarredImagesFirst": "スター付き画像を最初に",
+        "showStarredImagesFirst": "スター付きを先頭",
         "exitBoardSearch": "ボード検索を終了",
         "showArchivedBoards": "アーカイブされたボードを表示",
         "searchImages": "メタデータで検索",
         "gallery": "ギャラリー",
         "newestFirst": "最新から",
         "go": "進む",
-        "sortDirection": "並び替え順",
+        "sortDirection": "並び順",
         "displayBoardSearch": "ボード検索",
         "displaySearch": "画像を検索",
         "boardsSettings": "ボード設定",
-        "imagesSettings": "ギャラリー画像設定",
+        "imagesSettings": "ギャラリー設定",
         "selectAllOnPage": "ページ上のすべてを選択",
         "images": "画像",
         "assetsTab": "プロジェクトで使用するためにアップロードされたファイル。",
@@ -216,9 +217,9 @@
         "noImagesInGallery": "表示する画像がありません",
         "unableToLoad": "ギャラリーを読み込めません",
         "selectAnImageToCompare": "比較する画像を選択",
-        "openViewer": "ビューアーを開く",
-        "closeViewer": "ビューアーを閉じる",
-        "usePagedGalleryView": "ページ型ギャラリービューを使う",
+        "openViewer": "ビューアを開く",
+        "closeViewer": "ビューアを閉じる",
+        "usePagedGalleryView": "ページ型ギャラリービュー",
         "loadingGallery": "ギャラリーをロード中...",
         "loadingMetadata": "メタデータをロード中...",
         "noImagesFound": "画像が見つかりません",
@@ -387,8 +388,8 @@
                 "title": "ツール幅を増加する"
             },
             "selectRectTool": {
-                "title": "矩形ツール",
-                "desc": "矩形ツールを選択します。"
+                "title": "シェイプツール",
+                "desc": "シェイプツールを選択します。"
             },
             "settings": {
                 "behavior": "挙動",
@@ -398,7 +399,7 @@
             },
             "toggleNonRasterLayers": {
                 "title": "非ラスターレイヤーの切り替え",
-                "desc": "ラスター以外のレイヤー カテゴリ (コントロール レイヤー、インペイント マスク、地域ガイダンス) を表示または非表示にします。"
+                "desc": "ラスター以外のレイヤー カテゴリ (コントロール レイヤー、インペイント マスク、領域ガイダンス) を表示または非表示にします。"
             },
             "setFillColorsToDefault": {
                 "title": "デフォルトカラーをセット",
@@ -437,6 +438,14 @@
             "selectLassoTool": {
                 "title": "投げ縄ツール",
                 "desc": "投げ縄ツールを選択します。"
+            },
+            "mergeDown": {
+                "title": "下のレイヤーと結合",
+                "desc": "選択したレイヤーを直下のレイヤーと結合します。"
+            },
+            "mergeVisible": {
+                "title": "表示レイヤーを結合",
+                "desc": "選択中の種別の表示レイヤーをマージします。"
             }
         },
         "workflows": {
@@ -533,12 +542,12 @@
                 "desc": "カーソルをポジティブプロンプト欄に移動します。"
             },
             "promptHistoryPrev": {
-                "title": "ヒストリーの以前のプロンプト",
-                "desc": "プロンプトにフォーカスがある場合は、履歴内の前の（古い）プロンプトに移動します。"
+                "title": "ヒストリー内の前のプロンプト",
+                "desc": "プロンプトがフォーカスされている場合、ヒストリー内の前の（古い）プロンプトに移動します。"
             },
             "promptHistoryNext": {
-                "title": "履歴の次のプロンプト",
-                "desc": "プロンプトにフォーカスが当たったら、履歴内の次の（新しい）プロンプトに移動します。"
+                "title": "ヒストリーの次のプロンプト",
+                "desc": "プロンプトがフォーカスされている場合、ヒストリーの次の（新しい）プロンプトに移動します。"
             },
             "selectGenerateTab": {
                 "title": "生成タブを選択",
@@ -702,7 +711,7 @@
         "fluxRedux": "FLUX リダックス",
         "installQueue": "インストール進捗状況",
         "noMatchingModels": "一致するモデルがありません",
-        "noDefaultSettings": "このモデルには構成されたデフォルト設定がありません.デフォルト設定を追加するためにモデルマネージャーにアクセスしてください.",
+        "noDefaultSettings": "このモデルにはデフォルト設定が構成されていません。デフォルト設定を追加するためにはモデルマネージャーにアクセスしてください。",
         "usingDefaultSettings": "モデルのデフォルト設定を使用する",
         "defaultSettingsOutOfSync": "いくつかの設定がデフォルト設定とマッチしません:",
         "vaePrecision": "VAE精度",
@@ -716,13 +725,13 @@
         "hfTokenInvalid": "HuggingFaceトークンが無効または見つかりません",
         "hfForbiddenErrorMessage": "リポジトリにアクセスすることを勧めます.所有者はダウンロードにあたり利用規約への同意を要求する場合があります.",
         "noModelsInstalled": "インストールされているモデルがありません",
-        "pathToConfig": "設定へのパス",
+        "pathToConfig": "設定ファイルパス",
         "noModelsInstalledDesc1": "モデルを一緒にインストール",
         "pruneTooltip": "完了したインポートをキューから削除",
         "scanResults": "結果をスキャン",
         "scanPlaceholder": "ローカルフォルダへのパス",
         "typePhraseHere": "ここにフレーズを入力",
-        "modelImageUpdated": "モデル画像アップデート",
+        "modelImageUpdated": "モデル画像がアップデートされました",
         "installAll": "全てインストール",
         "installRepo": "リポジトリをインストール",
         "localOnly": "ローカルのみ",
@@ -730,7 +739,7 @@
         "hfTokenInvalidErrorMessage": "HuggingFaceトークンが無効または見つかりません。",
         "hfTokenRequired": "有効なHuggingFaceトークンが必要なモデルをダウンロードしようとしています。",
         "hfTokenInvalidErrorMessage2": "更新してください ",
-        "modelImageDeleted": "モデル画像削除",
+        "modelImageDeleted": "モデル画像が削除されました",
         "repoVariant": "リポジトリバリアント",
         "llavaOnevision": "LLaVA ワンビジョン",
         "installingXModels_other": "{{count}} 個のモデルをインストール",
@@ -748,14 +757,14 @@
         "prune": "除去",
         "hfTokenHelperText": "いくつかのモデルにHuggingFaceトークンが必要です。ここをクリックしてあなたのトークンを作成してください。",
         "starterBundleHelpText": "メインモデル，コントロールネット，IPアダプターなど，ベースモデルから始めるのに必要なすべてのモデルを簡単にインストールできます.バンドルを選択すると，すでにインストールされているモデルはスキップされます.",
-        "inplaceInstallDesc": "ファイルを移動せずにモデルをインストールします.このモデルを使ったとき、元の場所からロードされます.利用できない場合、モデルファイルはInvoke管理モデルディレクトリにインストールしている間に移動されます。",
+        "inplaceInstallDesc": "ファイルを移動せずにモデルをインストールします。このモデルを利用する際には元の場所からロードされます。これが利用できない場合、モデルファイルはInvoke管理下のモデルディレクトリに移動されインストールされます。",
         "hfTokenUnableToVerifyErrorMessage": "HuggingFaceトークンを確認できません。ネットワークによるエラーの可能性があります。後ほどトライしてください。",
         "restoreDefaultSettings": "クリックするとモデルのデフォルト設定が使用されます.",
         "hfTokenSaved": "HuggingFaceトークンを保存しました",
         "imageEncoderModelId": "画像エンコーダーモデルID",
         "includesNModels": "{{n}}個のモデルとこれらの依存関係を含みます。",
-        "learnMoreAboutSupportedModels": "私たちのサポートしているモデルについて更に学ぶ",
-        "modelImageUpdateFailed": "モデル画像アップデート失敗",
+        "learnMoreAboutSupportedModels": "サポートされているモデルについて更に学ぶ",
+        "modelImageUpdateFailed": "モデル画像のアップデートに失敗しました",
         "scanFolder": "スキャンフォルダ",
         "simpleModelPlaceholder": "ローカルファイルかディフューザーズフォルダへのURLかパス",
         "installingModel": "モデルをインストール",
@@ -763,12 +772,12 @@
         "spandrelImageToImage": "Image to Image(スパンドレル)",
         "starterBundles": "スターターバンドル",
         "starterModels": "スターターモデル",
-        "modelImageDeleteFailed": "モデル画像の削除失敗",
+        "modelImageDeleteFailed": "モデル画像の削除に失敗しました",
         "urlForbidden": "このモデルにアクセスできません",
         "urlForbiddenErrorMessage": "このモデルを配布しているサイトからリクエスト権限が必要かもしれません.",
         "urlUnauthorizedErrorMessage": "このモデルにアクセスするためにAPIトークンを構成する必要があるかもしれません.",
         "urlUnauthorizedErrorMessage2": "ここでどうやるか学びます.",
-        "inplaceInstall": "定位置にインストール",
+        "inplaceInstall": "元位置でインストール",
         "fileSize": "ファイルサイズ",
         "modelPickerFallbackNoModelsInstalled2": "<LinkComponent>モデルマネージャー</LinkComponent> にアクセスしてモデルをインストールしてください.",
         "modelPickerFallbackNoModelsInstalled": "モデルがインストールされていません.",
@@ -783,20 +792,21 @@
         "bundleAlreadyInstalledDesc": "{{bundleName}} バンドル内のすべてのモデルはすでにインストールされています。",
         "launchpadTab": "ローンチパッド",
         "launchpad": {
-            "welcome": "モデルマネジメントへようこそ",
-            "description": "Invoke プラットフォームのほとんどの機能を利用するには、モデルのインストールが必要です。手動インストールオプションから選択するか、厳選されたスターターモデルをご覧ください。",
+            "welcome": "モデルマネージャーへようこそ",
+            "description": "Invokeの多様な機能を利用するには、各種モデルのインストールが必要です。手動インストールオプションから選択するか、厳選されたスターターモデルをご覧ください。",
             "manualInstall": "マニュアルインストール",
             "urlDescription": "URLまたはローカルファイルパスからモデルをインストールします。特定のモデルを追加したい場合に最適です。",
             "huggingFaceDescription": "HuggingFace リポジトリからモデルを直接参照してインストールします。",
             "scanFolderDescription": "ローカルフォルダをスキャンしてモデルを自動的に検出し、インストールします。",
             "recommendedModels": "推奨モデル",
             "exploreStarter": "または、利用可能なすべてのスターターモデルを参照してください",
-            "bundleDescription": "各バンドルには各モデルファミリーの必須モデルと、開始するための厳選されたベースモデルが含まれています。",
+            "bundleDescription": "各バンドルにはそれぞれのモデルファミリー向けの必須モデルと、厳選されたベースモデルが含まれています。",
             "sdxl": "SDXL",
             "quickStart": "クイックスタートバンドル",
-            "browseAll": "または、利用可能なすべてのモデルを参照してください。",
+            "browseAll": "利用可能なすべてのモデルを見る:",
             "stableDiffusion15": "Stable Diffusion 1.5",
-            "fluxDev": "FLUX.1 dev"
+            "fluxDev": "FLUX.1 dev",
+            "externalDescription": "GeminiやOpenAIなどの外部画像生成がAPIキー経由で利用できます。利用コストはプロバイダー側で発生します。"
         },
         "filterModels": "フィルターモデル",
         "installBundle": "バンドルをインストール",
@@ -830,13 +840,13 @@
         "cancelAll": "すべてキャンセル",
         "cancelAllTooltip": "アクティブなダウンロードを全てキャンセル",
         "reidentify": "再識別",
-        "reidentifyTooltip": "モデルが正しくインストールされなかった場合（例えば、タイプが間違っている、または動作しない場合）、モデルを再識別してみてください。これにより、適用したカスタム設定がすべてリセットされます。",
+        "reidentifyTooltip": "モデルが正しくインストールされなかった場合（例：タイプが間違っている、動作しない場合）、モデルの再識別を実行してみてください。ただし、編集したカスタム設定はすべてリセットされます。",
         "reidentifySuccess": "モデルの再識別に成功",
         "reidentifyUnknown": "モデルの識別ができません",
         "reidentifyError": "モデルの識別中にエラーが発生",
         "reidentifyModels": "モデルの再識別",
-        "reidentifyModelsConfirm": "{{count}} 個のモデルを再識別しますか？ これにより、モデルが再度解析され、正しい形式と設定が特定されます。",
-        "reidentifyWarning": "これにより、これらのモデルに適用したカスタム設定はすべてリセットされます。",
+        "reidentifyModelsConfirm": "{{count}} 個のモデルを再識別しますか？ モデルが再度解析され、正しい形式と設定が特定されます。",
+        "reidentifyWarning": "これらのモデルに適用したカスタム設定はすべてリセットされます。",
         "modelsReidentified": "{{count}} 個のモデルの再識別に成功",
         "modelsReidentifyFailed": "モデルの再識別に失敗",
         "someModelsFailedToReidentify": "{{count}} このモデルを再識別できませんでした",
@@ -868,11 +878,60 @@
         "syncModelsDirectory": "モデルディレクトリを同期する",
         "externalProviders": "外部プロバイダー",
         "externalSetupTitle": "外部プロバイダーの設定",
-        "externalSetupDescription": "API キーを設定し外部プロバイダーでの画像生成を有効にします。"
+        "externalSetupDescription": "API キーを設定し、外部プロバイダーによる画像生成を有効にします。",
+        "externalImageGenerator": "外部画像生成サービス",
+        "externalInstallDefaults": "スターターモデルの自動インストール",
+        "externalProvidersUnavailable": "このビルドでは外部プロバイダーは利用できません。",
+        "externalSetupFooter": "APIキーが必要です。外部プロバイダーのAPIを使用する場合、利用コストはプロバイダー側で発生します。",
+        "externalProviderCardDescription": "外部画像生成サービス {{providerId}} の認証情報を設定します。",
+        "externalApiKey": "APIキー",
+        "externalApiKeyPlaceholder": "APIキーを貼り付け",
+        "externalApiKeyPlaceholderSet": "APIキー設定済み",
+        "externalApiKeyHelper": "InvokeAIルートディレクトリのapi_keys.yaml に保存されます。",
+        "externalBaseUrl": "ベースURL(オプション)",
+        "externalBaseUrlHelper": "必要に応じてデフォルト API のURL を上書きしてください。",
+        "externalResetHelper": "APIキーとベースURLをクリアします。",
+        "sortByName": "名前",
+        "sortByBase": "ベースモデル",
+        "sortBySize": "サイズ",
+        "sortByDateAdded": "追加日",
+        "sortByDateModified": "変更日",
+        "sortByPath": "パス",
+        "sortByType": "タイプ",
+        "sortByFormat": "フォーマット",
+        "sortDefault": "デフォルト",
+        "externalProvider": "外部プロバイダ",
+        "externalCapabilities": "外部利用可能機能",
+        "externalDefaults": "外部デフォルト設定",
+        "providerId": "プロバイダID",
+        "providerModelId": "プロバイダモデルID",
+        "supportedModes": "サポートされているモード",
+        "supportsNegativePrompt": "ネガティブプロンプトのサポート",
+        "supportsReferenceImages": "参照画像のサポート",
+        "supportsSeed": "シード値のサポート",
+        "supportsGuidance": "ガイド画像のサポート",
+        "maxImagesPerRequest": "リクエストあたりの最大画像数",
+        "maxReferenceImages": "参照画像の最大数",
+        "maxImageWidth": "画像の最大横幅",
+        "sourceUrl": "ソースURL",
+        "textLLM": "LLM",
+        "filesCount": "{{count}} ファイル",
+        "deleteSelected": "選択中の {{count}} を削除",
+        "orphanedModelsDeleteErrors": "いくつかのモデルが削除できませんでした",
+        "queueEmpty": "インストールキューが空です。",
+        "selectModelToView": "モデルを選択して詳細を表示",
+        "importSettings": "設定をインポート",
+        "exportSettings": "設定をエクスポート",
+        "settingsExported": "モデル設定がエクスポートされました",
+        "settingsImported": "モデル設定がインポートされました",
+        "settingsImportedPartial": "モデル設定は部分的にインポートされました。互換性のない設定はスキップされました: {{fields}}",
+        "settingsImportFailed": "モデル設定のインポートに失敗しました",
+        "settingsImportIncompatible": "設定ファイルにこのモデルタイプと互換性のある設定項目がありません",
+        "settingsImportInvalidFile": "不正な設定ファイルです"
     },
     "parameters": {
         "images": "画像",
-        "steps": "ステップ数",
+        "steps": "ステップ",
         "width": "幅",
         "height": "高さ",
         "seed": "シード値",
@@ -940,11 +999,11 @@
         },
         "aspect": "縦横比",
         "lockAspectRatio": "縦横比を固定",
-        "scheduler": "スケジューラー",
+        "scheduler": "スケジューラ",
         "sendToUpscale": "アップスケーラーに転送",
         "useSize": "サイズを使用",
         "postProcessing": "ポストプロセス (Shift + U)",
-        "denoisingStrength": "除去ノイズ強度",
+        "denoisingStrength": "ノイズ強度",
         "recallMetadata": "メタデータを再使用",
         "copyImage": "画像をコピー",
         "positivePromptPlaceholder": "ポジティブプロンプト",
@@ -976,7 +1035,7 @@
         "useCpuNoise": "CPUノイズの使用",
         "staged": "ステージ",
         "perlinNoise": "パーリン・ノイズ(グラデーションノイズ)",
-        "imageActions": "画像処理",
+        "imageActions": "その他のアクション",
         "gaussianBlur": "ガウスぼかし",
         "noiseThreshold": "ノイズの閾値",
         "maskBlur": "マスクぼかし",
@@ -998,43 +1057,59 @@
     },
     "settings": {
         "models": "モデル",
-        "displayInProgress": "生成中の画像を表示",
-        "confirmOnDelete": "削除時に確認",
+        "displayInProgress": "生成中の画像を表示する",
+        "confirmOnDelete": "削除時に確認する",
         "resetWebUI": "WebUIをリセット",
-        "resetWebUIDesc1": "WebUIのリセットは、画像と保存された設定のキャッシュをリセットするだけです。画像を削除するわけではありません。",
+        "resetWebUIDesc1": "WebUIのリセットは、ブラウザローカルキャッシュの画像と設定のリセットします。ディスク内の画像は削除されません。",
         "resetWebUIDesc2": "もしギャラリーに画像が表示されないなど、何か問題が発生した場合はGitHubにissueを提出する前にリセットを試してください。",
         "resetComplete": "WebUIはリセットされました。",
         "ui": "ユーザーインターフェイス",
         "beta": "ベータ",
-        "developer": "開発者",
-        "antialiasProgressImages": "アンチエイリアスの経過画像",
+        "developer": "デベロッパー",
+        "antialiasProgressImages": "生成中の画像にアンチエイリアスを適用する",
         "enableInformationalPopovers": "情報ポップオーバーを有効にする",
         "enableModelDescriptions": "ドロップダウンでモデルの説明を有効にする",
         "confirmOnNewSession": "新しいセッションで確認する",
         "informationalPopoversDisabled": "情報ポップオーバーが無効になっています",
-        "informationalPopoversDisabledDesc": "情報ポップオーバーが無効になっています.設定で有効にしてください.",
+        "informationalPopoversDisabledDesc": "情報ポップオーバーが無効になっています。設定で有効にしてください。",
         "enableNSFWChecker": "NSFWチェッカーを有効にする",
-        "enableInvisibleWatermark": "目に見えない透かしを有効にする",
-        "enableHighlightFocusedRegions": "重点領域を強調表示",
-        "clearIntermediatesDesc1": "中間物をクリアすると、キャンバスとコントロールネットの状態がリセットされます.",
-        "showProgressInViewer": "ビューアで進行状況画像を表示する",
-        "clearIntermediatesDisabled": "中間物をクリアするにはキューが空でなければなりません",
-        "clearIntermediatesDesc2": "中間画像は生成時に生成される副産物であり、ギャラリーに表示される結果画像とは異なります.中間画像を削除するとディスク容量が解放されます.",
-        "intermediatesClearedFailed": "中間物をクリアする問題",
+        "enableInvisibleWatermark": "不可視のウォーターマークを有効にする",
+        "enableHighlightFocusedRegions": "フォーカスエリアを強調表示",
+        "clearIntermediatesDesc1": "中間生成物をクリアすると、キャンバスやコントロールレイヤーの状態がリセットされます。",
+        "showProgressInViewer": "ビューアで生成状況を表示する",
+        "clearIntermediatesDisabled": "中間生成物をクリアするには、キューが空でなければなりません",
+        "clearIntermediatesDesc2": "中間生成物とは、生成工程内で利用された内部画像です。ギャラリー内の画像とは異なります。中間生成物を削除するとディスク容量が解放されます。",
+        "intermediatesClearedFailed": "中間生成物のクリア中に問題が発生しました",
         "reloadingIn": "リロード中",
-        "clearIntermediatesDesc3": "ギャラリー画像は削除されません.",
-        "clearIntermediates": "中間物をクリア",
-        "clearIntermediatesWithCount_other": "{{count}} 個の中間物をクリア",
-        "intermediatesCleared_other": "{{count}}個の中間物がクリアされました",
+        "clearIntermediatesDesc3": "ギャラリーの画像は削除されません。",
+        "clearIntermediates": "中間生成物をクリア",
+        "clearIntermediatesWithCount_other": "{{count}} 個の中間生成物をクリア",
+        "intermediatesCleared_other": "{{count}}個の中間生成物がクリアされました",
         "general": "一般",
         "generation": "生成",
-        "showDetailedInvocationProgress": "進捗状況の詳細を表示",
+        "showDetailedInvocationProgress": "生成状況の詳細を表示",
         "modelDescriptionsDisabled": "ドロップダウンのモデル説明が無効になっています",
-        "modelDescriptionsDisabledDesc": "ドロップダウンのモデル説明が無効になっています。設定で有効にしてください。"
+        "modelDescriptionsDisabledDesc": "ドロップダウンのモデル説明が無効になっています。設定で有効にしてください。",
+        "externalProviderConfigured": "設定済み",
+        "externalProviderNotConfigured": "APIキーが必要",
+        "externalProviderNotConfiguredHint": "このプロバイダを有効にするには、モデルマネージャまたはサーバー設定で API キーを追加してください。",
+        "externalProviders": "外部プロバイダー",
+        "maxQueueHistory": "キュー履歴の最大数",
+        "maxQueueHistorySaveFailed": "キュー履歴の最大数の保存に失敗",
+        "imageSubfolderStrategy": "画像保存サブフォルダーの構成",
+        "imageSubfolderStrategyDate": "日付",
+        "imageSubfolderStrategyFlat": "フラット",
+        "imageSubfolderStrategyHash": "ハッシュ",
+        "imageSubfolderStrategySaveFailed": "画像保存サブフォルダーの構成設定に失敗しました",
+        "imageSubfolderStrategyType": "タイプ",
+        "imageSubfolderStrategyUnknown": "不明な ({{strategy}})",
+        "prompt": "プロンプト",
+        "preferAttentionStyleNumeric": "数字による重みづけスタイル",
+        "middleClickOpenInNewTab": "ミドルクリックで画像を新しいタブで開く"
     },
     "toast": {
         "uploadFailed": "アップロード失敗",
-        "imageCopied": "画像をコピー",
+        "imageCopied": "画像がコピーされました",
         "imageUploadFailed": "画像のアップロードに失敗しました",
         "uploadFailedInvalidUploadDesc": "画像はPNGかJPGかWEBPである必要があります .",
         "sentToUpscale": "アップスケーラーに転送しました",
@@ -1075,20 +1150,20 @@
         "workflowLoaded": "ワークフローがロードされました",
         "unableToCopy": "コピーできません",
         "unableToCopyDesc": "あなたのブラウザはクリップボードアクセスをサポートしていません.Firefoxユーザーの場合は、以下の手順で修正できる可能性があります. ",
-        "fluxFillIncompatibleWithT2IAndI2I": "FLUX Fillは、テキストから画像へ、または画像から画像へ変換機能と互換性がありません.これらのタスクには、他のFLUXモデルをご利用ください.",
+        "fluxFillIncompatibleWithT2IAndI2I": "FLUX Fillは、テキストから画像・画像から画像への変換機能と互換性がありません。これらのタスクには他のFLUXモデルをご利用ください。",
         "problemUnpublishingWorkflowDescription": "取り下げられたワークフローの問題がありました.もう一度試してください.",
         "workflowUnpublished": "ワークフローが取り消されました",
         "sessionRef": "セッション: {{sessionId}}",
         "somethingWentWrong": "問題が発生しました",
-        "unableToCopyDesc_theseSteps": "これらのステップ数",
+        "unableToCopyDesc_theseSteps": "ステップ",
         "stylePresetLoaded": "スタイルプリセットがロードされました",
         "parameterNotSetDescWithMessage": "{{parameter}}: {{message}}を呼び出せません",
         "problemCopyingLayer": "レイヤーをコピーできません",
         "problemSavingLayer": "レイヤー保存ができません",
         "outOfMemoryErrorDescLocal": "OOM を削減するには、<LinkComponent>低 VRAM ガイド</LinkComponent> に従ってください.",
         "parameterNotSet": "パラメーターが呼び出されていません",
-        "addedToBoard": "{{name}} 個の資産をボードに追加しました",
-        "addedToUncategorized": "$t(boards.uncategorized)個のアセットがボードに追加されました",
+        "addedToBoard": "ボード {{name}} にアセットを追加しました",
+        "addedToUncategorized": "ボード $t(boards.uncategorized) にアセットが追加されました",
         "problemDeletingWorkflow": "ワークフローが削除された問題",
         "parameterNotSetDesc": "{{parameter}}を呼び出せません",
         "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4oは,テキストから画像への生成と画像から画像への生成のみをサポートしています.インペインティングおよび,アウトペインティングタスクには他のモデルを使用してください.",
@@ -1102,7 +1177,7 @@
         "psdExportSuccessDesc": "{{count}} 個のレイヤーを PSD ファイルに正常にエクスポートしました",
         "problemExportingPSD": "PSD のエクスポート中に問題が発生しました",
         "canvasManagerNotAvailable": "キャンバスマネージャーは利用できません",
-        "fluxKontextIncompatibleGenerationMode": "FLUX Kontextはキャンバス上に配置された画像からの生成をサポートしていません。参照画像セクションを使用して再試行し、ラスターレイヤーを無効にしてください。",
+        "fluxKontextIncompatibleGenerationMode": "FLUX Kontextはキャンバス上に配置された画像からの生成をサポートしていません。参照画像を使用して再試行し、ラスターレイヤーも無効にしてください。",
         "promptGenerationStarted": "プロンプト生成が開始されました",
         "uploadAndPromptGenerationFailed": "画像のアップロードとプロンプトの生成に失敗しました",
         "promptExpansionFailed": "問題が発生しました。プロンプトの展開をもう一度お試しください。",
@@ -1127,7 +1202,13 @@
         "noInpaintMaskSelected": "インペイントマスクが選択されていません",
         "noInpaintMaskSelectedDesc": "反転するインペイントマスクを選択",
         "invalidBbox": "無効なバウンディングボックス",
-        "invalidBboxDesc": "バウンディングボックスの寸法が有効ではありません"
+        "invalidBboxDesc": "バウンディングボックスの寸法が有効ではありません",
+        "modelDownloadPaused": "モデルダウンロードの一時停止中",
+        "modelDownloadResumed": "ダウンロード再開",
+        "modelDownloadRestartFailed": "失敗したダウンロードを再開",
+        "modelDownloadRestartFile": "ファイルダウンロードの再開中",
+        "modelDownloadRestartedFromScratch": "一部のファイルが見つかりません。 最初からダウンロードを再開しました。",
+        "schedulerReset": "スケジューラをリセット"
     },
     "accessibility": {
         "invokeProgressBar": "進捗バー",
@@ -1151,7 +1232,7 @@
         "width": "幅",
         "workflow": "ワークフロー",
         "steps": "ステップ",
-        "scheduler": "スケジューラー",
+        "scheduler": "スケジューラ",
         "positivePrompt": "ポジティブプロンプト",
         "strength": "Image to Image 強度",
         "recallParameters": "パラメータを再使用",
@@ -1183,7 +1264,11 @@
         "seedVarianceEnabled": "シードバリアンスが有効",
         "seedVarianceStrength": "シードバリアンス強度",
         "seedVarianceRandomizePercent": "シードバリアンスのランダム化パーセンテージ",
-        "zImageShift": "Z-Image シフト"
+        "zImageShift": "Z-Image シフト",
+        "geminiTemperature": "Gemini Temperature",
+        "geminiThinkingLevel": "Gemini Thinking Level",
+        "openaiQuality": "OpenAI 品質",
+        "imageSize": "画像サイズ"
     },
     "queue": {
         "queueEmpty": "キューが空です",
@@ -1239,9 +1324,9 @@
         "time": "時間",
         "completedIn": "完了まで",
         "back": "戻る",
-        "prune": "刈り込み",
+        "prune": "完了を削除",
         "prompts_other": "プロンプト",
-        "iterations_other": "繰り返し",
+        "iterations_other": "イテレーション",
         "generations_other": "生成",
         "canvas": "キャンバス",
         "workflows": "ワークフロー",
@@ -1250,14 +1335,14 @@
         "other": "その他",
         "gallery": "ギャラリー",
         "cancelAllExceptCurrentQueueItemAlertDialog2": "すべての保留中のキュー項目をキャンセルしてもよいですか？",
-        "cancelAllExceptCurrentTooltip": "現在の項目を除いてすべてキャンセル",
+        "cancelAllExceptCurrentTooltip": "現在のアイテム以外すべてキャンセル",
         "origin": "先頭",
         "destination": "出力先",
         "confirm": "確認",
         "retryItem": "項目をリトライ",
         "batchSize": "バッチサイズ",
         "retryFailed": "項目のリトライに問題があります",
-        "cancelAllExceptCurrentQueueItemAlertDialog": "現在の項目を除くすべてのキュー項目をキャンセルすると、保留中の項目は停止しますが、進行中の項目は完了します。",
+        "cancelAllExceptCurrentQueueItemAlertDialog": "現在のアイテム以外のすべてのキューをキャンセルすると、保留中アイテムは停止しますが、進行中アイテムは完了します。",
         "retrySucceeded": "項目がリトライされました",
         "credits": "クレジット",
         "cancelAllExceptCurrent": "現在選択中のもの以外はすべてキャンセル",
@@ -1306,10 +1391,10 @@
         "downloadWorkflow": "ワークフローのJSONをダウンロード",
         "fieldTypesMustMatch": "フィールドタイプが一致している必要があります",
         "edge": "エッジ",
-        "animatedEdgesHelp": "選択したエッジおよび選択したノードに接続されたエッジをアニメーション化します",
+        "animatedEdgesHelp": "選択したエッジ、選択したノードに接続されたエッジをアニメーション表示",
         "cannotDuplicateConnection": "重複した接続は作れません",
         "noWorkflow": "ワークフローがありません",
-        "fullyContainNodesHelp": "ノードは選択ボックス内に完全に存在する必要があります",
+        "fullyContainNodesHelp": "選択ボックス内に完全に含まれているノードだけが選択されます",
         "nodeType": "ノードタイプ",
         "executionStateInProgress": "処理中",
         "executionStateError": "エラー",
@@ -1322,9 +1407,9 @@
         "cannotConnectInputToInput": "入力から入力には接続できません",
         "cannotConnectOutputToOutput": "出力から出力には接続できません",
         "cannotConnectToSelf": "自身のノードには接続できません",
-        "colorCodeEdges": "エッジのカラー化",
+        "colorCodeEdges": "エッジのカラー",
         "loadingNodes": "ノードを読み込み中...",
-        "scheduler": "スケジューラー",
+        "scheduler": "スケジューラ",
         "version": "バージョン",
         "edit": "編集",
         "nodeVersion": "ノードバージョン",
@@ -1348,10 +1433,10 @@
         "missingNode": "呼び出しノードがありません",
         "missingSourceOrTargetNode": "ソースまたはターゲットノードがありません",
         "missingSourceOrTargetHandle": "ソースまたはターゲットハンドルがありません",
-        "fullyContainNodes": "選択するノードを完全に含む",
+        "fullyContainNodes": "完全に囲んだノードを選択する",
         "noWorkflows": "ワークフローがありません",
-        "nodeSearch": "ノードを探します",
-        "showEdgeLabels": "エッジラベルを表示",
+        "nodeSearch": "ノードを検索",
+        "showEdgeLabels": "エッジのラベルを表示",
         "downloadWorkflowError": "ワークフローのダウンロード中にエラーが発生しました",
         "generatorNRandomValues_other": "{{count}} 個のランダムな値",
         "dynamicPromptsRandom": "ダイナミックプロンプト(ランダム)",
@@ -1375,8 +1460,8 @@
         "unableToUpdateNode": "ノードアップロード失敗:ノード {{node}} のタイプ {{type}} (削除か再生成が必要かもしれません)",
         "deletedInvalidEdge": "無効なエッジを削除しました{{source}} -> {{target}}",
         "collectionFieldType": "{{name}} (コレクション)",
-        "colorCodeEdgesHelp": "接続されたフィールド種ごとにエッジをカラー化",
-        "showEdgeLabelsHelp": "エッジのラベルを表示，接続されているノードを示す",
+        "colorCodeEdgesHelp": "接続されたフィールドのタイプごとにエッジの色を変える",
+        "showEdgeLabelsHelp": "エッジに接続されているノードをラベル表示",
         "sourceNodeFieldDoesNotExist": "無効なエッジ:ソース/アウトプットフィールド{{node}}.{{field}}が存在しません",
         "deletedMissingNodeFieldFormElement": "不足しているフォームフィールドを削除しました: ノード {{nodeId}} フィールド {{fieldName}}",
         "nodeName": "ノード名",
@@ -1385,11 +1470,11 @@
         "unknownNodeType": "不明なノード型",
         "inputFieldTypeParseError": "入力フィールド{{node}}.{{field}}の型を解析できません ({{message}})",
         "loadWorkflowDesc": "ワークフローを読み込みますか？",
-        "loadWorkflowDesc2": "現在のワークフローは保存されていない変更があります.",
+        "loadWorkflowDesc2": "現在のワークフローには保存されていない変更があります。",
         "clearWorkflowDesc": "このワークフローをクリアして新しいワークフローにしますか？",
         "updateNode": "ノードをアップデート",
         "graph": "グラフ",
-        "workflowContact": "お問い合わせ",
+        "workflowContact": "問い合わせ先",
         "outputFieldTypeParseError": "出力フィールド {{node}}.{{field}} の型を解析できません({{message}})",
         "unableToExtractEnumOptions": "enum オプションを抽出できません",
         "zoomOutNodes": "縮小",
@@ -1402,21 +1487,21 @@
         "imageAccessError": "画像{{image_name}}が見つからないので,デフォルトにリセットします",
         "prototypeDesc": "この呼び出しはプロトタイプです.アプリの更新時に変更される可能性があり,いつでも削除される可能性があります.",
         "reloadNodeTemplates": "ノードテンプレートを再読み込み",
-        "snapToGridHelp": "移動されたときにノードをグリッドにスナップ",
+        "snapToGridHelp": "移動時にノードをグリッドにスナップ",
         "unableToExtractSchemaNameFromRef": "参照からスキーマ名を抽出できません",
         "unableToUpdateNodes_other": "{{count}} 個のノードをアップデートできません",
         "workflowSettings": "ワークフローエディター設定",
         "specialDesc": "この呼び出しは,アプリ内で特別な処理を行います.例えば,バッチノードは1つのワークフローから複数のグラフをキューに入れるために使用されます.",
         "modelAccessError": "モデル {{key}}が見つからないので,デフォルトにリセットします",
         "betaDesc": "この呼び出しはベータ版です.安定するまでは,アプリのアップデートの際に変更される可能性があります.この呼び出しは長期的にサポートする予定です.",
-        "internalDesc": "この呼び出しはInvokeによって内部的に使用されます.アプリの更新時に変更される可能性があり,いつでも削除される可能性があります.",
+        "internalDesc": "この呼び出しはInvokeによって内部的に使用されます。アプリの更新時に変更される可能性があり、いつでも削除される可能性があります。",
         "noFieldsViewMode": "このワークフローには表示する選択フィールドがありません.値を設定するためにはワークフロー全体を表示します.",
         "clearWorkflow": "ワークフローをクリア",
         "snapToGrid": "グリッドにスナップ",
         "showMinimapnodes": "ミニマップを表示",
         "description": "説明",
         "notesDescription": "ワークフローに関するメモを追加する",
-        "newWorkflowDesc2": "現在のワークフローに保存されていない変更があります.",
+        "newWorkflowDesc2": "現在のワークフローには保存されていない変更があります。",
         "unknownField": "不明なフィールド",
         "unexpectedField_withName": "予期しないフィールド\"{{name}}\"",
         "validateConnectionsHelp": "無効な接続が行われたり,無効なグラフが呼び出されたりしないようにします",
@@ -1427,7 +1512,7 @@
         "unsupportedArrayItemType": "サポートされていない配列項目型です \"{{type}}\"",
         "unableToValidateWorkflow": "ワークフローを確認できません",
         "unknownErrorValidatingWorkflow": "ワークフローの確認で不明なエラーが発生",
-        "clearWorkflowDesc2": "現在のワークフローは保存されていない変更があります.",
+        "clearWorkflowDesc2": "現在のワークフローには保存されていない変更があります。",
         "unsupportedMismatchedUnion": "CollectionOrScalar型とベース型{{firstType}}および{{secondType}}が不一致です",
         "updateApp": "アプリケーションをアップデート",
         "noGraph": "グラフなし",
@@ -1442,7 +1527,7 @@
         "unknownField_withName": "不明なフィールド\"{{name}}\"",
         "unknownFieldEditWorkflowToFix_withName": "ワークフローは不明なフィールドを含んでいます \"{{name}}\".\n問題を修正するためにワークフローを編集してください.",
         "viewMode": "線形ビューでの使用",
-        "workflowDescription": "短い説明",
+        "workflowDescription": "概要",
         "workflowValidation": "ワークフロー検証エラー",
         "noOutputRecorded": "記録されたアウトプットがありません",
         "nodeOpacity": "ノードの不透明度",
@@ -1461,7 +1546,7 @@
         "loadingTemplates": "{{name}}を読み込んでいます",
         "versionUnknown": " バージョン不明",
         "generateValues": "値を生成する",
-        "floatRangeGenerator": "フロート範囲ジェネレータ",
+        "floatRangeGenerator": "浮動小数点範囲ジェネレータ",
         "integerRangeGenerator": "整数範囲ジェネレータ",
         "layout": {
             "autoLayout": "自動レイアウト",
@@ -1478,7 +1563,10 @@
             "alignmentDL": "左下",
             "alignmentUR": "右上",
             "alignmentDR": "右下"
-        }
+        },
+        "noWorkflowToSave": "保存するワークフローがありません",
+        "groupNodesByCategory": "ノードをカテゴリごとに表示",
+        "groupNodesByCategoryHelp": "ノード追加ダイアログ内で、ノードをカテゴリ別に表示"
     },
     "boards": {
         "autoAddBoard": "自動追加するボード",
@@ -1574,13 +1662,13 @@
         "regionalReferenceImage": {
             "heading": "領域参照画像",
             "paragraphs": [
-                "特定の領域に参照画像を適用するためのブラシ."
+                "ブラシで指定した範囲に参照画像を適用します。"
             ]
         },
         "paramScheduler": {
-            "heading": "スケジューラー",
+            "heading": "スケジューラ",
             "paragraphs": [
-                "スケジューラーは生成中のプロセスで使用されます.",
+                "スケジューラは生成処理中に利用されます。",
                 "各スケジューラは、画像にノイズを反復的に追加する方法や、モデルの出力に基づいてサンプルを更新する方法を定義します."
             ]
         },
@@ -1599,7 +1687,7 @@
         "globalReferenceImage": {
             "heading": "全域参照画像",
             "paragraphs": [
-                "参照画像を適用して,生成全体に影響を及ぼします."
+                "参照画像で画像全体に影響を及ぼします。"
             ]
         },
         "paramUpscaleMethod": {
@@ -1641,7 +1729,7 @@
             ]
         },
         "refinerScheduler": {
-            "heading": "スケジューラー",
+            "heading": "スケジューラ",
             "paragraphs": [
                 "生成プロセスのリファイナー部分で使用されるスケジューラ。",
                 "生成スケジューラに似ています。"
@@ -1656,7 +1744,7 @@
         "paramModel": {
             "heading": "モデル",
             "paragraphs": [
-                "生成に使用されるモデル。異なるモデルは、異なる美的結果とコンテンツを生成するように特化するようにトレーニングされています。"
+                "生成に使用するメインモデル。各モデルは、それぞれに特化したテイストやコンテンツが出力される様にチューニングされています。"
             ]
         },
         "paramHeight": {
@@ -1669,7 +1757,7 @@
             "heading": "ステップ",
             "paragraphs": [
                 "各生成で実行されるステップの数.",
-                "通常, ステップ数が多いほど, より高品質な画像が作成されますが生成時間も長くなります."
+                "基本的にステップが多いほどより高品質な画像が作成されますが、生成時間も長くなります。"
             ]
         },
         "ipAdapterMethod": {
@@ -1689,13 +1777,13 @@
             "heading": "生成回数",
             "paragraphs": [
                 "生成する画像の数。",
-                "ダイナミックプロンプトが有効になっている場合、各プロンプトはこの回数生成されます。"
+                "ダイナミックプロンプトが有効の場合、各プロンプトはこの回数生成されます。"
             ]
         },
         "controlNet": {
-            "heading": "ControlNet",
+            "heading": "コントロールネット",
             "paragraphs": [
-                "コントロールネットは生成プロセスへのガイダンスを提供し,選択したモデルに応じて制御された構成,構造,またはスタイルを持つ画像の作成に役立ちます."
+                "コントロールネットは生成を誘導し、構図・レイアウト・構造などが制御された画像の生成に役立ちます。"
             ]
         },
         "paramWidth": {
@@ -1726,9 +1814,9 @@
         "controlNetWeight": {
             "heading": "重み",
             "paragraphs": [
-                "レイヤーが生成プロセスにどの程度影響を与えるかを調整します",
-                "• 高いウエイト (.75-2): 最終結果にさらに大きな影響を及ぼします.",
-                "• 低いウエイト (0-.75): 最終結果への影響が小さくなります."
+                "このレイヤーが生成にどの程度影響を与えるかを調整します",
+                "• 高い重み (.75-2): 最終結果に大きな影響を及ぼします。",
+                "• 低い重み (0-.75): 最終結果への影響が小さくなります。"
             ]
         },
         "paramNegativeConditioning": {
@@ -1754,7 +1842,7 @@
         "paramPositiveConditioning": {
             "paragraphs": [
                 "生成プロセスをガイドします.任意の単語やフレーズを使用できます.",
-                "強制とダイナミックプロンプトの構文と埋め込み."
+                "強制とダイナミックプロンプト構文と埋め込み。"
             ],
             "heading": "ポジティブプロンプト"
         },
@@ -1766,8 +1854,8 @@
         },
         "compositingCoherenceMinDenoise": {
             "paragraphs": [
-                "境界なじませ処理の最小除去ノイズ強度",
-                "インペイント・アウトペイント時の境界なじませ領域の最小除去ノイズ強度"
+                "境界なじませ処理の最小ノイズ強度",
+                "インペイント・アウトペイント時の境界なじませ領域の最小ノイズ強度"
             ],
             "heading": "最小ノイズ除去"
         },
@@ -1779,11 +1867,11 @@
         },
         "controlNetBeginEnd": {
             "paragraphs": [
-                "この設定は,ノイズ除去 (生成) プロセスのどの部分にこのレイヤーからのガイダンスが組み込まれるかを決定します.",
-                "• 開始ステップ (%): 生成プロセス中にこのレイヤーからのガイダンスの適用を開始するタイミングを指定します.",
-                "• 終了ステップ (%): このレイヤーのガイダンスの適用を停止し,モデルやその他の設定からの一般的なガイダンスを元に戻すタイミングを指定します."
+                "このレイヤーの影響を、ノイズ除去 (生成) 工程のどの範囲に及ぼすかを決めます。",
+                "• 開始ステップ (%): 生成プロセス内で、このレイヤーからのガイダンスの適用の開始タイミングを指定します。",
+                "• 終了ステップ (%): このレイヤーのガイダンスの適用を停止し、モデルやその他設定からの一般的な影響のみに戻すタイミングを指定します。"
             ],
-            "heading": "開始/終了ステップの割合"
+            "heading": "開始/終了ステップの範囲"
         },
         "compositingCoherenceEdgeSize": {
             "heading": "境界の拡張",
@@ -1798,16 +1886,16 @@
             "heading": "ぼかし方法"
         },
         "inpainting": {
-            "heading": "インペインティング",
+            "heading": "インペイント",
             "paragraphs": [
-                "ノイズ除去の強度に応じて,変更する領域を制御します."
+                "編集する領域を指定します。"
             ]
         },
         "dynamicPrompts": {
             "heading": "ダイナミックプロンプト",
             "paragraphs": [
                 "ダイナミック プロンプトは,単一のプロンプトを複数のプロンプトに解析します.",
-                "基本的な構文は「{赤|緑|青}のボール」です.これにより,「赤いボール」「緑のボール」「青いボール」という3つのプロンプトが生成されます.",
+                "基本構文は「{red|green|blue} ball」です。これにより「red ball」「green ball」「blue ball」の3プロンプトが生成されます。",
                 "1 つのプロンプト内で構文を何度でも使用できますが, 生成されるプロンプトの数を Max Prompts 設定で制限するようにしてください."
             ]
         },
@@ -1824,9 +1912,9 @@
             ]
         },
         "controlNetControlMode": {
-            "heading": "コントロールモード",
+            "heading": "制御モード",
             "paragraphs": [
-                "プロンプトまたは コントロールネットのいずれかを重視します."
+                "プロンプトと コントロールネットの影響度のバランスを調整します。"
             ]
         },
         "noiseUseCPU": {
@@ -1873,11 +1961,11 @@
         },
         "paramDenoisingStrength": {
             "paragraphs": [
-                "生成されたイメージがラスター レイヤーとどの程度異なるかを制御します。",
-                "強度が低いほど、結合された表示ラスターレイヤーに近くなります。強度が高いほど、グローバルプロンプトに大きく依存します。",
-                "表示されるコンテンツを持つラスター レイヤーがない場合、この設定は無視されます。"
+                "生成される画像がラスター レイヤーからどの程度変化するかを制御します。",
+                "低いほど表示ラスターレイヤーに影響され、高いほどプロンプトに影響されます。",
+                "生成範囲に可視のラスターレイヤーがない場合、この設定は無視されます。"
             ],
-            "heading": "ディノイジングストレングス"
+            "heading": "ノイズ強度"
         },
         "refinerStart": {
             "heading": "リファイナースタート",
@@ -1889,7 +1977,7 @@
         "optimizedDenoising": {
             "heading": "イメージtoイメージの最適化",
             "paragraphs": [
-                "「イメージtoイメージを最適化」を有効にすると、Fluxモデルを用いた画像間変換およびインペイント変換において、より段階的な除去ノイズ強度スケールが適用されます。この設定により、画像に適用される変化量を制御する能力が向上しますが、標準の除去ノイズ強度スケールを使用したい場合はオフにすることができます。この設定は現在調整中で、ベータ版です。"
+                "「イメージtoイメージを最適化」を有効にすると、Fluxモデルを用いたイメージtoイメージとインペイントで、より段階的なノイズ強度値が適用されます。この設定により、画像の変化量を制御する能力が向上しますが、標準のノイズ強度値を使用したい場合はオフにしてください。この設定は現在調整中のベータ版です。"
             ]
         },
         "refinerPositiveAestheticScore": {
@@ -2038,9 +2126,9 @@
         "compatibleEmbeddings": "互換性のある埋め込み",
         "noMatchingTriggers": "一致するトリガーがありません",
         "generateFromImage": "画像からプロンプトを生成する",
-        "expandCurrentPrompt": "現在のプロンプトを展開",
+        "expandCurrentPrompt": "現在のプロンプトを拡張",
         "uploadImageForPromptGeneration": "プロンプト生成用の画像をアップロードする",
-        "expandingPrompt": "プロンプトを展開しています...",
+        "expandingPrompt": "プロンプトを拡張中...",
         "replace": "置換する",
         "discard": "破棄する",
         "resultTitle": "プロンプト拡張完了",
@@ -2049,13 +2137,24 @@
         "noPromptHistory": "プロンプトヒストリーが記録されていません。",
         "noMatchingPrompts": "一致するプロンプトがヒストリーにありません。",
         "toSwitchBetweenPrompts": "プロンプトを切り替えます。",
-        "promptHistory": "プロンプト履歴",
-        "clearHistory": "履歴をクリア",
+        "promptHistory": "プロンプトヒストリー",
+        "clearHistory": "ヒストリーをクリア",
         "usePrompt": "プロンプトを使用",
         "searchPrompts": "検索...",
         "expandPromptWithLLM": "プロンプトをLLMで拡張",
         "expandPrompt": "プロンプトを拡張",
-        "expand": "拡張する"
+        "expand": "拡張する",
+        "openModelManager": "モデルマネージャーを開く",
+        "imageToPrompt": "画像からプロンプト生成",
+        "selectVisionModel": "画像認識モデルを選択...",
+        "changeImage": "画像を変更",
+        "uploadImage": "画像をアップロード",
+        "generatePrompt": "プロンプトを生成",
+        "selectTextLLM": "LLMを選択...",
+        "noTextLLMInstalledTitle": "LLMがインストールされていません",
+        "noVisionModelInstalledTitle": "画像認識モデルがインストールされていません",
+        "noTextLLMInstalledDescription": "プロンプト拡張にはLLMが必要です。推奨モデルは軽量・高速な Qwen2.5-1.5B-Instruct (~3 GB) です。スターターモデルから追加できます。",
+        "noVisionModelInstalledDescription": "画像からプロンプト生成には画像認識モデル(LLaVA Onevisionなど)が必要です。0.5B(~1 GB)は軽量デフォルトです。"
     },
     "ui": {
         "tabs": {
@@ -2152,7 +2251,7 @@
         "panels": {
             "launchpad": "ローンチパッド",
             "workflowEditor": "ワークフローエディター",
-            "imageViewer": "ビューアー",
+            "imageViewer": "ビューア",
             "canvas": "キャンバス"
         }
     },
@@ -2177,7 +2276,7 @@
             "copyToClipboard": "クリップボードにコピー",
             "copyCanvasToClipboard": "キャンバスをクリップボードにコピー",
             "copyBboxToClipboard": "バウンディングボックスをクリップボードにコピー",
-            "newResizedControlLayer": "新しくサイズ変更されたコントロールレイヤー"
+            "newResizedControlLayer": "新規コントロールレイヤー(リサイズ)"
         },
         "regionalGuidance": "領域ガイダンス",
         "globalReferenceImage": "全域参照画像",
@@ -2211,7 +2310,11 @@
             "move": "移動",
             "eraser": "消しゴム",
             "bbox": "バウンディングボックス",
-            "view": "ビュー"
+            "view": "ビュー",
+            "shapes": "シェイプ",
+            "lasso": "投げ縄",
+            "gradient": "グラデーション",
+            "text": "テキスト"
         },
         "saveCanvasToGallery": "キャンバスをギャラリーに保存",
         "saveBboxToGallery": "バウンディングボックスをギャラリーへ保存",
@@ -2231,7 +2334,7 @@
         "savedToGalleryOk": "ギャラリーに保存しました",
         "controlMode": {
             "prompt": "プロンプト",
-            "controlMode": "コントロールモード",
+            "controlMode": "制御モード",
             "balanced": "バランス（推奨）",
             "control": "コントロール",
             "megaControl": "メガコントロール"
@@ -2245,14 +2348,14 @@
             },
             "preserveMask": {
                 "label": "マスクされた領域を保護",
-                "alert": "マスクされた領域の保存"
+                "alert": "マスクされた領域を保護中"
             },
             "isolatedStagingPreview": "分離されたステージングプレビュー",
             "isolatedPreview": "単体プレビュー",
             "isolatedLayerPreview": "分離されたレイヤーのプレビュー",
             "isolatedLayerPreviewDesc": "フィルタリングや変換などの操作を実行するときに、このレイヤーのみを表示するかどうか。",
-            "invertBrushSizeScrollDirection": "ブラシサイズのスクロール反転",
-            "pressureSensitivity": "筆圧検知",
+            "invertBrushSizeScrollDirection": "ブラシサイズ調整のスクロール方向を反転",
+            "pressureSensitivity": "筆圧感知",
             "saveAllImagesToGallery": {
                 "label": "ギャラリーに新しい生成画像を送る",
                 "alert": "キャンバスを経由せず、直接ギャラリーに生成画像が送られます"
@@ -2274,7 +2377,7 @@
             "filters": "フィルター",
             "filterType": "フィルタータイプ",
             "autoProcess": "自動で実行",
-            "process": "プロセス",
+            "process": "処理",
             "advanced": "詳細設定",
             "processingLayerWith": "{{type}} フィルターを使用した処理レイヤー。",
             "forMoreControl": "さらに細かく制御するには、以下の「詳細設定」をクリックしてください。",
@@ -2349,27 +2452,27 @@
             "img_blur": {
                 "label": "ぼかし",
                 "description": "選択したレイヤーをぼかします。",
-                "blur_type": "ぼかしの種類",
+                "blur_type": "ぼかしタイプ",
                 "blur_radius": "半径",
-                "gaussian_type": "ガウス分布",
+                "gaussian_type": "ガウス",
                 "box_type": "ボックス"
             },
             "img_noise": {
                 "label": "ノイズ",
                 "description": "選択したレイヤーにノイズを追加します。",
                 "noise_type": "ノイズの種類",
-                "noise_amount": "総計",
-                "gaussian_type": "ガウス分布",
-                "salt_and_pepper_type": "塩コショウ",
+                "noise_amount": "量",
+                "gaussian_type": "ガウス",
+                "salt_and_pepper_type": "インパルス",
                 "noise_color": "カラーノイズ",
                 "size": "ノイズサイズ"
             },
             "adjust_image": {
-                "label": "画像を調整する",
+                "label": "色調補正",
                 "description": "画像の選択したチャンネルを調整します。",
                 "channel": "チャンネル",
-                "value_setting": "バリュー",
-                "scale_values": "スケールバリュー",
+                "value_setting": "量",
+                "scale_values": "スケール値",
                 "red": "赤（RGBA）",
                 "green": "緑（RGBA）",
                 "blue": "青（RGBA）",
@@ -2387,6 +2490,9 @@
                 "y": "Y（YCbCr）",
                 "cb": "Cb（YCbCr）",
                 "cr": "Cr（YCbCr）"
+            },
+            "pbr_maps": {
+                "label": "PBRマップを作成"
             }
         },
         "weight": "重み",
@@ -2397,8 +2503,8 @@
         "copyRegionError": "{{region}} のコピー中にエラーが発生しました",
         "newGlobalReferenceImageOk": "作成されたグローバル参照画像",
         "newGlobalReferenceImageError": "グローバル参照イメージの作成中に問題が発生しました",
-        "newRegionalReferenceImageOk": "地域参照画像の作成",
-        "newRegionalReferenceImageError": "地域参照画像の作成中に問題が発生しました",
+        "newRegionalReferenceImageOk": "領域参照画像の作成",
+        "newRegionalReferenceImageError": "領域参照画像の作成中に問題が発生しました",
         "newControlLayerOk": "作成されたコントロールレイヤー",
         "newControlLayerError": "制御層の作成中に問題が発生しました",
         "newRasterLayerOk": "ラスターレイヤーを作成しました",
@@ -2412,12 +2518,12 @@
         "mergeVisibleOk": "レイヤーが結合されました",
         "mergeVisibleError": "レイヤーの結合エラー",
         "mergingLayers": "レイヤーの結合中",
-        "clearHistory": "履歴をクリア",
+        "clearHistory": "ヒストリーをクリア",
         "bboxOverlay": "バウンディングボックス外を暗くする",
         "ruleOfThirds": "三分割法を表示",
         "newSession": "新しいセッション",
         "clearCaches": "キャッシュをクリア",
-        "recalculateRects": "長方形を再計算する",
+        "recalculateRects": "矩形を再計算する",
         "clipToBbox": "描画をバウンディングボックス内に制限",
         "outputOnlyMaskedRegions": "生成された領域のみを出力する",
         "width": "幅",
@@ -2438,7 +2544,7 @@
         "addDenoiseLimit": "$t(controlLayers.denoiseLimit)を追加します",
         "controlLayer": "コントロールレイヤー",
         "inpaintMask": "インペイントマスク",
-        "referenceImageRegional": "参考画像（地域別）",
+        "referenceImageRegional": "参考画像（領域）",
         "asRasterLayer": "$t(controlLayers.rasterLayer) として",
         "asRasterLayerResize": "$t(controlLayers.rasterLayer) として (リサイズ)",
         "asControlLayer": "$t(controlLayers.controlLayer) として",
@@ -2558,9 +2664,9 @@
             "neutral": "ニュートラル",
             "apply": "適用",
             "reset": "リセット",
-            "saveAs": "名前を付けて保存",
+            "saveAs": "保存",
             "cancel": "キャンセル",
-            "process": "プロセス",
+            "process": "処理",
             "clickToAdd": "レイヤーをクリックしてポイントを追加します",
             "dragToMove": "ポイントをドラッグして移動します",
             "clickToRemove": "ポイントをクリックして削除します",
@@ -2575,24 +2681,25 @@
             "model": "モデル",
             "segmentAnything1": "Segment Anything 1",
             "segmentAnything2": "Segment Anything 2",
-            "prompt": "プロンプト選択"
+            "prompt": "選択プロンプト"
         },
         "HUD": {
             "bbox": "バウンディングボックス",
             "scaledBbox": "リサイズ後のバウンディングボックス",
             "entityStatus": {
                 "isFiltering": "{{title}} はフィルタリング中です",
-                "isTransforming": "{{title}}は変化しています",
+                "isTransforming": "{{title}}を変形中です",
                 "isLocked": "{{title}}はロックされています",
                 "isHidden": "{{title}}は非表示になっています",
                 "isDisabled": "{{title}}は無効です",
                 "isEmpty": "{{title}} は空です"
-            }
+            },
+            "textSessionActive": "文字入力がアクティブ中"
         },
         "stagingArea": {
-            "accept": "受け入れる",
+            "accept": "採用",
             "discardAll": "すべて破棄",
-            "discard": "破棄する",
+            "discard": "破棄",
             "previous": "前へ",
             "next": "次へ",
             "saveToGallery": "ギャラリーに保存",
@@ -2615,7 +2722,7 @@
             "saturation": "彩度",
             "temperature": "色温度",
             "tint": "色相",
-            "sharpness": "シャープネス",
+            "sharpness": "シャープ",
             "finish": "終了",
             "reset": "リセット",
             "master": "マスター"
@@ -2635,12 +2742,12 @@
         "viewProgressInViewer": "<Btn>画像ビューア</Btn>で進行状況と出力を表示します。",
         "viewProgressOnCanvas": "<Btn>キャンバス</Btn> で進行状況とステージ出力を表示します。",
         "globalReferenceImage_withCount_other": "グローバル参照画像",
-        "regionalGuidance_withCount_hidden": "地域ガイダンス（{{count}}件非表示）",
+        "regionalGuidance_withCount_hidden": "領域ガイダンス（{{count}}件非表示）",
         "controlLayers_withCount_hidden": "コントロールレイヤー（{{count}} 個非表示）",
         "rasterLayers_withCount_hidden": "ラスターレイヤー ({{count}} 個非表示)",
         "globalReferenceImages_withCount_hidden": "グローバル参照画像（{{count}} 枚非表示）",
         "inpaintMasks_withCount_hidden": "インペイントマスク（{{count}} 個非表示）",
-        "regionalGuidance_withCount_visible": "地域ガイダンス ({{count}})",
+        "regionalGuidance_withCount_visible": "領域ガイダンス ({{count}})",
         "controlLayers_withCount_visible": "コントロールレイヤー ({{count}})",
         "rasterLayers_withCount_visible": "ラスターレイヤー（{{count}}）",
         "globalReferenceImages_withCount_visible": "グローバル参照画像 ({{count}})",
@@ -2741,7 +2848,35 @@
         "maskLayerEmpty": "マスクレイヤーが空です",
         "extractMaskedAreaFailed": "マスク領域の抽出ができません。",
         "extractMaskedAreaMissingData": "抽出ができません：画像かマスクデータが不明です。",
-        "invertRegion": "領域反転"
+        "invertRegion": "領域反転",
+        "workflowIntegration": {
+            "title": "キャンバスでワークフローを使う",
+            "runWorkflow": "ワークフローを使う",
+            "execute": "ワークフローを実行",
+            "executing": "実行中..."
+        },
+        "shape": {
+            "rect": "矩形",
+            "oval": "楕円"
+        },
+        "modifierHints": {
+            "labels": {
+                "pan": "パン",
+                "moveShape": "シェイプを移動",
+                "pickColor": "色をスポイト",
+                "straightLine": "直線",
+                "resizeBrush": "ブラシサイズの変更",
+                "resizeEraser": "消しゴムサイズの変更",
+                "erase": "消去",
+                "snap45Degrees": "45度でスナップ",
+                "lockAspectRatio": "縦横比を固定",
+                "unlockAspectRatio": "縦横比の固定を解除",
+                "scaleFromCenter": "中央から変形",
+                "snapRotation": "回転をスナップ",
+                "nudgeSelection": "選択をナッジ",
+                "cancelText": "キャンセル"
+            }
+        }
     },
     "stylePresets": {
         "clearTemplateSelection": "選択したテンプレートをクリア",
@@ -2814,8 +2949,8 @@
         "tileOverlap": "タイルオーバーラップ"
     },
     "sdxl": {
-        "denoisingStrength": "除去ノイズ強度",
-        "scheduler": "スケジューラー",
+        "denoisingStrength": "ノイズ強度",
+        "scheduler": "スケジューラ",
         "loading": "ロード中...",
         "steps": "ステップ",
         "refiner": "リファイナー",
@@ -2849,7 +2984,7 @@
             "containerPlaceholder": "空のコンテナ",
             "showDescription": "説明を表示",
             "emptyRootPlaceholderEditMode": "開始するには、フォーム要素またはノード フィールドをここにドラッグします。",
-            "divider": "仕切り",
+            "divider": "区切り線",
             "deleteAllElements": "すべてのフォーム要素を削除",
             "heading": "見出し",
             "nodeField": "ノードフィールド",
@@ -2859,7 +2994,7 @@
             "both": "両方",
             "builder": "フォームビルダー",
             "text": "テキスト",
-            "row": "行",
+            "row": "横",
             "multiLine": "テキスト(複数行)",
             "resetAllNodeFields": "すべてのノードフィールドをリセット",
             "slider": "スライダー",
@@ -2872,10 +3007,10 @@
             "addOption": "オプションを追加",
             "singleLine": "テキスト",
             "numberInput": "数値入力",
-            "column": "列",
+            "column": "縦",
             "container": "コンテナ",
-            "containerRowLayout": "コンテナ（行レイアウト）",
-            "containerColumnLayout": "コンテナ（列レイアウト）",
+            "containerRowLayout": "コンテナ（横レイアウト）",
+            "containerColumnLayout": "コンテナ（縦レイアウト）",
             "maximum": "最大",
             "published": "公開済み",
             "publishedWorkflowOutputs": "アウトプット",
@@ -2897,7 +3032,7 @@
             "errorWorkflowHasUnpublishableNodes": "ワークフローにはバッチ、ジェネレータ、またはメタデータ抽出ノードがあります",
             "errorWorkflowHasInvalidGraph": "ワークフロー グラフが無効です (詳細については [呼び出し] ボタンにマウスを移動してください)",
             "errorWorkflowHasNoOutputNode": "出力ノードが選択されていません",
-            "warningWorkflowHasNoPublishableInputFields": "公開可能な入力フィールドが選択されていません - 公開されたワークフローはデフォルト値のみで実行されます",
+            "warningWorkflowHasNoPublishableInputFields": "パブリッシュ可能な入力フィールドが選択されていません - パブリッシュされたワークフローはデフォルト値のみで実行されます",
             "warningWorkflowHasUnpublishableInputFields": "ワークフローには公開できない入力がいくつかあります。これらは公開されたワークフローから省略されます",
             "publishFailed": "公開失敗",
             "publishFailedDesc": "ワークフローの公開中に問題が発生しました。もう一度お試しください。",
@@ -2905,9 +3040,9 @@
             "publishSuccessDesc": "<LinkComponent>プロジェクト ダッシュボード</LinkComponent> をチェックして進捗状況を確認してください。",
             "publishInProgress": "公開中",
             "publishedWorkflowIsLocked": "公開されたワークフローはロックされています",
-            "publishingValidationRun": "公開検証実行",
-            "publishingValidationRunInProgress": "公開検証の実行が進行中です。",
-            "publishedWorkflowsLocked": "公開済みのワークフローはロックされており、編集または実行できません。このワークフローを編集または実行するには、ワークフローを非公開にするか、コピーを保存してください。",
+            "publishingValidationRun": "パブリッシュ用検証を実行",
+            "publishingValidationRunInProgress": "パブリッシュ用検証を実行中です。",
+            "publishedWorkflowsLocked": "パブリッシュ済みのワークフローはロックされ編集や実行はできません。このワークフローを編集または実行するには、ワークフローのパブリッシュを取りやめるか、コピーを保存してください。",
             "selectingOutputNode": "出力ノードの選択",
             "selectingOutputNodeDesc": "ノードをクリックして、ワークフローの出力ノードとして選択します。",
             "removeFromForm": "フォームから削除",
@@ -2957,7 +3092,7 @@
         "loadFromGraph": "グラフからワークフローをロード",
         "workflowName": "ワークフロー名",
         "loading": "ワークフローをロードしています",
-        "uploadWorkflow": "ファイルからロードする",
+        "uploadWorkflow": "ファイルから読み込み",
         "defaultWorkflows": "デフォルトワークフロー",
         "userWorkflows": "ユーザーワークフロー",
         "projectWorkflows": "プロジェクトワークフロー",
@@ -3001,14 +3136,14 @@
         "promptsPreview": "プロンプトプレビュー",
         "seedBehaviour": {
             "label": "シードの挙動",
-            "perPromptLabel": "画像ごとのシード",
-            "perIterationLabel": "イテレーションごとのシード",
-            "perPromptDesc": "それぞれの画像に足して別のシードを使う",
+            "perPromptLabel": "画像毎のシード",
+            "perIterationLabel": "イテレーション毎のシード",
+            "perPromptDesc": "それぞれの画像で別のシードを使う",
             "perIterationDesc": "それぞれのイテレーションに別のシードを使う"
         },
         "showDynamicPrompts": "ダイナミックプロンプトを表示",
         "dynamicPrompts": "ダイナミックプロンプト",
-        "loading": "ダイナミックプロンプトを生成...",
+        "loading": "ダイナミックプロンプトを生成中...",
         "maxPrompts": "最大プロンプト",
         "promptsToGenerate": "生成するプロンプト"
     },
@@ -3145,5 +3280,33 @@
             "moderate": "適切なパスワード",
             "strong": "強力なパスワード"
         }
+    },
+    "customNodes": {
+        "title": "カスタムノード",
+        "installTitle": "ノードパックのインストール",
+        "gitUrl": "GitリポジトリURL",
+        "gitUrlLabel": "リポジトリURL",
+        "install": "インストール",
+        "installing": "インストール中",
+        "installSuccess": "ノードパックがインストールされました",
+        "installFailed": "インストールが失敗しました",
+        "installError": "インストール中に予期しないエラーが発生しました。",
+        "securityWarning": "ノードパックは信頼できる開発元からのみインストールししてください。カスタムノードはシステム上でコードを実行します。 悪意のあるノードはシステムに損害を及ぼしたり、データを破壊する可能性があります。",
+        "installDescription": "リポジトリをノードディレクトリにクローンします。 ワークフローファイル(.json)はライブラリにインポートされます。 Python の依存関係 (requirements.txt または pyproject.toml ) は自動的にインストールされません。ノードパックのドキュメントに従って手動でインストールしてください。",
+        "dependenciesRequiredTitle": "依存関係の手動インストールが必要です",
+        "dependenciesRequiredDescription": "'{{name}}' には {{file}} が含まれています。 ノードパックのドキュメントに従って、ノードを使用する前にPythonの依存関係をインストールしてください。",
+        "uninstall": "アンインストール",
+        "reload": "再読み込み",
+        "reloading": "再読み込み中",
+        "noNodePacks": "カスタムノードパックがインストールされていません。",
+        "scanFolder": "フォルダーをスキャン",
+        "scanFolderDescription": "nodes ディレクトリに置いた Node パックは起動時に自動検出されます。 再読み込みボタン押すと、再起動せずに新しく追加されたパックを検出できます。",
+        "nodesDirectory": "ノードディレクトリ",
+        "installQueue": "インストール履歴",
+        "queueEmpty": "最近インストールされた履歴はありません。",
+        "name": "名前",
+        "message": "メッセージ",
+        "nodeCount_other": "{{count}} ノード",
+        "uninstalled": "アンインストール済み"
     }
 }
