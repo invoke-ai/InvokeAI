@@ -1,0 +1,77 @@
+---
+title: Lasso Tool
+description: Learn how to create and refine inpaint masks with the Lasso tool.
+lastUpdated: 2026-05-15
+sidebar:
+  order: 2
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+The Lasso tool is the canvas's dedicated masking tool. It always draws into **inpaint mask layers** and is designed
+for quickly defining irregular regions for inpainting.
+
+You can activate the Lasso tool from the canvas toolbar or with the default hotkey <kbd>L</kbd>.
+
+## Where Lasso Draws
+
+Lasso always targets an **enabled inpaint mask**:
+
+- If an enabled inpaint mask is currently selected, Lasso draws into that mask.
+- If no enabled inpaint mask is available, Lasso creates a new inpaint mask automatically and commits the contour
+  there.
+
+:::note
+If a disabled inpaint mask is selected, Lasso does not draw into the disabled mask. It creates a new enabled mask for
+the next contour instead.
+:::
+
+## Common Behavior
+
+- Lasso always commits a **closed contour**.
+- Hold <kbd>Ctrl</kbd> on Windows/Linux or <kbd>Cmd</kbd> on macOS to switch to **subtractive** mode and remove area
+  from the mask instead of adding to it.
+- Press <kbd>Esc</kbd> to cancel the current lasso session.
+- Hold <kbd>Space</kbd> during an active session to pan the viewport without discarding the unfinished contour.
+
+## Lasso Modes
+
+<CardGrid>
+  <Card title="Freehand">
+    Click and drag to sketch an irregular contour. Releasing the pointer closes and commits the contour automatically.
+  </Card>
+  <Card title="Polygon">
+    Click to place vertices. Click the first point to close and commit the contour. Hold <kbd>Shift</kbd> while
+    placing the next edge to snap it to horizontal, vertical, and 45 degree angles.
+  </Card>
+</CardGrid>
+
+## Moving and Panning During Drawing
+
+The Lasso tool uses <kbd>Space</kbd> for panning in both modes:
+
+- **Freehand:** While drawing, hold <kbd>Space</kbd> to pan the viewport without discarding the unfinished contour.
+  Release <kbd>Space</kbd> to continue drawing.
+- **Polygon:** During an active polygon session, hold <kbd>Space</kbd> to pan the viewport without discarding the
+  unfinished contour. Release <kbd>Space</kbd> and continue placing points.
+
+This is especially useful when drawing large mask regions that extend beyond the current viewport.
+
+## Working With Masks
+
+- Use **Freehand** for organic shapes like hair, smoke, foliage, fabric, and quick blocking.
+- Use **Polygon** when you need straight edges and deliberate corner placement.
+- Use **subtractive mode** to trim or punch holes in an existing inpaint mask.
+- Use Lasso when you want mask-first editing behavior without first creating a mask layer by hand.
+
+## Practical Notes
+
+- Polygon mode shows the starting point so you can close the contour precisely.
+- After at least three polygon points, moving near the start point lets you click it to finish the shape.
+- Freehand is faster for loose silhouettes. Polygon is better when edge placement matters.
+
+## Summary
+
+The Lasso tool is the fastest way to create and refine inpaint masks on the canvas. Use Freehand for organic regions,
+Polygon for hard edges, and hold <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> whenever you need to subtract from the mask instead of
+adding to it.
