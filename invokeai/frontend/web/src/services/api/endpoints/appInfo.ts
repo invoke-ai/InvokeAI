@@ -3,6 +3,7 @@ import type { stringify } from 'querystring';
 import type { paths } from 'services/api/schema';
 import type {
   AppVersion,
+  ExternalApiModelConfig,
   ExternalProviderConfig,
   ExternalProviderConfigUpdate,
   ExternalProviderStatus,
@@ -97,14 +98,36 @@ export const appInfoApi = api.injectEndpoints({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['AppConfig', 'FetchOnReconnect'],
+      invalidatesTags: ['AppConfig', 'FetchOnReconnect', 'ModelConfig'],
     }),
     resetExternalProviderConfig: build.mutation<ExternalProviderConfig, string>({
       query: (provider_id) => ({
         url: buildAppInfoUrl(`external_providers/config/${provider_id}`),
         method: 'DELETE',
       }),
-      invalidatesTags: ['AppConfig', 'FetchOnReconnect'],
+      invalidatesTags: ['AppConfig', 'FetchOnReconnect', 'ModelConfig'],
+    }),
+    getCustomOpenAIImagesModels: build.query<ExternalApiModelConfig[], void>({
+      query: () => ({
+        url: buildAppInfoUrl('external_providers/custom_openai_images/models'),
+        method: 'GET',
+      }),
+      providesTags: ['ModelConfig', 'FetchOnReconnect'],
+    }),
+    createCustomOpenAIImagesModel: build.mutation<ExternalApiModelConfig, CreateCustomOpenAIImagesModelArg>({
+      query: (body) => ({
+        url: buildAppInfoUrl('external_providers/custom_openai_images/models'),
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['ModelConfig', 'FetchOnReconnect'],
+    }),
+    deleteCustomOpenAIImagesModel: build.mutation<void, string>({
+      query: (model_key) => ({
+        url: buildAppInfoUrl(`external_providers/custom_openai_images/models/${model_key}`),
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['ModelConfig', 'FetchOnReconnect'],
     }),
     getInvocationCacheStatus: build.query<
       paths['/api/v1/app/invocation_cache/status']['get']['responses']['200']['content']['application/json'],
@@ -153,6 +176,9 @@ export const {
   useGetExternalProviderConfigsQuery,
   useSetExternalProviderConfigMutation,
   useResetExternalProviderConfigMutation,
+  useGetCustomOpenAIImagesModelsQuery,
+  useCreateCustomOpenAIImagesModelMutation,
+  useDeleteCustomOpenAIImagesModelMutation,
   useUpdateRuntimeConfigMutation,
   useClearInvocationCacheMutation,
   useDisableInvocationCacheMutation,
@@ -164,4 +190,9 @@ export const {
 
 type SetExternalProviderConfigArg = ExternalProviderConfigUpdate & {
   provider_id: string;
+};
+
+type CreateCustomOpenAIImagesModelArg = {
+  provider_model_id: string;
+  name?: string | null;
 };

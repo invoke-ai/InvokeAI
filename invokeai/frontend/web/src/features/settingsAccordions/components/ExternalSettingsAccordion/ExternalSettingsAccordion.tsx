@@ -39,7 +39,7 @@ export const ExternalSettingsAccordion = memo(() => {
         <FormControlGroup formLabelProps={formLabelProps}>
           <ExternalModelResolutionSelect />
           <ExternalModelImageSizeSelect />
-          {providerId === 'openai' && <OpenAIProviderOptions />}
+          {(providerId === 'openai' || providerId === 'custom_openai_images') && <OpenAIProviderOptions />}
           {providerId === 'gemini' && <GeminiProviderOptions />}
           {providerId === 'seedream' && <SeedreamProviderOptions />}
         </FormControlGroup>

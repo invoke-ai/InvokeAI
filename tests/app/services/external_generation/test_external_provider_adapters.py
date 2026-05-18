@@ -11,6 +11,7 @@ from invokeai.app.services.external_generation.external_generation_common import
     ExternalReferenceImage,
 )
 from invokeai.app.services.external_generation.image_utils import decode_image_base64, encode_image_base64
+from invokeai.app.services.external_generation.providers.custom_openai_images import CustomOpenAIImagesProvider
 from invokeai.app.services.external_generation.providers.gemini import GeminiProvider
 from invokeai.app.services.external_generation.providers.openai import OpenAIProvider
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig, ExternalModelCapabilities
@@ -391,3 +392,32 @@ def test_openai_generate_txt2img_with_references_uses_edit_endpoint(monkeypatch:
     assert image_files[0][1][0] == "image_0.png"
     assert image_files[1][1][0] == "image_1.png"
     assert result.images
+
+
+def test_custom_openai_images_limits_response_images_to_requested_count(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = InvokeAIAppConfig(
+        external_custom_openai_images_api_key="custom-key",
+        external_custom_openai_images_base_url="https://proxy.example/v1",
+    )
+    provider = CustomOpenAIImagesProvider(config, logging.getLogger("test"))
+    model = _build_model("custom_openai_images", "gemini-3-pro-image-preview")
+    request = _build_request(model)
+    first = encode_image_base64(_make_image("purple"))
+    second = encode_image_base64(_make_image("orange"))
+    captured: dict[str, object] = {}
+
+    def fake_post(url: str, headers: dict, json: dict, timeout: int) -> DummyResponse:
+        captured["url"] = url
+        captured["json"] = json
+        return DummyResponse(ok=True, json_data={"data": [{"b64_json": first}, {"b64_json": second}]})
+
+    monkeypatch.setattr("requests.post", fake_post)
+
+    result = provider.generate(request)
+
+    assert captured["url"] == "https://proxy.example/v1/images/generations"
+    payload = captured["json"]
+    assert isinstance(payload, dict)
+    assert payload["n"] == 1
+    assert len(result.images) == 1
+    assert result.images[0].image.getpixel((0, 0)) == decode_image_base64(first).getpixel((0, 0))

@@ -35,6 +35,8 @@ CONFIG_SCHEMA_VERSION = "4.0.3"
 EXTERNAL_PROVIDER_CONFIG_FIELDS = (
     "external_alibabacloud_api_key",
     "external_alibabacloud_base_url",
+    "external_custom_openai_images_api_key",
+    "external_custom_openai_images_base_url",
     "external_gemini_api_key",
     "external_gemini_base_url",
     "external_openai_api_key",
@@ -128,6 +130,8 @@ class InvokeAIAppConfig(BaseSettings):
         strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.
         external_alibabacloud_api_key: API key for Alibaba Cloud DashScope image generation.
         external_alibabacloud_base_url: Base URL override for Alibaba Cloud DashScope image generation.
+        external_custom_openai_images_api_key: API key for a custom OpenAI Images-compatible provider.
+        external_custom_openai_images_base_url: Base URL for a custom OpenAI Images-compatible provider.
         external_gemini_api_key: API key for Gemini image generation.
         external_openai_api_key: API key for OpenAI image generation.
         external_gemini_base_url: Base URL override for Gemini image generation.
@@ -237,6 +241,12 @@ class InvokeAIAppConfig(BaseSettings):
     external_alibabacloud_api_key: Optional[str] = Field(default=None, description="API key for Alibaba Cloud DashScope image generation.")
     external_alibabacloud_base_url: Optional[str] = Field(
         default=None, description="Base URL override for Alibaba Cloud DashScope image generation."
+    )
+    external_custom_openai_images_api_key: Optional[str] = Field(
+        default=None, description="API key for a custom OpenAI Images-compatible provider."
+    )
+    external_custom_openai_images_base_url: Optional[str] = Field(
+        default=None, description="Base URL for a custom OpenAI Images-compatible provider."
     )
     external_gemini_api_key: Optional[str] = Field(default=None, description="API key for Gemini image generation.")
     external_openai_api_key: Optional[str] = Field(default=None, description="API key for OpenAI image generation.")

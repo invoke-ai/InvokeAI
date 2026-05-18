@@ -1409,6 +1409,23 @@ openai_gpt_image_1_mini = StarterModel(
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
     panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
 )
+openai_gpt_image_2 = StarterModel(
+    name="GPT Image 2",
+    base=BaseModelType.External,
+    source="external://openai/gpt-image-2",
+    description="OpenAI GPT-Image-2 image generation model. Requires a configured OpenAI API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_images_per_request=10,
+        allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
 openai_dall_e_3 = StarterModel(
     name="DALL-E 3",
     base=BaseModelType.External,
@@ -1678,6 +1695,7 @@ STARTER_MODELS: list[StarterModel] = [
     openai_gpt_image_1_5,
     openai_gpt_image_1,
     openai_gpt_image_1_mini,
+    openai_gpt_image_2,
     openai_dall_e_3,
     seedream_5_0,
     seedream_5_0_lite,

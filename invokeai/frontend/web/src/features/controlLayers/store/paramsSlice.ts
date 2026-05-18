@@ -952,11 +952,17 @@ export const selectResolutionPresets = createSelector(selectModelConfig, (modelC
   }
   return modelConfig.capabilities.resolution_presets ?? null;
 });
-export const selectHasFixedDimensionSizes = createSelector(
-  selectAspectRatioSizes,
-  selectResolutionPresets,
-  (sizes, presets) => sizes !== null || (presets !== null && presets.length > 0)
-);
+export const selectHasFixedDimensionSizes = createSelector(selectModelConfig, (modelConfig) => {
+  if (!modelConfig || !isExternalApiModelConfig(modelConfig)) {
+    return false;
+  }
+  if (modelConfig.provider_id === 'custom_openai_images') {
+    return false;
+  }
+  const sizes = modelConfig.capabilities.aspect_ratio_sizes ?? null;
+  const presets = modelConfig.capabilities.resolution_presets ?? null;
+  return sizes !== null || (presets !== null && presets.length > 0);
+});
 export const selectImageSize = createParamsSelector((params) => params.imageSize);
 export const selectOpenaiQuality = createParamsSelector((params) => params.openaiQuality);
 export const selectOpenaiBackground = createParamsSelector((params) => params.openaiBackground);

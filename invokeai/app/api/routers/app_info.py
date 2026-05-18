@@ -23,11 +23,18 @@ from invokeai.app.services.config.config_default import (
     load_external_api_keys,
 )
 from invokeai.app.services.external_generation.external_generation_common import ExternalProviderStatus
+from invokeai.app.services.external_generation.providers.custom_openai_images import (
+    CUSTOM_OPENAI_IMAGES_CAPABILITIES,
+    CUSTOM_OPENAI_IMAGES_DEFAULT_SETTINGS,
+    CUSTOM_OPENAI_IMAGES_PROVIDER_ID,
+)
 from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
-from invokeai.app.services.model_records.model_records_base import UnknownModelException
+from invokeai.app.services.model_records.model_records_base import DuplicateModelException, UnknownModelException
 from invokeai.backend.image_util.infill_methods.patchmatch import PatchMatch
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelSourceType, ModelType
 from invokeai.backend.util.logging import logging
+from invokeai.backend.util.util import slugify
 from invokeai.version import __version__
 
 
@@ -98,8 +105,17 @@ class ExternalProviderConfigModel(BaseModel):
     base_url: str | None = Field(default=None, description="Optional base URL override")
 
 
+class CustomOpenAIImagesModelCreate(BaseModel):
+    provider_model_id: str = Field(min_length=1, description="Provider-specific model ID")
+    name: str | None = Field(default=None, description="Optional display name")
+
+
 EXTERNAL_PROVIDER_FIELDS: dict[str, tuple[str, str]] = {
     "alibabacloud": ("external_alibabacloud_api_key", "external_alibabacloud_base_url"),
+    CUSTOM_OPENAI_IMAGES_PROVIDER_ID: (
+        "external_custom_openai_images_api_key",
+        "external_custom_openai_images_base_url",
+    ),
     "gemini": ("external_gemini_api_key", "external_gemini_base_url"),
     "openai": ("external_openai_api_key", "external_openai_base_url"),
     "seedream": ("external_seedream_api_key", "external_seedream_base_url"),
@@ -239,6 +255,87 @@ async def reset_external_provider_config(
     return _build_external_provider_config(provider_id, get_config())
 
 
+@app_router.get(
+    "/external_providers/custom_openai_images/models",
+    operation_id="list_custom_openai_images_models",
+    status_code=200,
+    response_model=list[ExternalApiModelConfig],
+)
+async def list_custom_openai_images_models() -> list[ExternalApiModelConfig]:
+    return _list_external_models_for_provider(CUSTOM_OPENAI_IMAGES_PROVIDER_ID)
+
+
+@app_router.post(
+    "/external_providers/custom_openai_images/models",
+    operation_id="create_custom_openai_images_model",
+    status_code=200,
+    response_model=ExternalApiModelConfig,
+)
+async def create_custom_openai_images_model(
+    model: CustomOpenAIImagesModelCreate = Body(description="Custom OpenAI Images-compatible model settings"),
+) -> ExternalApiModelConfig:
+    provider_model_id = model.provider_model_id.strip()
+    if not provider_model_id:
+        raise HTTPException(status_code=400, detail="Provider model ID is required")
+    name = (model.name or provider_model_id).strip() or provider_model_id
+
+    model_store = ApiDependencies.invoker.services.model_manager.store
+    existing = next(
+        (
+            external_model
+            for external_model in _list_external_models_for_provider(CUSTOM_OPENAI_IMAGES_PROVIDER_ID)
+            if external_model.provider_model_id == provider_model_id
+        ),
+        None,
+    )
+    key = existing.key if existing is not None else _build_unique_external_model_key(provider_model_id)
+    source = f"external://{CUSTOM_OPENAI_IMAGES_PROVIDER_ID}/{provider_model_id}"
+    config = ExternalApiModelConfig(
+        key=key,
+        name=name,
+        description="Custom OpenAI Images-compatible external API model.",
+        provider_id=CUSTOM_OPENAI_IMAGES_PROVIDER_ID,
+        provider_model_id=provider_model_id,
+        capabilities=CUSTOM_OPENAI_IMAGES_CAPABILITIES,
+        default_settings=CUSTOM_OPENAI_IMAGES_DEFAULT_SETTINGS,
+        source=source,
+        source_type=ModelSourceType.External,
+        path="",
+        hash="",
+        file_size=0,
+        tags=["custom", "openai-compatible"],
+    )
+
+    try:
+        if existing is not None:
+            saved_model = model_store.replace_model(existing.key, config)
+        else:
+            saved_model = model_store.add_model(config)
+    except DuplicateModelException as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    if not isinstance(saved_model, ExternalApiModelConfig):
+        raise HTTPException(status_code=500, detail="Saved model was not an external API model")
+    return saved_model
+
+
+@app_router.delete(
+    "/external_providers/custom_openai_images/models/{model_key}",
+    operation_id="delete_custom_openai_images_model",
+    status_code=204,
+)
+async def delete_custom_openai_images_model(
+    model_key: str = Path(description="Custom OpenAI Images-compatible model key"),
+) -> None:
+    model_store = ApiDependencies.invoker.services.model_manager.store
+    try:
+        model = model_store.get_model(model_key)
+    except UnknownModelException as e:
+        raise HTTPException(status_code=404, detail=f"Unknown model '{model_key}'") from e
+    if not isinstance(model, ExternalApiModelConfig) or model.provider_id != CUSTOM_OPENAI_IMAGES_PROVIDER_ID:
+        raise HTTPException(status_code=404, detail=f"Unknown custom OpenAI Images-compatible model '{model_key}'")
+    model_store.del_model(model_key)
+
+
 def status_to_model(status: ExternalProviderStatus) -> ExternalProviderStatusModel:
     return ExternalProviderStatusModel(
         provider_id=status.provider_id,
@@ -312,6 +409,31 @@ def _build_external_provider_config(provider_id: str, config: InvokeAIAppConfig)
         api_key_configured=bool(getattr(config, api_key_field)),
         base_url=getattr(config, base_url_field),
     )
+
+
+def _list_external_models_for_provider(provider_id: str) -> list[ExternalApiModelConfig]:
+    model_store = ApiDependencies.invoker.services.model_manager.store
+    external_models = model_store.search_by_attr(
+        base_model=BaseModelType.External,
+        model_type=ModelType.ExternalImageGenerator,
+    )
+    models = [
+        model
+        for model in external_models
+        if isinstance(model, ExternalApiModelConfig) and model.provider_id == provider_id
+    ]
+    return sorted(models, key=lambda model: model.name.lower())
+
+
+def _build_unique_external_model_key(provider_model_id: str) -> str:
+    model_store = ApiDependencies.invoker.services.model_manager.store
+    base_key = slugify(f"{CUSTOM_OPENAI_IMAGES_PROVIDER_ID}-{provider_model_id}")
+    key = base_key
+    suffix = 2
+    while model_store.exists(key):
+        key = f"{base_key}-{suffix}"
+        suffix += 1
+    return key
 
 
 def _remove_external_models_for_provider(provider_id: str) -> None:

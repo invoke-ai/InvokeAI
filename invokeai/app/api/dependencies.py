@@ -19,6 +19,7 @@ from invokeai.app.services.events.events_fastapievents import FastAPIEventServic
 from invokeai.app.services.external_generation.external_generation_default import ExternalGenerationService
 from invokeai.app.services.external_generation.providers import (
     AlibabaCloudProvider,
+    CustomOpenAIImagesProvider,
     GeminiProvider,
     OpenAIProvider,
     SeedreamProvider,
@@ -167,6 +168,9 @@ class ApiDependencies:
         external_generation = ExternalGenerationService(
             providers={
                 AlibabaCloudProvider.provider_id: AlibabaCloudProvider(app_config=configuration, logger=logger),
+                CustomOpenAIImagesProvider.provider_id: CustomOpenAIImagesProvider(
+                    app_config=configuration, logger=logger
+                ),
                 GeminiProvider.provider_id: GeminiProvider(app_config=configuration, logger=logger),
                 OpenAIProvider.provider_id: OpenAIProvider(app_config=configuration, logger=logger),
                 SeedreamProvider.provider_id: SeedreamProvider(app_config=configuration, logger=logger),

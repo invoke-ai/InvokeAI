@@ -182,6 +182,30 @@ describe('buildExternalGraph', () => {
     expect(externalNode?.type).toBe('gemini_image_generation');
   });
 
+  it('uses custom OpenAI Images-compatible node type', async () => {
+    mockModelConfig = createExternalModel({
+      provider_id: 'custom_openai_images',
+      provider_model_id: 'google/gemini-image',
+      path: 'external://custom_openai_images/google/gemini-image',
+      source: 'external://custom_openai_images/google/gemini-image',
+      hash: 'external:custom_openai_images:google/gemini-image',
+    });
+
+    const { g } = await buildExternalGraph({
+      generationMode: 'txt2img',
+      state: {} as RootState,
+      manager: null,
+    });
+
+    const graph = g.getGraph();
+    const externalNode = Object.values(graph.nodes).find(
+      (node) => (node as Record<string, unknown>).type === 'custom_openai_images_generation'
+    ) as Record<string, unknown> | undefined;
+
+    expect(externalNode).toBeDefined();
+    expect(externalNode?.type).toBe('custom_openai_images_generation');
+  });
+
   it('throws when mode is unsupported', async () => {
     const modelConfig = createExternalModel({
       capabilities: {
