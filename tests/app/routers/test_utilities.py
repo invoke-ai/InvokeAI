@@ -50,9 +50,7 @@ def _create_extra_user(mock_invoker: Invoker, email: str) -> str:
         ("/api/v1/utilities/image-to-prompt", {"image_name": "img-1", "model_key": "m"}),
     ],
 )
-def test_routes_require_auth(
-    enable_multiuser: Any, client: TestClient, mock_invoker: Invoker, path: str, body: dict
-):
+def test_routes_require_auth(enable_multiuser: Any, client: TestClient, mock_invoker: Invoker, path: str, body: dict):
     r = client.post(path, json=body)
     assert r.status_code == status.HTTP_401_UNAUTHORIZED
     mock_invoker.services.model_manager.store.get_model.assert_not_called()
@@ -91,9 +89,7 @@ def test_image_to_prompt_forbidden_for_non_owner(
     mock_invoker.services.model_manager.store.get_model.assert_not_called()
 
 
-def test_image_to_prompt_owner_reaches_model_load(
-    client: TestClient, user1_token: str, mock_invoker: Invoker
-):
+def test_image_to_prompt_owner_reaches_model_load(client: TestClient, user1_token: str, mock_invoker: Invoker):
     """The owner passes the read-access check and the model load is attempted.
     We force an UnknownModelException to keep the test light and assert 404."""
     from invokeai.app.services.model_records.model_records_base import UnknownModelException
@@ -102,9 +98,7 @@ def test_image_to_prompt_owner_reaches_model_load(
     assert user1 is not None
     _save_image(mock_invoker, "owned-img.png", user1.user_id)
 
-    mock_invoker.services.model_manager.store.get_model = MagicMock(
-        side_effect=UnknownModelException("no such model")
-    )
+    mock_invoker.services.model_manager.store.get_model = MagicMock(side_effect=UnknownModelException("no such model"))
 
     r = client.post(
         "/api/v1/utilities/image-to-prompt",
@@ -124,9 +118,7 @@ def test_image_to_prompt_admin_can_access_any_image(
     assert user1 is not None
     _save_image(mock_invoker, "user1-img.png", user1.user_id)
 
-    mock_invoker.services.model_manager.store.get_model = MagicMock(
-        side_effect=UnknownModelException("no model")
-    )
+    mock_invoker.services.model_manager.store.get_model = MagicMock(side_effect=UnknownModelException("no model"))
 
     r = client.post(
         "/api/v1/utilities/image-to-prompt",

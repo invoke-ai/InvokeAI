@@ -201,9 +201,7 @@ def _run_image_to_prompt(image_name: str, model_key: str, instruction: str) -> s
         200: {"model": ImageToPromptResponse},
     },
 )
-async def image_to_prompt(
-    body: ImageToPromptRequest, current_user: CurrentUserOrDefault
-) -> ImageToPromptResponse:
+async def image_to_prompt(body: ImageToPromptRequest, current_user: CurrentUserOrDefault) -> ImageToPromptResponse:
     """Generate a descriptive prompt from an image using a vision-language model."""
     # Reuse the image-read access check so non-owners can't probe stored images
     # via this endpoint (mirrors the policy in routers/images.py).

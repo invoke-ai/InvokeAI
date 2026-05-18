@@ -35,9 +35,7 @@ def test_image_names_by_date_requires_auth(enable_multiuser: Any, client: TestCl
     assert r.status_code == status.HTTP_401_UNAUTHORIZED
 
 
-def test_user_sees_only_own_dates(
-    client: TestClient, user1_token: str, user2_token: str, mock_invoker: Invoker
-):
+def test_user_sees_only_own_dates(client: TestClient, user1_token: str, user2_token: str, mock_invoker: Invoker):
     user1 = mock_invoker.services.users.get_by_email("user1@test.com")
     user2 = mock_invoker.services.users.get_by_email("user2@test.com")
     assert user1 is not None and user2 is not None

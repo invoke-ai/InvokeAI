@@ -53,9 +53,7 @@ def _png_bytes() -> bytes:
         ("GET", "/api/v1/style_presets/export"),
     ],
 )
-def test_simple_routes_require_auth(
-    enable_multiuser: Any, client: TestClient, method: str, path: str
-):
+def test_simple_routes_require_auth(enable_multiuser: Any, client: TestClient, method: str, path: str):
     r = client.request(method, path)
     assert r.status_code == status.HTTP_401_UNAUTHORIZED
 
@@ -84,25 +82,19 @@ def test_import_requires_auth(enable_multiuser: Any, client: TestClient):
     assert r.status_code == status.HTTP_401_UNAUTHORIZED
 
 
-def test_export_forbidden_for_regular_user(
-    client: TestClient, user1_token: str, mock_invoker: Invoker
-):
+def test_export_forbidden_for_regular_user(client: TestClient, user1_token: str, mock_invoker: Invoker):
     mock_invoker.services.style_preset_records.get_many = MagicMock(return_value=[])
     r = client.get("/api/v1/style_presets/export", headers={"Authorization": f"Bearer {user1_token}"})
     assert r.status_code == status.HTTP_403_FORBIDDEN
 
 
-def test_export_allowed_for_admin(
-    client: TestClient, admin_token: str, mock_invoker: Invoker
-):
+def test_export_allowed_for_admin(client: TestClient, admin_token: str, mock_invoker: Invoker):
     mock_invoker.services.style_preset_records.get_many = MagicMock(return_value=[])
     r = client.get("/api/v1/style_presets/export", headers={"Authorization": f"Bearer {admin_token}"})
     assert r.status_code == status.HTTP_200_OK
 
 
-def test_import_forbidden_for_regular_user(
-    client: TestClient, user1_token: str, mock_invoker: Invoker
-):
+def test_import_forbidden_for_regular_user(client: TestClient, user1_token: str, mock_invoker: Invoker):
     r = client.post(
         "/api/v1/style_presets/import",
         files={"file": ("x.csv", b"name,prompt,negative_prompt\n", "text/csv")},
@@ -112,9 +104,7 @@ def test_import_forbidden_for_regular_user(
     mock_invoker.services.style_preset_records.create_many.assert_not_called()
 
 
-def test_list_allowed_for_regular_user(
-    client: TestClient, user1_token: str, mock_invoker: Invoker
-):
+def test_list_allowed_for_regular_user(client: TestClient, user1_token: str, mock_invoker: Invoker):
     mock_invoker.services.style_preset_records.get_many = MagicMock(return_value=[])
     r = client.get("/api/v1/style_presets/", headers={"Authorization": f"Bearer {user1_token}"})
     assert r.status_code == status.HTTP_200_OK
@@ -124,9 +114,7 @@ def test_list_allowed_for_regular_user(
 # ----------------------------- Bug B regression: JSONDecodeError → 400 -----------------------------
 
 
-def test_create_malformed_json_returns_400(
-    client: TestClient, user1_token: str, mock_invoker: Invoker
-):
+def test_create_malformed_json_returns_400(client: TestClient, user1_token: str, mock_invoker: Invoker):
     r = client.post(
         "/api/v1/style_presets/",
         data={"data": "not-valid-json"},
@@ -136,9 +124,7 @@ def test_create_malformed_json_returns_400(
     mock_invoker.services.style_preset_records.create.assert_not_called()
 
 
-def test_update_malformed_json_returns_400(
-    client: TestClient, user1_token: str, mock_invoker: Invoker
-):
+def test_update_malformed_json_returns_400(client: TestClient, user1_token: str, mock_invoker: Invoker):
     r = client.patch(
         "/api/v1/style_presets/i/preset-1",
         data={"data": "not-valid-json"},
@@ -151,9 +137,7 @@ def test_update_malformed_json_returns_400(
 # ----------------------------- Bug C regression: validation before image mutation -----------------------------
 
 
-def test_update_with_invalid_data_does_not_save_image(
-    client: TestClient, user1_token: str, mock_invoker: Invoker
-):
+def test_update_with_invalid_data_does_not_save_image(client: TestClient, user1_token: str, mock_invoker: Invoker):
     """A valid image plus malformed `data` must reject (400) AND must not have
     persisted or deleted the preset image — the validation has to run first."""
     r = client.patch(
@@ -184,9 +168,7 @@ def test_update_without_image_and_invalid_data_does_not_delete(
 # ----------------------------- Happy path: create + update -----------------------------
 
 
-def test_create_with_valid_data_succeeds(
-    client: TestClient, user1_token: str, mock_invoker: Invoker
-):
+def test_create_with_valid_data_succeeds(client: TestClient, user1_token: str, mock_invoker: Invoker):
     mock_invoker.services.style_preset_records.create = MagicMock(return_value=_record("new-id"))
     mock_invoker.services.style_preset_image_files.get_url = MagicMock(return_value=None)
     r = client.post(
@@ -198,9 +180,7 @@ def test_create_with_valid_data_succeeds(
     mock_invoker.services.style_preset_records.create.assert_called_once()
 
 
-def test_update_with_valid_data_calls_update(
-    client: TestClient, user1_token: str, mock_invoker: Invoker
-):
+def test_update_with_valid_data_calls_update(client: TestClient, user1_token: str, mock_invoker: Invoker):
     mock_invoker.services.style_preset_records.update = MagicMock(return_value=_record("preset-1"))
     mock_invoker.services.style_preset_image_files.get_url = MagicMock(return_value=None)
     r = client.patch(
@@ -215,9 +195,7 @@ def test_update_with_valid_data_calls_update(
 # ----------------------------- 415 for non-image upload is preserved -----------------------------
 
 
-def test_update_with_non_image_returns_415(
-    client: TestClient, user1_token: str, mock_invoker: Invoker
-):
+def test_update_with_non_image_returns_415(client: TestClient, user1_token: str, mock_invoker: Invoker):
     r = client.patch(
         "/api/v1/style_presets/i/preset-1",
         data={"data": json.dumps({"name": "Test", "positive_prompt": "p", "negative_prompt": "n", "type": "user"})},

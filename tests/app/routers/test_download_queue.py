@@ -37,49 +37,37 @@ def _make_job(id: int = 1) -> DownloadJob:
         ("DELETE", "/api/v1/download_queue/i"),
     ],
 )
-def test_routes_require_auth_in_multiuser_mode(
-    enable_multiuser: Any, client: TestClient, method: str, path: str
-):
+def test_routes_require_auth_in_multiuser_mode(enable_multiuser: Any, client: TestClient, method: str, path: str):
     response = client.request(method, path, json={"source": "http://x/y", "dest": "models/x"})
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
-def test_list_downloads_as_regular_user(
-    client: TestClient, user1_token: str, mock_invoker: Invoker
-):
+def test_list_downloads_as_regular_user(client: TestClient, user1_token: str, mock_invoker: Invoker):
     mock_invoker.services.download_queue.list_jobs = MagicMock(return_value=[])
     r = client.get("/api/v1/download_queue/", headers={"Authorization": f"Bearer {user1_token}"})
     assert r.status_code == status.HTTP_200_OK
     assert r.json() == []
 
 
-def test_prune_downloads_forbidden_for_regular_user(
-    client: TestClient, user1_token: str, mock_invoker: Invoker
-):
+def test_prune_downloads_forbidden_for_regular_user(client: TestClient, user1_token: str, mock_invoker: Invoker):
     r = client.patch("/api/v1/download_queue/", headers={"Authorization": f"Bearer {user1_token}"})
     assert r.status_code == status.HTTP_403_FORBIDDEN
     mock_invoker.services.download_queue.prune_jobs.assert_not_called()
 
 
-def test_prune_downloads_allowed_for_admin(
-    client: TestClient, admin_token: str, mock_invoker: Invoker
-):
+def test_prune_downloads_allowed_for_admin(client: TestClient, admin_token: str, mock_invoker: Invoker):
     r = client.patch("/api/v1/download_queue/", headers={"Authorization": f"Bearer {admin_token}"})
     assert r.status_code == status.HTTP_204_NO_CONTENT
     mock_invoker.services.download_queue.prune_jobs.assert_called_once()
 
 
-def test_cancel_all_forbidden_for_regular_user(
-    client: TestClient, user1_token: str, mock_invoker: Invoker
-):
+def test_cancel_all_forbidden_for_regular_user(client: TestClient, user1_token: str, mock_invoker: Invoker):
     r = client.delete("/api/v1/download_queue/i", headers={"Authorization": f"Bearer {user1_token}"})
     assert r.status_code == status.HTTP_403_FORBIDDEN
     mock_invoker.services.download_queue.cancel_all_jobs.assert_not_called()
 
 
-def test_cancel_all_allowed_for_admin(
-    client: TestClient, admin_token: str, mock_invoker: Invoker
-):
+def test_cancel_all_allowed_for_admin(client: TestClient, admin_token: str, mock_invoker: Invoker):
     r = client.delete("/api/v1/download_queue/i", headers={"Authorization": f"Bearer {admin_token}"})
     assert r.status_code == status.HTTP_204_NO_CONTENT
     mock_invoker.services.download_queue.cancel_all_jobs.assert_called_once()
@@ -113,9 +101,7 @@ def test_download_rejects_unsafe_dest_before_service_call(
     mock_invoker.services.download_queue.download.assert_not_called()
 
 
-def test_download_accepts_relative_dest(
-    client: TestClient, user1_token: str, mock_invoker: Invoker
-):
+def test_download_accepts_relative_dest(client: TestClient, user1_token: str, mock_invoker: Invoker):
     mock_invoker.services.download_queue.download = MagicMock(return_value=_make_job())
     r = client.post(
         "/api/v1/download_queue/i/",
