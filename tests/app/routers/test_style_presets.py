@@ -146,9 +146,7 @@ def test_create_malformed_json_returns_400(client: TestClient, user1_token: str,
 
 def test_update_malformed_json_returns_400(client: TestClient, user1_token: str, mock_invoker: Invoker):
     # No need for a real record — JSON validation happens before the record is loaded.
-    r = client.patch(
-        "/api/v1/style_presets/i/some-id", data={"data": "not-valid-json"}, headers=_auth(user1_token)
-    )
+    r = client.patch("/api/v1/style_presets/i/some-id", data={"data": "not-valid-json"}, headers=_auth(user1_token))
     assert r.status_code == status.HTTP_400_BAD_REQUEST
 
 
@@ -276,9 +274,7 @@ class TestOwnership:
         assert r.status_code == status.HTTP_200_OK
         assert r.json()["name"] == "pub"
 
-    def test_get_default_is_allowed_for_any_user(
-        self, client: TestClient, user1_token: str, mock_invoker: Invoker
-    ):
+    def test_get_default_is_allowed_for_any_user(self, client: TestClient, user1_token: str, mock_invoker: Invoker):
         seeded = _seed(mock_invoker, "system", name="builtin", preset_type=PresetType.Default)
         mock_invoker.services.style_preset_image_files.get_url.return_value = None
         r = client.get(f"/api/v1/style_presets/i/{seeded.id}", headers=_auth(user1_token))
@@ -367,9 +363,7 @@ class TestOwnership:
         assert r.status_code == status.HTTP_200_OK
         assert mock_invoker.services.style_preset_records.get(seeded.id).name == "admin-edit"
 
-    def test_admin_can_delete_default_preset(
-        self, client: TestClient, admin_token: str, mock_invoker: Invoker
-    ):
+    def test_admin_can_delete_default_preset(self, client: TestClient, admin_token: str, mock_invoker: Invoker):
         seeded = _seed(mock_invoker, "system", name="del-default", preset_type=PresetType.Default)
         r = client.delete(f"/api/v1/style_presets/i/{seeded.id}", headers=_auth(admin_token))
         # delete returns 200 with no body (operation_id has no explicit status_code)

@@ -14,7 +14,11 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.extract_metadata_from_image import extract_metadata_from_image
 from invokeai.app.api.routers._access import (
     assert_board_read_access as _assert_board_read_access,
+)
+from invokeai.app.api.routers._access import (
     assert_image_owner as _assert_image_owner,
+)
+from invokeai.app.api.routers._access import (
     assert_image_read_access as _assert_image_read_access,
 )
 from invokeai.app.invocations.fields import MetadataField

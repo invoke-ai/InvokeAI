@@ -330,9 +330,7 @@ async def import_style_presets(
 ):
     try:
         style_presets = await parse_presets_from_file(file)
-        ApiDependencies.invoker.services.style_preset_records.create_many(
-            style_presets, user_id=current_user.user_id
-        )
+        ApiDependencies.invoker.services.style_preset_records.create_many(style_presets, user_id=current_user.user_id)
     except InvalidPresetImportDataError as e:
         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
         raise HTTPException(status_code=400, detail=str(e))
