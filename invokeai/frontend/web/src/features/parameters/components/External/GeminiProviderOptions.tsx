@@ -62,9 +62,9 @@ export const GeminiProviderOptions = memo(() => {
           icon={<PiCaretDownBold />}
           iconSize="0.75rem"
         >
-          <option value="">Default</option>
-          <option value="minimal">Minimal</option>
-          <option value="high">High</option>
+          <option value="">{t('parameters.thinkingLevelOptions.default', 'Default')}</option>
+          <option value="minimal">{t('parameters.thinkingLevelOptions.minimal', 'Minimal')}</option>
+          <option value="high">{t('parameters.thinkingLevelOptions.high', 'High')}</option>
         </Select>
       </FormControl>
     </>
