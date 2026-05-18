@@ -10,6 +10,10 @@ FP8 Storage cuts a model's VRAM footprint roughly in half by keeping weights on 
 
 It pairs well with [Low-VRAM mode](/configuration/low-vram-mode/): low-VRAM mode streams layers between RAM and VRAM, while FP8 Storage shrinks the layers themselves.
 
+:::caution[For full precision models only]
+FP8 Storage only applies to **full precision** checkpoints (FP16 / BF16 / FP32). It is **silently a no-op** for already-quantized formats — **GGUF**, **NF4**, and **int8** checkpoints carry their own storage precision and the loader returns a different module type that the FP8 layer cast does not touch. If your model is already quantized, the toggle has no effect; use the full-precision variant of the model if you want to enable FP8 Storage.
+:::
+
 ## Requirements
 
 - **Nvidia GPU on Windows or Linux.** FP8 Storage uses CUDA tensor types and is silently disabled on CPU and MPS.
@@ -80,10 +84,11 @@ That said, some artifacts have been reported on:
 
 If you see unexpected quality regressions, disable FP8 Storage on the affected model and re-run.
 
-## Combining with Low-VRAM mode and quantized models
+## Combining with Low-VRAM mode
 
-- **FP8 + partial loading**: fully supported. FP8 Storage shrinks the layers; partial loading streams them between RAM and VRAM as needed. Use both on tight VRAM budgets.
-- **FP8 + GGUF / NF4 / int8 quantized checkpoints**: these formats already have their own storage precision. FP8 Storage is not applied on top — the toggle is silently a no-op for quantized formats, since the loader returns a different module type.
+**FP8 + partial loading**: fully supported. FP8 Storage shrinks the layers; partial loading streams them between RAM and VRAM as needed. Use both on tight VRAM budgets.
+
+(For why FP8 Storage doesn't stack on top of GGUF / NF4 / int8 checkpoints, see the [callout at the top of this page](#for-full-precision-models-only).)
 
 ## Troubleshooting
 
