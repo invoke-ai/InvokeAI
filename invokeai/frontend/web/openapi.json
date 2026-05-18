@@ -6544,6 +6544,11 @@
         "tags": ["app"],
         "summary": "Set External Provider Config",
         "operationId": "set_external_provider_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "provider_id",
@@ -6595,6 +6600,11 @@
         "tags": ["app"],
         "summary": "Reset External Provider Config",
         "operationId": "reset_external_provider_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "provider_id",
@@ -9065,7 +9075,7 @@
       "get": {
         "tags": ["style_presets"],
         "summary": "List Style Presets",
-        "description": "Gets a page of style presets",
+        "description": "Gets the style presets visible to the current user.",
         "operationId": "list_style_presets",
         "responses": {
           "200": {
@@ -66756,10 +66766,21 @@
             "$ref": "#/components/schemas/PresetType",
             "description": "The type of style preset"
           },
+          "is_public": {
+            "type": "boolean",
+            "title": "Is Public",
+            "description": "Whether the preset is visible to other users.",
+            "default": false
+          },
           "id": {
             "type": "string",
             "title": "Id",
             "description": "The style preset ID."
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "The user who owns this style preset."
           },
           "image": {
             "anyOf": [
@@ -66775,7 +66796,7 @@
           }
         },
         "type": "object",
-        "required": ["name", "preset_data", "type", "id", "image"],
+        "required": ["name", "preset_data", "type", "id", "user_id", "image"],
         "title": "StylePresetRecordWithImage"
       },
       "SubModelType": {
