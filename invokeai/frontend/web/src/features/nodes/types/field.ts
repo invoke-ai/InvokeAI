@@ -204,6 +204,32 @@ const zImageGeneratorFieldType = zFieldTypeBase.extend({
   name: z.literal('ImageGeneratorField'),
   originalType: zStatelessFieldType.optional(),
 });
+/**
+ * Synthetic field type used for `core_metadata` extra fields that are not declared in the backend
+ * schema (e.g. `z_image_seed_variance_*`, `dype_preset`, `ref_images`, ...). The backend's
+ * `CoreMetadataInvocation` is configured with `extra='allow'`, so these are valid metadata to
+ * round-trip even though there is no OpenAPI template for them.
+ */
+const zMetadataExtraFieldType = zFieldTypeBase.extend({
+  name: z.literal('MetadataExtraField'),
+  originalType: zStatelessFieldType.optional(),
+});
+const zLoRAMetadataFieldType = zFieldTypeBase.extend({
+  name: z.literal('LoRAMetadataField'),
+  originalType: zStatelessFieldType.optional(),
+});
+const zControlNetMetadataFieldType = zFieldTypeBase.extend({
+  name: z.literal('ControlNetMetadataField'),
+  originalType: zStatelessFieldType.optional(),
+});
+const zIPAdapterMetadataFieldType = zFieldTypeBase.extend({
+  name: z.literal('IPAdapterMetadataField'),
+  originalType: zStatelessFieldType.optional(),
+});
+const zT2IAdapterMetadataFieldType = zFieldTypeBase.extend({
+  name: z.literal('T2IAdapterMetadataField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zStatefulFieldType = z.union([
   zIntegerFieldType,
   zFloatFieldType,
@@ -220,6 +246,11 @@ const zStatefulFieldType = z.union([
   zIntegerGeneratorFieldType,
   zStringGeneratorFieldType,
   zImageGeneratorFieldType,
+  zLoRAMetadataFieldType,
+  zControlNetMetadataFieldType,
+  zIPAdapterMetadataFieldType,
+  zT2IAdapterMetadataFieldType,
+  zMetadataExtraFieldType,
 ]);
 export type StatefulFieldType = z.infer<typeof zStatefulFieldType>;
 const statefulFieldTypeNames = zStatefulFieldType.options.map((o) => o.shape.name.value);
@@ -1228,6 +1259,93 @@ export const getImageGeneratorDefaults = (type: ImageGeneratorFieldValue['type']
 };
 // #endregion
 
+// #region Metadata pass-through fields
+/**
+ * The `core_metadata` node carries metadata lists that are not edited via the UI - they are set by
+ * the Generate-mode graph builder (or by an edge) and must survive the workflow roundtrip verbatim
+ * so that the resulting image retains its recall metadata. Modeled as opaque object lists.
+ *
+ * See: https://github.com/invoke-ai/InvokeAI/issues/9151
+ */
+// `z.any()` (not `z.unknown()`) so the inferred type stays JSON-assignable for logging/serialization.
+const zMetadataPassthroughValue = z.array(z.record(z.string(), z.any())).nullish();
+
+const zLoRAMetadataFieldValue = zMetadataPassthroughValue;
+const zLoRAMetadataFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zLoRAMetadataFieldValue,
+});
+const zLoRAMetadataFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zLoRAMetadataFieldType,
+  originalType: zFieldType.optional(),
+  default: zLoRAMetadataFieldValue,
+});
+const zLoRAMetadataFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zLoRAMetadataFieldType,
+});
+export type LoRAMetadataFieldInputTemplate = z.infer<typeof zLoRAMetadataFieldInputTemplate>;
+
+const zControlNetMetadataFieldValue = zMetadataPassthroughValue;
+const zControlNetMetadataFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zControlNetMetadataFieldValue,
+});
+const zControlNetMetadataFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zControlNetMetadataFieldType,
+  originalType: zFieldType.optional(),
+  default: zControlNetMetadataFieldValue,
+});
+const zControlNetMetadataFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zControlNetMetadataFieldType,
+});
+export type ControlNetMetadataFieldInputTemplate = z.infer<typeof zControlNetMetadataFieldInputTemplate>;
+
+const zIPAdapterMetadataFieldValue = zMetadataPassthroughValue;
+const zIPAdapterMetadataFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zIPAdapterMetadataFieldValue,
+});
+const zIPAdapterMetadataFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zIPAdapterMetadataFieldType,
+  originalType: zFieldType.optional(),
+  default: zIPAdapterMetadataFieldValue,
+});
+const zIPAdapterMetadataFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zIPAdapterMetadataFieldType,
+});
+export type IPAdapterMetadataFieldInputTemplate = z.infer<typeof zIPAdapterMetadataFieldInputTemplate>;
+
+const zT2IAdapterMetadataFieldValue = zMetadataPassthroughValue;
+const zT2IAdapterMetadataFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zT2IAdapterMetadataFieldValue,
+});
+const zT2IAdapterMetadataFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zT2IAdapterMetadataFieldType,
+  originalType: zFieldType.optional(),
+  default: zT2IAdapterMetadataFieldValue,
+});
+const zT2IAdapterMetadataFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zT2IAdapterMetadataFieldType,
+});
+export type T2IAdapterMetadataFieldInputTemplate = z.infer<typeof zT2IAdapterMetadataFieldInputTemplate>;
+
+/**
+ * `MetadataExtraField` carries arbitrary JSON values for `core_metadata` extras that are not in the
+ * OpenAPI schema (e.g. `z_image_seed_variance_*`, `dype_preset`). Synthesized only by
+ * `graphToWorkflow` for `core_metadata` nodes; never produced by `parseSchema`.
+ */
+const zMetadataExtraFieldValue = z.any();
+const zMetadataExtraFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zMetadataExtraFieldValue,
+});
+const zMetadataExtraFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zMetadataExtraFieldType,
+  originalType: zFieldType.optional(),
+  default: zMetadataExtraFieldValue,
+});
+const zMetadataExtraFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zMetadataExtraFieldType,
+});
+export type MetadataExtraFieldInputTemplate = z.infer<typeof zMetadataExtraFieldInputTemplate>;
+// #endregion
+
 // #region StatelessField
 /**
  * StatelessField is a catchall for stateless fields with no UI input components. They do not
@@ -1294,6 +1412,11 @@ export const zStatefulFieldValue = z.union([
   zIntegerGeneratorFieldValue,
   zStringGeneratorFieldValue,
   zImageGeneratorFieldValue,
+  zLoRAMetadataFieldValue,
+  zControlNetMetadataFieldValue,
+  zIPAdapterMetadataFieldValue,
+  zT2IAdapterMetadataFieldValue,
+  zMetadataExtraFieldValue,
 ]);
 export type StatefulFieldValue = z.infer<typeof zStatefulFieldValue>;
 
@@ -1322,6 +1445,11 @@ const zStatefulFieldInputInstance = z.union([
   zIntegerGeneratorFieldInputInstance,
   zStringGeneratorFieldInputInstance,
   zImageGeneratorFieldInputInstance,
+  zLoRAMetadataFieldInputInstance,
+  zControlNetMetadataFieldInputInstance,
+  zIPAdapterMetadataFieldInputInstance,
+  zT2IAdapterMetadataFieldInputInstance,
+  zMetadataExtraFieldInputInstance,
 ]);
 
 export const zFieldInputInstance = z.union([zStatefulFieldInputInstance, zStatelessFieldInputInstance]);
@@ -1350,6 +1478,11 @@ const zStatefulFieldInputTemplate = z.union([
   zIntegerGeneratorFieldInputTemplate,
   zStringGeneratorFieldInputTemplate,
   zImageGeneratorFieldInputTemplate,
+  zLoRAMetadataFieldInputTemplate,
+  zControlNetMetadataFieldInputTemplate,
+  zIPAdapterMetadataFieldInputTemplate,
+  zT2IAdapterMetadataFieldInputTemplate,
+  zMetadataExtraFieldInputTemplate,
 ]);
 
 export const zFieldInputTemplate = z.union([zStatefulFieldInputTemplate, zStatelessFieldInputTemplate]);
@@ -1377,6 +1510,11 @@ const zStatefulFieldOutputTemplate = z.union([
   zIntegerGeneratorFieldOutputTemplate,
   zStringGeneratorFieldOutputTemplate,
   zImageGeneratorFieldOutputTemplate,
+  zLoRAMetadataFieldOutputTemplate,
+  zControlNetMetadataFieldOutputTemplate,
+  zIPAdapterMetadataFieldOutputTemplate,
+  zT2IAdapterMetadataFieldOutputTemplate,
+  zMetadataExtraFieldOutputTemplate,
 ]);
 
 export const zFieldOutputTemplate = z.union([zStatefulFieldOutputTemplate, zStatelessFieldOutputTemplate]);
