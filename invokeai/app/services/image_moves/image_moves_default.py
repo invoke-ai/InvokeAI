@@ -17,7 +17,6 @@ from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.util.thumbnails import make_thumbnail
 
 MoveJobState = Literal["planned", "moving", "moved", "committed", "error"]
-MoveItemState = Literal["planned", "moved", "committed", "error"]
 ImageMoveBackgroundOperation = Literal["move_all", "recovery"]
 
 
@@ -113,9 +112,6 @@ class ImageMoveService:
             self._refresh_finished_future_locked()
             return self._build_background_status_locked()
 
-    def get_active_job_id(self) -> int | None:
-        return self._get_active_job_id()
-
     def is_maintenance_active(self) -> bool:
         with self._future_lock:
             self._refresh_finished_future_locked()
@@ -132,9 +128,6 @@ class ImageMoveService:
         queue_status = session_queue.get_queue_status(DEFAULT_QUEUE_ID)
         if queue_status.pending > 0 or queue_status.in_progress > 0:
             raise ImageMoveQueueActive("Cannot start image move while queue work is active")
-
-    def assert_no_active_queue_work(self) -> None:
-        self._assert_no_active_queue_work()
 
     def _start_background_operation(
         self,
