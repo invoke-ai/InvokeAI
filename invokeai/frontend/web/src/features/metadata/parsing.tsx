@@ -24,7 +24,9 @@ import {
   positivePromptChanged,
   qwenImageComponentSourceSelected,
   qwenImageQuantizationChanged,
+  qwenImageQwenVLEncoderModelSelected,
   qwenImageShiftChanged,
+  qwenImageVaeModelSelected,
   refinerModelChanged,
   seedreamOptimizePromptChanged,
   seedreamWatermarkChanged,
@@ -502,8 +504,15 @@ const Scheduler: SingleMetadataHandler<ParameterScheduler> = {
         store.dispatch(setZImageScheduler(value));
       }
     } else if (base === 'anima') {
-      // Anima supports euler, heun, lcm
-      if (value === 'euler' || value === 'heun' || value === 'lcm') {
+      // Anima supports euler, heun, dpmpp_2m, dpmpp_2m_sde, er_sde, lcm
+      if (
+        value === 'euler' ||
+        value === 'heun' ||
+        value === 'dpmpp_2m' ||
+        value === 'dpmpp_2m_sde' ||
+        value === 'er_sde' ||
+        value === 'lcm'
+      ) {
         store.dispatch(setAnimaScheduler(value));
       }
     } else {
@@ -828,6 +837,58 @@ const QwenImageComponentSource: SingleMetadataHandler<ModelIdentifierField | nul
 };
 //#endregion QwenImageComponentSource
 
+//#region QwenImageVaeModel
+const QwenImageVaeModel: SingleMetadataHandler<ModelIdentifierField | null> = {
+  [SingleMetadataKey]: true,
+  type: 'QwenImageVaeModel',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'qwen_image_vae');
+    // Reject when the key is absent so the handler is not rendered for non-Qwen images
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(zModelIdentifierField.parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(qwenImageVaeModelSelected(value));
+  },
+  i18nKey: 'modelManager.qwenImageVae',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField | null>) => (
+    <MetadataPrimitiveValue value={value ? value.name : 'None'} />
+  ),
+};
+//#endregion QwenImageVaeModel
+
+//#region QwenImageQwenVLEncoderModel
+const QwenImageQwenVLEncoderModel: SingleMetadataHandler<ModelIdentifierField | null> = {
+  [SingleMetadataKey]: true,
+  type: 'QwenImageQwenVLEncoderModel',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'qwen_image_qwen_vl_encoder');
+    // Reject when the key is absent so the handler is not rendered for non-Qwen images
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(zModelIdentifierField.parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(qwenImageQwenVLEncoderModelSelected(value));
+  },
+  i18nKey: 'modelManager.qwenImageQwenVLEncoder',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField | null>) => (
+    <MetadataPrimitiveValue value={value ? value.name : 'None'} />
+  ),
+};
+//#endregion QwenImageQwenVLEncoderModel
+
 //#region QwenImageQuantization
 const QwenImageQuantization: SingleMetadataHandler<'none' | 'int8' | 'nf4'> = {
   [SingleMetadataKey]: true,
@@ -880,12 +941,26 @@ const QwenImageShift: SingleMetadataHandler<number | null> = {
 //#endregion QwenImageShift
 
 //#region ZImageShift
-const ZImageShift: SingleMetadataHandler<number> = {
+const ZImageShift: SingleMetadataHandler<number | null> = {
   [SingleMetadataKey]: true,
   type: 'ZImageShift',
-  parse: (metadata, _store) => {
+  parse: (metadata, store) => {
     const raw = getProperty(metadata, 'z_image_shift');
-    const parsed = z.number().min(0).max(3).parse(raw);
+    if (raw === undefined) {
+      // Older Z-Image images and new images generated with auto shift don't include this key.
+      // Recall as null (auto) only when the recalled image is a Z-Image, so we don't clobber
+      // the user's current shift when recalling unrelated metadata.
+      const base = selectBase(store.getState());
+      if (base !== 'z-image') {
+        return Promise.reject();
+      }
+      return Promise.resolve(null);
+    }
+    // null or the 'auto' sentinel (written by the graph builder when shift is auto) recall as auto.
+    if (raw === null || raw === 'auto') {
+      return Promise.resolve(null);
+    }
+    const parsed = z.number().min(0).max(10).parse(raw);
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
@@ -893,7 +968,9 @@ const ZImageShift: SingleMetadataHandler<number> = {
   },
   i18nKey: 'metadata.zImageShift',
   LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => (
+    <MetadataPrimitiveValue value={value ?? 'Auto'} />
+  ),
 };
 //#endregion ZImageShift
 
@@ -1684,6 +1761,8 @@ export const ImageMetadataHandlers = {
   ZImageSeedVarianceStrength,
   ZImageSeedVarianceRandomizePercent,
   QwenImageComponentSource,
+  QwenImageVaeModel,
+  QwenImageQwenVLEncoderModel,
   QwenImageQuantization,
   QwenImageShift,
   ZImageShift,
