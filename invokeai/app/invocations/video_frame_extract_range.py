@@ -50,12 +50,8 @@ class ExtractVideoRangeOutput(BaseInvocationOutput):
     num_frames: int = OutputField(description="The number of frames in the trimmed video")
     fps: float = OutputField(description="The frames-per-second of the trimmed video")
     duration: float = OutputField(description="The duration of the trimmed video in seconds")
-    start_frame: int = OutputField(
-        description="The resolved (positive, 0-based) start frame index in the source video"
-    )
-    end_frame: int = OutputField(
-        description="The resolved (positive, 0-based) end frame index in the source video"
-    )
+    start_frame: int = OutputField(description="The resolved (positive, 0-based) start frame index in the source video")
+    end_frame: int = OutputField(description="The resolved (positive, 0-based) end frame index in the source video")
 
 
 @invocation(
@@ -82,16 +78,12 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
     video: VideoField = InputField(description="The video to extract a frame range from.")
     start_frame: int = InputField(
         default=0,
-        description=(
-            "First frame to keep, inclusive. 0 = first frame. Negative indices count from the end."
-        ),
+        description=("First frame to keep, inclusive. 0 = first frame. Negative indices count from the end."),
         ui_component=UIComponent.VideoFrameIndex,
     )
     end_frame: int = InputField(
         default=-1,
-        description=(
-            "Last frame to keep, inclusive. -1 = last frame. Negative indices count from the end."
-        ),
+        description=("Last frame to keep, inclusive. -1 = last frame. Negative indices count from the end."),
         ui_component=UIComponent.VideoFrameIndex,
     )
     fps: int = InputField(
@@ -192,7 +184,5 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
     def _resolve_index(value: int, n_frames: int, field_name: str) -> int:
         resolved = value + n_frames if value < 0 else value
         if resolved < 0 or resolved >= n_frames:
-            raise ValueError(
-                f"{field_name}={value} is out of range for a {n_frames}-frame video."
-            )
+            raise ValueError(f"{field_name}={value} is out of range for a {n_frames}-frame video.")
         return resolved
