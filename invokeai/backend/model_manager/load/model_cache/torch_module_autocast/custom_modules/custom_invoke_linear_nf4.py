@@ -75,6 +75,12 @@ class CustomInvokeLinearNF4(InvokeLinearNF4, CustomModuleMixin):
         weight.quant_state.code = cast_to_device(weight.quant_state.code, x.device)
 
         bias = cast_to_device(self.bias, x.device)
+        if x.numel() == x.shape[-1]:
+            # bitsandbytes routes single-vector inputs through gemv_4bit, which can fail with CPU-stored,
+            # device-autocasted Params4bit weights on some CUDA/bnb combinations. Use the same dequantized
+            # matmul path that bnb.matmul_4bit uses for batched inputs.
+            dequantized_weight = bnb.functional.dequantize_4bit(weight, weight.quant_state).to(x.dtype)
+            return torch.nn.functional.linear(x, dequantized_weight, bias).to(inp_dtype)
         return bnb.matmul_4bit(x, weight.t(), bias=bias, quant_state=weight.quant_state).to(inp_dtype)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
