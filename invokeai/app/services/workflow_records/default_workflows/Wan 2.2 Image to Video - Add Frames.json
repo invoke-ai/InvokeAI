@@ -1,0 +1,1153 @@
+{
+  "name": "Image to Video - Add Frames",
+  "author": "InvokeAI",
+  "description": "Extend an existing video by generating new frames with Wan 2.2 I2V A14B + the Lightning LoRA pair. Drop a video into the 'Video' input \u2014 the workflow extracts the penultimate frame and uses it as the reference for a new image-to-video generation, then concatenates the result onto the original with a short crossfade transition. Lightning distillation converges the denoise in 4 steps at CFG 1.0. The 'Frames' input controls how many new frames are generated; the source video's dimensions are read from the input node, so width/height on the Denoise Video node are overridden at runtime.",
+  "version": "1.0.0",
+  "contact": "",
+  "tags": "wan2.2, Text to Video, Image to Video, video, lightning, lora",
+  "notes": "Prerequisite model downloads: a Wan 2.2 I2V A14B main (Diffusers or GGUF expert pair), plus the matching I2V Lightning LoRA pair (distinct from the T2V Lightning LoRAs). For GGUF mains, also install the Component Source (Diffusers Wan I2V) OR the standalone Wan VAE + UMT5-XXL encoder. The reference image is VAE-encoded across the full latent temporal dim (frame 0 carries the image, remaining frames are zero pixels). If your Lightning LoRAs are untagged, set the 'Apply LoRA (High)' target to 'high' and 'Apply LoRA (Low)' target to 'low' manually. CFG=1.0 skips the negative-conditioning branch; the Negative Prompt content is ignored at runtime.",
+  "exposedFields": [
+    {
+      "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "fieldName": "model"
+    },
+    {
+      "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "fieldName": "transformer_low_noise_model"
+    },
+    {
+      "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "fieldName": "component_source"
+    },
+    {
+      "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "fieldName": "vae_model"
+    },
+    {
+      "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "fieldName": "wan_t5_encoder_model"
+    },
+    {
+      "nodeId": "d781a3a6-eb2d-48dd-87a7-eb6898f1fca9",
+      "fieldName": "lora"
+    },
+    {
+      "nodeId": "d781a3a6-eb2d-48dd-87a7-eb6898f1fca9",
+      "fieldName": "weight"
+    },
+    {
+      "nodeId": "d781a3a6-eb2d-48dd-87a7-eb6898f1fca9",
+      "fieldName": "target"
+    },
+    {
+      "nodeId": "06bf5449-a0ca-44d0-a7cc-f37e03651761",
+      "fieldName": "lora"
+    },
+    {
+      "nodeId": "06bf5449-a0ca-44d0-a7cc-f37e03651761",
+      "fieldName": "weight"
+    },
+    {
+      "nodeId": "06bf5449-a0ca-44d0-a7cc-f37e03651761",
+      "fieldName": "target"
+    },
+    {
+      "nodeId": "7a6edc2d-f38e-a0c1-e27a-8f9dcbb20fce",
+      "fieldName": "image"
+    },
+    {
+      "nodeId": "7a6edc2d-f38e-a0c1-e27a-8f9dcbb20fce",
+      "fieldName": "num_frames"
+    },
+    {
+      "nodeId": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
+      "fieldName": "prompt"
+    },
+    {
+      "nodeId": "3c2a8e9d-bf4a-6d5e-af3c-4b5f6e7d8c9a",
+      "fieldName": "prompt"
+    },
+    {
+      "nodeId": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "fieldName": "steps"
+    },
+    {
+      "nodeId": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "fieldName": "guidance_scale"
+    },
+    {
+      "nodeId": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "fieldName": "guidance_scale_low_noise"
+    },
+    {
+      "nodeId": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "fieldName": "width"
+    },
+    {
+      "nodeId": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "fieldName": "height"
+    },
+    {
+      "nodeId": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "fieldName": "num_frames"
+    },
+    {
+      "nodeId": "6f5dcb1c-e27d-9fb0-d16f-7e8cbaa1fcbd",
+      "fieldName": "fps"
+    }
+  ],
+  "meta": {
+    "version": "4.0.0",
+    "category": "default"
+  },
+  "nodes": [
+    {
+      "id": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "type": "invocation",
+      "data": {
+        "id": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "wan_model_loader",
+        "inputs": {
+          "model": {
+            "name": "model",
+            "label": "Transformer (High Noise)",
+            "description": ""
+          },
+          "transformer_low_noise_model": {
+            "name": "transformer_low_noise_model",
+            "label": "",
+            "description": ""
+          },
+          "vae_model": {
+            "name": "vae_model",
+            "label": "",
+            "description": ""
+          },
+          "wan_t5_encoder_model": {
+            "name": "wan_t5_encoder_model",
+            "label": "",
+            "description": ""
+          },
+          "component_source": {
+            "name": "component_source",
+            "label": "",
+            "description": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": false
+      },
+      "position": {
+        "x": 131.0881399719261,
+        "y": 0.7948374148289883
+      }
+    },
+    {
+      "id": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
+      "type": "invocation",
+      "data": {
+        "id": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "Positive Prompt",
+        "notes": "",
+        "type": "wan_text_encoder",
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "",
+            "description": "",
+            "value": ""
+          },
+          "wan_t5_encoder": {
+            "name": "wan_t5_encoder",
+            "label": "",
+            "description": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 587.9298543401748,
+        "y": -95.02732472842037
+      }
+    },
+    {
+      "id": "3c2a8e9d-bf4a-6d5e-af3c-4b5f6e7d8c9a",
+      "type": "invocation",
+      "data": {
+        "id": "3c2a8e9d-bf4a-6d5e-af3c-4b5f6e7d8c9a",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "Negative Prompt (unused at CFG=1.0)",
+        "notes": "",
+        "type": "wan_text_encoder",
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "Negative Prompt",
+            "description": "",
+            "value": ""
+          },
+          "wan_t5_encoder": {
+            "name": "wan_t5_encoder",
+            "label": "",
+            "description": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 559.3876517680619,
+        "y": 282.5706231529781
+      }
+    },
+    {
+      "id": "7a6edc2d-f38e-a0c1-e27a-8f9dcbb20fce",
+      "type": "invocation",
+      "data": {
+        "id": "7a6edc2d-f38e-a0c1-e27a-8f9dcbb20fce",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "wan_ref_image_encoder",
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": "Reference Image",
+            "description": ""
+          },
+          "vae": {
+            "name": "vae",
+            "label": "",
+            "description": ""
+          },
+          "width": {
+            "name": "width",
+            "label": "",
+            "description": "",
+            "value": 480
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "description": "",
+            "value": 720
+          },
+          "num_frames": {
+            "name": "num_frames",
+            "label": "Frames",
+            "description": "",
+            "value": 81
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 557.9103163691349,
+        "y": 447.22846466649344
+      }
+    },
+    {
+      "id": "5e4cab0b-d16c-8faf-c05e-6d7baf90ebbc",
+      "type": "invocation",
+      "data": {
+        "id": "5e4cab0b-d16c-8faf-c05e-6d7baf90ebbc",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "rand_int",
+        "inputs": {
+          "low": {
+            "name": "low",
+            "label": "",
+            "description": "",
+            "value": 0
+          },
+          "high": {
+            "name": "high",
+            "label": "",
+            "description": "",
+            "value": 2147483647
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": false
+      },
+      "position": {
+        "x": 692.4427537381185,
+        "y": 767.8930416853509
+      }
+    },
+    {
+      "id": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "type": "invocation",
+      "data": {
+        "id": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "wan_video_denoise",
+        "inputs": {
+          "transformer": {
+            "name": "transformer",
+            "label": "",
+            "description": ""
+          },
+          "positive_conditioning": {
+            "name": "positive_conditioning",
+            "label": "",
+            "description": ""
+          },
+          "negative_conditioning": {
+            "name": "negative_conditioning",
+            "label": "",
+            "description": ""
+          },
+          "ref_image": {
+            "name": "ref_image",
+            "label": "",
+            "description": ""
+          },
+          "guidance_scale": {
+            "name": "guidance_scale",
+            "label": "CFG",
+            "description": "",
+            "value": 1
+          },
+          "guidance_scale_low_noise": {
+            "name": "guidance_scale_low_noise",
+            "label": "CFG (Low)",
+            "description": "",
+            "value": 1
+          },
+          "width": {
+            "name": "width",
+            "label": "",
+            "description": "",
+            "value": 480
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "description": "",
+            "value": 720
+          },
+          "num_frames": {
+            "name": "num_frames",
+            "label": "Frames",
+            "description": "",
+            "value": 81
+          },
+          "steps": {
+            "name": "steps",
+            "label": "",
+            "description": "",
+            "value": 4
+          },
+          "seed": {
+            "name": "seed",
+            "label": "",
+            "description": "",
+            "value": 0
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 1100,
+        "y": -50
+      }
+    },
+    {
+      "id": "6f5dcb1c-e27d-9fb0-d16f-7e8cbaa1fcbd",
+      "type": "invocation",
+      "data": {
+        "id": "6f5dcb1c-e27d-9fb0-d16f-7e8cbaa1fcbd",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "wan_l2v",
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": "",
+            "description": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": "",
+            "description": ""
+          },
+          "latents": {
+            "name": "latents",
+            "label": "",
+            "description": ""
+          },
+          "vae": {
+            "name": "vae",
+            "label": "",
+            "description": ""
+          },
+          "fps": {
+            "name": "fps",
+            "label": "FPS",
+            "description": "",
+            "value": 16
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 1550,
+        "y": -50
+      }
+    },
+    {
+      "id": "b5239ffa-041c-421c-b343-735c02709bb3",
+      "type": "invocation",
+      "data": {
+        "id": "b5239ffa-041c-421c-b343-735c02709bb3",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "integer",
+        "inputs": {
+          "value": {
+            "name": "value",
+            "label": "Total Frames",
+            "description": "",
+            "value": 81
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 187.29555089875728,
+        "y": 816.2354388686249
+      }
+    },
+    {
+      "id": "d781a3a6-eb2d-48dd-87a7-eb6898f1fca9",
+      "type": "invocation",
+      "data": {
+        "id": "d781a3a6-eb2d-48dd-87a7-eb6898f1fca9",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "Apply LoRA (High)",
+        "notes": "",
+        "type": "wan_lora_loader",
+        "inputs": {
+          "lora": {
+            "name": "lora",
+            "label": "",
+            "description": ""
+          },
+          "weight": {
+            "name": "weight",
+            "label": "",
+            "description": "",
+            "value": 1
+          },
+          "target": {
+            "name": "target",
+            "label": "",
+            "description": "",
+            "value": "auto"
+          },
+          "transformer": {
+            "name": "transformer",
+            "label": "",
+            "description": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 338.56334682023754,
+        "y": -333.1468780837475
+      }
+    },
+    {
+      "id": "06bf5449-a0ca-44d0-a7cc-f37e03651761",
+      "type": "invocation",
+      "data": {
+        "id": "06bf5449-a0ca-44d0-a7cc-f37e03651761",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "Apply LoRA (Low)",
+        "notes": "",
+        "type": "wan_lora_loader",
+        "inputs": {
+          "lora": {
+            "name": "lora",
+            "label": "",
+            "description": ""
+          },
+          "weight": {
+            "name": "weight",
+            "label": "",
+            "description": "",
+            "value": 1
+          },
+          "target": {
+            "name": "target",
+            "label": "",
+            "description": "",
+            "value": "auto"
+          },
+          "transformer": {
+            "name": "transformer",
+            "label": "",
+            "description": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 712.3477390652625,
+        "y": -334.8761434372357
+      }
+    },
+    {
+      "id": "642e7cda-08c1-435c-8e6b-99700b61200b",
+      "type": "invocation",
+      "data": {
+        "id": "642e7cda-08c1-435c-8e6b-99700b61200b",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "video",
+        "inputs": {
+          "video": {
+            "name": "video",
+            "label": "Starting Video",
+            "description": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": -1083.4154885344983,
+        "y": 534.2366394445222
+      }
+    },
+    {
+      "id": "956718a3-d447-4e6e-ad38-671baeb2350e",
+      "type": "invocation",
+      "data": {
+        "id": "956718a3-d447-4e6e-ad38-671baeb2350e",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "video_frame_extract",
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": "",
+            "description": "",
+            "value": "auto"
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": "",
+            "description": ""
+          },
+          "video": {
+            "name": "video",
+            "label": "",
+            "description": ""
+          },
+          "frame_index": {
+            "name": "frame_index",
+            "label": "",
+            "description": "",
+            "value": -2
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": -552.074720634205,
+        "y": 275.8409586730836
+      }
+    },
+    {
+      "id": "8648065d-056f-47fc-ab84-b762d976c021",
+      "type": "invocation",
+      "data": {
+        "id": "8648065d-056f-47fc-ab84-b762d976c021",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "video_concat",
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": "",
+            "description": "",
+            "value": "auto"
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": "",
+            "description": ""
+          },
+          "videos": {
+            "name": "videos",
+            "label": "",
+            "description": ""
+          },
+          "transition": {
+            "name": "transition",
+            "label": "",
+            "description": "",
+            "value": "crossfade"
+          },
+          "transition_frames": {
+            "name": "transition_frames",
+            "label": "",
+            "description": "",
+            "value": 2
+          },
+          "fps": {
+            "name": "fps",
+            "label": "",
+            "description": "",
+            "value": 16
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": true
+      },
+      "position": {
+        "x": -241.48844550023864,
+        "y": 689.2802200749895
+      }
+    },
+    {
+      "id": "1167a8f8-87b9-4e32-bf85-cff170e926ee",
+      "type": "invocation",
+      "data": {
+        "id": "1167a8f8-87b9-4e32-bf85-cff170e926ee",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "collect",
+        "inputs": {
+          "item": {
+            "name": "item",
+            "label": "",
+            "description": ""
+          },
+          "collection": {
+            "name": "collection",
+            "label": "",
+            "description": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": -663.8758722590726,
+        "y": 879.6897902329404
+      }
+    },
+    {
+      "id": "e39ebfc3-c2cc-49bd-8b1b-0e67b0ad4176",
+      "type": "invocation",
+      "data": {
+        "id": "e39ebfc3-c2cc-49bd-8b1b-0e67b0ad4176",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "collect",
+        "inputs": {
+          "item": {
+            "name": "item",
+            "label": "",
+            "description": ""
+          },
+          "collection": {
+            "name": "collection",
+            "label": "",
+            "description": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": -1080.732035096065,
+        "y": 901.1443896873569
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-loader-t5-pos",
+      "type": "default",
+      "source": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "target": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
+      "sourceHandle": "wan_t5_encoder",
+      "targetHandle": "wan_t5_encoder"
+    },
+    {
+      "id": "edge-loader-t5-neg",
+      "type": "default",
+      "source": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "target": "3c2a8e9d-bf4a-6d5e-af3c-4b5f6e7d8c9a",
+      "sourceHandle": "wan_t5_encoder",
+      "targetHandle": "wan_t5_encoder"
+    },
+    {
+      "id": "edge-loader-vae-l2v",
+      "type": "default",
+      "source": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "target": "6f5dcb1c-e27d-9fb0-d16f-7e8cbaa1fcbd",
+      "sourceHandle": "vae",
+      "targetHandle": "vae"
+    },
+    {
+      "id": "edge-loader-vae-refenc",
+      "type": "default",
+      "source": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "target": "7a6edc2d-f38e-a0c1-e27a-8f9dcbb20fce",
+      "sourceHandle": "vae",
+      "targetHandle": "vae"
+    },
+    {
+      "id": "edge-pos-cond-denoise",
+      "type": "default",
+      "source": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
+      "target": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "sourceHandle": "conditioning",
+      "targetHandle": "positive_conditioning"
+    },
+    {
+      "id": "edge-neg-cond-denoise",
+      "type": "default",
+      "source": "3c2a8e9d-bf4a-6d5e-af3c-4b5f6e7d8c9a",
+      "target": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "sourceHandle": "conditioning",
+      "targetHandle": "negative_conditioning"
+    },
+    {
+      "id": "edge-refenc-refimage-denoise",
+      "type": "default",
+      "source": "7a6edc2d-f38e-a0c1-e27a-8f9dcbb20fce",
+      "target": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "sourceHandle": "ref_image",
+      "targetHandle": "ref_image"
+    },
+    {
+      "id": "edge-rand-seed-denoise",
+      "type": "default",
+      "source": "5e4cab0b-d16c-8faf-c05e-6d7baf90ebbc",
+      "target": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "sourceHandle": "value",
+      "targetHandle": "seed"
+    },
+    {
+      "id": "edge-denoise-latents-l2v",
+      "type": "default",
+      "source": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "target": "6f5dcb1c-e27d-9fb0-d16f-7e8cbaa1fcbd",
+      "sourceHandle": "latents",
+      "targetHandle": "latents"
+    },
+    {
+      "id": "reactflow__edge-b5239ffa-041c-421c-b343-735c02709bb3value-7a6edc2d-f38e-a0c1-e27a-8f9dcbb20fcenum_frames",
+      "type": "default",
+      "source": "b5239ffa-041c-421c-b343-735c02709bb3",
+      "target": "7a6edc2d-f38e-a0c1-e27a-8f9dcbb20fce",
+      "sourceHandle": "value",
+      "targetHandle": "num_frames"
+    },
+    {
+      "id": "reactflow__edge-b5239ffa-041c-421c-b343-735c02709bb3value-4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dabnum_frames",
+      "type": "default",
+      "source": "b5239ffa-041c-421c-b343-735c02709bb3",
+      "target": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "sourceHandle": "value",
+      "targetHandle": "num_frames"
+    },
+    {
+      "id": "reactflow__edge-1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7etransformer-d781a3a6-eb2d-48dd-87a7-eb6898f1fca9transformer",
+      "type": "default",
+      "source": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "target": "d781a3a6-eb2d-48dd-87a7-eb6898f1fca9",
+      "sourceHandle": "transformer",
+      "targetHandle": "transformer"
+    },
+    {
+      "id": "reactflow__edge-d781a3a6-eb2d-48dd-87a7-eb6898f1fca9transformer-06bf5449-a0ca-44d0-a7cc-f37e03651761transformer",
+      "type": "default",
+      "source": "d781a3a6-eb2d-48dd-87a7-eb6898f1fca9",
+      "target": "06bf5449-a0ca-44d0-a7cc-f37e03651761",
+      "sourceHandle": "transformer",
+      "targetHandle": "transformer"
+    },
+    {
+      "id": "reactflow__edge-06bf5449-a0ca-44d0-a7cc-f37e03651761transformer-4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dabtransformer",
+      "type": "default",
+      "source": "06bf5449-a0ca-44d0-a7cc-f37e03651761",
+      "target": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "sourceHandle": "transformer",
+      "targetHandle": "transformer"
+    },
+    {
+      "id": "reactflow__edge-642e7cda-08c1-435c-8e6b-99700b61200bvideo-956718a3-d447-4e6e-ad38-671baeb2350evideo",
+      "type": "default",
+      "source": "642e7cda-08c1-435c-8e6b-99700b61200b",
+      "target": "956718a3-d447-4e6e-ad38-671baeb2350e",
+      "sourceHandle": "video",
+      "targetHandle": "video"
+    },
+    {
+      "id": "reactflow__edge-1167a8f8-87b9-4e32-bf85-cff170e926eecollection-8648065d-056f-47fc-ab84-b762d976c021videos",
+      "type": "default",
+      "source": "1167a8f8-87b9-4e32-bf85-cff170e926ee",
+      "target": "8648065d-056f-47fc-ab84-b762d976c021",
+      "sourceHandle": "collection",
+      "targetHandle": "videos"
+    },
+    {
+      "id": "reactflow__edge-e39ebfc3-c2cc-49bd-8b1b-0e67b0ad4176collection-1167a8f8-87b9-4e32-bf85-cff170e926eecollection",
+      "type": "default",
+      "source": "e39ebfc3-c2cc-49bd-8b1b-0e67b0ad4176",
+      "target": "1167a8f8-87b9-4e32-bf85-cff170e926ee",
+      "sourceHandle": "collection",
+      "targetHandle": "collection"
+    },
+    {
+      "id": "reactflow__edge-642e7cda-08c1-435c-8e6b-99700b61200bvideo-e39ebfc3-c2cc-49bd-8b1b-0e67b0ad4176item",
+      "type": "default",
+      "source": "642e7cda-08c1-435c-8e6b-99700b61200b",
+      "target": "e39ebfc3-c2cc-49bd-8b1b-0e67b0ad4176",
+      "sourceHandle": "video",
+      "targetHandle": "item"
+    },
+    {
+      "id": "reactflow__edge-6f5dcb1c-e27d-9fb0-d16f-7e8cbaa1fcbdvideo-1167a8f8-87b9-4e32-bf85-cff170e926eeitem",
+      "type": "default",
+      "source": "6f5dcb1c-e27d-9fb0-d16f-7e8cbaa1fcbd",
+      "target": "1167a8f8-87b9-4e32-bf85-cff170e926ee",
+      "sourceHandle": "video",
+      "targetHandle": "item"
+    },
+    {
+      "id": "reactflow__edge-642e7cda-08c1-435c-8e6b-99700b61200bwidth-7a6edc2d-f38e-a0c1-e27a-8f9dcbb20fcewidth",
+      "type": "default",
+      "source": "642e7cda-08c1-435c-8e6b-99700b61200b",
+      "target": "7a6edc2d-f38e-a0c1-e27a-8f9dcbb20fce",
+      "sourceHandle": "width",
+      "targetHandle": "width"
+    },
+    {
+      "id": "reactflow__edge-642e7cda-08c1-435c-8e6b-99700b61200bheight-7a6edc2d-f38e-a0c1-e27a-8f9dcbb20fceheight",
+      "type": "default",
+      "source": "642e7cda-08c1-435c-8e6b-99700b61200b",
+      "target": "7a6edc2d-f38e-a0c1-e27a-8f9dcbb20fce",
+      "sourceHandle": "height",
+      "targetHandle": "height"
+    },
+    {
+      "id": "reactflow__edge-642e7cda-08c1-435c-8e6b-99700b61200bwidth-4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dabwidth",
+      "type": "default",
+      "source": "642e7cda-08c1-435c-8e6b-99700b61200b",
+      "target": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "sourceHandle": "width",
+      "targetHandle": "width"
+    },
+    {
+      "id": "reactflow__edge-642e7cda-08c1-435c-8e6b-99700b61200bheight-4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dabheight",
+      "type": "default",
+      "source": "642e7cda-08c1-435c-8e6b-99700b61200b",
+      "target": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "sourceHandle": "height",
+      "targetHandle": "height"
+    },
+    {
+      "id": "reactflow__edge-956718a3-d447-4e6e-ad38-671baeb2350eimage-7a6edc2d-f38e-a0c1-e27a-8f9dcbb20fceimage",
+      "type": "default",
+      "source": "956718a3-d447-4e6e-ad38-671baeb2350e",
+      "target": "7a6edc2d-f38e-a0c1-e27a-8f9dcbb20fce",
+      "sourceHandle": "image",
+      "targetHandle": "image"
+    }
+  ],
+  "form": {
+    "elements": {
+      "root": {
+        "id": "root",
+        "data": {
+          "layout": "column",
+          "children": [
+            "node-field-tUu8xjrAMW",
+            "node-field-3H5g6vMeUr",
+            "container-WTyJo616Mt",
+            "container-NT48l2NzRe",
+            "node-field-WWwirfRWJM",
+            "node-field-IQzdqnlPjU",
+            "node-field-cvo27uAZJW",
+            "node-field-rjFxfyqXUE",
+            "node-field-dlpRVIIP44"
+          ]
+        },
+        "type": "container"
+      },
+      "node-field-IQzdqnlPjU": {
+        "id": "node-field-IQzdqnlPjU",
+        "parentId": "root",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "6f5dcb1c-e27d-9fb0-d16f-7e8cbaa1fcbd",
+            "fieldName": "fps"
+          },
+          "showDescription": false,
+          "settings": {
+            "type": "integer-field-config",
+            "showShuffle": false,
+            "component": "number-input"
+          }
+        },
+        "type": "node-field"
+      },
+      "node-field-dlpRVIIP44": {
+        "id": "node-field-dlpRVIIP44",
+        "parentId": "root",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+            "fieldName": "guidance_scale_low_noise"
+          },
+          "showDescription": false,
+          "settings": {
+            "type": "float-field-config",
+            "showShuffle": false,
+            "component": "number-input"
+          }
+        },
+        "type": "node-field"
+      },
+      "node-field-rjFxfyqXUE": {
+        "id": "node-field-rjFxfyqXUE",
+        "parentId": "root",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+            "fieldName": "guidance_scale"
+          },
+          "showDescription": false,
+          "settings": {
+            "type": "float-field-config",
+            "showShuffle": false,
+            "component": "number-input"
+          }
+        },
+        "type": "node-field"
+      },
+      "node-field-cvo27uAZJW": {
+        "id": "node-field-cvo27uAZJW",
+        "parentId": "root",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+            "fieldName": "steps"
+          },
+          "showDescription": false,
+          "settings": {
+            "type": "integer-field-config",
+            "showShuffle": false,
+            "component": "number-input"
+          }
+        },
+        "type": "node-field"
+      },
+      "node-field-tUu8xjrAMW": {
+        "id": "node-field-tUu8xjrAMW",
+        "parentId": "root",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
+            "fieldName": "prompt"
+          },
+          "showDescription": false,
+          "settings": {
+            "type": "string-field-config",
+            "component": "textarea"
+          }
+        },
+        "type": "node-field"
+      },
+      "node-field-WWwirfRWJM": {
+        "id": "node-field-WWwirfRWJM",
+        "parentId": "root",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "7a6edc2d-f38e-a0c1-e27a-8f9dcbb20fce",
+            "fieldName": "num_frames"
+          },
+          "showDescription": false,
+          "settings": {
+            "type": "integer-field-config",
+            "showShuffle": false,
+            "component": "number-input"
+          }
+        },
+        "type": "node-field"
+      },
+      "node-field-deb9Zb2Pea": {
+        "id": "node-field-deb9Zb2Pea",
+        "parentId": "container-NT48l2NzRe",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+            "fieldName": "wan_t5_encoder_model"
+          },
+          "showDescription": false
+        },
+        "type": "node-field"
+      },
+      "node-field-gmXZokDmtz": {
+        "id": "node-field-gmXZokDmtz",
+        "parentId": "container-NT48l2NzRe",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+            "fieldName": "vae_model"
+          },
+          "showDescription": false
+        },
+        "type": "node-field"
+      },
+      "node-field-Qu2wxKebZ3": {
+        "id": "node-field-Qu2wxKebZ3",
+        "parentId": "container-WTyJo616Mt",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+            "fieldName": "component_source"
+          },
+          "showDescription": false
+        },
+        "type": "node-field"
+      },
+      "node-field-ryYpbo6Cvy": {
+        "id": "node-field-ryYpbo6Cvy",
+        "parentId": "container-QW4jkChXMH",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+            "fieldName": "transformer_low_noise_model"
+          },
+          "showDescription": false
+        },
+        "type": "node-field"
+      },
+      "node-field-TSLaEfQaZZ": {
+        "id": "node-field-TSLaEfQaZZ",
+        "parentId": "container-QW4jkChXMH",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+            "fieldName": "model"
+          },
+          "showDescription": false
+        },
+        "type": "node-field"
+      },
+      "container-WTyJo616Mt": {
+        "id": "container-WTyJo616Mt",
+        "parentId": "root",
+        "data": {
+          "layout": "column",
+          "children": [
+            "container-QW4jkChXMH",
+            "node-field-Qu2wxKebZ3"
+          ]
+        },
+        "type": "container"
+      },
+      "container-NT48l2NzRe": {
+        "id": "container-NT48l2NzRe",
+        "parentId": "root",
+        "data": {
+          "layout": "row",
+          "children": [
+            "node-field-deb9Zb2Pea",
+            "node-field-gmXZokDmtz"
+          ]
+        },
+        "type": "container"
+      },
+      "container-QW4jkChXMH": {
+        "id": "container-QW4jkChXMH",
+        "parentId": "container-WTyJo616Mt",
+        "data": {
+          "layout": "row",
+          "children": [
+            "node-field-TSLaEfQaZZ",
+            "node-field-ryYpbo6Cvy"
+          ]
+        },
+        "type": "container"
+      },
+      "node-field-3H5g6vMeUr": {
+        "id": "node-field-3H5g6vMeUr",
+        "parentId": "root",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "642e7cda-08c1-435c-8e6b-99700b61200b",
+            "fieldName": "video"
+          },
+          "showDescription": true
+        },
+        "type": "node-field"
+      }
+    },
+    "rootElementId": "root"
+  },
+  "id": "default_wan22_i2v_add_frames_64fe9209-6871-49dd-a972-0a729b5332e7"
+}

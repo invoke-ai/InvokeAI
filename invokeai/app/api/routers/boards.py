@@ -21,6 +21,14 @@ class DeleteBoardResult(BaseModel):
         description="The image names of the board-images relationships that were deleted."
     )
     deleted_images: list[str] = Field(description="The names of the images that were deleted.")
+    deleted_board_videos: list[str] = Field(
+        default_factory=list,
+        description="The video names of the board-videos relationships that were deleted.",
+    )
+    deleted_videos: list[str] = Field(
+        default_factory=list,
+        description="The names of the videos that were deleted.",
+    )
 
 
 @boards_router.post(
@@ -116,19 +124,34 @@ async def delete_board(
     if not current_user.is_admin and board.user_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Not authorized to delete this board")
 
+    # Admins delete everything on the board; regular owners only delete their own
+    # contributions so that contributions from other users to a public/shared board
+    # are preserved (they cascade to "uncategorized" via FK on board_videos / board_images).
+    cascade_user_id: Optional[str] = None if current_user.is_admin else current_user.user_id
+
     try:
         if include_images is True:
             deleted_images = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
                 board_id=board_id,
                 categories=None,
                 is_intermediate=None,
+                user_id=cascade_user_id,
             )
-            ApiDependencies.invoker.services.images.delete_images_on_board(board_id=board_id)
+            deleted_videos = ApiDependencies.invoker.services.board_video_records.get_all_board_video_names_for_board(
+                board_id=board_id,
+                categories=None,
+                is_intermediate=None,
+                user_id=cascade_user_id,
+            )
+            ApiDependencies.invoker.services.images.delete_images_on_board(board_id=board_id, user_id=cascade_user_id)
+            ApiDependencies.invoker.services.videos.delete_videos_on_board(board_id=board_id, user_id=cascade_user_id)
             ApiDependencies.invoker.services.boards.delete(board_id=board_id)
             return DeleteBoardResult(
                 board_id=board_id,
                 deleted_board_images=[],
                 deleted_images=deleted_images,
+                deleted_board_videos=[],
+                deleted_videos=deleted_videos,
             )
         else:
             deleted_board_images = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
@@ -136,11 +159,20 @@ async def delete_board(
                 categories=None,
                 is_intermediate=None,
             )
+            deleted_board_videos = (
+                ApiDependencies.invoker.services.board_video_records.get_all_board_video_names_for_board(
+                    board_id=board_id,
+                    categories=None,
+                    is_intermediate=None,
+                )
+            )
             ApiDependencies.invoker.services.boards.delete(board_id=board_id)
             return DeleteBoardResult(
                 board_id=board_id,
                 deleted_board_images=deleted_board_images,
                 deleted_images=[],
+                deleted_board_videos=deleted_board_videos,
+                deleted_videos=[],
             )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to delete board")

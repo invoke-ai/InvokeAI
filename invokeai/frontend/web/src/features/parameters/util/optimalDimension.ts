@@ -63,9 +63,16 @@ export const isInSDXLTrainingDimensions = (width: number, height: number): boole
 /**
  * Gets the grid size for a given base model. For Flux, the grid size is 16, otherwise it is 8.
  * - sd-1, sd-2, sdxl, anima: 8
- * - flux, sd-3, qwen-image, z-image: 16
+ * - flux, sd-3, qwen-image, z-image, wan: 16
  * - cogview4: 32
  * - default: 8
+ *
+ * Wan 2.2's transformer has ``patch_size=(1, 2, 2)``: it patch-embeds with
+ * stride 2 then un-patches by 2. Combined with the VAE's 8x spatial scale,
+ * canvas H/W must be a multiple of ``8 * 2 = 16``; otherwise the patch
+ * round-trip produces an off-by-one and the scheduler step fails with a
+ * spatial-dim mismatch between latents and noise prediction.
+ *
  * @param base The base model
  * @returns The grid size for the model, defaulting to 8
  */
@@ -77,6 +84,7 @@ export const getGridSize = (base?: BaseModelType | null): number => {
     case 'flux2':
     case 'sd-3':
     case 'qwen-image':
+    case 'wan':
     case 'z-image':
       return 16;
     case 'sd-1':

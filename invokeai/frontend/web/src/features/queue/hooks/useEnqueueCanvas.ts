@@ -17,6 +17,7 @@ import { buildQwenImageGraph } from 'features/nodes/util/graph/generation/buildQ
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Graph';
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
+import { buildWanGraph } from 'features/nodes/util/graph/generation/buildWanGraph';
 import { buildZImageGraph } from 'features/nodes/util/graph/generation/buildZImageGraph';
 import { selectCanvasDestination } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg } from 'features/nodes/util/graph/types';
@@ -69,6 +70,8 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
         return await buildExternalGraph(graphBuilderArg);
       case 'anima':
         return await buildAnimaGraph(graphBuilderArg);
+      case 'wan':
+        return await buildWanGraph(graphBuilderArg);
       default:
         assert(false, `No graph builders for base ${base}`);
     }

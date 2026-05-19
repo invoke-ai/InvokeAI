@@ -39,6 +39,7 @@ import {
   isFLUXReduxConfig,
   isIPAdapterConfig,
   isQwenImageReferenceImageConfig,
+  isWanReferenceImageConfig,
 } from 'features/controlLayers/store/types';
 import type { SetGlobalReferenceImageDndTargetData } from 'features/dnd/dnd';
 import { setGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
@@ -129,9 +130,12 @@ const RefImageSettingsContent = memo(() => {
   const isFLUX = useAppSelector(selectIsFLUX);
   const isExternalModel = !!mainModelConfig && isExternalApiModelConfig(mainModelConfig);
 
-  // FLUX.2 Klein, Qwen Image Edit and external API models do not require a ref image model selection.
+  // FLUX.2 Klein, Qwen Image Edit, Wan 2.2 and external API models do not require a ref image model selection.
   const showModelSelector =
-    !isFlux2ReferenceImageConfig(config) && !isQwenImageReferenceImageConfig(config) && !isExternalModel;
+    !isFlux2ReferenceImageConfig(config) &&
+    !isQwenImageReferenceImageConfig(config) &&
+    !isWanReferenceImageConfig(config) &&
+    !isExternalModel;
 
   return (
     <Flex flexDir="column" gap={2} position="relative" w="full">

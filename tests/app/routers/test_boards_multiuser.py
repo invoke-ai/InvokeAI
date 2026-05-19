@@ -75,6 +75,17 @@ def enable_multiuser_for_tests(monkeypatch: Any, mock_invoker: Invoker):
     mock_board_images.get_all_board_image_names_for_board.return_value = []
     mock_invoker.services.board_images = mock_board_images
 
+    # delete_board cascade-deletes videos on the board too — stub the video services
+    # so the route doesn't hit AttributeError on the None placeholders in mock_services.
+    mock_board_video_records = MagicMock()
+    mock_board_video_records.get_all_board_video_names_for_board.return_value = []
+    mock_invoker.services.board_video_records = mock_board_video_records
+    mock_invoker.services.videos = MagicMock()
+    # The images service is a real ImageService instance in mock_services; the delete-board
+    # cascade calls ``delete_images_on_board`` on it, which fails without an initialized
+    # invoker. Stub it so the multiuser router tests can assert the cascade args.
+    mock_invoker.services.images = MagicMock()
+
     mock_deps = MockApiDependencies(mock_invoker)
     monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
@@ -675,3 +686,141 @@ def test_admin_can_change_any_board_visibility(client: TestClient, admin_token: 
     )
     assert response.status_code == status.HTTP_201_CREATED
     assert response.json()["board_visibility"] == "public"
+
+
+# ---------------------------------------------------------------------------
+# Video cascade on board deletion (PR #9163 review fix)
+# ---------------------------------------------------------------------------
+
+
+def test_delete_board_with_include_images_cascades_videos(client: TestClient, mock_invoker: Invoker, user1_token: str):
+    """include_images=true must also call delete_videos_on_board (not image-only)."""
+    create = client.post(
+        "/api/v1/boards/?board_name=Cascade+Test+Board",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert create.status_code == status.HTTP_201_CREATED
+    board_id = create.json()["board_id"]
+
+    # Pretend the board contains videos so the cascade has something to enumerate
+    mock_invoker.services.board_video_records.get_all_board_video_names_for_board.return_value = [
+        "video_a.mp4",
+        "video_b.mp4",
+    ]
+
+    response = client.delete(
+        f"/api/v1/boards/{board_id}?include_images=true",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["board_id"] == board_id
+    # Regression guard: video info must appear in the result, and delete_videos_on_board
+    # must have been invoked. Previously the route ignored videos entirely.
+    assert set(body["deleted_videos"]) == {"video_a.mp4", "video_b.mp4"}
+    mock_invoker.services.videos.delete_videos_on_board.assert_called_once()
+    call = mock_invoker.services.videos.delete_videos_on_board.call_args
+    assert call.kwargs["board_id"] == board_id
+
+
+def test_delete_board_with_include_images_filters_cascade_by_user(
+    client: TestClient, mock_invoker: Invoker, user1_token: str
+):
+    """A non-admin board owner deleting a public/shared board with include_images=True must
+    only destroy videos and images they themselves uploaded — other users' contributions are
+    preserved (they fall through to ``uncategorized`` via the FK cascade on board_videos /
+    board_images).
+
+    This guards against a privilege-escalation gap: previously the cascade iterated *all*
+    board_videos rows for the board_id regardless of uploader, letting the board owner
+    delete other users' files just by deleting the board.
+    """
+    create = client.post(
+        "/api/v1/boards/?board_name=Public+Cascade+Board",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert create.status_code == status.HTTP_201_CREATED
+    board_id = create.json()["board_id"]
+
+    response = client.delete(
+        f"/api/v1/boards/{board_id}?include_images=true",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+    # The router must pass the current user's id through to the cascade so the SQL filter
+    # narrows the lookup + delete to that user's rows only. Admins skip the filter (pass
+    # ``user_id=None``); this test exercises the non-admin path.
+    images_call = mock_invoker.services.board_images.get_all_board_image_names_for_board.call_args
+    videos_call = mock_invoker.services.board_video_records.get_all_board_video_names_for_board.call_args
+    assert images_call.kwargs.get("user_id") is not None
+    assert videos_call.kwargs.get("user_id") is not None
+
+    delete_images_call = mock_invoker.services.images.delete_images_on_board.call_args
+    delete_videos_call = mock_invoker.services.videos.delete_videos_on_board.call_args
+    assert delete_images_call.kwargs.get("user_id") is not None
+    assert delete_videos_call.kwargs.get("user_id") is not None
+    # Sanity: the four cascade calls must all share the same user_id (the requester).
+    requester_id = images_call.kwargs["user_id"]
+    assert videos_call.kwargs["user_id"] == requester_id
+    assert delete_images_call.kwargs["user_id"] == requester_id
+    assert delete_videos_call.kwargs["user_id"] == requester_id
+
+
+def test_delete_board_with_include_images_admin_skips_user_filter(
+    client: TestClient, mock_invoker: Invoker, admin_token: str
+):
+    """Admins keep the legacy behavior: cascade deletes everything on the board regardless of
+    uploader. The filter is bypassed by passing ``user_id=None`` so the SQL ``WHERE`` clause
+    has no per-user restriction.
+    """
+    create = client.post(
+        "/api/v1/boards/?board_name=Admin+Cascade+Board",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert create.status_code == status.HTTP_201_CREATED
+    board_id = create.json()["board_id"]
+
+    response = client.delete(
+        f"/api/v1/boards/{board_id}?include_images=true",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+    images_call = mock_invoker.services.board_images.get_all_board_image_names_for_board.call_args
+    videos_call = mock_invoker.services.board_video_records.get_all_board_video_names_for_board.call_args
+    assert images_call.kwargs.get("user_id") is None
+    assert videos_call.kwargs.get("user_id") is None
+
+    delete_images_call = mock_invoker.services.images.delete_images_on_board.call_args
+    delete_videos_call = mock_invoker.services.videos.delete_videos_on_board.call_args
+    assert delete_images_call.kwargs.get("user_id") is None
+    assert delete_videos_call.kwargs.get("user_id") is None
+
+
+def test_delete_board_without_include_images_lists_uncategorized_videos(
+    client: TestClient, mock_invoker: Invoker, user1_token: str
+):
+    """include_images=false: videos cascade out of board_videos and become uncategorized.
+
+    The response now reports those names in deleted_board_videos so the frontend can
+    invalidate the right caches.
+    """
+    create = client.post(
+        "/api/v1/boards/?board_name=Soft+Delete+Board",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert create.status_code == status.HTTP_201_CREATED
+    board_id = create.json()["board_id"]
+
+    mock_invoker.services.board_video_records.get_all_board_video_names_for_board.return_value = ["v1.mp4"]
+
+    response = client.delete(
+        f"/api/v1/boards/{board_id}",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["deleted_board_videos"] == ["v1.mp4"]
+    # delete_videos_on_board MUST NOT be invoked when include_images is false.
+    mock_invoker.services.videos.delete_videos_on_board.assert_not_called()
