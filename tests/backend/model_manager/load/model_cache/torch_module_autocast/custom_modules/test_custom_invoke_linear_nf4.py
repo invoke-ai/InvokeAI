@@ -70,9 +70,9 @@ def test_custom_invoke_linear_nf4_all_weights_on_cpu(linear_nf4_layer: InvokeLin
     state_dict = {k: v.to("cpu") for k, v in state_dict.items()}
     linear_nf4_layer.load_state_dict(state_dict)
 
-    # Inference of the original layer should fail.
-    with pytest.raises(RuntimeError):
-        linear_nf4_layer(x)
+    # Do not call the raw bitsandbytes NF4 layer here. With CPU-stored weights and a single-row CUDA input, some
+    # bitsandbytes versions hit an unsafe gemv_4bit path instead of raising a Python exception. The custom layer below
+    # is the behavior under test.
 
     # Wrap the InvokeLinearNF4 layer in a CustomInvokeLinearNF4 layer, and run inference on it.
     custom_linear_nf4_layer = wrap_custom_layer(linear_nf4_layer, CustomInvokeLinearNF4)
