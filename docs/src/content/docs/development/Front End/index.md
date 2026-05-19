@@ -12,8 +12,8 @@ Follow the [dev environment](/development/setup/dev-environment/) guide to get s
 ## Package scripts
 
 - `dev`: run the frontend in dev mode, enabling hot reloading
-- `build`: run all checks (dpdm, eslint, prettier, tsc, knip) and then build the frontend
-- `lint:dpdm`: check circular dependencies
+- `build`: run all checks (lint:circular, eslint, prettier, tsc, knip) and then build the frontend
+- `lint:circular`: check circular dependencies
 - `lint:eslint`: check code quality
 - `lint:prettier`: check code formatting
 - `lint:tsc`: check type issues
