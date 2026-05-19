@@ -28,8 +28,8 @@ def test_invokeai_imports():
     for mod in modules:
         try:
             importlib.import_module(mod)
-        except Exception:
+        except Exception as e:
             if mod not in KNOWN_IMPORT_ERRORS:
-                failed_to_import.add(mod)
+                failed_to_import.add((mod, e))
 
     assert not failed_to_import, f"Modules failed to import: {failed_to_import}"
