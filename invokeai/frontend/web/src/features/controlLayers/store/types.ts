@@ -260,6 +260,7 @@ const zCanvasRectState = z.object({
   type: z.literal('rect'),
   rect: zRect,
   color: zRgbaColor,
+  compositeOperation: z.enum(['source-over', 'destination-out']).default('source-over'),
 });
 export type CanvasRectState = z.infer<typeof zCanvasRectState>;
 
@@ -276,6 +277,28 @@ const zCanvasLassoState = z.object({
   compositeOperation: zCanvasLassoCompositeOperation.default('source-over'),
 });
 export type CanvasLassoState = z.infer<typeof zCanvasLassoState>;
+
+const zCanvasOvalState = z.object({
+  id: zId,
+  type: z.literal('oval'),
+  rect: zRect,
+  color: zRgbaColor,
+  compositeOperation: z.enum(['source-over', 'destination-out']).default('source-over'),
+});
+export type CanvasOvalState = z.infer<typeof zCanvasOvalState>;
+
+const zCanvasPolygonState = z.object({
+  id: zId,
+  type: z.literal('polygon'),
+  points: zPoints,
+  color: zRgbaColor,
+  compositeOperation: z.enum(['source-over', 'destination-out']).default('source-over'),
+  previewPoint: zCoordinate.optional(),
+});
+export type CanvasPolygonState = z.infer<typeof zCanvasPolygonState>;
+
+const zCanvasShapeState = z.union([zCanvasRectState, zCanvasOvalState, zCanvasPolygonState]);
+type CanvasShapeState = z.infer<typeof zCanvasShapeState>;
 
 // Gradient state includes clip metadata so the tool can optionally clip to drag gesture.
 const zCanvasLinearGradientState = z.object({
@@ -325,7 +348,7 @@ const zCanvasObjectState = z.union([
   zCanvasImageState,
   zCanvasBrushLineState,
   zCanvasEraserLineState,
-  zCanvasRectState,
+  zCanvasShapeState,
   zCanvasLassoState,
   zCanvasBrushLineWithPressureState,
   zCanvasEraserLineWithPressureState,
@@ -1020,8 +1043,8 @@ export type EntityBrushLineAddedPayload = EntityIdentifierPayload<{
 export type EntityEraserLineAddedPayload = EntityIdentifierPayload<{
   eraserLine: CanvasEraserLineState | CanvasEraserLineWithPressureState;
 }>;
-export type EntityRectAddedPayload = EntityIdentifierPayload<{ rect: CanvasRectState }>;
 export type EntityLassoAddedPayload = EntityIdentifierPayload<{ lasso: CanvasLassoState }>;
+export type EntityShapeAddedPayload = EntityIdentifierPayload<{ shape: CanvasShapeState }>;
 export type EntityGradientAddedPayload = EntityIdentifierPayload<{ gradient: CanvasGradientState }>;
 export type EntityRasterizedPayload = EntityIdentifierPayload<{
   imageObject: CanvasImageState;

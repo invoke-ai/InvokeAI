@@ -3140,6 +3140,11 @@ export type components = {
              */
             latents?: components["schemas"]["LatentsField"] | null;
             /**
+             * @description Noise tensor
+             * @default null
+             */
+            noise?: components["schemas"]["LatentsField"] | null;
+            /**
              * @description A mask of the region to apply the denoising process to. Values of 0.0 represent the regions to be fully denoised, and 1.0 represent the regions to be preserved.
              * @default null
              */
@@ -5798,6 +5803,11 @@ export type components = {
              * @default null
              */
             latents?: components["schemas"]["LatentsField"] | null;
+            /**
+             * @description Noise tensor
+             * @default null
+             */
+            noise?: components["schemas"]["LatentsField"] | null;
             /**
              * @description A mask of the region to apply the denoising process to. Values of 0.0 represent the regions to be fully denoised, and 1.0 represent the regions to be preserved.
              * @default null
@@ -10211,6 +10221,11 @@ export type components = {
              */
             latents?: components["schemas"]["LatentsField"] | null;
             /**
+             * @description Noise tensor
+             * @default null
+             */
+            noise?: components["schemas"]["LatentsField"] | null;
+            /**
              * @description A mask of the region to apply the denoising process to. Values of 0.0 represent the regions to be fully denoised, and 1.0 represent the regions to be preserved.
              * @default null
              */
@@ -10947,6 +10962,11 @@ export type components = {
              */
             latents?: components["schemas"]["LatentsField"] | null;
             /**
+             * @description Noise tensor
+             * @default null
+             */
+            noise?: components["schemas"]["LatentsField"] | null;
+            /**
              * @description A mask of the region to apply the denoising process to. Values of 0.0 represent the regions to be fully denoised, and 1.0 represent the regions to be preserved.
              * @default null
              */
@@ -11140,6 +11160,11 @@ export type components = {
              * @default null
              */
             latents?: components["schemas"]["LatentsField"] | null;
+            /**
+             * @description Noise tensor
+             * @default null
+             */
+            noise?: components["schemas"]["LatentsField"] | null;
             /**
              * @description A mask of the region to apply the denoising process to. Values of 0.0 represent the regions to be fully denoised, and 1.0 represent the regions to be preserved.
              * @default null
@@ -23976,7 +24001,7 @@ export type components = {
         };
         /**
          * Create Latent Noise
-         * @description Generates latent noise.
+         * @description Generates latent noise for supported denoiser architectures.
          */
         NoiseInvocation: {
             /**
@@ -23996,6 +24021,13 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Noise Type
+             * @description Architecture-specific noise type.
+             * @default SD
+             * @enum {string}
+             */
+            noise_type?: "SD" | "FLUX" | "FLUX.2" | "SD3" | "CogView4" | "Z-Image" | "Anima";
             /**
              * Seed
              * @description Seed for random number generation
@@ -26733,6 +26765,11 @@ export type components = {
              * @default null
              */
             latents?: components["schemas"]["LatentsField"] | null;
+            /**
+             * @description Noise tensor
+             * @default null
+             */
+            noise?: components["schemas"]["LatentsField"] | null;
             /**
              * @description A mask of the region to apply the denoising process to. Values of 0.0 represent the regions to be fully denoised, and 1.0 represent the regions to be preserved.
              * @default null
@@ -32239,6 +32276,11 @@ export type components = {
              */
             latents?: components["schemas"]["LatentsField"] | null;
             /**
+             * @description Noise tensor
+             * @default null
+             */
+            noise?: components["schemas"]["LatentsField"] | null;
+            /**
              * @description A mask of the region to apply the denoising process to. Values of 0.0 represent the regions to be fully denoised, and 1.0 represent the regions to be preserved.
              * @default null
              */
@@ -32371,6 +32413,11 @@ export type components = {
              * @default null
              */
             latents?: components["schemas"]["LatentsField"] | null;
+            /**
+             * @description Noise tensor
+             * @default null
+             */
+            noise?: components["schemas"]["LatentsField"] | null;
             /**
              * @description A mask of the region to apply the denoising process to. Values of 0.0 represent the regions to be fully denoised, and 1.0 represent the regions to be preserved.
              * @default null
