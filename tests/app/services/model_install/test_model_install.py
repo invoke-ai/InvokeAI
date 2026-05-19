@@ -11,6 +11,7 @@ from typing import Any, Dict
 
 import pytest
 from pydantic_core import Url
+from requests_testadapter import TestAdapter
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.events.events_base import EventServiceBase
@@ -36,6 +37,7 @@ from invokeai.app.services.model_install.model_install_common import (
 )
 from invokeai.app.services.model_records import ModelRecordChanges, UnknownModelException
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
+from invokeai.backend.model_manager.metadata import CivitaiMetadata
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
@@ -389,6 +391,41 @@ def test_huggingface_repo_id(mm2_installer: ModelInstallServiceBase, mm2_app_con
     print(downloading_events[-1])
     print(job.download_parts)
     assert job.total_bytes == sum(x["total_bytes"] for x in downloading_events[-1].parts)
+
+
+def test_civitai_download_url_metadata_fetch_failure_falls_back_to_direct_download(
+    mm2_installer: ModelInstallServiceBase,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._session is not None
+    mm2_installer._session.mount(
+        "https://civitai.com/api/v1/model-versions/999999",
+        TestAdapter(b"Not found", status=404),
+    )
+    source = URLModelSource(url=Url("https://civitai.com/api/download/models/999999"))
+
+    remote_files, metadata = mm2_installer._remote_files_from_source(source)
+
+    assert metadata is None
+    assert len(remote_files) == 1
+    assert str(remote_files[0].url) == str(source.url)
+    assert remote_files[0].path == Path(".")
+    assert remote_files[0].size == 0
+
+
+def test_civitai_download_url_metadata_fetch_returns_metadata_files(
+    mm2_installer: ModelInstallServiceBase,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    source = URLModelSource(url=Url("https://civitai.com/api/download/models/242807"))
+
+    remote_files, metadata = mm2_installer._remote_files_from_source(source)
+
+    assert isinstance(metadata, CivitaiMetadata)
+    assert metadata.model_version_id == 242807
+    assert len(remote_files) == 1
+    assert str(remote_files[0].url) == "https://civitai.com/api/download/models/242807"
+    assert remote_files[0].path.as_posix() == "sd_xl_turbo_lora_v1.safetensors"
 
 
 def test_restore_paused_hf_install_preserves_access_token(
