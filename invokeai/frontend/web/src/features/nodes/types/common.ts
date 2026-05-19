@@ -20,6 +20,10 @@ export const zStylePresetField = z.object({
   style_preset_id: z.string().trim().min(1),
 });
 
+export const zSystemPromptField = z.object({
+  system_prompt_id: z.string().trim().min(1),
+});
+
 export const zColorField = z.object({
   r: z.number().int().min(0).max(255),
   g: z.number().int().min(0).max(255),

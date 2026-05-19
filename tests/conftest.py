@@ -23,6 +23,9 @@ from invokeai.app.services.invocation_cache.invocation_cache_memory import Memor
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.system_prompt_records.system_prompt_records_sqlite import (
+    SqliteSystemPromptRecordsStorage,
+)
 from invokeai.app.services.users.users_default import UserService
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa: F403
@@ -64,6 +67,7 @@ def mock_services() -> InvocationServices:
         conditioning=None,  # type: ignore
         style_preset_records=None,  # type: ignore
         style_preset_image_files=None,  # type: ignore
+        system_prompt_records=SqliteSystemPromptRecordsStorage(db=db),
         workflow_thumbnails=None,  # type: ignore
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore

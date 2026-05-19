@@ -3274,6 +3274,25 @@
         "incompatibleBaseModel": "Unsupported main model architecture for upscaling",
         "incompatibleBaseModelDesc": "Upscaling is supported for SD1.5 and SDXL architecture models only. Change the main model to enable upscaling."
     },
+    "systemPrompts": {
+        "systemPrompt": "System Prompt",
+        "selectSystemPrompt": "Select system prompt...",
+        "manageSystemPrompts": "Manage system prompts",
+        "newSystemPrompt": "New System Prompt",
+        "editSystemPrompt": "Edit System Prompt",
+        "name": "Name",
+        "content": "Content",
+        "contentPlaceholder": "Enter the system prompt that instructs the LLM how to expand the user's prompt...",
+        "deletePrompt": "Delete System Prompt",
+        "deletePromptConfirm": "Are you sure you want to delete this system prompt? This cannot be undone.",
+        "promptDeleted": "System prompt deleted",
+        "unableToDeletePrompt": "Unable to delete system prompt",
+        "unableToSavePrompt": "Unable to save system prompt",
+        "noPromptsYet": "No system prompts yet. Create one to get started.",
+        "systemBadge": "System",
+        "sharedBadge": "Shared",
+        "shareWithEveryone": "Share with everyone (visible to all users)"
+    },
     "stylePresets": {
         "active": "Active",
         "choosePromptTemplate": "Choose Prompt Template",
