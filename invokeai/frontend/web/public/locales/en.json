@@ -1785,6 +1785,29 @@
         "dynamicPrompts": "Dynamic Prompts",
         "maxPrompts": "Max Prompts",
         "promptsPreview": "Prompts Preview",
+        "promptExpansionsWithCount_one": "Prompt Expansion ({{count}})",
+        "promptExpansionsWithCount_other": "Prompt Expansions ({{count}})",
+        "maxCombinations": "Max Combinations",
+        "randomSamples": "Random Samples",
+        "preview": "Preview",
+        "reshuffleNow": "Reshuffle Now",
+        "resolveFailed": "Failed to resolve dynamic prompts",
+        "mode": {
+            "label": "Mode",
+            "randomLabel": "Random Sample",
+            "randomDesc": "Sample prompts. Randomness applies to random wildcards.",
+            "combinatorialLabel": "All Combinations",
+            "combinatorialDesc": "Preview and queue every combination up to the limit."
+        },
+        "randomness": {
+            "label": "Randomness",
+            "perImageLabel": "Per Image",
+            "perImageDesc": "Roll a new random sample for each generated image.",
+            "perInvokeLabel": "Per Invoke",
+            "perInvokeDesc": "Random wildcards roll once per Invoke; cyclic wildcards still advance per queued output.",
+            "manualLabel": "Locked Preview",
+            "manualDesc": "Keep the preview fixed until Reshuffle is used."
+        },
         "seedBehaviour": {
             "label": "Seed Behaviour",
             "perIterationLabel": "Seed per Iteration",
@@ -1795,6 +1818,110 @@
         "loading": "Generating Dynamic Prompts...",
         "problemGeneratingPrompts": "Problem generating prompts",
         "promptsToGenerate": "Prompts to Generate"
+    },
+    "promptWorkbench": {
+        "panel": {
+            "title": "Prompt intent"
+        },
+        "autocomplete": {
+            "loading": "Loading local wildcards...",
+            "unavailable": "Wildcard index unavailable. Restart the backend or check the wildcard endpoint.",
+            "empty": "No local wildcards found.",
+            "noMatches": "No local wildcards match \"{{query}}\".",
+            "noWildcardMatches": "No local wildcard matches.",
+            "matching": "Matching \"{{query}}\"",
+            "localWildcards": "Local wildcards",
+            "insertWithBehaviorAria": "Insert {{path}} with wildcard behavior"
+        },
+        "actions": {
+            "wildcardBehavior": "Wildcard behavior",
+            "wildcardActions": "Wildcard actions",
+            "weightActions": "Weight actions",
+            "randomWildcard": "Random wildcard",
+            "randomWildcardTooltip": "Use this wildcard as a random token. Random cadence is controlled by the prompt.",
+            "cycle": "Cycle through values",
+            "cycleTooltip": "Cycles through values across generated outputs.",
+            "pickFixed": "Pick fixed value",
+            "remove": "Remove",
+            "openWildcardActionsAria": "Open {{path}} wildcard actions",
+            "openWeightActionsAria": "Open {{text}} weight actions"
+        },
+        "behavior": {
+            "randomImageLabel": "Random per Image",
+            "randomInvokeLabel": "Random per Invoke",
+            "randomPreviewLabel": "Random preview",
+            "randomImageShort": "Random/image",
+            "randomInvokeShort": "Random/invoke",
+            "previewShort": "Preview",
+            "cycleLabel": "Cycle",
+            "cycleShort": "Cycle",
+            "allCombinationsLabel": "All combinations",
+            "allShort": "All",
+            "missingLabel": "Missing",
+            "unavailableLabel": "Unavailable"
+        },
+        "diagnostics": {
+            "weightsLiteralLabel": "Weights literal?",
+            "weightsLiteralDesc": "This prompt uses weight syntax, but the selected model may encode it as literal text.",
+            "wildcardErrorLabel": "Wildcard error",
+            "wildcardErrorDesc": "The local wildcard index could not be loaded. Restart the backend so /api/v1/utilities/wildcards is available.",
+            "missingLabel_one": "Missing {{count}}",
+            "missingLabel_other": "Missing {{count}}",
+            "missingDesc_one": "Missing wildcard: {{wildcards}}",
+            "missingDesc_other": "Missing wildcards: {{wildcards}}",
+            "wildcardsFoundLabel_one": "Wildcards {{count}}",
+            "wildcardsFoundLabel_other": "Wildcards {{count}}",
+            "wildcardsFoundDesc": "All referenced wildcards are available locally.",
+            "indexErrorsLabel_one": "Index error {{count}}",
+            "indexErrorsLabel_other": "Index errors {{count}}",
+            "indexErrorsDesc": "Some local wildcard files could not be read.",
+            "dynamicErrorLabel": "Dynamic error",
+            "dynamicErrorDesc": "Dynamic prompt parser error: {{error}}",
+            "dynamicAllLabel_one": "All {{count}}",
+            "dynamicAllLabel_other": "All {{count}}",
+            "dynamicMixedLabel": "Mixed dynamic",
+            "dynamicCycleLabel_one": "Cycle {{count}}",
+            "dynamicCycleLabel_other": "Cycle {{count}}",
+            "dynamicAllDesc": "All-combinations prompt expansion is active for this prompt.",
+            "dynamicMixedDesc": "Cyclic wildcards advance per output; random wildcards follow the selected randomness mode.",
+            "dynamicCycleDesc": "Cyclic wildcard expansion is deterministic and cycles through values across generated outputs.",
+            "dynamicRandomImageDesc": "Random prompt sampling will roll fresh values for each generated image.",
+            "dynamicRandomInvokeDesc": "Random prompt sampling will roll once when generation is queued.",
+            "dynamicRandomPreviewDesc": "Random prompt sampling is fixed to the current preview until Reshuffle is used.",
+            "changeRandomBehaviorTooltip": "{{description}} Change random wildcard behavior.",
+            "openDynamicPreviewTooltip": "{{description}} Open dynamic prompt preview."
+        },
+        "rows": {
+            "wildcardIntentAria": "{{path}} wildcard intent",
+            "weightIntentAria": "{{text}} prompt weight",
+            "missingWildcard": "Missing wildcard",
+            "wildcardIndexUnavailable": "Wildcard index unavailable",
+            "randomWildcard": "Random wildcard",
+            "randomWildcardWithCount_one": "Random wildcard · {{count}} value",
+            "randomWildcardWithCount_other": "Random wildcard · {{count}} values",
+            "cycle": "Cycle",
+            "cycleWithCount_one": "Cycle · {{count}} value",
+            "cycleWithCount_other": "Cycle · {{count}} values",
+            "allCombinations": "All combinations",
+            "allCombinationsWithCount_one": "All combinations · {{count}} value",
+            "allCombinationsWithCount_other": "All combinations · {{count}} values"
+        },
+        "values": {
+            "loading": "Loading values..."
+        },
+        "weight": {
+            "promptWeight": "prompt weight",
+            "supportedLabel": "Weight supported",
+            "literalLabel": "Weight may be literal",
+            "literalShort": "Literal?",
+            "valueLabel": "{{value}}",
+            "supportedDescription": "Prompt weights are supported for this model.",
+            "literalDescription": "Prompt weight syntax may be treated as literal text by this model."
+        },
+        "header": {
+            "randomImageTooltip": "Random wildcards roll once per generated image.",
+            "randomInvokeTooltip": "Random wildcards roll once per Invoke; cyclic wildcards still advance per generated output."
+        }
     },
     "sdxl": {
         "cfgScale": "CFG Scale",

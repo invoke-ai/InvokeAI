@@ -6,7 +6,7 @@ import {
   selectDynamicPromptsIsError,
   selectDynamicPromptsIsLoading,
 } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBracketsCurlyBold } from 'react-icons/pi';
 
@@ -20,6 +20,10 @@ export const ShowDynamicPromptsPreviewButton = memo(() => {
   const isError = useAppSelector(selectDynamicPromptsIsError);
   const { isOpen, onOpen } = useDynamicPromptsModal();
 
+  const onClick = useCallback(() => {
+    onOpen();
+  }, [onOpen]);
+
   return (
     <Tooltip label={isLoading ? t('dynamicPrompts.loading') : t('dynamicPrompts.showDynamicPrompts')}>
       <IconButton
@@ -28,7 +32,7 @@ export const ShowDynamicPromptsPreviewButton = memo(() => {
         isDisabled={isOpen}
         aria-label={t('dynamicPrompts.showDynamicPrompts')}
         icon={<PiBracketsCurlyBold />}
-        onClick={onOpen}
+        onClick={onClick}
         sx={isLoading ? loadingStyles : undefined}
         colorScheme={isError && !isLoading ? 'error' : 'base'}
       />

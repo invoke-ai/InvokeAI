@@ -222,7 +222,7 @@ function tokenizeWord(prompt: string, i: number): TokenizeResult {
 
     // Check for weight immediately after word (e.g., "Lorem+", "consectetur-")
     const weightMatch = prompt.slice(j).match(WEIGHT_PATTERN);
-    if (weightMatch && weightMatch[0]) {
+    if (weightMatch && weightMatch[0] && getIsWordWeightSuffix(prompt, j, weightMatch[0])) {
       const weightEnd = j + weightMatch[0].length;
       return {
         token: { type: 'word', value: word, start: i, end: j },
@@ -237,6 +237,14 @@ function tokenizeWord(prompt: string, i: number): TokenizeResult {
     };
   }
   return null;
+}
+
+function getIsWordWeightSuffix(prompt: string, start: number, weight: string): boolean {
+  const nextChar = prompt[start + weight.length];
+  if (/^[+-]+$/.test(weight) && nextChar && WORD_CHAR_PATTERN.test(nextChar)) {
+    return false;
+  }
+  return true;
 }
 
 function tokenizeEmbedding(char: string, i: number): TokenizeResult {

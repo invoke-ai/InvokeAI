@@ -13,7 +13,10 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ParamDynamicPromptsMaxPrompts from './ParamDynamicPromptsMaxPrompts';
+import ParamDynamicPromptsMode from './ParamDynamicPromptsMode';
 import ParamDynamicPromptsPreview from './ParamDynamicPromptsPreview';
+import ParamDynamicPromptsRandomRefreshMode from './ParamDynamicPromptsRandomRefreshMode';
+import ParamDynamicPromptsReshuffle from './ParamDynamicPromptsReshuffle';
 import ParamDynamicPromptsSeedBehaviour from './ParamDynamicPromptsSeedBehaviour';
 
 export const DynamicPromptsModal = memo(() => {
@@ -29,8 +32,11 @@ export const DynamicPromptsModal = memo(() => {
         <ModalCloseButton />
         <ModalBody as={Flex} flexDir="column" gap={4} w="full" h="full" pb={4}>
           <Flex gap={4}>
+            <ParamDynamicPromptsMode />
+            <ParamDynamicPromptsRandomRefreshMode />
             <ParamDynamicPromptsSeedBehaviour />
             <ParamDynamicPromptsMaxPrompts />
+            <ParamDynamicPromptsReshuffle />
           </Flex>
           <ParamDynamicPromptsPreview />
         </ModalBody>

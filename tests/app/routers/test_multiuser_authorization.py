@@ -179,6 +179,7 @@ def enable_multiuser(monkeypatch: Any, mock_invoker: Invoker):
     monkeypatch.setattr("invokeai.app.api.routers.recall_parameters.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers.custom_nodes.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers.utilities.ApiDependencies", mock_deps)
     yield
 
 
@@ -1819,6 +1820,33 @@ class TestWebSocketAuth:
 
         rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
         assert "default" in rooms_emitted_to
+
+
+class TestUtilitiesAuthorization:
+    """Tests that wildcard and dynamic prompt utility endpoints require auth in multiuser mode."""
+
+    def test_list_wildcards_requires_auth(self, enable_multiuser: Any, client: TestClient) -> None:
+        r = client.get("/api/v1/utilities/wildcards")
+
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_list_wildcard_values_requires_auth(self, enable_multiuser: Any, client: TestClient) -> None:
+        r = client.get("/api/v1/utilities/wildcards/values", params={"path": "camera/lens"})
+
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_parse_dynamicprompts_requires_auth(self, enable_multiuser: Any, client: TestClient) -> None:
+        r = client.post(
+            "/api/v1/utilities/dynamicprompts",
+            json={"prompt": "__camera/lens__", "max_prompts": 1, "combinatorial": False},
+        )
+
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_list_wildcards_allows_authenticated_user(self, client: TestClient, user1_token: str) -> None:
+        r = client.get("/api/v1/utilities/wildcards", headers=_auth(user1_token))
+
+        assert r.status_code == status.HTTP_200_OK
 
 
 class TestCustomNodesAuthorization:

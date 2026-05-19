@@ -26,7 +26,7 @@ const ParamDynamicPromptsPreview = () => {
   const prompts = useAppSelector(selectDynamicPromptsPrompts);
 
   const label = useMemo(() => {
-    let _label = `${t('dynamicPrompts.promptsPreview')} (${prompts.length})`;
+    let _label = t('dynamicPrompts.promptExpansionsWithCount', { count: prompts.length });
     if (parsingError) {
       _label += ` - ${parsingError}`;
     }

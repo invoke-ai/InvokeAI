@@ -11,10 +11,21 @@ const zSeedBehaviour = z.enum(['PER_ITERATION', 'PER_PROMPT']);
 export const isSeedBehaviour = buildZodTypeGuard(zSeedBehaviour);
 export type SeedBehaviour = z.infer<typeof zSeedBehaviour>;
 
+const zDynamicPromptMode = z.enum(['random', 'combinatorial']);
+export const isDynamicPromptMode = buildZodTypeGuard(zDynamicPromptMode);
+export type DynamicPromptMode = z.infer<typeof zDynamicPromptMode>;
+
+const zDynamicPromptRandomRefreshMode = z.enum(['manual', 'per_enqueue', 'per_image']);
+export const isDynamicPromptRandomRefreshMode = buildZodTypeGuard(zDynamicPromptRandomRefreshMode);
+export type DynamicPromptRandomRefreshMode = z.infer<typeof zDynamicPromptRandomRefreshMode>;
+
 const zDynamicPromptsState = z.object({
-  _version: z.literal(1),
-  maxPrompts: z.number().int().min(1).max(1000),
-  combinatorial: z.boolean(),
+  _version: z.literal(4),
+  mode: zDynamicPromptMode,
+  randomSamples: z.number().int().min(1).max(1000),
+  maxCombinations: z.number().int().min(1).max(10000),
+  randomSeed: z.number().int().min(0),
+  randomRefreshMode: zDynamicPromptRandomRefreshMode,
   prompts: z.array(z.string()),
   parsingError: z.string().nullish(),
   isError: z.boolean(),
@@ -24,9 +35,12 @@ const zDynamicPromptsState = z.object({
 export type DynamicPromptsState = z.infer<typeof zDynamicPromptsState>;
 
 const getInitialState = (): DynamicPromptsState => ({
-  _version: 1,
-  maxPrompts: 100,
-  combinatorial: true,
+  _version: 4,
+  mode: 'random',
+  randomSamples: 1,
+  maxCombinations: 100,
+  randomSeed: 0,
+  randomRefreshMode: 'per_image',
   prompts: [],
   parsingError: undefined,
   isError: false,
@@ -38,8 +52,20 @@ const slice = createSlice({
   name: 'dynamicPrompts',
   initialState: getInitialState(),
   reducers: {
-    maxPromptsChanged: (state, action: PayloadAction<number>) => {
-      state.maxPrompts = action.payload;
+    modeChanged: (state, action: PayloadAction<DynamicPromptMode>) => {
+      state.mode = action.payload;
+    },
+    randomSamplesChanged: (state, action: PayloadAction<number>) => {
+      state.randomSamples = action.payload;
+    },
+    maxCombinationsChanged: (state, action: PayloadAction<number>) => {
+      state.maxCombinations = action.payload;
+    },
+    randomSeedChanged: (state, action: PayloadAction<number>) => {
+      state.randomSeed = action.payload;
+    },
+    randomRefreshModeChanged: (state, action: PayloadAction<DynamicPromptRandomRefreshMode>) => {
+      state.randomRefreshMode = action.payload;
     },
     promptsChanged: (state, action: PayloadAction<string[]>) => {
       state.prompts = action.payload;
@@ -61,7 +87,11 @@ const slice = createSlice({
 });
 
 export const {
-  maxPromptsChanged,
+  modeChanged,
+  randomSamplesChanged,
+  maxCombinationsChanged,
+  randomSeedChanged,
+  randomRefreshModeChanged,
   promptsChanged,
   parsingErrorChanged,
   isErrorChanged,
@@ -76,24 +106,72 @@ export const dynamicPromptsSliceConfig: SliceConfig<typeof slice> = {
   persistConfig: {
     migrate: (state) => {
       assert(isPlainObject(state));
-      if (!('_version' in state)) {
-        state._version = 1;
+      const initialState = getInitialState();
+      if (state._version === 4) {
+        return zDynamicPromptsState.parse({ ...initialState, ...state });
       }
-      return zDynamicPromptsState.parse(state);
+      if (state._version === 2 || state._version === 3) {
+        const mode = isDynamicPromptMode(state.mode) ? state.mode : initialState.mode;
+        return zDynamicPromptsState.parse({
+          ...initialState,
+          ...state,
+          _version: 4,
+          mode,
+          randomRefreshMode: getMigratedRandomRefreshMode(mode, state.randomRefreshMode),
+          seedBehaviour: isSeedBehaviour(state.seedBehaviour) ? state.seedBehaviour : initialState.seedBehaviour,
+        });
+      }
+      const legacyCombinatorial = state.combinatorial === true;
+      const legacyMode = legacyCombinatorial ? 'combinatorial' : 'random';
+      const legacyMaxPrompts = typeof state.maxPrompts === 'number' ? state.maxPrompts : initialState.maxCombinations;
+      return zDynamicPromptsState.parse({
+        ...initialState,
+        mode: legacyMode,
+        maxCombinations: legacyMaxPrompts,
+        randomRefreshMode: getMigratedRandomRefreshMode(legacyMode, state.randomRefreshMode),
+        seedBehaviour: isSeedBehaviour(state.seedBehaviour) ? state.seedBehaviour : initialState.seedBehaviour,
+      });
     },
     persistDenylist: ['prompts', 'parsingError', 'isError', 'isLoading'],
   },
+};
+
+const getMigratedRandomRefreshMode = (
+  mode: DynamicPromptMode,
+  value: unknown
+): DynamicPromptRandomRefreshMode => {
+  if (mode !== 'random') {
+    return 'manual';
+  }
+  if (value === 'manual') {
+    return 'manual';
+  }
+  return 'per_image';
 };
 
 export const selectDynamicPromptsSlice = (state: RootState) => state.dynamicPrompts;
 const createDynamicPromptsSelector = <T>(selector: Selector<DynamicPromptsState, T>) =>
   createSelector(selectDynamicPromptsSlice, selector);
 
+export const selectDynamicPromptsMode = createDynamicPromptsSelector((dynamicPrompts) => dynamicPrompts.mode);
+export const selectDynamicPromptsRandomSamples = createDynamicPromptsSelector(
+  (dynamicPrompts) => dynamicPrompts.randomSamples
+);
+export const selectDynamicPromptsMaxCombinations = createDynamicPromptsSelector(
+  (dynamicPrompts) => dynamicPrompts.maxCombinations
+);
+export const selectDynamicPromptsRandomSeed = createDynamicPromptsSelector(
+  (dynamicPrompts) => dynamicPrompts.randomSeed
+);
+export const selectDynamicPromptsRandomRefreshMode = createDynamicPromptsSelector(
+  (dynamicPrompts) => dynamicPrompts.randomRefreshMode
+);
 export const selectDynamicPromptsMaxPrompts = createDynamicPromptsSelector(
-  (dynamicPrompts) => dynamicPrompts.maxPrompts
+  (dynamicPrompts) =>
+    dynamicPrompts.mode === 'combinatorial' ? dynamicPrompts.maxCombinations : dynamicPrompts.randomSamples
 );
 export const selectDynamicPromptsCombinatorial = createDynamicPromptsSelector(
-  (dynamicPrompts) => dynamicPrompts.combinatorial
+  (dynamicPrompts) => dynamicPrompts.mode === 'combinatorial'
 );
 export const selectDynamicPromptsPrompts = createDynamicPromptsSelector((dynamicPrompts) => dynamicPrompts.prompts);
 export const selectDynamicPromptsParsingError = createDynamicPromptsSelector(

@@ -5,6 +5,7 @@ import { useAppStore } from 'app/store/storeHooks';
 import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
 import { withResult, withResultAsync } from 'common/util/result';
 import { positivePromptAddedToHistory, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
+import { refreshDynamicPromptsForEnqueue } from 'features/dynamicPrompts/util/refreshDynamicPromptsForEnqueue';
 import type { BaseModelType } from 'features/nodes/types/common';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildAnimaGraph } from 'features/nodes/util/graph/generation/buildAnimaGraph';
@@ -20,16 +21,24 @@ import type { GraphBuilderArg } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { serializeError } from 'serialize-error';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 import { assert, AssertionError } from 'tsafe';
 
 const log = logger('generation');
 
-const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
-  const { dispatch, getState } = store;
+const enqueueGenerate = async (store: AppStore, prepend: boolean, dynamicPromptsErrorTitle: string) => {
+  const { dispatch } = store;
 
-  const state = getState();
+  const state = await refreshDynamicPromptsForEnqueue(store);
+  if (!state) {
+    toast({
+      status: 'error',
+      title: dynamicPromptsErrorTitle,
+    });
+    return;
+  }
 
   const model = state.params.model;
   if (!model) {
@@ -126,12 +135,13 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
 };
 
 export const useEnqueueGenerate = () => {
+  const { t } = useTranslation();
   const store = useAppStore();
   const enqueue = useCallback(
     (prepend: boolean) => {
-      return enqueueGenerate(store, prepend);
+      return enqueueGenerate(store, prepend, t('dynamicPrompts.resolveFailed'));
     },
-    [store]
+    [store, t]
   );
   return enqueue;
 };

@@ -52,9 +52,12 @@ const kleinVaeModel = { key: 'vae', name: 'VAE', base: 'flux2', type: 'vae' };
 const kleinQwen3Model = { key: 'qwen3', name: 'Qwen3', base: 'flux2', type: 'qwen3_encoder' };
 
 const baseDynamicPrompts: DynamicPromptsState = {
-  _version: 1,
-  maxPrompts: 100,
-  combinatorial: false,
+  _version: 4,
+  mode: 'random',
+  randomSamples: 1,
+  maxCombinations: 100,
+  randomSeed: 0,
+  randomRefreshMode: 'per_image',
   prompts: ['test prompt'],
   parsingError: undefined,
   isError: false,
