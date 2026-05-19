@@ -178,7 +178,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
   render = async (): Promise<boolean> => {
     let didRender = false;
 
-    const objects = this.parent.state.objects;
+    const objects = this.parent.state.type === 'vector_layer' ? [] : this.parent.state.objects;
     const objectIds = objects.map((obj) => obj.id);
 
     for (const renderer of this.renderers.values()) {

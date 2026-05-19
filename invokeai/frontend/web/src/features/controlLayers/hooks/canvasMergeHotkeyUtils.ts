@@ -22,6 +22,9 @@ export const getIsCanvasMergeVisibleHotkeyEnabled = (
   if (!selectedEntityIdentifier) {
     return false;
   }
+  if (selectedEntityIdentifier.type === 'vector_layer') {
+    return false;
+  }
   if (visibleEntityCount <= 1) {
     return false;
   }

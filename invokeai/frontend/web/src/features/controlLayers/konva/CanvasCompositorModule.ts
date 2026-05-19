@@ -19,6 +19,7 @@ import {
   selectActiveInpaintMaskEntities,
   selectActiveRasterLayerEntities,
   selectActiveRegionalGuidanceEntities,
+  selectActiveVectorLayerEntities,
 } from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityIdentifier,
@@ -153,6 +154,9 @@ export class CanvasCompositorModule extends CanvasModuleBase {
         break;
       case 'control_layer':
         entities = this.manager.stateApi.getControlLayersState().entities;
+        break;
+      case 'vector_layer':
+        entities = this.manager.stateApi.getVectorLayersState().entities;
         break;
       case 'regional_guidance':
         entities = this.manager.stateApi.getRegionsState().entities;
@@ -394,6 +398,15 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       case 'control_layer':
         this.manager.stateApi.addControlLayer(addEntityArg);
         break;
+      case 'vector_layer':
+        this.log.warn('Merging into a vector layer is not supported');
+        toast({
+          id: 'MERGE_LAYERS_TOAST',
+          title: t('controlLayers.mergeVisibleError'),
+          status: 'error',
+          withCount: false,
+        });
+        return null;
       default:
         assert<Equals<typeof type, never>>(false, 'Unsupported type for merge');
     }
@@ -474,6 +487,9 @@ export class CanvasCompositorModule extends CanvasModuleBase {
         break;
       case 'regional_guidance':
         entities = this.manager.stateApi.runSelector(selectActiveRegionalGuidanceEntities);
+        break;
+      case 'vector_layer':
+        entities = this.manager.stateApi.runSelector(selectActiveVectorLayerEntities);
         break;
       case 'control_layer':
         entities = this.manager.stateApi.runSelector(selectActiveControlLayerEntities);
