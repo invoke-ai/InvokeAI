@@ -12,7 +12,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
 import { selectWorkflowLibraryView, workflowLibraryViewChanged } from 'features/nodes/store/workflowLibrarySlice';
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetCountsByCategoryQuery } from 'services/api/endpoints/workflows';
 
@@ -81,7 +81,7 @@ const queryOptions = {
 const useSyncInitialWorkflowLibraryCategories = () => {
   const dispatch = useAppDispatch();
   const view = useAppSelector(selectWorkflowLibraryView);
-  const [didSync, setDidSync] = useState(false);
+  const didSyncRef = useRef(false);
 
   const { count: recentWorkflowsCount, isLoading: isLoadingRecentWorkflowsCount } = useGetCountsByCategoryQuery(
     recentWorkflowsCountQueryArg,
@@ -93,7 +93,7 @@ const useSyncInitialWorkflowLibraryCategories = () => {
   );
 
   useEffect(() => {
-    if (didSync || isLoadingRecentWorkflowsCount || isLoadingYourWorkflowsCount) {
+    if (didSyncRef.current || isLoadingRecentWorkflowsCount || isLoadingYourWorkflowsCount) {
       return;
     }
     // If the user's selected view has no workflows, switch to the next available view
@@ -110,9 +110,8 @@ const useSyncInitialWorkflowLibraryCategories = () => {
         dispatch(workflowLibraryViewChanged('defaults'));
       }
     }
-    setDidSync(true);
+    didSyncRef.current = true;
   }, [
-    didSync,
     dispatch,
     isLoadingRecentWorkflowsCount,
     isLoadingYourWorkflowsCount,
@@ -121,5 +120,5 @@ const useSyncInitialWorkflowLibraryCategories = () => {
     yourWorkflowsCount,
   ]);
 
-  return didSync;
+  return !isLoadingRecentWorkflowsCount && !isLoadingYourWorkflowsCount;
 };

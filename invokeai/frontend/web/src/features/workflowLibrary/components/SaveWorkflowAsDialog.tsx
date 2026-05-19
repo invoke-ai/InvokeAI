@@ -83,7 +83,7 @@ export const SaveWorkflowAsDialog = () => {
   );
 };
 
-const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef: RefObject<HTMLButtonElement> }) => {
+const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef: RefObject<HTMLButtonElement | null> }) => {
   const [name, setName] = useState(() => {
     if (workflow) {
       return getInitialName(workflow);
@@ -112,15 +112,18 @@ const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef
   }, []);
 
   const onSave = useCallback(async () => {
-    workflow.id = undefined;
-    workflow.name = name;
-    workflow.meta.category = 'user';
+    const workflowToCreate = {
+      ...workflow,
+      id: undefined,
+      name,
+      meta: { ...workflow.meta, category: 'user' as const },
+    };
 
     // We've just made the workflow a draft, but TS doesn't know that. We need to assert it.
-    assert(isDraftWorkflow(workflow));
+    assert(isDraftWorkflow(workflowToCreate));
 
     await createNewWorkflow({
-      workflow,
+      workflow: workflowToCreate,
       onSuccess: async (workflowId?: string) => {
         if (isPublic && workflowId) {
           try {

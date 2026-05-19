@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 /**
  * Handles the initialization of the overlay scrollbars for the queue list, returning the ref to the scroller element.
  */
-export const useScrollableQueueList = (rootRef: RefObject<HTMLDivElement>) => {
+export const useScrollableQueueList = (rootRef: RefObject<HTMLDivElement | null>) => {
   const [scroller, scrollerRef] = useState<HTMLElement | null>(null);
   const [initialize, osInstance] = useOverlayScrollbars({
     defer: true,

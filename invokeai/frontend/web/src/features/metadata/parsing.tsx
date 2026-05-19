@@ -1877,21 +1877,26 @@ export function useSingleMetadataDatum<T>(metadata: unknown, handler: SingleMeta
     error: null,
   }));
 
-  const parse = useCallback(
-    async (metadata: unknown) => {
-      try {
-        const value = await handler.parse(metadata, store);
-        setData(buildParsedSuccessData(value));
-      } catch (error) {
-        setData(buildParsedErrorData(WrappedError.wrap(error)));
-      }
-    },
-    [handler, store]
-  );
-
   useEffect(() => {
-    parse(metadata);
-  }, [metadata, parse]);
+    let isActive = true;
+
+    void handler.parse(metadata, store).then(
+      (value) => {
+        if (isActive) {
+          setData(buildParsedSuccessData(value));
+        }
+      },
+      (error) => {
+        if (isActive) {
+          setData(buildParsedErrorData(WrappedError.wrap(error)));
+        }
+      }
+    );
+
+    return () => {
+      isActive = false;
+    };
+  }, [metadata, handler, store]);
 
   const recall = useCallback(
     (value: T) => {
@@ -1907,21 +1912,26 @@ export function useCollectionMetadataDatum<T extends any[]>(metadata: unknown, h
   const store = useAppStore();
   const [data, setData] = useState<Data<T>>(buildUnparsedData);
 
-  const parse = useCallback(
-    async (metadata: unknown) => {
-      try {
-        const value = await handler.parse(metadata, store);
-        setData(buildParsedSuccessData(value));
-      } catch (error) {
-        setData(buildParsedErrorData(WrappedError.wrap(error)));
-      }
-    },
-    [handler, store]
-  );
-
   useEffect(() => {
-    parse(metadata);
-  }, [metadata, parse]);
+    let isActive = true;
+
+    void handler.parse(metadata, store).then(
+      (value) => {
+        if (isActive) {
+          setData(buildParsedSuccessData(value));
+        }
+      },
+      (error) => {
+        if (isActive) {
+          setData(buildParsedErrorData(WrappedError.wrap(error)));
+        }
+      }
+    );
+
+    return () => {
+      isActive = false;
+    };
+  }, [metadata, handler, store]);
 
   const recallAll = useCallback(
     (values: T) => {
@@ -1944,21 +1954,26 @@ export function useUnrecallableMetadataDatum<T>(metadata: unknown, handler: Unre
   const store = useAppStore();
   const [data, setData] = useState<Data<T>>(buildUnparsedData);
 
-  const parse = useCallback(
-    async (metadata: unknown) => {
-      try {
-        const value = await handler.parse(metadata, store);
-        setData(buildParsedSuccessData(value));
-      } catch (error) {
-        setData(buildParsedErrorData(WrappedError.wrap(error)));
-      }
-    },
-    [handler, store]
-  );
-
   useEffect(() => {
-    parse(metadata);
-  }, [metadata, parse]);
+    let isActive = true;
+
+    void handler.parse(metadata, store).then(
+      (value) => {
+        if (isActive) {
+          setData(buildParsedSuccessData(value));
+        }
+      },
+      (error) => {
+        if (isActive) {
+          setData(buildParsedErrorData(WrappedError.wrap(error)));
+        }
+      }
+    );
+
+    return () => {
+      isActive = false;
+    };
+  }, [metadata, handler, store]);
 
   return { data };
 }

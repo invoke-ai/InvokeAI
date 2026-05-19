@@ -135,6 +135,7 @@ export const ParamPositivePrompt = memo(() => {
   const promptHistoryApi = usePromptHistory();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   usePersistedTextAreaSize('positive_prompt', textareaRef, persistOptions);
 
   const { activeStylePreset } = useListStylePresetsQuery(undefined, {
@@ -251,6 +252,21 @@ export const ParamPositivePrompt = memo(() => {
     setDroppedImage(undefined);
   }, []);
 
+  const [textareaWidth, setTextareaWidth] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    const element = textareaRef.current;
+    if (!element) {
+      return;
+    }
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setTextareaWidth(entry.contentBoxSize[0]?.inlineSize);
+      }
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     const element = dropTargetRef.current;
     if (!element || !hasLlavaModels) {
@@ -280,7 +296,7 @@ export const ParamPositivePrompt = memo(() => {
 
   return (
     <Box pos="relative" ref={dropTargetRef}>
-      <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
+      <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaWidth}>
         <Box pos="relative" pb={`${PROMPT_RESIZE_HANDLE_HEIGHT_PX}px`}>
           <Textarea
             className="positive-prompt-textarea"

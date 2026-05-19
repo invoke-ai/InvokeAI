@@ -3,19 +3,27 @@ import react from '@vitejs/plugin-react-swc';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig } from 'vite';
 import eslint from 'vite-plugin-eslint';
-import tsconfigPaths from 'vite-tsconfig-paths';
 import { loggerContextPlugin } from './vite-plugin-logger-context';
+
+import babel from 'vite-plugin-babel';
 
 export default defineConfig(({ mode }) => {
   return {
     base: './',
     plugins: [
       react(),
+      babel({
+        babelConfig: {
+          plugins: ['babel-plugin-react-compiler'],
+        },
+      }),
       mode !== 'test' && eslint({ failOnError: mode === 'production', failOnWarning: mode === 'production' }),
-      tsconfigPaths(),
       mode !== 'test' && loggerContextPlugin(),
       visualizer(),
     ],
+    resolve: {
+      tsconfigPaths: true,
+    },
     build: {
       chunkSizeWarningLimit: 1500,
     },
