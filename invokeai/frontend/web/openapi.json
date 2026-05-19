@@ -24407,6 +24407,140 @@
         "required": ["label", "aspect_ratio", "image_size", "width", "height"],
         "title": "ExternalResolutionPreset"
       },
+      "ExtractVideoRangeInvocation": {
+        "category": "video",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Trim a video to a contiguous frame range and re-encode as MP4.\n\nBoth bounds are inclusive and 0-based \u2014 ``start_frame=10, end_frame=50``\nemits 41 frames. Negative indices count from the end (``end_frame=-1``\nis the final frame), matching ``video_frame_extract``. The output\ninherits the input's frame rate unless ``fps`` is set.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "video": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VideoField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The video to extract a frame range from.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "start_frame": {
+            "default": 0,
+            "description": "First frame to keep, inclusive. 0 = first frame. Negative indices count from the end.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Start Frame",
+            "type": "integer"
+          },
+          "end_frame": {
+            "default": -1,
+            "description": "Last frame to keep, inclusive. -1 = last frame. Negative indices count from the end.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": -1,
+            "orig_required": false,
+            "title": "End Frame",
+            "type": "integer"
+          },
+          "fps": {
+            "anyOf": [
+              {
+                "maximum": 120,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Output frame rate. Defaults to the input video's fps.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Fps"
+          },
+          "type": {
+            "const": "extract_video_range",
+            "default": "extract_video_range",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["video", "trim", "range", "frames"],
+        "title": "Frame Range from Video",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/VideoOutput"
+        }
+      },
       "FLUXLoRACollectionLoader": {
         "category": "model",
         "class": "invocation",
@@ -30468,6 +30602,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/ExpandMaskWithFadeInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/ExtractVideoRangeInvocation"
                 },
                 {
                   "$ref": "#/components/schemas/FLUXLoRACollectionLoader"
@@ -38012,6 +38149,9 @@
                 "$ref": "#/components/schemas/ExpandMaskWithFadeInvocation"
               },
               {
+                "$ref": "#/components/schemas/ExtractVideoRangeInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/FLUXLoRACollectionLoader"
               },
               {
@@ -39195,6 +39335,9 @@
                 "$ref": "#/components/schemas/ExpandMaskWithFadeInvocation"
               },
               {
+                "$ref": "#/components/schemas/ExtractVideoRangeInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/FLUXLoRACollectionLoader"
               },
               {
@@ -40034,6 +40177,9 @@
           "expand_mask_with_fade": {
             "$ref": "#/components/schemas/ImageOutput"
           },
+          "extract_video_range": {
+            "$ref": "#/components/schemas/VideoOutput"
+          },
           "face_identifier": {
             "$ref": "#/components/schemas/ImageOutput"
           },
@@ -40734,6 +40880,7 @@
           "dynamic_prompt",
           "esrgan",
           "expand_mask_with_fade",
+          "extract_video_range",
           "face_identifier",
           "face_mask_detection",
           "face_off",
@@ -41181,6 +41328,9 @@
               },
               {
                 "$ref": "#/components/schemas/ExpandMaskWithFadeInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ExtractVideoRangeInvocation"
               },
               {
                 "$ref": "#/components/schemas/FLUXLoRACollectionLoader"
@@ -42107,6 +42257,9 @@
               },
               {
                 "$ref": "#/components/schemas/ExpandMaskWithFadeInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ExtractVideoRangeInvocation"
               },
               {
                 "$ref": "#/components/schemas/FLUXLoRACollectionLoader"

@@ -1441,6 +1441,12 @@
         "noCompatibleLoRAs": "No Compatible LoRAs"
     },
     "nodes": {
+        "extractVideoRange": {
+            "startFrame": "Start frame",
+            "endFrame": "End frame",
+            "dropVideoPrompt": "Drop a video to preview the selected frame range.",
+            "missingFps": "Cannot preview frames: input video has no fps metadata."
+        },
         "arithmeticSequence": "Arithmetic Sequence",
         "linearDistribution": "Linear Distribution",
         "uniformRandomDistribution": "Uniform Random Distribution",

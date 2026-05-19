@@ -1,5 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, Grid, GridItem } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
+import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { InputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldGate';
 import { OutputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/OutputFieldGate';
 import { OutputFieldNodesEditorView } from 'features/nodes/components/flow/nodes/Invocation/fields/OutputFieldNodesEditorView';
@@ -10,8 +12,9 @@ import {
 } from 'features/nodes/hooks/useInputFieldNamesByStatus';
 import { useOutputFieldNames } from 'features/nodes/hooks/useOutputFieldNames';
 import { useWithFooter } from 'features/nodes/hooks/useWithFooter';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 
+import ExtractVideoRangePreview from './ExtractVideoRangePreview';
 import { InputFieldEditModeNodes } from './fields/InputFieldEditModeNodes';
 import InvocationNodeFooter from './InvocationNodeFooter';
 import InvocationNodeHeader from './InvocationNodeHeader';
@@ -52,6 +55,7 @@ const InvocationNode = ({ nodeId, isOpen }: Props) => {
               </Grid>
               <AnyOrDirectFields nodeId={nodeId} />
               <MissingFields nodeId={nodeId} />
+              <CustomNodeBody nodeId={nodeId} />
             </Flex>
           </Flex>
           {withFooter && <InvocationNodeFooter nodeId={nodeId} />}
@@ -92,6 +96,21 @@ const AnyOrDirectFields = memo(({ nodeId }: { nodeId: string }) => {
   );
 });
 AnyOrDirectFields.displayName = 'AnyOrDirectFields';
+
+/**
+ * Per-node-type body extension. Most nodes render nothing here; specific node types can
+ * inject custom UI by adding a case below. Kept inline (not a registry) because the set
+ * of nodes with custom bodies is small enough that explicit cases are clearer.
+ */
+const CustomNodeBody = memo(({ nodeId }: { nodeId: string }) => {
+  const ctx = useInvocationNodeContext();
+  const nodeType = useAppSelector(useMemo(() => ctx.selectNodeTypeSafe, [ctx]));
+  if (nodeType === 'extract_video_range') {
+    return <ExtractVideoRangePreview nodeId={nodeId} />;
+  }
+  return null;
+});
+CustomNodeBody.displayName = 'CustomNodeBody';
 
 const MissingFields = memo(({ nodeId }: { nodeId: string }) => {
   const fieldNames = useInputFieldNamesMissing();
