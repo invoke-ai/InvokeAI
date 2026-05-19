@@ -9,8 +9,6 @@ from invokeai.backend.hidiffusion.hidiffusion import (
 )
 from invokeai.backend.hidiffusion.hidiffusion import (
     switching_threshold_ratio_dict,
-)
-from invokeai.backend.hidiffusion.hidiffusion import (
     text_to_img_controlnet_switching_threshold_ratio_dict,
 )
 from invokeai.backend.stable_diffusion.hidiffusion_utils import hidiffusion_patch

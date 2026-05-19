@@ -134,8 +134,8 @@ vi.mock('./addRegions', () => ({
 import type { GraphBuilderArg } from 'features/nodes/util/graph/types';
 
 import { buildSD1Graph } from './buildSD1Graph';
-import type { Graph } from './Graph';
 import { buildSDXLGraph } from './buildSDXLGraph';
+import type { Graph } from './Graph';
 
 const buildGraphArg = (): GraphBuilderArg =>
   ({
