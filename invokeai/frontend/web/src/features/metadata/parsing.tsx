@@ -58,6 +58,11 @@ import {
   setZImageSeedVarianceStrength,
   setZImageShift,
   vaeSelected,
+  wanComponentSourceSelected,
+  wanGuidanceScaleLowNoiseChanged,
+  wanT5EncoderModelSelected,
+  wanTransformerLowNoiseSelected,
+  wanVaeModelSelected,
   widthChanged,
   zImageQwen3EncoderModelSelected,
   zImageQwen3SourceModelSelected,
@@ -844,6 +849,133 @@ const QwenImageShift: SingleMetadataHandler<number | null> = {
   ),
 };
 //#endregion QwenImageShift
+
+//#region WanTransformerLowNoise
+const WanTransformerLowNoise: SingleMetadataHandler<ModelIdentifierField | null> = {
+  [SingleMetadataKey]: true,
+  type: 'WanTransformerLowNoise',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'wan_transformer_low_noise');
+    // Reject when the key is absent so the handler is not rendered for non-Wan images
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(zModelIdentifierField.parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(wanTransformerLowNoiseSelected(value));
+  },
+  i18nKey: 'modelManager.wanTransformerLowNoise',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField | null>) => (
+    <MetadataPrimitiveValue value={value ? value.name : 'None'} />
+  ),
+};
+//#endregion WanTransformerLowNoise
+
+//#region WanComponentSource
+const WanComponentSource: SingleMetadataHandler<ModelIdentifierField | null> = {
+  [SingleMetadataKey]: true,
+  type: 'WanComponentSource',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'wan_component_source');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(zModelIdentifierField.parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(wanComponentSourceSelected(value));
+  },
+  i18nKey: 'modelManager.wanComponentSource',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField | null>) => (
+    <MetadataPrimitiveValue value={value ? value.name : 'None'} />
+  ),
+};
+//#endregion WanComponentSource
+
+//#region WanVaeModel
+const WanVaeModel: SingleMetadataHandler<ModelIdentifierField | null> = {
+  [SingleMetadataKey]: true,
+  type: 'WanVaeModel',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'wan_vae_model');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(zModelIdentifierField.parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(wanVaeModelSelected(value));
+  },
+  i18nKey: 'modelManager.wanVae',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField | null>) => (
+    <MetadataPrimitiveValue value={value ? value.name : 'None'} />
+  ),
+};
+//#endregion WanVaeModel
+
+//#region WanT5EncoderModel
+const WanT5EncoderModel: SingleMetadataHandler<ModelIdentifierField | null> = {
+  [SingleMetadataKey]: true,
+  type: 'WanT5EncoderModel',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'wan_t5_encoder_model');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(zModelIdentifierField.parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(wanT5EncoderModelSelected(value));
+  },
+  i18nKey: 'modelManager.wanT5Encoder',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField | null>) => (
+    <MetadataPrimitiveValue value={value ? value.name : 'None'} />
+  ),
+};
+//#endregion WanT5EncoderModel
+
+//#region WanGuidanceScaleLowNoise
+const WanGuidanceScaleLowNoise: SingleMetadataHandler<number | null> = {
+  [SingleMetadataKey]: true,
+  type: 'WanGuidanceScaleLowNoise',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'wan_guidance_scale_low_noise');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    const parsed = z.number().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(wanGuidanceScaleLowNoiseChanged(value));
+  },
+  i18nKey: 'parameters.wanGuidanceScaleLowNoise',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => (
+    <MetadataPrimitiveValue value={value ?? 'Default'} />
+  ),
+};
+//#endregion WanGuidanceScaleLowNoise
 
 //#region ZImageShift
 const ZImageShift: SingleMetadataHandler<number | null> = {
@@ -1665,6 +1797,11 @@ export const ImageMetadataHandlers = {
   QwenImageQwenVLEncoderModel,
   QwenImageQuantization,
   QwenImageShift,
+  WanTransformerLowNoise,
+  WanComponentSource,
+  WanVaeModel,
+  WanT5EncoderModel,
+  WanGuidanceScaleLowNoise,
   ZImageShift,
   LoRAs,
   CanvasLayers,

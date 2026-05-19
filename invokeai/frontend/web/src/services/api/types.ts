@@ -101,6 +101,7 @@ type FLUX2ModelConfig = Extract<InternalAnyModelConfig, { type: 'main'; base: 'f
 export type AnyFLUXModelConfig = FLUXModelConfig | FLUX2ModelConfig;
 export type ControlLoRAModelConfig = Extract<InternalAnyModelConfig, { type: 'control_lora' }>;
 export type LoRAModelConfig = Extract<InternalAnyModelConfig, { type: 'lora' }>;
+type WanLoRAModelConfig = Extract<InternalAnyModelConfig, { type: 'lora'; base: 'wan' }>;
 export type VAEModelConfig = Extract<InternalAnyModelConfig, { type: 'vae' }>;
 export type ControlNetModelConfig = Extract<InternalAnyModelConfig, { type: 'controlnet' }>;
 export type IPAdapterModelConfig = Extract<InternalAnyModelConfig, { type: 'ip_adapter' }>;
@@ -117,6 +118,7 @@ export type T5EncoderBnbQuantizedLlmInt8bModelConfig = Extract<
 >;
 export type Qwen3EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen3_encoder' }>;
 export type QwenVLEncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen_vl_encoder' }>;
+export type WanT5EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'wan_t5_encoder' }>;
 export type SpandrelImageToImageModelConfig = Extract<InternalAnyModelConfig, { type: 'spandrel_image_to_image' }>;
 export type CheckpointModelConfig = Extract<InternalAnyModelConfig, { type: 'main'; format: 'checkpoint' }>;
 export type CLIPVisionModelConfig = Extract<InternalAnyModelConfig, { type: 'clip_vision' }>;
@@ -321,6 +323,13 @@ export const isQwenImageVAEModelConfig = (
   );
 };
 
+export const isWanVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {
+  return (
+    (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
+    config.base === 'wan'
+  );
+};
+
 export const isControlNetModelConfig = (config: AnyModelConfig): config is ControlNetModelConfig => {
   return config.type === 'controlnet';
 };
@@ -377,6 +386,10 @@ export const isAnimaQwen3EncoderModelConfig = (config: AnyModelConfig): config i
 
 export const isQwenVLEncoderModelConfig = (config: AnyModelConfig): config is QwenVLEncoderModelConfig => {
   return config.type === 'qwen_vl_encoder';
+};
+
+export const isWanT5EncoderModelConfig = (config: AnyModelConfig): config is WanT5EncoderModelConfig => {
+  return config.type === 'wan_t5_encoder';
 };
 
 export const isCLIPEmbedModelConfigOrSubmodel = (
@@ -484,6 +497,23 @@ export const isFlux2DiffusersMainModelConfig = (config: AnyModelConfig): config 
 
 export const isQwenImageDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'qwen-image' && config.format === 'diffusers';
+};
+
+export const isWanDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'wan' && config.format === 'diffusers';
+};
+
+/** Wan GGUF main models marked as the low-noise expert (the second half
+ *  of the A14B MoE pair). Suitable for the Transformer (Low Noise) picker;
+ *  also used to filter low-noise GGUFs out of the primary main dropdown. */
+export const isWanGGUFLowNoiseMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return (
+    config.type === 'main' && config.base === 'wan' && config.format === 'gguf_quantized' && config.expert === 'low'
+  );
+};
+
+export const isWanLoRAModelConfig = (config: AnyModelConfig): config is WanLoRAModelConfig => {
+  return config.type === 'lora' && config.base === 'wan';
 };
 
 export const isTIModelConfig = (config: AnyModelConfig): config is MainModelConfig => {

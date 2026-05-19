@@ -173,6 +173,9 @@ class FieldDescriptions:
     z_image_model = "Z-Image model (Transformer) to load"
     qwen_image_model = "Qwen Image Edit model (Transformer) to load"
     qwen_vl_encoder = "Qwen2.5-VL tokenizer, processor and text/vision encoder"
+    wan_model = "Wan 2.2 model (Transformer) to load"
+    wan_t5_encoder = "UMT5-XXL tokenizer and text encoder for Wan 2.2"
+    wan_ref_image = "Reference-image (VAE-latent) conditioning for Wan 2.2 I2V."
     sdxl_main_model = "SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load"
     sdxl_refiner_model = "SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load"
     onnx_main_model = "ONNX Main model (UNet, VAE, CLIP) to load"
@@ -362,6 +365,33 @@ class AnimaConditioningField(BaseModel):
         description="The mask associated with this conditioning tensor for regional prompting. "
         "Excluded regions should be set to False, included regions should be set to True.",
     )
+
+
+class WanConditioningField(BaseModel):
+    """A Wan 2.2 conditioning tensor primitive value.
+
+    Wan conditioning is the UMT5-XXL hidden state for the prompt plus an attention
+    mask marking valid (non-padding) tokens.
+    """
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
+class WanRefImageConditioningField(BaseModel):
+    """Reference-image conditioning for Wan 2.2 I2V.
+
+    Carries the 20-channel VAE-latent condition tensor (4-channel first-frame
+    mask + 16-channel ref-image latents). The denoise loop concatenates this
+    to the 16-channel noise latents along the channel dim each step, producing
+    the 36-channel input the I2V-A14B transformer expects.
+
+    Also carries the spatial dims used to encode the image, so the denoise
+    node can sanity-check that the user's width/height match.
+    """
+
+    condition_tensor_name: str = Field(description="Name of the saved [1, 20, 1, H/8, W/8] condition tensor.")
+    width: int = Field(description="Image width used during VAE encoding (matches denoise width).")
+    height: int = Field(description="Image height used during VAE encoding (matches denoise height).")
 
 
 class ConditioningField(BaseModel):
