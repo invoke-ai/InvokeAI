@@ -352,3 +352,26 @@ def test_deny_nodes(patch_rootdir):
     # Reset the config so that it doesn't affect other tests
     get_config.cache_clear()
     InvocationRegistry.invalidate_invocation_typeadapter()
+
+
+def test_storage_backend_defaults_to_disk(patch_rootdir: None):
+    config = InvokeAIAppConfig()
+    assert config.storage_backend == "disk"
+    assert config.s3_bucket is None
+    assert config.s3_endpoint_url is None
+
+
+def test_storage_backend_accepts_s3(patch_rootdir: None):
+    config = InvokeAIAppConfig(
+        storage_backend="s3",
+        s3_bucket="my-bucket",
+        s3_endpoint_url="https://s3.us-west-004.backblazeb2.com",
+    )
+    assert config.storage_backend == "s3"
+    assert config.s3_bucket == "my-bucket"
+    assert config.s3_endpoint_url == "https://s3.us-west-004.backblazeb2.com"
+
+
+def test_storage_backend_rejects_unknown_value(patch_rootdir: None):
+    with pytest.raises(ValidationError):
+        InvokeAIAppConfig(storage_backend="azure")
