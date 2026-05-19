@@ -1,0 +1,9 @@
+This code is vendored from: https://github.com/monofy-org/HiDiffusion
+
+This repository is a fork which implements some fixes to HiDiffusion
+
+I have further modified HiDiffusion so that apply_hidiffusion accepts
+a torch.Generator object, so that deterministic images based on a seed
+can be achieved.
+
+HiDiffusion is here: https://github.com/megvii-research/HiDiffusion
