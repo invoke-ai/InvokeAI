@@ -762,7 +762,9 @@ class ModelInstallService(ModelInstallServiceBase):
             except ValueError:
                 pass
 
-            return [RemoteModelFile(url=source.url, path=Path("."), size=0)], None
+            return [
+                RemoteModelFile(url=self._normalize_huggingface_blob_url(source.url), path=Path("."), size=0)
+            ], None
 
         raise Exception(f"No files associated with {source}")
 
@@ -1488,3 +1490,15 @@ class ModelInstallService(ModelInstallServiceBase):
         if re.match(r"^https?://huggingface.co/[^/]+/[^/]+$", url.lower()):
             return HuggingFaceMetadataFetch
         raise ValueError(f"Unsupported model source: '{url}'")
+
+    @staticmethod
+    def _normalize_huggingface_blob_url(url: AnyHttpUrl) -> Url:
+        """Convert Hugging Face file page URLs to direct download URLs."""
+        return Url(
+            re.sub(
+                r"^(https?://huggingface\.co/[^/]+/[^/]+)/blob/([^?#]+)([?#].*)?$",
+                r"\1/resolve/\2\3",
+                str(url),
+                flags=re.IGNORECASE,
+            )
+        )
