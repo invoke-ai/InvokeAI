@@ -1,5 +1,6 @@
 import importlib
 import pkgutil
+import sys
 
 import invokeai
 
@@ -23,12 +24,14 @@ KNOWN_IMPORT_ERRORS = {
 
 def test_invokeai_imports():
     modules = {name for _, name, _ in pkgutil.walk_packages(invokeai.__path__, invokeai.__name__ + ".")}
-    failed_to_import = set()
+    failed_to_import: set[tuple[str, Exception]] = set()
 
     for mod in modules:
         try:
             importlib.import_module(mod)
         except Exception as e:
+            if sys.platform == "darwin" and isinstance(e, ModuleNotFoundError) and e.name == "bitsandbytes":
+                continue  # no bitsandbytes on mac
             if mod not in KNOWN_IMPORT_ERRORS:
                 failed_to_import.add((mod, e))
 
