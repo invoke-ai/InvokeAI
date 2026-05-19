@@ -1939,7 +1939,6 @@ export const {
   bboxScaledWidthChanged,
   bboxScaledHeightChanged,
   bboxScaleMethodChanged,
-  bboxSizeRecalled,
   bboxWidthChanged,
   bboxHeightChanged,
   bboxAspectRatioLockToggled,

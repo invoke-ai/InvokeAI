@@ -2,11 +2,7 @@ import { Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { objectEquals } from '@observ33r/object-equals';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { UploadImageIconButton } from 'common/hooks/useImageUploadButton';
-import { bboxSizeOptimized, bboxSizeRecalled } from 'features/controlLayers/store/canvasSlice';
-import { useCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { sizeOptimized, sizeRecalled } from 'features/controlLayers/store/paramsSlice';
 import type { CroppableImageWithDims } from 'features/controlLayers/store/types';
 import { imageDTOToCroppableImage, imageDTOToImageWithDims } from 'features/controlLayers/store/util';
 import { Editor } from 'features/cropper/lib/editor';
@@ -15,7 +11,7 @@ import type { setGlobalReferenceImageDndTarget, setRegionalGuidanceReferenceImag
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
 import { DndImageIcon } from 'features/dnd/DndImageIcon';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { useRecallDimensions } from 'features/gallery/hooks/useRecallDimensions';
 import { memo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiCropBold, PiRulerBold } from 'react-icons/pi';
@@ -38,10 +34,7 @@ export const RefImageImage = memo(
     dndTargetData,
   }: Props<T>) => {
     const { t } = useTranslation();
-    const store = useAppStore();
     const isConnected = useStore($isConnected);
-    const tab = useAppSelector(selectActiveTab);
-    const isStaging = useCanvasIsStaging();
     const imageWithDims = image?.crop?.image ?? image?.original.image ?? null;
     const croppedImageDTOReq = useGetImageDTOQuery(image?.crop?.image?.image_name ?? skipToken);
     const originalImageDTOReq = useGetImageDTOQuery(image?.original.image.image_name ?? skipToken);
@@ -50,6 +43,7 @@ export const RefImageImage = memo(
     const originalImageDTO = originalImageDTOReq.currentData;
     const croppedImageDTO = croppedImageDTOReq.currentData;
     const imageDTO = croppedImageDTO ?? originalImageDTO;
+    const recallDimensions = useRecallDimensions(imageDTO);
 
     const handleResetControlImage = useCallback(() => {
       onChangeImage(null);
@@ -67,20 +61,6 @@ export const RefImageImage = memo(
       },
       [onChangeImage]
     );
-
-    const recallSizeAndOptimize = useCallback(() => {
-      if (!imageDTO || (tab === 'canvas' && isStaging)) {
-        return;
-      }
-      const { width, height } = imageDTO;
-      if (tab === 'canvas') {
-        store.dispatch(bboxSizeRecalled({ width, height }));
-        store.dispatch(bboxSizeOptimized());
-      } else if (tab === 'generate') {
-        store.dispatch(sizeRecalled({ width, height }));
-        store.dispatch(sizeOptimized());
-      }
-    }, [imageDTO, isStaging, store, tab]);
 
     const edit = useCallback(() => {
       if (!originalImageDTO) {
@@ -159,10 +139,10 @@ export const RefImageImage = memo(
             </Flex>
             <Flex position="absolute" flexDir="column" bottom={2} insetInlineEnd={2} gap={1}>
               <DndImageIcon
-                onClick={recallSizeAndOptimize}
+                onClick={recallDimensions.recall}
                 icon={<PiRulerBold size={16} />}
                 tooltip={t('parameters.useSize')}
-                isDisabled={!imageDTO || (tab === 'canvas' && isStaging)}
+                isDisabled={!recallDimensions.isEnabled}
               />
             </Flex>
 

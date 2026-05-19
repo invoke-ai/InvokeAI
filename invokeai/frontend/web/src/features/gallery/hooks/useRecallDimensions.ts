@@ -5,12 +5,16 @@ import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { useCallback, useMemo } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
-export const useRecallDimensions = (imageDTO: ImageDTO) => {
+export const useRecallDimensions = (imageDTO: ImageDTO | null | undefined) => {
   const store = useAppStore();
   const tab = useAppSelector(selectActiveTab);
   const isStaging = useCanvasIsStaging();
 
   const isEnabled = useMemo(() => {
+    if (!imageDTO) {
+      return false;
+    }
+
     if (tab !== 'canvas' && tab !== 'generate') {
       return false;
     }
@@ -20,10 +24,10 @@ export const useRecallDimensions = (imageDTO: ImageDTO) => {
     }
 
     return true;
-  }, [isStaging, tab]);
+  }, [imageDTO, isStaging, tab]);
 
   const recall = useCallback(() => {
-    if (!isEnabled) {
+    if (!isEnabled || !imageDTO) {
       return;
     }
     MetadataUtils.recallImageDimensions(imageDTO, store);
