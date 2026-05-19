@@ -9,6 +9,8 @@ export type ImageOutputNodes =
   | 'img_nsfw'
   | 'img_watermark'
   | 'img_resize'
+  | 'img_paste'
+  | 'detailer_paste_crop'
   | 'invokeai_img_blend'
   | 'apply_mask_to_image'
   | 'flux_vae_decode'
