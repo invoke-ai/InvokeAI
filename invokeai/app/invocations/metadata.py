@@ -252,6 +252,58 @@ class CoreMetadataInvocation(BaseInvocation):
         default=None,
         description="The high resolution fix img2img strength used in the upscale pass.",
     )
+    hrf_scale: Optional[float] = InputField(
+        default=None,
+        description="The high resolution fix upscale factor.",
+    )
+    hrf_latent_interpolation_mode: Optional[str] = InputField(
+        default=None,
+        description="The latent interpolation mode used in the high resolution fix upscale pass.",
+    )
+    hrf_upscale_model: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="The Spandrel upscale model used in the high resolution fix upscale pass.",
+    )
+    hrf_tile_controlnet_model: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="The tile ControlNet model used in the high resolution fix upscale pass.",
+    )
+    hrf_structure: Optional[float] = InputField(
+        default=None,
+        description="Legacy high resolution fix tile ControlNet structure value.",
+    )
+    hrf_tile_control_weight: Optional[float] = InputField(
+        default=None,
+        description="The high resolution fix tile ControlNet control weight.",
+    )
+    hrf_tile_control_end: Optional[float] = InputField(
+        default=None,
+        description="The high resolution fix tile ControlNet end step percentage.",
+    )
+    hrf_tile_size: Optional[int] = InputField(
+        default=None,
+        description="The high resolution fix tiled processing tile size.",
+    )
+    hrf_tile_overlap: Optional[int] = InputField(
+        default=None,
+        description="The high resolution fix tiled processing tile overlap.",
+    )
+    hrf_steps: Optional[int] = InputField(
+        default=None,
+        description="The number of steps used for the high resolution fix refinement pass.",
+    )
+    hrf_model: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="The optional model override used for the high resolution fix refinement pass.",
+    )
+    hrf_lora_mode: Optional[str] = InputField(
+        default=None,
+        description="The LoRA mode used for the high resolution fix refinement pass.",
+    )
+    hrf_loras: Optional[list[LoRAMetadataField]] = InputField(
+        default=None,
+        description="The dedicated LoRAs used for the high resolution fix refinement pass.",
+    )
 
     # SDXL
     positive_style_prompt: Optional[str] = InputField(
