@@ -978,12 +978,26 @@ const WanGuidanceScaleLowNoise: SingleMetadataHandler<number | null> = {
 //#endregion WanGuidanceScaleLowNoise
 
 //#region ZImageShift
-const ZImageShift: SingleMetadataHandler<number> = {
+const ZImageShift: SingleMetadataHandler<number | null> = {
   [SingleMetadataKey]: true,
   type: 'ZImageShift',
-  parse: (metadata, _store) => {
+  parse: (metadata, store) => {
     const raw = getProperty(metadata, 'z_image_shift');
-    const parsed = z.number().min(0).max(3).parse(raw);
+    if (raw === undefined) {
+      // Older Z-Image images and new images generated with auto shift don't include this key.
+      // Recall as null (auto) only when the recalled image is a Z-Image, so we don't clobber
+      // the user's current shift when recalling unrelated metadata.
+      const base = selectBase(store.getState());
+      if (base !== 'z-image') {
+        return Promise.reject();
+      }
+      return Promise.resolve(null);
+    }
+    // null or the 'auto' sentinel (written by the graph builder when shift is auto) recall as auto.
+    if (raw === null || raw === 'auto') {
+      return Promise.resolve(null);
+    }
+    const parsed = z.number().min(0).max(10).parse(raw);
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
@@ -991,7 +1005,9 @@ const ZImageShift: SingleMetadataHandler<number> = {
   },
   i18nKey: 'metadata.zImageShift',
   LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => (
+    <MetadataPrimitiveValue value={value ?? 'Auto'} />
+  ),
 };
 //#endregion ZImageShift
 
