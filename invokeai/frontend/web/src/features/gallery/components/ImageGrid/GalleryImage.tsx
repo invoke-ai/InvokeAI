@@ -29,11 +29,16 @@ import { PiImageBold } from 'react-icons/pi';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
-import { galleryItemContainerSX } from './galleryItemContainerSX';
+import { getGalleryItemContainerSX } from './galleryItemContainerSX';
 
 interface Props {
   imageDTO: ImageDTO;
+  layout?: 'grid' | 'masonry';
 }
+
+type GalleryImagePlaceholderProps = FlexProps & {
+  isQuiet?: boolean;
+};
 
 const buildOnClick =
   (imageName: string, dispatch: AppDispatch, getState: AppGetState) => (e: MouseEvent<HTMLDivElement>) => {
@@ -86,7 +91,7 @@ const buildOnClick =
     }
   };
 
-export const GalleryImage = memo(({ imageDTO }: Props) => {
+export const GalleryImage = memo(({ imageDTO, layout = 'grid' }: Props) => {
   const store = useAppStore();
   const [isDragging, setIsDragging] = useState(false);
   const [dragPreviewState, setDragPreviewState] = useState<
@@ -198,12 +203,29 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
   }, [store]);
 
   useImageContextMenu(imageDTO, ref);
+  const containerSX = useMemo(() => {
+    const aspectRatio = layout === 'masonry' ? `${imageDTO.width}/${imageDTO.height}` : '1/1';
+    return getGalleryItemContainerSX(aspectRatio);
+  }, [imageDTO.height, imageDTO.width, layout]);
+  const imageProps = useMemo(() => {
+    if (layout === 'masonry') {
+      return {
+        h: 'full' as const,
+        objectFit: 'cover' as const,
+        w: 'full' as const,
+      };
+    }
+    return {
+      objectFit: 'contain' as const,
+      w: imageDTO.width,
+    };
+  }, [imageDTO.width, layout]);
 
   return (
     <>
       <Flex
         ref={ref}
-        sx={galleryItemContainerSX}
+        sx={containerSX}
         data-is-dragging={isDragging}
         data-item-id={imageDTO.image_name}
         role="button"
@@ -217,9 +239,8 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
         <Image
           pointerEvents="none"
           src={imageDTO.thumbnail_url}
-          w={imageDTO.width}
-          fallback={<GalleryImagePlaceholder />}
-          objectFit="contain"
+          {...imageProps}
+          fallback={<GalleryImagePlaceholder isQuiet={layout === 'masonry'} />}
           maxW="full"
           maxH="full"
           borderRadius="base"
@@ -234,10 +255,16 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
 
 GalleryImage.displayName = 'GalleryImage';
 
-export const GalleryImagePlaceholder = memo((props: FlexProps) => (
-  <Flex w="full" h="full" bg="base.850" borderRadius="base" alignItems="center" justifyContent="center" {...props}>
-    <Icon as={PiImageBold} boxSize={16} color="base.800" />
-  </Flex>
-));
+export const GalleryImagePlaceholder = memo(({ isQuiet = false, ...props }: GalleryImagePlaceholderProps) => {
+  if (isQuiet) {
+    return <Flex w="full" h="full" bg="base.700" borderRadius="base" opacity={0.45} {...props} />;
+  }
+
+  return (
+    <Flex w="full" h="full" bg="base.850" borderRadius="base" alignItems="center" justifyContent="center" {...props}>
+      <Icon as={PiImageBold} boxSize={16} color="base.800" />
+    </Flex>
+  );
+});
 
 GalleryImagePlaceholder.displayName = 'GalleryImagePlaceholder';
