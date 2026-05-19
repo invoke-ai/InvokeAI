@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import sys
 from contextlib import contextmanager
 from typing import Any, Optional
 
@@ -62,29 +63,6 @@ def hidiffusion_patch(
         except Exception:
             return False
 
-    set_model_name_or_path = False
-    try:
-        object.__setattr__(model, "_name_or_path", effective_name_or_path)
-        set_model_name_or_path = True
-    except Exception:
-        set_model_name_or_path = False
-
-    set_config_name_or_path = _set_name_or_path_on_config(config, effective_name_or_path)
-
-    # Ensure the property resolves to a non-None value before calling HiDiffusion.
-    try:
-        if getattr(model, "name_or_path", None) is None:
-            if not set_model_name_or_path:
-                try:
-                    object.__setattr__(model, "_name_or_path", effective_name_or_path)
-                    set_model_name_or_path = True
-                except Exception:
-                    pass
-            if not set_config_name_or_path:
-                set_config_name_or_path = _set_name_or_path_on_config(config, effective_name_or_path)
-    except Exception:
-        pass
-
     original_num_upsamplers = getattr(target, "num_upsamplers", None)
 
     ratio_overrides = None
@@ -95,24 +73,53 @@ def hidiffusion_patch(
             _text_to_img_controlnet_switching_threshold_ratio_dict,
         )
 
-    if ratio_dicts is not None:
-        ratio_overrides = (copy.deepcopy(ratio_dicts[0]), copy.deepcopy(ratio_dicts[1]))
-
-        def _apply_ratio_overrides(ratio_dict: dict) -> None:
-            for _, entry in ratio_dict.items():
-                if t1_ratio is not None:
-                    entry["T1_ratio"] = t1_ratio
-                if t2_ratio is not None and "T2_ratio" in entry:
-                    entry["T2_ratio"] = t2_ratio
-
-        _apply_ratio_overrides(ratio_dicts[0])
-        _apply_ratio_overrides(ratio_dicts[1])
-
-    apply_hidiffusion(model, apply_raunet=apply_raunet, apply_window_attn=apply_window_attn)
+    set_model_name_or_path = False
+    set_config_name_or_path = False
     try:
+        try:
+            object.__setattr__(model, "_name_or_path", effective_name_or_path)
+            set_model_name_or_path = True
+        except Exception:
+            set_model_name_or_path = False
+
+        set_config_name_or_path = _set_name_or_path_on_config(config, effective_name_or_path)
+
+        # Ensure the property resolves to a non-None value before calling HiDiffusion.
+        try:
+            if getattr(model, "name_or_path", None) is None:
+                if not set_model_name_or_path:
+                    try:
+                        object.__setattr__(model, "_name_or_path", effective_name_or_path)
+                        set_model_name_or_path = True
+                    except Exception:
+                        pass
+                if not set_config_name_or_path:
+                    set_config_name_or_path = _set_name_or_path_on_config(config, effective_name_or_path)
+        except Exception:
+            pass
+
+        if ratio_dicts is not None:
+            ratio_overrides = (copy.deepcopy(ratio_dicts[0]), copy.deepcopy(ratio_dicts[1]))
+
+            def _apply_ratio_overrides(ratio_dict: dict) -> None:
+                for _, entry in ratio_dict.items():
+                    if t1_ratio is not None:
+                        entry["T1_ratio"] = t1_ratio
+                    if t2_ratio is not None and "T2_ratio" in entry:
+                        entry["T2_ratio"] = t2_ratio
+
+            _apply_ratio_overrides(ratio_dicts[0])
+            _apply_ratio_overrides(ratio_dicts[1])
+
+        apply_hidiffusion(model, apply_raunet=apply_raunet, apply_window_attn=apply_window_attn)
         yield
     finally:
-        remove_hidiffusion(model)
+        had_active_exception = sys.exc_info()[0] is not None
+        try:
+            remove_hidiffusion(model)
+        except Exception:
+            if not had_active_exception:
+                raise
         if ratio_overrides is not None and ratio_dicts is not None:
             ratio_dicts[0].clear()
             ratio_dicts[0].update(ratio_overrides[0])
