@@ -51,7 +51,7 @@ import {
 
 // #region Base schemas & misc
 const zFieldInput = z.enum(['connection', 'direct', 'any']);
-const zFieldUIComponent = z.enum(['none', 'textarea', 'slider']);
+const zFieldUIComponent = z.enum(['none', 'textarea', 'slider', 'video-frame-index']);
 const zFieldInputInstanceBase = z.object({
   name: z.string().trim().min(1),
   label: z.string().catch(''),

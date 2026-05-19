@@ -1442,9 +1442,7 @@
     },
     "nodes": {
         "extractVideoRange": {
-            "startFrame": "Start frame",
-            "endFrame": "End frame",
-            "dropVideoPrompt": "Drop a video to preview the selected frame range.",
+            "dropVideoPrompt": "Connect a video to preview the selected frame.",
             "missingFps": "Cannot preview frames: input video has no fps metadata."
         },
         "arithmeticSequence": "Arithmetic Sequence",

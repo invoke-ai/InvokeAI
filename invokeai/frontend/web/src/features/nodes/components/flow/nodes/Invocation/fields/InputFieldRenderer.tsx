@@ -13,6 +13,7 @@ import { StringGeneratorFieldInputComponent } from 'features/nodes/components/fl
 import { IntegerFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/IntegerFieldInput';
 import { IntegerFieldInputAndSlider } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/IntegerFieldInputAndSlider';
 import { IntegerFieldSlider } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/IntegerFieldSlider';
+import { VideoFrameIndexFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/VideoFrameIndexFieldInput';
 import { StringFieldDropdown } from 'features/nodes/components/flow/nodes/Invocation/fields/StringField/StringFieldDropdown';
 import { StringFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/StringField/StringFieldInput';
 import { StringFieldTextarea } from 'features/nodes/components/flow/nodes/Invocation/fields/StringField/StringFieldTextarea';
@@ -126,6 +127,13 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
   if (isIntegerFieldInputTemplate(template)) {
     if (!isIntegerFieldInputInstance(field)) {
       return null;
+    }
+    // The ``video-frame-index`` ui_component bolts a frame thumbnail + scrubber slider
+    // onto the standard integer input. It's a per-field widget rather than a node-body
+    // widget so it works in both the workflow editor and the Form Builder (both of
+    // which dispatch through this same renderer).
+    if (template.ui_component === 'video-frame-index') {
+      return <VideoFrameIndexFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
     }
     if (!settings || settings.type !== 'integer-field-config') {
       return <IntegerFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;

@@ -24411,7 +24411,7 @@
         "category": "video",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Trim a video to a contiguous frame range and re-encode as MP4.\n\nBoth bounds are inclusive and 0-based \u2014 ``start_frame=10, end_frame=50``\nemits 41 frames. Negative indices count from the end (``end_frame=-1``\nis the final frame), matching ``video_frame_extract``. The output\ninherits the input's frame rate unless ``fps`` is set.",
+        "description": "Trim a video to a contiguous frame range and re-encode as MP4.\n\nBoth bounds are inclusive and 0-based \u2014 ``start_frame=10, end_frame=50``\nemits 41 frames. Negative indices count from the end (``end_frame=-1``\nis the final frame), matching ``video_frame_extract``. The output\ndefaults to 16 fps, matching the other Wan video nodes.\n\nThe resolved (positive) ``start_frame`` and ``end_frame`` are also emitted as\noutputs, so chained workflows can re-use the boundary indices \u2014 e.g. feeding\nthem into a downstream Frame from Video to extract the same boundary frame.",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -24493,7 +24493,8 @@
             "orig_default": 0,
             "orig_required": false,
             "title": "Start Frame",
-            "type": "integer"
+            "type": "integer",
+            "ui_component": "video-frame-index"
           },
           "end_frame": {
             "default": -1,
@@ -24503,26 +24504,20 @@
             "orig_default": -1,
             "orig_required": false,
             "title": "End Frame",
-            "type": "integer"
+            "type": "integer",
+            "ui_component": "video-frame-index"
           },
           "fps": {
-            "anyOf": [
-              {
-                "maximum": 120,
-                "minimum": 1,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Output frame rate. Defaults to the input video's fps.",
+            "default": 16,
+            "description": "Output frame rate.",
             "field_kind": "input",
             "input": "any",
-            "orig_default": null,
+            "maximum": 120,
+            "minimum": 1,
+            "orig_default": 16,
             "orig_required": false,
-            "title": "Fps"
+            "title": "Fps",
+            "type": "integer"
           },
           "type": {
             "const": "extract_video_range",
@@ -24538,8 +24533,91 @@
         "type": "object",
         "version": "1.0.0",
         "output": {
-          "$ref": "#/components/schemas/VideoOutput"
+          "$ref": "#/components/schemas/ExtractVideoRangeOutput"
         }
+      },
+      "ExtractVideoRangeOutput": {
+        "class": "output",
+        "description": "Output of ``extract_video_range``: a trimmed video plus the resolved frame indices.\n\nMirrors ``VideoOutput`` so the video can be piped directly into Concatenate Videos or\nany other ``VideoField``-consuming node, and additionally exposes the resolved\n(positive, clamped) start and end indices so chained workflows can feed them back in\n\u2014 e.g. drive a downstream Frame from Video to pull the same boundary frame.",
+        "properties": {
+          "video": {
+            "$ref": "#/components/schemas/VideoField",
+            "description": "The trimmed video",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "width": {
+            "description": "The width of the video in pixels",
+            "field_kind": "output",
+            "title": "Width",
+            "type": "integer",
+            "ui_hidden": false
+          },
+          "height": {
+            "description": "The height of the video in pixels",
+            "field_kind": "output",
+            "title": "Height",
+            "type": "integer",
+            "ui_hidden": false
+          },
+          "num_frames": {
+            "description": "The number of frames in the trimmed video",
+            "field_kind": "output",
+            "title": "Num Frames",
+            "type": "integer",
+            "ui_hidden": false
+          },
+          "fps": {
+            "description": "The frames-per-second of the trimmed video",
+            "field_kind": "output",
+            "title": "Fps",
+            "type": "number",
+            "ui_hidden": false
+          },
+          "duration": {
+            "description": "The duration of the trimmed video in seconds",
+            "field_kind": "output",
+            "title": "Duration",
+            "type": "number",
+            "ui_hidden": false
+          },
+          "start_frame": {
+            "description": "The resolved (positive, 0-based) start frame index in the source video",
+            "field_kind": "output",
+            "title": "Start Frame",
+            "type": "integer",
+            "ui_hidden": false
+          },
+          "end_frame": {
+            "description": "The resolved (positive, 0-based) end frame index in the source video",
+            "field_kind": "output",
+            "title": "End Frame",
+            "type": "integer",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "extract_video_range_output",
+            "default": "extract_video_range_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "output_meta",
+          "video",
+          "width",
+          "height",
+          "num_frames",
+          "fps",
+          "duration",
+          "start_frame",
+          "end_frame",
+          "type",
+          "type"
+        ],
+        "title": "ExtractVideoRangeOutput",
+        "type": "object"
       },
       "FLUXLoRACollectionLoader": {
         "category": "model",
@@ -31352,6 +31430,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/DenoiseMaskOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/ExtractVideoRangeOutput"
                 },
                 {
                   "$ref": "#/components/schemas/FaceMaskOutput"
@@ -38856,6 +38937,9 @@
                 "$ref": "#/components/schemas/DenoiseMaskOutput"
               },
               {
+                "$ref": "#/components/schemas/ExtractVideoRangeOutput"
+              },
+              {
                 "$ref": "#/components/schemas/FaceMaskOutput"
               },
               {
@@ -40178,7 +40262,7 @@
             "$ref": "#/components/schemas/ImageOutput"
           },
           "extract_video_range": {
-            "$ref": "#/components/schemas/VideoOutput"
+            "$ref": "#/components/schemas/ExtractVideoRangeOutput"
           },
           "face_identifier": {
             "$ref": "#/components/schemas/ImageOutput"
@@ -72294,7 +72378,7 @@
       },
       "UIComponent": {
         "description": "The type of UI component to use for a field, used to override the default components, which are\ninferred from the field type.",
-        "enum": ["none", "textarea", "slider"],
+        "enum": ["none", "textarea", "slider", "video-frame-index"],
         "title": "UIComponent",
         "type": "string"
       },

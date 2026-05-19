@@ -140,6 +140,7 @@ class UIComponent(str, Enum, metaclass=MetaEnum):
     None_ = "none"
     Textarea = "textarea"
     Slider = "slider"
+    VideoFrameIndex = "video-frame-index"
 
 
 class FieldDescriptions:

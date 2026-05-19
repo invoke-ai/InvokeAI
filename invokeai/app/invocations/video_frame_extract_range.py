@@ -9,14 +9,21 @@ to a usable middle section before chaining it to another shot.
 
 import tempfile
 from pathlib import Path
-from typing import Optional
 
 import imageio.v3 as iio
 import numpy as np
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
+from invokeai.app.invocations.baseinvocation import (
+    BaseInvocation,
+    BaseInvocationOutput,
+    Classification,
+    invocation,
+    invocation_output,
+)
 from invokeai.app.invocations.fields import (
     InputField,
+    OutputField,
+    UIComponent,
     VideoField,
     WithBoard,
     WithMetadata,
@@ -25,6 +32,30 @@ from invokeai.app.invocations.primitives import VideoOutput
 from invokeai.app.invocations.video_frame_extract import _decoder_frame_count
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.video_thumbnails import probe_video
+
+
+@invocation_output("extract_video_range_output")
+class ExtractVideoRangeOutput(BaseInvocationOutput):
+    """Output of ``extract_video_range``: a trimmed video plus the resolved frame indices.
+
+    Mirrors ``VideoOutput`` so the video can be piped directly into Concatenate Videos or
+    any other ``VideoField``-consuming node, and additionally exposes the resolved
+    (positive, clamped) start and end indices so chained workflows can feed them back in
+    — e.g. drive a downstream Frame from Video to pull the same boundary frame.
+    """
+
+    video: VideoField = OutputField(description="The trimmed video")
+    width: int = OutputField(description="The width of the video in pixels")
+    height: int = OutputField(description="The height of the video in pixels")
+    num_frames: int = OutputField(description="The number of frames in the trimmed video")
+    fps: float = OutputField(description="The frames-per-second of the trimmed video")
+    duration: float = OutputField(description="The duration of the trimmed video in seconds")
+    start_frame: int = OutputField(
+        description="The resolved (positive, 0-based) start frame index in the source video"
+    )
+    end_frame: int = OutputField(
+        description="The resolved (positive, 0-based) end frame index in the source video"
+    )
 
 
 @invocation(
@@ -41,7 +72,11 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
     Both bounds are inclusive and 0-based — ``start_frame=10, end_frame=50``
     emits 41 frames. Negative indices count from the end (``end_frame=-1``
     is the final frame), matching ``video_frame_extract``. The output
-    inherits the input's frame rate unless ``fps`` is set.
+    defaults to 16 fps, matching the other Wan video nodes.
+
+    The resolved (positive) ``start_frame`` and ``end_frame`` are also emitted as
+    outputs, so chained workflows can re-use the boundary indices — e.g. feeding
+    them into a downstream Frame from Video to extract the same boundary frame.
     """
 
     video: VideoField = InputField(description="The video to extract a frame range from.")
@@ -50,21 +85,23 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
         description=(
             "First frame to keep, inclusive. 0 = first frame. Negative indices count from the end."
         ),
+        ui_component=UIComponent.VideoFrameIndex,
     )
     end_frame: int = InputField(
         default=-1,
         description=(
             "Last frame to keep, inclusive. -1 = last frame. Negative indices count from the end."
         ),
+        ui_component=UIComponent.VideoFrameIndex,
     )
-    fps: Optional[int] = InputField(
-        default=None,
+    fps: int = InputField(
+        default=16,
         ge=1,
         le=120,
-        description="Output frame rate. Defaults to the input video's fps.",
+        description="Output frame rate.",
     )
 
-    def invoke(self, context: InvocationContext) -> VideoOutput:
+    def invoke(self, context: InvocationContext) -> ExtractVideoRangeOutput:
         video_path = context.videos.get_path(self.video.video_name)
         width, height, duration, source_fps = probe_video(video_path)
 
@@ -87,7 +124,7 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
                 f"({self.start_frame} → {start}) after resolving negative indices."
             )
 
-        output_fps = float(self.fps) if self.fps is not None else (source_fps or 16.0)
+        output_fps = float(self.fps)
 
         context.util.signal_progress(f"Decoding frames {start}-{end} of {n_frames}")
         # imageio's iter_index isn't exposed by iio.imiter, so we enumerate and skip.
@@ -134,7 +171,17 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
                 fps=output_fps,
             )
             context.logger.info(f"Saved trimmed video: {video_dto.video_name}")
-            return VideoOutput.build(video_dto)
+            base = VideoOutput.build(video_dto)
+            return ExtractVideoRangeOutput(
+                video=base.video,
+                width=base.width,
+                height=base.height,
+                num_frames=base.num_frames,
+                fps=base.fps,
+                duration=base.duration,
+                start_frame=start,
+                end_frame=end,
+            )
         finally:
             try:
                 tmp_path.unlink(missing_ok=True)
