@@ -2,6 +2,26 @@ import type { paths } from 'services/api/schema';
 
 import { api, buildV1Url } from '..';
 
+export type UserFontFace = {
+  path: string;
+  url: string;
+  weight: number;
+  style: 'normal' | 'italic';
+};
+
+export type UserFont = {
+  id: string;
+  family: string;
+  label: string;
+  path: string;
+  url: string;
+  faces: UserFontFace[];
+};
+
+type UserFontsResponse = {
+  fonts: UserFont[];
+};
+
 /**
  * Builds an endpoint URL for the utilities router
  * @example
@@ -50,6 +70,13 @@ export const utilitiesApi = api.injectEndpoints({
       // disconnected.
       providesTags: ['FetchOnReconnect'],
     }),
+    listUserFonts: build.query<UserFont[], void>({
+      query: () => ({
+        url: buildUtilitiesUrl('fonts'),
+      }),
+      transformResponse: (response: UserFontsResponse) => response.fonts,
+      providesTags: ['FetchOnReconnect'],
+    }),
     expandPrompt: build.mutation<ExpandPromptResponse, ExpandPromptRequest>({
       query: (arg) => ({
         url: buildUtilitiesUrl('expand-prompt'),
@@ -67,4 +94,4 @@ export const utilitiesApi = api.injectEndpoints({
   }),
 });
 
-export const { useExpandPromptMutation, useImageToPromptMutation } = utilitiesApi;
+export const { useListUserFontsQuery, useExpandPromptMutation, useImageToPromptMutation } = utilitiesApi;

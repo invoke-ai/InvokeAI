@@ -30,6 +30,28 @@ def move_defs_to_top_level(openapi_schema: dict[str, Any], component_schema: dic
         openapi_schema["components"]["schemas"][schema_key] = json_schema
 
 
+def normalize_path_defaults(schema_node: Any) -> Any:
+    """Normalizes OpenAPI defaults for Path-typed fields to POSIX separators.
+
+    Pydantic serializes ``pathlib.Path`` defaults using the host OS separator. That
+    makes generated OpenAPI, and therefore ``schema.ts``, differ between Windows and
+    Linux. OpenAPI is documentation/schema data rather than a runtime filesystem API,
+    so normalize ``format: path`` defaults to forward slashes for deterministic output.
+    """
+
+    if isinstance(schema_node, dict):
+        if schema_node.get("format") == "path" and isinstance(schema_node.get("default"), str):
+            schema_node["default"] = schema_node["default"].replace("\\", "/")
+
+        for value in schema_node.values():
+            normalize_path_defaults(value)
+    elif isinstance(schema_node, list):
+        for item in schema_node:
+            normalize_path_defaults(item)
+
+    return schema_node
+
+
 def get_openapi_func(
     app: FastAPI, post_transform: Optional[Callable[[dict[str, Any]], dict[str, Any]]] = None
 ) -> Callable[[], dict[str, Any]]:
@@ -126,6 +148,7 @@ def get_openapi_func(
         if post_transform is not None:
             openapi_schema = post_transform(openapi_schema)
 
+        openapi_schema = normalize_path_defaults(openapi_schema)
         openapi_schema["components"]["schemas"] = dict(sorted(openapi_schema["components"]["schemas"].items()))
 
         app.openapi_schema = openapi_schema
