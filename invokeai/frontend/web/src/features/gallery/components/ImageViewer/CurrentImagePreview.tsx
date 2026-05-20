@@ -30,10 +30,15 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
   const shouldShowItemDetails = useAppSelector(selectShouldShowItemDetails);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
   const { goToPreviousImage, goToNextImage, isFetching } = useNextPrevItemNavigation();
-  const { onLoadImage, $progressEvent, $progressImage } = useImageViewerContext();
+  const { onLoadImage, $progressEvent, $progressImage, $isProgressImageResolving, $isTemporarilyShowingSelectedImage } =
+    useImageViewerContext();
   const progressEvent = useStore($progressEvent);
   const progressImage = useStore($progressImage);
+  const isProgressImageResolving = useStore($isProgressImageResolving);
+  const isTemporarilyShowingSelectedImage = useStore($isTemporarilyShowingSelectedImage);
   const [imageToRender, setImageToRender] = useState<ImageDTO | null>(null);
+  const previousRenderedImageNameRef = useRef<string | null>(null);
+  const selectedImageRevealTimeoutId = useRef(0);
 
   useEffect(() => {
     if (!selectedImageName) {
@@ -75,6 +80,54 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       preloader.onerror = null;
     };
   }, [imageDTO, imageToRender?.image_name, selectedImageName]);
+
+  const hasProgressImage = progressImage !== null;
+
+  useEffect(() => {
+    const renderedImageName = imageToRender?.image_name ?? null;
+    const previousRenderedImageName = previousRenderedImageNameRef.current;
+    previousRenderedImageNameRef.current = renderedImageName;
+
+    window.clearTimeout(selectedImageRevealTimeoutId.current);
+
+    if (
+      !shouldShowProgressInViewer ||
+      !hasProgressImage ||
+      isProgressImageResolving ||
+      !renderedImageName ||
+      renderedImageName !== selectedImageName
+    ) {
+      $isTemporarilyShowingSelectedImage.set(false);
+      return;
+    }
+
+    if (previousRenderedImageName === null || previousRenderedImageName === renderedImageName) {
+      return;
+    }
+
+    $isTemporarilyShowingSelectedImage.set(true);
+    selectedImageRevealTimeoutId.current = window.setTimeout(() => {
+      $isTemporarilyShowingSelectedImage.set(false);
+    }, SELECTED_IMAGE_REVEAL_DURATION_MS);
+
+    return () => {
+      window.clearTimeout(selectedImageRevealTimeoutId.current);
+    };
+  }, [
+    $isTemporarilyShowingSelectedImage,
+    hasProgressImage,
+    imageToRender?.image_name,
+    isProgressImageResolving,
+    selectedImageName,
+    shouldShowProgressInViewer,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(selectedImageRevealTimeoutId.current);
+      $isTemporarilyShowingSelectedImage.set(false);
+    };
+  }, [$isTemporarilyShowingSelectedImage]);
 
   // Show and hide the next/prev buttons on mouse move
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] = useState<boolean>(false);
@@ -133,7 +186,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     dependencies: [onHotkeyNextImage],
   });
 
-  const withProgress = shouldShowProgressInViewer && progressImage !== null;
+  const withProgress = shouldShowProgressInViewer && hasProgressImage && !isTemporarilyShowingSelectedImage;
 
   return (
     <Flex
@@ -202,3 +255,5 @@ const exit: AnimationProps['exit'] = {
   opacity: 0,
   transition: { duration: 0.07 },
 };
+
+const SELECTED_IMAGE_REVEAL_DURATION_MS = 2000;
