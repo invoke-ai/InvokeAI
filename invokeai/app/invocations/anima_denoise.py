@@ -675,7 +675,9 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     latents = latents.to(dtype=torch.float32)
                     latents = latents + (sigma_prev - sigma_curr) * noise_pred
                     latents = latents.to(dtype=latents_dtype)
-                    latents_preview = self._estimate_preview_latents(latents=latents, sigma=sigma_prev, noise_pred=noise_pred)
+                    latents_preview = self._estimate_preview_latents(
+                        latents=latents, sigma=sigma_prev, noise_pred=noise_pred
+                    )
 
                     if inpaint_extension is not None:
                         latents_4d = latents.squeeze(2)
