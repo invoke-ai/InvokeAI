@@ -5,7 +5,6 @@ from typing import Optional, TypedDict
 
 import cv2
 import numpy as np
-from mediapipe.python.solutions.face_mesh import FaceMesh  # type: ignore[import]
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 from PIL.Image import Image as ImageType
 from pydantic import field_validator
@@ -20,6 +19,7 @@ from invokeai.app.invocations.fields import ImageField, InputField, OutputField,
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.image_util.mediapipe_face.mediapipe_face_common import detect_face_landmarks
 
 
 @invocation_output("face_mask_output")
@@ -194,23 +194,15 @@ def generate_face_box_mask(
         # Convert RGBA to RGB by removing the alpha channel.
         np_image = np_image[:, :, :3]
 
-    # Create a FaceMesh object for face landmark detection and mesh generation.
-    face_mesh = FaceMesh(
-        max_num_faces=999,
-        min_detection_confidence=minimum_confidence,
-        min_tracking_confidence=minimum_confidence,
-    )
-
-    # Detect the face landmarks and mesh in the input image.
-    results = face_mesh.process(np_image)
+    results = detect_face_landmarks(np_image, max_faces=999, min_confidence=minimum_confidence)
 
     # Check if any face is detected.
-    if results.multi_face_landmarks:  # type: ignore # this are via protobuf and not typed
+    if results:
         # Search for the face_id in the detected faces.
-        for _face_id, face_landmarks in enumerate(results.multi_face_landmarks):  # type: ignore #this are via protobuf and not typed
+        for _face_id, face_landmarks in enumerate(results):
             # Get the bounding box of the face mesh.
-            x_coordinates = [landmark.x for landmark in face_landmarks.landmark]
-            y_coordinates = [landmark.y for landmark in face_landmarks.landmark]
+            x_coordinates = [landmark.x for landmark in face_landmarks]
+            y_coordinates = [landmark.y for landmark in face_landmarks]
             x_min, x_max = min(x_coordinates), max(x_coordinates)
             y_min, y_max = min(y_coordinates), max(y_coordinates)
 
@@ -219,13 +211,13 @@ def generate_face_box_mask(
             mesh_height = int((y_max - y_min) * np_image.shape[0])
 
             # Get the center of the face.
-            x_center = np.mean([landmark.x * np_image.shape[1] for landmark in face_landmarks.landmark])
-            y_center = np.mean([landmark.y * np_image.shape[0] for landmark in face_landmarks.landmark])
+            x_center = np.mean([landmark.x * np_image.shape[1] for landmark in face_landmarks])
+            y_center = np.mean([landmark.y * np_image.shape[0] for landmark in face_landmarks])
 
             face_landmark_points = np.array(
                 [
                     [landmark.x * np_image.shape[1], landmark.y * np_image.shape[0]]
-                    for landmark in face_landmarks.landmark
+                    for landmark in face_landmarks
                 ]
             )
 
