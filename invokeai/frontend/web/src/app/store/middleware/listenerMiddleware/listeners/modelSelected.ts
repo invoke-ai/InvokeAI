@@ -129,7 +129,20 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
             const availableZImageDiffusers = selectZImageDiffusersModels(state);
 
             if (availableZImageDiffusers.length > 0) {
-              const diffusersModel = availableZImageDiffusers[0];
+              // Look up the new model's variant to match turbo vs zbase
+              const modelConfigsResult = selectModelConfigsQuery(state);
+              let selectedVariant: string | null = null;
+              if (modelConfigsResult.data) {
+                const newModelConfig = modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key);
+                if (newModelConfig && 'variant' in newModelConfig && typeof newModelConfig.variant === 'string') {
+                  selectedVariant = newModelConfig.variant;
+                }
+              }
+
+              const matchingModel = selectedVariant
+                ? availableZImageDiffusers.find((m) => 'variant' in m && m.variant === selectedVariant)
+                : undefined;
+              const diffusersModel = matchingModel ?? availableZImageDiffusers[0];
               if (diffusersModel) {
                 dispatch(
                   zImageQwen3SourceModelSelected({
@@ -534,6 +547,35 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
 
           if (diffusersModel) {
             dispatch(qwenImageComponentSourceSelected(zModelIdentifierField.parse(diffusersModel)));
+          }
+        }
+      }
+
+      // Handle Z-Image model changes within the same base (variant may change between turbo/zbase)
+      // Auto-update the Qwen3 source diffusers model to match the new variant
+      if (newBase === 'z-image' && state.params.model?.base === 'z-image' && newModel.key !== state.params.model?.key) {
+        const modelConfigsResult = selectModelConfigsQuery(state);
+        if (modelConfigsResult.data) {
+          const newModelConfig = modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key);
+          const newVariant =
+            newModelConfig && 'variant' in newModelConfig && typeof newModelConfig.variant === 'string'
+              ? newModelConfig.variant
+              : null;
+
+          if (newVariant) {
+            const availableZImageDiffusers = selectZImageDiffusersModels(state);
+            const matchingModel = availableZImageDiffusers.find((m) => 'variant' in m && m.variant === newVariant);
+            if (matchingModel) {
+              dispatch(
+                zImageQwen3SourceModelSelected({
+                  key: matchingModel.key,
+                  hash: matchingModel.hash,
+                  name: matchingModel.name,
+                  base: matchingModel.base,
+                  type: matchingModel.type,
+                })
+              );
+            }
           }
         }
       }
