@@ -1,5 +1,5 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
-import { Box, Flex, FormControlGroup, SimpleGrid, StandaloneAccordion } from '@invoke-ai/ui-library';
+import { Flex, FormControlGroup, SimpleGrid, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -21,6 +21,13 @@ import ParamCLIPGEmbedModelSelect from 'features/parameters/components/Advanced/
 import ParamCLIPLEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPLEmbedModelSelect';
 import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip';
 import ParamFlux2KleinModelSelect from 'features/parameters/components/Advanced/ParamFlux2KleinModelSelect';
+import {
+  ParamHiDiffusionRauNetToggle,
+  ParamHiDiffusionT1Ratio,
+  ParamHiDiffusionT2Ratio,
+  ParamHiDiffusionToggle,
+  ParamHiDiffusionWindowAttnToggle,
+} from 'features/parameters/components/Advanced/ParamHiDiffusionToggle';
 import ParamQwenImageComponentSourceSelect from 'features/parameters/components/Advanced/ParamQwenImageComponentSourceSelect';
 import ParamQwenImageQuantization from 'features/parameters/components/Advanced/ParamQwenImageQuantization';
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
@@ -87,6 +94,9 @@ export const AdvancedSettingsAccordion = memo(() => {
           if (params.seamlessXAxis || params.seamlessYAxis) {
             badges.push('seamless');
           }
+          if (params.hiDiffusionEnabled) {
+            badges.push('HiDiffusion');
+          }
         }
 
         return badges;
@@ -124,9 +134,12 @@ export const AdvancedSettingsAccordion = memo(() => {
                 <SimpleGrid columns={2} spacing={4} w="full">
                   <ParamSeamlessXAxis />
                   <ParamSeamlessYAxis />
+                  <ParamHiDiffusionToggle />
                   <ParamColorCompensation />
-                  {/* Empty box for visual alignment. Replace with new option when needed. */}
-                  <Box />
+                  <ParamHiDiffusionRauNetToggle />
+                  <ParamHiDiffusionWindowAttnToggle />
+                  <ParamHiDiffusionT1Ratio />
+                  <ParamHiDiffusionT2Ratio />
                 </SimpleGrid>
               </FormControlGroup>
             </Flex>

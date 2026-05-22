@@ -137,10 +137,10 @@ describe('paramsSlice selectors for external models', () => {
 describe('paramsSliceConfig persisted state migration', () => {
   const migrate = paramsSliceConfig.persistConfig?.migrate;
 
-  it('backfills new Qwen Image fields when migrating from v2 and preserves existing params', () => {
+  it('backfills Qwen Image and HiDiffusion fields when migrating from v2 and preserves existing params', () => {
     expect(migrate).toBeDefined();
 
-    // Build a valid pre-PR v2 persisted state by removing the fields that were added in v3
+    // Build a valid pre-PR v2 persisted state by removing the fields that were added later.
     const initial = getInitialParamsState();
     const v2State: Record<string, unknown> = {
       ...initial,
@@ -152,12 +152,22 @@ describe('paramsSliceConfig persisted state migration', () => {
     };
     delete v2State.qwenImageVaeModel;
     delete v2State.qwenImageQwenVLEncoderModel;
+    delete v2State.hiDiffusionEnabled;
+    delete v2State.hiDiffusionRauNetEnabled;
+    delete v2State.hiDiffusionWindowAttnEnabled;
+    delete v2State.hiDiffusionT1Ratio;
+    delete v2State.hiDiffusionT2Ratio;
 
     const result = migrate?.(v2State) as ReturnType<typeof getInitialParamsState>;
 
     expect(result._version).toBe(3);
     expect(result.qwenImageVaeModel).toBeNull();
     expect(result.qwenImageQwenVLEncoderModel).toBeNull();
+    expect(result.hiDiffusionEnabled).toBe(false);
+    expect(result.hiDiffusionRauNetEnabled).toBe(true);
+    expect(result.hiDiffusionWindowAttnEnabled).toBe(true);
+    expect(result.hiDiffusionT1Ratio).toBe(0.4);
+    expect(result.hiDiffusionT2Ratio).toBe(0.0);
     // Existing params should be preserved
     expect(result.positivePrompt).toBe('a fluffy cat');
     expect(result.seed).toBe(42);
