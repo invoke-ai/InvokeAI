@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "InvokeAI"
 description = "A full-featured AI-assisted image generation environment designed for creatives and enthusiasts."
-requires-python = ">=3.11, <3.13"
+requires-python = ">=3.11, <=3.14.5"
 readme = { content-type = "text/markdown", file = "README.md" }
 keywords = ["stable-diffusion", "AI"]
 dynamic = ["version"]
@@ -90,11 +90,11 @@ dependencies = [
   # torch 2.4+cu carries its own triton dependency
 ]
 
-"cpu" = ["torch==2.7.1+cpu", "torchvision==0.22.1+cpu"]
-"cuda" = ["torch==2.7.1+cu128", "torchvision==0.22.1+cu128"]
+"cpu" = ["torch==2.12.0+cpu", "torchvision==0.27.0+cpu"]
+"cuda" = ["torch==2.12.0+cu130", "torchvision==0.27.0+cu130"]
 "rocm" = [
-  "torch==2.7.1+rocm6.3",
-  "torchvision==0.22.1+rocm6.3",
+  "torch==2.12.0+rocm7.2",
+  "torchvision==0.27.0+rocm7.2",
   "pytorch-triton-rocm",
 ]
 
