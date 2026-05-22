@@ -9260,6 +9260,228 @@
         ]
       }
     },
+    "/api/v1/system_prompts/": {
+      "get": {
+        "tags": ["system_prompts"],
+        "summary": "List System Prompts",
+        "description": "Lists system prompts visible to the current user (own + public).",
+        "operationId": "list_system_prompts",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SystemPromptRecordDTO"
+                  },
+                  "type": "array",
+                  "title": "Response 200 List System Prompts"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["system_prompts"],
+        "summary": "Create System Prompt",
+        "description": "Creates a new system prompt owned by the current user.",
+        "operationId": "create_system_prompt",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SystemPromptWithoutId",
+                "description": "The system prompt to create"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemPromptRecordDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/system_prompts/i/{system_prompt_id}": {
+      "get": {
+        "tags": ["system_prompts"],
+        "summary": "Get System Prompt",
+        "description": "Gets a system prompt by id.",
+        "operationId": "get_system_prompt",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "system_prompt_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The id of the system prompt to get",
+              "title": "System Prompt Id"
+            },
+            "description": "The id of the system prompt to get"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemPromptRecordDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["system_prompts"],
+        "summary": "Update System Prompt",
+        "description": "Updates a system prompt. Only the owner or an admin may update.",
+        "operationId": "update_system_prompt",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "system_prompt_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The id of the system prompt to update",
+              "title": "System Prompt Id"
+            },
+            "description": "The id of the system prompt to update"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SystemPromptChanges",
+                "description": "The changes to apply"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemPromptRecordDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["system_prompts"],
+        "summary": "Delete System Prompt",
+        "description": "Deletes a system prompt. Only the owner or an admin may delete.",
+        "operationId": "delete_system_prompt",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "system_prompt_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The id of the system prompt to delete",
+              "title": "System Prompt Id"
+            },
+            "description": "The id of the system prompt to delete"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/client_state/{queue_id}/get_by_key": {
       "get": {
         "tags": ["client_state"],
@@ -29327,6 +29549,9 @@
                   "$ref": "#/components/schemas/TextLLMInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/TextLLMWithPresetInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/TileToPropertiesInvocation"
                 },
                 {
@@ -36812,6 +37037,9 @@
                 "$ref": "#/components/schemas/TextLLMInvocation"
               },
               {
+                "$ref": "#/components/schemas/TextLLMWithPresetInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/TileToPropertiesInvocation"
               },
               {
@@ -37938,6 +38166,9 @@
                 "$ref": "#/components/schemas/TextLLMInvocation"
               },
               {
+                "$ref": "#/components/schemas/TextLLMWithPresetInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/TileToPropertiesInvocation"
               },
               {
@@ -38738,6 +38969,9 @@
           "text_llm": {
             "$ref": "#/components/schemas/StringOutput"
           },
+          "text_llm_with_preset": {
+            "$ref": "#/components/schemas/StringOutput"
+          },
           "tile_to_properties": {
             "$ref": "#/components/schemas/TileToPropertiesOutput"
           },
@@ -39026,6 +39260,7 @@
           "t2i_adapter",
           "tensor_mask_to_image",
           "text_llm",
+          "text_llm_with_preset",
           "tile_to_properties",
           "tiled_multi_diffusion_denoise_latents",
           "tomask",
@@ -39826,6 +40061,9 @@
               },
               {
                 "$ref": "#/components/schemas/TextLLMInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/TextLLMWithPresetInvocation"
               },
               {
                 "$ref": "#/components/schemas/TileToPropertiesInvocation"
@@ -40712,6 +40950,9 @@
                 "$ref": "#/components/schemas/TextLLMInvocation"
               },
               {
+                "$ref": "#/components/schemas/TextLLMWithPresetInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/TileToPropertiesInvocation"
               },
               {
@@ -40893,14 +41134,14 @@
             "format": "path",
             "title": "Convert Cache Dir",
             "description": "Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).",
-            "default": "models/.convert_cache"
+            "default": "models\\.convert_cache"
           },
           "download_cache_dir": {
             "type": "string",
             "format": "path",
             "title": "Download Cache Dir",
             "description": "Path to the directory that contains dynamically downloaded models.",
-            "default": "models/.download_cache"
+            "default": "models\\.download_cache"
           },
           "legacy_conf_dir": {
             "type": "string",
@@ -67037,6 +67278,131 @@
           "$ref": "#/components/schemas/IntegerOutput"
         }
       },
+      "SystemPromptChanges": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "The new name."
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content",
+            "description": "The new content."
+          },
+          "is_public": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Public",
+            "description": "Whether the prompt is shared with all users."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SystemPromptChanges"
+      },
+      "SystemPromptField": {
+        "description": "A system prompt primitive field",
+        "properties": {
+          "system_prompt_id": {
+            "description": "The id of the system prompt",
+            "title": "System Prompt Id",
+            "type": "string"
+          }
+        },
+        "required": ["system_prompt_id"],
+        "title": "SystemPromptField",
+        "type": "object"
+      },
+      "SystemPromptRecordDTO": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name",
+            "description": "The name of the system prompt."
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Content",
+            "description": "The system prompt content."
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The system prompt ID."
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "The owning user id ('system' for built-in defaults)."
+          },
+          "is_public": {
+            "type": "boolean",
+            "title": "Is Public",
+            "description": "Whether the prompt is shared with all users."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When the system prompt was created."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "When the system prompt was last updated."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["name", "content", "id", "user_id", "is_public", "created_at", "updated_at"],
+        "title": "SystemPromptRecordDTO"
+      },
+      "SystemPromptWithoutId": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name",
+            "description": "The name of the system prompt."
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Content",
+            "description": "The system prompt content."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["name", "content"],
+        "title": "SystemPromptWithoutId"
+      },
       "T2IAdapterField": {
         "properties": {
           "image": {
@@ -68749,6 +69115,109 @@
         "required": ["type", "id"],
         "tags": ["llm", "text", "prompt"],
         "title": "Text LLM",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/StringOutput"
+        }
+      },
+      "TextLLMWithPresetInvocation": {
+        "category": "llm",
+        "class": "invocation",
+        "classification": "beta",
+        "description": "Run a text language model using a saved system prompt from the System Prompts library.\n\nBehaves identically to the Text LLM node, but the system prompt is selected from a\nDB-backed preset instead of being typed inline. Useful when you maintain a curated\nlibrary of expansion strategies and want to reuse them across workflows.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "prompt": {
+            "default": "",
+            "description": "Input text prompt.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Prompt",
+            "type": "string",
+            "ui_component": "textarea"
+          },
+          "system_prompt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SystemPromptField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The saved system prompt to use as the LLM's instruction.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "text_llm_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The text language model to use for text generation",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Text LLM Model",
+            "ui_model_type": ["text_llm"]
+          },
+          "max_tokens": {
+            "default": 300,
+            "description": "Maximum number of tokens to generate.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 2048,
+            "minimum": 1,
+            "orig_default": 300,
+            "orig_required": false,
+            "title": "Max Tokens",
+            "type": "integer"
+          },
+          "type": {
+            "const": "text_llm_with_preset",
+            "default": "text_llm_with_preset",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["llm", "text", "prompt", "preset", "template"],
+        "title": "Text LLM (with System Prompt Preset)",
         "type": "object",
         "version": "1.0.0",
         "output": {
