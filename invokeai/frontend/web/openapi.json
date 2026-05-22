@@ -481,7 +481,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/utilities/expand-prompt": {
@@ -521,7 +526,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/utilities/image-to-prompt": {
@@ -561,7 +571,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v2/models/": {
@@ -3932,7 +3947,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       },
       "patch": {
         "tags": ["download_queue"],
@@ -3954,7 +3974,12 @@
           "400": {
             "description": "Bad request"
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/download_queue/i/": {
@@ -3994,7 +4019,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/download_queue/i/{id}": {
@@ -4003,6 +4033,11 @@
         "summary": "Get Download Job",
         "description": "Get a download job using its ID.",
         "operationId": "get_download_job",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -4047,6 +4082,11 @@
         "summary": "Cancel Download Job",
         "description": "Cancel a download job using its ID.",
         "operationId": "cancel_download_job",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -4106,7 +4146,12 @@
           "204": {
             "description": "Download jobs have been cancelled"
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/images/upload": {
@@ -6740,6 +6785,11 @@
         "summary": "Get Related Models",
         "description": "Get a list of model keys related to a given model.",
         "operationId": "get_related_models",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "model_key",
@@ -6815,7 +6865,12 @@
           "500": {
             "description": "Internal server error"
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       },
       "delete": {
         "tags": ["model_relationships"],
@@ -6849,7 +6904,12 @@
           "500": {
             "description": "Internal server error"
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/model_relationships/batch": {
@@ -6899,7 +6959,12 @@
           "500": {
             "description": "Internal server error"
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/version": {
@@ -9462,6 +9527,11 @@
         "summary": "Get Style Preset",
         "description": "Gets a style preset",
         "operationId": "get_style_preset",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "style_preset_id",
@@ -9503,6 +9573,11 @@
         "summary": "Update Style Preset",
         "description": "Updates a style preset",
         "operationId": "update_style_preset",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "style_preset_id",
@@ -9554,6 +9629,11 @@
         "summary": "Delete Style Preset",
         "description": "Deletes a style preset",
         "operationId": "delete_style_preset",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "style_preset_id",
@@ -9593,7 +9673,7 @@
       "get": {
         "tags": ["style_presets"],
         "summary": "List Style Presets",
-        "description": "Gets a page of style presets",
+        "description": "Gets the style presets visible to the current user.",
         "operationId": "list_style_presets",
         "responses": {
           "200": {
@@ -9610,7 +9690,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       },
       "post": {
         "tags": ["style_presets"],
@@ -9648,7 +9733,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/style_presets/i/{style_preset_id}/image": {
@@ -9657,6 +9747,11 @@
         "summary": "Get Style Preset Image",
         "description": "Gets an image file that previews the model",
         "operationId": "get_style_preset_image",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "style_preset_id",
@@ -9713,7 +9808,12 @@
               "text/csv": {}
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/style_presets/import": {
@@ -9750,7 +9850,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/client_state/{queue_id}/get_by_key": {
@@ -67480,10 +67585,21 @@
             "$ref": "#/components/schemas/PresetType",
             "description": "The type of style preset"
           },
+          "is_public": {
+            "type": "boolean",
+            "title": "Is Public",
+            "description": "Whether the preset is visible to other users.",
+            "default": false
+          },
           "id": {
             "type": "string",
             "title": "Id",
             "description": "The style preset ID."
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "The user who owns this style preset."
           },
           "image": {
             "anyOf": [
@@ -67499,7 +67615,7 @@
           }
         },
         "type": "object",
-        "required": ["name", "preset_data", "type", "id", "image"],
+        "required": ["name", "preset_data", "type", "id", "user_id", "image"],
         "title": "StylePresetRecordWithImage"
       },
       "SubModelType": {
