@@ -65,6 +65,7 @@ def test_board_image_mutations_are_blocked_during_image_move_maintenance(
         ),
     )
     monkeypatch.setattr("invokeai.app.api.routers.board_images.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers._access.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers.image_move_maintenance.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
 
@@ -102,6 +103,7 @@ def test_board_image_mutation_checks_access_before_image_move_maintenance(
         ),
     )
     monkeypatch.setattr("invokeai.app.api.routers.board_images.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers._access.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers.image_move_maintenance.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
 

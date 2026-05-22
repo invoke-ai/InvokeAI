@@ -12,7 +12,9 @@ from pydantic import BaseModel, Field
 from pyparsing import ParseException
 from transformers import AutoProcessor, AutoTokenizer, LlavaOnevisionForConditionalGeneration, LlavaOnevisionProcessor
 
+from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers._access import assert_image_read_access
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
@@ -42,6 +44,7 @@ class DynamicPromptsResponse(BaseModel):
     },
 )
 async def parse_dynamicprompts(
+    current_user: CurrentUserOrDefault,
     prompt: str = Body(description="The prompt to parse with dynamicprompts"),
     max_prompts: int = Body(ge=1, le=10000, default=1000, description="The max number of prompts to generate"),
     combinatorial: bool = Body(default=True, description="Whether to use the combinatorial generator"),
@@ -123,7 +126,7 @@ def _run_expand_prompt(prompt: str, model_key: str, max_tokens: int, system_prom
         200: {"model": ExpandPromptResponse},
     },
 )
-async def expand_prompt(body: ExpandPromptRequest) -> ExpandPromptResponse:
+async def expand_prompt(current_user: CurrentUserOrDefault, body: ExpandPromptRequest) -> ExpandPromptResponse:
     """Expand a brief prompt into a detailed image generation prompt using a text LLM."""
     try:
         expanded = await asyncio.to_thread(
@@ -200,9 +203,13 @@ def _run_image_to_prompt(image_name: str, model_key: str, instruction: str) -> s
         200: {"model": ImageToPromptResponse},
     },
 )
-async def image_to_prompt(body: ImageToPromptRequest) -> ImageToPromptResponse:
+async def image_to_prompt(current_user: CurrentUserOrDefault, body: ImageToPromptRequest) -> ImageToPromptResponse:
     """Generate a descriptive prompt from an image using a vision-language model."""
     assert_image_move_maintenance_inactive()
+
+    # Reuse the image-read access check so non-owners can't probe stored images
+    # via this endpoint (mirrors the policy in routers/images.py).
+    assert_image_read_access(body.image_name, current_user)
 
     try:
         prompt = await asyncio.to_thread(
