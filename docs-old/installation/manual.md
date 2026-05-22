@@ -75,7 +75,7 @@ The following commands vary depending on the version of Invoke being installed a
 
         - If you are on Windows or Linux with an Nvidia GPU, use `--torch-backend=cu128`.
         - If you are on Linux with no GPU, use `--torch-backend=cpu`.
-        - If you are on Linux with an AMD GPU, use `--torch-backend=rocm6.3`.
+        - If you are on Linux with an AMD GPU, use `--torch-backend=rocm7.1`.
         - **In all other cases, do not use a torch backend.**
 
     === "Invoke v5.10.0 to v5.11.0"
