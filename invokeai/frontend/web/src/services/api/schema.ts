@@ -38952,7 +38952,7 @@ export interface operations {
     delete_board: {
         parameters: {
             query?: {
-                /** @description Permanently delete all images on the board */
+                /** @description Permanently delete all images and videos on the board */
                 include_images?: boolean | null;
             };
             header?: never;

@@ -483,13 +483,19 @@ async def get_video_thumbnail(
     """Returns the first-frame WebP thumbnail of a video. Unauthenticated; UUIDs provide unguessability."""
     try:
         path = ApiDependencies.invoker.services.videos.get_path(video_name, thumbnail=True)
-        return FileResponse(
-            path,
-            media_type="image/webp",
-            headers={"Cache-Control": f"max-age={VIDEO_MAX_AGE}"},
-        )
     except Exception:
         raise HTTPException(status_code=404)
+    # FileResponse stats the file lazily *after* the route returns, which means a missing
+    # thumbnail surfaces as a server-side error rather than the documented 404. Check up
+    # front so callers get the right status. Video saves are allowed without a thumbnail
+    # (see video_files_disk.save), so this is a reachable path.
+    if not Path(path).is_file():
+        raise HTTPException(status_code=404)
+    return FileResponse(
+        path,
+        media_type="image/webp",
+        headers={"Cache-Control": f"max-age={VIDEO_MAX_AGE}"},
+    )
 
 
 @videos_router.get("/i/{video_name}/urls", operation_id="get_video_urls", response_model=VideoUrlsDTO)

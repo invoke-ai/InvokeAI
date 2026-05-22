@@ -270,14 +270,24 @@ class VideoService(VideoServiceABC):
             video_names = self.__invoker.services.board_video_records.get_all_board_video_names_for_board(
                 board_id, categories=None, is_intermediate=None, user_id=user_id
             )
+            # Only delete records for files we actually managed to remove. Otherwise a
+            # transient FS error would leave the file orphaned on disk with no record
+            # pointing at it — the API would report success and the user would have no
+            # way to clean up the leak. The board itself will still be deleted by the
+            # caller, so any preserved records cascade to "uncategorized" via the
+            # board_videos FK.
+            deleted_video_names: list[str] = []
             for video_name in video_names:
                 try:
                     record = self.__invoker.services.video_records.get(video_name)
                     self.__invoker.services.video_files.delete(video_name, video_subfolder=record.video_subfolder)
-                except Exception:
-                    pass
-            self.__invoker.services.video_records.delete_many(video_names)
-            for video_name in video_names:
+                    deleted_video_names.append(video_name)
+                except Exception as e:
+                    self.__invoker.services.logger.error(
+                        f"Failed to delete video file {video_name}; keeping record: {str(e)}"
+                    )
+            self.__invoker.services.video_records.delete_many(deleted_video_names)
+            for video_name in deleted_video_names:
                 self._on_deleted(video_name)
         except VideoRecordDeleteException:
             self.__invoker.services.logger.error("Failed to delete video records")

@@ -113,7 +113,9 @@ async def update_board(
 async def delete_board(
     current_user: CurrentUserOrDefault,
     board_id: str = Path(description="The id of board to delete"),
-    include_images: Optional[bool] = Query(description="Permanently delete all images on the board", default=False),
+    include_images: Optional[bool] = Query(
+        description="Permanently delete all images and videos on the board", default=False
+    ),
 ) -> DeleteBoardResult:
     """Deletes a board (user must have access to it)"""
     try:

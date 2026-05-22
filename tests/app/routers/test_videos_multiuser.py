@@ -306,3 +306,30 @@ def test_upload_video_malformed_mp4_returns_415_and_cleans_up_tmp(
     assert len(captured_paths) == 1, f"expected one tmp file, got {captured_paths}"
     tmp_file = captured_paths[0]
     assert not tmp_file.exists(), f"tmp file leaked after 415: {tmp_file}"
+
+
+# ---------------------------------------------------------------------------
+# GET /videos/i/{video_name}/thumbnail must return 404 when the thumbnail file
+# is missing on disk (JPPhoto PR #9163 follow-up). Video saves are allowed
+# without a thumbnail in video_files_disk.save, so this is reachable.
+# ---------------------------------------------------------------------------
+
+
+def test_get_video_thumbnail_missing_file_returns_404(
+    enable_multiuser_for_videos: Any,
+    client: TestClient,
+    mock_invoker: Invoker,
+    tmp_path: Path,
+):
+    """If videos.get_path resolves successfully but the file doesn't exist, the route must
+    return 404 up front. Previously it returned FileResponse and the missing-file error was
+    raised by Starlette *after* the route's try/except, so callers saw a 500-class failure
+    instead of the documented 404.
+    """
+    missing_path = tmp_path / "does_not_exist.webp"
+    assert not missing_path.exists()
+    mock_invoker.services.videos.get_path.return_value = str(missing_path)
+
+    response = client.get("/api/v1/videos/i/some_video.mp4/thumbnail")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    mock_invoker.services.videos.get_path.assert_called_once_with("some_video.mp4", thumbnail=True)
