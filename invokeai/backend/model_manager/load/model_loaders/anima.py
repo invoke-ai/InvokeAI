@@ -118,7 +118,7 @@ class AnimaCheckpointModel(ModelLoader):
 
         # Determine safe dtype
         target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        model_dtype = TorchDevice.choose_anima_inference_dtype(target_device)
 
         # Handle memory management
         new_sd_size = sum(ten.nelement() * model_dtype.itemsize for ten in sd.values())
@@ -129,8 +129,17 @@ class AnimaCheckpointModel(ModelLoader):
             if sd[k].is_floating_point():
                 sd[k] = sd[k].to(model_dtype)
 
-        # Filter out rotary embedding inv_freq buffers that are regenerated at runtime
-        keys_to_remove = [k for k in sd.keys() if k.endswith(".inv_freq")]
+        # Filter out tensors that are regenerated at runtime and therefore not part of the
+        # in-memory module state. Some community-trained checkpoints (e.g. animaCatTower_v10)
+        # serialize derived pos_embedder buffers/cached tensors that the official model
+        # registers as non-persistent (or recomputes locally).
+        runtime_only_suffixes = (
+            ".inv_freq",
+            "pos_embedder.dim_spatial_range",
+            "pos_embedder.dim_temporal_range",
+            "pos_embedder.seq",
+        )
+        keys_to_remove = [k for k in sd.keys() if k.endswith(runtime_only_suffixes)]
         for k in keys_to_remove:
             del sd[k]
 

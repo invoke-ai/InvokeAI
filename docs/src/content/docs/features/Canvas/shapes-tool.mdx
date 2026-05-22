@@ -2,6 +2,8 @@
 title: Shapes Tool
 description: Learn how to draw filled shapes on raster and inpaint mask layers with the Shapes tool.
 lastUpdated: 2026-05-11
+sidebar:
+  order: 1
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
@@ -25,7 +27,8 @@ Shapes always draws into the **active raster target**:
 
 :::note
 Shapes overlaps with some Lasso workflows on mask layers, but the tools are not identical. Lasso is still the more
-specialized masking tool and can create a new mask layer automatically when one does not already exist.
+specialized masking tool and can create a new mask layer automatically when one does not already exist. See the
+[Lasso tool guide](./lasso-tool/) for mask-specific behavior.
 :::
 
 ## Common Behavior
