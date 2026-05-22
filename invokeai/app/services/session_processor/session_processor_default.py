@@ -31,6 +31,7 @@ from invokeai.app.services.session_queue.session_queue_common import SessionQueu
 from invokeai.app.services.shared.graph import NodeInputError
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
 from invokeai.app.util.profiler import Profiler
+from invokeai.backend.util.devices import TorchDevice
 
 
 class DefaultSessionRunner(SessionRunnerBase):
@@ -140,7 +141,12 @@ class DefaultSessionRunner(SessionRunnerBase):
             #
             # See the comment in the processor's `_on_queue_item_status_changed()` method for more details on how we
             # handle cancellation.
-            pass
+            #
+            # Clear the device cache so that GPU/MPS memory allocated during the cancelled invocation (intermediate
+            # latents, activations, etc.) is returned to the OS. Without this, PyTorch's allocator holds the pooled
+            # memory indefinitely and it never appears as freed RAM.
+            gc.collect()
+            TorchDevice.empty_cache()
         except Exception as e:
             error_type = e.__class__.__name__
             error_message = str(e)
@@ -451,6 +457,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     # Python will never cede allocated memory back to the OS, so anything we can do to reduce the peak
                     # allocation is well worth it.
                     gc.collect()
+                    # Clear the PyTorch device allocator cache so any memory reserved from a previous (cancelled or
+                    # completed) job is returned to the OS before starting the next one.
+                    TorchDevice.empty_cache()
 
                     self._invoker.services.logger.info(
                         f"Executing queue item {self._queue_item.item_id}, session {self._queue_item.session_id}"
