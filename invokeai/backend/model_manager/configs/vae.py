@@ -40,6 +40,11 @@ def _is_qwen_image_vae(state_dict: dict[str | int, Any]) -> bool:
     1. Diffusers-format encoder/decoder keys (`encoder.conv_in`, `decoder.conv_in`)
     2. 5-dimensional convolution weights (3D causal convolutions vs. standard 2D conv in SD/SDXL/FLUX VAEs)
     3. 16-dimensional latent space (z_dim=16)
+
+    Note: Wan 2.2 A14B reuses the same architecture (AutoencoderKLWan with z_dim=16),
+    so this function returns True for both. Disambiguation between the two for
+    standalone files relies on the filename heuristic in :func:`_is_wan_vae` and
+    config registration order.
     """
     decoder_conv_in_key = "decoder.conv_in.weight"
     if decoder_conv_in_key not in state_dict:
@@ -50,6 +55,34 @@ def _is_qwen_image_vae(state_dict: dict[str | int, Any]) -> bool:
         return False
     # z_dim is the input channel dim of decoder.conv_in
     return shape[1] == 16
+
+
+def _wan_vae_z_dim(state_dict: dict[str | int, Any]) -> int | None:
+    """Return ``z_dim`` for a Wan-family VAE state dict, or ``None`` if it isn't one.
+
+    Wan-family VAEs (AutoencoderKLWan) have 5D convolution weights and a
+    decoder.conv_in input channel count of 16 (Wan 2.1 / A14B / Qwen Image) or
+    48 (Wan 2.2 TI2V-5B's Wan2.2-VAE).
+    """
+    decoder_conv_in_key = "decoder.conv_in.weight"
+    if decoder_conv_in_key not in state_dict:
+        return None
+    weight = state_dict[decoder_conv_in_key]
+    shape = getattr(weight, "shape", None)
+    if shape is None or len(shape) != 5:
+        return None
+    z = int(shape[1])
+    return z if z in (16, 48) else None
+
+
+def _filename_suggests_wan(mod: ModelOnDisk) -> bool:
+    """Filename heuristic to distinguish standalone Wan VAE files from Qwen Image VAEs.
+
+    Both use the same ``AutoencoderKLWan`` architecture for 16-channel files, so the
+    state dict alone can't tell them apart. Filenames in the wild (community ports,
+    ComfyUI repacks) typically include ``wan`` for Wan releases.
+    """
+    return "wan" in mod.path.name.lower()
 
 
 def _is_flux2_vae(state_dict: dict[str | int, Any]) -> bool:
@@ -113,9 +146,10 @@ class VAE_Checkpoint_Config_Base(Checkpoint_Config_Base):
         if _is_flux2_vae(state_dict):
             raise NotAMatchError("model is a FLUX.2 VAE, not a standard VAE")
 
-        # Exclude Qwen Image VAEs - they have their own config class
-        if _is_qwen_image_vae(state_dict):
-            raise NotAMatchError("model is a Qwen Image VAE, not a standard VAE")
+        # Exclude Qwen Image / Wan VAEs - they share the AutoencoderKLWan
+        # architecture and each has its own config class.
+        if _is_qwen_image_vae(state_dict) or _wan_vae_z_dim(state_dict) is not None:
+            raise NotAMatchError("model is a Wan-family VAE, not a standard VAE")
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
@@ -215,7 +249,94 @@ class VAE_Checkpoint_QwenImage_Config(Checkpoint_Config_Base, Config_Base):
         if not _is_qwen_image_vae(state_dict):
             raise NotAMatchError("state dict does not look like a Qwen Image VAE")
 
+        # Defer to VAE_Checkpoint_Wan_Config for files whose names indicate Wan
+        # (both architectures are 16-channel AutoencoderKLWan and otherwise
+        # indistinguishable from the state dict alone).
+        if _filename_suggests_wan(mod):
+            raise NotAMatchError("filename suggests a Wan VAE, not Qwen Image")
+
         return cls(**override_fields)
+
+
+class VAE_Checkpoint_Wan_Config(Checkpoint_Config_Base, Config_Base):
+    """Model config for Wan 2.2 VAE checkpoint models (AutoencoderKLWan).
+
+    Distinguishes A14B (z_dim=16, standard Wan VAE) from TI2V-5B (z_dim=48,
+    Wan2.2-VAE) via the input channel count of ``decoder.conv_in.weight``.
+    """
+
+    type: Literal[ModelType.VAE] = Field(default=ModelType.VAE)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    base: Literal[BaseModelType.Wan] = Field(default=BaseModelType.Wan)
+    latent_channels: Literal[16, 48] = Field(
+        description="VAE latent channel count: 16 for A14B (standard Wan VAE) or 48 for TI2V-5B (Wan2.2-VAE)."
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        state_dict = mod.load_state_dict()
+        z_dim = _wan_vae_z_dim(state_dict)
+        if z_dim is None:
+            raise NotAMatchError("state dict does not look like a Wan VAE")
+
+        # 48-channel files are unambiguously Wan2.2-VAE (TI2V-5B). 16-channel
+        # files are architecturally identical to Qwen Image's VAE; require the
+        # filename to suggest Wan to claim them, otherwise let the QwenImage
+        # config win.
+        latent_channels: int = z_dim
+        if latent_channels == 16 and not _filename_suggests_wan(mod):
+            raise NotAMatchError(
+                "16-channel AutoencoderKLWan VAE without 'wan' in filename — deferring to Qwen Image VAE config."
+            )
+
+        explicit = override_fields.pop("latent_channels", None)
+        if explicit is not None:
+            latent_channels = int(explicit)
+
+        return cls(**override_fields, latent_channels=latent_channels)
+
+
+class VAE_Diffusers_Wan_Config(Diffusers_Config_Base, Config_Base):
+    """Model config for Wan 2.2 VAE in diffusers folder layout (AutoencoderKLWan)."""
+
+    type: Literal[ModelType.VAE] = Field(default=ModelType.VAE)
+    format: Literal[ModelFormat.Diffusers] = Field(default=ModelFormat.Diffusers)
+    base: Literal[BaseModelType.Wan] = Field(default=BaseModelType.Wan)
+    latent_channels: Literal[16, 48] = Field(
+        default=16,
+        description="VAE latent channel count: 16 for A14B or 48 for TI2V-5B's Wan2.2-VAE.",
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {"AutoencoderKLWan"},
+        )
+
+        # Read z_dim from the diffusers config to set latent_channels.
+        latent_channels: int = 16
+        try:
+            config = get_config_dict_or_raise(common_config_paths(mod.path))
+            z = config.get("z_dim")
+            if z is not None and int(z) in (16, 48):
+                latent_channels = int(z)
+        except NotAMatchError:
+            pass
+
+        explicit = override_fields.pop("latent_channels", None)
+        if explicit is not None:
+            latent_channels = int(explicit)
+
+        return cls(**override_fields, latent_channels=latent_channels)
 
 
 def _has_anima_vae_keys(state_dict: dict[str | int, Any]) -> bool:
