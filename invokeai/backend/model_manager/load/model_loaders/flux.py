@@ -53,7 +53,11 @@ from invokeai.backend.model_manager.configs.main import (
     Main_SDNQ_Diffusers_FLUX_Config,
     Main_SDNQ_FLUX_Config,
 )
-from invokeai.backend.model_manager.configs.t5_encoder import T5Encoder_BnBLLMint8_Config, T5Encoder_T5Encoder_Config
+from invokeai.backend.model_manager.configs.t5_encoder import (
+    T5Encoder_BnBLLMint8_Config,
+    T5Encoder_SDNQ_Config,
+    T5Encoder_T5Encoder_Config,
+)
 from invokeai.backend.model_manager.configs.vae import VAE_Checkpoint_Config_Base, VAE_Checkpoint_Flux2_Config
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
@@ -506,6 +510,50 @@ class T5EncoderCheckpointModel(ModelLoader):
         raise ValueError(
             f"Only Tokenizer and TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
         )
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.SDNQQuantized)
+class T5EncoderSDNQLoader(ModelLoader):
+    """Class to load SDNQ-quantized T5 Encoder models."""
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, T5Encoder_SDNQ_Config):
+            raise ValueError("Only T5Encoder_SDNQ_Config models are supported here.")
+
+        match submodel_type:
+            case SubModelType.Tokenizer2 | SubModelType.Tokenizer3:
+                return T5TokenizerFast.from_pretrained(
+                    Path(config.path) / "tokenizer_2", max_length=512, local_files_only=True
+                )
+            case SubModelType.TextEncoder2 | SubModelType.TextEncoder3:
+                return self._load_text_encoder(config)
+
+        raise ValueError(
+            f"Only Tokenizer and TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
+        )
+
+    def _load_text_encoder(self, config: T5Encoder_SDNQ_Config) -> AnyModel:
+        te_dir = Path(config.path) / "text_encoder_2"
+
+        model_config = AutoConfig.from_pretrained(te_dir, local_files_only=True)
+        with accelerate.init_empty_weights():
+            model = AutoModelForTextEncoding.from_config(model_config)
+
+        sd = sdnq_sd_loader(te_dir, compute_dtype=torch.bfloat16)
+
+        # T5's embed_tokens and shared point to the same parameter; the SDNQ state dict only carries one of them.
+        missing_keys, unexpected_keys = model.load_state_dict(sd, strict=False, assign=True)
+        assert len(unexpected_keys) == 0, f"Unexpected keys loading SDNQ T5: {unexpected_keys}"
+        assert set(missing_keys) <= {"encoder.embed_tokens.weight"}, (
+            f"Unexpected missing keys loading SDNQ T5: {missing_keys}"
+        )
+        if "encoder.embed_tokens.weight" in missing_keys:
+            model.encoder.embed_tokens.weight = model.shared.weight
+        return model
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.Main, format=ModelFormat.Checkpoint)
