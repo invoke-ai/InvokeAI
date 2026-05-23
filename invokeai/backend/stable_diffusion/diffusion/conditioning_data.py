@@ -89,6 +89,20 @@ class ZImageConditioningInfo:
 
 
 @dataclass
+class ErnieImageConditioningInfo:
+    """ERNIE-Image text conditioning. Holds the unbatched, unpadded second-to-last
+    hidden states of the Mistral3 encoder for a single prompt.
+    """
+
+    prompt_embeds: torch.Tensor
+    """Encoder hidden states for a single prompt. Shape: (seq_len, hidden_size)."""
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+        return self
+
+
+@dataclass
 class QwenImageConditioningInfo:
     """Qwen Image Edit conditioning information from Qwen2.5-VL encoder."""
 
@@ -142,6 +156,7 @@ class ConditioningFieldData:
         | List[SD3ConditioningInfo]
         | List[CogView4ConditioningInfo]
         | List[ZImageConditioningInfo]
+        | List[ErnieImageConditioningInfo]
         | List[QwenImageConditioningInfo]
         | List[AnimaConditioningInfo]
     )

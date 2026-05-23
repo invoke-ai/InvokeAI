@@ -217,6 +217,7 @@ export const isMainModelWithoutUnet = (modelLoader: Invocation<MainModelLoaderNo
     modelLoader.type === 'cogview4_model_loader' ||
     modelLoader.type === 'qwen_image_model_loader' ||
     modelLoader.type === 'z_image_model_loader' ||
+    modelLoader.type === 'ernie_image_model_loader' ||
     modelLoader.type === 'anima_model_loader'
   );
 };

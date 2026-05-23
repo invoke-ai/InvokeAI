@@ -805,6 +805,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_ErnieImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -827,6 +830,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_ErnieImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -1123,6 +1129,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_ErnieImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -1145,6 +1154,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_ErnieImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -1441,6 +1453,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_ErnieImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -1463,6 +1478,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_ErnieImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -1809,6 +1827,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_ErnieImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -1831,6 +1852,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_ErnieImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -2201,6 +2225,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_ErnieImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -2223,6 +2250,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_ErnieImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -3413,6 +3443,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_ErnieImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -3435,6 +3468,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_ErnieImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -11401,6 +11437,9 @@
             "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
           },
           {
+            "$ref": "#/components/schemas/Main_Diffusers_ErnieImage_Config"
+          },
+          {
             "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
           },
           {
@@ -11423,6 +11462,9 @@
           },
           {
             "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_Checkpoint_ErnieImage_Config"
           },
           {
             "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -11930,6 +11972,7 @@
           "flux2",
           "cogview4",
           "z-image",
+          "ernie-image",
           "external",
           "qwen-image",
           "anima",
@@ -18837,6 +18880,10 @@
                   "z_image_img2img",
                   "z_image_inpaint",
                   "z_image_outpaint",
+                  "ernie_image_txt2img",
+                  "ernie_image_img2img",
+                  "ernie_image_inpaint",
+                  "ernie_image_outpaint",
                   "qwen_image_txt2img",
                   "qwen_image_img2img",
                   "qwen_image_inpaint",
@@ -22032,6 +22079,720 @@
         "type": "object",
         "required": ["queue_id", "enqueued", "requested", "batch", "priority", "item_ids"],
         "title": "EnqueueBatchResult"
+      },
+      "ErnieImageConditioningField": {
+        "description": "An ERNIE-Image conditioning tensor primitive value.",
+        "properties": {
+          "conditioning_name": {
+            "description": "The name of conditioning tensor",
+            "title": "Conditioning Name",
+            "type": "string"
+          }
+        },
+        "required": ["conditioning_name"],
+        "title": "ErnieImageConditioningField",
+        "type": "object"
+      },
+      "ErnieImageConditioningOutput": {
+        "class": "output",
+        "description": "Base class for nodes that output an ERNIE-Image text conditioning tensor.",
+        "properties": {
+          "conditioning": {
+            "$ref": "#/components/schemas/ErnieImageConditioningField",
+            "description": "Conditioning tensor",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "ernie_image_conditioning_output",
+            "default": "ernie_image_conditioning_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "conditioning", "type", "type"],
+        "title": "ErnieImageConditioningOutput",
+        "type": "object"
+      },
+      "ErnieImageDenoiseInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Run the ERNIE-Image denoising loop and emit packed latents.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Transformer"
+          },
+          "positive_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErnieImageConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Positive prompt conditioning",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "negative_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErnieImageConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Negative prompt conditioning (required when guidance_scale != 1.0)",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional starting latents for img2img (must already be VAE-encoded, BN-normalized, and patchified).",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "width": {
+            "default": 1024,
+            "description": "Generation width.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 1024,
+            "description": "Generation height.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "steps": {
+            "default": 50,
+            "description": "Denoising steps. Use 8 for ERNIE-Image-Turbo.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 50,
+            "orig_required": false,
+            "title": "Steps",
+            "type": "integer"
+          },
+          "guidance_scale": {
+            "default": 4.0,
+            "description": "Classifier-free guidance scale. 4.0 for ERNIE-Image, 1.0 (no CFG) for Turbo.",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 1.0,
+            "orig_default": 4.0,
+            "orig_required": false,
+            "title": "Guidance Scale",
+            "type": "number"
+          },
+          "denoising_start": {
+            "default": 0.0,
+            "description": "When to start denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 0.0,
+            "orig_required": false,
+            "title": "Denoising Start",
+            "type": "number"
+          },
+          "denoising_end": {
+            "default": 1.0,
+            "description": "When to stop denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Denoising End",
+            "type": "number"
+          },
+          "seed": {
+            "default": 0,
+            "description": "Random seed for noise generation.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "scheduler": {
+            "default": "euler",
+            "description": "Scheduler used during denoising.",
+            "enum": ["euler", "heun", "lcm"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "euler",
+            "orig_required": false,
+            "title": "Scheduler",
+            "type": "string",
+            "ui_choice_labels": {
+              "euler": "Euler",
+              "heun": "Heun (2nd order)",
+              "lcm": "LCM"
+            }
+          },
+          "type": {
+            "const": "ernie_image_denoise",
+            "default": "ernie_image_denoise",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["latents", "denoise", "ernie-image"],
+        "title": "Denoise - ERNIE-Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/LatentsOutput"
+        }
+      },
+      "ErnieImageModelLoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Loads an ERNIE-Image diffusers pipeline and emits its submodels.\n\nThe transformer, VAE, text encoder, and (optional) prompt enhancer are all expected to\nlive inside the same diffusers pipeline directory under their conventional subfolders\n(`transformer/`, `vae/`, `text_encoder/`, `tokenizer/`, `pe/`, `pe_tokenizer/`).",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "ERNIE-Image diffusers pipeline (provides transformer, VAE, text encoder, and optional prompt enhancer)",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_required": true,
+            "title": "ERNIE-Image Model",
+            "ui_model_base": ["ernie-image"],
+            "ui_model_type": ["main"]
+          },
+          "use_prompt_enhancer": {
+            "default": true,
+            "description": "If true and the pipeline ships with a prompt-enhancer submodel, expose it on the output.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": true,
+            "orig_required": false,
+            "title": "Use Prompt Enhancer",
+            "type": "boolean"
+          },
+          "type": {
+            "const": "ernie_image_model_loader",
+            "default": "ernie_image_model_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["model", "type", "id"],
+        "tags": ["model", "ernie-image"],
+        "title": "Main Model - ERNIE-Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ErnieImageModelLoaderOutput"
+        }
+      },
+      "ErnieImageModelLoaderOutput": {
+        "class": "output",
+        "description": "ERNIE-Image model loader output.",
+        "properties": {
+          "transformer": {
+            "$ref": "#/components/schemas/TransformerField",
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "text_encoder": {
+            "$ref": "#/components/schemas/Mistral3EncoderField",
+            "description": "Mistral3 text encoder",
+            "field_kind": "output",
+            "title": "Text Encoder",
+            "ui_hidden": false
+          },
+          "vae": {
+            "$ref": "#/components/schemas/VAEField",
+            "description": "VAE",
+            "field_kind": "output",
+            "title": "VAE",
+            "ui_hidden": false
+          },
+          "prompt_enhancer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PromptEnhancerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional prompt-enhancer (Ministral3ForCausalLM)",
+            "field_kind": "output",
+            "title": "Prompt Enhancer",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "ernie_image_model_loader_output",
+            "default": "ernie_image_model_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "text_encoder", "vae", "prompt_enhancer", "type", "type"],
+        "title": "ErnieImageModelLoaderOutput",
+        "type": "object"
+      },
+      "ErnieImageTextEncoderInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Encodes a prompt for ERNIE-Image generation, optionally rewriting it via the\nbundled prompt-enhancer (Ministral3ForCausalLM) before tokenization.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Text prompt to encode.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Prompt",
+            "ui_component": "textarea"
+          },
+          "text_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Mistral3EncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Mistral3 text encoder + tokenizer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Text Encoder"
+          },
+          "prompt_enhancer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PromptEnhancerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "If connected and `use_prompt_enhancer` is true, the PE model rewrites the prompt before encoding.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Prompt Enhancer"
+          },
+          "use_prompt_enhancer": {
+            "default": true,
+            "description": "Whether to run the prompt-enhancer (no-op if no PE field is connected).",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": true,
+            "orig_required": false,
+            "title": "Use Prompt Enhancer",
+            "type": "boolean"
+          },
+          "pe_width": {
+            "default": 1024,
+            "description": "Target width passed to the prompt enhancer.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Pe Width",
+            "type": "integer"
+          },
+          "pe_height": {
+            "default": 1024,
+            "description": "Target height passed to the prompt enhancer.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Pe Height",
+            "type": "integer"
+          },
+          "pe_temperature": {
+            "default": 0.6,
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "orig_default": 0.6,
+            "orig_required": false,
+            "title": "Pe Temperature",
+            "type": "number"
+          },
+          "pe_top_p": {
+            "default": 0.95,
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 0.95,
+            "orig_required": false,
+            "title": "Pe Top P",
+            "type": "number"
+          },
+          "type": {
+            "const": "ernie_image_text_encoder",
+            "default": "ernie_image_text_encoder",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["prompt", "conditioning", "ernie-image"],
+        "title": "Prompt - ERNIE-Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ErnieImageConditioningOutput"
+        }
+      },
+      "ErnieImageVaeDecodeInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Decode ERNIE-Image patched latents to an image.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "type": {
+            "const": "ernie_image_vae_decode",
+            "default": "ernie_image_vae_decode",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["latents", "image", "vae", "l2i", "ernie-image"],
+        "title": "Latents to Image - ERNIE-Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
+      },
+      "ErnieImageVaeEncodeInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Encode an image into ERNIE-Image-ready packed latents.",
+        "node_pack": "invokeai",
+        "properties": {
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Input image to encode.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "type": {
+            "const": "ernie_image_vae_encode",
+            "default": "ernie_image_vae_encode",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["latents", "image", "vae", "i2l", "ernie-image"],
+        "title": "Image to Latents - ERNIE-Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/LatentsOutput"
+        }
       },
       "ExpandMaskWithFadeInvocation": {
         "category": "mask",
@@ -28772,6 +29533,21 @@
                   "$ref": "#/components/schemas/ESRGANInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/ErnieImageDenoiseInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/ErnieImageModelLoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/ErnieImageTextEncoderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/ErnieImageVaeDecodeInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/ErnieImageVaeEncodeInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/ExpandMaskWithFadeInvocation"
                 },
                 {
@@ -29478,6 +30254,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/DenoiseMaskOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/ErnieImageConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/ErnieImageModelLoaderOutput"
                 },
                 {
                   "$ref": "#/components/schemas/FaceMaskOutput"
@@ -36257,6 +37039,21 @@
                 "$ref": "#/components/schemas/ESRGANInvocation"
               },
               {
+                "$ref": "#/components/schemas/ErnieImageDenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageTextEncoderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageVaeDecodeInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageVaeEncodeInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ExpandMaskWithFadeInvocation"
               },
               {
@@ -36922,6 +37719,12 @@
                 "$ref": "#/components/schemas/DenoiseMaskOutput"
               },
               {
+                "$ref": "#/components/schemas/ErnieImageConditioningOutput"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageModelLoaderOutput"
+              },
+              {
                 "$ref": "#/components/schemas/FaceMaskOutput"
               },
               {
@@ -37381,6 +38184,21 @@
               },
               {
                 "$ref": "#/components/schemas/ESRGANInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageDenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageTextEncoderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageVaeDecodeInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageVaeEncodeInvocation"
               },
               {
                 "$ref": "#/components/schemas/ExpandMaskWithFadeInvocation"
@@ -38177,6 +38995,21 @@
           "dynamic_prompt": {
             "$ref": "#/components/schemas/StringCollectionOutput"
           },
+          "ernie_image_denoise": {
+            "$ref": "#/components/schemas/LatentsOutput"
+          },
+          "ernie_image_model_loader": {
+            "$ref": "#/components/schemas/ErnieImageModelLoaderOutput"
+          },
+          "ernie_image_text_encoder": {
+            "$ref": "#/components/schemas/ErnieImageConditioningOutput"
+          },
+          "ernie_image_vae_decode": {
+            "$ref": "#/components/schemas/ImageOutput"
+          },
+          "ernie_image_vae_encode": {
+            "$ref": "#/components/schemas/LatentsOutput"
+          },
           "esrgan": {
             "$ref": "#/components/schemas/ImageOutput"
           },
@@ -38839,6 +39672,11 @@
           "div",
           "dw_openpose_detection",
           "dynamic_prompt",
+          "ernie_image_denoise",
+          "ernie_image_model_loader",
+          "ernie_image_text_encoder",
+          "ernie_image_vae_decode",
+          "ernie_image_vae_encode",
           "esrgan",
           "expand_mask_with_fade",
           "face_identifier",
@@ -39271,6 +40109,21 @@
               },
               {
                 "$ref": "#/components/schemas/ESRGANInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageDenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageTextEncoderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageVaeDecodeInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageVaeEncodeInvocation"
               },
               {
                 "$ref": "#/components/schemas/ExpandMaskWithFadeInvocation"
@@ -40155,6 +41008,21 @@
               },
               {
                 "$ref": "#/components/schemas/ESRGANInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageDenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageTextEncoderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageVaeDecodeInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ErnieImageVaeEncodeInvocation"
               },
               {
                 "$ref": "#/components/schemas/ExpandMaskWithFadeInvocation"
@@ -47375,6 +48243,171 @@
         "title": "Main_Checkpoint_Anima_Config",
         "description": "Model config for Anima single-file checkpoint models (safetensors).\n\nAnima is built on NVIDIA Cosmos Predict2 DiT with a custom LLM Adapter\nthat bridges Qwen3 0.6B text encoder outputs to the DiT."
       },
+      "Main_Checkpoint_ErnieImage_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "ernie-image",
+            "title": "Base",
+            "default": "ernie-image"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format"
+        ],
+        "title": "Main_Checkpoint_ErnieImage_Config",
+        "description": "Model config for ERNIE-Image single-file checkpoint models."
+      },
       "Main_Checkpoint_FLUX_Config": {
         "properties": {
           "key": {
@@ -48725,6 +49758,163 @@
           "base"
         ],
         "title": "Main_Diffusers_CogView4_Config"
+      },
+      "Main_Diffusers_ErnieImage_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "diffusers",
+            "title": "Format",
+            "default": "diffusers"
+          },
+          "repo_variant": {
+            "$ref": "#/components/schemas/ModelRepoVariant",
+            "default": ""
+          },
+          "base": {
+            "type": "string",
+            "const": "ernie-image",
+            "title": "Base",
+            "default": "ernie-image"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "repo_variant",
+          "base"
+        ],
+        "title": "Main_Diffusers_ErnieImage_Config",
+        "description": "Model config for ERNIE-Image diffusers models (ERNIE-Image, ERNIE-Image-Turbo)."
       },
       "Main_Diffusers_FLUX_Config": {
         "properties": {
@@ -54387,6 +55577,22 @@
           "$ref": "#/components/schemas/VAEOutput"
         }
       },
+      "Mistral3EncoderField": {
+        "description": "Field for Mistral3 text encoder used by ERNIE-Image models.",
+        "properties": {
+          "tokenizer": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load tokenizer submodel"
+          },
+          "text_encoder": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load text_encoder submodel"
+          }
+        },
+        "required": ["tokenizer", "text_encoder"],
+        "title": "Mistral3EncoderField",
+        "type": "object"
+      },
       "ModelFormat": {
         "type": "string",
         "enum": [
@@ -54676,6 +55882,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_ErnieImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
               },
               {
@@ -54698,6 +55907,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Checkpoint_ErnieImage_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -55245,6 +56457,9 @@
                     "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_Diffusers_ErnieImage_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                   },
                   {
@@ -55267,6 +56482,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_ErnieImage_Config"
                   },
                   {
                     "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -55699,6 +56917,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_ErnieImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
               },
               {
@@ -55721,6 +56942,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Checkpoint_ErnieImage_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -56003,6 +57227,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_ErnieImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
               },
               {
@@ -56025,6 +57252,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Checkpoint_ErnieImage_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -56707,6 +57937,7 @@
           "siglip",
           "flux_redux",
           "llava_onevision",
+          "prompt_enhancer",
           "text_llm",
           "external_image_generator",
           "unknown"
@@ -56756,6 +57987,9 @@
                   "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/Main_Diffusers_ErnieImage_Config"
+                },
+                {
                   "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                 },
                 {
@@ -56778,6 +58012,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_Checkpoint_ErnieImage_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -58605,6 +59842,22 @@
         },
         "required": ["width", "height", "dataURL"],
         "title": "ProgressImage",
+        "type": "object"
+      },
+      "PromptEnhancerField": {
+        "description": "Field for the optional ERNIE-Image prompt-enhancer (Ministral3ForCausalLM).",
+        "properties": {
+          "tokenizer": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load PE tokenizer submodel"
+          },
+          "text_encoder": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load PE causal-LM submodel"
+          }
+        },
+        "required": ["tokenizer", "text_encoder"],
+        "title": "PromptEnhancerField",
         "type": "object"
       },
       "PromptTemplateInvocation": {
@@ -66917,6 +68170,8 @@
           "tokenizer",
           "tokenizer_2",
           "tokenizer_3",
+          "pe",
+          "pe_tokenizer",
           "vae",
           "vae_decoder",
           "vae_encoder",

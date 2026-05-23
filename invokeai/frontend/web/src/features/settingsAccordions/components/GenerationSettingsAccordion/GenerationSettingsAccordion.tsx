@@ -8,6 +8,7 @@ import {
   selectFluxDypePreset,
   selectIsAnima,
   selectIsCogView4,
+  selectIsErnieImage,
   selectIsExternal,
   selectIsFLUX,
   selectIsFlux2,
@@ -21,6 +22,7 @@ import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
 import ParamAnimaScheduler from 'features/parameters/components/Core/ParamAnimaScheduler';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
+import ParamErnieImageScheduler from 'features/parameters/components/Core/ParamErnieImageScheduler';
 import ParamFluxDypeExponent from 'features/parameters/components/Core/ParamFluxDypeExponent';
 import ParamFluxDypePreset from 'features/parameters/components/Core/ParamFluxDypePreset';
 import ParamFluxDypeScale from 'features/parameters/components/Core/ParamFluxDypeScale';
@@ -52,6 +54,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const isSD3 = useAppSelector(selectIsSD3);
   const isCogView4 = useAppSelector(selectIsCogView4);
   const isZImage = useAppSelector(selectIsZImage);
+  const isErnieImage = useAppSelector(selectIsErnieImage);
   const isExternal = useAppSelector(selectIsExternal);
   const isQwenImage = useAppSelector(selectIsQwenImage);
   const isAnima = useAppSelector(selectIsAnima);
@@ -104,9 +107,11 @@ export const GenerationSettingsAccordion = memo(() => {
                   !isCogView4 &&
                   !isZImage &&
                   !isQwenImage &&
+                  !isErnieImage &&
                   !isAnima && <ParamScheduler />}
                 {!isExternal && (isFLUX || isFlux2) && <ParamFluxScheduler />}
                 {!isExternal && isZImage && <ParamZImageScheduler />}
+                {!isExternal && isErnieImage && <ParamErnieImageScheduler />}
                 {!isExternal && isAnima && <ParamAnimaScheduler />}
                 {modelSupportsSteps && <ParamSteps />}
                 {isExternal && modelSupportsGuidance && <ParamGuidance />}
