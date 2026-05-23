@@ -101,10 +101,17 @@ class T5Encoder_BnBLLMint8_Config(Config_Base):
 class T5Encoder_SDNQ_Config(Config_Base):
     """Configuration for SDNQ-quantized T5 Encoder models.
 
-    Expected layout matches the standard T5 bundle (``text_encoder_2/`` + ``tokenizer_2/``),
-    with the safetensors in ``text_encoder_2/`` quantized either via SDNQ-style key triplets
-    (``weight`` + ``scale`` [+ ``zero_point``]) or signalled by ``quantization_config.json``
-    with ``quant_method == "sdnq"``.
+    Matches two layouts:
+
+    1. **Standalone T5 bundle**: ``mod.path`` is the pipeline-style root, with
+       ``text_encoder_2/`` (and usually ``tokenizer_2/``) as subfolders.
+    2. **Inline submodel**: ``mod.path`` *is* the ``text_encoder_2`` folder itself —
+       this is how a parent FluxPipeline / similar config registers its T5 submodel
+       (``submodels[TextEncoder2].path_or_prefix`` points straight at the folder).
+
+    In both cases, the SDNQ-quantized state lives next to a ``config.json`` declaring
+    ``T5EncoderModel`` and is signalled either by ``quantization_config.json`` with
+    ``quant_method == "sdnq"`` or by SDNQ-style ``weight`` + ``scale`` key pairs.
     """
 
     base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
@@ -118,13 +125,22 @@ class T5Encoder_SDNQ_Config(Config_Base):
 
         raise_for_override_fields(cls, override_fields)
 
-        te_dir = mod.path / "text_encoder_2"
-        expected_config_path = te_dir / "config.json"
-        raise_for_class_name(expected_config_path, "T5EncoderModel")
+        te_dir = cls._locate_text_encoder_dir(mod)
+        raise_for_class_name(te_dir / "config.json", "T5EncoderModel")
 
         cls._raise_if_not_sdnq_quantized(te_dir)
 
         return cls(**override_fields)
+
+    @classmethod
+    def _locate_text_encoder_dir(cls, mod: ModelOnDisk):
+        """Return the directory that actually holds T5's config.json + safetensors."""
+        nested = mod.path / "text_encoder_2"
+        if (nested / "config.json").exists():
+            return nested
+        if (mod.path / "config.json").exists():
+            return mod.path
+        raise NotAMatchError("no text_encoder_2/config.json or config.json at model root")
 
     @classmethod
     def _raise_if_not_sdnq_quantized(cls, te_dir) -> None:

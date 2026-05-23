@@ -538,7 +538,11 @@ class T5EncoderSDNQLoader(ModelLoader):
         )
 
     def _load_text_encoder(self, config: T5Encoder_SDNQ_Config) -> AnyModel:
-        te_dir = Path(config.path) / "text_encoder_2"
+        # Two layouts: either config.path is the pipeline root (T5 lives under text_encoder_2/),
+        # or config.path is the text_encoder_2 folder itself (FluxPipeline submodel case).
+        base = Path(config.path)
+        nested = base / "text_encoder_2"
+        te_dir = nested if (nested / "config.json").exists() else base
 
         model_config = AutoConfig.from_pretrained(te_dir, local_files_only=True)
         with accelerate.init_empty_weights():
