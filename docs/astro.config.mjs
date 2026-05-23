@@ -10,7 +10,12 @@ import { rehypePrefixBaseToRootLinks } from './plugins/rehype-prefix-base-to-roo
 import starlightContextualMenu from 'starlight-contextual-menu';
 
 // Configs
-import { createRedirects, sidebarConfig, socialConfig } from './src/config';
+import {
+  createHeadConfig,
+  createRedirects,
+  sidebarConfig,
+  socialConfig,
+} from './src/config';
 
 // Deployment target: 'custom' (default, custom domain at invoke.ai) or 'ghpages'
 // (GitHub Pages project URL at invoke-ai.github.io/InvokeAI). Drive site/base from this
@@ -19,12 +24,14 @@ const deployTarget = process.env.DEPLOY_TARGET ?? 'custom';
 const isGhPages = deployTarget === 'ghpages';
 const enableAnalytics = process.env.ENABLE_ANALYTICS === 'true';
 const base = isGhPages ? '/InvokeAI' : '';
+const site = isGhPages ? 'https://invoke-ai.github.io' : 'https://invoke.ai';
 
 const redirects = createRedirects(base);
+const head = createHeadConfig({ base, enableAnalytics, isGhPages, site });
 
 // https://astro.build/config
 export default defineConfig({
-  site: isGhPages ? 'https://invoke-ai.github.io' : 'https://invoke.ai',
+  site,
   base: base || undefined,
   markdown: {
     rehypePlugins: [[rehypePrefixBaseToRootLinks, { base }]],
@@ -44,23 +51,7 @@ export default defineConfig({
       editLink: {
         baseUrl: 'https://github.com/invoke-ai/InvokeAI/edit/main/docs',
       },
-      head:
-        enableAnalytics && !isGhPages
-          ? [
-              {
-                tag: 'script',
-                attrs: {
-                  async: true,
-                  src: 'https://plausible.tracking.events/js/pa-BHcumuOemKz4XIQeWkTn4.js',
-                },
-              },
-              {
-                tag: 'script',
-                content:
-                  'window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};plausible.init()',
-              },
-            ]
-          : [],
+      head,
       defaultLocale: 'root',
       locales: {
         root: {
