@@ -84,6 +84,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_GGUF_QwenImage_Config,
     Main_GGUF_ZImage_Config,
     Main_SDNQ_Diffusers_FLUX_Config,
+    Main_SDNQ_Diffusers_ZImage_Config,
     Main_SDNQ_Flux2_Config,
     Main_SDNQ_FLUX_Config,
     Main_SDNQ_ZImage_Config,
@@ -207,6 +208,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_SDNQ_Diffusers_FLUX_Config, Main_SDNQ_Diffusers_FLUX_Config.get_tag()],
         Annotated[Main_SDNQ_Flux2_Config, Main_SDNQ_Flux2_Config.get_tag()],
         Annotated[Main_SDNQ_ZImage_Config, Main_SDNQ_ZImage_Config.get_tag()],
+        Annotated[Main_SDNQ_Diffusers_ZImage_Config, Main_SDNQ_Diffusers_ZImage_Config.get_tag()],
         # VAE - checkpoint format
         Annotated[VAE_Checkpoint_SD1_Config, VAE_Checkpoint_SD1_Config.get_tag()],
         Annotated[VAE_Checkpoint_SD2_Config, VAE_Checkpoint_SD2_Config.get_tag()],

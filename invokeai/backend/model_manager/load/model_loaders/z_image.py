@@ -14,6 +14,7 @@ from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_ZImage_Config,
     Main_GGUF_ZImage_Config,
+    Main_SDNQ_Diffusers_ZImage_Config,
     Main_SDNQ_ZImage_Config,
 )
 from invokeai.backend.model_manager.configs.qwen3_encoder import (
@@ -563,18 +564,28 @@ class ZImageGGUFCheckpointModel(ModelLoader):
 
 @ModelLoaderRegistry.register(base=BaseModelType.ZImage, type=ModelType.Main, format=ModelFormat.SDNQQuantized)
 class ZImageSDNQCheckpointModel(ModelLoader):
-    """Class to load SDNQ-quantized Z-Image transformer models."""
+    """Class to load SDNQ-quantized Z-Image transformer models.
+
+    Handles both single-file SDNQ checkpoints (``Main_SDNQ_ZImage_Config``) and full
+    diffusers-pipeline folders (``Main_SDNQ_Diffusers_ZImage_Config``), where the
+    quantized weights live under ``transformer/`` alongside a ``config.json`` that
+    describes the architecture.
+    """
 
     def _load_model(
         self,
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if not isinstance(config, Checkpoint_Config_Base):
-            raise ValueError("Only CheckpointConfigBase models are currently supported here.")
+        if not isinstance(config, (Main_SDNQ_ZImage_Config, Main_SDNQ_Diffusers_ZImage_Config)):
+            raise ValueError(
+                "Only Main_SDNQ_ZImage_Config or Main_SDNQ_Diffusers_ZImage_Config models are supported here."
+            )
 
         match submodel_type:
             case SubModelType.Transformer:
+                if isinstance(config, Main_SDNQ_Diffusers_ZImage_Config):
+                    return self._load_from_diffusers_folder(config)
                 return self._load_from_singlefile(config)
 
         raise ValueError(
@@ -583,21 +594,15 @@ class ZImageSDNQCheckpointModel(ModelLoader):
 
     def _load_from_singlefile(
         self,
-        config: AnyModelConfig,
+        config: Main_SDNQ_ZImage_Config,
     ) -> AnyModel:
         from diffusers import ZImageTransformer2DModel
 
-        if not isinstance(config, Main_SDNQ_ZImage_Config):
-            raise TypeError(
-                f"Expected Main_SDNQ_ZImage_Config, got {type(config).__name__}. Model configuration type mismatch."
-            )
         model_path = Path(config.path)
 
-        # Determine safe dtype based on target device capabilities
         target_device = TorchDevice.choose_torch_device()
         compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
-        # Load the SDNQ state dict
         sd = sdnq_sd_loader(model_path, compute_dtype=compute_dtype)
 
         # Some Z-Image SDNQ models may have keys prefixed with "diffusion_model." or
@@ -643,6 +648,34 @@ class ZImageSDNQCheckpointModel(ModelLoader):
             )
 
         model.load_state_dict(sd, assign=True)
+        return model
+
+    def _load_from_diffusers_folder(
+        self,
+        config: Main_SDNQ_Diffusers_ZImage_Config,
+    ) -> AnyModel:
+        from diffusers import ZImageTransformer2DModel
+
+        # When ZImagePipeline is registered with submodels, the transformer submodel's path points
+        # into transformer/ directly. The pipeline-level Main config has its own path at the root.
+        # Either way, locate the transformer/config.json + safetensors.
+        model_path = Path(config.path)
+        transformer_path = model_path / "transformer" if (model_path / "transformer").is_dir() else model_path
+
+        target_device = TorchDevice.choose_torch_device()
+        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+
+        # Build the empty model from the on-disk architecture description so we honor non-default
+        # axes_lens / dim / etc. that the single-file path hardcodes.
+        with accelerate.init_empty_weights():
+            model = ZImageTransformer2DModel.from_config(
+                ZImageTransformer2DModel.load_config(transformer_path, local_files_only=True)
+            )
+
+        sd = sdnq_sd_loader(transformer_path, compute_dtype=compute_dtype)
+        # Diffusers-format Z-Image keys already match ZImageTransformer2DModel.state_dict(),
+        # so no BFL→diffusers conversion is needed here.
+        model.load_state_dict(sd, assign=True, strict=False)
         return model
 
 

@@ -1566,6 +1566,114 @@ class Main_SDNQ_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_B
             raise NotAMatchError("state dict does not look like SDNQ quantized")
 
 
+class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
+    """Model config for SDNQ-quantized Z-Image models in diffusers format (full ZImagePipeline folder)."""
+
+    base: Literal[BaseModelType.ZImage] = Field(default=BaseModelType.ZImage)
+    format: Literal[ModelFormat.SDNQQuantized] = Field(default=ModelFormat.SDNQQuantized)
+
+    repo_variant: ModelRepoVariant = Field(default=ModelRepoVariant.Default)
+    submodels: dict[SubModelType, SubmodelDefinition] | None = Field(
+        description="Loadable submodels in this model",
+        default=None,
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_z_image_diffusers(mod)
+
+        cls._validate_has_sdnq_transformer(mod)
+
+        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant(mod)
+
+        submodels = override_fields.get("submodels") or cls._get_submodels(mod)
+
+        return cls(**override_fields, repo_variant=repo_variant, submodels=submodels)
+
+    @classmethod
+    def _validate_looks_like_z_image_diffusers(cls, mod: ModelOnDisk) -> None:
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "ZImagePipeline",
+                "ZImageTransformer2DModel",
+            },
+        )
+
+    @classmethod
+    def _validate_has_sdnq_transformer(cls, mod: ModelOnDisk) -> None:
+        transformer_path = mod.path / "transformer"
+        if not transformer_path.is_dir():
+            raise NotAMatchError("no transformer subfolder found")
+
+        if not _is_sdnq_folder(transformer_path):
+            raise NotAMatchError("transformer is not SDNQ quantized")
+
+    @classmethod
+    def _get_repo_variant(cls, mod: ModelOnDisk) -> ModelRepoVariant:
+        weight_files = list(mod.path.glob("**/*.safetensors"))
+        weight_files.extend(list(mod.path.glob("**/*.bin")))
+        for x in weight_files:
+            if ".fp16" in x.suffixes:
+                return ModelRepoVariant.FP16
+            if "openvino_model" in x.name:
+                return ModelRepoVariant.OpenVINO
+            if "flax_model" in x.name:
+                return ModelRepoVariant.Flax
+            if x.suffix == ".onnx":
+                return ModelRepoVariant.ONNX
+        return ModelRepoVariant.Default
+
+    @classmethod
+    def _get_submodels(cls, mod: ModelOnDisk) -> dict[SubModelType, SubmodelDefinition]:
+        config = get_config_dict_or_raise(common_config_paths(mod.path))
+
+        submodels: dict[SubModelType, SubmodelDefinition] = {}
+
+        for key, value in config.items():
+            if key.startswith("_") or not (isinstance(value, list) and len(value) == 2):
+                continue
+
+            _library_name, class_name = value
+
+            if class_name is None:
+                continue
+
+            match class_name:
+                case "ZImageTransformer2DModel":
+                    submodels[SubModelType.Transformer] = SubmodelDefinition(
+                        path_or_prefix=(mod.path / key).resolve().as_posix(),
+                        model_type=ModelType.Main,
+                        variant=None,
+                    )
+                case "Qwen3ForCausalLM":
+                    submodels[SubModelType.TextEncoder] = SubmodelDefinition(
+                        path_or_prefix=(mod.path / key).resolve().as_posix(),
+                        model_type=ModelType.Qwen3Encoder,
+                        variant=None,
+                    )
+                case "Qwen2Tokenizer":
+                    submodels[SubModelType.Tokenizer] = SubmodelDefinition(
+                        path_or_prefix=(mod.path / key).resolve().as_posix(),
+                        model_type=ModelType.Qwen3Encoder,
+                        variant=None,
+                    )
+                case "AutoencoderKL":
+                    submodels[SubModelType.VAE] = SubmodelDefinition(
+                        path_or_prefix=(mod.path / key).resolve().as_posix(),
+                        model_type=ModelType.VAE,
+                        variant=None,
+                    )
+                case _:
+                    pass
+
+        return submodels
+
+
 def _is_sdnq_folder(folder_path: Path) -> bool:
     """Check if a folder contains SDNQ-quantized model weights by checking quantization_config.json."""
     import json
