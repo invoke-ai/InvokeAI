@@ -119,9 +119,7 @@ def denoise(
         t_curr = timesteps[i]
         t_next = timesteps[i + 1]
         # Sigmas are [0, 1]; scale up to the model's training-timestep range.
-        t_vec = torch.full(
-            (img.shape[0],), t_curr * model_timestep_scale, dtype=img.dtype, device=img.device
-        )
+        t_vec = torch.full((img.shape[0],), t_curr * model_timestep_scale, dtype=img.dtype, device=img.device)
 
         pred = _forward(model, img, t_vec, text_bth, text_lens)
         step_cfg = cfg_scale[min(i, len(cfg_scale) - 1)]
