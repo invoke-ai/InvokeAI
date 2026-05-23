@@ -51,6 +51,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_GGUF_Flux2_Config,
     Main_GGUF_FLUX_Config,
     Main_SDNQ_Diffusers_FLUX_Config,
+    Main_SDNQ_Flux2_Config,
     Main_SDNQ_FLUX_Config,
 )
 from invokeai.backend.model_manager.configs.t5_encoder import (
@@ -1166,6 +1167,98 @@ class Flux2CheckpointModel(ModelLoader):
             sd[key] = sd[key].float()
 
         return sd
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Flux2, type=ModelType.Main, format=ModelFormat.SDNQQuantized)
+class Flux2SDNQCheckpointModel(ModelLoader):
+    """Class to load SDNQ-quantized FLUX.2 transformer models (e.g. Klein 4B / 9B).
+
+    The checkpoint is expected to be in diffusers layout (i.e. the same key naming as
+    Flux2Transformer2DModel.state_dict()), since SDNQ tooling typically operates on
+    diffusers state dicts. BFL-layout SDNQ FLUX.2 checkpoints are not supported here.
+    """
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, Main_SDNQ_Flux2_Config):
+            raise ValueError("Only Main_SDNQ_Flux2_Config models are supported here.")
+
+        match submodel_type:
+            case SubModelType.Transformer:
+                return self._load_from_singlefile(config)
+
+        raise ValueError(
+            f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
+        )
+
+    def _load_from_singlefile(self, config: Main_SDNQ_Flux2_Config) -> AnyModel:
+        from diffusers import Flux2Transformer2DModel
+
+        model_path = Path(config.path)
+
+        sd = sdnq_sd_loader(model_path, compute_dtype=torch.bfloat16)
+
+        # Detect architecture from state dict shapes. SDNQTensor.shape returns the
+        # *dequantized* shape, so this works identically to the fp16 path.
+        double_block_indices = [
+            int(k.split(".")[1]) for k in sd.keys() if isinstance(k, str) and k.startswith("transformer_blocks.")
+        ]
+        single_block_indices = [
+            int(k.split(".")[1]) for k in sd.keys() if isinstance(k, str) and k.startswith("single_transformer_blocks.")
+        ]
+        num_layers = max(double_block_indices) + 1 if double_block_indices else 5
+        num_single_layers = max(single_block_indices) + 1 if single_block_indices else 20
+
+        context_embedder_weight = sd.get("context_embedder.weight")
+        if context_embedder_weight is not None:
+            hidden_size = context_embedder_weight.shape[0]
+            joint_attention_dim = context_embedder_weight.shape[1]
+        else:
+            hidden_size = 3072
+            joint_attention_dim = 7680
+
+        x_embedder_weight = sd.get("x_embedder.weight")
+        in_channels = x_embedder_weight.shape[1] if x_embedder_weight is not None else 128
+
+        attention_head_dim = 128
+        num_attention_heads = hidden_size // attention_head_dim
+
+        has_guidance = "time_guidance_embed.guidance_embedder.linear_1.weight" in sd
+
+        with SilenceWarnings():
+            with accelerate.init_empty_weights():
+                model = Flux2Transformer2DModel(
+                    in_channels=in_channels,
+                    out_channels=in_channels,
+                    num_layers=num_layers,
+                    num_single_layers=num_single_layers,
+                    attention_head_dim=attention_head_dim,
+                    num_attention_heads=num_attention_heads,
+                    joint_attention_dim=joint_attention_dim,
+                    patch_size=1,
+                )
+
+        # Klein variants ship without guidance embeddings — zero-fill from the timestep
+        # embedder dimensions so load_state_dict has a tensor for those slots.
+        if not has_guidance:
+            timestep_linear1 = sd.get("time_guidance_embed.timestep_embedder.linear_1.weight")
+            if timestep_linear1 is not None:
+                out_features, in_features = timestep_linear1.shape[0], timestep_linear1.shape[1]
+                sd["time_guidance_embed.guidance_embedder.linear_1.weight"] = torch.zeros(
+                    out_features, in_features, dtype=torch.bfloat16
+                )
+                timestep_linear2 = sd.get("time_guidance_embed.timestep_embedder.linear_2.weight")
+                if timestep_linear2 is not None:
+                    out2, in2 = timestep_linear2.shape[0], timestep_linear2.shape[1]
+                    sd["time_guidance_embed.guidance_embedder.linear_2.weight"] = torch.zeros(
+                        out2, in2, dtype=torch.bfloat16
+                    )
+
+        model.load_state_dict(sd, assign=True)
+        return model
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Flux2, type=ModelType.Main, format=ModelFormat.GGUFQuantized)

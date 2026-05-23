@@ -1477,6 +1477,64 @@ class Main_SDNQ_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Bas
             raise NotAMatchError("state dict does not look like SDNQ quantized")
 
 
+class Main_SDNQ_Flux2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for SDNQ-quantized FLUX.2 transformer models (e.g. Klein 4B / 9B)."""
+
+    base: Literal[BaseModelType.Flux2] = Field(default=BaseModelType.Flux2)
+    format: Literal[ModelFormat.SDNQQuantized] = Field(default=ModelFormat.SDNQQuantized)
+
+    variant: Flux2VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_main_model(mod)
+
+        cls._validate_is_flux2(mod)
+
+        cls._validate_looks_like_sdnq_quantized(mod)
+
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _validate_looks_like_main_model(cls, mod: ModelOnDisk) -> None:
+        has_main_model_keys = _has_main_keys(mod.load_state_dict())
+        if not has_main_model_keys:
+            raise NotAMatchError("state dict does not look like a main model")
+
+    @classmethod
+    def _validate_is_flux2(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
+        if not _is_flux2_model(state_dict):
+            raise NotAMatchError("state dict does not look like a FLUX.2 model")
+
+    @classmethod
+    def _validate_looks_like_sdnq_quantized(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
+        if not _has_sdnq_keys(state_dict) and not _has_sdnq_tensors(state_dict):
+            raise NotAMatchError("state dict does not look like SDNQ quantized")
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> Flux2VariantType:
+        state_dict = mod.load_state_dict()
+        variant = _get_flux2_variant(state_dict)
+
+        if variant is None:
+            raise NotAMatchError("unable to determine FLUX.2 model variant from state dict")
+
+        if variant == Flux2VariantType.Klein9B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein9BBase
+        if variant == Flux2VariantType.Klein4B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein4BBase
+
+        return variant
+
+
 class Main_SDNQ_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
     """Model config for SDNQ-quantized Z-Image transformer models."""
 
