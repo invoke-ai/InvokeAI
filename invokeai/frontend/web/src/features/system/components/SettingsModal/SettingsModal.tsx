@@ -23,10 +23,12 @@ import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableCon
 import { buildUseBoolean } from 'common/hooks/useBoolean';
 import { selectCurrentUser } from 'features/auth/store/authSlice';
 import { selectShouldUseCPUNoise, shouldUseCpuNoiseChanged } from 'features/controlLayers/store/paramsSlice';
+import { ExternalProviderStatusList } from 'features/system/components/SettingsModal/ExternalProviderStatusList';
 import { useRefreshAfterResetModal } from 'features/system/components/SettingsModal/RefreshAfterResetModal';
 import { SettingsDeveloperLogIsEnabled } from 'features/system/components/SettingsModal/SettingsDeveloperLogIsEnabled';
 import { SettingsDeveloperLogLevel } from 'features/system/components/SettingsModal/SettingsDeveloperLogLevel';
 import { SettingsDeveloperLogNamespaces } from 'features/system/components/SettingsModal/SettingsDeveloperLogNamespaces';
+import { SettingsImageSubfolderStrategySelect } from 'features/system/components/SettingsModal/SettingsImageSubfolderStrategySelect';
 import { useClearIntermediates } from 'features/system/components/SettingsModal/useClearIntermediates';
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
 import {
@@ -38,6 +40,7 @@ import {
   selectSystemShouldEnableInformationalPopovers,
   selectSystemShouldEnableModelDescriptions,
   selectSystemShouldShowInvocationProgressDetail,
+  selectSystemShouldUseMiddleClickToOpenInNewTab,
   selectSystemShouldUseNSFWChecker,
   selectSystemShouldUseWatermarker,
   setPrefersNumericAttentionStyle,
@@ -46,6 +49,7 @@ import {
   setShouldEnableModelDescriptions,
   setShouldHighlightFocusedRegions,
   setShouldShowInvocationProgressDetail,
+  setShouldUseMiddleClickToOpenInNewTab,
   shouldAntialiasProgressImageChanged,
   shouldConfirmOnNewSessionToggled,
   shouldUseNSFWCheckerChanged,
@@ -99,6 +103,7 @@ const SettingsModal = (props: { children: ReactElement }) => {
   const shouldEnableInformationalPopovers = useAppSelector(selectSystemShouldEnableInformationalPopovers);
   const shouldEnableModelDescriptions = useAppSelector(selectSystemShouldEnableModelDescriptions);
   const shouldHighlightFocusedRegions = useAppSelector(selectSystemShouldEnableHighlightFocusedRegions);
+  const shouldUseMiddleClickToOpenInNewTab = useAppSelector(selectSystemShouldUseMiddleClickToOpenInNewTab);
   const shouldConfirmOnNewSession = useAppSelector(selectSystemShouldConfirmOnNewSession);
   const shouldShowInvocationProgressDetail = useAppSelector(selectSystemShouldShowInvocationProgressDetail);
   const maxQueueHistory = runtimeConfig?.config.max_queue_history ?? null;
@@ -234,6 +239,13 @@ const SettingsModal = (props: { children: ReactElement }) => {
     [dispatch]
   );
 
+  const handleChangeShouldUseMiddleClickToOpenInNewTab = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setShouldUseMiddleClickToOpenInNewTab(e.target.checked));
+    },
+    [dispatch]
+  );
+
   const handleChangePreferAttentionStyleNumeric = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(setPrefersNumericAttentionStyle(e.target.checked));
@@ -308,6 +320,11 @@ const SettingsModal = (props: { children: ReactElement }) => {
                         <NumberInputField onKeyDown={handleKeyDownMaxQueueHistory} />
                       </NumberInput>
                     </FormControl>
+                    <SettingsImageSubfolderStrategySelect />
+                  </StickyScrollable>
+
+                  <StickyScrollable title={t('settings.models')}>
+                    <ExternalProviderStatusList />
                   </StickyScrollable>
 
                   <StickyScrollable title={t('settings.ui')}>
@@ -358,6 +375,13 @@ const SettingsModal = (props: { children: ReactElement }) => {
                       <Switch
                         isChecked={shouldHighlightFocusedRegions}
                         onChange={handleChangeShouldHighlightFocusedRegions}
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel>{t('settings.middleClickOpenInNewTab')}</FormLabel>
+                      <Switch
+                        isChecked={shouldUseMiddleClickToOpenInNewTab}
+                        onChange={handleChangeShouldUseMiddleClickToOpenInNewTab}
                       />
                     </FormControl>
                   </StickyScrollable>

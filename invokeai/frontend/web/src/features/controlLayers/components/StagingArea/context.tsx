@@ -75,11 +75,18 @@ export const StagingAreaContextProvider = memo(({ children, sessionId }: PropsWi
       onAccept: (item, imageDTO) => {
         const bboxRect = selectBboxRect(store.getState());
         const { x, y } = bboxRect;
+        const imageObject = imageDTOToImageObject(imageDTO, { usePixelBbox: false });
+        const scale = Math.min(bboxRect.width / imageDTO.width, bboxRect.height / imageDTO.height);
+        const scaledWidth = Math.round(imageDTO.width * scale);
+        const scaledHeight = Math.round(imageDTO.height * scale);
+        const position = {
+          x: x + Math.round((bboxRect.width - scaledWidth) / 2),
+          y: y + Math.round((bboxRect.height - scaledHeight) / 2),
+        };
         const selectedEntityIdentifier = selectSelectedEntityIdentifier(store.getState());
 
-        const imageObject = imageDTOToImageObject(imageDTO);
         const overrides: Partial<CanvasRasterLayerState> = {
-          position: { x, y },
+          position,
           objects: [imageObject],
         };
         store.dispatch(rasterLayerAdded({ overrides, isSelected: selectedEntityIdentifier?.type === 'raster_layer' }));

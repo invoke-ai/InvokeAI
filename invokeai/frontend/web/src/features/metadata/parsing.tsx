@@ -11,15 +11,25 @@ import {
   animaQwen3EncoderModelSelected,
   animaT5EncoderModelSelected,
   animaVaeModelSelected,
+  geminiTemperatureChanged,
+  geminiThinkingLevelChanged,
   heightChanged,
+  imageSizeChanged,
   kleinQwen3EncoderModelSelected,
   kleinVaeModelSelected,
   negativePromptChanged,
+  openaiBackgroundChanged,
+  openaiInputFidelityChanged,
+  openaiQualityChanged,
   positivePromptChanged,
   qwenImageComponentSourceSelected,
   qwenImageQuantizationChanged,
+  qwenImageQwenVLEncoderModelSelected,
   qwenImageShiftChanged,
+  qwenImageVaeModelSelected,
   refinerModelChanged,
+  seedreamOptimizePromptChanged,
+  seedreamWatermarkChanged,
   selectBase,
   setAnimaScheduler,
   setCfgRescaleMultiplier,
@@ -374,6 +384,15 @@ const Guidance: SingleMetadataHandler<ParameterGuidance> = {
   [SingleMetadataKey]: true,
   type: 'Guidance',
   parse: (metadata, _store) => {
+    // Legacy FLUX.2 images may still carry a `guidance` field, but guidance_embeds
+    // is inert for all current Klein variants. Reject parsing for FLUX.2 metadata
+    // so the handler is skipped on both display and recall - avoids leaking a stale
+    // value into the shared guidance param (which is still used by FLUX.1).
+    const rawModel = getProperty(metadata, 'model');
+    const modelBase = (rawModel as { base?: unknown } | undefined)?.base;
+    if (modelBase === 'flux2') {
+      throw new Error('Guidance is not used for FLUX.2 Klein models.');
+    }
     const raw = getProperty(metadata, 'guidance');
     const parsed = zParameterGuidance.parse(raw);
     return Promise.resolve(parsed);
@@ -480,8 +499,15 @@ const Scheduler: SingleMetadataHandler<ParameterScheduler> = {
         store.dispatch(setZImageScheduler(value));
       }
     } else if (base === 'anima') {
-      // Anima supports euler, heun, lcm
-      if (value === 'euler' || value === 'heun' || value === 'lcm') {
+      // Anima supports euler, heun, dpmpp_2m, dpmpp_2m_sde, er_sde, lcm
+      if (
+        value === 'euler' ||
+        value === 'heun' ||
+        value === 'dpmpp_2m' ||
+        value === 'dpmpp_2m_sde' ||
+        value === 'er_sde' ||
+        value === 'lcm'
+      ) {
         store.dispatch(setAnimaScheduler(value));
       }
     } else {
@@ -716,6 +742,58 @@ const QwenImageComponentSource: SingleMetadataHandler<ModelIdentifierField | nul
 };
 //#endregion QwenImageComponentSource
 
+//#region QwenImageVaeModel
+const QwenImageVaeModel: SingleMetadataHandler<ModelIdentifierField | null> = {
+  [SingleMetadataKey]: true,
+  type: 'QwenImageVaeModel',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'qwen_image_vae');
+    // Reject when the key is absent so the handler is not rendered for non-Qwen images
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(zModelIdentifierField.parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(qwenImageVaeModelSelected(value));
+  },
+  i18nKey: 'modelManager.qwenImageVae',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField | null>) => (
+    <MetadataPrimitiveValue value={value ? value.name : 'None'} />
+  ),
+};
+//#endregion QwenImageVaeModel
+
+//#region QwenImageQwenVLEncoderModel
+const QwenImageQwenVLEncoderModel: SingleMetadataHandler<ModelIdentifierField | null> = {
+  [SingleMetadataKey]: true,
+  type: 'QwenImageQwenVLEncoderModel',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'qwen_image_qwen_vl_encoder');
+    // Reject when the key is absent so the handler is not rendered for non-Qwen images
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(zModelIdentifierField.parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(qwenImageQwenVLEncoderModelSelected(value));
+  },
+  i18nKey: 'modelManager.qwenImageQwenVLEncoder',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField | null>) => (
+    <MetadataPrimitiveValue value={value ? value.name : 'None'} />
+  ),
+};
+//#endregion QwenImageQwenVLEncoderModel
+
 //#region QwenImageQuantization
 const QwenImageQuantization: SingleMetadataHandler<'none' | 'int8' | 'nf4'> = {
   [SingleMetadataKey]: true,
@@ -768,12 +846,26 @@ const QwenImageShift: SingleMetadataHandler<number | null> = {
 //#endregion QwenImageShift
 
 //#region ZImageShift
-const ZImageShift: SingleMetadataHandler<number> = {
+const ZImageShift: SingleMetadataHandler<number | null> = {
   [SingleMetadataKey]: true,
   type: 'ZImageShift',
-  parse: (metadata, _store) => {
+  parse: (metadata, store) => {
     const raw = getProperty(metadata, 'z_image_shift');
-    const parsed = z.number().min(0).max(3).parse(raw);
+    if (raw === undefined) {
+      // Older Z-Image images and new images generated with auto shift don't include this key.
+      // Recall as null (auto) only when the recalled image is a Z-Image, so we don't clobber
+      // the user's current shift when recalling unrelated metadata.
+      const base = selectBase(store.getState());
+      if (base !== 'z-image') {
+        return Promise.reject();
+      }
+      return Promise.resolve(null);
+    }
+    // null or the 'auto' sentinel (written by the graph builder when shift is auto) recall as auto.
+    if (raw === null || raw === 'auto') {
+      return Promise.resolve(null);
+    }
+    const parsed = z.number().min(0).max(10).parse(raw);
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
@@ -781,7 +873,9 @@ const ZImageShift: SingleMetadataHandler<number> = {
   },
   i18nKey: 'metadata.zImageShift',
   LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => (
+    <MetadataPrimitiveValue value={value ?? 'Auto'} />
+  ),
 };
 //#endregion ZImageShift
 
@@ -952,6 +1046,9 @@ const VAEModel: SingleMetadataHandler<ParameterVAEModel> = {
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
     assert(isCompatibleWithMainModel(parsed, store));
+    // Z-Image and FLUX.2 Klein have dedicated VAE handlers; avoid rendering a duplicate row.
+    const base = selectBase(store.getState());
+    assert(base !== 'z-image' && base !== 'flux2', 'VAEModel handler does not apply to Z-Image or FLUX.2 Klein');
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
@@ -1186,7 +1283,8 @@ const LoRAs: CollectionMetadataHandler<LoRA[]> = {
           const key = getProperty(rawItem, 'lora.key');
           assert(isString(key));
           // No need to catch here - if this throws, we move on to the next item
-          identifier = await getModelIdentiferFromKey(key, store);
+          const modelConfig = await getModelIdentiferFromKey(key, store);
+          identifier = zModelIdentifierField.parse(modelConfig);
         }
 
         assert(identifier.type === 'lora');
@@ -1372,6 +1470,155 @@ const RefImages: CollectionMetadataHandler<RefImageState[]> = {
 };
 //#endregion RefImages
 
+//#region External Image Size
+const ImageSize: SingleMetadataHandler<string> = {
+  [SingleMetadataKey]: true,
+  type: 'ImageSize',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'image_size');
+    const parsed = z.string().min(1).parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(imageSizeChanged(value));
+  },
+  i18nKey: 'metadata.imageSize',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<string>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion External Image Size
+
+//#region Gemini Temperature
+const GeminiTemperature: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'GeminiTemperature',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'gemini_temperature');
+    const parsed = z.number().min(0).max(2).parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(geminiTemperatureChanged(value));
+  },
+  i18nKey: 'metadata.geminiTemperature',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Gemini Temperature
+
+//#region Gemini Thinking Level
+const zGeminiThinkingLevel = z.enum(['minimal', 'high']);
+const GeminiThinkingLevel: SingleMetadataHandler<'minimal' | 'high'> = {
+  [SingleMetadataKey]: true,
+  type: 'GeminiThinkingLevel',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'gemini_thinking_level');
+    const parsed = zGeminiThinkingLevel.parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(geminiThinkingLevelChanged(value));
+  },
+  i18nKey: 'metadata.geminiThinkingLevel',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<'minimal' | 'high'>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Gemini Thinking Level
+
+//#region OpenAI Quality
+const OpenaiQuality: SingleMetadataHandler<'auto' | 'high' | 'medium' | 'low'> = {
+  [SingleMetadataKey]: true,
+  type: 'OpenaiQuality',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'openai_quality');
+    const parsed = z.enum(['auto', 'high', 'medium', 'low']).parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(openaiQualityChanged(value));
+  },
+  i18nKey: 'metadata.openaiQuality',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<'auto' | 'high' | 'medium' | 'low'>) => (
+    <MetadataPrimitiveValue value={value} />
+  ),
+};
+//#endregion OpenAI Quality
+
+//#region OpenAI Background
+const OpenaiBackground: SingleMetadataHandler<'auto' | 'transparent' | 'opaque'> = {
+  [SingleMetadataKey]: true,
+  type: 'OpenaiBackground',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'openai_background');
+    const parsed = z.enum(['auto', 'transparent', 'opaque']).parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(openaiBackgroundChanged(value));
+  },
+  i18nKey: 'metadata.openaiBackground',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<'auto' | 'transparent' | 'opaque'>) => (
+    <MetadataPrimitiveValue value={value} />
+  ),
+};
+//#endregion OpenAI Background
+
+//#region OpenAI Input Fidelity
+const OpenaiInputFidelity: SingleMetadataHandler<'low' | 'high'> = {
+  [SingleMetadataKey]: true,
+  type: 'OpenaiInputFidelity',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'openai_input_fidelity');
+    const parsed = z.enum(['low', 'high']).parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(openaiInputFidelityChanged(value));
+  },
+  i18nKey: 'metadata.openaiInputFidelity',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<'low' | 'high'>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion OpenAI Input Fidelity
+
+//#region Seedream Watermark
+const SeedreamWatermark: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'SeedreamWatermark',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'seedream_watermark');
+    const parsed = z.boolean().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(seedreamWatermarkChanged(value));
+  },
+  i18nKey: 'metadata.seedreamWatermark',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Seedream Watermark
+
+//#region Seedream Optimize Prompt
+const SeedreamOptimizePrompt: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'SeedreamOptimizePrompt',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'seedream_optimize_prompt');
+    const parsed = z.boolean().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(seedreamOptimizePromptChanged(value));
+  },
+  i18nKey: 'metadata.seedreamOptimizePrompt',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Seedream Optimize Prompt
+
 export const ImageMetadataHandlers = {
   CreatedBy,
   GenerationMode,
@@ -1414,12 +1661,22 @@ export const ImageMetadataHandlers = {
   ZImageSeedVarianceStrength,
   ZImageSeedVarianceRandomizePercent,
   QwenImageComponentSource,
+  QwenImageVaeModel,
+  QwenImageQwenVLEncoderModel,
   QwenImageQuantization,
   QwenImageShift,
   ZImageShift,
   LoRAs,
   CanvasLayers,
   RefImages,
+  ImageSize,
+  GeminiTemperature,
+  GeminiThinkingLevel,
+  OpenaiQuality,
+  OpenaiBackground,
+  OpenaiInputFidelity,
+  SeedreamWatermark,
+  SeedreamOptimizePrompt,
   // TODO: These had parsers in the prev implementation, but they were never actually used?
   // controlNet: parseControlNet,
   // controlNets: parseAllControlNets,

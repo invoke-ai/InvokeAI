@@ -1,9 +1,9 @@
 """Dynamic Position Extrapolation (DyPE) for FLUX models.
 
-DyPE enables high-resolution image generation (4K+) with pretrained FLUX models
-by dynamically scaling RoPE position embeddings during the denoising process.
+DyPE enables high-resolution image generation with pretrained FLUX models by
+dynamically modulating RoPE extrapolation during denoising.
 
-Based on: https://github.com/wildminder/ComfyUI-DyPE
+Based on the official DyPE project: https://github.com/guyyariv/DyPE
 """
 
 from invokeai.backend.flux.dype.base import DyPEConfig

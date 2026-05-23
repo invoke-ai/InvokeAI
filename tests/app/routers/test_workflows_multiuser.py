@@ -106,6 +106,7 @@ def mock_services() -> InvocationServices:
         model_relationships=None,  # type: ignore
         client_state_persistence=ClientStatePersistenceSqlite(db=db),
         users=UserService(db),
+        external_generation=None,  # type: ignore
     )
 
 

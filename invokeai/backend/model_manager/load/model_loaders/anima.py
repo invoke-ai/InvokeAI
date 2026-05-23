@@ -67,10 +67,12 @@ class AnimaCheckpointModel(ModelLoader):
         # Load the state dict from safetensors
         sd = load_file(model_path)
 
-        # Strip the `net.` prefix that all Anima checkpoint keys have
-        # e.g., "net.blocks.0.self_attn.q_proj.weight" -> "blocks.0.self_attn.q_proj.weight"
+        # Handle different checkpoint packaging formats:
+        # - Official format: keys prefixed with `net.` (e.g. `net.blocks.0...`)
+        # - ComfyUI bundled format: transformer keys prefixed with `model.diffusion_model.`
+        #   alongside `first_stage_model.*` (VAE) and `cond_stage_model.*` (text encoder)
         prefix_to_strip = None
-        for prefix in ["net."]:
+        for prefix in ["model.diffusion_model.", "net."]:
             if any(k.startswith(prefix) for k in sd.keys() if isinstance(k, str)):
                 prefix_to_strip = prefix
                 break
@@ -80,8 +82,7 @@ class AnimaCheckpointModel(ModelLoader):
             for key, value in sd.items():
                 if isinstance(key, str) and key.startswith(prefix_to_strip):
                     stripped_sd[key[len(prefix_to_strip) :]] = value
-                else:
-                    stripped_sd[key] = value
+                # Skip non-transformer keys from bundled checkpoints (VAE, text encoder)
             sd = stripped_sd
 
         # Create an empty AnimaTransformer with Anima's default architecture parameters
@@ -101,6 +102,14 @@ class AnimaCheckpointModel(ModelLoader):
                 mlp_ratio=4.0,
                 crossattn_emb_channels=1024,
                 pos_emb_cls="rope3d",
+                # Anima reuses the Cosmos-Predict2 2B Text2Image DiT, which trains with
+                # rope_scale=(t=1.0, h=4.0, w=4.0). The NTK-scaled spatial RoPE base is
+                # mandatory; omitting it (theta=10000 on all axes) shifts every step's
+                # velocity ~7% off and compounds into degraded images. Matches diffusers
+                # CosmosTransformer3DModel rope_scale via *_extrapolation_ratio.
+                rope_h_extrapolation_ratio=4.0,
+                rope_w_extrapolation_ratio=4.0,
+                rope_t_extrapolation_ratio=1.0,
                 use_adaln_lora=True,
                 adaln_lora_dim=256,
                 extra_per_block_abs_pos_emb=False,
@@ -109,7 +118,7 @@ class AnimaCheckpointModel(ModelLoader):
 
         # Determine safe dtype
         target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        model_dtype = TorchDevice.choose_anima_inference_dtype(target_device)
 
         # Handle memory management
         new_sd_size = sum(ten.nelement() * model_dtype.itemsize for ten in sd.values())
@@ -120,8 +129,17 @@ class AnimaCheckpointModel(ModelLoader):
             if sd[k].is_floating_point():
                 sd[k] = sd[k].to(model_dtype)
 
-        # Filter out rotary embedding inv_freq buffers that are regenerated at runtime
-        keys_to_remove = [k for k in sd.keys() if k.endswith(".inv_freq")]
+        # Filter out tensors that are regenerated at runtime and therefore not part of the
+        # in-memory module state. Some community-trained checkpoints (e.g. animaCatTower_v10)
+        # serialize derived pos_embedder buffers/cached tensors that the official model
+        # registers as non-persistent (or recomputes locally).
+        runtime_only_suffixes = (
+            ".inv_freq",
+            "pos_embedder.dim_spatial_range",
+            "pos_embedder.dim_temporal_range",
+            "pos_embedder.seq",
+        )
+        keys_to_remove = [k for k in sd.keys() if k.endswith(runtime_only_suffixes)]
         for k in keys_to_remove:
             del sd[k]
 

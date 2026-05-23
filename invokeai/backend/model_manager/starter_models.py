@@ -2,6 +2,13 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+from invokeai.backend.model_manager.configs.external_api import (
+    ExternalApiModelDefaultSettings,
+    ExternalImageSize,
+    ExternalModelCapabilities,
+    ExternalModelPanelSchema,
+    ExternalResolutionPreset,
+)
 from invokeai.backend.model_manager.taxonomy import (
     AnyVariant,
     BaseModelType,
@@ -20,6 +27,9 @@ class StarterModelWithoutDependencies(BaseModel):
     format: Optional[ModelFormat] = None
     variant: Optional[AnyVariant] = None
     is_installed: bool = False
+    capabilities: ExternalModelCapabilities | None = None
+    default_settings: ExternalApiModelDefaultSettings | None = None
+    panel_schema: ExternalModelPanelSchema | None = None
     # allows us to track what models a user has installed across name changes within starter models
     # if you update a starter model name, please add the old one to this list for that starter model
     previous_names: list[str] = []
@@ -656,6 +666,38 @@ cogview4 = StarterModel(
 )
 # endregion
 
+# region Qwen Image components (shared between Edit and txt2img variants)
+qwen_image_vae = StarterModel(
+    name="Qwen Image VAE",
+    base=BaseModelType.QwenImage,
+    source="Qwen/Qwen-Image-Edit-2511::vae/diffusion_pytorch_model.safetensors",
+    description="Qwen Image VAE (AutoencoderKLQwenImage), shared between the Edit and txt2img variants. "
+    "Use with GGUF transformers to avoid downloading the full ~40GB Diffusers pipeline. (~250MB)",
+    type=ModelType.VAE,
+    format=ModelFormat.Checkpoint,
+)
+
+qwen_vl_encoder_fp8 = StarterModel(
+    name="Qwen2.5-VL Encoder (fp8 scaled)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
+    description="ComfyUI's single-file FP8-scaled Qwen2.5-VL 7B encoder. Bundles the language model and "
+    "visual tower; tokenizer/processor are fetched from HuggingFace on first use. (~7GB)",
+    type=ModelType.QwenVLEncoder,
+    format=ModelFormat.Checkpoint,
+)
+
+qwen_vl_encoder_diffusers = StarterModel(
+    name="Qwen2.5-VL Encoder (Diffusers)",
+    base=BaseModelType.Any,
+    source="Qwen/Qwen-Image-Edit-2511::text_encoder+tokenizer+processor",
+    description="Full-precision Qwen2.5-VL 7B encoder in Diffusers folder layout (text_encoder + tokenizer + processor). "
+    "Larger than the fp8 variant but no on-the-fly dequantization. (~16GB)",
+    type=ModelType.QwenVLEncoder,
+    format=ModelFormat.QwenVLEncoder,
+)
+# endregion
+
 # region Qwen Image Edit
 qwen_image_edit = StarterModel(
     name="Qwen Image Edit 2511",
@@ -674,6 +716,7 @@ qwen_image_edit_gguf_q4_k_m = StarterModel(
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
     variant=QwenImageVariantType.Edit,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_edit_gguf_q2_k = StarterModel(
@@ -684,6 +727,7 @@ qwen_image_edit_gguf_q2_k = StarterModel(
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
     variant=QwenImageVariantType.Edit,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_edit_gguf_q6_k = StarterModel(
@@ -694,6 +738,7 @@ qwen_image_edit_gguf_q6_k = StarterModel(
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
     variant=QwenImageVariantType.Edit,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_edit_gguf_q8_0 = StarterModel(
@@ -704,6 +749,7 @@ qwen_image_edit_gguf_q8_0 = StarterModel(
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
     variant=QwenImageVariantType.Edit,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_edit_lightning_4step = StarterModel(
@@ -740,6 +786,7 @@ qwen_image_gguf_q4_k_m = StarterModel(
     description="Qwen Image 2512 - Q4_K_M quantized transformer. Good quality/size balance. (~13GB)",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_gguf_q2_k = StarterModel(
@@ -749,6 +796,7 @@ qwen_image_gguf_q2_k = StarterModel(
     description="Qwen Image 2512 - Q2_K heavily quantized transformer. Smallest size, lower quality. (~7.5GB)",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_gguf_q6_k = StarterModel(
@@ -758,6 +806,7 @@ qwen_image_gguf_q6_k = StarterModel(
     description="Qwen Image 2512 - Q6_K quantized transformer. Near-lossless quality. (~17GB)",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_gguf_q8_0 = StarterModel(
@@ -767,6 +816,7 @@ qwen_image_gguf_q8_0 = StarterModel(
     description="Qwen Image 2512 - Q8_0 quantized transformer. Highest quality quantization. (~22GB)",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_lightning_4step = StarterModel(
@@ -809,13 +859,47 @@ flux_redux = StarterModel(
 )
 # endregion
 
-# region LlavaOnevisionModel
+# region LlavaOnevisionModel (vision-language models for Image-to-Prompt)
 llava_onevision = StarterModel(
     name="LLaVA Onevision Qwen2 0.5B",
     base=BaseModelType.Any,
     source="llava-hf/llava-onevision-qwen2-0.5b-ov-hf",
-    description="LLaVA Onevision VLLM model",
+    description="LLaVA Onevision vision-language model (~1 GB). Lightweight default for the Image-to-Prompt feature.",
     type=ModelType.LlavaOnevision,
+)
+
+llava_onevision_7b = StarterModel(
+    name="LLaVA Onevision Qwen2 7B",
+    base=BaseModelType.Any,
+    source="llava-hf/llava-onevision-qwen2-7b-ov-hf",
+    description="LLaVA Onevision 7B vision-language model. Larger, higher-quality alternative for Image-to-Prompt. (~16 GB)",
+    type=ModelType.LlavaOnevision,
+)
+# endregion
+
+# region TextLLM (causal language models for Prompt Expansion)
+qwen2_5_1_5b_instruct = StarterModel(
+    name="Qwen2.5-1.5B-Instruct",
+    base=BaseModelType.Any,
+    source="Qwen/Qwen2.5-1.5B-Instruct",
+    description="Qwen2.5 1.5B instruction-tuned LLM. Recommended default for the Prompt Expansion feature — small and fast. (~3 GB)",
+    type=ModelType.TextLLM,
+)
+
+qwen2_5_3b_instruct = StarterModel(
+    name="Qwen2.5-3B-Instruct",
+    base=BaseModelType.Any,
+    source="Qwen/Qwen2.5-3B-Instruct",
+    description="Qwen2.5 3B instruction-tuned LLM. Better prompt expansion quality at the cost of more VRAM. (~6 GB)",
+    type=ModelType.TextLLM,
+)
+
+smollm2_1_7b_instruct = StarterModel(
+    name="SmolLM2-1.7B-Instruct",
+    base=BaseModelType.Any,
+    source="HuggingFaceTB/SmolLM2-1.7B-Instruct",
+    description="SmolLM2 1.7B instruction-tuned LLM (Apache-2.0). Alternative to Qwen for prompt expansion. (~3 GB)",
+    type=ModelType.TextLLM,
 )
 # endregion
 
@@ -1001,6 +1085,465 @@ z_image_controlnet_tile = StarterModel(
 )
 # endregion
 
+# region External API
+GEMINI_3_IMAGE_ALLOWED_ASPECT_RATIOS = [
+    "1:1",
+    "1:4",
+    "1:8",
+    "2:3",
+    "3:2",
+    "3:4",
+    "4:1",
+    "4:3",
+    "4:5",
+    "5:4",
+    "8:1",
+    "9:16",
+    "16:9",
+    "21:9",
+]
+GEMINI_3_IMAGE_MAX_SIZE = ExternalImageSize(width=4096, height=4096)
+
+
+def _gemini_3_resolution_presets(
+    image_sizes: list[str],
+    aspect_ratios: list[str] | None = None,
+) -> list[ExternalResolutionPreset]:
+    """Build resolution presets for Gemini 3 models.
+
+    Each preset combines an aspect ratio with an image size preset (512/1K/2K/4K).
+    Pixel dimensions are approximations based on the preset name (longest side).
+    """
+    if aspect_ratios is None:
+        aspect_ratios = GEMINI_3_IMAGE_ALLOWED_ASPECT_RATIOS
+    base_pixels = {"512": 512, "1K": 1024, "2K": 2048, "4K": 4096}
+    presets: list[ExternalResolutionPreset] = []
+    for image_size in image_sizes:
+        base = base_pixels[image_size]
+        for ratio_str in aspect_ratios:
+            w_part, h_part = (int(x) for x in ratio_str.split(":"))
+            if w_part >= h_part:
+                w = base
+                h = max(1, round(base * h_part / w_part))
+            else:
+                h = base
+                w = max(1, round(base * w_part / h_part))
+            presets.append(
+                ExternalResolutionPreset(
+                    label=f"{ratio_str} ({image_size}) — {w}\u00d7{h}",
+                    aspect_ratio=ratio_str,
+                    image_size=image_size,
+                    width=w,
+                    height=h,
+                )
+            )
+    return presets
+
+
+GEMINI_3_PRO_RESOLUTION_PRESETS = _gemini_3_resolution_presets(["1K", "2K", "4K"])
+GEMINI_3_1_FLASH_RESOLUTION_PRESETS = _gemini_3_resolution_presets(["512", "1K", "2K", "4K"])
+
+gemini_flash_image = StarterModel(
+    name="Gemini 2.5 Flash Image",
+    base=BaseModelType.External,
+    source="external://gemini/gemini-2.5-flash-image",
+    description="Google Gemini 2.5 Flash image generation model (external API). Requires a configured Gemini API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_seed=True,
+        supports_reference_images=True,
+        max_images_per_request=1,
+        allowed_aspect_ratios=[
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "4:5",
+            "5:4",
+            "9:16",
+            "16:9",
+            "21:9",
+        ],
+        aspect_ratio_sizes={
+            "1:1": ExternalImageSize(width=1024, height=1024),
+            "2:3": ExternalImageSize(width=832, height=1248),
+            "3:2": ExternalImageSize(width=1248, height=832),
+            "3:4": ExternalImageSize(width=864, height=1184),
+            "4:3": ExternalImageSize(width=1184, height=864),
+            "4:5": ExternalImageSize(width=896, height=1152),
+            "5:4": ExternalImageSize(width=1152, height=896),
+            "9:16": ExternalImageSize(width=768, height=1344),
+            "16:9": ExternalImageSize(width=1344, height=768),
+            "21:9": ExternalImageSize(width=1536, height=672),
+        },
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
+)
+gemini_pro_image_preview = StarterModel(
+    name="Gemini 3 Pro Image Preview",
+    base=BaseModelType.External,
+    source="external://gemini/gemini-3-pro-image-preview",
+    description="Google Gemini 3 Pro image generation preview model (external API). Supports up to 14 reference images, including up to 6 object references and up to 5 character references. Supports 1K/2K/4K resolution presets. Requires a configured Gemini API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_seed=True,
+        supports_reference_images=True,
+        max_reference_images=14,
+        max_images_per_request=1,
+        max_image_size=GEMINI_3_IMAGE_MAX_SIZE,
+        allowed_aspect_ratios=GEMINI_3_IMAGE_ALLOWED_ASPECT_RATIOS,
+        resolution_presets=GEMINI_3_PRO_RESOLUTION_PRESETS,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
+)
+gemini_3_1_flash_image_preview = StarterModel(
+    name="Gemini 3.1 Flash Image Preview",
+    base=BaseModelType.External,
+    source="external://gemini/gemini-3.1-flash-image-preview",
+    description="Google Gemini 3.1 Flash image generation preview model (external API). Supports up to 14 reference images, including up to 10 object references and up to 4 character references. Supports 512/1K/2K/4K resolution presets. Requires a configured Gemini API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_seed=True,
+        supports_reference_images=True,
+        max_reference_images=14,
+        max_images_per_request=1,
+        max_image_size=GEMINI_3_IMAGE_MAX_SIZE,
+        allowed_aspect_ratios=GEMINI_3_IMAGE_ALLOWED_ASPECT_RATIOS,
+        resolution_presets=GEMINI_3_1_FLASH_RESOLUTION_PRESETS,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
+)
+QWEN_IMAGE_2_ALLOWED_ASPECT_RATIOS = ["1:1", "4:3", "3:4", "16:9", "9:16"]
+QWEN_IMAGE_MAX_ALLOWED_ASPECT_RATIOS = ["1:1", "4:3", "3:4", "16:9", "9:16"]
+WAN_V2_ALLOWED_ASPECT_RATIOS = ["1:1", "4:3", "3:4", "16:9", "9:16"]
+
+alibabacloud_qwen_image_2_pro = StarterModel(
+    name="Qwen Image 2.0 Pro",
+    base=BaseModelType.External,
+    source="external://alibabacloud/qwen-image-2.0-pro",
+    description="Alibaba Cloud Qwen Image 2.0 Pro model (external API). Best quality text-to-image with excellent bilingual text rendering. Requires a configured Alibaba Cloud DashScope API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=4,
+        allowed_aspect_ratios=QWEN_IMAGE_2_ALLOWED_ASPECT_RATIOS,
+        aspect_ratio_sizes={
+            "1:1": ExternalImageSize(width=2048, height=2048),
+            "4:3": ExternalImageSize(width=2368, height=1728),
+            "3:4": ExternalImageSize(width=1728, height=2368),
+            "16:9": ExternalImageSize(width=2688, height=1536),
+            "9:16": ExternalImageSize(width=1536, height=2688),
+        },
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=2048, height=2048, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+alibabacloud_qwen_image_2 = StarterModel(
+    name="Qwen Image 2.0",
+    base=BaseModelType.External,
+    source="external://alibabacloud/qwen-image-2.0",
+    description="Alibaba Cloud Qwen Image 2.0 model (external API). Fast text-to-image with good bilingual text rendering. Requires a configured Alibaba Cloud DashScope API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=4,
+        allowed_aspect_ratios=QWEN_IMAGE_2_ALLOWED_ASPECT_RATIOS,
+        aspect_ratio_sizes={
+            "1:1": ExternalImageSize(width=2048, height=2048),
+            "4:3": ExternalImageSize(width=2368, height=1728),
+            "3:4": ExternalImageSize(width=1728, height=2368),
+            "16:9": ExternalImageSize(width=2688, height=1536),
+            "9:16": ExternalImageSize(width=1536, height=2688),
+        },
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=2048, height=2048, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+alibabacloud_qwen_image_max = StarterModel(
+    name="Qwen Image Max",
+    base=BaseModelType.External,
+    source="external://alibabacloud/qwen-image-max",
+    description="Alibaba Cloud Qwen Image Max model (external API). High quality text-to-image generation. Requires a configured Alibaba Cloud DashScope API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=4,
+        allowed_aspect_ratios=QWEN_IMAGE_MAX_ALLOWED_ASPECT_RATIOS,
+        aspect_ratio_sizes={
+            "1:1": ExternalImageSize(width=1328, height=1328),
+            "4:3": ExternalImageSize(width=1472, height=1104),
+            "3:4": ExternalImageSize(width=1104, height=1472),
+            "16:9": ExternalImageSize(width=1664, height=928),
+            "9:16": ExternalImageSize(width=928, height=1664),
+        },
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1328, height=1328, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+alibabacloud_wan26_t2i = StarterModel(
+    name="Wan 2.6 Text-to-Image",
+    base=BaseModelType.External,
+    source="external://alibabacloud/wan2.6-t2i",
+    description="Alibaba Cloud Wan 2.6 text-to-image model (external API). Photorealistic image generation. Requires a configured Alibaba Cloud DashScope API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=4,
+        allowed_aspect_ratios=WAN_V2_ALLOWED_ASPECT_RATIOS,
+        aspect_ratio_sizes={
+            "1:1": ExternalImageSize(width=1024, height=1024),
+            "4:3": ExternalImageSize(width=1440, height=1080),
+            "3:4": ExternalImageSize(width=1080, height=1440),
+            "16:9": ExternalImageSize(width=1440, height=810),
+            "9:16": ExternalImageSize(width=810, height=1440),
+        },
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+alibabacloud_qwen_image_edit_max = StarterModel(
+    name="Qwen Image Edit Max",
+    base=BaseModelType.External,
+    source="external://alibabacloud/qwen-image-edit-max",
+    description="Alibaba Cloud Qwen Image Edit Max model (external API). Image editing with industrial design and geometric reasoning, driven by up to 3 reference images. Requires a configured Alibaba Cloud DashScope API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_reference_images=True,
+        supports_seed=True,
+        max_reference_images=3,
+        max_images_per_request=4,
+        allowed_aspect_ratios=QWEN_IMAGE_2_ALLOWED_ASPECT_RATIOS,
+        aspect_ratio_sizes={
+            "1:1": ExternalImageSize(width=2048, height=2048),
+            "4:3": ExternalImageSize(width=2368, height=1728),
+            "3:4": ExternalImageSize(width=1728, height=2368),
+            "16:9": ExternalImageSize(width=2688, height=1536),
+            "9:16": ExternalImageSize(width=1536, height=2688),
+        },
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=2048, height=2048, num_images=1),
+    panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
+)
+OPENAI_GPT_IMAGE_ASPECT_RATIOS = ["1:1", "3:2", "2:3"]
+OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES = {
+    "1:1": ExternalImageSize(width=1024, height=1024),
+    "3:2": ExternalImageSize(width=1536, height=1024),
+    "2:3": ExternalImageSize(width=1024, height=1536),
+}
+OPENAI_GPT_IMAGE_PANEL_SCHEMA = ExternalModelPanelSchema(
+    prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]
+)
+
+openai_gpt_image_2 = StarterModel(
+    name="GPT Image 2",
+    base=BaseModelType.External,
+    source="external://openai/gpt-image-2",
+    description="OpenAI GPT-Image-2 image generation model. State-of-the-art image generation and editing with flexible sizing and high-fidelity image inputs. Does not support transparent backgrounds or configurable input fidelity. Requires a configured OpenAI API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_images_per_request=10,
+        allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
+openai_gpt_image_1_5 = StarterModel(
+    name="GPT Image 1.5",
+    base=BaseModelType.External,
+    source="external://openai/gpt-image-1.5",
+    description="OpenAI GPT-Image-1.5 image generation model. Fastest and most affordable GPT image model. Requires a configured OpenAI API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_images_per_request=10,
+        allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
+openai_gpt_image_1 = StarterModel(
+    name="GPT Image 1",
+    base=BaseModelType.External,
+    source="external://openai/gpt-image-1",
+    description="OpenAI GPT-Image-1 image generation model. High quality image generation. Requires a configured OpenAI API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_images_per_request=10,
+        allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
+openai_gpt_image_1_mini = StarterModel(
+    name="GPT Image 1 Mini",
+    base=BaseModelType.External,
+    source="external://openai/gpt-image-1-mini",
+    description="OpenAI GPT-Image-1-Mini image generation model. Cost-efficient option, 80%% cheaper than GPT-Image-1. Requires a configured OpenAI API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_images_per_request=10,
+        allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
+openai_dall_e_3 = StarterModel(
+    name="DALL-E 3",
+    base=BaseModelType.External,
+    source="external://openai/dall-e-3",
+    description="OpenAI DALL-E 3 image generation model. Supports vivid and natural styles. Only text-to-image, no editing. Requires a configured OpenAI API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        max_images_per_request=1,
+        allowed_aspect_ratios=["1:1", "7:4", "4:7"],
+        aspect_ratio_sizes={
+            "1:1": ExternalImageSize(width=1024, height=1024),
+            "7:4": ExternalImageSize(width=1792, height=1024),
+            "4:7": ExternalImageSize(width=1024, height=1792),
+        },
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+SEEDREAM_ASPECT_RATIOS = ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"]
+SEEDREAM_2K_SIZES = {
+    "1:1": ExternalImageSize(width=2048, height=2048),
+    "3:4": ExternalImageSize(width=1728, height=2304),
+    "4:3": ExternalImageSize(width=2304, height=1728),
+    "16:9": ExternalImageSize(width=2848, height=1600),
+    "9:16": ExternalImageSize(width=1600, height=2848),
+    "3:2": ExternalImageSize(width=2496, height=1664),
+    "2:3": ExternalImageSize(width=1664, height=2496),
+    "21:9": ExternalImageSize(width=3136, height=1344),
+}
+SEEDREAM_1K_SIZES = {
+    "1:1": ExternalImageSize(width=1024, height=1024),
+    "3:4": ExternalImageSize(width=864, height=1152),
+    "4:3": ExternalImageSize(width=1152, height=864),
+    "16:9": ExternalImageSize(width=1312, height=736),
+    "9:16": ExternalImageSize(width=736, height=1312),
+    "2:3": ExternalImageSize(width=832, height=1248),
+    "3:2": ExternalImageSize(width=1248, height=832),
+    "21:9": ExternalImageSize(width=1568, height=672),
+}
+SEEDREAM_PANEL_SCHEMA = ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}])
+seedream_5_0 = StarterModel(
+    name="Seedream 5.0",
+    base=BaseModelType.External,
+    source="external://seedream/seedream-5-0-260128",
+    description="BytePlus Seedream 5.0 flagship image generation model (external API). Supports 2K and 4K resolutions, txt2img and img2img with multi-image reference input.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_reference_images=14,
+        max_images_per_request=15,
+        allowed_aspect_ratios=SEEDREAM_ASPECT_RATIOS,
+        aspect_ratio_sizes=SEEDREAM_2K_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=2048, height=2048, num_images=1),
+    panel_schema=SEEDREAM_PANEL_SCHEMA,
+)
+seedream_5_0_lite = StarterModel(
+    name="Seedream 5.0 Lite",
+    base=BaseModelType.External,
+    source="external://seedream/seedream-5-0-lite-260128",
+    description="BytePlus Seedream 5.0 Lite image generation model (external API). Supports 2K and 4K resolutions, txt2img and img2img with multi-image reference input.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_reference_images=14,
+        max_images_per_request=15,
+        allowed_aspect_ratios=SEEDREAM_ASPECT_RATIOS,
+        aspect_ratio_sizes=SEEDREAM_2K_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=2048, height=2048, num_images=1),
+    panel_schema=SEEDREAM_PANEL_SCHEMA,
+)
+seedream_4_5 = StarterModel(
+    name="Seedream 4.5",
+    base=BaseModelType.External,
+    source="external://seedream/seedream-4-5-251128",
+    description="BytePlus Seedream 4.5 image generation model (external API). Supports 2K and 4K resolutions, txt2img, img2img, batch generation, and multi-image reference input.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_reference_images=14,
+        max_images_per_request=15,
+        allowed_aspect_ratios=SEEDREAM_ASPECT_RATIOS,
+        aspect_ratio_sizes=SEEDREAM_2K_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=2048, height=2048, num_images=1),
+    panel_schema=SEEDREAM_PANEL_SCHEMA,
+)
+seedream_4_0 = StarterModel(
+    name="Seedream 4.0",
+    base=BaseModelType.External,
+    source="external://seedream/seedream-4-0-250828",
+    description="BytePlus Seedream 4.0 image generation model (external API). Supports 1K, 2K, and 4K resolutions, txt2img, img2img, batch generation, and multi-image reference input.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_reference_images=14,
+        max_images_per_request=15,
+        allowed_aspect_ratios=SEEDREAM_ASPECT_RATIOS,
+        aspect_ratio_sizes=SEEDREAM_2K_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=2048, height=2048, num_images=1),
+    panel_schema=SEEDREAM_PANEL_SCHEMA,
+)
+# Seedream 3.0 T2I (seedream-3-0-t2i-250415) removed — deprecated by BytePlus, replaced by seedream-4-0-250828.
+
+# DALL-E 2 removed — deprecated by OpenAI, shutdown May 12, 2026.
 # region Anima
 anima_qwen3_encoder = StarterModel(
     name="Anima Qwen3 0.6B Text Encoder",
@@ -1020,11 +1563,11 @@ anima_vae = StarterModel(
     format=ModelFormat.Checkpoint,
 )
 
-anima_preview3 = StarterModel(
-    name="Anima Preview 3",
+anima_base = StarterModel(
+    name="Anima Base 1.0",
     base=BaseModelType.Anima,
-    source="https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/diffusion_models/anima-preview3-base.safetensors",
-    description="Anima Preview 3 - 2B parameter anime-focused text-to-image model built on Cosmos Predict2 DiT. ~4.5GB",
+    source="https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/diffusion_models/anima-base-v1.0.safetensors",
+    description="Anima Base 1.0 - 2B parameter anime-focused text-to-image model built on Cosmos Predict2 DiT. ~4.5GB",
     type=ModelType.Main,
     format=ModelFormat.Checkpoint,
     dependencies=[anima_qwen3_encoder, anima_vae, t5_base_encoder],
@@ -1103,6 +1646,10 @@ STARTER_MODELS: list[StarterModel] = [
     siglip,
     flux_redux,
     llava_onevision,
+    llava_onevision_7b,
+    qwen2_5_1_5b_instruct,
+    qwen2_5_3b_instruct,
+    smollm2_1_7b_instruct,
     flux_fill,
     flux2_vae,
     flux2_klein_4b,
@@ -1117,6 +1664,9 @@ STARTER_MODELS: list[StarterModel] = [
     flux2_klein_qwen3_4b_encoder,
     flux2_klein_qwen3_8b_encoder,
     cogview4,
+    qwen_image_vae,
+    qwen_vl_encoder_fp8,
+    qwen_vl_encoder_diffusers,
     qwen_image_edit,
     qwen_image_edit_gguf_q2_k,
     qwen_image_edit_gguf_q4_k_m,
@@ -1140,7 +1690,24 @@ STARTER_MODELS: list[StarterModel] = [
     z_image_qwen3_encoder_quantized,
     z_image_controlnet_union,
     z_image_controlnet_tile,
-    anima_preview3,
+    gemini_flash_image,
+    gemini_pro_image_preview,
+    gemini_3_1_flash_image_preview,
+    openai_gpt_image_2,
+    openai_gpt_image_1_5,
+    openai_gpt_image_1,
+    openai_gpt_image_1_mini,
+    openai_dall_e_3,
+    seedream_5_0,
+    seedream_5_0_lite,
+    seedream_4_5,
+    seedream_4_0,
+    alibabacloud_qwen_image_2_pro,
+    alibabacloud_qwen_image_2,
+    alibabacloud_qwen_image_max,
+    alibabacloud_wan26_t2i,
+    alibabacloud_qwen_image_edit_max,
+    anima_base,
     anima_qwen3_encoder,
     anima_vae,
 ]
@@ -1212,6 +1779,8 @@ flux2_klein_bundle: list[StarterModel] = [
 ]
 
 qwen_image_bundle: list[StarterModel] = [
+    qwen_image_vae,
+    qwen_vl_encoder_fp8,
     qwen_image_edit,
     qwen_image_edit_gguf_q4_k_m,
     qwen_image_edit_gguf_q8_0,
@@ -1225,7 +1794,7 @@ qwen_image_bundle: list[StarterModel] = [
 ]
 
 anima_bundle: list[StarterModel] = [
-    anima_preview3,
+    anima_base,
     anima_qwen3_encoder,
     anima_vae,
     t5_base_encoder,

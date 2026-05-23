@@ -64,6 +64,25 @@ export const getInitialProgressData = (itemId: number): ProgressData => ({
 });
 type ProgressDataMap = Record<number, ProgressData | undefined>;
 
+const TERMINAL_QUEUE_ITEM_STATUS_RANK = 2;
+
+const getQueueItemStatusRank = (status: S['SessionQueueItem']['status']): number => {
+  switch (status) {
+    case 'pending':
+      return 0;
+    case 'in_progress':
+      return 1;
+    case 'completed':
+    case 'failed':
+    case 'canceled':
+      return TERMINAL_QUEUE_ITEM_STATUS_RANK;
+  }
+};
+
+const getStatusSequence = (item: { status_sequence?: number | null }): number | undefined => {
+  return item.status_sequence ?? undefined;
+};
+
 /**
  * API for managing the Canvas Staging Area - a view of the image generation queue.
  * Provides reactive state management for pending, in-progress, and completed images.
@@ -81,6 +100,72 @@ export class StagingAreaApi {
 
   /** Generation counter to prevent stale async writes in onItemsChangedEvent */
   _itemsEventGeneration = 0;
+
+  /**
+   * Highest lifecycle status observed for each queue item.
+   * Used to ignore stale query snapshots that regress terminal items back to pending/in_progress.
+   */
+  _seenItemStatusRanks = new Map<number, number>();
+  _seenItemStatusSequences = new Map<number, number>();
+
+  _recordSeenItemOrdering = (
+    itemId: number,
+    status: S['SessionQueueItem']['status'],
+    statusSequence?: number
+  ): void => {
+    if (statusSequence !== undefined) {
+      const previousSequence = this._seenItemStatusSequences.get(itemId) ?? -1;
+      if (statusSequence > previousSequence) {
+        this._seenItemStatusSequences.set(itemId, statusSequence);
+      }
+    }
+
+    const nextRank = getQueueItemStatusRank(status);
+    const previousRank = this._seenItemStatusRanks.get(itemId) ?? -1;
+    if (nextRank > previousRank) {
+      this._seenItemStatusRanks.set(itemId, nextRank);
+    }
+  };
+
+  _shouldAcceptQueueItem = (item: S['SessionQueueItem']): boolean => {
+    const statusSequence = getStatusSequence(item);
+    const previousSequence = this._seenItemStatusSequences.get(item.item_id);
+    const previousRank = this._seenItemStatusRanks.get(item.item_id);
+    const nextRank = getQueueItemStatusRank(item.status);
+
+    if (statusSequence !== undefined) {
+      if (previousSequence === undefined) {
+        return true;
+      }
+      if (statusSequence > previousSequence) {
+        return true;
+      }
+      if (statusSequence < previousSequence) {
+        return false;
+      }
+      // Equal-sequence updates should be rare; if they happen, let the later terminal-vs-terminal arrival win.
+      return previousRank === undefined || nextRank >= previousRank;
+    }
+
+    return previousRank === undefined || nextRank >= previousRank;
+  };
+
+  _pruneSeenItemOrdering = (items: S['SessionQueueItem'][]): void => {
+    const itemIds = new Set(items.map(({ item_id }) => item_id));
+
+    // Evict vanished items so long-lived sessions do not grow these maps without bound.
+    for (const itemId of this._seenItemStatusRanks.keys()) {
+      if (!itemIds.has(itemId)) {
+        this._seenItemStatusRanks.delete(itemId);
+      }
+    }
+
+    for (const itemId of this._seenItemStatusSequences.keys()) {
+      if (!itemIds.has(itemId)) {
+        this._seenItemStatusSequences.delete(itemId);
+      }
+    }
+  };
 
   /** Item ID of the last started item. Used for auto-switch on start. */
   $lastStartedItemId = atom<number | null>(null);
@@ -348,6 +433,7 @@ export class StagingAreaApi {
     if (data.destination !== this._sessionId) {
       return;
     }
+    this._recordSeenItemOrdering(data.item_id, data.status, getStatusSequence(data));
     if (data.status === 'completed') {
       /**
        * There is an unpleasant bit of indirection here. When an item is completed, and auto-switch is set to
@@ -375,31 +461,47 @@ export class StagingAreaApi {
     const generation = ++this._itemsEventGeneration;
 
     const oldItems = this.$items.get();
+    const oldItemsById = new Map(oldItems.map((item) => [item.item_id, item]));
+    let didSubstituteStaleItem = false;
+    const nextItems = items.flatMap((item) => {
+      if (this._shouldAcceptQueueItem(item)) {
+        return [item];
+      }
+      didSubstituteStaleItem = true;
+      const previousItem = oldItemsById.get(item.item_id);
+      return previousItem ? [previousItem] : [];
+    });
+    const normalizedItems = didSubstituteStaleItem ? nextItems : items;
 
-    if (items === oldItems) {
+    for (const item of normalizedItems) {
+      this._recordSeenItemOrdering(item.item_id, item.status, getStatusSequence(item));
+    }
+    this._pruneSeenItemOrdering(normalizedItems);
+
+    if (normalizedItems === oldItems) {
       return;
     }
 
-    if (items.length === 0) {
+    if (normalizedItems.length === 0) {
       // If there are no items, cannot have a selected item.
       this.$selectedItemId.set(null);
       this.$selectedImageIndex.set(0);
-    } else if (this.$selectedItemId.get() === null && items.length > 0) {
+    } else if (this.$selectedItemId.get() === null && normalizedItems.length > 0) {
       // If there is no selected item but there are items, select the first one.
-      this.$selectedItemId.set(items[0]?.item_id ?? null);
+      this.$selectedItemId.set(normalizedItems[0]?.item_id ?? null);
       this.$selectedImageIndex.set(0);
     }
 
     const progressData = this.$progressData.get();
 
     for (const [id, datum] of objectEntries(progressData)) {
-      if (!datum || !items.find(({ item_id }) => item_id === datum.itemId)) {
+      if (!datum || !normalizedItems.find(({ item_id }) => item_id === datum.itemId)) {
         this.$progressData.setKey(id, undefined);
         continue;
       }
     }
 
-    for (const item of items) {
+    for (const item of normalizedItems) {
       const datum = progressData[item.item_id];
 
       if (item.status === 'canceled' || item.status === 'failed') {
@@ -467,30 +569,30 @@ export class StagingAreaApi {
     }
 
     const selectedItemId = this.$selectedItemId.get();
-    if (selectedItemId !== null && !items.find(({ item_id }) => item_id === selectedItemId)) {
+    if (selectedItemId !== null && !normalizedItems.find(({ item_id }) => item_id === selectedItemId)) {
       // If the selected item no longer exists, select the next best item.
       // Prefer the next item in the list - must check oldItems to determine this
       const nextItemIndex = oldItems.findIndex(({ item_id }) => item_id === selectedItemId);
       if (nextItemIndex !== -1) {
-        const nextItem = items[nextItemIndex] ?? items[nextItemIndex - 1];
+        const nextItem = normalizedItems[nextItemIndex] ?? normalizedItems[nextItemIndex - 1];
         if (nextItem) {
           this.$selectedItemId.set(nextItem.item_id);
           this.$selectedImageIndex.set(0);
         }
       } else {
         // Next, if there is an in-progress item, select that.
-        const inProgressItem = items.find(({ status }) => status === 'in_progress');
+        const inProgressItem = normalizedItems.find(({ status }) => status === 'in_progress');
         if (inProgressItem) {
           this.$selectedItemId.set(inProgressItem.item_id);
           this.$selectedImageIndex.set(0);
         }
         // Finally just select the first item.
-        this.$selectedItemId.set(items[0]?.item_id ?? null);
+        this.$selectedItemId.set(normalizedItems[0]?.item_id ?? null);
         this.$selectedImageIndex.set(0);
       }
     }
 
-    this.$items.set(items);
+    this.$items.set(normalizedItems);
   };
 
   onImageLoaded = (itemId: number) => {
@@ -521,6 +623,8 @@ export class StagingAreaApi {
   /** Cleans up all state and unsubscribes from all events. */
   cleanup = () => {
     this._itemsEventGeneration++;
+    this._seenItemStatusRanks.clear();
+    this._seenItemStatusSequences.clear();
     this.$lastStartedItemId.set(null);
     this.$lastCompletedItemId.set(null);
     this.$items.set([]);

@@ -232,6 +232,10 @@ class QueueItemStatusChangedEvent(QueueItemEventBase):
     __event_name__ = "queue_item_status_changed"
 
     status: QUEUE_ITEM_STATUS = Field(description="The new status of the queue item")
+    status_sequence: int | None = Field(
+        default=None,
+        description="A monotonically increasing version for this queue item's visible status lifecycle",
+    )
     error_type: Optional[str] = Field(default=None, description="The error type, if any")
     error_message: Optional[str] = Field(default=None, description="The error message, if any")
     error_traceback: Optional[str] = Field(default=None, description="The error traceback, if any")
@@ -256,6 +260,7 @@ class QueueItemStatusChangedEvent(QueueItemEventBase):
             user_id=queue_item.user_id,
             session_id=queue_item.session_id,
             status=queue_item.status,
+            status_sequence=queue_item.status_sequence,
             error_type=queue_item.error_type,
             error_message=queue_item.error_message,
             error_traceback=queue_item.error_traceback,

@@ -5,7 +5,7 @@ import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiUploadSimpleBold } from 'react-icons/pi';
 import { useUpdateModelMutation } from 'services/api/endpoints/models';
-import type { AnyModelConfig } from 'services/api/types';
+import type { AnyModelConfigWithExternal } from 'services/api/types';
 
 const validateImportData = (data: unknown): data is Record<string, unknown> => {
   if (typeof data !== 'object' || data === null || Array.isArray(data)) {
@@ -40,7 +40,7 @@ const validateImportData = (data: unknown): data is Record<string, unknown> => {
 };
 
 type Props = {
-  modelConfig: AnyModelConfig;
+  modelConfig: AnyModelConfigWithExternal;
 };
 
 export const ModelSettingsImportButton = memo(({ modelConfig }: Props) => {

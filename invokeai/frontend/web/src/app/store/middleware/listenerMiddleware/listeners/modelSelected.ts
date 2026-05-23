@@ -7,10 +7,14 @@ import {
   animaQwen3EncoderModelSelected,
   animaT5EncoderModelSelected,
   animaVaeModelSelected,
+  aspectRatioIdChanged,
   kleinQwen3EncoderModelSelected,
   kleinVaeModelSelected,
   modelChanged,
   qwenImageComponentSourceSelected,
+  qwenImageQwenVLEncoderModelSelected,
+  qwenImageVaeModelSelected,
+  resolutionPresetSelected,
   setZImageScheduler,
   syncedToOptimalDimension,
   vaeSelected,
@@ -30,6 +34,7 @@ import {
 } from 'features/controlLayers/store/selectors';
 import {
   getEntityIdentifier,
+  isAspectRatioID,
   isFlux2ReferenceImageConfig,
   isQwenImageReferenceImageConfig,
 } from 'features/controlLayers/store/types';
@@ -54,12 +59,14 @@ import {
   selectGlobalRefImageModels,
   selectQwen3EncoderModels,
   selectQwenImageDiffusersModels,
+  selectQwenImageVAEModels,
+  selectQwenVLEncoderModels,
   selectRegionalRefImageModels,
   selectT5EncoderModels,
   selectZImageDiffusersModels,
 } from 'services/api/hooks/modelsByType';
 import type { FLUXKontextModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig } from 'services/api/types';
-import { isFluxKontextModelConfig, isFluxReduxModelConfig } from 'services/api/types';
+import { isExternalApiModelConfig, isFluxKontextModelConfig, isFluxReduxModelConfig } from 'services/api/types';
 
 const log = logger('models');
 
@@ -248,10 +255,18 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         }
 
         // handle incompatible Qwen Image Edit component source - clear if switching away
-        const { qwenImageComponentSource } = state.params;
+        const { qwenImageComponentSource, qwenImageVaeModel, qwenImageQwenVLEncoderModel } = state.params;
         if (newBase !== 'qwen-image') {
           if (qwenImageComponentSource) {
             dispatch(qwenImageComponentSourceSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (qwenImageVaeModel) {
+            dispatch(qwenImageVaeModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (qwenImageQwenVLEncoderModel) {
+            dispatch(qwenImageQwenVLEncoderModelSelected(null));
             modelsUpdatedDisabledOrCleared += 1;
           }
         } else {
@@ -283,9 +298,30 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
               dispatch(qwenImageComponentSourceSelected(zModelIdentifierField.parse(diffusersModel)));
             }
           }
+
+          // Auto-select standalone VAE and Qwen2.5-VL Encoder if available - this allows GGUF
+          // users to be ready-to-go after installing the starter pack without having to dig into
+          // Advanced. Only set if the user hasn't already chosen one.
+          if (!qwenImageVaeModel) {
+            const availableQwenImageVAEs = selectQwenImageVAEModels(state);
+            const vae = availableQwenImageVAEs[0];
+            if (vae) {
+              dispatch(qwenImageVaeModelSelected(zModelIdentifierField.parse(vae)));
+            }
+          }
+          if (!qwenImageQwenVLEncoderModel) {
+            const availableQwenVLEncoders = selectQwenVLEncoderModels(state);
+            // Prefer diffusers (folder) format over single-file checkpoints, since the latter
+            // can fail to load on some checkpoints.
+            const encoder =
+              availableQwenVLEncoders.find((m) => m.format === 'qwen_vl_encoder') ?? availableQwenVLEncoders[0];
+            if (encoder) {
+              dispatch(qwenImageQwenVLEncoderModelSelected(zModelIdentifierField.parse(encoder)));
+            }
+          }
         }
 
-        if (SUPPORTS_REF_IMAGES_BASE_MODELS.includes(newModel.base)) {
+        if (newModel.base !== 'external' && SUPPORTS_REF_IMAGES_BASE_MODELS.includes(newModel.base)) {
           // Handle incompatible reference image models - switch to first compatible model, with some smart logic
           // to choose the best available model based on the new main model.
           const allRefImageModels = selectGlobalRefImageModels(state).filter(({ base }) => base === newBase);
@@ -531,6 +567,34 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         if (!isStaging) {
           // Canvas tab only syncs if not staging
           dispatch(bboxSyncedToOptimalDimension());
+        }
+      }
+
+      // When switching to an external model, sync bbox to the model's first preset dimensions
+      if (newBase === 'external') {
+        const modelConfigsResult = selectModelConfigsQuery(getState());
+        if (modelConfigsResult.data) {
+          const newModelConfig = modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key);
+          if (newModelConfig && isExternalApiModelConfig(newModelConfig)) {
+            const { aspect_ratio_sizes, resolution_presets } = newModelConfig.capabilities;
+            if (resolution_presets && resolution_presets.length > 0) {
+              const firstPreset = resolution_presets[0]!;
+              dispatch(
+                resolutionPresetSelected({
+                  imageSize: firstPreset.image_size,
+                  aspectRatio: firstPreset.aspect_ratio,
+                  width: firstPreset.width,
+                  height: firstPreset.height,
+                })
+              );
+            } else if (aspect_ratio_sizes) {
+              const firstRatio = Object.keys(aspect_ratio_sizes)[0];
+              const firstSize = firstRatio ? aspect_ratio_sizes[firstRatio] : undefined;
+              if (firstRatio && firstSize && isAspectRatioID(firstRatio)) {
+                dispatch(aspectRatioIdChanged({ id: firstRatio, fixedSize: firstSize }));
+              }
+            }
+          }
         }
       }
     },
