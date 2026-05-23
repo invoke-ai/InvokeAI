@@ -28,7 +28,11 @@ class TestSDNQTensor:
         assert torch.allclose(dequantized, expected, atol=1e-6)
 
     def test_asymmetric_dequantization(self):
-        """Test asymmetric dequantization: result = (weight - zero_point) * scale."""
+        """Test asymmetric dequantization: result = zero_point + weight * scale.
+
+        Matches the SDNQ upstream convention (Disty0/sdnq: torch.addcmul(zero_point, weight, scale)),
+        where zero_point is a post-scale bias rather than a pre-scale integer offset.
+        """
         weight = torch.tensor([[10, 20], [30, 40]], dtype=torch.int8)
         scale = torch.tensor([0.1], dtype=torch.float32)
         zero_point = torch.tensor([5], dtype=torch.float32)
@@ -43,8 +47,8 @@ class TestSDNQTensor:
         )
 
         dequantized = tensor.get_dequantized_tensor()
-        # (weight - zero_point) * scale = ([10-5, 20-5], [30-5, 40-5]) * 0.1
-        expected = torch.tensor([[0.5, 1.5], [2.5, 3.5]], dtype=torch.float32)
+        # zero_point + weight * scale = 5 + [[10, 20], [30, 40]] * 0.1
+        expected = torch.tensor([[6.0, 7.0], [8.0, 9.0]], dtype=torch.float32)
         assert torch.allclose(dequantized, expected, atol=1e-6)
 
     def test_svd_correction(self):
