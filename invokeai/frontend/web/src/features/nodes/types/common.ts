@@ -41,6 +41,7 @@ export const zSchedulerField = z.enum([
   'dpmpp_3m',
   'dpmpp_2m_sde',
   'dpmpp_sde',
+  'er_sde',
   'heun',
   'kdpm_2',
   'lms',
@@ -72,7 +73,7 @@ export const zFluxSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 // Note: LCM is only supported for Z-Image Turbo, not for Z-Image Base (undistilled)
 export const zZImageSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 // Anima scheduler options (same flow-matching schedulers, defined separately to avoid coupling)
-export const zAnimaSchedulerField = z.enum(['euler', 'heun', 'lcm']);
+export const zAnimaSchedulerField = z.enum(['euler', 'heun', 'dpmpp_2m', 'dpmpp_2m_sde', 'er_sde', 'lcm']);
 
 // ERNIE-Image scheduler options (Flow Matching schedulers, same as Flux/Z-Image)
 export const zErnieImageSchedulerField = z.enum(['euler', 'heun', 'lcm']);
@@ -137,6 +138,7 @@ export const zModelType = z.enum([
   'spandrel_image_to_image',
   't5_encoder',
   'qwen3_encoder',
+  'qwen_vl_encoder',
   'clip_embed',
   'siglip',
   'flux_redux',
@@ -192,6 +194,7 @@ export const zModelFormat = z.enum([
   'invokeai',
   't5_encoder',
   'qwen3_encoder',
+  'qwen_vl_encoder',
   'bnb_quantized_int8b',
   'bnb_quantized_nf4b',
   'gguf_quantized',

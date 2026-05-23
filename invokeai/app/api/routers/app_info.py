@@ -3,17 +3,19 @@ from enum import Enum
 from importlib.metadata import distributions
 from pathlib import Path as FilePath
 from threading import Lock
+from typing import Any
 
 import torch
 import yaml
 from fastapi import Body, HTTPException, Path
 from fastapi.routing import APIRouter
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from invokeai.app.api.auth_dependencies import AdminUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.config.config_default import (
     EXTERNAL_PROVIDER_CONFIG_FIELDS,
+    IMAGE_SUBFOLDER_STRATEGY,
     DefaultInvokeAIAppConfig,
     InvokeAIAppConfig,
     get_config,
@@ -97,20 +99,44 @@ class ExternalProviderConfigModel(BaseModel):
 
 
 EXTERNAL_PROVIDER_FIELDS: dict[str, tuple[str, str]] = {
+    "alibabacloud": ("external_alibabacloud_api_key", "external_alibabacloud_base_url"),
     "gemini": ("external_gemini_api_key", "external_gemini_base_url"),
     "openai": ("external_openai_api_key", "external_openai_base_url"),
+    "seedream": ("external_seedream_api_key", "external_seedream_base_url"),
 }
 _EXTERNAL_PROVIDER_CONFIG_LOCK = Lock()
+
+
+def _remove_nullable_default_from_schema(schema: dict[str, Any]) -> None:
+    schema.pop("default", None)
+    any_of = schema.pop("anyOf", None)
+    if isinstance(any_of, list):
+        non_null_schemas = [
+            subschema for subschema in any_of if isinstance(subschema, dict) and subschema.get("type") != "null"
+        ]
+        if len(non_null_schemas) == 1:
+            schema.update(non_null_schemas[0])
 
 
 class UpdateAppGenerationSettingsRequest(BaseModel):
     """Writable generation-related app settings."""
 
+    image_subfolder_strategy: IMAGE_SUBFOLDER_STRATEGY | None = Field(
+        default=None,
+        description="Strategy for organizing images into subfolders.",
+        json_schema_extra=_remove_nullable_default_from_schema,
+    )
     max_queue_history: int | None = Field(
         default=None,
         ge=0,
         description="Keep the last N completed, failed, and canceled queue items on startup. Set to 0 to prune all terminal items.",
     )
+
+    @model_validator(mode="after")
+    def validate_explicit_nulls(self) -> "UpdateAppGenerationSettingsRequest":
+        if "image_subfolder_strategy" in self.model_fields_set and self.image_subfolder_strategy is None:
+            raise ValueError("image_subfolder_strategy may not be null")
+        return self
 
 
 @app_router.get(
@@ -131,18 +157,19 @@ async def update_runtime_config(
     _: AdminUserOrDefault,
     changes: UpdateAppGenerationSettingsRequest = Body(description="Writable runtime configuration changes"),
 ) -> InvokeAIAppConfigWithSetFields:
-    config = get_config()
-    update_dict = changes.model_dump(exclude_unset=True)
-    config.update_config(update_dict)
+    with _EXTERNAL_PROVIDER_CONFIG_LOCK:
+        config = get_config()
+        update_dict = changes.model_dump(exclude_unset=True)
+        config.update_config(update_dict)
 
-    if config.config_file_path.exists():
-        persisted_config = load_and_migrate_config(config.config_file_path)
-    else:
-        persisted_config = DefaultInvokeAIAppConfig()
+        if config.config_file_path.exists():
+            persisted_config = load_and_migrate_config(config.config_file_path)
+        else:
+            persisted_config = DefaultInvokeAIAppConfig()
 
-    persisted_config.update_config(update_dict)
-    persisted_config.write_file(config.config_file_path)
-    return InvokeAIAppConfigWithSetFields(set_fields=config.model_fields_set, config=config)
+        persisted_config.update_config(update_dict)
+        persisted_config.write_file(config.config_file_path)
+        return InvokeAIAppConfigWithSetFields(set_fields=config.model_fields_set, config=config)
 
 
 @app_router.get(
@@ -174,6 +201,7 @@ async def get_external_provider_configs() -> list[ExternalProviderConfigModel]:
     response_model=ExternalProviderConfigModel,
 )
 async def set_external_provider_config(
+    _: AdminUserOrDefault,
     provider_id: str = Path(description="The external provider identifier"),
     update: ExternalProviderConfigUpdate = Body(description="External provider configuration settings"),
 ) -> ExternalProviderConfigModel:
@@ -204,6 +232,7 @@ async def set_external_provider_config(
     response_model=ExternalProviderConfigModel,
 )
 async def reset_external_provider_config(
+    _: AdminUserOrDefault,
     provider_id: str = Path(description="The external provider identifier"),
 ) -> ExternalProviderConfigModel:
     api_key_field, base_url_field = _get_external_provider_fields(provider_id)
