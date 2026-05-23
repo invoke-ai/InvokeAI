@@ -193,11 +193,13 @@ def dequantize_uint4_per_group(
     # Diagnostic logging (once)
     if not _uint4_diagnostic_done:
         _uint4_diagnostic_done = True
-        print(f"[SDNQ uint4] Diagnostic:")
+        print("[SDNQ uint4] Diagnostic:")
         print(f"  packed_weight: shape={packed_weight.shape}, dtype={packed_weight.dtype}")
         print(f"  unpacked: min={unpacked.min().item()}, max={unpacked.max().item()}, unique={len(unpacked.unique())}")
         print(f"  scale: shape={scale.shape}, dtype={scale.dtype}, range=[{scale.min():.6f}, {scale.max():.6f}]")
-        print(f"  zero_point: shape={zero_point.shape}, dtype={zero_point.dtype}, range=[{zero_point.min():.6f}, {zero_point.max():.6f}]")
+        print(
+            f"  zero_point: shape={zero_point.shape}, dtype={zero_point.dtype}, range=[{zero_point.min():.6f}, {zero_point.max():.6f}]"
+        )
         print(f"  group_size={group_size}, num_groups={num_groups}")
         # Sample values
         zp_sample = zero_point.flatten()[:10].tolist()

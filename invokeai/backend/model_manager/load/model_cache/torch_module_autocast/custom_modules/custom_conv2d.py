@@ -8,6 +8,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
     add_nullable_tensors,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
 
 
 class CustomConv2d(torch.nn.Conv2d, CustomModuleMixin):
@@ -17,7 +18,7 @@ class CustomConv2d(torch.nn.Conv2d, CustomModuleMixin):
             tensor is not None
             and input.is_floating_point()
             and tensor.is_floating_point()
-            and not isinstance(tensor, GGMLTensor)
+            and not isinstance(tensor, (GGMLTensor, SDNQTensor))
             and tensor.dtype != input.dtype
         ):
             tensor = tensor.to(dtype=input.dtype)
@@ -57,13 +58,13 @@ class CustomConv2d(torch.nn.Conv2d, CustomModuleMixin):
         elif input.is_floating_point() and (
             (
                 self.weight.is_floating_point()
-                and not isinstance(self.weight, GGMLTensor)
+                and not isinstance(self.weight, (GGMLTensor, SDNQTensor))
                 and self.weight.dtype != input.dtype
             )
             or (
                 self.bias is not None
                 and self.bias.is_floating_point()
-                and not isinstance(self.bias, GGMLTensor)
+                and not isinstance(self.bias, (GGMLTensor, SDNQTensor))
                 and self.bias.dtype != input.dtype
             )
         ):

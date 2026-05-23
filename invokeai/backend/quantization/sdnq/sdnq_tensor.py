@@ -341,9 +341,7 @@ class SDNQTensor(torch.Tensor):
 
         # Log output range for debugging
         if should_log:
-            logger.info(
-                f"  -> output_shape={result.shape}, output_range=[{result.min():.6f}, {result.max():.6f}]"
-            )
+            logger.info(f"  -> output_shape={result.shape}, output_range=[{result.min():.6f}, {result.max():.6f}]")
 
         return result
 
@@ -361,6 +359,8 @@ class SDNQTensor(torch.Tensor):
             cls._warned_ops.add(func)
             import logging
 
-            logging.getLogger(__name__).warning(f"SDNQTensor: unknown op {func}, dequantizing (add to op table for efficiency)")
+            logging.getLogger(__name__).warning(
+                f"SDNQTensor: unknown op {func}, dequantizing (add to op table for efficiency)"
+            )
 
         return dequantize_and_run(func, args, kwargs)

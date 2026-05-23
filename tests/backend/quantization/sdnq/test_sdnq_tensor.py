@@ -1,6 +1,5 @@
 """Unit tests for SDNQTensor class."""
 
-import pytest
 import torch
 
 from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor

@@ -1,8 +1,9 @@
 """Integration tests for SDNQ state dict loader."""
 
+from pathlib import Path
+
 import pytest
 import torch
-from pathlib import Path
 
 from invokeai.backend.quantization.sdnq.loaders import has_sdnq_keys, sdnq_sd_loader
 from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor

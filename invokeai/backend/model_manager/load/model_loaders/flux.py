@@ -1506,7 +1506,9 @@ class FluxSDNQDiffusersModel(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        print(f"[SDNQ] FluxSDNQDiffusersModel._load_model called with config={type(config).__name__}, submodel={submodel_type}")
+        print(
+            f"[SDNQ] FluxSDNQDiffusersModel._load_model called with config={type(config).__name__}, submodel={submodel_type}"
+        )
         # Handle single-file SDNQ checkpoint (Main_SDNQ_FLUX_Config)
         if isinstance(config, Main_SDNQ_FLUX_Config):
             if submodel_type == SubModelType.Transformer:
