@@ -70,6 +70,7 @@ describe('getCanvasToolModifierHintIds', () => {
   it('shows edit hints for path tool while editing a vector layer', () => {
     expect(getCanvasToolModifierHintIds(buildArgs({ tool: 'path', isEditingPathSession: true }))).toEqual([
       'shiftInsertPathPoint',
+      'shiftUnlockPathHandles',
       'modDeletePathPoint',
       'enterAcceptPathEdit',
       'escDiscardPathEdit',

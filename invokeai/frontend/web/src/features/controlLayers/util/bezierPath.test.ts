@@ -36,7 +36,7 @@ describe('bezierPath utilities', () => {
         anchor: { x: 5, y: 0 },
         inHandle: { x: 2.5, y: 0 },
         outHandle: { x: 7.5, y: 0 },
-        type: 'corner',
+        type: 'smooth',
       },
       toInHandle: null,
     });

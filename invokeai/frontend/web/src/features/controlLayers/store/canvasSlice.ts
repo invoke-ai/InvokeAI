@@ -24,6 +24,7 @@ import type {
   ChannelPoints,
   CompositeOperation,
   ControlLoRAConfig,
+  Coordinate,
   EntityMovedByPayload,
   FillStyle,
   FLUXReduxImageInfluence,
@@ -109,6 +110,22 @@ const resetInpaintMasksHiddenIfEmpty = (state: CanvasState) => {
     state.inpaintMasks.isHidden = false;
   }
 };
+
+const offsetCoordinate = (coordinate: Coordinate, offset: Coordinate): Coordinate => ({
+  x: coordinate.x + offset.x,
+  y: coordinate.y + offset.y,
+});
+
+const translateBezierPathToLayer = (path: CanvasBezierPathState, offset: Coordinate): CanvasBezierPathState => ({
+  ...path,
+  id: getPrefixedId('bezier_path'),
+  points: path.points.map((point) => ({
+    ...point,
+    anchor: offsetCoordinate(point.anchor, offset),
+    inHandle: point.inHandle ? offsetCoordinate(point.inHandle, offset) : null,
+    outHandle: point.outHandle ? offsetCoordinate(point.outHandle, offset) : null,
+  })),
+});
 
 const slice = createSlice({
   name: 'canvas',
@@ -531,6 +548,33 @@ const slice = createSlice({
       }
 
       entity.paths = paths.map((path) => ({ ...path }));
+    },
+    vectorLayersMergedDown: (
+      state,
+      action: PayloadAction<{
+        belowEntityIdentifier: CanvasEntityIdentifier<'vector_layer'>;
+        aboveEntityIdentifier: CanvasEntityIdentifier<'vector_layer'>;
+      }>
+    ) => {
+      const { belowEntityIdentifier, aboveEntityIdentifier } = action.payload;
+      if (belowEntityIdentifier.id === aboveEntityIdentifier.id) {
+        return;
+      }
+
+      const belowEntity = selectEntity(state, belowEntityIdentifier);
+      const aboveEntity = selectEntity(state, aboveEntityIdentifier);
+      if (!belowEntity || !aboveEntity || belowEntity.type !== 'vector_layer' || aboveEntity.type !== 'vector_layer') {
+        return;
+      }
+
+      const offset = {
+        x: aboveEntity.position.x - belowEntity.position.x,
+        y: aboveEntity.position.y - belowEntity.position.y,
+      };
+
+      belowEntity.paths.push(...aboveEntity.paths.map((path) => translateBezierPathToLayer(path, offset)));
+      state.vectorLayers.entities = state.vectorLayers.entities.filter((layer) => layer.id !== aboveEntity.id);
+      state.selectedEntityIdentifier = belowEntityIdentifier;
     },
     controlLayerConvertedToRasterLayer: {
       reducer: (
@@ -2078,6 +2122,7 @@ export const {
   vectorLayerAdded,
   vectorPathAdded,
   vectorLayerPathsReplaced,
+  vectorLayersMergedDown,
   controlLayerConvertedToRasterLayer,
   controlLayerConvertedToInpaintMask,
   controlLayerConvertedToRegionalGuidance,

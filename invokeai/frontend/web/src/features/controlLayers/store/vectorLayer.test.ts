@@ -16,6 +16,7 @@ import {
   entityReset,
   vectorLayerAdded,
   vectorLayerPathsReplaced,
+  vectorLayersMergedDown,
   vectorPathAdded,
 } from './canvasSlice';
 import { buildSelectHasObjects, selectAllEntities, selectCanvasMetadata } from './selectors';
@@ -139,6 +140,77 @@ describe('vector layer integration', () => {
         ],
       },
     ]);
+  });
+
+  it('merges an upper vector layer down into a lower vector layer', () => {
+    const state = getInitialCanvasState();
+    state.vectorLayers.entities.push(
+      getVectorLayerState('vector-layer-below', {
+        position: { x: 10, y: 20 },
+        paths: [
+          {
+            id: 'bezier-path-below',
+            name: 'Below Path',
+            isClosed: false,
+            points: [
+              { anchor: { x: 1, y: 2 }, inHandle: null, outHandle: null, type: 'corner' },
+              { anchor: { x: 3, y: 4 }, inHandle: null, outHandle: null, type: 'corner' },
+            ],
+          },
+        ],
+      }),
+      getVectorLayerState('vector-layer-above', {
+        position: { x: 30, y: 50 },
+        paths: [
+          {
+            id: 'bezier-path-above',
+            name: 'Above Path',
+            isClosed: false,
+            points: [
+              {
+                anchor: { x: 5, y: 6 },
+                inHandle: { x: 4, y: 5 },
+                outHandle: { x: 8, y: 9 },
+                type: 'smooth',
+              },
+              { anchor: { x: 10, y: 12 }, inHandle: null, outHandle: null, type: 'corner' },
+            ],
+          },
+        ],
+      })
+    );
+
+    const result = reducer(
+      state,
+      vectorLayersMergedDown({
+        belowEntityIdentifier: { id: 'vector-layer-below', type: 'vector_layer' },
+        aboveEntityIdentifier: { id: 'vector-layer-above', type: 'vector_layer' },
+      })
+    );
+
+    expect(result.vectorLayers.entities).toHaveLength(1);
+    expect(result.vectorLayers.entities[0]?.id).toBe('vector-layer-below');
+    expect(result.vectorLayers.entities[0]?.paths).toHaveLength(2);
+    expect(result.vectorLayers.entities[0]?.paths[1]).toEqual({
+      id: 'bezier_path-1',
+      name: 'Above Path',
+      isClosed: false,
+      points: [
+        {
+          anchor: { x: 25, y: 36 },
+          inHandle: { x: 24, y: 35 },
+          outHandle: { x: 28, y: 39 },
+          type: 'smooth',
+        },
+        {
+          anchor: { x: 30, y: 42 },
+          inHandle: null,
+          outHandle: null,
+          type: 'corner',
+        },
+      ],
+    });
+    expect(result.selectedEntityIdentifier).toEqual({ id: 'vector-layer-below', type: 'vector_layer' });
   });
 
   it('duplicates a vector layer and rekeys its paths', () => {

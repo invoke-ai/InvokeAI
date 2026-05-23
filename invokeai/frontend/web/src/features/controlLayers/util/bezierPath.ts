@@ -116,7 +116,7 @@ export const splitBezierSegmentAt = (
       anchor: s,
       inHandle: normalizeHandle(s, r0),
       outHandle: normalizeHandle(s, r1),
-      type: 'corner',
+      type: 'smooth',
     },
     toInHandle: normalizeHandle(to.anchor, q2),
   };

@@ -2,7 +2,7 @@ import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
-import { addCoords, floorCoord, getPrefixedId, offsetCoord } from 'features/controlLayers/konva/util';
+import { addCoords, getPrefixedId, offsetCoord } from 'features/controlLayers/konva/util';
 import type { CanvasBezierPathState, CanvasEntityIdentifier, Coordinate } from 'features/controlLayers/store/types';
 import { getBezierPathState } from 'features/controlLayers/store/util';
 import {
@@ -424,7 +424,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
   };
 
   private getEntityRelativePoint = (point: Coordinate, position: Coordinate): Coordinate => {
-    return floorCoord(offsetCoord(point, position));
+    return offsetCoord(point, position);
   };
 
   private getPathPoint = (point: Coordinate, shouldSnap: boolean): Coordinate => {
@@ -759,7 +759,7 @@ export class CanvasPathToolModule extends CanvasModuleBase {
         : null;
     } else {
       bezierPoint[session.dragTarget.type] = normalizeHandle(bezierPoint.anchor, point);
-      if (bezierPoint.type === 'smooth') {
+      if (bezierPoint.type === 'smooth' && !evt.shiftKey) {
         const oppositeHandleType = session.dragTarget.type === 'inHandle' ? 'outHandle' : 'inHandle';
         const handle = bezierPoint[session.dragTarget.type];
         bezierPoint[oppositeHandleType] = handle

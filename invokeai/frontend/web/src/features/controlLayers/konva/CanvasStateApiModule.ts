@@ -32,6 +32,7 @@ import {
   rgAdded,
   vectorLayerAdded,
   vectorLayerPathsReplaced,
+  vectorLayersMergedDown,
   vectorPathAdded,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSessionSlice } from 'features/controlLayers/store/canvasStagingAreaSlice';
@@ -232,6 +233,16 @@ export class CanvasStateApiModule extends CanvasModuleBase {
     paths: CanvasBezierPathState[];
   }) => {
     this.store.dispatch(vectorLayerPathsReplaced(arg));
+  };
+
+  /**
+   * Merges one vector layer into another, preserving editable paths.
+   */
+  mergeVectorLayersDown = (arg: {
+    belowEntityIdentifier: CanvasEntityIdentifier<'vector_layer'>;
+    aboveEntityIdentifier: CanvasEntityIdentifier<'vector_layer'>;
+  }) => {
+    this.store.dispatch(vectorLayersMergedDown(arg));
   };
 
   /**

@@ -2976,6 +2976,7 @@
                 "snapRotation": "Snap rotation",
                 "nudgeSelection": "Nudge selection",
                 "insertPathPoint": "Insert point",
+                "unlockPathHandles": "Unlock handles",
                 "deletePathPoint": "Delete point"
             }
         },

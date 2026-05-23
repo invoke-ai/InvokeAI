@@ -31,6 +31,7 @@ type CanvasToolModifierHintId =
   | 'shiftSnapRotation'
   | 'arrowKeysNudgeSelection'
   | 'shiftInsertPathPoint'
+  | 'shiftUnlockPathHandles'
   | 'modDeletePathPoint';
 
 type CanvasToolModifierHint = {
@@ -157,6 +158,11 @@ const HINTS: Record<CanvasToolModifierHintId, CanvasToolModifierHint> = {
     keys: ['shift'],
     labelKey: 'controlLayers.modifierHints.labels.insertPathPoint',
   },
+  shiftUnlockPathHandles: {
+    id: 'shiftUnlockPathHandles',
+    keys: ['shift'],
+    labelKey: 'controlLayers.modifierHints.labels.unlockPathHandles',
+  },
   modDeletePathPoint: {
     id: 'modDeletePathPoint',
     keys: ['mod'],
@@ -205,6 +211,7 @@ export const getCanvasToolModifierHintIds = ({
       isEditingPathSession
         ? [
             'shiftInsertPathPoint',
+            'shiftUnlockPathHandles',
             'modDeletePathPoint',
             'enterAcceptPathEdit',
             'escDiscardPathEdit',
