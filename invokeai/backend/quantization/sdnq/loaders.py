@@ -177,16 +177,16 @@ def sdnq_sd_loader(
         State dict with SDNQTensor wrappers for quantized weights and
         regular tensors for non-quantized weights.
     """
-    # Determine paths
+    # Determine which safetensors file(s) hold the weights. For larger models (FLUX.2 Klein 9B,
+    # FLUX.2 dev, ...) the transformer is sharded across multiple ``*-NNNNN-of-MMMMM.safetensors``
+    # files; we merge all of them into one state_dict before grouping.
     if model_path.is_dir():
-        # Look for main model file
-        safetensors_files = list(model_path.glob("*.safetensors"))
+        safetensors_files = sorted(model_path.glob("*.safetensors"))
         if not safetensors_files:
             raise ValueError(f"No safetensors files found in {model_path}")
-        model_file = safetensors_files[0]
         config_path = model_path / "quantization_config.json"
     else:
-        model_file = model_path
+        safetensors_files = [model_path]
         config_path = model_path.parent / "quantization_config.json"
 
     # Load quantization config if available
@@ -207,8 +207,15 @@ def sdnq_sd_loader(
                 for layer_key in layer_keys:
                     per_tensor_dtype_map[layer_key] = dtype_name
 
-    # Load safetensors file
-    raw_sd = load_file(model_file)
+    # Load and merge all safetensors shards.
+    raw_sd: dict[str, torch.Tensor] = {}
+    for shard in safetensors_files:
+        shard_sd = load_file(shard)
+        # Detect accidental key collisions between shards — would indicate a corrupted bundle.
+        overlap = set(shard_sd).intersection(raw_sd)
+        if overlap:
+            raise ValueError(f"Duplicate keys across SDNQ shards (model={model_path}): {sorted(overlap)[:3]}")
+        raw_sd.update(shard_sd)
 
     # Group related tensors (weight, scale, zero_point, svd_up, svd_down)
     sd: dict[str, Union[SDNQTensor, torch.Tensor]] = {}
@@ -320,8 +327,11 @@ def sdnq_sd_loader(
     # Log summary
     sdnq_count = sum(1 for v in sd.values() if isinstance(v, SDNQTensor))
     regular_count = len(sd) - sdnq_count
-    print(f"[SDNQ] Loaded {sdnq_count} quantized tensors, {regular_count} regular tensors from {model_file}")
-    logger.info(f"SDNQ loader: {sdnq_count} quantized tensors, {regular_count} regular tensors from {model_file}")
+    source_desc = (
+        str(safetensors_files[0]) if len(safetensors_files) == 1 else f"{len(safetensors_files)} shards in {model_path}"
+    )
+    print(f"[SDNQ] Loaded {sdnq_count} quantized tensors, {regular_count} regular tensors from {source_desc}")
+    logger.info(f"SDNQ loader: {sdnq_count} quantized tensors, {regular_count} regular tensors from {source_desc}")
 
     gc.collect()
     return sd

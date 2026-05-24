@@ -66,9 +66,7 @@ def unpack_uint5(packed: torch.Tensor, original_shape: torch.Size) -> torch.Tens
         Unpacked tensor with shape ``original_shape`` containing values 0-31.
     """
     if packed.dim() < 2 or packed.shape[-1] != 5:
-        raise ValueError(
-            f"unpack_uint5 expects packed tensor with last dim = 5; got shape {tuple(packed.shape)}"
-        )
+        raise ValueError(f"unpack_uint5 expects packed tensor with last dim = 5; got shape {tuple(packed.shape)}")
     result_bitwise_right_shift = torch.bitwise_right_shift(packed[..., :3], 5)
     result = torch.cat(
         (

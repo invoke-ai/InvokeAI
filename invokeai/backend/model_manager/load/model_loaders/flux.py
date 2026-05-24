@@ -50,8 +50,8 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_FLUX_Config,
     Main_GGUF_Flux2_Config,
     Main_GGUF_FLUX_Config,
-    Main_SDNQ_Diffusers_FLUX_Config,
     Main_SDNQ_Diffusers_Flux2_Config,
+    Main_SDNQ_Diffusers_FLUX_Config,
     Main_SDNQ_Flux2_Config,
     Main_SDNQ_FLUX_Config,
 )
@@ -1214,17 +1214,14 @@ class Flux2SDNQCheckpointModel(ModelLoader):
                 return self._load_vae(config)
 
         raise ValueError(
-            f"Unsupported submodel type for SDNQ FLUX.2 pipeline: "
-            f"{submodel_type.value if submodel_type else 'None'}"
+            f"Unsupported submodel type for SDNQ FLUX.2 pipeline: {submodel_type.value if submodel_type else 'None'}"
         )
 
     def _load_transformer_from_folder(self, config: Main_SDNQ_Diffusers_Flux2_Config) -> AnyModel:
         from diffusers import Flux2Transformer2DModel
 
         model_path = Path(config.path)
-        transformer_path = (
-            model_path / "transformer" if (model_path / "transformer").is_dir() else model_path
-        )
+        transformer_path = model_path / "transformer" if (model_path / "transformer").is_dir() else model_path
 
         with accelerate.init_empty_weights():
             model = Flux2Transformer2DModel.from_config(

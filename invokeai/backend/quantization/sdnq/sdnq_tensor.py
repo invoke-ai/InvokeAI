@@ -9,9 +9,9 @@ from invokeai.backend.quantization.sdnq.utils import (
     SDNQQuantizationType,
     apply_svd_correction,
     dequantize_asymmetric,
+    dequantize_int5_per_group,
     dequantize_symmetric,
     dequantize_uint4_per_group,
-    dequantize_int5_per_group,
 )
 
 logger = logging.getLogger(__name__)

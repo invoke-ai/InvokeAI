@@ -604,8 +604,7 @@ class ZImageSDNQCheckpointModel(ModelLoader):
                 return self._load_vae(config)
 
         raise ValueError(
-            f"Unsupported submodel type for SDNQ ZImagePipeline: "
-            f"{submodel_type.value if submodel_type else 'None'}"
+            f"Unsupported submodel type for SDNQ ZImagePipeline: {submodel_type.value if submodel_type else 'None'}"
         )
 
     def _load_text_encoder(self, config: Main_SDNQ_Diffusers_ZImage_Config) -> AnyModel:
