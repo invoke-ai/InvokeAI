@@ -818,6 +818,10 @@ class Main_Diffusers_FLUX_Config(Diffusers_Config_Base, Main_Config_Base, Config
             },
         )
 
+        # Reject SDNQ-quantized pipelines so Main_SDNQ_Diffusers_FLUX_Config matches instead.
+        if (mod.path / "transformer").is_dir() and _is_sdnq_folder(mod.path / "transformer"):
+            raise NotAMatchError("transformer is SDNQ-quantized; use Main_SDNQ_Diffusers_FLUX_Config")
+
         variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
 
         repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
@@ -871,6 +875,13 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
                 "Flux2KleinPipeline",
             },
         )
+
+        # Reject SDNQ-quantized pipelines so the SDNQ-specific config matches them instead.
+        # Without this both configs accept the same folder and identification can latch onto
+        # the wrong one (the plain diffusers loader would then mis-read packed uint8 weights
+        # as bf16 and crash with size-mismatch errors at first inference).
+        if (mod.path / "transformer").is_dir() and _is_sdnq_folder(mod.path / "transformer"):
+            raise NotAMatchError("transformer is SDNQ-quantized; use Main_SDNQ_Diffusers_Flux2_Config")
 
         variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
 
