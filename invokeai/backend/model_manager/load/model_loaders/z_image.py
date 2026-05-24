@@ -582,15 +582,64 @@ class ZImageSDNQCheckpointModel(ModelLoader):
                 "Only Main_SDNQ_ZImage_Config or Main_SDNQ_Diffusers_ZImage_Config models are supported here."
             )
 
+        # Single-file SDNQ checkpoints only carry the transformer.
+        if isinstance(config, Main_SDNQ_ZImage_Config):
+            if submodel_type == SubModelType.Transformer:
+                return self._load_from_singlefile(config)
+            raise ValueError(
+                f"Single-file SDNQ Z-Image checkpoints only provide the Transformer submodel. "
+                f"Received: {submodel_type.value if submodel_type else 'None'}"
+            )
+
+        # Full ZImagePipeline folder — dispatch each submodel out of its own subfolder so the
+        # model can be used as a 'Qwen3 & VAE source model' for other Z-Image runs.
         match submodel_type:
             case SubModelType.Transformer:
-                if isinstance(config, Main_SDNQ_Diffusers_ZImage_Config):
-                    return self._load_from_diffusers_folder(config)
-                return self._load_from_singlefile(config)
+                return self._load_from_diffusers_folder(config)
+            case SubModelType.TextEncoder:
+                return self._load_text_encoder(config)
+            case SubModelType.Tokenizer:
+                return self._load_tokenizer(config)
+            case SubModelType.VAE:
+                return self._load_vae(config)
 
         raise ValueError(
-            f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
+            f"Unsupported submodel type for SDNQ ZImagePipeline: "
+            f"{submodel_type.value if submodel_type else 'None'}"
         )
+
+    def _load_text_encoder(self, config: Main_SDNQ_Diffusers_ZImage_Config) -> AnyModel:
+        from transformers import AutoConfig, Qwen3ForCausalLM
+
+        te_dir = Path(config.path) / "text_encoder"
+        target_device = TorchDevice.choose_torch_device()
+        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+
+        te_config = AutoConfig.from_pretrained(te_dir, local_files_only=True)
+        with accelerate.init_empty_weights():
+            model = Qwen3ForCausalLM(te_config)
+
+        sd = sdnq_sd_loader(te_dir, compute_dtype=compute_dtype)
+        # Qwen3ForCausalLM may share lm_head.weight with model.embed_tokens.weight; missing keys
+        # for that tie are expected and handled by re-sharing post-load.
+        missing, unexpected = model.load_state_dict(sd, assign=True, strict=False)
+        if unexpected:
+            raise ValueError(f"Unexpected keys loading SDNQ Qwen3 text encoder: {unexpected}")
+        if missing and missing != ["lm_head.weight"]:
+            raise ValueError(f"Unexpected missing keys loading SDNQ Qwen3 text encoder: {missing}")
+        if missing == ["lm_head.weight"]:
+            model.lm_head.weight = model.model.embed_tokens.weight
+        return model
+
+    def _load_tokenizer(self, config: Main_SDNQ_Diffusers_ZImage_Config) -> AnyModel:
+        tok_dir = Path(config.path) / "tokenizer"
+        return AutoTokenizer.from_pretrained(tok_dir, local_files_only=True)
+
+    def _load_vae(self, config: Main_SDNQ_Diffusers_ZImage_Config) -> AnyModel:
+        from diffusers import AutoencoderKL
+
+        vae_dir = Path(config.path) / "vae"
+        return AutoencoderKL.from_pretrained(vae_dir, local_files_only=True)
 
     def _load_from_singlefile(
         self,
