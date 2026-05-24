@@ -303,6 +303,7 @@
         "unknown": "Unknown",
         "unpin": "Unpin",
         "upload": "Upload",
+        "userGuideLabel": "User Guide",
         "zoomIn": "Zoom In",
         "zoomOut": "Zoom Out",
         "updated": "Updated",
@@ -3477,7 +3478,8 @@
             "Redesigned download queue"
         ],
         "readReleaseNotes": "Read Release Notes",
-        "watchRecentReleaseVideos": "Watch Recent Release Videos",
+        "readTheDocs": "Read the Docs",
+        "readDocumentation": "Read Invoke Documentation",
         "watchUiUpdatesOverview": "Watch UI Updates Overview"
     },
     "cropper": {
