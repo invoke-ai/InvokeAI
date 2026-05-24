@@ -289,15 +289,23 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
-  if (model?.base === 'flux2' && model.format !== 'diffusers') {
-    // Non-diffusers FLUX.2 Klein models require standalone VAE and Qwen3 Encoder
-    // unless a diffusers flux2 model is available to extract them from.
-    // VAE is shared across variants, but Qwen3 encoder requires a variant-matching diffusers model.
-    if (!params.kleinVaeModel && !hasFlux2DiffusersVaeSource) {
-      reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
-    }
-    if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {
-      reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinQwen3EncoderModelSelected') });
+  if (model?.base === 'flux2') {
+    // A FLUX.2 Klein model is a self-sufficient source when its config exposes the diffusers-style
+    // submodels (transformer/vae/text_encoder/tokenizer). That's the case for both plain Diffusers
+    // pipelines and SDNQ-quantized ZImagePipeline / Flux2KleinPipeline folders. Single-file or
+    // GGUF Klein models don't have submodels and need a standalone VAE + Qwen3 (or a diffusers-
+    // shaped source model installed elsewhere).
+    const mainIsPipeline =
+      model.format === 'diffusers' ||
+      ((model as { format?: unknown }).format === 'sdnq_quantized' &&
+        Boolean((model as { submodels?: unknown }).submodels));
+    if (!mainIsPipeline) {
+      if (!params.kleinVaeModel && !hasFlux2DiffusersVaeSource) {
+        reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
+      }
+      if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {
+        reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinQwen3EncoderModelSelected') });
+      }
     }
   }
 
