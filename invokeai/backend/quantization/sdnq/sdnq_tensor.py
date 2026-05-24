@@ -11,6 +11,7 @@ from invokeai.backend.quantization.sdnq.utils import (
     dequantize_asymmetric,
     dequantize_symmetric,
     dequantize_uint4_per_group,
+    dequantize_int5_per_group,
 )
 
 logger = logging.getLogger(__name__)
@@ -302,6 +303,18 @@ class SDNQTensor(torch.Tensor):
             assert self._zero_point is not None
             assert self._group_size is not None
             dequantized = dequantize_uint4_per_group(
+                self.quantized_data,
+                self._scale,
+                self._zero_point,
+                self.tensor_shape,
+                self._group_size,
+                dtype=self.compute_dtype,
+            )
+        elif self._quantization_type == SDNQQuantizationType.INT5_ASYM:
+            # Signed 5-bit with per-group quantization (8 values per 5 bytes). zero_point may
+            # be absent for scale-only 5-bit tensors produced by SDNQ's dynamic-mixed pass.
+            assert self._group_size is not None
+            dequantized = dequantize_int5_per_group(
                 self.quantized_data,
                 self._scale,
                 self._zero_point,

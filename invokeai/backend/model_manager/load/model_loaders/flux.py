@@ -51,6 +51,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_GGUF_Flux2_Config,
     Main_GGUF_FLUX_Config,
     Main_SDNQ_Diffusers_FLUX_Config,
+    Main_SDNQ_Diffusers_Flux2_Config,
     Main_SDNQ_Flux2_Config,
     Main_SDNQ_FLUX_Config,
 )
@@ -1187,16 +1188,91 @@ class Flux2SDNQCheckpointModel(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if not isinstance(config, Main_SDNQ_Flux2_Config):
-            raise ValueError("Only Main_SDNQ_Flux2_Config models are supported here.")
+        if not isinstance(config, (Main_SDNQ_Flux2_Config, Main_SDNQ_Diffusers_Flux2_Config)):
+            raise ValueError(
+                "Only Main_SDNQ_Flux2_Config or Main_SDNQ_Diffusers_Flux2_Config models are supported here."
+            )
 
+        # Single-file SDNQ FLUX.2 checkpoints only ship the transformer.
+        if isinstance(config, Main_SDNQ_Flux2_Config):
+            if submodel_type == SubModelType.Transformer:
+                return self._load_from_singlefile(config)
+            raise ValueError(
+                f"Single-file SDNQ FLUX.2 checkpoints only provide the Transformer submodel. "
+                f"Received: {submodel_type.value if submodel_type else 'None'}"
+            )
+
+        # Full Flux2 pipeline folder — dispatch each submodel from its own subfolder.
         match submodel_type:
             case SubModelType.Transformer:
-                return self._load_from_singlefile(config)
+                return self._load_transformer_from_folder(config)
+            case SubModelType.TextEncoder:
+                return self._load_text_encoder(config)
+            case SubModelType.Tokenizer:
+                return self._load_tokenizer(config)
+            case SubModelType.VAE:
+                return self._load_vae(config)
 
         raise ValueError(
-            f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
+            f"Unsupported submodel type for SDNQ FLUX.2 pipeline: "
+            f"{submodel_type.value if submodel_type else 'None'}"
         )
+
+    def _load_transformer_from_folder(self, config: Main_SDNQ_Diffusers_Flux2_Config) -> AnyModel:
+        from diffusers import Flux2Transformer2DModel
+
+        model_path = Path(config.path)
+        transformer_path = (
+            model_path / "transformer" if (model_path / "transformer").is_dir() else model_path
+        )
+
+        with accelerate.init_empty_weights():
+            model = Flux2Transformer2DModel.from_config(
+                Flux2Transformer2DModel.load_config(transformer_path, local_files_only=True)
+            )
+
+        sd = sdnq_sd_loader(transformer_path, compute_dtype=torch.bfloat16)
+        model.load_state_dict(sd, assign=True, strict=False)
+        return model
+
+    def _load_text_encoder(self, config: Main_SDNQ_Diffusers_Flux2_Config) -> AnyModel:
+        from transformers import AutoConfig, Qwen3ForCausalLM
+
+        te_dir = Path(config.path) / "text_encoder"
+        te_config = AutoConfig.from_pretrained(te_dir, local_files_only=True)
+        with accelerate.init_empty_weights():
+            model = Qwen3ForCausalLM(te_config)
+
+        sd = sdnq_sd_loader(te_dir, compute_dtype=torch.bfloat16)
+        missing, unexpected = model.load_state_dict(sd, assign=True, strict=False)
+        if unexpected:
+            raise ValueError(f"Unexpected keys loading SDNQ Qwen3 text encoder: {unexpected}")
+        if missing and missing != ["lm_head.weight"]:
+            raise ValueError(f"Unexpected missing keys loading SDNQ Qwen3 text encoder: {missing}")
+        if missing == ["lm_head.weight"]:
+            model.lm_head.weight = model.model.embed_tokens.weight
+        return model
+
+    def _load_tokenizer(self, config: Main_SDNQ_Diffusers_Flux2_Config) -> AnyModel:
+        from transformers import AutoTokenizer
+
+        tok_dir = Path(config.path) / "tokenizer"
+        return AutoTokenizer.from_pretrained(tok_dir, local_files_only=True)
+
+    def _load_vae(self, config: Main_SDNQ_Diffusers_Flux2_Config) -> AnyModel:
+        # FLUX.2 Klein uses AutoencoderKLFlux2 (not the generic AutoencoderKL). Both ship as
+        # plain bf16 in this pipeline (the VAE itself isn't SDNQ-quantized).
+        from diffusers import AutoencoderKL, AutoencoderKLFlux2
+
+        vae_dir = Path(config.path) / "vae"
+        # Pick the right class based on what the on-disk config.json declares.
+        try:
+            cls_name = AutoencoderKL.load_config(vae_dir, local_files_only=True).get("_class_name", "")
+        except Exception:
+            cls_name = ""
+        if cls_name == "AutoencoderKLFlux2":
+            return AutoencoderKLFlux2.from_pretrained(vae_dir, local_files_only=True)
+        return AutoencoderKL.from_pretrained(vae_dir, local_files_only=True)
 
     def _load_from_singlefile(self, config: Main_SDNQ_Flux2_Config) -> AnyModel:
         from diffusers import Flux2Transformer2DModel

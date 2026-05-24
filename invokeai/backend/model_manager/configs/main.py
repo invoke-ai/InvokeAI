@@ -1566,6 +1566,142 @@ class Main_SDNQ_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_B
             raise NotAMatchError("state dict does not look like SDNQ quantized")
 
 
+class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
+    """Model config for SDNQ-quantized FLUX.2 models in diffusers format
+    (Flux2KleinPipeline / Flux2Pipeline folder with transformer/, text_encoder/, vae/, ...)."""
+
+    base: Literal[BaseModelType.Flux2] = Field(default=BaseModelType.Flux2)
+    format: Literal[ModelFormat.SDNQQuantized] = Field(default=ModelFormat.SDNQQuantized)
+
+    variant: Flux2VariantType = Field()
+    repo_variant: ModelRepoVariant = Field(default=ModelRepoVariant.Default)
+    submodels: dict[SubModelType, SubmodelDefinition] | None = Field(
+        description="Loadable submodels in this model",
+        default=None,
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_flux2_diffusers(mod)
+
+        cls._validate_has_sdnq_transformer(mod)
+
+        variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
+        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant(mod)
+        submodels = override_fields.get("submodels") or cls._get_submodels(mod)
+
+        return cls(**override_fields, variant=variant, repo_variant=repo_variant, submodels=submodels)
+
+    @classmethod
+    def _validate_looks_like_flux2_diffusers(cls, mod: ModelOnDisk) -> None:
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "Flux2Pipeline",
+                "Flux2KleinPipeline",
+                "Flux2Transformer2DModel",
+            },
+        )
+
+    @classmethod
+    def _validate_has_sdnq_transformer(cls, mod: ModelOnDisk) -> None:
+        transformer_path = mod.path / "transformer"
+        if not transformer_path.is_dir():
+            raise NotAMatchError("no transformer subfolder found")
+
+        if not _is_sdnq_folder(transformer_path):
+            raise NotAMatchError("transformer is not SDNQ quantized")
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> Flux2VariantType:
+        """Determine the Flux2 variant from the transformer config + filename heuristic."""
+        transformer_config = get_config_dict_or_raise(mod.path / "transformer" / "config.json")
+
+        hidden_size = transformer_config.get("attention_head_dim", 128) * transformer_config.get(
+            "num_attention_heads", 24
+        )
+        joint_attention_dim = transformer_config.get("joint_attention_dim", 7680)
+
+        # Klein 4B uses Qwen3-4B encoder → joint_attention_dim = 3 × 2560 = 7680
+        # Klein 9B uses Qwen3-8B encoder → joint_attention_dim = 3 × 4096 = 12288
+        # hidden_size 3072 → 4B variant, 4096 → 9B variant
+        if hidden_size == 4096 or joint_attention_dim == 12288:
+            variant = Flux2VariantType.Klein9B
+        else:
+            variant = Flux2VariantType.Klein4B
+
+        if _filename_suggests_base(mod.name):
+            if variant == Flux2VariantType.Klein9B:
+                return Flux2VariantType.Klein9BBase
+            if variant == Flux2VariantType.Klein4B:
+                return Flux2VariantType.Klein4BBase
+        return variant
+
+    @classmethod
+    def _get_repo_variant(cls, mod: ModelOnDisk) -> ModelRepoVariant:
+        weight_files = list(mod.path.glob("**/*.safetensors"))
+        weight_files.extend(list(mod.path.glob("**/*.bin")))
+        for x in weight_files:
+            if ".fp16" in x.suffixes:
+                return ModelRepoVariant.FP16
+            if "openvino_model" in x.name:
+                return ModelRepoVariant.OpenVINO
+            if "flax_model" in x.name:
+                return ModelRepoVariant.Flax
+            if x.suffix == ".onnx":
+                return ModelRepoVariant.ONNX
+        return ModelRepoVariant.Default
+
+    @classmethod
+    def _get_submodels(cls, mod: ModelOnDisk) -> dict[SubModelType, SubmodelDefinition]:
+        config = get_config_dict_or_raise(common_config_paths(mod.path))
+
+        submodels: dict[SubModelType, SubmodelDefinition] = {}
+
+        for key, value in config.items():
+            if key.startswith("_") or not (isinstance(value, list) and len(value) == 2):
+                continue
+
+            _library_name, class_name = value
+
+            if class_name is None:
+                continue
+
+            match class_name:
+                case "Flux2Transformer2DModel":
+                    submodels[SubModelType.Transformer] = SubmodelDefinition(
+                        path_or_prefix=(mod.path / key).resolve().as_posix(),
+                        model_type=ModelType.Main,
+                        variant=None,
+                    )
+                case "Qwen3ForCausalLM":
+                    submodels[SubModelType.TextEncoder] = SubmodelDefinition(
+                        path_or_prefix=(mod.path / key).resolve().as_posix(),
+                        model_type=ModelType.Qwen3Encoder,
+                        variant=None,
+                    )
+                case "Qwen2Tokenizer":
+                    submodels[SubModelType.Tokenizer] = SubmodelDefinition(
+                        path_or_prefix=(mod.path / key).resolve().as_posix(),
+                        model_type=ModelType.Qwen3Encoder,
+                        variant=None,
+                    )
+                case "AutoencoderKLFlux2" | "AutoencoderKL":
+                    submodels[SubModelType.VAE] = SubmodelDefinition(
+                        path_or_prefix=(mod.path / key).resolve().as_posix(),
+                        model_type=ModelType.VAE,
+                        variant=None,
+                    )
+                case _:
+                    pass
+
+        return submodels
+
+
 class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
     """Model config for SDNQ-quantized Z-Image models in diffusers format (full ZImagePipeline folder)."""
 

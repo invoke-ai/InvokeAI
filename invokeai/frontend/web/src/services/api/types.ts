@@ -496,7 +496,20 @@ export const isZImageDiffusersMainModelConfig = (config: AnyModelConfig): config
 };
 
 export const isFlux2DiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
-  return config.type === 'main' && config.base === 'flux2' && config.format === 'diffusers';
+  if (config.type !== 'main' || config.base !== 'flux2') {
+    return false;
+  }
+  // Same reasoning as isZImageDiffusersMainModelConfig: an SDNQ FLUX.2 pipeline folder ships
+  // the same submodels (transformer/text_encoder/tokenizer/vae) and qualifies as a source model.
+  const format = (config as { format?: unknown }).format as string | undefined;
+  if (format === 'diffusers') {
+    return true;
+  }
+  if (format !== 'sdnq_quantized') {
+    return false;
+  }
+  const submodels = (config as { submodels?: unknown }).submodels;
+  return Boolean(submodels);
 };
 
 export const isQwenImageDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {

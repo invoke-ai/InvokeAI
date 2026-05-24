@@ -173,13 +173,19 @@ class Flux2KleinModelLoaderInvocation(BaseInvocation):
     def _validate_diffusers_format(
         self, context: InvocationContext, model: ModelIdentifierField, model_name: str
     ) -> None:
-        """Validate that a model is in Diffusers format."""
+        """Validate that a model exposes the diffusers-style submodel layout. Both plain diffusers
+        pipelines and SDNQ-quantized pipeline folders (which ship the same submodels) qualify;
+        single-file SDNQ FLUX.2 checkpoints don't have submodels populated and are still rejected.
+        """
         config = context.models.get_config(model)
-        if config.format != ModelFormat.Diffusers:
-            raise ValueError(
-                f"The {model_name} model must be a Diffusers format model. "
-                f"The selected model '{config.name}' is in {config.format.value} format."
-            )
+        if config.format == ModelFormat.Diffusers:
+            return
+        if config.format == ModelFormat.SDNQQuantized and getattr(config, "submodels", None):
+            return
+        raise ValueError(
+            f"The {model_name} model must be a Diffusers-style FLUX.2 pipeline (with VAE / Qwen3 "
+            f"submodels). The selected model '{config.name}' is in {config.format.value} format."
+        )
 
     def _validate_qwen3_encoder_variant(self, context: InvocationContext, main_config) -> None:
         """Validate that the standalone Qwen3 encoder variant matches the FLUX.2 Klein variant.

@@ -24,18 +24,48 @@ def _parse_quantization_config(config_path: Path) -> dict[str, Any]:
         return json.load(f)
 
 
+_DTYPE_NAME_TO_QUANT_TYPE = {
+    "uint4": SDNQQuantizationType.UINT4_ASYM,
+    "int4": SDNQQuantizationType.UINT4_ASYM,  # signed naming, same packed storage
+    "uint5": SDNQQuantizationType.INT5_ASYM,
+    "int5": SDNQQuantizationType.INT5_ASYM,  # SDNQ dynamic-mixed uses this label
+    "int8": SDNQQuantizationType.INT8_SYM,
+    "uint8": SDNQQuantizationType.UINT8_SYM,
+}
+
+
 def _infer_quantization_type(
     weight_dtype: torch.dtype,
     has_zero_point: bool,
     config: dict[str, Any],
     weight: torch.Tensor | None = None,
     scale: torch.Tensor | None = None,
+    tensor_name: str | None = None,
+    per_tensor_dtype: str | None = None,
 ) -> SDNQQuantizationType:
-    """Infer quantization type from weight dtype and config."""
-    # Check config for weights_dtype (SDNQ style)
+    """Infer quantization type from weight dtype and config.
+
+    Dynamic-mixed-precision SDNQ models use ``modules_dtype_dict`` to record per-tensor dtypes
+    (e.g. some layers uint4, others int5). ``per_tensor_dtype`` is the resolved label for this
+    tensor; when provided it takes precedence over the global ``weights_dtype``.
+    """
+    # Per-tensor override (dynamic mixed precision)
+    if per_tensor_dtype:
+        mapped = _DTYPE_NAME_TO_QUANT_TYPE.get(per_tensor_dtype)
+        if mapped is not None:
+            # Asymmetric vs symmetric: int8/uint8 follow has_zero_point; everything else is asym.
+            if mapped == SDNQQuantizationType.INT8_SYM and has_zero_point:
+                return SDNQQuantizationType.INT8_ASYM
+            if mapped == SDNQQuantizationType.UINT8_SYM and has_zero_point:
+                return SDNQQuantizationType.UINT8_ASYM
+            return mapped
+
+    # Check config for weights_dtype (SDNQ style; static-quantization fallback)
     weights_dtype = config.get("weights_dtype", "")
     if weights_dtype == "uint4":
         return SDNQQuantizationType.UINT4_ASYM
+    if weights_dtype == "uint5" or weights_dtype == "int5":
+        return SDNQQuantizationType.INT5_ASYM
 
     # Check config for quant_type
     if "quant_type" in config:
@@ -92,33 +122,37 @@ def _get_original_shape(
     if "shapes" in config and tensor_name in config["shapes"]:
         return torch.Size(config["shapes"][tensor_name])
 
-    # For uint4 packed weights with per-group quantization
+    # For uint4 packed weights with per-group quantization. The packed size is the
+    # authoritative source for in_features: scale's num_groups × the passed-in group_size can
+    # be wrong if group_size was not actually known (e.g. Klein 4B uses group_size=64 for some
+    # to_out layers while others use 128).
     if quant_type == SDNQQuantizationType.UINT4_ASYM:
-        # For 1D flattened weights, infer shape from scale tensor
-        # Scale can have shape [out_features, num_groups, 1] or [out_features, num_groups]
-        if scale is not None and len(scale.shape) >= 2:
+        if scale is not None and scale.shape and scale.shape[0] > 0:
             out_features = scale.shape[0]
-            num_groups = scale.shape[1]
-            in_features = num_groups * group_size
-            if in_features > 0:
-                return torch.Size([out_features, in_features])
-
-        # For 2D packed weights, multiply last dim by 2
-        if len(weight.shape) == 2:
-            return torch.Size([weight.shape[0], weight.shape[1] * 2])
-
-        # For 1D, infer from packed size and scale's out_features
-        if len(weight.shape) == 1 and scale is not None:
-            # uint4 packs 2 values per byte
+            # uint4 packs 2 values per byte; total unpacked = numel * 2 regardless of 1D/2D layout.
             total_elements = weight.numel() * 2
-            out_features = scale.shape[0]
-            if out_features > 0 and total_elements % out_features == 0:
+            if total_elements % out_features == 0:
                 in_features = total_elements // out_features
                 return torch.Size([out_features, in_features])
 
-        # Final fallback for 1D
+        # Fallback for 2D packed weights without usable scale info.
+        if len(weight.shape) == 2:
+            return torch.Size([weight.shape[0], weight.shape[1] * 2])
+
+        # Final fallback for 1D.
         if len(weight.shape) == 1:
-            total_elements = weight.numel() * 2
+            return torch.Size([weight.numel() * 2])
+
+    # For uint5 packed weights with per-group quantization. SDNQ stores uint5 as 2D with last
+    # dim = 5 (8 unpacked values per 5 bytes). Same authoritative-packed-size logic.
+    if quant_type == SDNQQuantizationType.INT5_ASYM:
+        total_elements = weight.numel() * 8 // 5
+        if scale is not None and scale.shape and scale.shape[0] > 0:
+            out_features = scale.shape[0]
+            if total_elements % out_features == 0:
+                return torch.Size([out_features, total_elements // out_features])
+        # Fallback when there's no scale: trust the 2D packed layout.
+        if len(weight.shape) == 2 and weight.shape[-1] == 5:
             return torch.Size([total_elements])
 
     # Quantized tensors usually keep the same shape
@@ -162,6 +196,17 @@ def sdnq_sd_loader(
     # Note: group_size=0 in config means per-tensor quantization or it needs to be inferred
     config_group_size = quant_config.get("group_size", 128)
 
+    # Build a reverse map for dynamic-mixed-precision models. SDNQ stores
+    # ``modules_dtype_dict`` as ``{dtype_name: [list of layer keys]}``; we flip it to
+    # ``{layer_key: dtype_name}`` for O(1) lookup during the per-tensor type inference.
+    per_tensor_dtype_map: dict[str, str] = {}
+    modules_dtype_dict = quant_config.get("modules_dtype_dict") or {}
+    if isinstance(modules_dtype_dict, dict):
+        for dtype_name, layer_keys in modules_dtype_dict.items():
+            if isinstance(layer_keys, list):
+                for layer_key in layer_keys:
+                    per_tensor_dtype_map[layer_key] = dtype_name
+
     # Load safetensors file
     raw_sd = load_file(model_file)
 
@@ -190,13 +235,16 @@ def sdnq_sd_loader(
                 svd_up = raw_sd.get(svd_up_key)
                 svd_down = raw_sd.get(svd_down_key)
 
-                # Determine quantization type
+                # Determine quantization type. For dynamic-mixed-precision models, look up the
+                # per-tensor dtype in the reverse map we built from ``modules_dtype_dict``.
                 quant_type = _infer_quantization_type(
                     weight.dtype,
                     zero_point is not None,
                     quant_config,
                     weight=weight,
                     scale=scale,
+                    tensor_name=key,
+                    per_tensor_dtype=per_tensor_dtype_map.get(key),
                 )
 
                 # Determine group_size for this tensor
@@ -241,7 +289,9 @@ def sdnq_sd_loader(
                     zero_point=zero_point,
                     svd_up=svd_up,
                     svd_down=svd_down,
-                    group_size=tensor_group_size if quant_type == SDNQQuantizationType.UINT4_ASYM else None,
+                    group_size=tensor_group_size
+                    if quant_type in (SDNQQuantizationType.UINT4_ASYM, SDNQQuantizationType.INT5_ASYM)
+                    else None,
                 )
 
                 # Mark related keys as processed
