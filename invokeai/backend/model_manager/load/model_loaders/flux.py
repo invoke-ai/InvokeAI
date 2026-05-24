@@ -1737,6 +1737,19 @@ class FluxSDNQDiffusersModel(ModelLoader):
             dequantized = [maybe_dequantize(t) for t in tensors]
             return torch.cat(dequantized, dim=0)
 
+        def _swap_scale_shift_halves(t: torch.Tensor) -> torch.Tensor:
+            """Swap the (scale, shift) halves along dim 0 to (shift, scale).
+
+            diffusers' AdaLayerNormContinuous packs (scale, shift); BFL's LastLayer expects
+            (shift, scale). Same memory, different interpretation — without this swap the final
+            normalisation modulation is permuted and the output is high-frequency noise.
+            """
+            t = maybe_dequantize(t)
+            if t.dim() < 1 or t.shape[0] % 2 != 0:
+                return t
+            scale, shift = t.chunk(2, dim=0)
+            return torch.cat([shift, scale], dim=0)
+
         # Make a shallow copy so we can pop keys
         sd = sd.copy()
         new_sd: dict[str, torch.Tensor] = {}
@@ -1767,12 +1780,22 @@ class FluxSDNQDiffusersModel(ModelLoader):
             # final_layer keys
             "proj_out.bias": "final_layer.linear.bias",
             "proj_out.weight": "final_layer.linear.weight",
+            # norm_out.linear is the final AdaLayerNormContinuous. diffusers packs the linear
+            # output as (scale, shift); BFL's LastLayer packs as (shift, scale). Swap the
+            # halves of the weight and bias to keep the math correct.
             "norm_out.linear.bias": "final_layer.adaLN_modulation.1.bias",
             "norm_out.linear.weight": "final_layer.adaLN_modulation.1.weight",
+        }
+        # Keys whose first-axis halves (scale, shift) must be swapped to (shift, scale) for BFL.
+        SWAP_SCALE_SHIFT_KEYS = {
+            "norm_out.linear.bias",
+            "norm_out.linear.weight",
         }
         for old_key, new_key in basic_key_map.items():
             v = sd.pop(old_key, None)
             if v is not None:
+                if old_key in SWAP_SCALE_SHIFT_KEYS:
+                    v = _swap_scale_shift_halves(v)
                 new_sd[new_key] = v
 
         # Handle the double_blocks (19 blocks for FLUX)
