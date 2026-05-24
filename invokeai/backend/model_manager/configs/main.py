@@ -1551,6 +1551,7 @@ class Main_SDNQ_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_B
 
     base: Literal[BaseModelType.ZImage] = Field(default=BaseModelType.ZImage)
     format: Literal[ModelFormat.SDNQQuantized] = Field(default=ModelFormat.SDNQQuantized)
+    variant: ZImageVariantType = Field()
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -1562,7 +1563,9 @@ class Main_SDNQ_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_B
 
         cls._validate_looks_like_sdnq_quantized(mod)
 
-        return cls(**override_fields)
+        variant = override_fields.pop("variant", None) or ZImageVariantType.Turbo
+
+        return cls(**override_fields, variant=variant)
 
     @classmethod
     def _validate_looks_like_z_image_model(cls, mod: ModelOnDisk) -> None:
@@ -1718,6 +1721,7 @@ class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
 
     base: Literal[BaseModelType.ZImage] = Field(default=BaseModelType.ZImage)
     format: Literal[ModelFormat.SDNQQuantized] = Field(default=ModelFormat.SDNQQuantized)
+    variant: ZImageVariantType = Field()
 
     repo_variant: ModelRepoVariant = Field(default=ModelRepoVariant.Default)
     submodels: dict[SubModelType, SubmodelDefinition] | None = Field(
@@ -1735,11 +1739,26 @@ class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
 
         cls._validate_has_sdnq_transformer(mod)
 
+        variant = override_fields.get("variant") or cls._get_variant_or_default(mod)
+
         repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant(mod)
 
         submodels = override_fields.get("submodels") or cls._get_submodels(mod)
 
-        return cls(**override_fields, repo_variant=repo_variant, submodels=submodels)
+        return cls(**override_fields, variant=variant, repo_variant=repo_variant, submodels=submodels)
+
+    @classmethod
+    def _get_variant_or_default(cls, mod: ModelOnDisk) -> ZImageVariantType:
+        """Determine Z-Image variant from the scheduler config (same heuristic as the unquantized diffusers config).
+
+        Turbo (distilled) uses shift = 3.0, ZBase (undistilled) uses shift = 6.0.
+        """
+        try:
+            scheduler_config = get_config_dict_or_raise(mod.path / "scheduler" / "scheduler_config.json")
+            shift = scheduler_config.get("shift", 3.0)
+        except NotAMatchError:
+            return ZImageVariantType.Turbo
+        return ZImageVariantType.ZBase if shift >= 5.0 else ZImageVariantType.Turbo
 
     @classmethod
     def _validate_looks_like_z_image_diffusers(cls, mod: ModelOnDisk) -> None:

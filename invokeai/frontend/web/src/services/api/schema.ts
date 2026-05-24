@@ -22076,6 +22076,7 @@ export type components = {
              * @constant
              */
             format: "sdnq_quantized";
+            variant: components["schemas"]["ZImageVariantType"];
             /** @default  */
             repo_variant: components["schemas"]["ModelRepoVariant"];
             /**
@@ -25884,6 +25885,13 @@ export type components = {
              * @constant
              */
             format: "sdnq_quantized";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
+            /** @description Qwen3 model size variant (4B or 8B) */
+            variant: components["schemas"]["Qwen3VariantType"];
         };
         /**
          * Qwen3VariantType
