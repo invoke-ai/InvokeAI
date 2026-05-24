@@ -71,8 +71,8 @@ class InvokeAIAppConfig(BaseSettings):
         allow_credentials: Allow CORS credentials.
         allow_methods: Methods allowed for CORS.
         allow_headers: Headers allowed for CORS.
-        ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.org/settings/#https.
-        ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.
+        ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.
+        ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.
         log_tokenization: Enable logging of parsed prompt tokens.
         patchmatch: Enable patchmatch inpaint code.
         models_dir: Path to the models directory.
