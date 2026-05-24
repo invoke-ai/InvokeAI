@@ -844,6 +844,15 @@
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
                     },
                     {
@@ -958,6 +967,9 @@
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/T5Encoder_SDNQ_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
                     },
                     {
@@ -965,6 +977,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_SDNQ_Folder_Config"
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -1162,6 +1177,15 @@
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
                     },
                     {
@@ -1276,6 +1300,9 @@
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/T5Encoder_SDNQ_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
                     },
                     {
@@ -1283,6 +1310,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_SDNQ_Folder_Config"
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -1480,6 +1510,15 @@
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
                     },
                     {
@@ -1594,6 +1633,9 @@
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/T5Encoder_SDNQ_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
                     },
                     {
@@ -1601,6 +1643,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_SDNQ_Folder_Config"
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -1848,6 +1893,15 @@
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
                     },
                     {
@@ -1962,6 +2016,9 @@
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/T5Encoder_SDNQ_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
                     },
                     {
@@ -1969,6 +2026,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_SDNQ_Folder_Config"
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -2240,6 +2300,15 @@
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
                     },
                     {
@@ -2354,6 +2423,9 @@
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/T5Encoder_SDNQ_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
                     },
                     {
@@ -2361,6 +2433,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_SDNQ_Folder_Config"
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -3452,6 +3527,15 @@
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
                     },
                     {
@@ -3566,6 +3650,9 @@
                       "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/T5Encoder_SDNQ_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
                     },
                     {
@@ -3573,6 +3660,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_SDNQ_Folder_Config"
                     },
                     {
                       "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -11440,6 +11530,15 @@
             "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
           },
           {
+            "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
+          },
+          {
             "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
           },
           {
@@ -11554,6 +11653,9 @@
             "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
           },
           {
+            "$ref": "#/components/schemas/T5Encoder_SDNQ_Config"
+          },
+          {
             "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
           },
           {
@@ -11561,6 +11663,9 @@
           },
           {
             "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Qwen3Encoder_SDNQ_Folder_Config"
           },
           {
             "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -24853,14 +24958,13 @@
               }
             ],
             "default": null,
-            "description": "Diffusers Flux2 Klein model to extract VAE and/or Qwen3 encoder from. Use this if you don't have separate VAE/Qwen3 models. Ignored if both VAE and Qwen3 Encoder are provided separately.",
+            "description": "Diffusers or SDNQ-pipeline Flux2 Klein model to extract VAE and/or Qwen3 encoder from. Use this if you don't have separate VAE/Qwen3 models. Ignored if both VAE and Qwen3 Encoder are provided separately.",
             "field_kind": "input",
             "input": "direct",
             "orig_default": null,
             "orig_required": false,
-            "title": "Qwen3 Source (Diffusers)",
+            "title": "Qwen3 Source",
             "ui_model_base": ["flux2"],
-            "ui_model_format": ["diffusers"],
             "ui_model_type": ["main"]
           },
           "max_seq_len": {
@@ -40893,14 +40997,14 @@
             "format": "path",
             "title": "Convert Cache Dir",
             "description": "Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).",
-            "default": "models/.convert_cache"
+            "default": "models\\.convert_cache"
           },
           "download_cache_dir": {
             "type": "string",
             "format": "path",
             "title": "Download Cache Dir",
             "description": "Path to the directory that contains dynamically downloaded models.",
-            "default": "models/.download_cache"
+            "default": "models\\.download_cache"
           },
           "legacy_conf_dir": {
             "type": "string",
@@ -50891,6 +50995,546 @@
         "title": "Main_GGUF_ZImage_Config",
         "description": "Model config for GGUF-quantized Z-Image transformer models."
       },
+      "Main_SDNQ_Diffusers_FLUX_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "base": {
+            "type": "string",
+            "const": "flux",
+            "title": "Base",
+            "default": "flux"
+          },
+          "format": {
+            "type": "string",
+            "const": "sdnq_quantized",
+            "title": "Format",
+            "default": "sdnq_quantized"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/FluxVariantType"
+          },
+          "repo_variant": {
+            "$ref": "#/components/schemas/ModelRepoVariant",
+            "default": ""
+          },
+          "submodels": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/SubmodelDefinition"
+                },
+                "propertyNames": {
+                  "$ref": "#/components/schemas/SubModelType"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submodels",
+            "description": "Loadable submodels in this model"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "base",
+          "format",
+          "variant",
+          "repo_variant",
+          "submodels"
+        ],
+        "title": "Main_SDNQ_Diffusers_FLUX_Config",
+        "description": "Model config for SDNQ-quantized FLUX models in diffusers format (folder with transformer, text_encoder, etc.)."
+      },
+      "Main_SDNQ_Diffusers_Flux2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "base": {
+            "type": "string",
+            "const": "flux2",
+            "title": "Base",
+            "default": "flux2"
+          },
+          "format": {
+            "type": "string",
+            "const": "sdnq_quantized",
+            "title": "Format",
+            "default": "sdnq_quantized"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Flux2VariantType"
+          },
+          "repo_variant": {
+            "$ref": "#/components/schemas/ModelRepoVariant",
+            "default": ""
+          },
+          "submodels": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/SubmodelDefinition"
+                },
+                "propertyNames": {
+                  "$ref": "#/components/schemas/SubModelType"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submodels",
+            "description": "Loadable submodels in this model"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "base",
+          "format",
+          "variant",
+          "repo_variant",
+          "submodels"
+        ],
+        "title": "Main_SDNQ_Diffusers_Flux2_Config",
+        "description": "Model config for SDNQ-quantized FLUX.2 models in diffusers format\n(Flux2KleinPipeline / Flux2Pipeline folder with transformer/, text_encoder/, vae/, ...)."
+      },
+      "Main_SDNQ_Diffusers_ZImage_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "base": {
+            "type": "string",
+            "const": "z-image",
+            "title": "Base",
+            "default": "z-image"
+          },
+          "format": {
+            "type": "string",
+            "const": "sdnq_quantized",
+            "title": "Format",
+            "default": "sdnq_quantized"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/ZImageVariantType"
+          },
+          "repo_variant": {
+            "$ref": "#/components/schemas/ModelRepoVariant",
+            "default": ""
+          },
+          "submodels": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/SubmodelDefinition"
+                },
+                "propertyNames": {
+                  "$ref": "#/components/schemas/SubModelType"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submodels",
+            "description": "Loadable submodels in this model"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "base",
+          "format",
+          "variant",
+          "repo_variant",
+          "submodels"
+        ],
+        "title": "Main_SDNQ_Diffusers_ZImage_Config",
+        "description": "Model config for SDNQ-quantized Z-Image models in diffusers format (full ZImagePipeline folder)."
+      },
       "MaskCombineInvocation": {
         "category": "mask",
         "class": "invocation",
@@ -54406,6 +55050,7 @@
           "bnb_quantized_nf4b",
           "gguf_quantized",
           "external_api",
+          "sdnq_quantized",
           "unknown"
         ],
         "title": "ModelFormat",
@@ -54715,6 +55360,15 @@
                 "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
               },
               {
@@ -54829,6 +55483,9 @@
                 "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
               },
               {
+                "$ref": "#/components/schemas/T5Encoder_SDNQ_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
               },
               {
@@ -54836,6 +55493,9 @@
               },
               {
                 "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3Encoder_SDNQ_Folder_Config"
               },
               {
                 "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -55284,6 +55944,15 @@
                     "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
                   },
                   {
@@ -55398,6 +56067,9 @@
                     "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/T5Encoder_SDNQ_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
                   },
                   {
@@ -55405,6 +56077,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Qwen3Encoder_SDNQ_Folder_Config"
                   },
                   {
                     "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -55738,6 +56413,15 @@
                 "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
               },
               {
@@ -55852,6 +56536,9 @@
                 "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
               },
               {
+                "$ref": "#/components/schemas/T5Encoder_SDNQ_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
               },
               {
@@ -55859,6 +56546,9 @@
               },
               {
                 "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3Encoder_SDNQ_Folder_Config"
               },
               {
                 "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -56042,6 +56732,15 @@
                 "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
               },
               {
@@ -56156,6 +56855,9 @@
                 "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
               },
               {
+                "$ref": "#/components/schemas/T5Encoder_SDNQ_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
               },
               {
@@ -56163,6 +56865,9 @@
               },
               {
                 "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3Encoder_SDNQ_Folder_Config"
               },
               {
                 "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -56795,6 +57500,15 @@
                   "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
+                },
+                {
                   "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
                 },
                 {
@@ -56909,6 +57623,9 @@
                   "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/T5Encoder_SDNQ_Config"
+                },
+                {
                   "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
                 },
                 {
@@ -56916,6 +57633,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Qwen3Encoder_SDNQ_Folder_Config"
                 },
                 {
                   "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
@@ -59560,6 +60280,147 @@
         ],
         "title": "Qwen3Encoder_Qwen3Encoder_Config",
         "description": "Configuration for Qwen3 Encoder models in a diffusers-like format.\n\nThe model weights are expected to be in a folder called text_encoder inside the model directory,\ncompatible with Qwen2VLForConditionalGeneration or similar architectures used by Z-Image."
+      },
+      "Qwen3Encoder_SDNQ_Folder_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "qwen3_encoder",
+            "title": "Type",
+            "default": "qwen3_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "sdnq_quantized",
+            "title": "Format",
+            "default": "sdnq_quantized"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Qwen3VariantType",
+            "description": "Qwen3 model size variant (4B or 8B)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "base",
+          "type",
+          "format",
+          "cpu_only",
+          "variant"
+        ],
+        "title": "Qwen3Encoder_SDNQ_Folder_Config",
+        "description": "Configuration for folder-based SDNQ-quantized Qwen3 Encoder models.\n\nUsed for SDNQ bundles where the text_encoder is a folder containing\nquantization_config.json and safetensors files with SDNQ keys."
       },
       "Qwen3VariantType": {
         "type": "string",
@@ -67751,6 +68612,142 @@
         ],
         "title": "T5Encoder_BnBLLMint8_Config",
         "description": "Configuration for T5 Encoder models quantized by bitsandbytes' LLM.int8."
+      },
+      "T5Encoder_SDNQ_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "t5_encoder",
+            "title": "Type",
+            "default": "t5_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "sdnq_quantized",
+            "title": "Format",
+            "default": "sdnq_quantized"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "base",
+          "type",
+          "format",
+          "cpu_only"
+        ],
+        "title": "T5Encoder_SDNQ_Config",
+        "description": "Configuration for SDNQ-quantized T5 Encoder models.\n\nMatches two layouts:\n\n1. **Standalone T5 bundle**: ``mod.path`` is the pipeline-style root, with\n   ``text_encoder_2/`` (and usually ``tokenizer_2/``) as subfolders.\n2. **Inline submodel**: ``mod.path`` *is* the ``text_encoder_2`` folder itself \u2014\n   this is how a parent FluxPipeline / similar config registers its T5 submodel\n   (``submodels[TextEncoder2].path_or_prefix`` points straight at the folder).\n\nIn both cases, the SDNQ-quantized state lives next to a ``config.json`` declaring\n``T5EncoderModel`` and is signalled either by ``quantization_config.json`` with\n``quant_method == \"sdnq\"`` or by SDNQ-style ``weight`` + ``scale`` key pairs."
       },
       "T5Encoder_T5Encoder_Config": {
         "properties": {
