@@ -1,7 +1,7 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { getShouldUsePressureForEraser } from 'features/controlLayers/konva/pressure';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
+import { getShouldUsePressureForEraser } from 'features/controlLayers/konva/pressure';
 import {
   alignCoordForTool,
   getLastPointOfLastLine,
@@ -184,7 +184,8 @@ export class CanvasEraserToolModule extends CanvasModuleBase {
     const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
     const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
 
-    const shouldUsePressure = e.evt.pointerType === 'pen' && getShouldUsePressureForEraser(settings.pressureAffectsWidth);
+    const shouldUsePressure =
+      e.evt.pointerType === 'pen' && getShouldUsePressureForEraser(settings.pressureAffectsWidth);
 
     if (shouldUsePressure) {
       // If the pen is down and pressure input is enabled, add the point with pressure
@@ -237,7 +238,8 @@ export class CanvasEraserToolModule extends CanvasModuleBase {
 
     const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
 
-    const shouldUsePressure = e.evt.pointerType === 'pen' && getShouldUsePressureForEraser(settings.pressureAffectsWidth);
+    const shouldUsePressure =
+      e.evt.pointerType === 'pen' && getShouldUsePressureForEraser(settings.pressureAffectsWidth);
 
     if (shouldUsePressure) {
       // We need to get the last point of the last line to create a straight line if shift is held

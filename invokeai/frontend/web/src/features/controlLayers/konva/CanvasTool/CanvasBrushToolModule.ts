@@ -1,8 +1,8 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { getShouldUsePressureForBrush } from 'features/controlLayers/konva/pressure';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
+import { getShouldUsePressureForBrush } from 'features/controlLayers/konva/pressure';
 import {
   alignCoordForTool,
   getLastPointOfLastLine,
@@ -424,7 +424,11 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
     const settings = this.manager.stateApi.getSettings();
 
     const lastPoint = getLastPointOfLine(bufferState.points);
-    const minDistance = settings.brushWidth * this.parent.config.BRUSH_SPACING_TARGET_SCALE;
+    const spacingScale =
+      bufferState.type === 'brush_line_with_pressure' && bufferState.pressureAffectsOpacity
+        ? this.parent.config.PRESSURE_OPACITY_BRUSH_SPACING_TARGET_SCALE
+        : this.parent.config.BRUSH_SPACING_TARGET_SCALE;
+    const minDistance = bufferState.strokeWidth * spacingScale;
     if (!lastPoint || !isDistanceMoreThanMin(cursorPos.relative, lastPoint, minDistance)) {
       return;
     }
