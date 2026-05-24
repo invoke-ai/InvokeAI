@@ -1,4 +1,9 @@
-# Creating a Node Pack for the Custom Node Manager
+---
+title: Creating Node Packs
+lastUpdated: 2026-05-23
+---
+
+import { FileTree } from '@astrojs/starlight/components'
 
 This guide explains how to structure your Git repository so it can be installed via InvokeAI's Custom Node Manager.
 
@@ -8,35 +13,35 @@ Your repository **is** the node pack. When a user installs it, the entire repo i
 
 ### Minimum Required Structure
 
-```
-my-node-pack/
-├── __init__.py          # Required: imports your node classes
-├── my_node.py           # Your node implementation(s)
-└── README.md            # Recommended: describe your nodes
-```
+<FileTree>
+  - my-node-pack/
+    - `__init__.py` Required: Imports all node classes
+    - my_node.py Your node implementation(s)
+    - README.md Recommended: Describe how your nodes work
+</FileTree>
 
 The `__init__.py` at the root is **mandatory**. Without it, the pack will not be loaded.
 
 ### Recommended Structure
 
-```
-my-node-pack/
-├── __init__.py          # Imports all node classes
-├── requirements.txt     # Python dependencies (user-installed)
-├── README.md            # Description, usage, examples
-├── node_one.py          # Node implementation
-├── node_two.py          # Node implementation
-├── utils.py             # Shared utilities
-└── workflows/           # Optional: workflow files
-    ├── example_workflow.json
-    └── advanced_workflow.json
-```
+<FileTree>
+  - my-node-pack/
+    - `__init__.py` Required: Imports all node classes
+    - requirements.txt Python dependencies (user-installed)
+    - README.md Description, usage & examples
+    - node_one.py Node implementation
+    - node_two.py Node implementation
+    - utils.py Shared utilities
+    - workflows/ Optional: Included workflow files
+      - example_workflow.json
+      - advanced_workflow.json
+</FileTree>
 
 ## The `__init__.py` File
 
 This file must import all invocation classes you want to register. Only classes imported here will be available in InvokeAI.
 
-```python
+```python title="__init__.py"
 from .node_one import MyFirstInvocation
 from .node_two import MySecondInvocation
 ```
@@ -52,7 +57,7 @@ from .nodes.text_tools import ConcatInvocation
 
 If your nodes require additional Python packages, list them in a `requirements.txt` (or `pyproject.toml`) at the repository root:
 
-```
+```txt title="requirements.txt"
 numpy>=1.24
 opencv-python>=4.8
 ```
@@ -77,7 +82,7 @@ Imported workflows are automatically tagged with `node-pack:<your-repo-name>` so
 
 Workflows should follow the standard InvokeAI workflow format:
 
-```json
+```json title="example_workflow.json"
 {
   "name": "My Example Workflow",
   "author": "Your Name",
@@ -102,16 +107,14 @@ Workflows should follow the standard InvokeAI workflow format:
 
 Each node is a Python class decorated with `@invocation()`. Here's a minimal example:
 
-```python
+```python title="example_node.py"
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import InputField, OutputField
 from invokeai.invocation_api import BaseInvocationOutput, invocation_output
 
-
 @invocation_output("my_output")
 class MyOutput(BaseInvocationOutput):
     result: str = OutputField(description="The result")
-
 
 @invocation(
     "my_node",

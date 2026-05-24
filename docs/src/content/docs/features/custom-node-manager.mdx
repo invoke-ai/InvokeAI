@@ -1,4 +1,11 @@
-# Custom Node Manager
+---
+title: Custom Node Manager
+lastUpdated: 2026-05-23
+sidebar:
+  order: 4
+---
+
+import { Steps } from '@astrojs/starlight/components'
 
 The Custom Node Manager allows you to install, manage, and remove community node packs directly from the InvokeAI UI — no manual file copying required.
 
@@ -8,10 +15,12 @@ Click the **Nodes** tab (circuit icon) in the left sidebar, between Models and Q
 
 ## Installing a Node Pack
 
-1. Navigate to the **Nodes** tab
-2. On the right panel, select the **Git Repository URL** tab
-3. Paste the Git URL of the node pack (e.g. `https://github.com/user/my-node-pack.git`)
-4. Click **Install**
+<Steps>
+  1. Navigate to the **Nodes** tab
+  2. On the right panel, select the **Git Repository URL** tab
+  3. Paste the Git URL of the node pack (e.g. `https://github.com/user/my-node-pack.git`)
+  4. Click **Install**
+</Steps>
 
 The installer will:
 
@@ -63,15 +72,19 @@ The **Scan Folder** tab shows the location of your nodes directory. Node packs p
 
 ### Node pack fails to install
 
-- Verify the Git URL is correct and accessible
-- Check that the repository contains an `__init__.py` file at the top level
-- Review the Install Log for error details
+<Steps>
+  1. Verify the Git URL is correct and accessible
+  2. Check that the repository contains an `__init__.py` file at the top level
+  3. Review the Install Log for error details
+</Steps>
 
 ### Nodes don't appear after install
 
-- Click the **Reload** button
-- Check that the node pack's `__init__.py` imports its node classes
-- Check the server console for error messages
+<Steps>
+  1. Click the **Reload** button
+  2. Check that the node pack's `__init__.py` imports its node classes
+  3. Check the server console for error messages
+</Steps>
 
 ### Workflows show errors after uninstalling
 

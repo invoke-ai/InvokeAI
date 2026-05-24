@@ -37,15 +37,6 @@ const sidebar: SidebarConfig = [
     ],
   },
   {
-    label: 'Workflows',
-    items: [
-      {
-        autogenerate: { directory: 'workflows' },
-      },
-    ],
-    collapsed: true,
-  },
-  {
     label: 'Development',
     items: [
       {
