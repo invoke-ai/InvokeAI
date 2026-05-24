@@ -1,0 +1,130 @@
+---
+title: SDNQ Quantization
+sidebar:
+  order: 4
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+SDNQ ([SD.Next Quantization Engine](https://github.com/Disty0/sdnq)) is a quantization scheme that stores model weights at 4–5 bits with an optional low-rank SVD correction. InvokeAI loads SDNQ-quantized models as full HuggingFace diffusers pipelines and dequantizes weights on the fly during inference, with no extra Python package required.
+
+## Supported models
+
+| Model family       | Status | Format(s) supported                                  |
+| ------------------ | ------ | ---------------------------------------------------- |
+| **FLUX.1 schnell / dev** | ✅ | Diffusers pipeline (uint4 + SVD), single-file        |
+| **FLUX.2 Klein 4B / 9B** | ✅ | Diffusers pipeline (uint4 / int5 mixed, ± SVD), single-file |
+| **Z-Image Turbo**        | ✅ | Diffusers pipeline (uint4 + SVD), single-file        |
+| **T5 Encoder**           | ✅ | Folder + standalone                                  |
+| **Qwen3 Encoder**        | ✅ | Folder + standalone                                  |
+| **VAE (AutoencoderKL)**  | ✅ | Folder                                               |
+| **SDXL / SD1 / SD2**     | ❌ | Not yet — UNet pipeline conversion outstanding       |
+
+:::caution[SDNQ vs SVDQuant / Nunchaku]
+SDNQ ("SD.Next Quantization") and SVDQuant ("[Nunchaku](https://github.com/nunchaku-ai/nunchaku)") both apply SVD low-rank correction to 4-bit weights, but they use **different on-disk formats** and **different inference engines**. A file like `svdq-int4-flux.1-schnell.safetensors` from `mit-han-lab` is a Nunchaku checkpoint and will *not* load through InvokeAI's SDNQ path — it has keys like `qweight`, `wscales`, `smooth`, `lora_up` rather than SDNQ's `weight`, `scale`, `zero_point`, `svd_up`. Look for the `Disty0/...-SDNQ-...` repo prefix on HuggingFace to be sure you're picking up the right format.
+:::
+
+## Memory footprint
+
+Typical reductions vs. the bfloat16 baseline:
+
+| Model                       | bfloat16 | SDNQ uint4 + SVD | Approx. VRAM at inference |
+| --------------------------- | -------- | ---------------- | ------------------------- |
+| FLUX.1 schnell              | ~33 GB   | ~15 GB           | ~12 GB                    |
+| FLUX.2 Klein 4B (dynamic)   | ~8 GB    | ~5 GB            | ~5 GB                     |
+| FLUX.2 Klein 9B (dynamic + SVD) | ~18 GB | ~13 GB         | ~11 GB                    |
+| Z-Image Turbo               | ~12 GB   | ~5 GB            | ~5 GB                     |
+
+The actual peak VRAM depends on resolution, batch size, attention backend, and whether [Low-VRAM mode](/configuration/low-vram-mode/) is enabled.
+
+## Installing SDNQ models
+
+The easiest way is via the **Starter Models** picker — search for "SDNQ":
+
+<Steps>
+1. Open the **Model Manager** → **Starter Models** tab.
+2. Search for `SDNQ`.
+3. Click **Install** on the variant you want (each entry shows the HuggingFace source).
+</Steps>
+
+To install a different SDNQ model from HuggingFace:
+
+<Steps>
+1. Open the **Model Manager** → **Add Model** → **HuggingFace** tab.
+2. Enter the repo, e.g. `Disty0/FLUX.2-klein-9B-SDNQ-4bit-dynamic-svd-r32`.
+3. Click **Install**. The whole pipeline folder downloads (transformer + text encoder + tokenizer + VAE).
+:::tip
+For very large SDNQ models, you can also pre-download with `huggingface-cli` and then point InvokeAI at the local folder via **Add Model** → **Folder**.
+:::
+</Steps>
+
+InvokeAI auto-detects the SDNQ format from `transformer/quantization_config.json` (the `quant_method: "sdnq"` marker). The Model Manager shows the format as **sdnq** in the model badge once installed.
+
+## What gets quantized
+
+Inside a typical SDNQ pipeline folder:
+
+- **`transformer/`** — diffusion transformer weights (most of the savings come from here). Quantized to uint4 or, for dynamic-mixed exports, a per-layer mix of uint4 and int5.
+- **`text_encoder/`** — for FLUX.1 this is T5 + CLIP (T5 is SDNQ'd, CLIP stays full precision); for FLUX.2 Klein and Z-Image, Qwen3 is SDNQ'd.
+- **`vae/`** — left as bfloat16 in current Disty0 exports (the VAE is small enough that quantizing it isn't worth the quality risk).
+
+Layers in the producer's `modules_to_not_convert` list (typically embeddings, final projection, layer norms) stay full precision in all cases.
+
+## LoRA compatibility
+
+LoRAs apply to SDNQ-quantized models via the **sidecar patching path**: instead of merging the LoRA delta into the quantized weight, InvokeAI keeps the LoRA as a separate residual that runs alongside each forward pass.
+
+- ✅ Standard LoRA, LoKr, DoRA, FluxControl-LoRA, FullLayer patches all work.
+- ⚠️ Inference is slightly slower per step than non-quantized LoRA application (the sidecar adds an extra matmul per patched layer), but the loss is small in practice.
+- ❌ LoRA training against SDNQ-quantized weights is **not supported**.
+
+If you stack many LoRAs on a heavily quantized model and notice quality drift, try lowering individual LoRA weights — the 4-bit base already eats some headroom for cumulative perturbations.
+
+## Quality trade-offs
+
+The dynamic mixed-precision FLUX.2 Klein exports (`Disty0/FLUX.2-klein-{4B,9B}-SDNQ-4bit-dynamic-...`) let SDNQ promote individual layers from uint4 to int5 if the layer's quantization error exceeds a per-group budget. In practice this keeps the most sensitive attention projections at int5 while everything else stays uint4, with no user-visible quality regression vs. bfloat16 in most prompts.
+
+The static uint4 + SVD exports (`...-SDNQ-uint4-svd-r32`) are slightly more aggressive but use rank-32 SVD residuals to recover the lost precision. The SVD correction adds ~3 % of the original weight size back to the file but largely closes the quality gap.
+
+You will most likely see SDNQ-specific quality issues at:
+
+- **Very high CFG values** (> 8) on Klein 4B dynamic — the 4-bit attention saturates faster than bfloat16.
+- **Long generations with heavy LoRA stacks** — cumulative quantization noise becomes visible after dozens of steps.
+
+If you need higher quality and have the VRAM, the static `Disty0/FLUX.2-dev-SDNQ-uint4-svd-r32` (FLUX.2 dev, 12 B params) is the most faithful SDNQ option.
+
+## Comparison with other quantization formats
+
+| Format            | Size  | VRAM at inference | LoRA support | Loading path                             |
+| ----------------- | ----- | ----------------- | ------------ | ---------------------------------------- |
+| **SDNQ uint4 + SVD** | ~50 % | ~50 %          | ✅ sidecar    | Full diffusers pipeline                   |
+| **GGUF Q4_K_M**   | ~30 % | ~30 %             | ✅ sidecar    | Single-file transformer + separate encoders/VAE |
+| **BnB NF4**       | ~50 % | ~50 %             | ✅ sidecar    | Single-file transformer + separate encoders/VAE |
+| **FP8 storage**   | ~50 % | ~50 %             | ✅ direct     | Any full-precision model (toggle in Model Manager) |
+
+The headline differences:
+
+- **SDNQ models are pipeline-shaped**: one install pulls everything you need (transformer + encoders + VAE). GGUF and BnB usually need you to also install a T5 / Qwen3 / VAE separately.
+- **SDNQ has the cleanest dynamic-precision story**: GGUF picks one bit-width per file; SDNQ dynamic-mixed exports tune precision per layer.
+- **GGUF is more memory-efficient** at the same nominal bit-width because it uses smaller groups. SDNQ trades that for the SVD correction option.
+
+For low VRAM (~6–8 GB), GGUF Q4 is still the best fit. For 12–16 GB cards that can host a FLUX-class model, SDNQ is the simplest "install one thing, get a working pipeline" option.
+
+## Troubleshooting
+
+### "Non-diffusers FLUX.2 Klein models require a standalone Qwen3 Encoder" (Invoke button greyed out)
+
+The Klein SDNQ pipeline carries its own Qwen3 encoder, so this readiness gate shouldn't fire — if it does, the install most likely happened before SDNQ-pipeline support was wired up and the model is cached with the wrong format in the database. Delete the model from the Model Manager and re-install it; the second install will pick up the correct `sdnq_quantized` format with the submodels populated.
+
+### Heavy high-frequency noise overlay on output
+
+If the structure of your image is recognizable (rough subject + composition) but a colored static is layered over it, you've hit a quantization-loader bug. Open an issue with:
+
+- The exact HuggingFace repo of the model.
+- A side-by-side with a non-SDNQ variant of the same prompt (e.g. compare against GGUF Q4 of the same base model).
+
+Historically this has been caused by missing key-permutation steps in the diffusers→BFL state-dict conversion (e.g. `scale`/`shift` halves swapped). It's not a sign that the file itself is broken.
+
+### "no safetensors files found" or "size mismatch for weight"
+
+You probably pointed InvokeAI at the wrong subfolder — SDNQ pipelines are installed as the **whole repo root** (the folder that contains `model_index.json`), not at `transformer/` directly. The Model Manager's "Add Folder" flow expects the pipeline root.

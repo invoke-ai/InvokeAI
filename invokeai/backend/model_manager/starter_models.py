@@ -161,6 +161,15 @@ flux_dev = StarterModel(
     type=ModelType.Main,
     dependencies=[t5_base_encoder, flux_vae, clip_l_encoder],
 )
+flux_schnell_sdnq = StarterModel(
+    name="FLUX.1 schnell (SDNQ uint4 + SVD)",
+    base=BaseModelType.Flux,
+    source="Disty0/FLUX.1-schnell-SDNQ-uint4-svd-r32",
+    description="FLUX.1 schnell quantized via SDNQ to uint4 + SVD rank 32. Full self-contained "
+    "Flux pipeline (transformer + T5 + CLIP + VAE). ~15GB",
+    type=ModelType.Main,
+    format=ModelFormat.SDNQQuantized,
+)
 flux_kontext = StarterModel(
     name="FLUX.1 Kontext dev",
     base=BaseModelType.Flux,
@@ -981,6 +990,26 @@ flux2_klein_9b_fp8 = StarterModel(
     dependencies=[flux2_vae, flux2_klein_qwen3_8b_encoder],
 )
 
+flux2_klein_4b_sdnq = StarterModel(
+    name="FLUX.2 Klein 4B (SDNQ dynamic 4-bit)",
+    base=BaseModelType.Flux2,
+    source="Disty0/FLUX.2-klein-4B-SDNQ-4bit-dynamic",
+    description="FLUX.2 Klein 4B quantized via SDNQ to dynamic uint4/int5 mixed precision. "
+    "Full self-contained Flux2KleinPipeline (transformer + Qwen3 4B + AutoencoderKLFlux2). ~5GB",
+    type=ModelType.Main,
+    format=ModelFormat.SDNQQuantized,
+)
+
+flux2_klein_9b_sdnq = StarterModel(
+    name="FLUX.2 Klein 9B (SDNQ dynamic 4-bit + SVD)",
+    base=BaseModelType.Flux2,
+    source="Disty0/FLUX.2-klein-9B-SDNQ-4bit-dynamic-svd-r32",
+    description="FLUX.2 Klein 9B quantized via SDNQ to dynamic uint4/int5 + SVD rank 32. "
+    "Full self-contained Flux2KleinPipeline. ~13GB",
+    type=ModelType.Main,
+    format=ModelFormat.SDNQQuantized,
+)
+
 flux2_klein_4b_gguf_q4 = StarterModel(
     name="FLUX.2 Klein 4B (GGUF Q4)",
     base=BaseModelType.Flux2,
@@ -1066,6 +1095,16 @@ z_image_turbo_q8 = StarterModel(
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
     dependencies=[z_image_qwen3_encoder_quantized, flux_vae],
+)
+
+z_image_turbo_sdnq = StarterModel(
+    name="Z-Image Turbo (SDNQ uint4 + SVD)",
+    base=BaseModelType.ZImage,
+    source="Disty0/Z-Image-Turbo-SDNQ-uint4-svd-r32",
+    description="Z-Image Turbo quantized via SDNQ to uint4 + SVD rank 32. Full self-contained "
+    "ZImagePipeline (transformer + Qwen3 + VAE). ~5GB",
+    type=ModelType.Main,
+    format=ModelFormat.SDNQQuantized,
 )
 
 z_image_controlnet_union = StarterModel(
@@ -1582,6 +1621,7 @@ STARTER_MODELS: list[StarterModel] = [
     flux_dev_quantized,
     flux_schnell,
     flux_dev,
+    flux_schnell_sdnq,
     sd35_medium,
     sd35_large,
     cyberrealistic_sd1,
@@ -1657,6 +1697,8 @@ STARTER_MODELS: list[StarterModel] = [
     flux2_klein_4b_fp8,
     flux2_klein_9b,
     flux2_klein_9b_fp8,
+    flux2_klein_4b_sdnq,
+    flux2_klein_9b_sdnq,
     flux2_klein_4b_gguf_q4,
     flux2_klein_4b_gguf_q8,
     flux2_klein_9b_gguf_q4,
@@ -1686,6 +1728,7 @@ STARTER_MODELS: list[StarterModel] = [
     z_image_turbo,
     z_image_turbo_quantized,
     z_image_turbo_q8,
+    z_image_turbo_sdnq,
     z_image_qwen3_encoder,
     z_image_qwen3_encoder_quantized,
     z_image_controlnet_union,
