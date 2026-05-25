@@ -6,6 +6,7 @@ import {
   getPressureStrokeRenderOpsFromPointIndex,
   getShouldUsePressureForBrush,
   getShouldUsePressureForEraser,
+  mergeOpacityDotAlphaAtPixel,
 } from './pressure';
 
 describe('pressure helpers', () => {
@@ -157,5 +158,29 @@ describe('pressure helpers', () => {
     expect(dots[0]?.color.a).toBeLessThan(0.4);
     expect(dots.at(-1)?.color.a ?? 0).toBeGreaterThan(0.8);
     expect(dots.at(-1)?.color.a ?? 0).toBeLessThan(1);
+  });
+
+  it('composites distant opacity revisits instead of clamping them to the local pass maximum', () => {
+    const samePass = mergeOpacityDotAlphaAtPixel({
+      currentAlpha: 120,
+      candidateAlpha: 180,
+      lastStrokeDistance: 10,
+      strokeDistance: 30,
+      lastRadius: 20,
+      radius: 20,
+    });
+
+    expect(samePass.alpha).toBe(180);
+
+    const revisit = mergeOpacityDotAlphaAtPixel({
+      currentAlpha: 120,
+      candidateAlpha: 180,
+      lastStrokeDistance: 10,
+      strokeDistance: 80,
+      lastRadius: 20,
+      radius: 20,
+    });
+
+    expect(revisit.alpha).toBe(Math.round(120 + (180 * (255 - 120)) / 255));
   });
 });

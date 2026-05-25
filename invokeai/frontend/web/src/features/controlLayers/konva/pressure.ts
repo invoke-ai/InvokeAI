@@ -26,6 +26,7 @@ type PressureStrokeRenderOp =
       y: number;
       radius: number;
       color: RgbaColor;
+      strokeDistance?: number;
     }
   | {
       type: 'segment';
@@ -40,6 +41,10 @@ export type PressureStrokeCanvasTarget = {
   x: number;
   y: number;
   imageData: ImageData;
+};
+
+type PressureStrokeOpacityDotRenderOp = Extract<PressureStrokeRenderOp, { type: 'dot' }> & {
+  strokeDistance: number;
 };
 
 const clampPressure = (pressure: number): number => Math.min(Math.max(pressure, 0), 1);
@@ -243,6 +248,7 @@ const buildOpacityStampRenderOps = (arg: {
   }
 
   const ops: PressureStrokeRenderOp[] = [];
+  let strokeDistance = 0;
   for (let i = 1; i < pressurePoints.length; i++) {
     const prevPoint = pressurePoints[i - 1];
     const nextPoint = pressurePoints[i];
@@ -269,6 +275,7 @@ const buildOpacityStampRenderOps = (arg: {
       )
     );
     const sampleStart = includeLeadingDot && i === 1 ? 0 : 1;
+    const segmentStartDistance = strokeDistance;
 
     for (let sampleIndex = sampleStart; sampleIndex <= stampCount; sampleIndex++) {
       const t = sampleIndex / stampCount;
@@ -282,8 +289,11 @@ const buildOpacityStampRenderOps = (arg: {
         y: samplePoint.y,
         radius: (strokeWidth * widthFactor) / 2,
         color: scaleColorOpacity(color, opacityFactor),
+        strokeDistance: segmentStartDistance + distance * t,
       });
     }
+
+    strokeDistance += distance;
   }
 
   return ops;
@@ -389,6 +399,48 @@ const mergeRects = (a: Rect, b: Rect): Rect => {
     y,
     width: maxX - x,
     height: maxY - y,
+  };
+};
+
+const isOpacityDotRenderOp = (renderOp: PressureStrokeRenderOp): renderOp is PressureStrokeOpacityDotRenderOp =>
+  renderOp.type === 'dot' && typeof renderOp.strokeDistance === 'number';
+
+const compositeSourceOverAlphaByte = (currentAlpha: number, candidateAlpha: number): number =>
+  Math.round(currentAlpha + (candidateAlpha * (255 - currentAlpha)) / 255);
+
+export const mergeOpacityDotAlphaAtPixel = (arg: {
+  currentAlpha: number;
+  candidateAlpha: number;
+  lastStrokeDistance: number;
+  strokeDistance: number;
+  lastRadius: number;
+  radius: number;
+}): { alpha: number; lastStrokeDistance: number; lastRadius: number } => {
+  const { currentAlpha, candidateAlpha, lastStrokeDistance, strokeDistance, lastRadius, radius } = arg;
+
+  if (currentAlpha <= 0 || !Number.isFinite(lastStrokeDistance)) {
+    return {
+      alpha: candidateAlpha,
+      lastStrokeDistance: strokeDistance,
+      lastRadius: radius,
+    };
+  }
+
+  const revisitDistanceThreshold = Math.max(lastRadius, radius) * 2;
+  const isSameLocalPass = strokeDistance - lastStrokeDistance <= revisitDistanceThreshold;
+
+  if (isSameLocalPass) {
+    return {
+      alpha: Math.max(currentAlpha, candidateAlpha),
+      lastStrokeDistance: strokeDistance,
+      lastRadius: Math.max(lastRadius, radius),
+    };
+  }
+
+  return {
+    alpha: compositeSourceOverAlphaByte(currentAlpha, candidateAlpha),
+    lastStrokeDistance: strokeDistance,
+    lastRadius: radius,
   };
 };
 
@@ -575,9 +627,101 @@ export const appendPressureStrokeRenderOpsToCanvas = (
   return nextTarget;
 };
 
+const renderOpacityStrokeDotsToCanvas = (
+  renderOps: PressureStrokeOpacityDotRenderOp[]
+): { canvas: HTMLCanvasElement; x: number; y: number } | null => {
+  const bounds = getPressureStrokeRenderBounds(renderOps);
+
+  if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
+    return null;
+  }
+
+  const canvas = document.createElement('canvas');
+  const ctx = getCanvasContext(canvas, bounds.width, bounds.height);
+
+  if (!ctx) {
+    return null;
+  }
+
+  const imageData = ctx.createImageData(bounds.width, bounds.height);
+  const output = imageData.data;
+  const lastStrokeDistances = new Float32Array(bounds.width * bounds.height);
+  lastStrokeDistances.fill(Number.NEGATIVE_INFINITY);
+  const lastRadii = new Float32Array(bounds.width * bounds.height);
+  const patchCanvas = document.createElement('canvas');
+
+  for (const renderOp of renderOps) {
+    const patchBounds = getPressureStrokeRenderOpBounds(renderOp);
+    const opacityByte = Math.round(clampPressure(renderOp.color.a) * 255);
+
+    if (!patchBounds || opacityByte === 0) {
+      continue;
+    }
+
+    const patchCtx = getCanvasContext(patchCanvas, patchBounds.width, patchBounds.height, true);
+
+    if (!patchCtx) {
+      return null;
+    }
+
+    patchCtx.beginPath();
+    patchCtx.arc(renderOp.x - patchBounds.x, renderOp.y - patchBounds.y, renderOp.radius, 0, Math.PI * 2);
+    patchCtx.fill();
+
+    const patchData = patchCtx.getImageData(0, 0, patchBounds.width, patchBounds.height).data;
+    const targetOffsetX = patchBounds.x - bounds.x;
+    const targetOffsetY = patchBounds.y - bounds.y;
+
+    for (let patchY = 0; patchY < patchBounds.height; patchY++) {
+      for (let patchX = 0; patchX < patchBounds.width; patchX++) {
+        const patchIndex = (patchY * patchBounds.width + patchX) * 4;
+        const coverageAlpha = patchData[patchIndex + 3];
+
+        if (!coverageAlpha) {
+          continue;
+        }
+
+        const targetX = targetOffsetX + patchX;
+        const targetY = targetOffsetY + patchY;
+        const pixelIndex = targetY * bounds.width + targetX;
+        const targetIndex = pixelIndex * 4;
+        const candidateAlpha = Math.round((coverageAlpha * opacityByte) / 255);
+
+        const merged = mergeOpacityDotAlphaAtPixel({
+          currentAlpha: output[targetIndex + 3] ?? 0,
+          candidateAlpha,
+          lastStrokeDistance: lastStrokeDistances[pixelIndex] ?? Number.NEGATIVE_INFINITY,
+          strokeDistance: renderOp.strokeDistance,
+          lastRadius: lastRadii[pixelIndex] ?? 0,
+          radius: renderOp.radius,
+        });
+
+        output[targetIndex] = renderOp.color.r;
+        output[targetIndex + 1] = renderOp.color.g;
+        output[targetIndex + 2] = renderOp.color.b;
+        output[targetIndex + 3] = merged.alpha;
+        lastStrokeDistances[pixelIndex] = merged.lastStrokeDistance;
+        lastRadii[pixelIndex] = merged.lastRadius;
+      }
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+
+  return {
+    canvas,
+    x: bounds.x,
+    y: bounds.y,
+  };
+};
+
 export const renderPressureStrokeToCanvas = (
   renderOps: PressureStrokeRenderOp[]
 ): { canvas: HTMLCanvasElement; x: number; y: number } | null => {
+  if (renderOps.length > 0 && renderOps.every(isOpacityDotRenderOp)) {
+    return renderOpacityStrokeDotsToCanvas(renderOps);
+  }
+
   const target = appendPressureStrokeRenderOpsToCanvas(null, renderOps);
 
   if (!target) {
