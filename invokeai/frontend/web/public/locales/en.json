@@ -3169,8 +3169,8 @@
             "isolatedLayerPreview": "Isolated Layer Preview",
             "isolatedLayerPreviewDesc": "Whether to show only this layer when performing operations like filtering or transforming.",
             "invertBrushSizeScrollDirection": "Invert Scroll for Brush Size",
-            "pressureAffectsWidth": "Pressure Affects Stroke Width",
-            "pressureAffectsBrushOpacity": "Pressure Affects Brush Opacity"
+            "pressureAffectsWidth": "Pressure Affects Width",
+            "pressureAffectsBrushOpacity": "Pressure Affects Opacity"
         },
         "HUD": {
             "bbox": "Bbox",
