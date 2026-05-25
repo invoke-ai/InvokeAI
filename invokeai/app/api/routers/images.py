@@ -12,6 +12,15 @@ from pydantic import BaseModel, Field, model_validator
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.extract_metadata_from_image import extract_metadata_from_image
+from invokeai.app.api.routers._access import (
+    assert_board_read_access as _assert_board_read_access,
+)
+from invokeai.app.api.routers._access import (
+    assert_image_owner as _assert_image_owner,
+)
+from invokeai.app.api.routers._access import (
+    assert_image_read_access as _assert_image_read_access,
+)
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
@@ -36,96 +45,6 @@ images_router = APIRouter(prefix="/v1/images", tags=["images"])
 
 # images are immutable; set a high max-age
 IMAGE_MAX_AGE = 31536000
-
-
-def _assert_image_owner(image_name: str, current_user: CurrentUserOrDefault) -> None:
-    """Raise 403 if the current user does not own the image and is not an admin.
-
-    Ownership is satisfied when ANY of these hold:
-    - The user is an admin.
-    - The user is the image's direct owner (image_records.user_id).
-    - The user owns the board the image sits on.
-    - The image sits on a Public board (public boards grant mutation rights).
-    """
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
-    if current_user.is_admin:
-        return
-    owner = ApiDependencies.invoker.services.image_records.get_user_id(image_name)
-    if owner is not None and owner == current_user.user_id:
-        return
-
-    # Check whether the user owns the board the image belongs to,
-    # or the board is Public (public boards grant mutation rights).
-    board_id = ApiDependencies.invoker.services.board_image_records.get_board_for_image(image_name)
-    if board_id is not None:
-        try:
-            board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-            if board.user_id == current_user.user_id:
-                return
-            if board.board_visibility == BoardVisibility.Public:
-                return
-        except Exception:
-            pass
-
-    raise HTTPException(status_code=403, detail="Not authorized to modify this image")
-
-
-def _assert_image_read_access(image_name: str, current_user: CurrentUserOrDefault) -> None:
-    """Raise 403 if the current user may not view the image.
-
-    Access is granted when ANY of these hold:
-    - The user is an admin.
-    - The user owns the image.
-    - The image sits on a shared or public board.
-    """
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
-    if current_user.is_admin:
-        return
-
-    owner = ApiDependencies.invoker.services.image_records.get_user_id(image_name)
-    if owner is not None and owner == current_user.user_id:
-        return
-
-    # Check whether the image's board makes it visible to other users.
-    board_id = ApiDependencies.invoker.services.board_image_records.get_board_for_image(image_name)
-    if board_id is not None:
-        try:
-            board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-            if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
-                return
-        except Exception:
-            pass
-
-    raise HTTPException(status_code=403, detail="Not authorized to access this image")
-
-
-def _assert_board_read_access(board_id: str, current_user: CurrentUserOrDefault) -> None:
-    """Raise 403 if the current user may not read images from this board.
-
-    Access is granted when ANY of these hold:
-    - The user is an admin.
-    - The user owns the board.
-    - The board visibility is Shared or Public.
-    """
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
-    if current_user.is_admin:
-        return
-
-    try:
-        board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-    except Exception:
-        raise HTTPException(status_code=404, detail="Board not found")
-
-    if board.user_id == current_user.user_id:
-        return
-
-    if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
-        return
-
-    raise HTTPException(status_code=403, detail="Not authorized to access this board")
 
 
 class ResizeToDimensions(BaseModel):
