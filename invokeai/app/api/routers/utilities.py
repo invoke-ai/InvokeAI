@@ -278,6 +278,7 @@ async def image_to_prompt(current_user: CurrentUserOrDefault, body: ImageToPromp
     # via this endpoint (mirrors the policy in routers/images.py).
     assert_image_read_access(body.image_name, current_user)
 
+    events = ApiDependencies.invoker.services.events
     try:
         prompt = await asyncio.to_thread(
             _run_image_to_prompt,
