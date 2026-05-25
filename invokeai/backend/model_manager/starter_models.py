@@ -1022,6 +1022,76 @@ flux2_klein_9b_gguf_q8 = StarterModel(
 )
 # endregion
 
+# region FLUX.2 [dev]
+#
+# FLUX.2 [dev] is BFL's 32B guidance-distilled rectified-flow model and uses Mistral
+# Small 3.1 (24B) as its sole text encoder. The transformer alone is ~64 GB at full
+# bf16, so we surface several quantized variants. All FLUX.2 [dev] releases are
+# governed by the FLUX.2 Non-Commercial License.
+
+flux2_dev_mistral_encoder = StarterModel(
+    name="FLUX.2 [dev] Mistral Encoder",
+    base=BaseModelType.Any,
+    source="black-forest-labs/FLUX.2-dev::text_encoder+tokenizer",
+    description="Mistral Small 3.1 (24B) text encoder + tokenizer for FLUX.2 [dev]. ~48GB bf16",
+    type=ModelType.MistralEncoder,
+)
+
+flux2_dev_mistral_encoder_nf4 = StarterModel(
+    name="FLUX.2 [dev] Mistral Encoder (NF4)",
+    base=BaseModelType.Any,
+    source="diffusers/FLUX.2-dev-bnb-4bit::text_encoder+tokenizer",
+    description="NF4-quantized Mistral Small 3.1 text encoder for FLUX.2 [dev]. ~12GB",
+    type=ModelType.MistralEncoder,
+)
+
+flux2_dev_diffusers = StarterModel(
+    name="FLUX.2 [dev] (Diffusers)",
+    base=BaseModelType.Flux2,
+    source="black-forest-labs/FLUX.2-dev",
+    description="FLUX.2 [dev] full Diffusers pipeline - includes transformer, VAE, and Mistral text encoder. ~80GB. Non-Commercial License.",
+    type=ModelType.Main,
+)
+
+flux2_dev_diffusers_nf4 = StarterModel(
+    name="FLUX.2 [dev] (Diffusers, NF4)",
+    base=BaseModelType.Flux2,
+    source="diffusers/FLUX.2-dev-bnb-4bit",
+    description="FLUX.2 [dev] with NF4-quantized DiT and text encoder - runs on ~18GB VRAM with offload. Non-Commercial License.",
+    type=ModelType.Main,
+)
+
+flux2_dev_gguf_q4 = StarterModel(
+    name="FLUX.2 [dev] (GGUF Q4)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/city96/FLUX.2-dev-gguf/resolve/main/flux2_dev_Q4_K_M.gguf",
+    description="FLUX.2 [dev] transformer, GGUF Q4_K_M - ~18.7GB. Requires a separate FLUX.2 VAE and a Mistral encoder.",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[flux2_vae, flux2_dev_mistral_encoder_nf4],
+)
+
+flux2_dev_gguf_q6 = StarterModel(
+    name="FLUX.2 [dev] (GGUF Q6)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/city96/FLUX.2-dev-gguf/resolve/main/flux2_dev_Q6_K.gguf",
+    description="FLUX.2 [dev] transformer, GGUF Q6_K - ~26.7GB. Requires a separate FLUX.2 VAE and a Mistral encoder.",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[flux2_vae, flux2_dev_mistral_encoder_nf4],
+)
+
+flux2_dev_gguf_q8 = StarterModel(
+    name="FLUX.2 [dev] (GGUF Q8)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/city96/FLUX.2-dev-gguf/resolve/main/flux2_dev_Q8_0.gguf",
+    description="FLUX.2 [dev] transformer, GGUF Q8_0 - ~34.5GB. Requires a separate FLUX.2 VAE and a Mistral encoder.",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[flux2_vae, flux2_dev_mistral_encoder_nf4],
+)
+# endregion
+
 # region Z-Image
 z_image_qwen3_encoder = StarterModel(
     name="Z-Image Qwen3 Text Encoder",
@@ -1663,6 +1733,13 @@ STARTER_MODELS: list[StarterModel] = [
     flux2_klein_9b_gguf_q8,
     flux2_klein_qwen3_4b_encoder,
     flux2_klein_qwen3_8b_encoder,
+    flux2_dev_mistral_encoder,
+    flux2_dev_mistral_encoder_nf4,
+    flux2_dev_diffusers,
+    flux2_dev_diffusers_nf4,
+    flux2_dev_gguf_q4,
+    flux2_dev_gguf_q6,
+    flux2_dev_gguf_q8,
     cogview4,
     qwen_image_vae,
     qwen_vl_encoder_fp8,

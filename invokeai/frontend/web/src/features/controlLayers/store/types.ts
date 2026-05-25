@@ -837,6 +837,10 @@ export const zParamsState = z.object({
   // Flux2 Klein model components - uses Qwen3 instead of CLIP+T5
   kleinVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE for Klein
   kleinQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder for Klein
+  // Flux2 [dev] model components - uses Mistral Small 3.1 (24B) text encoder
+  flux2DevVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE for [dev]
+  flux2DevMistralEncoderModel: zModelIdentifierField.nullable(), // Optional: Standalone Mistral encoder for [dev]
+  flux2DevSourceModel: zParameterModel.nullable(), // Diffusers FLUX.2 [dev] (fallback for VAE/Encoder)
   // Qwen Image Edit model components - GGUF transformer needs a Diffusers source for VAE/encoder
   qwenImageComponentSource: zParameterModel.nullable(), // Diffusers model providing VAE + text encoder
   qwenImageVaeModel: zParameterVAEModel.nullable(), // Optional: Standalone Qwen Image VAE checkpoint
@@ -923,6 +927,9 @@ export const getInitialParamsState = (): ParamsState => ({
   animaScheduler: 'euler',
   kleinVaeModel: null,
   kleinQwen3EncoderModel: null,
+  flux2DevVaeModel: null,
+  flux2DevMistralEncoderModel: null,
+  flux2DevSourceModel: null,
   qwenImageComponentSource: null,
   qwenImageVaeModel: null,
   qwenImageQwenVLEncoderModel: null,

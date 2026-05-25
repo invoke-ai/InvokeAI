@@ -47,7 +47,7 @@ class BaseModelType(str, Enum):
     Flux = "flux"
     """Indicates the model is associated with FLUX.1 model architecture, including FLUX Dev, Schnell and Fill."""
     Flux2 = "flux2"
-    """Indicates the model is associated with FLUX.2 model architecture, including FLUX2 Klein."""
+    """Indicates the model is associated with FLUX.2 model architecture, including FLUX.2 Klein and FLUX.2 [dev]."""
     CogView4 = "cogview4"
     """Indicates the model is associated with CogView 4 model architecture."""
     ZImage = "z-image"
@@ -79,6 +79,7 @@ class ModelType(str, Enum):
     T5Encoder = "t5_encoder"
     Qwen3Encoder = "qwen3_encoder"
     QwenVLEncoder = "qwen_vl_encoder"
+    MistralEncoder = "mistral_encoder"
     SpandrelImageToImage = "spandrel_image_to_image"
     SigLIP = "siglip"
     FluxRedux = "flux_redux"
@@ -144,6 +145,9 @@ class Flux2VariantType(str, Enum):
     Klein9BBase = "klein_9b_base"
     """Flux2 Klein 9B Base variant - undistilled foundation model using Qwen3 8B text encoder."""
 
+    Dev = "dev"
+    """FLUX.2 [dev] - 32B rectified flow transformer using Mistral Small 3.1 text encoder (guidance-distilled)."""
+
 
 class ZImageVariantType(str, Enum):
     """Z-Image model variants."""
@@ -178,6 +182,13 @@ class Qwen3VariantType(str, Enum):
     """Qwen3 0.6B text encoder (hidden_size=1024). Used by Anima."""
 
 
+class MistralVariantType(str, Enum):
+    """Mistral text encoder variants used by FLUX.2 [dev]."""
+
+    Small3_1 = "mistral_small_3_1"
+    """Mistral Small 3.1 (24B, hidden_size=5120). Used by FLUX.2 [dev]."""
+
+
 class ModelFormat(str, Enum):
     """Storage format of model."""
 
@@ -193,6 +204,7 @@ class ModelFormat(str, Enum):
     T5Encoder = "t5_encoder"
     Qwen3Encoder = "qwen3_encoder"
     QwenVLEncoder = "qwen_vl_encoder"
+    MistralEncoder = "mistral_encoder"
     BnbQuantizedLlmInt8b = "bnb_quantized_int8b"
     BnbQuantizednf4b = "bnb_quantized_nf4b"
     GGUFQuantized = "gguf_quantized"
@@ -249,6 +261,7 @@ AnyVariant: TypeAlias = Union[
     ZImageVariantType,
     QwenImageVariantType,
     Qwen3VariantType,
+    MistralVariantType,
 ]
 variant_type_adapter = TypeAdapter[
     ModelVariantType
@@ -258,6 +271,7 @@ variant_type_adapter = TypeAdapter[
     | ZImageVariantType
     | QwenImageVariantType
     | Qwen3VariantType
+    | MistralVariantType
 ](
     ModelVariantType
     | ClipVariantType
@@ -266,4 +280,5 @@ variant_type_adapter = TypeAdapter[
     | ZImageVariantType
     | QwenImageVariantType
     | Qwen3VariantType
+    | MistralVariantType
 )
