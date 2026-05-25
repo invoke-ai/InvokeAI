@@ -195,6 +195,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     g.addEdge(devLoader, 'mistral_encoder', devCond, 'mistral_encoder');
     g.addEdge(devLoader, 'max_seq_len', devCond, 'max_seq_len');
     g.addEdge(devLoader, 'transformer', denoise, 'transformer');
+    g.addEdge(devLoader, 'vae', denoise, 'vae'); // required for BN statistics + inpaint paths
     g.addEdge(devLoader, 'vae', l2i, 'vae');
     g.addEdge(positivePrompt, 'value', devCond, 'prompt');
     g.addEdge(devCond, 'conditioning', denoise, 'positive_text_conditioning');

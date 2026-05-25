@@ -12,7 +12,7 @@ from typing import Any, Optional
 
 import accelerate
 import torch
-from transformers import AutoProcessor, MistralConfig, MistralModel
+from transformers import AutoProcessor, AutoTokenizer, MistralConfig, MistralModel
 
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.mistral_encoder import (
@@ -50,11 +50,20 @@ _MISTRAL_SMALL_3_1_MAX_POSITION_EMBEDDINGS = 131072
 _MISTRAL_SMALL_3_1_ROPE_THETA = 1000000.0
 _MISTRAL_SMALL_3_1_RMS_NORM_EPS = 1e-5
 
-# Default tokenizer / processor source. The official Mistral repo requires
-# accepting a license; FLUX.2-dev embeds the same processor under `tokenizer/`
-# and is the canonical companion for image-generation use.
-_DEFAULT_PROCESSOR_SOURCE = "black-forest-labs/FLUX.2-dev"
-_DEFAULT_PROCESSOR_SUBFOLDER = "tokenizer"
+# Fallback tokenizer/processor sources for single-file / GGUF Mistral encoders.
+# The GGUF format doesn't bundle a tokenizer; we have to fetch one. We try each
+# source in order, preferring the local HuggingFace cache before any network
+# lookup, and use AutoTokenizer (text-only, simpler config requirements) so the
+# offline fallback works even when HF Hub is unreachable.
+#
+# - ``black-forest-labs/FLUX.2-dev`` (subfolder=``tokenizer``): canonical FLUX.2 processor
+# - ``mistralai/Mistral-Small-3.1-24B-Instruct-2503``: official Mistral 3.1, the version FLUX.2 was trained on
+# - ``mistralai/Mistral-Small-3.2-24B-Instruct-2506``: drop-in 3.2 (same chat template)
+_TOKENIZER_FALLBACK_SOURCES: tuple[tuple[str, Optional[str]], ...] = (
+    ("black-forest-labs/FLUX.2-dev", "tokenizer"),
+    ("mistralai/Mistral-Small-3.1-24B-Instruct-2503", None),
+    ("mistralai/Mistral-Small-3.2-24B-Instruct-2506", None),
+)
 
 
 def _build_mistral_config(
@@ -143,6 +152,62 @@ def _strip_known_prefixes(sd: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _convert_for_bare_mistral_model(sd: dict[str, Any]) -> dict[str, Any]:
+    """Rewrite a `model.*` causal-LM state dict for direct loading into ``MistralModel``.
+
+    Transformers' ``MistralForCausalLM`` exposes its decoder under ``model.`` and adds
+    an ``lm_head``; bare ``MistralModel`` has the decoder modules at the top level
+    (``embed_tokens``, ``layers``, ``norm``) and no LM head. Our state dicts come from
+    GGUF / safetensors that target the CausalLM layout, so we strip the prefix and
+    drop the LM head before calling ``MistralModel.load_state_dict``.
+    """
+    out: dict[str, Any] = {}
+    for key, value in sd.items():
+        if not isinstance(key, str):
+            out[key] = value
+            continue
+        if key.startswith("lm_head."):
+            continue
+        if key.startswith("model."):
+            out[key[len("model.") :]] = value
+        else:
+            out[key] = value
+    return out
+
+
+def _materialize_remaining_meta_tensors(model: torch.nn.Module, dtype: torch.dtype, logger) -> None:
+    """Replace any parameters/buffers still on the meta device after load_state_dict.
+
+    A meta tensor in the final model triggers ``Cannot copy out of meta tensor`` when
+    the model cache moves the weights to the compute device. We can't recover the
+    actual values for missing weights, but we can at least give the model a real
+    tensor — norms get ones, everything else gets zeros — so the load completes and
+    obvious errors are easier to debug than a low-level move failure.
+    """
+    materialized: list[str] = []
+    for name, param in list(model.named_parameters()):
+        if not param.is_meta:
+            continue
+        is_norm = "norm" in name.split(".") or name.endswith("_norm.weight")
+        new_tensor = torch.ones(param.shape, dtype=dtype) if is_norm else torch.zeros(param.shape, dtype=dtype)
+        parent_name, _, attr = name.rpartition(".")
+        parent = model.get_submodule(parent_name) if parent_name else model
+        setattr(parent, attr, torch.nn.Parameter(new_tensor, requires_grad=False))
+        materialized.append(name)
+    for name, buffer in list(model.named_buffers()):
+        if not buffer.is_meta:
+            continue
+        parent_name, _, attr = name.rpartition(".")
+        parent = model.get_submodule(parent_name) if parent_name else model
+        parent.register_buffer(attr, torch.zeros(buffer.shape, dtype=dtype), persistent=False)
+        materialized.append(f"{name} (buffer)")
+    if materialized:
+        logger.warning(
+            f"Mistral encoder: materialized {len(materialized)} meta tensor(s) with default values "
+            f"(this usually means a key was missing from the checkpoint). First 5: {materialized[:5]}"
+        )
+
+
 def _drop_quantization_metadata(sd: dict[str, Any], logger) -> dict[str, Any]:
     """Dequantize Comfy-Org-style FP8/FP4 weights and drop their metadata keys.
 
@@ -181,18 +246,47 @@ def _drop_quantization_metadata(sd: dict[str, Any], logger) -> dict[str, Any]:
 
 
 def _load_processor_with_offline_fallback() -> AnyModel:
-    """Load the FLUX.2 Mistral processor (tokenizer + chat template) from cache, else HF."""
-    try:
-        return AutoProcessor.from_pretrained(
-            _DEFAULT_PROCESSOR_SOURCE,
-            subfolder=_DEFAULT_PROCESSOR_SUBFOLDER,
-            local_files_only=True,
-        )
-    except (OSError, EnvironmentError):
-        return AutoProcessor.from_pretrained(
-            _DEFAULT_PROCESSOR_SOURCE,
-            subfolder=_DEFAULT_PROCESSOR_SUBFOLDER,
-        )
+    """Load a Mistral tokenizer / processor for FLUX.2 [dev] text encoding.
+
+    Strategy: walk the fallback source list twice — first looking only at the
+    local HuggingFace cache, then with network lookups enabled. For each entry
+    we try ``AutoProcessor`` (multimodal Mistral3 processor, includes the
+    ``apply_chat_template`` we use) and then ``AutoTokenizer`` (text-only, used
+    when the source ships only tokenizer files without the multimodal
+    ``processor_config.json``). The first match wins.
+    """
+    attempts: list[str] = []
+
+    def _try(source: str, subfolder: Optional[str], local_only: bool) -> Optional[AnyModel]:
+        kwargs: dict[str, Any] = {"local_files_only": local_only}
+        if subfolder is not None:
+            kwargs["subfolder"] = subfolder
+        for loader_cls in (AutoProcessor, AutoTokenizer):
+            try:
+                return loader_cls.from_pretrained(source, **kwargs)
+            except (OSError, EnvironmentError, ValueError) as e:
+                attempts.append(
+                    f"{loader_cls.__name__}({source}, subfolder={subfolder}, local_only={local_only}): {type(e).__name__}"
+                )
+        return None
+
+    for local_only in (True, False):
+        for source, subfolder in _TOKENIZER_FALLBACK_SOURCES:
+            result = _try(source, subfolder, local_only)
+            if result is not None:
+                return result
+
+    sources_str = ", ".join(f"{s}{f':{f}' if f else ''}" for s, f in _TOKENIZER_FALLBACK_SOURCES)
+    raise RuntimeError(
+        "Could not load a Mistral tokenizer/processor for FLUX.2 [dev]. "
+        f"Tried (cached + online): {sources_str}. "
+        "Workarounds: (1) install the full FLUX.2-dev diffusers folder as a model in InvokeAI "
+        "(it bundles the tokenizer), (2) point HF_ENDPOINT at a reachable HuggingFace mirror "
+        "or run once with internet access to populate the local cache, "
+        "or (3) pre-cache the tokenizer with: "
+        "`huggingface-cli download black-forest-labs/FLUX.2-dev --include 'tokenizer/*'`. "
+        f"Attempt details: {'; '.join(attempts[-6:])}"
+    )
 
 
 @ModelLoaderRegistry.register(
@@ -304,6 +398,9 @@ class MistralEncoderCheckpointLoader(ModelLoader):
         for k in list(sd.keys()):
             sd[k] = sd[k].to(model_dtype)
 
+        # Adapt CausalLM-prefixed keys for bare MistralModel.
+        sd = _convert_for_bare_mistral_model(sd)
+
         with accelerate.init_empty_weights():
             model = MistralModel(mistral_config)
 
@@ -337,6 +434,8 @@ class MistralEncoderCheckpointLoader(ModelLoader):
                     ** (torch.arange(0, mistral_config.head_dim, 2, dtype=torch.float32) / mistral_config.head_dim)
                 )
                 parent.register_buffer(parts[-1], inv_freq.to(model_dtype), persistent=False)
+
+        _materialize_remaining_meta_tensors(model, model_dtype, logger)
 
         return model
 
@@ -390,10 +489,19 @@ class MistralEncoderGGUFLoader(ModelLoader):
             f"kv_heads={mistral_config.num_key_value_heads}, intermediate={mistral_config.intermediate_size}"
         )
 
+        # Adapt CausalLM-prefixed keys for bare MistralModel.
+        sd = _convert_for_bare_mistral_model(sd)
+
         with accelerate.init_empty_weights():
             model = MistralModel(mistral_config)
 
-        model.load_state_dict(sd, strict=False, assign=True)
+        missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
+        if unexpected:
+            logger.debug(f"Mistral encoder (GGUF): ignored {len(unexpected)} unexpected keys")
+        if missing:
+            logger.debug(
+                f"Mistral encoder (GGUF): {len(missing)} keys missing from state dict (first 5: {missing[:5]})"
+            )
 
         # Embedding lookups require an indexable tensor — dequantize the GGMLTensor for embed_tokens.
         embed_weight = model.embed_tokens.weight
@@ -409,6 +517,8 @@ class MistralEncoderGGUFLoader(ModelLoader):
                     ** (torch.arange(0, mistral_config.head_dim, 2, dtype=torch.float32) / mistral_config.head_dim)
                 )
                 parent.register_buffer(parts[-1], inv_freq.to(compute_dtype), persistent=False)
+
+        _materialize_remaining_meta_tensors(model, compute_dtype, logger)
 
         return model
 
@@ -433,6 +543,10 @@ def _convert_llamacpp_mistral_to_pytorch(sd: dict[str, Any]) -> dict[str, Any]:
             parts = key.split(".", 2)  # ["blk", "<N>", "<rest>"]
             if len(parts) == 3:
                 rest = parts[2]
+                # Order matters: q_norm/k_norm must be checked BEFORE attn_q/attn_k
+                # so we don't rewrite "attn_q_norm" -> "self_attn.q_proj_norm".
+                rest = rest.replace("attn_q_norm.", "self_attn.q_norm.")
+                rest = rest.replace("attn_k_norm.", "self_attn.k_norm.")
                 rest = rest.replace("attn_q.", "self_attn.q_proj.")
                 rest = rest.replace("attn_k.", "self_attn.k_proj.")
                 rest = rest.replace("attn_v.", "self_attn.v_proj.")

@@ -809,9 +809,7 @@ export const selectAnimaScheduler = createParamsSelector((params) => params.anim
 export const selectKleinVaeModel = createParamsSelector((params) => params.kleinVaeModel);
 export const selectKleinQwen3EncoderModel = createParamsSelector((params) => params.kleinQwen3EncoderModel);
 export const selectFlux2DevVaeModel = createParamsSelector((params) => params.flux2DevVaeModel);
-export const selectFlux2DevMistralEncoderModel = createParamsSelector(
-  (params) => params.flux2DevMistralEncoderModel
-);
+export const selectFlux2DevMistralEncoderModel = createParamsSelector((params) => params.flux2DevMistralEncoderModel);
 export const selectFlux2DevSourceModel = createParamsSelector((params) => params.flux2DevSourceModel);
 export const selectQwenImageComponentSource = createParamsSelector((params) => params.qwenImageComponentSource);
 export const selectQwenImageVaeModel = createParamsSelector((params) => params.qwenImageVaeModel);

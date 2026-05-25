@@ -139,18 +139,21 @@ class Flux2DevTextEncoderInvocation(BaseInvocation):
                 "The Mistral encoder model may be corrupted or incompatible."
             )
 
-        # Build the chat-template messages. The processor may be either a full
-        # AutoProcessor (for Mistral3ForConditionalGeneration) or a bare tokenizer
-        # (for text-only single-file/GGUF loaders); both expose `apply_chat_template`.
-        messages = [
-            {
-                "role": "system",
-                "content": [{"type": "text", "text": FLUX2_DEV_SYSTEM_MESSAGE}],
-            },
-            {
-                "role": "user",
-                "content": [{"type": "text", "text": self.prompt}],
-            },
+        # Two valid chat-template content shapes depending on the loaded artifact:
+        # - Multimodal Mistral3 processors (PixtralProcessor / Mistral3Processor) want
+        #   `[{type: "text", text: ...}]` even for text-only prompts and crash on a
+        #   plain string with `string indices must be integers`.
+        # - Plain AutoTokenizer / MistralTokenizer want simple string content and
+        #   may fail on the dict-list form depending on the template.
+        # We try multimodal first (matches BFL's canonical FLUX.2-dev processor),
+        # then fall back to string content, then to manual [INST]...[/INST] format.
+        multimodal_messages = [
+            {"role": "system", "content": [{"type": "text", "text": FLUX2_DEV_SYSTEM_MESSAGE}]},
+            {"role": "user", "content": [{"type": "text", "text": self.prompt}]},
+        ]
+        plain_messages = [
+            {"role": "system", "content": FLUX2_DEV_SYSTEM_MESSAGE},
+            {"role": "user", "content": self.prompt},
         ]
 
         tokenize_kwargs = {
@@ -163,12 +166,22 @@ class Flux2DevTextEncoderInvocation(BaseInvocation):
             "max_length": self.max_seq_len,
         }
 
-        try:
-            inputs = processor.apply_chat_template(messages, **tokenize_kwargs)
-        except (AttributeError, ValueError):
-            # Fallback path: processor has no chat template (single-file
-            # tokenizer download). Format the prompt manually using Mistral's
-            # [INST]...[/INST] convention.
+        inputs = None
+        last_error: Exception | None = None
+        for messages in (multimodal_messages, plain_messages):
+            try:
+                inputs = processor.apply_chat_template(messages, **tokenize_kwargs)
+                break
+            except (AttributeError, ValueError, TypeError, KeyError) as e:
+                last_error = e
+
+        if inputs is None:
+            # Fallback: no usable chat template. Format the prompt manually using
+            # Mistral's classic [INST]...[/INST] convention.
+            context.logger.debug(
+                f"Mistral chat template failed ({type(last_error).__name__}: {last_error}); "
+                "falling back to manual [INST] formatting."
+            )
             text = f"[INST] {FLUX2_DEV_SYSTEM_MESSAGE}\n\n{self.prompt} [/INST]"
             inputs = processor(
                 text,
