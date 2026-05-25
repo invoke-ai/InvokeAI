@@ -75,9 +75,9 @@ jobs:
         run: 'pnpm lint:tsc'
         shell: bash
 
-      - name: dpdm
+      - name: lint:circular
         if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
-        run: 'pnpm lint:dpdm'
+        run: 'pnpm lint:circular'
         shell: bash
 
       - name: eslint

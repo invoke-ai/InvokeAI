@@ -5,7 +5,7 @@ All commands should be run from `<REPO_ROOT>/invokeai/frontend/web/`.
 - `pnpm lint:prettier`: check formatting
 - `pnpm lint:eslint`: check for linting issues
 - `pnpm lint:knip`: check for unused dependencies
-- `pnpm lint:dpdm`: check for dependency cycles
+- `pnpm lint:circular`: check for dependency cycles
 - `pnpm lint:tsc`: check for TypeScript issues
 - `pnpm lint`: run all checks
 - `pnpm fix`: automatically fix issues where possible
