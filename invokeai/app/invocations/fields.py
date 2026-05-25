@@ -378,6 +378,10 @@ class ConditioningField(BaseModel):
 class BoundingBoxField(BoundingBox):
     """A bounding box primitive value."""
 
+    label: Optional[str] = Field(
+        default=None,
+        description="The label associated with the bounding box. This value is typically set when the bounding box was produced by a detector.",
+    )
     score: Optional[float] = Field(
         default=None,
         ge=0.0,
