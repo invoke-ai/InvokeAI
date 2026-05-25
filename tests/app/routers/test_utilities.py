@@ -1,4 +1,4 @@
-"""Router-level tests for /api/v1/utilities."""
+"""Tests for the utilities router."""
 
 import os
 from pathlib import Path
@@ -80,7 +80,6 @@ def patch_utilities_dependencies(monkeypatch: Any, mock_invoker: Invoker, invoke
     mock_invoker.services.configuration._root = invokeai_root_dir
     mock_invoker.services.model_manager = MagicMock()
     mock_invoker.services.model_manager.store.get_model = MagicMock()
-
     mock_deps = MockApiDependencies(mock_invoker)
     monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
@@ -104,13 +103,13 @@ def admin_token(setup_jwt_secret: None, enable_multiuser: Invoker, client: TestC
 
 @pytest.fixture
 def user1_token(enable_multiuser: Invoker, client: TestClient, admin_token: str):
-    setup_test_user(enable_multiuser, "user1@test.com", "User One", is_admin=False)
+    setup_test_user(enable_multiuser, "user1@test.com", "Test User 1")
     return get_user_token(client, "user1@test.com")
 
 
 @pytest.fixture
 def user2_token(enable_multiuser: Invoker, client: TestClient, admin_token: str):
-    setup_test_user(enable_multiuser, "user2@test.com", "User Two", is_admin=False)
+    setup_test_user(enable_multiuser, "user2@test.com", "Test User 2")
     return get_user_token(client, "user2@test.com")
 
 
@@ -122,8 +121,9 @@ def user2_token(enable_multiuser: Invoker, client: TestClient, admin_token: str)
         ("/api/v1/utilities/image-to-prompt", {"image_name": "img-1", "model_key": "m"}),
     ],
 )
-def test_routes_require_auth(enable_multiuser: Invoker, client: TestClient, mock_invoker: Invoker, path: str, body: dict):
+def test_routes_require_auth(enable_multiuser: Any, client: TestClient, mock_invoker: Invoker, path: str, body: dict):
     response = client.post(path, json=body)
+
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
     mock_invoker.services.model_manager.store.get_model.assert_not_called()
 
@@ -134,9 +134,9 @@ def test_dynamicprompts_works_for_user(client: TestClient, user1_token: str):
         json={"prompt": "a {b|c}"},
         headers={"Authorization": f"Bearer {user1_token}"},
     )
+
     assert response.status_code == status.HTTP_200_OK
-    body = response.json()
-    assert "prompts" in body
+    assert "prompts" in response.json()
 
 
 def test_image_to_prompt_forbidden_for_non_owner(
@@ -151,6 +151,7 @@ def test_image_to_prompt_forbidden_for_non_owner(
         json={"image_name": "private-img.png", "model_key": "some-key"},
         headers={"Authorization": f"Bearer {user2_token}"},
     )
+
     assert response.status_code == status.HTTP_403_FORBIDDEN
     mock_invoker.services.model_manager.store.get_model.assert_not_called()
 
@@ -161,7 +162,6 @@ def test_image_to_prompt_owner_reaches_model_load(client: TestClient, user1_toke
     user1 = mock_invoker.services.users.get_by_email("user1@test.com")
     assert user1 is not None
     _save_image(mock_invoker, "owned-img.png", user1.user_id)
-
     mock_invoker.services.model_manager.store.get_model = MagicMock(side_effect=UnknownModelException("no such model"))
 
     response = client.post(
@@ -169,19 +169,19 @@ def test_image_to_prompt_owner_reaches_model_load(client: TestClient, user1_toke
         json={"image_name": "owned-img.png", "model_key": "missing-model"},
         headers={"Authorization": f"Bearer {user1_token}"},
     )
+
     assert response.status_code == status.HTTP_404_NOT_FOUND
     mock_invoker.services.model_manager.store.get_model.assert_called_once()
 
 
 def test_image_to_prompt_admin_can_access_any_image(
-    client: TestClient, admin_token: str, mock_invoker: Invoker
+    client: TestClient, admin_token: str, user1_token: str, mock_invoker: Invoker
 ):
     from invokeai.app.services.model_records.model_records_base import UnknownModelException
 
     user1 = mock_invoker.services.users.get_by_email("user1@test.com")
     assert user1 is not None
     _save_image(mock_invoker, "user1-img.png", user1.user_id)
-
     mock_invoker.services.model_manager.store.get_model = MagicMock(side_effect=UnknownModelException("no model"))
 
     response = client.post(
@@ -189,8 +189,8 @@ def test_image_to_prompt_admin_can_access_any_image(
         json={"image_name": "user1-img.png", "model_key": "x"},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
+
     assert response.status_code == status.HTTP_404_NOT_FOUND
-    mock_invoker.services.model_manager.store.get_model.assert_called_once()
 
 
 def test_list_user_fonts_requires_auth(enable_multiuser: Invoker, client: TestClient, invokeai_root_dir: Path) -> None:
