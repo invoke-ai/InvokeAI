@@ -12,12 +12,10 @@ export const CanvasHUDItem = memo(({ label, value, color }: Props) => {
   return (
     <>
       <GridItem>
-        <Text textAlign="end" fontSize="sm" lineHeight="short" display="block">
-          {label}:
-        </Text>
+        <Text textAlign="end">{label}: </Text>
       </GridItem>
       <GridItem fontWeight="semibold">
-        <Text textAlign="end" color={color} fontSize="sm" lineHeight="short" display="block">
+        <Text textAlign="end" color={color}>
           {value}
         </Text>
       </GridItem>
