@@ -43,7 +43,11 @@ There are several node grouping concepts that can be examined with a narrow focu
 
 ### Create Latent Noise
 
-An initial noise tensor is necessary for the latent diffusion process. As a result, the Denoising node requires a noise node input.  
+An initial noise tensor is necessary for the latent diffusion process. As a result, the Denoising node requires a noise node input.
+
+The standard Create Latent Noise node includes a Noise Type selector for architecture-specific latent shapes. Leave it
+at SD for classic 4-channel Stable Diffusion workflows, or switch it to match the downstream denoiser when using
+architectures like FLUX, FLUX.2, SD3, CogView4, Z-Image, or Anima.
 
 ![groupsnoise](../assets/nodes/groupsnoise.png)
 
@@ -94,4 +98,3 @@ Iteration is a common concept in any processing, and means to repeat a process w
 Batch or multiple image generation in the workflow editor is done using the RandomRange node. In this case, the 'Size' field represents the number of images to generate, meaning this example will generate 4 images. As RandomRange produces a collection of integers, we need to add the Iterate node to iterate through the collection. This noise can then be fed to the Denoise Latents node for it to iterate through the denoising process with the different seeds provided.
 
 ![groupsmultigenseeding](../assets/nodes/groupsmultigenseeding.png)
-

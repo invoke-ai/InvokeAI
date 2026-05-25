@@ -224,6 +224,12 @@ This is where the actual mathematical implementation of the model lives.
        return rearrange(x, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)
    ```
 
+   If the architecture supports external noise, prefer extending the standard
+   `invokeai/app/invocations/noise.py` node's `noise_type` selector instead of
+   adding a brand new noise node. Only add a dedicated noise invocation when the
+   architecture's noise tensor rank or layout cannot be expressed by the
+   standard node.
+
 2. **The Denoising Loop**
 
    Implement the core sampling loop. This interacts with schedulers and handles classifier-free guidance (CFG).
@@ -311,6 +317,7 @@ Invocations expose your PyTorch functions as isolated execution nodes in InvokeA
    @invocation("newmodel_denoise", title="NewModel Denoise", category="latents")
    class NewModelDenoiseInvocation(BaseInvocation):
        latents: LatentsField | None = InputField(default=None)
+       noise: LatentsField | None = InputField(default=None)
        positive_conditioning: ConditioningField = InputField()
        transformer: TransformerField = InputField()
        steps: int = InputField(default=20)
@@ -320,6 +327,10 @@ Invocations expose your PyTorch functions as isolated execution nodes in InvokeA
            # Generate noise, get schedule, and call your denoise() function
            pass
    ```
+
+   If you add external noise support, keep it optional so seed-driven workflows
+   continue to work. Validate connected noise against the architecture's
+   expected shape before using it.
 
 4. **VAE Encode / Decode Invocations**
 
@@ -331,6 +342,7 @@ Invocations expose your PyTorch functions as isolated execution nodes in InvokeA
   - [ ] Model loader invocation (`[newmodel]_model_loader.py`)
   - [ ] Text encoder invocation (`[newmodel]_text_encoder.py`)
   - [ ] Denoise invocation (`[newmodel]_denoise.py`)
+  - [ ] Extend the standard `noise` invocation if the architecture supports external noise
   - [ ] VAE encode/decode invocations (`[newmodel]_vae_encode.py`, `[newmodel]_vae_decode.py`)
 :::
 
