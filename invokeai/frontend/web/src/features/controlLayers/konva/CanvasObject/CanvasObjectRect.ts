@@ -46,13 +46,15 @@ export class CanvasObjectRect extends CanvasModuleBase {
       this.isFirstRender = false;
 
       this.log.trace({ state }, 'Updating rect');
-      const { rect, color } = state;
+      const { rect, color, compositeOperation } = state;
+      const fill = compositeOperation === 'destination-out' ? 'rgba(255,255,255,1)' : rgbaColorToString(color);
       this.konva.rect.setAttrs({
         x: rect.x,
         y: rect.y,
         width: rect.width,
         height: rect.height,
-        fill: rgbaColorToString(color),
+        fill,
+        globalCompositeOperation: compositeOperation,
       });
       this.state = state;
       return true;

@@ -2,6 +2,8 @@
 title: Gallery Panel
 description: Learn how to manage, organize, and use your generated images and assets with the Gallery Panel in InvokeAI.
 lastUpdated: 2026-02-19
+sidebar:
+    order: 1
 ---
 
 import { Card, CardGrid, Steps } from '@astrojs/starlight/components';
@@ -63,6 +65,29 @@ Every board is organized into two distinct tabs:
 
 1. **Images:** Images generated directly within InvokeAI.
 2. **Assets:** External images you have uploaded to use as an [Image Prompt](https://support.invoke.ai/support/solutions/articles/151000159340-using-the-image-prompt-adapter-ip-adapter-) or within the Image to Image tab.
+
+---
+
+## Virtual Boards
+
+Virtual boards are read-only board groupings that Invoke computes on-the-fly from your image metadata rather than storing in the database. The first available type groups images **By Date**, creating one sub-board per day on which you generated images.
+
+Virtual boards are **off by default**. To enable them:
+
+1. Open the **board settings** (gear icon at the top of the Gallery).
+2. Toggle **Virtual Boards** on.
+3. A collapsible **By Date** section appears in the board list, with a sub-board for each day that has images. Each sub-board shows the date, image / asset counts, and a cover thumbnail.
+
+Selecting a date sub-board filters the gallery to just the images from that day. The collapse state of the By Date section persists across reloads.
+
+### Limits
+
+Because virtual boards are derived, not stored:
+
+- They are **read-only**: no drag-and-drop, no context menu, no auto-add destination.
+- You cannot rename or delete them.
+- Generating a new image updates the counts immediately, but the image is still saved to your regular auto-add board — virtual boards are a *view*, not a destination.
+- Disabling the **Virtual Boards** toggle hides the section and resets the selection to *Uncategorized* if you were viewing a virtual sub-board.
 
 ---
 
