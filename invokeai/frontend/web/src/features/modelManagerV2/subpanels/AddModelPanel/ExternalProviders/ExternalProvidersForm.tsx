@@ -12,12 +12,11 @@ import {
   Switch,
   Text,
   Tooltip,
+  useToast,
 } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useBuildModelInstallArg } from 'features/modelManagerV2/hooks/useBuildModelsToInstall';
 import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
-import { $installModelsTabIndex } from 'features/modelManagerV2/store/installModelsStore';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -66,7 +65,7 @@ type ProviderCardProps = {
 type UpdatePayload = {
   provider_id: string;
   api_key?: string;
-  base_url?: string;
+  base_url?: string | null;
 };
 
 export const ExternalProvidersForm = memo(() => {
@@ -82,7 +81,7 @@ export const ExternalProvidersForm = memo(() => {
       if (!model.source.startsWith('external://')) {
         continue;
       }
-      const providerId = model.source.replace('external://', '').split('/')[0];
+      const providerId = model.source.slice('external://'.length).split('/')[0];
       if (!providerId) {
         continue;
       }
@@ -162,6 +161,7 @@ ExternalProvidersForm.displayName = 'ExternalProvidersForm';
 
 const ProviderCard = memo(({ provider, onInstallModels, iconResolver }: ProviderCardProps) => {
   const { t } = useTranslation();
+  const toast = useToast();
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState(provider.base_url ?? '');
   const [saveConfig, { isLoading }] = useSetExternalProviderConfigMutation();
@@ -169,9 +169,17 @@ const ProviderCard = memo(({ provider, onInstallModels, iconResolver }: Provider
   const [overrideBaseUrl, setOverrideBaseUrl] = useState(!!provider.base_url);
 
   useEffect(() => {
+    setApiKey('');
     setBaseUrl(provider.base_url ?? '');
     setOverrideBaseUrl(!!provider.base_url);
-  }, [provider.base_url]);
+  }, [provider.base_url, provider.provider_id]);
+
+  const hasBaseUrlChange = useMemo(() => {
+    if (!overrideBaseUrl) {
+      return provider.base_url !== null;
+    }
+    return baseUrl.trim() !== (provider.base_url ?? '');
+  }, [baseUrl, overrideBaseUrl, provider.base_url]);
 
   const handleSave = useCallback(() => {
     const trimmedApiKey = apiKey.trim();
@@ -182,7 +190,9 @@ const ProviderCard = memo(({ provider, onInstallModels, iconResolver }: Provider
     if (trimmedApiKey) {
       updatePayload.api_key = trimmedApiKey;
     }
-    if (trimmedBaseUrl !== (provider.base_url ?? '')) {
+    if (!overrideBaseUrl && provider.base_url !== null) {
+      updatePayload.base_url = null;
+    } else if (overrideBaseUrl && trimmedBaseUrl !== (provider.base_url ?? '')) {
       updatePayload.base_url = trimmedBaseUrl;
     }
 
@@ -193,16 +203,31 @@ const ProviderCard = memo(({ provider, onInstallModels, iconResolver }: Provider
     saveConfig(updatePayload)
       .unwrap()
       .then((result) => {
-        if (result.api_key_configured) {
+        if (trimmedApiKey && result.api_key_configured) {
           setApiKey('');
           onInstallModels(provider.provider_id);
         }
-        if (result.base_url !== undefined) {
-          setBaseUrl(result.base_url ?? '');
-          setOverrideBaseUrl(!!result.base_url);
-        }
+        setBaseUrl(result.base_url ?? '');
+        setOverrideBaseUrl(!!result.base_url);
+      })
+      .catch(() => {
+        toast({
+          id: `EXTERNAL_PROVIDER_SAVE_FAILED_${provider.provider_id}`,
+          title: t('modelManager.externalProviderSaveFailed'),
+          status: 'error',
+        });
       });
-  }, [apiKey, baseUrl, onInstallModels, provider.base_url, provider.provider_id, saveConfig]);
+  }, [
+    apiKey,
+    baseUrl,
+    onInstallModels,
+    overrideBaseUrl,
+    provider.base_url,
+    provider.provider_id,
+    saveConfig,
+    t,
+    toast,
+  ]);
 
   const handleReset = useCallback(() => {
     resetConfig(provider.provider_id)
@@ -211,8 +236,15 @@ const ProviderCard = memo(({ provider, onInstallModels, iconResolver }: Provider
         setApiKey('');
         setBaseUrl(result.base_url ?? '');
         setOverrideBaseUrl(!!result.base_url);
+      })
+      .catch(() => {
+        toast({
+          id: `EXTERNAL_PROVIDER_RESET_FAILED_${provider.provider_id}`,
+          title: t('modelManager.externalProviderResetFailed'),
+          status: 'error',
+        });
       });
-  }, [provider.provider_id, resetConfig]);
+  }, [provider.provider_id, resetConfig, t, toast]);
 
   const handleApiKeyChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     setApiKey(event.target.value);
@@ -282,9 +314,11 @@ const ProviderCard = memo(({ provider, onInstallModels, iconResolver }: Provider
             isChecked={overrideBaseUrl}
             onChange={handleOverrideBaseUrlChange}
           />
-          <FormLabel htmlFor={`${provider.provider_id}-override-baseurl`}>Override Base URL</FormLabel>
+          <FormLabel htmlFor={`${provider.provider_id}-override-baseurl`}>
+            {t('modelManager.externalOverrideBaseUrl')}
+          </FormLabel>
         </FormControl>
-        <Flex hidden={!overrideBaseUrl ? true : undefined}>
+        <Flex hidden={!overrideBaseUrl}>
           <FormControl sx={FORM_CONTROL_SX}>
             <FormLabel>{t('modelManager.externalBaseUrl')}</FormLabel>
             <Input
@@ -305,7 +339,7 @@ const ProviderCard = memo(({ provider, onInstallModels, iconResolver }: Provider
             colorScheme="invokeYellow"
             onClick={handleSave}
             isLoading={isLoading}
-            isDisabled={!apiKey.trim() && baseUrl.trim() === (provider.base_url ?? '')}
+            isDisabled={!apiKey.trim() && !hasBaseUrlChange}
           >
             {t('common.save')}
           </Button>
