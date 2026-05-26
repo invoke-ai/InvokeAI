@@ -10,8 +10,9 @@ type WorkflowExecutionEvent =
       status: QueueStatus;
     }
   | {
-      type: 'completed_session_reconciled';
+      type: 'session_results_reconciled';
       itemId: number;
+      status: Extract<QueueStatus, 'completed' | 'failed' | 'canceled'>;
       completedInvocationIds: string[];
     }
   | {
@@ -53,7 +54,7 @@ export const transitionWorkflowExecutionState = (
   };
 
   if (event.type === 'queue_item_status_changed') {
-    if (isTerminalQueueStatus(state.queueStatus) && !isTerminalQueueStatus(event.status)) {
+    if (isTerminalQueueStatus(state.queueStatus)) {
       return { state, shouldApply: false };
     }
 
@@ -61,12 +62,11 @@ export const transitionWorkflowExecutionState = (
     return { state: nextState, shouldApply: true };
   }
 
-  if (event.type === 'completed_session_reconciled') {
-    if (state.queueStatus === 'failed' || state.queueStatus === 'canceled') {
+  if (event.type === 'session_results_reconciled') {
+    if (state.queueStatus !== event.status) {
       return { state, shouldApply: false };
     }
 
-    nextState.queueStatus = 'completed';
     for (const invocationId of event.completedInvocationIds) {
       nextState.invocations[invocationId] = 'completed';
     }
@@ -94,7 +94,7 @@ export const transitionWorkflowExecutionState = (
     return { state: nextState, shouldApply: true };
   }
 
-  if (state.queueStatus === 'failed' || state.queueStatus === 'canceled') {
+  if (state.queueStatus === 'canceled') {
     return { state, shouldApply: false };
   }
   nextState.invocations[event.invocationId] = 'completed';

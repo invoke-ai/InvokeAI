@@ -259,7 +259,7 @@ describe(createWorkflowExecutionCoordinator.name, () => {
       )
     ).toBe(false);
 
-    expect(queueItemRequests).toHaveLength(1);
+    expect(queueItemRequests.size).toBe(1);
   });
 
   it('still clears canvas workflow integration processing on late invocation errors', () => {

@@ -76,7 +76,7 @@ describe(transitionWorkflowExecutionState.name, () => {
     expect(staleTransition.state.queueStatus).toBe('completed');
   });
 
-  it('keeps a failed queue item from being overwritten by a late invocation completion', () => {
+  it('allows completed sibling invocations after a failed queue item', () => {
     let state = createWorkflowExecutionState();
 
     const failedTransition = transitionWorkflowExecutionState(state, {
@@ -94,16 +94,27 @@ describe(transitionWorkflowExecutionState.name, () => {
       invocationId: 'prepared-node-1',
     });
 
-    expect(lateCompletionTransition.shouldApply).toBe(false);
+    expect(lateCompletionTransition.shouldApply).toBe(true);
     expect(lateCompletionTransition.state.queueStatus).toBe('failed');
+    expect(lateCompletionTransition.state.invocations['prepared-node-1']).toBe('completed');
   });
 
-  it('treats reconciled completed invocations as terminal', () => {
+  it('treats reconciled completed invocations as terminal after a matching terminal queue transition', () => {
     let state = createWorkflowExecutionState();
 
-    const reconciliationTransition = transitionWorkflowExecutionState(state, {
-      type: 'completed_session_reconciled',
+    const queueTransition = transitionWorkflowExecutionState(state, {
+      type: 'queue_item_status_changed',
       itemId: 1,
+      status: 'completed',
+    });
+
+    expect(queueTransition.shouldApply).toBe(true);
+    state = queueTransition.state;
+
+    const reconciliationTransition = transitionWorkflowExecutionState(state, {
+      type: 'session_results_reconciled',
+      itemId: 1,
+      status: 'completed',
       completedInvocationIds: ['prepared-node-1'],
     });
 
@@ -119,5 +130,51 @@ describe(transitionWorkflowExecutionState.name, () => {
     });
 
     expect(lateCompletionTransition.shouldApply).toBe(false);
+  });
+
+  it('ignores duplicate terminal queue events', () => {
+    let state = createWorkflowExecutionState();
+
+    const completedTransition = transitionWorkflowExecutionState(state, {
+      type: 'queue_item_status_changed',
+      itemId: 1,
+      status: 'completed',
+    });
+
+    expect(completedTransition.shouldApply).toBe(true);
+    state = completedTransition.state;
+
+    const duplicateTransition = transitionWorkflowExecutionState(state, {
+      type: 'queue_item_status_changed',
+      itemId: 1,
+      status: 'completed',
+    });
+
+    expect(duplicateTransition.shouldApply).toBe(false);
+    expect(duplicateTransition.state.queueStatus).toBe('completed');
+  });
+
+  it('does not reconcile session results unless the terminal status matches', () => {
+    let state = createWorkflowExecutionState();
+
+    const failedTransition = transitionWorkflowExecutionState(state, {
+      type: 'queue_item_status_changed',
+      itemId: 1,
+      status: 'failed',
+    });
+
+    expect(failedTransition.shouldApply).toBe(true);
+    state = failedTransition.state;
+
+    const staleReconciliationTransition = transitionWorkflowExecutionState(state, {
+      type: 'session_results_reconciled',
+      itemId: 1,
+      status: 'completed',
+      completedInvocationIds: ['prepared-node-1'],
+    });
+
+    expect(staleReconciliationTransition.shouldApply).toBe(false);
+    expect(staleReconciliationTransition.state.queueStatus).toBe('failed');
+    expect(staleReconciliationTransition.state.invocations['prepared-node-1']).toBeUndefined();
   });
 });
