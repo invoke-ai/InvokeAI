@@ -1,3 +1,4 @@
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import {
   Badge,
   Button,
@@ -8,6 +9,7 @@ import {
   FormLabel,
   Heading,
   Input,
+  Switch,
   Text,
   Tooltip,
 } from '@invoke-ai/ui-library';
@@ -19,7 +21,9 @@ import { $installModelsTabIndex } from 'features/modelManagerV2/store/installMod
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { IconType } from 'react-icons';
 import { PiCheckBold, PiWarningBold } from 'react-icons/pi';
+import { SiAlibabacloud, SiBytedance, SiGooglegemini, SiOpenai } from 'react-icons/si';
 import {
   useGetExternalProviderConfigsQuery,
   useResetExternalProviderConfigMutation,
@@ -30,9 +34,33 @@ import type { ExternalProviderConfig, StarterModel } from 'services/api/types';
 
 const PROVIDER_SORT_ORDER = ['gemini', 'openai', 'seedream', 'alibabacloud'];
 
+function resolveProviderIcon(providerId: string): IconType | null {
+  const provider = providerId.toLowerCase();
+
+  switch (provider) {
+    case 'openai':
+      return SiOpenai;
+    case 'gemini':
+      return SiGooglegemini;
+    case 'seedream':
+      return SiBytedance;
+    case 'alibabacloud':
+      return SiAlibabacloud;
+    default:
+      return null;
+  }
+}
+
+const FORM_CONTROL_SX: SystemStyleObject = {
+  flexDir: 'column',
+  alignItems: 'flex-start',
+  gap: 2,
+};
+
 type ProviderCardProps = {
   provider: ExternalProviderConfig;
   onInstallModels: (providerId: string) => void;
+  iconResolver: (providerId: string) => IconType | null;
 };
 
 type UpdatePayload = {
@@ -47,7 +75,6 @@ export const ExternalProvidersForm = memo(() => {
   const { data: starterModels } = useGetStarterModelsQuery();
   const [installModel] = useInstallModel();
   const { getIsInstalled, buildModelInstallArg } = useBuildModelInstallArg();
-  const tabIndex = useStore($installModelsTabIndex);
 
   const externalModelsByProvider = useMemo(() => {
     const groups = new Map<string, StarterModel[]>();
@@ -107,8 +134,9 @@ export const ExternalProvidersForm = memo(() => {
   return (
     <Flex flexDir="column" height="100%" gap={4}>
       <Flex flexDir="column" gap={1}>
-        <Heading size="sm">{t('modelManager.externalSetupTitle')}</Heading>
-        <Text color="base.300">{t('modelManager.externalSetupDescription')}</Text>
+        <Heading size="md">{t('modelManager.externalSetupTitle')}</Heading>
+        <Text variant="subtext">{t('modelManager.externalSetupDescription')}</Text>
+        <Text variant="subtext">{t('modelManager.externalSetupFooter')}</Text>
       </Flex>
       <ScrollableContent>
         <Flex flexDir="column" gap={4}>
@@ -120,31 +148,29 @@ export const ExternalProvidersForm = memo(() => {
             <ProviderCard
               key={provider.provider_id}
               provider={provider}
+              iconResolver={resolveProviderIcon}
               onInstallModels={handleInstallProviderModels}
             />
           ))}
         </Flex>
       </ScrollableContent>
-      {tabIndex === 3 && (
-        <Text variant="subtext" color="base.400">
-          {t('modelManager.externalSetupFooter')}
-        </Text>
-      )}
     </Flex>
   );
 });
 
 ExternalProvidersForm.displayName = 'ExternalProvidersForm';
 
-const ProviderCard = memo(({ provider, onInstallModels }: ProviderCardProps) => {
+const ProviderCard = memo(({ provider, onInstallModels, iconResolver }: ProviderCardProps) => {
   const { t } = useTranslation();
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState(provider.base_url ?? '');
   const [saveConfig, { isLoading }] = useSetExternalProviderConfigMutation();
   const [resetConfig, { isLoading: isResetting }] = useResetExternalProviderConfigMutation();
+  const [overrideBaseUrl, setOverrideBaseUrl] = useState(!!provider.base_url);
 
   useEffect(() => {
     setBaseUrl(provider.base_url ?? '');
+    setOverrideBaseUrl(!!provider.base_url);
   }, [provider.base_url]);
 
   const handleSave = useCallback(() => {
@@ -173,6 +199,7 @@ const ProviderCard = memo(({ provider, onInstallModels }: ProviderCardProps) => 
         }
         if (result.base_url !== undefined) {
           setBaseUrl(result.base_url ?? '');
+          setOverrideBaseUrl(!!result.base_url);
         }
       });
   }, [apiKey, baseUrl, onInstallModels, provider.base_url, provider.provider_id, saveConfig]);
@@ -183,6 +210,7 @@ const ProviderCard = memo(({ provider, onInstallModels }: ProviderCardProps) => 
       .then((result) => {
         setApiKey('');
         setBaseUrl(result.base_url ?? '');
+        setOverrideBaseUrl(!!result.base_url);
       });
   }, [provider.provider_id, resetConfig]);
 
@@ -206,21 +234,34 @@ const ProviderCard = memo(({ provider, onInstallModels }: ProviderCardProps) => 
     </Badge>
   );
 
+  const handleOverrideBaseUrlChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    event.stopPropagation();
+    setOverrideBaseUrl(event.target.checked);
+    if (!event.target.checked) {
+      setBaseUrl('');
+    }
+  }, []);
+
+  const ProviderIcon = iconResolver(provider.provider_id);
+
   return (
-    <Card p={4} gap={4} variant="outline">
+    <Card p={4} gap={2} layerStyle="second">
       <Flex justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={3}>
-        <Flex flexDir="column" gap={1}>
-          <Heading size="xs" textTransform="capitalize">
-            {provider.provider_id}
-          </Heading>
-          <Text variant="subtext">
-            {t('modelManager.externalProviderCardDescription', { providerId: provider.provider_id })}
-          </Text>
+        <Flex alignItems="start" gap="4">
+          {ProviderIcon && <ProviderIcon />}
+          <Flex flexDir="column" gap={1} mt="-0.5">
+            <Heading size="xs" textTransform="capitalize" display="flex" alignItems="center" gap={2}>
+              {provider.provider_id}
+            </Heading>
+            <Text variant="subtext">
+              {t('modelManager.externalProviderCardDescription', { providerId: provider.provider_id })}
+            </Text>
+          </Flex>
         </Flex>
         {statusBadge}
       </Flex>
       <Flex flexDir="column" gap={4}>
-        <FormControl>
+        <FormControl sx={FORM_CONTROL_SX}>
           <FormLabel>{t('modelManager.externalApiKey')}</FormLabel>
           <Input
             type="password"
@@ -235,16 +276,26 @@ const ProviderCard = memo(({ provider, onInstallModels }: ProviderCardProps) => 
           />
           <FormHelperText>{t('modelManager.externalApiKeyHelper')}</FormHelperText>
         </FormControl>
-        <FormControl>
-          <FormLabel>{t('modelManager.externalBaseUrl')}</FormLabel>
-          <Input
-            placeholder={t('modelManager.externalBaseUrlPlaceholder')}
-            value={baseUrl}
-            onChange={handleBaseUrlChange}
+        <FormControl display="flex" alignItems="center">
+          <Switch
+            id={`${provider.provider_id}-override-baseurl`}
+            isChecked={overrideBaseUrl}
+            onChange={handleOverrideBaseUrlChange}
           />
-          <FormHelperText>{t('modelManager.externalBaseUrlHelper')}</FormHelperText>
+          <FormLabel htmlFor={`${provider.provider_id}-override-baseurl`}>Override Base URL</FormLabel>
         </FormControl>
-        <Flex gap={2} justifyContent="flex-end" flexWrap="wrap">
+        <Flex hidden={!overrideBaseUrl ? true : undefined}>
+          <FormControl sx={FORM_CONTROL_SX}>
+            <FormLabel>{t('modelManager.externalBaseUrl')}</FormLabel>
+            <Input
+              placeholder={t('modelManager.externalBaseUrlPlaceholder')}
+              value={baseUrl}
+              onChange={handleBaseUrlChange}
+            />
+            <FormHelperText>{t('modelManager.externalBaseUrlHelper')}</FormHelperText>
+          </FormControl>
+        </Flex>
+        <Flex gap={2} justifyContent="flex-end" flexWrap="wrap" borderTopWidth="1px" pt="4">
           <Tooltip label={t('modelManager.externalResetHelper')}>
             <Button variant="ghost" onClick={handleReset} isLoading={isResetting}>
               {t('common.reset')}
