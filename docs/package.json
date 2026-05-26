@@ -8,6 +8,7 @@
     "generate-docs-data": "uv run python ../scripts/generate_docs_json.py",
     "check-docs-data": "pnpm run generate-docs-data && git diff --exit-code -- src/generated",
     "check-deploy-output": "node ./scripts/verify-deploy-output.mjs",
+    "check-redirects": "node ./scripts/validate-redirect-targets.mjs",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro"
