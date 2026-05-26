@@ -5,6 +5,8 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPolygonBold, PiScribbleLoopBold } from 'react-icons/pi';
 
+import { TOOL_OPTION_ICON_SIZE } from './toolOptionIconSize';
+
 export const ToolLassoModeToggle = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -23,7 +25,7 @@ export const ToolLassoModeToggle = memo(() => {
       <Tooltip label={t('controlLayers.lasso.freehand', { defaultValue: 'Freehand' })}>
         <IconButton
           aria-label={t('controlLayers.lasso.freehand', { defaultValue: 'Freehand' })}
-          icon={<PiScribbleLoopBold size={16} />}
+          icon={<PiScribbleLoopBold size={TOOL_OPTION_ICON_SIZE} />}
           colorScheme={lassoMode === 'freehand' ? 'invokeBlue' : 'base'}
           variant="solid"
           onClick={setFreehand}
@@ -34,7 +36,7 @@ export const ToolLassoModeToggle = memo(() => {
           aria-label={t('controlLayers.lasso.polygonHint', {
             defaultValue: 'Click to add points, click the first point to close.',
           })}
-          icon={<PiPolygonBold size={16} />}
+          icon={<PiPolygonBold size={TOOL_OPTION_ICON_SIZE} />}
           colorScheme={lassoMode === 'polygon' ? 'invokeBlue' : 'base'}
           variant="solid"
           onClick={setPolygon}
