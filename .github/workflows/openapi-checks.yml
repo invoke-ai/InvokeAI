@@ -74,13 +74,13 @@ jobs:
         with:
           version: '0.6.10'
           enable-cache: true
-          python-version: '3.11'
+          python-version: '3.14'
 
       - name: setup python
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.14'
 
       - name: install dependencies
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}

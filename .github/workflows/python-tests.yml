@@ -39,8 +39,7 @@ jobs:
     strategy:
       matrix:
         python-version:
-          - '3.11'
-          - '3.12'
+          - '3.14'
         platform:
           - linux-cpu
           - macos-default
