@@ -51,10 +51,7 @@ describe('createBoardAndDispatchActions', () => {
 
     await createBoardAndDispatchActions(createBoard, dispatch, 'My Board', false);
 
-    expect(dispatch.mock.calls).toEqual([
-      [boardIdSelected({ boardId: 'board-1' })],
-      [boardSearchTextChanged('')],
-    ]);
+    expect(dispatch.mock.calls).toEqual([[boardIdSelected({ boardId: 'board-1' })], [boardSearchTextChanged('')]]);
   });
 
   it('swallows errors from createBoard', async () => {
