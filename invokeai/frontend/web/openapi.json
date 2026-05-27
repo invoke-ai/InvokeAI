@@ -29328,6 +29328,9 @@
                   "$ref": "#/components/schemas/SaveImageInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/SaveImageToFileInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/ScaleLatentsInvocation"
                 },
                 {
@@ -36813,6 +36816,9 @@
                 "$ref": "#/components/schemas/SaveImageInvocation"
               },
               {
+                "$ref": "#/components/schemas/SaveImageToFileInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ScaleLatentsInvocation"
               },
               {
@@ -37939,6 +37945,9 @@
                 "$ref": "#/components/schemas/SaveImageInvocation"
               },
               {
+                "$ref": "#/components/schemas/SaveImageToFileInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ScaleLatentsInvocation"
               },
               {
@@ -38712,6 +38721,9 @@
           "save_image": {
             "$ref": "#/components/schemas/ImageOutput"
           },
+          "save_image_to_file": {
+            "$ref": "#/components/schemas/ImageOutput"
+          },
           "scheduler": {
             "$ref": "#/components/schemas/SchedulerOutput"
           },
@@ -39062,6 +39074,7 @@
           "rectangle_mask",
           "round_float",
           "save_image",
+          "save_image_to_file",
           "scheduler",
           "sd3_denoise",
           "sd3_i2l",
@@ -39827,6 +39840,9 @@
               },
               {
                 "$ref": "#/components/schemas/SaveImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/SaveImageToFileInvocation"
               },
               {
                 "$ref": "#/components/schemas/ScaleLatentsInvocation"
@@ -40711,6 +40727,9 @@
               },
               {
                 "$ref": "#/components/schemas/SaveImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/SaveImageToFileInvocation"
               },
               {
                 "$ref": "#/components/schemas/ScaleLatentsInvocation"
@@ -63649,6 +63668,154 @@
         "title": "Save Image",
         "type": "object",
         "version": "1.2.2",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
+      },
+      "SaveImageToFileInvocation": {
+        "category": "image",
+        "class": "invocation",
+        "classification": "stable",
+        "description": "Saves an image to the gallery (like the standard Save Image node) AND additionally exports a copy\nto the filesystem with a custom filename.\n\nFilename pattern: {prefix}{uuid}{suffix}.{file_format}\n- The UUID is the same UUID used for the gallery entry, so the exported file can be matched to the gallery item.\n- The gallery entry itself always uses the plain UUID (prefix/suffix apply only to the exported file on disk).\n- Board and Metadata inputs behave exactly like the standard Save Image node.\n- The export target is restricted to (subfolders of) the InvokeAI outputs folder \u2014 absolute paths are rejected.\n\nExample: prefix=\"hero_\", suffix=\"_final\", file_format=\"png\" \u2192 \"hero_<uuid>_final.png\"",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": false,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image to save and export",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "output_directory": {
+            "default": "",
+            "description": "Target subdirectory (relative to the configured InvokeAI outputs folder) for the exported file. Leave empty to use the outputs folder directly. Example: 'my-exports' \u2192 <outputs>/my-exports/. Nested paths like 'exports/2026' are allowed. Absolute paths and path traversal ('..') are not allowed for security reasons. The directory is created automatically if it doesn't exist.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Output Directory",
+            "type": "string"
+          },
+          "prefix": {
+            "default": "",
+            "description": "Text prepended to the UUID in the exported filename. Example: 'portrait_' \u2192 'portrait_<uuid>.png'",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Prefix",
+            "type": "string"
+          },
+          "suffix": {
+            "default": "",
+            "description": "Text appended to the UUID (before the extension). Example: '_v2' \u2192 '<uuid>_v2.png'",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Suffix",
+            "type": "string"
+          },
+          "file_format": {
+            "default": "png",
+            "description": "File format for the exported file. PNG is lossless; JPG/WEBP are lossy and respect 'quality'.",
+            "enum": ["png", "jpg", "webp"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "png",
+            "orig_required": false,
+            "title": "File Format",
+            "type": "string"
+          },
+          "quality": {
+            "default": 95,
+            "description": "Compression quality for JPG and WEBP (1-100, higher = better quality, larger file). Ignored for PNG.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 100,
+            "minimum": 1,
+            "orig_default": 95,
+            "orig_required": false,
+            "title": "Quality",
+            "type": "integer"
+          },
+          "type": {
+            "const": "save_image_to_file",
+            "default": "save_image_to_file",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "export", "file", "save"],
+        "title": "Save Image (Gallery + File Export)",
+        "type": "object",
+        "version": "1.0.0",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }

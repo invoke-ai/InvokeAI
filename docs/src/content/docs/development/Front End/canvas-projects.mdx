@@ -1,0 +1,54 @@
+---
+title: Canvas Projects
+---
+
+Canvas projects serialize the current canvas into a portable `.invk` archive. The feature lives in `invokeai/frontend/web/src/features/controlLayers/` and is exposed in the canvas toolbar archive menu and the canvas context menu under **Project**.
+
+## File format
+
+`.invk` files are ZIP archives. The current manifest version is `1`.
+
+Each archive contains:
+
+| Target | Description |
+| - | - |
+| `manifest.json` | project metadata, including the archive version, app version, creation timestamp, and project name. |
+| `canvas_state.json` | raster layers, control layers, inpaint masks, regional guidance, bounding box state, and selected/bookmarked entity identifiers. |
+| `params.json` | generation parameter state. |
+| `ref_images.json` | global reference image state. |
+| `loras.json` | active LoRA state. |
+| `images/` | image blobs referenced by the canvas or reference image state. |
+
+The save path builds this archive in `useCanvasProjectSave.ts`. It collects all referenced `image_name` values, fetches each image from the server, writes successfully fetched files under `images/`, and downloads the ZIP with the `.invk` extension. Failed image fetches are logged and skipped rather than aborting the save.
+
+## Image collection
+
+Image references are collected by `collectImageNames()` in `canvasProjectFile.ts`.
+
+The collector checks:
+
+- Image objects in raster layers.
+- Image objects in control layers.
+- Image objects in inpaint masks.
+- Image objects and IP Adapter / Flux Redux reference images in regional guidance.
+- Global reference images, including cropped source images.
+
+Image fetches are concurrency-limited with `processWithConcurrencyLimit()` so large projects do not flood the browser or backend with simultaneous requests.
+
+## Loading and remapping
+
+The load path is implemented in `useCanvasProjectLoad.ts`.
+
+Loading validates `manifest.json`, requires `canvas_state.json`, and reads optional `params.json`, `ref_images.json`, and `loras.json` files. Before restoring state, it checks whether each referenced image already exists on the server with `checkExistingImages()`.
+
+Only missing images are uploaded from the archive. If a referenced missing image is not present in `images/`, the loader logs a warning and leaves that reference unchanged. If an upload returns a different `image_name`, the loader records an old-to-new mapping and remaps image references before dispatching restored canvas and reference image state.
+
+LoRAs are cleared before project LoRAs are recalled. This prevents LoRAs from the previous canvas session from leaking into the loaded project.
+
+Image existence checks and uploads are also concurrency-limited.
+
+## Compatibility notes
+
+The archive stores references to models, LoRAs, and other generation resources, not the model files themselves. Loading a project on another install can restore the canvas images and state, but missing model resources still need to be installed or replaced by the user.
+
+Future format changes should increment `CANVAS_PROJECT_VERSION` and keep validation in `parseManifest()` explicit so unsupported project files fail early.
