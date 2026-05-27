@@ -13,8 +13,11 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       babel({
+        filter: /\.[jt]sx?$/,
+        exclude: /node_modules/,
         babelConfig: {
-          plugins: ['babel-plugin-react-compiler'],
+          presets: ['@babel/preset-typescript'],
+          plugins: [['babel-plugin-react-compiler', { target: '19' }]],
         },
       }),
       mode !== 'test' && eslint({ failOnError: mode === 'production', failOnWarning: mode === 'production' }),
