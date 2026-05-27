@@ -5,6 +5,8 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCircleBold, PiPolygonBold, PiRectangleBold, PiScribbleLoopBold } from 'react-icons/pi';
 
+import { TOOL_OPTION_ICON_SIZE } from './toolOptionIconSize';
+
 export const ToolShapeTypeToggle = memo(() => {
   const { t } = useTranslation();
   const shapeType = useAppSelector(selectShapeType);
@@ -25,7 +27,7 @@ export const ToolShapeTypeToggle = memo(() => {
       <Tooltip label={rectLabel}>
         <IconButton
           aria-label={rectLabel}
-          icon={<PiRectangleBold />}
+          icon={<PiRectangleBold size={TOOL_OPTION_ICON_SIZE} />}
           colorScheme={shapeType === 'rect' ? 'invokeBlue' : 'base'}
           variant="solid"
           onClick={onRectClick}
@@ -34,7 +36,7 @@ export const ToolShapeTypeToggle = memo(() => {
       <Tooltip label={ovalLabel}>
         <IconButton
           aria-label={ovalLabel}
-          icon={<PiCircleBold />}
+          icon={<PiCircleBold size={TOOL_OPTION_ICON_SIZE} />}
           colorScheme={shapeType === 'oval' ? 'invokeBlue' : 'base'}
           variant="solid"
           onClick={onOvalClick}
@@ -43,7 +45,7 @@ export const ToolShapeTypeToggle = memo(() => {
       <Tooltip label={polygonLabel}>
         <IconButton
           aria-label={polygonLabel}
-          icon={<PiPolygonBold />}
+          icon={<PiPolygonBold size={TOOL_OPTION_ICON_SIZE} />}
           colorScheme={shapeType === 'polygon' ? 'invokeBlue' : 'base'}
           variant="solid"
           onClick={onPolygonClick}
@@ -52,7 +54,7 @@ export const ToolShapeTypeToggle = memo(() => {
       <Tooltip label={freehandLabel}>
         <IconButton
           aria-label={freehandLabel}
-          icon={<PiScribbleLoopBold />}
+          icon={<PiScribbleLoopBold size={TOOL_OPTION_ICON_SIZE} />}
           colorScheme={shapeType === 'freehand' ? 'invokeBlue' : 'base'}
           variant="solid"
           onClick={onFreehandClick}
