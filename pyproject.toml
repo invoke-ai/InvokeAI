@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "InvokeAI"
 description = "A full-featured AI-assisted image generation environment designed for creatives and enthusiasts."
-requires-python = ">=3.11, <=3.14.5"
+requires-python = ">=3.14, <=3.14.5"
 readme = { content-type = "text/markdown", file = "README.md" }
 keywords = ["stable-diffusion", "AI"]
 dynamic = ["version"]
@@ -23,7 +23,7 @@ classifiers = [
   'Operating System :: MacOS',
   'Operating System :: Microsoft :: Windows',
   'Programming Language :: Python :: 3 :: Only',
-  'Programming Language :: Python :: 3.12',
+  'Programming Language :: Python :: 3.14',
   'Topic :: Artistic Software',
   'Topic :: Internet :: WWW/HTTP :: WSGI :: Application',
   'Topic :: Internet :: WWW/HTTP :: WSGI :: Server',
@@ -93,9 +93,9 @@ dependencies = [
 "cpu" = ["torch==2.12.0+cpu", "torchvision==0.27.0+cpu"]
 "cuda" = ["torch==2.12.0+cu130", "torchvision==0.27.0+cu130"]
 "rocm" = [
-  "torch==2.12.0+rocm7.2",
-  "torchvision==0.27.0+rocm7.2",
-  "pytorch-triton-rocm",
+  "torch==2.12.0+rocm7.2; sys_platform == 'linux'",
+  "torchvision==0.27.0+rocm7.2; sys_platform == 'linux'",
+  "triton-rocm; sys_platform == 'linux'",
 ]
 
 "onnx" = ["onnxruntime"]
@@ -142,7 +142,7 @@ torchvision = [
   { index = "torch-cuda", extra = "cuda" },
   { index = "torch-rocm", extra = "rocm" },
 ]
-pytorch-triton-rocm = [
+triton-rocm = [
   { index = "torch-rocm", extra = "rocm", marker = "sys_platform == 'linux'" },
 ]
 
@@ -153,12 +153,12 @@ explicit = true
 
 [[tool.uv.index]]
 name = "torch-cuda"
-url = "https://download.pytorch.org/whl/cu128"
+url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
 [[tool.uv.index]]
 name = "torch-rocm"
-url = "https://download.pytorch.org/whl/rocm6.3"
+url = "https://download.pytorch.org/whl/rocm7.2"
 explicit = true
 
 [project.scripts]

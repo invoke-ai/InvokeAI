@@ -215,10 +215,7 @@ def generate_face_box_mask(
             y_center = np.mean([landmark.y * np_image.shape[0] for landmark in face_landmarks])
 
             face_landmark_points = np.array(
-                [
-                    [landmark.x * np_image.shape[1], landmark.y * np_image.shape[0]]
-                    for landmark in face_landmarks
-                ]
+                [[landmark.x * np_image.shape[1], landmark.y * np_image.shape[0]] for landmark in face_landmarks]
             )
 
             # Apply the scaling offsets to the face landmark points with a multiplier.
