@@ -1,11 +1,17 @@
+import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
+import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { Box, Button, Flex, IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useClipboard } from 'common/hooks/useClipboard';
 import { useDownloadItem } from 'common/hooks/useDownloadImage';
 import { useDeleteVideoModalApi } from 'features/deleteVideoModal/store/state';
+import { multipleVideoDndSource, singleVideoDndSource } from 'features/dnd/dnd';
+import { firefoxDndFix } from 'features/dnd/util';
 import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
 import { useNextPrevItemNavigation } from 'features/gallery/components/useNextPrevItemNavigation';
+import { selectSelectedBoardId, selectSelection } from 'features/gallery/store/gallerySelectors';
+import { isVideoName } from 'features/gallery/store/types';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { toast } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -47,6 +53,7 @@ type Props = {
  */
 export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   const { t } = useTranslation();
+  const store = useAppStore();
   const videoName = videoDTO?.video_name ?? null;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -65,6 +72,41 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   useEffect(() => {
     setIsPlaying(false);
   }, [videoName]);
+
+  // Register the viewer's <video> as a drag source so users can drag the currently-displayed
+  // video onto node fields (e.g. a Video Primitive's "Starting Video" input) directly from
+  // the viewer, just like they can from the gallery thumbnail. Mirrors GalleryVideoItem's
+  // setup. Without this, the bare <video> element has no drag handler and the drop target
+  // sees nothing it can accept.
+  useEffect(() => {
+    const element = videoRef.current;
+    if (!element || !videoDTO) {
+      return;
+    }
+    return combine(
+      firefoxDndFix(element),
+      draggable({
+        element,
+        getInitialData: () => {
+          // Honor any active gallery multi-selection so dropping onto a board moves the whole
+          // batch, matching the gallery thumbnail's behavior.
+          const state = store.getState();
+          const selection = selectSelection(state);
+          const boardId = selectSelectedBoardId(state);
+          if (selection.length > 1 && selection.includes(videoDTO.video_name)) {
+            const video_names = selection.filter(isVideoName);
+            const image_names = selection.filter((n) => !isVideoName(n));
+            return multipleVideoDndSource.getData({
+              video_names,
+              image_names,
+              board_id: boardId,
+            });
+          }
+          return singleVideoDndSource.getData({ videoDTO }, videoDTO.video_name);
+        },
+      })
+    );
+  }, [videoDTO, store]);
 
   const handlePlay = useCallback(() => {
     setIsPlaying(true);
