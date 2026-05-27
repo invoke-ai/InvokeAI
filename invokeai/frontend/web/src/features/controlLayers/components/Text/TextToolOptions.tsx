@@ -40,7 +40,7 @@ import {
   type TextFontId,
 } from 'features/controlLayers/text/textConstants';
 import type { FocusEvent, KeyboardEvent, MouseEvent } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiCaretDownBold,
@@ -114,6 +114,11 @@ const FontSizeControl = () => {
   const fontSize = useAppSelector(selectTextFontSize);
 
   const [localFontSize, setLocalFontSize] = useState(String(fontSize));
+  const [lastExternalFontSize, setLastExternalFontSize] = useState(fontSize);
+  if (lastExternalFontSize !== fontSize) {
+    setLastExternalFontSize(fontSize);
+    setLocalFontSize(String(fontSize));
+  }
 
   const marks = useMemo(
     () => [1, 100, 200, 300, 400, 500].filter((value) => value >= TEXT_MIN_FONT_SIZE && value <= TEXT_MAX_FONT_SIZE),
@@ -169,10 +174,6 @@ const FontSizeControl = () => {
     e.currentTarget.focus();
     e.currentTarget.select();
   }, []);
-
-  useEffect(() => {
-    setLocalFontSize(String(fontSize));
-  }, [fontSize]);
 
   return (
     <Flex w="auto" flexShrink={0} alignItems="center" gap={2}>

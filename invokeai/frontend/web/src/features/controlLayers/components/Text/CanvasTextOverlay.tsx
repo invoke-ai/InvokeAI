@@ -108,13 +108,11 @@ const TextEditor = ({
   const [isDragging, setIsDragging] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
   const [textValue, setTextValue] = useState(initialText);
-  const [contentMetrics, setContentMetrics] = useState(() =>
-    measureTextContent(buildMeasureConfig(initialText, textSettings))
+  const contentMetrics = useMemo(
+    () => measureTextContent(buildMeasureConfig(textValue, textSettings)),
+    [textValue, textSettings]
   );
-  const [measuredSize, setMeasuredSize] = useState(() => ({
-    width: Math.max(contentMetrics.contentWidth, textSettings.fontSize),
-    height: Math.max(contentMetrics.contentHeight, textSettings.fontSize),
-  }));
+  const [measuredSize, setMeasuredSize] = useState<{ width: number; height: number } | null>(null);
   const dragStateRef = useRef<{
     pointerId: number;
     startPointer: Coordinate;
@@ -193,7 +191,7 @@ const TextEditor = ({
       node.textContent = initialText;
       const syncedText = (node.innerText ?? '').replace(/\r/g, '');
       setTextValue(syncedText);
-      setContentMetrics(measureTextContent(buildMeasureConfig(syncedText, textSettings)));
+      setMeasuredSize(null);
       canvasManager.tool.tools.text.updateSessionText(sessionId, syncedText);
     }
     if (lastFocusedSessionIdRef.current !== sessionId) {
@@ -213,11 +211,7 @@ const TextEditor = ({
         focusRafIdRef.current = null;
       }
     };
-  }, [canvasManager.tool.tools.text, focusEditor, initialText, sessionId, textSettings]);
-
-  useEffect(() => {
-    setContentMetrics(measureTextContent(buildMeasureConfig(textValue, textSettings)));
-  }, [textSettings, textValue]);
+  }, [canvasManager.tool.tools.text, focusEditor, initialText, sessionId]);
 
   const updateMeasuredSize = useCallback(
     (width: number, height: number) => {
@@ -341,8 +335,8 @@ const TextEditor = ({
 
   const fallbackWidth = Math.max(textContainerData.width, textSettings.fontSize);
   const fallbackHeight = Math.max(textContainerData.height, textSettings.fontSize);
-  const effectiveWidth = lastMeasuredSizeRef.current ? measuredSize.width : fallbackWidth;
-  const effectiveHeight = lastMeasuredSizeRef.current ? measuredSize.height : fallbackHeight;
+  const effectiveWidth = measuredSize ? measuredSize.width : fallbackWidth;
+  const effectiveHeight = measuredSize ? measuredSize.height : fallbackHeight;
 
   useEffect(() => {
     const node = containerRef.current;
