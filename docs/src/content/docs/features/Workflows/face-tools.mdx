@@ -1,0 +1,94 @@
+---
+title: Face Tools Nodes
+---
+
+The Face Tools nodes detect faces with MediaPipe and provide utilities for identifying, masking, and extracting faces in workflows. The current nodes are in the `segmentation` category and use version `1.2.2`.
+
+## FaceIdentifier
+
+**FaceIdentifier** outputs a copy of the input image with detected face IDs printed on each face. Use it first when you need to target a specific face with FaceMask or FaceOff.
+
+Face IDs are numbered from `0`. Detection order can change if the image changes, so run FaceIdentifier again after editing an image.
+
+### Inputs
+
+| Input | Description |
+| --- | --- |
+| Image | Image to face detect. |
+| Minimum Confidence | Minimum confidence for face detection. Lower this if detection is failing. |
+| Chunk | Bypass full-image face detection and use chunking. Chunking is also used automatically if no faces are found in the full image. |
+
+### Outputs
+
+| Output | Description |
+| --- | --- |
+| Image | The input image with face ID numbers drawn on detected faces. |
+| Width | Output image width in pixels. |
+| Height | Output image height in pixels. |
+
+## FaceMask
+
+**FaceMask** creates a mask for detected faces on the input image.
+
+Leave **Face IDs** empty to mask all detected faces, or provide a comma-separated list such as `0,2,7` to target specific faces. Use FaceIdentifier to find the IDs.
+
+The mask can be adjusted with X and Y offsets if detection is slightly too large or small. Enable **Invert Mask** to affect everything except the detected faces.
+
+### Inputs
+
+| Input | Description |
+| --- | --- |
+| Image | Image to face detect. |
+| Face IDs | Comma-separated list of face IDs to mask. Leave empty to mask all detected faces. |
+| Minimum Confidence | Minimum confidence for face detection. Lower this if detection is failing. |
+| X Offset | Offset for the X-axis of the face mask. |
+| Y Offset | Offset for the Y-axis of the face mask. |
+| Chunk | Bypass full-image face detection and use chunking. Chunking is also used automatically if no faces are found in the full image. |
+| Invert Mask | Toggle to invert the mask. |
+
+### Outputs
+
+| Output | Description |
+| --- | --- |
+| Image | The original image, converted to RGBA. |
+| Width | Output image width in pixels. |
+| Height | Output image height in pixels. |
+| Mask | The generated face mask. |
+
+## FaceOff
+
+**FaceOff** extracts a single detected face into a bounded image and returns a matching mask plus paste coordinates. Use FaceIdentifier to find the face ID before targeting a specific face.
+
+Padding expands the bounding box around the detected face. This gives downstream processing more context and increases the bounded image size while keeping the face in place within the crop.
+
+### Inputs
+
+| Input | Description |
+| --- | --- |
+| Image | Image for face detection. |
+| Face ID | The face ID to process, numbered from `0`. Multiple faces are not supported. |
+| Minimum Confidence | Minimum confidence for face detection. Lower this if detection is failing. |
+| X Offset | X-axis offset of the mask. |
+| Y Offset | Y-axis offset of the mask. |
+| Padding | All-axis padding around the mask in pixels. |
+| Chunk | Bypass full-image face detection and use chunking. Chunking is also used automatically if no faces are found in the full image. |
+
+### Outputs
+
+| Output | Description |
+| --- | --- |
+| Image | The bounded face image. If no face is found, the original image passes through. |
+| Width | Output image width in pixels. |
+| Height | Output image height in pixels. |
+| Mask | Mask matching the bounded image. |
+| X | X coordinate of the bounding box's left side. |
+| Y | Y coordinate of the bounding box's top side. |
+
+## Tips
+
+- Use the same **Minimum Confidence** value in FaceIdentifier and the FaceMask or FaceOff node that consumes the IDs.
+- Enable **Chunk** if not all target faces are detected. Full-image detection and chunked detection can produce different results.
+- Lower **Minimum Confidence** when detection fails, but watch for false positives.
+- Adjust X and Y offsets if the mask is too large, too small, or shifted.
+- Add FaceOff padding when the extracted face needs more surrounding context.
+- Face detection can fail on heavy face paint, hair covering the face, extreme angles, or other obstructions.
