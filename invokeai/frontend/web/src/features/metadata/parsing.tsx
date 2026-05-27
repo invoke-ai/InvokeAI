@@ -247,10 +247,16 @@ const isSingleMetadataHandler = (
   return SingleMetadataKey in handler && handler[SingleMetadataKey] === true;
 };
 
-const isCollectionMetadataHandler = (
+export const isCollectionMetadataHandler = (
   handler: SingleMetadataHandler<any> | CollectionMetadataHandler<any[]> | UnrecallableMetadataHandler<any>
 ): handler is CollectionMetadataHandler<any[]> => {
   return CollectionMetadataKey in handler && handler[CollectionMetadataKey] === true;
+};
+
+export const isUnrecallableMetadataHandler = (
+  handler: SingleMetadataHandler<any> | CollectionMetadataHandler<any[]> | UnrecallableMetadataHandler<any>
+): handler is UnrecallableMetadataHandler<any> => {
+  return UnrecallableMetadataKey in handler && handler[UnrecallableMetadataKey] === true;
 };
 
 //#region Created By

@@ -1,37 +1,7 @@
 import { autoAddBoardIdChanged, boardIdSelected, boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({
-  autoAssignBoardOnClick: true,
-  createBoard: vi.fn(),
-  dispatch: vi.fn(),
-}));
-
-vi.mock('react', async () => {
-  const actual = await vi.importActual('react');
-  return {
-    ...actual,
-    memo: (component: unknown) => component,
-    useCallback: (callback: unknown) => callback,
-  };
-});
-
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string) => (key === 'boards.myBoard' ? 'My Board' : key),
-  }),
-}));
-
-vi.mock('app/store/storeHooks', () => ({
-  useAppDispatch: () => mocks.dispatch,
-  useAppSelector: () => mocks.autoAssignBoardOnClick,
-}));
-
-vi.mock('services/api/endpoints/boards', () => ({
-  useCreateBoardMutation: () => [mocks.createBoard, { isLoading: false }],
-}));
-
-import AddBoardButton, { getCreatedBoardActions } from './AddBoardButton';
+import { createBoardAndDispatchActions, getCreatedBoardActions } from './AddBoardButton';
 
 describe('getCreatedBoardActions', () => {
   it('selects the created board and auto-adds it when auto assign is enabled', () => {
@@ -50,23 +20,24 @@ describe('getCreatedBoardActions', () => {
   });
 });
 
-describe('AddBoardButton', () => {
+describe('createBoardAndDispatchActions', () => {
+  const createBoard = vi.fn();
+  const dispatch = vi.fn();
+
   beforeEach(() => {
-    mocks.autoAssignBoardOnClick = true;
-    mocks.createBoard.mockReset();
-    mocks.dispatch.mockReset();
+    createBoard.mockReset();
+    dispatch.mockReset();
   });
 
   it('auto-adds the created board when auto assign is enabled', async () => {
-    mocks.createBoard.mockReturnValue({
+    createBoard.mockReturnValue({
       unwrap: () => Promise.resolve({ board_id: 'board-1' }),
     });
 
-    const button = AddBoardButton({}) as { props: { onClick: () => Promise<void> } };
-    await button.props.onClick();
+    await createBoardAndDispatchActions(createBoard, dispatch, 'My Board', true);
 
-    expect(mocks.createBoard).toHaveBeenCalledWith({ board_name: 'My Board' });
-    expect(mocks.dispatch.mock.calls).toEqual([
+    expect(createBoard).toHaveBeenCalledWith({ board_name: 'My Board' });
+    expect(dispatch.mock.calls).toEqual([
       [boardIdSelected({ boardId: 'board-1' })],
       [autoAddBoardIdChanged('board-1')],
       [boardSearchTextChanged('')],
@@ -74,17 +45,24 @@ describe('AddBoardButton', () => {
   });
 
   it('leaves the auto-add board unchanged when auto assign is disabled', async () => {
-    mocks.autoAssignBoardOnClick = false;
-    mocks.createBoard.mockReturnValue({
+    createBoard.mockReturnValue({
       unwrap: () => Promise.resolve({ board_id: 'board-1' }),
     });
 
-    const button = AddBoardButton({}) as { props: { onClick: () => Promise<void> } };
-    await button.props.onClick();
+    await createBoardAndDispatchActions(createBoard, dispatch, 'My Board', false);
 
-    expect(mocks.dispatch.mock.calls).toEqual([
+    expect(dispatch.mock.calls).toEqual([
       [boardIdSelected({ boardId: 'board-1' })],
       [boardSearchTextChanged('')],
     ]);
+  });
+
+  it('swallows errors from createBoard', async () => {
+    createBoard.mockReturnValue({
+      unwrap: () => Promise.reject(new Error('boom')),
+    });
+
+    await expect(createBoardAndDispatchActions(createBoard, dispatch, 'My Board', true)).resolves.toBeUndefined();
+    expect(dispatch).not.toHaveBeenCalled();
   });
 });
