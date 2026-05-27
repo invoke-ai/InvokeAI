@@ -984,13 +984,13 @@ class Flux2CheckpointModel(ModelLoader):
             return f"{prefix}.attn.to_add_out.weight"
 
         # Attention norms
-        if "img_attn.norm.query_norm.scale" in rest:
+        if "img_attn.norm.query_norm.scale" in rest or "img_attn.norm.query_norm.weight" in rest:
             return f"{prefix}.attn.norm_q.weight"
-        elif "img_attn.norm.key_norm.scale" in rest:
+        elif "img_attn.norm.key_norm.scale" in rest or "img_attn.norm.key_norm.weight" in rest:
             return f"{prefix}.attn.norm_k.weight"
-        elif "txt_attn.norm.query_norm.scale" in rest:
+        elif "txt_attn.norm.query_norm.scale" in rest or "txt_attn.norm.query_norm.weight" in rest:
             return f"{prefix}.attn.norm_added_q.weight"
-        elif "txt_attn.norm.key_norm.scale" in rest:
+        elif "txt_attn.norm.key_norm.scale" in rest or "txt_attn.norm.key_norm.weight" in rest:
             return f"{prefix}.attn.norm_added_k.weight"
 
         # MLP layers
@@ -1020,9 +1020,9 @@ class Flux2CheckpointModel(ModelLoader):
             return f"{prefix}.attn.to_out.weight"
 
         # Norms
-        if "norm.query_norm.scale" in rest:
+        if "norm.query_norm.scale" in rest or "norm.query_norm.weight" in rest:
             return f"{prefix}.attn.norm_q.weight"
-        elif "norm.key_norm.scale" in rest:
+        elif "norm.key_norm.scale" in rest or "norm.key_norm.weight" in rest:
             return f"{prefix}.attn.norm_k.weight"
 
         return key
@@ -1328,13 +1328,13 @@ class Flux2GGUFCheckpointModel(ModelLoader):
         elif "txt_attn.proj.weight" in rest:
             return f"{prefix}.attn.to_add_out.weight"
 
-        if "img_attn.norm.query_norm.scale" in rest:
+        if "img_attn.norm.query_norm.scale" in rest or "img_attn.norm.query_norm.weight" in rest:
             return f"{prefix}.attn.norm_q.weight"
-        elif "img_attn.norm.key_norm.scale" in rest:
+        elif "img_attn.norm.key_norm.scale" in rest or "img_attn.norm.key_norm.weight" in rest:
             return f"{prefix}.attn.norm_k.weight"
-        elif "txt_attn.norm.query_norm.scale" in rest:
+        elif "txt_attn.norm.query_norm.scale" in rest or "txt_attn.norm.query_norm.weight" in rest:
             return f"{prefix}.attn.norm_added_q.weight"
-        elif "txt_attn.norm.key_norm.scale" in rest:
+        elif "txt_attn.norm.key_norm.scale" in rest or "txt_attn.norm.key_norm.weight" in rest:
             return f"{prefix}.attn.norm_added_k.weight"
 
         if "img_mlp.0.weight" in rest:
@@ -1359,9 +1359,9 @@ class Flux2GGUFCheckpointModel(ModelLoader):
         elif "linear2.weight" in rest:
             return f"{prefix}.attn.to_out.weight"
 
-        if "norm.query_norm.scale" in rest:
+        if "norm.query_norm.scale" in rest or "norm.query_norm.weight" in rest:
             return f"{prefix}.attn.norm_q.weight"
-        elif "norm.key_norm.scale" in rest:
+        elif "norm.key_norm.scale" in rest or "norm.key_norm.weight" in rest:
             return f"{prefix}.attn.norm_k.weight"
 
         return key
