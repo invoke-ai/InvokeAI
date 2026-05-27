@@ -7215,11 +7215,11 @@
                   "type": "null"
                 }
               ],
-              "description": "Permanently delete all images on the board",
+              "description": "Permanently delete all images and videos on the board",
               "default": false,
               "title": "Include Images"
             },
-            "description": "Permanently delete all images on the board"
+            "description": "Permanently delete all images and videos on the board"
           }
         ],
         "responses": {
@@ -15971,7 +15971,8 @@
           }
         },
         "type": "object",
-        "title": "CacheStats"
+        "title": "CacheStats",
+        "description": "Collect statistics on cache performance."
       },
       "CalculateImageTilesEvenSplitInvocation": {
         "category": "tiles",
