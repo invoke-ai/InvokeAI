@@ -82,10 +82,7 @@ export function useFilteredWorkflows(workflows: WorkflowListItem[]): UseFiltered
           })
         );
 
-        log.debug(
-          { totalWorkflows: workflows.length, filteredCount: filteredWorkflowIds.size },
-          'Filtered workflows'
-        );
+        log.debug({ totalWorkflows: workflows.length, filteredCount: filteredWorkflowIds.size }, 'Filtered workflows');
 
         if (!isCancelled) {
           setFilteredWorkflowIds(filteredWorkflowIds);
