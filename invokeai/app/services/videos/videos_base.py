@@ -126,12 +126,16 @@ class VideoServiceABC(ABC):
         pass
 
     @abstractmethod
-    def delete_videos_on_board(self, board_id: str, user_id: Optional[str] = None) -> None:
-        """Deletes all videos on a board.
+    def delete_videos_on_board(self, board_id: str, user_id: Optional[str] = None) -> list[str]:
+        """Deletes all videos on a board and returns the names that were actually removed.
 
         When ``user_id`` is provided, only videos owned by that user are deleted (other users'
         contributions to a public/shared board are preserved). Pass ``None`` for the admin
         path to delete every video on the board regardless of uploader.
+
+        Videos whose backing file deletion fails are intentionally retained (their DB records
+        survive and cascade to "uncategorized" via the board_videos FK), so the returned list
+        is the authoritative ``deleted_videos`` for the caller's response.
         """
         pass
 

@@ -139,14 +139,15 @@ async def delete_board(
                 is_intermediate=None,
                 user_id=cascade_user_id,
             )
-            deleted_videos = ApiDependencies.invoker.services.board_video_records.get_all_board_video_names_for_board(
-                board_id=board_id,
-                categories=None,
-                is_intermediate=None,
-                user_id=cascade_user_id,
-            )
             ApiDependencies.invoker.services.images.delete_images_on_board(board_id=board_id, user_id=cascade_user_id)
-            ApiDependencies.invoker.services.videos.delete_videos_on_board(board_id=board_id, user_id=cascade_user_id)
+            # Use the service-returned list as the authoritative ``deleted_videos``.
+            # delete_videos_on_board now preserves DB records when the underlying file
+            # delete fails (so the API doesn't lie about a file that is still orphaned
+            # on disk), and the preserved records cascade to "uncategorized" via the
+            # board_videos FK when the board itself is deleted below.
+            deleted_videos = ApiDependencies.invoker.services.videos.delete_videos_on_board(
+                board_id=board_id, user_id=cascade_user_id
+            )
             ApiDependencies.invoker.services.boards.delete(board_id=board_id)
             return DeleteBoardResult(
                 board_id=board_id,

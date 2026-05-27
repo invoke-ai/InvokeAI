@@ -81,6 +81,10 @@ def enable_multiuser_for_tests(monkeypatch: Any, mock_invoker: Invoker):
     mock_board_video_records.get_all_board_video_names_for_board.return_value = []
     mock_invoker.services.board_video_records = mock_board_video_records
     mock_invoker.services.videos = MagicMock()
+    # delete_videos_on_board now returns the authoritative ``deleted_videos`` list (only the
+    # videos whose file deletion actually succeeded). Default to an empty list so pydantic
+    # validation on ``DeleteBoardResult`` doesn't reject the MagicMock auto-return.
+    mock_invoker.services.videos.delete_videos_on_board.return_value = []
     # The images service is a real ImageService instance in mock_services; the delete-board
     # cascade calls ``delete_images_on_board`` on it, which fails without an initialized
     # invoker. Stub it so the multiuser router tests can assert the cascade args.
@@ -702,11 +706,10 @@ def test_delete_board_with_include_images_cascades_videos(client: TestClient, mo
     assert create.status_code == status.HTTP_201_CREATED
     board_id = create.json()["board_id"]
 
-    # Pretend the board contains videos so the cascade has something to enumerate
-    mock_invoker.services.board_video_records.get_all_board_video_names_for_board.return_value = [
-        "video_a.mp4",
-        "video_b.mp4",
-    ]
+    # The cascade returns the names of videos it actually deleted; the router must surface
+    # *that* list (not the pre-delete enumeration) so the response can't claim a video was
+    # destroyed when its DB record was preserved due to a file-delete failure.
+    mock_invoker.services.videos.delete_videos_on_board.return_value = ["video_a.mp4", "video_b.mp4"]
 
     response = client.delete(
         f"/api/v1/boards/{board_id}?include_images=true",
@@ -715,12 +718,41 @@ def test_delete_board_with_include_images_cascades_videos(client: TestClient, mo
     assert response.status_code == status.HTTP_200_OK
     body = response.json()
     assert body["board_id"] == board_id
-    # Regression guard: video info must appear in the result, and delete_videos_on_board
-    # must have been invoked. Previously the route ignored videos entirely.
     assert set(body["deleted_videos"]) == {"video_a.mp4", "video_b.mp4"}
     mock_invoker.services.videos.delete_videos_on_board.assert_called_once()
     call = mock_invoker.services.videos.delete_videos_on_board.call_args
     assert call.kwargs["board_id"] == board_id
+
+
+def test_delete_board_with_partial_video_file_delete_failure_reports_only_actual_deletes(
+    client: TestClient, mock_invoker: Invoker, user1_token: str
+):
+    """JPPhoto PR #9163 May-22 follow-up: ``delete_board`` previously reported every video
+    that *would have been* deleted, but ``delete_videos_on_board`` now intentionally preserves
+    records whose backing files failed to delete (so the file isn't orphaned on disk). The
+    response must therefore report only the videos that were actually destroyed; preserved
+    records cascade to "uncategorized" via the board_videos FK and the frontend must learn
+    they still exist so the cache stays consistent.
+    """
+    create = client.post(
+        "/api/v1/boards/?board_name=Partial+Failure+Board",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert create.status_code == status.HTTP_201_CREATED
+    board_id = create.json()["board_id"]
+
+    # The service deleted "good.mp4" successfully but preserved "stuck.mp4" because its
+    # file delete failed. The router must NOT claim "stuck.mp4" was deleted.
+    mock_invoker.services.videos.delete_videos_on_board.return_value = ["good.mp4"]
+
+    response = client.delete(
+        f"/api/v1/boards/{board_id}?include_images=true",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["deleted_videos"] == ["good.mp4"]
+    assert "stuck.mp4" not in body["deleted_videos"]
 
 
 def test_delete_board_with_include_images_filters_cascade_by_user(
@@ -752,17 +784,14 @@ def test_delete_board_with_include_images_filters_cascade_by_user(
     # narrows the lookup + delete to that user's rows only. Admins skip the filter (pass
     # ``user_id=None``); this test exercises the non-admin path.
     images_call = mock_invoker.services.board_images.get_all_board_image_names_for_board.call_args
-    videos_call = mock_invoker.services.board_video_records.get_all_board_video_names_for_board.call_args
     assert images_call.kwargs.get("user_id") is not None
-    assert videos_call.kwargs.get("user_id") is not None
 
     delete_images_call = mock_invoker.services.images.delete_images_on_board.call_args
     delete_videos_call = mock_invoker.services.videos.delete_videos_on_board.call_args
     assert delete_images_call.kwargs.get("user_id") is not None
     assert delete_videos_call.kwargs.get("user_id") is not None
-    # Sanity: the four cascade calls must all share the same user_id (the requester).
+    # Sanity: the three cascade calls must all share the same user_id (the requester).
     requester_id = images_call.kwargs["user_id"]
-    assert videos_call.kwargs["user_id"] == requester_id
     assert delete_images_call.kwargs["user_id"] == requester_id
     assert delete_videos_call.kwargs["user_id"] == requester_id
 
@@ -788,9 +817,7 @@ def test_delete_board_with_include_images_admin_skips_user_filter(
     assert response.status_code == status.HTTP_200_OK
 
     images_call = mock_invoker.services.board_images.get_all_board_image_names_for_board.call_args
-    videos_call = mock_invoker.services.board_video_records.get_all_board_video_names_for_board.call_args
     assert images_call.kwargs.get("user_id") is None
-    assert videos_call.kwargs.get("user_id") is None
 
     delete_images_call = mock_invoker.services.images.delete_images_on_board.call_args
     delete_videos_call = mock_invoker.services.videos.delete_videos_on_board.call_args

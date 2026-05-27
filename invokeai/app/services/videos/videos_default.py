@@ -66,6 +66,8 @@ class VideoService(VideoServiceABC):
         strategy = create_subfolder_strategy(strategy_name)
         video_subfolder = strategy.get_subfolder(video_name, video_category, is_intermediate or False)
 
+        record_saved = False
+        board_attached = False
         try:
             self.__invoker.services.video_records.save(
                 video_name=video_name,
@@ -83,11 +85,13 @@ class VideoService(VideoServiceABC):
                 user_id=user_id,
                 video_subfolder=video_subfolder,
             )
+            record_saved = True
             if board_id is not None:
                 try:
                     self.__invoker.services.board_video_records.add_video_to_board(
                         board_id=board_id, video_name=video_name
                     )
+                    board_attached = True
                 except Exception as e:
                     self.__invoker.services.logger.warning(f"Failed to add video to board {board_id}: {str(e)}")
 
@@ -106,12 +110,30 @@ class VideoService(VideoServiceABC):
         except VideoRecordSaveException:
             self.__invoker.services.logger.error("Failed to save video record")
             raise
-        except VideoFileSaveException:
-            self.__invoker.services.logger.error("Failed to save video file")
-            raise
         except Exception as e:
-            self.__invoker.services.logger.error(f"Problem saving video record and file: {str(e)}")
-            raise e
+            # Roll back any DB-side state we created so the gallery doesn't end up with a
+            # ghost record whose file endpoints 404. Most commonly triggered by
+            # VideoFileSaveException (disk save or sidecar write failure), but we also
+            # need to unwind on any unexpected post-record failure.
+            if board_attached:
+                try:
+                    self.__invoker.services.board_video_records.remove_video_from_board(video_name=video_name)
+                except Exception as rollback_err:
+                    self.__invoker.services.logger.error(
+                        f"Failed to roll back board attachment for {video_name}: {str(rollback_err)}"
+                    )
+            if record_saved:
+                try:
+                    self.__invoker.services.video_records.delete(video_name)
+                except Exception as rollback_err:
+                    self.__invoker.services.logger.error(
+                        f"Failed to roll back video record for {video_name}: {str(rollback_err)}"
+                    )
+            if isinstance(e, VideoFileSaveException):
+                self.__invoker.services.logger.error("Failed to save video file")
+            else:
+                self.__invoker.services.logger.error(f"Problem saving video record and file: {str(e)}")
+            raise
 
     def update(self, video_name: str, changes: VideoRecordChanges) -> VideoDTO:
         try:
@@ -263,7 +285,7 @@ class VideoService(VideoServiceABC):
             self.__invoker.services.logger.error("Problem deleting video record and file")
             raise e
 
-    def delete_videos_on_board(self, board_id: str, user_id: Optional[str] = None) -> None:
+    def delete_videos_on_board(self, board_id: str, user_id: Optional[str] = None) -> list[str]:
         try:
             # When ``user_id`` is set the lookup filters to videos owned by that user so the
             # cascade doesn't destroy other users' contributions to a public/shared board.
@@ -289,6 +311,7 @@ class VideoService(VideoServiceABC):
             self.__invoker.services.video_records.delete_many(deleted_video_names)
             for video_name in deleted_video_names:
                 self._on_deleted(video_name)
+            return deleted_video_names
         except VideoRecordDeleteException:
             self.__invoker.services.logger.error("Failed to delete video records")
             raise

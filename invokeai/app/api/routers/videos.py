@@ -669,9 +669,18 @@ async def remove_video_from_board(
     current_user: CurrentUserOrDefault,
     video_name: str = Body(description="The name of the video to remove from its board", embed=True),
 ) -> RemoveVideosFromBoardResult:
-    _assert_video_direct_owner(video_name, current_user)
+    # A video association can be removed by EITHER the direct video owner OR a user with
+    # write access to the destination board (admin, board owner, or any contributor when the
+    # board is Public). This mirrors remove_image_from_board and prevents a video from being
+    # stranded when a non-owner uploads into a Public board that is later made Shared/Private:
+    # without the board-write fallback, neither the uploader nor the board owner could
+    # detach the video. See PR #9163 review.
     old_board_id = ApiDependencies.invoker.services.board_video_records.get_board_for_video(video_name)
-    if old_board_id is not None:
+    try:
+        _assert_video_direct_owner(video_name, current_user)
+    except HTTPException:
+        if old_board_id is None:
+            raise
         _assert_board_write_access(old_board_id, current_user)
     try:
         ApiDependencies.invoker.services.board_video_records.remove_video_from_board(video_name=video_name)

@@ -93,6 +93,9 @@ def enable_multiuser_for_videos(monkeypatch: Any, mock_invoker: Invoker):
     monkeypatch.setattr("invokeai.app.api.routers.boards.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers.videos.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
+    # _access.assert_board_read_access is called from list_video_dtos and get_video_names
+    # via the videos router; it uses ApiDependencies from its own module scope.
+    monkeypatch.setattr("invokeai.app.api.routers._access.ApiDependencies", mock_deps)
     yield
 
 
@@ -333,3 +336,99 @@ def test_get_video_thumbnail_missing_file_returns_404(
     response = client.get("/api/v1/videos/i/some_video.mp4/thumbnail")
     assert response.status_code == status.HTTP_404_NOT_FOUND
     mock_invoker.services.videos.get_path.assert_called_once_with("some_video.mp4", thumbnail=True)
+
+
+# ---------------------------------------------------------------------------
+# DELETE /videos/board: stranded-contributor recovery (JPPhoto PR #9163 May-22 follow-up)
+#
+# Scenario: user2 uploads to user1's Public board, user1 later flips the board to
+# Shared/Private. Without a fallback path, neither the uploader nor the board owner
+# can detach the video — _assert_video_direct_owner rejects user1, and
+# _assert_board_write_access rejects user2 because the board is no longer Public.
+# The route must accept removal from either the video owner OR a user with write
+# access to the destination board (mirrors remove_image_from_board).
+# ---------------------------------------------------------------------------
+
+
+def test_remove_video_from_board_succeeds_for_video_owner_on_foreign_private_board(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+):
+    """user2 owns the video; the video sits on user1's now-private board. user2 must still
+    be able to detach it via its direct ownership."""
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+    assert user1 is not None and user2 is not None
+
+    # user2 owns the video.
+    mock_invoker.services.video_records.get_user_id.return_value = user2.user_id
+    # The video lives on user1's now-private board.
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = "user1-private-board"
+
+    response = client.request(
+        "DELETE",
+        "/api/v1/videos/board",
+        json={"video_name": "uploaded.mp4"},
+        headers={"Authorization": f"Bearer {user2_token}"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    mock_invoker.services.board_video_records.remove_video_from_board.assert_called_once_with(video_name="uploaded.mp4")
+
+
+def test_remove_video_from_board_succeeds_for_board_owner_of_non_owned_video(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+):
+    """user1 owns the board; user2 owns the video sitting on it. user1 must be able to
+    detach the foreign video from their board even though they are not the video owner."""
+    from invokeai.app.services.board_records.board_records_common import BoardVisibility
+
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+    assert user1 is not None and user2 is not None
+
+    mock_invoker.services.video_records.get_user_id.return_value = user2.user_id
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = "user1-board"
+
+    # _assert_board_write_access reads the board DTO to check ownership/visibility.
+    fake_board = MagicMock()
+    fake_board.user_id = user1.user_id
+    fake_board.board_visibility = BoardVisibility.Private
+    with patch.object(mock_invoker.services.boards, "get_dto", return_value=fake_board):
+        response = client.request(
+            "DELETE",
+            "/api/v1/videos/board",
+            json={"video_name": "stranded.mp4"},
+            headers={"Authorization": f"Bearer {user1_token}"},
+        )
+    assert response.status_code == status.HTTP_200_OK
+    mock_invoker.services.board_video_records.remove_video_from_board.assert_called_once_with(video_name="stranded.mp4")
+
+
+def test_remove_video_from_board_rejects_third_party(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+):
+    """A user who is neither the video owner nor a board write-access holder must be
+    rejected — the relaxed path is a stranded-contributor escape hatch, not an open door."""
+    from invokeai.app.services.board_records.board_records_common import BoardVisibility
+
+    admin = mock_invoker.services.users.get_by_email("admin@test.com")
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert admin is not None and user1 is not None
+
+    # Video is owned by admin; board is owned by user1 and is Private.
+    mock_invoker.services.video_records.get_user_id.return_value = admin.user_id
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = "user1-board"
+
+    fake_board = MagicMock()
+    fake_board.user_id = user1.user_id
+    fake_board.board_visibility = BoardVisibility.Private
+
+    # user2 has no claim to either resource.
+    with patch.object(mock_invoker.services.boards, "get_dto", return_value=fake_board):
+        response = client.request(
+            "DELETE",
+            "/api/v1/videos/board",
+            json={"video_name": "not_mine.mp4"},
+            headers={"Authorization": f"Bearer {user2_token}"},
+        )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    mock_invoker.services.board_video_records.remove_video_from_board.assert_not_called()
