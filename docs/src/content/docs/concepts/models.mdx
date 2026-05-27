@@ -82,6 +82,25 @@ If a model file is deleted or moved outside the Model Manager, its database entr
 
 Orphaned models are automatically excluded from selection dropdowns (main model, LoRA, VAE, etc.), so you cannot accidentally pick one for generation. Use the [bulk delete action](#bulk-actions-in-the-model-manager) to clean them out in one step.
 
+## Synchronizing orphaned model directories
+
+The **Missing Files** filter finds database records whose files are gone. InvokeAI also has a separate sync workflow for the opposite situation: model directories that still exist on disk but are not referenced in the database.
+
+This can happen after a failed import, a manual database edit, or deleting a model record while leaving files behind. The sync workflow scans the models directory for top-level folders containing model files with common model extensions, including `.safetensors`, `.ckpt`, `.pt`, `.pth`, `.bin`, `.onnx`, and `.gguf`.
+
+To review these directories:
+
+1. In multi-user mode, sign in as an administrator. In single-user mode, the Model Manager controls are available by default.
+2. Open the Model Manager.
+3. Click **Sync Models** to scan for orphaned model directories.
+4. Review each reported relative directory path, contained model files, and total size before deleting anything.
+
+:::caution[Deletion removes directories]
+Deleting an orphaned model directory removes the entire reported directory from disk. The server deletes it directly with recursive directory deletion, so make sure the directory contains only files you intend to remove.
+:::
+
+Only administrators can use this workflow in multi-user mode. The underlying API is `/api/v2/models/sync/orphaned`; API results also include the absolute path for each reported directory.
+
 ## Exporting and Importing Model Settings
 
 Each installed model has an **Export Settings** and **Import Settings** action in the Model Manager. Use these to back up a model's configuration, move it to another install, or share a curated setup with someone else.
