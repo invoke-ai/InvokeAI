@@ -99,7 +99,7 @@ jobs:
 
       - name: generate schema
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
-        run: cd invokeai/frontend/web && python ../../../scripts/generate_openapi_schema.py | pnpm typegen
+        run: cd invokeai/frontend/web && uv run ../../../scripts/generate_openapi_schema.py openapi.json && pnpm typegen openapi.json
         shell: bash
 
       - name: compare files
