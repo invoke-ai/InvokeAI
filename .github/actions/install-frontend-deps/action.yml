@@ -30,6 +30,6 @@ runs:
           ${{ runner.os }}-
 
     - name: install frontend dependencies
-      run: pnpm install --prefer-frozen-lockfile
+      run: pnpm install --prefer-frozen-lockfile --ignore-scripts
       shell: bash
       working-directory: invokeai/frontend/web
