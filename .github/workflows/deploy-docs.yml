@@ -78,12 +78,12 @@ jobs:
         with:
           version: '0.6.10'
           enable-cache: true
-          python-version: '3.11'
+          python-version: '3.14'
 
       - name: setup python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.14'
 
       # generate_docs_json.py only needs the invokeai package importable
       # (pydantic + invokeai.app/backend). Skip the [test] extra to keep CI fast.
