@@ -23,9 +23,11 @@ runs:
       uses: actions/cache@v4
       with:
         path: ${{ env.STORE_PATH }}
-        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+        key: ${{ runner.os }}-node20-python3.14-pnpm10-store-${{ hashFiles('**/pnpm-lock.yaml') }}
         restore-keys: |
-          ${{ runner.os }}-pnpm-store-
+          ${{ runner.os }}-node20-python3.14-pnpm10-store-
+          ${{ runner.os }}-node20-python3.14-
+          ${{ runner.os }}-
 
     - name: install frontend dependencies
       run: pnpm install --prefer-frozen-lockfile
