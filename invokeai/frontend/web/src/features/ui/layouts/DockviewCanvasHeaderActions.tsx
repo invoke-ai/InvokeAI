@@ -3,7 +3,7 @@ import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { IDockviewHeaderActionsProps } from 'dockview';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { selectLassoMode } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectLassoMode, selectShapeType } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectBbox } from 'features/controlLayers/store/selectors';
 import type { Tool } from 'features/controlLayers/store/types';
 import { IS_MAC_OS } from 'features/system/components/HotkeysModal/useHotkeyData';
@@ -16,6 +16,7 @@ import { WORKSPACE_PANEL_ID } from './shared';
 
 const $fallbackTool = atom<Tool>('move');
 const $fallbackToolBuffer = atom<Tool | null>(null);
+const $fallbackPrimaryPointerDown = atom(false);
 const $fallbackTextSession = atom<null>(null);
 
 type CanvasToolModifierHintKey = ReturnType<typeof getCanvasToolModifierHints>[number]['keys'][number];
@@ -45,10 +46,12 @@ export const DockviewCanvasHeaderActions = memo((props: IDockviewHeaderActionsPr
   const { t } = useTranslation();
   const canvasManager = useCanvasManagerSafe();
   const lassoMode = useAppSelector(selectLassoMode);
+  const shapeType = useAppSelector(selectShapeType);
   const bboxAspectRatioLocked = useAppSelector((state) => selectBbox(state).aspectRatio.isLocked);
 
   const tool = useStore(canvasManager?.tool.$tool ?? $fallbackTool);
   const toolBuffer = useStore(canvasManager?.tool.$toolBuffer ?? $fallbackToolBuffer);
+  const isPrimaryPointerDown = useStore(canvasManager?.tool.$isPrimaryPointerDown ?? $fallbackPrimaryPointerDown);
   const textSession = useStore(canvasManager?.tool.tools.text.$session ?? $fallbackTextSession);
 
   const effectiveTool = useMemo<Tool>(() => {
@@ -66,10 +69,21 @@ export const DockviewCanvasHeaderActions = memo((props: IDockviewHeaderActionsPr
     return getCanvasToolModifierHints({
       tool: effectiveTool,
       lassoMode,
+      shapeType,
       bboxAspectRatioLocked,
       hasActiveTextSession: Boolean(textSession),
+      isPrimaryPointerDown,
     });
-  }, [bboxAspectRatioLocked, canvasManager, effectiveTool, lassoMode, props.activePanel?.id, textSession]);
+  }, [
+    bboxAspectRatioLocked,
+    canvasManager,
+    effectiveTool,
+    isPrimaryPointerDown,
+    lassoMode,
+    props.activePanel?.id,
+    shapeType,
+    textSession,
+  ]);
 
   if (hints.length === 0) {
     return null;
