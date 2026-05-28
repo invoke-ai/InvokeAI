@@ -3,10 +3,10 @@ description: Installs frontend dependencies with pnpm, with caching
 runs:
   using: 'composite'
   steps:
-    - name: setup node 20
+    - name: setup node 22
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '22'
 
     - name: setup pnpm
       uses: pnpm/action-setup@v4
@@ -23,10 +23,10 @@ runs:
       uses: actions/cache@v4
       with:
         path: ${{ env.STORE_PATH }}
-        key: ${{ runner.os }}-node20-python3.14-pnpm10-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+        key: ${{ runner.os }}-node22-python3.14-pnpm10-store-${{ hashFiles('**/pnpm-lock.yaml') }}
         restore-keys: |
-          ${{ runner.os }}-node20-python3.14-pnpm10-store-
-          ${{ runner.os }}-node20-python3.14-
+          ${{ runner.os }}-node22-python3.14-pnpm10-store-
+          ${{ runner.os }}-node22-python3.14-
           ${{ runner.os }}-
 
     - name: install frontend dependencies
