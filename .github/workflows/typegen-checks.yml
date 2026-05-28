@@ -97,12 +97,9 @@ jobs:
         run: cp invokeai/frontend/web/src/services/api/schema.ts invokeai/frontend/web/src/services/api/schema_orig.ts
         shell: bash
 
-      - name: generate openapi schema file
-        run: uv run scripts/generate_openapi_schema.py /tmp/openapi.json
-        shell: bash
-
-      - name: generate frontend types
-        run: cd invokeai/frontend/web && pnpm typegen /tmp/openapi.json
+      - name: generate schema
+        if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
+        run: cd invokeai/frontend/web && python ../../../scripts/generate_openapi_schema.py | pnpm typegen
         shell: bash
 
       - name: compare files
