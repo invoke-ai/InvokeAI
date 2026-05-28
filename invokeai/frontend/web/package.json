@@ -31,7 +31,7 @@
     "lint:tsc": "tsc --noEmit",
     "lint": "concurrently -g -c red,green,yellow,blue,magenta pnpm:lint:*",
     "fix": "eslint --fix . && prettier --log-level warn --write .",
-    "preinstall": "npx only-allow pnpm",
+    "preinstall": "only-allow pnpm",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "test": "vitest",
