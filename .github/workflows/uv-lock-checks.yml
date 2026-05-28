@@ -61,8 +61,9 @@ jobs:
         with:
           version: '0.6.10'
           enable-cache: true
+          python-version: '3.14'
 
       - name: check lockfile
         if: ${{ steps.changed-files.outputs.uvlock-pyprojecttoml_any_changed == 'true' || inputs.always_run == true }}
-        run: uv lock --locked # this will exit with 1 if the lockfile is not consistent with pyproject.toml
+        run: uv lock --locked
         shell: bash
