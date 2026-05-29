@@ -56,7 +56,7 @@ class BaseBatchInvocation(BaseInvocation):
     "image_batch",
     title="Image Batch",
     tags=["primitives", "image", "batch", "special"],
-    category="primitives",
+    category="batch",
     version="1.0.0",
     classification=Classification.Special,
 )
@@ -87,7 +87,7 @@ class ImageGeneratorField(BaseModel):
     "image_generator",
     title="Image Generator",
     tags=["primitives", "board", "image", "batch", "special"],
-    category="primitives",
+    category="batch",
     version="1.0.0",
     classification=Classification.Special,
 )
@@ -111,7 +111,7 @@ class ImageGenerator(BaseInvocation):
     "string_batch",
     title="String Batch",
     tags=["primitives", "string", "batch", "special"],
-    category="primitives",
+    category="batch",
     version="1.0.0",
     classification=Classification.Special,
 )
@@ -142,7 +142,7 @@ class StringGeneratorField(BaseModel):
     "string_generator",
     title="String Generator",
     tags=["primitives", "string", "number", "batch", "special"],
-    category="primitives",
+    category="batch",
     version="1.0.0",
     classification=Classification.Special,
 )
@@ -166,7 +166,7 @@ class StringGenerator(BaseInvocation):
     "integer_batch",
     title="Integer Batch",
     tags=["primitives", "integer", "number", "batch", "special"],
-    category="primitives",
+    category="batch",
     version="1.0.0",
     classification=Classification.Special,
 )
@@ -195,7 +195,7 @@ class IntegerGeneratorField(BaseModel):
     "integer_generator",
     title="Integer Generator",
     tags=["primitives", "int", "number", "batch", "special"],
-    category="primitives",
+    category="batch",
     version="1.0.0",
     classification=Classification.Special,
 )
@@ -219,7 +219,7 @@ class IntegerGenerator(BaseInvocation):
     "float_batch",
     title="Float Batch",
     tags=["primitives", "float", "number", "batch", "special"],
-    category="primitives",
+    category="batch",
     version="1.0.0",
     classification=Classification.Special,
 )
@@ -250,7 +250,7 @@ class FloatGeneratorField(BaseModel):
     "float_generator",
     title="Float Generator",
     tags=["primitives", "float", "number", "batch", "special"],
-    category="primitives",
+    category="batch",
     version="1.0.0",
     classification=Classification.Special,
 )

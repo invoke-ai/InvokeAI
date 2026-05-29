@@ -15,6 +15,7 @@ import type {
   FLUXReduxConfig,
   ImageWithDims,
   IPAdapterConfig,
+  QwenImageReferenceImageConfig,
   RasterLayerAdjustments,
   RefImageState,
   RegionalGuidanceIPAdapterConfig,
@@ -115,6 +116,10 @@ export const initialFluxKontextReferenceImage: FluxKontextReferenceImageConfig =
 };
 export const initialFlux2ReferenceImage: Flux2ReferenceImageConfig = {
   type: 'flux2_reference_image',
+  image: null,
+};
+export const initialQwenImageReferenceImage: QwenImageReferenceImageConfig = {
+  type: 'qwen_image_reference_image',
   image: null,
 };
 export const initialT2IAdapter: T2IAdapterConfig = {
@@ -234,6 +239,7 @@ export const getRasterLayerState = (
     type: 'raster_layer',
     isEnabled: true,
     isLocked: false,
+    isTransparencyLocked: false,
     objects: [],
     opacity: 1,
     position: { x: 0, y: 0 },

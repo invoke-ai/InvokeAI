@@ -1,10 +1,11 @@
 """Z-Image LoRA conversion utilities.
 
 Z-Image uses S3-DiT transformer architecture with Qwen3 text encoder.
-LoRAs for Z-Image typically follow the diffusers PEFT format.
+LoRAs for Z-Image typically follow the diffusers PEFT format or Kohya format.
 """
 
-from typing import Dict
+import re
+from typing import Any, Dict
 
 import torch
 
@@ -16,6 +17,29 @@ from invokeai.backend.patches.lora_conversions.z_image_lora_constants import (
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
+# Regex for Kohya-format Z-Image transformer keys.
+# Example keys:
+#   lora_unet__layers_0_attention_to_k.alpha
+#   lora_unet__layers_0_attention_to_k.lora_down.weight
+#   lora_unet__context_refiner_0_feed_forward_w1.lora_up.weight
+#   lora_unet__noise_refiner_1_attention_to_v.lora_down.weight
+Z_IMAGE_KOHYA_TRANSFORMER_KEY_REGEX = (
+    r"lora_unet__(layers|context_refiner|noise_refiner)_(\d+)_(attention|feed_forward)_(to_k|to_q|to_v|w1|w2|w3)"
+)
+
+
+def is_state_dict_likely_z_image_kohya_lora(state_dict: dict[str | int, Any]) -> bool:
+    """Checks if the provided state dict is likely a Z-Image LoRA in Kohya format.
+
+    Kohya Z-Image LoRAs have keys like:
+    - lora_unet__layers_0_attention_to_k.lora_down.weight
+    - lora_unet__context_refiner_0_feed_forward_w1.alpha
+    - lora_unet__noise_refiner_1_attention_to_v.lora_up.weight
+    """
+    return any(
+        isinstance(k, str) and re.match(Z_IMAGE_KOHYA_TRANSFORMER_KEY_REGEX, k.split(".")[0]) for k in state_dict.keys()
+    )
+
 
 def is_state_dict_likely_z_image_lora(state_dict: dict[str | int, torch.Tensor]) -> bool:
     """Checks if the provided state dict is likely a Z-Image LoRA.
@@ -23,6 +47,9 @@ def is_state_dict_likely_z_image_lora(state_dict: dict[str | int, torch.Tensor])
     Z-Image LoRAs can have keys for transformer and/or Qwen3 text encoder.
     They may use various prefixes depending on the training framework.
     """
+    if is_state_dict_likely_z_image_kohya_lora(state_dict):
+        return True
+
     str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
 
     # Check for Z-Image transformer keys (S3-DiT architecture)
@@ -57,6 +84,7 @@ def lora_model_from_z_image_state_dict(
     - "transformer." or "base_model.model.transformer." for diffusers PEFT format
     - "diffusion_model." for some training frameworks
     - "text_encoder." or "base_model.model.text_encoder." for Qwen3 encoder
+    - "lora_unet__" for Kohya format (underscores instead of dots)
 
     Args:
         state_dict: The LoRA state dict
@@ -65,6 +93,10 @@ def lora_model_from_z_image_state_dict(
     Returns:
         A ModelPatchRaw containing the LoRA layers
     """
+    # If Kohya format, convert keys first then process normally
+    if is_state_dict_likely_z_image_kohya_lora(state_dict):
+        state_dict = _convert_z_image_kohya_state_dict(state_dict)
+
     layers: dict[str, BaseLayerPatch] = {}
 
     # Group keys by layer
@@ -118,6 +150,45 @@ def lora_model_from_z_image_state_dict(
         layers[final_key] = layer
 
     return ModelPatchRaw(layers=layers)
+
+
+def _convert_z_image_kohya_state_dict(state_dict: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    """Converts a Kohya-format Z-Image LoRA state dict to diffusion_model dot-notation.
+
+    Example key conversions:
+    - lora_unet__layers_0_attention_to_k.lora_down.weight -> diffusion_model.layers.0.attention.to_k.lora_down.weight
+    - lora_unet__context_refiner_0_feed_forward_w1.alpha -> diffusion_model.context_refiner.0.feed_forward.w1.alpha
+    - lora_unet__noise_refiner_1_attention_to_v.lora_up.weight -> diffusion_model.noise_refiner.1.attention.to_v.lora_up.weight
+    """
+    converted: Dict[str, torch.Tensor] = {}
+    for key, value in state_dict.items():
+        if not isinstance(key, str) or not key.startswith("lora_unet__"):
+            converted[key] = value
+            continue
+
+        # Split into layer name and param suffix (e.g. "lora_down.weight", "alpha")
+        layer_name, _, param_suffix = key.partition(".")
+
+        # Strip lora_unet__ prefix
+        remainder = layer_name[len("lora_unet__") :]
+
+        # Convert Kohya underscore format to dot-notation using the known structure
+        match = re.match(
+            r"(layers|context_refiner|noise_refiner)_(\d+)_(attention|feed_forward)_(to_k|to_q|to_v|w1|w2|w3)$",
+            remainder,
+        )
+        if match:
+            block, idx, submodule, param = match.groups()
+            new_layer = f"diffusion_model.{block}.{idx}.{submodule}.{param}"
+        else:
+            # Fallback: keep original key for unrecognized patterns
+            converted[key] = value
+            continue
+
+        new_key = f"{new_layer}.{param_suffix}" if param_suffix else new_layer
+        converted[new_key] = value
+
+    return converted
 
 
 def _get_lora_layer_values(layer_dict: dict[str, torch.Tensor], alpha: float | None) -> dict[str, torch.Tensor]:

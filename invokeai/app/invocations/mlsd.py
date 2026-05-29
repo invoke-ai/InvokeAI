@@ -10,7 +10,7 @@ from invokeai.backend.image_util.mlsd.models.mbv2_mlsd_large import MobileV2_MLS
     "mlsd_detection",
     title="MLSD Detection",
     tags=["controlnet", "mlsd", "edge"],
-    category="controlnet",
+    category="controlnet_preprocessors",
     version="1.0.0",
 )
 class MLSDDetectionInvocation(BaseInvocation, WithMetadata, WithBoard):

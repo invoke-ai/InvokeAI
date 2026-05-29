@@ -96,7 +96,7 @@ export const StagingAreaToolbarNewLayerFromImageMenuItems = memo(() => {
   }, [selectedItemImageDTO, store, toastSentToCanvas]);
 
   return (
-    <MenuGroup title="New Layer From Image">
+    <MenuGroup title={t('controlLayers.newLayerFromImage')}>
       <MenuItem
         icon={<NewLayerIcon />}
         onClickCapture={onClickNewInpaintMaskFromImage}

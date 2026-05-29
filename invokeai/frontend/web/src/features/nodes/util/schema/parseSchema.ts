@@ -39,9 +39,6 @@ const isReservedInputField = (nodeType: string, fieldName: string) => {
   if (RESERVED_INPUT_FIELD_NAMES.includes(fieldName)) {
     return true;
   }
-  if (nodeType === 'collect' && fieldName === 'collection') {
-    return true;
-  }
   if (nodeType === 'iterate' && fieldName === 'index') {
     return true;
   }
@@ -116,6 +113,7 @@ export const parseSchema = (
     const version = schema.version;
     const nodePack = schema.node_pack;
     const classification = schema.classification;
+    const category = schema.category ?? 'other';
 
     const inputs = reduce(
       schema.properties,
@@ -263,6 +261,7 @@ export const parseSchema = (
       useCache,
       nodePack,
       classification,
+      category,
     };
 
     Object.assign(invocationsAccumulator, { [type]: invocation });

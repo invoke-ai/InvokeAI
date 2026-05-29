@@ -31,7 +31,6 @@ class DyPEPresetConfig:
     """Preset configuration values."""
 
     base_resolution: int
-    method: str
     dype_scale: float
     dype_exponent: float
     dype_start_sigma: float
@@ -41,7 +40,6 @@ class DyPEPresetConfig:
 DYPE_PRESETS: dict[DyPEPreset, DyPEPresetConfig] = {
     DYPE_PRESET_4K: DyPEPresetConfig(
         base_resolution=1024,
-        method="vision_yarn",
         dype_scale=2.0,
         dype_exponent=2.0,
         dype_start_sigma=1.0,
@@ -84,7 +82,6 @@ def get_dype_config_for_resolution(
     return DyPEConfig(
         enable_dype=True,
         base_resolution=base_resolution,
-        method="vision_yarn",
         dype_scale=dynamic_dype_scale,
         dype_exponent=2.0,
         dype_start_sigma=1.0,
@@ -111,24 +108,24 @@ def get_dype_config_for_area(
         return None
 
     area_ratio = area / base_area
-    effective_side_ratio = math.sqrt(area_ratio)  # 1.0 at base, 2.0 at 2K (if base is 1K)
+    effective_side_ratio = math.sqrt(area_ratio)
+    aspect_ratio = max(width, height) / min(width, height)
+    aspect_attenuation = 1.0 if aspect_ratio <= 2.0 else 2.0 / aspect_ratio
 
-    # Strength: 0 at base area, 8 at sat_area, clamped thereafter.
-    sat_area = 2027520  # Determined by experimentation where a vertical line appears
-    sat_side_ratio = math.sqrt(sat_area / base_area)
-    dynamic_dype_scale = 8.0 * (effective_side_ratio - 1.0) / (sat_side_ratio - 1.0)
+    # Retune area mode to be "auto, but area-aware" instead of dramatically
+    # stronger than auto. This keeps it closer to the paper-style core DyPE.
+    dynamic_dype_scale = 2.4 * effective_side_ratio
+    dynamic_dype_scale *= aspect_attenuation
     dynamic_dype_scale = max(0.0, min(dynamic_dype_scale, 8.0))
 
-    # Continuous exponent schedule:
-    # r=1 -> 0.5, r=2 -> 1.0, r=4 -> 2.0 (exact), smoothly varying in between.
-    x = math.log2(effective_side_ratio)
-    dype_exponent = 0.25 * (x**2) + 0.25 * x + 0.5
-    dype_exponent = max(0.5, min(dype_exponent, 2.0))
+    # Use a narrower, higher exponent range than the old area heuristic so the
+    # paper-style scheduler decays more conservatively and artifacts are reduced.
+    exponent_progress = max(0.0, min(effective_side_ratio - 1.0, 1.0))
+    dype_exponent = 1.25 + 0.75 * exponent_progress
 
     return DyPEConfig(
         enable_dype=True,
         base_resolution=base_resolution,
-        method="vision_yarn",
         dype_scale=dynamic_dype_scale,
         dype_exponent=dype_exponent,
         dype_start_sigma=1.0,
@@ -165,7 +162,6 @@ def get_dype_config_from_preset(
         return DyPEConfig(
             enable_dype=True,
             base_resolution=1024,
-            method="vision_yarn",
             dype_scale=custom_scale if custom_scale is not None else dynamic_dype_scale,
             dype_exponent=custom_exponent if custom_exponent is not None else 2.0,
             dype_start_sigma=1.0,
@@ -196,7 +192,6 @@ def get_dype_config_from_preset(
     return DyPEConfig(
         enable_dype=True,
         base_resolution=preset_config.base_resolution,
-        method=preset_config.method,
         dype_scale=preset_config.dype_scale,
         dype_exponent=preset_config.dype_exponent,
         dype_start_sigma=preset_config.dype_start_sigma,

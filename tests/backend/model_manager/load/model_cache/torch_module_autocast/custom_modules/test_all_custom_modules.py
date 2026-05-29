@@ -1,4 +1,5 @@
 import copy
+from collections.abc import Callable
 
 import gguf
 import pytest
@@ -13,6 +14,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
 )
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
+from invokeai.backend.patches.layers.dora_layer import DoRALayer
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
@@ -122,6 +124,67 @@ def wrap_single_custom_layer(layer: torch.nn.Module):
 def unwrap_single_custom_layer(layer: torch.nn.Module):
     orig_layer_type = AUTOCAST_MODULE_TYPE_MAPPING_INVERSE[type(layer)]
     return unwrap_custom_layer(layer, orig_layer_type)
+
+
+class ZeroParamPatch(BaseLayerPatch):
+    """A minimal parameter patch that exercises the aggregated sidecar patch path."""
+
+    def get_parameters(self, orig_parameters: dict[str, torch.Tensor], weight: float) -> dict[str, torch.Tensor]:
+        return {name: torch.zeros_like(param) for name, param in orig_parameters.items()}
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        return self
+
+    def calc_size(self) -> int:
+        return 0
+
+
+def _cpu_dtype_supported(
+    layer_factory: Callable[[], torch.nn.Module],
+    input_factory: Callable[[torch.dtype], torch.Tensor],
+    dtype: torch.dtype,
+) -> bool:
+    try:
+        layer = layer_factory().to(dtype=dtype)
+        input_tensor = input_factory(dtype)
+        with torch.no_grad():
+            _ = layer(input_tensor)
+        return True
+    except (RuntimeError, TypeError, NotImplementedError):
+        return False
+
+
+def _cpu_dtype_param(
+    dtype: torch.dtype,
+    layer_factory: Callable[[], torch.nn.Module],
+    input_factory: Callable[[torch.dtype], torch.Tensor],
+):
+    supported = _cpu_dtype_supported(layer_factory, input_factory, dtype)
+    return pytest.param(
+        dtype,
+        id=str(dtype).removeprefix("torch."),
+        marks=pytest.mark.skipif(not supported, reason=f"CPU {dtype} is not supported for this op"),
+    )
+
+
+LINEAR_CPU_MIXED_DTYPE_PARAMS = [
+    _cpu_dtype_param(torch.bfloat16, lambda: torch.nn.Linear(8, 16), lambda dtype: torch.randn(2, 8, dtype=dtype)),
+    _cpu_dtype_param(torch.float16, lambda: torch.nn.Linear(8, 16), lambda dtype: torch.randn(2, 8, dtype=dtype)),
+]
+
+
+CONV2D_CPU_MIXED_DTYPE_PARAMS = [
+    _cpu_dtype_param(
+        torch.bfloat16,
+        lambda: torch.nn.Conv2d(8, 16, 3),
+        lambda dtype: torch.randn(2, 8, 5, 5, dtype=dtype),
+    ),
+    _cpu_dtype_param(
+        torch.float16,
+        lambda: torch.nn.Conv2d(8, 16, 3),
+        lambda dtype: torch.randn(2, 8, 5, 5, dtype=dtype),
+    ),
+]
 
 
 def test_isinstance(layer_under_test: LayerUnderTest):
@@ -284,6 +347,7 @@ PatchUnderTest = tuple[list[tuple[BaseLayerPatch, float]], torch.Tensor]
         "concatenated_lora",
         "flux_control_lora",
         "single_lokr",
+        "single_dora",
     ]
 )
 def patch_under_test(request: pytest.FixtureRequest) -> PatchUnderTest:
@@ -370,6 +434,20 @@ def patch_under_test(request: pytest.FixtureRequest) -> PatchUnderTest:
         )
         input = torch.randn(1, in_features)
         return ([(lokr_layer, 0.7)], input)
+    elif layer_type == "single_dora":
+        # Regression coverage for #8624: DoRA + partial-loading + CPU->device autocast.
+        # Scaled down so the patched weight stays well-conditioned for allclose comparisons.
+        # dora_scale has shape (1, in_features) to broadcast against direction_norm in
+        # DoRALayer.get_weight — see dora_layer.py:74-82.
+        dora_layer = DoRALayer(
+            up=torch.randn(out_features, rank) * 0.01,
+            down=torch.randn(rank, in_features) * 0.01,
+            dora_scale=torch.ones(1, in_features),
+            alpha=1.0,
+            bias=torch.randn(out_features) * 0.01,
+        )
+        input = torch.randn(1, in_features)
+        return ([(dora_layer, 0.7)], input)
     else:
         raise ValueError(f"Unsupported layer_type: {layer_type}")
 
@@ -550,3 +628,109 @@ def test_quantized_linear_sidecar_patches_with_autocast_from_cpu_to_device(
 
     # Assert that the outputs with and without autocasting are the same.
     assert torch.allclose(expected_output, autocast_output, atol=1e-6)
+
+
+@pytest.mark.parametrize("dtype", LINEAR_CPU_MIXED_DTYPE_PARAMS)
+@torch.no_grad()
+def test_linear_mixed_dtype_inference_without_patches(dtype: torch.dtype):
+    layer = wrap_single_custom_layer(torch.nn.Linear(8, 16))
+    input = torch.randn(2, 8, dtype=dtype)
+
+    output = layer(input)
+
+    assert output.dtype == input.dtype
+    assert output.shape == (2, 16)
+
+
+@pytest.mark.parametrize("dtype", LINEAR_CPU_MIXED_DTYPE_PARAMS)
+@torch.no_grad()
+def test_linear_mixed_dtype_inference_without_patches_bias_only_mismatch(dtype: torch.dtype):
+    layer = torch.nn.Linear(8, 16).to(dtype=dtype)
+    layer.bias = torch.nn.Parameter(layer.bias.detach().to(torch.float32))
+    layer = wrap_single_custom_layer(layer)
+    input = torch.randn(2, 8, dtype=dtype)
+
+    output = layer(input)
+
+    assert output.dtype == input.dtype
+    assert output.shape == (2, 16)
+
+
+@pytest.mark.parametrize("dtype", CONV2D_CPU_MIXED_DTYPE_PARAMS)
+@torch.no_grad()
+def test_conv2d_mixed_dtype_inference_without_patches(dtype: torch.dtype):
+    layer = wrap_single_custom_layer(torch.nn.Conv2d(8, 16, 3))
+    input = torch.randn(2, 8, 5, 5, dtype=dtype)
+
+    output = layer(input)
+
+    assert output.dtype == input.dtype
+    assert output.shape == (2, 16, 3, 3)
+
+
+@pytest.mark.parametrize("dtype", LINEAR_CPU_MIXED_DTYPE_PARAMS)
+@torch.no_grad()
+def test_linear_mixed_dtype_sidecar_parameter_patch(dtype: torch.dtype):
+    layer = wrap_single_custom_layer(torch.nn.Linear(8, 16))
+    layer.add_patch(ZeroParamPatch(), 1.0)
+    input = torch.randn(2, 8, dtype=dtype)
+
+    output = layer(input)
+
+    assert output.dtype == input.dtype
+    assert output.shape == (2, 16)
+
+
+@pytest.mark.parametrize("dtype", CONV2D_CPU_MIXED_DTYPE_PARAMS)
+@torch.no_grad()
+def test_conv2d_mixed_dtype_sidecar_parameter_patch(dtype: torch.dtype):
+    layer = wrap_single_custom_layer(torch.nn.Conv2d(8, 16, 3))
+    layer.add_patch(ZeroParamPatch(), 1.0)
+    input = torch.randn(2, 8, 5, 5, dtype=dtype)
+
+    output = layer(input)
+
+    assert output.dtype == input.dtype
+    assert output.shape == (2, 16, 3, 3)
+
+
+@torch.no_grad()
+def test_aggregate_patch_parameters_preserves_plain_tensor_with_dora():
+    """Regression test for #8624: when partial-loading autocasts a CPU Parameter onto the
+    compute device, cast_to_device returns a plain torch.Tensor (not a Parameter). The
+    aggregator must treat that as a real tensor and not substitute a meta-device dummy —
+    otherwise DoRA's quantization guard falsely triggers on non-quantized base models.
+
+    This test is CPU-only and simulates the hand-off by constructing a plain torch.Tensor
+    directly; the equivalent CUDA/MPS E2E flow is exercised by the "single_dora" variant
+    of test_linear_sidecar_patches_with_autocast_from_cpu_to_device.
+    """
+    layer = wrap_single_custom_layer(torch.nn.Linear(32, 64))
+
+    rank = 4
+    dora_patch = DoRALayer(
+        up=torch.randn(64, rank) * 0.01,
+        down=torch.randn(rank, 32) * 0.01,
+        dora_scale=torch.ones(1, 32),
+        alpha=1.0,
+        bias=None,
+    )
+
+    # Plain torch.Tensor — the shape _cast_weight_bias_for_input hands into
+    # _aggregate_patch_parameters after autocasting a Parameter across devices.
+    plain_weight = torch.randn(64, 32)
+    assert type(plain_weight) is torch.Tensor
+
+    orig_params = {"weight": plain_weight}
+    params = layer._aggregate_patch_parameters(
+        patches_and_weights=[(dora_patch, 1.0)],
+        orig_params=orig_params,
+        device=torch.device("cpu"),
+    )
+
+    # Pre-fix, orig_params["weight"] would have been replaced by a meta-device dummy,
+    # causing DoRALayer.get_parameters to raise "not compatible with DoRA patches".
+    assert orig_params["weight"].device.type == "cpu"
+    assert params["weight"].shape == (64, 32)
+    assert params["weight"].device.type == "cpu"
+    assert not torch.isnan(params["weight"]).any()

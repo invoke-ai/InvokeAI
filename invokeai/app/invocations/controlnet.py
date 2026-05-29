@@ -64,7 +64,7 @@ class ControlOutput(BaseInvocationOutput):
 
 
 @invocation(
-    "controlnet", title="ControlNet - SD1.5, SD2, SDXL", tags=["controlnet"], category="controlnet", version="1.1.3"
+    "controlnet", title="ControlNet - SD1.5, SD2, SDXL", tags=["controlnet"], category="conditioning", version="1.1.3"
 )
 class ControlNetInvocation(BaseInvocation):
     """Collects ControlNet info to pass to other nodes"""
@@ -116,7 +116,7 @@ class ControlNetInvocation(BaseInvocation):
     "heuristic_resize",
     title="Heuristic Resize",
     tags=["image, controlnet"],
-    category="image",
+    category="controlnet_preprocessors",
     version="1.1.1",
     classification=Classification.Prototype,
 )

@@ -1,9 +1,11 @@
 import { Button, Flex, Heading, SimpleGrid } from '@invoke-ai/ui-library';
 import { useControlAdapterModelDefaultSettings } from 'features/modelManagerV2/hooks/useControlAdapterModelDefaultSettings';
+import { useIsModelManagerEnabled } from 'features/modelManagerV2/hooks/useIsModelManagerEnabled';
+import { DefaultFp8StorageControlAdapter } from 'features/modelManagerV2/subpanels/ModelPanel/ControlAdapterModelDefaultSettings/DefaultFp8StorageControlAdapter';
 import { DefaultPreprocessor } from 'features/modelManagerV2/subpanels/ModelPanel/ControlAdapterModelDefaultSettings/DefaultPreprocessor';
 import type { FormField } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/MainModelDefaultSettings';
 import { toast } from 'features/toast/toast';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +15,7 @@ import type { ControlLoRAModelConfig, ControlNetModelConfig, T2IAdapterModelConf
 
 export type ControlAdapterModelDefaultSettingsFormData = {
   preprocessor: FormField<string>;
+  fp8Storage: FormField<boolean>;
 };
 
 type Props = {
@@ -21,6 +24,7 @@ type Props = {
 
 export const ControlAdapterModelDefaultSettings = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
+  const canManageModels = useIsModelManagerEnabled();
 
   const defaultSettingsDefaults = useControlAdapterModelDefaultSettings(modelConfig);
 
@@ -30,10 +34,15 @@ export const ControlAdapterModelDefaultSettings = memo(({ modelConfig }: Props) 
     defaultValues: defaultSettingsDefaults,
   });
 
+  useEffect(() => {
+    reset(defaultSettingsDefaults);
+  }, [defaultSettingsDefaults, reset]);
+
   const onSubmit = useCallback<SubmitHandler<ControlAdapterModelDefaultSettingsFormData>>(
     (data) => {
       const body = {
         preprocessor: data.preprocessor.isEnabled ? data.preprocessor.value : null,
+        fp8_storage: data.fp8Storage.isEnabled ? data.fp8Storage.value : null,
       };
 
       updateModel({
@@ -66,20 +75,23 @@ export const ControlAdapterModelDefaultSettings = memo(({ modelConfig }: Props) 
     <>
       <Flex gap="4" justifyContent="space-between" w="full" pb={4}>
         <Heading fontSize="md">{t('modelManager.defaultSettings')}</Heading>
-        <Button
-          size="sm"
-          leftIcon={<PiCheckBold />}
-          colorScheme="invokeYellow"
-          isDisabled={!formState.isDirty}
-          onClick={handleSubmit(onSubmit)}
-          isLoading={isLoadingUpdateModel}
-        >
-          {t('common.save')}
-        </Button>
+        {canManageModels && (
+          <Button
+            size="sm"
+            leftIcon={<PiCheckBold />}
+            colorScheme="invokeYellow"
+            isDisabled={!formState.isDirty}
+            onClick={handleSubmit(onSubmit)}
+            isLoading={isLoadingUpdateModel}
+          >
+            {t('common.save')}
+          </Button>
+        )}
       </Flex>
 
       <SimpleGrid columns={2} gap={8}>
         <DefaultPreprocessor control={control} name="preprocessor" />
+        {modelConfig.type !== 'control_lora' && <DefaultFp8StorageControlAdapter control={control} name="fp8Storage" />}
       </SimpleGrid>
     </>
   );

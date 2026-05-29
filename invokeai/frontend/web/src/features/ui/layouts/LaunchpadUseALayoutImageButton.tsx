@@ -44,7 +44,7 @@ export const LaunchpadUseALayoutImageButton = memo((props: { extraAction?: () =>
       <DndDropTarget
         dndTarget={newCanvasFromImageDndTarget}
         dndTargetData={dndTargetData}
-        label="Drop"
+        label={t('gallery.drop')}
         isDisabled={isStaging}
       />
     </LaunchpadButton>

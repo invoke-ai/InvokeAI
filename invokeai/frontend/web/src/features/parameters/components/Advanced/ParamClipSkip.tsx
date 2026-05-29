@@ -2,6 +2,7 @@ import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { selectCLIPSkip, selectModel, setClipSkip } from 'features/controlLayers/store/paramsSlice';
+import type { BaseModelType } from 'features/nodes/types/common';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -32,14 +33,14 @@ const ParamClipSkip = () => {
     if (!model) {
       return CLIP_SKIP_MAP['sd-1']?.maxClip;
     }
-    return CLIP_SKIP_MAP[model.base]?.maxClip;
+    return CLIP_SKIP_MAP[model.base as BaseModelType]?.maxClip;
   }, [model]);
 
   const sliderMarks = useMemo(() => {
     if (!model) {
       return CLIP_SKIP_MAP['sd-1']?.markers;
     }
-    return CLIP_SKIP_MAP[model.base]?.markers;
+    return CLIP_SKIP_MAP[model.base as BaseModelType]?.markers;
   }, [model]);
 
   if (model?.base === 'sdxl') {

@@ -1,0 +1,28 @@
+---
+import PageFooter from '@astrojs/starlight/components/Footer.astro';
+---
+
+<PageFooter {...Astro.props} />
+
+<div class="built-by">
+  This site was designed and developed by <a
+    target="_blank"
+    rel="noreferrer noopener"
+    href="https://aetherfox.studio">Aether Fox Studio</a
+  >.
+</div>
+
+<style>
+  /*footer {
+    margin-top: auto;
+  }*/
+
+  .built-by {
+    text-align: center;
+    font-size: var(--sl-text-2xs);
+
+    a {
+      color: #edc69c;
+    }
+  }
+</style>

@@ -19,7 +19,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     "z_image_seed_variance_enhancer",
     title="Seed Variance Enhancer - Z-Image",
     tags=["conditioning", "z-image", "variance", "seed"],
-    category="conditioning",
+    category="prompt",
     version="1.0.0",
     classification=Classification.Prototype,
 )

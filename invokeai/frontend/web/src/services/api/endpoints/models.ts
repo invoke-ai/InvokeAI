@@ -6,6 +6,7 @@ import type { operations, paths } from 'services/api/schema';
 import type {
   AnyModelConfig,
   GetHFTokenStatusResponse,
+  ModelInstallJob,
   ResetHFTokenResponse,
   SetHFTokenArg,
   SetHFTokenResponse,
@@ -51,6 +52,14 @@ type BulkDeleteModelsResponse = {
   failed: string[];
 };
 
+type BulkReidentifyModelsArg = {
+  keys: string[];
+};
+type BulkReidentifyModelsResponse = {
+  succeeded: string[];
+  failed: string[];
+};
+
 type ConvertMainModelResponse =
   paths['/api/v2/models/convert/{key}']['put']['responses']['200']['content']['application/json'];
 
@@ -66,6 +75,10 @@ type ListModelInstallsResponse =
 
 type CancelModelInstallResponse =
   paths['/api/v2/models/install/{id}']['delete']['responses']['201']['content']['application/json'];
+type PauseModelInstallResponse = ModelInstallJob;
+type ResumeModelInstallResponse = ModelInstallJob;
+type RestartFailedModelInstallResponse = ModelInstallJob;
+type RestartModelInstallFileResponse = ModelInstallJob;
 
 type PruneCompletedModelInstallsResponse =
   paths['/api/v2/models/install']['delete']['responses']['200']['content']['application/json'];
@@ -98,9 +111,13 @@ type DeleteOrphanedModelsResponse = {
   errors: Record<string, string>;
 };
 
+type GetModelConfigsArg = {
+  order_by?: string;
+  direction?: string;
+} | void;
+
 const modelConfigsAdapter = createEntityAdapter<AnyModelConfig, string>({
   selectId: (entity) => entity.key,
-  sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
 export const modelConfigsAdapterSelectors = modelConfigsAdapter.getSelectors(undefined, getSelectorsOptions);
 
@@ -234,6 +251,18 @@ export const modelsApi = api.injectEndpoints({
       },
       serializeQueryArgs: ({ queryArgs }) => `${queryArgs.name}.${queryArgs.base}.${queryArgs.type}`,
     }),
+    getModelConfigByHash: build.query<AnyModelConfig, string>({
+      query: (hash) => buildModelsUrl(`get_by_hash?${queryString.stringify({ hash })}`),
+      providesTags: (result) => {
+        const tags: ApiTagDescription[] = [];
+
+        if (result) {
+          tags.push({ type: 'ModelConfig', id: result.key });
+        }
+
+        return tags;
+      },
+    }),
     scanFolder: build.query<ScanFolderResponse, ScanFolderArg>({
       query: (arg) => {
         const folderQueryStr = arg ? queryString.stringify(arg, {}) : '';
@@ -267,6 +296,43 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['ModelInstalls'],
     }),
+    pauseModelInstall: build.mutation<PauseModelInstallResponse, number>({
+      query: (id) => {
+        return {
+          url: buildModelsUrl(`install/${id}/pause`),
+          method: 'POST',
+        };
+      },
+      invalidatesTags: ['ModelInstalls'],
+    }),
+    resumeModelInstall: build.mutation<ResumeModelInstallResponse, number>({
+      query: (id) => {
+        return {
+          url: buildModelsUrl(`install/${id}/resume`),
+          method: 'POST',
+        };
+      },
+      invalidatesTags: ['ModelInstalls'],
+    }),
+    restartFailedModelInstall: build.mutation<RestartFailedModelInstallResponse, number>({
+      query: (id) => {
+        return {
+          url: buildModelsUrl(`install/${id}/restart_failed`),
+          method: 'POST',
+        };
+      },
+      invalidatesTags: ['ModelInstalls'],
+    }),
+    restartModelInstallFile: build.mutation<RestartModelInstallFileResponse, { id: number; file_source: string }>({
+      query: ({ id, file_source }) => {
+        return {
+          url: buildModelsUrl(`install/${id}/restart_file`),
+          method: 'POST',
+          body: file_source,
+        };
+      },
+      invalidatesTags: ['ModelInstalls'],
+    }),
     pruneCompletedModelInstalls: build.mutation<PruneCompletedModelInstallsResponse, void>({
       query: () => {
         return {
@@ -276,8 +342,11 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['ModelInstalls'],
     }),
-    getModelConfigs: build.query<EntityState<AnyModelConfig, string>, void>({
-      query: () => ({ url: buildModelsUrl() }),
+    getModelConfigs: build.query<EntityState<AnyModelConfig, string>, GetModelConfigsArg>({
+      query: (arg) => {
+        const queryStr = arg ? `?${queryString.stringify(arg)}` : '';
+        return { url: buildModelsUrl(queryStr) };
+      },
       providesTags: (result) => {
         const tags: ApiTagDescription[] = [{ type: 'ModelConfig', id: LIST_TAG }];
         if (result) {
@@ -377,6 +446,16 @@ export const modelsApi = api.injectEndpoints({
         }
       },
     }),
+    bulkReidentifyModels: build.mutation<BulkReidentifyModelsResponse, BulkReidentifyModelsArg>({
+      query: ({ keys }) => {
+        return {
+          url: buildModelsUrl('i/bulk_reidentify'),
+          method: 'POST',
+          body: { keys },
+        };
+      },
+      invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
+    }),
     getOrphanedModels: build.query<GetOrphanedModelsResponse, void>({
       query: () => ({
         url: buildModelsUrl('sync/orphaned'),
@@ -410,6 +489,10 @@ export const {
   useLazyGetHuggingFaceModelsQuery,
   useListModelInstallsQuery,
   useCancelModelInstallMutation,
+  usePauseModelInstallMutation,
+  useResumeModelInstallMutation,
+  useRestartFailedModelInstallMutation,
+  useRestartModelInstallFileMutation,
   usePruneCompletedModelInstallsMutation,
   useGetStarterModelsQuery,
   useGetHFTokenStatusQuery,
@@ -417,9 +500,10 @@ export const {
   useResetHFTokenMutation,
   useEmptyModelCacheMutation,
   useReidentifyModelMutation,
+  useBulkReidentifyModelsMutation,
   useGetOrphanedModelsQuery,
   useDeleteOrphanedModelsMutation,
 } = modelsApi;
 
-export const selectModelConfigsQuery = modelsApi.endpoints.getModelConfigs.select();
+export const selectModelConfigsQuery = modelsApi.endpoints.getModelConfigs.select(undefined);
 export const selectMissingModelsQuery = modelsApi.endpoints.getMissingModels.select();

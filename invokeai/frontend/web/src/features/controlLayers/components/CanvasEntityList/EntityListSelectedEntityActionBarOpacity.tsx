@@ -132,7 +132,9 @@ export const EntityListSelectedEntityActionBarOpacity = memo(() => {
   return (
     <Popover>
       <FormControl w="min-content" gap={2} isDisabled={selectedEntityIdentifier === null}>
-        <FormLabel m={0}>{t('controlLayers.opacity')}</FormLabel>
+        <FormLabel m={0} mt={1}>
+          {t('controlLayers.opacity')}
+        </FormLabel>
         <PopoverAnchor>
           <NumberInput
             display="flex"
@@ -153,7 +155,7 @@ export const EntityListSelectedEntityActionBarOpacity = memo(() => {
             <NumberInputField paddingInlineEnd={7} _focusVisible={{ zIndex: 0 }} title="" />
             <PopoverTrigger>
               <IconButton
-                aria-label="open-slider"
+                aria-label={t('common.openSlider')}
                 icon={<PiCaretDownBold />}
                 size="sm"
                 variant="link"

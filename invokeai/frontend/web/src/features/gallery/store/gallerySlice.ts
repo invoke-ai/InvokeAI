@@ -3,6 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { isPlainObject, uniq } from 'es-toolkit';
+import { logout } from 'features/auth/store/authSlice';
 import type { BoardRecordOrderBy } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -11,6 +12,7 @@ import {
   type ComparisonMode,
   type GalleryState,
   type GalleryView,
+  isVirtualBoardId,
   type OrderDir,
   zGalleryState,
 } from './types';
@@ -32,6 +34,8 @@ const getInitialState = (): GalleryState => ({
   comparisonMode: 'slider',
   comparisonFit: 'fill',
   shouldShowArchivedBoards: false,
+  showVirtualBoards: false,
+  virtualBoardsSectionOpen: true,
   boardsListOrderBy: 'created_at',
   boardsListOrderDir: 'DESC',
 });
@@ -102,6 +106,10 @@ const slice = createSlice({
         state.autoAddBoardId = 'none';
         return;
       }
+      // Virtual boards cannot be auto-add targets
+      if (isVirtualBoardId(action.payload)) {
+        return;
+      }
       state.autoAddBoardId = action.payload;
     },
     galleryViewChanged: (state, action: PayloadAction<GalleryView>) => {
@@ -126,6 +134,17 @@ const slice = createSlice({
     shouldShowArchivedBoardsChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldShowArchivedBoards = action.payload;
     },
+    showVirtualBoardsChanged: (state, action: PayloadAction<boolean>) => {
+      state.showVirtualBoards = action.payload;
+      // If virtual boards are hidden and a virtual board is selected, reset to 'none'
+      if (!action.payload && isVirtualBoardId(state.selectedBoardId)) {
+        state.selectedBoardId = 'none';
+        state.selection = [];
+      }
+    },
+    virtualBoardsSectionOpenChanged: (state, action: PayloadAction<boolean>) => {
+      state.virtualBoardsSectionOpen = action.payload;
+    },
     starredFirstChanged: (state, action: PayloadAction<boolean>) => {
       state.starredFirst = action.payload;
     },
@@ -141,6 +160,14 @@ const slice = createSlice({
     boardsListOrderDirChanged: (state, action: PayloadAction<OrderDir>) => {
       state.boardsListOrderDir = action.payload;
     },
+  },
+  extraReducers(builder) {
+    // Clear board-related state on logout to prevent stale data when switching users
+    builder.addCase(logout, (state) => {
+      state.selectedBoardId = 'none';
+      state.autoAddBoardId = 'none';
+      state.boardSearchText = '';
+    });
   },
 });
 
@@ -163,6 +190,8 @@ export const {
   orderDirChanged,
   starredFirstChanged,
   shouldShowArchivedBoardsChanged,
+  showVirtualBoardsChanged,
+  virtualBoardsSectionOpenChanged,
   searchTermChanged,
   boardsListOrderByChanged,
   boardsListOrderDirChanged,
@@ -180,8 +209,15 @@ export const gallerySliceConfig: SliceConfig<typeof slice> = {
       if (!('_version' in state)) {
         state._version = 1;
       }
+      // Add virtual boards fields if missing (added in virtual boards feature)
+      if (!('showVirtualBoards' in state)) {
+        state.showVirtualBoards = false;
+      }
+      if (!('virtualBoardsSectionOpen' in state)) {
+        state.virtualBoardsSectionOpen = true;
+      }
       return zGalleryState.parse(state);
     },
-    persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'imageToCompare'],
+    persistDenylist: ['selection', 'galleryView', 'imageToCompare'],
   },
 };

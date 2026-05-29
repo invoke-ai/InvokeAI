@@ -15,6 +15,9 @@ const config: KnipConfig = {
     // Will be using this
     'src/common/hooks/useAsyncState.ts',
     'src/app/store/use-debounced-app-selector.ts',
+    // Auth features - exports will be used in follow-up phases
+    'src/features/auth/**',
+    'src/services/api/endpoints/auth.ts',
   ],
   ignoreBinaries: ['only-allow'],
   ignoreDependencies: ['magic-string'],

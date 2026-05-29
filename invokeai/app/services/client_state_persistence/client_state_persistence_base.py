@@ -4,15 +4,16 @@ from abc import ABC, abstractmethod
 class ClientStatePersistenceABC(ABC):
     """
     Base class for client persistence implementations.
-    This class defines the interface for persisting client data.
+    This class defines the interface for persisting client data per user.
     """
 
     @abstractmethod
-    def set_by_key(self, queue_id: str, key: str, value: str) -> str:
+    def set_by_key(self, user_id: str, key: str, value: str) -> str:
         """
         Set a key-value pair for the client.
 
         Args:
+            user_id (str): The user ID to set state for.
             key (str): The key to set.
             value (str): The value to set for the key.
 
@@ -22,11 +23,12 @@ class ClientStatePersistenceABC(ABC):
         pass
 
     @abstractmethod
-    def get_by_key(self, queue_id: str, key: str) -> str | None:
+    def get_by_key(self, user_id: str, key: str) -> str | None:
         """
         Get the value for a specific key of the client.
 
         Args:
+            user_id (str): The user ID to get state for.
             key (str): The key to retrieve the value for.
 
         Returns:
@@ -35,8 +37,36 @@ class ClientStatePersistenceABC(ABC):
         pass
 
     @abstractmethod
-    def delete(self, queue_id: str) -> None:
+    def get_keys_by_prefix(self, user_id: str, prefix: str) -> list[str]:
         """
-        Delete all client state.
+        Get all keys matching a prefix for a user.
+
+        Args:
+            user_id (str): The user ID to get keys for.
+            prefix (str): The prefix to filter keys by.
+
+        Returns:
+            list[str]: A list of keys matching the prefix.
+        """
+        pass
+
+    @abstractmethod
+    def delete_by_key(self, user_id: str, key: str) -> None:
+        """
+        Delete a specific key-value pair for a user.
+
+        Args:
+            user_id (str): The user ID to delete state for.
+            key (str): The key to delete.
+        """
+        pass
+
+    @abstractmethod
+    def delete(self, user_id: str) -> None:
+        """
+        Delete all client state for a user.
+
+        Args:
+            user_id (str): The user ID to delete state for.
         """
         pass

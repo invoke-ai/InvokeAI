@@ -18,6 +18,7 @@ const _zInvocationTemplate = z.object({
   useCache: z.boolean(),
   nodePack: z.string().min(1).default('invokeai'),
   classification: zClassification,
+  category: z.string().default('other'),
 });
 export type InvocationTemplate = z.infer<typeof _zInvocationTemplate>;
 // #endregion
@@ -43,6 +44,12 @@ export const zNotesNodeData = z.object({
   isOpen: z.boolean(),
   notes: z.string(),
 });
+export const zConnectorNodeData = z.object({
+  id: z.string().trim().min(1),
+  type: z.literal('connector'),
+  label: z.string(),
+  isOpen: z.boolean(),
+});
 const zCurrentImageNodeData = z.object({
   id: z.string().trim().min(1),
   type: z.literal('current_image'),
@@ -52,6 +59,7 @@ const zCurrentImageNodeData = z.object({
 
 export type NotesNodeData = z.infer<typeof zNotesNodeData>;
 export type InvocationNodeData = z.infer<typeof zInvocationNodeData>;
+export type ConnectorNodeData = z.infer<typeof zConnectorNodeData>;
 type CurrentImageNodeData = z.infer<typeof zCurrentImageNodeData>;
 
 const zInvocationNodeValidationSchema = z.looseObject({
@@ -70,6 +78,15 @@ const zNotesNodeValidationSchema = z.looseObject({
 const zNotesNode = z.custom<Node<NotesNodeData, 'notes'>>((val) => zNotesNodeValidationSchema.safeParse(val).success);
 export type NotesNode = z.infer<typeof zNotesNode>;
 
+const zConnectorNodeValidationSchema = z.looseObject({
+  type: z.literal('connector'),
+  data: zConnectorNodeData,
+});
+const zConnectorNode = z.custom<Node<ConnectorNodeData, 'connector'>>(
+  (val) => zConnectorNodeValidationSchema.safeParse(val).success
+);
+export type ConnectorNode = z.infer<typeof zConnectorNode>;
+
 const zCurrentImageNodeValidationSchema = z.looseObject({
   type: z.literal('current_image'),
   data: zCurrentImageNodeData,
@@ -79,12 +96,14 @@ const zCurrentImageNode = z.custom<Node<CurrentImageNodeData, 'current_image'>>(
 );
 export type CurrentImageNode = z.infer<typeof zCurrentImageNode>;
 
-export const zAnyNode = z.union([zInvocationNode, zNotesNode, zCurrentImageNode]);
+export const zAnyNode = z.union([zInvocationNode, zNotesNode, zConnectorNode, zCurrentImageNode]);
 export type AnyNode = z.infer<typeof zAnyNode>;
 
 export const isInvocationNode = (node?: AnyNode | null): node is InvocationNode =>
   Boolean(node && node.type === 'invocation');
 export const isNotesNode = (node?: AnyNode | null): node is NotesNode => Boolean(node && node.type === 'notes');
+export const isConnectorNode = (node?: AnyNode | null): node is ConnectorNode =>
+  Boolean(node && node.type === 'connector');
 // #endregion
 
 // #region NodeExecutionState

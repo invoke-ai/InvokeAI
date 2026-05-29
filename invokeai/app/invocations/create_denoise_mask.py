@@ -18,7 +18,7 @@ from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_t
     "create_denoise_mask",
     title="Create Denoise Mask",
     tags=["mask", "denoise"],
-    category="latents",
+    category="mask",
     version="1.0.2",
 )
 class CreateDenoiseMaskInvocation(BaseInvocation):

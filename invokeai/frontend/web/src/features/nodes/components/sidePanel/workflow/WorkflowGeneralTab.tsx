@@ -1,8 +1,19 @@
 import type { FormControlProps } from '@invoke-ai/ui-library';
-import { Box, Flex, FormControl, FormControlGroup, FormLabel, Image, Input, Textarea } from '@invoke-ai/ui-library';
+import {
+  Box,
+  Checkbox,
+  Flex,
+  FormControl,
+  FormControlGroup,
+  FormLabel,
+  Image,
+  Input,
+  Textarea,
+} from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import {
   workflowAuthorChanged,
   workflowContactChanged,
@@ -25,7 +36,8 @@ import {
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetWorkflowQuery } from 'services/api/endpoints/workflows';
+import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
+import { useGetWorkflowQuery, useUpdateWorkflowIsPublicMutation } from 'services/api/endpoints/workflows';
 
 import { WorkflowThumbnailEditor } from './WorkflowThumbnail/WorkflowThumbnailEditor';
 
@@ -95,6 +107,7 @@ const WorkflowGeneralTab = () => {
             <FormLabel>{t('nodes.workflowName')}</FormLabel>
             <Input variant="darkFilled" value={name} onChange={handleChangeName} />
           </FormControl>
+          <ShareWorkflowCheckbox id={id} />
           <Thumbnail id={id} />
           <FormControl>
             <FormLabel>{t('nodes.workflowVersion')}</FormLabel>
@@ -186,4 +199,41 @@ const Thumbnail = ({ id }: { id?: string | null }) => {
 
   // This is a default workflow and it does not have a thumbnail set. Users may not edit the thumbnail.
   return null;
+};
+
+const ShareWorkflowCheckbox = ({ id }: { id?: string | null }) => {
+  const { t } = useTranslation();
+  const currentUser = useAppSelector(selectCurrentUser);
+  const { data: setupStatus } = useGetSetupStatusQuery();
+  const { data } = useGetWorkflowQuery(id ?? skipToken);
+  const [updateIsPublic, { isLoading }] = useUpdateWorkflowIsPublicMutation();
+
+  const handleChange = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      if (!id) {
+        return;
+      }
+      updateIsPublic({ workflow_id: id, is_public: e.target.checked });
+    },
+    [id, updateIsPublic]
+  );
+
+  // Only show for saved user workflows in multiuser mode when the current user is the owner or admin
+  if (!data || !id || data.workflow.meta.category !== 'user') {
+    return null;
+  }
+  if (setupStatus?.multiuser_enabled) {
+    const isOwner = currentUser !== null && data.user_id === currentUser.user_id;
+    const isAdmin = currentUser?.is_admin ?? false;
+    if (!isOwner && !isAdmin) {
+      return null;
+    }
+  }
+
+  return (
+    <Flex alignItems="center" gap={2}>
+      <Checkbox isChecked={data.is_public} onChange={handleChange} isDisabled={isLoading} />
+      <FormLabel mb={0}>{t('workflows.shareWorkflow')}</FormLabel>
+    </Flex>
+  );
 };

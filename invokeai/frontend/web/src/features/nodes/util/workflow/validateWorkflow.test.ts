@@ -1,4 +1,5 @@
 import { get } from 'es-toolkit/compat';
+import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from 'features/nodes/store/util/connectorTopology';
 import { img_resize, main_model_loader } from 'features/nodes/store/util/testUtils';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { getDefaultForm } from 'features/nodes/types/workflow';
@@ -7,6 +8,17 @@ import { describe, expect, it } from 'vitest';
 
 //TODO(psyche): Test workflow validation for form builder fields
 describe('validateWorkflow', () => {
+  const buildConnectorNode = (id: string) => ({
+    id,
+    type: 'connector' as const,
+    position: { x: 0, y: 0 },
+    data: {
+      id,
+      type: 'connector' as const,
+      label: 'Connector',
+      isOpen: true,
+    },
+  });
   const getWorkflow = (): WorkflowV3 => ({
     name: '',
     author: '',
@@ -17,7 +29,7 @@ describe('validateWorkflow', () => {
     notes: '',
     exposedFields: [],
     form: getDefaultForm(),
-    meta: { version: '3.0.0', category: 'user' },
+    meta: { version: '4.0.0', category: 'user' },
     nodes: [
       {
         id: '94b1d596-f2f2-4c1c-bd5b-a79c62d947ad',
@@ -104,6 +116,7 @@ describe('validateWorkflow', () => {
     });
     expect(validationResult.warnings.length).toBe(1);
     expect(get(validationResult, 'workflow.nodes[1].data.inputs.image.value')).toBeUndefined();
+    expect(validationResult.workflow.meta.version).toBe('4.0.0');
   });
   it('should reset boards that are inaccessible', async () => {
     const validationResult = await validateWorkflow({
@@ -126,5 +139,139 @@ describe('validateWorkflow', () => {
     });
     expect(validationResult.warnings.length).toBe(1);
     expect(get(validationResult, 'workflow.nodes[0].data.inputs.model.value')).toBeUndefined();
+  });
+
+  it('should delete malformed connector edges with invalid handles', async () => {
+    const workflow = getWorkflow();
+    workflow.nodes.push(buildConnectorNode('connector-1'));
+    workflow.edges.push({
+      id: 'e1',
+      type: 'default',
+      source: workflow.nodes[0]!.id,
+      sourceHandle: 'vae',
+      target: 'connector-1',
+      targetHandle: 'wrong',
+    });
+
+    const validationResult = await validateWorkflow({
+      workflow,
+      templates: { img_resize, main_model_loader },
+      checkImageAccess: resolveTrue,
+      checkBoardAccess: resolveTrue,
+      checkModelAccess: resolveTrue,
+    });
+
+    expect(validationResult.workflow.edges).toEqual([]);
+    expect(validationResult.warnings.length).toBe(1);
+  });
+
+  it('should delete connector edges with missing endpoints', async () => {
+    const workflow = getWorkflow();
+    workflow.nodes.push(buildConnectorNode('connector-1'));
+    workflow.edges.push({
+      id: 'e1',
+      type: 'default',
+      source: 'missing-node',
+      sourceHandle: 'value',
+      target: 'connector-1',
+      targetHandle: CONNECTOR_INPUT_HANDLE,
+    });
+
+    const validationResult = await validateWorkflow({
+      workflow,
+      templates: { img_resize, main_model_loader },
+      checkImageAccess: resolveTrue,
+      checkBoardAccess: resolveTrue,
+      checkModelAccess: resolveTrue,
+    });
+
+    expect(validationResult.workflow.edges).toEqual([]);
+    expect(validationResult.warnings.length).toBe(1);
+  });
+
+  it('should repair invalid multi-input connector state predictably by keeping the first valid input edge', async () => {
+    const workflow = getWorkflow();
+    const loader2 = structuredClone(workflow.nodes[0]!);
+    loader2.id = 'second-loader';
+    loader2.data.id = 'second-loader';
+    const connector = buildConnectorNode('connector-1');
+    workflow.nodes.push(loader2, connector);
+    workflow.edges.push({
+      id: 'e1',
+      type: 'default',
+      source: workflow.nodes[0]!.id,
+      sourceHandle: 'vae',
+      target: connector.id,
+      targetHandle: CONNECTOR_INPUT_HANDLE,
+    });
+    workflow.edges.push({
+      id: 'e2',
+      type: 'default',
+      source: loader2.id,
+      sourceHandle: 'vae',
+      target: connector.id,
+      targetHandle: CONNECTOR_INPUT_HANDLE,
+    });
+
+    const validationResult = await validateWorkflow({
+      workflow,
+      templates: { img_resize, main_model_loader },
+      checkImageAccess: resolveTrue,
+      checkBoardAccess: resolveTrue,
+      checkModelAccess: resolveTrue,
+    });
+
+    expect(validationResult.workflow.edges).toEqual([
+      {
+        id: 'e1',
+        type: 'default',
+        source: workflow.nodes[0]!.id,
+        sourceHandle: 'vae',
+        target: connector.id,
+        targetHandle: CONNECTOR_INPUT_HANDLE,
+      },
+    ]);
+    expect(validationResult.warnings.length).toBe(1);
+  });
+
+  it('should retain isolated connectors during workflow validation', async () => {
+    const workflow = getWorkflow();
+    workflow.nodes.push(buildConnectorNode('connector-1'));
+
+    const validationResult = await validateWorkflow({
+      workflow,
+      templates: { img_resize, main_model_loader },
+      checkImageAccess: resolveTrue,
+      checkBoardAccess: resolveTrue,
+      checkModelAccess: resolveTrue,
+    });
+
+    expect(validationResult.workflow.nodes.find((node) => node.id === 'connector-1')).toBeDefined();
+    expect(validationResult.warnings).toEqual([]);
+  });
+
+  it('should retain unresolved connector output edges that establish downstream constraints in the editor', async () => {
+    const workflow = getWorkflow();
+    workflow.nodes.push(buildConnectorNode('connector-1'));
+    const unresolvedEdge = {
+      id: 'e1',
+      type: 'default' as const,
+      source: 'connector-1',
+      sourceHandle: CONNECTOR_OUTPUT_HANDLE,
+      target: workflow.nodes[1]!.id,
+      targetHandle: 'image',
+    };
+    workflow.edges.push(unresolvedEdge);
+
+    const validationResult = await validateWorkflow({
+      workflow,
+      templates: { img_resize, main_model_loader },
+      checkImageAccess: resolveTrue,
+      checkBoardAccess: resolveTrue,
+      checkModelAccess: resolveTrue,
+    });
+
+    expect(validationResult.workflow.edges).toEqual([unresolvedEdge]);
+    expect(validationResult.warnings).toEqual([]);
   });
 });

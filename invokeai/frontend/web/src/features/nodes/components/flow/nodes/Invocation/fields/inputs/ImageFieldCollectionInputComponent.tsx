@@ -116,6 +116,7 @@ ImageFieldCollectionInputComponent.displayName = 'ImageFieldCollectionInputCompo
 
 const ImageGridItemContent = memo(
   ({ value, index, onRemoveImage }: { value: ImageField; index: number; onRemoveImage: (index: number) => void }) => {
+    const { t } = useTranslation();
     const query = useGetImageDTOQuery(value.image_name);
     const onClickRemove = useCallback(() => {
       onRemoveImage(index);
@@ -132,7 +133,7 @@ const ImageGridItemContent = memo(
           <DndImageIcon
             onClick={onClickRemove}
             icon={<PiXBold />}
-            tooltip="Remove Image from Collection"
+            tooltip={t('controlLayers.removeImageFromCollection')}
             position="absolute"
             flexDir="column"
             top={1}
@@ -159,7 +160,7 @@ const ImageGridItemContent = memo(
         <DndImageIcon
           onClick={onClickRemove}
           icon={<PiXBold />}
-          tooltip="Remove Image from Collection"
+          tooltip={t('controlLayers.removeImageFromCollection')}
           position="absolute"
           flexDir="column"
           top={1}

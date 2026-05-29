@@ -40,7 +40,7 @@ export const Notifications = () => {
       <PopoverTrigger>
         <Flex pos="relative">
           <IconButton
-            aria-label="Notifications"
+            aria-label={t('common.notifications')}
             variant="link"
             icon={<PiLightbulbFilamentBold fontSize={20} />}
             boxSize={8}
