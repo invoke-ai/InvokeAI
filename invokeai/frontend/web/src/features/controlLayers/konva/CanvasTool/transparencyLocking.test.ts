@@ -1,7 +1,7 @@
 import type { CanvasEntityState } from 'features/controlLayers/store/types';
 import { describe, expect, it } from 'vitest';
 
-import { getTransparencyLockedCompositeOperation } from './transparencyLocking';
+import { getDrawingCompositeOperation, getTransparencyLockedCompositeOperation } from './transparencyLocking';
 
 describe('transparency locking', () => {
   it('uses source-atop for locked raster layers', () => {
@@ -26,5 +26,23 @@ describe('transparency locking', () => {
     expect(getTransparencyLockedCompositeOperation(unlockedRasterLayer)).toBeUndefined();
     expect(getTransparencyLockedCompositeOperation(controlLayer)).toBeUndefined();
     expect(getTransparencyLockedCompositeOperation(null)).toBeUndefined();
+  });
+
+  it('uses source-atop for normal drawing on locked raster layers', () => {
+    const entity = {
+      type: 'raster_layer',
+      isTransparencyLocked: true,
+    } as CanvasEntityState;
+
+    expect(getDrawingCompositeOperation(entity)).toBe('source-atop');
+  });
+
+  it('preserves explicit fallback compositing when transparency is not locked', () => {
+    const entity = {
+      type: 'raster_layer',
+      isTransparencyLocked: false,
+    } as CanvasEntityState;
+
+    expect(getDrawingCompositeOperation(entity, 'destination-out')).toBe('destination-out');
   });
 });

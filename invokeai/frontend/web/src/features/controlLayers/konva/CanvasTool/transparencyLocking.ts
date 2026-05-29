@@ -9,3 +9,10 @@ export const getTransparencyLockedCompositeOperation = (
 
   return undefined;
 };
+
+export const getDrawingCompositeOperation = (
+  entity: CanvasEntityState | null | undefined,
+  fallback: CompositeOperation = 'source-over'
+): CompositeOperation => {
+  return getTransparencyLockedCompositeOperation(entity) ?? fallback;
+};
