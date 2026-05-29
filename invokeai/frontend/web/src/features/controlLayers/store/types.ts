@@ -315,6 +315,7 @@ const zCanvasLinearGradientState = z.object({
   bboxRect: zRect,
   fgColor: zRgbaColor,
   bgColor: zRgbaColor,
+  globalCompositeOperation: z.string().optional(),
 });
 const zCanvasRadialGradientState = z.object({
   id: zId,
@@ -329,6 +330,7 @@ const zCanvasRadialGradientState = z.object({
   bboxRect: zRect,
   fgColor: zRgbaColor,
   bgColor: zRgbaColor,
+  globalCompositeOperation: z.string().optional(),
 });
 const zCanvasGradientState = z.discriminatedUnion('gradientType', [
   zCanvasLinearGradientState,
