@@ -14,6 +14,7 @@ import huggingface_hub
 from fastapi import Body, Path, Query, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.routing import APIRouter
+from huggingface_hub.errors import HfHubHTTPError
 from PIL import Image
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException
@@ -1048,12 +1049,17 @@ class HFTokenHelper:
             if token is None:
                 # No token set
                 return HFTokenStatus.INVALID
-            if huggingface_hub.get_token_permission(token):
-                # Valid token!
-                return HFTokenStatus.VALID
-            # Token exists but has no permissions (shouldn't normally happen)
+            # get_token_permission() was removed in huggingface_hub 1.x. whoami() validates
+            # the token against the Hub: it returns user info for a valid token and raises
+            # HfHubHTTPError (e.g. 401) for an invalid one.
+            huggingface_hub.whoami(token=token)
+            # Valid token!
+            return HFTokenStatus.VALID
+        except HfHubHTTPError:
+            # Token is present but rejected by the Hub -> invalid
             return HFTokenStatus.INVALID
         except Exception:
+            # Network error or other unexpected failure -> unknown
             return HFTokenStatus.UNKNOWN
 
     @classmethod
