@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "InvokeAI"
 description = "A full-featured AI-assisted image generation environment designed for creatives and enthusiasts."
-requires-python = ">=3.11, <3.13"
+requires-python = ">=3.14, <=3.14.5"
 readme = { content-type = "text/markdown", file = "README.md" }
 keywords = ["stable-diffusion", "AI"]
 dynamic = ["version"]
@@ -23,7 +23,7 @@ classifiers = [
   'Operating System :: MacOS',
   'Operating System :: Microsoft :: Windows',
   'Programming Language :: Python :: 3 :: Only',
-  'Programming Language :: Python :: 3.12',
+  'Programming Language :: Python :: 3.14',
   'Topic :: Artistic Software',
   'Topic :: Internet :: WWW/HTTP :: WSGI :: Application',
   'Topic :: Internet :: WWW/HTTP :: WSGI :: Server',
@@ -34,22 +34,22 @@ classifiers = [
 dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
   "accelerate",
-  "bitsandbytes; sys_platform!='darwin'",
+  "bitsandbytes>=0.48.0; sys_platform!='darwin'", # CUDA 130 supported as of 0.48.0 feb-2026, CUDA 131/132 slated for "future release"
   "compel==2.1.1",
   "diffusers[torch]==0.37.0",
   "gguf",
-  "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
-  "numpy<2.0.0",
-  "onnx==1.16.1",
-  "onnxruntime==1.19.2",
+  "mediapipe==0.10.35",                   # needed for "mediapipeface" controlnet model
+  "numpy<=2.4.6",                         # TODO: figure out why numpy<2.0.0 was pinned?
+  "onnx==1.21.0",
+  "onnxruntime==1.26.0",                  # 1.27.0 will drop support for CUDA 12
   "opencv-contrib-python",
   "safetensors",
-  "sentencepiece==0.2.0",                 # 0.2.1 coredumps windows when loading t5 tokenizer
+  "sentencepiece==0.2.1",                 # 0.2.1 coredumps windows when loading t5 tokenizer
   "spandrel",
-  "torch~=2.7.0",                         # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
+  "torch~=2.12.0",                         # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
   "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
   "torchvision",
-  "transformers>=4.56.0",
+  "transformers>=4.56.0",                 # Waiting on compel 2.2 to upgrade to 5.8.1
 
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events",
@@ -90,12 +90,12 @@ dependencies = [
   # torch 2.4+cu carries its own triton dependency
 ]
 
-"cpu" = ["torch==2.7.1+cpu", "torchvision==0.22.1+cpu"]
-"cuda" = ["torch==2.7.1+cu128", "torchvision==0.22.1+cu128"]
+"cpu" = ["torch==2.12.0+cpu", "torchvision==0.27.0+cpu"]
+"cuda" = ["torch==2.12.0+cu130", "torchvision==0.27.0+cu130"]
 "rocm" = [
-  "torch==2.7.1+rocm6.3",
-  "torchvision==0.22.1+rocm6.3",
-  "pytorch-triton-rocm",
+  "torch==2.12.0+rocm7.2; sys_platform == 'linux'",
+  "torchvision==0.27.0+rocm7.2; sys_platform == 'linux'",
+  "triton-rocm; sys_platform == 'linux'",
 ]
 
 "onnx" = ["onnxruntime"]
@@ -136,7 +136,7 @@ torchvision = [
   { index = "torch-cuda", extra = "cuda" },
   { index = "torch-rocm", extra = "rocm" },
 ]
-pytorch-triton-rocm = [
+triton-rocm = [
   { index = "torch-rocm", extra = "rocm", marker = "sys_platform == 'linux'" },
 ]
 
@@ -147,12 +147,12 @@ explicit = true
 
 [[tool.uv.index]]
 name = "torch-cuda"
-url = "https://download.pytorch.org/whl/cu128"
+url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
 [[tool.uv.index]]
 name = "torch-rocm"
-url = "https://download.pytorch.org/whl/rocm6.3"
+url = "https://download.pytorch.org/whl/rocm7.2"
 explicit = true
 
 [project.scripts]
@@ -195,7 +195,7 @@ version = { attr = "invokeai.version.__version__" }
   "*.png",
 ]
 "invokeai.assets.fonts" = ["**/*.ttf"]
-"invokeai.backend" = ["**.png", "**/*.icc"]
+"invokeai.backend" = ["**.png", "**/*.icc", "**/*.task"]
 "invokeai.configs" = ["*.example", "**/*.yaml", "*.txt"]
 "invokeai.frontend.web.dist" = ["**"]
 "invokeai.frontend.web.static" = ["**"]

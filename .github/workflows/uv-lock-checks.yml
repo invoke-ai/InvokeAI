@@ -38,7 +38,7 @@ jobs:
     timeout-minutes: 5 # expected run time: <1 min
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: check for changed python files
         if: ${{ inputs.always_run != true }}
@@ -48,7 +48,7 @@ jobs:
         # - CVE-2025-30066
         # - https://www.stepsecurity.io/blog/harden-runner-detection-tj-actions-changed-files-action-is-compromised
         # - https://github.com/tj-actions/changed-files/issues/2463
-        uses: tj-actions/changed-files@a284dc1814e3fd07f2e34267fc8f81227ed29fb8
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96
         with:
           files_yaml: |
             uvlock-pyprojecttoml:
@@ -57,12 +57,13 @@ jobs:
 
       - name: setup uv
         if: ${{ steps.changed-files.outputs.uvlock-pyprojecttoml_any_changed == 'true' || inputs.always_run == true }}
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v8.1.0
         with:
-          version: '0.6.10'
+          version: '0.11.16'
           enable-cache: true
+          python-version: '3.14'
 
       - name: check lockfile
         if: ${{ steps.changed-files.outputs.uvlock-pyprojecttoml_any_changed == 'true' || inputs.always_run == true }}
-        run: uv lock --locked # this will exit with 1 if the lockfile is not consistent with pyproject.toml
+        run: uv lock --locked
         shell: bash

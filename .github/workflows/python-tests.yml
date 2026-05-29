@@ -39,8 +39,7 @@ jobs:
     strategy:
       matrix:
         python-version:
-          - '3.11'
-          - '3.12'
+          - '3.14'
         platform:
           - linux-cpu
           - macos-default
@@ -76,7 +75,7 @@ jobs:
         # - CVE-2025-30066
         # - https://www.stepsecurity.io/blog/harden-runner-detection-tj-actions-changed-files-action-is-compromised
         # - https://github.com/tj-actions/changed-files/issues/2463
-        uses: tj-actions/changed-files@a284dc1814e3fd07f2e34267fc8f81227ed29fb8
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96
         with:
           files_yaml: |
             python:
@@ -87,15 +86,15 @@ jobs:
 
       - name: setup uv
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v8.1.0
         with:
-          version: '0.6.10'
+          version: '0.11.16'
           enable-cache: true
           python-version: ${{ matrix.python-version }}
 
       - name: setup python
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 

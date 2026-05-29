@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10 # expected run time: <2 min
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: check for changed frontend files
         if: ${{ inputs.always_run != true }}
@@ -49,7 +49,7 @@ jobs:
         # - CVE-2025-30066
         # - https://www.stepsecurity.io/blog/harden-runner-detection-tj-actions-changed-files-action-is-compromised
         # - https://github.com/tj-actions/changed-files/issues/2463
-        uses: tj-actions/changed-files@a284dc1814e3fd07f2e34267fc8f81227ed29fb8
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96
         with:
           files_yaml: |
             frontend:
