@@ -102,12 +102,8 @@ class Sd3TextEncoderInvocation(BaseInvocation):
         ):
             context.util.signal_progress("Running T5 encoder")
             assert isinstance(t5_text_encoder, T5EncoderModel)
-<<<<<<< HEAD
             assert isinstance(t5_tokenizer, T5Tokenizer)
-=======
-            assert isinstance(t5_tokenizer, (T5Tokenizer, T5TokenizerFast))
             t5_device = get_effective_device(t5_text_encoder)
->>>>>>> upstream/main
 
             text_inputs = t5_tokenizer(
                 prompt,
