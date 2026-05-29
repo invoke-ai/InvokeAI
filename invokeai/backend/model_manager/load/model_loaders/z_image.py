@@ -750,7 +750,13 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
                 # For rotary embeddings, this is inv_freq which is computed from config
                 if buffer_name == "inv_freq":
                     # Compute inv_freq from config (same logic as Qwen3RotaryEmbedding.__init__)
-                    base = qwen_config.rope_theta
+                    # NB: transformers 5.x moved rope_theta into the rope_parameters/rope_scaling dict
+                    rope_params = (
+                        getattr(qwen_config, "rope_parameters", None)
+                        or getattr(qwen_config, "rope_scaling", None)
+                        or {}
+                    )
+                    base = rope_params.get("rope_theta") or getattr(qwen_config, "rope_theta", 1000000.0)
                     inv_freq = 1.0 / (base ** (torch.arange(0, head_dim, 2, dtype=torch.float32) / head_dim))
                     parent.register_buffer(buffer_name, inv_freq.to(model_dtype), persistent=False)
                 else:
@@ -966,7 +972,13 @@ class Qwen3EncoderGGUFLoader(ModelLoader):
 
                 if buffer_name == "inv_freq":
                     # Compute inv_freq from config - keep on CPU, cache system will move to GPU as needed
-                    base = qwen_config.rope_theta
+                    # NB: transformers 5.x moved rope_theta into the rope_parameters/rope_scaling dict
+                    rope_params = (
+                        getattr(qwen_config, "rope_parameters", None)
+                        or getattr(qwen_config, "rope_scaling", None)
+                        or {}
+                    )
+                    base = rope_params.get("rope_theta") or getattr(qwen_config, "rope_theta", 1000000.0)
                     inv_freq = 1.0 / (base ** (torch.arange(0, head_dim, 2, dtype=torch.float32) / head_dim))
                     parent.register_buffer(buffer_name, inv_freq.to(dtype=compute_dtype), persistent=False)
                 else:
