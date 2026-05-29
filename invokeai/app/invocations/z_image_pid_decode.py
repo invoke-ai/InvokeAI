@@ -1,0 +1,151 @@
+"""Z-Image PiD decode invocation.
+
+Z-Image shares FLUX.1's 16-channel VAE, so the FLUX-trained PiD decoder
+(``PiD_res2k_sr4x_official_flux_distill_4step``) is the correct choice for
+Z-Image latents. This node replaces the regular Z-Image VAE decode with a
+PiD super-resolution decode (4x scale, ~256×256 latent → 2048×2048 image
+by default).
+"""
+
+from contextlib import ExitStack
+
+import torch
+from einops import rearrange
+from PIL import Image
+from transformers import PreTrainedModel, PreTrainedTokenizerBase
+
+from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
+from invokeai.app.invocations.fields import (
+    FieldDescriptions,
+    Input,
+    InputField,
+    LatentsField,
+    UIComponent,
+    WithBoard,
+    WithMetadata,
+)
+from invokeai.app.invocations.model import Gemma2EncoderField, PiDDecoderField
+from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.pid.decode import (
+    PiDDecodeConfig,
+    PiDDecoder,
+    encode_caption_for_pid,
+    load_pid_decoder,
+)
+from invokeai.backend.util.devices import TorchDevice
+
+# Z-Image / FLUX.1 VAE constants (see diffusers AutoencoderKL config for FLUX VAE).
+# We need to denormalise InvokeAI's stored latent (which is `scale * (raw - shift)`)
+# back to the raw form that the PiD decoder was trained against.
+_ZIMAGE_VAE_SCALING_FACTOR: float = 0.3611
+_ZIMAGE_VAE_SHIFT_FACTOR: float = 0.1159
+
+
+@invocation(
+    "z_image_pid_decode",
+    title="Latents to Image - Z-Image + PiD (4x SR)",
+    tags=["latents", "image", "pid", "z-image", "upscale"],
+    category="latents",
+    version="1.0.0",
+    classification=Classification.Prototype,
+)
+class ZImagePiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Decode a Z-Image latent with the PiD pixel-diffusion decoder.
+
+    Produces a 4x super-resolved image in a single pass (Z-Image decoder is
+    trained on FLUX.1 latents; ``sr_scale=4`` with the FLUX VAE's 8x spatial
+    down-factor gives a 32x linear scale from latent to pixel).
+    """
+
+    latents: LatentsField = InputField(description=FieldDescriptions.latents, input=Input.Connection)
+    prompt: str = InputField(
+        description="Text prompt the latent was generated from. PiD conditions on it.",
+        ui_component=UIComponent.Textarea,
+    )
+    gemma2_encoder: Gemma2EncoderField = InputField(
+        title="Gemma-2 Encoder",
+        description="Gemma-2 caption encoder. Required by PiD.",
+        input=Input.Connection,
+    )
+    pid_decoder: PiDDecoderField = InputField(
+        title="PiD Decoder",
+        description="PiD FLUX decoder checkpoint.",
+        input=Input.Connection,
+    )
+    num_inference_steps: int = InputField(
+        default=4,
+        ge=1,
+        le=8,
+        description="Number of PiD distill steps. The released checkpoints are trained for 4.",
+    )
+    seed: int = InputField(default=0, description="Seed for the PiD decoder's noise.")
+
+    @torch.no_grad()
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        latents = context.tensors.load(self.latents.latents_name)
+
+        # 1) Encode caption with Gemma-2.
+        gemma_text_encoder_info = context.models.load(self.gemma2_encoder.text_encoder)
+        gemma_tokenizer_info = context.models.load(self.gemma2_encoder.tokenizer)
+        with ExitStack() as stack:
+            (_, gemma_encoder) = stack.enter_context(gemma_text_encoder_info.model_on_device())
+            (_, gemma_tokenizer) = stack.enter_context(gemma_tokenizer_info.model_on_device())
+            if not isinstance(gemma_encoder, PreTrainedModel):
+                raise TypeError(f"Expected PreTrainedModel for Gemma encoder, got {type(gemma_encoder).__name__}.")
+            if not isinstance(gemma_tokenizer, PreTrainedTokenizerBase):
+                raise TypeError(
+                    f"Expected PreTrainedTokenizerBase for Gemma tokenizer, got {type(gemma_tokenizer).__name__}."
+                )
+
+            device = TorchDevice.choose_torch_device()
+            encode_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
+
+            context.util.signal_progress("Encoding caption with Gemma-2")
+            caption_embs = encode_caption_for_pid(
+                [self.prompt],
+                tokenizer=gemma_tokenizer,
+                encoder=gemma_encoder,
+                device=device,
+                dtype=encode_dtype,
+            )
+            # Move off-device so Gemma's slot in the cache can be reclaimed.
+            caption_embs = caption_embs.detach().to("cpu")
+        # Drop Gemma references so the cache can evict it before we load PiD.
+        del gemma_encoder, gemma_tokenizer
+        TorchDevice.empty_cache()
+
+        # 2) Build PidNet on demand from the state dict loader, then run decode.
+        pid_info = context.models.load(self.pid_decoder.decoder)
+        with pid_info.model_on_device() as (_, raw):
+            if not isinstance(raw, dict):
+                raise TypeError(f"Expected PiD decoder state dict, got {type(raw).__name__}.")
+            device = TorchDevice.choose_torch_device()
+            dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
+            context.util.signal_progress("Building PiD network")
+            pid_net = load_pid_decoder(raw, BaseModelType.Flux).to(device=device, dtype=dtype)
+
+            # Z-Image latents come out of the diffusers pipeline normalised
+            # by the FLUX VAE constants. PiD expects the raw latent.
+            denorm_latent = (
+                latents.to(device=device, dtype=dtype) / _ZIMAGE_VAE_SCALING_FACTOR + _ZIMAGE_VAE_SHIFT_FACTOR
+            )
+            caption_embs = caption_embs.to(device=device, dtype=dtype)
+
+            context.util.signal_progress("Running PiD decoder")
+            decoder = PiDDecoder(pid_net, backbone=BaseModelType.Flux)
+            x0 = decoder.decode(
+                latent=denorm_latent,
+                caption_embs=caption_embs,
+                config=PiDDecodeConfig(num_inference_steps=self.num_inference_steps, seed=self.seed),
+            )
+
+        TorchDevice.empty_cache()
+
+        # x0 is [B, 3, H, W] in [-1, 1]; convert the first item to a PIL image.
+        img = rearrange(x0[0].clamp(-1, 1), "c h w -> h w c")
+        img_pil = Image.fromarray((127.5 * (img + 1.0)).byte().cpu().numpy())
+
+        image_dto = context.images.save(image=img_pil)
+        return ImageOutput.build(image_dto)
