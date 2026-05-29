@@ -8,7 +8,7 @@ from invokeai.app.invocations.baseinvocation import (
 from invokeai.app.invocations.fields import InputField, OutputField
 from invokeai.app.invocations.model import Gemma2EncoderField, ModelIdentifierField
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
+from invokeai.backend.model_manager.taxonomy import ModelType, SubModelType
 
 
 @invocation_output("gemma2_encoder_output")
@@ -34,7 +34,6 @@ class Gemma2EncoderLoaderInvocation(BaseInvocation):
     gemma2_model: ModelIdentifierField = InputField(
         description="Gemma-2 model used to encode captions for PiD decoders.",
         title="Gemma-2",
-        ui_model_base=[BaseModelType.Any],
         ui_model_type=ModelType.Gemma2Encoder,
     )
 

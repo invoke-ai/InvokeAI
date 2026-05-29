@@ -8,7 +8,7 @@ from invokeai.app.invocations.baseinvocation import (
 from invokeai.app.invocations.fields import InputField, OutputField
 from invokeai.app.invocations.model import ModelIdentifierField, PiDDecoderField
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.model_manager.taxonomy import ModelType
 
 
 @invocation_output("pid_decoder_output")
@@ -34,7 +34,6 @@ class PiDDecoderLoaderInvocation(BaseInvocation):
     pid_decoder_model: ModelIdentifierField = InputField(
         description="PiD decoder checkpoint matching the upstream backbone.",
         title="PiD Decoder",
-        ui_model_base=[BaseModelType.Flux, BaseModelType.Flux2, BaseModelType.StableDiffusion3],
         ui_model_type=ModelType.PiDDecoder,
     )
 

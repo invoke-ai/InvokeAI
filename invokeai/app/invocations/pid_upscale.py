@@ -39,11 +39,11 @@ from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.util import get_flux_ae_params
 from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.pid._src.networks.pid_net import PidNet
 from invokeai.backend.pid.decode import (
     PiDDecodeConfig,
     PiDDecoder,
     encode_caption_for_pid,
-    load_pid_decoder,
 )
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.backend.util.devices import TorchDevice
@@ -129,7 +129,7 @@ class PiDUpscaleInvocation(BaseInvocation, WithMetadata, WithBoard):
             device = TorchDevice.choose_torch_device()
             encode_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
             context.util.signal_progress("Encoding caption with Gemma-2")
-            caption_embs = encode_caption_for_pid(
+            caption_embs, caption_mask = encode_caption_for_pid(
                 [self.prompt],
                 tokenizer=gemma_tokenizer,
                 encoder=gemma_encoder,
@@ -137,18 +137,18 @@ class PiDUpscaleInvocation(BaseInvocation, WithMetadata, WithBoard):
                 dtype=encode_dtype,
             )
             caption_embs = caption_embs.detach().to("cpu")
+
+            caption_mask = caption_mask.detach().to("cpu")
         del gemma_encoder, gemma_tokenizer
         TorchDevice.empty_cache()
 
-        # 3) Load PiD and decode.
+        # 3) Run PiD decode (the loader already returns a live PidNet).
         pid_info = context.models.load(self.pid_decoder.decoder)
-        with pid_info.model_on_device() as (_, raw):
-            if not isinstance(raw, dict):
-                raise TypeError(f"Expected PiD decoder state dict, got {type(raw).__name__}.")
+        with pid_info.model_on_device() as (_, pid_net):
+            if not isinstance(pid_net, PidNet):
+                raise TypeError(f"Expected PidNet for PiD decoder, got {type(pid_net).__name__}.")
             device = TorchDevice.choose_torch_device()
-            dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
-            context.util.signal_progress("Building PiD network")
-            pid_net = load_pid_decoder(raw, BaseModelType.Flux).to(device=device, dtype=dtype)
+            dtype = next(iter(pid_net.parameters())).dtype
 
             latent_on_device = raw_latent.to(device=device, dtype=dtype)
             caption_embs = caption_embs.to(device=device, dtype=dtype)
@@ -158,6 +158,8 @@ class PiDUpscaleInvocation(BaseInvocation, WithMetadata, WithBoard):
             x0 = decoder.decode(
                 latent=latent_on_device,
                 caption_embs=caption_embs,
+
+                caption_mask=caption_mask,
                 config=PiDDecodeConfig(num_inference_steps=self.num_inference_steps, seed=self.seed),
             )
 

@@ -192,6 +192,7 @@ def _student_sample_loop(
     noise: Tensor,
     t_list: Tensor,
     caption_embs: Tensor,
+    caption_mask: Optional[Tensor],
     lq_latent: Optional[Tensor],
     degrade_sigma: Tensor,
     sample_type: str = "sde",
@@ -217,6 +218,13 @@ def _student_sample_loop(
     for t_cur, t_next in zip(t_list[:-1], t_list[1:], strict=True):
         t_cur_batch = t_cur.expand(batch_size)
         with autocast_ctx:
+            # Do not pass the caption mask through here: upstream PiD's
+            # PidDistillModel sampler omits it too, and PidNet forwards the
+            # same `mask` argument unchanged to its pixel blocks where the
+            # shape (B, T_text) is incompatible with the patch-token K
+            # dimension that block expects. We keep `caption_mask` available
+            # in the signature so a future patch-block-only path can reuse
+            # it without another API change.
             v_pred = net(
                 x,
                 t_cur_batch * _FM_TIMESCALE,
@@ -301,6 +309,7 @@ class PiDDecoder:
         *,
         latent: Tensor,
         caption_embs: Tensor,
+        caption_mask: Optional[Tensor] = None,
         config: Optional[PiDDecodeConfig] = None,
     ) -> Tensor:
         """Decode *latent* + *caption_embs* into a pixel tensor in [-1, 1].
@@ -321,9 +330,12 @@ class PiDDecoder:
         cfg = config or PiDDecodeConfig()
         device = latent.device
         dtype = next(self.net.parameters()).dtype
-        # bf16/fp16 weights need autocast inside forward because RoPE / cosines
-        # are constructed in float32 from torch.arange. fp32 weights run as-is.
-        autocast_dtype = dtype if dtype in (torch.bfloat16, torch.float16) else None
+        # On CUDA, always run the forward pass under bf16 autocast: matmuls and
+        # convolutions execute in bf16 (fast + small activations), while
+        # numerically sensitive reductions like RMSNorm stay in the parameter
+        # dtype. PidNet is intentionally loaded in fp32 (see the loader) so
+        # those reductions actually keep their precision.
+        autocast_dtype = torch.bfloat16 if device.type == "cuda" else None
         batch_size = latent.shape[0]
 
         # Spatial size of the noise tensor — the decoder operates in pixel
@@ -350,6 +362,8 @@ class PiDDecoder:
             )
 
         caption_embs = caption_embs.to(device=device, dtype=dtype)
+        if caption_mask is not None:
+            caption_mask = caption_mask.to(device=device)
         lq_latent = latent.to(device=device, dtype=dtype)
 
         t_list = _get_t_list(device, num_steps=cfg.num_inference_steps)
@@ -360,6 +374,7 @@ class PiDDecoder:
             noise=noise,
             t_list=t_list,
             caption_embs=caption_embs,
+            caption_mask=caption_mask,
             lq_latent=lq_latent,
             degrade_sigma=degrade_sigma_t,
             sample_type=cfg.sample_type,
@@ -379,29 +394,50 @@ def encode_caption_for_pid(
     dtype: torch.dtype = torch.bfloat16,
     chi_prompt: str = PID_CHI_PROMPT,
     model_max_length: int = PID_MODEL_MAX_LENGTH,
-) -> Tensor:
+) -> tuple[Tensor, Tensor]:
     """Mirror of `PixelDiTModel._encode_text_raw`.
 
     Prepends the chi-prompt, tokenises with right-padding, runs Gemma's
     `model` (the transformer stack without the LM head), and selects
     ``[CLS] + last (model_max_length - 1)`` tokens to yield a fixed
-    ``[B, model_max_length, 2304]`` tensor that the PiD decoder expects.
+    ``[B, model_max_length, 2304]`` embedding plus the matching attention
+    mask. The mask is critical: PidNet's joint attention zeros padded text
+    tokens out via this mask. Without it the decoder treats all ~300 slots
+    (including the padding) as valid caption tokens and produces a
+    washed-out average image.
     """
     if not captions:
         raise ValueError("encode_caption_for_pid requires at least one caption.")
     n_chi_tokens = len(tokenizer.encode(chi_prompt)) if chi_prompt else 0
     prompts = [chi_prompt + c for c in captions]
     max_len = (n_chi_tokens + model_max_length - 2) if chi_prompt else model_max_length
-    toks = tokenizer(
-        prompts,
-        max_length=max_len,
-        padding="max_length",
-        truncation=True,
-        return_tensors="pt",
-    ).to(device)
+    # PiD was trained with right-padding (see PixelDiTModel._load_text_encoder
+    # upstream). Gemma2's tokenizer defaults to "left" which would push the
+    # BOS token away from index 0 and shove pads into the slice the decoder
+    # consumes — yielding a garbled caption embedding. We toggle the value
+    # for the duration of this call and restore it afterwards so we don't
+    # poison the shared cached tokenizer.
+    old_padding_side = getattr(tokenizer, "padding_side", "right")
+    try:
+        tokenizer.padding_side = "right"
+        toks = tokenizer(
+            prompts,
+            max_length=max_len,
+            padding="max_length",
+            truncation=True,
+            return_tensors="pt",
+        ).to(device)
+    finally:
+        tokenizer.padding_side = old_padding_side
     hidden = encoder(toks.input_ids, toks.attention_mask)[0]
     select_idx = [0] + list(range(-(model_max_length - 1), 0))
-    return hidden[:, select_idx].to(dtype=dtype)
+    caption_embs = hidden[:, select_idx].to(dtype=dtype)
+    # Cast to bool: HF tokenizers emit attention_mask as int64, but PidNet's
+    # SDPA call (scaled_dot_product_attention) refuses any int dtype — it
+    # requires bool or matching float. Bool also matches the upstream
+    # `pad = mask == 0` reduction in pid_net.py.
+    caption_mask = toks.attention_mask[:, select_idx].to(torch.bool)
+    return caption_embs, caption_mask
 
 
 __all__ = [
