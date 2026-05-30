@@ -303,6 +303,7 @@
         "unknown": "Unknown",
         "unpin": "Unpin",
         "upload": "Upload",
+        "userGuideLabel": "User Guide",
         "zoomIn": "Zoom In",
         "zoomOut": "Zoom Out",
         "updated": "Updated",
@@ -3471,17 +3472,16 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "LLM Prompt Tools: Use local language models to expand prompts or generate prompts from images. Install a Text LLM model (e.g. Qwen2.5-1.5B-Instruct) to get started.",
-            "FLUX.2 Klein Support: InvokeAI now supports the new FLUX.2 Klein models (4B and 9B variants) with GGUF, FP8, and Diffusers formats. Features include txt2img, img2img, inpainting, and outpainting. See 'Starter Models' to get started.",
-            "DyPE support for FLUX models improves high-resolution  (>1536 px up to 4K) images. Go to the 'Advanced Options' section to activate.",
-            "Z-Image Turbo diversity: Active 'Seed Variance Enhancer' under 'Advanced Options' to add diversity to your ZiT gens.",
-            "Multi-user mode supports multiple isolated users on the same server.",
-            "Enhanced support for Z-Image and FLUX.2 Models.",
-            "Multiple user interface enhancements and new canvas features."
+            "New model types: Qwen Image, Qwen Image Edit, Anima.",
+            "Support for hosted models: Gemini (Nano Banana), GPT Image, Qwen, Seedream, Wan",
+            "Private and shared image boards and workflows in multiuser mode",
+            "Canvas lasso tool, save/restore function, and the ability to hide those pesky preview tiles",
+            "Custom node manager",
+            "Redesigned download queue"
         ],
-        "takeUserSurvey": "📣 Let us know how you like InvokeAI. Take our User Experience Survey!",
         "readReleaseNotes": "Read Release Notes",
-        "watchRecentReleaseVideos": "Watch Recent Release Videos",
+        "readTheDocs": "Read the Docs",
+        "readDocumentation": "Read Invoke Documentation",
         "watchUiUpdatesOverview": "Watch UI Updates Overview"
     },
     "cropper": {
