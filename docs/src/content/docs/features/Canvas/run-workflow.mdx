@@ -1,0 +1,70 @@
+---
+title: Run Workflow on Canvas
+sidebar:
+  order: 5
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+You can run any workflow against a raster layer directly from the canvas. The selected layer is passed in as the workflow's image input, and the results land in the canvas staging area where you can review and accept them — without leaving the canvas tab.
+
+## Requirements for a workflow
+
+For a workflow to be available from the canvas, it must satisfy three conditions:
+
+1. **Form Builder is enabled.** The workflow's parameters are presented through the Form Builder UI when the workflow is launched from the canvas, so the workflow needs to have a form configured.
+2. **At least one image input field.** The layer you right-click on is passed into the first eligible image field as the workflow's input.
+3. **At least one `Canvas Output` node.** This is the node that marks which images should be routed back to the canvas staging area.
+
+Workflows that do not meet all three are filtered out of the canvas workflow selector.
+
+## The `Canvas Output` node
+
+`Canvas Output` is a dedicated workflow node that explicitly marks the images you want shown in the canvas staging area. Add it at the end of any branch whose output should appear on the canvas.
+
+A workflow can include **multiple `Canvas Output` nodes**. Each one becomes its own entry in the staging area, with an individually selectable thumbnail. You can navigate between entries with the arrow keys and accept just one of them onto the canvas.
+
+:::note[Why an explicit node?]
+Earlier versions detected output images heuristically (by scanning for `board` fields). That was fragile and caused unrelated nodes — for example, `save_image` — to be mistaken for canvas outputs. `Canvas Output` makes the routing intentional.
+:::
+
+## Running a workflow
+
+<Steps>
+1. On the canvas, **right-click a raster layer** to open its context menu.
+2. Choose **Run Workflow**.
+3. Pick a workflow from the list. Only workflows that meet the [requirements](#requirements-for-a-workflow) appear here.
+4. Adjust any exposed parameters in the form. All form field types are supported: text, numbers, booleans, enums, schedulers, boards, models, and images.
+5. Click **Run**. The workflow is queued and the results stream into the staging area as they complete.
+</Steps>
+
+The current layer is automatically passed into the workflow's image input — you do not need to select an image manually.
+
+## Reviewing and accepting results
+
+Results appear in the canvas staging area strip at the bottom of the canvas:
+
+- If the workflow has a single `Canvas Output`, you get one thumbnail per run.
+- If it has multiple `Canvas Output` nodes, each run produces multiple thumbnails, one per output node.
+- Use the staging area's next / previous controls (or arrow keys) to cycle through entries. Navigation wraps across run boundaries.
+- Click **Accept** to commit the currently selected entry onto the canvas. Only that single image is committed — siblings stay in staging until you accept or discard them.
+
+## Troubleshooting
+
+### My workflow doesn't appear in the selector
+
+Check, in order:
+
+- The workflow has Form Builder enabled.
+- The workflow has at least one image input field.
+- The workflow contains at least one `Canvas Output` node.
+
+If any of these is missing, the workflow is hidden.
+
+### Queueing fails with a "BoardField" validation error
+
+This was a known issue with workflows that combined `save_image` and `canvas_output` nodes. It is fixed — update Invoke and try again.
+
+### Errors during execution
+
+Workflow errors are surfaced as toasts and the staging area is cleaned up so it returns to a usable state. Open the queue panel for the full error message.

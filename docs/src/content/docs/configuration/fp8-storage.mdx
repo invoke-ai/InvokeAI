@@ -10,12 +10,36 @@ FP8 Storage cuts a model's VRAM footprint roughly in half by keeping weights on 
 
 It pairs well with [Low-VRAM mode](/configuration/low-vram-mode/): low-VRAM mode streams layers between RAM and VRAM, while FP8 Storage shrinks the layers themselves.
 
+:::caution[For full precision models only]
+FP8 Storage only applies to **full precision** checkpoints (FP16 / BF16 / FP32). It is **silently a no-op** for already-quantized formats — **GGUF**, **NF4**, and **int8** checkpoints carry their own storage precision and the loader returns a different module type that the FP8 layer cast does not touch. If your model is already quantized, the toggle has no effect; use the full-precision variant of the model if you want to enable FP8 Storage.
+:::
+
 ## Requirements
 
 - **Nvidia GPU on Windows or Linux.** FP8 Storage uses CUDA tensor types and is silently disabled on CPU and MPS.
 - **CUDA 12.x and recent PyTorch.** The `float8_e4m3fn` dtype was added in PyTorch 2.1 — InvokeAI's bundled versions satisfy this.
 
 There is no hardware requirement for FP8 *compute* — InvokeAI casts back to FP16/BF16 for math. This means FP8 Storage works on GPUs that do not natively support FP8 matmul (e.g. RTX 30-series), at a small per-step throughput cost.
+
+## Hardware support tiers
+
+InvokeAI's FP8 path stores weights in FP8 and casts them back to BF16/FP16 on each forward pass via its own `register_forward_pre_hook` / `register_forward_hook` wrappers (the same skip list as diffusers' `apply_layerwise_casting`, but applied to every `nn.Module` — including diffusers `ModelMixin` subclasses — so it composes correctly with InvokeAI's `CustomLinear` and partial loading). The practical benefit of toggling FP8 Storage depends on what your GPU can do natively. There are three tiers:
+
+### RTX 30-series and older Ampere workstation cards — VRAM win only
+
+The toggle works as advertised: the UNet / transformer drops by roughly 50% on the GPU. Per-step latency is the same or marginally slower because every forward pass adds an FP8 → BF16 cast on entry and a BF16 → FP8 cast on exit. This is the **largest target group**: 3090 owners squeezing FLUX into 24 GB benefit the most.
+
+### RTX 40-series, RTX 50-series, and Hopper — VRAM win today, compute win possible later
+
+These GPUs have native FP8 tensor cores. The toggle still buys you the same ~50% VRAM reduction today, because the forward pass still runs in BF16 — the hook casts weights back up to compute precision before each layer. If InvokeAI later wires up a true FP8 matmul path (e.g. via `torchao`), the same toggle will *also* unlock compute speedups on this hardware. Until then, treat the benefit as "VRAM only, same as Ampere".
+
+### Older CUDA cards — still a VRAM win
+
+`float8_e4m3fn` is a pure storage dtype in PyTorch and works on any CUDA device, so pre-Ampere cards (GTX 16-series, RTX 20-series, etc.) get the same ~50% VRAM reduction as Ampere. There are no native FP8 tensor cores on these GPUs, so the throughput trade-off is the same as on the 30-series: cast in, compute in BF16/FP16, cast back out.
+
+### MPS and CPU — no-op
+
+FP8 Storage is silently disabled on anything that is not CUDA. On CPU PyTorch *technically* supports FP8 dtypes, but the cast operations are software-emulated and end up costing more than the memory savings buy back, so InvokeAI gates the entire path on `device.type == "cuda"`. If you toggle it on CPU or MPS, the loader skips the cast and returns the model unchanged with no log line.
 
 ## Enabling FP8 Storage
 
@@ -64,10 +88,11 @@ That said, some artifacts have been reported on:
 
 If you see unexpected quality regressions, disable FP8 Storage on the affected model and re-run.
 
-## Combining with Low-VRAM mode and quantized models
+## Combining with Low-VRAM mode
 
-- **FP8 + partial loading**: fully supported. FP8 Storage shrinks the layers; partial loading streams them between RAM and VRAM as needed. Use both on tight VRAM budgets.
-- **FP8 + GGUF / NF4 / int8 quantized checkpoints**: these formats already have their own storage precision. FP8 Storage is not applied on top — the toggle is silently a no-op for quantized formats, since the loader returns a different module type.
+**FP8 + partial loading**: fully supported. FP8 Storage shrinks the layers; partial loading streams them between RAM and VRAM as needed. Use both on tight VRAM budgets.
+
+(For why FP8 Storage doesn't stack on top of GGUF / NF4 / int8 checkpoints, see the [callout at the top of this page](#for-full-precision-models-only).)
 
 ## Troubleshooting
 
@@ -87,3 +112,17 @@ Disable FP8 Storage for that model in Model Manager and reload. If quality is re
 ### "RuntimeError: ... float8_e4m3fn ..."
 
 You're on a PyTorch version that predates FP8 support. Reinstall InvokeAI using the official launcher — the bundled torch version supports FP8.
+
+### Reporting an FP8 issue
+
+If FP8 Storage misbehaves — crash, quality regression, OOM that shouldn't happen — please [open a GitHub issue](https://github.com/invoke-ai/InvokeAI/issues/new/choose) and include:
+
+- **What you did**: the workflow / generation step that triggered the problem, and whether it reproduces every time.
+- **Model**: exact name and variant (e.g. "FLUX.2 Klein 9B Diffusers", "SDXL Base 1.0 single-file"), and whether the file is a full-precision checkpoint or already quantized (GGUF / NF4 / int8).
+- **LoRAs**: whether any LoRAs (or ControlLoRAs) are stacked on the model, and how many.
+- **Other toggles**: Low-VRAM mode on/off, any `cpu_only` text encoder setting, configured VRAM limit.
+- **GPU**: model and VRAM size (e.g. "RTX 3090 24 GB", "RTX 4070 Ti 12 GB").
+- **OS**: Windows or Linux, plus driver / CUDA version if you have it.
+- **Logs**: the InvokeAI log around the failure — in particular the `FP8 layerwise casting enabled for <model>` line (or its absence) and any traceback.
+
+A side-by-side image comparison (FP8 on vs. FP8 off, same seed) is extremely useful for quality regressions.

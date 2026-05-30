@@ -132,7 +132,7 @@ class AnimaTextEncoderInvocation(BaseInvocation):
             device = text_encoder.device
 
             # Apply LoRA models to the text encoder
-            lora_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
+            lora_dtype = TorchDevice.choose_anima_inference_dtype(device)
             exit_stack.enter_context(
                 LayerPatcher.apply_smart_model_patches(
                     model=text_encoder,
