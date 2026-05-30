@@ -11,6 +11,7 @@ import imageio.v3 as iio
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import (
     InputField,
+    UIComponent,
     VideoField,
     WithBoard,
     WithMetadata,
@@ -25,7 +26,7 @@ from invokeai.app.util.video_thumbnails import extract_video_frame, probe_video
     title="Frame from Video",
     tags=["video", "image", "frame"],
     category="image",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class VideoFrameExtractInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -40,6 +41,7 @@ class VideoFrameExtractInvocation(BaseInvocation, WithMetadata, WithBoard):
     frame_index: int = InputField(
         default=-1,
         description="Index of the frame to extract. 0 = first frame, -1 = last frame, -2 = second-to-last, etc.",
+        ui_component=UIComponent.VideoFrameIndex,
     )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
