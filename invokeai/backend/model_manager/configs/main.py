@@ -1343,6 +1343,52 @@ def _has_qwen_image_keys(state_dict: dict[str | int, Any]) -> bool:
     return has_txt_in and has_txt_norm and has_img_in and not has_context_embedder
 
 
+def _infer_qwen_image_variant(sd: dict[str | int, Any], path) -> QwenImageVariantType:
+    """Infer Qwen Image variant from state dict marker or filename heuristic.
+
+    Edit-variant models include an `__index_timestep_zero__` tensor used by the
+    `zero_cond_t` dual-modulation path. Falls back to a filename "edit" substring
+    check for converters that don't emit the marker.
+    """
+    if "__index_timestep_zero__" in sd:
+        return QwenImageVariantType.Edit
+    if "edit" in path.stem.lower():
+        return QwenImageVariantType.Edit
+    return QwenImageVariantType.Generate
+
+
+class Main_Checkpoint_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Qwen Image single-file checkpoint models (safetensors, etc).
+
+    Covers both raw bf16/fp16 checkpoints and ComfyUI-style fp8_scaled checkpoints.
+    The loader dequantizes fp8 weights back to bf16 at load time; the
+    `default_settings.fp8_storage` toggle can then optionally re-cast to fp8 for
+    VRAM savings.
+    """
+
+    base: Literal[BaseModelType.QwenImage] = Field(default=BaseModelType.QwenImage)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    variant: QwenImageVariantType | None = Field(default=None)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        sd = mod.load_state_dict()
+
+        if not _has_qwen_image_keys(sd):
+            raise NotAMatchError("state dict does not look like a Qwen Image model")
+
+        if _has_ggml_tensors(sd):
+            raise NotAMatchError("state dict looks like GGUF quantized")
+
+        explicit_variant = override_fields.pop("variant", None) or _infer_qwen_image_variant(sd, mod.path)
+
+        return cls(**override_fields, variant=explicit_variant)
+
+
 class Main_GGUF_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
     """Model config for GGUF-quantized Qwen Image transformer models."""
 
@@ -1364,21 +1410,7 @@ class Main_GGUF_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Confi
         if not _has_ggml_tensors(sd):
             raise NotAMatchError("state dict does not look like GGUF quantized")
 
-        # Infer variant from the state dict if not explicitly provided.
-        # The Edit variant includes an extra tensor `__index_timestep_zero__` (used by the
-        # `zero_cond_t` dual-modulation path in diffusers' QwenImageTransformer2DModel).
-        # If the marker tensor is missing, fall back to the filename heuristic since older
-        # or alternate GGUF converters may not emit it.
-        explicit_variant = override_fields.pop("variant", None)
-        if explicit_variant is None:
-            if "__index_timestep_zero__" in sd:
-                explicit_variant = QwenImageVariantType.Edit
-            else:
-                filename = mod.path.stem.lower()
-                if "edit" in filename:
-                    explicit_variant = QwenImageVariantType.Edit
-                else:
-                    explicit_variant = QwenImageVariantType.Generate
+        explicit_variant = override_fields.pop("variant", None) or _infer_qwen_image_variant(sd, mod.path)
 
         return cls(**override_fields, variant=explicit_variant)
 
