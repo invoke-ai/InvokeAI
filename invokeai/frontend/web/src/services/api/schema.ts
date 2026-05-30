@@ -10161,7 +10161,9 @@ export type components = {
          * @description Run denoising process with a FLUX.2 Klein transformer model.
          *
          *     This node is designed for FLUX.2 Klein models which use Qwen3 as the text encoder.
-         *     It does not support ControlNet, IP-Adapters, or regional prompting.
+         *     Regional prompting is supported via per-conditioning masks (single mask is applied
+         *     to every transformer block via `joint_attention_kwargs`). ControlNet and IP-Adapters
+         *     are not supported. Regional masking is skipped when reference images are attached.
          */
         Flux2DenoiseInvocation: {
             /**
@@ -10221,10 +10223,11 @@ export type components = {
              */
             transformer?: components["schemas"]["TransformerField"] | null;
             /**
+             * Positive Text Conditioning
              * @description Positive conditioning tensor
              * @default null
              */
-            positive_text_conditioning?: components["schemas"]["FluxConditioningField"] | null;
+            positive_text_conditioning?: components["schemas"]["FluxConditioningField"] | components["schemas"]["FluxConditioningField"][] | null;
             /**
              * @description Negative conditioning tensor. Can be None if cfg_scale is 1.0.
              * @default null
