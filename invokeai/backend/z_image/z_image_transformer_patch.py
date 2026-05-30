@@ -73,10 +73,13 @@ def create_regional_forward(
         adaln_input = t_emb.type_as(x_cat)
         x_cat[torch.cat(x_inner_pad_mask)] = self.x_pad_token
         x_list = list(x_cat.split(x_item_seqlens, dim=0))
-        x_freqs_cis = list(self.rope_embedder(torch.cat(x_pos_ids, dim=0)).split(x_item_seqlens, dim=0))
+        # Split pos_ids by their own lengths — diffusers' _pad_with_ids can emit pos_ids
+        # longer than the padded feature when ori_len is not a multiple of SEQ_MULTI_OF.
+        x_freqs_cis = list(self.rope_embedder(torch.cat(x_pos_ids, dim=0)).split([len(p) for p in x_pos_ids], dim=0))
 
         x_padded = pad_sequence(x_list, batch_first=True, padding_value=0.0)
         x_freqs_cis_padded = pad_sequence(x_freqs_cis, batch_first=True, padding_value=0.0)
+        x_freqs_cis_padded = x_freqs_cis_padded[:, : x_padded.shape[1]]
         x_attn_mask = torch.zeros((bsz, x_max_item_seqlen), dtype=torch.bool, device=device)
         for i, seq_len in enumerate(x_item_seqlens):
             x_attn_mask[i, :seq_len] = 1
@@ -100,10 +103,13 @@ def create_regional_forward(
         cap_cat = self.cap_embedder(cap_cat)
         cap_cat[torch.cat(cap_inner_pad_mask)] = self.cap_pad_token
         cap_list = list(cap_cat.split(cap_item_seqlens, dim=0))
-        cap_freqs_cis = list(self.rope_embedder(torch.cat(cap_pos_ids, dim=0)).split(cap_item_seqlens, dim=0))
+        cap_freqs_cis = list(
+            self.rope_embedder(torch.cat(cap_pos_ids, dim=0)).split([len(p) for p in cap_pos_ids], dim=0)
+        )
 
         cap_padded = pad_sequence(cap_list, batch_first=True, padding_value=0.0)
         cap_freqs_cis_padded = pad_sequence(cap_freqs_cis, batch_first=True, padding_value=0.0)
+        cap_freqs_cis_padded = cap_freqs_cis_padded[:, : cap_padded.shape[1]]
         cap_attn_mask = torch.zeros((bsz, cap_max_item_seqlen), dtype=torch.bool, device=device)
         for i, seq_len in enumerate(cap_item_seqlens):
             cap_attn_mask[i, :seq_len] = 1
