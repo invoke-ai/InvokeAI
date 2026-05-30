@@ -9,6 +9,7 @@ to a usable middle section before chaining it to another shot.
 
 import tempfile
 from pathlib import Path
+from typing import Optional
 
 import imageio.v3 as iio
 import numpy as np
@@ -59,7 +60,7 @@ class ExtractVideoRangeOutput(BaseInvocationOutput):
     title="Frame Range from Video",
     tags=["video", "trim", "range", "frames"],
     category="video",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -67,8 +68,9 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     Both bounds are inclusive and 0-based — ``start_frame=10, end_frame=50``
     emits 41 frames. Negative indices count from the end (``end_frame=-1``
-    is the final frame), matching ``video_frame_extract``. The output
-    defaults to 16 fps, matching the other Wan video nodes.
+    is the final frame), matching ``video_frame_extract``. The output frame
+    rate defaults to the source video's frame rate; leave ``fps`` unset to
+    inherit it (or 16 fps if the source rate can't be probed).
 
     The resolved (positive) ``start_frame`` and ``end_frame`` are also emitted as
     outputs, so chained workflows can re-use the boundary indices — e.g. feeding
@@ -86,11 +88,12 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
         description=("Last frame to keep, inclusive. -1 = last frame. Negative indices count from the end."),
         ui_component=UIComponent.VideoFrameIndex,
     )
-    fps: int = InputField(
-        default=16,
+    fps: Optional[int] = InputField(
+        default=None,
         ge=1,
         le=120,
-        description="Output frame rate.",
+        description="Output frame rate. Leave unset to match the source video's frame rate "
+        "(falls back to 16 fps if the source rate can't be probed).",
     )
 
     def invoke(self, context: InvocationContext) -> ExtractVideoRangeOutput:
@@ -116,7 +119,16 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
                 f"({self.start_frame} → {start}) after resolving negative indices."
             )
 
-        output_fps = float(self.fps)
+        # Derive the output frame rate from the source video when the user
+        # leaves ``fps`` unset, so a trimmed clip plays back at the same speed
+        # as its source. Fall back to 16 fps (the Wan video default) when the
+        # source rate couldn't be probed.
+        if self.fps is not None:
+            output_fps = float(self.fps)
+        elif source_fps and source_fps > 0:
+            output_fps = float(source_fps)
+        else:
+            output_fps = 16.0
 
         context.util.signal_progress(f"Decoding frames {start}-{end} of {n_frames}")
         # imageio's iter_index isn't exposed by iio.imiter, so we enumerate and skip.
