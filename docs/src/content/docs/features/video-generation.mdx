@@ -12,6 +12,10 @@ InvokeAI ships **experimental support for the Wan 2.2 model family**, which lets
 Video generation is a prototype feature. Workflows, node fields, and starter-model packaging may change between releases. The underlying models are also new — expect rough edges in coherence and artifacts at longer durations.
 :::
 
+:::tip[Just want to make a video?]
+Start with the [**Video Workflows** guide](/features/video-workflows/) — a plain-language tour of the eight ready-made workflows that ship with InvokeAI and how to run them. This page is the deeper technical reference behind them.
+:::
+
 ---
 
 ## Models
@@ -68,7 +72,7 @@ Higher-quality Q8_0 quantizations of every transformer, plus full Diffusers buil
 
 ## Workflow setup
 
-The shipped starter workflows ("Text to Video - Wan 2.2 Lightning", "Image to Video - Wan 2.2 Lightning") are the easiest starting point — load them from the workflow library, pick your models, set a prompt, and Invoke. The sections below describe what's happening inside so you can build your own.
+The shipped starter workflows ("Text to Video - Wan 2.2 Lightning", "Image to Video - Wan 2.2 Lightning") are the easiest starting point — load them from the workflow library, pick your models, set a prompt, and Invoke. The [Video Workflows guide](/features/video-workflows/) walks through all eight and how to choose between them; the sections below describe what's happening inside so you can build your own.
 
 ### Constraints that apply to every video workflow
 

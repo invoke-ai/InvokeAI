@@ -1,0 +1,143 @@
+---
+title: Video Workflows
+description: A plain-language guide to the eight ready-made Wan 2.2 video workflows that ship with InvokeAI — which one to pick, and how to run it.
+lastUpdated: 2026-05-30
+---
+
+import { Card, CardGrid, Steps, LinkButton } from '@astrojs/starlight/components';
+
+InvokeAI ships **eight ready-made video workflows** so you can start generating video without wiring up nodes yourself. Each one is a complete recipe — open it from the **Workflows** library, pick your models, type a prompt (and/or drop in an image), and press **Invoke**.
+
+This page helps you choose the right workflow and run it. For how the models work under the hood, VRAM details, and troubleshooting, see the [Video Generation guide](/features/video-generation/).
+
+:::caution[Experimental]
+Video generation is a prototype feature. These workflows and the models behind them are new — expect rough edges, and check the [Video Generation guide](/features/video-generation/) if something misbehaves.
+:::
+
+---
+
+## Before you start
+
+**1. Install the video models.** Open the **Model Manager** and install a Wan 2.2 starter bundle (Text-to-Video and/or Image-to-Video). The [Video Generation guide explains the bundles and what fits your GPU](/features/video-generation/#installing-models).
+
+**2. You'll select models when you open a workflow.** The shipped workflows come with their model slots **left empty on purpose** — every InvokeAI install stores models a little differently, so a workflow can't point at yours automatically. When you open one, look at its **Notes** panel (the note icon in the workflow editor): it lists exactly which model to pick in each slot. Drop those in once and you're set.
+
+:::tip
+Whenever a workflow won't run because a model field is empty, open its **Notes** — the shopping list of models to select is right there.
+:::
+
+---
+
+## Which workflow should I use?
+
+The eight workflows come in three families — **Text to Video**, **Image to Video**, and **Extend Video** — and within each family there's a high-quality option, a "concept LoRA" variant, and a lighter low-VRAM option.
+
+| I want to… | Use | Notes |
+|---|---|---|
+| Make a clip from a text description | **Text to Video - Wan 2.2 Lightning** | Best quality, fast. Start here. |
+| Animate an existing image | **Image to Video - Wan 2.2 Lightning** | Your image becomes the first frame. |
+| Make a video longer than ~5 seconds | **Extend Video - Wan 2.2 Lightning** | Continues an existing video and stitches the pieces together. |
+| Add my own style/subject LoRAs | the **w/ Concept LoRAs** variant of any of the above | Same as the base workflow, plus slots for your LoRAs. |
+| Run on a smaller GPU (≈12–16 GB) | a **TI2V-5B (Low Quality)** workflow | Smaller model, lower memory, lower quality. |
+
+If you're not sure, start with **Text to Video - Wan 2.2 Lightning** to get a feel for it, then move to Image-to-Video and Extend.
+
+---
+
+## The eight workflows
+
+### Text to Video
+
+<CardGrid>
+  <Card title="Text to Video - Wan 2.2 Lightning" icon="pencil">
+    Type a prompt, get a ~5-second clip. Uses the high-quality A14B model with the Lightning speed-up (just 4 steps). **The recommended starting point.**
+  </Card>
+  <Card title="Text to Video - …w/ Concept LoRAs" icon="pencil">
+    The same workflow, with extra slots to add your own concept LoRAs (a style or character you've trained or downloaded). Leave the slots empty to behave exactly like the base version.
+  </Card>
+  <Card title="Text to Video - Wan 2.2 TI2V-5B (Low Quality)" icon="pencil">
+    Uses the smaller TI2V-5B model. Lower quality and slower per result, but fits comfortably on 12–16 GB GPUs. Good for quick drafts or smaller cards.
+  </Card>
+</CardGrid>
+
+### Image to Video
+
+<CardGrid>
+  <Card title="Image to Video - Wan 2.2 Lightning" icon="star">
+    Drop in a starting image and a prompt; the model animates outward from your image as the first frame. Uses the A14B model + Lightning. **The recommended image-to-video starting point.**
+  </Card>
+  <Card title="Image to Video - …w/ Concept LoRAs" icon="star">
+    Same as above, with slots for your own concept LoRAs.
+  </Card>
+  <Card title="Image to Video - Wan 2.2 TI2V-5B (Low Quality)" icon="star">
+    Image-to-video on the smaller TI2V-5B model. Lower quality, lower VRAM — the low-memory option for animating an image.
+  </Card>
+</CardGrid>
+
+### Extend Video
+
+The Wan models are trained on short (~5 second) clips, so the way to make something longer is to **continue** a video and stitch the pieces together. These workflows do that for you.
+
+<CardGrid>
+  <Card title="Extend Video - Wan 2.2 Lightning" icon="clock">
+    Provide an existing video and use the sliders to choose where to continue from. The workflow generates a new clip starting from that point and joins it onto the original with a smooth transition. Run it repeatedly to keep growing the video.
+  </Card>
+  <Card title="Extend Video - …w/ Concept LoRAs" icon="clock">
+    Same as above, with slots for your own concept LoRAs so the continuation keeps your style or subject.
+  </Card>
+</CardGrid>
+
+:::tip[About the "Concept LoRAs" variants]
+A **concept LoRA** is an add-on that teaches the model a specific style, character, or subject. The *w/ Concept LoRAs* workflows are identical to their plain counterparts but add empty LoRA slots for you to fill in. If you don't have a concept LoRA, just use the plain version — you're not missing anything.
+:::
+
+:::note[About the "TI2V-5B (Low Quality)" variants]
+"Low quality" here means *lower than the A14B Lightning workflows*, in exchange for running on much less video memory. On a 12–16 GB GPU they may be your best (or only) option, and they're handy everywhere for fast drafts.
+:::
+
+---
+
+## Running a workflow
+
+<Steps>
+
+1. **Open the Workflows tab** and load one of the eight workflows from the library.
+
+2. **Read the Notes** (note icon) and select the models it lists — the main model, VAE, and text encoder, plus the Lightning LoRA pair on the A14B workflows.
+
+3. **Set your inputs:**
+   - *Text to Video* — type a **positive prompt** describing the scene and motion.
+   - *Image to Video* — drop a starting **image** into the image field, and optionally add a prompt.
+   - *Extend Video* — provide a **starting video** and use the sliders to pick where the continuation begins.
+
+4. **(Optional) adjust resolution.** The defaults are chosen to balance speed and memory. If you hit an out-of-memory error, lower the resolution preset — see the [VRAM tips](#which-one-fits-my-gpu) below.
+
+5. **Press Invoke.** The finished MP4 appears in the gallery and plays inline in the viewer.
+
+</Steps>
+
+:::tip
+Leave the **frame count** and **steps** at their defaults to start. They're already tuned for each workflow (for example, the Lightning workflows use only 4 steps, which is what makes them fast).
+:::
+
+---
+
+## Which one fits my GPU?
+
+A rough guide — exact numbers depend on resolution and your system. See [Video Generation → OOM errors](/features/video-generation/#oom-errors) for the full picture.
+
+| Your GPU | Best choice |
+|---|---|
+| 24 GB and up | Any workflow at 720p. |
+| 16–24 GB | A14B Lightning workflows at 480p; TI2V-5B at up to 720p. |
+| 12–16 GB | The **TI2V-5B (Low Quality)** workflows. |
+
+If you get an **out-of-memory** error, lower the resolution first (it helps far more than reducing the frame count), and switch to a TI2V-5B workflow if you're still over budget.
+
+---
+
+## Going further
+
+These workflows are starting points. Once you're comfortable, the [Video Generation guide](/features/video-generation/) covers what's happening inside them — the model variants, how image conditioning works, the trick for chaining clips into longer videos, recommended parameters, and troubleshooting.
+
+<LinkButton href="/features/video-generation/" variant="secondary">Read the Video Generation guide</LinkButton>
