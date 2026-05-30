@@ -537,8 +537,8 @@ wheels = [
 
 [[package]]
 name = "compel"
-version = "2.3.1"
-source = { git = "https://github.com/invoke-ai/compel.git?rev=main#8f404b45ef620f37c454bc93cf35db1ddcb348e7" }
+version = "2.4.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "diffusers" },
     { name = "notebook" },
@@ -548,6 +548,10 @@ dependencies = [
     { name = "torch", version = "2.7.1+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'extra-8-invokeai-cuda' or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm')" },
     { name = "torch", version = "2.7.1+rocm6.3", source = { registry = "https://download.pytorch.org/whl/rocm6.3" }, marker = "(extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (extra != 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (extra != 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm')" },
     { name = "transformers" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d3/7b/172a6c7fcba0f669c16e3ba3dc86e80fbdaa5b2a5a7ef60807ec1d43d5c4/compel-2.4.0.tar.gz", hash = "sha256:9d935d35bb4d16fa21d4b3b529d8b8f9dc784d67b44e42f46cd48c9dd321adc2", size = 54125, upload-time = "2026-05-30T16:07:48.477Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/76/3d/16a60bb74ad3430e99bd7db8c24a2810dcdc2dd60aec36c240ce1ceeabc7/compel-2.4.0-py3-none-any.whl", hash = "sha256:27a0ce5b540fba227c23ad1943f90128a9ee6266eda760e8cfb29fb9d041ac18", size = 36941, upload-time = "2026-05-30T16:07:47.184Z" },
 ]
 
 [[package]]
@@ -1237,7 +1241,7 @@ requires-dist = [
     { name = "bcrypt", specifier = "<4.0.0" },
     { name = "bitsandbytes", marker = "sys_platform != 'darwin'" },
     { name = "blake3" },
-    { name = "compel", git = "https://github.com/invoke-ai/compel.git?rev=main" },
+    { name = "compel", specifier = ">=2.4.0,<3" },
     { name = "deprecated" },
     { name = "diffusers", extras = ["torch"], specifier = "==0.37.0" },
     { name = "dnspython" },

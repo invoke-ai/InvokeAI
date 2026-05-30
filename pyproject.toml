@@ -35,7 +35,7 @@ dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
   "accelerate",
   "bitsandbytes; sys_platform!='darwin'",
-  "compel @ git+https://github.com/invoke-ai/compel.git@main",
+  "compel>=2.4.0,<3",
   "diffusers[torch]==0.37.0",
   "gguf",
   "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
