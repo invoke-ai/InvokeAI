@@ -49,16 +49,6 @@ In this situation, you may need to provide some additional information to identi
   Add `:v2` to the repo ID and use that when installing the model: `monster-labs/control_v1p_sd15_qrcode_monster:v2`
 :::
 
-## Exporting and Importing Model Settings
-
-Each model in the Model Manager has **Export Settings** and **Import Settings** buttons in the model header. These let you save a model's configuration to a JSON file and apply it to another installation, which is useful for backing up your tweaks, sharing a curated configuration with other users, or restoring a model after a reinstall.
-
-The exported file contains the model's `name`, `description`, `source URL`, the cover image (encoded as a base64 data URL), and any settings that apply to the model type — typically `default_settings`, `trigger_phrases`, and `cpu_only`. When importing, every field present in the file is applied to the selected model, overwriting its current values. Fields the target model type does not support are skipped and reported in a warning toast.
-
-:::caution
-  Importing replaces the target model's metadata, settings, and thumbnail with whatever is in the file. Make sure you're importing into the correct model.
-:::
-
 [set up in the config file]: ../../configuration/invokeai-yaml
 
 ## Editing model metadata
