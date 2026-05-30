@@ -9,7 +9,6 @@ to a usable middle section before chaining it to another shot.
 
 import tempfile
 from pathlib import Path
-from typing import Optional
 
 import imageio.v3 as iio
 import numpy as np
@@ -69,8 +68,8 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
     Both bounds are inclusive and 0-based — ``start_frame=10, end_frame=50``
     emits 41 frames. Negative indices count from the end (``end_frame=-1``
     is the final frame), matching ``video_frame_extract``. The output frame
-    rate defaults to the source video's frame rate; leave ``fps`` unset to
-    inherit it (or 16 fps if the source rate can't be probed).
+    rate defaults to the source video's frame rate; set ``fps=0`` to inherit
+    it (or 16 fps if the source rate can't be probed).
 
     The resolved (positive) ``start_frame`` and ``end_frame`` are also emitted as
     outputs, so chained workflows can re-use the boundary indices — e.g. feeding
@@ -88,11 +87,11 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
         description=("Last frame to keep, inclusive. -1 = last frame. Negative indices count from the end."),
         ui_component=UIComponent.VideoFrameIndex,
     )
-    fps: Optional[int] = InputField(
-        default=None,
-        ge=1,
+    fps: int = InputField(
+        default=0,
+        ge=0,
         le=120,
-        description="Output frame rate. Leave unset to match the source video's frame rate "
+        description="Output frame rate. 0 = match the source video's frame rate "
         "(falls back to 16 fps if the source rate can't be probed).",
     )
 
@@ -119,11 +118,11 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
                 f"({self.start_frame} → {start}) after resolving negative indices."
             )
 
-        # Derive the output frame rate from the source video when the user
-        # leaves ``fps`` unset, so a trimmed clip plays back at the same speed
-        # as its source. Fall back to 16 fps (the Wan video default) when the
-        # source rate couldn't be probed.
-        if self.fps is not None:
+        # Derive the output frame rate from the source video when ``fps`` is 0
+        # (the default), so a trimmed clip plays back at the same speed as its
+        # source. Fall back to 16 fps (the Wan video default) when the source
+        # rate couldn't be probed.
+        if self.fps > 0:
             output_fps = float(self.fps)
         elif source_fps and source_fps > 0:
             output_fps = float(source_fps)
