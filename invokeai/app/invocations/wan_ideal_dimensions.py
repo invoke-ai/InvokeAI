@@ -96,16 +96,20 @@ def _scale_and_snap(
 
 @invocation(
     "wan_i2v_ideal_dimensions",
-    title="Wan 2.2 I2V Ideal Dimensions",
+    title="Wan 2.2 I2V Ideal Dimensions (A14B)",
     tags=["wan", "video", "dimensions", "math"],
     category="video",
     version="1.1.0",
 )
 class WanI2VIdealDimensionsInvocation(BaseInvocation):
-    """Compute Wan I2V-compatible (width, height) for a chosen resolution preset.
+    """Ideal dimensions for the Wan 2.2 A14B models (I2V-A14B and T2V-A14B).
+
+    Use this node for the A14B family. For the TI2V-5B model use "Wan 2.2 TI2V
+    Ideal Dimensions" instead — TI2V-5B requires multiples of 32, and feeding it
+    these multiples-of-16 dims fails the patchify step.
 
     Scales the input W×H so the shorter side equals the chosen preset (480 / 720 /
-    1080 px), then snaps each dimension to a multiple of 16 (Wan's pixel-grid
+    1080 px), then snaps each dimension to a multiple of 16 (the A14B pixel-grid
     constraint). Wire from ``Image Primitive``'s width/height outputs and into
     ``wan_ref_image_encoder`` / ``wan_denoise``.
     """
@@ -148,19 +152,23 @@ class WanI2VIdealDimensionsInvocation(BaseInvocation):
 
 @invocation(
     "wan_ti2v_ideal_dimensions",
-    title="Wan 2.2 TI2V Ideal Dimensions",
+    title="Wan 2.2 TI2V Ideal Dimensions (5B)",
     tags=["wan", "video", "dimensions", "math"],
     category="video",
     version="1.0.0",
 )
 class WanTI2VIdealDimensionsInvocation(BaseInvocation):
-    """Compute Wan TI2V-5B-compatible (width, height) for a chosen resolution preset.
+    """Ideal dimensions for the Wan 2.2 TI2V-5B model.
 
-    Identical to ``wan_i2v_ideal_dimensions`` but snaps each dimension to a multiple
-    of 32 instead of 16. The Wan 2.2-VAE used by TI2V-5B applies 16x spatial
-    compression and the transformer adds a 2x patch on top, so pixel dims must
-    divide by 32 for the patchify step. Wire from ``Image Primitive``'s width/height
-    outputs and into the matching ``wan_denoise`` inputs.
+    Use this node for TI2V-5B only. For the A14B models (I2V-A14B / T2V-A14B) use
+    "Wan 2.2 I2V Ideal Dimensions" instead — those need multiples of 16, and this
+    node's multiples-of-32 dims would overshoot their pixel grid.
+
+    Identical to the A14B node but snaps each dimension to a multiple of 32 instead
+    of 16: the Wan 2.2-VAE used by TI2V-5B applies 16x spatial compression and the
+    transformer adds a 2x patch on top, so pixel dims must divide by 32 for the
+    patchify step. Wire from ``Image Primitive``'s width/height outputs and into
+    the matching ``wan_denoise`` inputs.
     """
 
     width: int = InputField(
