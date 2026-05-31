@@ -34,7 +34,7 @@ jobs:
       docs: ${{ steps.manual.outputs.docs || steps.filter.outputs.docs }}
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -94,7 +94,7 @@ jobs:
       - name: setup node
         uses: actions/setup-node@v6
         with:
-          node-version: '22.12.0'
+          node-version: '22'
 
       - name: setup pnpm
         uses: pnpm/action-setup@v6
