@@ -46,7 +46,7 @@ If you're not sure, start with **Text to Video - Wan 2.2 Lightning** to get a fe
 
 ---
 
-## The ten workflows
+## Bundled video workflows
 
 ### Text to Video
 
@@ -76,6 +76,22 @@ If you're not sure, start with **Text to Video - Wan 2.2 Lightning** to get a fe
   </Card>
 </CardGrid>
 
+### Interpolate Between Two Images
+
+<CardGrid>
+  <Card title="Interpolate 2 Images to Video - Wan 2.2 Lightning" icon="random">
+    Provide a **start image** and an **end image**; the model generates a clip that begins on the first and animates smoothly to the second (first-last-frame interpolation). Great for morphing between two stills or bridging two shots. Uses I2V-A14B + Lightning (4-step).
+  </Card>
+</CardGrid>
+
+:::caution[The "Concept LoRAs" variants need a LoRA in every slot]
+A **concept LoRA** is an add-on that teaches the model a specific style, character, or subject. The *w/ Concept LoRAs* workflows are the same as their plain counterparts but add extra LoRA slots. **Every LoRA slot is required** — if any slot, including the extra concept ones, is left empty, the workflow won't run. Only use these variants when you actually have concept LoRAs to apply; otherwise use the plain version.
+:::
+
+:::note[About the "TI2V-5B (Low Quality)" variants]
+"Low quality" here means *lower than the A14B Lightning workflows*, in exchange for running on much less video memory. On a 12–16 GB GPU they may be your best (or only) option, and they're handy everywhere for fast drafts.
+:::
+
 ### Extend Video
 
 The Wan models are trained on short (~5 second) clips, so the way to make something longer is to **continue** a video and stitch the pieces together. These workflows do that for you.
@@ -100,22 +116,6 @@ This variant takes **two inputs** — the source video and a destination image:
 3. **Invoke.** The new segment is concatenated onto the source with a cross-fade — tune the join (transition type and frame count) on the **Concatenate Videos** node.
 
 Because the endpoint is pinned to your image, it's ideal for bridging a clip to a known next shot or landing on a specific final frame.
-:::
-
-### Interpolate Between Two Images
-
-<CardGrid>
-  <Card title="Interpolate 2 Images to Video - Wan 2.2 Lightning" icon="random">
-    Provide a **start image** and an **end image**; the model generates a clip that begins on the first and animates smoothly to the second (first-last-frame interpolation). Great for morphing between two stills or bridging two shots. Uses I2V-A14B + Lightning (4-step).
-  </Card>
-</CardGrid>
-
-:::caution[The "Concept LoRAs" variants need a LoRA in every slot]
-A **concept LoRA** is an add-on that teaches the model a specific style, character, or subject. The *w/ Concept LoRAs* workflows are the same as their plain counterparts but add extra LoRA slots. **Every LoRA slot is required** — if any slot, including the extra concept ones, is left empty, the workflow won't run. Only use these variants when you actually have concept LoRAs to apply; otherwise use the plain version.
-:::
-
-:::note[About the "TI2V-5B (Low Quality)" variants]
-"Low quality" here means *lower than the A14B Lightning workflows*, in exchange for running on much less video memory. On a 12–16 GB GPU they may be your best (or only) option, and they're handy everywhere for fast drafts.
 :::
 
 ---
