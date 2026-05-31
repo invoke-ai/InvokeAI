@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 from invokeai.app.api.routers.custom_nodes import (
     PACK_MANIFEST_FILENAME,
+    _extract_pack_name_from_source,
     _get_installed_packs,
     _import_workflows_from_pack,
     _load_node_pack,
@@ -75,6 +76,35 @@ class TestGetInstalledPacks:
             packs = _get_installed_packs()
         assert len(packs) == 3
         assert [p.name for p in packs] == ["alpha_pack", "middle_pack", "zebra_pack"]
+
+
+class TestPackNameValidation:
+    """Tests for safely deriving node pack directory names from install sources."""
+
+    def test_extracts_pack_name_from_git_url(self) -> None:
+        assert _extract_pack_name_from_source("https://github.com/example/my-pack.git") == "my-pack"
+
+    def test_rejects_empty_pack_name(self) -> None:
+        try:
+            _extract_pack_name_from_source("")
+        except ValueError:
+            return
+        raise AssertionError("Expected empty pack name to be rejected")
+
+    def test_rejects_dot_segments(self) -> None:
+        for source in ("https://github.com/example/..", "https://github.com/example/.git"):
+            try:
+                _extract_pack_name_from_source(source)
+            except ValueError:
+                continue
+            raise AssertionError(f"Expected {source!r} to be rejected")
+
+    def test_rejects_windows_path_separator_traversal(self) -> None:
+        try:
+            _extract_pack_name_from_source("https://github.com/example/..\\outside.git")
+        except ValueError:
+            return
+        raise AssertionError("Expected Windows path separator traversal to be rejected")
 
 
 class TestImportWorkflowsFromPack:
