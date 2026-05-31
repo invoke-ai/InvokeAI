@@ -15971,7 +15971,8 @@
           }
         },
         "type": "object",
-        "title": "CacheStats"
+        "title": "CacheStats",
+        "description": "Collect statistics on cache performance."
       },
       "CalculateImageTilesEvenSplitInvocation": {
         "category": "tiles",
@@ -76628,7 +76629,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["wan"],
+            "ui_model_type": ["lora"]
           },
           "transformer": {
             "anyOf": [

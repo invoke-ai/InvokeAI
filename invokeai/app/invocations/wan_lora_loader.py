@@ -138,6 +138,8 @@ class WanLoRACollectionLoader(BaseInvocation):
         default=None,
         description="LoRAs to apply. May be a single LoRA or a collection.",
         title="LoRAs",
+        ui_model_base=[BaseModelType.Wan],
+        ui_model_type=ModelType.LoRA,
     )
     transformer: Optional[WanTransformerField] = InputField(
         default=None,
