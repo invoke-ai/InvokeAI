@@ -53,7 +53,7 @@ If you're not sure, start with **Text to Video - Wan 2.2 Lightning** to get a fe
     Type a prompt, get a ~5-second clip. Uses the high-quality A14B model with the Lightning speed-up (just 4 steps). **The recommended starting point.**
   </Card>
   <Card title="Text to Video - …w/ Concept LoRAs" icon="pencil">
-    The same workflow, with extra slots to add your own concept LoRAs (a style or character you've trained or downloaded). Leave the slots empty to behave exactly like the base version.
+    The same workflow, plus extra slots for your own concept LoRAs (a style or character you've trained or downloaded). Every LoRA slot must be filled — if you don't have concept LoRAs to add, use the plain version instead.
   </Card>
   <Card title="Text to Video - Wan 2.2 TI2V-5B (Low Quality)" icon="pencil">
     Uses the smaller TI2V-5B model. Lower quality and slower per result, but fits comfortably on 12–16 GB GPUs. Good for quick drafts or smaller cards.
@@ -87,8 +87,8 @@ The Wan models are trained on short (~5 second) clips, so the way to make someth
   </Card>
 </CardGrid>
 
-:::tip[About the "Concept LoRAs" variants]
-A **concept LoRA** is an add-on that teaches the model a specific style, character, or subject. The *w/ Concept LoRAs* workflows are identical to their plain counterparts but add empty LoRA slots for you to fill in. If you don't have a concept LoRA, just use the plain version — you're not missing anything.
+:::caution[The "Concept LoRAs" variants need a LoRA in every slot]
+A **concept LoRA** is an add-on that teaches the model a specific style, character, or subject. The *w/ Concept LoRAs* workflows are the same as their plain counterparts but add extra LoRA slots. **Every LoRA slot is required** — if any slot, including the extra concept ones, is left empty, the workflow won't run. Only use these variants when you actually have concept LoRAs to apply; otherwise use the plain version.
 :::
 
 :::note[About the "TI2V-5B (Low Quality)" variants]
