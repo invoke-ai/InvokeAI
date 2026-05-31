@@ -22927,7 +22927,7 @@
             "orig_default": null,
             "orig_required": false,
             "title": "LoRAs",
-            "ui_model_base": ["flux", "flux2"],
+            "ui_model_base": ["flux"],
             "ui_model_type": ["lora"]
           },
           "transformer": {

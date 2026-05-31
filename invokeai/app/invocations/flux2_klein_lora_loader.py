@@ -161,7 +161,11 @@ class Flux2KleinLoRACollectionLoader(BaseInvocation):
             if not context.models.exists(lora.lora.key):
                 raise Exception(f"Unknown lora: {lora.lora.key}!")
 
-            assert lora.lora.base in (BaseModelType.Flux, BaseModelType.Flux2)
+            if lora.lora.base is not BaseModelType.Flux2:
+                raise ValueError(
+                    f"LoRA '{lora.lora.key}' is for {lora.lora.base.value if lora.lora.base else 'unknown'} models, "
+                    "not FLUX.2 Klein models. Ensure you are using a FLUX.2 compatible LoRA."
+                )
 
             # Warn if LoRA variant doesn't match transformer variant
             lora_config = context.models.get_config(lora.lora.key)
