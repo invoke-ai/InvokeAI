@@ -120,7 +120,7 @@ class FLUXLoRACollectionLoader(BaseInvocation):
         default=None,
         description="LoRA models and weights. May be a single LoRA or collection.",
         title="LoRAs",
-        ui_model_base=[BaseModelType.Flux, BaseModelType.Flux2],
+        ui_model_base=[BaseModelType.Flux],
         ui_model_type=ModelType.LoRA,
     )
 
