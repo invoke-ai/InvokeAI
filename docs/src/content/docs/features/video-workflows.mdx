@@ -6,7 +6,7 @@ lastUpdated: 2026-05-30
 
 import { Card, CardGrid, Steps, LinkButton } from '@astrojs/starlight/components';
 
-InvokeAI ships **nine ready-made video workflows** so you can start generating video without wiring up nodes yourself. Each one is a complete recipe — open it from the **Workflows** library, pick your models, type a prompt (and/or drop in an image), and press **Invoke**.
+InvokeAI ships **ten ready-made video workflows** so you can start generating video without wiring up nodes yourself. Each one is a complete recipe — open it from the **Workflows** library, pick your models, type a prompt (and/or drop in an image), and press **Invoke**.
 
 This page helps you choose the right workflow and run it. For how the models work under the hood, VRAM details, and troubleshooting, see the [Video Generation guide](/features/video-generation/).
 
@@ -30,7 +30,7 @@ Whenever a workflow won't run because a model field is empty, open its **Notes**
 
 ## Which workflow should I use?
 
-The workflows come in three families — **Text to Video**, **Image to Video**, and **Extend Video** — each with a high-quality option, a "concept LoRA" variant, and a lighter low-VRAM option — plus a standalone **Interpolate** workflow that bridges two images.
+The workflows come in three families — **Text to Video**, **Image to Video**, and **Extend Video** — each with a high-quality option, a "concept LoRA" variant, and a lighter low-VRAM option — plus an **Interpolate** workflow that bridges two images and an **Extend Video to Image** variant that steers a continuation toward a target frame.
 
 | I want to… | Use | Notes |
 |---|---|---|
@@ -38,6 +38,7 @@ The workflows come in three families — **Text to Video**, **Image to Video**, 
 | Animate an existing image | **Image to Video - Wan 2.2 Lightning** | Your image becomes the first frame. |
 | Make a video between two images | **Interpolate 2 Images to Video - Wan 2.2 Lightning** | Provide a start and end image; the model interpolates between them. |
 | Make a video longer than ~5 seconds | **Extend Video - Wan 2.2 Lightning** | Continues an existing video and stitches the pieces together. |
+| Extend a video toward a specific end frame | **Extend Video to Image - Wan 2.2 Lightning** | Continues a video and interpolates the new part to a target image. |
 | Add my own style/subject LoRAs | the **w/ Concept LoRAs** variant of any of the above | Same as the base workflow, plus slots for your LoRAs. |
 | Run on a smaller GPU (≈12–16 GB) | a **TI2V-5B (Low Quality)** workflow | Smaller model, lower memory, lower quality. |
 
@@ -45,7 +46,7 @@ If you're not sure, start with **Text to Video - Wan 2.2 Lightning** to get a fe
 
 ---
 
-## The nine workflows
+## The ten workflows
 
 ### Text to Video
 
@@ -86,7 +87,20 @@ The Wan models are trained on short (~5 second) clips, so the way to make someth
   <Card title="Extend Video - …w/ Concept LoRAs" icon="clock">
     Same as above, with slots for your own concept LoRAs so the continuation keeps your style or subject.
   </Card>
+  <Card title="Extend Video to Image - Wan 2.2 Lightning" icon="clock">
+    Continue a video **toward a target image**. Provide a starting video and a destination image; the new segment interpolates from the video's last frame to your image (FLF2V), then joins onto the original with a smooth transition. Combines the Extend and Interpolate ideas — useful for steering where a continuation ends up.
+  </Card>
 </CardGrid>
+
+:::tip[Using "Extend Video to Image"]
+This variant takes **two inputs** — the source video and a destination image:
+
+1. Drop your **video** into the video input and use the **start/end frame sliders** to pick the slice to continue from.
+2. Drop a **destination image** into the image input. The generated continuation interpolates from the video's last selected frame to this image, so the extended clip *ends on your image*.
+3. **Invoke.** The new segment is concatenated onto the source with a cross-fade — tune the join (transition type and frame count) on the **Concatenate Videos** node.
+
+Because the endpoint is pinned to your image, it's ideal for bridging a clip to a known next shot or landing on a specific final frame.
+:::
 
 ### Interpolate Between Two Images
 
