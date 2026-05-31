@@ -2,10 +2,9 @@
 
 from unittest.mock import MagicMock
 
+import pytest
 import torch
 from PIL import Image
-
-import pytest
 
 from invokeai.backend.wan.extensions.wan_ref_image_extension import (
     encode_reference_image_to_condition,
