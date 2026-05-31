@@ -1,4 +1,9 @@
-import type { FieldType } from 'features/nodes/types/field';
+import type {
+  FieldType,
+  LoRAFieldCollectionInputInstance,
+  LoRAFieldCollectionInputTemplate,
+  LoRAFieldValue,
+} from 'features/nodes/types/field';
 import {
   isLoRAFieldCollectionFieldType,
   isLoRAFieldCollectionInputInstance,
@@ -7,7 +12,7 @@ import {
 } from 'features/nodes/types/field';
 import { describe, expect, it } from 'vitest';
 
-const loraValue = {
+const loraValue: LoRAFieldValue = {
   lora: {
     key: 'some-key',
     hash: 'some-hash',
@@ -51,12 +56,17 @@ describe('LoRAField collection', () => {
 
   describe('input instance / template guards', () => {
     it('recognizes a valid collection input instance', () => {
-      const instance = { name: 'loras', label: '', description: '', value: [loraValue] };
+      const instance: LoRAFieldCollectionInputInstance = {
+        name: 'loras',
+        label: '',
+        description: '',
+        value: [loraValue],
+      };
       expect(isLoRAFieldCollectionInputInstance(instance)).toBe(true);
     });
 
     it('recognizes a collection input template (SINGLE_OR_COLLECTION)', () => {
-      const template = {
+      const template: LoRAFieldCollectionInputTemplate = {
         name: 'loras',
         title: 'LoRAs',
         description: '',
