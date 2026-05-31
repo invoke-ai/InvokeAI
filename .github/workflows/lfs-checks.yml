@@ -24,7 +24,7 @@ jobs:
       pull-requests: write
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: check lfs files
         uses: ppremk/lfs-warning@v3.3
