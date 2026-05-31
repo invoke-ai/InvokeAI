@@ -126,6 +126,7 @@ def encode_reference_image_to_video_condition(
     num_frames: int,
     device: torch.device,
     dtype: torch.dtype,
+    last_image: Image.Image | None = None,
 ) -> torch.Tensor:
     """Build the multi-frame I2V condition tensor for Wan 2.2 video generation.
 
@@ -135,36 +136,54 @@ def encode_reference_image_to_video_condition(
     are the rearranged first-frame mask, last 16 channels are the VAE-encoded
     latents of the image+zero pseudo-video.
 
-    Mirrors :class:`diffusers.WanImageToVideoPipeline.prepare_latents` with
-    ``last_image=None`` and ``expand_timesteps=False``:
+    When ``last_image`` is given the function builds a **first-last-frame
+    (FLF2V)** condition instead: the end image is placed in the final temporal
+    slot and the mask anchors **both** the first and last latent frames, so the
+    model interpolates the motion between the two stills. With ``last_image=None``
+    it builds the standard single-reference I2V condition (frame 0 anchored,
+    the rest free).
+
+    Mirrors :class:`diffusers.WanImageToVideoPipeline.prepare_latents`
+    (``expand_timesteps=False``):
 
     1. The reference image is concatenated with zero pixel-frames to form a
-       ``[1, 3, num_frames, H, W]`` pseudo-video — only frame 0 carries the
-       image content, all other frames are zero. The model was trained against
-       latents produced this way; padding in latent space after a 1-frame VAE
-       encode would land different values.
+       ``[1, 3, num_frames, H, W]`` pseudo-video — frame 0 carries the start
+       image, frame ``num_frames - 1`` carries ``last_image`` (when given), and
+       the frames in between are zero. The model was trained against latents
+       produced this way; padding in latent space after a 1-frame VAE encode
+       would land different values.
     2. The VAE encodes that to ``[1, 16, T_lat, H_lat, W_lat]`` and we
        normalise by the per-channel ``(mean, std)`` from ``vae.config``.
     3. The mask starts in pixel-frame space as ``[1, 1, num_frames, ...]``
-       with 1 at frame 0 and 0 elsewhere. The first frame is repeated 4× then
-       the whole thing is reshaped/transposed into ``[1, 4, T_lat, ...]`` —
-       so the first latent frame's 4 mask channels are all 1 and the rest
-       are all 0.
+       with 1 at the anchored frame(s) and 0 elsewhere — frame 0 for plain I2V,
+       or frames 0 and ``num_frames - 1`` for FLF2V. The first frame is repeated
+       4× then the whole thing is reshaped/transposed into ``[1, 4, T_lat, ...]``.
 
     The denoise loop concatenates the result along the channel dim to the
     16-channel noise latents each step, yielding the 36-channel input the
     Wan 2.2 I2V-A14B transformer expects.
     """
+    if last_image is not None and num_frames <= 1:
+        raise ValueError("last_image (FLF2V) interpolation requires num_frames > 1.")
+
     vae_dtype = next(iter(vae.parameters())).dtype
     pixel = preprocess_reference_image(image, width=width, height=height).to(
         device=device, dtype=vae_dtype
     )  # [1, 3, 1, H, W]
 
     # Pad the temporal dim with zero pixel-frames; the VAE handles temporal
-    # compression to T_lat.
+    # compression to T_lat. For FLF2V the end image takes the final slot and
+    # only the in-between frames are zero.
     if num_frames > 1:
-        zero_frames = torch.zeros(1, 3, num_frames - 1, height, width, device=device, dtype=vae_dtype)
-        video_condition = torch.cat([pixel, zero_frames], dim=2)
+        if last_image is not None:
+            last_pixel = preprocess_reference_image(last_image, width=width, height=height).to(
+                device=device, dtype=vae_dtype
+            )
+            middle_zeros = torch.zeros(1, 3, num_frames - 2, height, width, device=device, dtype=vae_dtype)
+            video_condition = torch.cat([pixel, middle_zeros, last_pixel], dim=2)
+        else:
+            zero_frames = torch.zeros(1, 3, num_frames - 1, height, width, device=device, dtype=vae_dtype)
+            video_condition = torch.cat([pixel, zero_frames], dim=2)
     else:
         video_condition = pixel
 
@@ -183,7 +202,11 @@ def encode_reference_image_to_video_condition(
     # latent-temporal form the transformer expects.
     mask_pixel = torch.ones(1, 1, num_frames, h_lat, w_lat, device=device, dtype=dtype)
     if num_frames > 1:
-        mask_pixel[:, :, 1:] = 0
+        if last_image is not None:
+            # FLF2V: keep both the first and last frames anchored; zero the middle.
+            mask_pixel[:, :, 1:-1] = 0
+        else:
+            mask_pixel[:, :, 1:] = 0
 
     first_frame_mask = mask_pixel[:, :, 0:1].repeat_interleave(repeats=_WAN_VAE_TEMPORAL_SCALE, dim=2)
     mask = torch.cat([first_frame_mask, mask_pixel[:, :, 1:]], dim=2)

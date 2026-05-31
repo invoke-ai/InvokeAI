@@ -5,8 +5,11 @@ from unittest.mock import MagicMock
 import torch
 from PIL import Image
 
+import pytest
+
 from invokeai.backend.wan.extensions.wan_ref_image_extension import (
     encode_reference_image_to_condition,
+    encode_reference_image_to_video_condition,
     preprocess_reference_image,
 )
 
@@ -110,6 +113,73 @@ class TestEncodeReferenceImageToCondition:
             image=img, vae=vae, width=64, height=64, device=torch.device("cpu"), dtype=torch.bfloat16
         )
         assert cond.dtype == torch.bfloat16
+
+
+class TestEncodeReferenceImageToVideoCondition:
+    """Multi-frame A14B I2V condition, including first-last-frame (FLF2V) mode.
+
+    The fake VAE returns zero latents, so we can't assert on the *content* of the
+    last frame — but the 4-channel mask is built independently of the VAE output,
+    so we can verify exactly which latent frames get anchored.
+    """
+
+    def test_video_condition_shape(self):
+        img = Image.new("RGB", (64, 64))
+        vae = _make_fake_vae()
+        # num_frames=5 → t_lat = (5-1)//4 + 1 = 2.
+        cond = encode_reference_image_to_video_condition(
+            image=img, vae=vae, width=64, height=64, num_frames=5, device=torch.device("cpu"), dtype=torch.float32
+        )
+        assert cond.shape == (1, 20, 2, 8, 8)
+
+    def test_single_reference_anchors_only_first_latent_frame(self):
+        img = Image.new("RGB", (64, 64))
+        vae = _make_fake_vae()
+        cond = encode_reference_image_to_video_condition(
+            image=img, vae=vae, width=64, height=64, num_frames=5, device=torch.device("cpu"), dtype=torch.float32
+        )
+        mask = cond[:, :4]  # [1, 4, t_lat=2, 8, 8]
+        # First latent frame fully anchored; the rest entirely free.
+        assert torch.equal(mask[:, :, 0], torch.ones_like(mask[:, :, 0]))
+        assert torch.equal(mask[:, :, 1:], torch.zeros_like(mask[:, :, 1:]))
+
+    def test_flf2v_anchors_first_and_last_latent_frame(self):
+        img = Image.new("RGB", (64, 64))
+        end = Image.new("RGB", (64, 64), (255, 255, 255))
+        vae = _make_fake_vae()
+        cond = encode_reference_image_to_video_condition(
+            image=img,
+            vae=vae,
+            width=64,
+            height=64,
+            num_frames=5,
+            device=torch.device("cpu"),
+            dtype=torch.float32,
+            last_image=end,
+        )
+        mask = cond[:, :4]  # [1, 4, 2, 8, 8]
+        # First latent frame still fully anchored.
+        assert torch.equal(mask[:, :, 0], torch.ones_like(mask[:, :, 0]))
+        # The end image anchors the final pixel-frame, which lands in the last
+        # mask channel of the last latent frame (and only there).
+        assert torch.equal(mask[:, 3, 1], torch.ones_like(mask[:, 3, 1]))
+        assert torch.equal(mask[:, :3, 1], torch.zeros_like(mask[:, :3, 1]))
+
+    def test_flf2v_requires_multiple_frames(self):
+        img = Image.new("RGB", (64, 64))
+        end = Image.new("RGB", (64, 64))
+        vae = _make_fake_vae()
+        with pytest.raises(ValueError, match="FLF2V"):
+            encode_reference_image_to_video_condition(
+                image=img,
+                vae=vae,
+                width=64,
+                height=64,
+                num_frames=1,
+                device=torch.device("cpu"),
+                dtype=torch.float32,
+                last_image=end,
+            )
 
 
 class TestEncodeReferenceImageToTI2VCondition:

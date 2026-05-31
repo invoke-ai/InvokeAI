@@ -9,6 +9,8 @@ Supports both single-frame (image I2V, ``num_frames=1``) and multi-frame
 (video I2V, e.g. ``num_frames=81``) condition tensors.
 """
 
+from typing import Optional
+
 import torch
 from diffusers.models.autoencoders import AutoencoderKLWan
 
@@ -35,7 +37,7 @@ from invokeai.backend.wan.extensions.wan_ref_image_extension import (
     title="Reference Image - Wan 2.2",
     tags=["image", "conditioning", "wan", "i2v"],
     category="conditioning",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class WanRefImageEncoderInvocation(BaseInvocation):
@@ -49,11 +51,16 @@ class WanRefImageEncoderInvocation(BaseInvocation):
     I2V set ``num_frames`` to match the value on the video-denoise node
     (e.g. 81 for the Wan 2.2 reference defaults).
 
+    Supply an optional ``end_image`` for **first-last-frame interpolation
+    (FLF2V)** — the model then interpolates the motion from ``image`` (first
+    frame) to ``end_image`` (final frame). FLF2V is I2V-A14B video only
+    (``num_frames > 1``); it is not supported for TI2V-5B or single-frame I2V.
+
     Only works with I2V-A14B (the denoise loop's variant gate enforces this).
     For T2V or TI2V-5B, omit this node entirely.
     """
 
-    image: ImageField = InputField(description="Reference image to condition on.")
+    image: ImageField = InputField(description="Reference image to condition on (the first frame).")
     vae: VAEField = InputField(description=FieldDescriptions.vae, input=Input.Connection, title="VAE")
     # Must match wan_denoise's width/height. multiple_of=16 (not 8) because
     # Wan's transformer patch_size=(1, 2, 2) needs latent H/W to be even.
@@ -75,6 +82,13 @@ class WanRefImageEncoderInvocation(BaseInvocation):
         "(num_frames - 1) %% 4 == 0, e.g. 81).",
         title="Number of Frames",
     )
+    end_image: Optional[ImageField] = InputField(
+        default=None,
+        description="Optional end frame for first-last-frame interpolation (FLF2V). When set, the "
+        "video interpolates from the reference image (first frame) to this image (final frame). "
+        "I2V-A14B video only (num_frames > 1); not supported for TI2V-5B or single-frame I2V.",
+        title="End Image (FLF2V)",
+    )
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> WanRefImageOutput:
@@ -85,6 +99,7 @@ class WanRefImageEncoderInvocation(BaseInvocation):
             )
 
         pil_image = context.images.get_pil(self.image.image_name, "RGB")
+        end_pil_image = context.images.get_pil(self.end_image.image_name, "RGB") if self.end_image is not None else None
 
         vae_info = context.models.load(self.vae.vae)
         device = TorchDevice.choose_torch_device()
@@ -94,7 +109,8 @@ class WanRefImageEncoderInvocation(BaseInvocation):
             if not isinstance(vae, AutoencoderKLWan):
                 raise TypeError(f"Reference-image encoder requires AutoencoderKLWan, got {type(vae).__name__}.")
             context.util.signal_progress(
-                "VAE-encoding reference image" + (f" ({self.num_frames} frames)" if self.num_frames > 1 else "")
+                ("VAE-encoding FLF2V start+end images" if end_pil_image is not None else "VAE-encoding reference image")
+                + (f" ({self.num_frames} frames)" if self.num_frames > 1 else "")
             )
             # Free cached allocator blocks left over from earlier nodes (denoise expert
             # swaps in particular can leave the cache fragmented in ways that look like
@@ -107,6 +123,12 @@ class WanRefImageEncoderInvocation(BaseInvocation):
             # 16 means the standard Wan VAE (A14B), which uses the 20-channel
             # mask + latent condition concatenated to noise along the channel dim.
             is_ti2v_5b = getattr(vae.config, "z_dim", 16) == 48
+            if end_pil_image is not None and (is_ti2v_5b or self.num_frames <= 1):
+                raise ValueError(
+                    "End-image (FLF2V) interpolation is only supported for I2V-A14B video "
+                    f"(num_frames > 1). Got {'TI2V-5B' if is_ti2v_5b else 'single-frame I2V'}. "
+                    "Remove the End Image input, or use an A14B VAE with num_frames > 1."
+                )
             if is_ti2v_5b:
                 # TI2V-5B I2V needs latent H/W to be even for the transformer
                 # patch_size=(1,2,2), so pixel dims must be multiples of 32
@@ -145,6 +167,7 @@ class WanRefImageEncoderInvocation(BaseInvocation):
                     num_frames=self.num_frames,
                     device=device,
                     dtype=target_dtype,
+                    last_image=end_pil_image,
                 )
 
         condition = condition.detach().to("cpu")
