@@ -1,12 +1,12 @@
 ---
 title: Video Workflows
-description: A plain-language guide to the eight ready-made Wan 2.2 video workflows that ship with InvokeAI — which one to pick, and how to run it.
+description: A plain-language guide to the ready-made Wan 2.2 video workflows that ship with InvokeAI — which one to pick, and how to run it.
 lastUpdated: 2026-05-30
 ---
 
 import { Card, CardGrid, Steps, LinkButton } from '@astrojs/starlight/components';
 
-InvokeAI ships **eight ready-made video workflows** so you can start generating video without wiring up nodes yourself. Each one is a complete recipe — open it from the **Workflows** library, pick your models, type a prompt (and/or drop in an image), and press **Invoke**.
+InvokeAI ships **nine ready-made video workflows** so you can start generating video without wiring up nodes yourself. Each one is a complete recipe — open it from the **Workflows** library, pick your models, type a prompt (and/or drop in an image), and press **Invoke**.
 
 This page helps you choose the right workflow and run it. For how the models work under the hood, VRAM details, and troubleshooting, see the [Video Generation guide](/features/video-generation/).
 
@@ -30,12 +30,13 @@ Whenever a workflow won't run because a model field is empty, open its **Notes**
 
 ## Which workflow should I use?
 
-The eight workflows come in three families — **Text to Video**, **Image to Video**, and **Extend Video** — and within each family there's a high-quality option, a "concept LoRA" variant, and a lighter low-VRAM option.
+The workflows come in three families — **Text to Video**, **Image to Video**, and **Extend Video** — each with a high-quality option, a "concept LoRA" variant, and a lighter low-VRAM option — plus a standalone **Interpolate** workflow that bridges two images.
 
 | I want to… | Use | Notes |
 |---|---|---|
 | Make a clip from a text description | **Text to Video - Wan 2.2 Lightning** | Best quality, fast. Start here. |
 | Animate an existing image | **Image to Video - Wan 2.2 Lightning** | Your image becomes the first frame. |
+| Make a video between two images | **Interpolate 2 Images to Video - Wan 2.2 Lightning** | Provide a start and end image; the model interpolates between them. |
 | Make a video longer than ~5 seconds | **Extend Video - Wan 2.2 Lightning** | Continues an existing video and stitches the pieces together. |
 | Add my own style/subject LoRAs | the **w/ Concept LoRAs** variant of any of the above | Same as the base workflow, plus slots for your LoRAs. |
 | Run on a smaller GPU (≈12–16 GB) | a **TI2V-5B (Low Quality)** workflow | Smaller model, lower memory, lower quality. |
@@ -44,7 +45,7 @@ If you're not sure, start with **Text to Video - Wan 2.2 Lightning** to get a fe
 
 ---
 
-## The eight workflows
+## The nine workflows
 
 ### Text to Video
 
@@ -87,6 +88,14 @@ The Wan models are trained on short (~5 second) clips, so the way to make someth
   </Card>
 </CardGrid>
 
+### Interpolate Between Two Images
+
+<CardGrid>
+  <Card title="Interpolate 2 Images to Video - Wan 2.2 Lightning" icon="random">
+    Provide a **start image** and an **end image**; the model generates a clip that begins on the first and animates smoothly to the second (first-last-frame interpolation). Great for morphing between two stills or bridging two shots. Uses I2V-A14B + Lightning (4-step).
+  </Card>
+</CardGrid>
+
 :::caution[The "Concept LoRAs" variants need a LoRA in every slot]
 A **concept LoRA** is an add-on that teaches the model a specific style, character, or subject. The *w/ Concept LoRAs* workflows are the same as their plain counterparts but add extra LoRA slots. **Every LoRA slot is required** — if any slot, including the extra concept ones, is left empty, the workflow won't run. Only use these variants when you actually have concept LoRAs to apply; otherwise use the plain version.
 :::
@@ -101,7 +110,7 @@ A **concept LoRA** is an add-on that teaches the model a specific style, charact
 
 <Steps>
 
-1. **Open the Workflows tab** and load one of the eight workflows from the library.
+1. **Open the Workflows tab** and load one of the workflows from the library.
 
 2. **Read the Notes** (note icon) and select the models it lists — the main model, VAE, and text encoder, plus the Lightning LoRA pair on the A14B workflows.
 

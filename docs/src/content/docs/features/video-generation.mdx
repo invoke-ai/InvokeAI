@@ -141,6 +141,18 @@ For **TI2V-5B image-to-video**, the conditioning math is different (the model us
 TI2V-5B image-to-video requires **width and height divisible by 32** (not just 16). The encoder will refuse the workflow with a clear error if not. 832×480 works; 1280×720 does not (720 is not divisible by 32). Use 1280×704 for 720p-ish on TI2V-5B.
 :::
 
+### First-last-frame interpolation (FLF2V)
+
+The **Reference Image - Wan 2.2** node has an optional **End Image** input. Provide a start image on the regular `image` field and an end image on `End Image (FLF2V)`, and the model interpolates a clip that **begins on the first image and animates to the second** — handy for morphing between two stills or bridging two shots.
+
+```
+Image Primitive (start) ──→ image ────┐
+                                       ├─→ Reference Image - Wan 2.2 ──→ Denoise Video ──→ MP4
+Image Primitive (end) ──→ End Image ───┘
+```
+
+This is **I2V-A14B only** (`num_frames > 1`); it is not supported on TI2V-5B or single-frame I2V (the node raises a clear error). Wan 2.2 has no dedicated first-last-frame checkpoint — that was a Wan 2.1 model — so the stock I2V-A14B model accepts the end-frame anchor through its existing conditioning channels. Quality is good in practice but not guaranteed for every image pair, so eyeball your results. The shipped **"Interpolate 2 Images to Video - Wan 2.2 Lightning"** workflow wires this up end to end.
+
 ### Recommended starting parameters
 
 | | T2V-A14B + Lightning | T2V-A14B | I2V-A14B + Lightning | TI2V-5B (T2V or I2V) |
