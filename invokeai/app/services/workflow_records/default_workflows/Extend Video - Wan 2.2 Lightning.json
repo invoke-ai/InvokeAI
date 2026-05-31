@@ -4,7 +4,7 @@
   "description": "This workflow adds frames to an existing video. Provide a starting video and use the sliders to select the starting and ending frames. The workflow will create a new video starting from the selected ending frame and then concatenate the new video to the end of the first video, performing a quick cross-fade at the selected ending frame to generate a smooth transition.",
   "version": "1.0.0",
   "contact": "",
-  "tags": "wan2.2, text to video, video, lightning, lora",
+  "tags": "wan2.2, video to video, video, lightning, lora",
   "notes": "Each InvokeAI install assigns its own internal model IDs, so the model fields are left blank -- select these in the form after loading:\n\nMain Model node:\n- Main Model: Wan 2.2 I2V A14B High Noise (Q4_K_M GGUF recommended for <=16 GB VRAM)\n- Transformer (Low Noise): Wan 2.2 I2V A14B Low Noise (Q4_K_M)\n- VAE: Wan 2.2 A14B VAE\n- T5 Encoder: Wan T5 Encoder (UMT5-XXL)\n\nLightning LoRAs (4-step distillation, I2V variant):\n- Apply Lightning LoRA (High Noise): Wan 2.2 I2V Lightning High Noise (4-step)\n- Apply Lightning LoRA (Low Noise): Wan 2.2 I2V Lightning Low Noise (4-step)\n\nEdit the \"Concatenate Videos\" node to adjust the transition and number of transition frames.",
   "exposedFields": [
     {

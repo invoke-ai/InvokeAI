@@ -4,7 +4,7 @@
   "description": "Low quality but fast image-to-video generation with Wan 2.2 TI2V 5B model.  Provide an initial image and a target resolution for the video.",
   "version": "1.0.0",
   "contact": "",
-  "tags": "wan2.2, text to video, video, lightning, lora",
+  "tags": "wan2.2, image to video, video",
   "notes": "This workflow needs the Wan 2.2 TI2V-5B model. Each InvokeAI install assigns its own internal model IDs, so the model fields are left blank -- select these in the form after loading:\n\nMain Model node:\n- Main Model: Wan 2.2 TI2V-5B (Q4_K_M GGUF recommended for <=16 GB VRAM)\n- Transformer (Low Noise): leave empty (TI2V-5B is a single-expert model)\n- VAE: Wan 2.2 TI2V-5B VAE\n- T5 Encoder: Wan T5 Encoder (UMT5-XXL)\n\n720p should work on GPUs with 16 GB VRAM and up.",
   "exposedFields": [
     {

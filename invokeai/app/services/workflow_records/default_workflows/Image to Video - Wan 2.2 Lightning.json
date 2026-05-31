@@ -4,7 +4,7 @@
   "description": "Fast image-to-video generation with Wan 2.2 I2V A14B + the Lightning LoRA pair.  Provide an initial image and specify the resolution of the resulting video. The resolution will be applied to the shorter dimension of the image, and the other dimension will be scaled accordingly. ",
   "version": "1.0.0",
   "contact": "",
-  "tags": "wan2.2, text to video, video, lightning, lora",
+  "tags": "wan2.2, image to video, video, lightning, lora",
   "notes": "Each InvokeAI install assigns its own internal model IDs, so the model fields are left blank -- select these in the form after loading:\n\nMain Model node:\n- Main Model: Wan 2.2 I2V A14B High Noise (Q4_K_M GGUF recommended for <=16 GB VRAM)\n- Transformer (Low Noise): Wan 2.2 I2V A14B Low Noise (Q4_K_M)\n- VAE: Wan 2.2 A14B VAE\n- T5 Encoder: Wan T5 Encoder (UMT5-XXL)\n\nLightning LoRAs (4-step distillation, I2V variant):\n- Apply Lightning LoRA (High Noise): Wan 2.2 I2V Lightning High Noise (4-step)\n- Apply Lightning LoRA (Low Noise): Wan 2.2 I2V Lightning Low Noise (4-step)\n\nVRAM: for <=16 GB, keep the resolution at 480p (on the \"Ideal Dimensions\" node); 720p and 1080p need more VRAM.",
   "exposedFields": [
     {
