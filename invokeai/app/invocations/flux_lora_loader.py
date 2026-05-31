@@ -111,13 +111,17 @@ class FluxLoRALoaderInvocation(BaseInvocation):
     title="Apply LoRA Collection - FLUX",
     tags=["lora", "model", "flux"],
     category="model",
-    version="1.3.1",
+    version="1.3.2",
 )
 class FLUXLoRACollectionLoader(BaseInvocation):
     """Applies a collection of LoRAs to a FLUX transformer."""
 
     loras: Optional[LoRAField | list[LoRAField]] = InputField(
-        default=None, description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
+        default=None,
+        description="LoRA models and weights. May be a single LoRA or collection.",
+        title="LoRAs",
+        ui_model_base=[BaseModelType.Flux, BaseModelType.Flux2],
+        ui_model_type=ModelType.LoRA,
     )
 
     transformer: Optional[TransformerField] = InputField(

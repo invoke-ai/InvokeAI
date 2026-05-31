@@ -114,14 +114,18 @@ class Flux2KleinLoRALoaderInvocation(BaseInvocation):
     title="Apply LoRA Collection - Flux2 Klein",
     tags=["lora", "model", "flux", "klein", "flux2"],
     category="model",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Prototype,
 )
 class Flux2KleinLoRACollectionLoader(BaseInvocation):
     """Applies a collection of LoRAs to a FLUX.2 Klein transformer and/or Qwen3 text encoder."""
 
     loras: Optional[LoRAField | list[LoRAField]] = InputField(
-        default=None, description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
+        default=None,
+        description="LoRA models and weights. May be a single LoRA or collection.",
+        title="LoRAs",
+        ui_model_base=[BaseModelType.Flux2],
+        ui_model_type=ModelType.LoRA,
     )
 
     transformer: Optional[TransformerField] = InputField(
