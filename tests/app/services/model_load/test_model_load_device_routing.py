@@ -1,12 +1,27 @@
 """Tests that ModelLoadService routes to the per-device cache for the calling thread (multi-GPU)."""
 
 import threading
+from collections.abc import Iterator
 
+import pytest
 import torch
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig, get_config
 from invokeai.app.services.model_load.model_load_default import ModelLoadService
 from invokeai.backend.util.devices import TorchDevice
+
+
+@pytest.fixture(autouse=True)
+def restore_global_device() -> Iterator[None]:
+    """`get_config()` is a process-wide singleton; restore `device` so we don't leak a CUDA device
+    into later CPU-only tests (e.g. the model-loading suite on the CUDA-less CI runner)."""
+    config = get_config()
+    original_device = config.device
+    try:
+        yield
+    finally:
+        config.device = original_device
+        TorchDevice.clear_session_device()
 
 
 class _FakeCache:
