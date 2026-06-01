@@ -223,6 +223,31 @@ def _create_workflow(client: TestClient, token: str) -> str:
     return r.json()["workflow_id"]
 
 
+def _insert_pending_queue_item(session_queue: Any, user_id: str, queue_id: str = "default") -> int:
+    """Insert a pending queue item owned by ``user_id`` directly into the queue's database."""
+    import uuid
+
+    from invokeai.app.services.shared.graph import Graph, GraphExecutionState
+    from tests.test_nodes import PromptTestInvocation
+
+    graph = Graph()
+    graph.add_node(PromptTestInvocation(id="prompt", prompt="test"))
+    session = GraphExecutionState(graph=graph)
+    session_json = session.model_dump_json(warnings=False, exclude_none=True)
+    with session_queue._db.transaction() as cursor:
+        cursor.execute(
+            """--sql
+            INSERT INTO session_queue (
+                queue_id, session, session_id, batch_id, field_values, priority,
+                workflow, origin, destination, retried_from_item_id, user_id
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (queue_id, session_json, session.id, str(uuid.uuid4()), None, 0, None, None, None, None, user_id),
+        )
+        return cursor.lastrowid
+
+
 # ===========================================================================
 # 1. Board-image mutation authorization
 # ===========================================================================
@@ -1359,6 +1384,62 @@ class TestQueueStatusScoping:
         )
         assert status_obj.user_pending == 2
         assert status_obj.user_in_progress == 1
+
+    def _setup_queue_router(self, mock_invoker: Invoker):
+        """Wire a real session queue and a stub processor into the invoker the router uses,
+        so GET /queue/{queue_id}/status exercises the real service contract."""
+        from unittest.mock import MagicMock
+
+        from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
+        from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+
+        db = mock_invoker.services.board_records._db
+        queue = SqliteSessionQueue(db=db)
+        queue.start(mock_invoker)
+        mock_invoker.services.session_queue = queue
+
+        processor = MagicMock()
+        processor.get_status.return_value = SessionProcessorStatus(is_started=True, is_processing=False)
+        mock_invoker.services.session_processor = processor
+        return queue
+
+    def test_get_queue_status_route_returns_global_and_user_counts(
+        self, setup_jwt_secret: None, enable_multiuser: Any, mock_invoker: Invoker, client: TestClient
+    ):
+        """Regression test: GET /api/v1/queue/{queue_id}/status must return 200 (not 500) and the
+        expected global and per-user counts for both non-admin and admin callers. Previously the
+        router called get_queue_status() with a keyword the service did not accept, raising a
+        TypeError that the broad except turned into a 500 for every status request."""
+        queue = self._setup_queue_router(mock_invoker)
+
+        user1_id = _create_user(mock_invoker, "user1@test.com", "User One")
+        user2_id = _create_user(mock_invoker, "user2@test.com", "User Two")
+        _create_user(mock_invoker, "admin@test.com", "Admin", is_admin=True)
+        user1_tok = _login(client, "user1@test.com")
+        admin_tok = _login(client, "admin@test.com")
+
+        # Three pending jobs globally: two owned by user1, one by user2; none by the admin.
+        _insert_pending_queue_item(queue, user_id=user1_id)
+        _insert_pending_queue_item(queue, user_id=user1_id)
+        _insert_pending_queue_item(queue, user_id=user2_id)
+
+        # Non-admin caller sees the global total but only their own pending count.
+        r = client.get("/api/v1/queue/default/status", headers=_auth(user1_tok))
+        assert r.status_code == 200
+        queue_status = r.json()["queue"]
+        assert queue_status["pending"] == 3
+        assert queue_status["total"] == 3
+        assert queue_status["user_pending"] == 2
+        assert queue_status["user_in_progress"] == 0
+
+        # Admin caller sees the same global total. Admins query with user_id=None, so no
+        # per-user counts are computed (the badge falls back to the global total for admins).
+        r = client.get("/api/v1/queue/default/status", headers=_auth(admin_tok))
+        assert r.status_code == 200
+        queue_status = r.json()["queue"]
+        assert queue_status["pending"] == 3
+        assert queue_status["total"] == 3
+        assert queue_status["user_pending"] is None
 
 
 # ===========================================================================

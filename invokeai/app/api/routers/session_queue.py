@@ -435,15 +435,12 @@ async def get_queue_status(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> SessionQueueAndProcessorStatus:
-    """Gets the status of the session queue. Returns global counts plus the calling user's own
-    pending/in_progress counts (so the UI can show an X/Y badge). Non-admin users cannot see the
+    """Gets the status of the session queue. Returns global counts; non-admin users additionally
+    get their own pending/in_progress counts (so the UI can show an X/Y badge) and cannot see the
     current item's identifiers unless they own it."""
     try:
-        queue = ApiDependencies.invoker.services.session_queue.get_queue_status(
-            queue_id,
-            user_id=current_user.user_id,
-            is_admin=current_user.is_admin,
-        )
+        user_id = None if current_user.is_admin else current_user.user_id
+        queue = ApiDependencies.invoker.services.session_queue.get_queue_status(queue_id, user_id=user_id)
         processor = ApiDependencies.invoker.services.session_processor.get_status()
         return SessionQueueAndProcessorStatus(queue=queue, processor=processor)
     except Exception as e:
