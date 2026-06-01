@@ -481,7 +481,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/utilities/expand-prompt": {
@@ -521,7 +526,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/utilities/image-to-prompt": {
@@ -561,7 +571,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v2/models/": {
@@ -3932,7 +3947,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       },
       "patch": {
         "tags": ["download_queue"],
@@ -3954,7 +3974,12 @@
           "400": {
             "description": "Bad request"
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/download_queue/i/": {
@@ -3994,7 +4019,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/download_queue/i/{id}": {
@@ -4003,6 +4033,11 @@
         "summary": "Get Download Job",
         "description": "Get a download job using its ID.",
         "operationId": "get_download_job",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -4047,6 +4082,11 @@
         "summary": "Cancel Download Job",
         "description": "Cancel a download job using its ID.",
         "operationId": "cancel_download_job",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -4106,7 +4146,12 @@
           "204": {
             "description": "Download jobs have been cancelled"
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/images/upload": {
@@ -6142,6 +6187,11 @@
         "summary": "Get Related Models",
         "description": "Get a list of model keys related to a given model.",
         "operationId": "get_related_models",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "model_key",
@@ -6217,7 +6267,12 @@
           "500": {
             "description": "Internal server error"
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       },
       "delete": {
         "tags": ["model_relationships"],
@@ -6251,7 +6306,12 @@
           "500": {
             "description": "Internal server error"
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/model_relationships/batch": {
@@ -6301,7 +6361,12 @@
           "500": {
             "description": "Internal server error"
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/version": {
@@ -6479,6 +6544,11 @@
         "tags": ["app"],
         "summary": "Set External Provider Config",
         "operationId": "set_external_provider_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "provider_id",
@@ -6530,6 +6600,11 @@
         "tags": ["app"],
         "summary": "Reset External Provider Config",
         "operationId": "reset_external_provider_config",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "provider_id",
@@ -8854,6 +8929,11 @@
         "summary": "Get Style Preset",
         "description": "Gets a style preset",
         "operationId": "get_style_preset",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "style_preset_id",
@@ -8895,6 +8975,11 @@
         "summary": "Update Style Preset",
         "description": "Updates a style preset",
         "operationId": "update_style_preset",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "style_preset_id",
@@ -8946,6 +9031,11 @@
         "summary": "Delete Style Preset",
         "description": "Deletes a style preset",
         "operationId": "delete_style_preset",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "style_preset_id",
@@ -8985,7 +9075,7 @@
       "get": {
         "tags": ["style_presets"],
         "summary": "List Style Presets",
-        "description": "Gets a page of style presets",
+        "description": "Gets the style presets visible to the current user.",
         "operationId": "list_style_presets",
         "responses": {
           "200": {
@@ -9002,7 +9092,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       },
       "post": {
         "tags": ["style_presets"],
@@ -9040,7 +9135,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/style_presets/i/{style_preset_id}/image": {
@@ -9049,6 +9149,11 @@
         "summary": "Get Style Preset Image",
         "description": "Gets an image file that previews the model",
         "operationId": "get_style_preset_image",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "style_preset_id",
@@ -9105,7 +9210,12 @@
               "text/csv": {}
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/style_presets/import": {
@@ -9142,7 +9252,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/client_state/{queue_id}/get_by_key": {
@@ -10313,6 +10428,22 @@
             "orig_default": null,
             "orig_required": false
           },
+          "noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Noise tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
           "denoise_mask": {
             "anyOf": [
               {
@@ -10509,7 +10640,7 @@
         "tags": ["image", "anima"],
         "title": "Denoise - Anima",
         "type": "object",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -15317,6 +15448,22 @@
             "orig_default": null,
             "orig_required": false
           },
+          "noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Noise tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
           "denoise_mask": {
             "anyOf": [
               {
@@ -15478,7 +15625,7 @@
         "tags": ["image", "cogview4"],
         "title": "Denoise - CogView4",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -24063,7 +24210,7 @@
         }
       },
       "Flux2DenoiseInvocation": {
-        "category": "image",
+        "category": "latents",
         "class": "invocation",
         "classification": "prototype",
         "description": "Run denoising process with a FLUX.2 Klein transformer model.\n\nThis node is designed for FLUX.2 Klein models which use Qwen3 as the text encoder.\nIt does not support ControlNet, IP-Adapters, or regional prompting.",
@@ -24104,6 +24251,22 @@
             ],
             "default": null,
             "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Noise tensor",
             "field_kind": "input",
             "input": "connection",
             "orig_default": null,
@@ -25553,6 +25716,22 @@
             "orig_default": null,
             "orig_required": false
           },
+          "noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Noise tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
           "denoise_mask": {
             "anyOf": [
               {
@@ -25984,7 +26163,7 @@
         "tags": ["image", "flux"],
         "title": "FLUX Denoise",
         "type": "object",
-        "version": "4.5.1",
+        "version": "4.6.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -26047,6 +26226,22 @@
             ],
             "default": null,
             "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Noise tensor",
             "field_kind": "input",
             "input": "connection",
             "orig_default": null,
@@ -29064,6 +29259,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/SaveImageInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/SaveImageToFileInvocation"
                 },
                 {
                   "$ref": "#/components/schemas/ScaleLatentsInvocation"
@@ -36551,6 +36749,9 @@
                 "$ref": "#/components/schemas/SaveImageInvocation"
               },
               {
+                "$ref": "#/components/schemas/SaveImageToFileInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ScaleLatentsInvocation"
               },
               {
@@ -37677,6 +37878,9 @@
                 "$ref": "#/components/schemas/SaveImageInvocation"
               },
               {
+                "$ref": "#/components/schemas/SaveImageToFileInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ScaleLatentsInvocation"
               },
               {
@@ -38450,6 +38654,9 @@
           "save_image": {
             "$ref": "#/components/schemas/ImageOutput"
           },
+          "save_image_to_file": {
+            "$ref": "#/components/schemas/ImageOutput"
+          },
           "scheduler": {
             "$ref": "#/components/schemas/SchedulerOutput"
           },
@@ -38800,6 +39007,7 @@
           "rectangle_mask",
           "round_float",
           "save_image",
+          "save_image_to_file",
           "scheduler",
           "sd3_denoise",
           "sd3_i2l",
@@ -39565,6 +39773,9 @@
               },
               {
                 "$ref": "#/components/schemas/SaveImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/SaveImageToFileInvocation"
               },
               {
                 "$ref": "#/components/schemas/ScaleLatentsInvocation"
@@ -40449,6 +40660,9 @@
               },
               {
                 "$ref": "#/components/schemas/SaveImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/SaveImageToFileInvocation"
               },
               {
                 "$ref": "#/components/schemas/ScaleLatentsInvocation"
@@ -56973,7 +57187,7 @@
         "category": "latents",
         "class": "invocation",
         "classification": "stable",
-        "description": "Generates latent noise.",
+        "description": "Generates latent noise for supported denoiser architectures.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -56999,6 +57213,17 @@
             "field_kind": "node_attribute",
             "title": "Use Cache",
             "type": "boolean"
+          },
+          "noise_type": {
+            "default": "SD",
+            "description": "Architecture-specific noise type.",
+            "enum": ["SD", "FLUX", "FLUX.2", "SD3", "CogView4", "Z-Image", "Anima"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "SD",
+            "orig_required": false,
+            "title": "Noise Type",
+            "type": "string"
           },
           "seed": {
             "default": 0,
@@ -57058,7 +57283,7 @@
         "tags": ["latents", "noise"],
         "title": "Create Latent Noise",
         "type": "object",
-        "version": "1.0.3",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/NoiseOutput"
         }
@@ -62055,6 +62280,22 @@
             "orig_default": null,
             "orig_required": false
           },
+          "noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Noise tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
           "denoise_mask": {
             "anyOf": [
               {
@@ -62216,7 +62457,7 @@
         "tags": ["image", "sd3"],
         "title": "Denoise - SD3",
         "type": "object",
-        "version": "1.1.1",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -63360,6 +63601,154 @@
         "title": "Save Image",
         "type": "object",
         "version": "1.2.2",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
+      },
+      "SaveImageToFileInvocation": {
+        "category": "image",
+        "class": "invocation",
+        "classification": "stable",
+        "description": "Saves an image to the gallery (like the standard Save Image node) AND additionally exports a copy\nto the filesystem with a custom filename.\n\nFilename pattern: {prefix}{uuid}{suffix}.{file_format}\n- The UUID is the same UUID used for the gallery entry, so the exported file can be matched to the gallery item.\n- The gallery entry itself always uses the plain UUID (prefix/suffix apply only to the exported file on disk).\n- Board and Metadata inputs behave exactly like the standard Save Image node.\n- The export target is restricted to (subfolders of) the InvokeAI outputs folder \u2014 absolute paths are rejected.\n\nExample: prefix=\"hero_\", suffix=\"_final\", file_format=\"png\" \u2192 \"hero_<uuid>_final.png\"",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": false,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image to save and export",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "output_directory": {
+            "default": "",
+            "description": "Target subdirectory (relative to the configured InvokeAI outputs folder) for the exported file. Leave empty to use the outputs folder directly. Example: 'my-exports' \u2192 <outputs>/my-exports/. Nested paths like 'exports/2026' are allowed. Absolute paths and path traversal ('..') are not allowed for security reasons. The directory is created automatically if it doesn't exist.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Output Directory",
+            "type": "string"
+          },
+          "prefix": {
+            "default": "",
+            "description": "Text prepended to the UUID in the exported filename. Example: 'portrait_' \u2192 'portrait_<uuid>.png'",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Prefix",
+            "type": "string"
+          },
+          "suffix": {
+            "default": "",
+            "description": "Text appended to the UUID (before the extension). Example: '_v2' \u2192 '<uuid>_v2.png'",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Suffix",
+            "type": "string"
+          },
+          "file_format": {
+            "default": "png",
+            "description": "File format for the exported file. PNG is lossless; JPG/WEBP are lossy and respect 'quality'.",
+            "enum": ["png", "jpg", "webp"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "png",
+            "orig_required": false,
+            "title": "File Format",
+            "type": "string"
+          },
+          "quality": {
+            "default": 95,
+            "description": "Compression quality for JPG and WEBP (1-100, higher = better quality, larger file). Ignored for PNG.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 100,
+            "minimum": 1,
+            "orig_default": 95,
+            "orig_required": false,
+            "title": "Quality",
+            "type": "integer"
+          },
+          "type": {
+            "const": "save_image_to_file",
+            "default": "save_image_to_file",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "export", "file", "save"],
+        "title": "Save Image (Gallery + File Export)",
+        "type": "object",
+        "version": "1.0.0",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
@@ -66651,10 +67040,21 @@
             "$ref": "#/components/schemas/PresetType",
             "description": "The type of style preset"
           },
+          "is_public": {
+            "type": "boolean",
+            "title": "Is Public",
+            "description": "Whether the preset is visible to other users.",
+            "default": false
+          },
           "id": {
             "type": "string",
             "title": "Id",
             "description": "The style preset ID."
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "The user who owns this style preset."
           },
           "image": {
             "anyOf": [
@@ -66670,7 +67070,7 @@
           }
         },
         "type": "object",
-        "required": ["name", "preset_data", "type", "id", "image"],
+        "required": ["name", "preset_data", "type", "id", "user_id", "image"],
         "title": "StylePresetRecordWithImage"
       },
       "SubModelType": {
@@ -72173,6 +72573,22 @@
             "orig_default": null,
             "orig_required": false
           },
+          "noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Noise tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
           "denoise_mask": {
             "anyOf": [
               {
@@ -72416,7 +72832,7 @@
         "tags": ["image", "z-image"],
         "title": "Denoise - Z-Image",
         "type": "object",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -72479,6 +72895,22 @@
             ],
             "default": null,
             "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Noise tensor",
             "field_kind": "input",
             "input": "connection",
             "orig_default": null,
@@ -72727,7 +73159,7 @@
         "tags": ["z-image", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - Z-Image + Metadata",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
