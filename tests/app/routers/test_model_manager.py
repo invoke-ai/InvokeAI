@@ -297,7 +297,7 @@ def test_refresh_trigger_phrases_uses_hash_lookup_for_generic_civitai_source(
     assert response.status_code == 200
     assert set(response.json()["trigger_phrases"]) == {"hash word"}
     updated_config = mm2_model_manager.store.get_model("test_config_4")
-    assert updated_config.source_url == "https://civitai.com/models/111?modelVersionId=222"
+    assert updated_config.source_url == "https://civitai.com/models/111/test-lora?modelVersionId=222"
 
 
 def test_refresh_trigger_phrases_rejects_non_lora_model(
@@ -371,7 +371,7 @@ def test_refresh_trigger_phrases_falls_back_to_stored_civitai_response(
     assert response.status_code == 200
     assert set(response.json()["trigger_phrases"]) == {"cached", "custom"}
     updated_config = mm2_model_manager.store.get_model("test_config_4")
-    assert updated_config.source_url == "https://civitai.com/models/111?modelVersionId=222"
+    assert updated_config.source_url == "https://civitai.com/models/111/test-lora?modelVersionId=222"
 
 
 def test_refresh_trigger_phrases_preserves_source_url_when_cached_metadata_has_no_source_url(
@@ -422,4 +422,6 @@ def test_refresh_trigger_phrases_errors_when_metadata_cannot_be_resolved(
     response = client.post("/api/v2/models/i/test_config_4/refresh_trigger_phrases")
 
     assert response.status_code == 404
-    assert "Unable to resolve CivitAI metadata" in response.json()["detail"]
+    assert "No version-specific CivitAI URL, matching CivitAI hash, or cached CivitAI response" in response.json()[
+        "detail"
+    ]

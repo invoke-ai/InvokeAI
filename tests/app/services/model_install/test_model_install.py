@@ -428,6 +428,34 @@ def test_civitai_download_url_metadata_fetch_returns_metadata_files(
     assert remote_files[0].path.as_posix() == "sd_xl_turbo_lora_v1.safetensors"
 
 
+def test_huggingface_url_metadata_fetch_failure_falls_back_to_direct_download(
+    mm2_installer: ModelInstallServiceBase,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+
+    class FakeHuggingFaceMetadataFetch:
+        def __init__(self, session: Any) -> None:
+            pass
+
+        def from_url(self, url: Url) -> None:
+            raise ValueError("metadata unavailable")
+
+    monkeypatch.setattr(
+        "invokeai.app.services.model_install.model_install_default.HuggingFaceMetadataFetch",
+        FakeHuggingFaceMetadataFetch,
+    )
+    source = URLModelSource(url=Url("https://huggingface.co/test/repo"))
+
+    remote_files, metadata = mm2_installer._remote_files_from_source(source)
+
+    assert metadata is None
+    assert len(remote_files) == 1
+    assert str(remote_files[0].url) == str(source.url)
+    assert remote_files[0].path == Path(".")
+    assert remote_files[0].size == 0
+
+
 def test_restore_paused_hf_install_preserves_access_token(
     mm2_installer: ModelInstallServiceBase,
     mm2_app_config: InvokeAIAppConfig,

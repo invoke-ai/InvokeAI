@@ -149,8 +149,14 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
         response = self._requests.get(url)
         if response.status_code == 404:
             raise UnknownMetadataException(f"'{url}' not found.")
-        response.raise_for_status()
-        data = response.json()
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as e:
+            raise UnknownMetadataException(f"'{url}' returned HTTP {response.status_code}.") from e
+        try:
+            data = response.json()
+        except ValueError as e:
+            raise UnknownMetadataException(f"'{url}' did not return valid JSON") from e
         if not isinstance(data, dict):
             raise UnknownMetadataException(f"'{url}' did not return a CivitAI metadata object")
         return data
@@ -201,7 +207,10 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
             raise UnknownMetadataException("Malformed CivitAI model file response")
 
         size = file_data.get("sizeKB")
-        size_bytes = int(float(size) * 1024) if size is not None else 0
+        try:
+            size_bytes = int(float(size) * 1024) if size is not None else 0
+        except (TypeError, ValueError) as e:
+            raise UnknownMetadataException("Malformed CivitAI model file response: invalid sizeKB") from e
         hashes = file_data.get("hashes") if isinstance(file_data.get("hashes"), dict) else {}
         sha256 = hashes.get("SHA256") if isinstance(hashes.get("SHA256"), str) else None
 

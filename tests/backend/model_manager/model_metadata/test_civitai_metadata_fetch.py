@@ -150,6 +150,24 @@ def test_civitai_fetcher_raises_for_404() -> None:
         fetcher.from_url("https://civitai.com/api/v1/model-versions/222")  # type: ignore[arg-type]
 
 
+def test_civitai_fetcher_raises_metadata_error_for_http_failure() -> None:
+    session = TestSession()
+    session.mount("https://civitai.com/api/v1/model-versions/222", TestAdapter(b"Rate limited", status=429))
+    fetcher = CivitaiMetadataFetch(session)
+
+    with pytest.raises(UnknownMetadataException, match="HTTP 429"):
+        fetcher.from_url("https://civitai.com/api/v1/model-versions/222")  # type: ignore[arg-type]
+
+
+def test_civitai_fetcher_raises_metadata_error_for_invalid_json() -> None:
+    session = TestSession()
+    session.mount("https://civitai.com/api/v1/model-versions/222", TestAdapter(b"not json"))
+    fetcher = CivitaiMetadataFetch(session)
+
+    with pytest.raises(UnknownMetadataException, match="valid JSON"):
+        fetcher.from_url("https://civitai.com/api/v1/model-versions/222")  # type: ignore[arg-type]
+
+
 def test_civitai_fetcher_raises_for_malformed_response() -> None:
     fetcher = CivitaiMetadataFetch(_session_for_civitai(json.dumps({"id": 222, "modelId": 111}).encode()))
 
@@ -175,6 +193,47 @@ def test_civitai_fetcher_raises_when_no_model_file_exists() -> None:
 
     with pytest.raises(UnknownMetadataException):
         fetcher.from_url("https://civitai.com/api/v1/model-versions/222")  # type: ignore[arg-type]
+
+
+def test_civitai_fetcher_raises_metadata_error_for_invalid_size_kb() -> None:
+    fetcher = CivitaiMetadataFetch(
+        _session_for_civitai(
+            _version_response(
+                files=[
+                    {
+                        "name": "test-lora.safetensors",
+                        "type": "Model",
+                        "downloadUrl": "https://civitai.com/api/download/models/222",
+                        "sizeKB": "unknown",
+                    }
+                ]
+            )
+        )
+    )
+
+    with pytest.raises(UnknownMetadataException, match="invalid sizeKB"):
+        fetcher.from_url("https://civitai.com/api/v1/model-versions/222")  # type: ignore[arg-type]
+
+
+def test_civitai_fetcher_treats_missing_size_kb_as_zero() -> None:
+    fetcher = CivitaiMetadataFetch(
+        _session_for_civitai(
+            _version_response(
+                files=[
+                    {
+                        "name": "test-lora.safetensors",
+                        "type": "Model",
+                        "downloadUrl": "https://civitai.com/api/download/models/222",
+                        "sizeKB": None,
+                    }
+                ]
+            )
+        )
+    )
+
+    metadata = fetcher.from_url("https://civitai.com/api/v1/model-versions/222")  # type: ignore[arg-type]
+
+    assert metadata.files[0].size == 0
 
 
 def test_civitai_model_version_url_detection_requires_concrete_version() -> None:

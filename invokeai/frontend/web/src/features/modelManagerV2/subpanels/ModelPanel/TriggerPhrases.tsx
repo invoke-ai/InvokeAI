@@ -86,10 +86,10 @@ export const TriggerPhrases = memo(({ modelConfig }: Props) => {
           status: 'success',
         });
       })
-      .catch((error) => {
+      .catch(() => {
         toast({
           id: 'TRIGGER_PHRASES_REFRESH_FAILED',
-          title: error?.data?.detail || t('modelManager.triggerPhrasesRefreshFailed'),
+          title: t('modelManager.triggerPhrasesRefreshFailed'),
           status: 'error',
         });
       });
@@ -121,6 +121,7 @@ export const TriggerPhrases = memo(({ modelConfig }: Props) => {
                   size="sm"
                   onClick={refreshTriggerPhrases}
                   isLoading={isRefreshing}
+                  isDisabled={isLoading}
                 >
                   {t('modelManager.refreshTriggerPhrases')}
                 </Button>

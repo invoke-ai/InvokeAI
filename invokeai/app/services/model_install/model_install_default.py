@@ -770,11 +770,10 @@ class ModelInstallService(ModelInstallServiceBase):
                 assert isinstance(metadata, ModelMetadataWithFiles)
                 return metadata.download_urls(session=self._session), metadata
             except (UnknownMetadataException, RequestException, ValueError) as e:
-                if fetcher is not CivitaiMetadataFetch:
-                    raise
-                self._logger.warning(
-                    f"Unable to fetch metadata for {source.url}: {e}. Falling back to direct download."
-                )
+                if fetcher is CivitaiMetadataFetch:
+                    self._logger.warning(
+                        f"Unable to fetch metadata for {source.url}: {e}. Falling back to direct download."
+                    )
 
             return [RemoteModelFile(url=source.url, path=Path("."), size=0)], None
 

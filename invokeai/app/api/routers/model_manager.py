@@ -9,6 +9,7 @@ from copy import deepcopy
 from enum import Enum
 from tempfile import TemporaryDirectory
 from typing import List, Optional, Type
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import huggingface_hub
 import requests
@@ -42,7 +43,11 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SDXLRefiner_Config,
 )
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
-from invokeai.backend.model_manager.metadata.fetch.civitai import CivitaiMetadataFetch, is_civitai_model_version_url
+from invokeai.backend.model_manager.metadata.fetch.civitai import (
+    CivitaiMetadataFetch,
+    is_civitai_model_version_url,
+    is_civitai_url,
+)
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
 from invokeai.backend.model_manager.metadata.metadata_base import (
     CivitaiMetadata,
@@ -158,14 +163,44 @@ def _fetch_civitai_metadata_for_config(config: AnyModelConfig) -> CivitaiMetadat
         except (UnknownMetadataException, ValueError) as e:
             errors.append(str(e))
 
-    details = "; ".join(errors) if errors else "No CivitAI source URL or hash is available"
-    raise UnknownMetadataException(details)
+    details = "; ".join(errors) if errors else "no lookup attempts were possible"
+    raise UnknownMetadataException(
+        "No version-specific CivitAI URL, matching CivitAI hash, or cached CivitAI response was usable"
+        f" ({details})"
+    )
+
+
+def _get_civitai_source_url_with_model_version_id(url: str, metadata: CivitaiMetadata) -> str | None:
+    """Return a CivitAI model page URL with metadata's concrete model version id, preserving slugs."""
+    if not is_civitai_url(url):
+        return None
+
+    parsed = urlparse(url)
+    path_parts = [part for part in parsed.path.strip("/").split("/") if part]
+    if len(path_parts) < 2 or path_parts[0] != "models":
+        return None
+
+    try:
+        model_id = int(path_parts[1])
+    except ValueError:
+        return None
+
+    if model_id != metadata.model_id:
+        return None
+
+    query = [(key, value) for key, value in parse_qsl(parsed.query, keep_blank_values=True) if key != "modelVersionId"]
+    query.append(("modelVersionId", str(metadata.model_version_id)))
+    return urlunparse(parsed._replace(query=urlencode(query)))
 
 
 def _get_refreshed_civitai_source_url(config: AnyModelConfig, metadata: CivitaiMetadata) -> str | None:
     """Return the source URL to save after refreshing CivitAI metadata."""
     if config.source_url and is_civitai_model_version_url(config.source_url):
         return config.source_url
+    if config.source_url and metadata.source_url:
+        civitai_source_url = _get_civitai_source_url_with_model_version_id(config.source_url, metadata)
+        if civitai_source_url:
+            return civitai_source_url
     return metadata.source_url or config.source_url
 
 
@@ -412,7 +447,7 @@ async def refresh_model_trigger_phrases(
 
     try:
         metadata = _fetch_civitai_metadata_for_config(config)
-    except UnknownMetadataException as e:
+    except (UnknownMetadataException, requests.RequestException, ValueError) as e:
         raise HTTPException(status_code=404, detail=f"Unable to resolve CivitAI metadata: {e}")
 
     existing_phrases = set(config.trigger_phrases or [])
