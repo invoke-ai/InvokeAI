@@ -8,6 +8,7 @@ import {
   Tag,
   TagCloseButton,
   TagLabel,
+  Tooltip,
 } from '@invoke-ai/ui-library';
 import { toast } from 'features/toast/toast';
 import type { ChangeEvent } from 'react';
@@ -105,26 +106,35 @@ export const TriggerPhrases = memo(({ modelConfig }: Props) => {
           <FormLabel>{t('modelManager.triggerPhrases')}</FormLabel>
           <Flex flexDir="column" w="full">
             <Flex gap="3" alignItems="center" w="full">
-              <Input value={phrase} onChange={handlePhraseChange} placeholder={t('modelManager.typePhraseHere')} />
+              <Input
+                value={phrase}
+                onChange={handlePhraseChange}
+                placeholder={t('modelManager.typePhraseHere')}
+                minW={0}
+              />
               <Button
                 leftIcon={<PiPlusBold />}
                 size="sm"
                 onClick={addTriggerPhrase}
                 isDisabled={!phrase || Boolean(errors.length)}
                 isLoading={isLoading}
+                flexShrink={0}
               >
                 {t('common.add')}
               </Button>
               {canRefreshTriggerPhrases && (
-                <Button
-                  leftIcon={<PiArrowClockwiseBold />}
-                  size="sm"
-                  onClick={refreshTriggerPhrases}
-                  isLoading={isRefreshing}
-                  isDisabled={isLoading}
-                >
-                  {t('modelManager.refreshTriggerPhrases')}
-                </Button>
+                <Tooltip label={t('modelManager.refreshTriggerPhrasesTooltip')}>
+                  <Button
+                    leftIcon={<PiArrowClockwiseBold />}
+                    size="sm"
+                    onClick={refreshTriggerPhrases}
+                    isLoading={isRefreshing}
+                    isDisabled={isLoading}
+                    flexShrink={0}
+                  >
+                    {t('modelManager.refreshTriggerPhrases')}
+                  </Button>
+                </Tooltip>
               )}
             </Flex>
             {errors.map((error) => (
