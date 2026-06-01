@@ -2137,8 +2137,8 @@ export type paths = {
         };
         /**
          * Get Queue Status
-         * @description Gets the status of the session queue. Returns global counts plus the calling user's own
-         *     pending/in_progress counts (so the UI can show an X/Y badge). Non-admin users cannot see the
+         * @description Gets the status of the session queue. Returns global counts; non-admin users additionally
+         *     get their own pending/in_progress counts (so the UI can show an X/Y badge) and cannot see the
          *     current item's identifiers unless they own it.
          */
         get: operations["get_queue_status"];
