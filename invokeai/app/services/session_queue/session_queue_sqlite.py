@@ -1,6 +1,7 @@
 import asyncio
 import json
 import sqlite3
+import threading
 from typing import Optional, Union, cast
 
 from pydantic_core import to_jsonable_python
@@ -41,6 +42,12 @@ from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 class SqliteSessionQueue(SessionQueueBase):
     __invoker: Invoker
+
+    # Serializes the select-candidate-then-claim sequence in `dequeue()`. The DB connection's
+    # RLock serializes individual statements, but the gap between selecting the next pending item
+    # and marking it 'in_progress' is a race: with multiple session-processor workers (multi-GPU),
+    # two workers could select the same item. Holding this lock across the whole claim prevents it.
+    _dequeue_lock = threading.Lock()
 
     def start(self, invoker: Invoker) -> None:
         self.__invoker = invoker
@@ -210,27 +217,32 @@ class SqliteSessionQueue(SessionQueueBase):
         return enqueue_result
 
     def dequeue(self) -> Optional[SessionQueueItem]:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT
-                    sq.*,
-                    u.display_name as user_display_name,
-                    u.email as user_email
-                FROM session_queue sq
-                LEFT JOIN users u ON sq.user_id = u.user_id
-                WHERE sq.status = 'pending'
-                ORDER BY
-                    sq.priority DESC,
-                    sq.item_id ASC
-                LIMIT 1
-                """
-            )
-            result = cast(Union[sqlite3.Row, None], cursor.fetchone())
-        if result is None:
-            return None
-        queue_item = SessionQueueItem.queue_item_from_dict(dict(result))
-        queue_item = self._set_queue_item_status(item_id=queue_item.item_id, status="in_progress")
+        # Hold the dequeue lock across the select-then-claim so concurrent workers (multi-GPU)
+        # cannot select and claim the same pending item. `_set_queue_item_status` already no-ops
+        # if the item was concurrently moved to a terminal state (e.g. canceled), so we only need
+        # to guard against two dequeues racing for the same pending row.
+        with self._dequeue_lock:
+            with self._db.transaction() as cursor:
+                cursor.execute(
+                    """--sql
+                    SELECT
+                        sq.*,
+                        u.display_name as user_display_name,
+                        u.email as user_email
+                    FROM session_queue sq
+                    LEFT JOIN users u ON sq.user_id = u.user_id
+                    WHERE sq.status = 'pending'
+                    ORDER BY
+                        sq.priority DESC,
+                        sq.item_id ASC
+                    LIMIT 1
+                    """
+                )
+                result = cast(Union[sqlite3.Row, None], cursor.fetchone())
+            if result is None:
+                return None
+            queue_item = SessionQueueItem.queue_item_from_dict(dict(result))
+            queue_item = self._set_queue_item_status(item_id=queue_item.item_id, status="in_progress")
         return queue_item
 
     def get_next(self, queue_id: str) -> Optional[SessionQueueItem]:

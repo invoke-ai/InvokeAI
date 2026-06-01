@@ -2,6 +2,7 @@
 Test abstract device class.
 """
 
+import threading
 from unittest.mock import patch
 
 import pytest
@@ -22,6 +23,50 @@ def test_device_choice(device_name):
     config.device = device_name
     torch_device = TorchDevice.choose_torch_device()
     assert torch_device == torch.device(device_name)
+
+
+# ===== per-thread session device (multi-GPU worker pinning) ================
+
+
+def test_session_device_overrides_config():
+    """A per-thread session device takes precedence over the global config.device."""
+    config = get_config()
+    config.device = "cpu"
+    try:
+        TorchDevice.set_session_device("cuda:1")
+        assert TorchDevice.choose_torch_device() == torch.device("cuda:1")
+    finally:
+        TorchDevice.clear_session_device()
+    # Once cleared, we fall back to the global config.
+    assert TorchDevice.choose_torch_device() == torch.device("cpu")
+
+
+def test_session_device_is_thread_local():
+    """Each thread sees only its own pinned device; the main thread is unaffected."""
+    config = get_config()
+    config.device = "cpu"
+    results: dict[str, torch.device] = {}
+    barrier = threading.Barrier(2)
+
+    def worker(name: str, device: str):
+        TorchDevice.set_session_device(device)
+        # Wait so both threads have set their device before either reads it, proving isolation.
+        barrier.wait()
+        results[name] = TorchDevice.choose_torch_device()
+        TorchDevice.clear_session_device()
+
+    t0 = threading.Thread(target=worker, args=("a", "cuda:0"))
+    t1 = threading.Thread(target=worker, args=("b", "cuda:1"))
+    t0.start()
+    t1.start()
+    t0.join()
+    t1.join()
+
+    assert results["a"] == torch.device("cuda:0")
+    assert results["b"] == torch.device("cuda:1")
+    # The main thread never set a session device, so it still uses the global config.
+    assert TorchDevice.get_session_device() is None
+    assert TorchDevice.choose_torch_device() == torch.device("cpu")
 
 
 @pytest.mark.parametrize("device_dtype_pair", device_types_cpu)

@@ -26,7 +26,21 @@ class ModelLoadServiceBase(ABC):
     @property
     @abstractmethod
     def ram_cache(self) -> ModelCache:
-        """Return the RAM cache used by this loader."""
+        """Return the RAM cache for the current thread's execution device.
+
+        In multi-GPU mode, each session-processor worker is pinned to a device and gets its own
+        cache; this resolves to the calling thread's cache. Outside a worker (e.g. API threads),
+        it resolves to the default device's cache.
+        """
+
+    @property
+    @abstractmethod
+    def ram_caches(self) -> dict[str, ModelCache]:
+        """Return all per-device RAM caches, keyed by normalized device string.
+
+        Use this for maintenance operations that must apply to every device (clear cache, drop a
+        model from all devices, shutdown).
+        """
 
     @abstractmethod
     def load_model_from_path(

@@ -33,13 +33,25 @@ class ModelLoadService(ModelLoadServiceBase):
         app_config: InvokeAIAppConfig,
         ram_cache: ModelCache,
         registry: Optional[Type[ModelLoaderRegistryBase]] = ModelLoaderRegistry,
+        ram_caches: Optional[dict[str, ModelCache]] = None,
     ):
-        """Initialize the model load service."""
+        """Initialize the model load service.
+
+        Args:
+            ram_cache: The default RAM cache, used when no per-device cache matches the calling
+                thread (e.g. single-device installs, or API threads).
+            ram_caches: Optional map of normalized device string -> ModelCache for multi-GPU mode.
+                One cache per generation device. The default `ram_cache` is always included.
+        """
         logger = InvokeAILogger.get_logger(self.__class__.__name__)
         logger.setLevel(app_config.log_level.upper())
         self._logger = logger
         self._app_config = app_config
-        self._ram_cache = ram_cache
+        self._default_ram_cache = ram_cache
+        # Map normalized device string -> cache. Always includes the default cache so that callers
+        # without a pinned device (API threads) resolve to a valid cache.
+        self._ram_caches: dict[str, ModelCache] = dict(ram_caches) if ram_caches else {}
+        self._ram_caches.setdefault(str(TorchDevice.normalize(ram_cache.execution_device)), ram_cache)
         self._registry = registry
 
     def start(self, invoker: Invoker) -> None:
@@ -47,8 +59,18 @@ class ModelLoadService(ModelLoadServiceBase):
 
     @property
     def ram_cache(self) -> ModelCache:
-        """Return the RAM cache used by this loader."""
-        return self._ram_cache
+        """Return the RAM cache for the calling thread's execution device.
+
+        `choose_torch_device()` is thread-local-aware: a session-processor worker pinned to a GPU
+        gets that GPU's cache; everything else falls back to the default cache.
+        """
+        key = str(TorchDevice.choose_torch_device())
+        return self._ram_caches.get(key, self._default_ram_cache)
+
+    @property
+    def ram_caches(self) -> dict[str, ModelCache]:
+        """Return all per-device RAM caches, keyed by normalized device string."""
+        return dict(self._ram_caches)
 
     def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
         """
@@ -67,7 +89,7 @@ class ModelLoadService(ModelLoadServiceBase):
         loaded_model: LoadedModel = implementation(
             app_config=self._app_config,
             logger=self._logger,
-            ram_cache=self._ram_cache,
+            ram_cache=self.ram_cache,
         ).load_model(model_config, submodel_type)
 
         if hasattr(self, "_invoker"):
@@ -78,9 +100,11 @@ class ModelLoadService(ModelLoadServiceBase):
     def load_model_from_path(
         self, model_path: Path, loader: Optional[Callable[[Path], AnyModel]] = None
     ) -> LoadedModelWithoutConfig:
+        # Resolve the calling thread's cache once so the whole load uses a single device's cache.
+        ram_cache = self.ram_cache
         cache_key = str(model_path)
         try:
-            return LoadedModelWithoutConfig(cache_record=self._ram_cache.get(key=cache_key), cache=self._ram_cache)
+            return LoadedModelWithoutConfig(cache_record=ram_cache.get(key=cache_key), cache=ram_cache)
         except IndexError:
             pass
 
@@ -110,7 +134,7 @@ class ModelLoadService(ModelLoadServiceBase):
             load_class = GenericDiffusersLoader(
                 app_config=self._app_config,
                 logger=self._logger,
-                ram_cache=self._ram_cache,
+                ram_cache=ram_cache,
                 convert_cache=self.convert_cache,
             ).get_hf_load_class(directory)
             return load_class.from_pretrained(model_path, torch_dtype=TorchDevice.choose_torch_dtype())
@@ -124,5 +148,5 @@ class ModelLoadService(ModelLoadServiceBase):
         )
         assert loader is not None
         raw_model = loader(model_path)
-        self._ram_cache.put(key=cache_key, model=raw_model)
-        return LoadedModelWithoutConfig(cache_record=self._ram_cache.get(key=cache_key), cache=self._ram_cache)
+        ram_cache.put(key=cache_key, model=raw_model)
+        return LoadedModelWithoutConfig(cache_record=ram_cache.get(key=cache_key), cache=ram_cache)

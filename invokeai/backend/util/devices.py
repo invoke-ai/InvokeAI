@@ -1,3 +1,4 @@
+import threading
 from typing import Dict, Literal, Optional, Union
 
 import torch
@@ -46,9 +47,35 @@ class TorchDevice:
     CUDA_DEVICE = torch.device("cuda")
     MPS_DEVICE = torch.device("mps")
 
+    # Per-thread execution device. When set (by a session-processor worker thread bound to a
+    # specific GPU), `choose_torch_device()` returns it instead of consulting the global config.
+    # This is the lynchpin that makes the ~79 `choose_torch_device()` call sites (nodes, model
+    # patcher, etc.) resolve to the calling worker's GPU without per-call-site changes.
+    _session_device = threading.local()
+
+    @classmethod
+    def set_session_device(cls, device: Union[str, torch.device]) -> None:
+        """Pin the calling thread's execution device. Used by multi-GPU session workers."""
+        cls._session_device.device = cls.normalize(device)
+
+    @classmethod
+    def get_session_device(cls) -> Optional[torch.device]:
+        """Return the calling thread's pinned execution device, or None if unset."""
+        return getattr(cls._session_device, "device", None)
+
+    @classmethod
+    def clear_session_device(cls) -> None:
+        """Remove the calling thread's pinned execution device, reverting to global config."""
+        if hasattr(cls._session_device, "device"):
+            del cls._session_device.device
+
     @classmethod
     def choose_torch_device(cls) -> torch.device:
         """Return the torch.device to use for accelerated inference."""
+        # A worker thread pinned to a specific GPU takes precedence over the global config.
+        session_device = cls.get_session_device()
+        if session_device is not None:
+            return session_device
         app_config = get_config()
         if app_config.device != "auto":
             device = torch.device(app_config.device)

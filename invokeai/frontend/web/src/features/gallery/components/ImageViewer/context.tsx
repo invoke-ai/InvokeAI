@@ -4,7 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { selectAutoSwitch } from 'features/gallery/store/gallerySelectors';
 import type { ProgressImage as ProgressImageType } from 'features/nodes/types/common';
 import { LRUCache } from 'lru-cache';
-import { type Atom, atom, computed } from 'nanostores';
+import { type Atom, atom, computed, map, type MapStore } from 'nanostores';
 import type { PropsWithChildren } from 'react';
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { S } from 'services/api/types';
@@ -12,10 +12,24 @@ import { $socket } from 'services/events/stores';
 import { assert } from 'tsafe';
 import type { JsonObject } from 'type-fest';
 
+/** Live progress for a single in-flight session (queue item). Used to tile the viewer when several
+ * sessions run concurrently (multi-GPU). Only items that have produced a preview image are tracked. */
+export type ViewerProgressDatum = {
+  itemId: number;
+  progressEvent: S['InvocationProgressEvent'];
+  progressImage: ProgressImageType;
+};
+
+type ViewerProgressDataMap = Record<number, ViewerProgressDatum | undefined>;
+
 type ImageViewerContextValue = {
   $progressEvent: Atom<S['InvocationProgressEvent'] | null>;
   $progressImage: Atom<ProgressImageType | null>;
   $hasProgressImage: Atom<boolean>;
+  /** Per-session progress, keyed by queue item id. Drives the tiled multi-session preview. */
+  $progressData: MapStore<ViewerProgressDataMap>;
+  /** Active sessions (those with a preview image), sorted by item id for a stable tile order. */
+  $activeProgressData: Atom<ViewerProgressDatum[]>;
   onLoadImage: () => void;
 };
 
@@ -29,6 +43,15 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
   const $progressEvent = useState(() => atom<S['InvocationProgressEvent'] | null>(null))[0];
   const $progressImage = useState(() => atom<ProgressImageType | null>(null))[0];
   const $hasProgressImage = useState(() => computed($progressImage, (progressImage) => progressImage !== null))[0];
+  // Per-session progress, keyed by queue item id, for the tiled multi-session preview (multi-GPU).
+  const $progressData = useState(() => map<ViewerProgressDataMap>({}))[0];
+  const $activeProgressData = useState(() =>
+    computed($progressData, (progressData) =>
+      Object.values(progressData)
+        .filter((datum): datum is ViewerProgressDatum => datum !== undefined)
+        .sort((a, b) => a.itemId - b.itemId)
+    )
+  )[0];
   // We can have race conditions where we receive a progress event for a queue item that has already finished. Easiest
   // way to handle this is to keep track of finished queue items in a cache and ignore progress events for those.
   const [finishedQueueItemIds] = useState(() => new LRUCache<number, boolean>({ max: 200 }));
@@ -49,6 +72,12 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
       $progressEvent.set(data);
       if (data.image) {
         $progressImage.set(data.image);
+        // Track per-session so the viewer can tile concurrent sessions (multi-GPU).
+        $progressData.setKey(data.item_id, {
+          itemId: data.item_id,
+          progressEvent: data,
+          progressImage: data.image,
+        });
       }
     };
 
@@ -57,7 +86,7 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
     return () => {
       socket.off('invocation_progress', onInvocationProgress);
     };
-  }, [$progressEvent, $progressImage, finishedQueueItemIds, socket]);
+  }, [$progressData, $progressEvent, $progressImage, finishedQueueItemIds, socket]);
 
   useEffect(() => {
     if (!socket) {
@@ -74,6 +103,9 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
       }
       if (data.status === 'completed' || data.status === 'canceled' || data.status === 'failed') {
         finishedQueueItemIds.set(data.item_id, true);
+        // Remove this session's tile from the multi-session preview as soon as it reaches a terminal
+        // state. The single-image "resolve" illusion below is handled separately via onLoadImage.
+        $progressData.setKey(data.item_id, undefined);
         // Completed queue items have the progress event cleared by the onLoadImage callback. This allows the viewer to
         // create the illusion of the progress image "resolving" into the final image. If we cleared the progress image
         // now, there would be a flicker where the progress image disappears before the final image appears, and the
@@ -103,7 +135,7 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
     return () => {
       socket.off('queue_item_status_changed', onQueueItemStatusChanged);
     };
-  }, [$progressEvent, $progressImage, autoSwitch, finishedQueueItemIds, socket]);
+  }, [$progressData, $progressEvent, $progressImage, autoSwitch, finishedQueueItemIds, socket]);
 
   const onLoadImage = useCallback(() => {
     $progressEvent.set(null);
@@ -111,8 +143,8 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
   }, [$progressEvent, $progressImage]);
 
   const value = useMemo(
-    () => ({ $progressEvent, $progressImage, $hasProgressImage, onLoadImage }),
-    [$hasProgressImage, $progressEvent, $progressImage, onLoadImage]
+    () => ({ $progressEvent, $progressImage, $hasProgressImage, $progressData, $activeProgressData, onLoadImage }),
+    [$hasProgressImage, $progressEvent, $progressImage, $progressData, $activeProgressData, onLoadImage]
   );
 
   return <ImageViewerContext.Provider value={value}>{props.children}</ImageViewerContext.Provider>;

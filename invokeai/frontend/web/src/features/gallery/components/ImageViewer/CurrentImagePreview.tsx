@@ -22,6 +22,7 @@ import type { ImageDTO } from 'services/api/types';
 import { useImageViewerContext } from './context';
 import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
+import { ProgressImageTiles } from './ProgressImageTiles';
 import { ProgressIndicator } from './ProgressIndicator2';
 
 export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | null }) => {
@@ -30,9 +31,10 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
   const shouldShowItemDetails = useAppSelector(selectShouldShowItemDetails);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
   const { goToPreviousImage, goToNextImage, isFetching } = useNextPrevItemNavigation();
-  const { onLoadImage, $progressEvent, $progressImage } = useImageViewerContext();
+  const { onLoadImage, $progressEvent, $progressImage, $activeProgressData } = useImageViewerContext();
   const progressEvent = useStore($progressEvent);
   const progressImage = useStore($progressImage);
+  const activeProgressData = useStore($activeProgressData);
   const [imageToRender, setImageToRender] = useState<ImageDTO | null>(null);
 
   useEffect(() => {
@@ -134,6 +136,9 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
   });
 
   const withProgress = shouldShowProgressInViewer && progressImage !== null;
+  // When more than one session is generating concurrently (multi-GPU), tile their previews instead of
+  // showing only the most recent one.
+  const withTiledProgress = withProgress && activeProgressData.length > 1;
 
   return (
     <Flex
@@ -153,9 +158,15 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       {!imageToRender && <NoContentForViewer />}
       {withProgress && (
         <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center" bg="base.900">
-          <ProgressImage progressImage={progressImage} />
-          {progressEvent && (
-            <ProgressIndicator progressEvent={progressEvent} position="absolute" top={6} right={6} size={8} />
+          {withTiledProgress ? (
+            <ProgressImageTiles data={activeProgressData} />
+          ) : (
+            <>
+              <ProgressImage progressImage={progressImage} />
+              {progressEvent && (
+                <ProgressIndicator progressEvent={progressEvent} position="absolute" top={6} right={6} size={8} />
+              )}
+            </>
           )}
         </Flex>
       )}

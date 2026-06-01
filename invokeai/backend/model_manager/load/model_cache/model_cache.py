@@ -230,6 +230,11 @@ class ModelCache:
         return unsubscribe
 
     @property
+    def execution_device(self) -> torch.device:
+        """Return the default execution device this cache loads models onto."""
+        return self._execution_device
+
+    @property
     @synchronized
     def stats(self) -> Optional[CacheStats]:
         """Return collected CacheStats object."""

@@ -60,9 +60,10 @@ class ModelManagerService(ModelManagerServiceBase):
                 service.start(invoker)
 
     def stop(self, invoker: Invoker) -> None:
-        # Shutdown the model cache to cancel any pending timers
-        if hasattr(self._load, "ram_cache"):
-            self._load.ram_cache.shutdown()
+        # Shutdown every per-device model cache to cancel any pending keep-alive timers.
+        if hasattr(self._load, "ram_caches"):
+            for cache in self._load.ram_caches.values():
+                cache.shutdown()
 
         for service in [self._store, self._install, self._load]:
             if hasattr(service, "stop"):
@@ -85,22 +86,39 @@ class ModelManagerService(ModelManagerServiceBase):
         logger = InvokeAILogger.get_logger(cls.__name__)
         logger.setLevel(app_config.log_level.upper())
 
-        ram_cache = ModelCache(
-            execution_device_working_mem_gb=app_config.device_working_mem_gb,
-            enable_partial_loading=app_config.enable_partial_loading,
-            keep_ram_copy_of_weights=app_config.keep_ram_copy_of_weights,
-            max_ram_cache_size_gb=app_config.max_cache_ram_gb,
-            max_vram_cache_size_gb=app_config.max_cache_vram_gb,
-            execution_device=execution_device or TorchDevice.choose_torch_device(),
-            storage_device="cpu",
-            log_memory_usage=app_config.log_memory_usage,
-            logger=logger,
-            keep_alive_minutes=app_config.model_cache_keep_alive_min,
-        )
+        def build_cache(device: torch.device) -> ModelCache:
+            return ModelCache(
+                execution_device_working_mem_gb=app_config.device_working_mem_gb,
+                enable_partial_loading=app_config.enable_partial_loading,
+                keep_ram_copy_of_weights=app_config.keep_ram_copy_of_weights,
+                max_ram_cache_size_gb=app_config.max_cache_ram_gb,
+                max_vram_cache_size_gb=app_config.max_cache_vram_gb,
+                execution_device=device,
+                storage_device="cpu",
+                log_memory_usage=app_config.log_memory_usage,
+                logger=logger,
+                keep_alive_minutes=app_config.model_cache_keep_alive_min,
+            )
+
+        # The default cache for callers without a pinned device (API threads, single-device installs).
+        default_device = execution_device or TorchDevice.choose_torch_device()
+        ram_cache = build_cache(default_device)
+
+        # In multi-GPU mode, build one independent cache per generation device. Each session-processor
+        # worker is pinned to a device (see TorchDevice.set_session_device) and resolves to its own
+        # cache. The default cache is always included by ModelLoadService.
+        ram_caches: dict[str, ModelCache] = {str(TorchDevice.normalize(default_device)): ram_cache}
+        if app_config.generation_devices:
+            for device_str in app_config.generation_devices:
+                key = str(TorchDevice.normalize(device_str))
+                if key not in ram_caches:
+                    ram_caches[key] = build_cache(torch.device(key))
+
         loader = ModelLoadService(
             app_config=app_config,
             ram_cache=ram_cache,
             registry=ModelLoaderRegistry,
+            ram_caches=ram_caches,
         )
         installer = ModelInstallService(
             app_config=app_config,
