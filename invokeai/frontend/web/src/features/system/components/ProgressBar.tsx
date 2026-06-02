@@ -6,9 +6,20 @@ import { useTranslation } from 'react-i18next';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 import { $activeProgressEvents, $isConnected, $loadingModelsCount } from 'services/events/stores';
 
+// In "fit" mode (e.g. the strip below a dockview tab label) the stack is constrained to a fixed height.
+// Bars stay at FIT_BAR_HEIGHT_PX while they fit, then shrink to share the available space so they never
+// overlap the label, no matter how many sessions are running.
+const FIT_BAR_HEIGHT_PX = 4;
+const FIT_BAR_GAP_PX = 1;
+
 type ProgressBarProps = ProgressProps & {
   /** Applied to the Flex that stacks the per-session bars. Use for positioning (e.g. absolute). */
   containerProps?: FlexProps;
+  /**
+   * When set, the stacked bars are constrained to this total height (in px) and shrink to share it, so
+   * they never grow past the available space (e.g. the strip below a dockview tab label).
+   */
+  fitHeightPx?: number;
 };
 
 type BarDescriptor = {
@@ -17,7 +28,7 @@ type BarDescriptor = {
   isIndeterminate: boolean;
 };
 
-const ProgressBar = ({ containerProps, ...props }: ProgressBarProps) => {
+const ProgressBar = ({ containerProps, fitHeightPx, ...props }: ProgressBarProps) => {
   const { t } = useTranslation();
   const { data: queueStatus } = useGetQueueStatusQuery();
   const isConnected = useStore($isConnected);
@@ -44,8 +55,21 @@ const ProgressBar = ({ containerProps, ...props }: ProgressBarProps) => {
     return [{ key: 'idle', value: 0, isIndeterminate }];
   }, [activeProgressEvents, isConnected, loadingModelsCount, queueStatus?.queue.in_progress]);
 
+  // In fit mode, cap the whole stack to the available strip and let the bars flex to share it. When the
+  // bars fit at their natural height the stack is shorter than the cap; once they don't, they shrink.
+  const isFit = fitHeightPx !== undefined;
+  const fitContainerProps = useMemo<FlexProps | undefined>(() => {
+    if (!isFit) {
+      return undefined;
+    }
+    const naturalHeight = bars.length * FIT_BAR_HEIGHT_PX + Math.max(0, bars.length - 1) * FIT_BAR_GAP_PX;
+    return { h: `${Math.min(naturalHeight, fitHeightPx)}px`, gap: `${FIT_BAR_GAP_PX}px` };
+  }, [bars.length, fitHeightPx, isFit]);
+
+  const fitBarProps: ProgressProps | undefined = isFit ? { flex: '1 1 0', minH: 0, h: 'auto' } : undefined;
+
   return (
-    <Flex flexDir="column" gap="2px" w="full" {...containerProps}>
+    <Flex flexDir="column" gap="2px" w="full" {...fitContainerProps} {...containerProps}>
       {bars.map((bar) => (
         <Progress
           key={bar.key}
@@ -56,6 +80,7 @@ const ProgressBar = ({ containerProps, ...props }: ProgressBarProps) => {
           w="full"
           colorScheme="invokeBlue"
           {...props}
+          {...fitBarProps}
         />
       ))}
     </Flex>
