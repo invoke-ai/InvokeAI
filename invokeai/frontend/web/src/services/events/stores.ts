@@ -14,7 +14,7 @@ export const $loadingModelsCount = atom<number>(0);
  * the UI can render one progress bar per concurrent session (multi-GPU). Entries are added as progress
  * events arrive and removed when the session reaches a terminal state.
  */
-export const $progressEvents = map<Record<number, S['InvocationProgressEvent'] | undefined>>({});
+const $progressEvents = map<Record<number, S['InvocationProgressEvent'] | undefined>>({});
 
 /** In-flight sessions sorted by queue item id, for a stable top-to-bottom bar order. */
 export const $activeProgressEvents = computed($progressEvents, (events) =>
