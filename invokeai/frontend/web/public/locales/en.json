@@ -13,7 +13,7 @@
         "toggleRightPanel": "Toggle Right Panel (G)",
         "toggleLeftPanel": "Toggle Left Panel (T)",
         "uploadImage": "Upload Image",
-        "uploadImages": "Upload Image(s)"
+        "uploadImages": "Upload Images"
     },
     "auth": {
         "login": {
@@ -303,6 +303,7 @@
         "unknown": "Unknown",
         "unpin": "Unpin",
         "upload": "Upload",
+        "userGuideLabel": "User Guide",
         "zoomIn": "Zoom In",
         "zoomOut": "Zoom Out",
         "updated": "Updated",
@@ -553,7 +554,7 @@
         "assets": "Assets",
         "alwaysShowImageSizeBadge": "Always Show Image Size Badge",
         "assetsTab": "Files you've uploaded for use in your projects.",
-        "autoAssignBoardOnClick": "Auto-Assign Board on Click",
+        "autoAssignBoardOnClick": "Auto-Assign Board",
         "autoSwitchNewImages": "Auto-Switch to New Images",
         "boardsSettings": "Boards Settings",
         "copy": "Copy",
@@ -634,7 +635,7 @@
         "resetToDefault": "Reset to Default",
         "resetAll": "Reset All to Default",
         "resetAllConfirmation": "Are you sure you want to reset all hotkeys to their default values? This cannot be undone.",
-        "enterHotkeys": "Enter hotkey(s), separated by commas",
+        "enterHotkeys": "Enter hotkeys, separated by commas",
         "save": "Save",
         "cancel": "Cancel",
         "modifiers": "Modifiers",
@@ -763,8 +764,8 @@
                 "desc": "Select the move tool."
             },
             "selectRectTool": {
-                "title": "Rect Tool",
-                "desc": "Select the rect tool."
+                "title": "Shapes Tool",
+                "desc": "Select the shapes tool."
             },
             "selectLassoTool": {
                 "title": "Lasso Tool",
@@ -1095,11 +1096,14 @@
     "modelManager": {
         "active": "active",
         "actions": "Bulk Actions",
-        "deleteModelsConfirm": "Are you sure you want to delete {{count}} model(s)? This action cannot be undone.",
+        "deleteModelsConfirm_one": "Are you sure you want to delete {{count}} model? This action cannot be undone.",
+        "deleteModelsConfirm_other": "Are you sure you want to delete {{count}} models? This action cannot be undone.",
         "deleteWarning": "Models in your Invoke models directory will be permanently deleted from disk.",
-        "modelsDeleted": "Successfully deleted {{count}} model(s)",
+        "modelsDeleted_one": "Successfully deleted {{count}} model",
+        "modelsDeleted_other": "Successfully deleted {{count}} models",
         "modelsDeleteFailed": "Failed to delete models",
-        "someModelsFailedToDelete": "{{count}} model(s) could not be deleted",
+        "someModelsFailedToDelete_one": "{{count}} model could not be deleted",
+        "someModelsFailedToDelete_other": "{{count}} models could not be deleted",
         "modelsDeletedPartial": "Partially completed",
         "someModelsDeleted": "{{deleted}} deleted, {{failed}} failed",
         "modelsDeleteError": "Error deleting models",
@@ -1134,11 +1138,14 @@
         "reidentifyUnknown": "Unable to identify model",
         "reidentifyError": "Error reidentifying model",
         "reidentifyModels": "Reidentify Models",
-        "reidentifyModelsConfirm": "Are you sure you want to reidentify {{count}} model(s)? This will re-probe their weights files to determine the correct format and settings.",
+        "reidentifyModelsConfirm_one": "Are you sure you want to reidentify {{count}} model? This will re-probe its weights file to determine the correct format and settings.",
+        "reidentifyModelsConfirm_other": "Are you sure you want to reidentify {{count}} models? This will re-probe their weights files to determine the correct format and settings.",
         "reidentifyWarning": "This will reset any custom settings you may have applied to these models.",
-        "modelsReidentified": "Successfully reidentified {{count}} model(s)",
+        "modelsReidentified_one": "Successfully reidentified {{count}} model",
+        "modelsReidentified_other": "Successfully reidentified {{count}} models",
         "modelsReidentifyFailed": "Failed to reidentify models",
-        "someModelsFailedToReidentify": "{{count}} model(s) could not be reidentified",
+        "someModelsFailedToReidentify_one": "{{count}} model could not be reidentified",
+        "someModelsFailedToReidentify_other": "{{count}} models could not be reidentified",
         "modelsReidentifiedPartial": "Partially completed",
         "someModelsReidentified": "{{succeeded}} reidentified, {{failed}} failed",
         "modelsReidentifyError": "Error reidentifying models",
@@ -1161,6 +1168,7 @@
         "convertToDiffusersHelpText5": "Please make sure you have enough disk space. Models generally vary between 2GB-7GB in size.",
         "convertToDiffusersHelpText6": "Do you wish to convert this model?",
         "cpuOnly": "CPU Only",
+        "fp8Storage": "FP8 Storage (Save VRAM)",
         "runOnCpu": "Run text encoder model on CPU only",
         "noDefaultSettings": "No default settings configured for this model. Visit the Model Manager to add default settings.",
         "defaultSettings": "Default Settings",
@@ -1228,7 +1236,7 @@
         "nAlreadyInstalled": "{{count}} already installed",
         "installQueue": "Install Queue",
         "inplaceInstall": "In-place install",
-        "inplaceInstallDesc": "Install models without moving the files. When using the model, it will be loaded from its original location. If disabled, the model file(s) will be moved into the Invoke-managed models directory during installation.",
+        "inplaceInstallDesc": "Install models without moving the files. When using the model, it will be loaded from its original location. If disabled, the model files will be moved into the Invoke-managed models directory during installation.",
         "install": "Install",
         "installAll": "Install All",
         "installRepo": "Install Repo",
@@ -1352,13 +1360,17 @@
         "orphanedModelsFound": "Orphaned Models Found",
         "orphanedModelsDescription": "The following model directories are not referenced in the database and can be safely deleted:",
         "foundOrphanedModels": "Found {{count}} orphaned model directory",
+        "foundOrphanedModels_one": "",
         "foundOrphanedModels_other": "Found {{count}} orphaned model directories",
         "filesCount": "{{count}} file",
+        "filesCount_one": "",
         "filesCount_other": "{{count}} files",
         "deleteSelected": "Delete {{count}} selected",
+        "deleteSelected_one": "",
         "deleteSelected_other": "Delete {{count}} selected",
         "deselectAll": "Deselect All",
         "orphanedModelsDeleted": "Successfully deleted {{count}} orphaned model",
+        "orphanedModelsDeleted_one": "",
         "orphanedModelsDeleted_other": "Successfully deleted {{count}} orphaned models",
         "orphanedModelsDeleteErrors": "Some models could not be deleted",
         "orphanedModelsDeleteFailed": "Failed to delete orphaned models",
@@ -1717,7 +1729,7 @@
             "modelIncompatibleScaledBboxWidth": "Scaled bbox width is {{width}} but {{model}} requires multiple of {{multiple}}",
             "modelIncompatibleScaledBboxHeight": "Scaled bbox height is {{height}} but {{model}} requires multiple of {{multiple}}",
             "fluxModelMultipleControlLoRAs": "Can only use 1 Control LoRA at a time",
-            "incompatibleLoRAs": "Incompatible LoRA(s) added",
+            "incompatibleLoRAs": "Incompatible LoRAs added",
             "hrfExternalModelUnsupported": "High Resolution Fix is not supported for external models",
             "hrfRefinerUnsupported": "High Resolution Fix is not supported when SDXL Refiner is enabled",
             "hrfUpscaleModelBaseUnsupported": "High Resolution Fix with an upscale model is supported for SD1.5 and SDXL models only",
@@ -1789,6 +1801,34 @@
         "staged": "Staged",
         "resolution": "Resolution",
         "imageSize": "Image Size",
+        "quality": "Quality",
+        "qualityOptions": {
+            "auto": "Auto",
+            "high": "High",
+            "medium": "Medium",
+            "low": "Low"
+        },
+        "background": "Background",
+        "backgroundOptions": {
+            "auto": "Auto",
+            "transparent": "Transparent",
+            "opaque": "Opaque"
+        },
+        "inputFidelity": "Input Fidelity",
+        "inputFidelityOptions": {
+            "default": "Default",
+            "low": "Low",
+            "high": "High"
+        },
+        "temperature": "Temperature",
+        "thinkingLevel": "Thinking Level",
+        "thinkingLevelOptions": {
+            "default": "Default",
+            "minimal": "Minimal",
+            "high": "High"
+        },
+        "watermark": "Watermark",
+        "optimizePrompt": "Optimize Prompt",
         "modelDisabledForTrial": "Generating with {{modelName}} is not available on trial accounts. Visit your <LinkComponent>account settings</LinkComponent> to upgrade."
     },
     "dynamicPrompts": {
@@ -1844,6 +1884,13 @@
         "enableNSFWChecker": "Enable NSFW Checker",
         "general": "General",
         "generation": "Generation",
+        "imageSubfolderStrategy": "Image Subfolder Strategy",
+        "imageSubfolderStrategyDate": "Date",
+        "imageSubfolderStrategyFlat": "Flat",
+        "imageSubfolderStrategyHash": "Hash",
+        "imageSubfolderStrategySaveFailed": "Failed to save Image Subfolder Strategy",
+        "imageSubfolderStrategyType": "Type",
+        "imageSubfolderStrategyUnknown": "Unknown ({{strategy}})",
         "maxQueueHistory": "Max Queue History",
         "maxQueueHistorySaveFailed": "Failed to save Max Queue History",
         "models": "Models",
@@ -2229,7 +2276,7 @@
         "paramDenoisingStrength": {
             "heading": "Denoising Strength",
             "paragraphs": [
-                "Controls how much the generated image varies from the raster layer(s).",
+                "Controls how much the generated image varies from the raster layers.",
                 "Lower strength stays closer to the combined visible raster layers. Higher strength relies more on the global prompt.",
                 "When there are no raster layers with visible content, this setting is ignored."
             ]
@@ -2537,6 +2584,13 @@
             "paragraphs": [
                 "When enabled, only the text encoder component will run on CPU instead of GPU.",
                 "This saves VRAM for the denoiser while only slightly impacting performance. The conditioning outputs are automatically moved to GPU for the denoiser."
+            ]
+        },
+        "fp8Storage": {
+            "heading": "FP8 Storage",
+            "paragraphs": [
+                "Stores model weights in FP8 format in VRAM, reducing memory usage by approximately 50% compared to FP16.",
+                "During inference, weights are cast layer-by-layer to the compute precision (FP16/BF16), so image quality is preserved. Works on all CUDA GPUs."
             ]
         }
     },
@@ -3022,9 +3076,48 @@
             "polygon": "Polygon",
             "polygonHint": "Click to add points, click the first point to close."
         },
+        "shape": {
+            "rect": "Rect",
+            "oval": "Oval"
+        },
+        "modifierHints": {
+            "keys": {
+                "control": "Ctrl",
+                "command": "Cmd",
+                "option": "Option",
+                "alt": "Alt",
+                "shift": "Shift",
+                "space": "Space",
+                "wheel": "Wheel",
+                "arrows": "Arrows",
+                "enter": "Enter",
+                "esc": "Esc"
+            },
+            "labels": {
+                "pan": "Pan",
+                "moveShape": "Move shape",
+                "pickColor": "Pick color",
+                "straightLine": "Straight line",
+                "resizeBrush": "Resize brush",
+                "resizeEraser": "Resize eraser",
+                "erase": "Erase",
+                "snap45Degrees": "Snap to 45deg",
+                "lockAspectRatio": "Lock ratio",
+                "unlockAspectRatio": "Unlock ratio",
+                "scaleFromCenter": "Scale from center",
+                "fineGrid": "Fine grid",
+                "commitText": "Commit",
+                "newLine": "New line",
+                "cancelText": "Cancel",
+                "dragText": "Drag text",
+                "snapRotation": "Snap rotation",
+                "nudgeSelection": "Nudge selection"
+            }
+        },
         "tool": {
             "brush": "Brush",
             "eraser": "Eraser",
+            "shapes": "Shapes",
             "rectangle": "Rectangle",
             "lasso": "Lasso",
             "gradient": "Gradient",
@@ -3533,17 +3626,16 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "LLM Prompt Tools: Use local language models to expand prompts or generate prompts from images. Install a Text LLM model (e.g. Qwen2.5-1.5B-Instruct) to get started.",
-            "FLUX.2 Klein Support: InvokeAI now supports the new FLUX.2 Klein models (4B and 9B variants) with GGUF, FP8, and Diffusers formats. Features include txt2img, img2img, inpainting, and outpainting. See 'Starter Models' to get started.",
-            "DyPE support for FLUX models improves high-resolution  (>1536 px up to 4K) images. Go to the 'Advanced Options' section to activate.",
-            "Z-Image Turbo diversity: Active 'Seed Variance Enhancer' under 'Advanced Options' to add diversity to your ZiT gens.",
-            "Multi-user mode supports multiple isolated users on the same server.",
-            "Enhanced support for Z-Image and FLUX.2 Models.",
-            "Multiple user interface enhancements and new canvas features."
+            "New model types: Qwen Image, Qwen Image Edit, Anima.",
+            "Support for hosted models: Gemini (Nano Banana), GPT Image, Qwen, Seedream, Wan",
+            "Private and shared image boards and workflows in multiuser mode",
+            "Canvas lasso tool, save/restore function, and the ability to hide those pesky preview tiles",
+            "Custom node manager",
+            "Redesigned download queue"
         ],
-        "takeUserSurvey": "📣 Let us know how you like InvokeAI. Take our User Experience Survey!",
         "readReleaseNotes": "Read Release Notes",
-        "watchRecentReleaseVideos": "Watch Recent Release Videos",
+        "readTheDocs": "Read the Docs",
+        "readDocumentation": "Read Invoke Documentation",
         "watchUiUpdatesOverview": "Watch UI Updates Overview"
     },
     "cropper": {

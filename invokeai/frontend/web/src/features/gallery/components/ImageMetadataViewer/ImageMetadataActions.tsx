@@ -77,6 +77,7 @@ export const ImageMetadataActions = memo((props: Props) => {
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.QwenImageComponentSource} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.QwenImageQuantization} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.QwenImageShift} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.ZImageShift} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.CanvasLayers} />
       <CollectionMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefImages} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.KleinVAEModel} />
