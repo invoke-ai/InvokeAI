@@ -121,6 +121,34 @@ class TorchDevice:
         return torch.cuda.get_device_name(device) if device.type == "cuda" else device.type.upper()
 
     @classmethod
+    def get_generation_devices(cls, generation_devices: Union[str, list[str], None]) -> list[torch.device]:
+        """Resolve the configured `generation_devices` into a concrete, deduplicated device list.
+
+        - ``"auto"`` (the default) expands to every visible CUDA device, or the single best available
+          device (mps/cpu) when CUDA is unavailable.
+        - An explicit list is normalized and deduplicated, with order preserved.
+        - ``None`` or an empty list yields an empty list; the caller decides the single-device fallback.
+        """
+        if generation_devices == "auto":
+            if torch.cuda.is_available():
+                device_strs: list[str] = [f"cuda:{index}" for index in range(torch.cuda.device_count())]
+            else:
+                device_strs = [str(cls.choose_torch_device())]
+        elif not generation_devices:
+            return []
+        else:
+            device_strs = list(generation_devices)
+
+        devices: list[torch.device] = []
+        seen: set[str] = set()
+        for device_str in device_strs:
+            device = cls.normalize(device_str)
+            if str(device) not in seen:
+                seen.add(str(device))
+                devices.append(device)
+        return devices
+
+    @classmethod
     def normalize(cls, device: Union[str, torch.device]) -> torch.device:
         """Add the device index to CUDA devices."""
         device = torch.device(device)

@@ -108,11 +108,10 @@ class ModelManagerService(ModelManagerServiceBase):
         # worker is pinned to a device (see TorchDevice.set_session_device) and resolves to its own
         # cache. The default cache is always included by ModelLoadService.
         ram_caches: dict[str, ModelCache] = {str(TorchDevice.normalize(default_device)): ram_cache}
-        if app_config.generation_devices:
-            for device_str in app_config.generation_devices:
-                key = str(TorchDevice.normalize(device_str))
-                if key not in ram_caches:
-                    ram_caches[key] = build_cache(torch.device(key))
+        for device in TorchDevice.get_generation_devices(app_config.generation_devices):
+            key = str(device)
+            if key not in ram_caches:
+                ram_caches[key] = build_cache(device)
 
         loader = ModelLoadService(
             app_config=app_config,

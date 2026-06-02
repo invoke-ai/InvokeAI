@@ -11,7 +11,7 @@ import re
 import shutil
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, Union
 
 import yaml
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
@@ -205,7 +205,7 @@ class InvokeAIAppConfig(BaseSettings):
 
     # DEVICE
     device:                      str = Field(default="auto",                description="Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)", pattern=r"^(auto|cpu|mps|cuda(:\d+)?)$")
-    generation_devices: Optional[list[str]] = Field(default=None,           description="List of devices to use for parallel generation, e.g. `[cuda:0, cuda:1]`. When set, the session processor runs one generation session per listed device concurrently, distributing jobs fairly across users. When unset (the default), generation runs serially on the single `device`.<br>Valid values for each entry: `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)")
+    generation_devices: Union[Literal["auto"], list[str]] = Field(default="auto", description="Devices to use for parallel generation. `auto` (the default) uses every available GPU, running one generation session per GPU concurrently and distributing jobs fairly across users. Provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices, or a single-device list (e.g. `[cuda:0]`) to run serially. On systems without a GPU, `auto` resolves to the single `cpu`/`mps` device.<br>Valid values: `auto`, or a list whose entries are each `cpu`, `cuda`, `mps`, or `cuda:N` (where N is a device number)")
     precision:                PRECISION = Field(default="auto",             description="Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.")
 
     # GENERATION
@@ -260,14 +260,14 @@ class InvokeAIAppConfig(BaseSettings):
 
     @field_validator("generation_devices")
     @classmethod
-    def validate_generation_devices(cls, v: Optional[list[str]]) -> Optional[list[str]]:
-        if v is None:
+    def validate_generation_devices(cls, v: Union[str, list[str]]) -> Union[str, list[str]]:
+        if v == "auto":
             return v
         pattern = re.compile(r"^(cpu|mps|cuda(:\d+)?)$")
         for device in v:
             if not pattern.match(device):
                 raise ValueError(
-                    f"Invalid generation device '{device}'. Valid values are 'cpu', 'mps', 'cuda', or 'cuda:N'."
+                    f"Invalid generation device '{device}'. Valid values are 'auto', 'cpu', 'mps', 'cuda', or 'cuda:N'."
                 )
         return v
 

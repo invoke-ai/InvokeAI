@@ -347,21 +347,16 @@ class DefaultSessionProcessor(SessionProcessorBase):
     def _resolve_devices(self) -> list[Optional[torch.device]]:
         """Determine the per-worker devices from config.
 
-        Returns a single `None` (legacy single-worker, device chosen by the global config) unless
-        `generation_devices` is configured, in which case it returns one normalized device per
-        listed device (deduplicated, order preserved).
+        Resolves `generation_devices` (which defaults to `"auto"` — every available GPU) into one
+        normalized device per worker. Returns a single `None` (legacy single-worker, device chosen by
+        the global config) only if the resolution is empty (e.g. `generation_devices` set to an empty
+        list).
         """
         generation_devices = self._invoker.services.configuration.generation_devices
-        if not generation_devices:
+        devices = TorchDevice.get_generation_devices(generation_devices)
+        if not devices:
             return [None]
-        devices: list[Optional[torch.device]] = []
-        seen: set[str] = set()
-        for device_str in generation_devices:
-            device = TorchDevice.normalize(device_str)
-            if str(device) not in seen:
-                seen.add(str(device))
-                devices.append(device)
-        return devices
+        return list(devices)
 
     def _clone_session_runner(self, template: SessionRunnerBase) -> SessionRunnerBase:
         """Create an independent runner for an additional worker.

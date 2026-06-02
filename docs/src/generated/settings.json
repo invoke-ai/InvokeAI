@@ -492,13 +492,13 @@
     },
     {
       "category": "DEVICE",
-      "default": null,
-      "description": "List of devices to use for parallel generation, e.g. `[cuda:0, cuda:1]`. When set, the session processor runs one generation session per listed device concurrently, distributing jobs fairly across users. When unset (the default), generation runs serially on the single `device`.<br>Valid values for each entry: `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)",
+      "default": "auto",
+      "description": "Devices to use for parallel generation. `auto` (the default) uses every available GPU, running one generation session per GPU concurrently and distributing jobs fairly across users. Provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices, or a single-device list (e.g. `[cuda:0]`) to run serially. On systems without a GPU, `auto` resolves to the single `cpu`/`mps` device.<br>Valid values: `auto`, or a list whose entries are each `cpu`, `cuda`, `mps`, or `cuda:N` (where N is a device number)",
       "env_var": "INVOKEAI_GENERATION_DEVICES",
       "literal_values": [],
       "name": "generation_devices",
       "required": false,
-      "type": "typing.Optional[list[str]]",
+      "type": "typing.Union[typing.Literal['auto'], list[str]]",
       "validation": {}
     },
     {

@@ -69,6 +69,47 @@ def test_session_device_is_thread_local():
     assert TorchDevice.choose_torch_device() == torch.device("cpu")
 
 
+# ===== generation_devices resolution (config -> concrete device list) =======
+
+
+def test_get_generation_devices_auto_expands_to_all_cuda():
+    """`auto` enumerates every visible CUDA device."""
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=True),
+        patch("invokeai.backend.util.devices.torch.cuda.device_count", return_value=3),
+    ):
+        assert TorchDevice.get_generation_devices("auto") == [
+            torch.device("cuda:0"),
+            torch.device("cuda:1"),
+            torch.device("cuda:2"),
+        ]
+
+
+def test_get_generation_devices_auto_without_cuda():
+    """`auto` falls back to the single best device when CUDA is unavailable."""
+    config = get_config()
+    config.device = "cpu"
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=False),
+        patch("invokeai.backend.util.devices.torch.backends.mps.is_available", return_value=False),
+    ):
+        assert TorchDevice.get_generation_devices("auto") == [torch.device("cpu")]
+
+
+def test_get_generation_devices_explicit_list_is_deduplicated():
+    """An explicit list is normalized and deduplicated, preserving order."""
+    assert TorchDevice.get_generation_devices(["cuda:0", "cuda:0", "cuda:1"]) == [
+        torch.device("cuda:0"),
+        torch.device("cuda:1"),
+    ]
+
+
+@pytest.mark.parametrize("value", [None, []])
+def test_get_generation_devices_empty(value):
+    """`None` or an empty list resolves to an empty list (caller handles the single-device fallback)."""
+    assert TorchDevice.get_generation_devices(value) == []
+
+
 @pytest.mark.parametrize("device_dtype_pair", device_types_cpu)
 def test_device_dtype_cpu(device_dtype_pair):
     with (
