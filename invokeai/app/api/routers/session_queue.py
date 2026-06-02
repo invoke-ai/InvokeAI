@@ -141,11 +141,19 @@ async def get_queue_item_ids(
     queue_id: str = Path(description="The queue id to perform this operation on"),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
 ) -> ItemIdsResult:
-    """Gets all queue item ids that match the given parameters. Non-admin users only see their own items."""
+    """Gets all queue item ids that match the given parameters.
+
+    IDs for every user's items are returned (item ids carry no sensitive data on their own).
+    When the corresponding items are hydrated via get_queue_items_by_item_ids, those belonging
+    to other users are redacted by sanitize_queue_item_for_user. This lets a non-admin see
+    partially-redacted entries for other users' jobs in the queue list, while still revealing
+    only timestamps and status for items they do not own.
+
+    current_user is required so the endpoint stays behind authentication in multiuser mode.
+    """
     try:
-        user_id = None if current_user.is_admin else current_user.user_id
         return ApiDependencies.invoker.services.session_queue.get_queue_item_ids(
-            queue_id=queue_id, order_dir=order_dir, user_id=user_id
+            queue_id=queue_id, order_dir=order_dir
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while listing all queue item ids: {e}")
