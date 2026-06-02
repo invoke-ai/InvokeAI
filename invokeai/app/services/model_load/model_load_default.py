@@ -18,7 +18,7 @@ from invokeai.backend.model_manager.load import (
     ModelLoaderRegistry,
     ModelLoaderRegistryBase,
 )
-from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK, ModelCache
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
 from invokeai.backend.util.devices import TorchDevice
@@ -147,6 +147,15 @@ class ModelLoadService(ModelLoadServiceBase):
             else lambda path: safetensors_load_file(path, device="cpu")
         )
         assert loader is not None
-        raw_model = loader(model_path)
-        ram_cache.put(key=cache_key, model=raw_model)
-        return LoadedModelWithoutConfig(cache_record=ram_cache.get(key=cache_key), cache=ram_cache)
+        # Serialize construction (see MODEL_LOAD_LOCK): the diffusers loader path uses the same
+        # process-global, non-thread-safe monkey-patches as the main loader, so it takes the write
+        # lock to exclude concurrent VRAM moves. Re-check the cache after acquiring the lock in case
+        # a worker sharing this cache built it while we waited.
+        with MODEL_LOAD_LOCK.write_lock():
+            try:
+                return LoadedModelWithoutConfig(cache_record=ram_cache.get(key=cache_key), cache=ram_cache)
+            except IndexError:
+                pass
+            raw_model = loader(model_path)
+            ram_cache.put(key=cache_key, model=raw_model)
+            return LoadedModelWithoutConfig(cache_record=ram_cache.get(key=cache_key), cache=ram_cache)

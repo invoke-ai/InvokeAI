@@ -13,7 +13,11 @@ from invokeai.backend.model_manager.configs.base import Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
-from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache, get_model_cache_key
+from invokeai.backend.model_manager.load.model_cache.model_cache import (
+    MODEL_LOAD_LOCK,
+    ModelCache,
+    get_model_cache_key,
+)
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.model_manager.taxonomy import (
@@ -52,7 +56,9 @@ _FP8_DEFAULT_SKIP_PATTERNS: tuple[str, ...] = (
 )
 
 
-# TO DO: The loader is not thread safe!
+# The construction path is not thread-safe on its own; it monkey-patches process-global torch state
+# (see MODEL_LOAD_LOCK). Concurrent callers must hold the MODEL_LOAD_LOCK write lock (see
+# _load_and_cache).
 class ModelLoader(ModelLoaderBase):
     """Default implementation of ModelLoaderBase."""
 
@@ -85,8 +91,7 @@ class ModelLoader(ModelLoaderBase):
         if not model_path.exists():
             raise FileNotFoundError(f"Files for model '{model_config.name}' not found at {model_path}")
 
-        with skip_torch_weight_init():
-            cache_record = self._load_and_cache(model_config, submodel_type)
+        cache_record = self._load_and_cache(model_config, submodel_type)
         return LoadedModel(config=model_config, cache_record=cache_record, cache=self._ram_cache)
 
     @property
@@ -124,25 +129,46 @@ class ModelLoader(ModelLoaderBase):
 
     def _load_and_cache(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> CacheRecord:
         stats_name = ":".join([config.base, config.type, config.name, (submodel_type or "")])
+        cache_key = get_model_cache_key(config.key, submodel_type)
         try:
-            return self._ram_cache.get(key=get_model_cache_key(config.key, submodel_type), stats_name=stats_name)
+            return self._ram_cache.get(key=cache_key, stats_name=stats_name)
         except IndexError:
             pass
 
-        config.path = str(self._get_model_path(config))
-        self._ram_cache.make_room(self.get_size_fs(config, Path(config.path), submodel_type))
-        loaded_model = self._load_model(config, submodel_type)
+        # Cache miss: construct the model from disk. This path holds the MODEL_LOAD_LOCK *write*
+        # lock because it relies on process-global, non-thread-safe monkey-patches
+        # (skip_torch_weight_init and, inside the loaders, accelerate.init_empty_weights / diffusers
+        # low_cpu_mem_usage). The write lock excludes both other constructions AND concurrent VRAM
+        # load/unload on other workers (which take the read lock); without that, a concurrent move's
+        # load_state_dict(assign=True) -> register_parameter gets hijacked onto the `meta` device.
+        # See MODEL_LOAD_LOCK for the full explanation.
+        #
+        # Lock-ordering: the write lock is acquired before any ModelCache._lock taken below
+        # (get/make_room/put), matching the readers' order, so there is no AB-BA deadlock.
+        with MODEL_LOAD_LOCK.write_lock():
+            # Double-checked locking: another worker sharing this cache may have loaded the same
+            # entry while we waited for the mutex. (Workers on other devices use a different cache,
+            # so they will still miss here and construct their own copy — which is intended.)
+            try:
+                return self._ram_cache.get(key=cache_key, stats_name=stats_name)
+            except IndexError:
+                pass
 
-        # Determine execution device from model config, considering submodel type
-        execution_device = self._get_execution_device(config, submodel_type)
+            config.path = str(self._get_model_path(config))
+            self._ram_cache.make_room(self.get_size_fs(config, Path(config.path), submodel_type))
+            with skip_torch_weight_init():
+                loaded_model = self._load_model(config, submodel_type)
 
-        self._ram_cache.put(
-            get_model_cache_key(config.key, submodel_type),
-            model=loaded_model,
-            execution_device=execution_device,
-        )
+            # Determine execution device from model config, considering submodel type
+            execution_device = self._get_execution_device(config, submodel_type)
 
-        return self._ram_cache.get(key=get_model_cache_key(config.key, submodel_type), stats_name=stats_name)
+            self._ram_cache.put(
+                cache_key,
+                model=loaded_model,
+                execution_device=execution_device,
+            )
+
+            return self._ram_cache.get(key=cache_key, stats_name=stats_name)
 
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
