@@ -422,6 +422,7 @@ def test_refresh_trigger_phrases_errors_when_metadata_cannot_be_resolved(
     response = client.post("/api/v2/models/i/test_config_4/refresh_trigger_phrases")
 
     assert response.status_code == 404
-    assert "No version-specific CivitAI URL, matching CivitAI hash, or cached CivitAI response" in response.json()[
-        "detail"
-    ]
+    assert (
+        "No version-specific CivitAI URL, matching CivitAI hash, or cached CivitAI response"
+        in response.json()["detail"]
+    )

@@ -165,8 +165,7 @@ def _fetch_civitai_metadata_for_config(config: AnyModelConfig) -> CivitaiMetadat
 
     details = "; ".join(errors) if errors else "no lookup attempts were possible"
     raise UnknownMetadataException(
-        "No version-specific CivitAI URL, matching CivitAI hash, or cached CivitAI response was usable"
-        f" ({details})"
+        f"No version-specific CivitAI URL, matching CivitAI hash, or cached CivitAI response was usable ({details})"
     )
 
 

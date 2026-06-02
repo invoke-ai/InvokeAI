@@ -138,7 +138,9 @@ class CivitaiMetadata(ModelMetadataWithFiles):
     type: Literal["civitai"] = "civitai"
     model_id: int = Field(description="The CivitAI model id")
     model_version_id: int = Field(description="The CivitAI model version id")
-    trained_words: List[str] = Field(description="Trigger phrases from CivitAI's trainedWords field", default_factory=list)
+    trained_words: List[str] = Field(
+        description="Trigger phrases from CivitAI's trainedWords field", default_factory=list
+    )
     api_response: Optional[str] = Field(description="Response from the CivitAI API as stringified JSON", default=None)
     source_url: Optional[str] = Field(description="CivitAI model page URL for this model version", default=None)
 

@@ -1,4 +1,4 @@
-{
+﻿{
   "openapi": "3.1.0",
   "info": {
     "title": "Invoke - Community Edition",
@@ -2472,6 +2472,353 @@
           },
           "404": {
             "description": "The model could not be found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/models/i/{key}/refresh_trigger_phrases": {
+      "post": {
+        "tags": ["model_manager"],
+        "summary": "Refresh Model Trigger Phrases",
+        "description": "Refresh a LoRA model's trigger phrases from CivitAI metadata.",
+        "operationId": "refresh_model_trigger_phrases",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Key of the model to refresh trigger phrases for.",
+              "title": "Key"
+            },
+            "description": "Key of the model to refresh trigger phrases for."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The model trigger phrases were refreshed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_SDXLRefiner_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_SDXLRefiner_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Diffusers_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Diffusers_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_OMI_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_OMI_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlLoRA_LyCORIS_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/T5Encoder_T5Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TI_File_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TI_File_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TI_File_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TI_Folder_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TI_Folder_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TI_Folder_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_InvokeAI_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_InvokeAI_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_InvokeAI_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_Checkpoint_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_Checkpoint_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_Checkpoint_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/T2IAdapter_Diffusers_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Spandrel_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CLIPEmbed_Diffusers_G_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CLIPEmbed_Diffusers_L_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CLIPVision_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SigLIP_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/FLUXRedux_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LlavaOnevision_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ExternalApiModelConfig"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unknown_Config"
+                    }
+                  ],
+                  "title": "Response Refresh Model Trigger Phrases"
+                },
+                "example": {
+                  "path": "string",
+                  "name": "string",
+                  "base": "sd-1",
+                  "type": "main",
+                  "format": "checkpoint",
+                  "config_path": "string",
+                  "key": "string",
+                  "hash": "string",
+                  "file_size": 1,
+                  "description": "string",
+                  "source": "string",
+                  "converted_at": 0,
+                  "variant": "normal",
+                  "prediction_type": "epsilon",
+                  "repo_variant": "fp16",
+                  "upcast_attention": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "404": {
+            "description": "The model or CivitAI metadata could not be found"
           },
           "422": {
             "description": "Validation Error",
@@ -15308,6 +15655,75 @@
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
+      },
+      "CivitaiMetadata": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "model's name"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/RemoteModelFile"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "model files and their sizes"
+          },
+          "type": {
+            "type": "string",
+            "const": "civitai",
+            "title": "Type",
+            "default": "civitai"
+          },
+          "model_id": {
+            "type": "integer",
+            "title": "Model Id",
+            "description": "The CivitAI model id"
+          },
+          "model_version_id": {
+            "type": "integer",
+            "title": "Model Version Id",
+            "description": "The CivitAI model version id"
+          },
+          "trained_words": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Trained Words",
+            "description": "Trigger phrases from CivitAI's trainedWords field"
+          },
+          "api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Response",
+            "description": "Response from the CivitAI API as stringified JSON"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "CivitAI model page URL for this model version"
+          }
+        },
+        "type": "object",
+        "required": ["name", "model_id", "model_version_id"],
+        "title": "CivitaiMetadata",
+        "description": "Extended metadata fields provided by CivitAI."
       },
       "Classification": {
         "description": "The classification of an Invocation.\n- `Stable`: The invocation, including its inputs/outputs and internal logic, is stable. You may build workflows with it, having confidence that they will not break because of a change in this invocation.\n- `Beta`: The invocation is not yet stable, but is planned to be stable in the future. Workflows built around this invocation may break, but we are committed to supporting this invocation long-term.\n- `Prototype`: The invocation is not yet stable and may be removed from the application at any time. Workflows built around this invocation may break, and we are *not* committed to supporting this invocation.\n- `Deprecated`: The invocation is deprecated and may be removed in a future version.\n- `Internal`: The invocation is not intended for use by end-users. It may be changed or removed at any time, but is exposed for users to play with.\n- `Special`: The invocation is a special case and does not fit into any of the other classifications.",
@@ -55575,12 +55991,16 @@
                   },
                   {
                     "$ref": "#/components/schemas/HuggingFaceMetadata"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CivitaiMetadata"
                   }
                 ],
                 "discriminator": {
                   "propertyName": "type",
                   "mapping": {
                     "basemetadata": "#/components/schemas/BaseMetadata",
+                    "civitai": "#/components/schemas/CivitaiMetadata",
                     "huggingface": "#/components/schemas/HuggingFaceMetadata"
                   }
                 }
