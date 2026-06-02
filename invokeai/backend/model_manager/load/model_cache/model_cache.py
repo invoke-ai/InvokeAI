@@ -34,6 +34,17 @@ GB = 2**30
 # Size of a MB in bytes.
 MB = 2**20
 
+# The shipped default for device_working_mem_gb (see config_default.py). Used to detect when a user
+# has explicitly RAISED the working-memory reserve (an OOM mitigation we must keep respecting).
+DEFAULT_DEVICE_WORKING_MEM_GB = 3
+# When an operation supplies its OWN working-memory estimate, the reserve is honored down to this
+# absolute minimum rather than the full default reserve, so light/instrumented ops stop needlessly
+# holding back VRAM (issue #9257). Operations that supply no estimate still get the full default.
+# Set from measurement: the largest measured denoise activation peak at <=1536^2 was ~1.2GB (FLUX),
+# so 1.5GB covers the measured need with ~25% headroom. (Heavy ControlNet/IP-Adapter stacks at high
+# res are covered by the per-op estimate rising above this floor, or by raising device_working_mem_gb.)
+MIN_DEVICE_WORKING_MEM_GB = 1.5
+
 
 # TODO(ryand): Where should this go? The ModelCache shouldn't be concerned with submodels.
 def get_model_cache_key(model_key: str, submodel_type: Optional[SubModelType] = None) -> str:
@@ -141,6 +152,7 @@ class ModelCache:
         execution_device_working_mem_gb: float,
         enable_partial_loading: bool,
         keep_ram_copy_of_weights: bool,
+        smart_partial_loading: bool = True,
         max_ram_cache_size_gb: float | None = None,
         max_vram_cache_size_gb: float | None = None,
         execution_device: torch.device | str = "cuda",
@@ -170,6 +182,7 @@ class ModelCache:
         :param keep_alive_minutes: How long to keep models in cache after last use (in minutes). 0 means keep indefinitely.
         """
         self._enable_partial_loading = enable_partial_loading
+        self._smart_partial_loading = smart_partial_loading
         self._keep_ram_copy_of_weights = keep_ram_copy_of_weights
         self._execution_device_working_mem_gb = execution_device_working_mem_gb
         self._execution_device: torch.device = torch.device(execution_device)
@@ -600,7 +613,22 @@ class ModelCache:
             return vram_total_available_to_cache - self._get_vram_in_use()
 
         working_mem_bytes_default = int(self._execution_device_working_mem_gb * GB)
-        working_mem_bytes = max(working_mem_bytes or working_mem_bytes_default, working_mem_bytes_default)
+        if not self._smart_partial_loading:
+            # Smart partial loading disabled: legacy behavior — the reserve is a one-directional
+            # floor that callers may only raise, never lower.
+            working_mem_bytes = max(working_mem_bytes or working_mem_bytes_default, working_mem_bytes_default)
+        elif working_mem_bytes is None:
+            # Un-instrumented operation: keep the full default reserve as a safety net.
+            working_mem_bytes = working_mem_bytes_default
+        else:
+            # The operation provided a working-memory estimate (e.g. denoise/VAE). Honor it down to a
+            # small absolute minimum instead of the full default, so a light op stops needlessly
+            # holding back VRAM (#9257). If the user explicitly RAISED device_working_mem_gb above the
+            # shipped default (an OOM mitigation), respect that raised value as the floor instead.
+            min_working_mem_bytes = int(MIN_DEVICE_WORKING_MEM_GB * GB)
+            if self._execution_device_working_mem_gb > DEFAULT_DEVICE_WORKING_MEM_GB:
+                min_working_mem_bytes = working_mem_bytes_default
+            working_mem_bytes = max(working_mem_bytes, min_working_mem_bytes)
 
         if self._execution_device.type == "cuda":
             # TODO(ryand): It is debatable whether we should use memory_reserved() or memory_allocated() here.

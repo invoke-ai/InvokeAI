@@ -75,6 +75,13 @@ from invokeai.backend.stable_diffusion.extensions.t2i_adapter import T2IAdapterE
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
+from invokeai.backend.util.denoise_working_memory import (
+    begin_denoise_measure,
+    dtype_element_size,
+    end_denoise_measure,
+    estimate_denoise_working_memory_for_model,
+    resolve_denoise_working_mem_bytes,
+)
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.hotfixes import ControlNetModel
 from invokeai.backend.util.mask import to_standard_float_mask
@@ -940,8 +947,23 @@ class DenoiseLatentsInvocation(BaseInvocation):
             # ext: t2i/ip adapter
             ext_manager.run_callback(ExtensionCallbackType.SETUP, denoise_ctx)
 
+            # Estimate the denoise forward's working-memory need so the cache reserves it.
+            # The cache applies max(estimate, device_working_mem_gb), so this can only RAISE the
+            # reserve above the configured floor (never lower it).
+            unet_info = context.models.load(self.unet.unet)
+            estimated_working_memory = estimate_denoise_working_memory_for_model(
+                model=unet_info.model,
+                latent_height=latents.shape[-2],
+                latent_width=latents.shape[-1],
+                batch_size=latents.shape[0],
+                element_size=dtype_element_size(dtype),
+                family="unet",
+            )
             with (
-                context.models.load(self.unet.unet).model_on_device() as (cached_weights, unet),
+                unet_info.model_on_device(working_mem_bytes=resolve_denoise_working_mem_bytes(estimated_working_memory, "unet")) as (
+                    cached_weights,
+                    unet,
+                ),
                 ModelPatcher.patch_unet_attention_processor(unet, denoise_ctx.inputs.attention_processor_cls),
                 # ext: controlnet
                 ext_manager.patch_extensions(denoise_ctx),
@@ -950,7 +972,18 @@ class DenoiseLatentsInvocation(BaseInvocation):
             ):
                 sd_backend = StableDiffusionBackend(unet, scheduler)
                 denoise_ctx.unet = unet
+                _denoise_mem_token = begin_denoise_measure(context.logger)
                 result_latents = sd_backend.latents_from_embeddings(denoise_ctx, ext_manager)
+                end_denoise_measure(
+                    _denoise_mem_token,
+                    context.logger,
+                    label="sdxl",
+                    estimate_bytes=estimated_working_memory,
+                    pixel_height=latents.shape[-2] * LATENT_SCALE_FACTOR,
+                    pixel_width=latents.shape[-1] * LATENT_SCALE_FACTOR,
+                    batch_size=latents.shape[0],
+                    element_size=dtype_element_size(dtype),
+                )
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         result_latents = result_latents.detach().to("cpu")
@@ -1009,9 +1042,23 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 del lora_info
             return
 
+        # Estimate the denoise forward's working-memory need so the cache reserves it (raises-only
+        # via max(estimate, device_working_mem_gb)).
+        unet_info = context.models.load(self.unet.unet)
+        estimated_working_memory = estimate_denoise_working_memory_for_model(
+            model=unet_info.model,
+            latent_height=latents.shape[-2],
+            latent_width=latents.shape[-1],
+            batch_size=latents.shape[0],
+            element_size=dtype_element_size(TorchDevice.choose_torch_dtype()),
+            family="unet",
+        )
         with (
             ExitStack() as exit_stack,
-            context.models.load(self.unet.unet).model_on_device() as (cached_weights, unet),
+            unet_info.model_on_device(working_mem_bytes=resolve_denoise_working_mem_bytes(estimated_working_memory, "unet")) as (
+                cached_weights,
+                unet,
+            ),
             ModelPatcher.apply_freeu(unet, self.unet.freeu_config),
             SeamlessExt.static_patch_model(unet, self.unet.seamless_axes),  # FIXME
             # Apply the LoRA after unet has been moved to its target device for faster patching.
@@ -1085,6 +1132,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 seed=seed,
             )
 
+            _denoise_mem_token = begin_denoise_measure()
             result_latents = pipeline.latents_from_embeddings(
                 latents=latents,
                 timesteps=timesteps,
@@ -1100,6 +1148,16 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 ip_adapter_data=ip_adapter_data,
                 t2i_adapter_data=t2i_adapter_data,
                 callback=step_callback,
+            )
+            end_denoise_measure(
+                _denoise_mem_token,
+                context.logger,
+                label="sdxl-legacy",
+                estimate_bytes=estimated_working_memory,
+                pixel_height=latents.shape[-2] * LATENT_SCALE_FACTOR,
+                pixel_width=latents.shape[-1] * LATENT_SCALE_FACTOR,
+                batch_size=latents.shape[0],
+                element_size=dtype_element_size(unet.dtype),
             )
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
