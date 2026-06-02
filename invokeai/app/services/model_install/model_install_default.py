@@ -114,6 +114,11 @@ class ModelInstallService(ModelInstallServiceBase):
         self._install_completed_event = threading.Event()
         self._download_queue = download_queue
         self._download_cache: Dict[int, ModelInstallJob] = {}
+        # Per-source locks serializing download_and_cache_model() so parallel (multi-GPU) sessions
+        # that need the same remote model (e.g. the LaMa infill model) don't race to download into
+        # the same cache directory. _download_cache_locks_guard protects the dict itself.
+        self._download_cache_locks: Dict[str, threading.Lock] = {}
+        self._download_cache_locks_guard = threading.Lock()
         self._running = False
         self._session = session
         self._install_thread: Optional[threading.Thread] = None
@@ -711,27 +716,47 @@ class ModelInstallService(ModelInstallServiceBase):
             if len(contents) > 0:
                 return contents[0]
 
-        model_path.mkdir(parents=True, exist_ok=True)
-        model_source = self._guess_source(str(source))
-        remote_files, _ = self._remote_files_from_source(model_source)
-        # Handle multiple subfolders for HFModelSource
-        subfolders = model_source.subfolders if isinstance(model_source, HFModelSource) else []
-        job = self._multifile_download(
-            dest=model_path,
-            remote_files=remote_files,
-            subfolder=model_source.subfolder
-            if isinstance(model_source, HFModelSource) and len(subfolders) <= 1
-            else None,
-            subfolders=subfolders if len(subfolders) > 1 else None,
-        )
-        files_string = "file" if len(remote_files) == 1 else "files"
-        self._logger.info(f"Queuing model download: {source} ({len(remote_files)} {files_string})")
-        self._download_queue.wait_for_job(job)
-        if job.complete:
-            assert job.download_path is not None
-            return job.download_path
-        else:
-            raise Exception(job.error)
+        # Serialize concurrent downloads of the same source. Parallel multi-GPU sessions can each
+        # request the same remote model (e.g. the LaMa infill model) at once; without this lock they
+        # both download into the same cache directory and collide on the final rename, which fails on
+        # Windows with "WinError 32: the file is being used by another process". The other waiters
+        # find the completed download on the post-lock re-check below and skip downloading.
+        with self._download_cache_lock(str(source)):
+            if model_path.exists():
+                contents = list(model_path.iterdir())
+                if len(contents) > 0:
+                    return contents[0]
+
+            model_path.mkdir(parents=True, exist_ok=True)
+            model_source = self._guess_source(str(source))
+            remote_files, _ = self._remote_files_from_source(model_source)
+            # Handle multiple subfolders for HFModelSource
+            subfolders = model_source.subfolders if isinstance(model_source, HFModelSource) else []
+            job = self._multifile_download(
+                dest=model_path,
+                remote_files=remote_files,
+                subfolder=model_source.subfolder
+                if isinstance(model_source, HFModelSource) and len(subfolders) <= 1
+                else None,
+                subfolders=subfolders if len(subfolders) > 1 else None,
+            )
+            files_string = "file" if len(remote_files) == 1 else "files"
+            self._logger.info(f"Queuing model download: {source} ({len(remote_files)} {files_string})")
+            self._download_queue.wait_for_job(job)
+            if job.complete:
+                assert job.download_path is not None
+                return job.download_path
+            else:
+                raise Exception(job.error)
+
+    def _download_cache_lock(self, source: str) -> threading.Lock:
+        """Return the lock that serializes downloads for a given source, creating it on first use."""
+        with self._download_cache_locks_guard:
+            lock = self._download_cache_locks.get(source)
+            if lock is None:
+                lock = threading.Lock()
+                self._download_cache_locks[source] = lock
+            return lock
 
     def _remote_files_from_source(
         self, source: ModelSource
