@@ -30,13 +30,6 @@ from invokeai.app.invocations.latent_noise import validate_noise_tensor_shape
 from invokeai.app.invocations.model import ControlLoRAField, LoRAField, TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.util.denoise_working_memory import (
-    begin_denoise_measure,
-    dtype_element_size,
-    end_denoise_measure,
-    estimate_denoise_working_memory_for_model,
-    resolve_denoise_working_mem_bytes,
-)
 from invokeai.backend.flux.controlnet.instantx_controlnet_flux import InstantXControlNetFlux
 from invokeai.backend.flux.controlnet.xlabs_controlnet_flux import XLabsControlNetFlux
 from invokeai.backend.flux.denoise import denoise
@@ -71,6 +64,13 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
+from invokeai.backend.util.denoise_working_memory import (
+    begin_denoise_measure,
+    dtype_element_size,
+    end_denoise_measure,
+    estimate_denoise_working_memory_for_model,
+    resolve_denoise_working_mem_bytes,
+)
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -430,10 +430,9 @@ class FluxDenoiseInvocation(BaseInvocation):
                 device=x.device,
             )
 
-            # Estimate the denoise forward's working-memory need so the cache reserves it.
-            # The cache applies max(estimate, device_working_mem_gb), so this can only RAISE the
-            # reserve above the configured floor (never lower it) — it adds OOM protection for
-            # high-resolution/large-batch runs with no change to the typical case.
+            # Estimate this denoise forward's working-memory need so the cache reserves the right amount
+            # instead of the flat default. With smart_partial_loading on, the cache honors the estimate down
+            # to a small minimum (keeping more of the model resident); un-instrumented ops keep the default.
             transformer_info = context.models.load(self.transformer.transformer)
             estimated_working_memory = estimate_denoise_working_memory_for_model(
                 model=transformer_info.model,

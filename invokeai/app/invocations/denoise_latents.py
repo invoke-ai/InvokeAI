@@ -947,9 +947,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
             # ext: t2i/ip adapter
             ext_manager.run_callback(ExtensionCallbackType.SETUP, denoise_ctx)
 
-            # Estimate the denoise forward's working-memory need so the cache reserves it.
-            # The cache applies max(estimate, device_working_mem_gb), so this can only RAISE the
-            # reserve above the configured floor (never lower it).
+            # Estimate this denoise forward's working-memory need so the cache reserves the right amount
+            # instead of the flat default. With smart_partial_loading on, the cache honors the estimate down
+            # to a small minimum (keeping more of the model resident); un-instrumented ops keep the default.
             unet_info = context.models.load(self.unet.unet)
             estimated_working_memory = estimate_denoise_working_memory_for_model(
                 model=unet_info.model,
@@ -1042,8 +1042,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 del lora_info
             return
 
-        # Estimate the denoise forward's working-memory need so the cache reserves it (raises-only
-        # via max(estimate, device_working_mem_gb)).
+        # Estimate this denoise forward's working-memory need so the cache reserves the right amount
+        # instead of the flat default (honored down to a small minimum when smart_partial_loading is on).
         unet_info = context.models.load(self.unet.unet)
         estimated_working_memory = estimate_denoise_working_memory_for_model(
             model=unet_info.model,
