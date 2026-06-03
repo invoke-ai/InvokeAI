@@ -1,5 +1,6 @@
 """Tests for the architecture-scaled denoise working-memory estimator."""
 
+import json
 import types
 
 import torch
@@ -189,6 +190,11 @@ def test_begin_end_denoise_measure_emit_or_noop_without_raising():
     if torch.cuda.is_available():
         assert token is not None
         assert len(log.records) == 1 and log.records[0].startswith("DENOISE_MEM ")
+        payload = json.loads(log.records[0][len("DENOISE_MEM ") :])
+        # The record must be self-describing for calibration: it carries the multiplier that produced
+        # the estimate (flux2 -> "dit" family), so back-solving M needs no external state.
+        assert payload["mult"] == ACTIVATION_MULTIPLIER["dit"]
+        assert payload["label"] == "flux2" and "measured_peak_mb" in payload
     else:
         assert token is None
         assert log.records == []

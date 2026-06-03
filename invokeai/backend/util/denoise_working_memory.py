@@ -242,6 +242,7 @@ def end_denoise_measure(
                     "px_w": int(pixel_width),
                     "batch": int(batch_size),
                     "elt": int(element_size),
+                    "mult": ACTIVATION_MULTIPLIER["unet"] if is_unet else ACTIVATION_MULTIPLIER["dit"],
                     "estimate_mb": round(estimate_bytes / MB, 1),
                     "measured_peak_mb": round(measured / MB, 1),
                     "resident_before_mb": round(token / MB, 1),
