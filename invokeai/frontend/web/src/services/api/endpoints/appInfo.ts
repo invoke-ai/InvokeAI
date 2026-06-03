@@ -58,6 +58,16 @@ export const appInfoApi = api.injectEndpoints({
       }),
       providesTags: ['AppConfig'],
     }),
+    getGenerationDeviceOptions: build.query<
+      paths['/api/v1/app/generation_device_options']['get']['responses']['200']['content']['application/json'],
+      void
+    >({
+      query: () => ({
+        url: buildAppInfoUrl('generation_device_options'),
+        method: 'GET',
+      }),
+      providesTags: ['FetchOnReconnect'],
+    }),
     updateRuntimeConfig: build.mutation<
       paths['/api/v1/app/runtime_config']['patch']['responses']['200']['content']['application/json'],
       paths['/api/v1/app/runtime_config']['patch']['requestBody']['content']['application/json']
@@ -149,6 +159,7 @@ export const {
   useGetAppDepsQuery,
   useGetPatchmatchStatusQuery,
   useGetRuntimeConfigQuery,
+  useGetGenerationDeviceOptionsQuery,
   useGetExternalProviderStatusesQuery,
   useGetExternalProviderConfigsQuery,
   useSetExternalProviderConfigMutation,

@@ -1,15 +1,16 @@
 import locale
+import re
 from enum import Enum
 from importlib.metadata import distributions
 from pathlib import Path as FilePath
 from threading import Lock
-from typing import Any
+from typing import Any, Literal, Union
 
 import torch
 import yaml
 from fastapi import Body, HTTPException, Path
 from fastapi.routing import APIRouter
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from invokeai.app.api.auth_dependencies import AdminUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
@@ -118,6 +119,16 @@ def _remove_nullable_default_from_schema(schema: dict[str, Any]) -> None:
             schema.update(non_null_schemas[0])
 
 
+_GENERATION_DEVICE_PATTERN = re.compile(r"^(cpu|mps|cuda(:\d+)?)$")
+
+
+class GenerationDeviceOption(BaseModel):
+    """A device that may be selected for generation."""
+
+    device: str = Field(description="The device identifier, e.g. 'cuda:0', 'mps', or 'cpu'")
+    name: str = Field(description="Human-readable device name")
+
+
 class UpdateAppGenerationSettingsRequest(BaseModel):
     """Writable generation-related app settings."""
 
@@ -131,12 +142,57 @@ class UpdateAppGenerationSettingsRequest(BaseModel):
         ge=0,
         description="Keep the last N completed, failed, and canceled queue items on startup. Set to 0 to prune all terminal items.",
     )
+    generation_devices: Union[Literal["auto"], list[str]] | None = Field(
+        default=None,
+        description="Devices to use for parallel generation. `auto` uses every available GPU; provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices. Takes effect after restarting InvokeAI.",
+        json_schema_extra=_remove_nullable_default_from_schema,
+    )
+
+    @field_validator("generation_devices")
+    @classmethod
+    def validate_generation_devices(
+        cls, v: Union[Literal["auto"], list[str], None]
+    ) -> Union[Literal["auto"], list[str], None]:
+        if v is None or v == "auto":
+            return v
+        for device in v:
+            if not _GENERATION_DEVICE_PATTERN.match(device):
+                raise ValueError(
+                    f"Invalid generation device '{device}'. Valid values are 'auto', 'cpu', 'mps', 'cuda', or 'cuda:N'."
+                )
+        return v
 
     @model_validator(mode="after")
     def validate_explicit_nulls(self) -> "UpdateAppGenerationSettingsRequest":
         if "image_subfolder_strategy" in self.model_fields_set and self.image_subfolder_strategy is None:
             raise ValueError("image_subfolder_strategy may not be null")
+        if "generation_devices" in self.model_fields_set and self.generation_devices is None:
+            raise ValueError("generation_devices may not be null")
         return self
+
+
+@app_router.get(
+    "/generation_device_options",
+    operation_id="get_generation_device_options",
+    status_code=200,
+    response_model=list[GenerationDeviceOption],
+)
+async def get_generation_device_options() -> list[GenerationDeviceOption]:
+    """List the devices available for generation, for use with the `generation_devices` setting."""
+    options: list[GenerationDeviceOption] = []
+    if torch.cuda.is_available():
+        for index in range(torch.cuda.device_count()):
+            device = f"cuda:{index}"
+            try:
+                name = torch.cuda.get_device_name(index)
+            except Exception:
+                name = device
+            options.append(GenerationDeviceOption(device=device, name=name))
+    elif torch.backends.mps.is_available():
+        options.append(GenerationDeviceOption(device="mps", name="Apple MPS"))
+    else:
+        options.append(GenerationDeviceOption(device="cpu", name="CPU"))
+    return options
 
 
 @app_router.get(

@@ -28,6 +28,7 @@ import { useRefreshAfterResetModal } from 'features/system/components/SettingsMo
 import { SettingsDeveloperLogIsEnabled } from 'features/system/components/SettingsModal/SettingsDeveloperLogIsEnabled';
 import { SettingsDeveloperLogLevel } from 'features/system/components/SettingsModal/SettingsDeveloperLogLevel';
 import { SettingsDeveloperLogNamespaces } from 'features/system/components/SettingsModal/SettingsDeveloperLogNamespaces';
+import { SettingsGenerationDevices } from 'features/system/components/SettingsModal/SettingsGenerationDevices';
 import { SettingsImageSubfolderStrategySelect } from 'features/system/components/SettingsModal/SettingsImageSubfolderStrategySelect';
 import { useClearIntermediates } from 'features/system/components/SettingsModal/useClearIntermediates';
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
@@ -321,6 +322,7 @@ const SettingsModal = (props: { children: ReactElement }) => {
                       </NumberInput>
                     </FormControl>
                     <SettingsImageSubfolderStrategySelect />
+                    <SettingsGenerationDevices />
                   </StickyScrollable>
 
                   <StickyScrollable title={t('settings.models')}>

@@ -1652,6 +1652,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app/generation_device_options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Generation Device Options
+         * @description List the devices available for generation, for use with the `generation_devices` setting.
+         */
+        get: operations["get_generation_device_options"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/app/runtime_config": {
         parameters: {
             query?: never;
@@ -12189,6 +12209,22 @@ export type components = {
              * @description Generated strong password
              */
             password: string;
+        };
+        /**
+         * GenerationDeviceOption
+         * @description A device that may be selected for generation.
+         */
+        GenerationDeviceOption: {
+            /**
+             * Device
+             * @description The device identifier, e.g. 'cuda:0', 'mps', or 'cpu'
+             */
+            device: string;
+            /**
+             * Name
+             * @description Human-readable device name
+             */
+            name: string;
         };
         /**
          * Get Image Mask Bounding Box
@@ -30871,6 +30907,11 @@ export type components = {
              * @description Keep the last N completed, failed, and canceled queue items on startup. Set to 0 to prune all terminal items.
              */
             max_queue_history?: number | null;
+            /**
+             * Generation Devices
+             * @description Devices to use for parallel generation. `auto` uses every available GPU; provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices. Takes effect after restarting InvokeAI.
+             */
+            generation_devices?: unknown;
         };
         /**
          * UserDTO
@@ -36317,6 +36358,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": boolean;
+                };
+            };
+        };
+    };
+    get_generation_device_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerationDeviceOption"][];
                 };
             };
         };
