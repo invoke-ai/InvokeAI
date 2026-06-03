@@ -16507,11 +16507,6 @@ export type components = {
              */
             device?: string;
             /**
-             * Generation Devices
-             * @description List of devices to use for parallel generation, e.g. `[cuda:0, cuda:1]`. When set, the session processor runs one generation session per listed device concurrently, distributing jobs fairly across users. When unset (the default), generation runs serially on the single `device`.<br>Valid values for each entry: `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)
-             */
-            generation_devices?: string[] | null;
-            /**
              * Precision
              * @description Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.
              * @default auto

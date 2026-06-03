@@ -41151,21 +41151,6 @@
             "description": "Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)",
             "default": "auto"
           },
-          "generation_devices": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Generation Devices",
-            "description": "List of devices to use for parallel generation, e.g. `[cuda:0, cuda:1]`. When set, the session processor runs one generation session per listed device concurrently, distributing jobs fairly across users. When unset (the default), generation runs serially on the single `device`.<br>Valid values for each entry: `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)"
-          },
           "precision": {
             "type": "string",
             "enum": ["auto", "float16", "bfloat16", "float32"],
