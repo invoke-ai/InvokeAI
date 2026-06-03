@@ -197,6 +197,7 @@ def test_begin_end_denoise_measure_emit_or_noop_without_raising():
         # produced the estimate (flux2), so back-solving M needs no external state.
         assert payload["mult"] == ACTIVATION_MULTIPLIER["flux2"]
         assert payload["label"] == "flux2" and "measured_peak_mb" in payload
+        assert "elapsed_ms" in payload  # denoise-loop wall time, for the on/off timing A/B
     else:
         assert token is None
         assert log.records == []

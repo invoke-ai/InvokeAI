@@ -36,6 +36,7 @@ the minimum; over-estimates only cost streaming speed. See ``resolve_denoise_wor
 
 import json
 import logging
+import time
 from typing import Any, Optional, Protocol
 
 import torch
@@ -216,13 +217,13 @@ def resolve_denoise_working_mem_bytes(estimate_bytes: int, family: str) -> Optio
     return estimate_bytes if family_enforced(family) else None
 
 
-def begin_denoise_measure(logger: _LevelLogger) -> Optional[int]:
-    """Snapshot allocator state immediately before a denoise loop, for calibration diagnostics.
+def begin_denoise_measure(logger: _LevelLogger) -> Optional[tuple[int, float]]:
+    """Snapshot allocator state and a wall-clock start immediately before a denoise loop.
 
     Only active when DEBUG logging is enabled (the ``DENOISE_MEM`` record is logged at debug level),
-    so it adds zero overhead in normal operation. Returns the bytes currently allocated (the
-    resident-weights baseline), or ``None`` if disabled / CUDA unavailable. Pass the result to
-    :func:`end_denoise_measure`.
+    so it adds zero overhead in normal operation. Returns ``(bytes_allocated, start_time)`` — the
+    resident-weights baseline and a ``perf_counter`` start taken after a CUDA sync — or ``None`` if
+    disabled / CUDA unavailable. Pass the result to :func:`end_denoise_measure`.
     """
     if not logger.isEnabledFor(logging.DEBUG) or not torch.cuda.is_available():
         return None
@@ -230,13 +231,13 @@ def begin_denoise_measure(logger: _LevelLogger) -> Optional[int]:
         torch.cuda.synchronize()
         alloc_before = torch.cuda.memory_allocated()
         torch.cuda.reset_peak_memory_stats()
-        return alloc_before
+        return alloc_before, time.perf_counter()
     except Exception:
         return None
 
 
 def end_denoise_measure(
-    token: Optional[int],
+    token: Optional[tuple[int, float]],
     logger: _LevelLogger,
     *,
     label: str,
@@ -250,14 +251,18 @@ def end_denoise_measure(
 
     ``measured_peak_mb`` is the extra VRAM the denoise loop allocated on top of the resident
     weights — the real working-memory need the estimate should match. ``estimate_over_measured``
-    > 1 means we are over-estimating (would over-reserve if enforced).
+    > 1 means we are over-estimating (would over-reserve if enforced). ``elapsed_ms`` is the
+    GPU-synced wall time of the denoise loop, so an A/B (e.g. smart_partial_loading on vs off) can
+    confirm that loading more of the model speeds up inference rather than overhead slowing it down.
     """
     if token is None or not torch.cuda.is_available():
         return
     try:
         torch.cuda.synchronize()
+        alloc_before, start_time = token
+        elapsed_ms = round((time.perf_counter() - start_time) * 1000, 1)
         peak = torch.cuda.max_memory_allocated()
-        measured = max(0, peak - token)
+        measured = max(0, peak - alloc_before)
         ratio = round(estimate_bytes / measured, 2) if measured > 0 else None
         logger.debug(
             "DENOISE_MEM "
@@ -271,8 +276,9 @@ def end_denoise_measure(
                     "mult": family_multiplier(label),
                     "estimate_mb": round(estimate_bytes / MB, 1),
                     "measured_peak_mb": round(measured / MB, 1),
-                    "resident_before_mb": round(token / MB, 1),
+                    "resident_before_mb": round(alloc_before / MB, 1),
                     "total_peak_mb": round(peak / MB, 1),
+                    "elapsed_ms": elapsed_ms,
                     "estimate_over_measured": ratio,
                     "enforced": family_enforced(label),
                 }
