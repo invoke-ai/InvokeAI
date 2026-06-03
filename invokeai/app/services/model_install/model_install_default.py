@@ -762,9 +762,7 @@ class ModelInstallService(ModelInstallServiceBase):
             except ValueError:
                 pass
 
-            return [
-                RemoteModelFile(url=self._normalize_huggingface_blob_url(source.url), path=Path("."), size=0)
-            ], None
+            return [RemoteModelFile(url=self._normalize_huggingface_blob_url(source.url), path=Path("."), size=0)], None
 
         raise Exception(f"No files associated with {source}")
 

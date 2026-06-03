@@ -331,10 +331,7 @@ def test_huggingface_blob_url_uses_resolve_download_url(mm2_installer: ModelInst
 
     assert metadata is None
     assert len(files) == 1
-    assert (
-        str(files[0].url)
-        == "https://huggingface.co/h94/IP-Adapter/resolve/main/sdxl_models/ip-adapter.safetensors"
-    )
+    assert str(files[0].url) == "https://huggingface.co/h94/IP-Adapter/resolve/main/sdxl_models/ip-adapter.safetensors"
 
 
 @pytest.mark.timeout(timeout=10, method="thread")
