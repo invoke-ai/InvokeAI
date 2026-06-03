@@ -66,7 +66,7 @@ jobs:
     steps:
       - name: checkout
         # https://github.com/nschloe/action-cached-lfs-checkout
-        uses: nschloe/action-cached-lfs-checkout@f46300cd8952454b9f0a21a3d133d4bd5684cfc2
+        uses: nschloe/action-cached-lfs-checkout@385a8ecc719e50b8c71af6ab01a624b486b7c3bc
 
       - name: check for changed python files
         if: ${{ inputs.always_run != true }}
