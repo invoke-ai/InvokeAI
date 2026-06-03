@@ -152,7 +152,7 @@ class ModelCache:
         execution_device_working_mem_gb: float,
         enable_partial_loading: bool,
         keep_ram_copy_of_weights: bool,
-        smart_partial_loading: bool = True,
+        smart_partial_loading: bool = False,
         max_ram_cache_size_gb: float | None = None,
         max_vram_cache_size_gb: float | None = None,
         execution_device: torch.device | str = "cuda",
