@@ -6431,6 +6431,30 @@
         }
       }
     },
+    "/api/v1/app/generation_device_options": {
+      "get": {
+        "tags": ["app"],
+        "summary": "Get Generation Device Options",
+        "description": "List the devices available for generation, for use with the `generation_devices` setting.",
+        "operationId": "get_generation_device_options",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GenerationDeviceOption"
+                  },
+                  "type": "array",
+                  "title": "Response Get Generation Device Options"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/app/runtime_config": {
       "get": {
         "tags": ["app"],
@@ -28460,6 +28484,24 @@
         "required": ["password"],
         "title": "GeneratePasswordResponse",
         "description": "Response containing a generated password."
+      },
+      "GenerationDeviceOption": {
+        "properties": {
+          "device": {
+            "type": "string",
+            "title": "Device",
+            "description": "The device identifier, e.g. 'cuda:0', 'mps', or 'cpu'"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Human-readable device name"
+          }
+        },
+        "type": "object",
+        "required": ["device", "name"],
+        "title": "GenerationDeviceOption",
+        "description": "A device that may be selected for generation."
       },
       "GetMaskBoundingBoxInvocation": {
         "category": "mask",
@@ -70155,6 +70197,10 @@
             ],
             "title": "Max Queue History",
             "description": "Keep the last N completed, failed, and canceled queue items on startup. Set to 0 to prune all terminal items."
+          },
+          "generation_devices": {
+            "title": "Generation Devices",
+            "description": "Devices to use for parallel generation. `auto` uses every available GPU; provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices. Takes effect after restarting InvokeAI."
           }
         },
         "type": "object",
