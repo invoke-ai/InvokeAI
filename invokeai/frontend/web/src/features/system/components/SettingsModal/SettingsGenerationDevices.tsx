@@ -149,7 +149,12 @@ export const SettingsGenerationDevices = memo(() => {
           ))}
         </Flex>
       )}
-      <FormHelperText>{t('settings.generationDevicesHelp')}</FormHelperText>
+      <FormHelperText>
+        {t('settings.generationDevicesHelp')}{' '}
+        <Text as="span" fontWeight="bold">
+          {t('settings.generationDevicesRestart')}
+        </Text>
+      </FormHelperText>
     </FormControl>
   );
 });
