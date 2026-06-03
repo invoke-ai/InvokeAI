@@ -12,7 +12,9 @@ from invokeai.backend.util.denoise_working_memory import (
     ENFORCE_UNET_WORKING_MEMORY,
     GB,
     MB,
+    begin_denoise_measure,
     dtype_element_size,
+    end_denoise_measure,
     estimate_denoise_working_memory,
     estimate_denoise_working_memory_for_model,
     model_activation_width,
@@ -131,3 +133,62 @@ def test_dtype_element_size():
     assert dtype_element_size(torch.float16) == 2
     assert dtype_element_size(torch.bfloat16) == 2
     assert dtype_element_size(torch.float32) == 4
+
+
+# --- DENOISE_MEM telemetry: the logger the invocations actually pass ---
+
+
+def test_begin_denoise_measure_works_with_logger_interface():
+    """Regression: every denoise node passes ``context.logger`` — a ``LoggerInterface``, NOT a
+    ``logging.Logger`` — to ``begin_denoise_measure``, which calls ``logger.isEnabledFor(...)``. The
+    wrapper must expose ``isEnabledFor`` or that call raises ``AttributeError`` on EVERY denoise.
+    This reproduces the exact call site with a real LoggerInterface."""
+    import logging
+
+    from invokeai.app.services.shared.invocation_context import LoggerInterface
+
+    real = logging.getLogger("test_denoise_mem_regression")
+    real.setLevel(logging.WARNING)  # DEBUG disabled
+
+    ctx_logger = LoggerInterface.__new__(LoggerInterface)
+    ctx_logger._services = types.SimpleNamespace(logger=real)
+
+    # The wrapper must support the level check begin_denoise_measure relies on...
+    assert ctx_logger.isEnabledFor(logging.DEBUG) is False
+    assert ctx_logger.isEnabledFor(logging.WARNING) is True
+    # ...and the exact call the invocations make must not raise (returns None because DEBUG is off).
+    assert begin_denoise_measure(ctx_logger) is None
+
+
+def test_begin_end_denoise_measure_emit_or_noop_without_raising():
+    """With DEBUG enabled the pair must run cleanly: on CUDA it snapshots and emits one DENOISE_MEM
+    record; without CUDA it no-ops. Never raises either way."""
+
+    class _StubLogger:
+        def __init__(self) -> None:
+            self.records: list[str] = []
+
+        def isEnabledFor(self, level: int) -> bool:
+            return True
+
+        def debug(self, msg: str) -> None:
+            self.records.append(msg)
+
+    log = _StubLogger()
+    token = begin_denoise_measure(log)
+    end_denoise_measure(
+        token,
+        log,
+        label="flux2",
+        estimate_bytes=512 * MB,
+        pixel_height=1024,
+        pixel_width=1024,
+        batch_size=1,
+        element_size=2,
+    )
+    if torch.cuda.is_available():
+        assert token is not None
+        assert len(log.records) == 1 and log.records[0].startswith("DENOISE_MEM ")
+    else:
+        assert token is None
+        assert log.records == []

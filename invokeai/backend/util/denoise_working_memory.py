@@ -36,10 +36,23 @@ the minimum; over-estimates only cost streaming speed. See ``resolve_denoise_wor
 
 import json
 import logging
-from logging import Logger
-from typing import Any, Optional
+from typing import Any, Optional, Protocol
 
 import torch
+
+
+class _LevelLogger(Protocol):
+    """Minimal logger surface used for ``DENOISE_MEM`` diagnostics: a level check plus debug emit.
+
+    Both the stdlib :class:`logging.Logger` and InvokeAI's ``LoggerInterface`` wrapper (what an
+    invocation's ``context.logger`` is) satisfy this. The wrapper is NOT a real ``Logger``, so these
+    functions must not assume the full ``logging.Logger`` API — only ``isEnabledFor`` and ``debug``.
+    """
+
+    def isEnabledFor(self, level: int) -> bool: ...
+
+    def debug(self, msg: str) -> None: ...
+
 
 MB = 2**20
 GB = 2**30
@@ -176,7 +189,7 @@ def resolve_denoise_working_mem_bytes(estimate_bytes: int, family: str) -> Optio
     return estimate_bytes if enforce else None
 
 
-def begin_denoise_measure(logger: Logger) -> Optional[int]:
+def begin_denoise_measure(logger: _LevelLogger) -> Optional[int]:
     """Snapshot allocator state immediately before a denoise loop, for calibration diagnostics.
 
     Only active when DEBUG logging is enabled (the ``DENOISE_MEM`` record is logged at debug level),
@@ -197,7 +210,7 @@ def begin_denoise_measure(logger: Logger) -> Optional[int]:
 
 def end_denoise_measure(
     token: Optional[int],
-    logger: Logger,
+    logger: _LevelLogger,
     *,
     label: str,
     estimate_bytes: int,

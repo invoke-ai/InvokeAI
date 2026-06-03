@@ -1132,7 +1132,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 seed=seed,
             )
 
-            _denoise_mem_token = begin_denoise_measure()
+            _denoise_mem_token = begin_denoise_measure(context.logger)
             result_latents = pipeline.latents_from_embeddings(
                 latents=latents,
                 timesteps=timesteps,
