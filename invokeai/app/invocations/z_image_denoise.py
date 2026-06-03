@@ -459,13 +459,13 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 latent_width=latents.shape[-1],
                 batch_size=latents.shape[0],
                 element_size=dtype_element_size(inference_dtype),
-                family="dit",
+                family="z_image",
             )
 
             # Load transformer - always use base transformer, control is handled via extension
             (cached_weights, transformer) = exit_stack.enter_context(
                 transformer_info.model_on_device(
-                    working_mem_bytes=resolve_denoise_working_mem_bytes(estimated_working_memory, "dit")
+                    working_mem_bytes=resolve_denoise_working_mem_bytes(estimated_working_memory, "z_image")
                 )
             )
 

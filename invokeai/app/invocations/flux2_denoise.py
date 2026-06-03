@@ -466,13 +466,13 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 latent_width=latent_w,
                 batch_size=b,
                 element_size=dtype_element_size(inference_dtype),
-                family="dit",
+                family="flux2",
             )
 
             # Load the transformer model
             (cached_weights, transformer) = exit_stack.enter_context(
                 transformer_info.model_on_device(
-                    working_mem_bytes=resolve_denoise_working_mem_bytes(estimated_working_memory, "dit")
+                    working_mem_bytes=resolve_denoise_working_mem_bytes(estimated_working_memory, "flux2")
                 )
             )
             config = transformer_config

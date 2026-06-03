@@ -299,11 +299,11 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             latent_width=latent_width,
             batch_size=batch_size,
             element_size=dtype_element_size(inference_dtype),
-            family="dit",
+            family="sd3",
         )
 
         with transformer_info.model_on_device(
-            working_mem_bytes=resolve_denoise_working_mem_bytes(estimated_working_memory, "dit")
+            working_mem_bytes=resolve_denoise_working_mem_bytes(estimated_working_memory, "sd3")
         ) as (cached_weights, transformer):
             assert isinstance(transformer, SD3Transformer2DModel)
 

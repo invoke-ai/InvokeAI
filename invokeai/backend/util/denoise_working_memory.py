@@ -57,23 +57,33 @@ class _LevelLogger(Protocol):
 MB = 2**20
 GB = 2**30
 
-# Per-family activation multiplier (dimensionless: ~number of live activation copies at peak).
-# CALIBRATED against our own measured denoise peaks. UNet is anchored to SDXL: measured ~332/737/1295
-# MB at 1024/1536/2048^2 with model_channels=320 => multiplier ~32 (base ~12MB). DiT is PROVISIONAL —
-# the FLUX/Anima measurement runs were lost to a cascade OOM, so DiT stays measure-only (not enforced)
-# until WE measure it via the DENOISE_MEM records. Do not assume the UNet value transfers to
-# transformers; that is exactly what the per-family measurement is for.
-# Both values are CALIBRATED from our own DENOISE_MEM measurements on an 8GB card:
-#   - unet: SDXL (width 320) measured implied multiplier ~28 at 1024/1536^2; we keep 32 for a small
-#     safety margin.
-#   - dit: FLUX (width 3072) measured a clean, resolution-stable ~5.3; Anima (width 2048) measured
-#     ~3.3 (its measurement also includes the LLM-adapter forward, so it is an upper bound on pure
-#     denoise). 6 covers FLUX with margin and safely over-covers Anima. One multiplier for all
-#     transformers works because per-model size differences are absorbed by the activation_width term.
+# Per-architecture activation multiplier (dimensionless: ~number of live activation copies at peak),
+# CALIBRATED from our own DENOISE_MEM measurements on an 8GB card (RTX 4070). It is read per
+# ARCHITECTURE, not one value for all transformers: reading activation_width from the model absorbs
+# SIZE differences WITHIN a family (FLUX.2 Klein 4B and 9B both back-solve to ~2-3), but block-structure
+# differences ACROSS families do not collapse to a single constant (measured implied multipliers:
+# sd3 ~2.2, anima ~2.4-3.0, flux2 ~2.1-3.1, z_image ~3.5-3.8, qwen-Edit ~6.8). Each measured value
+# below is roughly max-implied x 1.15 for margin.
+#   - "unet": SDXL (width 320) measured ~28; kept at 32.
+#   - "dit": the DEFAULT for transformers we have NOT measured yet (cogview4, FLUX.1, future archs),
+#     kept conservative so an unmeasured arch never under-reserves.
+#   - sd3's value folds in its always-on CFG (a doubled-batch single forward). qwen is the Edit variant
+#     (its reference image lengthens the sequence ~2x) from a single 1024 point. Both are floor-covered
+#     at the resolutions they were run, so their exact value is not yet load-bearing.
 ACTIVATION_MULTIPLIER = {
-    "unet": 32,
-    "dit": 6,
+    "unet": 32,  # SD1.5 / SDXL conv UNet
+    "dit": 6,  # DEFAULT for unmeasured transformers (cogview4, FLUX.1, future archs)
+    "flux2": 3.6,  # FLUX.2 Klein 4B + 9B (4 points across 2 size variants)
+    "z_image": 4.5,  # Z-Image Turbo (2 points)
+    "anima": 3.5,  # Anima (2 points, cfg=1)
+    "sd3": 3.0,  # SD3.5 Medium (1 point; includes its always-on CFG 2x)
+    "qwen": 8.0,  # Qwen-Image Edit (1 point; reference-image sequence inflation)
 }
+
+# Families that use the conv-UNet multiplier / enforcement rather than the transformer path. Both an
+# estimate `family` and a DENOISE_MEM `label` resolve through family_multiplier()/family_enforced(),
+# so a label like "sdxl-legacy" maps to the same multiplier as family "unet".
+UNET_FAMILIES = frozenset({"unet", "sdxl", "sdxl-legacy", "sd15", "sd"})
 
 # Fallback activation width if it can't be read from the model config (estimate then degrades to a
 # flat per-area value, still floored by the cache).
@@ -86,6 +96,23 @@ BASE_WORKING_MEMORY_BYTES = 64 * MB
 # multiplier is calibrated from our own measurements. Both are now calibrated (see ACTIVATION_MULTIPLIER).
 ENFORCE_UNET_WORKING_MEMORY = True
 ENFORCE_DIT_WORKING_MEMORY = True
+
+
+def family_multiplier(family: str) -> float:
+    """The calibrated activation multiplier for an architecture / family key.
+
+    UNet families (incl. labels like ``"sdxl-legacy"``) map to the conv-UNet value; an unmeasured
+    transformer falls back to the conservative ``"dit"`` default. Accepts either an estimate
+    ``family`` or a DENOISE_MEM ``label`` — they resolve identically by construction.
+    """
+    if family in UNET_FAMILIES:
+        return ACTIVATION_MULTIPLIER["unet"]
+    return ACTIVATION_MULTIPLIER.get(family, ACTIVATION_MULTIPLIER["dit"])
+
+
+def family_enforced(family: str) -> bool:
+    """Whether the cache should reserve this family's estimate (vs measure-only)."""
+    return ENFORCE_UNET_WORKING_MEMORY if family in UNET_FAMILIES else ENFORCE_DIT_WORKING_MEMORY
 
 
 def model_activation_width(model: Any) -> int:
@@ -158,9 +185,10 @@ def estimate_denoise_working_memory_for_model(
     """Estimate denoise working memory for a loaded model, scaling by its activation width.
 
     :param model: the loaded denoise model (read its config for the activation width).
-    :param family: ``"unet"`` or ``"dit"`` — selects the calibrated multiplier and enforcement.
+    :param family: an architecture/family key (e.g. ``"unet"``, ``"flux2"``, ``"sd3"``); selects the
+        calibrated multiplier, with unknown transformers falling back to the conservative ``"dit"``.
     """
-    multiplier = ACTIVATION_MULTIPLIER.get(family, ACTIVATION_MULTIPLIER["dit"])
+    multiplier = family_multiplier(family)
     return estimate_denoise_working_memory(
         latent_area=int(latent_height) * int(latent_width),
         activation_width=model_activation_width(model),
@@ -181,12 +209,11 @@ def dtype_element_size(dtype: torch.dtype) -> int:
 def resolve_denoise_working_mem_bytes(estimate_bytes: int, family: str) -> Optional[int]:
     """Return the working-memory value to pass to ``model_on_device`` for the given family.
 
-    :param family: ``"unet"`` (SD/SDXL conv UNet) or ``"dit"`` (diffusion transformers).
-    Returns the estimate only when that family's enforcement is enabled; otherwise ``None``
-    (measure-only: the cache keeps its default reserve while the family's multiplier is calibrated).
+    :param family: an architecture/family key. UNet families use UNet enforcement; every other key
+    uses the transformer enforcement flag. Returns the estimate only when that family's enforcement is
+    enabled; otherwise ``None`` (measure-only: the cache keeps its default reserve).
     """
-    enforce = ENFORCE_UNET_WORKING_MEMORY if family == "unet" else ENFORCE_DIT_WORKING_MEMORY
-    return estimate_bytes if enforce else None
+    return estimate_bytes if family_enforced(family) else None
 
 
 def begin_denoise_measure(logger: _LevelLogger) -> Optional[int]:
@@ -232,7 +259,6 @@ def end_denoise_measure(
         peak = torch.cuda.max_memory_allocated()
         measured = max(0, peak - token)
         ratio = round(estimate_bytes / measured, 2) if measured > 0 else None
-        is_unet = label in ("unet", "sdxl", "sdxl-legacy", "sd15", "sd")
         logger.debug(
             "DENOISE_MEM "
             + json.dumps(
@@ -242,13 +268,13 @@ def end_denoise_measure(
                     "px_w": int(pixel_width),
                     "batch": int(batch_size),
                     "elt": int(element_size),
-                    "mult": ACTIVATION_MULTIPLIER["unet"] if is_unet else ACTIVATION_MULTIPLIER["dit"],
+                    "mult": family_multiplier(label),
                     "estimate_mb": round(estimate_bytes / MB, 1),
                     "measured_peak_mb": round(measured / MB, 1),
                     "resident_before_mb": round(token / MB, 1),
                     "total_peak_mb": round(peak / MB, 1),
                     "estimate_over_measured": ratio,
-                    "enforced": ENFORCE_UNET_WORKING_MEMORY if is_unet else ENFORCE_DIT_WORKING_MEMORY,
+                    "enforced": family_enforced(label),
                 }
             )
         )

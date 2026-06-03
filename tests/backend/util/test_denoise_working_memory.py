@@ -18,6 +18,8 @@ from invokeai.backend.util.denoise_working_memory import (
     end_denoise_measure,
     estimate_denoise_working_memory,
     estimate_denoise_working_memory_for_model,
+    family_enforced,
+    family_multiplier,
     model_activation_width,
     resolve_denoise_working_mem_bytes,
 )
@@ -191,10 +193,50 @@ def test_begin_end_denoise_measure_emit_or_noop_without_raising():
         assert token is not None
         assert len(log.records) == 1 and log.records[0].startswith("DENOISE_MEM ")
         payload = json.loads(log.records[0][len("DENOISE_MEM ") :])
-        # The record must be self-describing for calibration: it carries the multiplier that produced
-        # the estimate (flux2 -> "dit" family), so back-solving M needs no external state.
-        assert payload["mult"] == ACTIVATION_MULTIPLIER["dit"]
+        # The record must be self-describing for calibration: it carries the per-arch multiplier that
+        # produced the estimate (flux2), so back-solving M needs no external state.
+        assert payload["mult"] == ACTIVATION_MULTIPLIER["flux2"]
         assert payload["label"] == "flux2" and "measured_peak_mb" in payload
     else:
         assert token is None
         assert log.records == []
+
+
+# --- per-architecture multipliers ---
+
+
+def test_family_multiplier_per_arch():
+    assert family_multiplier("flux2") == ACTIVATION_MULTIPLIER["flux2"] == 3.6
+    assert family_multiplier("qwen") == 8.0
+    assert family_multiplier("sd3") == 3.0
+    assert family_multiplier("unet") == ACTIVATION_MULTIPLIER["unet"] == 32
+    # UNet LABELS (not just the "unet" key) all resolve to the conv-UNet value.
+    assert family_multiplier("sdxl") == 32
+    assert family_multiplier("sdxl-legacy") == 32
+    # Unmeasured transformers fall back to the conservative "dit" default.
+    assert family_multiplier("cogview4") == ACTIVATION_MULTIPLIER["dit"]
+    assert family_multiplier("totally-unknown") == ACTIVATION_MULTIPLIER["dit"]
+
+
+def test_family_enforced_unet_vs_transformer():
+    assert family_enforced("unet") is ENFORCE_UNET_WORKING_MEMORY
+    assert family_enforced("sdxl-legacy") is ENFORCE_UNET_WORKING_MEMORY
+    assert family_enforced("flux2") is ENFORCE_DIT_WORKING_MEMORY
+    assert family_enforced("cogview4") is ENFORCE_DIT_WORKING_MEMORY
+
+
+def test_per_arch_estimates_differ_on_same_model():
+    """The arch key selects the multiplier, so the same model reserves differently per arch:
+    qwen (8.0) > z_image (4.5) > flux2 (3.6) at identical width/resolution."""
+    m = _model(hidden_size=3072)
+    qwen = estimate_denoise_working_memory_for_model(m, 128, 128, 1, 2, "qwen")
+    z = estimate_denoise_working_memory_for_model(m, 128, 128, 1, 2, "z_image")
+    flux2 = estimate_denoise_working_memory_for_model(m, 128, 128, 1, 2, "flux2")
+    assert qwen > z > flux2
+    # flux2 (3.6) reserves less than the generic "dit" default (6) — that's the per-arch win.
+    assert flux2 < estimate_denoise_working_memory_for_model(m, 128, 128, 1, 2, "dit")
+
+
+def test_resolve_per_arch_enforcement():
+    for fam in ("flux2", "z_image", "anima", "sd3", "qwen"):
+        assert resolve_denoise_working_mem_bytes(1234, fam) == (1234 if ENFORCE_DIT_WORKING_MEMORY else None)

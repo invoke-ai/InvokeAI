@@ -478,12 +478,12 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 latent_width=latent_width,
                 batch_size=latents.shape[0],
                 element_size=dtype_element_size(inference_dtype),
-                family="dit",
+                family="qwen",
             )
 
             (cached_weights, transformer) = exit_stack.enter_context(
                 transformer_info.model_on_device(
-                    working_mem_bytes=resolve_denoise_working_mem_bytes(estimated_working_memory, "dit")
+                    working_mem_bytes=resolve_denoise_working_mem_bytes(estimated_working_memory, "qwen")
                 )
             )
             assert isinstance(transformer, QwenImageTransformer2DModel)
