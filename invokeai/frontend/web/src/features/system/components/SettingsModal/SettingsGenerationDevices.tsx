@@ -23,6 +23,9 @@ const AUTO = 'auto';
 
 type GenerationDevicesValue = 'auto' | string[];
 
+/** Drop the verbose vendor prefix so e.g. "NVIDIA GeForce RTX 3090" reads as "RTX 3090". */
+const shortenDeviceName = (name: string): string => name.replace(/^NVIDIA GeForce /, '').replace(/^NVIDIA /, '');
+
 type DeviceBadge = {
   /** The device identifier, or 'auto' for the special "use all GPUs" badge. */
   device: string;
@@ -63,17 +66,41 @@ export const SettingsGenerationDevices = memo(() => {
 
   const autoBadge = useMemo<DeviceBadge>(() => ({ device: AUTO, label: t('settings.generationDevicesAuto') }), [t]);
 
+  // Build a per-device badge (label + tooltip) keyed by device id, e.g. "cuda:0 (RTX 3090 #1)".
+  // Cards sharing a name get a 1-based "#N" suffix so identical GPUs can be told apart.
+  const deviceBadges = useMemo<Record<string, DeviceBadge>>(() => {
+    const options = deviceOptions ?? [];
+    const nameCounts = new Map<string, number>();
+    for (const option of options) {
+      const name = shortenDeviceName(option.name);
+      nameCounts.set(name, (nameCounts.get(name) ?? 0) + 1);
+    }
+    const ordinals = new Map<string, number>();
+    const badges: Record<string, DeviceBadge> = {};
+    for (const option of options) {
+      const name = shortenDeviceName(option.name);
+      const ordinal = (ordinals.get(name) ?? 0) + 1;
+      ordinals.set(name, ordinal);
+      const namePart = (nameCounts.get(name) ?? 0) > 1 ? `${name} #${ordinal}` : name;
+      badges[option.device] = { device: option.device, label: `${option.device} (${namePart})`, tooltip: option.name };
+    }
+    return badges;
+  }, [deviceOptions]);
+
+  // Fall back to a bare device id when a configured device isn't in the current options (e.g. a
+  // GPU that's no longer present).
+  const getDeviceBadge = useCallback(
+    (device: string): DeviceBadge => deviceBadges[device] ?? { device, label: device },
+    [deviceBadges]
+  );
+
   // The active badges: the `auto` pseudo-device, or the explicitly-selected devices in config order.
   const activeBadges = useMemo<DeviceBadge[]>(() => {
     if (isAuto) {
       return [autoBadge];
     }
-    return selectedDevices.map((device) => ({
-      device,
-      label: device,
-      tooltip: deviceOptions?.find((option) => option.device === device)?.name,
-    }));
-  }, [autoBadge, deviceOptions, isAuto, selectedDevices]);
+    return selectedDevices.map(getDeviceBadge);
+  }, [autoBadge, getDeviceBadge, isAuto, selectedDevices]);
 
   // The inactive badges: `auto` (when an explicit list is active) plus any unselected devices.
   const inactiveBadges = useMemo<DeviceBadge[]>(() => {
@@ -83,11 +110,11 @@ export const SettingsGenerationDevices = memo(() => {
     }
     for (const option of deviceOptions ?? []) {
       if (!selectedDevices.includes(option.device)) {
-        badges.push({ device: option.device, label: option.device, tooltip: option.name });
+        badges.push(getDeviceBadge(option.device));
       }
     }
     return badges;
-  }, [autoBadge, deviceOptions, isAuto, selectedDevices]);
+  }, [autoBadge, deviceOptions, getDeviceBadge, isAuto, selectedDevices]);
 
   const onActivate = useCallback(
     (device: string) => {
