@@ -152,9 +152,7 @@ async def get_queue_item_ids(
     current_user is required so the endpoint stays behind authentication in multiuser mode.
     """
     try:
-        return ApiDependencies.invoker.services.session_queue.get_queue_item_ids(
-            queue_id=queue_id, order_dir=order_dir
-        )
+        return ApiDependencies.invoker.services.session_queue.get_queue_item_ids(queue_id=queue_id, order_dir=order_dir)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while listing all queue item ids: {e}")
 
