@@ -46,13 +46,15 @@ const InvokeAIUI = () => {
   }
 
   return (
-    <Provider store={store}>
-      <BrowserRouter>
-        <React.Suspense fallback={<Loading />}>
-          <App />
-        </React.Suspense>
-      </BrowserRouter>
-    </Provider>
+    <React.StrictMode>
+      <Provider store={store}>
+        <BrowserRouter>
+          <React.Suspense fallback={<Loading />}>
+            <App />
+          </React.Suspense>
+        </BrowserRouter>
+      </Provider>
+    </React.StrictMode>
   );
 };
 
