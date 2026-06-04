@@ -371,6 +371,7 @@ def test_import_waits_for_startup_restore(
         release_restore.set()
         installer.stop()
 
+
 def test_huggingface_blob_url_uses_resolve_download_url(mm2_installer: ModelInstallServiceBase) -> None:
     source = URLModelSource(
         url=Url("https://huggingface.co/h94/IP-Adapter/blob/main/sdxl_models/ip-adapter.safetensors")
