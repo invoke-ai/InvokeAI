@@ -274,14 +274,16 @@ const LineHeightSelect = () => {
         {t('controlLayers.text.lineHeight')}
       </Text>
       <Tooltip label={t('controlLayers.text.lineHeight')}>
-        <Combobox
-          size="sm"
-          variant="outline"
-          isSearchable={false}
-          options={lineHeightOptions}
-          value={selectedOption}
-          onChange={handleLineHeightChange}
-        />
+        <Box>
+          <Combobox
+            size="sm"
+            variant="outline"
+            isSearchable={false}
+            options={lineHeightOptions}
+            value={selectedOption}
+            onChange={handleLineHeightChange}
+          />
+        </Box>
       </Tooltip>
     </Flex>
   );
