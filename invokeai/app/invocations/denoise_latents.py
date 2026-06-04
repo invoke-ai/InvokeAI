@@ -960,7 +960,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 family="unet",
             )
             with (
-                unet_info.model_on_device(working_mem_bytes=resolve_denoise_working_mem_bytes(estimated_working_memory, "unet")) as (
+                unet_info.model_on_device(
+                    working_mem_bytes=resolve_denoise_working_mem_bytes(estimated_working_memory, "unet")
+                ) as (
                     cached_weights,
                     unet,
                 ),
@@ -1055,7 +1057,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
         )
         with (
             ExitStack() as exit_stack,
-            unet_info.model_on_device(working_mem_bytes=resolve_denoise_working_mem_bytes(estimated_working_memory, "unet")) as (
+            unet_info.model_on_device(
+                working_mem_bytes=resolve_denoise_working_mem_bytes(estimated_working_memory, "unet")
+            ) as (
                 cached_weights,
                 unet,
             ),
