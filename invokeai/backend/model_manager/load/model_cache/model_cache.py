@@ -44,6 +44,16 @@ DEFAULT_DEVICE_WORKING_MEM_GB = 3
 # so 1.5GB covers the measured need with ~25% headroom. (Heavy ControlNet/IP-Adapter stacks at high
 # res are covered by the per-op estimate rising above this floor, or by raising device_working_mem_gb.)
 MIN_DEVICE_WORKING_MEM_GB = 1.5
+# When smart_partial_loading is on and a model will be PARTIALLY loaded, its working-memory reserve is
+# the op's activation estimate times this factor (clamped to [MIN_DEVICE_WORKING_MEM_GB, the legacy
+# default]). A partial-loaded model streams its non-resident weights just-in-time every forward; that
+# scratch + allocator fragmentation co-resides with the activation set, so the real headroom need is a
+# MULTIPLE of the bare activation peak. Without it, a large model at high resolution loads to a
+# high-but-not-full residency (~85-96%) where the activation set collides with the streaming scratch and
+# thrashes the CUDA allocator (on Windows it silently spills to shared RAM) -> ~2x slower despite loading
+# MORE. 2.5 reverts the worst measured high-res cases to ~the legacy reserve (measured-safe) while
+# leaving low-res / fully-fitting models untouched. Set to 1.0 to disable the headroom (legacy smart).
+PARTIAL_LOAD_HEADROOM_MULTIPLIER = 2.5
 
 
 # TODO(ryand): Where should this go? The ModelCache shouldn't be concerned with submodels.
@@ -538,6 +548,28 @@ class ModelCache:
             f"After unloading: {self._get_vram_state_str(model_cur_vram_bytes, model_total_bytes, vram_available)}"
         )
 
+        # Partial-load headroom (smart_partial_loading): if the model still can't fully fit, it will
+        # stream weights every forward. Reserve EXTRA working memory (scaled with the op's activation
+        # estimate; see PARTIAL_LOAD_HEADROOM_MULTIPLIER) so it does not over-load to a high-but-not-full
+        # residency that collides with the activation set and thrashes the allocator at high resolution.
+        # Only triggers for genuinely partial models — one that fully fits keeps its small reserve and
+        # loads 100% (no streaming, the #9257 win).
+        if (
+            self._smart_partial_loading
+            and self._max_vram_cache_size_gb is None  # a fixed VRAM cap overrides the reserve; headroom is inert
+            and working_mem_bytes is not None
+            and model_vram_needed > vram_available
+            and PARTIAL_LOAD_HEADROOM_MULTIPLIER > 1.0
+        ):
+            headroom_available = self._get_vram_available(self._partial_load_reserve(working_mem_bytes))
+            if headroom_available < vram_available:
+                self._logger.debug(
+                    f"Partial-load headroom: vram_available {vram_available / MB:.2f}MB -> "
+                    f"{headroom_available / MB:.2f}MB (estimate {working_mem_bytes / MB:.0f}MB "
+                    f"x{PARTIAL_LOAD_HEADROOM_MULTIPLIER}) to keep residency below the thrash cliff."
+                )
+                vram_available = headroom_available
+
         if vram_available < 0:
             # There is insufficient VRAM available. As a last resort, try to unload the model being locked from VRAM,
             # as it may still be loaded from a previous use.
@@ -649,6 +681,21 @@ class ModelCache:
         vram_total_available_to_cache = vram_available_to_process - working_mem_bytes
         vram_cur_available_to_cache = vram_total_available_to_cache - self._get_vram_in_use()
         return vram_cur_available_to_cache
+
+    def _partial_load_reserve(self, estimate_bytes: int) -> int:
+        """Working-memory reserve for a model that will be PARTIALLY loaded (see
+        PARTIAL_LOAD_HEADROOM_MULTIPLIER): the op's activation estimate scaled by the headroom factor,
+        clamped to ``[smart floor, max(legacy default, estimate)]`` so a partial model never over-loads
+        past the thrash cliff (at worst it falls back to the legacy reserve) while low resolution keeps
+        the aggressive floor. A user-raised ``device_working_mem_gb`` is respected as both floor and cap.
+        """
+        default_bytes = int(self._execution_device_working_mem_gb * GB)
+        floor_bytes = int(MIN_DEVICE_WORKING_MEM_GB * GB)
+        if self._execution_device_working_mem_gb > DEFAULT_DEVICE_WORKING_MEM_GB:
+            floor_bytes = default_bytes
+        cap_bytes = max(default_bytes, estimate_bytes)
+        scaled_bytes = int(estimate_bytes * PARTIAL_LOAD_HEADROOM_MULTIPLIER)
+        return max(floor_bytes, min(scaled_bytes, cap_bytes))
 
     def _get_vram_in_use(self) -> int:
         """Get the amount of VRAM currently in use by the cache."""
