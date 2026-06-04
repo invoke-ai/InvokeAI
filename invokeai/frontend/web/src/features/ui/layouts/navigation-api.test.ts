@@ -555,6 +555,14 @@ describe('AppNavigationApi', () => {
 
       expect(result).toBe(false);
     });
+
+    it('should return false when no active tab', async () => {
+      mockGetAppTab.mockReturnValue(null as unknown as TabName);
+
+      const result = await navigationApi.focusPanelInActiveTab(SETTINGS_PANEL_ID);
+
+      expect(result).toBe(false);
+    });
   });
 
   describe('Panel Expansion and Collapse', () => {
@@ -650,6 +658,14 @@ describe('AppNavigationApi', () => {
       expect(result).toBe(false);
     });
 
+    it('should return false when no active tab', () => {
+      mockGetAppTab.mockReturnValue(null as unknown as TabName);
+
+      const result = navigationApi.toggleLeftPanel();
+
+      expect(result).toBe(false);
+    });
+
     it('should return false when left panel not found', () => {
       mockGetAppTab.mockReturnValue('generate');
 
@@ -706,6 +722,14 @@ describe('AppNavigationApi', () => {
 
     it('should return false without app connection', () => {
       navigationApi.disconnectFromApp();
+
+      const result = navigationApi.toggleRightPanel();
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false when no active tab', () => {
+      mockGetAppTab.mockReturnValue(null as unknown as TabName);
 
       const result = navigationApi.toggleRightPanel();
 
@@ -836,6 +860,14 @@ describe('AppNavigationApi', () => {
       expect(result).toBe(false);
     });
 
+    it('should return false when no active tab', () => {
+      mockGetAppTab.mockReturnValue(null as unknown as TabName);
+
+      const result = navigationApi.toggleLeftAndRightPanels();
+
+      expect(result).toBe(false);
+    });
+
     it('should return false when panels not found', () => {
       mockGetAppTab.mockReturnValue('generate');
 
@@ -891,6 +923,14 @@ describe('AppNavigationApi', () => {
 
     it('should return false without app connection', () => {
       navigationApi.disconnectFromApp();
+
+      const result = navigationApi.resetLeftAndRightPanels();
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false when no active tab', () => {
+      mockGetAppTab.mockReturnValue(null as unknown as TabName);
 
       const result = navigationApi.resetLeftAndRightPanels();
 
@@ -1193,6 +1233,14 @@ describe('AppNavigationApi', () => {
 
     it('should return false without app connection', async () => {
       navigationApi.disconnectFromApp();
+
+      const result = await navigationApi.toggleViewerPanel();
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false when no active tab', async () => {
+      mockGetAppTab.mockReturnValue(null as unknown as TabName);
 
       const result = await navigationApi.toggleViewerPanel();
 
