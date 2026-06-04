@@ -38,6 +38,7 @@ export function useFilteredWorkflows(workflows: WorkflowListItem[]): UseFiltered
     const filterWorkflows = async () => {
       if (workflows.length === 0) {
         setFilteredWorkflowIds(new Set());
+        setIsFiltering(false);
         return;
       }
 
