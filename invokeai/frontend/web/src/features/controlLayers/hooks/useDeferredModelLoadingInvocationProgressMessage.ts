@@ -6,7 +6,7 @@ import { $lastProgressMessage } from 'services/events/stores';
 export const useDeferredModelLoadingInvocationProgressMessage = () => {
   const { t } = useTranslation();
   const invocationProgressMessage = useStore($lastProgressMessage);
-  const [delayedInvocationProgressMessage, setDelayedInvocationProgressMessage] = useState<string | null>(null);
+  const [didDelayLoadingModelProgressMessage, setDidDelayLoadingModelProgressMessage] = useState(false);
   const isLoadingModelProgressMessage = invocationProgressMessage?.startsWith('Loading model') ?? false;
 
   useEffect(() => {
@@ -15,13 +15,16 @@ export const useDeferredModelLoadingInvocationProgressMessage = () => {
     }
 
     const timer = setTimeout(() => {
-      setDelayedInvocationProgressMessage(invocationProgressMessage);
+      setDidDelayLoadingModelProgressMessage(true);
     }, 5000);
 
-    return () => clearTimeout(timer);
-  }, [invocationProgressMessage, isLoadingModelProgressMessage]);
+    return () => {
+      clearTimeout(timer);
+      setDidDelayLoadingModelProgressMessage(false);
+    };
+  }, [isLoadingModelProgressMessage]);
 
-  if (!isLoadingModelProgressMessage || delayedInvocationProgressMessage !== invocationProgressMessage) {
+  if (!isLoadingModelProgressMessage || !didDelayLoadingModelProgressMessage) {
     return null;
   }
 
