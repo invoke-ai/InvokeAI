@@ -351,13 +351,48 @@
         "options_withCount_other": "{{count}} options"
     },
     "hrf": {
-        "hrf": "High Resolution Fix",
-        "enableHrf": "Enable High Resolution Fix",
+        "hrf": "Upscale",
+        "enableHrf": "Enable",
+        "enableUpscale": "Enable Upscale",
+        "scale": "Scale",
+        "strength": "Denoise Strength",
         "upscaleMethod": "Upscale Method",
+        "latentInterpolationMode": "Latent Interpolation",
+        "tileControlWeight": "Tile Control Weight",
+        "tileControlEnd": "Tile Control Duration",
+        "steps": "Refinement Steps",
+        "model": "Refinement Model",
+        "reuseGenerateModel": "Reuse Base Model",
+        "loraMode": "Refinement LoRAs",
+        "reuseGenerateLoras": "Reuse",
+        "noLoras": "None",
+        "dedicatedLoras": "LoRAs",
+        "addDedicatedLora": "Add LoRA",
+        "noCompatibleModels": "No Compatible Models",
+        "latent": "Latent",
+        "upscaleModelMethod": "Upscale Model",
+        "nearest": "Nearest",
+        "bilinear": "Bilinear",
+        "bicubic": "Bicubic",
+        "area": "Area",
+        "nearestExact": "Nearest Exact",
         "metadata": {
             "enabled": "High Resolution Fix Enabled",
             "strength": "High Resolution Fix Strength",
-            "method": "High Resolution Fix Method"
+            "method": "High Resolution Fix Method",
+            "scale": "High Resolution Fix Scale",
+            "latentInterpolationMode": "High Resolution Fix Latent Interpolation",
+            "upscaleModel": "High Resolution Fix Upscale Model",
+            "tileControlNetModel": "High Resolution Fix Tile ControlNet",
+            "legacyStructure": "Legacy High Resolution Fix Structure",
+            "tileControlWeight": "High Resolution Fix Tile Control Weight",
+            "tileControlEnd": "High Resolution Fix Tile Control Duration",
+            "tileSize": "High Resolution Fix Tile Size",
+            "tileOverlap": "High Resolution Fix Tile Overlap",
+            "steps": "High Resolution Fix Refinement Steps",
+            "model": "High Resolution Fix Refinement Model",
+            "loraMode": "High Resolution Fix LoRA Mode",
+            "loras": "High Resolution Fix Dedicated LoRAs"
         }
     },
     "prompt": {
@@ -1695,6 +1730,15 @@
             "modelIncompatibleScaledBboxHeight": "Scaled bbox height is {{height}} but {{model}} requires multiple of {{multiple}}",
             "fluxModelMultipleControlLoRAs": "Can only use 1 Control LoRA at a time",
             "incompatibleLoRAs": "Incompatible LoRAs added",
+            "hrfExternalModelUnsupported": "High Resolution Fix is not supported for external models",
+            "hrfRefinerUnsupported": "High Resolution Fix is not supported when SDXL Refiner is enabled",
+            "hrfUpscaleModelBaseUnsupported": "High Resolution Fix with an upscale model is supported for SD1.5 and SDXL models only",
+            "hrfModelOverrideMethodUnsupported": "High Resolution Fix model override is only supported with upscale-model HRF",
+            "hrfModelOverrideExternalUnsupported": "High Resolution Fix model override does not support external models",
+            "hrfModelOverrideBaseUnsupported": "High Resolution Fix model override is supported for SD1.5 and SDXL models only",
+            "hrfModelOverrideBaseMismatch": "High Resolution Fix model override must use the same base as the Generate model",
+            "hrfUpscaleModelMissing": "High Resolution Fix needs an upscale model",
+            "hrfTileControlNetModelMissing": "High Resolution Fix needs a tile ControlNet model",
             "canvasIsFiltering": "Canvas is busy (filtering)",
             "canvasIsTransforming": "Canvas is busy (transforming)",
             "canvasIsRasterizing": "Canvas is busy (rasterizing)",
@@ -2245,6 +2289,118 @@
             "heading": "Enable High Resolution Fix",
             "paragraphs": [
                 "Generate high quality images at a larger resolution than optimal for the model. Generally used to prevent duplication in the generated image."
+            ]
+        },
+        "hrfEnabled": {
+            "heading": "Enable Upscale",
+            "paragraphs": [
+                "Adds an optional second pass that upscales the base image and refines details at the larger size.",
+                "When disabled, the Upscale settings are saved but are not applied to new generations."
+            ]
+        },
+        "hrfMethod": {
+            "heading": "Upscale Method",
+            "paragraphs": [
+                "Latent resizes the image in latent space before refinement. It is faster and does not require an upscale model.",
+                "Upscale Model enlarges the image with a selected upscale model before refinement, which can preserve more texture and detail."
+            ]
+        },
+        "hrfScale": {
+            "heading": "Scale",
+            "paragraphs": [
+                "Controls final output size as a multiplier of the base Width and Height.",
+                "Higher scale makes a larger image and uses more time and VRAM. Lower scale stays closer to the base size."
+            ]
+        },
+        "hrfDenoisingStrength": {
+            "heading": "Denoise Strength",
+            "paragraphs": [
+                "Controls how much the refinement pass can change the upscaled image.",
+                "Lower strength preserves more of the upscaled image. Higher strength allows more new detail and more prompt influence."
+            ]
+        },
+        "hrfLatentInterpolation": {
+            "heading": "Latent Interpolation",
+            "paragraphs": [
+                "Controls how Latent Upscale resizes the latent image before refinement.",
+                "Smoother modes such as Bicubic and Bilinear can soften transitions. Nearest modes preserve harder edges but can look blockier."
+            ]
+        },
+        "hrfUpscaleModel": {
+            "heading": "Upscale Model",
+            "paragraphs": [
+                "Selects the image-to-image upscale model used to enlarge the base image before refinement.",
+                "Different upscale models may work better for different image types, such as photos, illustration, or line art."
+            ]
+        },
+        "hrfTileControl": {
+            "heading": "Tile Control",
+            "paragraphs": [
+                "Selects a compatible Tile or Union ControlNet model used during Upscale Model refinement.",
+                "Only same-base Tile-style ControlNet models are shown. Tile guidance helps preserve structure and reduce drift after the image is enlarged."
+            ]
+        },
+        "hrfTileControlWeight": {
+            "heading": "Tile Control Weight",
+            "paragraphs": [
+                "Controls how strongly Tile Control guides the refinement pass.",
+                "Higher weight preserves structure more strongly. Lower weight gives the model and prompt more freedom to change details."
+            ]
+        },
+        "hrfTileControlEnd": {
+            "heading": "Tile Control Duration",
+            "paragraphs": [
+                "Controls how long Tile Control remains active during the refinement pass.",
+                "Higher values keep tile guidance active for more of the pass. Lower values use tile guidance early, then let refinement finish more freely."
+            ]
+        },
+        "hrfTileSize": {
+            "heading": "Tile Size",
+            "paragraphs": [
+                "Controls the tile size used during Upscale Model refinement.",
+                "Larger tiles can improve consistency but use more VRAM. Smaller tiles use less VRAM and may be safer on memory-limited systems."
+            ]
+        },
+        "hrfTileOverlap": {
+            "heading": "Tile Overlap",
+            "paragraphs": [
+                "Controls how much adjacent tiles overlap during Upscale Model refinement.",
+                "Higher overlap can reduce visible seams but uses more VRAM and time. Lower overlap is faster but may show more tile boundaries."
+            ]
+        },
+        "hrfModel": {
+            "heading": "Refinement Model",
+            "paragraphs": [
+                "Selects an optional model used only for the Upscale refinement pass.",
+                "Reuse Base Model keeps the base generation model for refinement. Choosing another model lets you use a compatible refinement model for the Upscale pass."
+            ]
+        },
+        "hrfLoraMode": {
+            "heading": "Refinement LoRAs",
+            "paragraphs": [
+                "Controls which LoRAs are applied during the Upscale refinement pass.",
+                "Reuse applies the base generation LoRAs again. None disables LoRAs for refinement. Dedicated lets you select LoRAs used only for refinement."
+            ]
+        },
+        "hrfLoraSelect": {
+            "heading": "Dedicated Refinement LoRAs",
+            "paragraphs": [
+                "Selects LoRAs that apply only during the Upscale refinement pass.",
+                "Dedicated refinement LoRAs can add detail or style after upscaling without affecting the base image generation."
+            ]
+        },
+        "hrfLoraWeight": {
+            "heading": "Refinement LoRA Weight",
+            "paragraphs": [
+                "Controls how strongly this dedicated LoRA affects the Upscale refinement pass.",
+                "Higher weight increases the LoRA's impact on refined details. Lower weight makes the effect more subtle."
+            ]
+        },
+        "hrfSteps": {
+            "heading": "Refinement Steps",
+            "paragraphs": [
+                "Controls the number of denoising steps used for the Upscale refinement pass.",
+                "When custom refinement steps are off, Upscale reuses the Generate step count. Higher values can add detail but take longer."
             ]
         },
         "paramIterations": {

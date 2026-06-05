@@ -12,7 +12,7 @@ vi.mock('i18next', () => ({
 
 import type { ParamsState, RefImagesState } from 'features/controlLayers/store/types';
 import type { DynamicPromptsState } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
-import type { MainModelConfig } from 'services/api/types';
+import type { MainModelConfig, MainOrExternalModelConfig } from 'services/api/types';
 
 import { getReasonsWhyCannotEnqueueCanvasTab, getReasonsWhyCannotEnqueueGenerateTab } from './readiness';
 
@@ -50,6 +50,39 @@ const flux2GGUF9BModel = {
 
 const kleinVaeModel = { key: 'vae', name: 'VAE', base: 'flux2', type: 'vae' };
 const kleinQwen3Model = { key: 'qwen3', name: 'Qwen3', base: 'flux2', type: 'qwen3_encoder' };
+const externalModel = {
+  key: 'external',
+  hash: 'h',
+  name: 'External',
+  base: 'external',
+  type: 'external_image_generator',
+  format: 'external_api',
+} as unknown as MainOrExternalModelConfig;
+
+const sdxlModel = {
+  key: 'sdxl',
+  hash: 'h',
+  name: 'SDXL',
+  base: 'sdxl',
+  type: 'main',
+  format: 'checkpoint',
+} as unknown as MainModelConfig;
+
+const upscaleModel = {
+  key: 'upscale',
+  hash: 'h',
+  name: 'Upscale',
+  base: 'any',
+  type: 'spandrel_image_to_image',
+};
+
+const tileControlNetModel = {
+  key: 'tile',
+  hash: 'h',
+  name: 'Tile ControlNet',
+  base: 'sdxl',
+  type: 'controlnet',
+};
 
 const baseDynamicPrompts: DynamicPromptsState = {
   _version: 1,
@@ -71,14 +104,28 @@ const baseParams = {
   positivePrompt: 'test',
   kleinVaeModel: null,
   kleinQwen3EncoderModel: null,
+  hrfEnabled: false,
+  hrfMethod: 'latent',
+  hrfUpscaleModel: null,
+  hrfTileControlNetModel: null,
+  hrfModel: null,
+  hrfLoraMode: 'reuse_generate',
+  hrfLoras: [],
+  refinerModel: null,
 } as unknown as ParamsState;
 
 // --- Helpers ---
 
 const buildGenerateTabArg = (overrides: {
-  model?: MainModelConfig | null;
+  model?: MainOrExternalModelConfig | null;
   kleinVaeModel?: unknown;
   kleinQwen3EncoderModel?: unknown;
+  hrfEnabled?: boolean;
+  hrfMethod?: ParamsState['hrfMethod'];
+  hrfUpscaleModel?: unknown;
+  hrfTileControlNetModel?: unknown;
+  hrfModel?: unknown;
+  refinerModel?: unknown;
   hasFlux2DiffusersVaeSource?: boolean;
   hasFlux2DiffusersQwen3Source?: boolean;
 }) => ({
@@ -88,6 +135,12 @@ const buildGenerateTabArg = (overrides: {
     ...baseParams,
     kleinVaeModel: overrides.kleinVaeModel ?? null,
     kleinQwen3EncoderModel: overrides.kleinQwen3EncoderModel ?? null,
+    hrfEnabled: overrides.hrfEnabled ?? false,
+    hrfMethod: overrides.hrfMethod ?? 'latent',
+    hrfUpscaleModel: overrides.hrfUpscaleModel ?? null,
+    hrfTileControlNetModel: overrides.hrfTileControlNetModel ?? null,
+    hrfModel: overrides.hrfModel ?? null,
+    refinerModel: overrides.refinerModel ?? null,
   } as unknown as ParamsState,
   refImages: baseRefImages,
   loras: [],
@@ -138,6 +191,24 @@ const hasFlux2VaeReason = (reasons: { content: string }[]) =>
 
 const hasFlux2Qwen3Reason = (reasons: { content: string }[]) =>
   reasons.some((r) => r.content.includes('noFlux2KleinQwen3EncoderModelSelected'));
+
+const hasHrfExternalReason = (reasons: { content: string }[]) =>
+  reasons.some((r) => r.content.includes('hrfExternalModelUnsupported'));
+
+const hasHrfRefinerReason = (reasons: { content: string }[]) =>
+  reasons.some((r) => r.content.includes('hrfRefinerUnsupported'));
+
+const hasHrfUpscaleModelBaseReason = (reasons: { content: string }[]) =>
+  reasons.some((r) => r.content.includes('hrfUpscaleModelBaseUnsupported'));
+
+const hasHrfUpscaleModelMissingReason = (reasons: { content: string }[]) =>
+  reasons.some((r) => r.content.includes('hrfUpscaleModelMissing'));
+
+const hasHrfTileControlNetMissingReason = (reasons: { content: string }[]) =>
+  reasons.some((r) => r.content.includes('hrfTileControlNetModelMissing'));
+
+const hasHrfModelOverrideBaseMismatchReason = (reasons: { content: string }[]) =>
+  reasons.some((r) => r.content.includes('hrfModelOverrideBaseMismatch'));
 
 // --- Tests ---
 
@@ -218,6 +289,107 @@ describe('FLUX.2 Klein readiness checks – generate tab', () => {
     );
     expect(hasFlux2VaeReason(reasons)).toBe(false);
     expect(hasFlux2Qwen3Reason(reasons)).toBe(false);
+  });
+});
+
+describe('High Resolution Fix readiness checks - generate tab', () => {
+  it('ignores stale HRF state for external models', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildGenerateTabArg({ model: externalModel, hrfEnabled: true })
+    );
+    expect(hasHrfExternalReason(reasons)).toBe(false);
+  });
+
+  it('errors when HRF is enabled with SDXL Refiner', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildGenerateTabArg({ model: sdxlModel, hrfEnabled: true, refinerModel: { key: 'refiner' } })
+    );
+    expect(hasHrfRefinerReason(reasons)).toBe(true);
+  });
+
+  it('ignores stale HRF state for unsupported model bases', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildGenerateTabArg({
+        model: flux2DiffusersModel,
+        hrfEnabled: true,
+        hrfMethod: 'upscale_model',
+        hrfUpscaleModel: null,
+        hrfTileControlNetModel: null,
+        hrfModel: { key: 'anima', hash: 'h', name: 'Anima', base: 'anima', type: 'main' },
+      })
+    );
+    expect(hasHrfUpscaleModelBaseReason(reasons)).toBe(false);
+    expect(hasHrfUpscaleModelMissingReason(reasons)).toBe(false);
+    expect(hasHrfTileControlNetMissingReason(reasons)).toBe(false);
+    expect(hasHrfModelOverrideBaseMismatchReason(reasons)).toBe(false);
+  });
+
+  it('errors when upscale-model HRF is missing required models', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildGenerateTabArg({ model: sdxlModel, hrfEnabled: true, hrfMethod: 'upscale_model' })
+    );
+    expect(hasHrfUpscaleModelMissingReason(reasons)).toBe(true);
+    expect(hasHrfTileControlNetMissingReason(reasons)).toBe(true);
+  });
+
+  it('does not error when upscale-model HRF has required SDXL models', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildGenerateTabArg({
+        model: sdxlModel,
+        hrfEnabled: true,
+        hrfMethod: 'upscale_model',
+        hrfUpscaleModel: upscaleModel,
+        hrfTileControlNetModel: tileControlNetModel,
+      })
+    );
+    expect(hasHrfUpscaleModelBaseReason(reasons)).toBe(false);
+    expect(hasHrfUpscaleModelMissingReason(reasons)).toBe(false);
+    expect(hasHrfTileControlNetMissingReason(reasons)).toBe(false);
+  });
+
+  it('does not apply stale upscale-model-only readiness checks to latent HRF', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildGenerateTabArg({
+        model: sdxlModel,
+        hrfEnabled: true,
+        hrfMethod: 'latent',
+        hrfModel: { key: 'sd1', hash: 'h', name: 'SD1', base: 'sd-1', type: 'main' },
+        hrfUpscaleModel: null,
+        hrfTileControlNetModel: null,
+      })
+    );
+
+    expect(hasHrfUpscaleModelMissingReason(reasons)).toBe(false);
+    expect(hasHrfTileControlNetMissingReason(reasons)).toBe(false);
+    expect(hasHrfModelOverrideBaseMismatchReason(reasons)).toBe(false);
+  });
+
+  it('errors when dedicated HRF model base differs from the Generate model base', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildGenerateTabArg({
+        model: sdxlModel,
+        hrfEnabled: true,
+        hrfMethod: 'upscale_model',
+        hrfUpscaleModel: upscaleModel,
+        hrfTileControlNetModel: tileControlNetModel,
+        hrfModel: { key: 'sd1', hash: 'h', name: 'SD1', base: 'sd-1', type: 'main' },
+      })
+    );
+    expect(hasHrfModelOverrideBaseMismatchReason(reasons)).toBe(true);
+  });
+
+  it('validates Tile ControlNet against the dedicated HRF model base', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildGenerateTabArg({
+        model: sdxlModel,
+        hrfEnabled: true,
+        hrfMethod: 'upscale_model',
+        hrfUpscaleModel: upscaleModel,
+        hrfTileControlNetModel: { ...tileControlNetModel, base: 'sd-1' },
+        hrfModel: { key: 'hrf-sdxl', hash: 'h', name: 'HRF SDXL', base: 'sdxl', type: 'main' },
+      })
+    );
+    expect(hasHrfTileControlNetMissingReason(reasons)).toBe(true);
   });
 });
 
