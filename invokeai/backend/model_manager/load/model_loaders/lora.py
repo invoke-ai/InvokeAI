@@ -57,6 +57,7 @@ from invokeai.backend.patches.lora_conversions.flux_xlabs_lora_conversion_utils 
     is_state_dict_likely_in_flux_xlabs_format,
     lora_model_from_flux_xlabs_state_dict,
 )
+from invokeai.backend.patches.lora_conversions.peft_adapter_utils import normalize_peft_adapter_names
 from invokeai.backend.patches.lora_conversions.qwen_image_lora_conversion_utils import (
     lora_model_from_qwen_image_state_dict,
 )
@@ -105,6 +106,10 @@ class LoRALoader(ModelLoader):
         # Strip 'bundle_emb' keys - these are unused and currently cause downstream errors.
         # To revisit later to determine if they're needed/useful.
         state_dict = {k: v for k, v in state_dict.items() if not k.startswith("bundle_emb")}
+
+        # Normalize PEFT named-adapter keys (e.g. `lora_A.default.weight` → `lora_A.weight`)
+        # so the downstream format detectors and converters see canonical PEFT keys.
+        state_dict = normalize_peft_adapter_names(state_dict)
 
         # At the time of writing, we support the OMI standard for base models Flux and SDXL
         if config.format == ModelFormat.OMI and self._model_base in [

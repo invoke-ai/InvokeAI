@@ -46,14 +46,22 @@ import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
   4. Create a directory for user data (images, models, db, etc). This is typically at `~/invokeai`, but if you already have a non-dev install, you may want to create a separate directory for the dev install.
   5. Follow the [manual install](/start-here/manual/) guide, with some modifications to the install command:
 
-        - Use `.` instead of `invokeai` to install from the current directory. You don't need to specify the version.
-        - Add `-e` after the `install` operation to make this an [editable install](https://pip.pypa.io/en/latest/cli/pip_install/#cmdoption-e). That means your changes to the python code will be reflected when you restart the Invoke server.
-        - When installing the `invokeai` package, add the `dev`, `test` and `docs` package options to the package specifier. You may or may not need the `xformers` option - follow the manual install guide to figure that out. So, your package specifier will be either `".[dev,test,docs]"` or `".[dev,test,docs,xformers]"`. Note the quotes!
+      - Use `.` instead of `invokeai` to install from the current directory. You don't need to specify the version.
+      - Use `uv sync` instead of `uv pip install` so the environment is synchronized from the repository lockfile.
+      - The current project is installed as an editable install by default. That means your changes to the python code will be reflected when you restart the Invoke server.
+      - Add the `dev`, `test`, `docs`, and appropriate GPU package options with `--extra`. You may or may not need the `xformers` option - follow the manual install guide to figure that out.
 
-       With the modifications made, the install command should look something like this:
+      With the modifications made, the sync command should look something like this:
 
         ```sh
-        uv pip install -e ".[dev,test,docs,xformers]" --python 3.12 --python-preference only-managed --index=https://download.pytorch.org/whl/cu128 --reinstall
+        uv sync --frozen \
+          --python 3.12 \
+          --managed-python \
+          --extra dev \
+          --extra test \
+          --extra docs \
+          --extra cuda \
+          --extra xformers
         ```
   6. At this point, you should have Invoke installed, a venv set up and activated, and the server running. But you will see a warning in the terminal that no UI was found. If you go to the URL for the server, you won't get a UI.
 
