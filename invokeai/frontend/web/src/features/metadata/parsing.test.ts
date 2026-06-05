@@ -31,6 +31,23 @@ describe('Qwen metadata parsing', () => {
     expect(hasMetadata).toBe(false);
   });
 
+  it('does not report metadata as available when require some and all handlers reject', async () => {
+    const store = createStore();
+
+    const hasMetadata = await MetadataUtils.hasMetadataByHandlers({
+      metadata: {},
+      handlers: [
+        ImageMetadataHandlers.QwenImageComponentSource,
+        ImageMetadataHandlers.QwenImageQuantization,
+        ImageMetadataHandlers.QwenImageShift,
+      ],
+      store,
+      require: 'some',
+    });
+
+    expect(hasMetadata).toBe(false);
+  });
+
   it('does not recall Qwen values when metadata keys are absent', async () => {
     const store = createStore();
 
