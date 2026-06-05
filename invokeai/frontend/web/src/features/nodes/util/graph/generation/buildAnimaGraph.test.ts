@@ -21,7 +21,6 @@ const model = {
 
 const animaVaeModel = { key: 'anima-vae', name: 'Anima VAE', base: 'any', type: 'vae' };
 const animaQwen3EncoderModel = { key: 'anima-qwen3', name: 'Qwen3 0.6B', base: 'any', type: 'qwen3_encoder' };
-const animaT5EncoderModel = { key: 'anima-t5', name: 'T5-XXL', base: 'any', type: 't5_encoder' };
 
 const defaultParams: {
   cfgScale: number | number[];
@@ -38,7 +37,6 @@ vi.mock('features/controlLayers/store/paramsSlice', () => ({
   selectParamsSlice: vi.fn(() => params),
   selectAnimaVaeModel: vi.fn(() => animaVaeModel),
   selectAnimaQwen3EncoderModel: vi.fn(() => animaQwen3EncoderModel),
-  selectAnimaT5EncoderModel: vi.fn(() => animaT5EncoderModel),
   selectAnimaScheduler: vi.fn(() => 'euler'),
 }));
 
