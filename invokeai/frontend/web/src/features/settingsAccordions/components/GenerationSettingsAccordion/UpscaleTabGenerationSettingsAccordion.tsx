@@ -4,11 +4,13 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
-import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
+import { selectIsFLUX, selectIsZImage } from 'features/controlLayers/store/paramsSlice';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
+import ParamFluxScheduler from 'features/parameters/components/Core/ParamFluxScheduler';
 import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
+import ParamZImageScheduler from 'features/parameters/components/Core/ParamZImageScheduler';
 import ParamUpscaleCFGScale from 'features/parameters/components/Upscale/ParamUpscaleCFGScale';
 import ParamUpscaleScheduler from 'features/parameters/components/Upscale/ParamUpscaleScheduler';
 import { MainModelPicker } from 'features/settingsAccordions/components/GenerationSettingsAccordion/MainModelPicker';
@@ -27,6 +29,7 @@ export const UpscaleTabGenerationSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const modelConfig = useSelectedModelConfig();
   const isFLUX = useAppSelector(selectIsFLUX);
+  const isZImage = useAppSelector(selectIsZImage);
 
   const selectBadges = useMemo(
     () =>
@@ -64,10 +67,10 @@ export const UpscaleTabGenerationSettingsAccordion = memo(() => {
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} flexDir="column" pb={4}>
             <FormControlGroup formLabelProps={formLabelProps}>
-              <ParamUpscaleScheduler />
+              {isZImage ? <ParamZImageScheduler /> : isFLUX ? <ParamFluxScheduler /> : <ParamUpscaleScheduler />}
               <ParamSteps />
               {isFLUX && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}
-              <ParamUpscaleCFGScale />
+              {!isFLUX && !isZImage && <ParamUpscaleCFGScale />}
             </FormControlGroup>
           </Flex>
         </Expander>
