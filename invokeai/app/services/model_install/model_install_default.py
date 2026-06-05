@@ -249,11 +249,7 @@ class ModelInstallService(ModelInstallServiceBase):
             with self._lock:
                 already_active = any(
                     str(j.source) == source_str for j in self._install_jobs if not j.in_terminal_state
-                ) or any(
-                    str(j.source) == source_str
-                    for j in self._download_cache.values()
-                    if not j.in_terminal_state
-                )
+                ) or any(str(j.source) == source_str for j in self._download_cache.values() if not j.in_terminal_state)
                 if already_active:
                     self._logger.debug(f"Skipping restore for {source_str} - already being tracked")
                     continue
