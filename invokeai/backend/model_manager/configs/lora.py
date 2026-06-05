@@ -37,7 +37,6 @@ from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
 )
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
 
-
 # Defaults used to compute the effective slider range when one or both bounds
 # are unset. These intentionally mirror the frontend's DEFAULT_LORA_WEIGHT_CONFIG
 # in invokeai/frontend/web/src/features/controlLayers/store/lorasSlice.ts so that
