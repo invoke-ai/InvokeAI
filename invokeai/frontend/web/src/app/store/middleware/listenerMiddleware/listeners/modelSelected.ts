@@ -66,7 +66,6 @@ import {
   selectQwenImageVAEModels,
   selectQwenVLEncoderModels,
   selectRegionalRefImageModels,
-  selectT5EncoderModels,
   selectWanDiffusersModels,
   selectWanT5EncoderModels,
   selectWanVAEModels,
