@@ -46543,9 +46543,7 @@
           "weight": {
             "anyOf": [
               {
-                "type": "number",
-                "maximum": 2.0,
-                "minimum": -1.0
+                "type": "number"
               },
               {
                 "type": "null"
@@ -46553,6 +46551,30 @@
             ],
             "title": "Weight",
             "description": "Default weight for this model"
+          },
+          "weight_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Min",
+            "description": "Minimum weight slider value for this model"
+          },
+          "weight_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Max",
+            "description": "Maximum weight slider value for this model"
           }
         },
         "additionalProperties": false,
