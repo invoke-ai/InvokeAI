@@ -132,3 +132,56 @@ class TestCheckpointQwenImageVariantDetection:
 
         with pytest.raises(NotAMatchError):
             Main_Checkpoint_QwenImage_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
+
+
+class TestHasQwenImageKeys:
+    """Detection must agree with the loader, which strips ComfyUI prefixes before loading."""
+
+    def test_bare_keys_detected(self):
+        from invokeai.backend.model_manager.configs.main import _has_qwen_image_keys
+
+        sd = {"txt_in.weight": 1, "txt_norm.weight": 1, "img_in.weight": 1}
+        assert _has_qwen_image_keys(sd)
+
+    @pytest.mark.parametrize("prefix", ["model.diffusion_model.", "diffusion_model."])
+    def test_comfyui_prefixed_keys_detected(self, prefix: str):
+        """A ComfyUI checkpoint with prefixed keys must still be identified so it reaches the loader."""
+        from invokeai.backend.model_manager.configs.main import _has_qwen_image_keys
+
+        sd = {f"{prefix}txt_in.weight": 1, f"{prefix}txt_norm.weight": 1, f"{prefix}img_in.weight": 1}
+        assert _has_qwen_image_keys(sd)
+
+    def test_flux_rejected(self):
+        from invokeai.backend.model_manager.configs.main import _has_qwen_image_keys
+
+        sd = {"txt_in.weight": 1, "txt_norm.weight": 1, "img_in.weight": 1, "context_embedder.weight": 1}
+        assert not _has_qwen_image_keys(sd)
+
+    def test_prefixed_marker_sets_edit_variant(self):
+        """The Edit marker tensor may also carry a ComfyUI prefix."""
+        from invokeai.backend.model_manager.configs.main import _infer_qwen_image_variant
+        from invokeai.backend.model_manager.taxonomy import QwenImageVariantType
+
+        sd = {"model.diffusion_model.__index_timestep_zero__": object()}
+        assert _infer_qwen_image_variant(sd, Path("/fake/plain-name.safetensors")) == QwenImageVariantType.Edit
+
+
+class TestEditTokenHeuristic:
+    """The filename "edit" heuristic must match the token, not any substring."""
+
+    @pytest.mark.parametrize(
+        "stem",
+        ["qwen-image-edit-2511", "qwen_image_edit_2509", "Qwen-Image-EDIT", "model.edit"],
+    )
+    def test_edit_token_matches(self, stem: str):
+        from invokeai.backend.model_manager.configs.main import _infer_qwen_image_variant
+        from invokeai.backend.model_manager.taxonomy import QwenImageVariantType
+
+        assert _infer_qwen_image_variant({}, Path(f"/fake/{stem}.safetensors")) == QwenImageVariantType.Edit
+
+    @pytest.mark.parametrize("stem", ["credited-model", "edited-final", "unedited", "qwen-image"])
+    def test_edit_substring_does_not_false_positive(self, stem: str):
+        from invokeai.backend.model_manager.configs.main import _infer_qwen_image_variant
+        from invokeai.backend.model_manager.taxonomy import QwenImageVariantType
+
+        assert _infer_qwen_image_variant({}, Path(f"/fake/{stem}.safetensors")) == QwenImageVariantType.Generate

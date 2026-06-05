@@ -302,12 +302,15 @@ class QwenImageCheckpointModel(ModelLoader):
         with accelerate.init_empty_weights():
             model = QwenImageTransformer2DModel(**model_config)
 
-        new_sd_size = sum(t.nelement() * model_dtype.itemsize for t in sd.values())
-        self._ram_cache.make_room(new_sd_size)
-
+        # Cast to compute dtype first, then size the cache reservation from the actual
+        # post-cast tensors. Dequantized weights are transiently float32, so sizing
+        # before the cast (with model_dtype.itemsize) would undercount by ~2x.
         for k in list(sd.keys()):
             if sd[k].is_floating_point():
                 sd[k] = sd[k].to(model_dtype)
+
+        new_sd_size = sum(t.nelement() * t.element_size() for t in sd.values())
+        self._ram_cache.make_room(new_sd_size)
 
         model.load_state_dict(sd, strict=False, assign=True)
         return model
@@ -422,54 +425,13 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
 
         sd = load_file(str(model_path))
 
-        # Dequantize ComfyUI-style fp8 weights. Two key naming schemes are in the wild:
-        #   - `<path>.weight` + `<path>.weight_scale`  (FLUX, Z-Image style)
-        #   - `<path>.weight` + `<path>.scale_weight`  (Qwen2.5-VL fp8_scaled style, also
-        #     emits `<path>.scale_input` for activation scaling that we discard).
-        scale_suffixes = (".weight_scale", ".scale_weight")
-        weight_scale_keys = [k for k in sd.keys() if isinstance(k, str) and k.endswith(scale_suffixes)]
-        dequantized_count = 0
-        for scale_key in weight_scale_keys:
-            for suffix in scale_suffixes:
-                if scale_key.endswith(suffix):
-                    weight_key = scale_key[: -len(suffix)] + ".weight"
-                    break
-            if weight_key not in sd:
-                continue
-            weight = sd[weight_key]
-            scale = sd[scale_key]
-            weight_float = weight.float()
-            scale_float = scale.float()
-            if scale_float.shape != weight_float.shape and scale_float.numel() > 1:
-                # Block-wise quantization: expand scale along mismatching dim
-                for dim in range(len(weight_float.shape)):
-                    if dim < len(scale_float.shape) and scale_float.shape[dim] != weight_float.shape[dim]:
-                        block_size = weight_float.shape[dim] // scale_float.shape[dim]
-                        if block_size > 1:
-                            scale_float = scale_float.repeat_interleave(block_size, dim=dim)
-            sd[weight_key] = weight_float * scale_float
-            dequantized_count += 1
-
+        # Dequantize ComfyUI-style fp8 weights, then strip the now-unused quantization
+        # metadata (`scale_input` is the activation scale ComfyUI's fp8 matmul kernels
+        # use at runtime — we run the encoder in bf16 after dequantization).
+        dequantized_count = _dequantize_comfyui_fp8(sd)
         if dequantized_count > 0:
             logger.info(f"Dequantized {dequantized_count} ComfyUI-quantized weights")
-
-        # Strip ComfyUI quantization metadata. `scale_input` is the activation scale used
-        # at runtime by ComfyUI's fp8 matmul kernels — we run the encoder in bf16 after
-        # dequantization, so it is not needed.
-        keys_to_drop = [
-            k
-            for k in sd.keys()
-            if isinstance(k, str)
-            and (
-                k.endswith(".weight_scale")
-                or k.endswith(".scale_weight")
-                or k.endswith(".scale_input")
-                or "comfy_quant" in k
-                or k == "scaled_fp8"
-            )
-        ]
-        for k in keys_to_drop:
-            del sd[k]
+        _strip_quantization_metadata(sd)
 
         # ComfyUI single-file checkpoints use the legacy Qwen2.5-VL key layout
         # (`visual.X`, `model.X`); transformers ≥4.50 expects `model.visual.X` and

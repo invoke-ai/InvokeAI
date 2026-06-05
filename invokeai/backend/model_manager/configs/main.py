@@ -1,4 +1,6 @@
+import re
 from abc import ABC
+from pathlib import Path
 from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -1329,30 +1331,52 @@ class Main_Diffusers_QwenImage_Config(Diffusers_Config_Base, Main_Config_Base, C
         return QwenImageVariantType.Generate
 
 
+# ComfyUI single-file checkpoints prefix every transformer key with one of these.
+# The loaders strip them before instantiating the model (see `_strip_comfyui_prefix`
+# in the qwen_image loader); detection must strip them too so the two paths agree.
+_COMFYUI_KEY_PREFIXES = ("model.diffusion_model.", "diffusion_model.")
+
+
+def _strip_comfyui_key_prefix(key: str) -> str:
+    """Strip a leading ComfyUI `model.diffusion_model.` / `diffusion_model.` prefix from a key."""
+    for prefix in _COMFYUI_KEY_PREFIXES:
+        if key.startswith(prefix):
+            return key[len(prefix) :]
+    return key
+
+
 def _has_qwen_image_keys(state_dict: dict[str | int, Any]) -> bool:
     """Check if state dict contains Qwen Image Edit transformer keys.
 
     Qwen Image Edit uses 'txt_in' and 'txt_norm' instead of 'context_embedder' (FLUX).
-    This distinguishes it from FLUX and other architectures.
+    This distinguishes it from FLUX and other architectures. ComfyUI-style prefixes are
+    stripped first so prefixed checkpoints are detected and reach the loader.
     """
-    has_txt_in = any(isinstance(k, str) and k.startswith("txt_in.") for k in state_dict.keys())
-    has_txt_norm = any(isinstance(k, str) and k.startswith("txt_norm.") for k in state_dict.keys())
-    has_img_in = any(isinstance(k, str) and k.startswith("img_in.") for k in state_dict.keys())
+    keys = [_strip_comfyui_key_prefix(k) for k in state_dict.keys() if isinstance(k, str)]
+    has_txt_in = any(k.startswith("txt_in.") for k in keys)
+    has_txt_norm = any(k.startswith("txt_norm.") for k in keys)
+    has_img_in = any(k.startswith("img_in.") for k in keys)
     # Must NOT have context_embedder (which would indicate FLUX)
-    has_context_embedder = any(isinstance(k, str) and "context_embedder" in k for k in state_dict.keys())
+    has_context_embedder = any("context_embedder" in k for k in keys)
     return has_txt_in and has_txt_norm and has_img_in and not has_context_embedder
 
 
-def _infer_qwen_image_variant(sd: dict[str | int, Any], path) -> QwenImageVariantType:
+# Matches "edit" as a standalone token (delimited by start/end or any non-alphanumeric
+# separator), so `qwen_image_edit_2509` matches but `credited` / `edited` / `unedited` do not.
+_EDIT_TOKEN_RE = re.compile(r"(?:^|[^a-z0-9])edit(?:[^a-z0-9]|$)")
+
+
+def _infer_qwen_image_variant(sd: dict[str | int, Any], path: Path) -> QwenImageVariantType:
     """Infer Qwen Image variant from state dict marker or filename heuristic.
 
     Edit-variant models include an `__index_timestep_zero__` tensor used by the
-    `zero_cond_t` dual-modulation path. Falls back to a filename "edit" substring
-    check for converters that don't emit the marker.
+    `zero_cond_t` dual-modulation path. Falls back to a filename "edit" token check
+    for converters that don't emit the marker.
     """
-    if "__index_timestep_zero__" in sd:
+    marker = "__index_timestep_zero__"
+    if marker in sd or any(isinstance(k, str) and _strip_comfyui_key_prefix(k) == marker for k in sd):
         return QwenImageVariantType.Edit
-    if "edit" in path.stem.lower():
+    if _EDIT_TOKEN_RE.search(path.stem.lower()):
         return QwenImageVariantType.Edit
     return QwenImageVariantType.Generate
 
