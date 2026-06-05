@@ -201,6 +201,7 @@ async def get_external_provider_configs() -> list[ExternalProviderConfigModel]:
     response_model=ExternalProviderConfigModel,
 )
 async def set_external_provider_config(
+    _: AdminUserOrDefault,
     provider_id: str = Path(description="The external provider identifier"),
     update: ExternalProviderConfigUpdate = Body(description="External provider configuration settings"),
 ) -> ExternalProviderConfigModel:
@@ -231,6 +232,7 @@ async def set_external_provider_config(
     response_model=ExternalProviderConfigModel,
 )
 async def reset_external_provider_config(
+    _: AdminUserOrDefault,
     provider_id: str = Path(description="The external provider identifier"),
 ) -> ExternalProviderConfigModel:
     api_key_field, base_url_field = _get_external_provider_fields(provider_id)

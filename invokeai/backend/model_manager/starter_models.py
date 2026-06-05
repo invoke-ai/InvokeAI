@@ -1335,6 +1335,7 @@ alibabacloud_qwen_image_edit_max = StarterModel(
         supports_negative_prompt=False,
         supports_reference_images=True,
         supports_seed=True,
+        max_reference_images=3,
         max_images_per_request=4,
         allowed_aspect_ratios=QWEN_IMAGE_2_ALLOWED_ASPECT_RATIOS,
         aspect_ratio_sizes={
@@ -1358,6 +1359,23 @@ OPENAI_GPT_IMAGE_PANEL_SCHEMA = ExternalModelPanelSchema(
     prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]
 )
 
+openai_gpt_image_2 = StarterModel(
+    name="GPT Image 2",
+    base=BaseModelType.External,
+    source="external://openai/gpt-image-2",
+    description="OpenAI GPT-Image-2 image generation model. State-of-the-art image generation and editing with flexible sizing and high-fidelity image inputs. Does not support transparent backgrounds or configurable input fidelity. Requires a configured OpenAI API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_images_per_request=10,
+        allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
 openai_gpt_image_1_5 = StarterModel(
     name="GPT Image 1.5",
     base=BaseModelType.External,
@@ -1552,7 +1570,7 @@ anima_base = StarterModel(
     description="Anima Base 1.0 - 2B parameter anime-focused text-to-image model built on Cosmos Predict2 DiT. ~4.5GB",
     type=ModelType.Main,
     format=ModelFormat.Checkpoint,
-    dependencies=[anima_qwen3_encoder, anima_vae, t5_base_encoder],
+    dependencies=[anima_qwen3_encoder, anima_vae],
 )
 # endregion
 
@@ -1675,6 +1693,7 @@ STARTER_MODELS: list[StarterModel] = [
     gemini_flash_image,
     gemini_pro_image_preview,
     gemini_3_1_flash_image_preview,
+    openai_gpt_image_2,
     openai_gpt_image_1_5,
     openai_gpt_image_1,
     openai_gpt_image_1_mini,
@@ -1778,7 +1797,6 @@ anima_bundle: list[StarterModel] = [
     anima_base,
     anima_qwen3_encoder,
     anima_vae,
-    t5_base_encoder,
 ]
 
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {

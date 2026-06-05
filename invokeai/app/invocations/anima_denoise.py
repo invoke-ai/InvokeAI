@@ -34,6 +34,7 @@ from invokeai.app.invocations.fields import (
     InputField,
     LatentsField,
 )
+from invokeai.app.invocations.latent_noise import validate_noise_tensor_shape
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -166,7 +167,7 @@ class AnimaInpaintExtension(RectifiedFlowInpaintExtension):
     title="Denoise - Anima",
     tags=["image", "anima"],
     category="image",
-    version="1.5.0",
+    version="1.6.0",
     classification=Classification.Prototype,
 )
 class AnimaDenoiseInvocation(BaseInvocation):
@@ -181,6 +182,9 @@ class AnimaDenoiseInvocation(BaseInvocation):
     # If latents is provided, this means we are doing image-to-image.
     latents: Optional[LatentsField] = InputField(
         default=None, description=FieldDescriptions.latents, input=Input.Connection
+    )
+    noise: Optional[LatentsField] = InputField(
+        default=None, description=FieldDescriptions.noise, input=Input.Connection
     )
     # denoise_mask is used for inpainting. Only the masked region is modified.
     denoise_mask: Optional[DenoiseMaskField] = InputField(
@@ -396,7 +400,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
     def _run_diffusion(self, context: InvocationContext) -> torch.Tensor:
         device = TorchDevice.choose_torch_device()
-        inference_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
+        inference_dtype = TorchDevice.choose_anima_inference_dtype(device)
 
         if self.denoising_start >= self.denoising_end:
             raise ValueError(
@@ -459,12 +463,27 @@ class AnimaDenoiseInvocation(BaseInvocation):
             if init_latents.ndim == 4:
                 init_latents = init_latents.unsqueeze(2)  # [B, C, H, W] -> [B, C, 1, H, W]
 
-        # Generate initial noise (3D latent: [B, C, T, H, W])
-        noise = self._get_noise(self.height, self.width, inference_dtype, device, self.seed)
+        # Generate initial noise (3D latent: [B, C, T, H, W]).
+        # If noise will never be consumed, avoid validating/loading it.
+        should_ignore_noise = init_latents is not None and not self.add_noise and self.denoise_mask is None
+        noise: torch.Tensor | None
+        if should_ignore_noise:
+            noise = None
+        else:
+            noise = self._prepare_noise_tensor(context, inference_dtype, device)
 
         # Prepare input latents
         if init_latents is not None:
             if self.add_noise:
+                assert noise is not None
+                # Noise the init latents using the first sigma from the clipped
+                # InvokeAI schedule.
+                #
+                # Known limitation: if the selected scheduler later starts from a
+                # different first effective sigma/timestep than sigmas[0], the
+                # img2img preblend below may not match that scheduler exactly.
+                # This is an existing pipeline limitation and affects both
+                # internally generated noise and externally supplied noise.
                 s_0 = sigmas[0]
                 latents = s_0 * noise + (1.0 - s_0) * init_latents
             else:
@@ -472,6 +491,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
         else:
             if self.denoising_start > 1e-5:
                 raise ValueError("denoising_start should be 0 when initial latents are not provided.")
+            assert noise is not None
             latents = noise
 
         if total_steps <= 0:
@@ -483,6 +503,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
         if inpaint_mask is not None:
             if init_latents is None:
                 raise ValueError("Initial latents are required when using an inpaint mask (image-to-image inpainting)")
+            assert noise is not None
             inpaint_extension = AnimaInpaintExtension(
                 init_latents=init_latents.squeeze(2),
                 inpaint_mask=inpaint_mask,
@@ -601,6 +622,12 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     else:
                         noise_pred = noise_pred_cond
 
+                    latents_preview = self._estimate_preview_latents(
+                        latents=latents,
+                        sigma=it.sigma_curr,
+                        noise_pred=noise_pred,
+                    )
+
                     latents = driver.step(model_output=noise_pred, timestep=it.sched_timestep, sample=latents)
 
                     if it.completes_user_step:
@@ -622,7 +649,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
                                 order=it.order,
                                 total_steps=total_steps,
                                 timestep=int(it.sigma_curr * 1000),
-                                latents=latents.squeeze(2),
+                                latents=latents_preview.squeeze(2),
                             )
                         )
                 pbar.close()
@@ -648,6 +675,9 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     latents = latents.to(dtype=torch.float32)
                     latents = latents + (sigma_prev - sigma_curr) * noise_pred
                     latents = latents.to(dtype=latents_dtype)
+                    latents_preview = self._estimate_preview_latents(
+                        latents=latents, sigma=sigma_prev, noise_pred=noise_pred
+                    )
 
                     if inpaint_extension is not None:
                         latents_4d = latents.squeeze(2)
@@ -662,12 +692,28 @@ class AnimaDenoiseInvocation(BaseInvocation):
                             order=1,
                             total_steps=total_steps,
                             timestep=int(sigma_curr * 1000),
-                            latents=latents.squeeze(2),
+                            latents=latents_preview.squeeze(2),
                         ),
                     )
 
         # Remove temporal dimension for output: [B, C, 1, H, W] -> [B, C, H, W]
         return latents.squeeze(2)
+
+    def _prepare_noise_tensor(
+        self, context: InvocationContext, inference_dtype: torch.dtype, device: torch.device
+    ) -> torch.Tensor:
+        if self.noise is not None:
+            noise = context.tensors.load(self.noise.latents_name).to(device=device, dtype=inference_dtype)
+            validate_noise_tensor_shape(noise, "Anima", self.width, self.height)
+            return noise
+
+        return self._get_noise(self.height, self.width, inference_dtype, device, self.seed)
+
+    def _estimate_preview_latents(self, latents: torch.Tensor, sigma: float, noise_pred: torch.Tensor) -> torch.Tensor:
+        latents_dtype = latents.dtype
+        latents_fp32 = latents.to(dtype=torch.float32)
+        preview = latents_fp32 - sigma * noise_pred.to(dtype=torch.float32)
+        return preview.to(dtype=latents_dtype)
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:
