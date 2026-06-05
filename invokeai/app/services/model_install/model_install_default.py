@@ -112,6 +112,8 @@ class ModelInstallService(ModelInstallServiceBase):
         self._stop_event = threading.Event()
         self._downloads_changed_event = threading.Event()
         self._install_completed_event = threading.Event()
+        self._restore_completed_event = threading.Event()
+        self._restore_completed_event.set()
         self._download_queue = download_queue
         self._download_cache: Dict[int, ModelInstallJob] = {}
         self._running = False
@@ -272,6 +274,8 @@ class ModelInstallService(ModelInstallServiceBase):
                         self._safe_rmtree(job._install_tmpdir, self._logger)
 
     def _restore_incomplete_installs_async(self) -> None:
+        self._restore_completed_event.clear()
+
         def _run() -> None:
             try:
                 self._logger.info("Restoring incomplete installs")
@@ -279,8 +283,13 @@ class ModelInstallService(ModelInstallServiceBase):
                 self._logger.info("Finished restoring incomplete installs")
             except Exception as e:
                 self._logger.error(f"Failed to restore incomplete installs: {e}")
+            finally:
+                self._restore_completed_event.set()
 
         threading.Thread(target=_run, daemon=True).start()
+
+    def _wait_for_restore_complete(self) -> None:
+        self._restore_completed_event.wait()
 
     def _resume_remote_download(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.WAITING
@@ -467,6 +476,8 @@ class ModelInstallService(ModelInstallServiceBase):
         return self.import_model(source_obj, config)
 
     def import_model(self, source: ModelSource, config: Optional[ModelRecordChanges] = None) -> ModelInstallJob:  # noqa D102
+        self._wait_for_restore_complete()
+
         similar_jobs = [x for x in self.list_jobs() if x.source == source and not x.in_terminal_state]
         if similar_jobs:
             self._logger.warning(f"There is already an active install job for {source}. Not enqueuing.")
@@ -514,6 +525,8 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def wait_for_installs(self, timeout: int = 0) -> List[ModelInstallJob]:  # noqa D102
         """Block until all installation jobs are done."""
+        self._wait_for_restore_complete()
+
         start = time.time()
         while len(self._download_cache) > 0:
             if self._downloads_changed_event.wait(timeout=0.25):  # in case we miss an event
@@ -770,7 +783,7 @@ class ModelInstallService(ModelInstallServiceBase):
             except ValueError:
                 pass
 
-            return [RemoteModelFile(url=source.url, path=Path("."), size=0)], None
+            return [RemoteModelFile(url=self._normalize_huggingface_blob_url(source.url), path=Path("."), size=0)], None
 
         raise Exception(f"No files associated with {source}")
 
@@ -1496,3 +1509,15 @@ class ModelInstallService(ModelInstallServiceBase):
         if re.match(r"^https?://huggingface.co/[^/]+/[^/]+$", url.lower()):
             return HuggingFaceMetadataFetch
         raise ValueError(f"Unsupported model source: '{url}'")
+
+    @staticmethod
+    def _normalize_huggingface_blob_url(url: AnyHttpUrl) -> Url:
+        """Convert Hugging Face file page URLs to direct download URLs."""
+        return Url(
+            re.sub(
+                r"^(https?://huggingface\.co/[^/]+/[^/]+)/blob/([^?#]+)([?#].*)?$",
+                r"\1/resolve/\2\3",
+                str(url),
+                flags=re.IGNORECASE,
+            )
+        )

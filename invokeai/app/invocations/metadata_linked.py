@@ -717,7 +717,13 @@ class FluxDenoiseLatentsMetaInvocation(FluxDenoiseInvocation, WithMetadata):
         md.update({"denoising_start": self.denoising_start})
         md.update({"denoising_end": self.denoising_end})
         md.update({"model": self.transformer.transformer})
-        md.update({"seed": self.seed})
+        md.update(
+            {
+                "seed": self.noise.seed
+                if self.noise is not None and self.noise.seed is not None and (self.latents is None or self.add_noise)
+                else self.seed
+            }
+        )
         md.update({"cfg_scale": self.cfg_scale})
         md.update({"cfg_scale_start_step": self.cfg_scale_start_step})
         md.update({"cfg_scale_end_step": self.cfg_scale_end_step})
@@ -735,7 +741,7 @@ class FluxDenoiseLatentsMetaInvocation(FluxDenoiseInvocation, WithMetadata):
     title=f"{ZImageDenoiseInvocation.UIConfig.title} + Metadata",
     tags=["z-image", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="metadata",
-    version="1.0.0",
+    version="1.1.0",
 )
 class ZImageDenoiseMetaInvocation(ZImageDenoiseInvocation, WithMetadata):
     """Run denoising process with a Z-Image transformer model + metadata."""
@@ -766,7 +772,13 @@ class ZImageDenoiseMetaInvocation(ZImageDenoiseInvocation, WithMetadata):
         md.update({"denoising_end": self.denoising_end})
         md.update({"scheduler": self.scheduler})
         md.update({"model": self.transformer.transformer})
-        md.update({"seed": self.seed})
+        md.update(
+            {
+                "seed": self.noise.seed
+                if self.noise is not None and self.noise.seed is not None and (self.latents is None or self.add_noise)
+                else self.seed
+            }
+        )
         if len(self.transformer.loras) > 0:
             md.update({"loras": _loras_to_json(self.transformer.loras)})
 

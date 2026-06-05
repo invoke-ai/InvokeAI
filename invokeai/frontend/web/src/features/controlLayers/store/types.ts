@@ -260,6 +260,7 @@ const zCanvasRectState = z.object({
   type: z.literal('rect'),
   rect: zRect,
   color: zRgbaColor,
+  compositeOperation: z.enum(['source-over', 'destination-out']).default('source-over'),
 });
 export type CanvasRectState = z.infer<typeof zCanvasRectState>;
 
@@ -276,6 +277,28 @@ const zCanvasLassoState = z.object({
   compositeOperation: zCanvasLassoCompositeOperation.default('source-over'),
 });
 export type CanvasLassoState = z.infer<typeof zCanvasLassoState>;
+
+const zCanvasOvalState = z.object({
+  id: zId,
+  type: z.literal('oval'),
+  rect: zRect,
+  color: zRgbaColor,
+  compositeOperation: z.enum(['source-over', 'destination-out']).default('source-over'),
+});
+export type CanvasOvalState = z.infer<typeof zCanvasOvalState>;
+
+const zCanvasPolygonState = z.object({
+  id: zId,
+  type: z.literal('polygon'),
+  points: zPoints,
+  color: zRgbaColor,
+  compositeOperation: z.enum(['source-over', 'destination-out']).default('source-over'),
+  previewPoint: zCoordinate.optional(),
+});
+export type CanvasPolygonState = z.infer<typeof zCanvasPolygonState>;
+
+const zCanvasShapeState = z.union([zCanvasRectState, zCanvasOvalState, zCanvasPolygonState]);
+type CanvasShapeState = z.infer<typeof zCanvasShapeState>;
 
 // Gradient state includes clip metadata so the tool can optionally clip to drag gesture.
 const zCanvasLinearGradientState = z.object({
@@ -325,7 +348,7 @@ const zCanvasObjectState = z.union([
   zCanvasImageState,
   zCanvasBrushLineState,
   zCanvasEraserLineState,
-  zCanvasRectState,
+  zCanvasShapeState,
   zCanvasLassoState,
   zCanvasBrushLineWithPressureState,
   zCanvasEraserLineWithPressureState,
@@ -806,10 +829,9 @@ export const zParamsState = z.object({
   zImageVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX VAE
   zImageQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder
   zImageQwen3SourceModel: zParameterModel.nullable(), // Diffusers Z-Image model (fallback for VAE/Encoder)
-  // Anima model components - uses Qwen3 0.6B + T5-XXL tokenizer + QwenImage VAE
+  // Anima model components - uses Qwen3 0.6B + bundled T5-XXL tokenizer + QwenImage VAE
   animaVaeModel: zParameterVAEModel.nullable(), // Optional: Separate QwenImage/FLUX VAE for Anima
   animaQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 0.6B Encoder for Anima
-  animaT5EncoderModel: zModelIdentifierField.nullable(), // T5-XXL tokenizer for Anima LLM Adapter
   animaScheduler: zParameterAnimaScheduler,
   // Flux2 Klein model components - uses Qwen3 instead of CLIP+T5
   kleinVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE for Klein
@@ -896,7 +918,6 @@ export const getInitialParamsState = (): ParamsState => ({
   zImageQwen3SourceModel: null,
   animaVaeModel: null,
   animaQwen3EncoderModel: null,
-  animaT5EncoderModel: null,
   animaScheduler: 'euler',
   kleinVaeModel: null,
   kleinQwen3EncoderModel: null,
@@ -1020,8 +1041,8 @@ export type EntityBrushLineAddedPayload = EntityIdentifierPayload<{
 export type EntityEraserLineAddedPayload = EntityIdentifierPayload<{
   eraserLine: CanvasEraserLineState | CanvasEraserLineWithPressureState;
 }>;
-export type EntityRectAddedPayload = EntityIdentifierPayload<{ rect: CanvasRectState }>;
 export type EntityLassoAddedPayload = EntityIdentifierPayload<{ lasso: CanvasLassoState }>;
+export type EntityShapeAddedPayload = EntityIdentifierPayload<{ shape: CanvasShapeState }>;
 export type EntityGradientAddedPayload = EntityIdentifierPayload<{ gradient: CanvasGradientState }>;
 export type EntityRasterizedPayload = EntityIdentifierPayload<{
   imageObject: CanvasImageState;
