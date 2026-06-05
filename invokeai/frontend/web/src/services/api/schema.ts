@@ -3448,7 +3448,9 @@ export type components = {
          *     - Transformer: Cosmos Predict2 DiT + LLM Adapter (from single-file checkpoint)
          *     - Qwen3 Encoder: Qwen3 0.6B (standalone single-file)
          *     - VAE: AutoencoderKLQwenImage / Wan 2.1 VAE (standalone single-file or FLUX VAE)
-         *     - T5 Encoder: T5-XXL model (only the tokenizer submodel is used, for LLM Adapter token IDs)
+         *
+         *     The T5-XXL tokenizer needed for LLM Adapter token IDs is bundled in the package,
+         *     so no T5-XXL encoder model needs to be installed.
          */
         AnimaModelLoaderInvocation: {
             /**
@@ -3484,11 +3486,6 @@ export type components = {
              */
             qwen3_encoder_model: components["schemas"]["ModelIdentifierField"];
             /**
-             * T5 Encoder
-             * @description T5-XXL encoder model. The tokenizer submodel is used for Anima text encoding.
-             */
-            t5_encoder_model: components["schemas"]["ModelIdentifierField"];
-            /**
              * type
              * @default anima_model_loader
              * @constant
@@ -3516,11 +3513,6 @@ export type components = {
              */
             vae: components["schemas"]["VAEField"];
             /**
-             * T5 Encoder
-             * @description T5 tokenizer and text encoder
-             */
-            t5_encoder: components["schemas"]["T5EncoderField"];
-            /**
              * type
              * @default anima_model_loader_output
              * @constant
@@ -3531,7 +3523,7 @@ export type components = {
          * Prompt - Anima
          * @description Encodes and preps a prompt for an Anima image.
          *
-         *     Uses Qwen3 0.6B for hidden state extraction and T5-XXL tokenizer for
+         *     Uses Qwen3 0.6B for hidden state extraction and a bundled T5-XXL tokenizer for
          *     token IDs (no T5 model weights needed). Both are combined by the
          *     LLM Adapter inside the Anima transformer during denoising.
          */
@@ -3565,12 +3557,6 @@ export type components = {
              * @default null
              */
             qwen3_encoder?: components["schemas"]["Qwen3EncoderField"] | null;
-            /**
-             * T5 Encoder
-             * @description T5 tokenizer and text encoder
-             * @default null
-             */
-            t5_encoder?: components["schemas"]["T5EncoderField"] | null;
             /**
              * @description A mask defining the region that this conditioning prompt applies to.
              * @default null
