@@ -139,6 +139,7 @@ class Flux2VAEDiffusersLoader(ModelLoader):
             local_files_only=True,
         )
 
+        model = self._apply_fp8_layerwise_casting(model, config, submodel_type)
         return model
 
 
@@ -232,6 +233,7 @@ class Flux2VAELoader(ModelLoader):
             vae_dtype = self._torch_dtype
         model.to(vae_dtype)
 
+        model = self._apply_fp8_layerwise_casting(model, config, submodel_type)
         return model
 
     def _convert_flux2_vae_bfl_to_diffusers(self, sd: dict) -> dict:
@@ -516,7 +518,9 @@ class FluxCheckpointModel(ModelLoader):
 
         match submodel_type:
             case SubModelType.Transformer:
-                return self._load_from_singlefile(config)
+                model = self._load_from_singlefile(config)
+                model = self._apply_fp8_layerwise_casting(model, config, submodel_type)
+                return model
 
         raise ValueError(
             f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
@@ -670,6 +674,7 @@ class FluxDiffusersModel(GenericDiffusersLoader):
             else:
                 raise e
 
+        result = self._apply_fp8_layerwise_casting(result, config, submodel_type)
         return result
 
 
@@ -746,6 +751,7 @@ class Flux2DiffusersModel(GenericDiffusersLoader):
                         if guidance_emb.linear_2.bias is not None:
                             guidance_emb.linear_2.bias.data.zero_()
 
+        result = self._apply_fp8_layerwise_casting(result, config, submodel_type)
         return result
 
 
@@ -763,7 +769,9 @@ class Flux2CheckpointModel(ModelLoader):
 
         match submodel_type:
             case SubModelType.Transformer:
-                return self._load_from_singlefile(config)
+                model = self._load_from_singlefile(config)
+                model = self._apply_fp8_layerwise_casting(model, config, submodel_type)
+                return model
 
         raise ValueError(
             f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
@@ -976,13 +984,13 @@ class Flux2CheckpointModel(ModelLoader):
             return f"{prefix}.attn.to_add_out.weight"
 
         # Attention norms
-        if "img_attn.norm.query_norm.scale" in rest:
+        if "img_attn.norm.query_norm.scale" in rest or "img_attn.norm.query_norm.weight" in rest:
             return f"{prefix}.attn.norm_q.weight"
-        elif "img_attn.norm.key_norm.scale" in rest:
+        elif "img_attn.norm.key_norm.scale" in rest or "img_attn.norm.key_norm.weight" in rest:
             return f"{prefix}.attn.norm_k.weight"
-        elif "txt_attn.norm.query_norm.scale" in rest:
+        elif "txt_attn.norm.query_norm.scale" in rest or "txt_attn.norm.query_norm.weight" in rest:
             return f"{prefix}.attn.norm_added_q.weight"
-        elif "txt_attn.norm.key_norm.scale" in rest:
+        elif "txt_attn.norm.key_norm.scale" in rest or "txt_attn.norm.key_norm.weight" in rest:
             return f"{prefix}.attn.norm_added_k.weight"
 
         # MLP layers
@@ -1012,9 +1020,9 @@ class Flux2CheckpointModel(ModelLoader):
             return f"{prefix}.attn.to_out.weight"
 
         # Norms
-        if "norm.query_norm.scale" in rest:
+        if "norm.query_norm.scale" in rest or "norm.query_norm.weight" in rest:
             return f"{prefix}.attn.norm_q.weight"
-        elif "norm.key_norm.scale" in rest:
+        elif "norm.key_norm.scale" in rest or "norm.key_norm.weight" in rest:
             return f"{prefix}.attn.norm_k.weight"
 
         return key
@@ -1320,13 +1328,13 @@ class Flux2GGUFCheckpointModel(ModelLoader):
         elif "txt_attn.proj.weight" in rest:
             return f"{prefix}.attn.to_add_out.weight"
 
-        if "img_attn.norm.query_norm.scale" in rest:
+        if "img_attn.norm.query_norm.scale" in rest or "img_attn.norm.query_norm.weight" in rest:
             return f"{prefix}.attn.norm_q.weight"
-        elif "img_attn.norm.key_norm.scale" in rest:
+        elif "img_attn.norm.key_norm.scale" in rest or "img_attn.norm.key_norm.weight" in rest:
             return f"{prefix}.attn.norm_k.weight"
-        elif "txt_attn.norm.query_norm.scale" in rest:
+        elif "txt_attn.norm.query_norm.scale" in rest or "txt_attn.norm.query_norm.weight" in rest:
             return f"{prefix}.attn.norm_added_q.weight"
-        elif "txt_attn.norm.key_norm.scale" in rest:
+        elif "txt_attn.norm.key_norm.scale" in rest or "txt_attn.norm.key_norm.weight" in rest:
             return f"{prefix}.attn.norm_added_k.weight"
 
         if "img_mlp.0.weight" in rest:
@@ -1351,9 +1359,9 @@ class Flux2GGUFCheckpointModel(ModelLoader):
         elif "linear2.weight" in rest:
             return f"{prefix}.attn.to_out.weight"
 
-        if "norm.query_norm.scale" in rest:
+        if "norm.query_norm.scale" in rest or "norm.query_norm.weight" in rest:
             return f"{prefix}.attn.norm_q.weight"
-        elif "norm.key_norm.scale" in rest:
+        elif "norm.key_norm.scale" in rest or "norm.key_norm.weight" in rest:
             return f"{prefix}.attn.norm_k.weight"
 
         return key

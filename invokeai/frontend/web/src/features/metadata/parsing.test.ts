@@ -31,6 +31,23 @@ describe('Qwen metadata parsing', () => {
     expect(hasMetadata).toBe(false);
   });
 
+  it('does not report metadata as available when require some and all handlers reject', async () => {
+    const store = createStore();
+
+    const hasMetadata = await MetadataUtils.hasMetadataByHandlers({
+      metadata: {},
+      handlers: [
+        ImageMetadataHandlers.QwenImageComponentSource,
+        ImageMetadataHandlers.QwenImageQuantization,
+        ImageMetadataHandlers.QwenImageShift,
+      ],
+      store,
+      require: 'some',
+    });
+
+    expect(hasMetadata).toBe(false);
+  });
+
   it('does not recall Qwen values when metadata keys are absent', async () => {
     const store = createStore();
 
@@ -72,6 +89,45 @@ describe('Qwen metadata parsing', () => {
     expect(recalled.size).toBe(3);
     const mockStore = store as ReturnType<typeof createMockStore>;
     expect(mockStore.dispatch).toHaveBeenCalledTimes(3);
+  });
+
+  it('recalls standalone Qwen Image VAE and Qwen VL encoder when metadata keys are present', async () => {
+    const store = createStore();
+
+    const recalled = await MetadataUtils.recallByHandlers({
+      metadata: {
+        qwen_image_vae: { key: 'vae-key', hash: 'vae-hash', name: 'Qwen VAE', base: 'qwen-image', type: 'vae' },
+        qwen_image_qwen_vl_encoder: {
+          key: 'enc-key',
+          hash: 'enc-hash',
+          name: 'Qwen VL Encoder',
+          base: 'qwen-image',
+          type: 'qwen_vl_encoder',
+        },
+      },
+      handlers: [ImageMetadataHandlers.QwenImageVaeModel, ImageMetadataHandlers.QwenImageQwenVLEncoderModel],
+      store,
+      silent: true,
+    });
+
+    expect(recalled.size).toBe(2);
+    const mockStore = store as ReturnType<typeof createMockStore>;
+    expect(mockStore.dispatch).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not recall standalone Qwen Image VAE/encoder when keys are absent', async () => {
+    const store = createStore();
+
+    const recalled = await MetadataUtils.recallByHandlers({
+      metadata: {},
+      handlers: [ImageMetadataHandlers.QwenImageVaeModel, ImageMetadataHandlers.QwenImageQwenVLEncoderModel],
+      store,
+      silent: true,
+    });
+
+    expect(recalled.size).toBe(0);
+    const mockStore = store as ReturnType<typeof createMockStore>;
+    expect(mockStore.dispatch).not.toHaveBeenCalled();
   });
 
   it('recalls Qwen component source as null when key is present but value is null', async () => {
