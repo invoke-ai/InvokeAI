@@ -5,6 +5,8 @@ Test the model installer
 import gc
 import platform
 import shutil
+import threading
+import time
 import uuid
 from pathlib import Path
 from typing import Any, Dict
@@ -319,6 +321,68 @@ def test_simple_download(mm2_installer: ModelInstallServiceBase, mm2_app_config:
     assert isinstance(bus.events[2], ModelInstallDownloadsCompleteEvent)  # download completed
     assert isinstance(bus.events[3], ModelInstallStartedEvent)  # install started
     assert isinstance(bus.events[4], ModelInstallCompleteEvent)  # install completed
+
+
+def test_import_waits_for_startup_restore(
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_record_store,
+    mm2_download_queue,
+    mm2_session,
+    embedding_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_record_store,
+        download_queue=mm2_download_queue,
+        event_bus=TestEventService(),
+        session=mm2_session,
+    )
+    restore_started = threading.Event()
+    release_restore = threading.Event()
+    imported = threading.Event()
+
+    def _blocked_restore() -> None:
+        restore_started.set()
+        assert release_restore.wait(timeout=5)
+
+    monkeypatch.setattr(installer, "_restore_incomplete_installs", _blocked_restore)
+
+    try:
+        installer.start()
+        assert restore_started.wait(timeout=5)
+
+        import_thread = threading.Thread(
+            target=lambda: (
+                installer.import_model(LocalModelSource(path=embedding_file)),
+                imported.set(),
+            )
+        )
+        import_thread.start()
+
+        time.sleep(0.1)
+        assert not imported.is_set()
+
+        release_restore.set()
+        import_thread.join(timeout=5)
+        assert imported.is_set()
+        installer.wait_for_installs(timeout=5)
+    finally:
+        release_restore.set()
+        installer.stop()
+
+
+def test_huggingface_blob_url_uses_resolve_download_url(mm2_installer: ModelInstallServiceBase) -> None:
+    source = URLModelSource(
+        url=Url("https://huggingface.co/h94/IP-Adapter/blob/main/sdxl_models/ip-adapter.safetensors")
+    )
+
+    assert isinstance(mm2_installer, ModelInstallService)
+    files, metadata = mm2_installer._remote_files_from_source(source)
+
+    assert metadata is None
+    assert len(files) == 1
+    assert str(files[0].url) == "https://huggingface.co/h94/IP-Adapter/resolve/main/sdxl_models/ip-adapter.safetensors"
 
 
 @pytest.mark.timeout(timeout=10, method="thread")
