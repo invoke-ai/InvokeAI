@@ -1,5 +1,6 @@
+import math
 from contextlib import ExitStack
-from typing import Callable, Iterator, Optional, Tuple
+from typing import Callable, ClassVar, Iterator, Optional, Tuple
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -176,6 +177,72 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         latents = latents.reshape(batch_size, channels // 4, h, w)
         return latents
 
+    @staticmethod
+    def _align_ref_latent_dims(rh: int, rw: int) -> tuple[int, int]:
+        """Trim reference latent spatial dims to even values for 2x2 packing.
+
+        Raises ValueError if the aligned dims would be < 2 (i.e., the reference
+        latent is too small to produce any valid tokens).
+        """
+        rh_aligned = rh - (rh % 2)
+        rw_aligned = rw - (rw % 2)
+        if rh_aligned < 2 or rw_aligned < 2:
+            raise ValueError(
+                f"Reference latent spatial dims must be >= 2 after even alignment; "
+                f"got ({rh_aligned}, {rw_aligned}) from input shape ({rh}, {rw}). "
+                "Ensure the reference image is at least 16 pixels in each dimension."
+            )
+        return rh_aligned, rw_aligned
+
+    @staticmethod
+    def _build_img_shapes(
+        latent_height: int,
+        latent_width: int,
+        ref_latent_height: int | None = None,
+        ref_latent_width: int | None = None,
+    ) -> list[list[tuple[int, int, int]]]:
+        """Build the img_shapes argument for the transformer.
+
+        The reference segment (if present) must use its own dims so QwenEmbedRope's
+        spatial frequencies position ref tokens distinctly from noisy tokens —
+        otherwise reference content bleeds into the generation as a ghost.
+        """
+        shapes: list[tuple[int, int, int]] = [(1, latent_height // 2, latent_width // 2)]
+        if ref_latent_height is not None and ref_latent_width is not None:
+            shapes.append((1, ref_latent_height // 2, ref_latent_width // 2))
+        return [shapes]
+
+    # diffusers' QwenImageEdit(Plus)Pipeline VAE_IMAGE_SIZE = 1024 * 1024 pixels;
+    # ref images are resized to this area (preserving aspect, snapped to multiples
+    # of 32) before VAE encoding. We mirror this clamp in latent space so direct
+    # backend callers — whose i2l may not pass explicit width/height — don't feed
+    # the transformer an out-of-distribution reference sequence length (which
+    # also causes a VRAM spike for large inputs).
+    _REF_TARGET_PIXEL_AREA: ClassVar[int] = 1024 * 1024
+    _VAE_SCALE_FACTOR: ClassVar[int] = 8
+
+    @classmethod
+    def _maybe_clamp_ref_latent_size(cls, ref_latents: torch.Tensor) -> torch.Tensor:
+        """Bilinear-downscale the reference latent if it exceeds diffusers'
+        VAE_IMAGE_SIZE budget.
+
+        Returns the latent unchanged if it's already within budget.
+        """
+        _, _, rh, rw = ref_latents.shape
+        target_cells = cls._REF_TARGET_PIXEL_AREA // (cls._VAE_SCALE_FACTOR**2)
+        if rh * rw <= target_cells:
+            return ref_latents
+        aspect = rw / rh
+        target_w_px = math.sqrt(cls._REF_TARGET_PIXEL_AREA * aspect)
+        target_h_px = target_w_px / aspect
+        target_w_px = max(32, round(target_w_px / 32) * 32)
+        target_h_px = max(32, round(target_h_px / 32) * 32)
+        target_rh = target_h_px // cls._VAE_SCALE_FACTOR
+        target_rw = target_w_px // cls._VAE_SCALE_FACTOR
+        return torch.nn.functional.interpolate(
+            ref_latents, size=(target_rh, target_rw), mode="bilinear", antialias=False
+        )
+
     def _run_diffusion(self, context: InvocationContext):
         inference_dtype = torch.bfloat16
         device = TorchDevice.choose_torch_device()
@@ -332,35 +399,37 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         use_ref_latents = has_zero_cond_t
 
         ref_latents_packed = None
+        ref_latent_height = latent_height
+        ref_latent_width = latent_width
         if use_ref_latents:
             if ref_latents is not None:
-                _, ref_ch, rh, rw = ref_latents.shape
-                if rh != latent_height or rw != latent_width:
-                    ref_latents = torch.nn.functional.interpolate(
-                        ref_latents, size=(latent_height, latent_width), mode="bilinear"
-                    )
+                # Defense-in-depth: backend callers (direct API, older graph JSON)
+                # may wire qwen_image_i2l without explicit width/height, producing
+                # a native-resolution reference latent. Clamp here so the
+                # transformer always sees an in-distribution sequence length.
+                ref_latents = self._maybe_clamp_ref_latent_size(ref_latents)
+                _, _, rh, rw = ref_latents.shape
+                ref_latent_height, ref_latent_width = self._align_ref_latent_dims(rh, rw)
+                if ref_latent_height != rh or ref_latent_width != rw:
+                    ref_latents = ref_latents[..., :ref_latent_height, :ref_latent_width]
             else:
                 # No reference image provided — use zeros so the model still gets the
                 # expected sequence layout.
                 ref_latents = torch.zeros(
                     1, out_channels, latent_height, latent_width, device=device, dtype=inference_dtype
                 )
-            ref_latents_packed = self._pack_latents(ref_latents, 1, out_channels, latent_height, latent_width)
+            ref_latents_packed = self._pack_latents(ref_latents, 1, out_channels, ref_latent_height, ref_latent_width)
 
-        # img_shapes tells the transformer the spatial layout of patches.
+        # img_shapes tells the transformer the spatial layout of patches. The reference
+        # segment must use the reference latent's own dimensions so RoPE positions it
+        # distinctly from the noisy latent — otherwise the two segments share spatial
+        # positional encoding and the model can't disentangle them, producing a
+        # ghost/doubling artifact across the whole frame. Matches diffusers'
+        # QwenImageEditPipeline / QwenImageEditPlusPipeline.
         if use_ref_latents:
-            img_shapes = [
-                [
-                    (1, latent_height // 2, latent_width // 2),
-                    (1, latent_height // 2, latent_width // 2),
-                ]
-            ]
+            img_shapes = self._build_img_shapes(latent_height, latent_width, ref_latent_height, ref_latent_width)
         else:
-            img_shapes = [
-                [
-                    (1, latent_height // 2, latent_width // 2),
-                ]
-            ]
+            img_shapes = self._build_img_shapes(latent_height, latent_width)
 
         # Prepare inpaint extension (operates in 4D space, so unpack/repack around it)
         inpaint_mask = self._prep_inpaint_mask(context, noise)  # noise has the right 4D shape

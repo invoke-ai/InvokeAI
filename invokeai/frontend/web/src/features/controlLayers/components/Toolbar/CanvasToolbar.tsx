@@ -7,6 +7,7 @@ import { ToolGradientClipToggle } from 'features/controlLayers/components/Tool/T
 import { ToolGradientModeToggle } from 'features/controlLayers/components/Tool/ToolGradientModeToggle';
 import { ToolLassoModeToggle } from 'features/controlLayers/components/Tool/ToolLassoModeToggle';
 import { ToolOptionsRowContainer } from 'features/controlLayers/components/Tool/ToolOptionsRowContainer';
+import { ToolShapeTypeToggle } from 'features/controlLayers/components/Tool/ToolShapeTypeToggle';
 import { ToolWidthPicker } from 'features/controlLayers/components/Tool/ToolWidthPicker';
 import { CanvasToolbarFitBboxToLayersButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToLayersButton';
 import { CanvasToolbarFitBboxToMasksButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToMasksButton';
@@ -35,6 +36,7 @@ import { memo, useMemo } from 'react';
 export const CanvasToolbar = memo(() => {
   const isBrushSelected = useToolIsSelected('brush');
   const isEraserSelected = useToolIsSelected('eraser');
+  const isShapeSelected = useToolIsSelected('rect');
   const isTextSelected = useToolIsSelected('text');
   const isLassoSelected = useToolIsSelected('lasso');
   const isGradientSelected = useToolIsSelected('gradient');
@@ -56,30 +58,41 @@ export const CanvasToolbar = memo(() => {
   useCanvasToggleBboxHotkey();
 
   return (
-    <Flex w="full" gap={2} alignItems="center" px={2}>
+    <Flex w="full" minW={0} gap={2} alignItems="center" px={2}>
       <ToolOptionsRowContainer gap={4} alignItems="center" h="full">
         <ToolFillColorPicker />
+        {isShapeSelected && (
+          <Box ms={2} minW={0} flexShrink={1} overflow="hidden">
+            <Box mt="-2px" display="flex" alignItems="center" gap={2} w="max-content">
+              <ToolShapeTypeToggle />
+            </Box>
+          </Box>
+        )}
         {isGradientSelected && (
-          <Box ms={2} mt="-2px" display="flex" alignItems="center" gap={2}>
-            <ToolGradientClipToggle />
-            <ToolGradientModeToggle />
+          <Box ms={2} minW={0} flexShrink={1} overflow="hidden">
+            <Box mt="-2px" display="flex" alignItems="center" gap={2} w="max-content">
+              <ToolGradientClipToggle />
+              <ToolGradientModeToggle />
+            </Box>
           </Box>
         )}
         {isLassoSelected && (
-          <Box ms={2} mt="-2px" display="flex" alignItems="center" gap={2}>
-            <ToolLassoModeToggle />
+          <Box ms={2} minW={0} flexShrink={1} overflow="hidden">
+            <Box mt="-2px" display="flex" alignItems="center" gap={2} w="max-content">
+              <ToolLassoModeToggle />
+            </Box>
           </Box>
         )}
         {isTextSelected ? <TextToolOptions /> : showToolWithPicker && <ToolWidthPicker />}
       </ToolOptionsRowContainer>
-      <Flex alignItems="center" h="full">
+      <Flex alignItems="center" h="full" flexGrow={1} flexShrink={0} justifyContent="flex-end" minW="fit-content">
         <CanvasToolbarScale />
         <CanvasToolbarResetViewButton />
         <CanvasToolbarFitBboxToLayersButton />
         <CanvasToolbarFitBboxToMasksButton />
       </Flex>
       <Divider orientation="vertical" />
-      <Flex alignItems="center" h="full">
+      <Flex alignItems="center" h="full" flexShrink={0}>
         <CanvasToolbarProjectMenuButton />
         <CanvasToolbarSaveToGalleryButton />
         <CanvasToolbarSnapshotMenuButton />

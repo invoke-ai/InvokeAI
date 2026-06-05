@@ -1,6 +1,7 @@
 import type { AnyModelVariant, BaseModelType, ModelFormat, ModelType } from 'features/nodes/types/common';
 import {
   type AnyModelConfig,
+  isAnimaQwen3EncoderModelConfig,
   isCLIPEmbedModelConfig,
   isCLIPVisionModelConfig,
   isControlLoRAModelConfig,
@@ -77,7 +78,7 @@ const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
   qwen3_encoder: {
     category: 'qwen3_encoder',
     i18nKey: 'modelManager.qwen3Encoder',
-    filter: isQwen3EncoderModelConfig,
+    filter: (config) => isQwen3EncoderModelConfig(config) || isAnimaQwen3EncoderModelConfig(config),
   },
   qwen_vl_encoder: {
     category: 'qwen_vl_encoder',
@@ -276,7 +277,7 @@ export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
   unknown: 'Unknown',
 };
 
-export const SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS: BaseModelType[] = ['flux', 'sd-3', 'z-image'];
+export const SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS: BaseModelType[] = ['flux', 'sd-3'];
 
 export const SUPPORTS_REF_IMAGES_BASE_MODELS: BaseModelType[] = ['sd-1', 'sdxl', 'flux', 'flux2', 'qwen-image'];
 

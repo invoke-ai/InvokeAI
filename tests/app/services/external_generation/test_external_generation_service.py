@@ -248,3 +248,30 @@ def test_generate_resizes_inpaint_result_to_original_init_size() -> None:
     assert response.images[0].image.width == request.init_image.width
     assert response.images[0].image.height == request.init_image.height
     assert response.images[0].seed == 1
+
+
+def test_qwen_image_edit_max_enforces_three_reference_images() -> None:
+    from invokeai.backend.model_manager.starter_models import alibabacloud_qwen_image_edit_max
+
+    capabilities = alibabacloud_qwen_image_edit_max.capabilities
+    assert capabilities is not None
+    assert capabilities.max_reference_images == 3
+
+    model = ExternalApiModelConfig(
+        key="qwen_image_edit_max",
+        name="Qwen Image Edit Max",
+        provider_id="alibabacloud",
+        provider_model_id="qwen-image-edit-max",
+        capabilities=capabilities,
+    )
+    request = _build_request(
+        model=model,
+        reference_images=[ExternalReferenceImage(image=_make_image()) for _ in range(4)],
+    )
+    provider = DummyProvider("alibabacloud", configured=True, result=ExternalGenerationResult(images=[]))
+    service = ExternalGenerationService({"alibabacloud": provider}, logging.getLogger("test"))
+
+    with pytest.raises(ExternalProviderCapabilityError, match="supports at most 3 reference images"):
+        service.generate(request)
+
+    assert provider.last_request is None

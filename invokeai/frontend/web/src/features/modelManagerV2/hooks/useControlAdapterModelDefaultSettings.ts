@@ -11,6 +11,10 @@ export const useControlAdapterModelDefaultSettings = (
         isEnabled: !isNil(modelConfig?.default_settings?.preprocessor),
         value: modelConfig?.default_settings?.preprocessor || 'none',
       },
+      fp8Storage: {
+        isEnabled: !isNil(modelConfig?.default_settings?.fp8_storage),
+        value: modelConfig?.default_settings?.fp8_storage ?? false,
+      },
     };
   }, [modelConfig?.default_settings]);
 
