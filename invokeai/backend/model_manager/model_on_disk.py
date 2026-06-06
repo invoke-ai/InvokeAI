@@ -118,6 +118,13 @@ class ModelOnDisk:
                 raise ValueError(f"Unrecognized model extension: {path.suffix}")
 
         state_dict = checkpoint.get("state_dict", checkpoint)
+
+        # Normalize PEFT named-adapter keys (e.g. `lora_A.default.weight` → `lora_A.weight`).
+        # Pattern is LoRA-specific, so this is a no-op for non-LoRA state dicts.
+        from invokeai.backend.patches.lora_conversions.peft_adapter_utils import normalize_peft_adapter_names
+
+        state_dict = normalize_peft_adapter_names(state_dict)
+
         self._state_dict_cache[path] = state_dict
         return state_dict
 
