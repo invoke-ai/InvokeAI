@@ -124,7 +124,6 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
 
   useEffect(() => {
     return () => {
-      window.clearTimeout(selectedImageRevealTimeoutId.current);
       $isTemporarilyShowingSelectedImage.set(false);
     };
   }, [$isTemporarilyShowingSelectedImage]);
