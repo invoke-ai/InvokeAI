@@ -16,7 +16,7 @@ documentation, but the shipped weights are the 30-layer cow variant — upstream
 """
 
 from contextlib import ExitStack
-from typing import Iterator, Literal, Optional, Tuple
+from typing import Any, Iterator, Literal, Optional, Tuple, cast
 
 import torch
 from transformers import PreTrainedModel
@@ -40,20 +40,27 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
 
-# System prompt used by the FLUX.2 [dev] reference pipeline. Biasing the model
-# toward structured image descriptions produces the embedding distribution the
-# transformer was trained to consume.
+# System prompt used by the FLUX.2 [dev] reference pipeline. Byte-for-byte
+# identical to ComfyUI's ``Flux2Tokenizer.llama_template`` — note the literal
+# ``\n`` between "object" and "attribution"; that's part of the trained-against
+# token sequence, not a formatting artifact.
 FLUX2_DEV_SYSTEM_MESSAGE = (
     "You are an AI that reasons about image descriptions. You give structured "
-    "responses focusing on object relationships, object attribution and actions "
+    "responses focusing on object relationships, object\nattribution and actions "
     "without speculation."
 )
 
+# Raw chat template fed straight to the tokenizer — matches Comfy's approach
+# (no ``apply_chat_template`` indirection). ``[SYSTEM_PROMPT]`` / ``[INST]`` are
+# special tokens in Mistral Small 3's Tekken vocab, so the encoder produces the
+# exact token sequence BFL trained the joint attention against.
+FLUX2_DEV_PROMPT_TEMPLATE = "[SYSTEM_PROMPT]{system}[/SYSTEM_PROMPT][INST]{prompt}[/INST]"
+
 # Indices into hidden_states[] (hidden_states[0] is the embedding output) that
-# FLUX.2 [dev]'s joint attention was trained to consume. Hard-coded to the
-# 30-layer cow Mistral — (10, 20, 30) hits (1/3, 2/3, last) for that depth.
-# The model loaders reject anything other than 30-layer cow weights, so we don't
-# need a scaling fallback here.
+# FLUX.2 [dev]'s joint attention was trained to consume. ComfyUI uses these
+# same indices for both the 30-layer cow distillation and the 40-layer Mistral
+# Small 3; for cow they hit (1/3, 2/3, last), and the loader strips the final
+# RMSNorm so the layer-30 readout is the raw post-layer-29 state.
 DEV_EXTRACTION_LAYERS = (10, 20, 30)
 
 # Default max sequence length for FLUX.2 [dev]. The reference pipeline caps at 512.
@@ -142,58 +149,32 @@ class Flux2DevTextEncoderInvocation(BaseInvocation):
                 "The Mistral encoder model may be corrupted or incompatible."
             )
 
-        # Two valid chat-template content shapes depending on the loaded artifact:
-        # - Multimodal Mistral3 processors (PixtralProcessor / Mistral3Processor) want
-        #   `[{type: "text", text: ...}]` even for text-only prompts and crash on a
-        #   plain string with `string indices must be integers`.
-        # - Plain AutoTokenizer / MistralTokenizer want simple string content and
-        #   may fail on the dict-list form depending on the template.
-        # We try multimodal first (matches BFL's canonical FLUX.2-dev processor),
-        # then fall back to string content, then to manual [INST]...[/INST] format.
-        multimodal_messages = [
-            {"role": "system", "content": [{"type": "text", "text": FLUX2_DEV_SYSTEM_MESSAGE}]},
-            {"role": "user", "content": [{"type": "text", "text": self.prompt}]},
-        ]
-        plain_messages = [
-            {"role": "system", "content": FLUX2_DEV_SYSTEM_MESSAGE},
-            {"role": "user", "content": self.prompt},
-        ]
+        # Build the raw FLUX.2 [dev] prompt template — matches ComfyUI's
+        # `Flux2Tokenizer.llama_template.format(text)` byte-for-byte. `[SYSTEM_PROMPT]`,
+        # `[/SYSTEM_PROMPT]`, `[INST]`, `[/INST]` are Tekken special tokens, so any of
+        # the three processors we can land on (Pixtral/Mistral3 processor, plain HF
+        # LlamaTokenizerFast, our embedded-Tekken adapter) emit the same sequence.
+        text = FLUX2_DEV_PROMPT_TEMPLATE.format(system=FLUX2_DEV_SYSTEM_MESSAGE, prompt=self.prompt)
 
-        tokenize_kwargs = {
-            "tokenize": True,
-            "return_dict": True,
-            "return_tensors": "pt",
-            "add_generation_prompt": False,
-            "padding": "max_length",
-            "truncation": True,
-            "max_length": self.max_seq_len,
-        }
+        # Comfy pads on the LEFT (`pad_left=True`), keeping the meaningful tokens
+        # at the right edge of the sequence. HF processors expose this via the
+        # `padding_side` attribute on their underlying tokenizer; we set it
+        # explicitly so the call matches Comfy's behavior regardless of the
+        # tokenizer's default. `processor` is typed as the `AnyModel` union;
+        # narrow to `Any` for the duration of the tokenizer call.
+        proc = cast(Any, processor)
+        tokenizer = getattr(proc, "tokenizer", proc)
+        if hasattr(tokenizer, "padding_side"):
+            tokenizer.padding_side = "left"
 
-        inputs = None
-        last_error: Exception | None = None
-        for messages in (multimodal_messages, plain_messages):
-            try:
-                inputs = processor.apply_chat_template(messages, **tokenize_kwargs)
-                break
-            except (AttributeError, ValueError, TypeError, KeyError) as e:
-                last_error = e
-
-        if inputs is None:
-            # Fallback: no usable chat template. Format the prompt manually using
-            # Mistral's classic [INST]...[/INST] convention.
-            context.logger.debug(
-                f"Mistral chat template failed ({type(last_error).__name__}: {last_error}); "
-                "falling back to manual [INST] formatting."
-            )
-            text = f"[INST] {FLUX2_DEV_SYSTEM_MESSAGE}\n\n{self.prompt} [/INST]"
-            inputs = processor(
-                text,
-                return_tensors="pt",
-                padding="max_length",
-                truncation=True,
-                max_length=self.max_seq_len,
-            )
-
+        inputs = proc(
+            text,
+            return_tensors="pt",
+            padding="max_length",
+            padding_side="left",
+            truncation=True,
+            max_length=self.max_seq_len,
+        )
         input_ids = inputs["input_ids"].to(device)
         attention_mask = inputs["attention_mask"].to(device)
 

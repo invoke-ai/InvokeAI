@@ -165,7 +165,7 @@ export const zFlux2VariantType = z.enum(['klein_4b', 'klein_4b_base', 'klein_9b'
 export const zZImageVariantType = z.enum(['turbo', 'zbase']);
 const zQwenImageVariantType = z.enum(['generate', 'edit']);
 export const zQwen3VariantType = z.enum(['qwen3_4b', 'qwen3_8b', 'qwen3_06b']);
-export const zMistralVariantType = z.enum(['cow_mistral3_small']);
+export const zMistralVariantType = z.enum(['cow_mistral3_small', 'mistral3_24b']);
 export const zAnyModelVariant = z.union([
   zModelVariantType,
   zClipVariantType,

@@ -48,6 +48,7 @@ from invokeai.backend.util.logging import InvokeAILogger
 _COW_HIDDEN_SIZE = 5120
 _COW_INTERMEDIATE_SIZE = 32768
 _COW_NUM_HIDDEN_LAYERS = 30
+_MISTRAL_24B_NUM_HIDDEN_LAYERS = 40
 _COW_NUM_ATTENTION_HEADS = 32
 _COW_NUM_KV_HEADS = 8  # grouped-query attention
 _COW_HEAD_DIM = 128
@@ -254,6 +255,53 @@ def _materialize_remaining_meta_tensors(model: torch.nn.Module, dtype: torch.dty
         )
 
 
+def _strip_final_norm_for_cow(model: torch.nn.Module, num_hidden_layers: int, logger: Any) -> None:
+    """Replace ``model.norm`` with ``Identity`` for the 30-layer cow distillation.
+
+    ComfyUI's reference implementation (``Mistral3_24BModel`` with ``num_layers=30``)
+    sets ``final_norm=False``, so the hidden state at extraction index 30 is the
+    raw output of layer 29 — NOT the final-RMSNorm'd version. Transformers'
+    ``MistralModel`` always builds a final ``model.norm`` and applies it to
+    ``hidden_states[-1]`` when ``output_hidden_states=True``, which produces
+    off-distribution embeddings for the cow weights. Swap the norm out for an
+    identity here so our extraction matches Comfy / BFL.
+
+    The 40-layer Mistral Small 3 variant keeps the final norm.
+    """
+    if num_hidden_layers != _COW_NUM_HIDDEN_LAYERS:
+        return
+    if not hasattr(model, "norm"):
+        return
+    model.norm = torch.nn.Identity()
+    logger.info("Replaced model.norm with Identity for 30-layer cow Mistral (final_norm=False).")
+
+
+def _warn_if_40_layer_mistral(num_hidden_layers: int, logger: Any) -> None:
+    """Warn when a 40-layer Mistral Small 3 is loaded as a FLUX.2 [dev] text encoder.
+
+    Architecturally, BFL's canonical ``black-forest-labs/FLUX.2-dev/text_encoder``
+    (40-layer, fine-tuned by BFL) and upstream ``mistralai/Mistral-Small-3.x``
+    GGUFs / safetensors (40-layer, base weights) are indistinguishable. In
+    practice only the BFL bundle produces clean output — upstream Mistral 3.1/3.2
+    at any quantization level gives visibly degraded prompt adherence because
+    the joint attention was not trained against those weights.
+
+    We accept both at probe time and emit this warning at load time so users who
+    install a non-BFL 40-layer Mistral see the issue called out in the log
+    instead of just getting weird images.
+    """
+    if num_hidden_layers != _MISTRAL_24B_NUM_HIDDEN_LAYERS:
+        return
+    logger.warning(
+        "Loaded a 40-layer Mistral Small 3 text encoder. "
+        "If this is NOT BFL's canonical FLUX.2-dev/text_encoder, expect degraded "
+        "prompt adherence — upstream Mistral 3.1 / 3.2 weights (GGUFs from "
+        "unsloth, gguf-org, etc.) are not what FLUX.2's joint attention was "
+        "trained against. Recommended encoders: Comfy-Org bf16/fp8/fp4 or "
+        "gguf-org cow-mistral3-small quants (all 30-layer cow distillation)."
+    )
+
+
 def _drop_quantization_metadata(sd: dict[str, Any], logger) -> dict[str, Any]:
     """Dequantize Comfy-Org-style FP8/FP4 weights and drop their metadata keys.
 
@@ -291,76 +339,79 @@ def _drop_quantization_metadata(sd: dict[str, Any], logger) -> dict[str, Any]:
     return sd
 
 
-def _flatten_message_content(content: Any) -> str:
-    """Reduce HF chat-template content (str or [{type:"text", text:"..."}]) to plain text."""
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        parts: list[str] = []
-        for item in content:
-            if isinstance(item, dict) and item.get("type") == "text":
-                parts.append(str(item.get("text", "")))
-        return "".join(parts)
-    return str(content)
+class _TekkenRawTextAdapter:
+    """Expose a HuggingFace-tokenizer-like ``__call__`` over a ``mistral_common``
+    Tekkenizer.
 
+    FLUX.2 [dev]'s reference encoder pipeline (matching ComfyUI's
+    ``Mistral3Tokenizer`` + ``Flux2Tokenizer``) feeds a pre-formatted raw string
+    — ``[SYSTEM_PROMPT]…[/SYSTEM_PROMPT][INST]{prompt}[/INST]`` — straight into
+    the BPE encoder rather than going through ``apply_chat_template``. The
+    Tekken special tokens (``[SYSTEM_PROMPT]``, ``[/SYSTEM_PROMPT]``, ``[INST]``,
+    ``[/INST]``) are part of the vocab so the encode call produces the right
+    token IDs without any chat-template indirection.
 
-class _TekkenChatTemplateAdapter:
-    """Expose HuggingFace's ``apply_chat_template`` surface backed by
-    ``mistral_common.MistralTokenizer``.
-
-    The FLUX.2 [dev] invocation only calls ``apply_chat_template(messages,
-    tokenize=True, return_tensors='pt', padding='max_length', max_length=N)``,
-    so only that surface is implemented.
+    Padding defaults to **left** to match Comfy's ``pad_left=True`` — this keeps
+    the meaningful tokens at the right edge of the sequence, where the
+    transformer's joint attention was trained to consume them.
     """
+
+    # Default special tokens for Mistral Small 3 Tekken vocab.
+    _BOS_ID = 1  # <s>
+    _PAD_ID = 11  # <pad>
 
     def __init__(self, mistral_tokenizer: Any):
         self._tok = mistral_tokenizer
-        # Mistral Small 3's <pad> id (token 11 in the Tekken vocab).
-        self.pad_token_id = 11
+        self.pad_token_id = self._PAD_ID
 
-    def apply_chat_template(
+    def _encode(self, text: str) -> list[int]:
+        """Encode raw text via the underlying Tekkenizer (adds BOS, no EOS).
+
+        ``mistral_common`` exposes the BPE under
+        ``MistralTokenizer.instruct_tokenizer.tokenizer`` (the inner Tekkenizer).
+        Different mistral-common versions name the encode entrypoint slightly
+        differently; we try the documented one first and fall back to the
+        wrapper's own encode method.
+        """
+        inner = getattr(getattr(self._tok, "instruct_tokenizer", None), "tokenizer", None)
+        if inner is not None and hasattr(inner, "encode"):
+            # Tekkenizer.encode(text, bos: bool, eos: bool) → list[int]
+            return list(inner.encode(text, bos=True, eos=False))
+        # Older mistral-common releases expose .encode on the top-level wrapper.
+        return list(self._tok.encode(text, add_bos=True, add_eos=False))
+
+    def __call__(
         self,
-        messages: list[dict[str, Any]],
+        text: str,
         *,
-        tokenize: bool = True,
-        return_dict: bool = True,
-        return_tensors: str = "pt",
-        add_generation_prompt: bool = False,
         padding: str | bool = "max_length",
+        padding_side: str = "left",
         truncation: bool = True,
         max_length: int = 512,
+        return_tensors: str = "pt",
         **_kwargs: Any,
     ) -> dict[str, torch.Tensor]:
-        if not tokenize or return_tensors != "pt":
+        if return_tensors != "pt":
             raise NotImplementedError(
-                "_TekkenChatTemplateAdapter only supports tokenize=True / return_tensors='pt' "
-                f"(got tokenize={tokenize}, return_tensors={return_tensors})"
+                "_TekkenRawTextAdapter only supports return_tensors='pt' " f"(got {return_tensors})"
             )
 
-        from mistral_common.protocol.instruct.messages import SystemMessage, UserMessage
-        from mistral_common.protocol.instruct.request import ChatCompletionRequest
-
-        msgs: list[Any] = []
-        for msg in messages:
-            role = msg.get("role")
-            content = _flatten_message_content(msg.get("content"))
-            if role == "system":
-                msgs.append(SystemMessage(content=content))
-            elif role == "user":
-                msgs.append(UserMessage(content=content))
-
-        encoded = self._tok.encode_chat_completion(ChatCompletionRequest(messages=msgs))
-        tokens: list[int] = list(encoded.tokens)
-
+        tokens = self._encode(text)
         if truncation and len(tokens) > max_length:
             tokens = tokens[:max_length]
-        attention: list[int] = [1] * len(tokens)
+        attention = [1] * len(tokens)
 
         if padding == "max_length":
             pad_needed = max_length - len(tokens)
             if pad_needed > 0:
-                tokens.extend([self.pad_token_id] * pad_needed)
-                attention.extend([0] * pad_needed)
+                pad_tokens = [self.pad_token_id] * pad_needed
+                pad_attn = [0] * pad_needed
+                if padding_side == "left":
+                    tokens = pad_tokens + tokens
+                    attention = pad_attn + attention
+                else:
+                    tokens = tokens + pad_tokens
+                    attention = attention + pad_attn
 
         return {
             "input_ids": torch.tensor([tokens], dtype=torch.long),
@@ -457,7 +508,7 @@ def _try_load_embedded_tekken(model_path: Path, logger: Any) -> Optional[AnyMode
             pass
 
     logger.info(f"Loaded embedded Tekken tokenizer from {model_path.name}")
-    return _TekkenChatTemplateAdapter(mistral_tok)
+    return _TekkenRawTextAdapter(mistral_tok)
 
 
 def _load_tokenizer_from_hf(logger: Any) -> AnyModel:
@@ -578,12 +629,23 @@ class MistralEncoderDiffusersLoader(ModelLoader):
                 # only when the diffusers/transformers version supports it.
                 from transformers import AutoModel
 
-                return AutoModel.from_pretrained(
+                model = AutoModel.from_pretrained(
                     text_encoder_path,
                     torch_dtype=model_dtype,
                     low_cpu_mem_usage=True,
                     local_files_only=True,
                 )
+                # `MistralModel.norm` is always built by transformers, but the
+                # 30-layer cow distillation was trained against the post-layer-29
+                # state *without* the final norm — swap it for Identity to match
+                # ComfyUI's reference implementation. ``Mistral3ForConditionalGeneration``
+                # nests the LM under ``.language_model``; handle both layouts.
+                inner = getattr(model, "language_model", None) or model
+                num_layers = int(getattr(getattr(inner, "config", None), "num_hidden_layers", 0))
+                logger = InvokeAILogger.get_logger("MistralEncoderDiffusersLoader")
+                _strip_final_norm_for_cow(inner, num_layers, logger)
+                _warn_if_40_layer_mistral(num_layers, logger)
+                return model
 
         raise ValueError(
             "Only Tokenizer and TextEncoder submodels are supported. "
@@ -679,6 +741,8 @@ class MistralEncoderCheckpointLoader(ModelLoader):
                 parent.register_buffer(parts[-1], inv_freq.to(model_dtype), persistent=False)
 
         _materialize_remaining_meta_tensors(model, model_dtype, logger)
+        _strip_final_norm_for_cow(model, mistral_config.num_hidden_layers, logger)
+        _warn_if_40_layer_mistral(mistral_config.num_hidden_layers, logger)
 
         return model
 
@@ -778,6 +842,8 @@ class MistralEncoderGGUFLoader(ModelLoader):
                 parent.register_buffer(parts[-1], inv_freq.to(compute_dtype), persistent=False)
 
         _materialize_remaining_meta_tensors(model, compute_dtype, logger)
+        _strip_final_norm_for_cow(model, mistral_config.num_hidden_layers, logger)
+        _warn_if_40_layer_mistral(mistral_config.num_hidden_layers, logger)
 
         return model
 

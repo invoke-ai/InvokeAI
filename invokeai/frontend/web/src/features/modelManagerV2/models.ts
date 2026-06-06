@@ -263,6 +263,7 @@ export const MODEL_VARIANT_TO_LONG_NAME: Record<AnyModelVariant, string> = {
   qwen3_8b: 'Qwen3 8B',
   qwen3_06b: 'Qwen3 0.6B',
   cow_mistral3_small: 'cow-mistral3-small (FLUX.2)',
+  mistral3_24b: 'Mistral Small 3 (24B, FLUX.2)',
 };
 
 export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {

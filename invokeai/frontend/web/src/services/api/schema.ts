@@ -23820,7 +23820,7 @@ export type components = {
          * @description Mistral text encoder variants used by FLUX.2 [dev].
          * @enum {string}
          */
-        MistralVariantType: "cow_mistral3_small";
+        MistralVariantType: "cow_mistral3_small" | "mistral3_24b";
         /**
          * ModelFormat
          * @description Storage format of model.

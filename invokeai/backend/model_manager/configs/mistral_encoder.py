@@ -15,15 +15,18 @@ from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, MistralVariantType, ModelFormat, ModelType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 
-# Mistral cow distillation hidden_size. Used by FLUX.2 [dev].
-_COW_HIDDEN_SIZE = 5120
+# Mistral Small 3 family hidden_size — both the BFL canonical 40-layer encoder
+# (``black-forest-labs/FLUX.2-dev/text_encoder``) and the 30-layer "cow" community
+# distillation share this. Anything else is rejected as not a FLUX.2 encoder.
+_MISTRAL_3_HIDDEN_SIZE = 5120
 
-# Layer count of the BFL "cow-mistral3-small" distillation. FLUX.2 [dev]'s joint
-# attention was trained with hidden-state indices (10, 20, 30) — for a 30-layer
-# Mistral that's (1/3, 2/3, last). Upstream Mistral Small 3.1 / 3.2 (40 layers)
-# sample at different relative depths and produce off-distribution embeddings,
-# so we reject anything but 30-layer cow encoders.
+# Layer counts ComfyUI's reference implementation accepts:
+# - 40 layers → BFL canonical (Mistral3_24B), keep final RMSNorm enabled.
+# - 30 layers → BFL "cow" distillation, final RMSNorm dropped at load time.
+# Anything else is rejected.
+_MISTRAL_24B_NUM_LAYERS = 40
 _COW_NUM_LAYERS = 30
+_ACCEPTED_NUM_LAYERS = (_COW_NUM_LAYERS, _MISTRAL_24B_NUM_LAYERS)
 
 
 def _has_mistral_keys(state_dict: dict[str | int, Any]) -> bool:
@@ -104,25 +107,30 @@ def _embed_hidden_size(state_dict: dict[str | int, Any]) -> int | None:
     return None
 
 
-def _is_cow_state_dict(state_dict: dict[str | int, Any]) -> bool:
-    """Check whether a state dict matches the 30-layer cow distillation.
+def _get_mistral_variant_from_state_dict(state_dict: dict[str | int, Any]) -> MistralVariantType | None:
+    """Return the Mistral variant for a state dict, or ``None`` if unrecognized.
 
-    FLUX.2 [dev] only works with the 30-layer cow-mistral3-small weights — upstream
-    Mistral Small 3.1 / 3.2 (40 layers) produce off-distribution embeddings under
-    the (10, 20, 30) hidden-state extraction the joint attention was trained for.
+    Recognized variants:
+    - 30-layer + hidden_size=5120 → ``MistralVariantType.Cow`` (BFL distillation)
+    - 40-layer + hidden_size=5120 → ``MistralVariantType.Mistral24B`` (BFL canonical / upstream Mistral Small 3.x)
     """
-    if _embed_hidden_size(state_dict) != _COW_HIDDEN_SIZE:
-        return False
-    return _count_mistral_layers(state_dict) == _COW_NUM_LAYERS
+    if _embed_hidden_size(state_dict) != _MISTRAL_3_HIDDEN_SIZE:
+        return None
+    num_layers = _count_mistral_layers(state_dict)
+    if num_layers == _COW_NUM_LAYERS:
+        return MistralVariantType.Cow
+    if num_layers == _MISTRAL_24B_NUM_LAYERS:
+        return MistralVariantType.Mistral24B
+    return None
 
 
-def _is_cow_config(config_path) -> bool:
-    """Check a HF ``config.json`` for the 30-layer cow Mistral signature."""
+def _get_mistral_variant_from_config(config_path) -> MistralVariantType | None:
+    """Return the Mistral variant for a HF ``config.json``, or ``None`` if unrecognized."""
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
     except (json.JSONDecodeError, OSError):
-        return False
+        return None
 
     # Mistral3ForConditionalGeneration nests the LM config under text_config.
     hidden_size = config.get("hidden_size")
@@ -134,7 +142,13 @@ def _is_cow_config(config_path) -> bool:
         if num_layers is None:
             num_layers = text_config.get("num_hidden_layers")
 
-    return hidden_size == _COW_HIDDEN_SIZE and num_layers == _COW_NUM_LAYERS
+    if hidden_size != _MISTRAL_3_HIDDEN_SIZE:
+        return None
+    if num_layers == _COW_NUM_LAYERS:
+        return MistralVariantType.Cow
+    if num_layers == _MISTRAL_24B_NUM_LAYERS:
+        return MistralVariantType.Mistral24B
+    return None
 
 
 class MistralEncoder_Diffusers_Config(Config_Base):
@@ -148,9 +162,13 @@ class MistralEncoder_Diffusers_Config(Config_Base):
     Does NOT match a full FLUX.2 pipeline directory — those are picked up by the
     `Main_Diffusers_Flux2_Config` instead.
 
-    Only the 30-layer cow distillation is accepted; upstream Mistral Small 3.1 / 3.2
-    (40 layers) produces off-distribution embeddings under FLUX.2's (10, 20, 30)
-    hidden-state extraction.
+    Accepts both:
+    - 30-layer "cow" distillation (recommended, produces the cleanest output)
+    - 40-layer Mistral Small 3 (BFL canonical / upstream Mistral 3.x — also works,
+      slightly weaker prompt adherence than cow in our tests)
+
+    The variant field records which one was probed so the loader can decide
+    whether to keep the final RMSNorm (40-layer) or strip it (30-layer cow).
     """
 
     base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
@@ -191,21 +209,22 @@ class MistralEncoder_Diffusers_Config(Config_Base):
             },
         )
 
-        if not _is_cow_config(expected_config_path):
+        variant = _get_mistral_variant_from_config(expected_config_path)
+        if variant is None:
             raise NotAMatchError(
-                "config.json describes a non-cow Mistral (expected hidden_size=5120, num_hidden_layers=30). "
-                "Only the 30-layer cow-mistral3-small distillation is supported for FLUX.2 [dev]."
+                f"config.json does not describe a recognized Mistral variant "
+                f"(expected hidden_size={_MISTRAL_3_HIDDEN_SIZE} and num_hidden_layers in {_ACCEPTED_NUM_LAYERS})."
             )
 
-        return cls(variant=MistralVariantType.Cow, **override_fields)
+        return cls(variant=variant, **override_fields)
 
 
 class MistralEncoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
     """Configuration for a single-file Mistral text encoder (safetensors).
 
-    Only the 30-layer cow distillation is accepted (e.g. Comfy-Org's bf16/fp8/fp4
-    files). Upstream Mistral Small 3.1 / 3.2 single-files are rejected — they have
-    40 layers and produce off-distribution embeddings for FLUX.2's joint attention.
+    Accepts both 30-layer cow (Comfy-Org bf16/fp8/fp4) and 40-layer Mistral Small 3
+    (BFL canonical / upstream Mistral 3.x single-files). The loader uses the
+    detected variant to decide whether to keep or strip the final RMSNorm.
     """
 
     base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
@@ -228,20 +247,22 @@ class MistralEncoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
         if _has_ggml_tensors(state_dict):
             raise NotAMatchError("state dict looks like GGUF quantized")
 
-        if not _is_cow_state_dict(state_dict):
+        variant = _get_mistral_variant_from_state_dict(state_dict)
+        if variant is None:
             raise NotAMatchError(
-                f"not a 30-layer cow-mistral3-small (got hidden_size={_embed_hidden_size(state_dict)}, "
-                f"layers={_count_mistral_layers(state_dict)}). FLUX.2 [dev] only works with the 30-layer "
-                "cow distillation — upstream Mistral Small 3.1 / 3.2 (40 layers) produces wrong embeddings."
+                f"unrecognized Mistral geometry (got hidden_size={_embed_hidden_size(state_dict)}, "
+                f"layers={_count_mistral_layers(state_dict)}). Expected hidden_size={_MISTRAL_3_HIDDEN_SIZE} "
+                f"and num_hidden_layers in {_ACCEPTED_NUM_LAYERS}."
             )
 
-        return cls(variant=MistralVariantType.Cow, **override_fields)
+        return cls(variant=variant, **override_fields)
 
 
 class MistralEncoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
     """Configuration for a GGUF-quantized Mistral text encoder.
 
-    Only the 30-layer cow distillation is accepted — see ``MistralEncoder_Checkpoint_Config``.
+    Accepts both 30-layer cow GGUFs and 40-layer Mistral Small 3 GGUFs — see
+    ``MistralEncoder_Checkpoint_Config`` for variant handling.
     """
 
     base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
@@ -264,11 +285,12 @@ class MistralEncoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
         if not _has_ggml_tensors(state_dict):
             raise NotAMatchError("state dict does not look like GGUF quantized")
 
-        if not _is_cow_state_dict(state_dict):
+        variant = _get_mistral_variant_from_state_dict(state_dict)
+        if variant is None:
             raise NotAMatchError(
-                f"not a 30-layer cow-mistral3-small (got hidden_size={_embed_hidden_size(state_dict)}, "
-                f"layers={_count_mistral_layers(state_dict)}). FLUX.2 [dev] only works with the 30-layer "
-                "cow distillation — upstream Mistral Small 3.1 / 3.2 (40 layers) produces wrong embeddings."
+                f"unrecognized Mistral geometry (got hidden_size={_embed_hidden_size(state_dict)}, "
+                f"layers={_count_mistral_layers(state_dict)}). Expected hidden_size={_MISTRAL_3_HIDDEN_SIZE} "
+                f"and num_hidden_layers in {_ACCEPTED_NUM_LAYERS}."
             )
 
-        return cls(variant=MistralVariantType.Cow, **override_fields)
+        return cls(variant=variant, **override_fields)
