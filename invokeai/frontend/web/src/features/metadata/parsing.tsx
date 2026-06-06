@@ -240,6 +240,14 @@ export type UnrecallableMetadataHandler<T> = {
   ValueComponent: ComponentType<UnrecallableMetadataValueProps<T>>;
 };
 
+export const parseMetadataHandler = <T,>(
+  metadata: unknown,
+  handler: { parse: (metadata: unknown, store: AppStore) => Promise<T> },
+  store: AppStore
+): Promise<T> => {
+  return Promise.resolve().then(() => handler.parse(metadata, store));
+};
+
 const isSingleMetadataHandler = (
   handler: SingleMetadataHandler<any> | CollectionMetadataHandler<any[]> | UnrecallableMetadataHandler<any>
 ): handler is SingleMetadataHandler<any> => {
@@ -1701,7 +1709,7 @@ const recallByHandler = async (arg: {
   let didRecall = false;
 
   try {
-    const value = await handler.parse(metadata, store);
+    const value = await parseMetadataHandler(metadata, handler, store);
     handler.recall(value, store);
     didRecall = true;
   } catch {
@@ -1750,7 +1758,7 @@ const recallByHandlers = async (arg: {
 
   for (const handler of sortedHandlers) {
     try {
-      const value = await handler.parse(metadata, store);
+      const value = await parseMetadataHandler(metadata, handler, store);
       handler.recall(value, store);
       recalled.set(handler, value);
     } catch {
@@ -1798,7 +1806,7 @@ const hasMetadataByHandlers = async (arg: {
   const { metadata, handlers, store, require } = arg;
   for (const handler of handlers) {
     try {
-      await handler.parse(metadata, store);
+      await parseMetadataHandler(metadata, handler, store);
       if (require === 'some') {
         return true;
       }
@@ -1861,7 +1869,7 @@ export function useSingleMetadataDatum<T>(metadata: unknown, handler: SingleMeta
   useEffect(() => {
     let isActive = true;
 
-    void handler.parse(metadata, store).then(
+    void parseMetadataHandler(metadata, handler, store).then(
       (value) => {
         if (isActive) {
           setData(buildParsedSuccessData(value));
@@ -1896,7 +1904,7 @@ export function useCollectionMetadataDatum<T extends any[]>(metadata: unknown, h
   useEffect(() => {
     let isActive = true;
 
-    void handler.parse(metadata, store).then(
+    void parseMetadataHandler(metadata, handler, store).then(
       (value) => {
         if (isActive) {
           setData(buildParsedSuccessData(value));
@@ -1938,7 +1946,7 @@ export function useUnrecallableMetadataDatum<T>(metadata: unknown, handler: Unre
   useEffect(() => {
     let isActive = true;
 
-    void handler.parse(metadata, store).then(
+    void parseMetadataHandler(metadata, handler, store).then(
       (value) => {
         if (isActive) {
           setData(buildParsedSuccessData(value));
