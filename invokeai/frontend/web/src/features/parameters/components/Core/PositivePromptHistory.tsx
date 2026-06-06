@@ -20,6 +20,7 @@ import {
   positivePromptChanged,
   promptHistoryCleared,
   promptRemovedFromHistory,
+  selectModelSupportsNegativePrompt,
   selectPositivePromptHistory,
 } from 'features/controlLayers/store/paramsSlice';
 import type { PromptHistoryItem } from 'features/controlLayers/store/types';
@@ -142,11 +143,16 @@ const PromptItem = memo(({ prompt }: { prompt: PromptHistoryItem }) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const shiftKey = useShiftModifier();
+  const modelSupportsNegativePrompt = useAppSelector(selectModelSupportsNegativePrompt);
 
   const onClickUse = useCallback(() => {
     dispatch(positivePromptChanged(prompt.positivePrompt));
-    dispatch(negativePromptChanged(prompt.negativePrompt));
-  }, [dispatch, prompt]);
+    // Only restore the negative prompt for models that support one, otherwise we'd silently set negative prompt state
+    // that is hidden in the UI and would resurface when switching to a model that supports negative prompts.
+    if (modelSupportsNegativePrompt) {
+      dispatch(negativePromptChanged(prompt.negativePrompt));
+    }
+  }, [dispatch, modelSupportsNegativePrompt, prompt]);
 
   const onClickDelete = useCallback(() => {
     dispatch(promptRemovedFromHistory(prompt));

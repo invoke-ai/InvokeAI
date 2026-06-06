@@ -101,7 +101,9 @@ const usePromptHistory = () => {
       return;
     }
     store.dispatch(positivePromptChanged(newPrompts.positivePrompt));
-    store.dispatch(negativePromptChanged(newPrompts.negativePrompt));
+    if (selectModelSupportsNegativePrompt(store.getState())) {
+      store.dispatch(negativePromptChanged(newPrompts.negativePrompt));
+    }
   }, [history, store]);
   const next = useCallback(() => {
     if (history.length === 0) {
@@ -117,7 +119,9 @@ const usePromptHistory = () => {
     if (state.historyIdx < 0) {
       // Overshot to the "current" stashed prompt
       store.dispatch(positivePromptChanged(state.stashedPrompts.positivePrompt));
-      store.dispatch(negativePromptChanged(state.stashedPrompts.negativePrompt));
+      if (selectModelSupportsNegativePrompt(store.getState())) {
+        store.dispatch(negativePromptChanged(state.stashedPrompts.negativePrompt));
+      }
       // Clear state bc we're back to current prompt
       stateRef.current = null;
       return;
@@ -129,7 +133,9 @@ const usePromptHistory = () => {
       return;
     }
     store.dispatch(positivePromptChanged(newPrompts.positivePrompt));
-    store.dispatch(negativePromptChanged(newPrompts.negativePrompt));
+    if (selectModelSupportsNegativePrompt(store.getState())) {
+      store.dispatch(negativePromptChanged(newPrompts.negativePrompt));
+    }
   }, [history, store]);
   const reset = useCallback(() => {
     // Clear stashed state - used when user clicks away or types in the prompt box
