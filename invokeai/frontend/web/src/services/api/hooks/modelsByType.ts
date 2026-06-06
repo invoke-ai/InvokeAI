@@ -159,6 +159,5 @@ export const selectFlux2DevDiffusersModels = buildModelsSelector(isFlux2DevDiffu
 export const selectMistralEncoderModels = buildModelsSelector(isMistralEncoderModelConfig);
 export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
 export const selectAnimaVAEModels = buildModelsSelector(isAnimaVAEModelConfig);
-export const selectT5EncoderModels = buildModelsSelector(isT5EncoderModelConfigOrSubmodel);
 export const useTextLLMModels = () => buildModelsHook(isTextLLMModelConfig)();
 export const useLlavaModels = () => buildModelsHook(isLLaVAModelConfig)();

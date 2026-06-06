@@ -9,7 +9,6 @@ import { bboxHeightChanged, bboxWidthChanged, canvasMetadataRecalled } from 'fea
 import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/lorasSlice';
 import {
   animaQwen3EncoderModelSelected,
-  animaT5EncoderModelSelected,
   animaVaeModelSelected,
   flux2DevMistralEncoderModelSelected,
   flux2DevVaeModelSelected,
@@ -1186,29 +1185,6 @@ const AnimaQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
 };
 //#endregion AnimaQwen3EncoderModel
 
-//#region AnimaT5EncoderModel
-const AnimaT5EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
-  [SingleMetadataKey]: true,
-  type: 'AnimaT5EncoderModel',
-  parse: async (metadata, store) => {
-    const raw = getProperty(metadata, 't5_encoder');
-    const parsed = await parseModelIdentifier(raw, store, 't5_encoder');
-    assert(parsed.type === 't5_encoder');
-    const base = selectBase(store.getState());
-    assert(base === 'anima', 'AnimaT5EncoderModel handler only works with Anima models');
-    return Promise.resolve(parsed);
-  },
-  recall: (value, store) => {
-    store.dispatch(animaT5EncoderModelSelected(value));
-  },
-  i18nKey: 'metadata.t5Encoder',
-  LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
-    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
-  ),
-};
-//#endregion AnimaT5EncoderModel
-
 //#region KleinVAEModel
 const KleinVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
@@ -1719,7 +1695,6 @@ export const ImageMetadataHandlers = {
   ZImageQwen3SourceModel,
   AnimaVAEModel,
   AnimaQwen3EncoderModel,
-  AnimaT5EncoderModel,
   KleinVAEModel,
   KleinQwen3EncoderModel,
   Flux2DevVAEModel,
@@ -1894,7 +1869,7 @@ const hasMetadataByHandlers = async (arg: {
       }
     }
   }
-  return true;
+  return require === 'all';
 };
 
 const recallImageDimensions = async (metadata: unknown, store: AppStore) => {

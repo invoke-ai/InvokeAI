@@ -194,7 +194,7 @@ export const addRegions = async ({
           g.addEdgeFromObj(clone);
         }
       } else if (posCond.type === 'anima_text_encoder') {
-        for (const edge of g.getEdgesTo(posCond, ['qwen3_encoder', 't5_encoder', 'mask'])) {
+        for (const edge of g.getEdgesTo(posCond, ['qwen3_encoder', 'mask'])) {
           const clone = deepClone(edge);
           clone.destination.node_id = regionalPosCond.id;
           g.addEdgeFromObj(clone);
@@ -276,7 +276,7 @@ export const addRegions = async ({
           g.addEdgeFromObj(clone);
         }
       } else if (negCond.type === 'anima_text_encoder') {
-        for (const edge of g.getEdgesTo(negCond, ['qwen3_encoder', 't5_encoder', 'mask'])) {
+        for (const edge of g.getEdgesTo(negCond, ['qwen3_encoder', 'mask'])) {
           const clone = deepClone(edge);
           clone.destination.node_id = regionalNegCond.id;
           g.addEdgeFromObj(clone);
@@ -364,7 +364,7 @@ export const addRegions = async ({
           g.addEdgeFromObj(clone);
         }
       } else if (posCond.type === 'anima_text_encoder') {
-        for (const edge of g.getEdgesTo(posCond, ['qwen3_encoder', 't5_encoder', 'mask'])) {
+        for (const edge of g.getEdgesTo(posCond, ['qwen3_encoder', 'mask'])) {
           const clone = deepClone(edge);
           clone.destination.node_id = regionalPosCondInverted.id;
           g.addEdgeFromObj(clone);
