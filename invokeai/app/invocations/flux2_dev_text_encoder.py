@@ -1,15 +1,18 @@
 """FLUX.2 [dev] text encoder invocation.
 
-FLUX.2 [dev] uses Mistral Small 3.1 as its sole text encoder, following the
-diffusers Flux2Pipeline reference implementation:
+FLUX.2 [dev] uses the BFL "cow-mistral3-small" 30-layer Mistral distillation as
+its sole text encoder (sometimes referred to as "Mistral Small 3" in BFL's
+documentation, but the shipped weights are the 30-layer cow variant — upstream
+40-layer Mistral Small 3.1 / 3.2 does not work):
 
 - A fixed system message biases the model toward structured image descriptions.
 - The user prompt is wrapped in Mistral's chat template via the multimodal
   AutoProcessor.
-- Three intermediate hidden states (layers 10, 20, 30 in the 30-layer model) are
-  stacked and flattened to produce a (B, seq, 3 * hidden_size) tensor — for
-  Mistral Small 3.1 that is 3 * 5120 = 15360, matching the transformer's
-  joint_attention_dim.
+- Three intermediate hidden states (layers 10, 20, 30) are stacked and flattened
+  to produce a (B, seq, 3 * hidden_size) = (B, seq, 15360) tensor matching the
+  FLUX.2 transformer's joint_attention_dim. For the 30-layer cow model those
+  indices map to (1/3, 2/3, last) — exactly what BFL's joint attention was
+  trained to consume.
 """
 
 from contextlib import ExitStack
@@ -46,11 +49,11 @@ FLUX2_DEV_SYSTEM_MESSAGE = (
     "without speculation."
 )
 
-# Diffusers / BFL extract hidden states from these layers and stack them.
-# Indices are 1-based into hidden_states[] (hidden_states[0] is the embedding layer).
-# Mistral Small 3.1 has 40 transformer layers (so up to hidden_states[40]); the
-# reference pipeline uses (10, 20, 30) and we scale proportionally if the model
-# has fewer layers.
+# Indices into hidden_states[] (hidden_states[0] is the embedding output) that
+# FLUX.2 [dev]'s joint attention was trained to consume. Hard-coded to the
+# 30-layer cow Mistral — (10, 20, 30) hits (1/3, 2/3, last) for that depth.
+# The model loaders reject anything other than 30-layer cow weights, so we don't
+# need a scaling fallback here.
 DEV_EXTRACTION_LAYERS = (10, 20, 30)
 
 # Default max sequence length for FLUX.2 [dev]. The reference pipeline caps at 512.
@@ -213,12 +216,13 @@ class Flux2DevTextEncoderInvocation(BaseInvocation):
             )
         num_hidden_states = len(outputs.hidden_states)  # = num_hidden_layers + 1 (embedding output)
 
-        # Scale extraction layer indices if the model is smaller than the reference.
-        # hidden_states[0] is the embedding output, hidden_states[i] is the output of layer i.
+        # Safety check: the model loaders only accept 30-layer cow weights, so
+        # hidden_states[] should have ≥ 31 entries (embedding output + 30 layers).
+        # Fall back to a scaled tuple only if a non-cow encoder somehow slipped
+        # past the loaders, so we don't crash with an IndexError.
         if num_hidden_states - 1 < max(DEV_EXTRACTION_LAYERS):
-            n = num_hidden_states - 1  # number of transformer layers
-            scaled = (max(1, n // 3), max(1, (2 * n) // 3), n)
-            extraction_layers = scaled
+            n = num_hidden_states - 1
+            extraction_layers = (max(1, n // 3), max(1, (2 * n) // 3), n)
         else:
             extraction_layers = DEV_EXTRACTION_LAYERS
 

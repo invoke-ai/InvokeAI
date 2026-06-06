@@ -185,8 +185,13 @@ class Qwen3VariantType(str, Enum):
 class MistralVariantType(str, Enum):
     """Mistral text encoder variants used by FLUX.2 [dev]."""
 
-    Small3_1 = "mistral_small_3_1"
-    """Mistral Small 3.1 (24B, hidden_size=5120). Used by FLUX.2 [dev]."""
+    Cow = "cow_mistral3_small"
+    """The 30-layer BFL "cow-mistral3-small" distillation (hidden_size=5120) —
+    the only Mistral variant FLUX.2 [dev]'s joint attention was trained against.
+    Hidden states are sampled at indices (10, 20, 30) which on a 30-layer model
+    hit 1/3, 2/3, and the final layer. Upstream Mistral Small 3.1 / 3.2 (40
+    layers) sample at different relative depths and produce off-distribution
+    embeddings, so they are not accepted as FLUX.2 text encoders."""
 
 
 class ModelFormat(str, Enum):

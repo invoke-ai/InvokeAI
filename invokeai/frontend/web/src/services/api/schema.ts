@@ -23554,6 +23554,10 @@ export type components = {
         /**
          * MistralEncoder_Checkpoint_Config
          * @description Configuration for a single-file Mistral text encoder (safetensors).
+         *
+         *     Only the 30-layer cow distillation is accepted (e.g. Comfy-Org's bf16/fp8/fp4
+         *     files). Upstream Mistral Small 3.1 / 3.2 single-files are rejected — they have
+         *     40 layers and produce off-distribution embeddings for FLUX.2's joint attention.
          */
         MistralEncoder_Checkpoint_Config: {
             /**
@@ -23650,6 +23654,10 @@ export type components = {
          *
          *     Does NOT match a full FLUX.2 pipeline directory — those are picked up by the
          *     `Main_Diffusers_Flux2_Config` instead.
+         *
+         *     Only the 30-layer cow distillation is accepted; upstream Mistral Small 3.1 / 3.2
+         *     (40 layers) produces off-distribution embeddings under FLUX.2's (10, 20, 30)
+         *     hidden-state extraction.
          */
         MistralEncoder_Diffusers_Config: {
             /**
@@ -23733,6 +23741,8 @@ export type components = {
         /**
          * MistralEncoder_GGUF_Config
          * @description Configuration for a GGUF-quantized Mistral text encoder.
+         *
+         *     Only the 30-layer cow distillation is accepted — see ``MistralEncoder_Checkpoint_Config``.
          */
         MistralEncoder_GGUF_Config: {
             /**
@@ -23823,7 +23833,7 @@ export type components = {
          * @description Mistral text encoder variants used by FLUX.2 [dev].
          * @enum {string}
          */
-        MistralVariantType: "mistral_small_3_1";
+        MistralVariantType: "cow_mistral3_small";
         /**
          * ModelFormat
          * @description Storage format of model.

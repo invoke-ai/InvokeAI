@@ -1036,6 +1036,7 @@
         "noRecallParameters": "No parameters to recall found",
         "parameterSet": "Parameter {{parameter}} set",
         "parsingFailed": "Parsing Failed",
+        "mistralEncoder": "Mistral Encoder",
         "positivePrompt": "Positive Prompt",
         "qwen3Encoder": "Qwen3 Encoder",
         "qwen3Source": "Qwen3 Source",
