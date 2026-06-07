@@ -7,7 +7,13 @@ import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMul
 import { isPlainObject } from 'es-toolkit';
 import { clamp } from 'es-toolkit/compat';
 import { logout } from 'features/auth/store/authSlice';
-import type { AspectRatioID, InfillMethod, ParamsState, RgbaColor } from 'features/controlLayers/store/types';
+import type {
+  AspectRatioID,
+  InfillMethod,
+  ParamsState,
+  PromptHistoryItem,
+  RgbaColor,
+} from 'features/controlLayers/store/types';
 import {
   ASPECT_RATIO_MAP,
   DEFAULT_ASPECT_RATIO_CONFIG,
@@ -323,20 +329,33 @@ const slice = createSlice({
     positivePromptChanged: (state, action: PayloadAction<ParameterPositivePrompt>) => {
       state.positivePrompt = action.payload;
     },
-    positivePromptAddedToHistory: (state, action: PayloadAction<ParameterPositivePrompt>) => {
-      const prompt = action.payload.trim();
-      if (prompt.length === 0) {
+    positivePromptAddedToHistory: (state, action: PayloadAction<PromptHistoryItem>) => {
+      const prompt: PromptHistoryItem = {
+        positivePrompt: action.payload.positivePrompt.trim(),
+        negativePrompt: action.payload.negativePrompt?.trim() || null,
+      };
+      if (prompt.positivePrompt.length === 0 && !prompt.negativePrompt) {
         return;
       }
 
-      state.positivePromptHistory = [prompt, ...state.positivePromptHistory.filter((p) => p !== prompt)];
+      state.positivePromptHistory = [
+        prompt,
+        ...state.positivePromptHistory.filter(
+          (p) =>
+            p.positivePrompt !== prompt.positivePrompt || (p.negativePrompt ?? null) !== (prompt.negativePrompt ?? null)
+        ),
+      ];
 
       if (state.positivePromptHistory.length > MAX_POSITIVE_PROMPT_HISTORY) {
         state.positivePromptHistory = state.positivePromptHistory.slice(0, MAX_POSITIVE_PROMPT_HISTORY);
       }
     },
-    promptRemovedFromHistory: (state, action: PayloadAction<string>) => {
-      state.positivePromptHistory = state.positivePromptHistory.filter((p) => p !== action.payload);
+    promptRemovedFromHistory: (state, action: PayloadAction<PromptHistoryItem>) => {
+      state.positivePromptHistory = state.positivePromptHistory.filter(
+        (p) =>
+          p.positivePrompt !== action.payload.positivePrompt ||
+          (p.negativePrompt ?? null) !== (action.payload.negativePrompt ?? null)
+      );
     },
     promptHistoryCleared: (state) => {
       state.positivePromptHistory = [];
