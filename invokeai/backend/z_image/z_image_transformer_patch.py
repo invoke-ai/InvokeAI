@@ -123,11 +123,15 @@ def create_regional_forward(
         # Build a per-item additive float mask. Start from the plain padding mask (0 where a
         # token is valid, -inf where it is padding) so non-matching items behave normally.
         neg_inf = torch.finfo(unified.dtype).min
-        float_mask = torch.where(
-            unified_mask.bool().unsqueeze(1).unsqueeze(1),  # (bsz, 1, 1, S)
-            torch.zeros((), dtype=unified.dtype, device=device),
-            torch.full((), neg_inf, dtype=unified.dtype, device=device),
-        ).expand(bsz, 1, unified_seqlen, unified_seqlen).clone()
+        float_mask = (
+            torch.where(
+                unified_mask.bool().unsqueeze(1).unsqueeze(1),  # (bsz, 1, 1, S)
+                torch.zeros((), dtype=unified.dtype, device=device),
+                torch.full((), neg_inf, dtype=unified.dtype, device=device),
+            )
+            .expand(bsz, 1, unified_seqlen, unified_seqlen)
+            .clone()
+        )
 
         applied_regional = [False] * bsz
         for i in range(bsz):
