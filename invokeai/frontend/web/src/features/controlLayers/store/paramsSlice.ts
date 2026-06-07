@@ -390,15 +390,6 @@ const slice = createSlice({
     },
 
     //#region Dimensions
-    sizeRecalled: (state, action: PayloadAction<{ width: number; height: number }>) => {
-      const { width, height } = action.payload;
-      const gridSize = getGridSize(state.model?.base as BaseModelType | undefined);
-      state.dimensions.width = Math.max(roundDownToMultiple(width, gridSize), 64);
-      state.dimensions.height = Math.max(roundDownToMultiple(height, gridSize), 64);
-      state.dimensions.aspectRatio.value = state.dimensions.width / state.dimensions.height;
-      state.dimensions.aspectRatio.id = 'Free';
-      state.dimensions.aspectRatio.isLocked = true;
-    },
     widthChanged: (state, action: PayloadAction<{ width: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
       const { width, updateAspectRatio, clamp } = action.payload;
       const gridSize = getGridSize(state.model?.base as BaseModelType | undefined);
