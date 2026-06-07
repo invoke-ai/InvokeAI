@@ -16,11 +16,14 @@ import {
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import {
+  negativePromptChanged,
   positivePromptChanged,
   promptHistoryCleared,
   promptRemovedFromHistory,
+  selectModelSupportsNegativePrompt,
   selectPositivePromptHistory,
 } from 'features/controlLayers/store/paramsSlice';
+import type { PromptHistoryItem } from 'features/controlLayers/store/types';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -67,7 +70,12 @@ const PromptHistoryContent = memo(() => {
     if (!trimmedSearchTerm) {
       return positivePromptHistory;
     }
-    return positivePromptHistory.filter((prompt) => prompt.toLowerCase().includes(trimmedSearchTerm.toLowerCase()));
+    const searchTermLower = trimmedSearchTerm.toLowerCase();
+    return positivePromptHistory.filter(
+      (prompt) =>
+        prompt.positivePrompt.toLowerCase().includes(searchTermLower) ||
+        (prompt.negativePrompt ?? '').toLowerCase().includes(searchTermLower)
+    );
   }, [positivePromptHistory, searchTerm]);
 
   const onChangeSearchTerm = useCallback((e: ChangeEvent<HTMLInputElement>) => {
@@ -115,7 +123,7 @@ const PromptHistoryContent = memo(() => {
           <ScrollableContent>
             <Flex flexDir="column">
               {filteredPrompts.map((prompt, index) => (
-                <PromptItem key={`${prompt}-${index}`} prompt={prompt} />
+                <PromptItem key={`${prompt.positivePrompt}-${prompt.negativePrompt ?? ''}-${index}`} prompt={prompt} />
               ))}
             </Flex>
           </ScrollableContent>
@@ -131,14 +139,20 @@ const PromptHistoryContent = memo(() => {
 });
 PromptHistoryContent.displayName = 'PromptHistoryContent';
 
-const PromptItem = memo(({ prompt }: { prompt: string }) => {
+const PromptItem = memo(({ prompt }: { prompt: PromptHistoryItem }) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const shiftKey = useShiftModifier();
+  const modelSupportsNegativePrompt = useAppSelector(selectModelSupportsNegativePrompt);
 
   const onClickUse = useCallback(() => {
-    dispatch(positivePromptChanged(prompt));
-  }, [dispatch, prompt]);
+    dispatch(positivePromptChanged(prompt.positivePrompt));
+    // Only restore the negative prompt for models that support one, otherwise we'd silently set negative prompt state
+    // that is hidden in the UI and would resurface when switching to a model that supports negative prompts.
+    if (modelSupportsNegativePrompt) {
+      dispatch(negativePromptChanged(prompt.negativePrompt));
+    }
+  }, [dispatch, modelSupportsNegativePrompt, prompt]);
 
   const onClickDelete = useCallback(() => {
     dispatch(promptRemovedFromHistory(prompt));
@@ -165,7 +179,24 @@ const PromptItem = memo(({ prompt }: { prompt: string }) => {
           colorScheme="error"
         />
       )}
-      <Text color="base.300">{prompt}</Text>
+      <Flex flexDir="column" gap={1} minW={0}>
+        {prompt.positivePrompt && (
+          <Text color="base.300" wordBreak="break-word">
+            <Text as="span" color="base.100">
+              {t('common.prompt')}:
+            </Text>{' '}
+            {prompt.positivePrompt}
+          </Text>
+        )}
+        {prompt.negativePrompt && (
+          <Text color="base.400" wordBreak="break-word">
+            <Text as="span" color="base.100">
+              {t('common.negativePrompt')}:
+            </Text>{' '}
+            {prompt.negativePrompt}
+          </Text>
+        )}
+      </Flex>
     </Flex>
   );
 });
