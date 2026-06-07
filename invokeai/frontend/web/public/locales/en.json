@@ -3450,6 +3450,7 @@
             "models": "Models",
             "config": "Config",
             "canvas": "Canvas",
+            "canvas-workflow-integration": "Canvas Workflow Integration",
             "generation": "Generation",
             "workflows": "Workflows",
             "system": "System",
