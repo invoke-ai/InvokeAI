@@ -20,7 +20,7 @@ import { selectEdges, selectNodes } from 'features/nodes/store/selectors';
 import {
   CONNECTOR_INPUT_HANDLE,
   CONNECTOR_OUTPUT_HANDLE,
-  resolveConnectorDisplayFieldType,
+  resolveConnectorInferredFieldType,
 } from 'features/nodes/store/util/connectorTopology';
 import { HANDLE_TOOLTIP_OPEN_DELAY, NO_DRAG_CLASS } from 'features/nodes/types/constants';
 import type { FieldType } from 'features/nodes/types/field';
@@ -61,7 +61,7 @@ type PassthroughHandleProps = {
   handleId: string;
   position: Position;
   hitboxStyle: CSSProperties;
-  displayFieldType: FieldType | null;
+  inferredFieldType: FieldType | null;
   fieldColor: string;
   fieldTypeName: string;
 };
@@ -73,7 +73,7 @@ const ConnectorPassthroughHandle = memo(
     handleId,
     position,
     hitboxStyle,
-    displayFieldType,
+    inferredFieldType,
     fieldColor,
     fieldTypeName,
   }: PassthroughHandleProps) => {
@@ -91,11 +91,11 @@ const ConnectorPassthroughHandle = memo(
 
     const innerProps = useMemo(() => {
       const shape =
-        displayFieldType !== null
+        inferredFieldType !== null
           ? {
-              'data-cardinality': displayFieldType.cardinality,
-              'data-is-batch-field': displayFieldType.batch,
-              'data-is-model-field': isModelFieldType(displayFieldType),
+              'data-cardinality': inferredFieldType.cardinality,
+              'data-is-batch-field': inferredFieldType.batch,
+              'data-is-model-field': isModelFieldType(inferredFieldType),
             }
           : {
               'data-cardinality': 'SINGLE' as const,
@@ -110,10 +110,10 @@ const ConnectorPassthroughHandle = memo(
         'data-is-connection-start-field': isConnectionInProgress ? isConnectionStartField : false,
         'data-is-connection-valid': isConnectionInProgress ? connectionError === null : false,
       };
-    }, [connectionError, displayFieldType, isConnectionInProgress, isConnectionStartField]);
+    }, [connectionError, inferredFieldType, isConnectionInProgress, isConnectionStartField]);
 
     const innerBackgroundColor =
-      displayFieldType !== null && displayFieldType.cardinality !== 'SINGLE' ? 'base.900' : fieldColor;
+      inferredFieldType !== null && inferredFieldType.cardinality !== 'SINGLE' ? 'base.900' : fieldColor;
 
     return (
       <Tooltip label={tooltipLabel} placement="start" openDelay={HANDLE_TOOLTIP_OPEN_DELAY}>
@@ -132,14 +132,14 @@ const ConnectorNode = ({ id, selected }: NodeProps<Node<ConnectorNodeData>>) => 
   const nodes = useAppSelector(selectNodes);
   const edges = useAppSelector(selectEdges);
 
-  const displayFieldType = useMemo(
-    () => resolveConnectorDisplayFieldType(id, nodes, edges, templates),
+  const inferredFieldType = useMemo(
+    () => resolveConnectorInferredFieldType(id, nodes, edges, templates),
     [id, nodes, edges, templates]
   );
 
-  const fieldColor = useMemo(() => getFieldColor(displayFieldType), [displayFieldType]);
+  const fieldColor = useMemo(() => getFieldColor(inferredFieldType), [inferredFieldType]);
 
-  const fieldTypeLabel = useFieldTypeName(displayFieldType ?? CONNECTOR_FALLBACK_FIELD_TYPE);
+  const fieldTypeName = useFieldTypeName(inferredFieldType ?? CONNECTOR_FALLBACK_FIELD_TYPE);
 
   return (
     <NonInvocationNodeWrapper nodeId={id} selected={selected} width={CONNECTOR_NODE_SIZE} borderRadius="full">
@@ -159,9 +159,9 @@ const ConnectorNode = ({ id, selected }: NodeProps<Node<ConnectorNodeData>>) => 
           handleId={CONNECTOR_INPUT_HANDLE}
           position={Position.Left}
           hitboxStyle={CONNECTOR_HANDLE_INPUT_STYLE}
-          displayFieldType={displayFieldType}
+          inferredFieldType={inferredFieldType}
           fieldColor={fieldColor}
-          fieldTypeName={fieldTypeLabel}
+          fieldTypeName={fieldTypeName}
         />
         <Box
           layerStyle="nodeBody"
@@ -181,9 +181,9 @@ const ConnectorNode = ({ id, selected }: NodeProps<Node<ConnectorNodeData>>) => 
           handleId={CONNECTOR_OUTPUT_HANDLE}
           position={Position.Right}
           hitboxStyle={CONNECTOR_HANDLE_OUTPUT_STYLE}
-          displayFieldType={displayFieldType}
+          inferredFieldType={inferredFieldType}
           fieldColor={fieldColor}
-          fieldTypeName={fieldTypeLabel}
+          fieldTypeName={fieldTypeName}
         />
       </Box>
     </NonInvocationNodeWrapper>

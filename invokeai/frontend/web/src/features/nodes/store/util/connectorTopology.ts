@@ -108,20 +108,20 @@ export const resolveConnectorSourceFieldType = (
 /**
  * Downstream field type when the connector input is unwired: scans {@link getConnectorOutputEdges} in order.
  * Uses each target invocation’s input field type, or recurses through connector chains via
- * {@link resolveConnectorDisplayFieldType} until a type is found.
- * `sinkWalkVisited` prevents cycles along that chain.
+ * {@link resolveConnectorInferredFieldType} until a type is found.
+ * `downstreamVisited` prevents cycles along that chain.
  */
-export const resolveConnectorSinkFieldType = (
+export const resolveConnectorDownstreamFieldType = (
   connectorId: string,
   nodes: AnyNode[],
   edges: AnyEdge[],
   templates: Templates,
-  sinkWalkVisited: Set<string> = new Set()
+  downstreamVisited: Set<string> = new Set()
 ): FieldType | null => {
-  if (sinkWalkVisited.has(connectorId)) {
+  if (downstreamVisited.has(connectorId)) {
     return null;
   }
-  sinkWalkVisited.add(connectorId);
+  downstreamVisited.add(connectorId);
 
   for (const edge of getConnectorOutputEdges(connectorId, edges)) {
     if (typeof edge.targetHandle !== 'string') {
@@ -133,14 +133,14 @@ export const resolveConnectorSinkFieldType = (
     }
     if (isInvocationNode(targetNode)) {
       const inputTemplate = templates[targetNode.data.type]?.inputs[edge.targetHandle];
-      const t = inputTemplate?.type;
-      if (t) {
-        return t;
+      const fieldType = inputTemplate?.type;
+      if (fieldType) {
+        return fieldType;
       }
       continue;
     }
     if (isConnectorNode(targetNode)) {
-      const nested = resolveConnectorDisplayFieldType(edge.target, nodes, edges, templates, sinkWalkVisited);
+      const nested = resolveConnectorInferredFieldType(edge.target, nodes, edges, templates, downstreamVisited);
       if (nested) {
         return nested;
       }
@@ -150,18 +150,18 @@ export const resolveConnectorSinkFieldType = (
 };
 
 /**
- * Unified field type for connector chrome, edge coloring, and connection validation helpers:
- * {@link resolveConnectorSourceFieldType} when upstream is wired, else {@link resolveConnectorSinkFieldType}.
+ * Inferred field type for connector chrome, edge coloring, and connection validation helpers:
+ * {@link resolveConnectorSourceFieldType} when upstream is wired, else {@link resolveConnectorDownstreamFieldType}.
  */
-export const resolveConnectorDisplayFieldType = (
+export const resolveConnectorInferredFieldType = (
   connectorId: string,
   nodes: AnyNode[],
   edges: AnyEdge[],
   templates: Templates,
-  sinkWalkVisited: Set<string> = new Set()
+  downstreamVisited: Set<string> = new Set()
 ): FieldType | null =>
   resolveConnectorSourceFieldType(connectorId, nodes, edges, templates) ??
-  resolveConnectorSinkFieldType(connectorId, nodes, edges, templates, sinkWalkVisited);
+  resolveConnectorDownstreamFieldType(connectorId, nodes, edges, templates, downstreamVisited);
 
 export const getConnectorDeletionSpliceConnections = (
   connectorId: string,

@@ -27,7 +27,7 @@ export const NODE_IO_HANDLE_INNER_SX = {
   '&[data-is-connection-in-progress="true"][data-is-connection-start-field="true"][data-is-connection-valid="false"]': {
     cursor: 'grab',
   },
-  '&[data-is-connection-in-progress="false"] &[data-is-connection-valid="true"]': {
+  '&[data-is-connection-in-progress="false"][data-is-connection-valid="true"]': {
     cursor: 'crosshair',
   },
 } satisfies SystemStyleObject;

@@ -7,8 +7,8 @@ import {
   getConnectorDeletionSpliceConnections,
   getConnectorInputEdge,
   getConnectorOutputEdges,
-  resolveConnectorDisplayFieldType,
-  resolveConnectorSinkFieldType,
+  resolveConnectorInferredFieldType,
+  resolveConnectorDownstreamFieldType,
   resolveConnectorSource,
   resolveConnectorSourceFieldType,
 } from './connectorTopology';
@@ -126,18 +126,18 @@ describe('connectorTopology', () => {
     expect(getConnectorDeletionSpliceConnections(connector.id, nodes, edges, templates)).toBe(null);
   });
 
-  it('resolves sink field type from downstream when the connector input is unwired', () => {
+  it('resolves downstream field type when the connector input is unwired', () => {
     const connector = buildConnectorNode('connector-1');
     const target = buildNode(sub);
     const nodes: AnyNode[] = [connector, target];
     const edges = [buildEdge(connector.id, CONNECTOR_OUTPUT_HANDLE, target.id, 'a')];
 
     expect(resolveConnectorSourceFieldType(connector.id, nodes, edges, templates)).toBe(null);
-    expect(resolveConnectorSinkFieldType(connector.id, nodes, edges, templates)).toEqual(sub.inputs.a?.type);
-    expect(resolveConnectorDisplayFieldType(connector.id, nodes, edges, templates)).toEqual(sub.inputs.a?.type);
+    expect(resolveConnectorDownstreamFieldType(connector.id, nodes, edges, templates)).toEqual(sub.inputs.a?.type);
+    expect(resolveConnectorInferredFieldType(connector.id, nodes, edges, templates)).toEqual(sub.inputs.a?.type);
   });
 
-  it('prefers upstream output type over downstream input for display when both are wired', () => {
+  it('prefers upstream output type over downstream input when both are wired', () => {
     const source = buildNode(add);
     const connector = buildConnectorNode('connector-1');
     const target = buildNode(sub);
@@ -147,10 +147,10 @@ describe('connectorTopology', () => {
       buildEdge(connector.id, CONNECTOR_OUTPUT_HANDLE, target.id, 'a'),
     ];
 
-    expect(resolveConnectorDisplayFieldType(connector.id, nodes, edges, templates)).toEqual(add.outputs.value?.type);
+    expect(resolveConnectorInferredFieldType(connector.id, nodes, edges, templates)).toEqual(add.outputs.value?.type);
   });
 
-  it('resolves display type through a chain of connectors to an invocation input', () => {
+  it('infers field type through a chain of connectors to an invocation input', () => {
     const connectorA = buildConnectorNode('connector-a');
     const connectorB = buildConnectorNode('connector-b');
     const connectorC = buildConnectorNode('connector-c');
@@ -162,7 +162,7 @@ describe('connectorTopology', () => {
       buildEdge(connectorC.id, CONNECTOR_OUTPUT_HANDLE, target.id, 'a'),
     ];
 
-    expect(resolveConnectorDisplayFieldType(connectorA.id, nodes, edges, templates)).toEqual(sub.inputs.a?.type);
-    expect(resolveConnectorDisplayFieldType(connectorB.id, nodes, edges, templates)).toEqual(sub.inputs.a?.type);
+    expect(resolveConnectorInferredFieldType(connectorA.id, nodes, edges, templates)).toEqual(sub.inputs.a?.type);
+    expect(resolveConnectorInferredFieldType(connectorB.id, nodes, edges, templates)).toEqual(sub.inputs.a?.type);
   });
 });
