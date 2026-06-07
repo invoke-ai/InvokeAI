@@ -4,7 +4,6 @@ from contextlib import contextmanager
 from typing import Callable, List, Optional, Tuple
 
 import torch
-from torch.nn.utils.rnn import pad_sequence
 
 
 def create_regional_forward(
@@ -14,15 +13,21 @@ def create_regional_forward(
 ) -> Callable:
     """Create a modified forward function that uses a regional attention mask.
 
-    The regional attention mask replaces the internally computed padding mask,
-    allowing for regional prompting where different image regions attend to
-    different text prompts.
+    The regional attention mask replaces the internally computed padding mask on the
+    main transformer layers (alternating with the plain padding mask), allowing for
+    regional prompting where different image regions attend to different text prompts.
+
+    This delegates to the model's own helper methods (``patchify_and_embed``,
+    ``_prepare_sequence``, ``_build_unified_sequence``) so it stays in sync with the
+    upstream diffusers ``ZImageTransformer2DModel.forward`` implementation. Only the
+    main-layer attention mask is overridden.
 
     Args:
-        original_forward: The original forward method of ZImageTransformer2DModel.
-        regional_attn_mask: Attention mask of shape (seq_len, seq_len) where
-                           seq_len = img_seq_len + txt_seq_len.
-        img_seq_len: Number of image tokens in the sequence.
+        original_forward: The original forward method of ZImageTransformer2DModel
+            (kept for signature compatibility; not used directly).
+        regional_attn_mask: Boolean attention mask of shape (seq_len, seq_len) where
+                           seq_len = img_seq_len + txt_seq_len, ordered [img, txt].
+        img_seq_len: Number of (unpadded) image tokens in the sequence.
 
     Returns:
         A modified forward function with regional attention support.
@@ -38,160 +43,90 @@ def create_regional_forward(
     ) -> Tuple[List[torch.Tensor], dict]:
         """Modified forward with regional attention mask injection.
 
-        This is based on the original ZImageTransformer2DModel.forward but
-        replaces the padding-based attention mask with a regional attention mask.
+        Mirrors the basic (non-omni) path of ZImageTransformer2DModel.forward but
+        injects a regional attention mask into the main transformer layers.
         """
         assert patch_size in self.all_patch_size
         assert f_patch_size in self.all_f_patch_size
 
-        bsz = len(x)
         device = x[0].device
-        t_scaled = t * self.t_scale
-        t_emb = self.t_embedder(t_scaled)
 
-        SEQ_MULTI_OF = 32  # From diffusers transformer_z_image.py
+        # Single adaLN embedding for all tokens (basic mode).
+        adaln_input = self.t_embedder(t * self.t_scale).type_as(x[0])
 
-        # Patchify and embed (reusing the original method)
+        # Patchify & embed (basic mode: single image per batch item).
         (
             x,
             cap_feats,
             x_size,
             x_pos_ids,
             cap_pos_ids,
-            x_inner_pad_mask,
-            cap_inner_pad_mask,
+            x_pad_mask,
+            cap_pad_mask,
         ) = self.patchify_and_embed(x, cap_feats, patch_size, f_patch_size)
 
-        # x embed & refine
-        x_item_seqlens = [len(_) for _ in x]
-        assert all(_ % SEQ_MULTI_OF == 0 for _ in x_item_seqlens)
-        x_max_item_seqlen = max(x_item_seqlens)
+        # X embed & refine.
+        x_seqlens = [len(xi) for xi in x]
+        x = self.all_x_embedder[f"{patch_size}-{f_patch_size}"](torch.cat(x, dim=0))
+        x, x_freqs, x_mask, _, _ = self._prepare_sequence(
+            list(x.split(x_seqlens, dim=0)), x_pos_ids, x_pad_mask, self.x_pad_token, None, device
+        )
+        for layer in self.noise_refiner:
+            x = layer(x, x_mask, x_freqs, adaln_input, None, None, None)
 
-        x_cat = torch.cat(x, dim=0)
-        x_cat = self.all_x_embedder[f"{patch_size}-{f_patch_size}"](x_cat)
+        # Cap embed & refine.
+        cap_seqlens = [len(ci) for ci in cap_feats]
+        cap_feats = self.cap_embedder(torch.cat(cap_feats, dim=0))
+        cap_feats, cap_freqs, cap_mask, _, _ = self._prepare_sequence(
+            list(cap_feats.split(cap_seqlens, dim=0)), cap_pos_ids, cap_pad_mask, self.cap_pad_token, None, device
+        )
+        for layer in self.context_refiner:
+            cap_feats = layer(cap_feats, cap_mask, cap_freqs)
 
-        adaln_input = t_emb.type_as(x_cat)
-        x_cat[torch.cat(x_inner_pad_mask)] = self.x_pad_token
-        x_list = list(x_cat.split(x_item_seqlens, dim=0))
-        x_freqs_cis = list(self.rope_embedder(torch.cat(x_pos_ids, dim=0)).split(x_item_seqlens, dim=0))
+        # Unified sequence: basic mode order [x, cap].
+        unified, unified_freqs, unified_mask, _ = self._build_unified_sequence(
+            x,
+            x_freqs,
+            x_seqlens,
+            None,
+            cap_feats,
+            cap_freqs,
+            cap_seqlens,
+            None,
+            None,
+            None,
+            None,
+            None,
+            False,  # omni_mode
+            device,
+        )
 
-        x_padded = pad_sequence(x_list, batch_first=True, padding_value=0.0)
-        x_freqs_cis_padded = pad_sequence(x_freqs_cis, batch_first=True, padding_value=0.0)
-        x_attn_mask = torch.zeros((bsz, x_max_item_seqlen), dtype=torch.bool, device=device)
-        for i, seq_len in enumerate(x_item_seqlens):
-            x_attn_mask[i, :seq_len] = 1
-
-        # Process through noise_refiner
-        if torch.is_grad_enabled() and self.gradient_checkpointing:
-            for layer in self.noise_refiner:
-                x_padded = self._gradient_checkpointing_func(
-                    layer, x_padded, x_attn_mask, x_freqs_cis_padded, adaln_input
-                )
-        else:
-            for layer in self.noise_refiner:
-                x_padded = layer(x_padded, x_attn_mask, x_freqs_cis_padded, adaln_input)
-
-        # cap embed & refine
-        cap_item_seqlens = [len(_) for _ in cap_feats]
-        assert all(_ % SEQ_MULTI_OF == 0 for _ in cap_item_seqlens)
-        cap_max_item_seqlen = max(cap_item_seqlens)
-
-        cap_cat = torch.cat(cap_feats, dim=0)
-        cap_cat = self.cap_embedder(cap_cat)
-        cap_cat[torch.cat(cap_inner_pad_mask)] = self.cap_pad_token
-        cap_list = list(cap_cat.split(cap_item_seqlens, dim=0))
-        cap_freqs_cis = list(self.rope_embedder(torch.cat(cap_pos_ids, dim=0)).split(cap_item_seqlens, dim=0))
-
-        cap_padded = pad_sequence(cap_list, batch_first=True, padding_value=0.0)
-        cap_freqs_cis_padded = pad_sequence(cap_freqs_cis, batch_first=True, padding_value=0.0)
-        cap_attn_mask = torch.zeros((bsz, cap_max_item_seqlen), dtype=torch.bool, device=device)
-        for i, seq_len in enumerate(cap_item_seqlens):
-            cap_attn_mask[i, :seq_len] = 1
-
-        # Process through context_refiner
-        if torch.is_grad_enabled() and self.gradient_checkpointing:
-            for layer in self.context_refiner:
-                cap_padded = self._gradient_checkpointing_func(layer, cap_padded, cap_attn_mask, cap_freqs_cis_padded)
-        else:
-            for layer in self.context_refiner:
-                cap_padded = layer(cap_padded, cap_attn_mask, cap_freqs_cis_padded)
-
-        # Unified sequence: [img_tokens, txt_tokens]
-        unified = []
-        unified_freqs_cis = []
-        for i in range(bsz):
-            x_len = x_item_seqlens[i]
-            cap_len = cap_item_seqlens[i]
-            unified.append(torch.cat([x_padded[i][:x_len], cap_padded[i][:cap_len]]))
-            unified_freqs_cis.append(torch.cat([x_freqs_cis_padded[i][:x_len], cap_freqs_cis_padded[i][:cap_len]]))
-
-        unified_item_seqlens = [a + b for a, b in zip(cap_item_seqlens, x_item_seqlens, strict=False)]
-        assert unified_item_seqlens == [len(_) for _ in unified]
-        unified_max_item_seqlen = max(unified_item_seqlens)
-
-        unified_padded = pad_sequence(unified, batch_first=True, padding_value=0.0)
-        unified_freqs_cis_padded = pad_sequence(unified_freqs_cis, batch_first=True, padding_value=0.0)
+        bsz = unified.shape[0]
+        unified_seqlen = unified.shape[1]
 
         # --- REGIONAL ATTENTION MASK INJECTION ---
-        # Instead of using the padding mask, we use the regional attention mask
-        # The regional mask is (seq_len, seq_len), we need to expand it to (batch, seq_len, seq_len)
-        # and then add the batch dimension for broadcasting: (batch, 1, seq_len, seq_len)
+        # The regional mask is (S, S) with S = img_seq_len + txt_seq_len, ordered [img, txt].
+        # The unified sequence may be longer due to per-item padding to SEQ_MULTI_OF, so we
+        # place the regional mask in the top-left block and block (-inf) everything else, which
+        # also masks out padding tokens.
+        regional = regional_attn_mask.to(device=device, dtype=torch.bool)
+        mask_size = min(regional.shape[0], unified_seqlen)
+        bool_mask = torch.zeros((unified_seqlen, unified_seqlen), dtype=torch.bool, device=device)
+        bool_mask[:mask_size, :mask_size] = regional[:mask_size, :mask_size]
 
-        # Expand regional mask to match the actual sequence length (may include padding)
-        if regional_attn_mask.shape[0] != unified_max_item_seqlen:
-            # Pad the regional mask to match unified sequence length
-            padded_regional_mask = torch.zeros(
-                (unified_max_item_seqlen, unified_max_item_seqlen),
-                dtype=regional_attn_mask.dtype,
-                device=device,
-            )
-            mask_size = min(regional_attn_mask.shape[0], unified_max_item_seqlen)
-            padded_regional_mask[:mask_size, :mask_size] = regional_attn_mask[:mask_size, :mask_size]
-        else:
-            padded_regional_mask = regional_attn_mask.to(device)
+        # Convert boolean mask to additive float mask: True (attend) -> 0.0, False (block) -> -inf.
+        float_mask = torch.zeros((unified_seqlen, unified_seqlen), dtype=unified.dtype, device=device)
+        float_mask[~bool_mask] = float("-inf")
+        regional_4d_mask = float_mask.unsqueeze(0).unsqueeze(0).expand(bsz, 1, -1, -1)
 
-        # Convert boolean mask to additive float mask for attention
-        # True (attend) -> 0.0, False (block) -> -inf
-        # This is required because the attention backend expects additive masks for 4D inputs
-        # Use bfloat16 to match the transformer's query dtype
-        float_mask = torch.zeros_like(padded_regional_mask, dtype=torch.bfloat16)
-        float_mask[~padded_regional_mask] = float("-inf")
+        # Main transformer layers: alternate regional mask (even) with plain padding mask (odd).
+        for layer_idx, layer in enumerate(self.layers):
+            attn_mask = regional_4d_mask if layer_idx % 2 == 0 else unified_mask
+            unified = layer(unified, attn_mask, unified_freqs, adaln_input, None, None, None)
 
-        # Expand to (batch, 1, seq_len, seq_len) for attention
-        unified_attn_mask = float_mask.unsqueeze(0).unsqueeze(0).expand(bsz, 1, -1, -1)
-
-        # Process through main layers with regional attention mask
-        if torch.is_grad_enabled() and self.gradient_checkpointing:
-            for layer_idx, layer in enumerate(self.layers):
-                # Alternate between regional mask and full attention
-                if layer_idx % 2 == 0:
-                    unified_padded = self._gradient_checkpointing_func(
-                        layer, unified_padded, unified_attn_mask, unified_freqs_cis_padded, adaln_input
-                    )
-                else:
-                    # Use padding mask only for odd layers (allows global coherence)
-                    padding_mask = torch.zeros((bsz, unified_max_item_seqlen), dtype=torch.bool, device=device)
-                    for i, seq_len in enumerate(unified_item_seqlens):
-                        padding_mask[i, :seq_len] = 1
-                    unified_padded = self._gradient_checkpointing_func(
-                        layer, unified_padded, padding_mask, unified_freqs_cis_padded, adaln_input
-                    )
-        else:
-            for layer_idx, layer in enumerate(self.layers):
-                # Alternate between regional mask and full attention
-                if layer_idx % 2 == 0:
-                    unified_padded = layer(unified_padded, unified_attn_mask, unified_freqs_cis_padded, adaln_input)
-                else:
-                    # Use padding mask only for odd layers (allows global coherence)
-                    padding_mask = torch.zeros((bsz, unified_max_item_seqlen), dtype=torch.bool, device=device)
-                    for i, seq_len in enumerate(unified_item_seqlens):
-                        padding_mask[i, :seq_len] = 1
-                    unified_padded = layer(unified_padded, padding_mask, unified_freqs_cis_padded, adaln_input)
-
-        # Final layer
-        unified_out = self.all_final_layer[f"{patch_size}-{f_patch_size}"](unified_padded, adaln_input)
-        unified_list = list(unified_out.unbind(dim=0))
-        x_out = self.unpatchify(unified_list, x_size, patch_size, f_patch_size)
+        # Final layer + unpatchify.
+        unified = self.all_final_layer[f"{patch_size}-{f_patch_size}"](unified, c=adaln_input)
+        x_out = self.unpatchify(list(unified.unbind(dim=0)), x_size, patch_size, f_patch_size)
 
         return x_out, {}
 
