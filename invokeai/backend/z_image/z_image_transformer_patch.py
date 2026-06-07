@@ -105,23 +105,68 @@ def create_regional_forward(
         unified_seqlen = unified.shape[1]
 
         # --- REGIONAL ATTENTION MASK INJECTION ---
-        # The regional mask is (S, S) with S = img_seq_len + txt_seq_len, ordered [img, txt].
-        # The unified sequence may be longer due to per-item padding to SEQ_MULTI_OF, so we
-        # place the regional mask in the top-left block and block (-inf) everything else, which
-        # also masks out padding tokens.
+        # The regional mask is (S, S) with S = img_seq_len + txt_seq_len, ordered [img, txt],
+        # using the *unpadded* image and text token counts. In the unified sequence, however,
+        # both the image block and the caption block are individually padded to a multiple of
+        # SEQ_MULTI_OF, so the real layout per item is:
+        #     [ img_real | img_pad | txt_real | txt_pad ]
+        # We therefore scatter the four regional sub-blocks (img-img, img-txt, txt-img, txt-txt)
+        # into their padding-aware positions instead of assuming a contiguous top-left block.
+        #
+        # The patched forward also runs for the negative/CFG pass (a different prompt with a
+        # different text length). The regional mask was built for the positive prompt only, so
+        # we apply it only to items whose layout matches the positive prompt and fall back to
+        # the plain padding mask otherwise.
         regional = regional_attn_mask.to(device=device, dtype=torch.bool)
-        mask_size = min(regional.shape[0], unified_seqlen)
-        bool_mask = torch.zeros((unified_seqlen, unified_seqlen), dtype=torch.bool, device=device)
-        bool_mask[:mask_size, :mask_size] = regional[:mask_size, :mask_size]
+        txt_seq_len = regional.shape[0] - img_seq_len
 
-        # Convert boolean mask to additive float mask: True (attend) -> 0.0, False (block) -> -inf.
-        float_mask = torch.zeros((unified_seqlen, unified_seqlen), dtype=unified.dtype, device=device)
-        float_mask[~bool_mask] = float("-inf")
-        regional_4d_mask = float_mask.unsqueeze(0).unsqueeze(0).expand(bsz, 1, -1, -1)
+        # Build a per-item additive float mask. Start from the plain padding mask (0 where a
+        # token is valid, -inf where it is padding) so non-matching items behave normally.
+        neg_inf = torch.finfo(unified.dtype).min
+        float_mask = torch.where(
+            unified_mask.bool().unsqueeze(1).unsqueeze(1),  # (bsz, 1, 1, S)
+            torch.zeros((), dtype=unified.dtype, device=device),
+            torch.full((), neg_inf, dtype=unified.dtype, device=device),
+        ).expand(bsz, 1, unified_seqlen, unified_seqlen).clone()
+
+        applied_regional = [False] * bsz
+        for i in range(bsz):
+            x_len = x_seqlens[i]
+            cap_len = cap_seqlens[i]
+            # The caption block is padded to a multiple of SEQ_MULTI_OF (=32). The positive
+            # prompt the regional mask was built for has exactly this padded caption length;
+            # any other pass (e.g. the negative/CFG prompt) is skipped so it runs normally.
+            SEQ_MULTI_OF = 32
+            expected_cap_len = txt_seq_len + ((-txt_seq_len) % SEQ_MULTI_OF)
+            if (
+                txt_seq_len <= 0
+                or img_seq_len > x_len
+                or cap_len != expected_cap_len
+                or x_len + cap_len > unified_seqlen
+            ):
+                continue
+            applied_regional[i] = True
+
+            ii, it = slice(0, img_seq_len), slice(img_seq_len, img_seq_len + txt_seq_len)
+            ui = slice(0, img_seq_len)  # real image positions in unified item
+            ut = slice(x_len, x_len + txt_seq_len)  # real text positions in unified item
+
+            # Reset the masked region so only regional rules apply to real img/txt tokens; their
+            # rows start fully blocked and we open the allowed sub-blocks below.
+            float_mask[i, 0, ui, :] = neg_inf
+            float_mask[i, 0, ut, :] = neg_inf
+
+            zero = torch.zeros((), dtype=unified.dtype, device=device)
+            float_mask[i, 0, ui, ui] = torch.where(regional[ii, ii], zero, neg_inf)  # img -> img
+            float_mask[i, 0, ui, ut] = torch.where(regional[ii, it], zero, neg_inf)  # img -> txt
+            float_mask[i, 0, ut, ui] = torch.where(regional[it, ii], zero, neg_inf)  # txt -> img
+            float_mask[i, 0, ut, ut] = torch.where(regional[it, it], zero, neg_inf)  # txt -> txt
 
         # Main transformer layers: alternate regional mask (even) with plain padding mask (odd).
+        # If no item matched the positive layout, skip regional injection entirely.
+        use_regional = any(applied_regional)
         for layer_idx, layer in enumerate(self.layers):
-            attn_mask = regional_4d_mask if layer_idx % 2 == 0 else unified_mask
+            attn_mask = float_mask if (use_regional and layer_idx % 2 == 0) else unified_mask
             unified = layer(unified, attn_mask, unified_freqs, adaln_input, None, None, None)
 
         # Final layer + unpatchify.
