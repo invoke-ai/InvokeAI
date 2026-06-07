@@ -105,6 +105,64 @@ export const resolveConnectorSourceFieldType = (
   return sourceTemplate?.outputs[resolvedSource.fieldName]?.type ?? null;
 };
 
+/**
+ * Downstream field type when the connector input is unwired: scans {@link getConnectorOutputEdges} in order.
+ * Uses each target invocation’s input field type, or recurses through connector chains via
+ * {@link resolveConnectorInferredFieldType} until a type is found.
+ * `downstreamVisited` prevents cycles along that chain.
+ */
+export const resolveConnectorDownstreamFieldType = (
+  connectorId: string,
+  nodes: AnyNode[],
+  edges: AnyEdge[],
+  templates: Templates,
+  downstreamVisited: Set<string> = new Set()
+): FieldType | null => {
+  if (downstreamVisited.has(connectorId)) {
+    return null;
+  }
+  downstreamVisited.add(connectorId);
+
+  for (const edge of getConnectorOutputEdges(connectorId, edges)) {
+    if (typeof edge.targetHandle !== 'string') {
+      continue;
+    }
+    const targetNode = nodes.find((node) => node.id === edge.target);
+    if (!targetNode) {
+      continue;
+    }
+    if (isInvocationNode(targetNode)) {
+      const inputTemplate = templates[targetNode.data.type]?.inputs[edge.targetHandle];
+      const fieldType = inputTemplate?.type;
+      if (fieldType) {
+        return fieldType;
+      }
+      continue;
+    }
+    if (isConnectorNode(targetNode)) {
+      const nested = resolveConnectorInferredFieldType(edge.target, nodes, edges, templates, downstreamVisited);
+      if (nested) {
+        return nested;
+      }
+    }
+  }
+  return null;
+};
+
+/**
+ * Inferred field type for connector chrome, edge coloring, and connection validation helpers:
+ * {@link resolveConnectorSourceFieldType} when upstream is wired, else {@link resolveConnectorDownstreamFieldType}.
+ */
+export const resolveConnectorInferredFieldType = (
+  connectorId: string,
+  nodes: AnyNode[],
+  edges: AnyEdge[],
+  templates: Templates,
+  downstreamVisited: Set<string> = new Set()
+): FieldType | null =>
+  resolveConnectorSourceFieldType(connectorId, nodes, edges, templates) ??
+  resolveConnectorDownstreamFieldType(connectorId, nodes, edges, templates, downstreamVisited);
+
 export const getConnectorDeletionSpliceConnections = (
   connectorId: string,
   nodes: AnyNode[],
