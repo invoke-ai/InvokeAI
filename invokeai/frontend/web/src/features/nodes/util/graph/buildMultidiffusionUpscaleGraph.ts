@@ -7,7 +7,7 @@ import { isNonRefinerMainModelConfig, isSpandrelImageToImageModelConfig } from '
 import { assert } from 'tsafe';
 
 import { addLoRAs } from './generation/addLoRAs';
-import { getBoardField, selectPresetModifiedPrompts } from './graphBuilderUtils';
+import { getBoardField } from './graphBuilderUtils';
 import type { GraphBuilderReturn } from './types';
 
 export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise<GraphBuilderReturn> => {
@@ -33,6 +33,10 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
 
   const positivePrompt = g.addNode({
     id: getPrefixedId('positive_prompt'),
+    type: 'string',
+  });
+  const negativePrompt = g.addNode({
+    id: getPrefixedId('negative_prompt'),
     type: 'string',
   });
 
@@ -105,8 +109,6 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
   let modelLoader;
 
   if (model.base === 'sdxl') {
-    const prompts = selectPresetModifiedPrompts(state);
-
     posCond = g.addNode({
       type: 'sdxl_compel_prompt',
       id: getPrefixedId('pos_cond'),
@@ -114,8 +116,6 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
     negCond = g.addNode({
       type: 'sdxl_compel_prompt',
       id: getPrefixedId('neg_cond'),
-      prompt: prompts.negative,
-      style: prompts.negative,
     });
     modelLoader = g.addNode({
       type: 'sdxl_model_loader',
@@ -131,16 +131,14 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
 
     g.addEdge(positivePrompt, 'value', posCond, 'prompt');
     g.addEdge(positivePrompt, 'value', posCond, 'style');
+    g.addEdge(negativePrompt, 'value', negCond, 'prompt');
+    g.addEdge(negativePrompt, 'value', negCond, 'style');
 
     addSDXLLoRAs(state, g, tiledMultidiffusion, modelLoader, null, posCond, negCond);
 
-    g.upsertMetadata({
-      negative_prompt: prompts.negative,
-    });
     g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
+    g.addEdgeToMetadata(negativePrompt, 'value', 'negative_prompt');
   } else {
-    const prompts = selectPresetModifiedPrompts(state);
-
     posCond = g.addNode({
       type: 'compel',
       id: getPrefixedId('pos_cond'),
@@ -148,7 +146,6 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
     negCond = g.addNode({
       type: 'compel',
       id: getPrefixedId('neg_cond'),
-      prompt: prompts.negative,
     });
     modelLoader = g.addNode({
       type: 'main_model_loader',
@@ -166,14 +163,12 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
     g.addEdge(modelLoader, 'unet', tiledMultidiffusion, 'unet');
 
     g.addEdge(positivePrompt, 'value', posCond, 'prompt');
+    g.addEdge(negativePrompt, 'value', negCond, 'prompt');
 
     addLoRAs(state, g, tiledMultidiffusion, modelLoader, null, clipSkipNode, posCond, negCond);
 
-    g.upsertMetadata({
-      negative_prompt: prompts.negative,
-    });
-
     g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
+    g.addEdgeToMetadata(negativePrompt, 'value', 'negative_prompt');
   }
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
@@ -261,5 +256,6 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
     g,
     seed,
     positivePrompt,
+    negativePrompt,
   };
 };
