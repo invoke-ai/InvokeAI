@@ -7,8 +7,8 @@ import {
   getConnectorDeletionSpliceConnections,
   getConnectorInputEdge,
   getConnectorOutputEdges,
-  resolveConnectorInferredFieldType,
   resolveConnectorDownstreamFieldType,
+  resolveConnectorInferredFieldType,
   resolveConnectorSource,
   resolveConnectorSourceFieldType,
 } from './connectorTopology';
