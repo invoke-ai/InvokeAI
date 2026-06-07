@@ -1,7 +1,7 @@
 import asyncio
 import json
 import sqlite3
-from typing import Optional, Union, cast
+from typing import Any, Optional, Union, cast
 
 from pydantic_core import to_jsonable_python
 
@@ -23,6 +23,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     IsEmptyResult,
     IsFullResult,
     ItemIdsResult,
+    NodeFieldValue,
     PruneResult,
     RetryItemsResult,
     SessionQueueCountsByDestination,
@@ -65,17 +66,40 @@ class SqliteSessionQueue(SessionQueueBase):
 
     def _set_in_progress_to_canceled(self) -> None:
         """
-        Sets all in_progress queue items to canceled. Run on app startup, not associated with any queue.
-        This is necessary because the invoker may have been killed while processing a queue item.
+        Sets all in_progress or waiting queue items to canceled. Run on app startup, not associated with any queue.
+        This is necessary because the invoker may have been killed while processing a queue item or while a parent
+        queue item was suspended waiting on a child workflow execution.
         """
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
+                SELECT item_id
+                FROM session_queue
+                WHERE status = 'in_progress'
+                   OR status = 'waiting';
+                """
+            )
+            interrupted_item_ids = [row[0] for row in cast(list[sqlite3.Row], cursor.fetchall())]
+        item_ids_to_cancel: set[int] = set()
+        for item_id in interrupted_item_ids:
+            item_ids_to_cancel.update(self._get_workflow_call_chain_item_ids(item_id))
+        if not item_ids_to_cancel:
+            return
+        with self._db.transaction() as cursor:
+            placeholders = ",".join("?" for _ in item_ids_to_cancel)
+            cursor.execute(
+                f"""--sql
                 UPDATE session_queue
                 SET status = 'canceled',
                     status_sequence = COALESCE(status_sequence, 0) + 1
-                WHERE status = 'in_progress';
-                """
+                WHERE item_id IN ({placeholders})
+                  AND (
+                    status = 'pending'
+                    OR status = 'in_progress'
+                    OR status = 'waiting'
+                  );
+                """,
+                tuple(item_ids_to_cancel),
             )
 
     def _prune_terminal_to_limit(self, queue_id: str, keep: int) -> int:
@@ -327,6 +351,53 @@ class SqliteSessionQueue(SessionQueueBase):
         self.__invoker.services.events.emit_queue_item_status_changed(queue_item, batch_status, queue_status)
         return queue_item
 
+    def _get_workflow_call_child_ids(self, item_id: int) -> list[int]:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT item_id
+                FROM session_queue
+                WHERE parent_item_id = ?
+                ORDER BY item_id ASC
+                """,
+                (item_id,),
+            )
+            rows = cast(list[sqlite3.Row], cursor.fetchall())
+        return [row[0] for row in rows]
+
+    def _get_workflow_call_descendant_ids(self, item_id: int) -> list[int]:
+        descendant_ids: list[int] = []
+        queue: list[int] = [item_id]
+        while queue:
+            current_item_id = queue.pop(0)
+            child_ids = self._get_workflow_call_child_ids(current_item_id)
+            descendant_ids.extend(child_ids)
+            queue.extend(child_ids)
+        return descendant_ids
+
+    def _get_workflow_call_ancestor_ids(self, item_id: int) -> list[int]:
+        ancestor_ids: list[int] = []
+        current_queue_item = self.get_queue_item(item_id)
+        while current_queue_item.parent_item_id is not None:
+            parent_item_id = current_queue_item.parent_item_id
+            ancestor_ids.append(parent_item_id)
+            current_queue_item = self.get_queue_item(parent_item_id)
+        return ancestor_ids
+
+    def _get_workflow_call_chain_item_ids(self, item_id: int) -> list[int]:
+        ancestor_ids = self._get_workflow_call_ancestor_ids(item_id)
+        root_item_id = ancestor_ids[-1] if ancestor_ids else item_id
+        descendant_ids = self._get_workflow_call_descendant_ids(root_item_id)
+        chain_item_ids = ancestor_ids + [item_id] + descendant_ids
+        deduped_chain_item_ids = list(dict.fromkeys(chain_item_ids))
+        return deduped_chain_item_ids
+
+    def _get_current_workflow_call_chain_item_ids(self, queue_id: str) -> set[int]:
+        current_queue_item = self.get_current(queue_id)
+        if current_queue_item is None:
+            return set()
+        return set(self._get_workflow_call_chain_item_ids(current_queue_item.item_id))
+
     def is_empty(self, queue_id: str) -> IsEmptyResult:
         with self._db.transaction() as cursor:
             cursor.execute(
@@ -384,6 +455,20 @@ class SqliteSessionQueue(SessionQueueBase):
         self.__invoker.services.events.emit_queue_cleared(queue_id)
         return ClearResult(deleted=count)
 
+    def delete_queue_items_by_id(self, item_ids: list[int]) -> None:
+        if not item_ids:
+            return
+        placeholders = ", ".join(["?" for _ in item_ids])
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                f"""--sql
+                DELETE
+                FROM session_queue
+                WHERE item_id IN ({placeholders})
+                """,
+                tuple(item_ids),
+            )
+
     def prune(self, queue_id: str, user_id: Optional[str] = None) -> PruneResult:
         with self._db.transaction() as cursor:
             # Build WHERE clause with optional user_id filter
@@ -398,7 +483,7 @@ class SqliteSessionQueue(SessionQueueBase):
                 )
                 {user_filter}
                 """
-            params = [queue_id]
+            params: list[Any] = [queue_id]
             if user_id is not None:
                 params.append(user_id)
 
@@ -422,27 +507,31 @@ class SqliteSessionQueue(SessionQueueBase):
         return PruneResult(deleted=count)
 
     def cancel_queue_item(self, item_id: int) -> SessionQueueItem:
-        queue_item = self._set_queue_item_status(item_id=item_id, status="canceled")
-        return queue_item
+        chain_item_ids = self._get_workflow_call_chain_item_ids(item_id)
+        for chain_item_id in chain_item_ids:
+            self._set_queue_item_status(item_id=chain_item_id, status="canceled")
+        return self.get_queue_item(item_id)
 
     def delete_queue_item(self, item_id: int) -> None:
         """Deletes a session queue item"""
-        try:
+        chain_item_ids = self._get_workflow_call_chain_item_ids(item_id)
+        if any(
+            self.get_queue_item(chain_item_id).status not in {"completed", "failed", "canceled"}
+            for chain_item_id in chain_item_ids
+        ):
             self.cancel_queue_item(item_id)
-        except SessionQueueItemNotFoundError:
-            pass
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                DELETE
-                FROM session_queue
-                WHERE item_id = ?
-                """,
-                (item_id,),
-            )
+        self.delete_queue_items_by_id(chain_item_ids)
 
     def complete_queue_item(self, item_id: int) -> SessionQueueItem:
         queue_item = self._set_queue_item_status(item_id=item_id, status="completed")
+        return queue_item
+
+    def suspend_queue_item(self, item_id: int) -> SessionQueueItem:
+        queue_item = self._set_queue_item_status(item_id=item_id, status="waiting")
+        return queue_item
+
+    def resume_queue_item(self, item_id: int) -> SessionQueueItem:
+        queue_item = self._set_queue_item_status(item_id=item_id, status="pending")
         return queue_item
 
     def fail_queue_item(
@@ -602,18 +691,25 @@ class SqliteSessionQueue(SessionQueueBase):
         return DeleteByDestinationResult(deleted=count)
 
     def delete_all_except_current(self, queue_id: str, user_id: Optional[str] = None) -> DeleteAllExceptCurrentResult:
+        current_chain_item_ids = self._get_current_workflow_call_chain_item_ids(queue_id)
         with self._db.transaction() as cursor:
             # Build WHERE clause with optional user_id filter
             user_filter = "AND user_id = ?" if user_id is not None else ""
+            current_chain_filter = ""
+            if current_chain_item_ids:
+                placeholders = ", ".join(["?" for _ in current_chain_item_ids])
+                current_chain_filter = f"AND item_id NOT IN ({placeholders})"
             where = f"""--sql
                 WHERE
                   queue_id == ?
-                  AND status == 'pending'
+                  AND status IN ('pending', 'waiting')
                   {user_filter}
+                  {current_chain_filter}
                 """
-            params = [queue_id]
+            params: list[Any] = [queue_id]
             if user_id is not None:
                 params.append(user_id)
+            params.extend(current_chain_item_ids)
 
             cursor.execute(
                 f"""--sql
@@ -671,18 +767,25 @@ class SqliteSessionQueue(SessionQueueBase):
         return CancelByQueueIDResult(canceled=count)
 
     def cancel_all_except_current(self, queue_id: str, user_id: Optional[str] = None) -> CancelAllExceptCurrentResult:
+        current_chain_item_ids = self._get_current_workflow_call_chain_item_ids(queue_id)
         with self._db.transaction() as cursor:
             # Build WHERE clause with optional user_id filter
             user_filter = "AND user_id = ?" if user_id is not None else ""
+            current_chain_filter = ""
+            if current_chain_item_ids:
+                placeholders = ", ".join(["?" for _ in current_chain_item_ids])
+                current_chain_filter = f"AND item_id NOT IN ({placeholders})"
             where = f"""--sql
                 WHERE
                   queue_id == ?
-                  AND status == 'pending'
+                  AND status IN ('pending', 'waiting')
                   {user_filter}
+                  {current_chain_filter}
                 """
             params = [queue_id]
             if user_id is not None:
                 params.append(user_id)
+            params.extend(current_chain_item_ids)
 
             cursor.execute(
                 f"""--sql
@@ -738,6 +841,102 @@ class SqliteSessionQueue(SessionQueueBase):
                 (session_json, item_id),
             )
         return self.get_queue_item(item_id)
+
+    def enqueue_workflow_call_child(
+        self,
+        parent_queue_item: SessionQueueItem,
+        child_session: GraphExecutionState,
+        field_values: list[NodeFieldValue] | None = None,
+    ) -> SessionQueueItem:
+        workflow_call_execution = parent_queue_item.session.waiting_workflow_call_execution
+        if workflow_call_execution is None:
+            raise ValueError("Parent queue item is missing active workflow call execution metadata.")
+
+        session_json = child_session.model_dump_json(warnings=False, exclude_none=True)
+        field_values_json = json.dumps(field_values, default=to_jsonable_python) if field_values is not None else None
+        root_item_id = parent_queue_item.root_item_id or parent_queue_item.item_id
+
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                INSERT INTO session_queue (
+                    queue_id,
+                    session,
+                    session_id,
+                    batch_id,
+                    field_values,
+                    priority,
+                    workflow,
+                    origin,
+                    destination,
+                    retried_from_item_id,
+                    user_id,
+                    workflow_call_id,
+                    parent_item_id,
+                    parent_session_id,
+                    root_item_id,
+                    workflow_call_depth,
+                    status
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+                """,
+                (
+                    parent_queue_item.queue_id,
+                    session_json,
+                    child_session.id,
+                    parent_queue_item.batch_id,
+                    field_values_json,
+                    parent_queue_item.priority,
+                    None,
+                    parent_queue_item.origin,
+                    parent_queue_item.destination,
+                    None,
+                    parent_queue_item.user_id,
+                    workflow_call_execution.id,
+                    parent_queue_item.item_id,
+                    parent_queue_item.session_id,
+                    root_item_id,
+                    workflow_call_execution.depth,
+                ),
+            )
+            item_id = cursor.lastrowid
+
+        queue_item = self.get_queue_item(item_id)
+        batch_status = self.get_batch_status(queue_id=queue_item.queue_id, batch_id=queue_item.batch_id)
+        queue_status = self.get_queue_status(queue_id=queue_item.queue_id, acting_user_id=queue_item.user_id)
+        self.__invoker.services.events.emit_queue_item_status_changed(queue_item, batch_status, queue_status)
+        return queue_item
+
+    def cancel_workflow_call_children(
+        self, workflow_call_id: str, exclude_item_ids: set[int] | None = None
+    ) -> list[int]:
+        exclude_item_ids = exclude_item_ids or set()
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT item_id
+                FROM session_queue
+                WHERE workflow_call_id = ?
+                ORDER BY item_id ASC
+                """,
+                (workflow_call_id,),
+            )
+            item_ids = [row[0] for row in cast(list[sqlite3.Row], cursor.fetchall())]
+        item_ids_with_descendants: list[int] = []
+        for item_id in item_ids:
+            item_ids_with_descendants.append(item_id)
+            item_ids_with_descendants.extend(self._get_workflow_call_descendant_ids(item_id))
+        item_ids = list(dict.fromkeys(item_ids_with_descendants))
+        canceled_item_ids: list[int] = []
+        for item_id in item_ids:
+            if item_id in exclude_item_ids:
+                continue
+            queue_item = self.get_queue_item(item_id)
+            if queue_item.status in {"completed", "failed", "canceled"}:
+                continue
+            self._set_queue_item_status(item_id=item_id, status="canceled")
+            canceled_item_ids.append(item_id)
+        return canceled_item_ids
 
     def list_queue_items(
         self,
@@ -905,6 +1104,7 @@ class SqliteSessionQueue(SessionQueueBase):
             batch_id=current_item.batch_id if show_current_item else None,
             pending=counts.get("pending", 0),
             in_progress=counts.get("in_progress", 0),
+            waiting=counts.get("waiting", 0),
             completed=counts.get("completed", 0),
             failed=counts.get("failed", 0),
             canceled=counts.get("canceled", 0),
@@ -937,6 +1137,7 @@ class SqliteSessionQueue(SessionQueueBase):
             queue_id=queue_id,
             pending=counts.get("pending", 0),
             in_progress=counts.get("in_progress", 0),
+            waiting=counts.get("waiting", 0),
             completed=counts.get("completed", 0),
             failed=counts.get("failed", 0),
             canceled=counts.get("canceled", 0),
@@ -968,6 +1169,7 @@ class SqliteSessionQueue(SessionQueueBase):
             destination=destination,
             pending=counts.get("pending", 0),
             in_progress=counts.get("in_progress", 0),
+            waiting=counts.get("waiting", 0),
             completed=counts.get("completed", 0),
             failed=counts.get("failed", 0),
             canceled=counts.get("canceled", 0),
@@ -978,47 +1180,77 @@ class SqliteSessionQueue(SessionQueueBase):
         """Retries the given queue items"""
         with self._db.transaction() as cursor:
             values_to_insert: list[ValueToInsertTuple] = []
-            retried_item_ids: list[int] = []
+            retried_root_item_ids: list[int] = []
+            retried_user_ids: list[str] = []
+            retried_item_ids_by_user: dict[str, list[int]] = {}
+            seen_root_item_ids: set[int] = set()
+            max_new_queue_items = self.__invoker.services.configuration.max_queue_size - self._get_current_queue_size(
+                queue_id
+            )
+
+            if max_new_queue_items <= 0:
+                return RetryItemsResult(queue_id=queue_id, retried_item_ids=[])
 
             for item_id in item_ids:
-                queue_item = self.get_queue_item(item_id)
+                try:
+                    queue_item = self.get_queue_item(item_id)
+                except SessionQueueItemNotFoundError:
+                    continue
+                if queue_item.queue_id != queue_id:
+                    continue
 
                 if queue_item.status not in ("failed", "canceled"):
                     continue
 
-                retried_item_ids.append(item_id)
+                root_item_id = queue_item.root_item_id or queue_item.item_id
+                if root_item_id in seen_root_item_ids:
+                    continue
+                seen_root_item_ids.add(root_item_id)
+
+                root_queue_item = self.get_queue_item(root_item_id)
+                if root_queue_item.status not in ("failed", "canceled"):
+                    continue
+
+                retried_root_item_ids.append(root_item_id)
+                retried_user_ids.append(root_queue_item.user_id)
+                retried_item_ids_by_user.setdefault(root_queue_item.user_id, []).append(root_item_id)
 
                 field_values_json = (
-                    json.dumps(queue_item.field_values, default=to_jsonable_python) if queue_item.field_values else None
+                    json.dumps(root_queue_item.field_values, default=to_jsonable_python)
+                    if root_queue_item.field_values
+                    else None
                 )
                 workflow_json = (
-                    json.dumps(queue_item.workflow, default=to_jsonable_python) if queue_item.workflow else None
+                    json.dumps(root_queue_item.workflow, default=to_jsonable_python)
+                    if root_queue_item.workflow
+                    else None
                 )
-                cloned_session = GraphExecutionState(graph=queue_item.session.graph)
+                cloned_session = GraphExecutionState(graph=root_queue_item.session.graph)
                 cloned_session_json = cloned_session.model_dump_json(warnings=False, exclude_none=True)
 
                 retried_from_item_id = (
-                    queue_item.retried_from_item_id
-                    if queue_item.retried_from_item_id is not None
-                    else queue_item.item_id
+                    root_queue_item.retried_from_item_id
+                    if root_queue_item.retried_from_item_id is not None
+                    else root_queue_item.item_id
                 )
 
                 value_to_insert: ValueToInsertTuple = (
-                    queue_item.queue_id,
+                    root_queue_item.queue_id,
                     cloned_session_json,
                     cloned_session.id,
-                    queue_item.batch_id,
+                    root_queue_item.batch_id,
                     field_values_json,
-                    queue_item.priority,
+                    root_queue_item.priority,
                     workflow_json,
-                    queue_item.origin,
-                    queue_item.destination,
+                    root_queue_item.origin,
+                    root_queue_item.destination,
                     retried_from_item_id,
-                    queue_item.user_id,
+                    root_queue_item.user_id,
                 )
                 values_to_insert.append(value_to_insert)
 
-            # TODO(psyche): Handle max queue size?
+                if len(values_to_insert) >= max_new_queue_items:
+                    break
 
             cursor.executemany(
                 """--sql
@@ -1030,7 +1262,11 @@ class SqliteSessionQueue(SessionQueueBase):
 
         retry_result = RetryItemsResult(
             queue_id=queue_id,
-            retried_item_ids=retried_item_ids,
+            retried_item_ids=retried_root_item_ids,
         )
-        self.__invoker.services.events.emit_queue_items_retried(retry_result)
+        self.__invoker.services.events.emit_queue_items_retried(
+            retry_result,
+            user_ids=list(dict.fromkeys(retried_user_ids)),
+            retried_item_ids_by_user=retried_item_ids_by_user,
+        )
         return retry_result

@@ -9,6 +9,7 @@ import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInva
 import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
 import { NO_DRAG_CLASS } from 'features/nodes/types/constants';
 import type { FieldInputTemplate } from 'features/nodes/types/field';
+import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { memo, useRef } from 'react';
 
 import { InputFieldAddRemoveFormRoot } from './InputFieldAddRemoveFormRoot';
@@ -19,9 +20,10 @@ import { InputFieldWrapper } from './InputFieldWrapper';
 interface Props {
   nodeId: string;
   fieldName: string;
+  settings?: NodeFieldElement['data']['settings'];
 }
 
-export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
+export const InputFieldEditModeNodes = memo(({ nodeId, fieldName, settings }: Props) => {
   const fieldTemplate = useInputFieldTemplateOrThrow(fieldName);
   const isInvalid = useInputFieldIsInvalid(fieldName);
   const isConnected = useInputFieldIsConnected(fieldName);
@@ -45,6 +47,7 @@ export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
       isInvalid={isInvalid}
       isConnected={isConnected}
       fieldTemplate={fieldTemplate}
+      settings={settings}
     />
   );
 });
@@ -57,6 +60,7 @@ type CommonProps = {
   isInvalid: boolean;
   isConnected: boolean;
   fieldTemplate: FieldInputTemplate;
+  settings?: NodeFieldElement['data']['settings'];
 };
 
 const ConnectedOrConnectionField = memo(({ nodeId, fieldName, isInvalid }: CommonProps) => {
@@ -96,7 +100,7 @@ const directFieldSx: SystemStyleObject = {
   },
 };
 
-const DirectField = memo(({ nodeId, fieldName, isInvalid, isConnected, fieldTemplate }: CommonProps) => {
+const DirectField = memo(({ nodeId, fieldName, isInvalid, isConnected, fieldTemplate, settings }: CommonProps) => {
   const draggableRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
 
@@ -116,7 +120,7 @@ const DirectField = memo(({ nodeId, fieldName, isInvalid, isConnected, fieldTemp
             <InputFieldAddRemoveFormRoot nodeId={nodeId} fieldName={fieldName} />
           </Flex>
         </Flex>
-        <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
+        <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} settings={settings} />
       </Flex>
       {fieldTemplate.input !== 'direct' && <InputFieldHandle nodeId={nodeId} fieldName={fieldName} />}
     </InputFieldWrapper>

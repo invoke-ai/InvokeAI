@@ -35,8 +35,13 @@ from invokeai.app.services.events.events_common import (
     ModelLoadStartedEvent,
     QueueClearedEvent,
     QueueEventBase,
+    QueueItemsRetriedEvent,
     QueueItemStatusChangedEvent,
     RecallParametersUpdatedEvent,
+    WorkflowCreatedEvent,
+    WorkflowDeletedEvent,
+    WorkflowEventBase,
+    WorkflowUpdatedEvent,
     register_events,
 )
 from invokeai.backend.util.logging import InvokeAILogger
@@ -65,6 +70,7 @@ QUEUE_EVENTS = {
     InvocationErrorEvent,
     QueueItemStatusChangedEvent,
     BatchEnqueuedEvent,
+    QueueItemsRetriedEvent,
     QueueClearedEvent,
     RecallParametersUpdatedEvent,
 }
@@ -86,6 +92,7 @@ MODEL_EVENTS = {
 }
 
 BULK_DOWNLOAD_EVENTS = {BulkDownloadStartedEvent, BulkDownloadCompleteEvent, BulkDownloadErrorEvent}
+WORKFLOW_EVENTS = {WorkflowCreatedEvent, WorkflowUpdatedEvent, WorkflowDeletedEvent}
 
 
 class SocketIO:
@@ -115,6 +122,7 @@ class SocketIO:
         register_events(QUEUE_EVENTS, self._handle_queue_event)
         register_events(MODEL_EVENTS, self._handle_model_event)
         register_events(BULK_DOWNLOAD_EVENTS, self._handle_bulk_image_download_event)
+        register_events(WORKFLOW_EVENTS, self._handle_workflow_event)
 
     async def _handle_connect(self, sid: str, environ: dict, auth: dict | None) -> bool:
         """Handle socket connection and authenticate the user.
@@ -167,6 +175,10 @@ class SocketIO:
                 logger.info(
                     f"Socket {sid} connected with user_id: {token_data.user_id}, is_admin: {token_data.is_admin}"
                 )
+                await self._sio.enter_room(sid, f"user:{token_data.user_id}")
+                await self._sio.enter_room(sid, "workflows:shared")
+                if token_data.is_admin:
+                    await self._sio.enter_room(sid, "admin")
                 return True
 
         # No valid token provided. In multiuser mode this is not allowed — reject
@@ -183,6 +195,9 @@ class SocketIO:
             "is_admin": True,
         }
         logger.debug(f"Socket {sid} connected as system admin (single-user mode)")
+        await self._sio.enter_room(sid, "user:system")
+        await self._sio.enter_room(sid, "workflows:shared")
+        await self._sio.enter_room(sid, "admin")
         return True
 
     @staticmethod
@@ -329,6 +344,26 @@ class SocketIO:
                 await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
                 logger.debug(f"Emitted private batch_enqueued event to user room {user_room} and admin room")
 
+            # QueueItemsRetriedEvent carries queue item ids that should only be visible
+            # to the affected owners + admins.
+            elif isinstance(event_data, QueueItemsRetriedEvent):
+                for user_id in event_data.user_ids:
+                    user_room = f"user:{user_id}"
+                    owner_event_data = event_data.model_copy(
+                        update={
+                            "retried_item_ids": event_data.retried_item_ids_by_user.get(user_id, []),
+                            "user_ids": [user_id],
+                            "retried_item_ids_by_user": {user_id: event_data.retried_item_ids_by_user.get(user_id, [])},
+                        }
+                    )
+                    await self._sio.emit(
+                        event=event_name, data=owner_event_data.model_dump(mode="json"), room=user_room
+                    )
+                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
+                logger.debug(
+                    f"Emitted private queue_items_retried event to user rooms {event_data.user_ids} and admin room"
+                )
+
             else:
                 # For remaining queue events (e.g. QueueClearedEvent) that do not
                 # carry user identity, emit to all subscribers in the queue room.
@@ -360,3 +395,32 @@ class SocketIO:
             await self._sio.emit(
                 event=event_name, data=event_data.model_dump(mode="json"), room=event_data.bulk_download_id
             )
+
+    async def _handle_workflow_event(self, event: FastAPIEvent[WorkflowEventBase]) -> None:
+        event_name, event_data = event
+        payload = event_data.model_dump(mode="json")
+
+        if not self._is_multiuser_enabled():
+            await self._sio.emit(event=event_name, data=payload, room="admin")
+            return
+
+        await self._sio.emit(event=event_name, data=payload, room=f"user:{event_data.user_id}")
+        await self._sio.emit(event=event_name, data=payload, room="admin")
+
+        if event_name == "workflow_created":
+            if getattr(event_data, "is_public", False):
+                await self._sio.emit(event=event_name, data=payload, room="workflows:shared")
+            return
+
+        if event_name == "workflow_deleted":
+            if getattr(event_data, "is_public", False):
+                await self._sio.emit(event=event_name, data=payload, room="workflows:shared")
+            return
+
+        if event_name == "workflow_updated":
+            if getattr(event_data, "new_is_public", False):
+                await self._sio.emit(event=event_name, data=payload, room="workflows:shared")
+            elif getattr(event_data, "old_is_public", False):
+                await self._sio.emit(
+                    event="workflow_deleted", data={"workflow_id": event_data.workflow_id}, room="workflows:shared"
+                )
