@@ -9092,6 +9092,11 @@ export type components = {
             max_tokens?: number;
             /** System Prompt */
             system_prompt?: string | null;
+            /**
+             * Task Id
+             * @description Client-supplied task ID used to correlate socket progress events to this request
+             */
+            task_id?: string | null;
         };
         /** ExpandPromptResponse */
         ExpandPromptResponse: {
@@ -14901,6 +14906,11 @@ export type components = {
              * @default Describe this image in detail for use as an AI image generation prompt.
              */
             instruction?: string;
+            /**
+             * Task Id
+             * @description Client-supplied task ID used to correlate socket progress events to this request
+             */
+            task_id?: string | null;
         };
         /** ImageToPromptResponse */
         ImageToPromptResponse: {
@@ -17259,6 +17269,106 @@ export type components = {
             type: "iterate_output";
         };
         JsonValue: unknown;
+        /**
+         * LLMTaskCompleteEvent
+         * @description Event model for llm_task_complete
+         */
+        LLMTaskCompleteEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * Task Id
+             * @description Client-supplied task ID correlating events to a single request
+             */
+            task_id: string;
+            /**
+             * User Id
+             * @description ID of the user who initiated the task
+             * @default system
+             */
+            user_id: string;
+        };
+        /**
+         * LLMTaskErrorEvent
+         * @description Event model for llm_task_error
+         */
+        LLMTaskErrorEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * Task Id
+             * @description Client-supplied task ID correlating events to a single request
+             */
+            task_id: string;
+            /**
+             * User Id
+             * @description ID of the user who initiated the task
+             * @default system
+             */
+            user_id: string;
+            /**
+             * Error
+             * @description The error message
+             */
+            error: string;
+        };
+        /**
+         * LLMTaskProgressEvent
+         * @description Event model for llm_task_progress
+         */
+        LLMTaskProgressEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * Task Id
+             * @description Client-supplied task ID correlating events to a single request
+             */
+            task_id: string;
+            /**
+             * User Id
+             * @description ID of the user who initiated the task
+             * @default system
+             */
+            user_id: string;
+            /**
+             * Phase
+             * @description Which phase of the task is in progress
+             * @enum {string}
+             */
+            phase: "loading_model" | "generating";
+            /**
+             * Message
+             * @description A short message describing the current phase
+             */
+            message: string;
+            /**
+             * Percentage
+             * @description Progress fraction in [0, 1]; omit for indeterminate progress
+             * @default null
+             */
+            percentage: number | null;
+            /**
+             * Current Tokens
+             * @description Number of tokens generated so far (generating phase)
+             * @default null
+             */
+            current_tokens: number | null;
+            /**
+             * Total Tokens
+             * @description Max tokens the request will generate (generating phase)
+             * @default null
+             */
+            total_tokens: number | null;
+        };
         /**
          * LaMa Infill
          * @description Infills transparent areas of an image using the LaMa model

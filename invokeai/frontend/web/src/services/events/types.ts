@@ -6,6 +6,29 @@ type ClientEmitUnsubscribeQueue = ClientEmitSubscribeQueue;
 type ClientEmitSubscribeBulkDownload = { bulk_download_id: string };
 type ClientEmitUnsubscribeBulkDownload = ClientEmitSubscribeBulkDownload;
 
+// LLM utility task events (expand-prompt, image-to-prompt). Hand-typed until schema regen.
+export type LLMTaskProgressEventPayload = {
+  task_id: string;
+  user_id: string;
+  phase: 'loading_model' | 'generating';
+  message: string;
+  percentage: number | null;
+  current_tokens: number | null;
+  total_tokens: number | null;
+  timestamp: number;
+};
+type LLMTaskCompleteEventPayload = {
+  task_id: string;
+  user_id: string;
+  timestamp: number;
+};
+type LLMTaskErrorEventPayload = {
+  task_id: string;
+  user_id: string;
+  error: string;
+  timestamp: number;
+};
+
 export type ServerToClientEvents = {
   invocation_progress: (payload: S['InvocationProgressEvent']) => void;
   invocation_complete: (payload: S['InvocationCompleteEvent']) => void;
@@ -33,6 +56,9 @@ export type ServerToClientEvents = {
   bulk_download_started: (payload: S['BulkDownloadStartedEvent']) => void;
   bulk_download_complete: (payload: S['BulkDownloadCompleteEvent']) => void;
   bulk_download_error: (payload: S['BulkDownloadErrorEvent']) => void;
+  llm_task_progress: (payload: LLMTaskProgressEventPayload) => void;
+  llm_task_complete: (payload: LLMTaskCompleteEventPayload) => void;
+  llm_task_error: (payload: LLMTaskErrorEventPayload) => void;
 };
 
 export type ClientToServerEvents = {

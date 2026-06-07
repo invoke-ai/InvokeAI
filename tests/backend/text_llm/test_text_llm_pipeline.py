@@ -1,6 +1,6 @@
 """Tests for the TextLLMPipeline class."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import torch
 
@@ -16,23 +16,38 @@ def _make_mock_tokenizer(has_chat_template: bool = True) -> MagicMock:
     else:
         tokenizer.chat_template = None
 
-    # Simulate tokenizer __call__ returning dict with input_ids
     input_ids = torch.tensor([[1, 2, 3, 4, 5]])
     tokenizer_output = MagicMock()
     tokenizer_output.__getitem__ = lambda self, key: {"input_ids": input_ids}[key]
     tokenizer_output.to.return_value = tokenizer_output
     tokenizer.return_value = tokenizer_output
 
-    tokenizer.decode.return_value = "A detailed landscape with mountains"
+    # Token-counting for progress: pretend each accumulated string is N tokens long.
+    tokenizer.encode.return_value = [10, 11, 12]
     return tokenizer
 
 
 def _make_mock_model() -> MagicMock:
-    """Create a mock causal LM model."""
-    model = MagicMock()
-    # generate returns tensor that includes input + generated tokens
-    model.generate.return_value = torch.tensor([[1, 2, 3, 4, 5, 10, 11, 12]])
-    return model
+    return MagicMock()
+
+
+class FakeStreamer:
+    """Stand-in for TextIteratorStreamer — yields a fixed sequence of text chunks."""
+
+    def __init__(self, chunks: list[str]):
+        self._chunks = chunks
+
+    def __iter__(self):
+        return iter(self._chunks)
+
+
+def _patch_streamer(chunks: list[str] | None = None):
+    """Patch TextIteratorStreamer in the pipeline module to return a FakeStreamer."""
+    chunks = chunks if chunks is not None else ["A detailed ", "landscape ", "with mountains"]
+    return patch(
+        "invokeai.backend.text_llm_pipeline.TextIteratorStreamer",
+        return_value=FakeStreamer(chunks),
+    )
 
 
 def test_pipeline_uses_chat_template_when_available():
@@ -41,7 +56,8 @@ def test_pipeline_uses_chat_template_when_available():
     model = _make_mock_model()
     pipeline = TextLLMPipeline(model, tokenizer)
 
-    pipeline.run(prompt="a cat", device=torch.device("cpu"), dtype=torch.float32)
+    with _patch_streamer():
+        pipeline.run(prompt="a cat", device=torch.device("cpu"), dtype=torch.float32)
 
     tokenizer.apply_chat_template.assert_called_once()
     call_args = tokenizer.apply_chat_template.call_args
@@ -56,10 +72,10 @@ def test_pipeline_fallback_without_chat_template():
     model = _make_mock_model()
     pipeline = TextLLMPipeline(model, tokenizer)
 
-    pipeline.run(prompt="a cat", system_prompt="Be helpful", device=torch.device("cpu"), dtype=torch.float32)
+    with _patch_streamer():
+        pipeline.run(prompt="a cat", system_prompt="Be helpful", device=torch.device("cpu"), dtype=torch.float32)
 
     tokenizer.apply_chat_template.assert_not_called()
-    # Check that the tokenizer was called with the fallback format
     call_args = tokenizer.call_args[0][0]
     assert "Be helpful" in call_args
     assert "a cat" in call_args
@@ -72,56 +88,62 @@ def test_pipeline_no_system_prompt():
     model = _make_mock_model()
     pipeline = TextLLMPipeline(model, tokenizer)
 
-    pipeline.run(prompt="a dog", system_prompt="", device=torch.device("cpu"), dtype=torch.float32)
+    with _patch_streamer():
+        pipeline.run(prompt="a dog", system_prompt="", device=torch.device("cpu"), dtype=torch.float32)
 
     call_args = tokenizer.apply_chat_template.call_args
     messages = call_args[0][0]
-    # No system message when system_prompt is empty
     assert not any(m["role"] == "system" for m in messages)
     assert any(m["role"] == "user" and m["content"] == "a dog" for m in messages)
 
 
-def test_pipeline_decodes_only_generated_tokens():
-    """Pipeline should strip input tokens and only decode newly generated ones."""
-    tokenizer = _make_mock_tokenizer(has_chat_template=True)
-    model = _make_mock_model()
-    pipeline = TextLLMPipeline(model, tokenizer)
-
-    pipeline.run(prompt="test", device=torch.device("cpu"), dtype=torch.float32)
-
-    # The mock model returns [1,2,3,4,5,10,11,12], input is [1,2,3,4,5]
-    # So decode should be called with [10, 11, 12]
-    decode_call = tokenizer.decode.call_args
-    decoded_tokens = decode_call[0][0]
-    assert decoded_tokens.tolist() == [10, 11, 12]
-    assert decode_call[1]["skip_special_tokens"] is True
-
-
 def test_pipeline_passes_generation_params():
-    """Pipeline should pass max_new_tokens and sampling params to model.generate."""
+    """Pipeline should pass max_new_tokens and sampling params to model.generate, plus a streamer."""
     tokenizer = _make_mock_tokenizer(has_chat_template=True)
     model = _make_mock_model()
     pipeline = TextLLMPipeline(model, tokenizer)
 
-    pipeline.run(prompt="test", max_new_tokens=100, device=torch.device("cpu"), dtype=torch.float32)
+    with _patch_streamer():
+        pipeline.run(prompt="test", max_new_tokens=100, device=torch.device("cpu"), dtype=torch.float32)
 
     generate_kwargs = model.generate.call_args[1]
     assert generate_kwargs["max_new_tokens"] == 100
     assert generate_kwargs["do_sample"] is True
     assert generate_kwargs["temperature"] == 0.7
     assert generate_kwargs["top_p"] == 0.9
+    assert "streamer" in generate_kwargs
 
 
-def test_pipeline_returns_stripped_string():
-    """Pipeline should return a stripped string from the decoded output."""
+def test_pipeline_returns_joined_streamed_chunks():
+    """Pipeline should return the concatenated, stripped streamer output."""
     tokenizer = _make_mock_tokenizer(has_chat_template=True)
-    tokenizer.decode.return_value = "  generated text with spaces  "
     model = _make_mock_model()
     pipeline = TextLLMPipeline(model, tokenizer)
 
-    result = pipeline.run(prompt="test", device=torch.device("cpu"), dtype=torch.float32)
+    with _patch_streamer(["  hello ", "world  "]):
+        result = pipeline.run(prompt="test", device=torch.device("cpu"), dtype=torch.float32)
 
-    assert result == "generated text with spaces"
+    assert result == "hello world"
+
+
+def test_pipeline_invokes_progress_callback_per_chunk():
+    """Pipeline should call progress_callback once per non-empty streamed chunk."""
+    tokenizer = _make_mock_tokenizer(has_chat_template=True)
+    model = _make_mock_model()
+    pipeline = TextLLMPipeline(model, tokenizer)
+    calls: list[tuple[int, int]] = []
+
+    with _patch_streamer(["a ", "b ", "c"]):
+        pipeline.run(
+            prompt="test",
+            max_new_tokens=50,
+            device=torch.device("cpu"),
+            dtype=torch.float32,
+            progress_callback=lambda current, total: calls.append((current, total)),
+        )
+
+    assert len(calls) == 3
+    assert all(total == 50 for _, total in calls)
 
 
 def test_default_system_prompt_content():
