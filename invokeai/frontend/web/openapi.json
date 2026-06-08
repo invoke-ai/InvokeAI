@@ -11130,7 +11130,7 @@
         "category": "model",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Loads an Anima model, outputting its submodels.\n\nAnima uses:\n- Transformer: Cosmos Predict2 DiT + LLM Adapter (from single-file checkpoint)\n- Qwen3 Encoder: Qwen3 0.6B (standalone single-file)\n- VAE: AutoencoderKLQwenImage / Wan 2.1 VAE (standalone single-file or FLUX VAE)\n- T5 Encoder: T5-XXL model (only the tokenizer submodel is used, for LLM Adapter token IDs)",
+        "description": "Loads an Anima model, outputting its submodels.\n\nAnima uses:\n- Transformer: Cosmos Predict2 DiT + LLM Adapter (from single-file checkpoint)\n- Qwen3 Encoder: Qwen3 0.6B (standalone single-file)\n- VAE: AutoencoderKLQwenImage / Wan 2.1 VAE (standalone single-file or FLUX VAE)\n\nThe T5-XXL tokenizer needed for LLM Adapter token IDs is bundled in the package,\nso no T5-XXL encoder model needs to be installed.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -11185,15 +11185,6 @@
             "title": "Qwen3 Encoder",
             "ui_model_type": ["qwen3_encoder"]
           },
-          "t5_encoder_model": {
-            "$ref": "#/components/schemas/ModelIdentifierField",
-            "description": "T5-XXL encoder model. The tokenizer submodel is used for Anima text encoding.",
-            "field_kind": "input",
-            "input": "direct",
-            "orig_required": true,
-            "title": "T5 Encoder",
-            "ui_model_type": ["t5_encoder"]
-          },
           "type": {
             "const": "anima_model_loader",
             "default": "anima_model_loader",
@@ -11202,11 +11193,11 @@
             "type": "string"
           }
         },
-        "required": ["model", "vae_model", "qwen3_encoder_model", "t5_encoder_model", "type", "id"],
+        "required": ["model", "vae_model", "qwen3_encoder_model", "type", "id"],
         "tags": ["model", "anima"],
         "title": "Main Model - Anima",
         "type": "object",
-        "version": "1.3.0",
+        "version": "1.4.0",
         "output": {
           "$ref": "#/components/schemas/AnimaModelLoaderOutput"
         }
@@ -11236,13 +11227,6 @@
             "title": "VAE",
             "ui_hidden": false
           },
-          "t5_encoder": {
-            "$ref": "#/components/schemas/T5EncoderField",
-            "description": "T5 tokenizer and text encoder",
-            "field_kind": "output",
-            "title": "T5 Encoder",
-            "ui_hidden": false
-          },
           "type": {
             "const": "anima_model_loader_output",
             "default": "anima_model_loader_output",
@@ -11251,7 +11235,7 @@
             "type": "string"
           }
         },
-        "required": ["output_meta", "transformer", "qwen3_encoder", "vae", "t5_encoder", "type", "type"],
+        "required": ["output_meta", "transformer", "qwen3_encoder", "vae", "type", "type"],
         "title": "AnimaModelLoaderOutput",
         "type": "object"
       },
@@ -11259,7 +11243,7 @@
         "category": "conditioning",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Encodes and preps a prompt for an Anima image.\n\nUses Qwen3 0.6B for hidden state extraction and T5-XXL tokenizer for\ntoken IDs (no T5 model weights needed). Both are combined by the\nLLM Adapter inside the Anima transformer during denoising.",
+        "description": "Encodes and preps a prompt for an Anima image.\n\nUses Qwen3 0.6B for hidden state extraction and a bundled T5-XXL tokenizer for\ntoken IDs (no T5 model weights needed). Both are combined by the\nLLM Adapter inside the Anima transformer during denoising.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -11319,22 +11303,6 @@
             "orig_required": true,
             "title": "Qwen3 Encoder"
           },
-          "t5_encoder": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/T5EncoderField"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "T5 tokenizer and text encoder",
-            "field_kind": "input",
-            "input": "connection",
-            "orig_required": true,
-            "title": "T5 Encoder"
-          },
           "mask": {
             "anyOf": [
               {
@@ -11363,7 +11331,7 @@
         "tags": ["prompt", "conditioning", "anima"],
         "title": "Prompt - Anima",
         "type": "object",
-        "version": "1.3.0",
+        "version": "1.4.0",
         "output": {
           "$ref": "#/components/schemas/AnimaConditioningOutput"
         }
