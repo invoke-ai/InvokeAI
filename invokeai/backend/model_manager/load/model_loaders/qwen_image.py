@@ -6,7 +6,10 @@ import torch
 
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
-from invokeai.backend.model_manager.configs.main import Main_GGUF_QwenImage_Config
+from invokeai.backend.model_manager.configs.main import (
+    Main_Checkpoint_QwenImage_Config,
+    Main_GGUF_QwenImage_Config,
+)
 from invokeai.backend.model_manager.configs.qwen_vl_encoder import (
     QwenVLEncoder_Checkpoint_Config,
     QwenVLEncoder_Diffusers_Config,
@@ -25,6 +28,132 @@ from invokeai.backend.model_manager.taxonomy import (
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.util.devices import TorchDevice
+
+
+def _strip_comfyui_prefix(sd: dict) -> dict:
+    """Strip ComfyUI-style `model.diffusion_model.` / `diffusion_model.` prefixes from keys."""
+    prefix_to_strip = None
+    for prefix in ["model.diffusion_model.", "diffusion_model."]:
+        if any(k.startswith(prefix) for k in sd.keys() if isinstance(k, str)):
+            prefix_to_strip = prefix
+            break
+    if prefix_to_strip is None:
+        return sd
+    stripped: dict = {}
+    for key, value in sd.items():
+        if isinstance(key, str) and key.startswith(prefix_to_strip):
+            stripped[key[len(prefix_to_strip) :]] = value
+        else:
+            stripped[key] = value
+    return stripped
+
+
+def _dequantize_comfyui_fp8(sd: dict) -> int:
+    """Dequantize ComfyUI-style fp8_scaled weights in-place. Returns count of dequantized tensors.
+
+    Two key naming schemes are in the wild:
+      - `<path>.weight` + `<path>.weight_scale`  (FLUX, Z-Image style)
+      - `<path>.weight` + `<path>.scale_weight`  (Qwen2.5-VL fp8_scaled style, also
+        emits `<path>.scale_input` for activation scaling that we discard).
+    """
+    scale_suffixes = (".weight_scale", ".scale_weight")
+    weight_scale_keys = [k for k in sd.keys() if isinstance(k, str) and k.endswith(scale_suffixes)]
+    count = 0
+    for scale_key in weight_scale_keys:
+        for suffix in scale_suffixes:
+            if scale_key.endswith(suffix):
+                weight_key = scale_key[: -len(suffix)] + ".weight"
+                break
+        if weight_key not in sd:
+            continue
+        weight = sd[weight_key]
+        scale = sd[scale_key]
+        weight_float = weight.float()
+        scale_float = scale.float()
+        if scale_float.shape != weight_float.shape and scale_float.numel() > 1:
+            for dim in range(len(weight_float.shape)):
+                if dim < len(scale_float.shape) and scale_float.shape[dim] != weight_float.shape[dim]:
+                    block_size = weight_float.shape[dim] // scale_float.shape[dim]
+                    if block_size > 1:
+                        scale_float = scale_float.repeat_interleave(block_size, dim=dim)
+        sd[weight_key] = weight_float * scale_float
+        count += 1
+    return count
+
+
+def _strip_quantization_metadata(sd: dict) -> None:
+    """Strip ComfyUI fp8 quantization metadata keys in-place."""
+    keys_to_drop = [
+        k
+        for k in sd.keys()
+        if isinstance(k, str)
+        and (
+            k.endswith(".weight_scale")
+            or k.endswith(".scale_weight")
+            or k.endswith(".scale_input")
+            or "comfy_quant" in k
+            or k == "scaled_fp8"
+        )
+    ]
+    for k in keys_to_drop:
+        del sd[k]
+
+
+def _build_qwen_image_transformer_config(sd: dict, is_edit: bool) -> dict:
+    """Auto-detect Qwen Image transformer architecture parameters from the state dict.
+
+    Works for both GGUF (GGMLTensor) and plain safetensors (torch.Tensor) state dicts.
+    Mutates nothing.
+    """
+    from diffusers import QwenImageTransformer2DModel
+
+    def _shape(t):
+        return t.tensor_shape if isinstance(t, GGMLTensor) else t.shape
+
+    num_layers = 0
+    for key in sd.keys():
+        if isinstance(key, str) and key.startswith("transformer_blocks."):
+            parts = key.split(".")
+            if len(parts) >= 2:
+                try:
+                    num_layers = max(num_layers, int(parts[1]) + 1)
+                except ValueError:
+                    pass
+
+    num_attention_heads = 24
+    attention_head_dim = 128
+    in_channels = 64
+
+    if "img_in.weight" in sd:
+        shape = _shape(sd["img_in.weight"])
+        hidden_dim = shape[0]
+        in_channels = shape[1]
+        num_attention_heads = hidden_dim // attention_head_dim
+
+    joint_attention_dim = 3584
+    if "txt_in.weight" in sd:
+        joint_attention_dim = _shape(sd["txt_in.weight"])[1]
+
+    model_config: dict = {
+        "patch_size": 2,
+        "in_channels": in_channels,
+        "out_channels": 16,
+        "num_layers": num_layers if num_layers > 0 else 60,
+        "attention_head_dim": attention_head_dim,
+        "num_attention_heads": num_attention_heads,
+        "joint_attention_dim": joint_attention_dim,
+        "guidance_embeds": False,
+        "axes_dims_rope": (16, 56, 56),
+    }
+
+    # zero_cond_t enables dual modulation for noisy vs reference patches in edit-variant
+    # models. Setting it on txt2img models produces garbage. Requires diffusers 0.37+.
+    import inspect
+
+    if is_edit and "zero_cond_t" in inspect.signature(QwenImageTransformer2DModel.__init__).parameters:
+        model_config["zero_cond_t"] = True
+
+    return model_config
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.QwenImage, type=ModelType.Main, format=ModelFormat.Diffusers)
@@ -73,6 +202,7 @@ class QwenImageDiffusersModel(GenericDiffusersLoader):
             else:
                 raise e
 
+        result = self._apply_fp8_layerwise_casting(result, config, submodel_type)
         return result
 
 
@@ -107,75 +237,80 @@ class QwenImageGGUFCheckpointModel(ModelLoader):
         compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
         sd = gguf_sd_loader(model_path, compute_dtype=compute_dtype)
-
-        # Strip ComfyUI-style prefixes if present
-        prefix_to_strip = None
-        for prefix in ["model.diffusion_model.", "diffusion_model."]:
-            if any(k.startswith(prefix) for k in sd.keys() if isinstance(k, str)):
-                prefix_to_strip = prefix
-                break
-
-        if prefix_to_strip:
-            stripped_sd = {}
-            for key, value in sd.items():
-                if isinstance(key, str) and key.startswith(prefix_to_strip):
-                    stripped_sd[key[len(prefix_to_strip) :]] = value
-                else:
-                    stripped_sd[key] = value
-            sd = stripped_sd
-
-        # Auto-detect architecture from state dict
-        num_layers = 0
-        for key in sd.keys():
-            if isinstance(key, str) and key.startswith("transformer_blocks."):
-                parts = key.split(".")
-                if len(parts) >= 2:
-                    try:
-                        layer_idx = int(parts[1])
-                        num_layers = max(num_layers, layer_idx + 1)
-                    except ValueError:
-                        pass
-
-        # Detect dimensions from weights
-        num_attention_heads = 24  # default
-        attention_head_dim = 128  # default
-
-        if "img_in.weight" in sd:
-            w = sd["img_in.weight"]
-            shape = w.tensor_shape if isinstance(w, GGMLTensor) else w.shape
-            hidden_dim = shape[0]
-            in_channels = shape[1]
-            num_attention_heads = hidden_dim // attention_head_dim
-
-        joint_attention_dim = 3584  # default
-        if "txt_in.weight" in sd:
-            w = sd["txt_in.weight"]
-            shape = w.tensor_shape if isinstance(w, GGMLTensor) else w.shape
-            joint_attention_dim = shape[1]
-
-        model_config: dict = {
-            "patch_size": 2,
-            "in_channels": in_channels if "img_in.weight" in sd else 64,
-            "out_channels": 16,
-            "num_layers": num_layers if num_layers > 0 else 60,
-            "attention_head_dim": attention_head_dim,
-            "num_attention_heads": num_attention_heads,
-            "joint_attention_dim": joint_attention_dim,
-            "guidance_embeds": False,
-            "axes_dims_rope": (16, 56, 56),
-        }
-
-        # zero_cond_t is only used by edit-variant models. It enables dual modulation
-        # for noisy vs reference patches. Setting it on txt2img models produces garbage.
-        # Also requires diffusers 0.37+ (the parameter doesn't exist in older versions).
-        import inspect
+        sd = _strip_comfyui_prefix(sd)
 
         is_edit = getattr(config, "variant", None) == QwenImageVariantType.Edit
-        if is_edit and "zero_cond_t" in inspect.signature(QwenImageTransformer2DModel.__init__).parameters:
-            model_config["zero_cond_t"] = True
+        model_config = _build_qwen_image_transformer_config(sd, is_edit=is_edit)
 
         with accelerate.init_empty_weights():
             model = QwenImageTransformer2DModel(**model_config)
+
+        model.load_state_dict(sd, strict=False, assign=True)
+        return model
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.QwenImage, type=ModelType.Main, format=ModelFormat.Checkpoint)
+class QwenImageCheckpointModel(ModelLoader):
+    """Loads Qwen Image transformer models from single-file safetensors checkpoints
+    (e.g. ComfyUI fp8_scaled, plain bf16/fp16). Dequantizes ComfyUI fp8 scaling to
+    bf16 at load time; the `default_settings.fp8_storage` toggle then optionally
+    re-casts to fp8 for VRAM savings."""
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, Checkpoint_Config_Base):
+            raise ValueError("Only CheckpointConfigBase models are currently supported here.")
+
+        match submodel_type:
+            case SubModelType.Transformer:
+                model = self._load_from_singlefile(config)
+                return self._apply_fp8_layerwise_casting(model, config, submodel_type)
+
+        raise ValueError(
+            f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
+        )
+
+    def _load_from_singlefile(self, config: AnyModelConfig) -> AnyModel:
+        from diffusers import QwenImageTransformer2DModel
+        from safetensors.torch import load_file
+
+        from invokeai.backend.util.logging import InvokeAILogger
+
+        logger = InvokeAILogger.get_logger(self.__class__.__name__)
+
+        if not isinstance(config, Main_Checkpoint_QwenImage_Config):
+            raise TypeError(f"Expected Main_Checkpoint_QwenImage_Config, got {type(config).__name__}.")
+        model_path = Path(config.path)
+
+        target_device = TorchDevice.choose_torch_device()
+        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+
+        sd = load_file(str(model_path))
+        sd = _strip_comfyui_prefix(sd)
+
+        dequantized = _dequantize_comfyui_fp8(sd)
+        if dequantized > 0:
+            logger.info(f"Dequantized {dequantized} ComfyUI-quantized weights")
+        _strip_quantization_metadata(sd)
+
+        is_edit = getattr(config, "variant", None) == QwenImageVariantType.Edit
+        model_config = _build_qwen_image_transformer_config(sd, is_edit=is_edit)
+
+        with accelerate.init_empty_weights():
+            model = QwenImageTransformer2DModel(**model_config)
+
+        # Cast to compute dtype first, then size the cache reservation from the actual
+        # post-cast tensors. Dequantized weights are transiently float32, so sizing
+        # before the cast (with model_dtype.itemsize) would undercount by ~2x.
+        for k in list(sd.keys()):
+            if sd[k].is_floating_point():
+                sd[k] = sd[k].to(model_dtype)
+
+        new_sd_size = sum(t.nelement() * t.element_size() for t in sd.values())
+        self._ram_cache.make_room(new_sd_size)
 
         model.load_state_dict(sd, strict=False, assign=True)
         return model
@@ -290,54 +425,13 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
 
         sd = load_file(str(model_path))
 
-        # Dequantize ComfyUI-style fp8 weights. Two key naming schemes are in the wild:
-        #   - `<path>.weight` + `<path>.weight_scale`  (FLUX, Z-Image style)
-        #   - `<path>.weight` + `<path>.scale_weight`  (Qwen2.5-VL fp8_scaled style, also
-        #     emits `<path>.scale_input` for activation scaling that we discard).
-        scale_suffixes = (".weight_scale", ".scale_weight")
-        weight_scale_keys = [k for k in sd.keys() if isinstance(k, str) and k.endswith(scale_suffixes)]
-        dequantized_count = 0
-        for scale_key in weight_scale_keys:
-            for suffix in scale_suffixes:
-                if scale_key.endswith(suffix):
-                    weight_key = scale_key[: -len(suffix)] + ".weight"
-                    break
-            if weight_key not in sd:
-                continue
-            weight = sd[weight_key]
-            scale = sd[scale_key]
-            weight_float = weight.float()
-            scale_float = scale.float()
-            if scale_float.shape != weight_float.shape and scale_float.numel() > 1:
-                # Block-wise quantization: expand scale along mismatching dim
-                for dim in range(len(weight_float.shape)):
-                    if dim < len(scale_float.shape) and scale_float.shape[dim] != weight_float.shape[dim]:
-                        block_size = weight_float.shape[dim] // scale_float.shape[dim]
-                        if block_size > 1:
-                            scale_float = scale_float.repeat_interleave(block_size, dim=dim)
-            sd[weight_key] = weight_float * scale_float
-            dequantized_count += 1
-
+        # Dequantize ComfyUI-style fp8 weights, then strip the now-unused quantization
+        # metadata (`scale_input` is the activation scale ComfyUI's fp8 matmul kernels
+        # use at runtime — we run the encoder in bf16 after dequantization).
+        dequantized_count = _dequantize_comfyui_fp8(sd)
         if dequantized_count > 0:
             logger.info(f"Dequantized {dequantized_count} ComfyUI-quantized weights")
-
-        # Strip ComfyUI quantization metadata. `scale_input` is the activation scale used
-        # at runtime by ComfyUI's fp8 matmul kernels — we run the encoder in bf16 after
-        # dequantization, so it is not needed.
-        keys_to_drop = [
-            k
-            for k in sd.keys()
-            if isinstance(k, str)
-            and (
-                k.endswith(".weight_scale")
-                or k.endswith(".scale_weight")
-                or k.endswith(".scale_input")
-                or "comfy_quant" in k
-                or k == "scaled_fp8"
-            )
-        ]
-        for k in keys_to_drop:
-            del sd[k]
+        _strip_quantization_metadata(sd)
 
         # ComfyUI single-file checkpoints use the legacy Qwen2.5-VL key layout
         # (`visual.X`, `model.X`); transformers ≥4.50 expects `model.visual.X` and
