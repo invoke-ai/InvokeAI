@@ -3,9 +3,8 @@ import { Box, Button, CompositeNumberInput, Flex, FormControl, FormLabel, Input 
 import { RGBA_COLOR_SWATCHES } from 'common/components/ColorPicker/swatches';
 import { hexToRGBA, rgbaColorToString, rgbaToHex } from 'common/util/colorCodeTransformers';
 import type { ChangeEvent, CSSProperties } from 'react';
-import { memo, useCallback, useEffect, useState } from 'react';
-import { RgbaColorPicker as ColorfulRgbaColorPicker } from 'react-colorful';
-import type { RgbaColor } from 'react-colorful/dist/types';
+import { memo, useCallback, useState } from 'react';
+import { type RgbaColor, RgbaColorPicker as ColorfulRgbaColorPicker } from 'react-colorful';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
@@ -41,10 +40,7 @@ const RgbaColorPicker = (props: Props) => {
   const handleChangeB = useCallback((b: number) => onChange({ ...color, b }), [color, onChange]);
   const handleChangeA = useCallback((a: number) => onChange({ ...color, a }), [color, onChange]);
   const [mode, setMode] = useState<'rgb' | 'hex'>('rgb');
-  const [hex, setHex] = useState<string>(rgbaToHex(color, true));
-  useEffect(() => {
-    setHex(rgbaToHex(color, true));
-  }, [color]);
+  const hex = rgbaToHex(color, true);
   const onToggleMode = useCallback(() => setMode((m) => (m === 'rgb' ? 'hex' : 'rgb')), []);
   const onChangeHex = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -53,7 +49,6 @@ const RgbaColorPicker = (props: Props) => {
         value = `#${value}`;
       }
       const cleaned = value.replace(/[^#0-9a-fA-F]/g, '').slice(0, 9);
-      setHex(cleaned);
       const hexBody = cleaned.replace('#', '');
       if (hexBody.length === 6 || hexBody.length === 8) {
         const a = hexBody.length === 8 ? parseInt(hexBody.slice(6, 8), 16) / 255 : color.a;
@@ -67,7 +62,6 @@ const RgbaColorPicker = (props: Props) => {
     (a: number) => {
       const next = { ...color, a: Math.max(0, Math.min(1, a)) };
       onChange(next);
-      setHex(rgbaToHex(next, true));
     },
     [color, onChange]
   );
