@@ -448,6 +448,16 @@ def patch_under_test(request: pytest.FixtureRequest) -> PatchUnderTest:
         )
         input = torch.randn(1, in_features)
         return ([(dora_layer, 0.7)], input)
+    elif layer_type == "diffusers_adaLN_lora":
+        lora_layer = DiffusersAdaLN_LoRALayer(
+            up=torch.randn(out_features, rank),
+            mid=None,
+            down=torch.randn(rank, in_features),
+            alpha=1.0,
+            bias=torch.randn(out_features),
+        )
+        input = torch.randn(1, in_features)
+        return ([(lora_layer, 0.7)], input)
     else:
         raise ValueError(f"Unsupported layer_type: {layer_type}")
 
