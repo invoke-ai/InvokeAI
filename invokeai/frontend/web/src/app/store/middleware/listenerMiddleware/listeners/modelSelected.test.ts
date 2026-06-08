@@ -21,15 +21,6 @@ const mockAnimaVAE = {
   format: 'diffusers' as const,
 };
 
-const mockT5Encoder = {
-  key: 't5-xxl-key',
-  hash: 't5-xxl-hash',
-  name: 'T5-XXL Encoder',
-  base: 'any' as const,
-  type: 't5_encoder' as const,
-  format: 't5_encoder' as const,
-};
-
 const mockAnimaMainModel = {
   key: 'anima-main-key',
   hash: 'anima-main-hash',
@@ -78,12 +69,9 @@ const mockSelectAnimaQwen3EncoderModels = vi.fn((_state: unknown) => [mockAnimaQ
 
 const mockSelectAnimaVAEModels = vi.fn((_state: unknown) => [mockAnimaVAE]);
 
-const mockSelectT5EncoderModels = vi.fn((_state: unknown) => [mockT5Encoder]);
-
 vi.mock('services/api/hooks/modelsByType', () => ({
   selectAnimaQwen3EncoderModels: (state: unknown) => mockSelectAnimaQwen3EncoderModels(state),
   selectAnimaVAEModels: (state: unknown) => mockSelectAnimaVAEModels(state),
-  selectT5EncoderModels: (state: unknown) => mockSelectT5EncoderModels(state),
   selectQwen3EncoderModels: vi.fn(() => []),
   selectZImageDiffusersModels: vi.fn(() => []),
   selectFluxVAEModels: vi.fn(() => []),
@@ -155,10 +143,9 @@ let capturedEffect: ((action: unknown, api: unknown) => void) | null = null;
 // Import actual action creators for assertion matching
 const paramsSliceActual = (await vi.importActual('features/controlLayers/store/paramsSlice')) as {
   animaQwen3EncoderModelSelected: { type: string };
-  animaT5EncoderModelSelected: { type: string };
   animaVaeModelSelected: { type: string };
 };
-const { animaQwen3EncoderModelSelected, animaT5EncoderModelSelected, animaVaeModelSelected } = paramsSliceActual;
+const { animaQwen3EncoderModelSelected, animaVaeModelSelected } = paramsSliceActual;
 
 // Import after mocks are set up
 const { addModelSelectedListener } = await import('./modelSelected');
@@ -180,7 +167,6 @@ function buildMockState(overrides: Record<string, unknown> = {}) {
       zImageQwen3SourceModel: null,
       animaVaeModel: null,
       animaQwen3EncoderModel: null,
-      animaT5EncoderModel: null,
       animaScheduler: 'euler',
       kleinVaeModel: null,
       kleinQwen3EncoderModel: null,
@@ -198,7 +184,6 @@ describe('modelSelected listener - Anima defaulting', () => {
     mockDispatch.mockClear();
     mockSelectAnimaQwen3EncoderModels.mockReturnValue([mockAnimaQwen3Encoder]);
     mockSelectAnimaVAEModels.mockReturnValue([mockAnimaVAE]);
-    mockSelectT5EncoderModels.mockReturnValue([mockT5Encoder]);
   });
 
   it('should dispatch encoder models with full ModelIdentifierField payloads when switching to Anima', () => {
@@ -212,17 +197,14 @@ describe('modelSelected listener - Anima defaulting', () => {
 
     // Find the dispatched actions for Anima encoders
     const qwen3Dispatch = dispatched.find((a) => a.type === animaQwen3EncoderModelSelected.type);
-    const t5Dispatch = dispatched.find((a) => a.type === animaT5EncoderModelSelected.type);
     const vaeDispatch = dispatched.find((a) => a.type === animaVaeModelSelected.type);
 
-    // All three should have been dispatched
+    // Both should have been dispatched
     expect(qwen3Dispatch).toBeDefined();
-    expect(t5Dispatch).toBeDefined();
     expect(vaeDispatch).toBeDefined();
 
     // The payloads must pass zModelIdentifierField validation (the actual schema used by reducers)
     expect(zModelIdentifierField.safeParse(qwen3Dispatch!.payload).success).toBe(true);
-    expect(zModelIdentifierField.safeParse(t5Dispatch!.payload).success).toBe(true);
     expect(zModelIdentifierField.safeParse(vaeDispatch!.payload).success).toBe(true);
   });
 
@@ -245,34 +227,13 @@ describe('modelSelected listener - Anima defaulting', () => {
     });
   });
 
-  it('should include hash and type in T5 encoder payload', () => {
-    const state = buildMockState({ model: mockFluxMainModel });
-    const action = modelSelected(zParameterModel.parse(mockAnimaMainModel));
-
-    capturedEffect!(action, {
-      getState: () => state,
-      dispatch: mockDispatch,
-    });
-
-    const t5Dispatch = dispatched.find((a) => a.type === animaT5EncoderModelSelected.type);
-    expect(t5Dispatch!.payload).toMatchObject({
-      key: mockT5Encoder.key,
-      hash: mockT5Encoder.hash,
-      name: mockT5Encoder.name,
-      base: mockT5Encoder.base,
-      type: mockT5Encoder.type,
-    });
-  });
-
   it('should not dispatch encoder defaults when Anima models are already set', () => {
     const existingQwen3 = { key: 'existing', hash: 'h', name: 'Existing', base: 'any', type: 'qwen3_encoder' };
-    const existingT5 = { key: 'existing-t5', hash: 'h', name: 'Existing T5', base: 'any', type: 't5_encoder' };
     const existingVae = { key: 'existing-vae', hash: 'h', name: 'Existing VAE', base: 'anima', type: 'vae' };
 
     const state = buildMockState({
       model: mockFluxMainModel,
       animaQwen3EncoderModel: existingQwen3,
-      animaT5EncoderModel: existingT5,
       animaVaeModel: existingVae,
     });
 
@@ -285,11 +246,9 @@ describe('modelSelected listener - Anima defaulting', () => {
 
     // Should NOT dispatch any encoder model selections since they're already set
     const qwen3Dispatch = dispatched.find((a) => a.type === animaQwen3EncoderModelSelected.type);
-    const t5Dispatch = dispatched.find((a) => a.type === animaT5EncoderModelSelected.type);
     const vaeDispatch = dispatched.find((a) => a.type === animaVaeModelSelected.type);
 
     expect(qwen3Dispatch).toBeUndefined();
-    expect(t5Dispatch).toBeUndefined();
     expect(vaeDispatch).toBeUndefined();
   });
 
@@ -306,23 +265,19 @@ describe('modelSelected listener - Anima defaulting', () => {
     });
 
     const qwen3Dispatch = dispatched.find((a) => a.type === animaQwen3EncoderModelSelected.type);
-    const t5Dispatch = dispatched.find((a) => a.type === animaT5EncoderModelSelected.type);
     const vaeDispatch = dispatched.find((a) => a.type === animaVaeModelSelected.type);
 
     expect(qwen3Dispatch).toBeUndefined();
-    expect(t5Dispatch).toBeUndefined();
     expect(vaeDispatch).toBeUndefined();
   });
 
   it('should clear Anima models when switching away from Anima', () => {
     const existingQwen3 = { key: 'existing', hash: 'h', name: 'Existing', base: 'any', type: 'qwen3_encoder' };
-    const existingT5 = { key: 'existing-t5', hash: 'h', name: 'Existing T5', base: 'any', type: 't5_encoder' };
     const existingVae = { key: 'existing-vae', hash: 'h', name: 'Existing VAE', base: 'anima', type: 'vae' };
 
     const state = buildMockState({
       model: mockAnimaMainModel,
       animaQwen3EncoderModel: existingQwen3,
-      animaT5EncoderModel: existingT5,
       animaVaeModel: existingVae,
     });
 
@@ -333,15 +288,12 @@ describe('modelSelected listener - Anima defaulting', () => {
       dispatch: mockDispatch,
     });
 
-    // Should dispatch null for all three
+    // Should dispatch null for both
     const qwen3Dispatch = dispatched.find((a) => a.type === animaQwen3EncoderModelSelected.type);
-    const t5Dispatch = dispatched.find((a) => a.type === animaT5EncoderModelSelected.type);
     const vaeDispatch = dispatched.find((a) => a.type === animaVaeModelSelected.type);
 
     expect(qwen3Dispatch).toBeDefined();
     expect(qwen3Dispatch!.payload).toBeNull();
-    expect(t5Dispatch).toBeDefined();
-    expect(t5Dispatch!.payload).toBeNull();
     expect(vaeDispatch).toBeDefined();
     expect(vaeDispatch!.payload).toBeNull();
   });
