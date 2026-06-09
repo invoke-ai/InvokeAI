@@ -127,7 +127,7 @@
     },
     {
       "category": "PATHS",
-      "default": "models\\.convert_cache",
+      "default": "models/.convert_cache",
       "description": "Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).",
       "env_var": "INVOKEAI_CONVERT_CACHE_DIR",
       "literal_values": [],
@@ -138,7 +138,7 @@
     },
     {
       "category": "PATHS",
-      "default": "models\\.download_cache",
+      "default": "models/.download_cache",
       "description": "Path to the directory that contains dynamically downloaded models.",
       "env_var": "INVOKEAI_DOWNLOAD_CACHE_DIR",
       "literal_values": [],
