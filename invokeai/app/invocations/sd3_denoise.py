@@ -28,6 +28,7 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import SD3ConditioningInfo
+from invokeai.backend.util.denoise_working_memory import estimate_denoise_working_memory_for_model
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -280,9 +281,23 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             ),
         )
 
-        with transformer_info.model_on_device() as (cached_weights, transformer):
+        # Estimate the working memory this denoise forward needs so the model cache can reserve it.
+        working_memory = estimate_denoise_working_memory_for_model(
+            model=transformer_info.model,
+            latent_height=latents.shape[-2],
+            latent_width=latents.shape[-1],
+            batch_size=latents.shape[0],
+            inference_dtype=inference_dtype,
+            family="sd3",
+        )
+
+        with transformer_info.model_on_device(working_mem_bytes=working_memory.bytes) as (
+            cached_weights,
+            transformer,
+        ):
             assert isinstance(transformer, SD3Transformer2DModel)
 
+            mem_probe = working_memory.measure(context.logger, pixel_height=self.height, pixel_width=self.width)
             # 6. Denoising loop
             for step_idx, (t_curr, t_prev) in tqdm(list(enumerate(zip(timesteps[:-1], timesteps[1:], strict=True)))):
                 # Expand the latents if we are doing CFG.
@@ -323,6 +338,8 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                         latents=latents,
                     ),
                 )
+
+            mem_probe.end()
 
         return latents
 

@@ -47,6 +47,7 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
+from invokeai.backend.util.denoise_working_memory import estimate_denoise_working_memory_for_model
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -449,9 +450,20 @@ class Flux2DenoiseInvocation(BaseInvocation):
             )
 
         with ExitStack() as exit_stack:
+            # Estimate the working memory this denoise forward needs so the model cache can reserve it.
+            transformer_info = context.models.load(self.transformer.transformer)
+            working_memory = estimate_denoise_working_memory_for_model(
+                model=transformer_info.model,
+                latent_height=latent_h,
+                latent_width=latent_w,
+                batch_size=b,
+                inference_dtype=inference_dtype,
+                family="flux2",
+            )
+
             # Load the transformer model
             (cached_weights, transformer) = exit_stack.enter_context(
-                context.models.load(self.transformer.transformer).model_on_device()
+                transformer_info.model_on_device(working_mem_bytes=working_memory.bytes)
             )
             config = transformer_config
 
@@ -490,6 +502,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
                     ref_image_extension.ref_image_ids,
                 )
 
+            mem_probe = working_memory.measure(context.logger, pixel_height=self.height, pixel_width=self.width)
             x = denoise(
                 model=transformer,
                 img=x,
@@ -508,6 +521,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 img_cond_seq=img_cond_seq,
                 img_cond_seq_ids=img_cond_seq_ids,
             )
+            mem_probe.end()
 
         # Apply BN denormalization if BN stats are available
         # The diffusers Flux2KleinPipeline applies: latents = latents * bn_std + bn_mean

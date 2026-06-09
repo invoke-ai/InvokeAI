@@ -35,6 +35,7 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ZImageConditioningInfo
+from invokeai.backend.util.denoise_working_memory import estimate_denoise_working_memory_for_model
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.z_image.extensions.regional_prompting_extension import ZImageRegionalPromptingExtension
 from invokeai.backend.z_image.text_conditioning import ZImageTextConditioning
@@ -443,8 +444,20 @@ class ZImageDenoiseInvocation(BaseInvocation):
             else:
                 raise ValueError(f"Unsupported Z-Image model format: {transformer_config.format}")
 
+            # Estimate the working memory this denoise forward needs so the model cache can reserve it.
+            working_memory = estimate_denoise_working_memory_for_model(
+                model=transformer_info.model,
+                latent_height=latents.shape[-2],
+                latent_width=latents.shape[-1],
+                batch_size=latents.shape[0],
+                inference_dtype=inference_dtype,
+                family="z_image",
+            )
+
             # Load transformer - always use base transformer, control is handled via extension
-            (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
+            (cached_weights, transformer) = exit_stack.enter_context(
+                transformer_info.model_on_device(working_mem_bytes=working_memory.bytes)
+            )
 
             # Prepare control extension if control is provided
             control_extension: ZImageControlNetExtension | None = None
@@ -565,6 +578,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
             # Track user-facing step for progress (accounts for Heun's double steps)
             user_step = 0
 
+            mem_probe = working_memory.measure(context.logger, pixel_height=self.height, pixel_width=self.width)
             if use_scheduler and scheduler is not None:
                 # Use diffusers scheduler for stepping
                 # Use tqdm with total_steps (user-facing steps) not num_scheduler_steps (internal steps)
@@ -772,6 +786,8 @@ class ZImageDenoiseInvocation(BaseInvocation):
                             latents=latents,
                         ),
                     )
+
+            mem_probe.end()
 
         return latents
 
