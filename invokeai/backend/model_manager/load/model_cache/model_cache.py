@@ -556,6 +556,8 @@ class ModelCache:
         # residency that collides with the activation set and thrashes the allocator at high resolution.
         # Only triggers for genuinely partial models — one that fully fits keeps its small reserve and
         # loads 100% (no streaming, the #9257 win).
+        # effective_working_mem_bytes is the reserve actually in effect for the rest of this load.
+        effective_working_mem_bytes = working_mem_bytes
         if (
             self._smart_partial_loading
             and self._max_vram_cache_size_gb is None  # a fixed VRAM cap overrides the reserve; headroom is inert
@@ -563,20 +565,24 @@ class ModelCache:
             and model_vram_needed > vram_available
             and PARTIAL_LOAD_HEADROOM_MULTIPLIER > 1.0
         ):
-            headroom_available = self._get_vram_available(self._partial_load_reserve(working_mem_bytes))
+            partial_load_reserve_bytes = self._partial_load_reserve(working_mem_bytes)
+            headroom_available = self._get_vram_available(partial_load_reserve_bytes)
             if headroom_available < vram_available:
                 self._logger.debug(
                     f"Partial-load headroom: vram_available {vram_available / MB:.2f}MB -> "
                     f"{headroom_available / MB:.2f}MB (estimate {working_mem_bytes / MB:.0f}MB "
                     f"x{PARTIAL_LOAD_HEADROOM_MULTIPLIER}) to keep residency below the thrash cliff."
                 )
+                effective_working_mem_bytes = partial_load_reserve_bytes
                 vram_available = headroom_available
 
         if vram_available < 0:
             # There is insufficient VRAM available. As a last resort, try to unload the model being locked from VRAM,
             # as it may still be loaded from a previous use.
+            # Recompute with the same effective reserve that produced the deficit: recomputing with the bare
+            # estimate would hand the just-freed bytes straight back and reload past the headroom target.
             vram_bytes_freed_from_own_model = self._move_model_to_ram(cache_entry, -vram_available)
-            vram_available = self._get_vram_available(working_mem_bytes)
+            vram_available = self._get_vram_available(effective_working_mem_bytes)
             self._logger.debug(
                 f"Unloaded {vram_bytes_freed_from_own_model / MB:.2f}MB from the model being locked ({cache_entry.key})."
             )
@@ -589,7 +595,7 @@ class ModelCache:
         model_bytes_loaded = self._move_model_to_vram(cache_entry, vram_available + MB)
 
         model_cur_vram_bytes = cache_entry.cached_model.cur_vram_bytes()
-        vram_available = self._get_vram_available(working_mem_bytes)
+        vram_available = self._get_vram_available(effective_working_mem_bytes)
         loaded_percent = model_cur_vram_bytes / model_total_bytes if model_total_bytes > 0 else 0
         # Use the model's actual compute_device for logging, not the cache's default
         model_device = cache_entry.cached_model.compute_device
