@@ -51,9 +51,11 @@ MIN_DEVICE_WORKING_MEM_GB = 1.5
 # MULTIPLE of the bare activation peak. Without it, a large model at high resolution loads to a
 # high-but-not-full residency (~85-96%) where the activation set collides with the streaming scratch and
 # thrashes the CUDA allocator (on Windows it silently spills to shared RAM) -> ~2x slower despite loading
-# MORE. 2.5 reverts the worst measured high-res cases to ~the legacy reserve (measured-safe) while
-# leaving low-res / fully-fitting models untouched. Set to 1.0 to disable the headroom (legacy smart).
-PARTIAL_LOAD_HEADROOM_MULTIPLIER = 2.5
+# MORE. 1.5 was tuned on an 8GB card (RTX 4070): it keeps the worst high-res cases below the thrash
+# cliff (e.g. Z-Image@1536 lands ~87% resident, cliff ~96%) while reclaiming the residency the more
+# conservative 2.5 left on the table, with no measured regression or OOM across a full model suite.
+# Set to 1.0 to disable the headroom (legacy smart); raise toward 2.5 for more margin on untested HW.
+PARTIAL_LOAD_HEADROOM_MULTIPLIER = 1.5
 
 
 # TODO(ryand): Where should this go? The ModelCache shouldn't be concerned with submodels.

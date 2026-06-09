@@ -207,7 +207,7 @@ def test_begin_end_denoise_measure_emit_or_noop_without_raising():
 
 
 def test_family_multiplier_per_arch():
-    assert family_multiplier("flux2") == ACTIVATION_MULTIPLIER["flux2"] == 3.6
+    assert family_multiplier("flux2") == ACTIVATION_MULTIPLIER["flux2"] == 2.2
     assert family_multiplier("qwen") == 8.0
     assert family_multiplier("sd3") == 3.0
     assert family_multiplier("unet") == ACTIVATION_MULTIPLIER["unet"] == 32
@@ -228,13 +228,13 @@ def test_family_enforced_unet_vs_transformer():
 
 def test_per_arch_estimates_differ_on_same_model():
     """The arch key selects the multiplier, so the same model reserves differently per arch:
-    qwen (8.0) > z_image (4.5) > flux2 (3.6) at identical width/resolution."""
+    qwen (8.0) > z_image (4.5) > flux2 (2.2) at identical width/resolution."""
     m = _model(hidden_size=3072)
     qwen = estimate_denoise_working_memory_for_model(m, 128, 128, 1, 2, "qwen")
     z = estimate_denoise_working_memory_for_model(m, 128, 128, 1, 2, "z_image")
     flux2 = estimate_denoise_working_memory_for_model(m, 128, 128, 1, 2, "flux2")
     assert qwen > z > flux2
-    # flux2 (3.6) reserves less than the generic "dit" default (6) — that's the per-arch win.
+    # flux2 (2.2) reserves less than the generic "dit" default (6) — that's the per-arch win.
     assert flux2 < estimate_denoise_working_memory_for_model(m, 128, 128, 1, 2, "dit")
 
 

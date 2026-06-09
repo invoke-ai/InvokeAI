@@ -74,7 +74,10 @@ GB = 2**30
 ACTIVATION_MULTIPLIER = {
     "unet": 32,  # SD1.5 / SDXL conv UNet
     "dit": 6,  # DEFAULT for unmeasured transformers (cogview4, FLUX.1, future archs)
-    "flux2": 3.6,  # FLUX.2 Klein 4B + 9B (4 points across 2 size variants)
+    "flux2": 2.2,  # FLUX.2 Klein 4B + 9B. Tracks the CONSTRAINED 9B peak (implied 2.1@1536, 2.6@1024).
+    # The high 4B implies (~3.1) come from the fully-fitting 4B variant, which has VRAM slack and needs
+    # no estimate margin; 3.6 (=3.1x1.15) over-reserved 9B past the 3GB cap and pinned it at ~35%. The
+    # partial-load headroom (PARTIAL_LOAD_HEADROOM_MULTIPLIER) now supplies the margin for the partial 9B.
     "z_image": 4.5,  # Z-Image Turbo (2 points)
     "anima": 3.5,  # Anima (2 points, cfg=1)
     "sd3": 3.0,  # SD3.5 Medium (1 point; includes its always-on CFG 2x)
