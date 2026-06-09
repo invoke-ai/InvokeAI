@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoke AI — Model Manager</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/design-system.css">
+  <link rel="stylesheet" href="../css/pages.css">
+</head>
+<body>
+
+  <div class="model-manager">
+
+    <!-- ==================== NAVBAR ==================== -->
+    <nav class="navbar">
+      <div class="navbar-inner">
+        <div class="navbar-logo">Invoke AI</div>
+        <div class="navbar-links">
+          <a href="../index.html" class="navbar-link">Home</a>
+          <a href="dashboard.html" class="navbar-link">Studio</a>
+          <a href="model-manager.html" class="navbar-link">Models</a>
+          <a href="pricing.html" class="navbar-link">Pricing</a>
+          <a href="dashboard.html" class="btn btn-primary btn-sm">Open Studio</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container" style="padding: 0 var(--space-8);">
+
+      <!-- Breadcrumb -->
+      <div class="breadcrumb">
+        <a href="../index.html" class="breadcrumb-link">Home</a>
+        <span class="breadcrumb-separator">/</span>
+        <span class="breadcrumb-current">Model Manager</span>
+      </div>
+
+      <!-- Header -->
+      <div class="model-manager-header">
+        <h1 class="model-manager-title">Model Manager</h1>
+        <p class="model-manager-subtitle">
+          Browse, install, and manage diffusion models for your creative workflow.
+        </p>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab active" data-tab="installed">Installed</button>
+        <button class="tab" data-tab="browse">Browse Models</button>
+        <button class="tab" data-tab="import">Import</button>
+        <button class="tab" data-tab="settings">Settings</button>
+      </div>
+
+      <!-- Search & Filter -->
+      <div style="display: flex; align-items: center; gap: var(--space-4); padding: var(--space-6) 0;">
+        <input type="text" class="input" placeholder="Search models..." style="flex: 1; max-width: 400px;" id="model-search">
+        <select class="model-selector" style="width: auto; min-width: 160px;">
+          <option value="all">All Types</option>
+          <option value="main">Main Models</option>
+          <option value="lora">LoRA</option>
+          <option value="controlnet">ControlNet</option>
+          <option value="vae">VAE</option>
+          <option value="clip">CLIP</option>
+          <option value="t2i">T2I Adapter</option>
+        </select>
+        <select class="model-selector" style="width: auto; min-width: 140px;">
+          <option value="all">All Formats</option>
+          <option value="diffusers">Diffusers</option>
+          <option value="checkpoint">Checkpoint</option>
+          <option value="ckpt">SafeTensors</option>
+        </select>
+      </div>
+
+      <!-- Installed Models Grid -->
+      <div class="model-grid" id="model-grid">
+
+        <!-- Model Card 1 -->
+        <div class="model-card">
+          <div class="model-card-thumbnail">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+          </div>
+          <div class="model-card-content">
+            <h4 class="model-card-name">stable-diffusion-xl-1.0-base</h4>
+            <div class="model-card-tags">
+              <span class="badge badge-neutral">Main</span>
+              <span class="badge badge-neutral">Diffusers</span>
+              <span class="badge badge-neutral">6.94 GB</span>
+            </div>
+          </div>
+          <div class="model-card-footer">
+            <button class="model-card-btn installed">Installed</button>
+          </div>
+        </div>
+
+        <!-- Model Card 2 -->
+        <div class="model-card">
+          <div class="model-card-thumbnail">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+          </div>
+          <div class="model-card-content">
+            <h4 class="model-card-name">stable-diffusion-xl-1.0-refiner</h4>
+            <div class="model-card-tags">
+              <span class="badge badge-neutral">Main</span>
+              <span class="badge badge-neutral">Diffusers</span>
+              <span class="badge badge-neutral">6.74 GB</span>
+            </div>
+          </div>
+          <div class="model-card-footer">
+            <button class="model-card-btn installed">Installed</button>
+          </div>
+        </div>
+
+        <!-- Model Card 3 -->
+        <div class="model-card">
+          <div class="model-card-thumbnail">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+          </div>
+          <div class="model-card-content">
+            <h4 class="model-card-name">flux-1-dev</h4>
+            <div class="model-card-tags">
+              <span class="badge badge-neutral">Main</span>
+              <span class="badge badge-neutral">Diffusers</span>
+              <span class="badge badge-neutral">23.0 GB</span>
+            </div>
+          </div>
+          <div class="model-card-footer">
+            <button class="model-card-btn installed">Installed</button>
+          </div>
+        </div>
+
+        <!-- Model Card 4 — Not Installed -->
+        <div class="model-card">
+          <div class="model-card-thumbnail">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+          </div>
+          <div class="model-card-content">
+            <h4 class="model-card-name">stable-diffusion-3-medium</h4>
+            <div class="model-card-tags">
+              <span class="badge badge-neutral">Main</span>
+              <span class="badge badge-neutral">Diffusers</span>
+              <span class="badge badge-neutral">4.5 GB</span>
+            </div>
+          </div>
+          <div class="model-card-footer">
+            <button class="model-card-btn available">Install</button>
+          </div>
+        </div>
+
+        <!-- Model Card 5 — Not Installed -->
+        <div class="model-card">
+          <div class="model-card-thumbnail">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+          </div>
+          <div class="model-card-content">
+            <h4 class="model-card-name">dreamshaper-xl-v2-turbo</h4>
+            <div class="model-card-tags">
+              <span class="badge badge-neutral">Main</span>
+              <span class="badge badge-neutral">Checkpoint</span>
+              <span class="badge badge-neutral">6.58 GB</span>
+            </div>
+          </div>
+          <div class="model-card-footer">
+            <button class="model-card-btn available">Install</button>
+          </div>
+        </div>
+
+        <!-- Model Card 6 — LoRA -->
+        <div class="model-card">
+          <div class="model-card-thumbnail">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+          </div>
+          <div class="model-card-content">
+            <h4 class="model-card-name">add_detail_xl</h4>
+            <div class="model-card-tags">
+              <span class="badge badge-neutral">LoRA</span>
+              <span class="badge badge-neutral">SafeTensors</span>
+              <span class="badge badge-neutral">144 MB</span>
+            </div>
+          </div>
+          <div class="model-card-footer">
+            <button class="model-card-btn available">Install</button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <script src="../js/main.js"></script>
+  <script>
+    (function () {
+      'use strict';
+
+      // Tab switching
+      var tabs = document.querySelectorAll('.tab');
+      tabs.forEach(function (tab) {
+        tab.addEventListener('click', function () {
+          tabs.forEach(function (t) { t.classList.remove('active'); });
+          tab.classList.add('active');
+        });
+      });
+
+      // Search filter
+      var searchInput = document.getElementById('model-search');
+      var modelGrid = document.getElementById('model-grid');
+      if (searchInput && modelGrid) {
+        searchInput.addEventListener('input', function () {
+          var query = this.value.toLowerCase();
+          var cards = modelGrid.querySelectorAll('.model-card');
+          cards.forEach(function (card) {
+            var name = card.querySelector('.model-card-name');
+            if (name) {
+              var match = name.textContent.toLowerCase().indexOf(query) !== -1;
+              card.style.display = match ? '' : 'none';
+            }
+          });
+        });
+      }
+
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoke AI — Generation Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/design-system.css">
+  <link rel="stylesheet" href="../css/pages.css">
+</head>
+<body>
+
+  <div class="dashboard">
+
+    <!-- ==================== LEFT SIDEBAR ==================== -->
+    <aside class="sidebar-left">
+
+      <!-- Model Selector -->
+      <div class="sidebar-section">
+        <h3 class="sidebar-section-title">Model</h3>
+        <select class="model-selector" id="model-select">
+          <option value="sdxl-1.0">Stable Diffusion XL 1.0</option>
+          <option value="sd-1.5">Stable Diffusion 1.5</option>
+          <option value="flux-1.1">FLUX.1 [dev]</option>
+          <option value="sd-3.0">Stable Diffusion 3.0</option>
+        </select>
+      </div>
+
+      <!-- Prompt -->
+      <div class="sidebar-section">
+        <h3 class="sidebar-section-title">Prompt</h3>
+        <textarea
+          class="textarea"
+          rows="4"
+          placeholder="Describe the image you want to create..."
+          id="prompt-input"
+        ></textarea>
+        <div style="height: var(--space-3);"></div>
+        <textarea
+          class="textarea"
+          rows="2"
+          placeholder="Negative prompt (optional)..."
+          id="negative-prompt-input"
+        ></textarea>
+      </div>
+
+      <!-- Dimensions -->
+      <div class="sidebar-section">
+        <h3 class="sidebar-section-title">Dimensions</h3>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span class="slider-label-text">Width</span>
+            <span class="slider-label-value" id="width-value">1024</span>
+          </div>
+          <input type="range" class="slider" min="256" max="2048" step="64" value="1024" id="width-slider">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span class="slider-label-text">Height</span>
+            <span class="slider-label-value" id="height-value">1024</span>
+          </div>
+          <input type="range" class="slider" min="256" max="2048" step="64" value="1024" id="height-slider">
+        </div>
+        <div class="aspect-ratio-grid" style="margin-top: var(--space-3);">
+          <button class="aspect-ratio-btn active" data-ratio="1:1">1:1</button>
+          <button class="aspect-ratio-btn" data-ratio="16:9">16:9</button>
+          <button class="aspect-ratio-btn" data-ratio="9:16">9:16</button>
+          <button class="aspect-ratio-btn" data-ratio="4:3">4:3</button>
+          <button class="aspect-ratio-btn" data-ratio="3:4">3:4</button>
+          <button class="aspect-ratio-btn" data-ratio="3:2">3:2</button>
+        </div>
+      </div>
+
+      <!-- Generation Parameters -->
+      <div class="sidebar-section">
+        <h3 class="sidebar-section-title">Parameters</h3>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span class="slider-label-text">Steps</span>
+            <span class="slider-label-value" id="steps-value">30</span>
+          </div>
+          <input type="range" class="slider" min="1" max="100" value="30" id="steps-slider">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span class="slider-label-text">CFG Scale</span>
+            <span class="slider-label-value" id="cfg-value">7.5</span>
+          </div>
+          <input type="range" class="slider" min="1" max="20" step="0.5" value="7.5" id="cfg-slider">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span class="slider-label-text">Seed</span>
+            <span class="slider-label-value" id="seed-value">-1</span>
+          </div>
+          <input type="number" class="input" value="-1" id="seed-input" style="margin-top: var(--space-2);">
+        </div>
+      </div>
+
+      <!-- Advanced Options -->
+      <div class="sidebar-section">
+        <div class="advanced-toggle" id="advanced-toggle">
+          <span class="advanced-toggle-text">Advanced Options</span>
+          <svg class="advanced-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </div>
+        <div class="advanced-content" id="advanced-content" style="display: none;">
+          <div class="slider-group">
+            <div class="slider-label">
+              <span class="slider-label-text">Scheduler</span>
+            </div>
+            <select class="model-selector" id="scheduler-select">
+              <option value="euler_a">Euler a</option>
+              <option value="euler">Euler</option>
+              <option value="dpmpp_2m">DPM++ 2M</option>
+              <option value="dpmpp_sde">DPM++ SDE</option>
+              <option value="ddim">DDIM</option>
+              <option value="lms">LMS</option>
+            </select>
+          </div>
+          <div class="slider-group">
+            <div class="slider-label">
+              <span class="slider-label-text">Clip Skip</span>
+              <span class="slider-label-value" id="clip-skip-value">1</span>
+            </div>
+            <input type="range" class="slider" min="1" max="4" value="1" id="clip-skip-slider">
+          </div>
+        </div>
+      </div>
+
+      <!-- Generate Button -->
+      <div class="sidebar-section" style="border-bottom: none;">
+        <button class="btn btn-primary btn-lg" style="width: 100%;" id="generate-btn">
+          Generate Image
+        </button>
+      </div>
+
+    </aside>
+
+
+    <!-- ==================== CENTER CANVAS ==================== -->
+    <main class="canvas-center">
+
+      <div class="canvas-header">
+        <div class="canvas-status">
+          <div class="canvas-status-dot"></div>
+          <span class="canvas-status-text">Ready</span>
+        </div>
+        <div class="canvas-progress" style="display: none;" id="progress-bar">
+          <div class="canvas-progress-bar" style="width: 0%;" id="progress-fill"></div>
+        </div>
+        <div style="display: flex; align-items: center; gap: var(--space-2);">
+          <button class="canvas-action-btn" title="Zoom to fit">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+            </svg>
+          </button>
+          <button class="canvas-action-btn" title="Toggle grid">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+              <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="canvas-viewport">
+        <div class="canvas-frame" id="canvas-frame">
+          <div class="canvas-frame-empty" id="canvas-empty">
+            <svg class="canvas-frame-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+            <p class="canvas-frame-empty-text">Enter a prompt and click Generate</p>
+          </div>
+          <!-- Generated image will appear here -->
+        </div>
+      </div>
+
+      <div class="canvas-footer">
+        <div class="canvas-actions">
+          <button class="canvas-action-btn" title="Download" id="download-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </button>
+          <button class="canvas-action-btn" title="Use as input">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 10 20 15 15 20"/>
+              <path d="M4 4v7a4 4 0 0 0 4 4h12"/>
+            </svg>
+          </button>
+          <button class="canvas-action-btn" title="Send to canvas">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <line x1="12" y1="8" x2="12" y2="16"/>
+              <line x1="8" y1="12" x2="16" y2="12"/>
+            </svg>
+          </button>
+          <button class="canvas-action-btn" title="Delete">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+    </main>
+
+
+    <!-- ==================== RIGHT GALLERY ==================== -->
+    <aside class="sidebar-right">
+
+      <div class="gallery-header">
+        <h3 class="gallery-title">Recent Generations</h3>
+      </div>
+
+      <div class="gallery-grid" id="gallery-grid">
+        <div class="gallery-item">
+          <div class="gallery-item-overlay">
+            <button class="gallery-item-action" title="Download">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+            </button>
+            <button class="gallery-item-action" title="Use as input">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 10 20 15 15 20"/>
+                <path d="M4 4v7a4 4 0 0 0 4 4h12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="gallery-item">
+          <div class="gallery-item-overlay">
+            <button class="gallery-item-action" title="Download">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+            </button>
+            <button class="gallery-item-action" title="Use as input">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 10 20 15 15 20"/>
+                <path d="M4 4v7a4 4 0 0 0 4 4h12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="gallery-item">
+          <div class="gallery-item-overlay">
+            <button class="gallery-item-action" title="Download">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+            </button>
+            <button class="gallery-item-action" title="Use as input">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 10 20 15 15 20"/>
+                <path d="M4 4v7a4 4 0 0 0 4 4h12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="gallery-item">
+          <div class="gallery-item-overlay">
+            <button class="gallery-item-action" title="Download">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+            </button>
+            <button class="gallery-item-action" title="Use as input">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 10 20 15 15 20"/>
+                <path d="M4 4v7a4 4 0 0 0 4 4h12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+
+  </div>
+
+
+  <script src="../js/main.js"></script>
+  <script>
+    (function () {
+      'use strict';
+
+      // Slider value updates
+      var sliders = [
+        { slider: 'width-slider', display: 'width-value' },
+        { slider: 'steps-slider', display: 'steps-value' },
+        { slider: 'cfg-slider', display: 'cfg-value' },
+        { slider: 'clip-skip-slider', display: 'clip-skip-value' }
+      ];
+
+      sliders.forEach(function (item) {
+        var slider = document.getElementById(item.slider);
+        var display = document.getElementById(item.display);
+        if (slider && display) {
+          slider.addEventListener('input', function () {
+            display.textContent = this.value;
+          });
+        }
+      });
+
+      // Height slider sync
+      var heightSlider = document.getElementById('height-slider');
+      var heightValue = document.getElementById('height-value');
+      if (heightSlider && heightValue) {
+        heightSlider.addEventListener('input', function () {
+          heightValue.textContent = this.value;
+        });
+      }
+
+      // Seed input
+      var seedInput = document.getElementById('seed-input');
+      var seedValue = document.getElementById('seed-value');
+      if (seedInput && seedValue) {
+        seedInput.addEventListener('input', function () {
+          seedValue.textContent = this.value;
+        });
+      }
+
+      // Aspect ratio buttons
+      var aspectBtns = document.querySelectorAll('.aspect-ratio-btn');
+      var widthSlider = document.getElementById('width-slider');
+      var widthValue = document.getElementById('width-value');
+
+      var ratios = {
+        '1:1': [1024, 1024],
+        '16:9': [1280, 720],
+        '9:16': [720, 1280],
+        '4:3': [1024, 768],
+        '3:4': [768, 1024],
+        '3:2': [1152, 768]
+      };
+
+      aspectBtns.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          aspectBtns.forEach(function (b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          var ratio = btn.getAttribute('data-ratio');
+          if (ratios[ratio]) {
+            widthSlider.value = ratios[ratio][0];
+            widthValue.textContent = ratios[ratio][0];
+            heightSlider.value = ratios[ratio][1];
+            heightValue.textContent = ratios[ratio][1];
+          }
+        });
+      });
+
+      // Advanced toggle
+      var advToggle = document.getElementById('advanced-toggle');
+      var advContent = document.getElementById('advanced-content');
+      var advIcon = advToggle ? advToggle.querySelector('.advanced-toggle-icon') : null;
+
+      if (advToggle && advContent) {
+        advToggle.addEventListener('click', function () {
+          var isVisible = advContent.style.display !== 'none';
+          advContent.style.display = isVisible ? 'none' : 'block';
+          if (advIcon) {
+            advIcon.classList.toggle('open', !isVisible);
+          }
+        });
+      }
+
+    })();
+  </script>
+</body>
+</html>
