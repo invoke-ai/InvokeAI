@@ -24,7 +24,7 @@ CALIBRATED against our own measured peaks, NOT borrowed from another implementat
 This is the same shape ComfyUI uses (``area * dtype * factor`` with a per-model factor); the
 difference is we make the model-size part explicit via ``activation_width`` (read from the model) and
 keep only a small per-family ``multiplier`` that we calibrate from our own ``DENOISE_MEM``
-measurements (see ``memory-audit/``).
+measurements.
 
 Safety properties
 -----------------
