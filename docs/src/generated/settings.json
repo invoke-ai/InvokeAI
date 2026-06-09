@@ -127,7 +127,7 @@
     },
     {
       "category": "PATHS",
-      "default": "models/.convert_cache",
+      "default": "models\\.convert_cache",
       "description": "Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).",
       "env_var": "INVOKEAI_CONVERT_CACHE_DIR",
       "literal_values": [],
@@ -138,7 +138,7 @@
     },
     {
       "category": "PATHS",
-      "default": "models/.download_cache",
+      "default": "models\\.download_cache",
       "description": "Path to the directory that contains dynamically downloaded models.",
       "env_var": "INVOKEAI_DOWNLOAD_CACHE_DIR",
       "literal_values": [],
@@ -420,6 +420,17 @@
       "env_var": "INVOKEAI_ENABLE_PARTIAL_LOADING",
       "literal_values": [],
       "name": "enable_partial_loading",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
+      "default": false,
+      "description": "EXPERIMENTAL (off by default, pending validation across hardware). Estimate each denoise operation's working-memory need (scaled by the model and output resolution) and reserve only that much VRAM, instead of always holding back the flat device_working_mem_gb. This keeps more of the model resident in VRAM on memory-constrained cards (faster). Operations that do not provide an estimate keep the full flat reserve. Enable to opt in.",
+      "env_var": "INVOKEAI_SMART_PARTIAL_LOADING",
+      "literal_values": [],
+      "name": "smart_partial_loading",
       "required": false,
       "type": "<class 'bool'>",
       "validation": {}
