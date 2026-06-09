@@ -75,13 +75,7 @@ from invokeai.backend.stable_diffusion.extensions.t2i_adapter import T2IAdapterE
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
-from invokeai.backend.util.denoise_working_memory import (
-    begin_denoise_measure,
-    dtype_element_size,
-    end_denoise_measure,
-    estimate_denoise_working_memory_for_model,
-    resolve_denoise_working_mem_bytes,
-)
+from invokeai.backend.util.denoise_working_memory import estimate_denoise_working_memory_for_model
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.hotfixes import ControlNetModel
 from invokeai.backend.util.mask import to_standard_float_mask
@@ -947,22 +941,18 @@ class DenoiseLatentsInvocation(BaseInvocation):
             # ext: t2i/ip adapter
             ext_manager.run_callback(ExtensionCallbackType.SETUP, denoise_ctx)
 
-            # Estimate this denoise forward's working-memory need so the cache reserves the right amount
-            # instead of the flat default. With smart_partial_loading on, the cache honors the estimate down
-            # to a small minimum (keeping more of the model resident); un-instrumented ops keep the default.
+            # Estimate the working memory this denoise forward needs so the model cache can reserve it.
             unet_info = context.models.load(self.unet.unet)
-            estimated_working_memory = estimate_denoise_working_memory_for_model(
+            working_memory = estimate_denoise_working_memory_for_model(
                 model=unet_info.model,
                 latent_height=latents.shape[-2],
                 latent_width=latents.shape[-1],
                 batch_size=latents.shape[0],
-                element_size=dtype_element_size(dtype),
+                inference_dtype=dtype,
                 family="unet",
             )
             with (
-                unet_info.model_on_device(
-                    working_mem_bytes=resolve_denoise_working_mem_bytes(estimated_working_memory, "unet")
-                ) as (
+                unet_info.model_on_device(working_mem_bytes=working_memory.bytes) as (
                     cached_weights,
                     unet,
                 ),
@@ -974,18 +964,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
             ):
                 sd_backend = StableDiffusionBackend(unet, scheduler)
                 denoise_ctx.unet = unet
-                _denoise_mem_token = begin_denoise_measure(context.logger)
-                result_latents = sd_backend.latents_from_embeddings(denoise_ctx, ext_manager)
-                end_denoise_measure(
-                    _denoise_mem_token,
+                mem_probe = working_memory.measure(
                     context.logger,
-                    label="sdxl",
-                    estimate_bytes=estimated_working_memory,
                     pixel_height=latents.shape[-2] * LATENT_SCALE_FACTOR,
                     pixel_width=latents.shape[-1] * LATENT_SCALE_FACTOR,
-                    batch_size=latents.shape[0],
-                    element_size=dtype_element_size(dtype),
+                    label="sdxl",
                 )
+                result_latents = sd_backend.latents_from_embeddings(denoise_ctx, ext_manager)
+                mem_probe.end()
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         result_latents = result_latents.detach().to("cpu")
@@ -1044,22 +1030,19 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 del lora_info
             return
 
-        # Estimate this denoise forward's working-memory need so the cache reserves the right amount
-        # instead of the flat default (honored down to a small minimum when smart_partial_loading is on).
+        # Estimate the working memory this denoise forward needs so the model cache can reserve it.
         unet_info = context.models.load(self.unet.unet)
-        estimated_working_memory = estimate_denoise_working_memory_for_model(
+        working_memory = estimate_denoise_working_memory_for_model(
             model=unet_info.model,
             latent_height=latents.shape[-2],
             latent_width=latents.shape[-1],
             batch_size=latents.shape[0],
-            element_size=dtype_element_size(TorchDevice.choose_torch_dtype()),
+            inference_dtype=TorchDevice.choose_torch_dtype(),
             family="unet",
         )
         with (
             ExitStack() as exit_stack,
-            unet_info.model_on_device(
-                working_mem_bytes=resolve_denoise_working_mem_bytes(estimated_working_memory, "unet")
-            ) as (
+            unet_info.model_on_device(working_mem_bytes=working_memory.bytes) as (
                 cached_weights,
                 unet,
             ),
@@ -1136,7 +1119,12 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 seed=seed,
             )
 
-            _denoise_mem_token = begin_denoise_measure(context.logger)
+            mem_probe = working_memory.measure(
+                context.logger,
+                pixel_height=latents.shape[-2] * LATENT_SCALE_FACTOR,
+                pixel_width=latents.shape[-1] * LATENT_SCALE_FACTOR,
+                label="sdxl-legacy",
+            )
             result_latents = pipeline.latents_from_embeddings(
                 latents=latents,
                 timesteps=timesteps,
@@ -1153,16 +1141,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 t2i_adapter_data=t2i_adapter_data,
                 callback=step_callback,
             )
-            end_denoise_measure(
-                _denoise_mem_token,
-                context.logger,
-                label="sdxl-legacy",
-                estimate_bytes=estimated_working_memory,
-                pixel_height=latents.shape[-2] * LATENT_SCALE_FACTOR,
-                pixel_width=latents.shape[-1] * LATENT_SCALE_FACTOR,
-                batch_size=latents.shape[0],
-                element_size=dtype_element_size(unet.dtype),
-            )
+            mem_probe.end()
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         result_latents = result_latents.to("cpu")

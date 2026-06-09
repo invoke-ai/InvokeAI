@@ -8,8 +8,8 @@ from invokeai.backend.model_manager.load.model_cache.model_cache import (
     GB,
     MB,
     MIN_DEVICE_WORKING_MEM_GB,
-    ModelCache,
     PARTIAL_LOAD_HEADROOM_MULTIPLIER,
+    ModelCache,
 )
 
 # Free VRAM reported by the mocked CUDA queries below.
@@ -118,7 +118,9 @@ def test_partial_load_headroom_multiplier_is_active():
         (True, 1 * GB, 8, False),  # fixed VRAM cap overrides the reserve
     ],
 )
-def test_partial_load_headroom_only_engages_when_applicable(smart, working_mem_bytes, max_vram_cache_size_gb, model_fits):
+def test_partial_load_headroom_only_engages_when_applicable(
+    smart, working_mem_bytes, max_vram_cache_size_gb, model_fits
+):
     """The headroom reserve must only be consulted for a smart-loaded, estimate-carrying, genuinely
     partial model with no fixed VRAM cap. In every other case _get_vram_available must only ever see
     the op's own reserve value."""

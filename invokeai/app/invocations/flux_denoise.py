@@ -64,13 +64,7 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
-from invokeai.backend.util.denoise_working_memory import (
-    begin_denoise_measure,
-    dtype_element_size,
-    end_denoise_measure,
-    estimate_denoise_working_memory_for_model,
-    resolve_denoise_working_mem_bytes,
-)
+from invokeai.backend.util.denoise_working_memory import estimate_denoise_working_memory_for_model
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -430,24 +424,20 @@ class FluxDenoiseInvocation(BaseInvocation):
                 device=x.device,
             )
 
-            # Estimate this denoise forward's working-memory need so the cache reserves the right amount
-            # instead of the flat default. With smart_partial_loading on, the cache honors the estimate down
-            # to a small minimum (keeping more of the model resident); un-instrumented ops keep the default.
+            # Estimate the working memory this denoise forward needs so the model cache can reserve it.
             transformer_info = context.models.load(self.transformer.transformer)
-            estimated_working_memory = estimate_denoise_working_memory_for_model(
+            working_memory = estimate_denoise_working_memory_for_model(
                 model=transformer_info.model,
                 latent_height=latent_h,
                 latent_width=latent_w,
                 batch_size=b,
-                element_size=dtype_element_size(inference_dtype),
+                inference_dtype=inference_dtype,
                 family="dit",
             )
 
             # Load the transformer model.
             (cached_weights, transformer) = exit_stack.enter_context(
-                transformer_info.model_on_device(
-                    working_mem_bytes=resolve_denoise_working_mem_bytes(estimated_working_memory, "dit")
-                )
+                transformer_info.model_on_device(working_mem_bytes=working_memory.bytes)
             )
             assert isinstance(transformer, Flux)
             config = transformer_config
@@ -522,7 +512,9 @@ class FluxDenoiseInvocation(BaseInvocation):
             else:
                 context.logger.debug(f"DyPE disabled: resolution={self.width}x{self.height}, preset={self.dype_preset}")
 
-            _denoise_mem_token = begin_denoise_measure(context.logger)
+            mem_probe = working_memory.measure(
+                context.logger, pixel_height=self.height, pixel_width=self.width, label="flux"
+            )
             x = denoise(
                 model=transformer,
                 img=x,
@@ -543,16 +535,7 @@ class FluxDenoiseInvocation(BaseInvocation):
                 dype_extension=dype_extension,
                 scheduler=scheduler,
             )
-            end_denoise_measure(
-                _denoise_mem_token,
-                context.logger,
-                label="flux",
-                estimate_bytes=estimated_working_memory,
-                pixel_height=self.height,
-                pixel_width=self.width,
-                batch_size=b,
-                element_size=dtype_element_size(inference_dtype),
-            )
+            mem_probe.end()
 
         x = unpack(x.float(), self.height, self.width)
         return x

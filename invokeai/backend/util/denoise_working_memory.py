@@ -26,18 +26,35 @@ difference is we make the model-size part explicit via ``activation_width`` (rea
 keep only a small per-family ``multiplier`` that we calibrate from our own ``DENOISE_MEM``
 measurements.
 
+Usage (every denoise invocation follows this shape)::
+
+    working_memory = estimate_denoise_working_memory_for_model(
+        model=transformer_info.model, latent_height=..., latent_width=..., batch_size=...,
+        inference_dtype=..., family="...",
+    )
+    with transformer_info.model_on_device(working_mem_bytes=working_memory.bytes) as (...):
+        ...
+        mem_probe = working_memory.measure(context.logger, pixel_height=..., pixel_width=...)
+        # denoise loop
+        mem_probe.end()
+
+Calibration convention: estimates and DENOISE_MEM records use PRE-PACKING latent spatial dims
+(``pixel // vae_scale_factor``); any token-packing factor is folded into the family multiplier. The
+cleanest calibration data comes from fully-resident runs — under partial loading, streamed-weight
+buffers count toward the measured peak.
+
 Safety properties
 -----------------
 The cache honors an op-provided estimate down to ``MIN_DEVICE_WORKING_MEM_GB`` (model_cache.py) but
-never below the user-configured reserve, and an absent estimate keeps the full default reserve. A
-failure to estimate falls back to ``None`` (= today's behavior). Under-estimates are clamped up to
-the minimum; over-estimates only cost streaming speed. See ``resolve_denoise_working_mem_bytes``.
+never below the user-configured reserve, and an absent estimate keeps the full default reserve.
+Under-estimates are clamped up to the minimum; over-estimates only cost streaming speed.
 """
 
 import json
 import logging
 import time
-from typing import Any, Optional, Protocol
+from dataclasses import dataclass
+from typing import Any, Literal, Optional, Protocol
 
 import torch
 
@@ -46,8 +63,8 @@ class _LevelLogger(Protocol):
     """Minimal logger surface used for ``DENOISE_MEM`` diagnostics: a level check plus debug emit.
 
     Both the stdlib :class:`logging.Logger` and InvokeAI's ``LoggerInterface`` wrapper (what an
-    invocation's ``context.logger`` is) satisfy this. The wrapper is NOT a real ``Logger``, so these
-    functions must not assume the full ``logging.Logger`` API — only ``isEnabledFor`` and ``debug``.
+    invocation's ``context.logger`` is) satisfy this. The wrapper is NOT a real ``Logger``, so this
+    module must not assume the full ``logging.Logger`` API — only ``isEnabledFor`` and ``debug``.
     """
 
     def isEnabledFor(self, level: int) -> bool: ...
@@ -58,6 +75,10 @@ class _LevelLogger(Protocol):
 MB = 2**20
 GB = 2**30
 
+# The architecture/family keys with a calibrated multiplier. New transformer architectures without
+# their own measurements should pass "dit" (the conservative default) until calibrated.
+DenoiseFamily = Literal["unet", "dit", "flux2", "z_image", "anima", "sd3", "qwen"]
+
 # Per-architecture activation multiplier (dimensionless: ~number of live activation copies at peak),
 # CALIBRATED from our own DENOISE_MEM measurements on an 8GB card (RTX 4070). It is read per
 # ARCHITECTURE, not one value for all transformers: reading activation_width from the model absorbs
@@ -66,14 +87,15 @@ GB = 2**30
 # sd3 ~2.2, anima ~2.4-3.0, flux2 ~2.1-3.1, z_image ~3.5-3.8, qwen-Edit ~6.8). Each measured value
 # below is roughly max-implied x 1.15 for margin.
 #   - "unet": SDXL (width 320) measured ~28; kept at 32.
-#   - "dit": the DEFAULT for transformers we have NOT measured yet (cogview4, FLUX.1, future archs),
-#     kept conservative so an unmeasured arch never under-reserves.
+#   - "dit": calibrated from FLUX.1 (implied ~5.3); doubles as the conservative DEFAULT for
+#     transformers we have NOT measured yet (cogview4, future archs), so an unmeasured arch never
+#     under-reserves.
 #   - sd3's value folds in its always-on CFG (a doubled-batch single forward). qwen is the Edit variant
 #     (its reference image lengthens the sequence ~2x) from a single 1024 point. Both are floor-covered
 #     at the resolutions they were run, so their exact value is not yet load-bearing.
-ACTIVATION_MULTIPLIER = {
+ACTIVATION_MULTIPLIER: dict[str, float] = {
     "unet": 32,  # SD1.5 / SDXL conv UNet
-    "dit": 6,  # DEFAULT for unmeasured transformers (cogview4, FLUX.1, future archs)
+    "dit": 6,  # FLUX.1 anchor + DEFAULT for unmeasured transformers (cogview4, future archs)
     "flux2": 2.2,  # FLUX.2 Klein 4B + 9B. Tracks the CONSTRAINED 9B peak (implied 2.1@1536, 2.6@1024).
     # The high 4B implies (~3.1) come from the fully-fitting 4B variant, which has VRAM slack and needs
     # no estimate margin; 3.6 (=3.1x1.15) over-reserved 9B past the 3GB cap and pinned it at ~35%. The
@@ -84,11 +106,6 @@ ACTIVATION_MULTIPLIER = {
     "qwen": 8.0,  # Qwen-Image Edit (1 point; reference-image sequence inflation)
 }
 
-# Families that use the conv-UNet multiplier / enforcement rather than the transformer path. Both an
-# estimate `family` and a DENOISE_MEM `label` resolve through family_multiplier()/family_enforced(),
-# so a label like "sdxl-legacy" maps to the same multiplier as family "unet".
-UNET_FAMILIES = frozenset({"unet", "sdxl", "sdxl-legacy", "sd15", "sd"})
-
 # Fallback activation width if it can't be read from the model config (estimate then degrades to a
 # flat per-area value, still floored by the cache).
 DEFAULT_ACTIVATION_WIDTH = 320
@@ -96,27 +113,11 @@ DEFAULT_ACTIVATION_WIDTH = 320
 # Fixed scratch overhead independent of resolution.
 BASE_WORKING_MEMORY_BYTES = 64 * MB
 
-# Per-family enforcement (see resolve_denoise_working_mem_bytes). A family is enforced once its
-# multiplier is calibrated from our own measurements. Both are now calibrated (see ACTIVATION_MULTIPLIER).
-ENFORCE_UNET_WORKING_MEMORY = True
-ENFORCE_DIT_WORKING_MEMORY = True
-
 
 def family_multiplier(family: str) -> float:
-    """The calibrated activation multiplier for an architecture / family key.
-
-    UNet families (incl. labels like ``"sdxl-legacy"``) map to the conv-UNet value; an unmeasured
-    transformer falls back to the conservative ``"dit"`` default. Accepts either an estimate
-    ``family`` or a DENOISE_MEM ``label`` — they resolve identically by construction.
-    """
-    if family in UNET_FAMILIES:
-        return ACTIVATION_MULTIPLIER["unet"]
+    """The calibrated activation multiplier for an architecture/family key; an unmeasured or unknown
+    family falls back to the conservative ``"dit"`` default."""
     return ACTIVATION_MULTIPLIER.get(family, ACTIVATION_MULTIPLIER["dit"])
-
-
-def family_enforced(family: str) -> bool:
-    """Whether the cache should reserve this family's estimate (vs measure-only)."""
-    return ENFORCE_UNET_WORKING_MEMORY if family in UNET_FAMILIES else ENFORCE_DIT_WORKING_MEMORY
 
 
 def model_activation_width(model: Any) -> int:
@@ -165,7 +166,7 @@ def estimate_denoise_working_memory(
 ) -> int:
     """Estimate denoise working memory (bytes) from the architecture-scaled activation size.
 
-    :param latent_area: latent spatial area = latent_height * latent_width.
+    :param latent_area: latent spatial area = latent_height * latent_width (pre-packing).
     :param activation_width: the model's activation width (conv channels / hidden dim).
     :param batch_size: the latent batch (number of images); CFG behavior is folded into the
         per-family multiplier, so do NOT double for classifier-free guidance.
@@ -178,30 +179,6 @@ def estimate_denoise_working_memory(
     return int(base_bytes + multiplier * area * width * batch * int(element_size))
 
 
-def estimate_denoise_working_memory_for_model(
-    model: Any,
-    latent_height: int,
-    latent_width: int,
-    batch_size: int,
-    element_size: int,
-    family: str,
-) -> int:
-    """Estimate denoise working memory for a loaded model, scaling by its activation width.
-
-    :param model: the loaded denoise model (read its config for the activation width).
-    :param family: an architecture/family key (e.g. ``"unet"``, ``"flux2"``, ``"sd3"``); selects the
-        calibrated multiplier, with unknown transformers falling back to the conservative ``"dit"``.
-    """
-    multiplier = family_multiplier(family)
-    return estimate_denoise_working_memory(
-        latent_area=int(latent_height) * int(latent_width),
-        activation_width=model_activation_width(model),
-        batch_size=batch_size,
-        element_size=element_size,
-        multiplier=multiplier,
-    )
-
-
 def dtype_element_size(dtype: torch.dtype) -> int:
     """Bytes per element for a torch dtype, robust across torch versions."""
     try:
@@ -210,82 +187,148 @@ def dtype_element_size(dtype: torch.dtype) -> int:
         return 2  # safe default (fp16/bf16)
 
 
-def resolve_denoise_working_mem_bytes(estimate_bytes: int, family: str) -> Optional[int]:
-    """Return the working-memory value to pass to ``model_on_device`` for the given family.
+class DenoiseMemProbe:
+    """Measures a denoise loop's peak VRAM delta and GPU-synced wall time, emitted as one
+    ``DENOISE_MEM`` debug record by :meth:`end`.
 
-    :param family: an architecture/family key. UNet families use UNet enforcement; every other key
-    uses the transformer enforcement flag. Returns the estimate only when that family's enforcement is
-    enabled; otherwise ``None`` (measure-only: the cache keeps its default reserve).
+    ``measured_peak_mb`` is the extra VRAM the loop allocated on top of the resident weights — the
+    real working-memory need the estimate should match (``estimate_over_measured`` > 1 means
+    over-reserving). ``elapsed_ms`` lets an A/B (e.g. smart_partial_loading on vs off) confirm that
+    loading more of the model speeds up inference.
+
+    Active only when DEBUG logging is enabled and CUDA is available; otherwise construction and
+    ``end()`` are no-ops, so it adds zero overhead in normal operation. Never raises.
     """
-    return estimate_bytes if family_enforced(family) else None
 
+    def __init__(
+        self,
+        estimate: "DenoiseWorkingMemory",
+        logger: _LevelLogger,
+        pixel_height: int,
+        pixel_width: int,
+        label: str,
+    ) -> None:
+        self._estimate = estimate
+        self._logger = logger
+        self._pixel_height = pixel_height
+        self._pixel_width = pixel_width
+        self._label = label
+        self._alloc_before = 0
+        self._start_time = 0.0
+        self.active = False
+        if not logger.isEnabledFor(logging.DEBUG) or not torch.cuda.is_available():
+            return
+        try:
+            torch.cuda.synchronize()
+            self._alloc_before = torch.cuda.memory_allocated()
+            torch.cuda.reset_peak_memory_stats()
+            self._start_time = time.perf_counter()
+            self.active = True
+        except Exception:
+            self.active = False
 
-def begin_denoise_measure(logger: _LevelLogger) -> Optional[tuple[int, float]]:
-    """Snapshot allocator state and a wall-clock start immediately before a denoise loop.
-
-    Only active when DEBUG logging is enabled (the ``DENOISE_MEM`` record is logged at debug level),
-    so it adds zero overhead in normal operation. Returns ``(bytes_allocated, start_time)`` — the
-    resident-weights baseline and a ``perf_counter`` start taken after a CUDA sync — or ``None`` if
-    disabled / CUDA unavailable. Pass the result to :func:`end_denoise_measure`.
-    """
-    if not logger.isEnabledFor(logging.DEBUG) or not torch.cuda.is_available():
-        return None
-    try:
-        torch.cuda.synchronize()
-        alloc_before = torch.cuda.memory_allocated()
-        torch.cuda.reset_peak_memory_stats()
-        return alloc_before, time.perf_counter()
-    except Exception:
-        return None
-
-
-def end_denoise_measure(
-    token: Optional[tuple[int, float]],
-    logger: _LevelLogger,
-    *,
-    label: str,
-    estimate_bytes: int,
-    pixel_height: int,
-    pixel_width: int,
-    batch_size: int,
-    element_size: int,
-) -> None:
-    """Emit a ``DENOISE_MEM`` calibration record: the estimate vs the MEASURED activation peak.
-
-    ``measured_peak_mb`` is the extra VRAM the denoise loop allocated on top of the resident
-    weights — the real working-memory need the estimate should match. ``estimate_over_measured``
-    > 1 means we are over-estimating (would over-reserve if enforced). ``elapsed_ms`` is the
-    GPU-synced wall time of the denoise loop, so an A/B (e.g. smart_partial_loading on vs off) can
-    confirm that loading more of the model speeds up inference rather than overhead slowing it down.
-    """
-    if token is None or not torch.cuda.is_available():
-        return
-    try:
-        torch.cuda.synchronize()
-        alloc_before, start_time = token
-        elapsed_ms = round((time.perf_counter() - start_time) * 1000, 1)
-        peak = torch.cuda.max_memory_allocated()
-        measured = max(0, peak - alloc_before)
-        ratio = round(estimate_bytes / measured, 2) if measured > 0 else None
-        logger.debug(
-            "DENOISE_MEM "
-            + json.dumps(
-                {
-                    "label": label,
-                    "px_h": int(pixel_height),
-                    "px_w": int(pixel_width),
-                    "batch": int(batch_size),
-                    "elt": int(element_size),
-                    "mult": family_multiplier(label),
-                    "estimate_mb": round(estimate_bytes / MB, 1),
-                    "measured_peak_mb": round(measured / MB, 1),
-                    "resident_before_mb": round(alloc_before / MB, 1),
-                    "total_peak_mb": round(peak / MB, 1),
-                    "elapsed_ms": elapsed_ms,
-                    "estimate_over_measured": ratio,
-                    "enforced": family_enforced(label),
-                }
+    def end(self) -> None:
+        """Emit the ``DENOISE_MEM`` record (idempotent; no-op when inactive)."""
+        if not self.active:
+            return
+        self.active = False
+        try:
+            torch.cuda.synchronize()
+            elapsed_ms = round((time.perf_counter() - self._start_time) * 1000, 1)
+            peak = torch.cuda.max_memory_allocated()
+            measured = max(0, peak - self._alloc_before)
+            estimate_bytes = self._estimate.bytes
+            ratio = round(estimate_bytes / measured, 2) if measured > 0 else None
+            self._logger.debug(
+                "DENOISE_MEM "
+                + json.dumps(
+                    {
+                        "label": self._label,
+                        "px_h": int(self._pixel_height),
+                        "px_w": int(self._pixel_width),
+                        "batch": int(self._estimate.batch_size),
+                        "elt": int(self._estimate.element_size),
+                        "mult": self._estimate.multiplier,
+                        "estimate_mb": round(estimate_bytes / MB, 1),
+                        "measured_peak_mb": round(measured / MB, 1),
+                        "resident_before_mb": round(self._alloc_before / MB, 1),
+                        "total_peak_mb": round(peak / MB, 1),
+                        "elapsed_ms": elapsed_ms,
+                        "estimate_over_measured": ratio,
+                    }
+                )
             )
+        except Exception:
+            pass
+
+
+@dataclass(frozen=True)
+class DenoiseWorkingMemory:
+    """An architecture-scaled working-memory estimate for one denoise operation.
+
+    Pass :attr:`bytes` to ``model_on_device(working_mem_bytes=...)`` so the cache reserves it, and
+    wrap the denoise loop with :meth:`measure` / ``probe.end()`` to log the estimate against the
+    measured peak for calibration.
+    """
+
+    bytes: int
+    family: str
+    multiplier: float
+    element_size: int
+    batch_size: int
+
+    def measure(
+        self,
+        logger: _LevelLogger,
+        *,
+        pixel_height: int,
+        pixel_width: int,
+        label: Optional[str] = None,
+    ) -> DenoiseMemProbe:
+        """Start a ``DENOISE_MEM`` measurement window over the denoise loop; call ``end()`` on the
+        returned probe after the loop.
+
+        :param label: record label; defaults to the family. Override where one family covers several
+            code paths (e.g. family ``"unet"`` emitting as ``"sdxl"`` vs ``"sdxl-legacy"``).
+        """
+        return DenoiseMemProbe(
+            estimate=self,
+            logger=logger,
+            pixel_height=pixel_height,
+            pixel_width=pixel_width,
+            label=label or self.family,
         )
-    except Exception:
-        pass
+
+
+def estimate_denoise_working_memory_for_model(
+    model: Any,
+    latent_height: int,
+    latent_width: int,
+    batch_size: int,
+    inference_dtype: torch.dtype,
+    family: DenoiseFamily,
+) -> DenoiseWorkingMemory:
+    """Estimate denoise working memory for a loaded model, scaling by its activation width.
+
+    :param model: the loaded denoise model (its config supplies the activation width).
+    :param latent_height: latent-space height (pre-packing), i.e. ``pixel_height // vae_scale_factor``.
+    :param latent_width: latent-space width (pre-packing).
+    :param family: the architecture/family key; selects the calibrated multiplier, with unmeasured
+        transformers passing ``"dit"`` (the conservative default).
+    """
+    multiplier = family_multiplier(family)
+    element_size = dtype_element_size(inference_dtype)
+    working_mem_bytes = estimate_denoise_working_memory(
+        latent_area=int(latent_height) * int(latent_width),
+        activation_width=model_activation_width(model),
+        batch_size=batch_size,
+        element_size=element_size,
+        multiplier=multiplier,
+    )
+    return DenoiseWorkingMemory(
+        bytes=working_mem_bytes,
+        family=family,
+        multiplier=multiplier,
+        element_size=element_size,
+        batch_size=max(1, int(batch_size)),
+    )

@@ -27,13 +27,7 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import CogView4ConditioningInfo
-from invokeai.backend.util.denoise_working_memory import (
-    begin_denoise_measure,
-    dtype_element_size,
-    end_denoise_measure,
-    estimate_denoise_working_memory_for_model,
-    resolve_denoise_working_mem_bytes,
-)
+from invokeai.backend.util.denoise_working_memory import estimate_denoise_working_memory_for_model
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -297,25 +291,23 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             ),
         )
 
-        # Estimate this denoise forward's working-memory need so the cache reserves the right amount
-        # instead of the flat default. With smart_partial_loading on, the cache honors the estimate down
-        # to a small minimum (keeping more of the model resident); un-instrumented ops keep the default.
-        estimated_working_memory = estimate_denoise_working_memory_for_model(
+        # Estimate the working memory this denoise forward needs so the model cache can reserve it.
+        working_memory = estimate_denoise_working_memory_for_model(
             model=transformer_info.model,
             latent_height=latents.shape[-2],
             latent_width=latents.shape[-1],
             batch_size=latents.shape[0],
-            element_size=dtype_element_size(inference_dtype),
+            inference_dtype=inference_dtype,
             family="dit",
         )
 
-        with transformer_info.model_on_device(
-            working_mem_bytes=resolve_denoise_working_mem_bytes(estimated_working_memory, "dit")
-        ) as (_, transformer):
+        with transformer_info.model_on_device(working_mem_bytes=working_memory.bytes) as (_, transformer):
             assert isinstance(transformer, CogView4Transformer2DModel)
 
             # Denoising loop
-            _denoise_mem_token = begin_denoise_measure(context.logger)
+            mem_probe = working_memory.measure(
+                context.logger, pixel_height=self.height, pixel_width=self.width, label="cogview4"
+            )
             for step_idx in tqdm(range(total_steps)):
                 t_curr = timesteps[step_idx]
                 sigma_curr = sigmas[step_idx]
@@ -372,16 +364,7 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                     ),
                 )
 
-            end_denoise_measure(
-                _denoise_mem_token,
-                context.logger,
-                label="cogview4",
-                estimate_bytes=estimated_working_memory,
-                pixel_height=self.height,
-                pixel_width=self.width,
-                batch_size=latents.shape[0],
-                element_size=dtype_element_size(inference_dtype),
-            )
+            mem_probe.end()
 
         return latents
 

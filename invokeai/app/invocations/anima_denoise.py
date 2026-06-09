@@ -57,13 +57,7 @@ from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import (
 )
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import AnimaConditioningInfo, Range
-from invokeai.backend.util.denoise_working_memory import (
-    begin_denoise_measure,
-    dtype_element_size,
-    end_denoise_measure,
-    estimate_denoise_working_memory_for_model,
-    resolve_denoise_working_mem_bytes,
-)
+from invokeai.backend.util.denoise_working_memory import estimate_denoise_working_memory_for_model
 from invokeai.backend.util.devices import TorchDevice
 
 # Anima uses 8x spatial compression (VAE downsamples by 2^3)
@@ -534,23 +528,19 @@ class AnimaDenoiseInvocation(BaseInvocation):
                 seed=self.seed,
             )
 
-        # Estimate the denoise forward's working-memory need (measure-only: passed as None unless
-        # enforcement is enabled; logged vs the measured peak for calibration).
-        estimated_working_memory = estimate_denoise_working_memory_for_model(
+        # Estimate the working memory this denoise forward needs so the model cache can reserve it.
+        working_memory = estimate_denoise_working_memory_for_model(
             model=transformer_info.model,
             latent_height=latents.shape[-2],
             latent_width=latents.shape[-1],
             batch_size=latents.shape[0],
-            element_size=dtype_element_size(inference_dtype),
+            inference_dtype=inference_dtype,
             family="anima",
         )
         with ExitStack() as exit_stack:
             (cached_weights, transformer) = exit_stack.enter_context(
-                transformer_info.model_on_device(
-                    working_mem_bytes=resolve_denoise_working_mem_bytes(estimated_working_memory, "anima")
-                )
+                transformer_info.model_on_device(working_mem_bytes=working_memory.bytes)
             )
-            _denoise_mem_token = begin_denoise_measure(context.logger)
 
             # Apply LoRA models to the transformer.
             # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
@@ -628,6 +618,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     # t5xxl_ids=None skips the LLM Adapter — context is already pre-computed
                 )
 
+            mem_probe = working_memory.measure(context.logger, pixel_height=self.height, pixel_width=self.width)
             if driver is not None:
                 user_step = 0
                 pbar = tqdm(total=total_steps, desc="Denoising (Anima)")
@@ -718,16 +709,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
                         ),
                     )
 
-            end_denoise_measure(
-                _denoise_mem_token,
-                context.logger,
-                label="anima",
-                estimate_bytes=estimated_working_memory,
-                pixel_height=self.height,
-                pixel_width=self.width,
-                batch_size=latents.shape[0],
-                element_size=dtype_element_size(inference_dtype),
-            )
+            mem_probe.end()
 
         # Remove temporal dimension for output: [B, C, 1, H, W] -> [B, C, H, W]
         return latents.squeeze(2)
