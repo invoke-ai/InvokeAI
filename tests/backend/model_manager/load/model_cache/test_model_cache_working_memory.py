@@ -40,7 +40,10 @@ def _make_cache(**kwargs) -> ModelCache:
         "execution_device": "cuda",
     }
     defaults.update(kwargs)
-    return ModelCache(**defaults)
+    # The constructor sizes the RAM cache via torch.cuda.mem_get_info, which raises on the CPU-only
+    # CI runners. Its value is irrelevant to the working-memory reserve logic under test.
+    with patch.object(ModelCache, "_calc_ram_available_to_model_cache", return_value=8 * GB):
+        return ModelCache(**defaults)
 
 
 def _make_partial_entry(total_bytes: int, cur_vram_bytes: int) -> MagicMock:
