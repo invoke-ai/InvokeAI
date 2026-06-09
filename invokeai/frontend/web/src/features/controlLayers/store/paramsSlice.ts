@@ -7,7 +7,13 @@ import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMul
 import { isPlainObject } from 'es-toolkit';
 import { clamp } from 'es-toolkit/compat';
 import { logout } from 'features/auth/store/authSlice';
-import type { AspectRatioID, InfillMethod, ParamsState, RgbaColor } from 'features/controlLayers/store/types';
+import type {
+  AspectRatioID,
+  InfillMethod,
+  ParamsState,
+  PromptHistoryItem,
+  RgbaColor,
+} from 'features/controlLayers/store/types';
 import {
   ASPECT_RATIO_MAP,
   DEFAULT_ASPECT_RATIO_CONFIG,
@@ -231,13 +237,6 @@ const slice = createSlice({
       }
       state.animaQwen3EncoderModel = result.data;
     },
-    animaT5EncoderModelSelected: (state, action: PayloadAction<ParameterT5EncoderModel | null>) => {
-      const result = zParamsState.shape.animaT5EncoderModel.safeParse(action.payload);
-      if (!result.success) {
-        return;
-      }
-      state.animaT5EncoderModel = result.data;
-    },
     setAnimaScheduler: (
       state,
       action: PayloadAction<'euler' | 'heun' | 'dpmpp_2m' | 'dpmpp_2m_sde' | 'er_sde' | 'lcm'>
@@ -306,20 +305,33 @@ const slice = createSlice({
     positivePromptChanged: (state, action: PayloadAction<ParameterPositivePrompt>) => {
       state.positivePrompt = action.payload;
     },
-    positivePromptAddedToHistory: (state, action: PayloadAction<ParameterPositivePrompt>) => {
-      const prompt = action.payload.trim();
-      if (prompt.length === 0) {
+    positivePromptAddedToHistory: (state, action: PayloadAction<PromptHistoryItem>) => {
+      const prompt: PromptHistoryItem = {
+        positivePrompt: action.payload.positivePrompt.trim(),
+        negativePrompt: action.payload.negativePrompt?.trim() || null,
+      };
+      if (prompt.positivePrompt.length === 0 && !prompt.negativePrompt) {
         return;
       }
 
-      state.positivePromptHistory = [prompt, ...state.positivePromptHistory.filter((p) => p !== prompt)];
+      state.positivePromptHistory = [
+        prompt,
+        ...state.positivePromptHistory.filter(
+          (p) =>
+            p.positivePrompt !== prompt.positivePrompt || (p.negativePrompt ?? null) !== (prompt.negativePrompt ?? null)
+        ),
+      ];
 
       if (state.positivePromptHistory.length > MAX_POSITIVE_PROMPT_HISTORY) {
         state.positivePromptHistory = state.positivePromptHistory.slice(0, MAX_POSITIVE_PROMPT_HISTORY);
       }
     },
-    promptRemovedFromHistory: (state, action: PayloadAction<string>) => {
-      state.positivePromptHistory = state.positivePromptHistory.filter((p) => p !== action.payload);
+    promptRemovedFromHistory: (state, action: PayloadAction<PromptHistoryItem>) => {
+      state.positivePromptHistory = state.positivePromptHistory.filter(
+        (p) =>
+          p.positivePrompt !== action.payload.positivePrompt ||
+          (p.negativePrompt ?? null) !== (action.payload.negativePrompt ?? null)
+      );
     },
     promptHistoryCleared: (state) => {
       state.positivePromptHistory = [];
@@ -602,7 +614,6 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.zImageQwen3SourceModel = oldState.zImageQwen3SourceModel;
   newState.animaVaeModel = oldState.animaVaeModel;
   newState.animaQwen3EncoderModel = oldState.animaQwen3EncoderModel;
-  newState.animaT5EncoderModel = oldState.animaT5EncoderModel;
   newState.kleinVaeModel = oldState.kleinVaeModel;
   newState.kleinQwen3EncoderModel = oldState.kleinQwen3EncoderModel;
   newState.qwenImageComponentSource = oldState.qwenImageComponentSource;
@@ -702,7 +713,6 @@ export const {
   paramsRecalled,
   animaVaeModelSelected,
   animaQwen3EncoderModelSelected,
-  animaT5EncoderModelSelected,
   setAnimaScheduler,
 } = slice.actions;
 
@@ -774,7 +784,6 @@ export const selectZImageQwen3EncoderModel = createParamsSelector((params) => pa
 export const selectZImageQwen3SourceModel = createParamsSelector((params) => params.zImageQwen3SourceModel);
 export const selectAnimaVaeModel = createParamsSelector((params) => params.animaVaeModel);
 export const selectAnimaQwen3EncoderModel = createParamsSelector((params) => params.animaQwen3EncoderModel);
-export const selectAnimaT5EncoderModel = createParamsSelector((params) => params.animaT5EncoderModel);
 export const selectAnimaScheduler = createParamsSelector((params) => params.animaScheduler);
 export const selectKleinVaeModel = createParamsSelector((params) => params.kleinVaeModel);
 export const selectKleinQwen3EncoderModel = createParamsSelector((params) => params.kleinQwen3EncoderModel);
