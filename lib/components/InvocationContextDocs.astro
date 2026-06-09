@@ -1,0 +1,324 @@
+---
+import invocationContext from '../../generated/invocation-context.json';
+
+/** Strip "Interface" suffix for the access path hint, e.g. "ImagesInterface" -> "context.images" */
+const accessPath = (name: string) => {
+  const stripped = name.replace(/Interface$/, '').toLowerCase();
+  return `context.${stripped}`;
+};
+
+/** Build a URL-friendly anchor id from an interface name, e.g. "ImagesInterface" -> "imagesinterface" */
+const ifaceId = (name: string) => name.toLowerCase();
+
+/** Build a URL-friendly anchor id for a method, e.g. ("ImagesInterface","get_dto") -> "imagesinterface--get_dto" */
+const methodId = (ifaceName: string, methodName: string) =>
+  `${ifaceName.toLowerCase()}--${methodName}`;
+
+/** Lightweight markdown-to-HTML for docstring content.
+ *  Handles: fenced code blocks (```lang ... ```), inline `code`, **bold**, and paragraphs. */
+const miniMarkdown = (text: string): string => {
+  // HTML-escape first
+  let s = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // Fenced code blocks: ```lang\n...\n```
+  s = s.replace(/```(\w*)\n([\s\S]*?)```/g, (_m, lang, code) => {
+    return `<pre class="ctx-code-block"><code>${code.replace(/^\n|\n$/g, '')}</code></pre>`;
+  });
+  // Inline code: `...`
+  s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // Bold: **...**
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // Convert double newlines to paragraph breaks
+  s = s.replace(/\n\n+/g, '</p><p>');
+  return `<p>${s}</p>`;
+};
+
+/** Inline-only markdown: just backtick `code` and **bold**, no block elements. */
+const inlineMarkdown = (text: string): string => {
+  let s = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  return s;
+};
+
+/** Get the first sentence/line of a description for the summary table. */
+const summaryDesc = (desc: string) => {
+  if (!desc) return '';
+  // Take up to first newline or period+space
+  const nl = desc.indexOf('\n');
+  const trimmed = nl !== -1 ? desc.substring(0, nl) : desc;
+  return trimmed;
+};
+---
+
+{invocationContext.interfaces.map((iface) => (
+  <div class="ctx-interface">
+    <h2 id={ifaceId(iface.name)}>
+      {iface.name}
+      <code class="ctx-access-path">{accessPath(iface.name)}</code>
+    </h2>
+
+    {iface.description && <div class="ctx-iface-desc" set:html={miniMarkdown(iface.description)} />}
+
+    {/* ── Summary table ── */}
+    <table class="ctx-summary-table">
+      <thead>
+        <tr>
+          <th>Method</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        {iface.methods.map((method) => (
+          <tr>
+            <td><code><a href={`#${methodId(iface.name, method.name)}`}>{method.name}</a></code></td>
+            <td set:html={inlineMarkdown(summaryDesc(method.description))} />
+          </tr>
+        ))}
+      </tbody>
+    </table>
+
+    {/* ── Per-method details ── */}
+    {iface.methods.map((method) => (
+      <div class="ctx-method-section">
+        <h3 id={methodId(iface.name, method.name)}>{method.name}</h3>
+
+        <pre class="ctx-signature"><code>{method.signature}</code></pre>
+
+        {method.description && (
+          <div class="ctx-method-desc" set:html={miniMarkdown(method.description)} />
+        )}
+
+        {method.parameters.length > 0 && (
+          <>
+            <p class="ctx-section-label">Parameters</p>
+            <table class="ctx-param-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Description</th>
+                  <th>Default</th>
+                </tr>
+              </thead>
+              <tbody>
+                {method.parameters.map((param) => (
+                  <tr>
+                    <td><code>{param.name}</code></td>
+                    <td><code>{param.type || '—'}</code></td>
+                    <td set:html={inlineMarkdown(param.description || '')} />
+                    <td>{param.default ? <code>{param.default}</code> : <em>required</em>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+
+        {(method.returns || method.return_type) && (
+          <>
+            <p class="ctx-section-label">Returns</p>
+            <table class="ctx-return-table">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>{method.return_type || '—'}</code></td>
+                  <td set:html={inlineMarkdown(method.returns || '')} />
+                </tr>
+              </tbody>
+            </table>
+          </>
+        )}
+      </div>
+    ))}
+  </div>
+))}
+
+<style>
+  /* ── Interface sections ── */
+  .ctx-interface {
+    margin-bottom: 2.5rem;
+  }
+
+  .ctx-interface h2 {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .ctx-access-path {
+    font-size: var(--sl-text-sm);
+    font-weight: 400;
+    color: var(--sl-color-gray-3);
+  }
+
+  .ctx-iface-desc {
+    margin: 0.25rem 0 1rem;
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-gray-2);
+  }
+
+  .ctx-iface-desc p {
+    margin: 0.25rem 0;
+  }
+
+  /* ── Summary table ── */
+  .ctx-summary-table {
+    width: 100%;
+    margin: 0.5rem 0 1.5rem;
+    border-collapse: collapse;
+    font-size: var(--sl-text-sm);
+  }
+
+  .ctx-summary-table th {
+    text-align: left;
+    padding: 0.4rem 0.75rem;
+    border-bottom: 2px solid var(--sl-color-hairline);
+    color: var(--sl-color-white);
+    font-weight: 600;
+    font-size: var(--sl-text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .ctx-summary-table td {
+    padding: 0.35rem 0.75rem;
+    border-bottom: 1px solid var(--sl-color-hairline);
+    vertical-align: top;
+  }
+
+  .ctx-summary-table td:first-child {
+    white-space: nowrap;
+  }
+
+  .ctx-summary-table a {
+    text-decoration: none;
+    color: var(--sl-color-text-accent);
+  }
+
+  .ctx-summary-table a:hover {
+    text-decoration: underline;
+  }
+
+  /* ── Method sections ── */
+  .ctx-method-section {
+    margin: 1.5rem 0;
+  }
+
+  .ctx-method-section h3 {
+    margin-top: 0;
+  }
+
+  /* ── Signature code block ── */
+  .ctx-signature {
+    margin: 0.25rem 0 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--sl-color-bg-nav);
+    border-radius: 0.35rem;
+    overflow-x: auto;
+    font-size: var(--sl-text-sm);
+  }
+
+  .ctx-signature code {
+    background: none;
+    padding: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* ── Description ── */
+  .ctx-method-desc {
+    margin: 0 0 0.75rem;
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-gray-2);
+  }
+
+  .ctx-method-desc p {
+    margin: 0.25rem 0;
+  }
+
+  .ctx-method-desc code {
+    font-size: var(--sl-text-xs);
+    background: var(--sl-color-bg-nav);
+    padding: 0.1rem 0.25rem;
+    border-radius: 0.2rem;
+  }
+
+  /* ── Section labels (Parameters / Returns) ── */
+  .ctx-section-label {
+    margin: 0.5rem 0 0.25rem;
+    font-size: var(--sl-text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--sl-color-white);
+  }
+
+  /* ── Parameter table ── */
+  .ctx-param-table,
+  .ctx-return-table {
+    width: 100%;
+    margin: 0 0 0.75rem;
+    border-collapse: collapse;
+    font-size: var(--sl-text-sm);
+  }
+
+  .ctx-param-table th,
+  .ctx-return-table th {
+    text-align: left;
+    padding: 0.35rem 0.6rem;
+    border-bottom: 2px solid var(--sl-color-hairline);
+    font-size: var(--sl-text-xs);
+    font-weight: 600;
+    color: var(--sl-color-white);
+  }
+
+  .ctx-param-table td,
+  .ctx-return-table td {
+    padding: 0.3rem 0.6rem;
+    border-bottom: 1px solid var(--sl-color-hairline);
+    vertical-align: top;
+  }
+
+  .ctx-param-table td:first-child {
+    white-space: nowrap;
+    font-weight: 500;
+  }
+
+  .ctx-param-table td:nth-child(2) code,
+  .ctx-return-table td:first-child code {
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-text-accent);
+    word-break: break-word;
+  }
+
+  .ctx-param-table td:last-child {
+    white-space: nowrap;
+  }
+
+  .ctx-param-table td:last-child em {
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+  }
+
+  /* ── Code blocks inside descriptions (via miniMarkdown) ── */
+  .ctx-code-block {
+    margin: 0.35rem 0;
+    padding: 0.4rem 0.6rem;
+    background: var(--sl-color-bg-nav);
+    border-radius: 0.25rem;
+    overflow-x: auto;
+    font-size: var(--sl-text-xs);
+  }
+
+  .ctx-code-block code {
+    background: none;
+    padding: 0;
+    white-space: pre;
+  }
+</style>
