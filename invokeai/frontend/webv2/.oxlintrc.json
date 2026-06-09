@@ -1,0 +1,71 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "import", "unicorn", "oxc"],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "curly": "error",
+    "eqeqeq": "error",
+    "import/no-cycle": "error",
+    "import/no-duplicates": "error",
+    "no-console": "warn",
+    "no-eval": "error",
+    "no-extend-native": "error",
+    "no-implied-eval": "error",
+    "no-label-var": "error",
+    "no-promise-executor-return": "error",
+    "no-return-assign": "error",
+    "no-sequences": "error",
+    "no-template-curly-in-string": "error",
+    "no-throw-literal": "error",
+    "no-unmodified-loop-condition": "error",
+    "no-var": "error",
+    "prefer-template": "error",
+    "radix": "error",
+    "react/jsx-curly-brace-presence": [
+      "error",
+      {
+        "props": "never",
+        "children": "never"
+      }
+    ],
+    "react-hooks/exhaustive-deps": "error",
+    "react-hooks/rules-of-hooks": "error",
+    "require-await": "error",
+    "typescript/consistent-type-imports": [
+      "error",
+      {
+        "fixStyle": "separate-type-imports",
+        "prefer": "type-imports"
+      }
+    ],
+    "typescript/no-empty-interface": [
+      "error",
+      {
+        "allowSingleExtends": true
+      }
+    ]
+  },
+  "env": {
+    "browser": true,
+    "builtin": true,
+    "es2022": true,
+    "node": true
+  },
+  "globals": {
+    "GlobalCompositeOperation": "readonly",
+    "RequestInit": "readonly"
+  },
+  "ignorePatterns": [
+    "dist/**",
+    "node_modules/**",
+    "static/**",
+    ".husky/**",
+    "patches/**",
+    "stats.html",
+    "index.html",
+    ".yarn/**",
+    "**/*.scss"
+  ]
+}

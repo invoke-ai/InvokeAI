@@ -1,0 +1,41 @@
+{
+  "name": "@invoke-ai/invoke-ai-webv2",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "dev:host": "vite dev --host",
+    "build": "pnpm run lint && vite build",
+    "fix": "pnpm run lint:oxc:fix && pnpm run format:write",
+    "format:check": "oxfmt --check .",
+    "format:write": "oxfmt --write .",
+    "lint": "pnpm run format:check && pnpm run lint:oxc && pnpm run lint:tsc",
+    "lint:oxc": "oxlint --react-plugin --import-plugin --deny-warnings .",
+    "lint:oxc:fix": "oxlint --react-plugin --import-plugin --fix .",
+    "preview": "vite preview",
+    "lint:tsc": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "^3.28.0",
+    "@emotion/react": "^11.14.0",
+    "lucide-react": "^1.17.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-icons": "^5.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.1",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react-swc": "^3.9.0",
+    "oxfmt": "^0.54.0",
+    "oxlint": "^1.69.0",
+    "typescript": "^5.8.3",
+    "vite": "^7.0.5"
+  },
+  "engines": {
+    "pnpm": "10"
+  },
+  "packageManager": "pnpm@10.12.4"
+}

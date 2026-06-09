@@ -1,0 +1,184 @@
+import { Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
+import {
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react';
+import type { IconType } from 'react-icons';
+
+import { createGraphBearingSurface } from '../graphSurfaces';
+import type { WidgetManifest, WidgetRegion, WorkbenchRegion } from '../types';
+import { useWorkbench } from '../WorkbenchContext';
+import { GraphSurfaceActions } from './GraphSurfaceActions';
+
+const PANEL_SIZE_STEP_PX = 16;
+const MIN_PANEL_SIZE_PX = 180;
+const MAX_PANEL_SIZE_PX = 520;
+const MIN_BOTTOM_PANEL_SIZE_PX = 96;
+const MAX_BOTTOM_PANEL_SIZE_PX = 420;
+
+const getPanelSizeBounds = (region: WidgetRegion): { max: number; min: number } => {
+  if (region === 'bottom') {
+    return { max: MAX_BOTTOM_PANEL_SIZE_PX, min: MIN_BOTTOM_PANEL_SIZE_PX };
+  }
+
+  return { max: MAX_PANEL_SIZE_PX, min: MIN_PANEL_SIZE_PX };
+};
+
+const clampSize = (region: WidgetRegion, sizePx: number): number => {
+  const { max, min } = getPanelSizeBounds(region);
+
+  return Math.min(max, Math.max(min, sizePx));
+};
+
+export const WidgetPanelFrame = ({
+  children,
+  region,
+}: {
+  children: ReactNode;
+  region: Exclude<WidgetRegion, 'center'>;
+}) => {
+  const { activeProject, dispatch } = useWorkbench();
+  const regionState = activeProject.widgetRegions[region];
+  const [dragSizePx, setDragSizePx] = useState<number | null>(null);
+  const isLeft = region === 'left';
+  const isBottom = region === 'bottom';
+  const displaySizePx = dragSizePx ?? regionState.sizePx;
+  const sizeBounds = getPanelSizeBounds(region);
+
+  const commitSize = (sizePx: number) => {
+    const nextSizePx = clampSize(region, sizePx);
+
+    if (nextSizePx !== regionState.sizePx) {
+      dispatch({ region, sizePx: nextSizePx, type: 'setRegionWidgetSize' });
+    }
+  };
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startSizePx = regionState.sizePx;
+    let nextSizePx = startSizePx;
+    const direction = isLeft ? 1 : -1;
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const deltaPx = isBottom ? startY - moveEvent.clientY : (moveEvent.clientX - startX) * direction;
+
+      nextSizePx = clampSize(region, startSizePx + deltaPx);
+      setDragSizePx(nextSizePx);
+    };
+
+    const handlePointerUp = () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+      setDragSizePx(null);
+      commitSize(nextSizePx);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+  };
+
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const step = event.shiftKey ? PANEL_SIZE_STEP_PX * 2 : PANEL_SIZE_STEP_PX;
+    const sizeChanges: Partial<Record<string, number>> = isBottom
+      ? { ArrowDown: -step, ArrowUp: step, End: sizeBounds.max - displaySizePx, Home: sizeBounds.min - displaySizePx }
+      : {
+          ArrowLeft: isLeft ? -step : step,
+          ArrowRight: isLeft ? step : -step,
+          End: sizeBounds.max - displaySizePx,
+          Home: sizeBounds.min - displaySizePx,
+        };
+    const sizeChange = sizeChanges[event.key];
+
+    if (sizeChange === undefined) {
+      return;
+    }
+
+    event.preventDefault();
+    commitSize(displaySizePx + sizeChange);
+  };
+
+  return (
+    <Stack
+      as="aside"
+      bg="bg.shell"
+      borderColor="border.subtle"
+      borderRightWidth={isLeft ? '1px' : '0'}
+      borderLeftWidth={!isLeft && !isBottom ? '1px' : '0'}
+      borderTopWidth={isBottom ? '1px' : '0'}
+      flexShrink={0}
+      gap="3"
+      minW="0"
+      overflowY="auto"
+      p="3"
+      position="relative"
+      {...(isBottom ? { h: `${displaySizePx}px`, w: 'full' } : { w: `${displaySizePx}px` })}
+    >
+      {children}
+      <Box
+        aria-label={`Resize ${region} widget panel`}
+        aria-orientation={isBottom ? 'horizontal' : 'vertical'}
+        aria-valuemax={sizeBounds.max}
+        aria-valuemin={sizeBounds.min}
+        aria-valuenow={displaySizePx}
+        as="div"
+        cursor={isBottom ? 'ns-resize' : 'ew-resize'}
+        opacity="0"
+        position="absolute"
+        role="separator"
+        tabIndex={0}
+        transition="opacity 0.12s ease, background 0.12s ease"
+        zIndex="1"
+        {...(isBottom ? { h: '2', left: '0', right: '0', top: '-1' } : { bottom: '0', top: '0', w: '2' })}
+        {...(!isBottom ? (isLeft ? { right: '-1' } : { left: '-1' }) : {})}
+        _hover={{ bg: 'accent.active', opacity: 0.45 }}
+        _focusVisible={{ bg: 'accent.active', opacity: 0.65, outline: '2px solid var(--chakra-colors-accent-active)' }}
+        onKeyDown={handleKeyDown}
+        onPointerDown={handlePointerDown}
+      />
+    </Stack>
+  );
+};
+
+export const GraphBearingWidgetHeader = ({
+  manifest,
+  region,
+}: {
+  manifest: WidgetManifest;
+  region: WorkbenchRegion;
+}) => {
+  const surface = createGraphBearingSurface(manifest, region);
+
+  return (
+    <HStack justify="space-between">
+      <Text fontSize="xs" fontWeight="700">
+        {manifest.labelText}
+      </Text>
+      {surface ? <GraphSurfaceActions surface={surface} /> : null}
+    </HStack>
+  );
+};
+
+export const FieldPlaceholder = ({ label, h }: { label: string; h: string }) => (
+  <Stack gap="1">
+    <Text color="fg.muted" fontSize="2xs" fontWeight="600" textTransform="uppercase">
+      {label}
+    </Text>
+    <Box bg="bg.surface" borderWidth="1px" borderColor="border.subtle" h={h} rounded="md" w="full" />
+  </Stack>
+);
+
+export const StatusWidgetChip = ({ icon, children }: { icon: IconType; children: ReactNode }) => (
+  <HStack borderWidth="1px" borderColor="border.emphasis" gap="1.5" py="0.5" px="2" rounded="sm" flexShrink={0}>
+    <Icon as={icon} boxSize="3" />
+    <Text fontSize="2xs" fontWeight="500" whiteSpace="nowrap">
+      {children}
+    </Text>
+  </HStack>
+);
