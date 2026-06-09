@@ -169,7 +169,7 @@ def test_reserve_smart_honors_estimate_down_to_floor():
 
 def test_reserve_smart_user_raised_default_is_the_floor():
     """A user-raised device_working_mem_gb is an OOM mitigation; smart mode must not go below it."""
-    cache = _make_cache(execution_device_working_mem_gb=6)
+    cache = _make_cache(execution_device_working_mem_gb=6, device_working_mem_raised=True)
     assert _vram_available(cache, 2 * GB) == FREE - 6 * GB
     assert _vram_available(cache, 7 * GB) == FREE - 7 * GB
 
@@ -200,6 +200,6 @@ def test_partial_load_reserve_scales_between_floor_and_default():
 
 
 def test_partial_load_reserve_respects_user_raised_default():
-    cache = _make_cache(execution_device_working_mem_gb=6)
+    cache = _make_cache(execution_device_working_mem_gb=6, device_working_mem_raised=True)
     assert cache._partial_load_reserve(2 * GB) == 6 * GB  # floor = raised default
     assert cache._partial_load_reserve(7 * GB) == 7 * GB  # estimate above raised default: cap = estimate

@@ -34,9 +34,6 @@ GB = 2**30
 # Size of a MB in bytes.
 MB = 2**20
 
-# The shipped default for device_working_mem_gb (see config_default.py). Used to detect when a user
-# has explicitly RAISED the working-memory reserve (an OOM mitigation we must keep respecting).
-DEFAULT_DEVICE_WORKING_MEM_GB = 3
 # When an operation supplies its OWN working-memory estimate, the reserve is honored down to this
 # absolute minimum rather than the full default reserve, so light/instrumented ops stop needlessly
 # holding back VRAM (issue #9257). Operations that supply no estimate still get the full default.
@@ -165,6 +162,7 @@ class ModelCache:
         enable_partial_loading: bool,
         keep_ram_copy_of_weights: bool,
         smart_partial_loading: bool = False,
+        device_working_mem_raised: bool = False,
         max_ram_cache_size_gb: float | None = None,
         max_vram_cache_size_gb: float | None = None,
         execution_device: torch.device | str = "cuda",
@@ -178,6 +176,10 @@ class ModelCache:
         :param execution_device_working_mem_gb: The amount of working memory to keep on the GPU (in GB) i.e. non-model
             VRAM.
         :param enable_partial_loading: Whether to enable partial loading of models.
+        :param device_working_mem_raised: True if the user explicitly configured device_working_mem_gb ABOVE the
+            shipped default (an OOM mitigation). smart_partial_loading then treats the configured value as the
+            minimum reserve for instrumented ops, instead of the smaller smart floor. Derived at the app boundary
+            so this module does not need to know the shipped default.
         :param max_ram_cache_size_gb: The maximum amount of CPU RAM to use for model caching in GB. This parameter is
             kept to maintain compatibility with previous versions of the model cache, but should be deprecated in the
             future. If set, this parameter overrides the default cache size logic.
@@ -195,6 +197,7 @@ class ModelCache:
         """
         self._enable_partial_loading = enable_partial_loading
         self._smart_partial_loading = smart_partial_loading
+        self._device_working_mem_raised = device_working_mem_raised
         self._keep_ram_copy_of_weights = keep_ram_copy_of_weights
         self._execution_device_working_mem_gb = execution_device_working_mem_gb
         self._execution_device: torch.device = torch.device(execution_device)
@@ -666,7 +669,7 @@ class ModelCache:
             # holding back VRAM (#9257). If the user explicitly RAISED device_working_mem_gb above the
             # shipped default (an OOM mitigation), respect that raised value as the floor instead.
             min_working_mem_bytes = int(MIN_DEVICE_WORKING_MEM_GB * GB)
-            if self._execution_device_working_mem_gb > DEFAULT_DEVICE_WORKING_MEM_GB:
+            if self._device_working_mem_raised:
                 min_working_mem_bytes = working_mem_bytes_default
             working_mem_bytes = max(working_mem_bytes, min_working_mem_bytes)
 
@@ -699,7 +702,7 @@ class ModelCache:
         """
         default_bytes = int(self._execution_device_working_mem_gb * GB)
         floor_bytes = int(MIN_DEVICE_WORKING_MEM_GB * GB)
-        if self._execution_device_working_mem_gb > DEFAULT_DEVICE_WORKING_MEM_GB:
+        if self._device_working_mem_raised:
             floor_bytes = default_bytes
         cap_bytes = max(default_bytes, estimate_bytes)
         scaled_bytes = int(estimate_bytes * PARTIAL_LOAD_HEADROOM_MULTIPLIER)
