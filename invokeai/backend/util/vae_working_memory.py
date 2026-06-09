@@ -2,6 +2,7 @@ from typing import Literal
 
 import torch
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
+from diffusers.models.autoencoders.autoencoder_kl_wan import AutoencoderKLWan
 from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
 
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
@@ -88,6 +89,37 @@ def estimate_vae_working_memory_flux(
     working_memory = out_h * out_w * element_size * scaling_constant
 
     print(f"estimate_vae_working_memory_flux: {int(working_memory)}")
+
+    return int(working_memory)
+
+
+def estimate_vae_working_memory_anima(
+    operation: Literal["encode", "decode"],
+    image_tensor: torch.Tensor,
+    vae: AutoencoderKLWan,
+    tile_size: int | None,
+) -> int:
+    """Estimate the working memory required to encode or decode with the Wan 2.1 VAE (Anima).
+
+    The Wan VAE uses 3D convolutions and needs noticeably more working memory per output
+    pixel than the 2D VAEs estimated above. Calibrated empirically on a 1024x1024 fp16
+    decode: peak reserved memory was ~5.95GB for a full decode and ~1.73GB with 512px
+    tiles (384px stride), i.e. ~2900 bytes per output pixel per element byte. Encoding
+    follows the house ratio of ~50% of decode.
+    """
+    element_size = next(vae.parameters()).element_size()
+    scaling_constant = 2900 if operation == "decode" else 1450
+
+    if tile_size is not None:
+        h = tile_size
+        w = tile_size
+        # Add 25% to account for tile overlap.
+        working_memory = h * w * element_size * scaling_constant * 1.25
+    else:
+        latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
+        h = latent_scale_factor_for_operation * image_tensor.shape[-2]
+        w = latent_scale_factor_for_operation * image_tensor.shape[-1]
+        working_memory = h * w * element_size * scaling_constant
 
     return int(working_memory)
 
