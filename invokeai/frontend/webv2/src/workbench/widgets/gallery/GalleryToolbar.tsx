@@ -1,35 +1,53 @@
-import { Box, HStack, Input, InputGroup, Menu, Portal, Slider, Spacer, Stack, Switch, Text } from '@chakra-ui/react';
+import {
+  Box,
+  HStack,
+  Icon,
+  Input,
+  InputGroup,
+  Menu,
+  Portal,
+  Slider,
+  Spacer,
+  Stack,
+  Switch,
+  Text,
+} from '@chakra-ui/react';
 import { useRef } from 'react';
-import { PiGearSixBold, PiMagnifyingGlassBold, PiUploadSimpleBold } from 'react-icons/pi';
+import { SearchIcon, SettingsIcon, UploadIcon } from 'lucide-react';
 
 import { Button, CloseButton, IconButton } from '../../components/ui/Button';
+import { Tabs } from '../../components/ui/Tabs';
 import { isDateBoardId } from '../../gallery/api';
+import type { GalleryView } from '../../gallery/api';
 import { GalleryBoardSelect } from './GalleryBoardSelect';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 const ACCEPTED_UPLOAD_EXTENSIONS = 'image/png,image/jpeg,image/webp';
+const galleryViewTabs = [
+  { label: 'Images', value: 'images' },
+  { label: 'Assets', value: 'assets' },
+] satisfies { label: string; value: GalleryView }[];
 
 export const GalleryToolbar = ({ layout }: { layout: 'stacked' | 'wide' }) => {
   const { actions, gallery } = useGalleryWidget();
   const isWide = layout === 'wide';
   const viewTabs = (
-    <HStack gap="1">
-      <Button
-        size="xs"
-        variant={gallery.galleryView === 'images' ? 'solid' : 'outline'}
-        onClick={() => actions.setView('images')}
-      >
-        Images
-      </Button>
-      <Button
-        size="xs"
-        variant={gallery.galleryView === 'assets' ? 'solid' : 'outline'}
-        onClick={() => actions.setView('assets')}
-      >
-        Assets
-      </Button>
-    </HStack>
+    <Tabs.Root
+      size="sm"
+      variant="subtle"
+      value={gallery.galleryView}
+      onValueChange={(event) => actions.setView(event.value as GalleryView)}
+    >
+      <Tabs.List>
+        {galleryViewTabs.map((item) => (
+          <Tabs.Trigger key={item.value} value={item.value} fontSize="xs">
+            {item.label}
+          </Tabs.Trigger>
+        ))}
+      </Tabs.List>
+    </Tabs.Root>
   );
+
   const toolbarActions = (
     <HStack gap="2">
       <Text color="fg.subtle" fontSize="2xs">
@@ -47,7 +65,7 @@ export const GalleryToolbar = ({ layout }: { layout: 'stacked' | 'wide' }) => {
     <Stack gap="2">
       {isWide ? (
         <HStack gap="2">
-          <Box flex="1" maxW="24rem" minW="10rem">
+          <Box flex="1" maxW="16rem" minW="10rem">
             <GalleryBoardSelect />
           </Box>
           {viewTabs}
@@ -63,7 +81,7 @@ export const GalleryToolbar = ({ layout }: { layout: 'stacked' | 'wide' }) => {
           </HStack>
         </>
       )}
-      <InputGroup startElement={<PiMagnifyingGlassBold />} endElement={searchClearButton}>
+      <InputGroup startElement={<Icon as={SearchIcon} size="sm" />} endElement={searchClearButton}>
         <Input
           aria-label="Search gallery images"
           placeholder="Search images"
@@ -111,7 +129,7 @@ const GalleryUploadButton = () => {
         variant="outline"
         onClick={() => fileInputRef.current?.click()}
       >
-        <PiUploadSimpleBold />
+        <UploadIcon />
       </IconButton>
     </>
   );
@@ -126,7 +144,7 @@ const GallerySettingsMenu = () => {
     <Menu.Root positioning={{ placement: 'bottom-end' }}>
       <Menu.Trigger asChild>
         <IconButton aria-label="Gallery settings" size="xs" variant="outline">
-          <PiGearSixBold />
+          <SettingsIcon />
         </IconButton>
       </Menu.Trigger>
       <Portal>

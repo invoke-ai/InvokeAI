@@ -1,5 +1,5 @@
 import { Icon, type IconProps } from '@chakra-ui/react';
-import { Square } from 'lucide-react';
+import { SquareIcon } from 'lucide-react';
 import { lazy, Suspense, type ComponentType } from 'react';
 
 import type { WidgetIconId } from './types';
@@ -39,7 +39,7 @@ const resolveLazyIcon = (iconId: WidgetIconId): ComponentType => {
     return cachedIcon;
   }
 
-  const LazyIcon = lazy(getIconImporter(iconId) ?? (() => Promise.resolve({ default: Square })));
+  const LazyIcon = lazy(getIconImporter(iconId) ?? (() => Promise.resolve({ default: SquareIcon })));
 
   iconCache.set(iconId, LazyIcon);
 
@@ -50,7 +50,7 @@ export const WidgetIcon = ({ iconId, ...props }: IconProps & { iconId: WidgetIco
   const ResolvedIcon = resolveLazyIcon(iconId);
 
   return (
-    <Suspense fallback={<Icon as={Square} {...props} />}>
+    <Suspense fallback={<Icon as={SquareIcon} {...props} />}>
       <Icon as={ResolvedIcon} {...props} />
     </Suspense>
   );

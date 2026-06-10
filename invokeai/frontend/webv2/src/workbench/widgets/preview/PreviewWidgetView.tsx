@@ -1,6 +1,6 @@
 import { Badge, Box, Flex, HStack, Stack, Text } from '@chakra-ui/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
+import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 
 import { ImageContextMenu, type ImageContextMenuTarget } from '../../components/ImageContextMenu';
 import { Button } from '../../components/ui/Button';
@@ -399,7 +399,7 @@ const SelectedImagePreview = ({
             variant="outline"
             onClick={onPrevious}
           >
-            <PiCaretLeftBold />
+            <ChevronLeftIcon />
           </Button>
           <Button
             aria-label="Next image in board"
@@ -408,7 +408,7 @@ const SelectedImagePreview = ({
             variant="outline"
             onClick={onNext}
           >
-            <PiCaretRightBold />
+            <ChevronRightIcon />
           </Button>
         </HStack>
       </HStack>

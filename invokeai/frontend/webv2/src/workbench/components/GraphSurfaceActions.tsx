@@ -1,6 +1,6 @@
 import { Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { useState } from 'react';
-import { PiDotsThreeBold, PiGraphBold, PiTargetBold } from 'react-icons/pi';
+import { GitBranchIcon, TargetIcon, MoreHorizontalIcon } from 'lucide-react';
 
 import { useWorkbench } from '../WorkbenchContext';
 import type { GraphBearingSurfaceContract, GraphContract, WidgetId } from '../types';
@@ -27,7 +27,7 @@ export const GraphSurfaceActions = ({ surface }: GraphSurfaceActionsProps) => {
       <Menu.Root positioning={{ placement: 'bottom-end' }}>
         <Menu.Trigger asChild>
           <IconButton aria-label={`${surface.label} graph actions`} color="fg.muted" size="2xs" variant="ghost">
-            <PiDotsThreeBold />
+            <MoreHorizontalIcon />
           </IconButton>
         </Menu.Trigger>
         <Portal>
@@ -51,7 +51,7 @@ export const GraphSurfaceActions = ({ surface }: GraphSurfaceActionsProps) => {
                   _disabled={{ opacity: 0.4 }}
                   onClick={() => dispatch({ sourceId: surface.sourceId, type: 'setInvocationSource' })}
                 >
-                  <Icon as={PiTargetBold} boxSize="3.5" />
+                  <Icon as={TargetIcon} boxSize="3.5" />
                   <Menu.ItemText>Set Source</Menu.ItemText>
                   {isActiveSource ? (
                     <Text color="fg.subtle" fontSize="2xs" ms="auto">
@@ -64,7 +64,7 @@ export const GraphSurfaceActions = ({ surface }: GraphSurfaceActionsProps) => {
                   disabled={!surface.canPreviewGraph}
                   onClick={() => setIsPreviewOpen(true)}
                 >
-                  <Icon as={PiGraphBold} boxSize="3.5" />
+                  <Icon as={GitBranchIcon} boxSize="3.5" />
                   <Menu.ItemText>View Graph</Menu.ItemText>
                 </Menu.Item>
               </Menu.ItemGroup>

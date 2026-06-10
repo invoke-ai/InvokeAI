@@ -1,5 +1,5 @@
 import { Badge } from '@chakra-ui/react';
-import { PiBugBold } from 'react-icons/pi';
+import { BugIcon } from 'lucide-react';
 
 import { Button } from '../../components/ui/Button';
 import { useWorkbench } from '../../WorkbenchContext';
@@ -11,7 +11,7 @@ export const DiagnosticsHeaderActions = () => {
     <>
       {state.errorLog.length ? (
         <Badge colorPalette="red" size="xs">
-          <PiBugBold />
+          <BugIcon />
           {state.errorLog.length}
         </Badge>
       ) : null}

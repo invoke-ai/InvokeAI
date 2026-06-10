@@ -5,7 +5,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
-import type { IconType } from 'react-icons';
+import type { LucideIcon } from 'lucide-react';
 
 import { createGraphBearingSurface } from '../graphSurfaces';
 import { useFocusRegionProps } from '../focusRegions';
@@ -191,7 +191,7 @@ export const StatusWidgetChip = ({
   borderColor?: string;
   children: ReactNode;
   color?: string;
-  icon: IconType;
+  icon: LucideIcon;
 }) => (
   <HStack
     borderWidth="1px"

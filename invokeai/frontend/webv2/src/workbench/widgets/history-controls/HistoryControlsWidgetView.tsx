@@ -1,5 +1,5 @@
 import { HStack } from '@chakra-ui/react';
-import { PiArrowClockwiseBold, PiArrowCounterClockwiseBold } from 'react-icons/pi';
+import { Redo2Icon, Undo2Icon } from 'lucide-react';
 
 import { IconButton } from '../../components/ui/Button';
 import { useWorkbench } from '../../WorkbenchContext';
@@ -24,7 +24,7 @@ export const HistoryControlsWidgetView = () => {
           dispatch({ type: 'undoProjectChange' });
         }}
       >
-        <PiArrowCounterClockwiseBold />
+        <Undo2Icon />
       </IconButton>
       <IconButton
         aria-label="Redo"
@@ -39,7 +39,7 @@ export const HistoryControlsWidgetView = () => {
           dispatch({ type: 'redoProjectChange' });
         }}
       >
-        <PiArrowClockwiseBold />
+        <Redo2Icon />
       </IconButton>
     </HStack>
   );

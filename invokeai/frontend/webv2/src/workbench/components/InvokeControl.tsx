@@ -1,6 +1,6 @@
 import { Flex, Group, HStack, Icon, Menu, Portal, Text, VStack } from '@chakra-ui/react';
 import { useEffect, useRef } from 'react';
-import { PiCaretDownBold, PiCheckBold, PiLockSimpleFill, PiSparkleFill } from 'react-icons/pi';
+import { CheckIcon, ChevronDownIcon, LockKeyholeIcon, SparklesIcon } from 'lucide-react';
 
 import { useWorkbench } from '../WorkbenchContext';
 import {
@@ -32,7 +32,6 @@ export const InvokeControl = () => {
   const isLocked = invocation.sourceLocked || invocation.destinationLocked;
   const isValid = isInvocationRouteValid(resolvedRoute);
   const routeLabel = formatRoute(resolvedRoute);
-  const invokeLabel = isValid ? `Invoke — ${routeLabel}` : `Invoke unavailable — ${resolvedRoute.validationMessage}`;
   const resolvedRouteRef = useRef(resolvedRoute);
   const isValidRef = useRef(isValid);
 
@@ -82,7 +81,7 @@ export const InvokeControl = () => {
       <Menu.Root positioning={{ placement: 'bottom-start' }}>
         <Group attached>
           <Button size="sm" onClick={onInvoke} w={CONTROL_WIDTH} minW="0" justifyContent="start">
-            <Icon as={PiSparkleFill} boxSize="4" flexShrink={0} />
+            <Icon as={SparklesIcon} boxSize="4" flexShrink={0} />
             <VStack align="start" gap="0" minW="0">
               <Text fontSize="sm" fontWeight="700" lineHeight="1">
                 Invoke
@@ -91,13 +90,13 @@ export const InvokeControl = () => {
                 <Text fontSize="2xs" fontWeight="600" lineHeight="1.1" opacity="0.85" truncate>
                   {routeLabel}
                 </Text>
-                {isLocked ? <Icon as={PiLockSimpleFill} boxSize="2.5" flexShrink={0} /> : null}
+                {isLocked ? <Icon as={LockKeyholeIcon} boxSize="2.5" flexShrink={0} /> : null}
               </HStack>
             </VStack>
           </Button>
           <Menu.Trigger asChild>
             <IconButton size="sm" minW="0" w="7">
-              <PiCaretDownBold />
+              <ChevronDownIcon />
             </IconButton>
           </Menu.Trigger>
         </Group>
@@ -135,7 +134,7 @@ export const InvokeControl = () => {
                       </Text>
                     )}
                     <Menu.ItemIndicator>
-                      <Icon as={PiCheckBold} boxSize="3" />
+                      <Icon as={CheckIcon} boxSize="3" />
                     </Menu.ItemIndicator>
                   </Menu.RadioItem>
                 ))}
@@ -156,7 +155,7 @@ export const InvokeControl = () => {
                   <Menu.RadioItem key={destination.id} value={destination.id}>
                     <Menu.ItemText>{destination.label}</Menu.ItemText>
                     <Menu.ItemIndicator>
-                      <Icon as={PiCheckBold} boxSize="3" />
+                      <Icon as={CheckIcon} boxSize="3" />
                     </Menu.ItemIndicator>
                   </Menu.RadioItem>
                 ))}
@@ -169,7 +168,7 @@ export const InvokeControl = () => {
                 closeOnSelect={false}
                 onClick={() => dispatch({ type: 'toggleSourceLock' })}
               >
-                <Icon as={PiLockSimpleFill} boxSize="3" opacity={invocation.sourceLocked ? 1 : 0.35} />
+                <Icon as={LockKeyholeIcon} boxSize="3" opacity={invocation.sourceLocked ? 1 : 0.35} />
                 <Menu.ItemText>{invocation.sourceLocked ? 'Unlock source' : 'Lock source'}</Menu.ItemText>
               </Menu.Item>
               <Menu.Item
@@ -177,7 +176,7 @@ export const InvokeControl = () => {
                 closeOnSelect={false}
                 onClick={() => dispatch({ type: 'toggleDestinationLock' })}
               >
-                <Icon as={PiLockSimpleFill} boxSize="3" opacity={invocation.destinationLocked ? 1 : 0.35} />
+                <Icon as={LockKeyholeIcon} boxSize="3" opacity={invocation.destinationLocked ? 1 : 0.35} />
                 <Menu.ItemText>
                   {invocation.destinationLocked ? 'Unlock destination' : 'Lock destination'}
                 </Menu.ItemText>
@@ -187,45 +186,5 @@ export const InvokeControl = () => {
         </Portal>
       </Menu.Root>
     </Flex>
-    // <HStack
-    //   aria-disabled={!isValid}
-    //   aria-label={invokeLabel}
-    //   as="button"
-    //   bg={isValid ? 'accent.invoke' : 'bg.surface'}
-    //   color={isValid ? 'accent.invokeFg' : 'fg.muted'}
-    //   flex="1"
-    //   gap="2"
-    //   h="full"
-    //   minW="0"
-    //   px="3"
-    //   transition="filter 0.12s ease"
-    //   title={resolvedRoute.validationMessage}
-    //   onClick={() => {
-    //     if (!isValid) {
-    //       return;
-    //     }
-
-    //     dispatch({
-    //       backendSupportsCancellation: true,
-    //       route: resolvedRoute,
-    //       type: 'submitResolvedInvocationSnapshot',
-    //     });
-    //   }}
-    //   _hover={isValid ? { filter: 'brightness(1.05)' } : undefined}
-    //   _active={{ filter: 'brightness(0.96)' }}
-    // >
-    //   <Icon as={PiSparkleFill} boxSize="4" flexShrink={0} />
-    //   <VStack align="start" gap="0" minW="0">
-    //     <Text fontSize="sm" fontWeight="700" lineHeight="1">
-    //       Invoke
-    //     </Text>
-    //     <HStack gap="1" maxW="full">
-    //       <Text fontSize="2xs" fontWeight="600" lineHeight="1.1" opacity="0.85" truncate>
-    //         {routeLabel}
-    //       </Text>
-    //       {isLocked ? <Icon as={PiLockSimpleFill} boxSize="2.5" flexShrink={0} /> : null}
-    //     </HStack>
-    //   </VStack>
-    // </HStack>
   );
 };

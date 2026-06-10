@@ -1,6 +1,6 @@
 import { CloseButton, IconButton } from './ui/Button';
 import { Tabs } from './ui/Tabs';
-import { PiPlusBold } from 'react-icons/pi';
+import { PlusIcon } from 'lucide-react';
 
 import { Tooltip } from './ui/Tooltip';
 import { useWorkbench } from '../WorkbenchContext';
@@ -60,7 +60,7 @@ export const ProjectTabs = () => {
             ms="2"
             onClick={() => dispatch({ type: 'createProject' })}
           >
-            <PiPlusBold />
+            <PlusIcon />
           </IconButton>
         </Tooltip>
       </Tabs.List>

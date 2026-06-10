@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { PiImageBold } from 'react-icons/pi';
+import { ImageIcon } from 'lucide-react';
 
 import { StatusWidgetChip } from '../../components/WidgetFrames';
 import { useImageActions } from '../../components/useImageActions';
@@ -133,7 +133,7 @@ export const GalleryWidgetView = ({ presentation, region }: WidgetViewProps) => 
   }, [dispatch, page, settings.paginationMode, total]);
 
   if (region === 'bottom' && presentation !== 'expanded') {
-    return <StatusWidgetChip icon={PiImageBold}>Gallery: {total ?? gallery.images.length}</StatusWidgetChip>;
+    return <StatusWidgetChip icon={ImageIcon}>Gallery: {total ?? gallery.images.length}</StatusWidgetChip>;
   }
 
   return (

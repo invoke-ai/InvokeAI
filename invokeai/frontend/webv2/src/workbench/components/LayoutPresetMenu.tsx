@@ -1,5 +1,5 @@
 import { Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
-import { PiCaretDownBold, PiCheckBold } from 'react-icons/pi';
+import { CheckIcon, ChevronDownIcon } from 'lucide-react';
 
 import { useWorkbench } from '../WorkbenchContext';
 import { getLayoutPreset, layoutPresets } from '../layoutPresets';
@@ -35,7 +35,7 @@ export const LayoutPresetMenu = () => {
           _hover={{ bg: 'bg.surfaceRaised' }}
         >
           {activePreset.label}
-          <Icon as={PiCaretDownBold} boxSize="3" />
+          <Icon as={ChevronDownIcon} boxSize="3" />
         </Button>
       </Menu.Trigger>
       <Portal>
@@ -67,7 +67,7 @@ export const LayoutPresetMenu = () => {
                       {preset.description}
                     </Text>
                   </Stack>
-                  {preset.id === activePreset.id ? <Icon as={PiCheckBold} boxSize="3" color="accent.active" /> : null}
+                  {preset.id === activePreset.id ? <Icon as={CheckIcon} boxSize="3" color="accent.active" /> : null}
                 </Menu.Item>
               ))}
             </Menu.ItemGroup>

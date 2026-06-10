@@ -1,5 +1,5 @@
 import { Badge, Progress, Stack, Text, HStack } from '@chakra-ui/react';
-import { PiListNumbersBold } from 'react-icons/pi';
+import { ListOrderedIcon } from 'lucide-react';
 
 import { useQueueItemProgress } from '../../backend/progressStore';
 import { StatusWidgetChip } from '../../components/WidgetFrames';
@@ -15,7 +15,7 @@ export const QueueWidgetView = ({ presentation, region }: WidgetViewProps) => {
   ).length;
 
   if (region === 'bottom' && presentation !== 'expanded') {
-    return <StatusWidgetChip icon={PiListNumbersBold}>{pendingQueueCount} queued</StatusWidgetChip>;
+    return <StatusWidgetChip icon={ListOrderedIcon}>{pendingQueueCount} queued</StatusWidgetChip>;
   }
 
   if (region === 'bottom') {

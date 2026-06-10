@@ -1,6 +1,6 @@
 import { Badge, Box, Flex, HStack, Stack } from '@chakra-ui/react';
 import { useRef, useState, type CSSProperties } from 'react';
-import { PiArrowsLeftRightBold, PiColumnsBold, PiXBold } from 'react-icons/pi';
+import { ArrowLeftRightIcon, Columns2Icon, XIcon } from 'lucide-react';
 
 import type { GeneratedImageContract } from '../../types';
 import { Button } from '../../components/ui/Button';
@@ -153,15 +153,15 @@ export const PreviewCompare = ({
       </Flex>
       <HStack flexShrink={0} gap="1" justify="center">
         <Button size="2xs" variant="outline" onClick={() => setMode(mode === 'slider' ? 'side-by-side' : 'slider')}>
-          <PiColumnsBold />
+          <Columns2Icon />
           {mode === 'slider' ? 'Side by Side' : 'Slider'}
         </Button>
         <Button size="2xs" variant="outline" onClick={onSwap}>
-          <PiArrowsLeftRightBold />
+          <ArrowLeftRightIcon />
           Swap
         </Button>
         <Button size="2xs" variant="outline" onClick={onExit}>
-          <PiXBold />
+          <XIcon />
           Exit Compare
         </Button>
       </HStack>

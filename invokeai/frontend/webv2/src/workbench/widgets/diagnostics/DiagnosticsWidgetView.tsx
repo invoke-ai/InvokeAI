@@ -1,5 +1,5 @@
 import { HStack, Stack, Text } from '@chakra-ui/react';
-import { PiBugBold, PiClipboardTextBold } from 'react-icons/pi';
+import { BugIcon, ClipboardListIcon } from 'lucide-react';
 
 import { StatusWidgetChip } from '../../components/WidgetFrames';
 import type { WidgetViewProps } from '../../types';
@@ -13,7 +13,7 @@ export const DiagnosticsWidgetView = ({ presentation, region }: WidgetViewProps)
 
   if (region === 'bottom' && presentation !== 'expanded') {
     return (
-      <StatusWidgetChip icon={errorCount > 0 ? PiBugBold : PiClipboardTextBold}>Diagnostics: {label}</StatusWidgetChip>
+      <StatusWidgetChip icon={errorCount > 0 ? BugIcon : ClipboardListIcon}>Diagnostics: {label}</StatusWidgetChip>
     );
   }
 

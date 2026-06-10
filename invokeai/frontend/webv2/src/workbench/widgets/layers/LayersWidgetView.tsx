@@ -1,5 +1,5 @@
 import { Box, Flex, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { PiStackBold } from 'react-icons/pi';
+import { LayersIcon } from 'lucide-react';
 
 import { useWorkbench } from '../../WorkbenchContext';
 
@@ -22,7 +22,7 @@ export const LayersWidgetView = () => {
         rounded="md"
         p="4"
       >
-        <Icon as={PiStackBold} boxSize="6" />
+        <Icon as={LayersIcon} boxSize="6" />
         <Text fontSize="2xs" textAlign="center">
           {layers.length} layers, {activeProject.canvas.stagingArea.pendingImageIds.length} staged images.
         </Text>

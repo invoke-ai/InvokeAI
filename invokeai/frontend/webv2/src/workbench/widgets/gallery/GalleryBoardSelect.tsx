@@ -1,18 +1,34 @@
-import { Badge, Flex, HStack, Icon, Image, Input, Menu, Portal, ScrollArea, Stack, Text } from '@chakra-ui/react';
+import {
+  Badge,
+  Flex,
+  HStack,
+  Icon,
+  Image,
+  Input,
+  InputGroup,
+  Menu,
+  Portal,
+  ScrollArea,
+  Stack,
+  Text,
+} from '@chakra-ui/react';
 import { useRef, useState, type MouseEvent } from 'react';
 import {
-  PiArchiveBold,
-  PiCalendarBlankBold,
-  PiCaretDownBold,
-  PiDotsThreeVerticalBold,
-  PiImageBold,
-  PiPlusBold,
-  PiPushPinBold,
-  PiSortAscendingBold,
-  PiSortDescendingBold,
-} from 'react-icons/pi';
+  ArchiveIcon,
+  ArrowDownAZIcon,
+  ArrowUpAZIcon,
+  CalendarIcon,
+  ChevronDownIcon,
+  ImageIcon,
+  MoreVerticalIcon,
+  PinIcon,
+  PlusIcon,
+  type LucideIcon,
+  SearchIcon,
+  XIcon,
+} from 'lucide-react';
 
-import { Button, IconButton } from '../../components/ui/Button';
+import { Button, CloseButton, IconButton } from '../../components/ui/Button';
 import type { GalleryBoard } from '../../gallery/api';
 import { GalleryBoardMenu, type GalleryBoardMenuTarget } from './GalleryBoardMenu';
 import { getBoardCounts } from './galleryStateView';
@@ -64,6 +80,16 @@ export const GalleryBoardSelect = () => {
     setBoardMenuTarget({ board, x, y });
   };
 
+  const clearSearch = () => {
+    setBoardSearchTerm('');
+  };
+
+  const clearSearchButton = boardSearchTerm ? (
+    <CloseButton aria-label="Clear search" size="2xs" onClick={clearSearch} me="-2">
+      <XIcon />
+    </CloseButton>
+  ) : null;
+
   return (
     <>
       <Menu.Root
@@ -96,7 +122,7 @@ export const GalleryBoardSelect = () => {
             ) : (
               <Text fontSize="xs">Loading board...</Text>
             )}
-            <Icon as={PiCaretDownBold} boxSize="3" flexShrink={0} />
+            <Icon as={ChevronDownIcon} boxSize="3" flexShrink={0} />
           </Button>
         </Menu.Trigger>
         <Portal>
@@ -111,23 +137,26 @@ export const GalleryBoardSelect = () => {
               overflow="hidden"
               rounded="lg"
               shadow="lg"
+              p="0"
             >
               <Stack gap="2" p="2">
-                <Input
-                  aria-label="Search or create boards"
-                  placeholder="Search or create boards"
-                  size="sm"
-                  value={boardSearchTerm}
-                  onChange={(event) => setBoardSearchTerm(event.currentTarget.value)}
-                  onKeyDown={(event) => {
-                    event.stopPropagation();
+                <InputGroup startElement={<Icon as={SearchIcon} size="xs" />} endElement={clearSearchButton}>
+                  <Input
+                    aria-label="Search or create boards"
+                    placeholder="Search or create boards"
+                    size="sm"
+                    value={boardSearchTerm}
+                    onChange={(event) => setBoardSearchTerm(event.currentTarget.value)}
+                    onKeyDown={(event) => {
+                      event.stopPropagation();
 
-                    if (event.key === 'Enter' && !hasAnyMatch) {
-                      event.preventDefault();
-                      createBoardFromSearch();
-                    }
-                  }}
-                />
+                      if (event.key === 'Enter' && !hasAnyMatch) {
+                        event.preventDefault();
+                        createBoardFromSearch();
+                      }
+                    }}
+                  />
+                </InputGroup>
                 <BoardListControls />
               </Stack>
               <Menu.Separator borderColor="border.subtle" m="0" />
@@ -155,7 +184,7 @@ export const GalleryBoardSelect = () => {
                           }}
                         >
                           <HStack gap="2" minW="0" w="full">
-                            <BoardCoverIcon icon={PiPushPinBold} />
+                            <BoardCoverIcon icon={PinIcon} />
                             <Text flex="1" fontSize="xs" fontWeight="500" minW="0" truncate>
                               {projectRowName}
                             </Text>
@@ -214,7 +243,7 @@ export const GalleryBoardSelect = () => {
                     {canCreateFromSearch && (
                       <Menu.Item value="__create-board__" onClick={createBoardFromSearch}>
                         <HStack gap="2" minW="0" w="full">
-                          <BoardCoverIcon icon={PiPlusBold} />
+                          <BoardCoverIcon icon={PlusIcon} />
                           <Text flex="1" fontSize="xs" fontWeight="600" minW="0" truncate>
                             Create board &ldquo;{trimmedSearchTerm}&rdquo;
                           </Text>
@@ -270,7 +299,7 @@ const BoardListControls = () => {
           variant="outline"
           onClick={() => actions.updateSettings({ boardOrderDir: isAscending ? 'DESC' : 'ASC' })}
         >
-          {isAscending ? <PiSortAscendingBold /> : <PiSortDescendingBold />}
+          {isAscending ? <ArrowUpAZIcon /> : <ArrowDownAZIcon />}
         </IconButton>
       </HStack>
       <HStack gap="1">
@@ -282,7 +311,7 @@ const BoardListControls = () => {
           variant={showDateBoards ? 'solid' : 'outline'}
           onClick={() => actions.updateSettings({ showDateBoards: !showDateBoards })}
         >
-          <PiCalendarBlankBold />
+          <CalendarIcon />
         </IconButton>
         <IconButton
           aria-label={showArchivedBoards ? 'Hide archived boards' : 'Show archived boards'}
@@ -292,7 +321,7 @@ const BoardListControls = () => {
           variant={showArchivedBoards ? 'solid' : 'outline'}
           onClick={() => actions.updateSettings({ showArchivedBoards: !showArchivedBoards })}
         >
-          <PiArchiveBold />
+          <ArchiveIcon />
         </IconButton>
       </HStack>
     </HStack>
@@ -353,7 +382,7 @@ const BoardRow = ({
         onPointerDown={(event) => event.stopPropagation()}
         onPointerUp={(event) => event.stopPropagation()}
       >
-        <PiDotsThreeVerticalBold />
+        <MoreVerticalIcon />
       </IconButton>
     )}
   </Menu.Item>
@@ -388,7 +417,7 @@ const BoardOptionContent = ({
   );
 };
 
-const BoardCoverIcon = ({ icon }: { icon: typeof PiImageBold }) => (
+const BoardCoverIcon = ({ icon }: { icon: LucideIcon }) => (
   <Flex
     align="center"
     bg="bg.panel"
@@ -421,5 +450,5 @@ const BoardCover = ({ board }: { board: GalleryBoard }) => {
     );
   }
 
-  return <BoardCoverIcon icon={board.kind === 'date' ? PiCalendarBlankBold : PiImageBold} />;
+  return <BoardCoverIcon icon={board.kind === 'date' ? CalendarIcon : ImageIcon} />;
 };

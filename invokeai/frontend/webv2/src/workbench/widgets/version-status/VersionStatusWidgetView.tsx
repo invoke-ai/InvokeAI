@@ -1,5 +1,5 @@
 import { Stack, Text } from '@chakra-ui/react';
-import { PiInfoBold } from 'react-icons/pi';
+import { InfoIcon } from 'lucide-react';
 
 import { StatusWidgetChip } from '../../components/WidgetFrames';
 import type { WidgetViewProps } from '../../types';
@@ -18,5 +18,5 @@ export const VersionStatusWidgetView = ({ presentation }: WidgetViewProps) => {
     );
   }
 
-  return <StatusWidgetChip icon={PiInfoBold}>Version 7.0</StatusWidgetChip>;
+  return <StatusWidgetChip icon={InfoIcon}>Version 7.0</StatusWidgetChip>;
 };

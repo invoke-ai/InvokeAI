@@ -1,12 +1,5 @@
 import { Box, HStack, ScrollArea, Stack, Text } from '@chakra-ui/react';
-import {
-  PiCaretLeftBold,
-  PiCaretLineDownBold,
-  PiCaretLineUpBold,
-  PiCaretRightBold,
-  PiEyeBold,
-  PiEyeSlashBold,
-} from 'react-icons/pi';
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, EyeIcon, EyeOffIcon } from 'lucide-react';
 
 import type { CanvasStagingCandidateContract, GeneratedImageContract } from '../../types';
 import { Button, IconButton } from '../../components/ui/Button';
@@ -99,7 +92,7 @@ export const CanvasStagingControls = ({
             variant="outline"
             onClick={onToggleThumbnails}
           >
-            {areThumbnailsVisible ? <PiCaretLineDownBold /> : <PiCaretLineUpBold />}
+            {areThumbnailsVisible ? <ChevronDownIcon /> : <ChevronUpIcon />}
           </IconButton>
           <IconButton
             aria-label="Previous staged candidate"
@@ -108,7 +101,7 @@ export const CanvasStagingControls = ({
             variant="outline"
             onClick={() => onCycle(-1)}
           >
-            <PiCaretLeftBold />
+            <ChevronLeftIcon />
           </IconButton>
           <IconButton
             aria-label="Next staged candidate"
@@ -117,7 +110,7 @@ export const CanvasStagingControls = ({
             variant="outline"
             onClick={() => onCycle(1)}
           >
-            <PiCaretRightBold />
+            <ChevronRightIcon />
           </IconButton>
         </HStack>
         <HStack gap="2">
@@ -127,7 +120,7 @@ export const CanvasStagingControls = ({
             variant="outline"
             onClick={onToggleVisibility}
           >
-            {isVisible ? <PiEyeBold /> : <PiEyeSlashBold />}
+            {isVisible ? <EyeIcon /> : <EyeOffIcon />}
           </IconButton>
           <Button size="xs" variant="outline" onClick={onDiscardSelected}>
             Discard

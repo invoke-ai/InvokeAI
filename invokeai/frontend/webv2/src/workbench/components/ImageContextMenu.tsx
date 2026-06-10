@@ -1,27 +1,27 @@
 import { Dialog, HStack, Icon, Menu, Portal, ScrollArea, Text } from '@chakra-ui/react';
-import { useRef, useState, type ComponentType, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import {
-  PiArrowSquareOutBold,
-  PiArrowsCounterClockwiseBold,
-  PiAsteriskBold,
-  PiCaretRightBold,
-  PiCopyBold,
-  PiDownloadSimpleBold,
-  PiEyeBold,
-  PiFileImageBold,
-  PiFlowArrowBold,
-  PiFoldersBold,
-  PiFrameCornersBold,
-  PiImageSquareBold,
-  PiImagesBold,
-  PiPlantBold,
-  PiQuotesBold,
-  PiStackBold,
-  PiStarBold,
-  PiStarFill,
-  PiTextAaBold,
-  PiTrashSimpleBold,
-} from 'react-icons/pi';
+  AsteriskIcon,
+  ChevronRightIcon,
+  CopyIcon,
+  DownloadIcon,
+  ExternalLinkIcon,
+  EyeIcon,
+  FileImageIcon,
+  FolderIcon,
+  ImageIcon,
+  ImagesIcon,
+  LayersIcon,
+  QuoteIcon,
+  ScanIcon,
+  ShuffleIcon,
+  SproutIcon,
+  StarIcon,
+  Trash2Icon,
+  TypeIcon,
+  WorkflowIcon,
+  type LucideIcon,
+} from 'lucide-react';
 
 import type { GalleryBoard, GalleryImage } from '../gallery/api';
 import { Button } from './ui/Button';
@@ -203,58 +203,58 @@ const SingleImageMenuItems = ({
   <>
     <HStack gap="1" px="1">
       <QuickMenuItem
-        icon={PiArrowSquareOutBold}
+        icon={ExternalLinkIcon}
         label="Open in new tab"
         value="open-in-new-tab"
         onClick={() => window.open(image.imageUrl, '_blank', 'noopener')}
       />
       <QuickMenuItem
-        icon={PiCopyBold}
+        icon={CopyIcon}
         label="Copy to clipboard"
         value="copy-to-clipboard"
         onClick={() => void actions.copyImage(image)}
       />
       <QuickMenuItem
-        icon={PiDownloadSimpleBold}
+        icon={DownloadIcon}
         label="Download image"
         value="download-image"
         onClick={() => void actions.downloadImage(image)}
       />
       <QuickMenuItem
-        icon={PiEyeBold}
+        icon={EyeIcon}
         label="Open in preview"
         value="open-in-preview"
         onClick={() => actions.openImageInPreview(image)}
       />
       <QuickMenuItem
-        icon={image.starred ? PiStarFill : PiStarBold}
+        icon={StarIcon}
         label={image.starred ? 'Unstar image' : 'Star image'}
         value="toggle-starred"
         onClick={() => void actions.setImagesStarred([image.imageName], !image.starred)}
       />
     </HStack>
     <Menu.Separator borderColor="border.subtle" />
-    <ContextMenuItem disabled icon={PiFlowArrowBold} label="Load Workflow" value="load-workflow" />
-    <ContextSubMenu icon={PiAsteriskBold} label="Recall Metadata">
-      <ContextMenuItem disabled icon={PiAsteriskBold} label="Recall All" value="recall-all" />
-      <ContextMenuItem disabled icon={PiArrowsCounterClockwiseBold} label="Remix Image" value="remix" />
-      <ContextMenuItem disabled icon={PiQuotesBold} label="Use Prompt" value="use-prompt" />
-      <ContextMenuItem disabled icon={PiPlantBold} label="Use Seed" value="use-seed" />
+    <ContextMenuItem disabled icon={WorkflowIcon} label="Load Workflow" value="load-workflow" />
+    <ContextSubMenu icon={AsteriskIcon} label="Recall Metadata">
+      <ContextMenuItem disabled icon={AsteriskIcon} label="Recall All" value="recall-all" />
+      <ContextMenuItem disabled icon={ShuffleIcon} label="Remix Image" value="remix" />
+      <ContextMenuItem disabled icon={QuoteIcon} label="Use Prompt" value="use-prompt" />
+      <ContextMenuItem disabled icon={SproutIcon} label="Use Seed" value="use-seed" />
     </ContextSubMenu>
     <Menu.Separator borderColor="border.subtle" />
-    <ContextMenuItem disabled icon={PiFrameCornersBold} label="Send to Upscale" value="send-to-upscale" />
-    <ContextMenuItem disabled icon={PiImageSquareBold} label="Use as Reference Image" value="use-as-reference-image" />
-    <ContextMenuItem disabled icon={PiTextAaBold} label="Use as Prompt Template" value="use-as-prompt-template" />
+    <ContextMenuItem disabled icon={ScanIcon} label="Send to Upscale" value="send-to-upscale" />
+    <ContextMenuItem disabled icon={ImageIcon} label="Use as Reference Image" value="use-as-reference-image" />
+    <ContextMenuItem disabled icon={TypeIcon} label="Use as Prompt Template" value="use-as-prompt-template" />
     <ContextMenuItem
-      icon={PiImagesBold}
+      icon={ImagesIcon}
       label="Select for Compare"
       value="select-for-compare"
       onClick={() => actions.selectForCompare(image)}
     />
     <Menu.Separator borderColor="border.subtle" />
-    <ContextSubMenu icon={PiFileImageBold} label="New from Image">
-      <ContextMenuItem disabled icon={PiFileImageBold} label="New Canvas from Image" value="new-canvas-from-image" />
-      <ContextMenuItem disabled icon={PiStackBold} label="New Layer from Image" value="new-layer-from-image" />
+    <ContextSubMenu icon={FileImageIcon} label="New from Image">
+      <ContextMenuItem disabled icon={FileImageIcon} label="New Canvas from Image" value="new-canvas-from-image" />
+      <ContextMenuItem disabled icon={LayersIcon} label="New Layer from Image" value="new-layer-from-image" />
     </ContextSubMenu>
     <ChangeBoardSubMenu
       boards={boards}
@@ -264,7 +264,7 @@ const SingleImageMenuItems = ({
     <Menu.Separator borderColor="border.subtle" />
     <ContextMenuItem
       color="fg.error"
-      icon={PiTrashSimpleBold}
+      icon={Trash2Icon}
       label="Delete Image"
       value="delete-image"
       onClick={() => onRequestDeletion([image.imageName])}
@@ -294,13 +294,13 @@ const BulkMenuItems = ({
       </Text>
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
-        icon={allStarred ? PiStarFill : PiStarBold}
+        icon={StarIcon}
         label={allStarred ? 'Unstar All' : 'Star All'}
         value="toggle-starred-all"
         onClick={() => void actions.setImagesStarred(imageNames, !allStarred)}
       />
       <ContextMenuItem
-        icon={PiDownloadSimpleBold}
+        icon={DownloadIcon}
         label="Download Selection"
         value="download-selection"
         onClick={() => void actions.downloadImages(imageNames)}
@@ -313,7 +313,7 @@ const BulkMenuItems = ({
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
         color="fg.error"
-        icon={PiTrashSimpleBold}
+        icon={Trash2Icon}
         label="Delete Selection"
         value="delete-selection"
         onClick={() => onRequestDeletion(imageNames)}
@@ -331,10 +331,10 @@ const ChangeBoardSubMenu = ({
   currentBoardId: string | null;
   onMove: (boardId: string) => void;
 }) => (
-  <ContextSubMenu icon={PiFoldersBold} label="Change Board" scrollArea>
+  <ContextSubMenu icon={FolderIcon} label="Change Board" scrollArea>
     {currentBoardId !== 'none' && (
       <ContextMenuItem
-        icon={PiFoldersBold}
+        icon={FolderIcon}
         label="Remove from Board"
         value="remove-from-board"
         onClick={() => onMove('none')}
@@ -359,7 +359,7 @@ const ContextSubMenu = ({
   scrollArea,
 }: {
   children: ReactNode;
-  icon: ComponentType;
+  icon: LucideIcon;
   label: string;
   scrollArea?: boolean;
 }) => (
@@ -370,7 +370,7 @@ const ContextSubMenu = ({
         <Text flex="1" fontSize="xs">
           {label}
         </Text>
-        <Icon as={PiCaretRightBold} boxSize="3" color="fg.subtle" flexShrink={0} />
+        <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
       </HStack>
     </Menu.TriggerItem>
     <Portal>
@@ -400,7 +400,7 @@ const QuickMenuItem = ({
   value,
   onClick,
 }: {
-  icon: ComponentType;
+  icon: LucideIcon;
   label: string;
   value: string;
   onClick: () => void;
@@ -428,7 +428,7 @@ const ContextMenuItem = ({
 }: {
   color?: string;
   disabled?: boolean;
-  icon: ComponentType;
+  icon: LucideIcon;
   label: string;
   value: string;
   onClick?: () => void;

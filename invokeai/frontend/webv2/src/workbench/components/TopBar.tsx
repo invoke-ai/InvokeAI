@@ -1,13 +1,5 @@
 import { Badge, Box, Flex, Group, HStack, Icon, Menu, NumberInput, Portal, Text } from '@chakra-ui/react';
-import {
-  PiCaretDownBold,
-  PiCubeBold,
-  PiListNumbersBold,
-  PiPause,
-  PiPlay,
-  PiUserCircleBold,
-  PiXBold,
-} from 'react-icons/pi';
+import { BoxIcon, ChevronDownIcon, CircleUserIcon, ListOrderedIcon, PauseIcon, PlayIcon, XIcon } from 'lucide-react';
 
 import { InvokeControl } from './InvokeControl';
 import { LayoutPresetMenu } from './LayoutPresetMenu';
@@ -35,7 +27,8 @@ export const TopBar = () => (
     <BrandMark />
     <InvokeControl />
     <BatchCountField />
-    <QueueCluster />
+    <QueueInfo />
+    <QueueActions />
     <Box w="1px" h="5" bg="border.subtle" mx="1" flexShrink={0} />
     <ProjectTabs />
     <LayoutPresetMenu />
@@ -47,12 +40,12 @@ export const TopBar = () => (
         variant="ghost"
         _hover={{ color: 'fg.default' }}
       >
-        <PiCubeBold />
+        <BoxIcon />
       </IconButton>
       <SettingsButton />
     </HStack>
     <HStack as="button" gap="1.5" color="fg.default" flexShrink={0} px="1">
-      <Icon as={PiUserCircleBold} boxSize="4" />
+      <Icon as={CircleUserIcon} boxSize="4" />
       <Text fontSize="xs" fontWeight="600">
         Josh
       </Text>
@@ -119,33 +112,42 @@ const BatchCountField = () => {
   );
 };
 
-/**
- * Queue status + cancel cluster placeholder.
- *
- * Mirrors the spec's queue progress / cancel affordance. Real queue wiring,
- * snapshotting, and cancellation arrive with the Invocation Controller phases.
- */
-const QueueCluster = () => {
+const QueueInfo = () => {
   const { activeProject } = useWorkbench();
   const activeCount = activeProject.queue.items.filter(
     (item) => item.status === 'pending' || item.status === 'running'
   ).length;
   const totalCount = activeProject.queue.items.length;
 
+  return (
+    <Badge variant="outline" h="9" borderColor="border.subtle" fontSize="xs" fontWeight="700" gap="1" px="2">
+      <ListOrderedIcon size="14" />
+      {activeCount}/{totalCount}
+    </Badge>
+  );
+};
+
+/**
+ * Queue status + cancel cluster placeholder.
+ *
+ * Mirrors the spec's queue progress / cancel affordance. Real queue wiring,
+ * snapshotting, and cancellation arrive with the Invocation Controller phases.
+ */
+const QueueActions = () => {
   const queueEndActions = [
     {
       label: 'Cancel Current Item',
-      icon: PiXBold,
+      icon: XIcon,
       onClick: () => void 0,
     },
     {
       label: 'Cancel All Items',
-      icon: PiXBold,
+      icon: XIcon,
       onClick: () => void 0,
     },
     {
       label: 'Cancel all except current item',
-      icon: PiXBold,
+      icon: XIcon,
       onClick: () => void 0,
     },
   ];
@@ -153,79 +155,72 @@ const QueueCluster = () => {
   const queueProcessorActions = [
     {
       label: 'Resume Processor',
-      icon: PiPlay,
+      icon: PlayIcon,
       onClick: () => void 0,
     },
     {
       label: 'Pause Processor',
-      icon: PiPause,
+      icon: PauseIcon,
       onClick: () => void 0,
     },
     {
       label: 'Open Queue',
-      icon: PiListNumbersBold,
+      icon: ListOrderedIcon,
       onClick: () => void 0,
     },
   ];
 
   return (
-    <HStack flexShrink={0} gap="1">
-      <Badge variant="outline" h="9" borderColor="border.subtle" fontSize="xs" fontWeight="700" gap="1" px="2">
-        {/*<Icon as={PiListNumbersBold} boxSize="3" />*/}
-        <PiListNumbersBold />
-        {activeCount}/{totalCount}
-      </Badge>
-      <Menu.Root>
-        <Group attached>
-          <Tooltip content="Cancel current item" showArrow>
-            <IconButton variant="outline" size="sm" roundedEnd="none">
-              <PiXBold />
-            </IconButton>
-          </Tooltip>
-          <Menu.Trigger>
-            <IconButton
-              variant="outline"
-              size="sm"
-              roundedStart="none"
-              borderStartWidth="0"
-              aspectRatio="unset"
-              minW="0"
-              w="6"
-            >
-              <PiCaretDownBold />
-            </IconButton>
-          </Menu.Trigger>
-        </Group>
-        <Portal>
-          <Menu.Positioner>
-            <Menu.Content>
-              <Menu.ItemGroup>
-                {queueEndActions.map((action, index) => (
-                  <Menu.Item
-                    key={index}
-                    onClick={action.onClick}
-                    value={action.label}
-                    color="fg.error"
-                    _hover={{ bg: 'bg.error', color: 'fg.error' }}
-                  >
-                    <Icon as={action.icon} boxSize="3" />
-                    <span>{action.label}</span>
-                  </Menu.Item>
-                ))}
-              </Menu.ItemGroup>
-              <Menu.Separator />
-              <Menu.ItemGroup>
-                {queueProcessorActions.map((action, index) => (
-                  <Menu.Item key={index} onClick={action.onClick} value={action.label}>
-                    <Icon as={action.icon} boxSize="3" />
-                    <span>{action.label}</span>
-                  </Menu.Item>
-                ))}
-              </Menu.ItemGroup>
-            </Menu.Content>
-          </Menu.Positioner>
-        </Portal>
-      </Menu.Root>
-    </HStack>
+    <Menu.Root>
+      <Group attached>
+        <Tooltip content="Cancel current item" showArrow>
+          <IconButton variant="outline" size="sm" roundedEnd="none">
+            <XIcon />
+          </IconButton>
+        </Tooltip>
+        <Menu.Trigger>
+          <IconButton
+            variant="outline"
+            size="sm"
+            roundedStart="none"
+            borderStartWidth="0"
+            aspectRatio="unset"
+            minW="0"
+            w="6"
+          >
+            <ChevronDownIcon />
+          </IconButton>
+        </Menu.Trigger>
+      </Group>
+      <Portal>
+        <Menu.Positioner>
+          <Menu.Content>
+            <Menu.ItemGroup>
+              {queueEndActions.map((action, index) => (
+                <Menu.Item
+                  key={index}
+                  onClick={action.onClick}
+                  value={action.label}
+                  color="fg.error"
+                  _hover={{ bg: 'bg.error', color: 'fg.error' }}
+                >
+                  <Icon as={action.icon} boxSize="3" />
+                  <span>{action.label}</span>
+                </Menu.Item>
+              ))}
+            </Menu.ItemGroup>
+            <Menu.Separator />
+            <Menu.ItemGroup>
+              {queueProcessorActions.map((action, index) => (
+                <Menu.Item key={index} onClick={action.onClick} value={action.label}>
+                  <Icon as={action.icon} boxSize="3" />
+                  <span>{action.label}</span>
+                </Menu.Item>
+              ))}
+            </Menu.ItemGroup>
+          </Menu.Content>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
   );
 };

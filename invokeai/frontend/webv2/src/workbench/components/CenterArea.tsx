@@ -1,5 +1,5 @@
 import { Box, Flex, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
-import { PiCheckBold, PiDotsThreeBold } from 'react-icons/pi';
+import { CheckIcon, MoreHorizontalIcon } from 'lucide-react';
 
 import { WidgetIcon } from '../iconResolver';
 import { useWorkbench } from '../WorkbenchContext';
@@ -114,7 +114,7 @@ const CenterWidgetMenu = ({
     <Menu.Root positioning={{ placement: 'bottom-end' }}>
       <Menu.Trigger asChild>
         <IconButton aria-label="Center widget menu" size="xs" variant="ghost">
-          <Icon as={PiDotsThreeBold} boxSize="4" />
+          <Icon as={MoreHorizontalIcon} boxSize="4" />
         </IconButton>
       </Menu.Trigger>
       <Portal>
@@ -147,7 +147,7 @@ const CenterWidgetMenu = ({
                     _disabled={{ opacity: 0.4 }}
                     onClick={() => onToggle(item.id)}
                   >
-                    <Icon as={PiCheckBold} boxSize="3" opacity={item.isEnabled ? 1 : 0} />
+                    <Icon as={CheckIcon} boxSize="3" opacity={item.isEnabled ? 1 : 0} />
                     <WidgetIcon iconId={item.widget.manifest.icon} boxSize="3.5" />
                     <Menu.ItemText>{item.label}</Menu.ItemText>
                     {isRequiredView ? (

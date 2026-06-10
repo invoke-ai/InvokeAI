@@ -1,5 +1,5 @@
 import { ButtonGroup, HStack, Pagination } from '@chakra-ui/react';
-import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
+import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 
 import { IconButton } from '../../components/ui/Button';
 import { getGallerySettings } from '../../gallery/settings';
@@ -36,7 +36,7 @@ export const GalleryWidgetFooter = (_props: WidgetViewProps) => {
         <ButtonGroup gap="1" size="2xs" variant="ghost">
           <Pagination.PrevTrigger asChild>
             <IconButton aria-label="Previous page">
-              <PiCaretLeftBold />
+              <ChevronLeftIcon />
             </IconButton>
           </Pagination.PrevTrigger>
           <Pagination.Items
@@ -48,7 +48,7 @@ export const GalleryWidgetFooter = (_props: WidgetViewProps) => {
           />
           <Pagination.NextTrigger asChild>
             <IconButton aria-label="Next page">
-              <PiCaretRightBold />
+              <ChevronRightIcon />
             </IconButton>
           </Pagination.NextTrigger>
         </ButtonGroup>

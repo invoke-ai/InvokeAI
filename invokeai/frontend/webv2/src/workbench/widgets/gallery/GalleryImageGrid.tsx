@@ -1,7 +1,7 @@
 import { Badge, Box, Flex, ScrollArea, Skeleton, Spinner, Text } from '@chakra-ui/react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react';
-import { PiStarBold, PiStarFill, PiUploadSimpleBold } from 'react-icons/pi';
+import { StarIcon, UploadIcon } from 'lucide-react';
 
 import { ImageContextMenu, type ImageContextMenuTarget } from '../../components/ImageContextMenu';
 import { IconButton } from '../../components/ui/Button';
@@ -347,7 +347,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
           rounded="md"
           zIndex="1"
         >
-          <PiUploadSimpleBold size="20" />
+          <UploadIcon size="20" />
           <Text fontSize="xs" fontWeight="600">
             Drop images to upload to {selectedBoardName}
           </Text>
@@ -468,7 +468,7 @@ const GalleryThumbnail = ({
           onToggleStarred(image);
         }}
       >
-        {image.starred ? <PiStarFill /> : <PiStarBold />}
+        <StarIcon fill={image.starred ? 'currentColor' : 'none'} />
       </IconButton>
       {image.width > 0 && image.height > 0 && (
         <Badge

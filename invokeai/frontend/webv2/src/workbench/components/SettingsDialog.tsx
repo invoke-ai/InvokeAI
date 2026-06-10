@@ -13,7 +13,7 @@ import {
   useSlotRecipe,
 } from '@chakra-ui/react';
 import type { ReactNode } from 'react';
-import { PiArrowCounterClockwiseBold, PiCheckBold, PiGearSixBold, PiTrashBold } from 'react-icons/pi';
+import { CheckIcon, RotateCcwIcon, SettingsIcon, Trash2Icon } from 'lucide-react';
 
 import { themeCardRecipe } from '../../theme/recipes';
 import { THEMES, type ThemeDefinition } from '../../theme/system';
@@ -31,7 +31,7 @@ export const SettingsButton = () => (
   <Dialog.Root placement="center" scrollBehavior="inside" size="lg">
     <Dialog.Trigger asChild>
       <IconButton aria-label="Settings" color="fg.muted" size="sm" variant="ghost" _hover={{ color: 'fg.default' }}>
-        <PiGearSixBold />
+        <SettingsIcon />
       </IconButton>
     </Dialog.Trigger>
     <SettingsDialogContent />
@@ -145,7 +145,7 @@ const ThemeCard = ({
         <HStack justify="space-between" w="full">
           <Text css={styles.name}>{theme.label}</Text>
           <Box css={styles.indicator}>
-            <Icon as={PiCheckBold} boxSize="3" />
+            <Icon as={CheckIcon} boxSize="3" />
           </Box>
         </HStack>
         <Text css={styles.description}>{theme.description}</Text>
@@ -217,7 +217,7 @@ const WorkspaceSection = () => {
     <SettingsSection description="Reset the layout or clear locally saved projects and preferences." title="Workspace">
       <HStack gap="2" wrap="wrap">
         <Button size="sm" variant="outline" onClick={() => dispatch({ type: 'resetActiveLayout' })}>
-          <PiArrowCounterClockwiseBold />
+          <RotateCcwIcon />
           Reset layout
         </Button>
         <Button
@@ -228,7 +228,7 @@ const WorkspaceSection = () => {
           _hover={{ bg: 'fg.error', color: 'bg.surface' }}
           onClick={clearSavedData}
         >
-          <PiTrashBold />
+          <Trash2Icon />
           Clear saved data
         </Button>
       </HStack>

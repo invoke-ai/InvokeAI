@@ -25,7 +25,6 @@
     "lucide-react": "^1.17.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-icons": "^5.5.0",
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {

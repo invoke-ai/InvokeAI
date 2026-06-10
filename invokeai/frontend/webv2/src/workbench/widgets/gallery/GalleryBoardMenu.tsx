@@ -1,6 +1,6 @@
 import { Dialog, HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
-import { useEffect, useRef, useState, type ComponentType } from 'react';
-import { PiArchiveBold, PiDownloadSimpleBold, PiPencilSimpleBold, PiTrashSimpleBold } from 'react-icons/pi';
+import { useEffect, useRef, useState } from 'react';
+import { ArchiveIcon, DownloadIcon, PencilIcon, Trash2Icon, type LucideIcon } from 'lucide-react';
 
 import type { GalleryBoard } from '../../gallery/api';
 import { Button } from '../../components/ui/Button';
@@ -86,11 +86,12 @@ export const GalleryBoardMenu = ({
                 color="fg.default"
                 minW="12rem"
                 py="1"
+                px="0"
                 rounded="lg"
                 shadow="lg"
               >
                 <BoardMenuItem
-                  icon={PiDownloadSimpleBold}
+                  icon={DownloadIcon}
                   label="Download Board"
                   value="download-board"
                   onClick={() => void actions.downloadBoard(board.id)}
@@ -98,7 +99,7 @@ export const GalleryBoardMenu = ({
                 {isManagedBoard && (
                   <>
                     <BoardMenuItem
-                      icon={PiPencilSimpleBold}
+                      icon={PencilIcon}
                       label="Rename Board"
                       value="rename-board"
                       onClick={() => {
@@ -107,7 +108,7 @@ export const GalleryBoardMenu = ({
                       }}
                     />
                     <BoardMenuItem
-                      icon={PiArchiveBold}
+                      icon={ArchiveIcon}
                       label={board.archived ? 'Unarchive Board' : 'Archive Board'}
                       value="toggle-archived"
                       onClick={() => void actions.archiveBoard(board.id, !board.archived)}
@@ -115,7 +116,7 @@ export const GalleryBoardMenu = ({
                     <Menu.Separator borderColor="border.subtle" />
                     <BoardMenuItem
                       color="fg.error"
-                      icon={PiTrashSimpleBold}
+                      icon={Trash2Icon}
                       label="Delete Board"
                       value="delete-board"
                       onClick={() => setDeleteTarget(board)}
@@ -135,6 +136,7 @@ export const GalleryBoardMenu = ({
             setRenameTarget(null);
           }
         }}
+        size="sm"
       >
         <Portal>
           <Dialog.Backdrop />
@@ -245,7 +247,7 @@ const BoardMenuItem = ({
   onClick,
 }: {
   color?: string;
-  icon: ComponentType;
+  icon: LucideIcon;
   label: string;
   value: string;
   onClick: () => void;

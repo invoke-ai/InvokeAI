@@ -1,5 +1,5 @@
 import { Stack, Text } from '@chakra-ui/react';
-import { PiCloudCheckBold, PiCloudWarningBold } from 'react-icons/pi';
+import { CloudAlertIcon, CloudCheckIcon } from 'lucide-react';
 
 import { StatusWidgetChip } from '../../components/WidgetFrames';
 import type { WidgetViewProps } from '../../types';
@@ -7,7 +7,7 @@ import { useWorkbench } from '../../WorkbenchContext';
 
 export const AutosaveStatusWidgetView = ({ presentation }: WidgetViewProps) => {
   const { state } = useWorkbench();
-  const icon = state.autosave.status === 'error' ? PiCloudWarningBold : PiCloudCheckBold;
+  const icon = state.autosave.status === 'error' ? CloudAlertIcon : CloudCheckIcon;
   const label = state.autosave.status === 'saved' ? 'Saved' : state.autosave.status;
 
   if (presentation === 'tooltip') {

@@ -1,5 +1,5 @@
 import { Stack, Text } from '@chakra-ui/react';
-import { PiPlugsConnectedBold, PiXCircleBold } from 'react-icons/pi';
+import { CircleXIcon, PlugZapIcon } from 'lucide-react';
 
 import { StatusWidgetChip } from '../../components/WidgetFrames';
 import type { WidgetViewProps } from '../../types';
@@ -32,11 +32,11 @@ export const ServerStatusWidgetView = ({ presentation }: WidgetViewProps) => {
 
   if (isDisconnected) {
     return (
-      <StatusWidgetChip borderColor="fg.error" color="fg.error" icon={PiXCircleBold}>
+      <StatusWidgetChip borderColor="fg.error" color="fg.error" icon={CircleXIcon}>
         {label}
       </StatusWidgetChip>
     );
   }
 
-  return <StatusWidgetChip icon={PiPlugsConnectedBold}>{label}</StatusWidgetChip>;
+  return <StatusWidgetChip icon={PlugZapIcon}>{label}</StatusWidgetChip>;
 };

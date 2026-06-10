@@ -1,5 +1,5 @@
 import { Box, Flex, Icon, Menu, Portal, Text } from '@chakra-ui/react';
-import { PiCheckBold, PiDotsThreeBold } from 'react-icons/pi';
+import { CheckIcon, MoreHorizontalIcon } from 'lucide-react';
 
 import { WidgetIcon } from '../iconResolver';
 import type { RegisteredWidget, WidgetId } from '../types';
@@ -159,7 +159,7 @@ const BottomWidgetMenu = ({
         w="5"
         _hover={{ bg: 'bg.surfaceRaised' }}
       >
-        <Icon as={PiDotsThreeBold} boxSize="4" />
+        <Icon as={MoreHorizontalIcon} boxSize="4" />
       </Flex>
     </Menu.Trigger>
     <Portal>
@@ -189,7 +189,7 @@ const BottomWidgetMenu = ({
                   _disabled={{ opacity: 0.4 }}
                   onClick={() => onToggle(item.id)}
                 >
-                  <Icon as={PiCheckBold} boxSize="3" opacity={item.isEnabled ? 1 : 0} />
+                  <Icon as={CheckIcon} boxSize="3" opacity={item.isEnabled ? 1 : 0} />
                   <WidgetIcon iconId={item.widget.manifest.icon} boxSize="3.5" />
                   <Menu.ItemText>{item.label}</Menu.ItemText>
                   {item.failureMessage ? (

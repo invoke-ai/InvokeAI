@@ -1,5 +1,5 @@
 import { Badge, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { PiBellBold, PiCheckCircleBold, PiInfoBold, PiWarningBold, PiXCircleBold } from 'react-icons/pi';
+import { BellIcon, CircleCheckIcon, CircleXIcon, InfoIcon, TriangleAlertIcon, type LucideIcon } from 'lucide-react';
 
 import { StatusWidgetChip } from '../../components/WidgetFrames';
 import type { WidgetViewProps, WorkbenchNotificationKind } from '../../types';
@@ -12,17 +12,17 @@ const kindColorPalette: Record<WorkbenchNotificationKind, string> = {
 };
 
 const kindIcon = {
-  error: PiXCircleBold,
-  info: PiInfoBold,
-  success: PiCheckCircleBold,
-} satisfies Record<WorkbenchNotificationKind, typeof PiInfoBold>;
+  error: CircleXIcon,
+  info: InfoIcon,
+  success: CircleCheckIcon,
+} satisfies Record<WorkbenchNotificationKind, LucideIcon>;
 
 export const NotificationsWidgetView = ({ presentation, region }: WidgetViewProps) => {
   const { state } = useWorkbench();
   const unreadCount = state.notifications.filter((notification) => !notification.isRead).length;
   const errorCount = state.notifications.filter((notification) => notification.kind === 'error').length;
   const label = unreadCount > 0 ? `${unreadCount} new` : `${state.notifications.length} total`;
-  const icon = errorCount > 0 ? PiWarningBold : PiBellBold;
+  const icon = errorCount > 0 ? TriangleAlertIcon : BellIcon;
 
   if (region === 'bottom' && presentation !== 'expanded') {
     return <StatusWidgetChip icon={icon}>Notifications: {label}</StatusWidgetChip>;
