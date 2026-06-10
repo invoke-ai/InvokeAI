@@ -85,6 +85,13 @@ const getBoardName = (boards: GalleryBoard[], boardId: string): string =>
 
 const shouldLoadBackendBoard = (image: PreviewImage): boolean => image.sourceQueueItemId === 'backend-gallery';
 
+const previewGridCss = {
+  backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1.5px)',
+  backgroundPosition: 'center',
+  backgroundRepeat: 'repeat',
+  backgroundSize: '14px 14px',
+} as const;
+
 export const PreviewWidgetView = ({ region }: WidgetViewProps) => {
   const { activeProject, dispatch } = useWorkbench();
   const galleryValues = activeProject.widgetStates.gallery.values;
@@ -323,10 +330,24 @@ const SelectedImagePreview = ({
       }
     }}
   >
-    <Flex align="center" flex="1" justify="center" minH="0" w="full">
+    <Flex
+      align="center"
+      backgroundColor="bg.canvas"
+      borderWidth="1px"
+      borderColor="border.subtle"
+      color="canvas.dot"
+      css={previewGridCss}
+      flex="1"
+      justify="center"
+      minH="0"
+      overflow="hidden"
+      p={isCompact ? '3' : '6'}
+      rounded="lg"
+      w="full"
+    >
       <Box
         aspectRatio={getImageAspectRatio(image)}
-        bg="bg.panel"
+        bg="transparent"
         borderWidth="1px"
         borderColor="border.emphasis"
         boxShadow="0 24px 80px rgba(0,0,0,0.42)"
@@ -407,8 +428,16 @@ const SelectedImagePreview = ({
 );
 
 const EmptyPreview = () => (
-  <Flex align="center" h="full" justify="center" w="full">
-    <Stack align="center" gap="2" maxW="18rem" textAlign="center">
+  <Flex
+    align="center"
+    backgroundColor="bg.canvas"
+    color="canvas.dot"
+    css={previewGridCss}
+    h="full"
+    justify="center"
+    w="full"
+  >
+    <Stack align="center" color="fg.default" gap="2" maxW="18rem" textAlign="center">
       <Text fontSize="sm" fontWeight="800">
         No gallery selection
       </Text>

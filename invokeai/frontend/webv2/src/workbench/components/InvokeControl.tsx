@@ -1,4 +1,4 @@
-import { Box, HStack, Icon, Menu, Portal, Text, VStack } from '@chakra-ui/react';
+import { Flex, Group, HStack, Icon, Menu, Portal, Text, VStack } from '@chakra-ui/react';
 import { useEffect, useRef } from 'react';
 import { PiCaretDownBold, PiCheckBold, PiLockSimpleFill, PiSparkleFill } from 'react-icons/pi';
 
@@ -11,6 +11,7 @@ import {
   resultDestinations,
 } from '../invocation';
 import type { InvocationSourceId, ResultDestination } from '../types';
+import { Button, IconButton } from './ui/Button';
 
 /**
  * Fixed-width global Invoke control.
@@ -22,7 +23,7 @@ import type { InvocationSourceId, ResultDestination } from '../types';
  * Controller menu (source / destination / lock), which is wired to project-owned
  * state even though full invocation lands in Phase 4.
  */
-const CONTROL_WIDTH = '13.5rem';
+const CONTROL_WIDTH = '12rem';
 
 export const InvokeControl = () => {
   const { activeProject, dispatch } = useWorkbench();
@@ -64,68 +65,42 @@ export const InvokeControl = () => {
     };
   }, [dispatch]);
 
+  const onInvoke = () => {
+    if (!isValid) {
+      return;
+    }
+
+    dispatch({
+      backendSupportsCancellation: true,
+      route: resolvedRouteRef.current,
+      type: 'submitResolvedInvocationSnapshot',
+    });
+  };
+
   return (
-    <HStack flexShrink={0} gap="0" h="9" overflow="hidden" rounded="sm" shadow="sm" w={CONTROL_WIDTH}>
-      <HStack
-        aria-disabled={!isValid}
-        aria-label={invokeLabel}
-        as="button"
-        bg={isValid ? 'accent.invoke' : 'bg.surface'}
-        color={isValid ? 'accent.invokeFg' : 'fg.muted'}
-        flex="1"
-        gap="2"
-        h="full"
-        minW="0"
-        px="3"
-        transition="filter 0.12s ease"
-        title={resolvedRoute.validationMessage}
-        onClick={() => {
-          if (!isValid) {
-            return;
-          }
-
-          dispatch({
-            backendSupportsCancellation: true,
-            route: resolvedRoute,
-            type: 'submitResolvedInvocationSnapshot',
-          });
-        }}
-        _hover={isValid ? { filter: 'brightness(1.05)' } : undefined}
-        _active={{ filter: 'brightness(0.96)' }}
-      >
-        <Icon as={PiSparkleFill} boxSize="4" flexShrink={0} />
-        <VStack align="start" gap="0" minW="0">
-          <Text fontSize="sm" fontWeight="700" lineHeight="1">
-            Invoke
-          </Text>
-          <HStack gap="1" maxW="full">
-            <Text fontSize="2xs" fontWeight="600" lineHeight="1.1" opacity="0.85" truncate>
-              {routeLabel}
-            </Text>
-            {isLocked ? <Icon as={PiLockSimpleFill} boxSize="2.5" flexShrink={0} /> : null}
-          </HStack>
-        </VStack>
-      </HStack>
-
+    <Flex>
       <Menu.Root positioning={{ placement: 'bottom-start' }}>
-        <Menu.Trigger asChild>
-          <Box
-            aria-label="Open invocation controller"
-            as="button"
-            bg="accent.invoke"
-            borderLeftWidth="1px"
-            borderColor="blackAlpha.300"
-            color="accent.invokeFg"
-            display="grid"
-            h="full"
-            placeItems="center"
-            px="2"
-            transition="filter 0.12s ease"
-            _hover={{ filter: 'brightness(1.05)' }}
-          >
-            <Icon as={PiCaretDownBold} boxSize="3" />
-          </Box>
-        </Menu.Trigger>
+        <Group attached>
+          <Button size="sm" onClick={onInvoke} w={CONTROL_WIDTH} minW="0" justifyContent="start">
+            <Icon as={PiSparkleFill} boxSize="4" flexShrink={0} />
+            <VStack align="start" gap="0" minW="0">
+              <Text fontSize="sm" fontWeight="700" lineHeight="1">
+                Invoke
+              </Text>
+              <HStack gap="1" maxW="full">
+                <Text fontSize="2xs" fontWeight="600" lineHeight="1.1" opacity="0.85" truncate>
+                  {routeLabel}
+                </Text>
+                {isLocked ? <Icon as={PiLockSimpleFill} boxSize="2.5" flexShrink={0} /> : null}
+              </HStack>
+            </VStack>
+          </Button>
+          <Menu.Trigger asChild>
+            <IconButton size="sm" minW="0" w="7">
+              <PiCaretDownBold />
+            </IconButton>
+          </Menu.Trigger>
+        </Group>
         <Portal>
           <Menu.Positioner>
             <Menu.Content
@@ -211,6 +186,46 @@ export const InvokeControl = () => {
           </Menu.Positioner>
         </Portal>
       </Menu.Root>
-    </HStack>
+    </Flex>
+    // <HStack
+    //   aria-disabled={!isValid}
+    //   aria-label={invokeLabel}
+    //   as="button"
+    //   bg={isValid ? 'accent.invoke' : 'bg.surface'}
+    //   color={isValid ? 'accent.invokeFg' : 'fg.muted'}
+    //   flex="1"
+    //   gap="2"
+    //   h="full"
+    //   minW="0"
+    //   px="3"
+    //   transition="filter 0.12s ease"
+    //   title={resolvedRoute.validationMessage}
+    //   onClick={() => {
+    //     if (!isValid) {
+    //       return;
+    //     }
+
+    //     dispatch({
+    //       backendSupportsCancellation: true,
+    //       route: resolvedRoute,
+    //       type: 'submitResolvedInvocationSnapshot',
+    //     });
+    //   }}
+    //   _hover={isValid ? { filter: 'brightness(1.05)' } : undefined}
+    //   _active={{ filter: 'brightness(0.96)' }}
+    // >
+    //   <Icon as={PiSparkleFill} boxSize="4" flexShrink={0} />
+    //   <VStack align="start" gap="0" minW="0">
+    //     <Text fontSize="sm" fontWeight="700" lineHeight="1">
+    //       Invoke
+    //     </Text>
+    //     <HStack gap="1" maxW="full">
+    //       <Text fontSize="2xs" fontWeight="600" lineHeight="1.1" opacity="0.85" truncate>
+    //         {routeLabel}
+    //       </Text>
+    //       {isLocked ? <Icon as={PiLockSimpleFill} boxSize="2.5" flexShrink={0} /> : null}
+    //     </HStack>
+    //   </VStack>
+    // </HStack>
   );
 };

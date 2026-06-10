@@ -182,8 +182,27 @@ export const FieldPlaceholder = ({ label, h }: { label: string; h: string }) => 
   </Stack>
 );
 
-export const StatusWidgetChip = ({ icon, children }: { icon: IconType; children: ReactNode }) => (
-  <HStack borderWidth="1px" borderColor="border.emphasis" gap="1.5" py="0.5" px="2" rounded="sm" flexShrink={0}>
+export const StatusWidgetChip = ({
+  borderColor = 'border.emphasis',
+  children,
+  color,
+  icon,
+}: {
+  borderColor?: string;
+  children: ReactNode;
+  color?: string;
+  icon: IconType;
+}) => (
+  <HStack
+    borderWidth="1px"
+    borderColor={borderColor}
+    color={color}
+    gap="1.5"
+    py="0.5"
+    px="2"
+    rounded="sm"
+    flexShrink={0}
+  >
     <Icon as={icon} boxSize="3" />
     <Text fontSize="2xs" fontWeight="500" whiteSpace="nowrap">
       {children}

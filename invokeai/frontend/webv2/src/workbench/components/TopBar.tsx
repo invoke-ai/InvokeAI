@@ -1,5 +1,13 @@
-import { Badge, Box, Flex, HStack, Icon, NumberInput, Text } from '@chakra-ui/react';
-import { PiCaretDownBold, PiCubeBold, PiListNumbersBold, PiUserCircleBold, PiXBold } from 'react-icons/pi';
+import { Badge, Box, Flex, Group, HStack, Icon, Menu, NumberInput, Portal, Text } from '@chakra-ui/react';
+import {
+  PiCaretDownBold,
+  PiCubeBold,
+  PiListNumbersBold,
+  PiPause,
+  PiPlay,
+  PiUserCircleBold,
+  PiXBold,
+} from 'react-icons/pi';
 
 import { InvokeControl } from './InvokeControl';
 import { LayoutPresetMenu } from './LayoutPresetMenu';
@@ -7,6 +15,8 @@ import { ProjectTabs } from './ProjectTabs';
 import { SettingsButton } from './SettingsDialog';
 import { IconButton } from './ui/Button';
 import { useWorkbench } from '../WorkbenchContext';
+import { DEFAULT_THEME_ID, THEMES_BY_ID } from '../../theme/themes';
+import { Tooltip } from './ui/Tooltip';
 
 /** Workbench top bar: brand, global Invoke command cluster, project tabs, layout + account controls. */
 export const TopBar = () => (
@@ -19,7 +29,7 @@ export const TopBar = () => (
     flexShrink={0}
     gap="2"
     h="12"
-    px="3"
+    pe="3"
     w="full"
   >
     <BrandMark />
@@ -50,23 +60,33 @@ export const TopBar = () => (
   </Flex>
 );
 
-/** Brand mark placeholder for the future workbench logo / app menu. */
-const BrandMark = () => (
-  <Flex
-    align="center"
-    aria-label="Invoke"
-    as="button"
-    color="accent.invoke"
-    flexShrink={0}
-    h="7"
-    justify="center"
-    rounded="md"
-    w="7"
-    _hover={{ bg: 'bg.surface' }}
-  >
-    <Icon as={PiListNumbersBold} boxSize="5" transform="rotate(90deg)" />
-  </Flex>
-);
+/** Compact legacy Invoke logo used as the workbench app-menu affordance. */
+const BrandMark = () => {
+  const { state } = useWorkbench();
+  const theme = THEMES_BY_ID[state.account.preferences.themeId] ?? THEMES_BY_ID[DEFAULT_THEME_ID];
+
+  return (
+    <Flex
+      align="center"
+      aria-label="Invoke"
+      as="button"
+      flexShrink={0}
+      h="full"
+      justify="center"
+      rounded="md"
+      aspectRatio="1/1"
+      me="-1"
+    >
+      <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 44 44" width="20">
+        <path
+          d="M29.1951 10.6667H42V2H2V10.6667H14.8049L29.1951 33.3333H42V42H2V33.3333H14.8049"
+          stroke={theme.colors.accent}
+          strokeWidth="2.8"
+        />
+      </svg>
+    </Flex>
+  );
+};
 
 const getBatchCount = (values: Record<string, unknown>): number => {
   const batchCount = values.batchCount;
@@ -84,7 +104,7 @@ const BatchCountField = () => {
       flexShrink={0}
       max={64}
       min={1}
-      size="xs"
+      size="sm"
       value={String(batchCount)}
       w="14"
       onValueChange={({ valueAsNumber }) => {
@@ -94,7 +114,7 @@ const BatchCountField = () => {
       }}
     >
       <NumberInput.Control />
-      <NumberInput.Input aria-label="Batch count" />
+      <NumberInput.Input paddingStart="4" aria-label="Batch count" />
     </NumberInput.Root>
   );
 };
@@ -112,34 +132,100 @@ const QueueCluster = () => {
   ).length;
   const totalCount = activeProject.queue.items.length;
 
+  const queueEndActions = [
+    {
+      label: 'Cancel Current Item',
+      icon: PiXBold,
+      onClick: () => void 0,
+    },
+    {
+      label: 'Cancel All Items',
+      icon: PiXBold,
+      onClick: () => void 0,
+    },
+    {
+      label: 'Cancel all except current item',
+      icon: PiXBold,
+      onClick: () => void 0,
+    },
+  ];
+
+  const queueProcessorActions = [
+    {
+      label: 'Resume Processor',
+      icon: PiPlay,
+      onClick: () => void 0,
+    },
+    {
+      label: 'Pause Processor',
+      icon: PiPause,
+      onClick: () => void 0,
+    },
+    {
+      label: 'Open Queue',
+      icon: PiListNumbersBold,
+      onClick: () => void 0,
+    },
+  ];
+
   return (
     <HStack flexShrink={0} gap="1">
-      <Badge bg="accent.active" color="accent.activeFg" fontSize="2xs" fontWeight="700" gap="1" h="7" px="2">
-        <Icon as={PiListNumbersBold} boxSize="3" />
+      <Badge variant="outline" h="9" borderColor="border.subtle" fontSize="xs" fontWeight="700" gap="1" px="2">
+        {/*<Icon as={PiListNumbersBold} boxSize="3" />*/}
+        <PiListNumbersBold />
         {activeCount}/{totalCount}
       </Badge>
-      <IconButton
-        aria-label="Cancel current batch"
-        borderWidth="1px"
-        borderColor="border.emphasis"
-        color="fg.muted"
-        size="xs"
-        variant="ghost"
-        _hover={{ color: 'fg.default' }}
-      >
-        <PiXBold />
-      </IconButton>
-      <IconButton
-        aria-label="Queue options"
-        borderWidth="1px"
-        borderColor="border.emphasis"
-        color="fg.muted"
-        size="xs"
-        variant="ghost"
-        _hover={{ color: 'fg.default' }}
-      >
-        <PiCaretDownBold />
-      </IconButton>
+      <Menu.Root>
+        <Group attached>
+          <Tooltip content="Cancel current item" showArrow>
+            <IconButton variant="outline" size="sm" roundedEnd="none">
+              <PiXBold />
+            </IconButton>
+          </Tooltip>
+          <Menu.Trigger>
+            <IconButton
+              variant="outline"
+              size="sm"
+              roundedStart="none"
+              borderStartWidth="0"
+              aspectRatio="unset"
+              minW="0"
+              w="6"
+            >
+              <PiCaretDownBold />
+            </IconButton>
+          </Menu.Trigger>
+        </Group>
+        <Portal>
+          <Menu.Positioner>
+            <Menu.Content>
+              <Menu.ItemGroup>
+                {queueEndActions.map((action, index) => (
+                  <Menu.Item
+                    key={index}
+                    onClick={action.onClick}
+                    value={action.label}
+                    color="fg.error"
+                    _hover={{ bg: 'bg.error', color: 'fg.error' }}
+                  >
+                    <Icon as={action.icon} boxSize="3" />
+                    <span>{action.label}</span>
+                  </Menu.Item>
+                ))}
+              </Menu.ItemGroup>
+              <Menu.Separator />
+              <Menu.ItemGroup>
+                {queueProcessorActions.map((action, index) => (
+                  <Menu.Item key={index} onClick={action.onClick} value={action.label}>
+                    <Icon as={action.icon} boxSize="3" />
+                    <span>{action.label}</span>
+                  </Menu.Item>
+                ))}
+              </Menu.ItemGroup>
+            </Menu.Content>
+          </Menu.Positioner>
+        </Portal>
+      </Menu.Root>
     </HStack>
   );
 };

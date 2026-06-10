@@ -18,6 +18,13 @@ const COMPARE_IMAGE_STYLE: CSSProperties = {
   width: '100%',
 };
 
+const previewGridCss = {
+  backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1.5px)',
+  backgroundPosition: 'center',
+  backgroundRepeat: 'repeat',
+  backgroundSize: '14px 14px',
+} as const;
+
 /**
  * Two-image comparison: a draggable slider that reveals the compare image over
  * the selected one, or a side-by-side split.
@@ -50,18 +57,29 @@ export const PreviewCompare = ({
 
   return (
     <Stack gap="3" h="full" minH="0" w="full">
-      <Flex align="center" flex="1" justify="center" minH="0" w="full">
+      <Flex
+        align="center"
+        backgroundColor="bg.canvas"
+        borderWidth="1px"
+        borderColor="border.subtle"
+        color="canvas.dot"
+        css={previewGridCss}
+        flex="1"
+        justify="center"
+        minH="0"
+        overflow="hidden"
+        p="6"
+        rounded="lg"
+        w="full"
+      >
         {mode === 'slider' ? (
           <Box
             ref={containerRef}
-            bg="bg.panel"
-            borderWidth="1px"
-            borderColor="border.emphasis"
+            bg="transparent"
             cursor="ew-resize"
             h="full"
             overflow="hidden"
             position="relative"
-            rounded="lg"
             style={{ touchAction: 'none' }}
             w="full"
             onPointerDown={(event) => {
@@ -96,7 +114,7 @@ export const PreviewCompare = ({
           >
             <img alt={baseImage.imageName} draggable={false} src={baseImage.imageUrl} style={COMPARE_IMAGE_STYLE} />
             <Box
-              bg="bg.panel"
+              bg="transparent"
               inset="0"
               pointerEvents="none"
               position="absolute"
@@ -152,17 +170,7 @@ export const PreviewCompare = ({
 };
 
 const CompareSidePane = ({ image, label }: { image: GeneratedImageContract; label: string }) => (
-  <Box
-    bg="bg.panel"
-    borderWidth="1px"
-    borderColor="border.emphasis"
-    flex="1"
-    h="full"
-    minW="0"
-    overflow="hidden"
-    position="relative"
-    rounded="lg"
-  >
+  <Box bg="transparent" flex="1" h="full" minW="0" overflow="hidden" position="relative">
     <img alt={image.imageName} draggable={false} src={image.imageUrl} style={COMPARE_IMAGE_STYLE} />
     <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
       {label}

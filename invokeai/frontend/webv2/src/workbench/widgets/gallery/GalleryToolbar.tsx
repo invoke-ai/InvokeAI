@@ -1,8 +1,8 @@
-import { Box, HStack, Input, Menu, Portal, Slider, Spacer, Stack, Switch, Text } from '@chakra-ui/react';
+import { Box, HStack, Input, InputGroup, Menu, Portal, Slider, Spacer, Stack, Switch, Text } from '@chakra-ui/react';
 import { useRef } from 'react';
-import { PiGearSixBold, PiUploadSimpleBold } from 'react-icons/pi';
+import { PiGearSixBold, PiMagnifyingGlassBold, PiUploadSimpleBold } from 'react-icons/pi';
 
-import { Button, IconButton } from '../../components/ui/Button';
+import { Button, CloseButton, IconButton } from '../../components/ui/Button';
 import { isDateBoardId } from '../../gallery/api';
 import { GalleryBoardSelect } from './GalleryBoardSelect';
 import { useGalleryWidget } from './GalleryWidgetContext';
@@ -39,6 +39,9 @@ export const GalleryToolbar = ({ layout }: { layout: 'stacked' | 'wide' }) => {
       <GallerySettingsMenu />
     </HStack>
   );
+  const searchClearButton = gallery.searchTerm ? (
+    <CloseButton size="2xs" aria-label="Clear search" onClick={() => actions.setSearchTerm('')} me="-2" />
+  ) : null;
 
   return (
     <Stack gap="2">
@@ -60,13 +63,15 @@ export const GalleryToolbar = ({ layout }: { layout: 'stacked' | 'wide' }) => {
           </HStack>
         </>
       )}
-      <Input
-        aria-label="Search gallery images"
-        placeholder="Search images"
-        size="sm"
-        value={gallery.searchTerm}
-        onChange={(event) => actions.setSearchTerm(event.currentTarget.value)}
-      />
+      <InputGroup startElement={<PiMagnifyingGlassBold />} endElement={searchClearButton}>
+        <Input
+          aria-label="Search gallery images"
+          placeholder="Search images"
+          size="xs"
+          value={gallery.searchTerm}
+          onChange={(event) => actions.setSearchTerm(event.currentTarget.value)}
+        />
+      </InputGroup>
     </Stack>
   );
 };

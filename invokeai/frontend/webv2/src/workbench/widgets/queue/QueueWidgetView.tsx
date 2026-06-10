@@ -1,6 +1,7 @@
-import { Badge, Stack, Text, HStack } from '@chakra-ui/react';
+import { Badge, Progress, Stack, Text, HStack } from '@chakra-ui/react';
 import { PiListNumbersBold } from 'react-icons/pi';
 
+import { useQueueItemProgress } from '../../backend/progressStore';
 import { StatusWidgetChip } from '../../components/WidgetFrames';
 import { Button } from '../../components/ui/Button';
 import type { WidgetViewProps } from '../../types';
@@ -22,6 +23,34 @@ export const QueueWidgetView = ({ presentation, region }: WidgetViewProps) => {
   }
 
   return <QueueContents />;
+};
+
+const QueueItemLiveProgress = ({ queueItemId }: { queueItemId: string }) => {
+  const progress = useQueueItemProgress(queueItemId);
+
+  if (!progress) {
+    return null;
+  }
+
+  return (
+    <Stack gap="1">
+      <Progress.Root
+        aria-label={progress.message || 'Generation progress'}
+        max={1}
+        size="xs"
+        value={progress.percentage}
+      >
+        <Progress.Track>
+          <Progress.Range />
+        </Progress.Track>
+      </Progress.Root>
+      {progress.message ? (
+        <Text color="fg.subtle" fontSize="2xs">
+          {progress.message}
+        </Text>
+      ) : null}
+    </Stack>
+  );
 };
 
 const QueueContents = () => {
@@ -70,6 +99,7 @@ const QueueContents = () => {
               <Text color="fg.subtle" fontSize="2xs">
                 {promptSummary}
               </Text>
+              {item.status === 'running' ? <QueueItemLiveProgress queueItemId={item.id} /> : null}
               <HStack justify="space-between">
                 <Text color={item.status === 'failed' ? 'red.300' : 'fg.subtle'} fontSize="2xs">
                   {item.id}

@@ -10,7 +10,7 @@ import type { GalleryThumbnailFit } from '../../gallery/settings';
 import type { GalleryQueuePlaceholder } from './galleryStateView';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
-const GRID_GAP_PX = 8;
+const GRID_GAP_PX = 4;
 
 const viewportWidthCache = new Map<'stacked' | 'wide', number>();
 
