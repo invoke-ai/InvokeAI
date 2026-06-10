@@ -1,0 +1,93 @@
+"""Wan 2.2 latents-to-image invocation.
+
+Decodes Wan latents using the Wan VAE (AutoencoderKLWan).
+
+Latents from the denoise loop are in normalised space (zero-centred). Before
+VAE decode they are denormalised using the VAE config's per-channel
+``latents_mean`` / ``latents_std`` (matching Diffusers ``WanPipeline``).
+
+The VAE expects 5D ``[B, C, T, H, W]``; downstream nodes work with 4D, so this
+node re-adds ``T=1`` before decode and squeezes it back out afterwards.
+"""
+
+import torch
+from diffusers.models.autoencoders import AutoencoderKLWan
+from einops import rearrange
+from PIL import Image
+
+from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
+from invokeai.app.invocations.fields import (
+    FieldDescriptions,
+    Input,
+    InputField,
+    LatentsField,
+    WithBoard,
+    WithMetadata,
+)
+from invokeai.app.invocations.model import VAEField
+from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux
+
+
+@invocation(
+    "wan_l2i",
+    title="Latents to Image - Wan 2.2",
+    tags=["latents", "image", "vae", "l2i", "wan"],
+    category="latents",
+    version="1.0.0",
+    classification=Classification.Prototype,
+)
+class WanLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Decodes Wan latents back to RGB."""
+
+    latents: LatentsField = InputField(description=FieldDescriptions.latents, input=Input.Connection)
+    vae: VAEField = InputField(description=FieldDescriptions.vae, input=Input.Connection)
+
+    @torch.no_grad()
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        latents = context.tensors.load(self.latents.latents_name)
+
+        vae_info = context.models.load(self.vae.vae)
+        if not isinstance(vae_info.model, AutoencoderKLWan):
+            raise TypeError(f"Expected AutoencoderKLWan for Wan VAE, got {type(vae_info.model).__name__}.")
+
+        estimated_working_memory = estimate_vae_working_memory_flux(
+            operation="decode",
+            image_tensor=latents,
+            vae=vae_info.model,
+        )
+
+        with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
+            context.util.signal_progress("Running Wan VAE decode")
+            assert isinstance(vae, AutoencoderKLWan)
+
+            vae_dtype = next(iter(vae.parameters())).dtype
+            latents = latents.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)
+
+            TorchDevice.empty_cache()
+
+            with torch.inference_mode():
+                # Re-add the temporal dim if upstream squeezed it out.
+                if latents.ndim == 4:
+                    latents = latents.unsqueeze(2)
+
+                # Denormalise from denoiser space back to raw VAE space.
+                latents_mean = torch.tensor(vae.config.latents_mean).view(1, -1, 1, 1, 1).to(latents)
+                latents_std = torch.tensor(vae.config.latents_std).view(1, -1, 1, 1, 1).to(latents)
+                latents = latents * latents_std + latents_mean
+
+                decoded = vae.decode(latents, return_dict=False)[0]
+
+                if decoded.ndim == 5:
+                    decoded = decoded.squeeze(2)
+
+            img = decoded.clamp(-1, 1)
+            img = rearrange(img[0], "c h w -> h w c")
+            img_pil = Image.fromarray((127.5 * (img + 1.0)).byte().cpu().numpy())
+
+        TorchDevice.empty_cache()
+
+        image_dto = context.images.save(image=img_pil)
+        return ImageOutput.build(image_dto)

@@ -1,0 +1,331 @@
+{
+  "id": "default_wan22_t2v_video_lightning_f5e8b4c6-6a7b-8c9d-de1e-bf2a3b4c5d6e",
+  "name": "Text to Video - Wan 2.2 Lightning",
+  "author": "InvokeAI",
+  "description": "Faster text-to-video with the Wan 2.2 Lightning LoRA pair. Runs at 4 denoising steps with CFG disabled (1.0), which skips the negative-conditioning branch — roughly 20× faster than the default 'Text to Video - Wan 2.2' workflow at similar quality. Requires the Wan 2.2 T2V A14B Lightning LoRAs (one for each MoE expert).",
+  "version": "1.0.0",
+  "contact": "",
+  "tags": "wan2.2, text to video, video, lightning, lora",
+  "notes": "Prerequisite models: a Wan 2.2 T2V A14B main (Diffusers or GGUF expert pair) PLUS the matching Wan 2.2 T2V Lightning LoRA pair (high-noise + low-noise). Wire the high-noise Lightning LoRA into the first 'Apply LoRA - Wan 2.2' node and the low-noise one into the second; if the LoRAs are properly tagged with their expert ('high'/'low'), leave the 'target' dropdown on 'auto'. Each LoRA's weight defaults to 1.0; lower it if the output looks over-baked. Don't change steps below 4 or raise guidance above 1.0 — that's where the Lightning distillation lives.",
+  "exposedFields": [
+    {
+      "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "fieldName": "model"
+    },
+    {
+      "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "fieldName": "transformer_low_noise_model"
+    },
+    {
+      "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "fieldName": "component_source"
+    },
+    {
+      "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "fieldName": "vae_model"
+    },
+    {
+      "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "fieldName": "wan_t5_encoder_model"
+    },
+    {
+      "nodeId": "3466ad11-a931-4adc-b394-9ec287f0c23b",
+      "fieldName": "lora"
+    },
+    {
+      "nodeId": "3466ad11-a931-4adc-b394-9ec287f0c23b",
+      "fieldName": "weight"
+    },
+    {
+      "nodeId": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
+      "fieldName": "lora"
+    },
+    {
+      "nodeId": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
+      "fieldName": "weight"
+    },
+    {
+      "nodeId": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
+      "fieldName": "prompt"
+    },
+    {
+      "nodeId": "3c2a8e9d-bf4a-6d5e-af3c-4b5f6e7d8c9a",
+      "fieldName": "prompt"
+    },
+    {
+      "nodeId": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "fieldName": "width"
+    },
+    {
+      "nodeId": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "fieldName": "height"
+    },
+    {
+      "nodeId": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "fieldName": "num_frames"
+    },
+    {
+      "nodeId": "6f5dcb1c-e27d-9fb0-d16f-7e8cbaa1fcbd",
+      "fieldName": "fps"
+    }
+  ],
+  "meta": {
+    "version": "3.0.0",
+    "category": "default"
+  },
+  "nodes": [
+    {
+      "id": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "type": "invocation",
+      "data": {
+        "id": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+        "type": "wan_model_loader",
+        "version": "1.0.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": false,
+        "inputs": {
+          "model": { "name": "model", "label": "" },
+          "transformer_low_noise_model": { "name": "transformer_low_noise_model", "label": "" },
+          "vae_model": { "name": "vae_model", "label": "" },
+          "wan_t5_encoder_model": { "name": "wan_t5_encoder_model", "label": "" },
+          "component_source": { "name": "component_source", "label": "" }
+        }
+      },
+      "position": { "x": 0, "y": 0 }
+    },
+    {
+      "id": "3466ad11-a931-4adc-b394-9ec287f0c23b",
+      "type": "invocation",
+      "data": {
+        "id": "3466ad11-a931-4adc-b394-9ec287f0c23b",
+        "type": "wan_lora_loader",
+        "version": "1.0.0",
+        "label": "Lightning LoRA (High)",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "lora": { "name": "lora", "label": "" },
+          "weight": { "name": "weight", "label": "", "value": 1.0 },
+          "target": { "name": "target", "label": "", "value": "auto" },
+          "transformer": { "name": "transformer", "label": "" }
+        }
+      },
+      "position": { "x": 230, "y": 0 }
+    },
+    {
+      "id": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
+      "type": "invocation",
+      "data": {
+        "id": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
+        "type": "wan_lora_loader",
+        "version": "1.0.0",
+        "label": "Lightning LoRA (Low)",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "lora": { "name": "lora", "label": "" },
+          "weight": { "name": "weight", "label": "", "value": 1.0 },
+          "target": { "name": "target", "label": "", "value": "auto" },
+          "transformer": { "name": "transformer", "label": "" }
+        }
+      },
+      "position": { "x": 460, "y": 0 }
+    },
+    {
+      "id": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
+      "type": "invocation",
+      "data": {
+        "id": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
+        "type": "wan_text_encoder",
+        "version": "1.0.0",
+        "label": "Positive Prompt",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "prompt": { "name": "prompt", "label": "", "value": "a cat walking through a field of tall grass, cinematic" },
+          "wan_t5_encoder": { "name": "wan_t5_encoder", "label": "" }
+        }
+      },
+      "position": { "x": 700, "y": -200 }
+    },
+    {
+      "id": "3c2a8e9d-bf4a-6d5e-af3c-4b5f6e7d8c9a",
+      "type": "invocation",
+      "data": {
+        "id": "3c2a8e9d-bf4a-6d5e-af3c-4b5f6e7d8c9a",
+        "type": "wan_text_encoder",
+        "version": "1.0.0",
+        "label": "Negative Prompt (unused at CFG=1)",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "prompt": { "name": "prompt", "label": "", "value": " " },
+          "wan_t5_encoder": { "name": "wan_t5_encoder", "label": "" }
+        }
+      },
+      "position": { "x": 700, "y": 100 }
+    },
+    {
+      "id": "5e4cab0b-d16c-8faf-c05e-6d7baf90ebbc",
+      "type": "invocation",
+      "data": {
+        "id": "5e4cab0b-d16c-8faf-c05e-6d7baf90ebbc",
+        "type": "rand_int",
+        "version": "1.0.1",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": false,
+        "inputs": {
+          "low": { "name": "low", "label": "", "value": 0 },
+          "high": { "name": "high", "label": "", "value": 2147483647 }
+        }
+      },
+      "position": { "x": 700, "y": 400 }
+    },
+    {
+      "id": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "type": "invocation",
+      "data": {
+        "id": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+        "type": "wan_video_denoise",
+        "version": "1.0.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "transformer": { "name": "transformer", "label": "" },
+          "positive_conditioning": { "name": "positive_conditioning", "label": "" },
+          "negative_conditioning": { "name": "negative_conditioning", "label": "" },
+          "ref_image": { "name": "ref_image", "label": "" },
+          "guidance_scale": { "name": "guidance_scale", "label": "CFG", "value": 1.0 },
+          "guidance_scale_low_noise": { "name": "guidance_scale_low_noise", "label": "CFG (Low)", "value": 1.0 },
+          "width": { "name": "width", "label": "", "value": 832 },
+          "height": { "name": "height", "label": "", "value": 480 },
+          "num_frames": { "name": "num_frames", "label": "Frames", "value": 81 },
+          "steps": { "name": "steps", "label": "", "value": 4 },
+          "seed": { "name": "seed", "label": "", "value": 0 }
+        }
+      },
+      "position": { "x": 1100, "y": -50 }
+    },
+    {
+      "id": "6f5dcb1c-e27d-9fb0-d16f-7e8cbaa1fcbd",
+      "type": "invocation",
+      "data": {
+        "id": "6f5dcb1c-e27d-9fb0-d16f-7e8cbaa1fcbd",
+        "type": "wan_l2v",
+        "version": "1.0.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": true,
+        "inputs": {
+          "board": { "name": "board", "label": "" },
+          "metadata": { "name": "metadata", "label": "" },
+          "latents": { "name": "latents", "label": "" },
+          "vae": { "name": "vae", "label": "" },
+          "fps": { "name": "fps", "label": "FPS", "value": 16 }
+        }
+      },
+      "position": { "x": 1550, "y": -50 }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-loader-transformer-lora-high",
+      "type": "default",
+      "source": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "target": "3466ad11-a931-4adc-b394-9ec287f0c23b",
+      "sourceHandle": "transformer",
+      "targetHandle": "transformer"
+    },
+    {
+      "id": "edge-lora-high-lora-low",
+      "type": "default",
+      "source": "3466ad11-a931-4adc-b394-9ec287f0c23b",
+      "target": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
+      "sourceHandle": "transformer",
+      "targetHandle": "transformer"
+    },
+    {
+      "id": "edge-lora-low-denoise",
+      "type": "default",
+      "source": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
+      "target": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "sourceHandle": "transformer",
+      "targetHandle": "transformer"
+    },
+    {
+      "id": "edge-loader-t5-pos",
+      "type": "default",
+      "source": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "target": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
+      "sourceHandle": "wan_t5_encoder",
+      "targetHandle": "wan_t5_encoder"
+    },
+    {
+      "id": "edge-loader-t5-neg",
+      "type": "default",
+      "source": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "target": "3c2a8e9d-bf4a-6d5e-af3c-4b5f6e7d8c9a",
+      "sourceHandle": "wan_t5_encoder",
+      "targetHandle": "wan_t5_encoder"
+    },
+    {
+      "id": "edge-loader-vae-l2v",
+      "type": "default",
+      "source": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "target": "6f5dcb1c-e27d-9fb0-d16f-7e8cbaa1fcbd",
+      "sourceHandle": "vae",
+      "targetHandle": "vae"
+    },
+    {
+      "id": "edge-pos-cond-denoise",
+      "type": "default",
+      "source": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
+      "target": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "sourceHandle": "conditioning",
+      "targetHandle": "positive_conditioning"
+    },
+    {
+      "id": "edge-neg-cond-denoise",
+      "type": "default",
+      "source": "3c2a8e9d-bf4a-6d5e-af3c-4b5f6e7d8c9a",
+      "target": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "sourceHandle": "conditioning",
+      "targetHandle": "negative_conditioning"
+    },
+    {
+      "id": "edge-rand-seed-denoise",
+      "type": "default",
+      "source": "5e4cab0b-d16c-8faf-c05e-6d7baf90ebbc",
+      "target": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "sourceHandle": "value",
+      "targetHandle": "seed"
+    },
+    {
+      "id": "edge-denoise-latents-l2v",
+      "type": "default",
+      "source": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "target": "6f5dcb1c-e27d-9fb0-d16f-7e8cbaa1fcbd",
+      "sourceHandle": "latents",
+      "targetHandle": "latents"
+    }
+  ]
+}

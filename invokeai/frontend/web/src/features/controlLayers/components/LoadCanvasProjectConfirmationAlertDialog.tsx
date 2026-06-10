@@ -7,7 +7,9 @@ import { atom } from 'nanostores';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const $pendingFile = atom<File | null>(null);
+type PendingLoad = { kind: 'file'; file: File } | { kind: 'server'; projectName: string };
+
+const $pending = atom<PendingLoad | null>(null);
 
 const openFileDialog = (onFileSelected: (file: File) => void) => {
   const input = document.createElement('input');
@@ -22,37 +24,57 @@ const openFileDialog = (onFileSelected: (file: File) => void) => {
   input.click();
 };
 
-export const useLoadCanvasProjectWithDialog = () => {
-  const openDialog = useCallback(() => {
+/**
+ * Opens the OS file picker, then queues the resulting file for the load-confirmation dialog.
+ * Used by the File menu / context menu "Load Canvas Project from File" entry.
+ */
+export const useLoadCanvasProjectFromFileWithDialog = () => {
+  return useCallback(() => {
     openFileDialog((file) => {
-      $pendingFile.set(file);
+      $pending.set({ kind: 'file', file });
     });
   }, []);
-
-  return openDialog;
 };
+
+/**
+ * Queues a server-stored canvas project for the load-confirmation dialog. The ZIP will be
+ * fetched from `/api/v1/canvas_projects/i/{name}/full` on accept.
+ *
+ * Returns a stable callback so consumers (gallery viewer toolbar, click-to-load actions) can
+ * pass it as an onClick handler.
+ */
+export const useLoadCanvasProjectFromServerWithDialog = () => {
+  return useCallback((projectName: string) => {
+    $pending.set({ kind: 'server', projectName });
+  }, []);
+};
+
+// Kept for backwards compatibility with the existing context-menu wiring.
+export const useLoadCanvasProjectWithDialog = useLoadCanvasProjectFromFileWithDialog;
 
 export const LoadCanvasProjectConfirmationAlertDialog = memo(() => {
   useAssertSingleton('LoadCanvasProjectConfirmationAlertDialog');
   const { t } = useTranslation();
-  const { loadCanvasProject } = useCanvasProjectLoad();
-  const pendingFile = useStore($pendingFile);
+  const { loadCanvasProjectFromFile, loadCanvasProjectFromServer } = useCanvasProjectLoad();
+  const pending = useStore($pending);
 
   const onClose = useCallback(() => {
-    $pendingFile.set(null);
+    $pending.set(null);
   }, []);
 
   const onAccept = useCallback(() => {
-    const file = $pendingFile.get();
-    if (file) {
-      void loadCanvasProject(file);
+    const p = $pending.get();
+    if (p?.kind === 'file') {
+      void loadCanvasProjectFromFile(p.file);
+    } else if (p?.kind === 'server') {
+      void loadCanvasProjectFromServer(p.projectName);
     }
-    $pendingFile.set(null);
-  }, [loadCanvasProject]);
+    $pending.set(null);
+  }, [loadCanvasProjectFromFile, loadCanvasProjectFromServer]);
 
   return (
     <ConfirmationAlertDialog
-      isOpen={pendingFile !== null}
+      isOpen={pending !== null}
       onClose={onClose}
       title={t('controlLayers.canvasProject.loadProject')}
       acceptCallback={onAccept}

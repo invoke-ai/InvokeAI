@@ -13,22 +13,46 @@ import type {
 import { getImageDTOSafe } from 'services/api/endpoints/images';
 import { z } from 'zod';
 
-export const CANVAS_PROJECT_VERSION = 1;
+export const CANVAS_PROJECT_VERSION = 2;
 export const CANVAS_PROJECT_EXTENSION = '.invk';
+export const CANVAS_PROJECT_PREVIEW_FILENAME = 'preview.webp';
 
 // #region Manifest
 
-const zCanvasProjectManifest = z.object({
-  version: z.literal(CANVAS_PROJECT_VERSION),
+// v1 — the original format, shipped in PR #8917. Manifest had only name/version/appVersion/createdAt;
+// width/height/imageCount/hasPreview were not captured. Still loadable — missing fields are
+// reconstructed from canvas_state.json at parse time.
+const zCanvasProjectManifestV1 = z.object({
+  version: z.literal(1),
+  appVersion: z.string(),
+  createdAt: z.string(),
+  name: z.string().optional().default(''),
+});
+
+// v2 — adds bbox dimensions, image count, and a flag indicating whether a preview WebP is
+// bundled alongside the manifest. Required for server-side persistence and gallery thumbnails.
+const zCanvasProjectManifestV2 = z.object({
+  version: z.literal(2),
   appVersion: z.string(),
   createdAt: z.string(),
   name: z.string(),
+  width: z.number(),
+  height: z.number(),
+  imageCount: z.number(),
+  hasPreview: z.boolean(),
 });
-export type CanvasProjectManifest = z.infer<typeof zCanvasProjectManifest>;
 
-export const parseManifest = (data: unknown): CanvasProjectManifest => {
-  return zCanvasProjectManifest.parse(data);
+export type CanvasProjectManifest = z.infer<typeof zCanvasProjectManifestV2>;
+export type CanvasProjectManifestV1 = z.infer<typeof zCanvasProjectManifestV1>;
+export type AnyCanvasProjectManifest = CanvasProjectManifest | CanvasProjectManifestV1;
+
+const zAnyCanvasProjectManifest = z.discriminatedUnion('version', [zCanvasProjectManifestV1, zCanvasProjectManifestV2]);
+
+export const parseManifest = (data: unknown): AnyCanvasProjectManifest => {
+  return zAnyCanvasProjectManifest.parse(data);
 };
+
+export const isV2Manifest = (m: AnyCanvasProjectManifest): m is CanvasProjectManifest => m.version === 2;
 
 // #endregion
 

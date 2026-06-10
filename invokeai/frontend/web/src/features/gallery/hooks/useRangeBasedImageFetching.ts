@@ -1,7 +1,10 @@
 import { useAppStore } from 'app/store/storeHooks';
+import { isCanvasProjectName, isVideoName } from 'features/gallery/store/types';
 import { useCallback, useEffect, useState } from 'react';
 import type { ListRange } from 'react-virtuoso';
+import { canvasProjectsApi } from 'services/api/endpoints/canvasProjects';
 import { imagesApi, useGetImageDTOsByNamesMutation } from 'services/api/endpoints/images';
+import { videosApi } from 'services/api/endpoints/videos';
 import { useThrottledCallback } from 'use-debounce';
 
 interface UseRangeBasedImageFetchingArgs {
@@ -30,9 +33,12 @@ const getUncachedNames = (imageNames: string[], cachedImageNames: string[], rang
 };
 
 /**
- * Hook for bulk fetching image DTOs based on the visible range from virtuoso.
- * Individual image components should use `useGetImageDTOQuery(imageName)` to get their specific DTO.
- * This hook ensures DTOs are bulk fetched and cached efficiently.
+ * Hook for bulk fetching gallery item DTOs based on the visible range from virtuoso.
+ *
+ * Names are polymorphic — image names go through the bulk `getImageDTOsByNames` mutation while
+ * video names dispatch individual `getVideoDTO` queries (the videos API doesn't have a batch
+ * endpoint yet; per-item is fine while video counts are low). Individual components still call
+ * `useGetImageDTOQuery` / `useGetVideoDTOQuery` to subscribe — this hook only triggers fetches.
  */
 export const useRangeBasedImageFetching = ({
   imageNames,
@@ -43,23 +49,46 @@ export const useRangeBasedImageFetching = ({
   const [lastRange, setLastRange] = useState<ListRange | null>(null);
   const [pendingRanges, setPendingRanges] = useState<ListRange[]>([]);
 
-  const fetchImages = useCallback(
-    (ranges: ListRange[], imageNames: string[]) => {
+  const fetchItems = useCallback(
+    (ranges: ListRange[], allNames: string[]) => {
       if (!enabled) {
         return;
       }
-      const cachedImageNames = imagesApi.util.selectCachedArgsForQuery(store.getState(), 'getImageDTO');
-      const uncachedNames = getUncachedNames(imageNames, cachedImageNames, ranges);
-      if (uncachedNames.length === 0) {
-        return;
+      const state = store.getState();
+
+      // Images — bulk fetch via the existing batch endpoint.
+      const cachedImageNames = imagesApi.util.selectCachedArgsForQuery(state, 'getImageDTO');
+      const uncachedImageNames = getUncachedNames(allNames, cachedImageNames, ranges).filter(
+        (n) => !isVideoName(n) && !isCanvasProjectName(n)
+      );
+      if (uncachedImageNames.length > 0) {
+        getImageDTOsByNames({ image_names: uncachedImageNames });
       }
-      getImageDTOsByNames({ image_names: uncachedNames });
+
+      // Videos — fetch one at a time (no batch endpoint yet). Each `initiate()` is a no-op for
+      // already-cached entries, so this is safe to call repeatedly while scrolling.
+      const cachedVideoNames = videosApi.util.selectCachedArgsForQuery(state, 'getVideoDTO');
+      const uncachedVideoNames = getUncachedNames(allNames, cachedVideoNames, ranges).filter((n) => isVideoName(n));
+      for (const videoName of uncachedVideoNames) {
+        store.dispatch(videosApi.endpoints.getVideoDTO.initiate(videoName));
+      }
+
+      // Canvas projects — same pattern as videos. List is small enough that per-item fetches
+      // are fine; bulk endpoint can come later if it becomes a hotspot.
+      const cachedProjectNames = canvasProjectsApi.util.selectCachedArgsForQuery(state, 'getCanvasProjectDTO');
+      const uncachedProjectNames = getUncachedNames(allNames, cachedProjectNames, ranges).filter((n) =>
+        isCanvasProjectName(n)
+      );
+      for (const projectName of uncachedProjectNames) {
+        store.dispatch(canvasProjectsApi.endpoints.getCanvasProjectDTO.initiate(projectName));
+      }
+
       setPendingRanges([]);
     },
     [enabled, getImageDTOsByNames, store]
   );
 
-  const throttledFetchImages = useThrottledCallback(fetchImages, 500);
+  const throttledFetchItems = useThrottledCallback(fetchItems, 500);
 
   const onRangeChanged = useCallback((range: ListRange) => {
     setLastRange(range);
@@ -68,8 +97,8 @@ export const useRangeBasedImageFetching = ({
 
   useEffect(() => {
     const combinedRanges = lastRange ? [...pendingRanges, lastRange] : pendingRanges;
-    throttledFetchImages(combinedRanges, imageNames);
-  }, [imageNames, lastRange, pendingRanges, throttledFetchImages]);
+    throttledFetchItems(combinedRanges, imageNames);
+  }, [imageNames, lastRange, pendingRanges, throttledFetchItems]);
 
   return {
     onRangeChanged,

@@ -13,6 +13,7 @@ import type { CanvasState, RefImagesState } from 'features/controlLayers/store/t
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
+import { isCanvasProjectName, isVideoName } from 'features/gallery/store/types';
 import { fieldImageCollectionValueChanged, fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState } from 'features/nodes/store/types';
@@ -22,7 +23,9 @@ import { selectUpscaleSlice, type UpscaleState } from 'features/parameters/store
 import { selectSystemShouldConfirmOnDelete } from 'features/system/store/systemSlice';
 import { atom } from 'nanostores';
 import { useMemo } from 'react';
+import { canvasProjectsApi } from 'services/api/endpoints/canvasProjects';
 import { imagesApi } from 'services/api/endpoints/images';
+import { videosApi } from 'services/api/endpoints/videos';
 import type { Param0 } from 'tsafe';
 
 // Implements an awaitable modal dialog for deleting images
@@ -53,14 +56,69 @@ const getInitialState = (): DeleteImagesModalState => ({
 
 const $deleteModalState = atom<DeleteImagesModalState>(getInitialState());
 
-const deleteImagesWithDialog = async (image_names: string[], store: AppStore): Promise<void> => {
-  const { getState } = store;
-  const imageUsage = getImageUsageFromImageNames(image_names, getState());
+/**
+ * Splits a polymorphic name list into the three resource kinds. Used by the bulk delete flow so
+ * that the image-usage modal only opens for actual images — canvas projects and videos go
+ * straight to their respective delete endpoints (no canvas/node/ref references to check).
+ */
+const splitNamesByKind = (names: string[]): { imageNames: string[]; videoNames: string[]; projectNames: string[] } => {
+  const imageNames: string[] = [];
+  const videoNames: string[] = [];
+  const projectNames: string[] = [];
+  for (const name of names) {
+    if (isCanvasProjectName(name)) {
+      projectNames.push(name);
+    } else if (isVideoName(name)) {
+      videoNames.push(name);
+    } else {
+      imageNames.push(name);
+    }
+  }
+  return { imageNames, videoNames, projectNames };
+};
+
+const deleteImagesWithDialog = async (names: string[], store: AppStore): Promise<void> => {
+  const { dispatch, getState } = store;
+  const { imageNames, videoNames, projectNames } = splitNamesByKind(names);
+
+  // Canvas projects and videos don't have the cross-feature references that images do (they
+  // can't be referenced from nodes/canvas/refs), so the usage modal is irrelevant for them.
+  // Fire-and-forget the deletes here; the image half goes through the modal below if there is one.
+  if (projectNames.length > 0) {
+    try {
+      await dispatch(
+        canvasProjectsApi.endpoints.deleteCanvasProjects.initiate({ project_names: projectNames }, { track: false })
+      ).unwrap();
+    } catch {
+      // no-op — RTK Query handles its own error logging
+    }
+  }
+  if (videoNames.length > 0) {
+    for (const video_name of videoNames) {
+      try {
+        await dispatch(videosApi.endpoints.deleteVideo.initiate({ video_name }, { track: false })).unwrap();
+      } catch {
+        // no-op
+      }
+    }
+  }
+
+  if (imageNames.length === 0) {
+    // Pure non-image selection — clear any selection that pointed at the deleted items so the
+    // gallery doesn't keep highlighting ghosts.
+    const state = getState();
+    if (intersection(state.gallery.selection, names).length > 0) {
+      dispatch(imageSelected(null));
+    }
+    return;
+  }
+
+  const imageUsage = getImageUsageFromImageNames(imageNames, getState());
   const shouldConfirmOnDelete = selectSystemShouldConfirmOnDelete(getState());
 
   if (!shouldConfirmOnDelete && !isAnyImageInUse(imageUsage)) {
     // If we don't need to confirm and the images are not in use, delete them directly
-    await handleDeletions(image_names, store);
+    await handleDeletions(imageNames, store);
     return;
   }
 
@@ -68,7 +126,7 @@ const deleteImagesWithDialog = async (image_names: string[], store: AppStore): P
     $deleteModalState.set({
       usagePerImage: imageUsage,
       usageSummary: getImageUsageSummary(imageUsage),
-      image_names,
+      image_names: imageNames,
       isOpen: true,
       resolve,
       reject,
