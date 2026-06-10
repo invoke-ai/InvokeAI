@@ -108,32 +108,29 @@ export const ImageContextMenu = ({
         <Portal>
           <Menu.Positioner>
             {image && (
-              <Menu.Content {...MENU_CONTENT_PROPS} minW="16rem">
-                <ScrollArea.Root maxH="min(28rem, calc(100vh - 2rem))" size="xs" variant="hover" w="full">
-                  <ScrollArea.Viewport maxH="inherit" w="full">
-                    <ScrollArea.Content py="1">
-                      {isBulk ? (
-                        <BulkMenuItems
-                          actions={actions}
-                          boards={boards}
-                          imageNames={imageNames}
-                          images={images}
-                          onRequestDeletion={requestDeletion}
-                        />
-                      ) : (
-                        <SingleImageMenuItems
-                          actions={actions}
-                          boards={boards}
-                          image={image}
-                          onRequestDeletion={requestDeletion}
-                        />
-                      )}
-                    </ScrollArea.Content>
-                  </ScrollArea.Viewport>
-                  <ScrollArea.Scrollbar>
-                    <ScrollArea.Thumb />
-                  </ScrollArea.Scrollbar>
-                </ScrollArea.Root>
+              <Menu.Content
+                {...MENU_CONTENT_PROPS}
+                maxH="min(28rem, calc(100vh - 2rem))"
+                minW="16rem"
+                overflowY="auto"
+                py="1"
+              >
+                {isBulk ? (
+                  <BulkMenuItems
+                    actions={actions}
+                    boards={boards}
+                    imageNames={imageNames}
+                    images={images}
+                    onRequestDeletion={requestDeletion}
+                  />
+                ) : (
+                  <SingleImageMenuItems
+                    actions={actions}
+                    boards={boards}
+                    image={image}
+                    onRequestDeletion={requestDeletion}
+                  />
+                )}
               </Menu.Content>
             )}
           </Menu.Positioner>
@@ -334,7 +331,7 @@ const ChangeBoardSubMenu = ({
   currentBoardId: string | null;
   onMove: (boardId: string) => void;
 }) => (
-  <ContextSubMenu icon={PiFoldersBold} label="Change Board">
+  <ContextSubMenu icon={PiFoldersBold} label="Change Board" scrollArea>
     {currentBoardId !== 'none' && (
       <ContextMenuItem
         icon={PiFoldersBold}
@@ -355,7 +352,17 @@ const ChangeBoardSubMenu = ({
   </ContextSubMenu>
 );
 
-const ContextSubMenu = ({ children, icon, label }: { children: ReactNode; icon: ComponentType; label: string }) => (
+const ContextSubMenu = ({
+  children,
+  icon,
+  label,
+  scrollArea,
+}: {
+  children: ReactNode;
+  icon: ComponentType;
+  label: string;
+  scrollArea?: boolean;
+}) => (
   <Menu.Root positioning={{ placement: 'right-start' }}>
     <Menu.TriggerItem>
       <HStack gap="2" minW="0" w="full">
@@ -368,15 +375,19 @@ const ContextSubMenu = ({ children, icon, label }: { children: ReactNode; icon: 
     </Menu.TriggerItem>
     <Portal>
       <Menu.Positioner>
-        <Menu.Content {...MENU_CONTENT_PROPS}>
-          <ScrollArea.Root maxH="18rem" size="xs" variant="hover" w="full">
-            <ScrollArea.Viewport maxH="inherit" w="full">
-              <ScrollArea.Content py="1">{children}</ScrollArea.Content>
-            </ScrollArea.Viewport>
-            <ScrollArea.Scrollbar>
-              <ScrollArea.Thumb />
-            </ScrollArea.Scrollbar>
-          </ScrollArea.Root>
+        <Menu.Content {...MENU_CONTENT_PROPS} maxH="18rem" overflowY={scrollArea ? undefined : 'auto'} py="1">
+          {scrollArea ? (
+            <ScrollArea.Root maxH="inherit" size="xs" variant="hover" w="full">
+              <ScrollArea.Viewport maxH="inherit" w="full">
+                <ScrollArea.Content>{children}</ScrollArea.Content>
+              </ScrollArea.Viewport>
+              <ScrollArea.Scrollbar>
+                <ScrollArea.Thumb />
+              </ScrollArea.Scrollbar>
+            </ScrollArea.Root>
+          ) : (
+            children
+          )}
         </Menu.Content>
       </Menu.Positioner>
     </Portal>
