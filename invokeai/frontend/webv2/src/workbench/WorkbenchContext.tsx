@@ -19,6 +19,7 @@ const getPersistedStateKey = (state: WorkbenchState): string =>
     account: state.account,
     activeProjectId: state.activeProjectId,
     errorLog: state.errorLog,
+    notifications: state.notifications,
     projects: state.projects,
     widgetFailures: state.widgetFailures,
   });
