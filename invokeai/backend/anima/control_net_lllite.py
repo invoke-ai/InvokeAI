@@ -525,7 +525,14 @@ class AnimaControlNetLLLite(nn.Module):
             m.bind(target)
 
     def restore(self) -> None:
-        """Undo :meth:`apply_to`. Safe to call when not applied."""
+        """Undo :meth:`apply_to`. Safe to call when not applied.
+
+        LIFO contract: each bind saves the forward that was CURRENT at bind
+        time, so when multiple adapters are stacked on one transformer they
+        must be restored in reverse apply order. Restoring an earlier adapter
+        first would delete a later adapter's wrapper and re-pin the earlier
+        one's saved forward.
+        """
         for m in self.lllite_modules:
             m.unbind()
 

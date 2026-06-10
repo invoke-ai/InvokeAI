@@ -1,6 +1,6 @@
 """Tests for the Anima ControlNet-LLLite adapter — construction from a saved
-state dict, exact-passthrough guarantees, forward-swap binding/restore, and the
-conditioning image preprocessing helpers."""
+state dict, exact-passthrough guarantees, forward-swap binding/restore,
+multi-adapter composition, and the conditioning image preprocessing helpers."""
 
 import os
 from pathlib import Path
@@ -10,6 +10,9 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
+from invokeai.app.invocations.anima_denoise import AnimaDenoiseInvocation
+from invokeai.app.invocations.anima_lllite import AnimaLLLiteField
+from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.backend.anima.control_net_lllite import (
     AnimaControlNetLLLite,
     build_inpaint_cond_image,
@@ -17,6 +20,7 @@ from invokeai.backend.anima.control_net_lllite import (
     prepare_mask,
     target_cond_hw,
 )
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
 # Opt-in test against the real adapter weights (anima-lllite-inpainting-v2.safetensors).
 _REAL_WEIGHTS_ENV_VAR = "ANIMA_LLLITE_WEIGHTS_PATH"
@@ -30,7 +34,7 @@ N_BLOCKS = 2
 KINDS = ("self_attn_q_proj", "self_attn_k_proj", "self_attn_v_proj", "mlp_layer1")
 
 
-def make_synthetic_state_dict(seed: int = 0) -> dict[str, torch.Tensor]:
+def make_synthetic_state_dict(seed: int = 0, mlp_dim: int = MLP_DIM) -> dict[str, torch.Tensor]:
     """Saved-format (v2 named-key) state dict for a tiny 2-block adapter with
     4-channel (inpaint) conditioning and one trunk resblock."""
     g = torch.Generator().manual_seed(seed)
@@ -68,13 +72,13 @@ def make_synthetic_state_dict(seed: int = 0) -> dict[str, torch.Tensor]:
     for i in range(N_BLOCKS):
         for kind in KINDS:
             p = f"lllite_dit_blocks_{i}_{kind}"
-            sd[f"{p}.down.weight"] = t(MLP_DIM, IN_DIM)
-            sd[f"{p}.down.bias"] = t(MLP_DIM)
-            sd[f"{p}.mid.weight"] = t(MLP_DIM, MLP_DIM + COND_EMB_DIM)
-            sd[f"{p}.mid.bias"] = t(MLP_DIM)
-            sd[f"{p}.cond_to_film.weight"] = t(2 * MLP_DIM, COND_EMB_DIM)
-            sd[f"{p}.cond_to_film.bias"] = t(2 * MLP_DIM)
-            sd[f"{p}.up.weight"] = t(IN_DIM, MLP_DIM)
+            sd[f"{p}.down.weight"] = t(mlp_dim, IN_DIM)
+            sd[f"{p}.down.bias"] = t(mlp_dim)
+            sd[f"{p}.mid.weight"] = t(mlp_dim, mlp_dim + COND_EMB_DIM)
+            sd[f"{p}.mid.bias"] = t(mlp_dim)
+            sd[f"{p}.cond_to_film.weight"] = t(2 * mlp_dim, COND_EMB_DIM)
+            sd[f"{p}.cond_to_film.bias"] = t(2 * mlp_dim)
+            sd[f"{p}.up.weight"] = t(IN_DIM, mlp_dim)
             sd[f"{p}.up.bias"] = t(IN_DIM)
             sd[f"{p}.depth_embed"] = t(COND_EMB_DIM)
     return sd
@@ -471,12 +475,188 @@ def test_forward_casts_mismatched_input_dtype() -> None:
 
 
 # ----------------------------------------------------------------------------
+# Multi-adapter composition (denoise applies in list order, restores LIFO)
+# ----------------------------------------------------------------------------
+
+
+class _IdentityCapture(nn.Linear):
+    """nn.Linear whose forward returns its input unchanged — binding a LLLite
+    module to it reads out the perturbed input the module passes to the
+    forward it wrapped."""
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x
+
+
+def make_two_adapters() -> tuple[AnimaControlNetLLLite, AnimaControlNetLLLite, FakeTransformer]:
+    """Two adapters with different mlp dims (8 and 16) plus one fake tree."""
+    model_a = AnimaControlNetLLLite.from_state_dict(make_synthetic_state_dict(seed=0, mlp_dim=8), None)
+    model_b = AnimaControlNetLLLite.from_state_dict(make_synthetic_state_dict(seed=1, mlp_dim=16), None)
+    torch.manual_seed(123)
+    transformer = FakeTransformer(IN_DIM, N_BLOCKS)
+    return model_a, model_b, transformer
+
+
+def cond_image_for(seed: int) -> torch.Tensor:
+    return torch.randn(1, 4, 32, 32, generator=torch.Generator().manual_seed(seed)).clamp(-1, 1)
+
+
+def test_two_adapters_chain_with_second_wrapping_first() -> None:
+    model_a, model_b, transformer = make_two_adapters()
+    assert model_a.mlp_dim != model_b.mlp_dim
+    q_proj = transformer.blocks[0].self_attn.q_proj
+    x = torch.randn(1, 4, IN_DIM, generator=torch.Generator().manual_seed(20))
+
+    model_a.set_multiplier(1.0)
+    model_a.set_cond_image(cond_image_for(30))
+    model_b.set_multiplier(1.0)
+    model_b.set_cond_image(cond_image_for(31))
+
+    # Capture x + delta_B(x): the input B hands to the forward it wrapped.
+    capture = _IdentityCapture(IN_DIM, IN_DIM, bias=False)
+    module_b = next(m for m in model_b.lllite_modules if m.lllite_name == "lllite_dit_blocks_0_self_attn_q_proj")
+    module_b.bind(capture)
+    try:
+        x_plus_delta_b = capture(x)
+    finally:
+        module_b.unbind()
+    assert not torch.equal(x_plus_delta_b, x)
+
+    model_a.apply_to(transformer)
+    expected = q_proj(x_plus_delta_b)  # A's wrapped forward on B's perturbed input
+
+    model_b.apply_to(transformer)  # B wraps A
+    assert torch.equal(q_proj(x), expected)
+
+    model_b.restore()
+    model_a.restore()
+
+
+def test_two_adapters_reverse_restore_returns_pristine_dispatch() -> None:
+    model_a, model_b, transformer = make_two_adapters()
+    x = torch.randn(1, 4, IN_DIM, generator=torch.Generator().manual_seed(21))
+
+    targets = [
+        linear
+        for block in transformer.blocks
+        for linear in (block.self_attn.q_proj, block.self_attn.k_proj, block.self_attn.v_proj, block.mlp.layer1)
+    ]
+    pre_outputs = [linear(x) for linear in targets]
+
+    for model, seed in ((model_a, 32), (model_b, 33)):
+        model.apply_to(transformer)
+        model.set_multiplier(1.0)
+        model.set_cond_image(cond_image_for(seed))
+    assert all("forward" in linear.__dict__ for linear in targets)
+
+    # LIFO: the last adapter applied is restored first.
+    model_b.restore()
+    model_a.restore()
+
+    for linear, expected in zip(targets, pre_outputs, strict=True):
+        assert "forward" not in linear.__dict__
+        assert torch.equal(linear(x), expected)
+
+
+def test_each_adapter_multiplier_gates_only_its_own_contribution() -> None:
+    model_a, model_b, transformer = make_two_adapters()
+    q_proj = transformer.blocks[0].self_attn.q_proj
+    x = torch.randn(1, 4, IN_DIM, generator=torch.Generator().manual_seed(22))
+    y_plain = plain_linear(q_proj, x)
+    cond_a = cond_image_for(34)
+    cond_b = cond_image_for(35)
+
+    # Single-adapter baselines.
+    model_a.apply_to(transformer)
+    model_a.set_multiplier(1.0)
+    model_a.set_cond_image(cond_a)
+    y_a_only = q_proj(x)
+    model_a.restore()
+
+    model_b.apply_to(transformer)
+    model_b.set_multiplier(1.0)
+    model_b.set_cond_image(cond_b)
+    y_b_only = q_proj(x)
+    model_b.restore()
+
+    assert not torch.equal(y_a_only, y_plain)
+    assert not torch.equal(y_b_only, y_plain)
+    assert not torch.equal(y_a_only, y_b_only)
+
+    # Both applied: zeroing one adapter's multiplier removes exactly its contribution.
+    model_a.apply_to(transformer)
+    model_b.apply_to(transformer)
+    model_a.set_cond_image(cond_a)
+    model_b.set_cond_image(cond_b)
+
+    model_a.set_multiplier(1.0)
+    model_b.set_multiplier(0.0)
+    assert torch.equal(q_proj(x), y_a_only)
+
+    model_a.set_multiplier(0.0)
+    model_b.set_multiplier(1.0)
+    assert torch.equal(q_proj(x), y_b_only)
+
+    model_a.set_multiplier(0.0)
+    model_b.set_multiplier(0.0)
+    assert torch.equal(q_proj(x), y_plain)
+
+    model_a.set_multiplier(1.0)
+    model_b.set_multiplier(1.0)
+    y_both = q_proj(x)
+    assert not torch.equal(y_both, y_a_only)
+    assert not torch.equal(y_both, y_b_only)
+
+    model_b.restore()
+    model_a.restore()
+
+
+# ----------------------------------------------------------------------------
+# Denoise input normalization (duplicate models share one cached instance)
+# ----------------------------------------------------------------------------
+
+
+def _lllite_field(key: str) -> AnimaLLLiteField:
+    return AnimaLLLiteField(
+        image_name="cond_image",
+        control_model=ModelIdentifierField(
+            key=key,
+            hash="blake3:0000",
+            name=f"adapter-{key}",
+            base=BaseModelType.Anima,
+            type=ModelType.ControlNet,
+        ),
+    )
+
+
+def test_normalize_control_lllite_to_list() -> None:
+    assert AnimaDenoiseInvocation._normalize_control_lllite(None) == []
+    single = _lllite_field("key-a")
+    assert AnimaDenoiseInvocation._normalize_control_lllite(single) == [single]
+    pair = [_lllite_field("key-a"), _lllite_field("key-b")]
+    assert AnimaDenoiseInvocation._normalize_control_lllite(pair) == pair
+
+
+def test_normalize_control_lllite_sorts_by_model_key() -> None:
+    """Apply order must be deterministic: collect-node input order follows random node ids."""
+    field_a = _lllite_field("key-a")
+    field_b = _lllite_field("key-b")
+    assert AnimaDenoiseInvocation._normalize_control_lllite([field_b, field_a]) == [field_a, field_b]
+
+
+def test_normalize_control_lllite_rejects_duplicate_model_keys() -> None:
+    pair = [_lllite_field("key-a"), _lllite_field("key-a")]
+    with pytest.raises(ValueError, match="used by more than one"):
+        AnimaDenoiseInvocation._normalize_control_lllite(pair)
+
+
+# ----------------------------------------------------------------------------
 # Real weight file (optional; skipped when the file is not present)
 # ----------------------------------------------------------------------------
 
 
 @pytest.mark.skipif(
-    REAL_WEIGHTS_PATH is None or not REAL_WEIGHTS_PATH.is_file(),
+    REAL_WEIGHTS_PATH is None,
     reason=f"set {_REAL_WEIGHTS_ENV_VAR} to the real LLLite weights file to run",
 )
 def test_from_state_dict_real_file() -> None:
@@ -484,6 +664,8 @@ def test_from_state_dict_real_file() -> None:
     from safetensors.torch import load_file
 
     assert REAL_WEIGHTS_PATH is not None
+    # A stale path must fail loudly, not silently skip.
+    assert REAL_WEIGHTS_PATH.is_file(), f"{_REAL_WEIGHTS_ENV_VAR} points to a missing file: {REAL_WEIGHTS_PATH}"
     sd = load_file(str(REAL_WEIGHTS_PATH))
     with safe_open(str(REAL_WEIGHTS_PATH), framework="pt") as f:
         metadata = f.metadata()
