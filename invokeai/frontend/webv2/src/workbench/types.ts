@@ -397,6 +397,7 @@ export interface WorkbenchPreferences {
   themeId: WorkbenchThemeId;
   reduceMotion: boolean;
   showFocusRegionHighlight: boolean;
+  confirmImageDeletion: boolean;
 }
 
 export interface AccountState {

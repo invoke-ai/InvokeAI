@@ -543,7 +543,12 @@ describe('workbench preferences', () => {
   it('defaults to the dark theme with motion enabled', () => {
     const state = createInitialWorkbenchState();
 
-    expect(state.account.preferences).toEqual({ reduceMotion: false, showFocusRegionHighlight: true, themeId: 'dark' });
+    expect(state.account.preferences).toEqual({
+      confirmImageDeletion: true,
+      reduceMotion: false,
+      showFocusRegionHighlight: true,
+      themeId: 'dark',
+    });
   });
 
   it('updates the theme without dropping other preferences', () => {
@@ -554,6 +559,7 @@ describe('workbench preferences', () => {
     state = workbenchReducer(state, { preferences: { themeId: 'forest' }, type: 'setPreferences' });
 
     expect(state.account.preferences).toEqual({
+      confirmImageDeletion: true,
       reduceMotion: true,
       showFocusRegionHighlight: false,
       themeId: 'forest',
@@ -579,7 +585,12 @@ describe('workbench preferences', () => {
 
     const state = workbenchReducer(initial, { state: legacy, type: 'hydrateWorkbench' });
 
-    expect(state.account.preferences).toEqual({ reduceMotion: false, showFocusRegionHighlight: true, themeId: 'dark' });
+    expect(state.account.preferences).toEqual({
+      confirmImageDeletion: true,
+      reduceMotion: false,
+      showFocusRegionHighlight: true,
+      themeId: 'dark',
+    });
   });
 
   it('heals hydrated state with an unsupported theme id', () => {
@@ -595,6 +606,7 @@ describe('workbench preferences', () => {
     const state = workbenchReducer(initial, { state: persisted, type: 'hydrateWorkbench' });
 
     expect(state.account.preferences).toEqual({
+      confirmImageDeletion: true,
       reduceMotion: true,
       showFocusRegionHighlight: false,
       themeId: 'dark',

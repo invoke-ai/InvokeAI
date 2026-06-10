@@ -6,6 +6,7 @@ import {
 } from './invocation';
 import { DEFAULT_THEME_ID, isWorkbenchThemeId } from '../theme/themes';
 import { compileGenerateGraph, resolveGenerateSeed } from './generation/graph';
+import type { GallerySettings } from './gallery/settings';
 import type { GenerateWidgetValues, MainModelConfig } from './generation/types';
 import { defaultLayoutPreset, getLayoutPreset } from './layoutPresets';
 import type {
@@ -68,10 +69,18 @@ type WorkbenchAction =
   | { type: 'toggleCanvasStagingVisibility' }
   | { type: 'toggleCanvasStagingThumbnailsVisibility' }
   | { type: 'selectGalleryImage'; image: GeneratedImageContract }
+  | { type: 'toggleGalleryImageInSelection'; image: GeneratedImageContract }
+  | { type: 'setGalleryMultiSelection'; imageNames: string[]; primaryImage: GeneratedImageContract }
+  | { type: 'setGalleryCompareImage'; image: GeneratedImageContract | null }
   | { type: 'selectGalleryBoard'; boardId: string }
   | { type: 'setGalleryView'; galleryView: 'images' | 'assets' }
   | { type: 'setGallerySearchTerm'; searchTerm: string }
-  | { type: 'setGalleryImageDensityPercent'; imageDensityPercent: number }
+  | { type: 'updateGallerySettings'; settings: Partial<GallerySettings> }
+  | { type: 'setGalleryPage'; page: number }
+  | { type: 'setGalleryPageInfo'; totalImages: number }
+  | { type: 'touchGalleryRefresh' }
+  | { type: 'removeGalleryImages'; imageNames: string[] }
+  | { type: 'setGalleryProjectBoardId'; boardId: string }
   | { type: 'acceptStagedImage' }
   | { type: 'clearCanvasStaging' }
   | { type: 'cancelQueueItem'; queueItemId: string }
@@ -86,7 +95,8 @@ type WorkbenchAction =
   | { type: 'clearErrorLog' }
   | { type: 'recordWidgetFailure'; failure: WidgetFailure }
   | { type: 'setPreferences'; preferences: Partial<WorkbenchPreferences> }
-  | { type: 'recordError'; message: string };
+  | { type: 'recordError'; message: string }
+  | { type: 'recordNotice'; kind: WorkbenchNotificationKind; title: string; message?: string };
 
 const HISTORY_LIMIT = 40;
 const INITIAL_PROJECT_COUNT = 3;
@@ -247,6 +257,14 @@ const cycleStagedImageIndex = (imageIndex: number, pendingImageCount: number, di
 
 const getGalleryImages = (values: Record<string, unknown>): GeneratedImageContract[] =>
   Array.isArray(values.recentImages) ? (values.recentImages as GeneratedImageContract[]) : [];
+
+const getGallerySelectedImageNames = (values: Record<string, unknown>): string[] => {
+  if (Array.isArray(values.selectedImageNames)) {
+    return (values.selectedImageNames as unknown[]).filter((name): name is string => typeof name === 'string');
+  }
+
+  return typeof values.selectedImageName === 'string' ? [values.selectedImageName] : [];
+};
 
 const cloneCanvas = (canvas: CanvasStateContract): CanvasStateContract => ({
   version: 1,
@@ -582,8 +600,12 @@ const normalizePreferences = (preferences?: Partial<WorkbenchPreferences>): Work
     typeof preferences?.showFocusRegionHighlight === 'boolean'
       ? preferences.showFocusRegionHighlight
       : DEFAULT_PREFERENCES.showFocusRegionHighlight;
+  const confirmImageDeletion =
+    typeof preferences?.confirmImageDeletion === 'boolean'
+      ? preferences.confirmImageDeletion
+      : DEFAULT_PREFERENCES.confirmImageDeletion;
 
-  return { reduceMotion, showFocusRegionHighlight, themeId };
+  return { confirmImageDeletion, reduceMotion, showFocusRegionHighlight, themeId };
 };
 
 const normalizeWorkbenchState = (state: WorkbenchState): WorkbenchState => ({
@@ -725,6 +747,21 @@ const updateProjectById = (
   ),
 });
 
+const updateGalleryValues = (
+  state: WorkbenchState,
+  getValues: (values: Record<string, unknown>) => Record<string, unknown>
+): WorkbenchState =>
+  updateActiveProject(state, (project) => ({
+    ...project,
+    widgetStates: {
+      ...project.widgetStates,
+      gallery: {
+        ...project.widgetStates.gallery,
+        values: getValues(project.widgetStates.gallery.values),
+      },
+    },
+  }));
+
 const updateQueueItem = (project: Project, queueItemId: string, getItem: (item: QueueItem) => QueueItem): Project => ({
   ...project,
   queue: {
@@ -758,6 +795,7 @@ const routeQueueItemResults = (project: Project, queueItemId: string, images: Ge
             recentImages: [...images, ...existingImages],
             selectedImage: images[0] ?? galleryValues.selectedImage,
             selectedImageName: images[0]?.imageName ?? nextProject.widgetStates.gallery.values.selectedImageName,
+            selectedImageNames: images[0] ? [images[0].imageName] : getGallerySelectedImageNames(galleryValues),
           },
         },
       },
@@ -848,6 +886,7 @@ const submitInvocationSnapshot = (
 };
 
 export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
+  confirmImageDeletion: true,
   reduceMotion: false,
   showFocusRegionHighlight: true,
   themeId: DEFAULT_THEME_ID,
@@ -1216,68 +1255,115 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       }));
     }
     case 'selectGalleryImage': {
-      return updateActiveProject(state, (project) => ({
-        ...project,
-        widgetStates: {
-          ...project.widgetStates,
-          gallery: {
-            ...project.widgetStates.gallery,
-            values: {
-              ...project.widgetStates.gallery.values,
-              selectedImage: action.image,
-              selectedImageName: action.image.imageName,
-            },
-          },
-        },
+      return updateGalleryValues(state, (values) => ({
+        ...values,
+        selectedImage: action.image,
+        selectedImageName: action.image.imageName,
+        selectedImageNames: [action.image.imageName],
       }));
     }
+    case 'toggleGalleryImageInSelection': {
+      return updateGalleryValues(state, (values) => {
+        const imageName = action.image.imageName;
+        const selectedImageNames = getGallerySelectedImageNames(values);
+
+        if (!selectedImageNames.includes(imageName)) {
+          return {
+            ...values,
+            selectedImage: action.image,
+            selectedImageName: imageName,
+            selectedImageNames: [...selectedImageNames, imageName],
+          };
+        }
+
+        const remainingImageNames = selectedImageNames.filter((name) => name !== imageName);
+        const wasPrimary = values.selectedImageName === imageName;
+
+        return {
+          ...values,
+          selectedImage: wasPrimary ? null : values.selectedImage,
+          selectedImageName: wasPrimary
+            ? (remainingImageNames[remainingImageNames.length - 1] ?? null)
+            : values.selectedImageName,
+          selectedImageNames: remainingImageNames,
+        };
+      });
+    }
+    case 'setGalleryMultiSelection': {
+      return updateGalleryValues(state, (values) => ({
+        ...values,
+        selectedImage: action.primaryImage,
+        selectedImageName: action.primaryImage.imageName,
+        selectedImageNames: action.imageNames,
+      }));
+    }
+    case 'setGalleryCompareImage': {
+      return updateGalleryValues(state, (values) => ({ ...values, compareImage: action.image }));
+    }
     case 'selectGalleryBoard': {
-      return updateActiveProject(state, (project) => ({
-        ...project,
-        widgetStates: {
-          ...project.widgetStates,
-          gallery: {
-            ...project.widgetStates.gallery,
-            values: { ...project.widgetStates.gallery.values, selectedBoardId: action.boardId },
-          },
-        },
+      return updateGalleryValues(state, (values) => ({
+        ...values,
+        galleryPage: 0,
+        selectedBoardId: action.boardId,
+        selectedImageNames: [],
       }));
     }
     case 'setGalleryView': {
-      return updateActiveProject(state, (project) => ({
-        ...project,
-        widgetStates: {
-          ...project.widgetStates,
-          gallery: {
-            ...project.widgetStates.gallery,
-            values: { ...project.widgetStates.gallery.values, galleryView: action.galleryView },
-          },
-        },
+      return updateGalleryValues(state, (values) => ({
+        ...values,
+        galleryPage: 0,
+        galleryView: action.galleryView,
+        selectedImageNames: [],
       }));
     }
     case 'setGallerySearchTerm': {
-      return updateActiveProject(state, (project) => ({
-        ...project,
-        widgetStates: {
-          ...project.widgetStates,
-          gallery: {
-            ...project.widgetStates.gallery,
-            values: { ...project.widgetStates.gallery.values, searchTerm: action.searchTerm },
-          },
-        },
+      return updateGalleryValues(state, (values) => ({
+        ...values,
+        galleryPage: 0,
+        searchTerm: action.searchTerm,
       }));
     }
-    case 'setGalleryImageDensityPercent': {
-      return updateActiveProject(state, (project) => ({
-        ...project,
-        widgetStates: {
-          ...project.widgetStates,
-          gallery: {
-            ...project.widgetStates.gallery,
-            values: { ...project.widgetStates.gallery.values, imageDensityPercent: action.imageDensityPercent },
-          },
-        },
+    case 'updateGallerySettings': {
+      const resetsQuery =
+        action.settings.imageOrderDir !== undefined ||
+        action.settings.starredFirst !== undefined ||
+        action.settings.paginationMode !== undefined;
+
+      return updateGalleryValues(state, (values) => ({
+        ...values,
+        ...action.settings,
+        ...(resetsQuery ? { galleryPage: 0 } : {}),
       }));
+    }
+    case 'setGalleryPage': {
+      return updateGalleryValues(state, (values) => ({ ...values, galleryPage: Math.max(0, action.page) }));
+    }
+    case 'setGalleryPageInfo': {
+      return updateGalleryValues(state, (values) => ({ ...values, galleryTotalImages: action.totalImages }));
+    }
+    case 'touchGalleryRefresh': {
+      return updateGalleryValues(state, (values) => ({ ...values, galleryRefreshToken: createId('gallery-refresh') }));
+    }
+    case 'removeGalleryImages': {
+      const removedImageNames = new Set(action.imageNames);
+
+      return updateGalleryValues(state, (values) => {
+        const selectedImage = values.selectedImage as GeneratedImageContract | null | undefined;
+        const compareImage = values.compareImage as GeneratedImageContract | null | undefined;
+        const selectedImageName = typeof values.selectedImageName === 'string' ? values.selectedImageName : null;
+
+        return {
+          ...values,
+          compareImage: compareImage && removedImageNames.has(compareImage.imageName) ? null : compareImage,
+          recentImages: getGalleryImages(values).filter((image) => !removedImageNames.has(image.imageName)),
+          selectedImage: selectedImage && removedImageNames.has(selectedImage.imageName) ? null : selectedImage,
+          selectedImageName: selectedImageName && removedImageNames.has(selectedImageName) ? null : selectedImageName,
+          selectedImageNames: getGallerySelectedImageNames(values).filter((name) => !removedImageNames.has(name)),
+        };
+      });
+    }
+    case 'setGalleryProjectBoardId': {
+      return updateGalleryValues(state, (values) => ({ ...values, projectBoardId: action.boardId }));
     }
     case 'toggleCanvasStagingVisibility': {
       return updateActiveProject(state, (project) => {
@@ -1522,6 +1608,12 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       return addNotification(
         { ...state, errorLog: [action.message, ...state.errorLog].slice(0, ERROR_LOG_LIMIT) },
         createNotification({ kind: 'error', message: action.message, title: 'Error' })
+      );
+    }
+    case 'recordNotice': {
+      return addNotification(
+        state,
+        createNotification({ kind: action.kind, message: action.message, title: action.title })
       );
     }
     case 'setPreferences': {
