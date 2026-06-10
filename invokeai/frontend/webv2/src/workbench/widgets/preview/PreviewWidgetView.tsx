@@ -1,7 +1,10 @@
-import { Badge, Box, Button, Flex, HStack, Stack, Text } from '@chakra-ui/react';
-import { useEffect, useMemo, useState } from 'react';
+import { Badge, Box, Flex, HStack, Stack, Text } from '@chakra-ui/react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
 
+import { ImageContextMenu, type ImageContextMenuTarget } from '../../components/ImageContextMenu';
+import { Button } from '../../components/ui/Button';
+import { useImageActions } from '../../components/useImageActions';
 import {
   listGalleryBoards,
   listGalleryImages,
@@ -9,15 +12,18 @@ import {
   type GalleryImage,
   type GalleryView,
 } from '../../gallery/api';
+import { getGallerySettings } from '../../gallery/settings';
 import type { GeneratedImageContract, WidgetViewProps } from '../../types';
 import { useWorkbench } from '../../WorkbenchContext';
+import { getGalleryCompareImage, getGalleryRecentImagesKey, getGalleryRefreshToken } from '../gallery/galleryStateView';
+import { PreviewCompare } from './PreviewCompare';
 
-type PreviewImage = GeneratedImageContract & Partial<Pick<GalleryImage, 'boardId' | 'imageCategory'>>;
+type PreviewImage = GeneratedImageContract & Partial<Pick<GalleryImage, 'boardId' | 'imageCategory' | 'starred'>>;
 
 const getImageAspectRatio = (image: GeneratedImageContract): number => image.width / image.height;
 
 const fallbackBoards: GalleryBoard[] = [
-  { assetCount: 0, id: 'none', imageCount: 0, isVirtual: true, name: 'Uncategorized' },
+  { archived: false, assetCount: 0, id: 'none', imageCount: 0, kind: 'uncategorized', name: 'Uncategorized' },
 ];
 
 const getGalleryImages = (values: Record<string, unknown>): PreviewImage[] =>
@@ -45,14 +51,20 @@ const getSelectedImage = (values: Record<string, unknown>): PreviewImage | null 
   return images.find((image) => image.imageName === selectedImageName) ?? images[0] ?? null;
 };
 
-const getImageBoardId = (image: PreviewImage, values: Record<string, unknown>): string => {
+/**
+ * The board used for the "N of M" index comes from the image itself, never
+ * from the gallery's currently selected board — switching boards or changing
+ * the board list sort must not reshuffle the preview. Freshly generated local
+ * images (no boardId yet) fall back to the gallery selection for display only.
+ */
+const getImageBoardId = (image: PreviewImage): string => (typeof image.boardId === 'string' ? image.boardId : 'none');
+
+const getDisplayBoardId = (image: PreviewImage, values: Record<string, unknown>): string => {
   if (typeof image.boardId === 'string') {
     return image.boardId;
   }
 
-  const selectedBoardId = typeof values.selectedBoardId === 'string' ? values.selectedBoardId : 'none';
-
-  return selectedBoardId;
+  return typeof values.selectedBoardId === 'string' ? values.selectedBoardId : 'none';
 };
 
 const getImageGalleryView = (image: PreviewImage): GalleryView => {
@@ -77,12 +89,17 @@ export const PreviewWidgetView = ({ region }: WidgetViewProps) => {
   const { activeProject, dispatch } = useWorkbench();
   const galleryValues = activeProject.widgetStates.gallery.values;
   const selectedImage = useMemo(() => getSelectedImage(galleryValues), [galleryValues]);
-  const selectedBoardId = selectedImage ? getImageBoardId(selectedImage, galleryValues) : 'none';
+  const compareImage = getGalleryCompareImage(galleryValues);
+  const recentImages = Array.isArray(galleryValues.recentImages) ? galleryValues.recentImages : null;
+  const localImages = useMemo(() => getGalleryImages({ recentImages }), [recentImages]);
+  const imageBoardId = selectedImage ? getImageBoardId(selectedImage) : 'none';
+  const displayBoardId = selectedImage ? getDisplayBoardId(selectedImage, galleryValues) : 'none';
   const selectedGalleryView = selectedImage ? getImageGalleryView(selectedImage) : 'images';
-  const localImages = useMemo(
-    () => getGalleryImages(galleryValues).filter((image) => image.boardId === selectedBoardId),
-    [galleryValues, selectedBoardId]
-  );
+  const hasSelectedImage = selectedImage !== null;
+  const isBackendImage = selectedImage ? shouldLoadBackendBoard(selectedImage) : false;
+  const { imageOrderDir, starredFirst } = getGallerySettings(galleryValues);
+  const refreshToken = getGalleryRefreshToken(galleryValues);
+  const recentImagesKey = getGalleryRecentImagesKey(galleryValues);
   const [boards, setBoards] = useState<GalleryBoard[]>(fallbackBoards);
   const [boardImages, setBoardImages] = useState<PreviewImage[]>(localImages);
   const [isLoadingBoard, setIsLoadingBoard] = useState(false);
@@ -90,16 +107,24 @@ export const PreviewWidgetView = ({ region }: WidgetViewProps) => {
   const selectedIndex = selectedImage
     ? boardImages.findIndex((image) => image.imageName === selectedImage.imageName)
     : -1;
-  const boardName = getBoardName(boards, selectedBoardId);
+  const boardName = getBoardName(boards, displayBoardId);
+  const selectedImageRef = useRef(selectedImage);
+  const boardImagesRef = useRef(boardImages);
 
+  selectedImageRef.current = selectedImage;
+  boardImagesRef.current = boardImages;
+
+  // Deliberately NOT keyed on the selected image object or the gallery's
+  // board selection/sort: the board context only refetches when the image's
+  // own board, the view, the image ordering, or backend contents change.
   useEffect(() => {
-    if (!selectedImage) {
+    if (!hasSelectedImage) {
       setBoardImages([]);
       setIsLoadingBoard(false);
       return;
     }
 
-    if (!shouldLoadBackendBoard(selectedImage)) {
+    if (!isBackendImage) {
       setBoardImages(localImages);
       setIsLoadingBoard(false);
       return;
@@ -110,20 +135,31 @@ export const PreviewWidgetView = ({ region }: WidgetViewProps) => {
     setIsLoadingBoard(true);
     Promise.all([
       listGalleryBoards().catch(() => fallbackBoards),
-      listGalleryImages({ boardId: selectedBoardId, galleryView: selectedGalleryView, searchTerm: '' }).catch(() => []),
+      listGalleryImages({
+        boardId: imageBoardId,
+        galleryView: selectedGalleryView,
+        orderDir: imageOrderDir,
+        searchTerm: '',
+        starredFirst,
+      }).catch(() => ({ images: [] as GalleryImage[], total: 0 })),
     ])
-      .then(([nextBoards, nextImages]) => {
+      .then(([nextBoards, nextImagesPage]) => {
         if (isStale) {
           return;
         }
 
+        const fallbackImage = selectedImageRef.current;
+
         setBoards(nextBoards);
-        setBoardImages(nextImages.length ? nextImages : [selectedImage]);
+        setBoardImages(nextImagesPage.images.length ? nextImagesPage.images : fallbackImage ? [fallbackImage] : []);
       })
       .catch((error: unknown) => {
         if (!isStale) {
           dispatch({ message: error instanceof Error ? error.message : String(error), type: 'recordError' });
-          setBoardImages([selectedImage]);
+
+          const fallbackImage = selectedImageRef.current;
+
+          setBoardImages(fallbackImage ? [fallbackImage] : []);
         }
       })
       .finally(() => {
@@ -135,7 +171,18 @@ export const PreviewWidgetView = ({ region }: WidgetViewProps) => {
     return () => {
       isStale = true;
     };
-  }, [dispatch, localImages, selectedBoardId, selectedGalleryView, selectedImage]);
+  }, [
+    dispatch,
+    hasSelectedImage,
+    imageBoardId,
+    imageOrderDir,
+    isBackendImage,
+    localImages,
+    recentImagesKey,
+    refreshToken,
+    selectedGalleryView,
+    starredFirst,
+  ]);
 
   const selectByOffset = (offset: -1 | 1) => {
     if (selectedIndex === -1) {
@@ -149,17 +196,89 @@ export const PreviewWidgetView = ({ region }: WidgetViewProps) => {
     }
   };
 
+  const [contextMenuTarget, setContextMenuTarget] = useState<ImageContextMenuTarget | null>(null);
+  const onImagesDeleted = useCallback(
+    (imageNames: string[]) => {
+      const deletedNames = new Set(imageNames);
+      const images = boardImagesRef.current;
+      const anchorName = selectedImageRef.current?.imageName ?? null;
+
+      if (!anchorName || !deletedNames.has(anchorName)) {
+        return;
+      }
+
+      const anchorIndex = images.findIndex((image) => image.imageName === anchorName);
+
+      if (anchorIndex === -1) {
+        return;
+      }
+
+      const remaining = images.filter((image) => !deletedNames.has(image.imageName));
+      const remainingBeforeAnchor = images
+        .slice(0, anchorIndex)
+        .filter((image) => !deletedNames.has(image.imageName)).length;
+      const nextImage = remaining[remainingBeforeAnchor] ?? remaining[remainingBeforeAnchor - 1] ?? null;
+
+      if (nextImage) {
+        dispatch({ image: nextImage, type: 'selectGalleryImage' });
+      }
+    },
+    [dispatch]
+  );
+  const imageActions = useImageActions({ boards, dispatch, onImagesDeleted });
+  const contextMenuImage = useMemo<GalleryImage | null>(() => {
+    if (!selectedImage) {
+      return null;
+    }
+
+    const boardImage = boardImages.find((image) => image.imageName === selectedImage.imageName);
+
+    return {
+      ...selectedImage,
+      boardId: boardImage?.boardId ?? displayBoardId,
+      imageCategory: boardImage?.imageCategory ?? selectedImage.imageCategory ?? 'general',
+      starred: boardImage?.starred ?? selectedImage.starred ?? false,
+    };
+  }, [boardImages, displayBoardId, selectedImage]);
+  const isComparing =
+    selectedImage !== null && compareImage !== null && compareImage.imageName !== selectedImage.imageName;
+
   return selectedImage ? (
-    <SelectedImagePreview
-      boardImageCount={boardImages.length}
-      boardName={boardName}
-      image={selectedImage}
-      isCompact={isSidePanel}
-      isLoadingBoard={isLoadingBoard}
-      selectedIndex={selectedIndex}
-      onNext={() => selectByOffset(1)}
-      onPrevious={() => selectByOffset(-1)}
-    />
+    <>
+      {isComparing && compareImage ? (
+        <PreviewCompare
+          baseImage={selectedImage}
+          compareImage={compareImage}
+          onExit={() => dispatch({ image: null, type: 'setGalleryCompareImage' })}
+          onSwap={() => {
+            dispatch({ image: compareImage, type: 'selectGalleryImage' });
+            dispatch({ image: selectedImage, type: 'setGalleryCompareImage' });
+          }}
+        />
+      ) : (
+        <SelectedImagePreview
+          boardImageCount={boardImages.length}
+          boardName={boardName}
+          image={selectedImage}
+          isCompact={isSidePanel}
+          isLoadingBoard={isLoadingBoard}
+          selectedIndex={selectedIndex}
+          onContextMenu={(x, y) => {
+            if (contextMenuImage) {
+              setContextMenuTarget({ images: [contextMenuImage], x, y });
+            }
+          }}
+          onNext={() => selectByOffset(1)}
+          onPrevious={() => selectByOffset(-1)}
+        />
+      )}
+      <ImageContextMenu
+        actions={imageActions}
+        boards={boards}
+        target={contextMenuTarget}
+        onClose={() => setContextMenuTarget(null)}
+      />
+    </>
   ) : (
     <EmptyPreview />
   );
@@ -172,6 +291,7 @@ const SelectedImagePreview = ({
   isCompact,
   isLoadingBoard,
   selectedIndex,
+  onContextMenu,
   onNext,
   onPrevious,
 }: {
@@ -181,6 +301,7 @@ const SelectedImagePreview = ({
   isCompact: boolean;
   isLoadingBoard: boolean;
   selectedIndex: number;
+  onContextMenu: (x: number, y: number) => void;
   onNext: () => void;
   onPrevious: () => void;
 }) => (
@@ -216,6 +337,10 @@ const SelectedImagePreview = ({
         position="relative"
         rounded="lg"
         w={isCompact ? 'full' : 'auto'}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          onContextMenu(event.clientX, event.clientY);
+        }}
       >
         <img
           alt={image.imageName}
