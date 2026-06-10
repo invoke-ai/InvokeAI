@@ -8,6 +8,7 @@ SDXL ControlNet-LLLite models (`lllite_unet_*`) and Z-Image Control adapters
 
 import os
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -59,13 +60,17 @@ Z_IMAGE_CONTROL_KEYS = [
 ]
 
 
-def _make_state_dict(keys: list[str]) -> dict[str, object]:
-    return dict.fromkeys(keys)
+def _make_state_dict(keys: list[str], conv1_in_channels: int = 3) -> dict[str, object]:
+    sd: dict[str, object] = dict.fromkeys(keys)
+    if "lllite_conditioning1.conv1.weight" in sd:
+        sd["lllite_conditioning1.conv1.weight"] = SimpleNamespace(shape=(160, conv1_in_channels, 4, 4))
+    return sd
 
 
-def _make_mod(state_dict: dict[str, object]) -> MagicMock:
+def _make_mod(state_dict: dict[str, object], metadata: dict[str, str] | None = None) -> MagicMock:
     mod = MagicMock()
     mod.load_state_dict.return_value = state_dict
+    mod.metadata.return_value = metadata or {}
     return mod
 
 
@@ -117,8 +122,60 @@ class TestAnimaControlNetConfigProbe:
             ControlNet_Checkpoint_Anima_Config.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
 
 
+class TestCondInChannels:
+    """Tests for the cond_in_channels field (metadata, conv1-shape fallback, old-JSON rehydration)."""
+
+    def test_populated_from_metadata(self):
+        mod = _make_mod(
+            _make_state_dict(ANIMA_LLLITE_KEYS, conv1_in_channels=3),
+            metadata={"lllite.cond_in_channels": "4"},
+        )
+
+        config = ControlNet_Checkpoint_Anima_Config.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
+
+        assert config.cond_in_channels == 4
+
+    def test_fallback_to_conv1_shape_when_metadata_absent(self):
+        mod = _make_mod(_make_state_dict(ANIMA_LLLITE_KEYS, conv1_in_channels=4))
+
+        config = ControlNet_Checkpoint_Anima_Config.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
+
+        assert config.cond_in_channels == 4
+
+    def test_old_json_rehydrates_with_none(self):
+        """Configs stored before the field existed must still validate, with cond_in_channels=None."""
+        mod = _make_mod(_make_state_dict(ANIMA_LLLITE_KEYS))
+        config = ControlNet_Checkpoint_Anima_Config.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
+        assert config.cond_in_channels == 3
+
+        stored = config.model_dump(mode="json")
+        del stored["cond_in_channels"]
+        rehydrated = ControlNet_Checkpoint_Anima_Config.model_validate(stored)
+
+        assert rehydrated.cond_in_channels is None
+
+    def test_override_skips_probe(self):
+        """An explicit override must win without probing the state dict (which may be unprobeable)."""
+        keys = [k for k in ANIMA_LLLITE_KEYS if k != "lllite_conditioning1.conv1.weight"]
+        mod = _make_mod(_make_state_dict(keys))
+
+        config = ControlNet_Checkpoint_Anima_Config.from_model_on_disk(
+            mod, dict(_OVERRIDE_FIELDS) | {"cond_in_channels": 4}
+        )
+
+        assert config.cond_in_channels == 4
+
+    def test_missing_conv1_without_metadata_is_not_a_match(self):
+        """A malformed file with LLLite keys but no conv1.weight must raise NotAMatchError, not KeyError."""
+        keys = [k for k in ANIMA_LLLITE_KEYS if k != "lllite_conditioning1.conv1.weight"]
+        mod = _make_mod(_make_state_dict(keys))
+
+        with pytest.raises(NotAMatchError, match="no lllite_conditioning1.conv1.weight"):
+            ControlNet_Checkpoint_Anima_Config.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
+
+
 @pytest.mark.skipif(
-    REAL_WEIGHTS_PATH is None or not REAL_WEIGHTS_PATH.is_file(),
+    REAL_WEIGHTS_PATH is None,
     reason=f"set {_REAL_WEIGHTS_ENV_VAR} to the real LLLite weights file to run",
 )
 def test_real_file_classifies_as_anima_controlnet():
@@ -126,8 +183,11 @@ def test_real_file_classifies_as_anima_controlnet():
     from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
 
     assert REAL_WEIGHTS_PATH is not None
+    # A stale path must fail loudly, not silently skip.
+    assert REAL_WEIGHTS_PATH.is_file(), f"{_REAL_WEIGHTS_ENV_VAR} points to a missing file: {REAL_WEIGHTS_PATH}"
     result = ModelConfigFactory.from_model_on_disk(REAL_WEIGHTS_PATH, allow_unknown=False)
 
     assert result.config is not None
     assert isinstance(result.config, ControlNet_Checkpoint_Anima_Config)
     assert result.match_count == 1
+    assert result.config.cond_in_channels == 4

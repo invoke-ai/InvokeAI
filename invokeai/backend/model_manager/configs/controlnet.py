@@ -304,6 +304,11 @@ class ControlNet_Checkpoint_Anima_Config(Checkpoint_Config_Base, Config_Base):
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
     base: Literal[BaseModelType.Anima] = Field(default=BaseModelType.Anima)
     default_settings: ControlAdapterDefaultSettings | None = Field(None)
+    cond_in_channels: int | None = Field(
+        default=None,
+        description="Number of conditioning image channels (3 = RGB control image, 4 = RGB + inpaint mask). None for "
+        "models installed before this field was recorded.",
+    )
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -313,7 +318,22 @@ class ControlNet_Checkpoint_Anima_Config(Checkpoint_Config_Base, Config_Base):
 
         cls._validate_looks_like_anima_lllite(mod)
 
-        return cls(**override_fields)
+        args = dict(override_fields)
+        if "cond_in_channels" not in args:
+            args["cond_in_channels"] = cls._get_cond_in_channels(mod)
+        return cls(**args)
+
+    @classmethod
+    def _get_cond_in_channels(cls, mod: ModelOnDisk) -> int:
+        # Mirrors AnimaControlNetLLLite.from_state_dict: prefer the saved `lllite.*` hyperparam, falling back to
+        # the conv1 weight shape (ch_half, cond_in_channels, 4, 4).
+        meta_value = mod.metadata().get("lllite.cond_in_channels")
+        if meta_value is not None:
+            return int(meta_value)
+        conv1_weight = mod.load_state_dict().get("lllite_conditioning1.conv1.weight")
+        if conv1_weight is None:
+            raise NotAMatchError("state dict has Anima ControlNet-LLLite keys but no lllite_conditioning1.conv1.weight")
+        return int(conv1_weight.shape[1])
 
     @classmethod
     def _validate_looks_like_anima_lllite(cls, mod: ModelOnDisk) -> None:

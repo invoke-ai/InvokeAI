@@ -1581,6 +1581,51 @@ anima_lllite_inpainting = StarterModel(
     type=ModelType.ControlNet,
     format=ModelFormat.Checkpoint,
 )
+
+anima_lllite_sketch = StarterModel(
+    name="Anima LLLite Sketch",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-any-test-like-v2.safetensors",
+    description="ControlNet-LLLite control adapter for Anima by kohya-ss. Trained on mixed scribble/HED/lineart/grayscale conditioning images. ~16MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_lllite_depth_preview3 = StarterModel(
+    name="Anima LLLite Depth (Preview3)",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-depth-1.safetensors",
+    description="ControlNet-LLLite depth adapter for Anima by kohya-ss. Trained on the Preview3 build; reduced quality on Anima Base 1.0. ~8MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_lllite_scribble_preview3 = StarterModel(
+    name="Anima LLLite Scribble (Preview3)",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-scribble-1.safetensors",
+    description="ControlNet-LLLite scribble adapter for Anima by kohya-ss. Trained on the Preview3 build; reduced quality on Anima Base 1.0. ~8MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_lllite_lineart_preview3 = StarterModel(
+    name="Anima LLLite Lineart (Preview3)",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-lineart-1.safetensors",
+    description="ControlNet-LLLite lineart adapter for Anima by kohya-ss. Trained on the Preview3 build; reduced quality on Anima Base 1.0. ~8MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_lllite_pose_preview3 = StarterModel(
+    name="Anima LLLite Pose (Preview3)",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-pose-1.safetensors",
+    description="ControlNet-LLLite pose adapter for Anima by kohya-ss. Trained on the Preview3 build; notably weak on Anima Base 1.0. ~23MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
 # endregion
 
 # List of starter models, displayed on the frontend.
@@ -1720,6 +1765,11 @@ STARTER_MODELS: list[StarterModel] = [
     anima_qwen3_encoder,
     anima_vae,
     anima_lllite_inpainting,
+    anima_lllite_sketch,
+    anima_lllite_depth_preview3,
+    anima_lllite_scribble_preview3,
+    anima_lllite_lineart_preview3,
+    anima_lllite_pose_preview3,
 ]
 
 sd1_bundle: list[StarterModel] = [
@@ -1808,6 +1858,7 @@ anima_bundle: list[StarterModel] = [
     anima_qwen3_encoder,
     anima_vae,
     anima_lllite_inpainting,
+    anima_lllite_sketch,
 ]
 
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {
