@@ -39,6 +39,8 @@ type AddInpaintArg = {
   vaeSource: Invocation<VaeSourceNodes | MainModelLoaderNodes>;
   modelLoader: Invocation<MainModelLoaderNodes>;
   seed: Invocation<'integer'>;
+  // Collect node that fans LLLite adapters into denoise.control_lllite (Anima only)
+  controlLLLiteCollect?: Invocation<'collect'> | null;
 };
 
 export const addInpaint = async ({
@@ -52,6 +54,7 @@ export const addInpaint = async ({
   vaeSource,
   modelLoader,
   seed,
+  controlLLLiteCollect,
 }: AddInpaintArg): Promise<Invocation<'invokeai_img_blend' | 'apply_mask_to_image'>> => {
   const { denoising_start, denoising_end } = getDenoisingStartAndEnd(state);
   denoise.denoising_start = denoising_start;
@@ -198,6 +201,7 @@ export const addInpaint = async ({
     g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
 
     if (denoise.type === 'anima_denoise' && params.animaLLLiteModel) {
+      assert(controlLLLiteCollect, 'A control_lllite collect node is required for the Anima inpaint adapter');
       // The canvas denoise-limit composite is white = keep / black = inpaint, but the LLLite
       // adapter expects white = inpaint — invert before wiring.
       const invertAnimaLLLiteMask = g.addNode({
@@ -215,7 +219,7 @@ export const addInpaint = async ({
       });
       g.addEdge(resizeImageToScaledSize, 'image', animaLLLite, 'image');
       g.addEdge(invertAnimaLLLiteMask, 'image', animaLLLite, 'mask');
-      g.addEdge(animaLLLite, 'control', denoise, 'control_lllite');
+      g.addEdge(animaLLLite, 'control', controlLLLiteCollect, 'item');
     }
 
     // After denoising, resize the image and mask back to original size
@@ -291,6 +295,7 @@ export const addInpaint = async ({
     g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
 
     if (denoise.type === 'anima_denoise' && params.animaLLLiteModel) {
+      assert(controlLLLiteCollect, 'A control_lllite collect node is required for the Anima inpaint adapter');
       // The canvas denoise-limit composite is white = keep / black = inpaint, but the LLLite
       // adapter expects white = inpaint — invert before wiring.
       const invertAnimaLLLiteMask = g.addNode({
@@ -308,7 +313,7 @@ export const addInpaint = async ({
         weight: params.animaLLLiteWeight,
       });
       g.addEdge(invertAnimaLLLiteMask, 'image', animaLLLite, 'mask');
-      g.addEdge(animaLLLite, 'control', denoise, 'control_lllite');
+      g.addEdge(animaLLLite, 'control', controlLLLiteCollect, 'item');
     }
 
     const expandMask = g.addNode({

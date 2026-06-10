@@ -32,6 +32,8 @@ type AddOutpaintArg = {
   vaeSource: Invocation<VaeSourceNodes | MainModelLoaderNodes>;
   modelLoader: Invocation<MainModelLoaderNodes>;
   seed: Invocation<'integer'>;
+  // Collect node that fans LLLite adapters into denoise.control_lllite (Anima only)
+  controlLLLiteCollect?: Invocation<'collect'> | null;
 };
 
 export const addOutpaint = async ({
@@ -45,6 +47,7 @@ export const addOutpaint = async ({
   vaeSource,
   modelLoader,
   seed,
+  controlLLLiteCollect,
 }: AddOutpaintArg): Promise<Invocation<'invokeai_img_blend' | 'apply_mask_to_image'>> => {
   const { denoising_start, denoising_end } = getDenoisingStartAndEnd(state);
   denoise.denoising_start = denoising_start;
@@ -165,6 +168,7 @@ export const addOutpaint = async ({
     g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
 
     if (denoise.type === 'anima_denoise' && params.animaLLLiteModel) {
+      assert(controlLLLiteCollect, 'A control_lllite collect node is required for the Anima inpaint adapter');
       // The combined canvas mask is white = keep / black = region-to-generate, but the LLLite
       // adapter expects white = inpaint — invert before wiring.
       const invertAnimaLLLiteMask = g.addNode({
@@ -182,7 +186,7 @@ export const addOutpaint = async ({
       });
       g.addEdge(infill, 'image', animaLLLite, 'image');
       g.addEdge(invertAnimaLLLiteMask, 'image', animaLLLite, 'mask');
-      g.addEdge(animaLLLite, 'control', denoise, 'control_lllite');
+      g.addEdge(animaLLLite, 'control', controlLLLiteCollect, 'item');
     }
 
     // If we have a noise mask, apply it to the input image before i2l conversion
@@ -313,6 +317,7 @@ export const addOutpaint = async ({
     g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
 
     if (denoise.type === 'anima_denoise' && params.animaLLLiteModel) {
+      assert(controlLLLiteCollect, 'A control_lllite collect node is required for the Anima inpaint adapter');
       // The combined canvas mask is white = keep / black = region-to-generate, but the LLLite
       // adapter expects white = inpaint — invert before wiring.
       const invertAnimaLLLiteMask = g.addNode({
@@ -330,7 +335,7 @@ export const addOutpaint = async ({
       });
       g.addEdge(infill, 'image', animaLLLite, 'image');
       g.addEdge(invertAnimaLLLiteMask, 'image', animaLLLite, 'mask');
-      g.addEdge(animaLLLite, 'control', denoise, 'control_lllite');
+      g.addEdge(animaLLLite, 'control', controlLLLiteCollect, 'item');
     }
 
     const expandMask = g.addNode({

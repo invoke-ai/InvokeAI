@@ -3182,10 +3182,11 @@ export type components = {
              */
             seed?: number;
             /**
-             * @description Anima ControlNet-LLLite conditioning (e.g. inpaint adapter).
+             * Control Lllite
+             * @description Anima ControlNet-LLLite conditioning (e.g. inpaint adapter, control layers). Adapters are applied in a deterministic order (sorted by model key); each model may be used at most once.
              * @default null
              */
-            control_lllite?: components["schemas"]["AnimaLLLiteField"] | null;
+            control_lllite?: components["schemas"]["AnimaLLLiteField"] | components["schemas"]["AnimaLLLiteField"][] | null;
             /**
              * Scheduler
              * @description Scheduler (sampler) for the denoising process.
@@ -7002,6 +7003,11 @@ export type components = {
              */
             base: "anima";
             default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
+            /**
+             * Cond In Channels
+             * @description Number of conditioning image channels (3 = RGB control image, 4 = RGB + inpaint mask). None for models installed before this field was recorded.
+             */
+            cond_in_channels: number | null;
         };
         /** ControlNet_Checkpoint_FLUX_Config */
         ControlNet_Checkpoint_FLUX_Config: {

@@ -24,7 +24,7 @@ import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  useAnimaControlNetModels,
+  useAnimaInpaintControlNetModels,
   useAnimaQwen3EncoderModels,
   useAnimaVAEModels,
 } from 'services/api/hooks/modelsByType';
@@ -125,7 +125,7 @@ const ParamAnimaLLLiteModelSelect = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const animaLLLiteModel = useAppSelector(selectAnimaLLLiteModel);
-  const [modelConfigs, { isLoading }] = useAnimaControlNetModels();
+  const [modelConfigs, { isLoading }] = useAnimaInpaintControlNetModels();
 
   const _onChange = useCallback(
     (model: ControlNetModelConfig | null) => {

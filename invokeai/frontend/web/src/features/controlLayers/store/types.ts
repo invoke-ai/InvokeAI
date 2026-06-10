@@ -530,6 +530,14 @@ const zZImageControlConfig = z.object({
 });
 export type ZImageControlConfig = z.infer<typeof zZImageControlConfig>;
 
+const zAnimaLLLiteConfig = z.object({
+  type: z.literal('anima_lllite'),
+  model: zModelIdentifierField.nullable(),
+  weight: z.number().gte(0).lte(2),
+  beginEndStepPct: zBeginEndStepPct,
+});
+export type AnimaLLLiteConfig = z.infer<typeof zAnimaLLLiteConfig>;
+
 /**
  * All simple params normalized to `[-1, 1]` except sharpness `[0, 1]`.
  *
@@ -652,6 +660,7 @@ const zCanvasControlLayerState = zCanvasRasterLayerState.extend({
     zT2IAdapterConfig,
     zControlLoRAConfig,
     zZImageControlConfig,
+    zAnimaLLLiteConfig,
   ]),
 });
 export type CanvasControlLayerState = z.infer<typeof zCanvasControlLayerState>;
