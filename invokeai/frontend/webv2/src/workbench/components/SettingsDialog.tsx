@@ -1,13 +1,10 @@
 import {
   Box,
-  Button,
   chakra,
-  CloseButton,
   Dialog,
   Flex,
   HStack,
   Icon,
-  IconButton,
   Portal,
   SimpleGrid,
   Stack,
@@ -23,6 +20,7 @@ import { THEMES, type ThemeDefinition } from '../../theme/system';
 import { localStorageWorkbenchPersistence } from '../persistence';
 import type { WorkbenchThemeId } from '../types';
 import { useWorkbench } from '../WorkbenchContext';
+import { Button, CloseButton, IconButton } from './ui/Button';
 
 /**
  * Settings entry point: a self-contained gear button that owns its own dialog
@@ -58,6 +56,7 @@ const SettingsDialogContent = () => (
         <Dialog.Body>
           <Stack gap="7" py="2">
             <AppearanceSection />
+            <BehaviorSection />
             <WorkspaceSection />
           </Stack>
         </Dialog.Body>
@@ -188,6 +187,22 @@ const SettingToggle = ({
     </Switch.Control>
   </Switch.Root>
 );
+
+const BehaviorSection = () => {
+  const { dispatch, state } = useWorkbench();
+  const { confirmImageDeletion } = state.account.preferences;
+
+  return (
+    <SettingsSection description="Safety checks and interaction behavior." title="Behavior">
+      <SettingToggle
+        checked={confirmImageDeletion}
+        description="Ask for confirmation before permanently deleting images."
+        label="Confirm image deletion"
+        onChange={(checked) => dispatch({ preferences: { confirmImageDeletion: checked }, type: 'setPreferences' })}
+      />
+    </SettingsSection>
+  );
+};
 
 const WorkspaceSection = () => {
   const { dispatch } = useWorkbench();

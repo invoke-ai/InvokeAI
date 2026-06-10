@@ -1,0 +1,427 @@
+import { Dialog, HStack, Icon, Menu, Portal, ScrollArea, Text } from '@chakra-ui/react';
+import { useRef, useState, type ComponentType, type ReactNode } from 'react';
+import {
+  PiArrowSquareOutBold,
+  PiArrowsCounterClockwiseBold,
+  PiAsteriskBold,
+  PiCaretRightBold,
+  PiCopyBold,
+  PiDownloadSimpleBold,
+  PiEyeBold,
+  PiFileImageBold,
+  PiFlowArrowBold,
+  PiFoldersBold,
+  PiFrameCornersBold,
+  PiImageSquareBold,
+  PiImagesBold,
+  PiPlantBold,
+  PiQuotesBold,
+  PiStackBold,
+  PiStarBold,
+  PiStarFill,
+  PiTextAaBold,
+  PiTrashSimpleBold,
+} from 'react-icons/pi';
+
+import type { GalleryBoard, GalleryImage } from '../gallery/api';
+import { Button } from './ui/Button';
+import { Tooltip } from './ui/Tooltip';
+import { useWorkbench } from '../WorkbenchContext';
+import type { ImageActions } from './useImageActions';
+
+export interface ImageContextMenuTarget {
+  /** Right-clicked image first; more entries switch the menu into bulk mode. */
+  images: GalleryImage[];
+  x: number;
+  y: number;
+}
+
+const MENU_CONTENT_PROPS = {
+  bg: 'bg.surfaceRaised',
+  borderColor: 'border.emphasis',
+  borderWidth: '1px',
+  color: 'fg.default',
+  minW: '13rem',
+  overflow: 'hidden',
+  p: '0',
+  rounded: 'lg',
+  shadow: 'lg',
+} as const;
+
+/**
+ * Shared right-click menu for backend images, usable from any widget (gallery
+ * grid, preview, ...). Anchored to the cursor through a virtual rect, so it
+ * needs no trigger element — set `target` to open it.
+ */
+export const ImageContextMenu = ({
+  actions,
+  boards,
+  target,
+  onClose,
+}: {
+  actions: ImageActions;
+  boards: GalleryBoard[];
+  target: ImageContextMenuTarget | null;
+  onClose: () => void;
+}) => {
+  const { state } = useWorkbench();
+  const confirmImageDeletion = state.account.preferences.confirmImageDeletion;
+  const [pendingDeletion, setPendingDeletion] = useState<string[] | null>(null);
+  const targetRef = useRef(target);
+
+  targetRef.current = target;
+
+  const images = target?.images ?? [];
+  const image = images[0] ?? null;
+  const isBulk = images.length > 1;
+  const imageNames = images.map((candidate) => candidate.imageName);
+
+  const requestDeletion = (names: string[]) => {
+    if (confirmImageDeletion) {
+      setPendingDeletion(names);
+    } else {
+      void actions.deleteImages(names);
+    }
+  };
+
+  return (
+    <>
+      <Menu.Root
+        key={target ? `${image?.imageName ?? 'none'}:${images.length}` : 'closed'}
+        lazyMount
+        open={target !== null}
+        positioning={{
+          getAnchorRect: () => {
+            const currentTarget = targetRef.current;
+
+            return currentTarget ? { height: 1, width: 1, x: currentTarget.x, y: currentTarget.y } : null;
+          },
+          placement: 'bottom-start',
+        }}
+        unmountOnExit
+        onOpenChange={(event) => {
+          if (!event.open) {
+            onClose();
+          }
+        }}
+      >
+        <Portal>
+          <Menu.Positioner>
+            {image && (
+              <Menu.Content {...MENU_CONTENT_PROPS} minW="16rem">
+                <ScrollArea.Root maxH="min(28rem, calc(100vh - 2rem))" size="xs" variant="hover" w="full">
+                  <ScrollArea.Viewport maxH="inherit" w="full">
+                    <ScrollArea.Content py="1">
+                      {isBulk ? (
+                        <BulkMenuItems
+                          actions={actions}
+                          boards={boards}
+                          imageNames={imageNames}
+                          images={images}
+                          onRequestDeletion={requestDeletion}
+                        />
+                      ) : (
+                        <SingleImageMenuItems
+                          actions={actions}
+                          boards={boards}
+                          image={image}
+                          onRequestDeletion={requestDeletion}
+                        />
+                      )}
+                    </ScrollArea.Content>
+                  </ScrollArea.Viewport>
+                  <ScrollArea.Scrollbar>
+                    <ScrollArea.Thumb />
+                  </ScrollArea.Scrollbar>
+                </ScrollArea.Root>
+              </Menu.Content>
+            )}
+          </Menu.Positioner>
+        </Portal>
+      </Menu.Root>
+      <Dialog.Root
+        open={pendingDeletion !== null}
+        role="alertdialog"
+        onOpenChange={(event) => {
+          if (!event.open) {
+            setPendingDeletion(null);
+          }
+        }}
+      >
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content bg="bg.surfaceRaised" borderColor="border.emphasis" borderWidth="1px" color="fg.default">
+              <Dialog.Header>
+                <Dialog.Title fontSize="sm">
+                  {pendingDeletion && pendingDeletion.length > 1
+                    ? `Delete ${pendingDeletion.length} images?`
+                    : 'Delete image?'}
+                </Dialog.Title>
+              </Dialog.Header>
+              <Dialog.Body>
+                <Text color="fg.subtle" fontSize="xs">
+                  This permanently deletes{' '}
+                  {pendingDeletion && pendingDeletion.length > 1 ? 'these images' : 'the image'} from every board and
+                  from disk. This cannot be undone. You can disable this confirmation in Settings.
+                </Text>
+              </Dialog.Body>
+              <Dialog.Footer gap="2">
+                <Button size="xs" variant="outline" onClick={() => setPendingDeletion(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  colorPalette="red"
+                  size="xs"
+                  onClick={() => {
+                    if (pendingDeletion) {
+                      void actions.deleteImages(pendingDeletion);
+                    }
+
+                    setPendingDeletion(null);
+                  }}
+                >
+                  Delete
+                </Button>
+              </Dialog.Footer>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
+    </>
+  );
+};
+
+const SingleImageMenuItems = ({
+  actions,
+  boards,
+  image,
+  onRequestDeletion,
+}: {
+  actions: ImageActions;
+  boards: GalleryBoard[];
+  image: GalleryImage;
+  onRequestDeletion: (imageNames: string[]) => void;
+}) => (
+  <>
+    <HStack gap="1" px="1">
+      <QuickMenuItem
+        icon={PiArrowSquareOutBold}
+        label="Open in new tab"
+        value="open-in-new-tab"
+        onClick={() => window.open(image.imageUrl, '_blank', 'noopener')}
+      />
+      <QuickMenuItem
+        icon={PiCopyBold}
+        label="Copy to clipboard"
+        value="copy-to-clipboard"
+        onClick={() => void actions.copyImage(image)}
+      />
+      <QuickMenuItem
+        icon={PiDownloadSimpleBold}
+        label="Download image"
+        value="download-image"
+        onClick={() => void actions.downloadImage(image)}
+      />
+      <QuickMenuItem
+        icon={PiEyeBold}
+        label="Open in preview"
+        value="open-in-preview"
+        onClick={() => actions.openImageInPreview(image)}
+      />
+      <QuickMenuItem
+        icon={image.starred ? PiStarFill : PiStarBold}
+        label={image.starred ? 'Unstar image' : 'Star image'}
+        value="toggle-starred"
+        onClick={() => void actions.setImagesStarred([image.imageName], !image.starred)}
+      />
+    </HStack>
+    <Menu.Separator borderColor="border.subtle" />
+    <ContextMenuItem disabled icon={PiFlowArrowBold} label="Load Workflow" value="load-workflow" />
+    <ContextSubMenu icon={PiAsteriskBold} label="Recall Metadata">
+      <ContextMenuItem disabled icon={PiAsteriskBold} label="Recall All" value="recall-all" />
+      <ContextMenuItem disabled icon={PiArrowsCounterClockwiseBold} label="Remix Image" value="remix" />
+      <ContextMenuItem disabled icon={PiQuotesBold} label="Use Prompt" value="use-prompt" />
+      <ContextMenuItem disabled icon={PiPlantBold} label="Use Seed" value="use-seed" />
+    </ContextSubMenu>
+    <Menu.Separator borderColor="border.subtle" />
+    <ContextMenuItem disabled icon={PiFrameCornersBold} label="Send to Upscale" value="send-to-upscale" />
+    <ContextMenuItem disabled icon={PiImageSquareBold} label="Use as Reference Image" value="use-as-reference-image" />
+    <ContextMenuItem disabled icon={PiTextAaBold} label="Use as Prompt Template" value="use-as-prompt-template" />
+    <ContextMenuItem
+      icon={PiImagesBold}
+      label="Select for Compare"
+      value="select-for-compare"
+      onClick={() => actions.selectForCompare(image)}
+    />
+    <Menu.Separator borderColor="border.subtle" />
+    <ContextSubMenu icon={PiFileImageBold} label="New from Image">
+      <ContextMenuItem disabled icon={PiFileImageBold} label="New Canvas from Image" value="new-canvas-from-image" />
+      <ContextMenuItem disabled icon={PiStackBold} label="New Layer from Image" value="new-layer-from-image" />
+    </ContextSubMenu>
+    <ChangeBoardSubMenu
+      boards={boards}
+      currentBoardId={image.boardId}
+      onMove={(boardId) => void actions.moveImagesToBoard([image.imageName], boardId)}
+    />
+    <Menu.Separator borderColor="border.subtle" />
+    <ContextMenuItem
+      color="fg.error"
+      icon={PiTrashSimpleBold}
+      label="Delete Image"
+      value="delete-image"
+      onClick={() => onRequestDeletion([image.imageName])}
+    />
+  </>
+);
+
+const BulkMenuItems = ({
+  actions,
+  boards,
+  imageNames,
+  images,
+  onRequestDeletion,
+}: {
+  actions: ImageActions;
+  boards: GalleryBoard[];
+  imageNames: string[];
+  images: GalleryImage[];
+  onRequestDeletion: (imageNames: string[]) => void;
+}) => {
+  const allStarred = images.every((image) => image.starred);
+
+  return (
+    <>
+      <Text color="fg.subtle" fontSize="2xs" fontWeight="700" px="3" py="1.5" textTransform="uppercase">
+        {images.length} images selected
+      </Text>
+      <Menu.Separator borderColor="border.subtle" />
+      <ContextMenuItem
+        icon={allStarred ? PiStarFill : PiStarBold}
+        label={allStarred ? 'Unstar All' : 'Star All'}
+        value="toggle-starred-all"
+        onClick={() => void actions.setImagesStarred(imageNames, !allStarred)}
+      />
+      <ContextMenuItem
+        icon={PiDownloadSimpleBold}
+        label="Download Selection"
+        value="download-selection"
+        onClick={() => void actions.downloadImages(imageNames)}
+      />
+      <ChangeBoardSubMenu
+        boards={boards}
+        currentBoardId={null}
+        onMove={(boardId) => void actions.moveImagesToBoard(imageNames, boardId)}
+      />
+      <Menu.Separator borderColor="border.subtle" />
+      <ContextMenuItem
+        color="fg.error"
+        icon={PiTrashSimpleBold}
+        label="Delete Selection"
+        value="delete-selection"
+        onClick={() => onRequestDeletion(imageNames)}
+      />
+    </>
+  );
+};
+
+const ChangeBoardSubMenu = ({
+  boards,
+  currentBoardId,
+  onMove,
+}: {
+  boards: GalleryBoard[];
+  currentBoardId: string | null;
+  onMove: (boardId: string) => void;
+}) => (
+  <ContextSubMenu icon={PiFoldersBold} label="Change Board">
+    {currentBoardId !== 'none' && (
+      <ContextMenuItem
+        icon={PiFoldersBold}
+        label="Remove from Board"
+        value="remove-from-board"
+        onClick={() => onMove('none')}
+      />
+    )}
+    {boards
+      .filter((board) => board.kind === 'board' && board.id !== currentBoardId)
+      .map((board) => (
+        <Menu.Item key={board.id} value={`move-to-${board.id}`} onClick={() => onMove(board.id)}>
+          <Text fontSize="xs" minW="0" truncate>
+            {board.name}
+          </Text>
+        </Menu.Item>
+      ))}
+  </ContextSubMenu>
+);
+
+const ContextSubMenu = ({ children, icon, label }: { children: ReactNode; icon: ComponentType; label: string }) => (
+  <Menu.Root positioning={{ placement: 'right-start' }}>
+    <Menu.TriggerItem>
+      <HStack gap="2" minW="0" w="full">
+        <Icon as={icon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
+        <Text flex="1" fontSize="xs">
+          {label}
+        </Text>
+        <Icon as={PiCaretRightBold} boxSize="3" color="fg.subtle" flexShrink={0} />
+      </HStack>
+    </Menu.TriggerItem>
+    <Portal>
+      <Menu.Positioner>
+        <Menu.Content {...MENU_CONTENT_PROPS}>
+          <ScrollArea.Root maxH="18rem" size="xs" variant="hover" w="full">
+            <ScrollArea.Viewport maxH="inherit" w="full">
+              <ScrollArea.Content py="1">{children}</ScrollArea.Content>
+            </ScrollArea.Viewport>
+            <ScrollArea.Scrollbar>
+              <ScrollArea.Thumb />
+            </ScrollArea.Scrollbar>
+          </ScrollArea.Root>
+        </Menu.Content>
+      </Menu.Positioner>
+    </Portal>
+  </Menu.Root>
+);
+
+const QuickMenuItem = ({
+  icon,
+  label,
+  value,
+  onClick,
+}: {
+  icon: ComponentType;
+  label: string;
+  value: string;
+  onClick: () => void;
+}) => (
+  <Tooltip content={label} contentProps={{ fontSize: '2xs' }} openDelay={300} positioning={{ placement: 'top' }}>
+    <Menu.Item aria-label={label} flex="1" justifyContent="center" value={value} onClick={onClick}>
+      <Icon as={icon} boxSize="4" color="fg.default" />
+    </Menu.Item>
+  </Tooltip>
+);
+
+const ContextMenuItem = ({
+  color,
+  disabled,
+  icon,
+  label,
+  value,
+  onClick,
+}: {
+  color?: string;
+  disabled?: boolean;
+  icon: ComponentType;
+  label: string;
+  value: string;
+  onClick?: () => void;
+}) => (
+  <Menu.Item color={color} disabled={disabled} value={value} onClick={onClick}>
+    <HStack gap="2" minW="0" w="full">
+      <Icon as={icon} boxSize="3.5" color={color ?? 'fg.subtle'} flexShrink={0} />
+      <Text flex="1" fontSize="xs">
+        {label}
+      </Text>
+    </HStack>
+  </Menu.Item>
+);
