@@ -14,7 +14,8 @@
     "lint:oxc": "oxlint --react-plugin --import-plugin --deny-warnings .",
     "lint:oxc:fix": "oxlint --react-plugin --import-plugin --fix .",
     "preview": "vite preview",
-    "lint:tsc": "tsc --noEmit"
+    "lint:tsc": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.28.0",
@@ -32,7 +33,8 @@
     "oxfmt": "^0.54.0",
     "oxlint": "^1.69.0",
     "typescript": "^5.8.3",
-    "vite": "^7.0.5"
+    "vite": "^7.0.5",
+    "vitest": "^4.1.8"
   },
   "engines": {
     "pnpm": "10"
