@@ -288,11 +288,21 @@ export interface LayoutPreset {
 export interface WorkbenchState {
   projects: Project[];
   activeProjectId: string;
+  backendConnection: BackendConnectionState;
   errorLog: string[];
   notifications: WorkbenchNotification[];
   autosave: AutosaveState;
   account: AccountState;
   widgetFailures: WidgetFailure[];
+}
+
+export type BackendConnectionStatus = 'connecting' | 'connected' | 'disconnected';
+
+export interface BackendConnectionState {
+  status: BackendConnectionStatus;
+  error?: string;
+  lastConnectedAt?: string;
+  lastDisconnectedAt?: string;
 }
 
 export type WorkbenchNotificationKind = 'error' | 'success' | 'info';
@@ -351,6 +361,7 @@ export interface QueueItem {
   cancellable: boolean;
   snapshot: QueueSubmissionSnapshot;
   backendItemIds?: number[];
+  backendBatchId?: string;
   error?: string;
   resultImages?: GeneratedImageContract[];
 }

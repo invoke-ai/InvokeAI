@@ -1,4 +1,14 @@
-import { createContext, use, useEffect, useMemo, useReducer, useRef, type Dispatch, type ReactNode } from 'react';
+import {
+  createContext,
+  use,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type Dispatch,
+  type ReactNode,
+} from 'react';
 
 import { localStorageWorkbenchPersistence } from './persistence';
 import type { Project, WorkbenchState } from './types';
@@ -8,6 +18,12 @@ interface WorkbenchContextValue {
   state: WorkbenchState;
   activeProject: Project;
   dispatch: Dispatch<WorkbenchAction>;
+  /**
+   * True once the persisted snapshot has been loaded (or found absent). Side
+   * effects that read or mutate the queue must wait for this, or they race the
+   * async hydration and act on state that is about to be replaced.
+   */
+  hasHydrated: boolean;
 }
 
 const WorkbenchContext = createContext<WorkbenchContextValue | null>(null);
@@ -26,6 +42,7 @@ const getPersistedStateKey = (state: WorkbenchState): string =>
 
 export const WorkbenchProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(workbenchReducer, undefined, createInitialWorkbenchState);
+  const [hasHydrated, setHasHydrated] = useState(false);
   const hasLoadedPersistenceRef = useRef(false);
   const latestStateRef = useRef(state);
   const lastSavedStateKeyRef = useRef(getPersistedStateKey(state));
@@ -55,6 +72,10 @@ export const WorkbenchProvider = ({ children }: { children: ReactNode }) => {
         });
       } finally {
         hasLoadedPersistenceRef.current = true;
+
+        if (!isCancelled) {
+          setHasHydrated(true);
+        }
       }
     };
 
@@ -110,8 +131,8 @@ export const WorkbenchProvider = ({ children }: { children: ReactNode }) => {
   const value = useMemo<WorkbenchContextValue>(() => {
     const activeProject = state.projects.find((project) => project.id === state.activeProjectId) ?? state.projects[0];
 
-    return { state, activeProject, dispatch };
-  }, [state]);
+    return { state, activeProject, dispatch, hasHydrated };
+  }, [state, hasHydrated]);
 
   return <WorkbenchContext value={value}>{children}</WorkbenchContext>;
 };

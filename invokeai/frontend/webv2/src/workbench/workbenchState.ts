@@ -59,7 +59,13 @@ type WorkbenchAction =
   | { type: 'setGenerateBatchCount'; batchCount: number }
   | { type: 'submitInvocationSnapshot'; backendSupportsCancellation: boolean }
   | { type: 'submitResolvedInvocationSnapshot'; backendSupportsCancellation: boolean; route: InvocationRoute }
-  | { type: 'markQueueItemBackendSubmitted'; projectId: string; queueItemId: string; backendItemIds: number[] }
+  | {
+      type: 'markQueueItemBackendSubmitted';
+      projectId: string;
+      queueItemId: string;
+      backendItemIds: number[];
+      backendBatchId?: string;
+    }
   | { type: 'setQueueItemStatus'; projectId: string; queueItemId: string; status: QueueItemStatus; error?: string }
   | { type: 'routeQueueItemResults'; projectId: string; queueItemId: string; images: GeneratedImageContract[] }
   | { type: 'setStagedImageIndex'; imageIndex: number }
@@ -96,6 +102,8 @@ type WorkbenchAction =
   | { type: 'recordWidgetFailure'; failure: WidgetFailure }
   | { type: 'setPreferences'; preferences: Partial<WorkbenchPreferences> }
   | { type: 'recordError'; message: string }
+  | { type: 'setBackendConnectionStatus'; status: WorkbenchState['backendConnection']['status']; error?: string }
+  | { type: 'refreshBackendData' }
   | { type: 'recordNotice'; kind: WorkbenchNotificationKind; title: string; message?: string };
 
 const HISTORY_LIMIT = 40;
@@ -610,6 +618,7 @@ const normalizePreferences = (preferences?: Partial<WorkbenchPreferences>): Work
 
 const normalizeWorkbenchState = (state: WorkbenchState): WorkbenchState => ({
   ...state,
+  backendConnection: { status: 'connecting' },
   // Persisted snapshots from before preferences existed (or partially written
   // ones) are healed by merging in defaults, so hydrate never reads `undefined`.
   account: {
@@ -762,6 +771,20 @@ const updateGalleryValues = (
     },
   }));
 
+const refreshProjectBackendData = (project: Project): Project => ({
+  ...project,
+  widgetStates: {
+    ...project.widgetStates,
+    gallery: {
+      ...project.widgetStates.gallery,
+      values: {
+        ...project.widgetStates.gallery.values,
+        galleryRefreshToken: createId('gallery-refresh'),
+      },
+    },
+  },
+});
+
 const updateQueueItem = (project: Project, queueItemId: string, getItem: (item: QueueItem) => QueueItem): Project => ({
   ...project,
   queue: {
@@ -896,6 +919,7 @@ export const createInitialWorkbenchState = (): WorkbenchState => ({
   account: { activeLayoutPresetId: 'canvas-default', preferences: { ...DEFAULT_PREFERENCES } },
   activeProjectId: 'project-1',
   autosave: { status: 'idle' },
+  backendConnection: { status: 'connecting' },
   errorLog: [],
   notifications: [],
   projects: Array.from({ length: INITIAL_PROJECT_COUNT }, (_value, index) => createProject(index + 1)),
@@ -1128,6 +1152,7 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       return updateProjectById(state, action.projectId, (project) =>
         updateQueueItem(project, action.queueItemId, (item) => ({
           ...item,
+          backendBatchId: action.backendBatchId,
           backendItemIds: action.backendItemIds,
           status: item.status === 'cancelled' ? 'cancelled' : 'running',
         }))
@@ -1609,6 +1634,22 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
         { ...state, errorLog: [action.message, ...state.errorLog].slice(0, ERROR_LOG_LIMIT) },
         createNotification({ kind: 'error', message: action.message, title: 'Error' })
       );
+    }
+    case 'setBackendConnectionStatus': {
+      const timestamp = now();
+
+      return {
+        ...state,
+        backendConnection: {
+          error: action.error,
+          lastConnectedAt: action.status === 'connected' ? timestamp : state.backendConnection.lastConnectedAt,
+          lastDisconnectedAt: action.status === 'disconnected' ? timestamp : state.backendConnection.lastDisconnectedAt,
+          status: action.status,
+        },
+      };
+    }
+    case 'refreshBackendData': {
+      return { ...state, projects: state.projects.map((project) => refreshProjectBackendData(project)) };
     }
     case 'recordNotice': {
       return addNotification(

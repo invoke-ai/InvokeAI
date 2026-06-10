@@ -622,3 +622,50 @@ describe('workbench preferences', () => {
     expect(state.account.preferences.themeId).toBe('dark');
   });
 });
+
+describe('workbench backend connection recovery', () => {
+  it('tracks backend connection status', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, {
+      status: 'disconnected',
+      type: 'setBackendConnectionStatus',
+      error: 'server down',
+    });
+
+    expect(state.backendConnection.status).toBe('disconnected');
+    expect(state.backendConnection.error).toBe('server down');
+    expect(state.backendConnection.lastDisconnectedAt).toBeDefined();
+
+    state = workbenchReducer(state, { status: 'connected', type: 'setBackendConnectionStatus' });
+
+    expect(state.backendConnection.status).toBe('connected');
+    expect(state.backendConnection.error).toBeUndefined();
+    expect(state.backendConnection.lastConnectedAt).toBeDefined();
+  });
+
+  it('refreshes every project gallery when backend data may have changed', () => {
+    const initial = createInitialWorkbenchState();
+    const previousTokens = initial.projects.map((project) => project.widgetStates.gallery.values.galleryRefreshToken);
+    const state = workbenchReducer(initial, { type: 'refreshBackendData' });
+
+    expect(state.projects).toHaveLength(initial.projects.length);
+
+    for (const [index, project] of state.projects.entries()) {
+      expect(project.widgetStates.gallery.values.galleryRefreshToken).toBeDefined();
+      expect(project.widgetStates.gallery.values.galleryRefreshToken).not.toBe(previousTokens[index]);
+    }
+  });
+
+  it('does not hydrate stale persisted backend connection state', () => {
+    const initial = createInitialWorkbenchState();
+    const persisted = {
+      ...initial,
+      backendConnection: { lastConnectedAt: '2026-06-10T00:00:00.000Z', status: 'connected' },
+    } as WorkbenchState;
+
+    const state = workbenchReducer(initial, { state: persisted, type: 'hydrateWorkbench' });
+
+    expect(state.backendConnection).toEqual({ status: 'connecting' });
+  });
+});

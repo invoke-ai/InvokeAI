@@ -1,10 +1,16 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, type Dispatch } from 'react';
 
-import { cancelQueueItems, enqueueGenerateGraph, waitForQueueItemImages } from './generation/api';
+import {
+  createQueueCoordinator,
+  QueueItemCancelledError,
+  type QueueCoordinator,
+  type ReconcileInput,
+} from './backend/queueCoordinator';
 import type { GenerateSettings } from './generation/types';
 import { addImagesToGalleryBoard } from './gallery/api';
-import type { QueueItem } from './types';
+import type { Project, QueueItem } from './types';
 import { useWorkbench } from './WorkbenchContext';
+import type { WorkbenchAction } from './workbenchState';
 
 const isGenerateSettings = (value: unknown): value is GenerateSettings => {
   if (!value || typeof value !== 'object') {
@@ -22,124 +28,276 @@ const isGenerateSettings = (value: unknown): value is GenerateSettings => {
   );
 };
 
-const getPendingGenerateQueueItems = (items: QueueItem[]): QueueItem[] =>
-  items.filter((item) => item.status === 'pending' && item.snapshot.sourceId === 'generate');
-
-const getCancelledQueueItems = (items: QueueItem[]): QueueItem[] => items.filter((item) => item.status === 'cancelled');
-
-const getCancelledBackendQueueItems = (items: QueueItem[]): QueueItem[] =>
-  items.filter((item) => item.status === 'cancelled' && item.backendItemIds?.length);
-
 const getSnapshotGalleryBoardId = (queueItem: QueueItem): string | null => {
   const selectedBoardId = queueItem.snapshot.widgetStates.gallery.values.selectedBoardId;
 
   return typeof selectedBoardId === 'string' ? selectedBoardId : null;
 };
 
+const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
+/**
+ * Await a tracked run's terminal outcome, route its images to the queue item's
+ * destination, and reflect the outcome in workbench state.
+ */
+const routeRunResults = async (
+  coordinator: QueueCoordinator,
+  projectId: string,
+  queueItem: QueueItem,
+  dispatch: Dispatch<WorkbenchAction>
+): Promise<void> => {
+  try {
+    const images = await coordinator.waitForResults(queueItem.id, queueItem.snapshot.submittedAt);
+
+    if (queueItem.snapshot.destination === 'gallery') {
+      const selectedBoardId = getSnapshotGalleryBoardId(queueItem);
+
+      if (selectedBoardId && selectedBoardId !== 'none') {
+        await addImagesToGalleryBoard(
+          selectedBoardId,
+          images.map((image) => image.imageName)
+        );
+      }
+    }
+
+    dispatch({ images, projectId, queueItemId: queueItem.id, type: 'routeQueueItemResults' });
+  } catch (error) {
+    if (error instanceof QueueItemCancelledError) {
+      dispatch({ projectId, queueItemId: queueItem.id, status: 'cancelled', type: 'setQueueItemStatus' });
+      return;
+    }
+
+    dispatch({
+      error: toErrorMessage(error),
+      projectId,
+      queueItemId: queueItem.id,
+      status: 'failed',
+      type: 'setQueueItemStatus',
+    });
+  }
+};
+
+const submitQueueItem = (
+  coordinator: QueueCoordinator,
+  project: Project,
+  queueItem: QueueItem,
+  dispatch: Dispatch<WorkbenchAction>
+): void => {
+  const graph = queueItem.snapshot.graph.backendGraph;
+  const generateValues = queueItem.snapshot.widgetStates.generate.values;
+
+  if (!graph || !isGenerateSettings(generateValues)) {
+    dispatch({
+      error: 'Generate queue item is missing a compiled backend graph.',
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      status: 'failed',
+      type: 'setQueueItemStatus',
+    });
+    return;
+  }
+
+  coordinator
+    .submitGenerate(queueItem.id, {
+      batchCount: generateValues.batchCount,
+      destination: queueItem.snapshot.destination,
+      graph,
+      negativePrompt: generateValues.negativePrompt,
+      negativePromptNodeId: 'negative_prompt',
+      positivePrompt: generateValues.positivePrompt,
+      positivePromptNodeId: 'positive_prompt',
+      seed: generateValues.seed,
+      seedNodeId: 'seed',
+      sourceQueueItemId: queueItem.id,
+    })
+    .then(({ batchId, itemIds }) => {
+      dispatch({
+        backendBatchId: batchId,
+        backendItemIds: itemIds,
+        projectId: project.id,
+        queueItemId: queueItem.id,
+        type: 'markQueueItemBackendSubmitted',
+      });
+
+      return routeRunResults(coordinator, project.id, queueItem, dispatch);
+    })
+    .catch((error: unknown) => {
+      dispatch({
+        error: toErrorMessage(error),
+        projectId: project.id,
+        queueItemId: queueItem.id,
+        status: 'failed',
+        type: 'setQueueItemStatus',
+      });
+    });
+};
+
+/**
+ * Bridges workbench state to the backend queue coordinator: it submits pending
+ * queue items, forwards cancellations, and reflects connection status, while
+ * the coordinator owns the socket and event-driven settlement. Mounted once
+ * inside the WorkbenchProvider; renders nothing.
+ */
 export const WorkbenchRuntime = () => {
-  const { state, dispatch } = useWorkbench();
+  const { state, dispatch, hasHydrated } = useWorkbench();
+  const coordinatorRef = useRef<QueueCoordinator | null>(null);
   const startedQueueItemIdsRef = useRef(new Set<string>());
   const cancelledQueueItemIdsRef = useRef(new Set<string>());
-  const backendCancellationQueueItemIdsRef = useRef(new Set<string>());
+  const reconcileStateRef = useRef<'idle' | 'running' | 'done'>('idle');
+  const [isReconciled, setIsReconciled] = useState(false);
 
   useEffect(() => {
-    for (const project of state.projects) {
-      for (const queueItem of getCancelledQueueItems(project.queue.items)) {
-        cancelledQueueItemIdsRef.current.add(queueItem.id);
-      }
+    const coordinator = createQueueCoordinator({
+      onConnectionChange: (status, error) => {
+        dispatch({ error, status, type: 'setBackendConnectionStatus' });
+      },
+      onGalleryRefresh: () => {
+        dispatch({ type: 'refreshBackendData' });
+      },
+    });
 
-      for (const queueItem of getPendingGenerateQueueItems(project.queue.items)) {
-        if (startedQueueItemIdsRef.current.has(queueItem.id)) {
-          continue;
+    coordinatorRef.current = coordinator;
+    coordinator.connect();
+
+    return () => {
+      coordinatorRef.current = null;
+      coordinator.dispose();
+    };
+  }, [dispatch]);
+
+  // Reconcile persisted queue items against the live backend queue exactly
+  // once, after hydration and first connect. Until this finishes, submission
+  // is held back so an item the backend already accepted is not enqueued twice.
+  useEffect(() => {
+    const coordinator = coordinatorRef.current;
+
+    if (
+      !coordinator ||
+      !hasHydrated ||
+      state.backendConnection.status !== 'connected' ||
+      reconcileStateRef.current !== 'idle'
+    ) {
+      return;
+    }
+
+    reconcileStateRef.current = 'running';
+
+    const openItems = state.projects.flatMap((project) =>
+      project.queue.items
+        .filter((queueItem) => queueItem.status === 'pending' || queueItem.status === 'running')
+        .map((queueItem) => ({ project, queueItem }))
+    );
+
+    for (const { queueItem } of openItems) {
+      startedQueueItemIdsRef.current.add(queueItem.id);
+    }
+
+    const inputs: ReconcileInput[] = openItems.map(({ queueItem }) => ({
+      backendBatchId: queueItem.backendBatchId,
+      backendItemIds: queueItem.backendItemIds,
+      id: queueItem.id,
+      status: queueItem.status === 'running' ? 'running' : 'pending',
+    }));
+
+    coordinator
+      .reconcile(inputs)
+      .then((outcomes) => {
+        for (const { project, queueItem } of openItems) {
+          const outcome = outcomes.get(queueItem.id);
+
+          switch (outcome?.kind) {
+            case 'enqueue': {
+              startedQueueItemIdsRef.current.delete(queueItem.id);
+              break;
+            }
+            case 'adopted': {
+              dispatch({
+                backendBatchId: outcome.backendBatchId,
+                backendItemIds: outcome.backendItemIds,
+                projectId: project.id,
+                queueItemId: queueItem.id,
+                type: 'markQueueItemBackendSubmitted',
+              });
+              void routeRunResults(coordinator, project.id, queueItem, dispatch);
+              break;
+            }
+            case 'resumed': {
+              void routeRunResults(coordinator, project.id, queueItem, dispatch);
+              break;
+            }
+            case 'missing': {
+              dispatch({
+                error: 'This run is no longer on the backend queue (it may have been cleared).',
+                projectId: project.id,
+                queueItemId: queueItem.id,
+                status: 'failed',
+                type: 'setQueueItemStatus',
+              });
+              break;
+            }
+          }
         }
+      })
+      .catch((error: unknown) => {
+        // Release pending items to the normal submission path; running items
+        // cannot be re-attached without backend state, so fail them visibly
+        // rather than leaving them stuck as running forever.
+        dispatch({ message: `Queue reconciliation failed: ${toErrorMessage(error)}`, type: 'recordError' });
 
-        startedQueueItemIdsRef.current.add(queueItem.id);
+        for (const { project, queueItem } of openItems) {
+          if (queueItem.status === 'pending') {
+            startedQueueItemIdsRef.current.delete(queueItem.id);
+            continue;
+          }
 
-        const graph = queueItem.snapshot.graph.backendGraph;
-        const generateValues = queueItem.snapshot.widgetStates.generate.values;
-
-        if (!graph || !isGenerateSettings(generateValues)) {
           dispatch({
-            error: 'Generate queue item is missing a compiled backend graph.',
+            error: 'Could not reconcile this run with the backend queue after reload.',
             projectId: project.id,
             queueItemId: queueItem.id,
             status: 'failed',
             type: 'setQueueItemStatus',
           });
-          continue;
+        }
+      })
+      .finally(() => {
+        reconcileStateRef.current = 'done';
+        setIsReconciled(true);
+      });
+  }, [dispatch, hasHydrated, state.backendConnection.status, state.projects]);
+
+  useEffect(() => {
+    const coordinator = coordinatorRef.current;
+
+    if (!coordinator || !isReconciled) {
+      return;
+    }
+
+    for (const project of state.projects) {
+      for (const queueItem of project.queue.items) {
+        if (
+          queueItem.status === 'pending' &&
+          queueItem.snapshot.sourceId === 'generate' &&
+          !startedQueueItemIdsRef.current.has(queueItem.id)
+        ) {
+          startedQueueItemIdsRef.current.add(queueItem.id);
+          submitQueueItem(coordinator, project, queueItem, dispatch);
         }
 
-        const queuedAt = queueItem.snapshot.submittedAt;
-
-        enqueueGenerateGraph({
-          batchCount: generateValues.batchCount,
-          destination: queueItem.snapshot.destination,
-          graph,
-          negativePrompt: generateValues.negativePrompt,
-          negativePromptNodeId: 'negative_prompt',
-          positivePrompt: generateValues.positivePrompt,
-          positivePromptNodeId: 'positive_prompt',
-          seed: generateValues.seed,
-          seedNodeId: 'seed',
-          sourceQueueItemId: queueItem.id,
-        })
-          .then(async ({ itemIds }) => {
-            dispatch({
-              backendItemIds: itemIds,
-              projectId: project.id,
-              queueItemId: queueItem.id,
-              type: 'markQueueItemBackendSubmitted',
+        if (
+          queueItem.status === 'cancelled' &&
+          (queueItem.backendBatchId || queueItem.backendItemIds?.length) &&
+          !cancelledQueueItemIdsRef.current.has(queueItem.id)
+        ) {
+          cancelledQueueItemIdsRef.current.add(queueItem.id);
+          coordinator
+            .cancelRun({ backendBatchId: queueItem.backendBatchId, backendItemIds: queueItem.backendItemIds })
+            .catch((error: unknown) => {
+              dispatch({ message: toErrorMessage(error), type: 'recordError' });
             });
-
-            if (cancelledQueueItemIdsRef.current.has(queueItem.id)) {
-              return;
-            }
-
-            const images = (
-              await Promise.all(itemIds.map((itemId) => waitForQueueItemImages(itemId, queueItem.id, queuedAt)))
-            ).flat();
-
-            if (cancelledQueueItemIdsRef.current.has(queueItem.id)) {
-              return;
-            }
-
-            if (queueItem.snapshot.destination === 'gallery') {
-              const selectedBoardId = getSnapshotGalleryBoardId(queueItem);
-
-              if (selectedBoardId && selectedBoardId !== 'none') {
-                await addImagesToGalleryBoard(
-                  selectedBoardId,
-                  images.map((image) => image.imageName)
-                );
-              }
-            }
-
-            dispatch({ images, projectId: project.id, queueItemId: queueItem.id, type: 'routeQueueItemResults' });
-          })
-          .catch((error: unknown) => {
-            dispatch({
-              error: error instanceof Error ? error.message : String(error),
-              projectId: project.id,
-              queueItemId: queueItem.id,
-              status: 'failed',
-              type: 'setQueueItemStatus',
-            });
-          });
-      }
-
-      for (const queueItem of getCancelledBackendQueueItems(project.queue.items)) {
-        if (backendCancellationQueueItemIdsRef.current.has(queueItem.id) || !queueItem.backendItemIds?.length) {
-          continue;
         }
-
-        backendCancellationQueueItemIdsRef.current.add(queueItem.id);
-
-        cancelQueueItems(queueItem.backendItemIds).catch((error: unknown) => {
-          dispatch({ message: error instanceof Error ? error.message : String(error), type: 'recordError' });
-        });
       }
     }
-  }, [dispatch, state.projects]);
+  }, [dispatch, isReconciled, state.projects]);
 
   return null;
 };
