@@ -1,8 +1,8 @@
-import { Box, Flex, HStack, Icon, IconButton } from '@chakra-ui/react';
-import { PiPlusBold, PiXBold } from 'react-icons/pi';
+import { Badge, CloseButton, IconButton, ScrollArea, Tabs } from '@chakra-ui/react';
+import { PiPlusBold } from 'react-icons/pi';
 
+import { Tooltip } from './ui/Tooltip';
 import { useWorkbench } from '../WorkbenchContext';
-import type { Project } from '../types';
 
 /**
  * Document-style project tabs, immediately right of the Invoke control.
@@ -14,82 +14,61 @@ import type { Project } from '../types';
 export const ProjectTabs = () => {
   const { state, activeProject, dispatch } = useWorkbench();
 
+  const onSwitchProject = (projectId: string) => {
+    dispatch({ projectId, type: 'switchProject' });
+  };
+
   return (
-    <HStack flex="1" gap="1" h="full" minW="0" overflowX="auto">
-      {state.projects.map((project) => (
-        <ProjectTab
-          key={project.id}
-          project={project}
-          isActive={project.id === activeProject.id}
-          canClose={state.projects.length > 1}
-          onSelect={() => dispatch({ projectId: project.id, type: 'switchProject' })}
-          onClose={() => dispatch({ projectId: project.id, type: 'closeProject' })}
-        />
-      ))}
-      <IconButton
-        aria-label="New project"
-        color="fg.muted"
-        flexShrink={0}
-        size="xs"
-        variant="ghost"
-        _hover={{ bg: 'bg.surface', color: 'fg.default' }}
-        onClick={() => dispatch({ type: 'createProject' })}
-      >
-        <PiPlusBold />
-      </IconButton>
-    </HStack>
+    <ScrollArea.Root flex="1" minW="0" size="xs" variant="hover">
+      <ScrollArea.Viewport h="full" w="full">
+        <Tabs.Root minW="max-content" variant="outline" value={activeProject.id}>
+          <Tabs.List flex="1 1 auto" h="full">
+            {state.projects.map((project) => (
+              <Tabs.Trigger
+                key={project.id}
+                value={project.id}
+                onClick={() => onSwitchProject(project.id)}
+                fontSize="xs"
+              >
+                {project.name}
+                {/*{project.id !== activeProject.id && project.queue.items.some((item) => item.resultImages?.length) ? (
+                  <Badge colorPalette="blue" size="xs">
+                    Results
+                  </Badge>
+                ) : null}*/}
+                {state.projects.length > 1 && (
+                  <CloseButton
+                    size="2xs"
+                    as="span"
+                    role="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      dispatch({ projectId: project.id, type: 'closeProject' });
+                    }}
+                  />
+                )}
+              </Tabs.Trigger>
+            ))}
+            <Tooltip content="Create new project">
+              <IconButton
+                aria-label="Create new project"
+                color="fg.muted"
+                flexShrink={0}
+                size="xs"
+                variant="ghost"
+                alignSelf="center"
+                ms="2"
+                onClick={() => dispatch({ type: 'createProject' })}
+              >
+                <PiPlusBold />
+              </IconButton>
+            </Tooltip>
+          </Tabs.List>
+        </Tabs.Root>
+      </ScrollArea.Viewport>
+      <ScrollArea.Scrollbar orientation="horizontal">
+        <ScrollArea.Thumb />
+      </ScrollArea.Scrollbar>
+    </ScrollArea.Root>
   );
 };
-
-interface ProjectTabProps {
-  project: Project;
-  isActive: boolean;
-  canClose: boolean;
-  onSelect: () => void;
-  onClose: () => void;
-}
-
-const ProjectTab = ({ project, isActive, canClose, onSelect, onClose }: ProjectTabProps) => (
-  <Flex
-    align="center"
-    bg={isActive ? 'bg.panel' : 'transparent'}
-    borderWidth="1px"
-    borderColor={isActive ? 'border.emphasis' : 'transparent'}
-    color={isActive ? 'fg.default' : 'fg.muted'}
-    flexShrink={0}
-    gap="2"
-    h="8"
-    maxW="11rem"
-    minW="7.5rem"
-    px="2"
-    rounded="md"
-    transition="background 0.12s ease, color 0.12s ease"
-    _hover={{ color: 'fg.default' }}
-  >
-    <Box
-      aria-current={isActive ? 'page' : undefined}
-      as="button"
-      flex="1"
-      fontSize="xs"
-      fontWeight={isActive ? '600' : '500'}
-      minW="0"
-      textAlign="left"
-      truncate
-      onClick={onSelect}
-    >
-      {project.name}
-    </Box>
-    {canClose ? (
-      <IconButton
-        aria-label={`Close ${project.name}`}
-        color="fg.subtle"
-        size="2xs"
-        variant="ghost"
-        _hover={{ bg: 'bg.surfaceRaised', color: 'fg.default' }}
-        onClick={onClose}
-      >
-        <Icon as={PiXBold} boxSize="3" />
-      </IconButton>
-    ) : null}
-  </Flex>
-);

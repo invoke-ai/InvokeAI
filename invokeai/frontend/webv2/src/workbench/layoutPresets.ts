@@ -41,16 +41,6 @@ export const layoutPresets: LayoutPreset[] = [
     },
     label: 'Linear UI',
   },
-  {
-    description: 'Future model management preset.',
-    id: 'model-manager',
-    initialLayout: {
-      centerViewId: 'gallery',
-      panels: { isBottomOpen: false, isLeftOpen: false, isRightOpen: true },
-      presetId: 'model-manager',
-    },
-    label: 'Model Manager',
-  },
 ];
 
 export const defaultLayoutPreset = layoutPresets[0];

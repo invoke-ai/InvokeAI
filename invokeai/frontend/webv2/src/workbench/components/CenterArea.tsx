@@ -3,12 +3,13 @@ import { PiCheckBold, PiDotsThreeBold } from 'react-icons/pi';
 
 import { WidgetIcon } from '../iconResolver';
 import { useWorkbench } from '../WorkbenchContext';
-import type { CenterViewId, RegisteredWidget } from '../types';
+import type { RegisteredWidget, WidgetId } from '../types';
 import { getWidgetsForRegion } from '../widgetRegistry';
+import { useFocusRegionProps } from '../focusRegions';
 import { WidgetRenderer } from './WidgetRenderer';
 
 interface CenterWidgetItem {
-  id: Exclude<CenterViewId, 'preview'>;
+  id: WidgetId;
   isEnabled: boolean;
   label: string;
   status: RegisteredWidget['status'];
@@ -17,7 +18,7 @@ interface CenterWidgetItem {
 
 const getCenterWidgetItems = (enabledWidgetIds: string[]): CenterWidgetItem[] =>
   getWidgetsForRegion('center').map((widget) => ({
-    id: widget.manifest.id as Exclude<CenterViewId, 'preview'>,
+    id: widget.manifest.id,
     isEnabled: enabledWidgetIds.includes(widget.manifest.id),
     label: widget.manifest.labelText,
     status: widget.status,
@@ -27,37 +28,33 @@ const getCenterWidgetItems = (enabledWidgetIds: string[]): CenterWidgetItem[] =>
 /** Center work area: the view tab strip plus the active registered center view. */
 export const CenterArea = () => {
   const { activeProject, dispatch } = useWorkbench();
+  const focusRegionProps = useFocusRegionProps('center');
   const centerRegion = activeProject.widgetRegions.center;
   const centerWidgetItems = getCenterWidgetItems(centerRegion.enabledWidgetIds);
   const enabledCenterWidgetItems = centerWidgetItems.filter((item) => item.isEnabled && item.status === 'enabled');
+  const centerViewItems = enabledCenterWidgetItems.filter((item) => item.widget.manifest.centerPlacement !== 'toolbar');
+  const centerToolbarItems = enabledCenterWidgetItems.filter(
+    (item) => item.widget.manifest.centerPlacement === 'toolbar'
+  );
+  const activeCenterViewId = centerViewItems.some((item) => item.id === centerRegion.activeWidgetId)
+    ? centerRegion.activeWidgetId
+    : centerViewItems[0]?.id;
 
   return (
-    <Flex as="section" bg="bg.center" direction="column" flex="1" minH="0" minW="0">
+    <Flex as="section" bg="bg.center" direction="column" flex="1" minH="0" minW="0" {...focusRegionProps}>
       <HStack bg="bg.surfaceRaised" borderBottomWidth="1px" borderColor="border.subtle" h="10" px="1.5">
         <Tabs.Root
-          value={centerRegion.activeWidgetId}
-          variant="plain"
+          value={activeCenterViewId}
+          variant="line"
+          h="full"
+          w="full"
           onValueChange={(event) =>
             dispatch({ region: 'center', type: 'selectRegionWidget', widgetId: event.value as CenterWidgetItem['id'] })
           }
         >
           <Tabs.List gap="1">
-            {enabledCenterWidgetItems.map((item) => (
-              <Tabs.Trigger
-                key={item.id}
-                value={item.id}
-                color="fg.muted"
-                disabled={item.status === 'disabled'}
-                fontSize="xs"
-                fontWeight="600"
-                gap="1.5"
-                h="7"
-                px="3"
-                rounded="md"
-                _selected={{ bg: 'accent.active', color: 'accent.activeFg' }}
-                _disabled={{ opacity: 0.4 }}
-                _hover={{ color: 'fg.default', _selected: { color: 'accent.activeFg' } }}
-              >
+            {centerViewItems.map((item) => (
+              <Tabs.Trigger key={item.id} value={item.id} disabled={item.status === 'disabled'} fontSize="xs" px="3">
                 <WidgetIcon iconId={item.widget.manifest.icon} boxSize="3.5" />
                 {item.label}
               </Tabs.Trigger>
@@ -65,8 +62,13 @@ export const CenterArea = () => {
           </Tabs.List>
         </Tabs.Root>
         <Box flex="1" />
+        {centerToolbarItems.map((item) => (
+          <Flex key={item.id} align="center" h="full">
+            <WidgetRenderer widget={item.widget} presentation="compact" region="center" />
+          </Flex>
+        ))}
         <CenterWidgetMenu
-          enabledCount={centerRegion.enabledWidgetIds.length}
+          enabledViewCount={centerViewItems.length}
           items={centerWidgetItems}
           onToggle={(centerWidgetId) =>
             dispatch({ region: 'center', type: 'toggleRegionWidget', widgetId: centerWidgetId })
@@ -75,13 +77,19 @@ export const CenterArea = () => {
       </HStack>
 
       <Box flex="1" minH="0" position="relative">
-        <CenterViewSlot activeWidgetId={centerRegion.activeWidgetId} items={enabledCenterWidgetItems} />
+        <CenterViewSlot activeWidgetId={activeCenterViewId} items={centerViewItems} />
       </Box>
     </Flex>
   );
 };
 
-const CenterViewSlot = ({ activeWidgetId, items }: { activeWidgetId: string; items: CenterWidgetItem[] }) => {
+const CenterViewSlot = ({
+  activeWidgetId,
+  items,
+}: {
+  activeWidgetId: string | undefined;
+  items: CenterWidgetItem[];
+}) => {
   const widget = items.find((item) => item.id === activeWidgetId)?.widget;
   const View = widget?.manifest.view;
 
@@ -93,11 +101,11 @@ const CenterViewSlot = ({ activeWidgetId, items }: { activeWidgetId: string; ite
 };
 
 const CenterWidgetMenu = ({
-  enabledCount,
+  enabledViewCount,
   items,
   onToggle,
 }: {
-  enabledCount: number;
+  enabledViewCount: number;
   items: CenterWidgetItem[];
   onToggle: (centerWidgetId: CenterWidgetItem['id']) => void;
 }) => (
@@ -133,27 +141,32 @@ const CenterWidgetMenu = ({
             <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
               Center Widgets
             </Menu.ItemGroupLabel>
-            {items.map((item) => (
-              <Menu.Item
-                key={item.id}
-                role="menuitemcheckbox"
-                aria-checked={item.isEnabled}
-                value={item.id}
-                closeOnSelect={false}
-                disabled={item.status === 'disabled' || (item.isEnabled && enabledCount === 1)}
-                _disabled={{ opacity: 0.4 }}
-                onClick={() => onToggle(item.id)}
-              >
-                <Icon as={PiCheckBold} boxSize="3" opacity={item.isEnabled ? 1 : 0} />
-                <WidgetIcon iconId={item.widget.manifest.icon} boxSize="3.5" />
-                <Menu.ItemText>{item.label}</Menu.ItemText>
-                {item.isEnabled && enabledCount === 1 ? (
-                  <Text color="fg.subtle" fontSize="2xs" ms="auto">
-                    Required
-                  </Text>
-                ) : null}
-              </Menu.Item>
-            ))}
+            {items.map((item) => {
+              const isView = item.widget.manifest.centerPlacement !== 'toolbar';
+              const isRequiredView = isView && item.isEnabled && enabledViewCount === 1;
+
+              return (
+                <Menu.Item
+                  key={item.id}
+                  role="menuitemcheckbox"
+                  aria-checked={item.isEnabled}
+                  value={item.id}
+                  closeOnSelect={false}
+                  disabled={item.status === 'disabled' || isRequiredView}
+                  _disabled={{ opacity: 0.4 }}
+                  onClick={() => onToggle(item.id)}
+                >
+                  <Icon as={PiCheckBold} boxSize="3" opacity={item.isEnabled ? 1 : 0} />
+                  <WidgetIcon iconId={item.widget.manifest.icon} boxSize="3.5" />
+                  <Menu.ItemText>{item.label}</Menu.ItemText>
+                  {isRequiredView ? (
+                    <Text color="fg.subtle" fontSize="2xs" ms="auto">
+                      Required
+                    </Text>
+                  ) : null}
+                </Menu.Item>
+              );
+            })}
           </Menu.ItemGroup>
         </Menu.Content>
       </Menu.Positioner>

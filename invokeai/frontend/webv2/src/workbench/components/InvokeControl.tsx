@@ -65,7 +65,7 @@ export const InvokeControl = () => {
   }, [dispatch]);
 
   return (
-    <HStack flexShrink={0} gap="0" h="7" overflow="hidden" rounded="md" shadow="sm" w={CONTROL_WIDTH}>
+    <HStack flexShrink={0} gap="0" h="7" overflow="hidden" rounded="xs" shadow="sm" w={CONTROL_WIDTH}>
       <HStack
         aria-disabled={!isValid}
         aria-label={invokeLabel}

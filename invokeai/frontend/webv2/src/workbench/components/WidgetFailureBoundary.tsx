@@ -1,4 +1,4 @@
-import { Button, Code, Stack, Text } from '@chakra-ui/react';
+import { Button, Code, ScrollArea, Stack, Text } from '@chakra-ui/react';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 import type { WidgetId } from '../types';
@@ -39,9 +39,22 @@ export class WidgetFailureBoundary extends Component<WidgetFailureBoundaryProps,
         <Text color="red.300" fontSize="xs" fontWeight="700">
           Widget failed: {widgetId}
         </Text>
-        <Code display="block" maxH="8rem" overflow="auto" p="2" whiteSpace="pre-wrap">
-          {copyableDetails}
-        </Code>
+        <ScrollArea.Root maxH="8rem" size="xs" variant="hover">
+          <ScrollArea.Viewport maxH="8rem">
+            <ScrollArea.Content>
+              <Code display="block" p="2" whiteSpace="pre-wrap">
+                {copyableDetails}
+              </Code>
+            </ScrollArea.Content>
+          </ScrollArea.Viewport>
+          <ScrollArea.Scrollbar>
+            <ScrollArea.Thumb />
+          </ScrollArea.Scrollbar>
+          <ScrollArea.Scrollbar orientation="horizontal">
+            <ScrollArea.Thumb />
+          </ScrollArea.Scrollbar>
+          <ScrollArea.Corner />
+        </ScrollArea.Root>
         <Button
           alignSelf="start"
           size="2xs"

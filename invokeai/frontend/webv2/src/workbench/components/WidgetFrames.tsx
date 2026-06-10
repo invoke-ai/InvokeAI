@@ -1,4 +1,4 @@
-import { Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
+import { Box, Flex, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -8,6 +8,7 @@ import {
 import type { IconType } from 'react-icons';
 
 import { createGraphBearingSurface } from '../graphSurfaces';
+import { useFocusRegionProps } from '../focusRegions';
 import type { WidgetManifest, WidgetRegion, WorkbenchRegion } from '../types';
 import { useWorkbench } from '../WorkbenchContext';
 import { GraphSurfaceActions } from './GraphSurfaceActions';
@@ -46,6 +47,7 @@ export const WidgetPanelFrame = ({
   const isBottom = region === 'bottom';
   const displaySizePx = dragSizePx ?? regionState.sizePx;
   const sizeBounds = getPanelSizeBounds(region);
+  const focusRegionProps = useFocusRegionProps(region);
 
   const commitSize = (sizePx: number) => {
     const nextSizePx = clampSize(region, sizePx);
@@ -105,20 +107,21 @@ export const WidgetPanelFrame = ({
   };
 
   return (
-    <Stack
+    <Flex
       as="aside"
       bg="bg.shell"
       borderColor="border.subtle"
       borderRightWidth={isLeft ? '1px' : '0'}
       borderLeftWidth={!isLeft && !isBottom ? '1px' : '0'}
       borderTopWidth={isBottom ? '1px' : '0'}
+      direction="column"
       flexShrink={0}
       gap="3"
+      overflow="hidden"
       minW="0"
-      overflowY="auto"
       p="3"
-      position="relative"
-      {...(isBottom ? { h: `${displaySizePx}px`, w: 'full' } : { w: `${displaySizePx}px` })}
+      {...focusRegionProps}
+      {...(isBottom ? { h: `${displaySizePx}px`, w: 'full' } : { h: 'full', w: `${displaySizePx}px` })}
     >
       {children}
       <Box
@@ -142,25 +145,30 @@ export const WidgetPanelFrame = ({
         onKeyDown={handleKeyDown}
         onPointerDown={handlePointerDown}
       />
-    </Stack>
+    </Flex>
   );
 };
 
-export const GraphBearingWidgetHeader = ({
+export const WidgetHeader = ({
+  actions,
   manifest,
   region,
 }: {
+  actions?: ReactNode;
   manifest: WidgetManifest;
   region: WorkbenchRegion;
 }) => {
-  const surface = createGraphBearingSurface(manifest, region);
+  const surface = manifest.graphBearing?.surfaces.includes(region) ? createGraphBearingSurface(manifest, region) : null;
 
   return (
     <HStack justify="space-between">
       <Text fontSize="xs" fontWeight="700">
         {manifest.labelText}
       </Text>
-      {surface ? <GraphSurfaceActions surface={surface} /> : null}
+      <HStack flexShrink={0} gap="1.5">
+        {actions}
+        {surface ? <GraphSurfaceActions surface={surface} /> : null}
+      </HStack>
     </HStack>
   );
 };

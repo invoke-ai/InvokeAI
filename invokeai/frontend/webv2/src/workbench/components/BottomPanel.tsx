@@ -1,9 +1,6 @@
-import { Text } from '@chakra-ui/react';
-
 import { useWorkbench } from '../WorkbenchContext';
 import { getWidgetById } from '../widgetRegistry';
-import { WidgetPanelFrame } from './WidgetFrames';
-import { WidgetRenderer } from './WidgetRenderer';
+import { MissingWidgetFrame, WidgetRenderer } from './WidgetRenderer';
 
 export const BottomPanel = () => {
   const { activeProject } = useWorkbench();
@@ -23,18 +20,8 @@ export const BottomPanel = () => {
   }
 
   if (!widget || !View) {
-    return (
-      <WidgetPanelFrame region="bottom">
-        <Text color="fg.subtle" fontSize="2xs">
-          Widget view unavailable.
-        </Text>
-      </WidgetPanelFrame>
-    );
+    return <MissingWidgetFrame label={widget?.manifest.labelText ?? bottomRegion.activeWidgetId} region="bottom" />;
   }
 
-  return (
-    <WidgetPanelFrame region="bottom">
-      <WidgetRenderer widget={widget} presentation="expanded" region="bottom" />
-    </WidgetPanelFrame>
-  );
+  return <WidgetRenderer widget={widget} presentation="expanded" region="bottom" />;
 };

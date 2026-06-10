@@ -1,4 +1,4 @@
-import { Button, Code, Dialog, Portal, Stack, Text } from '@chakra-ui/react';
+import { Button, Code, Dialog, Portal, ScrollArea, Stack, Text } from '@chakra-ui/react';
 
 import { formatRoute, isInvocationRouteValid, resolveInvocationRoute } from '../invocation';
 import type { GraphContract, GraphId, InvocationSourceId } from '../types';
@@ -41,9 +41,22 @@ export const GraphPreviewDialog = ({
                 <Text color="fg.muted" fontSize="sm">
                   Read-only shell for graph inspection. Full graph preview rendering lands in later phases.
                 </Text>
-                <Code display="block" maxH="20rem" overflow="auto" p="3" whiteSpace="pre-wrap">
-                  {JSON.stringify(graph ?? { id: graphId, status: 'not-created-yet' }, null, 2)}
-                </Code>
+                <ScrollArea.Root maxH="20rem" size="xs" variant="hover">
+                  <ScrollArea.Viewport maxH="20rem">
+                    <ScrollArea.Content>
+                      <Code display="block" p="3" whiteSpace="pre-wrap">
+                        {JSON.stringify(graph ?? { id: graphId, status: 'not-created-yet' }, null, 2)}
+                      </Code>
+                    </ScrollArea.Content>
+                  </ScrollArea.Viewport>
+                  <ScrollArea.Scrollbar>
+                    <ScrollArea.Thumb />
+                  </ScrollArea.Scrollbar>
+                  <ScrollArea.Scrollbar orientation="horizontal">
+                    <ScrollArea.Thumb />
+                  </ScrollArea.Scrollbar>
+                  <ScrollArea.Corner />
+                </ScrollArea.Root>
               </Stack>
             </Dialog.Body>
             <Dialog.Footer>

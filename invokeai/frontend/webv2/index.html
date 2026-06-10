@@ -4,6 +4,34 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Invoke V7 Workbench</title>
+    <script>
+      // Apply the saved theme before first paint so non-default themes don't
+      // flash the default dark surfaces. ThemeController re-applies it on mount.
+      (function () {
+        try {
+          var themeColorSchemes = {
+            dark: 'dark',
+            forest: 'dark',
+            light: 'light',
+            mono: 'dark',
+            ultradark: 'dark',
+          };
+          var raw = localStorage.getItem('invokeai:v7:webv2:workbench');
+          var id = raw && JSON.parse(raw).state.account.preferences.themeId;
+          var colorScheme = themeColorSchemes[id];
+          if (colorScheme) {
+            var isLight = colorScheme === 'light';
+            var root = document.documentElement;
+            root.setAttribute('data-theme', id);
+            root.style.colorScheme = colorScheme;
+            root.classList.toggle('dark', !isLight);
+            root.classList.toggle('light', isLight);
+          }
+        } catch (error) {
+          /* ignore malformed storage */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,8 +1,6 @@
-import { Stack, Text } from '@chakra-ui/react';
-
 import type { WidgetId, WorkbenchRegion } from '../types';
 import { getWidgetById } from '../widgetRegistry';
-import { WidgetRenderer } from './WidgetRenderer';
+import { MissingWidgetFrame, WidgetRenderer } from './WidgetRenderer';
 
 /** Left panel — hosts the active registered widget panel view. */
 export const LeftPanel = ({ widgetId }: { widgetId: WidgetId }) => (
@@ -25,27 +23,8 @@ const WidgetPanelSlot = ({ widgetId, panel }: { widgetId: WidgetId; panel: keyof
   const region = panelRegions[panel];
 
   if (!widget || widget.status !== 'enabled' || !View) {
-    return <MissingWidgetPanel label={widget?.manifest.labelText ?? widgetId} />;
+    return <MissingWidgetFrame label={widget?.manifest.labelText ?? widgetId} region={region} />;
   }
 
   return <WidgetRenderer widget={widget} region={region} />;
 };
-
-const MissingWidgetPanel = ({ label }: { label: string }) => (
-  <Stack
-    as="aside"
-    bg="bg.shell"
-    borderColor="border.subtle"
-    borderRightWidth="1px"
-    color="fg.subtle"
-    flexShrink={0}
-    gap="2"
-    p="3"
-    w="16rem"
-  >
-    <Text fontSize="xs" fontWeight="700">
-      {label}
-    </Text>
-    <Text fontSize="2xs">Widget view unavailable.</Text>
-  </Stack>
-);

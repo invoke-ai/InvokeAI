@@ -4,10 +4,11 @@ import { useEffect } from 'react';
 import { BottomPanel } from './components/BottomPanel';
 import { CenterArea } from './components/CenterArea';
 import { LeftPanel, RightPanel } from './components/Panels';
-import { ShellErrorSurface } from './components/ShellErrorSurface';
 import { StatusBar } from './components/StatusBar';
 import { TopBar } from './components/TopBar';
+import { WorkbenchNotificationToaster } from './components/WorkbenchNotificationToaster';
 import { WidgetBar, type WidgetBarItem } from './components/WidgetBar';
+import { FocusRegionProvider } from './focusRegions';
 import { getWidgetsForRegion, widgetRegistrationFailures } from './widgetRegistry';
 import { useWorkbench } from './WorkbenchContext';
 import type { WidgetId, WidgetRegion } from './types';
@@ -50,40 +51,42 @@ export const WorkbenchShell = () => {
   }, [dispatch]);
 
   return (
-    <Flex direction="column" h="100vh" w="100vw">
-      <TopBar />
+    <FocusRegionProvider>
+      <Flex direction="column" h="100vh" w="100vw">
+        <WorkbenchNotificationToaster />
+        <TopBar />
 
-      <Flex as="main" flex="1" minH="0" overflow="hidden">
-        <WidgetBar
-          activeId={panels.isLeftOpen && !leftRegion.isCollapsed ? leftRegion.activeWidgetId : null}
-          menuItems={leftMenuItems}
-          railItems={leftRailItems}
-          region="left"
-          side="left"
-          onSelect={(widgetId) => dispatch({ region: 'left', type: 'selectRegionWidget', widgetId })}
-          onToggle={(widgetId) => dispatch({ region: 'left', type: 'toggleRegionWidget', widgetId })}
-        />
-        {panels.isLeftOpen && !leftRegion.isCollapsed && canShowLeftPanel ? (
-          <LeftPanel widgetId={leftRegion.activeWidgetId} />
-        ) : null}
-        <CenterArea />
-        {panels.isRightOpen && !rightRegion.isCollapsed && canShowRightPanel ? (
-          <RightPanel widgetId={rightRegion.activeWidgetId} />
-        ) : null}
-        <WidgetBar
-          activeId={panels.isRightOpen && !rightRegion.isCollapsed ? rightRegion.activeWidgetId : null}
-          menuItems={rightMenuItems}
-          railItems={rightRailItems}
-          region="right"
-          side="right"
-          onSelect={(widgetId) => dispatch({ region: 'right', type: 'selectRegionWidget', widgetId })}
-          onToggle={(widgetId) => dispatch({ region: 'right', type: 'toggleRegionWidget', widgetId })}
-        />
+        <Flex as="main" flex="1" minH="0" overflow="hidden">
+          <WidgetBar
+            activeId={panels.isLeftOpen && !leftRegion.isCollapsed ? leftRegion.activeWidgetId : null}
+            menuItems={leftMenuItems}
+            railItems={leftRailItems}
+            region="left"
+            side="left"
+            onSelect={(widgetId) => dispatch({ region: 'left', type: 'selectRegionWidget', widgetId })}
+            onToggle={(widgetId) => dispatch({ region: 'left', type: 'toggleRegionWidget', widgetId })}
+          />
+          {panels.isLeftOpen && !leftRegion.isCollapsed && canShowLeftPanel ? (
+            <LeftPanel widgetId={leftRegion.activeWidgetId} />
+          ) : null}
+          <CenterArea />
+          {panels.isRightOpen && !rightRegion.isCollapsed && canShowRightPanel ? (
+            <RightPanel widgetId={rightRegion.activeWidgetId} />
+          ) : null}
+          <WidgetBar
+            activeId={panels.isRightOpen && !rightRegion.isCollapsed ? rightRegion.activeWidgetId : null}
+            menuItems={rightMenuItems}
+            railItems={rightRailItems}
+            region="right"
+            side="right"
+            onSelect={(widgetId) => dispatch({ region: 'right', type: 'selectRegionWidget', widgetId })}
+            onToggle={(widgetId) => dispatch({ region: 'right', type: 'toggleRegionWidget', widgetId })}
+          />
+        </Flex>
+
+        <BottomPanel />
+        <StatusBar />
       </Flex>
-
-      <BottomPanel />
-      <StatusBar />
-      <ShellErrorSurface />
-    </Flex>
+    </FocusRegionProvider>
   );
 };
