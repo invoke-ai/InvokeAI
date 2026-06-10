@@ -1,7 +1,8 @@
-import { Button, Code, ScrollArea, Stack, Text } from '@chakra-ui/react';
+import { Code, ScrollArea, Stack, Text } from '@chakra-ui/react';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 import type { WidgetId } from '../types';
+import { Button } from './ui/Button';
 
 interface WidgetFailureBoundaryProps {
   widgetId: WidgetId;

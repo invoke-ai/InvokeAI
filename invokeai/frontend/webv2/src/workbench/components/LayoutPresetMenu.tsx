@@ -1,9 +1,10 @@
-import { Button, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { PiCaretDownBold, PiCheckBold } from 'react-icons/pi';
 
 import { useWorkbench } from '../WorkbenchContext';
 import { getLayoutPreset, layoutPresets } from '../layoutPresets';
 import type { LayoutPresetId } from '../types';
+import { Button } from './ui/Button';
 
 /**
  * Global layout preset registry surfaced as a menu.

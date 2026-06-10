@@ -1,4 +1,4 @@
-import { Box, Flex, HStack, Icon, Menu, Portal, Tabs, Text } from '@chakra-ui/react';
+import { Box, Flex, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { PiCheckBold, PiDotsThreeBold } from 'react-icons/pi';
 
 import { WidgetIcon } from '../iconResolver';
@@ -7,6 +7,8 @@ import type { RegisteredWidget, WidgetId } from '../types';
 import { getWidgetsForRegion } from '../widgetRegistry';
 import { useFocusRegionProps } from '../focusRegions';
 import { WidgetRenderer } from './WidgetRenderer';
+import { IconButton } from './ui/Button';
+import { Tabs } from './ui/Tabs';
 
 interface CenterWidgetItem {
   id: WidgetId;
@@ -45,14 +47,13 @@ export const CenterArea = () => {
       <HStack bg="bg.surfaceRaised" borderBottomWidth="1px" borderColor="border.subtle" h="10" px="1.5">
         <Tabs.Root
           value={activeCenterViewId}
-          variant="line"
           h="full"
           w="full"
           onValueChange={(event) =>
             dispatch({ region: 'center', type: 'selectRegionWidget', widgetId: event.value as CenterWidgetItem['id'] })
           }
         >
-          <Tabs.List gap="1">
+          <Tabs.List>
             {centerViewItems.map((item) => (
               <Tabs.Trigger key={item.id} value={item.id} disabled={item.status === 'disabled'} fontSize="xs" px="3">
                 <WidgetIcon iconId={item.widget.manifest.icon} boxSize="3.5" />
@@ -108,71 +109,62 @@ const CenterWidgetMenu = ({
   enabledViewCount: number;
   items: CenterWidgetItem[];
   onToggle: (centerWidgetId: CenterWidgetItem['id']) => void;
-}) => (
-  <Menu.Root positioning={{ placement: 'bottom-end' }}>
-    <Menu.Trigger asChild>
-      <Flex
-        align="center"
-        aria-label="Center widget menu"
-        as="button"
-        color="fg.default"
-        h="7"
-        justify="center"
-        rounded="md"
-        transition="background 0.12s ease, color 0.12s ease"
-        w="7"
-        _hover={{ bg: 'bg.surface' }}
-      >
-        <Icon as={PiDotsThreeBold} boxSize="4" />
-      </Flex>
-    </Menu.Trigger>
-    <Portal>
-      <Menu.Positioner>
-        <Menu.Content
-          bg="bg.surfaceRaised"
-          borderWidth="1px"
-          borderColor="border.emphasis"
-          color="fg.default"
-          minW="12rem"
-          rounded="lg"
-          shadow="lg"
-        >
-          <Menu.ItemGroup>
-            <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
-              Center Widgets
-            </Menu.ItemGroupLabel>
-            {items.map((item) => {
-              const isView = item.widget.manifest.centerPlacement !== 'toolbar';
-              const isRequiredView = isView && item.isEnabled && enabledViewCount === 1;
+}) => {
+  return (
+    <Menu.Root positioning={{ placement: 'bottom-end' }}>
+      <Menu.Trigger asChild>
+        <IconButton aria-label="Center widget menu" size="xs" variant="ghost">
+          <Icon as={PiDotsThreeBold} boxSize="4" />
+        </IconButton>
+      </Menu.Trigger>
+      <Portal>
+        <Menu.Positioner>
+          <Menu.Content
+            bg="bg.surfaceRaised"
+            borderWidth="1px"
+            borderColor="border.emphasis"
+            color="fg.default"
+            minW="12rem"
+            rounded="lg"
+            shadow="lg"
+          >
+            <Menu.ItemGroup>
+              <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                Center Widgets
+              </Menu.ItemGroupLabel>
+              {items.map((item) => {
+                const isView = item.widget.manifest.centerPlacement !== 'toolbar';
+                const isRequiredView = isView && item.isEnabled && enabledViewCount === 1;
 
-              return (
-                <Menu.Item
-                  key={item.id}
-                  role="menuitemcheckbox"
-                  aria-checked={item.isEnabled}
-                  value={item.id}
-                  closeOnSelect={false}
-                  disabled={item.status === 'disabled' || isRequiredView}
-                  _disabled={{ opacity: 0.4 }}
-                  onClick={() => onToggle(item.id)}
-                >
-                  <Icon as={PiCheckBold} boxSize="3" opacity={item.isEnabled ? 1 : 0} />
-                  <WidgetIcon iconId={item.widget.manifest.icon} boxSize="3.5" />
-                  <Menu.ItemText>{item.label}</Menu.ItemText>
-                  {isRequiredView ? (
-                    <Text color="fg.subtle" fontSize="2xs" ms="auto">
-                      Required
-                    </Text>
-                  ) : null}
-                </Menu.Item>
-              );
-            })}
-          </Menu.ItemGroup>
-        </Menu.Content>
-      </Menu.Positioner>
-    </Portal>
-  </Menu.Root>
-);
+                return (
+                  <Menu.Item
+                    key={item.id}
+                    role="menuitemcheckbox"
+                    aria-checked={item.isEnabled}
+                    value={item.id}
+                    closeOnSelect={false}
+                    disabled={item.status === 'disabled' || isRequiredView}
+                    _disabled={{ opacity: 0.4 }}
+                    onClick={() => onToggle(item.id)}
+                  >
+                    <Icon as={PiCheckBold} boxSize="3" opacity={item.isEnabled ? 1 : 0} />
+                    <WidgetIcon iconId={item.widget.manifest.icon} boxSize="3.5" />
+                    <Menu.ItemText>{item.label}</Menu.ItemText>
+                    {isRequiredView ? (
+                      <Text color="fg.subtle" fontSize="2xs" ms="auto">
+                        Required
+                      </Text>
+                    ) : null}
+                  </Menu.Item>
+                );
+              })}
+            </Menu.ItemGroup>
+          </Menu.Content>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
+  );
+};
 
 const FallbackCenterView = ({ label }: { label: string }) => (
   <Flex align="center" h="full" justify="center" w="full">

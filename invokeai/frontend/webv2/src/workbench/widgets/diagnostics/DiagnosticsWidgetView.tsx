@@ -1,9 +1,10 @@
-import { Button, HStack, Stack, Text } from '@chakra-ui/react';
+import { HStack, Stack, Text } from '@chakra-ui/react';
 import { PiBugBold, PiClipboardTextBold } from 'react-icons/pi';
 
 import { StatusWidgetChip } from '../../components/WidgetFrames';
 import type { WidgetViewProps } from '../../types';
 import { useWorkbench } from '../../WorkbenchContext';
+import { Button } from '../../components/ui/Button';
 
 export const DiagnosticsWidgetView = ({ presentation, region }: WidgetViewProps) => {
   const { state } = useWorkbench();

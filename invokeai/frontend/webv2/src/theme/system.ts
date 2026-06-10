@@ -77,22 +77,24 @@ const colorSlotByToken: Record<string, keyof ThemeColors> = {
   'border.muted': 'line',
   'border.emphasized': 'lineStrong',
   'fg.error': 'danger',
-  // Chakra's default recipes style controls through colorPalette.* even when
-  // callers don't pass a colorPalette prop. Point that virtual palette at the
-  // active workbench theme so Button/Input/Switch/etc. don't fall back to gray.
-  'colorPalette.fg': 'fg',
-  'colorPalette.subtle': 'surfaceRaised',
-  'colorPalette.muted': 'panel',
-  'colorPalette.emphasized': 'lineStrong',
-  'colorPalette.border': 'lineStrong',
-  'colorPalette.solid': 'accent',
-  'colorPalette.contrast': 'accentFg',
-  'colorPalette.focusRing': 'active',
 };
 
-const semanticColors = Object.fromEntries(
-  Object.entries(colorSlotByToken).map(([token, slot]) => [token, colorToken(slot)])
-);
+const semanticColors = {
+  ...Object.fromEntries(Object.entries(colorSlotByToken).map(([token, slot]) => [token, colorToken(slot)])),
+  // A real Chakra color palette used via colorPalette="theme". Chakra resolves
+  // recipe tokens like colorPalette.subtle through this nested palette, not
+  // through flat semantic-token names such as "colorPalette.subtle".
+  theme: {
+    border: colorToken('lineStrong'),
+    contrast: colorToken('accentFg'),
+    emphasized: colorToken('lineStrong'),
+    fg: colorToken('fg'),
+    focusRing: colorToken('active'),
+    muted: colorToken('panel'),
+    solid: colorToken('accent'),
+    subtle: colorToken('paletteSubtle'),
+  },
+};
 
 const themeConditions = Object.fromEntries(
   NON_DEFAULT_THEMES.map((theme) => [conditionName(theme.id), `[data-theme=${theme.id}]`])

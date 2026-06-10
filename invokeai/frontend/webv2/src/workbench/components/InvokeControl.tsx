@@ -1,6 +1,6 @@
 import { Box, HStack, Icon, Menu, Portal, Text, VStack } from '@chakra-ui/react';
 import { useEffect, useRef } from 'react';
-import { PiCaretDownBold, PiCheckBold, PiLockSimpleFill, PiLightningFill } from 'react-icons/pi';
+import { PiCaretDownBold, PiCheckBold, PiLockSimpleFill, PiSparkleFill } from 'react-icons/pi';
 
 import { useWorkbench } from '../WorkbenchContext';
 import {
@@ -65,7 +65,7 @@ export const InvokeControl = () => {
   }, [dispatch]);
 
   return (
-    <HStack flexShrink={0} gap="0" h="7" overflow="hidden" rounded="xs" shadow="sm" w={CONTROL_WIDTH}>
+    <HStack flexShrink={0} gap="0" h="9" overflow="hidden" rounded="sm" shadow="sm" w={CONTROL_WIDTH}>
       <HStack
         aria-disabled={!isValid}
         aria-label={invokeLabel}
@@ -93,9 +93,9 @@ export const InvokeControl = () => {
         _hover={isValid ? { filter: 'brightness(1.05)' } : undefined}
         _active={{ filter: 'brightness(0.96)' }}
       >
-        <Icon as={PiLightningFill} boxSize="4" flexShrink={0} />
+        <Icon as={PiSparkleFill} boxSize="4" flexShrink={0} />
         <VStack align="start" gap="0" minW="0">
-          <Text fontSize="sm" fontWeight="800" lineHeight="1.1">
+          <Text fontSize="sm" fontWeight="700" lineHeight="1">
             Invoke
           </Text>
           <HStack gap="1" maxW="full">

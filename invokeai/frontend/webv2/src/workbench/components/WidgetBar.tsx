@@ -1,8 +1,9 @@
-import { Flex, Icon, Menu, Portal, Text, Tooltip } from '@chakra-ui/react';
+import { Flex, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { PiCheckBold, PiDotsThreeBold } from 'react-icons/pi';
 
 import { WidgetIcon } from '../iconResolver';
 import type { RegisteredWidget, WidgetIconId, WidgetId, WidgetRegion } from '../types';
+import { Tooltip } from './ui/Tooltip';
 
 export interface WidgetBarItem {
   id: WidgetId;
@@ -71,37 +72,28 @@ const WidgetSlot = ({
   const tooltipLabel = item.failureMessage ? `${item.label}: ${item.failureMessage}` : item.label;
 
   return (
-    <Tooltip.Root openDelay={250} closeDelay={80} positioning={{ placement: tooltipPlacement }}>
-      <Tooltip.Trigger asChild>
-        <Flex
-          align="center"
-          aria-label={item.label}
-          aria-disabled={item.status === 'disabled'}
-          aria-pressed={isActive}
-          as="button"
-          bg={isActive ? 'accent.widget' : 'transparent'}
-          color={isActive ? 'accent.widgetFg' : 'fg.default'}
-          h="9"
-          justify="center"
-          rounded="md"
-          opacity={item.status === 'disabled' ? 0.4 : 1}
-          pointerEvents={item.status === 'disabled' ? 'none' : 'auto'}
-          transition="background 0.12s ease, color 0.12s ease"
-          w="9"
-          _hover={{ bg: isActive ? 'accent.widget' : 'bg.surfaceRaised' }}
-          onClick={() => onSelect(item.id)}
-        >
-          <WidgetIcon iconId={item.iconId} boxSize="5" />
-        </Flex>
-      </Tooltip.Trigger>
-      <Portal>
-        <Tooltip.Positioner>
-          <Tooltip.Content bg="bg.surfaceRaised" borderWidth="1px" borderColor="border.emphasis" color="fg.default">
-            {tooltipLabel}
-          </Tooltip.Content>
-        </Tooltip.Positioner>
-      </Portal>
-    </Tooltip.Root>
+    <Tooltip closeDelay={80} content={tooltipLabel} openDelay={250} positioning={{ placement: tooltipPlacement }}>
+      <Flex
+        align="center"
+        aria-label={item.label}
+        aria-disabled={item.status === 'disabled'}
+        aria-pressed={isActive}
+        as="button"
+        bg={isActive ? 'accent.widget' : 'transparent'}
+        color={isActive ? 'accent.widgetFg' : 'fg.default'}
+        h="9"
+        justify="center"
+        rounded="md"
+        opacity={item.status === 'disabled' ? 0.4 : 1}
+        pointerEvents={item.status === 'disabled' ? 'none' : 'auto'}
+        transition="background 0.12s ease, color 0.12s ease"
+        w="9"
+        _hover={{ bg: isActive ? 'accent.widget' : 'bg.surfaceRaised' }}
+        onClick={() => onSelect(item.id)}
+      >
+        <WidgetIcon iconId={item.iconId} boxSize="5" />
+      </Flex>
+    </Tooltip>
   );
 };
 

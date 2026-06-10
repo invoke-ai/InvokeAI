@@ -76,3 +76,23 @@ export const fieldLabelRecipe = defineRecipe({
     textTransform: 'uppercase',
   },
 });
+
+/** Shared tooltip chrome for workbench controls. */
+export const workbenchTooltipRecipe = defineSlotRecipe({
+  slots: ['content', 'arrow', 'arrowTip'],
+  base: {
+    content: {
+      bg: 'bg.surfaceRaised',
+      borderColor: 'border.emphasis',
+      borderWidth: '1px',
+      boxShadow: 'lg',
+      color: 'fg.default',
+    },
+    arrow: {
+      '--arrow-background': 'colors.bg.surfaceRaised',
+    },
+    arrowTip: {
+      borderColor: 'border.emphasis',
+    },
+  },
+});

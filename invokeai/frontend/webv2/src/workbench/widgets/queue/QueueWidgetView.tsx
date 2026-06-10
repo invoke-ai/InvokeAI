@@ -1,7 +1,8 @@
-import { Badge, Button, Stack, Text, HStack } from '@chakra-ui/react';
+import { Badge, Stack, Text, HStack } from '@chakra-ui/react';
 import { PiListNumbersBold } from 'react-icons/pi';
 
 import { StatusWidgetChip } from '../../components/WidgetFrames';
+import { Button } from '../../components/ui/Button';
 import type { WidgetViewProps } from '../../types';
 import { useWorkbench } from '../../WorkbenchContext';
 import { getDestinationLabel, getSourceLabel } from '../../invocation';

@@ -1,5 +1,6 @@
-import { Button, HStack } from '@chakra-ui/react';
+import { HStack } from '@chakra-ui/react';
 
+import { Button } from '../../components/ui/Button';
 import { useWorkbench } from '../../WorkbenchContext';
 
 export const LayoutHeaderActions = () => {

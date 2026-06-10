@@ -1,8 +1,9 @@
-import { Button, Code, Dialog, Portal, ScrollArea, Stack, Text } from '@chakra-ui/react';
+import { Code, Dialog, Portal, ScrollArea, Stack, Text } from '@chakra-ui/react';
 
 import { formatRoute, isInvocationRouteValid, resolveInvocationRoute } from '../invocation';
 import type { GraphContract, GraphId, InvocationSourceId } from '../types';
 import { useWorkbench } from '../WorkbenchContext';
+import { Button } from './ui/Button';
 
 interface GraphPreviewDialogProps {
   graph: GraphContract | null;

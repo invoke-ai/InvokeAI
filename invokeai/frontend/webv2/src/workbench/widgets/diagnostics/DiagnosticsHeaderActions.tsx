@@ -1,6 +1,7 @@
-import { Badge, Button } from '@chakra-ui/react';
+import { Badge } from '@chakra-ui/react';
 import { PiBugBold } from 'react-icons/pi';
 
+import { Button } from '../../components/ui/Button';
 import { useWorkbench } from '../../WorkbenchContext';
 
 export const DiagnosticsHeaderActions = () => {

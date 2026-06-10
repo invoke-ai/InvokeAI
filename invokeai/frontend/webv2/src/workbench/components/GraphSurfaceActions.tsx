@@ -1,10 +1,11 @@
-import { Icon, IconButton, Menu, Portal, Text } from '@chakra-ui/react';
+import { Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { useState } from 'react';
 import { PiDotsThreeBold, PiGraphBold, PiTargetBold } from 'react-icons/pi';
 
 import { useWorkbench } from '../WorkbenchContext';
 import type { GraphBearingSurfaceContract, GraphContract, WidgetId } from '../types';
 import { GraphPreviewDialog } from './GraphPreviewDialog';
+import { IconButton } from './ui/Button';
 
 interface GraphSurfaceActionsProps {
   surface: GraphBearingSurfaceContract;

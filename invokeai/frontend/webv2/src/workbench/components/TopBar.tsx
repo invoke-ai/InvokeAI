@@ -1,10 +1,11 @@
-import { Badge, Box, Flex, HStack, Icon, IconButton, NumberInput, Text } from '@chakra-ui/react';
+import { Badge, Box, Flex, HStack, Icon, NumberInput, Text } from '@chakra-ui/react';
 import { PiCaretDownBold, PiCubeBold, PiListNumbersBold, PiUserCircleBold, PiXBold } from 'react-icons/pi';
 
 import { InvokeControl } from './InvokeControl';
 import { LayoutPresetMenu } from './LayoutPresetMenu';
 import { ProjectTabs } from './ProjectTabs';
 import { SettingsButton } from './SettingsDialog';
+import { IconButton } from './ui/Button';
 import { useWorkbench } from '../WorkbenchContext';
 
 /** Workbench top bar: brand, global Invoke command cluster, project tabs, layout + account controls. */
@@ -17,13 +18,13 @@ export const TopBar = () => (
     borderColor="border.subtle"
     flexShrink={0}
     gap="2"
-    h="10"
+    h="12"
     px="3"
     w="full"
   >
     <BrandMark />
-    <BatchCountField />
     <InvokeControl />
+    <BatchCountField />
     <QueueCluster />
     <Box w="1px" h="5" bg="border.subtle" mx="1" flexShrink={0} />
     <ProjectTabs />
@@ -85,7 +86,7 @@ const BatchCountField = () => {
       min={1}
       size="xs"
       value={String(batchCount)}
-      w="16"
+      w="14"
       onValueChange={({ valueAsNumber }) => {
         if (Number.isFinite(valueAsNumber)) {
           dispatch({ batchCount: valueAsNumber, type: 'setGenerateBatchCount' });

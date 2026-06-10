@@ -50,6 +50,8 @@ export interface ThemeColors {
   activeFg: string;
   /** Destructive / error foreground. */
   danger: string;
+  /** Chakra virtual color-palette subtle surface for component variant fills. */
+  paletteSubtle: string;
 }
 
 export interface ThemeDefinition {
@@ -85,6 +87,7 @@ const dark: ThemeColors = {
   active: '#59cfff',
   activeFg: '#081218',
   danger: '#ff6b6b',
+  paletteSubtle: '#181918',
 };
 
 const light: ThemeColors = {
@@ -108,6 +111,7 @@ const light: ThemeColors = {
   active: '#2563eb',
   activeFg: '#ffffff',
   danger: '#c33d3d',
+  paletteSubtle: '#f8faf5',
 };
 
 const forest: ThemeColors = {
@@ -131,6 +135,7 @@ const forest: ThemeColors = {
   active: '#3fb6a0',
   activeFg: '#04140f',
   danger: '#e8775a',
+  paletteSubtle: '#1c3019',
 };
 
 const mono: ThemeColors = {
@@ -154,6 +159,7 @@ const mono: ThemeColors = {
   active: '#9a9a9a',
   activeFg: '#121212',
   danger: '#d68a8a',
+  paletteSubtle: '#1b1b1b',
 };
 
 const ultradark: ThemeColors = {
@@ -177,6 +183,7 @@ const ultradark: ThemeColors = {
   active: '#59cfff',
   activeFg: '#05121a',
   danger: '#ff6b6b',
+  paletteSubtle: '#0a0a0a',
 };
 
 /**

@@ -1,4 +1,4 @@
-import { Box, Button, HStack, IconButton, ScrollArea, Stack, Text } from '@chakra-ui/react';
+import { Box, HStack, ScrollArea, Stack, Text } from '@chakra-ui/react';
 import {
   PiCaretLeftBold,
   PiCaretLineDownBold,
@@ -9,6 +9,7 @@ import {
 } from 'react-icons/pi';
 
 import type { CanvasStagingCandidateContract, GeneratedImageContract } from '../../types';
+import { Button, IconButton } from '../../components/ui/Button';
 
 const THUMBNAIL_STRIP_HEIGHT = '5.5rem';
 

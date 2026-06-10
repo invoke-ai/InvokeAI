@@ -1,6 +1,7 @@
-import { Button, HStack, Input, NativeSelect, Stack, Text, Textarea } from '@chakra-ui/react';
+import { HStack, Input, NativeSelect, Stack, Text, Textarea } from '@chakra-ui/react';
 import type { ChangeEvent } from 'react';
 
+import { Button } from '../../components/ui/Button';
 import { Field } from '../../components/ui/Field';
 import { getSettingsWithModelDefaults } from '../../generation/graph';
 import type { GenerateSettings, MainModelConfig } from '../../generation/types';

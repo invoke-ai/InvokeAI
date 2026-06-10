@@ -1,4 +1,4 @@
-import { Box, Flex, Icon, Menu, Portal, Text, Tooltip } from '@chakra-ui/react';
+import { Box, Flex, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { PiCheckBold, PiDotsThreeBold } from 'react-icons/pi';
 
 import { WidgetIcon } from '../iconResolver';
@@ -6,6 +6,7 @@ import type { RegisteredWidget, WidgetId } from '../types';
 import { getWidgetsForRegion } from '../widgetRegistry';
 import { useWorkbench } from '../WorkbenchContext';
 import { WidgetRenderer } from './WidgetRenderer';
+import { Tooltip } from './ui/Tooltip';
 
 interface BottomWidgetItem {
   failureMessage?: string;
@@ -112,30 +113,26 @@ const CompactBottomWidget = ({
 
   if (item.isExpandable) {
     return (
-      <Tooltip.Root openDelay={250} closeDelay={80} positioning={{ placement: 'top-start' }}>
-        <Tooltip.Trigger asChild>{content}</Tooltip.Trigger>
-        <Portal>
-          <Tooltip.Positioner>
-            <Tooltip.Content bg="bg.surfaceRaised" borderWidth="1px" borderColor="border.emphasis" color="fg.default">
-              {item.failureMessage ? `${item.label}: ${item.failureMessage}` : item.label}
-            </Tooltip.Content>
-          </Tooltip.Positioner>
-        </Portal>
-      </Tooltip.Root>
+      <Tooltip
+        closeDelay={80}
+        content={item.failureMessage ? `${item.label}: ${item.failureMessage}` : item.label}
+        openDelay={250}
+        positioning={{ placement: 'top-start' }}
+      >
+        {content}
+      </Tooltip>
     );
   }
 
   return (
-    <Tooltip.Root openDelay={250} closeDelay={80} positioning={{ placement: 'top-start' }}>
-      <Tooltip.Trigger asChild>{content}</Tooltip.Trigger>
-      <Portal>
-        <Tooltip.Positioner>
-          <Tooltip.Content bg="bg.surfaceRaised" borderWidth="1px" borderColor="border.emphasis" color="fg.default">
-            <WidgetRenderer widget={item.widget} presentation="tooltip" region="bottom" />
-          </Tooltip.Content>
-        </Tooltip.Positioner>
-      </Portal>
-    </Tooltip.Root>
+    <Tooltip
+      closeDelay={80}
+      content={<WidgetRenderer widget={item.widget} presentation="tooltip" region="bottom" />}
+      openDelay={250}
+      positioning={{ placement: 'top-start' }}
+    >
+      {content}
+    </Tooltip>
   );
 };
 
