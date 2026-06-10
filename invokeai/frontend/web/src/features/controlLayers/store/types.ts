@@ -768,8 +768,16 @@ const zDimensionsState = z.object({
 });
 
 export const MAX_POSITIVE_PROMPT_HISTORY = 100;
+const zPromptHistoryItem = z.union([
+  zParameterPositivePrompt.transform((positivePrompt) => ({ positivePrompt, negativePrompt: null })),
+  z.object({
+    positivePrompt: zParameterPositivePrompt,
+    negativePrompt: zParameterNegativePrompt,
+  }),
+]);
+export type PromptHistoryItem = z.infer<typeof zPromptHistoryItem>;
 const zPositivePromptHistory = z
-  .array(zParameterPositivePrompt)
+  .array(zPromptHistoryItem)
   .transform((arr) => arr.slice(0, MAX_POSITIVE_PROMPT_HISTORY));
 
 export const zInfillMethod = z.enum(['patchmatch', 'lama', 'cv2', 'color', 'tile']);
@@ -832,10 +840,9 @@ export const zParamsState = z.object({
   zImageVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX VAE
   zImageQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder
   zImageQwen3SourceModel: zParameterModel.nullable(), // Diffusers Z-Image model (fallback for VAE/Encoder)
-  // Anima model components - uses Qwen3 0.6B + T5-XXL tokenizer + QwenImage VAE
+  // Anima model components - uses Qwen3 0.6B + bundled T5-XXL tokenizer + QwenImage VAE
   animaVaeModel: zParameterVAEModel.nullable(), // Optional: Separate QwenImage/FLUX VAE for Anima
   animaQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 0.6B Encoder for Anima
-  animaT5EncoderModel: zModelIdentifierField.nullable(), // T5-XXL tokenizer for Anima LLM Adapter
   animaScheduler: zParameterAnimaScheduler,
   // Flux2 Klein model components - uses Qwen3 instead of CLIP+T5
   kleinVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE for Klein
@@ -922,7 +929,6 @@ export const getInitialParamsState = (): ParamsState => ({
   zImageQwen3SourceModel: null,
   animaVaeModel: null,
   animaQwen3EncoderModel: null,
-  animaT5EncoderModel: null,
   animaScheduler: 'euler',
   kleinVaeModel: null,
   kleinQwen3EncoderModel: null,
