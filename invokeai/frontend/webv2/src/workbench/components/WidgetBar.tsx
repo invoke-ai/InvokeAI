@@ -72,7 +72,13 @@ const WidgetSlot = ({
   const tooltipLabel = item.failureMessage ? `${item.label}: ${item.failureMessage}` : item.label;
 
   return (
-    <Tooltip closeDelay={80} content={tooltipLabel} openDelay={250} positioning={{ placement: tooltipPlacement }}>
+    <Tooltip
+      showArrow
+      closeDelay={80}
+      content={tooltipLabel}
+      openDelay={250}
+      positioning={{ placement: tooltipPlacement }}
+    >
       <Flex
         align="center"
         aria-label={item.label}

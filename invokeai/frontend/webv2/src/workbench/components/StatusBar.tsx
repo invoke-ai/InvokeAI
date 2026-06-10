@@ -118,6 +118,7 @@ const CompactBottomWidget = ({
         content={item.failureMessage ? `${item.label}: ${item.failureMessage}` : item.label}
         openDelay={250}
         positioning={{ placement: 'top-start' }}
+        showArrow
       >
         {content}
       </Tooltip>
@@ -130,6 +131,7 @@ const CompactBottomWidget = ({
       content={<WidgetRenderer widget={item.widget} presentation="tooltip" region="bottom" />}
       openDelay={250}
       positioning={{ placement: 'top-start' }}
+      showArrow
     >
       {content}
     </Tooltip>

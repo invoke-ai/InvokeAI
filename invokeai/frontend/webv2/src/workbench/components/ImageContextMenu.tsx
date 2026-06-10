@@ -405,7 +405,13 @@ const QuickMenuItem = ({
   value: string;
   onClick: () => void;
 }) => (
-  <Tooltip content={label} contentProps={{ fontSize: '2xs' }} openDelay={300} positioning={{ placement: 'top' }}>
+  <Tooltip
+    showArrow
+    content={label}
+    contentProps={{ fontSize: '2xs' }}
+    openDelay={300}
+    positioning={{ placement: 'top' }}
+  >
     <Menu.Item aria-label={label} flex="1" justifyContent="center" value={value} onClick={onClick}>
       <Icon as={icon} boxSize="4" color="fg.default" />
     </Menu.Item>

@@ -39,6 +39,7 @@ export const ProjectTabs = () => {
             {state.projects.length > 1 && (
               <CloseButton
                 size="2xs"
+                me="-2"
                 as="span"
                 role="button"
                 onClick={(event) => {
@@ -49,7 +50,7 @@ export const ProjectTabs = () => {
             )}
           </Tabs.Trigger>
         ))}
-        <Tooltip content="Create new project">
+        <Tooltip content="Create new project" showArrow>
           <IconButton
             aria-label="Create new project"
             flexShrink={0}
