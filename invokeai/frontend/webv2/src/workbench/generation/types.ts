@@ -48,15 +48,19 @@ export interface CompiledGenerateGraph {
 }
 
 export interface EnqueueGenerateResult {
+  batchId?: string;
   itemIds: number[];
 }
 
 export interface QueueItemDTO {
   item_id: number;
   status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'canceled';
+  batch_id?: string;
+  origin?: string | null;
+  destination?: string | null;
   error_type?: string | null;
   error_message?: string | null;
-  session: {
+  session?: {
     results: Record<string, unknown>;
   };
 }

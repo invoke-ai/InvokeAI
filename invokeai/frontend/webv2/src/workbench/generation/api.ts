@@ -1,37 +1,10 @@
+import { absolutizeApiUrl, apiFetchJson } from '../backend/http';
+import { buildQueueItemOrigin } from '../backend/events';
 import type { BackendGraphContract } from '../types';
 import type { EnqueueGenerateRequest, EnqueueGenerateResult, ImageDTO, MainModelConfig, QueueItemDTO } from './types';
 
-const API_BASE_URL = import.meta.env.VITE_INVOKEAI_API_BASE_URL ?? '';
-const POLL_INTERVAL_MS = 1500;
-const POLL_TIMEOUT_MS = 15 * 60 * 1000;
-
-const buildUrl = (path: string): string => `${API_BASE_URL}${path}`;
-
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
-
-const assertOk = async (response: Response): Promise<Response> => {
-  if (response.ok) {
-    return response;
-  }
-
-  const text = await response.text();
-  throw new Error(text || `${response.status} ${response.statusText}`);
-};
-
-const absolutizeImageUrl = (url: string): string => {
-  if (!API_BASE_URL || url.startsWith('http://') || url.startsWith('https://')) {
-    return url;
-  }
-
-  return new URL(url, API_BASE_URL).toString();
-};
-
 export const listMainModels = async (): Promise<MainModelConfig[]> => {
-  const response = await assertOk(await fetch(buildUrl('/api/v2/models/?model_type=main')));
-  const body = (await response.json()) as { models?: MainModelConfig[] };
+  const body = await apiFetchJson<{ models?: MainModelConfig[] }>('/api/v2/models/?model_type=main');
 
   return body.models ?? [];
 };
@@ -48,49 +21,43 @@ export const enqueueGenerateGraph = async (request: EnqueueGenerateRequest): Pro
       ],
       destination: request.destination,
       graph: request.graph satisfies BackendGraphContract,
-      origin: `webv2:${request.sourceQueueItemId}`,
+      origin: buildQueueItemOrigin(request.sourceQueueItemId),
       runs: request.batchCount,
     },
     prepend: false,
   };
-
-  const response = await assertOk(
-    await fetch(buildUrl('/api/v1/queue/default/enqueue_batch'), {
-      body: JSON.stringify(body),
-      headers: { 'Content-Type': 'application/json' },
-      method: 'POST',
-    })
+  const result = await apiFetchJson<{ batch?: { batch_id?: string }; item_ids?: number[] }>(
+    '/api/v1/queue/default/enqueue_batch',
+    { body: JSON.stringify(body), method: 'POST' }
   );
-  const result = (await response.json()) as { item_ids?: number[] };
 
-  return { itemIds: result.item_ids ?? [] };
+  return { batchId: result.batch?.batch_id, itemIds: result.item_ids ?? [] };
 };
 
-const getQueueItem = async (itemId: number): Promise<QueueItemDTO> => {
-  const response = await assertOk(await fetch(buildUrl(`/api/v1/queue/default/i/${itemId}`)));
+export const getQueueItem = (itemId: number): Promise<QueueItemDTO> =>
+  apiFetchJson<QueueItemDTO>(`/api/v1/queue/default/i/${itemId}`);
 
-  return (await response.json()) as QueueItemDTO;
-};
+export const listAllQueueItems = (): Promise<QueueItemDTO[]> =>
+  apiFetchJson<QueueItemDTO[]>('/api/v1/queue/default/list_all');
 
 const getImageDTO = async (imageName: string, queuedAt: string, sourceQueueItemId: string): Promise<ImageDTO> => {
-  const response = await assertOk(await fetch(buildUrl(`/api/v1/images/i/${encodeURIComponent(imageName)}`)));
-  const body = (await response.json()) as {
+  const body = await apiFetchJson<{
     image_name: string;
     image_url: string;
     thumbnail_url: string;
     width: number;
     height: number;
     is_intermediate: boolean;
-  };
+  }>(`/api/v1/images/i/${encodeURIComponent(imageName)}`);
 
   return {
     height: body.height,
     imageName: body.image_name,
-    imageUrl: absolutizeImageUrl(body.image_url),
+    imageUrl: absolutizeApiUrl(body.image_url),
     isIntermediate: body.is_intermediate,
     queuedAt,
     sourceQueueItemId,
-    thumbnailUrl: absolutizeImageUrl(body.thumbnail_url),
+    thumbnailUrl: absolutizeApiUrl(body.thumbnail_url),
     width: body.width,
   };
 };
@@ -98,7 +65,7 @@ const getImageDTO = async (imageName: string, queuedAt: string, sourceQueueItemI
 const getResultImageNames = (queueItem: QueueItemDTO): string[] => {
   const imageNames = new Set<string>();
 
-  for (const result of Object.values(queueItem.session.results)) {
+  for (const result of Object.values(queueItem.session?.results ?? {})) {
     if (!result || typeof result !== 'object') {
       continue;
     }
@@ -112,39 +79,32 @@ const getResultImageNames = (queueItem: QueueItemDTO): string[] => {
   return [...imageNames];
 };
 
-export const waitForQueueItemImages = async (
+/** Fetch the result image DTOs of a completed queue item. */
+export const getQueueItemResultImages = async (
   itemId: number,
   sourceQueueItemId: string,
   queuedAt: string
 ): Promise<ImageDTO[]> => {
-  const startedAt = Date.now();
+  const queueItem = await getQueueItem(itemId);
 
-  while (Date.now() - startedAt < POLL_TIMEOUT_MS) {
-    const queueItem = await getQueueItem(itemId);
+  return Promise.all(
+    getResultImageNames(queueItem).map((imageName) => getImageDTO(imageName, queuedAt, sourceQueueItemId))
+  );
+};
 
-    if (queueItem.status === 'completed') {
-      const imageNames = getResultImageNames(queueItem);
-      return Promise.all(imageNames.map((imageName) => getImageDTO(imageName, queuedAt, sourceQueueItemId)));
-    }
-
-    if (queueItem.status === 'failed' || queueItem.status === 'canceled') {
-      throw new Error(queueItem.error_message ?? queueItem.error_type ?? `Queue item ${itemId} ${queueItem.status}.`);
-    }
-
-    await sleep(POLL_INTERVAL_MS);
+export const cancelQueueItemsByBatchIds = async (batchIds: string[]): Promise<void> => {
+  if (batchIds.length === 0) {
+    return;
   }
 
-  throw new Error(`Timed out waiting for queue item ${itemId}.`);
+  await apiFetchJson('/api/v1/queue/default/cancel_by_batch_ids', {
+    body: JSON.stringify({ batch_ids: batchIds }),
+    method: 'PUT',
+  });
 };
 
 export const cancelQueueItems = async (itemIds: number[]): Promise<void> => {
   await Promise.all(
-    itemIds.map(async (itemId) => {
-      await assertOk(
-        await fetch(buildUrl(`/api/v1/queue/default/i/${itemId}/cancel`), {
-          method: 'PUT',
-        })
-      );
-    })
+    itemIds.map((itemId) => apiFetchJson(`/api/v1/queue/default/i/${itemId}/cancel`, { method: 'PUT' }))
   );
 };

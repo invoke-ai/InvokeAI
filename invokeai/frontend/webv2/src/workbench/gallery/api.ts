@@ -1,6 +1,5 @@
+import { absolutizeApiUrl, apiFetch, apiFetchJson, apiFetchRaw, sleep } from '../backend/http';
 import type { GeneratedImageContract } from '../types';
-
-const API_BASE_URL = import.meta.env.VITE_INVOKEAI_API_BASE_URL ?? '';
 
 export type GalleryView = 'images' | 'assets';
 
@@ -70,27 +69,8 @@ interface ListImagesResponse {
 const imageCategories = ['general'];
 const assetCategories = ['control', 'mask', 'user', 'other'];
 
-const buildUrl = (path: string): string => `${API_BASE_URL}${path}`;
-
-const absolutizeImageUrl = (url: string): string => {
-  if (!API_BASE_URL || url.startsWith('http://') || url.startsWith('https://')) {
-    return url;
-  }
-
-  return new URL(url, API_BASE_URL).toString();
-};
-
 const getImageThumbnailUrl = (imageName: string): string =>
-  absolutizeImageUrl(`/api/v1/images/i/${encodeURIComponent(imageName)}/thumbnail`);
-
-const assertOk = async (response: Response): Promise<Response> => {
-  if (response.ok) {
-    return response;
-  }
-
-  const text = await response.text();
-  throw new Error(text || `${response.status} ${response.statusText}`);
-};
+  absolutizeApiUrl(`/api/v1/images/i/${encodeURIComponent(imageName)}/thumbnail`);
 
 const toSearchParams = (entries: Record<string, boolean | number | string | string[] | undefined>): string => {
   const params = new URLSearchParams();
@@ -132,8 +112,7 @@ const getGalleryTotal = async ({ boardId, categories }: { boardId: string; categ
     limit: 0,
     offset: 0,
   });
-  const response = await assertOk(await fetch(buildUrl(`/api/v1/images/?${query}`)));
-  const body = (await response.json()) as Pick<ListImagesResponse, 'total'>;
+  const body = await apiFetchJson<Pick<ListImagesResponse, 'total'>>(`/api/v1/images/?${query}`);
 
   return body.total;
 };
@@ -143,11 +122,11 @@ const mapImage = (image: BackendImageDTO): GalleryImage => ({
   height: image.height,
   imageCategory: image.image_category,
   imageName: image.image_name,
-  imageUrl: absolutizeImageUrl(image.image_url),
+  imageUrl: absolutizeApiUrl(image.image_url),
   queuedAt: image.created_at,
   sourceQueueItemId: 'backend-gallery',
   starred: image.starred ?? false,
-  thumbnailUrl: absolutizeImageUrl(image.thumbnail_url),
+  thumbnailUrl: absolutizeApiUrl(image.thumbnail_url),
   width: image.width,
 });
 
@@ -166,14 +145,15 @@ export const listGalleryBoards = async ({
     include_archived: includeArchived,
     order_by: orderBy,
   });
-  const boardsResponsePromise = fetch(buildUrl(`/api/v1/boards/?${boardsQuery}`)).then(assertOk);
+  const boardsBodyPromise = apiFetchJson<BackendBoardDTO[] | { items?: BackendBoardDTO[] }>(
+    `/api/v1/boards/?${boardsQuery}`
+  );
 
-  const [response, uncategorizedImageCount, uncategorizedAssetCount] = await Promise.all([
-    boardsResponsePromise,
+  const [body, uncategorizedImageCount, uncategorizedAssetCount] = await Promise.all([
+    boardsBodyPromise,
     getGalleryTotal({ boardId: 'none', categories: imageCategories }),
     getGalleryTotal({ boardId: 'none', categories: assetCategories }),
   ]);
-  const body = (await response.json()) as BackendBoardDTO[] | { items?: BackendBoardDTO[] };
   const boards = Array.isArray(body) ? body : (body.items ?? []);
 
   return [
@@ -199,8 +179,7 @@ interface VirtualDateBoardDTO {
 }
 
 export const listGalleryDateBoards = async (): Promise<GalleryBoard[]> => {
-  const response = await assertOk(await fetch(buildUrl('/api/v1/virtual_boards/by_date')));
-  const body = (await response.json()) as VirtualDateBoardDTO[];
+  const body = await apiFetchJson<VirtualDateBoardDTO[]>('/api/v1/virtual_boards/by_date');
 
   return body.map((board) => ({
     archived: false,
@@ -224,15 +203,12 @@ const getGalleryImagesByNames = async (imageNames: string[]): Promise<GalleryIma
     return [];
   }
 
-  const response = await assertOk(
-    await fetch(buildUrl('/api/v1/images/images_by_names'), {
-      body: JSON.stringify({ image_names: imageNames }),
-      headers: { 'Content-Type': 'application/json' },
-      method: 'POST',
-    })
-  );
+  const body = await apiFetchJson<BackendImageDTO[]>('/api/v1/images/images_by_names', {
+    body: JSON.stringify({ image_names: imageNames }),
+    method: 'POST',
+  });
 
-  return ((await response.json()) as BackendImageDTO[]).map(mapImage);
+  return body.map(mapImage);
 };
 
 /**
@@ -262,12 +238,9 @@ const listGalleryDateBoardImages = async ({
     search_term: searchTerm.trim() || undefined,
     starred_first: starredFirst,
   });
-  const response = await assertOk(
-    await fetch(
-      buildUrl(`/api/v1/virtual_boards/by_date/${encodeURIComponent(getDateFromBoardId(boardId))}/image_names?${query}`)
-    )
+  const body = await apiFetchJson<{ image_names: string[]; total_count: number }>(
+    `/api/v1/virtual_boards/by_date/${encodeURIComponent(getDateFromBoardId(boardId))}/image_names?${query}`
   );
-  const body = (await response.json()) as { image_names: string[]; total_count: number };
   const images = await getGalleryImagesByNames(body.image_names.slice(offset, offset + limit));
 
   return { images, total: body.total_count };
@@ -304,46 +277,34 @@ export const listGalleryImages = async ({
     search_term: searchTerm.trim() || undefined,
     starred_first: starredFirst,
   });
-  const response = await assertOk(await fetch(buildUrl(`/api/v1/images/?${query}`)));
-  const body = (await response.json()) as ListImagesResponse;
+  const body = await apiFetchJson<ListImagesResponse>(`/api/v1/images/?${query}`);
 
   return { images: body.items.map(mapImage), total: body.total };
 };
 
 export const createGalleryBoard = async (boardName: string): Promise<GalleryBoard> => {
   const query = toSearchParams({ board_name: boardName });
-  const response = await assertOk(
-    await fetch(buildUrl(`/api/v1/boards/?${query}`), {
-      method: 'POST',
-    })
-  );
+  const body = await apiFetchJson<BackendBoardDTO>(`/api/v1/boards/?${query}`, { method: 'POST' });
 
-  return mapBoard((await response.json()) as BackendBoardDTO);
+  return mapBoard(body);
 };
 
 export const updateGalleryBoard = async (
   boardId: string,
   changes: { name?: string; archived?: boolean }
 ): Promise<GalleryBoard> => {
-  const response = await assertOk(
-    await fetch(buildUrl(`/api/v1/boards/${encodeURIComponent(boardId)}`), {
-      body: JSON.stringify({ archived: changes.archived, board_name: changes.name }),
-      headers: { 'Content-Type': 'application/json' },
-      method: 'PATCH',
-    })
-  );
+  const body = await apiFetchJson<BackendBoardDTO>(`/api/v1/boards/${encodeURIComponent(boardId)}`, {
+    body: JSON.stringify({ archived: changes.archived, board_name: changes.name }),
+    method: 'PATCH',
+  });
 
-  return mapBoard((await response.json()) as BackendBoardDTO);
+  return mapBoard(body);
 };
 
 export const deleteGalleryBoard = async (boardId: string, includeImages: boolean): Promise<void> => {
   const query = toSearchParams({ include_images: includeImages });
 
-  await assertOk(
-    await fetch(buildUrl(`/api/v1/boards/${encodeURIComponent(boardId)}?${query}`), {
-      method: 'DELETE',
-    })
-  );
+  await apiFetch(`/api/v1/boards/${encodeURIComponent(boardId)}?${query}`, { method: 'DELETE' });
 };
 
 export const addImagesToGalleryBoard = async (boardId: string, imageNames: string[]): Promise<void> => {
@@ -357,13 +318,10 @@ export const addImagesToGalleryBoard = async (boardId: string, imageNames: strin
     return;
   }
 
-  await assertOk(
-    await fetch(buildUrl('/api/v1/board_images/batch'), {
-      body: JSON.stringify({ board_id: boardId, image_names: imageNames }),
-      headers: { 'Content-Type': 'application/json' },
-      method: 'POST',
-    })
-  );
+  await apiFetchJson('/api/v1/board_images/batch', {
+    body: JSON.stringify({ board_id: boardId, image_names: imageNames }),
+    method: 'POST',
+  });
 };
 
 export const removeImagesFromGalleryBoard = async (imageNames: string[]): Promise<void> => {
@@ -371,13 +329,10 @@ export const removeImagesFromGalleryBoard = async (imageNames: string[]): Promis
     return;
   }
 
-  await assertOk(
-    await fetch(buildUrl('/api/v1/board_images/batch/delete'), {
-      body: JSON.stringify({ image_names: imageNames }),
-      headers: { 'Content-Type': 'application/json' },
-      method: 'POST',
-    })
-  );
+  await apiFetchJson('/api/v1/board_images/batch/delete', {
+    body: JSON.stringify({ image_names: imageNames }),
+    method: 'POST',
+  });
 };
 
 const setGalleryImagesStarred = async (imageNames: string[], starred: boolean): Promise<void> => {
@@ -385,13 +340,10 @@ const setGalleryImagesStarred = async (imageNames: string[], starred: boolean): 
     return;
   }
 
-  await assertOk(
-    await fetch(buildUrl(`/api/v1/images/${starred ? 'star' : 'unstar'}`), {
-      body: JSON.stringify({ image_names: imageNames }),
-      headers: { 'Content-Type': 'application/json' },
-      method: 'POST',
-    })
-  );
+  await apiFetchJson(`/api/v1/images/${starred ? 'star' : 'unstar'}`, {
+    body: JSON.stringify({ image_names: imageNames }),
+    method: 'POST',
+  });
 };
 
 export const starGalleryImages = (imageNames: string[]): Promise<void> => setGalleryImagesStarred(imageNames, true);
@@ -403,22 +355,14 @@ export const deleteGalleryImages = async (imageNames: string[]): Promise<void> =
     return;
   }
 
-  await assertOk(
-    await fetch(buildUrl('/api/v1/images/delete'), {
-      body: JSON.stringify({ image_names: imageNames }),
-      headers: { 'Content-Type': 'application/json' },
-      method: 'POST',
-    })
-  );
+  await apiFetchJson('/api/v1/images/delete', {
+    body: JSON.stringify({ image_names: imageNames }),
+    method: 'POST',
+  });
 };
 
 const BULK_DOWNLOAD_POLL_INTERVAL_MS = 2000;
 const BULK_DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000;
-
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
 
 /**
  * Starts a bulk download (a zip prepared in a backend background task) and
@@ -432,16 +376,13 @@ export const downloadGalleryArchive = async ({
   boardId?: string;
   imageNames?: string[];
 }): Promise<{ blob: Blob; fileName: string }> => {
-  const startResponse = await assertOk(
-    await fetch(buildUrl('/api/v1/images/download'), {
+  const { bulk_download_item_name: fileName } = await apiFetchJson<{ bulk_download_item_name?: string | null }>(
+    '/api/v1/images/download',
+    {
       body: JSON.stringify({ board_id: boardId, image_names: imageNames }),
-      headers: { 'Content-Type': 'application/json' },
       method: 'POST',
-    })
+    }
   );
-  const { bulk_download_item_name: fileName } = (await startResponse.json()) as {
-    bulk_download_item_name?: string | null;
-  };
 
   if (!fileName) {
     throw new Error('The bulk download failed to start.');
@@ -450,7 +391,7 @@ export const downloadGalleryArchive = async ({
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < BULK_DOWNLOAD_TIMEOUT_MS) {
-    const response = await fetch(buildUrl(`/api/v1/images/download/${encodeURIComponent(fileName)}`));
+    const response = await apiFetchRaw(`/api/v1/images/download/${encodeURIComponent(fileName)}`);
 
     if (response.ok) {
       return { blob: await response.blob(), fileName };
@@ -475,12 +416,10 @@ export const uploadGalleryImage = async (file: File, boardId: string): Promise<G
   const body = new FormData();
   body.append('file', file);
 
-  const response = await assertOk(
-    await fetch(buildUrl(`/api/v1/images/upload?${query}`), {
-      body,
-      method: 'POST',
-    })
-  );
+  const uploadedImage = await apiFetchJson<BackendImageDTO>(`/api/v1/images/upload?${query}`, {
+    body,
+    method: 'POST',
+  });
 
-  return mapImage((await response.json()) as BackendImageDTO);
+  return mapImage(uploadedImage);
 };
