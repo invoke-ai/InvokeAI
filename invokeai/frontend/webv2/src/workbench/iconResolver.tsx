@@ -7,7 +7,10 @@ import type { WidgetIconId } from './types';
 type IconImporter = () => Promise<{ default: ComponentType }>;
 
 const iconImporters = {
+  'lucide-react:bug': () => import('lucide-react/dist/esm/icons/bug.mjs'),
   'lucide-react:cloud-check': () => import('lucide-react/dist/esm/icons/cloud-check.mjs'),
+  'lucide-react:bell': () => import('lucide-react/dist/esm/icons/bell.mjs'),
+  'lucide-react:eye': () => import('lucide-react/dist/esm/icons/eye.mjs'),
   'lucide-react:image': () => import('lucide-react/dist/esm/icons/image.mjs'),
   'lucide-react:info': () => import('lucide-react/dist/esm/icons/info.mjs'),
   'lucide-react:layers': () => import('lucide-react/dist/esm/icons/layers.mjs'),

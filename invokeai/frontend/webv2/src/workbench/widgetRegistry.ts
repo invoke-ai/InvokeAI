@@ -2,11 +2,14 @@ import { isSupportedIconId } from './iconResolver';
 import type { RegisteredWidget, WidgetFailure, WidgetId, WidgetManifest, WorkbenchRegion } from './types';
 import { autosaveStatusWidgetManifest } from './widgets/autosave-status';
 import { canvasWidgetManifest } from './widgets/canvas';
+import { diagnosticsWidgetManifest } from './widgets/diagnostics';
 import { galleryWidgetManifest } from './widgets/gallery';
 import { generateWidgetManifest } from './widgets/generate';
 import { historyControlsWidgetManifest } from './widgets/history-controls';
 import { layoutActionsWidgetManifest } from './widgets/layout-actions';
 import { layersWidgetManifest } from './widgets/layers';
+import { notificationsWidgetManifest } from './widgets/notifications';
+import { previewWidgetManifest } from './widgets/preview';
 import { queueWidgetManifest } from './widgets/queue';
 import { serverStatusWidgetManifest } from './widgets/server-status';
 import { versionStatusWidgetManifest } from './widgets/version-status';
@@ -16,9 +19,12 @@ const firstPartyWidgetManifests: WidgetManifest[] = [
   generateWidgetManifest,
   workflowWidgetManifest,
   canvasWidgetManifest,
+  diagnosticsWidgetManifest,
   galleryWidgetManifest,
+  previewWidgetManifest,
   layersWidgetManifest,
   queueWidgetManifest,
+  notificationsWidgetManifest,
   serverStatusWidgetManifest,
   autosaveStatusWidgetManifest,
   historyControlsWidgetManifest,
