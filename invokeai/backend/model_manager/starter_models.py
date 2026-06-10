@@ -1572,6 +1572,15 @@ anima_base = StarterModel(
     format=ModelFormat.Checkpoint,
     dependencies=[anima_qwen3_encoder, anima_vae],
 )
+
+anima_lllite_inpainting = StarterModel(
+    name="Anima LLLite Inpainting",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/anima-lllite-inpainting-v2.safetensors",
+    description="ControlNet-LLLite inpainting adapter for Anima by kohya-ss. Conditions the model on the masked image content during inpainting/outpainting. ~66MB",
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+)
 # endregion
 
 # List of starter models, displayed on the frontend.
@@ -1710,6 +1719,7 @@ STARTER_MODELS: list[StarterModel] = [
     anima_base,
     anima_qwen3_encoder,
     anima_vae,
+    anima_lllite_inpainting,
 ]
 
 sd1_bundle: list[StarterModel] = [
@@ -1797,6 +1807,7 @@ anima_bundle: list[StarterModel] = [
     anima_base,
     anima_qwen3_encoder,
     anima_vae,
+    anima_lllite_inpainting,
 ]
 
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {
