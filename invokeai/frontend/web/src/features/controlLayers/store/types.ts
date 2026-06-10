@@ -841,6 +841,8 @@ export const zParamsState = z.object({
   animaVaeModel: zParameterVAEModel.nullable(), // Optional: Separate QwenImage/FLUX VAE for Anima
   animaQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 0.6B Encoder for Anima
   animaScheduler: zParameterAnimaScheduler,
+  animaLLLiteModel: zModelIdentifierField.nullable().default(null), // Optional: ControlNet-LLLite inpaint adapter for Anima
+  animaLLLiteWeight: z.number().min(-10).max(10).default(1),
   // Flux2 Klein model components - uses Qwen3 instead of CLIP+T5
   kleinVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE for Klein
   kleinQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder for Klein
@@ -927,6 +929,8 @@ export const getInitialParamsState = (): ParamsState => ({
   animaVaeModel: null,
   animaQwen3EncoderModel: null,
   animaScheduler: 'euler',
+  animaLLLiteModel: null,
+  animaLLLiteWeight: 1,
   kleinVaeModel: null,
   kleinQwen3EncoderModel: null,
   qwenImageComponentSource: null,

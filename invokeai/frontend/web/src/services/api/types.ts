@@ -325,6 +325,10 @@ export const isControlNetModelConfig = (config: AnyModelConfig): config is Contr
   return config.type === 'controlnet';
 };
 
+export const isAnimaControlNetModelConfig = (config: AnyModelConfig): config is ControlNetModelConfig => {
+  return config.type === 'controlnet' && config.base === 'anima';
+};
+
 export const isControlLayerModelConfig = (
   config: AnyModelConfig
 ): config is ControlNetModelConfig | T2IAdapterModelConfig | ControlLoRAModelConfig => {

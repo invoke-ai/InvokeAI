@@ -164,6 +164,27 @@ export const addOutpaint = async ({
 
     g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
 
+    if (denoise.type === 'anima_denoise' && params.animaLLLiteModel) {
+      // The combined canvas mask is white = keep / black = region-to-generate, but the LLLite
+      // adapter expects white = inpaint — invert before wiring.
+      const invertAnimaLLLiteMask = g.addNode({
+        type: 'img_lerp',
+        id: getPrefixedId('invert_anima_lllite_mask'),
+        min: 255,
+        max: 0,
+      });
+      g.addEdge(resizeInputMaskToScaledSize, 'image', invertAnimaLLLiteMask, 'image');
+      const animaLLLite = g.addNode({
+        type: 'anima_lllite',
+        id: getPrefixedId('anima_lllite'),
+        control_model: params.animaLLLiteModel,
+        weight: params.animaLLLiteWeight,
+      });
+      g.addEdge(infill, 'image', animaLLLite, 'image');
+      g.addEdge(invertAnimaLLLiteMask, 'image', animaLLLite, 'mask');
+      g.addEdge(animaLLLite, 'control', denoise, 'control_lllite');
+    }
+
     // If we have a noise mask, apply it to the input image before i2l conversion
     if (noiseMaskImage) {
       // Resize the noise mask to match the scaled size
@@ -290,6 +311,27 @@ export const addOutpaint = async ({
     }
 
     g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
+
+    if (denoise.type === 'anima_denoise' && params.animaLLLiteModel) {
+      // The combined canvas mask is white = keep / black = region-to-generate, but the LLLite
+      // adapter expects white = inpaint — invert before wiring.
+      const invertAnimaLLLiteMask = g.addNode({
+        type: 'img_lerp',
+        id: getPrefixedId('invert_anima_lllite_mask'),
+        min: 255,
+        max: 0,
+      });
+      g.addEdge(maskCombine, 'image', invertAnimaLLLiteMask, 'image');
+      const animaLLLite = g.addNode({
+        type: 'anima_lllite',
+        id: getPrefixedId('anima_lllite'),
+        control_model: params.animaLLLiteModel,
+        weight: params.animaLLLiteWeight,
+      });
+      g.addEdge(infill, 'image', animaLLLite, 'image');
+      g.addEdge(invertAnimaLLLiteMask, 'image', animaLLLite, 'mask');
+      g.addEdge(animaLLLite, 'control', denoise, 'control_lllite');
+    }
 
     const expandMask = g.addNode({
       type: 'expand_mask_with_fade',
