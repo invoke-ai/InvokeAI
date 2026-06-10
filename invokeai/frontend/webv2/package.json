@@ -18,24 +18,25 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@chakra-ui/react": "^3.28.0",
+    "@chakra-ui/react": "^3.36.0",
     "@emotion/react": "^11.14.0",
     "@fontsource/inter": "^5.2.8",
     "@tanstack/react-virtual": "^3.14.2",
     "lucide-react": "^1.17.0",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
-    "@types/node": "^22.15.1",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react-swc": "^3.9.0",
+    "@types/node": "^25.9.3",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "babel-plugin-react-compiler": "^1.0.0",
     "oxfmt": "^0.54.0",
     "oxlint": "^1.69.0",
-    "typescript": "^5.8.3",
-    "vite": "^7.0.5",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
     "vitest": "^4.1.8"
   },
   "engines": {
