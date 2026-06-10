@@ -30,7 +30,7 @@ export interface ResultDestinationMeta {
 
 export const invocationSources: InvocationSourceMeta[] = [
   { id: 'generate', label: 'Generate', available: true },
-  { id: 'project-graph', label: 'Workflow', available: true },
+  { id: 'project-graph', label: 'Workflow', available: false },
   { id: 'upscale', label: 'Upscale', available: false },
   { id: 'canvas-fill', label: 'Canvas Fill', available: false },
 ];
@@ -71,6 +71,27 @@ const sourceWidgetIds: Partial<Record<InvocationSourceId, WidgetId>> = {
 const isWidgetMounted = (project: Project, widgetId: WidgetId): boolean =>
   Object.values(project.widgetRegions).some((region) => region.enabledWidgetIds.includes(widgetId));
 
+const hasGenerateSnapshotInputs = (project: Project): boolean => {
+  const values = project.widgetStates.generate.values;
+  const model = values.model;
+  const hasFiniteNumber = (key: string) => typeof values[key] === 'number' && Number.isFinite(values[key]);
+
+  return (
+    typeof values.modelKey === 'string' &&
+    typeof values.positivePrompt === 'string' &&
+    typeof values.negativePrompt === 'string' &&
+    hasFiniteNumber('width') &&
+    hasFiniteNumber('height') &&
+    hasFiniteNumber('steps') &&
+    hasFiniteNumber('cfgScale') &&
+    hasFiniteNumber('cfgRescaleMultiplier') &&
+    typeof values.scheduler === 'string' &&
+    hasFiniteNumber('seed') &&
+    typeof values.shouldRandomizeSeed === 'boolean' &&
+    Boolean(model && typeof model === 'object' && (model as Record<string, unknown>).type === 'main')
+  );
+};
+
 export const isResultDestinationAvailable = (destination: ResultDestination): boolean =>
   validDestinationIds.has(destination);
 
@@ -83,10 +104,14 @@ export const resolveInvocationRoute = (
   const destination = route.destination;
   const sourceWidgetId = sourceWidgetIds[sourceId];
   const sourceValid =
-    isInvocationSourceAvailable(sourceId) && (!sourceWidgetId || isWidgetMounted(project, sourceWidgetId));
+    isInvocationSourceAvailable(sourceId) &&
+    (!sourceWidgetId || isWidgetMounted(project, sourceWidgetId)) &&
+    (sourceId !== 'generate' || hasGenerateSnapshotInputs(project));
   const destinationValid = isResultDestinationAvailable(destination);
   const validationMessage = !sourceValid
-    ? `${getSourceLabel(sourceId)} is not an available invocation source.`
+    ? sourceId === 'generate'
+      ? 'Generate needs a supported model before it can be invoked.'
+      : `${getSourceLabel(sourceId)} is not an available invocation source.`
     : !destinationValid
       ? `${getDestinationLabel(destination)} is not an available result destination.`
       : undefined;
