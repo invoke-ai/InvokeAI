@@ -119,7 +119,6 @@ export const WidgetPanelFrame = ({
       gap="3"
       overflow="hidden"
       minW="0"
-      p="3"
       {...focusRegionProps}
       {...(isBottom ? { h: `${displaySizePx}px`, w: 'full' } : { h: 'full', w: `${displaySizePx}px` })}
     >
@@ -161,7 +160,7 @@ export const WidgetHeader = ({
   const surface = manifest.graphBearing?.surfaces.includes(region) ? createGraphBearingSurface(manifest, region) : null;
 
   return (
-    <HStack justify="space-between">
+    <HStack justify="space-between" borderBottomWidth={1} h={10} ps="3" pe="2">
       <Text fontSize="xs" fontWeight="700">
         {manifest.labelText}
       </Text>

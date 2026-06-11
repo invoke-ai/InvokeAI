@@ -53,7 +53,7 @@ const WidgetShellFrame = ({
   }
 
   return (
-    <Flex bg="bg.canvas" direction="column" gap="3" h="full" minH="0" p="3" w="full">
+    <Flex bg="bg.canvas" direction="column" h="full" minH="0" w="full">
       <HeaderSlot presentation={presentation} region={region} widget={widget} />
       <Box flex="1" minH="0" overflow="hidden" position="relative">
         {content}

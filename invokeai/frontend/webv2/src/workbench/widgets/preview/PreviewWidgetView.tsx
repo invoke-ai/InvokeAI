@@ -250,44 +250,48 @@ export const PreviewWidgetView = ({ region }: WidgetViewProps) => {
   const isComparing =
     selectedImage !== null && compareImage !== null && compareImage.imageName !== selectedImage.imageName;
 
-  return selectedImage ? (
-    <>
-      {isComparing && compareImage ? (
-        <PreviewCompare
-          baseImage={selectedImage}
-          compareImage={compareImage}
-          onExit={() => dispatch({ image: null, type: 'setGalleryCompareImage' })}
-          onSwap={() => {
-            dispatch({ image: compareImage, type: 'selectGalleryImage' });
-            dispatch({ image: selectedImage, type: 'setGalleryCompareImage' });
-          }}
-        />
+  return (
+    <Box p="2" h="full">
+      {selectedImage ? (
+        <>
+          {isComparing && compareImage ? (
+            <PreviewCompare
+              baseImage={selectedImage}
+              compareImage={compareImage}
+              onExit={() => dispatch({ image: null, type: 'setGalleryCompareImage' })}
+              onSwap={() => {
+                dispatch({ image: compareImage, type: 'selectGalleryImage' });
+                dispatch({ image: selectedImage, type: 'setGalleryCompareImage' });
+              }}
+            />
+          ) : (
+            <SelectedImagePreview
+              boardImageCount={boardImages.length}
+              boardName={boardName}
+              image={selectedImage}
+              isCompact={isSidePanel}
+              isLoadingBoard={isLoadingBoard}
+              selectedIndex={selectedIndex}
+              onContextMenu={(x, y) => {
+                if (contextMenuImage) {
+                  setContextMenuTarget({ images: [contextMenuImage], x, y });
+                }
+              }}
+              onNext={() => selectByOffset(1)}
+              onPrevious={() => selectByOffset(-1)}
+            />
+          )}
+          <ImageContextMenu
+            actions={imageActions}
+            boards={boards}
+            target={contextMenuTarget}
+            onClose={() => setContextMenuTarget(null)}
+          />
+        </>
       ) : (
-        <SelectedImagePreview
-          boardImageCount={boardImages.length}
-          boardName={boardName}
-          image={selectedImage}
-          isCompact={isSidePanel}
-          isLoadingBoard={isLoadingBoard}
-          selectedIndex={selectedIndex}
-          onContextMenu={(x, y) => {
-            if (contextMenuImage) {
-              setContextMenuTarget({ images: [contextMenuImage], x, y });
-            }
-          }}
-          onNext={() => selectByOffset(1)}
-          onPrevious={() => selectByOffset(-1)}
-        />
+        <EmptyPreview />
       )}
-      <ImageContextMenu
-        actions={imageActions}
-        boards={boards}
-        target={contextMenuTarget}
-        onClose={() => setContextMenuTarget(null)}
-      />
-    </>
-  ) : (
-    <EmptyPreview />
+    </Box>
   );
 };
 
