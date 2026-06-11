@@ -37,7 +37,7 @@ export const SetupScreen = () => {
   return (
     <AuthScreen
       footer="You can add more users later from the user menu."
-      subtitle="Multi-user mode is on. Create the administrator account to get started."
+      subtitle="Create the administrator account to get started."
       title="Set up Invoke"
     >
       <chakra.form

@@ -10,6 +10,7 @@ import { UserMenu } from '../auth/components/UserMenu';
 import { useWorkbench } from '../WorkbenchContext';
 import { DEFAULT_THEME_ID, THEMES_BY_ID } from '../../theme/themes';
 import { Tooltip } from './ui/Tooltip';
+import { Link } from '@tanstack/react-router';
 
 /** Workbench top bar: brand, global Invoke command cluster, project tabs, layout + account controls. */
 export const TopBar = () => (
@@ -44,16 +45,16 @@ const BrandMark = () => {
   const theme = THEMES_BY_ID[state.account.preferences.themeId] ?? THEMES_BY_ID[DEFAULT_THEME_ID];
 
   return (
-    <Flex
-      align="center"
-      aria-label="Invoke"
-      as="button"
-      flexShrink={0}
-      h="full"
-      justify="center"
-      rounded="md"
-      aspectRatio="1/1"
-      me="-1"
+    <Link
+      to="/"
+      style={{
+        flexShrink: 0,
+        height: '100%',
+        aspectRatio: '1/1',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
     >
       <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 44 44" width="20">
         <path
@@ -62,7 +63,7 @@ const BrandMark = () => {
           strokeWidth="2.8"
         />
       </svg>
-    </Flex>
+    </Link>
   );
 };
 
