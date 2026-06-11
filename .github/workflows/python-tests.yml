@@ -103,7 +103,7 @@ jobs:
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
         env:
           UV_INDEX: ${{ matrix.extra-index-url }}
-        run: uv pip install --editable ".[test]"
+        run: uv sync --no-progress --locked --extra test
 
       - name: run pytest
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
