@@ -3,6 +3,11 @@ import { defineConfig } from 'vite';
 
 import babel from '@rolldown/plugin-babel';
 
+// Override with e.g. INVOKEAI_DEV_BACKEND=http://127.0.0.1:9091 when the
+// backend dev server runs on a non-default port.
+const BACKEND_URL = process.env.INVOKEAI_DEV_BACKEND ?? 'http://127.0.0.1:9090';
+const BACKEND_WS_URL = BACKEND_URL.replace(/^http/, 'ws');
+
 export default defineConfig({
   base: './',
   build: {
@@ -39,15 +44,15 @@ export default defineConfig({
       '/api/': {
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
-        target: 'http://127.0.0.1:9090/api/',
+        target: `${BACKEND_URL}/api/`,
       },
       '/openapi.json': {
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/openapi.json/, ''),
-        target: 'http://127.0.0.1:9090/openapi.json',
+        target: `${BACKEND_URL}/openapi.json`,
       },
       '/ws/socket.io': {
-        target: 'ws://127.0.0.1:9090',
+        target: BACKEND_WS_URL,
         ws: true,
       },
     },
