@@ -20,13 +20,25 @@ export const FieldLabel = ({ children }: { children: ReactNode }) => {
 
 export interface FieldProps extends Omit<StackProps, 'title'> {
   label: string;
+  /** Validation error, shown in place of `helpText`. Mark the control itself invalid via `aria-invalid`. */
+  error?: string | null;
+  helpText?: string;
   children: ReactNode;
 }
 
-/** A labelled form field: an uppercase label stacked above its control. */
-export const Field = ({ children, label, ...rest }: FieldProps) => (
+/** A labelled form field: an uppercase label stacked above its control, with an optional help/error line below. */
+export const Field = ({ children, error, helpText, label, ...rest }: FieldProps) => (
   <Stack flex="1" gap="1.5" minW="0" {...rest}>
     <FieldLabel>{label}</FieldLabel>
     {children}
+    {error ? (
+      <Text color="red.400" fontSize="2xs" role="alert">
+        {error}
+      </Text>
+    ) : helpText ? (
+      <Text color="fg.subtle" fontSize="2xs">
+        {helpText}
+      </Text>
+    ) : null}
   </Stack>
 );

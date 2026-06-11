@@ -25,6 +25,7 @@ import {
 
 import type { GalleryBoard, GalleryImage } from '../gallery/api';
 import { Button } from './ui/Button';
+import { MenuContent } from './ui/Menu';
 import { Tooltip } from './ui/Tooltip';
 import { useWorkbench } from '../WorkbenchContext';
 import type { ImageActions } from './useImageActions';
@@ -36,16 +37,11 @@ export interface ImageContextMenuTarget {
   y: number;
 }
 
+/** Extras on top of the shared MenuContent surface styling. */
 const MENU_CONTENT_PROPS = {
-  bg: 'bg.surfaceRaised',
-  borderColor: 'border.emphasis',
-  borderWidth: '1px',
-  color: 'fg.default',
   minW: '13rem',
   overflow: 'hidden',
   p: '0',
-  rounded: 'lg',
-  shadow: 'lg',
 } as const;
 
 /**
@@ -108,7 +104,7 @@ export const ImageContextMenu = ({
         <Portal>
           <Menu.Positioner>
             {image && (
-              <Menu.Content
+              <MenuContent
                 {...MENU_CONTENT_PROPS}
                 maxH="min(28rem, calc(100vh - 2rem))"
                 minW="16rem"
@@ -131,7 +127,7 @@ export const ImageContextMenu = ({
                     onRequestDeletion={requestDeletion}
                   />
                 )}
-              </Menu.Content>
+              </MenuContent>
             )}
           </Menu.Positioner>
         </Portal>
@@ -375,7 +371,7 @@ const ContextSubMenu = ({
     </Menu.TriggerItem>
     <Portal>
       <Menu.Positioner>
-        <Menu.Content {...MENU_CONTENT_PROPS} maxH="18rem" overflowY={scrollArea ? undefined : 'auto'} py="1">
+        <MenuContent {...MENU_CONTENT_PROPS} maxH="18rem" overflowY={scrollArea ? undefined : 'auto'} py="1">
           {scrollArea ? (
             <ScrollArea.Root maxH="inherit" size="xs" variant="hover" w="full">
               <ScrollArea.Viewport maxH="inherit" w="full">
@@ -388,7 +384,7 @@ const ContextSubMenu = ({
           ) : (
             children
           )}
-        </Menu.Content>
+        </MenuContent>
       </Menu.Positioner>
     </Portal>
   </Menu.Root>
