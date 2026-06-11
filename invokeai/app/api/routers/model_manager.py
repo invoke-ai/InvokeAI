@@ -219,6 +219,20 @@ async def list_missing_models() -> ModelsList:
 
 
 @model_manager_router.get(
+    "/models_dir",
+    operation_id="get_models_dir",
+    responses={200: {"description": "The absolute path of the models directory"}},
+)
+async def get_models_dir() -> str:
+    """Get the absolute path of the directory managed models are stored in.
+
+    Model config `path` values are relative to this directory unless they are
+    absolute (in-place installs from outside it).
+    """
+    return ApiDependencies.invoker.services.configuration.models_path.resolve().as_posix()
+
+
+@model_manager_router.get(
     "/get_by_attrs",
     operation_id="get_model_records_by_attrs",
     response_model=AnyModelConfig,
