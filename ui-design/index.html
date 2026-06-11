@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoke AI — Premium AI Image Generation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/design-system.css">
+  <link rel="stylesheet" href="css/pages.css">
+</head>
+<body>
+
+  <!-- ==================== NAVBAR ==================== -->
+  <nav class="navbar">
+    <div class="navbar-inner">
+      <div class="navbar-logo">Invoke AI</div>
+      <div class="navbar-links">
+        <a href="#features" class="navbar-link">Features</a>
+        <a href="#process" class="navbar-link">Process</a>
+        <a href="pages/pricing.html" class="navbar-link">Pricing</a>
+        <a href="pages/model-manager.html" class="navbar-link">Models</a>
+        <a href="pages/dashboard.html" class="btn btn-primary btn-sm">Open Studio</a>
+      </div>
+    </div>
+  </nav>
+
+
+  <!-- ==================== HERO ==================== -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-grid">
+
+        <div class="hero-content">
+          <h1 class="hero-title">Precision image generation for discerning creators</h1>
+          <p class="hero-description">
+            Invoke AI delivers studio-grade diffusion models with architectural control, 
+            seamless workflow integration, and the refinement your creative process demands.
+          </p>
+          <div class="hero-prompt">
+            <input type="text" placeholder="Describe your vision..." id="hero-prompt-input">
+            <button class="btn btn-primary">Generate</button>
+          </div>
+        </div>
+
+        <div class="hero-image-frame">
+          <div class="hero-image-placeholder">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0.5">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+          </div>
+          <div class="hero-image-meta">
+            <span>SDXL 1.0</span>
+            <span>1024 × 1024</span>
+            <span>24 steps</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ==================== PROCESS ==================== -->
+  <section class="process-section" id="process">
+    <div class="container">
+      <h2 class="process-section-title">The Process</h2>
+      <div class="process-grid">
+
+        <div class="process-step">
+          <div class="process-step-number">01</div>
+          <h3 class="process-step-title">Describe</h3>
+          <div class="process-step-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </div>
+          <p class="text-secondary text-sm">
+            Craft your vision with natural language. Our prompt engineering layer 
+            interprets nuance, style, and composition with precision.
+          </p>
+        </div>
+
+        <div class="process-step">
+          <div class="process-step-number">02</div>
+          <h3 class="process-step-title">Configure</h3>
+          <div class="process-step-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </div>
+          <p class="text-secondary text-sm">
+            Fine-tune every parameter — model selection, guidance scale, 
+            scheduler, resolution — with intuitive controls built for professionals.
+          </p>
+        </div>
+
+        <div class="process-step">
+          <div class="process-step-number">03</div>
+          <h3 class="process-step-title">Refine</h3>
+          <div class="process-step-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+          </div>
+          <p class="text-secondary text-sm">
+            Iterate with precision. ControlNet, IP-Adapter, and inpainting 
+            deliver the surgical refinement that separates good from exceptional.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ==================== CTA ==================== -->
+  <section class="cta-section">
+    <div class="container">
+      <div class="cta-box">
+        <h2 class="cta-text">Begin creating with precision</h2>
+        <div class="cta-buttons">
+          <a href="pages/dashboard.html" class="btn btn-primary">Open the Studio</a>
+          <a href="pages/pricing.html" class="btn btn-outline">View Plans</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ==================== FOOTER ==================== -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-inner">
+        <span class="footer-text">Invoke AI — Precision Image Generation</span>
+        <div class="footer-links">
+          <a href="#" class="footer-link">Documentation</a>
+          <a href="#" class="footer-link">GitHub</a>
+          <a href="#" class="footer-link">Discord</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+
+  <script src="js/main.js"></script>
+</body>
+</html>
