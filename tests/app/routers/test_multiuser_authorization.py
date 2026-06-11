@@ -21,6 +21,7 @@ from invokeai.app.api_app import app
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
@@ -114,6 +115,7 @@ def mock_services() -> InvocationServices:
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
         client_state_persistence=ClientStatePersistenceSqlite(db=db),
+        project_records=ProjectRecordsSqlite(db=db),
         users=UserService(db),
         external_generation=None,  # type: ignore
     )
