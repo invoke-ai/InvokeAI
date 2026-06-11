@@ -4,11 +4,11 @@ import {
   isInvocationSourceAvailable,
   resolveInvocationRoute,
 } from './invocation';
-import { DEFAULT_THEME_ID, isWorkbenchThemeId } from '../theme/themes';
 import { compileGenerateGraph, resolveGenerateSeed } from './generation/graph';
 import type { GallerySettings } from './gallery/settings';
 import type { GenerateWidgetValues, MainModelConfig } from './generation/types';
 import { defaultLayoutPreset, getLayoutPreset } from './layoutPresets';
+import { normalizeProjectSettings } from './settings/store';
 import type {
   CanvasDocumentContract,
   CanvasPlacementContract,
@@ -24,6 +24,7 @@ import type {
   LayoutPresetId,
   Project,
   ProjectLayoutState,
+  ProjectSettings,
   ProjectUndoSnapshot,
   QueueItem,
   QueueItemStatus,
@@ -35,7 +36,6 @@ import type {
   WidgetStateContract,
   WorkbenchNotification,
   WorkbenchNotificationKind,
-  WorkbenchPreferences,
   WorkbenchState,
 } from './types';
 
@@ -103,7 +103,7 @@ type WorkbenchAction =
   | { type: 'clearNotifications' }
   | { type: 'clearErrorLog' }
   | { type: 'recordWidgetFailure'; failure: WidgetFailure }
-  | { type: 'setPreferences'; preferences: Partial<WorkbenchPreferences> }
+  | { type: 'setActiveProjectSettings'; settings: Partial<ProjectSettings> }
   | { type: 'recordError'; message: string }
   | { type: 'setBackendConnectionStatus'; status: WorkbenchState['backendConnection']['status']; error?: string }
   | { type: 'refreshBackendData' }
@@ -508,6 +508,7 @@ const ensureProjectWidgetContracts = (project: Project): Project => {
   return {
     ...project,
     canvas: cloneCanvas(project.canvas ?? createCanvasState()),
+    settings: normalizeProjectSettings(project.settings),
     widgetRegions: {
       left: legacyWidgetRegions?.left ?? legacyWidgetRegions?.['left-panel'] ?? defaultWidgetRegions.left,
       right: ensureRightRegion(legacyWidgetRegions?.right ?? legacyWidgetRegions?.['right-panel']),
@@ -558,6 +559,7 @@ const createProject = (index: number, id = `project-${index}`): Project => ({
   name: `Project Name #${index}`,
   projectGraph: createProjectGraph(index, id),
   queue: { items: [] },
+  settings: normalizeProjectSettings(),
   undoRedo: { future: [], past: [] },
   widgetGraphs: {},
   widgetRegions: createWidgetRegions(),
@@ -616,31 +618,12 @@ const openPanelForRegion = (layout: ProjectLayoutState, region: WidgetRegion): P
   },
 });
 
-const normalizePreferences = (preferences?: Partial<WorkbenchPreferences>): WorkbenchPreferences => {
-  const themeId = isWorkbenchThemeId(preferences?.themeId) ? preferences.themeId : DEFAULT_THEME_ID;
-  const reduceMotion =
-    typeof preferences?.reduceMotion === 'boolean' ? preferences.reduceMotion : DEFAULT_PREFERENCES.reduceMotion;
-  const showFocusRegionHighlight =
-    typeof preferences?.showFocusRegionHighlight === 'boolean'
-      ? preferences.showFocusRegionHighlight
-      : DEFAULT_PREFERENCES.showFocusRegionHighlight;
-  const confirmImageDeletion =
-    typeof preferences?.confirmImageDeletion === 'boolean'
-      ? preferences.confirmImageDeletion
-      : DEFAULT_PREFERENCES.confirmImageDeletion;
-
-  return { confirmImageDeletion, reduceMotion, showFocusRegionHighlight, themeId };
-};
-
 const normalizeWorkbenchState = (state: WorkbenchState): WorkbenchState => ({
   ...state,
   backendConnection: { status: 'connecting' },
-  // Persisted snapshots from before preferences existed (or partially written
-  // ones) are healed by merging in defaults, so hydrate never reads `undefined`.
-  account: {
-    ...state.account,
-    preferences: normalizePreferences(state.account?.preferences),
-  },
+  // Built explicitly: legacy snapshots carried preferences inside the account
+  // (they live in the settings store now) and must not resurface here.
+  account: { activeLayoutPresetId: state.account?.activeLayoutPresetId ?? defaultLayoutPreset.id },
   notifications: state.notifications ?? [],
   projects: state.projects.map(ensureProjectWidgetContracts),
 });
@@ -750,7 +733,12 @@ const compileInvocationSnapshot = (
     seed: resolveGenerateSeed(values),
     shouldRandomizeSeed: false,
   };
-  const compiledGraph = compileGenerateGraph(resolvedSettings, resolvedSettings.model, route.destination).graph;
+  const compiledGraph = compileGenerateGraph(
+    resolvedSettings,
+    resolvedSettings.model,
+    route.destination,
+    project.settings
+  ).graph;
 
   widgetStates.generate = {
     ...widgetStates.generate,
@@ -924,18 +912,11 @@ const submitInvocationSnapshot = (
   };
 };
 
-export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
-  confirmImageDeletion: true,
-  reduceMotion: false,
-  showFocusRegionHighlight: true,
-  themeId: DEFAULT_THEME_ID,
-};
-
 export const createInitialWorkbenchState = (): WorkbenchState => {
   const draft = createDraftProject([]);
 
   return {
-    account: { activeLayoutPresetId: 'canvas-default', preferences: { ...DEFAULT_PREFERENCES } },
+    account: { activeLayoutPresetId: defaultLayoutPreset.id },
     activeProjectId: draft.id,
     autosave: { status: 'idle' },
     backendConnection: { status: 'connecting' },
@@ -1727,16 +1708,11 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
         createNotification({ kind: action.kind, message: action.message, title: action.title })
       );
     }
-    case 'setPreferences': {
-      const preferences = normalizePreferences({ ...state.account.preferences, ...action.preferences });
-
-      return {
-        ...state,
-        account: {
-          ...state.account,
-          preferences,
-        },
-      };
+    case 'setActiveProjectSettings': {
+      return updateActiveProject(state, (project) => ({
+        ...project,
+        settings: normalizeProjectSettings({ ...project.settings, ...action.settings }),
+      }));
     }
   }
 };

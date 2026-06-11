@@ -1,7 +1,6 @@
 import { useSearch } from '@tanstack/react-router';
 
 import { SessionExpiryGuard } from './workbench/auth/components/SessionExpiryGuard';
-import { ThemeController } from './workbench/ThemeController';
 import { ModelsRuntime } from './workbench/widgets/models/ModelsRuntime';
 import { WorkbenchProvider } from './workbench/WorkbenchContext';
 import { WorkbenchRuntime } from './workbench/WorkbenchRuntime';
@@ -24,7 +23,6 @@ export const WorkbenchApp = () => {
 
   return (
     <WorkbenchProvider loadOptions={{ createNew: search.new, openProjectId: search.project }}>
-      <ThemeController />
       <SessionExpiryGuard />
       <WorkbenchRuntime />
       <ModelsRuntime />

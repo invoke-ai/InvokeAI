@@ -3,37 +3,43 @@ import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ChevronDownIcon, LogOutIcon, UserRoundCogIcon, UsersIcon } from 'lucide-react';
 
-import { ProfileDialog } from './ProfileDialog';
 import { MenuContent } from '../../components/ui/Menu';
-import { useWorkbench } from '../../WorkbenchContext';
+import { SettingsButton } from '../../settings/SettingsDialog';
+import { useOptionalWorkbench } from '../../WorkbenchContext';
 import { logoutSession, useAuthSession } from '../session';
+import { ProfileDialog } from './ProfileDialog';
 
 /**
- * Signed-in account cluster for the top bar: avatar trigger, account dialog,
- * the admin users view, and sign-out. Renders nothing in single-user mode, so
- * the shell needs no awareness of whether multi-user is enabled.
+ * Shared settings/account cluster used by both Home and the workbench shell:
+ * the settings gear always renders; the avatar menu joins it when a
+ * multi-user session is signed in.
  */
-export const UserMenu = () => {
+export const AccountMenu = () => {
   const session = useAuthSession();
-  const { activeProject, dispatch } = useWorkbench();
+  const workbench = useOptionalWorkbench();
   const navigate = useNavigate();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   if (!session.multiuserEnabled || session.user === null) {
-    return null;
+    return <SettingsButton />;
   }
 
   const user = session.user;
   const label = user.display_name?.trim() || user.email;
 
   const openUserManagement = () => {
+    const activeProject = workbench?.activeProject;
+
+    if (!activeProject || !workbench) {
+      return;
+    }
+
     const centerRegion = activeProject.widgetRegions.center;
 
-    // Enabling an absent center widget also makes it active.
     if (centerRegion.enabledWidgetIds.includes('users')) {
-      dispatch({ region: 'center', type: 'selectRegionWidget', widgetId: 'users' });
+      workbench.dispatch({ region: 'center', type: 'selectRegionWidget', widgetId: 'users' });
     } else {
-      dispatch({ region: 'center', type: 'toggleRegionWidget', widgetId: 'users' });
+      workbench.dispatch({ region: 'center', type: 'toggleRegionWidget', widgetId: 'users' });
     }
   };
 
@@ -43,7 +49,8 @@ export const UserMenu = () => {
   };
 
   return (
-    <>
+    <HStack gap="0.5">
+      <SettingsButton />
       <Menu.Root positioning={{ placement: 'bottom-end' }}>
         <Menu.Trigger asChild>
           <chakra.button
@@ -92,7 +99,7 @@ export const UserMenu = () => {
                 <Icon as={UserRoundCogIcon} boxSize="3.5" />
                 Account settings
               </Menu.Item>
-              {user.is_admin ? (
+              {user.is_admin && workbench ? (
                 <Menu.Item value="users" onClick={openUserManagement}>
                   <Icon as={UsersIcon} boxSize="3.5" />
                   Manage users
@@ -108,6 +115,6 @@ export const UserMenu = () => {
         </Portal>
       </Menu.Root>
       <ProfileDialog isOpen={isProfileOpen} user={user} onClose={() => setIsProfileOpen(false)} />
-    </>
+    </HStack>
   );
 };

@@ -1,7 +1,8 @@
-import { Badge, Combobox, createListCollection, HStack, Portal, Text } from '@chakra-ui/react';
+import { Badge, Combobox, createListCollection, HStack, Portal, Stack, Text } from '@chakra-ui/react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { ensureModelsLoaded, useModelsSnapshot } from '../models/modelsStore';
+import { useWorkbenchPreferences } from '../settings/store';
 import {
   formatBytes,
   getModelBaseColorPalette,
@@ -38,6 +39,7 @@ export const ModelSelect = ({
   /** Selected model key, or null. */
   value: string | null;
 }) => {
+  const { enableModelDescriptions } = useWorkbenchPreferences();
   const { models } = useModelsSnapshot();
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -149,9 +151,16 @@ export const ModelSelect = ({
                 {groupModels.map((model) => (
                   <Combobox.Item key={model.key} item={model}>
                     <HStack flex="1" gap="2" minW="0">
-                      <Text flex="1" fontSize="xs" minW="0" truncate>
-                        {model.name}
-                      </Text>
+                      <Stack flex="1" gap="0" minW="0">
+                        <Text fontSize="xs" minW="0" truncate>
+                          {model.name}
+                        </Text>
+                        {enableModelDescriptions && model.description ? (
+                          <Text color="fg.subtle" fontSize="2xs" truncate>
+                            {model.description}
+                          </Text>
+                        ) : null}
+                      </Stack>
                       <Badge
                         colorPalette={getModelBaseColorPalette(model.base)}
                         flexShrink={0}

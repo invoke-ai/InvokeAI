@@ -212,3 +212,5 @@ export const useWorkbench = (): WorkbenchContextValue => {
 
   return context;
 };
+
+export const useOptionalWorkbench = (): WorkbenchContextValue | null => use(WorkbenchContext);

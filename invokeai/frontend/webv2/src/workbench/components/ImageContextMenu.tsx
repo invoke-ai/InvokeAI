@@ -27,7 +27,7 @@ import type { GalleryBoard, GalleryImage } from '../gallery/api';
 import { Button } from './ui/Button';
 import { MenuContent } from './ui/Menu';
 import { Tooltip } from './ui/Tooltip';
-import { useWorkbench } from '../WorkbenchContext';
+import { useWorkbenchPreferences } from '../settings/store';
 import type { ImageActions } from './useImageActions';
 
 export interface ImageContextMenuTarget {
@@ -60,8 +60,7 @@ export const ImageContextMenu = ({
   target: ImageContextMenuTarget | null;
   onClose: () => void;
 }) => {
-  const { state } = useWorkbench();
-  const confirmImageDeletion = state.account.preferences.confirmImageDeletion;
+  const { confirmImageDeletion } = useWorkbenchPreferences();
   const [pendingDeletion, setPendingDeletion] = useState<string[] | null>(null);
   const targetRef = useRef(target);
 

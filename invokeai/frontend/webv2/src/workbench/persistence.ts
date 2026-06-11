@@ -5,10 +5,9 @@ const BASE_STORAGE_KEY = 'invokeai:v7:webv2:workbench';
 const WORKBENCH_SCHEMA_VERSION = 1;
 
 /**
- * Projects, account preferences, and active layout are account-owned on
- * multi-user backends (spec: State Ownership), so each signed-in user gets
- * their own storage bucket on this browser. Single-user mode keeps the
- * unscoped key, so existing data is untouched.
+ * Projects and the editor session are account-owned on multi-user backends, so
+ * each signed-in user gets their own storage bucket on this browser.
+ * Single-user mode keeps the unscoped key, so existing data is untouched.
  */
 const getStorageKey = (): string => `${BASE_STORAGE_KEY}${getUserStorageScope()}`;
 

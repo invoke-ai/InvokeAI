@@ -1,9 +1,11 @@
 import { getClientStateValue } from './api';
-import type { AccountState, WorkbenchState } from '../types';
+import type { AccountState, WorkbenchPreferences, WorkbenchState } from '../types';
 
 /**
- * The per-user session blob in the client-state KV: account preferences plus
- * the editor session — which projects are open as tabs and which is active.
+ * The per-user session blob in the client-state KV: the editor session — which
+ * projects are open as tabs and which is active — plus a legacy account snapshot
+ * for older installs. Current settings live in `settings.ts` so Home can load
+ * them without mounting the workbench provider.
  *
  * `openProjectIds` arrived with the library/session split. Blobs written
  * before it have no open set; `undefined` there means "unknown — open every
@@ -23,7 +25,10 @@ export interface WorkbenchSearch {
 }
 
 export interface WorkbenchSessionBlob {
-  account: AccountState;
+  account: AccountState & {
+    /** Written by builds that kept preferences in the account; read once as a migration source. */
+    preferences?: Partial<WorkbenchPreferences>;
+  };
   activeProjectId: string;
   openProjectIds?: string[];
 }

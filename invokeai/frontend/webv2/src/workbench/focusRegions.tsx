@@ -1,8 +1,8 @@
 import type { FocusEvent, PointerEvent, ReactNode } from 'react';
 import { createContext, use, useState } from 'react';
 
+import { useWorkbenchPreferences } from './settings/store';
 import type { WidgetRegion } from './types';
-import { useWorkbench } from './WorkbenchContext';
 
 interface FocusRegionContextValue {
   focusedRegion: WidgetRegion | null;
@@ -48,8 +48,8 @@ const useFocusRegionContext = () => {
 
 export const useFocusRegionProps = (region: WidgetRegion) => {
   const { focusedRegion, setFocusedRegion } = useFocusRegionContext();
-  const { state } = useWorkbench();
-  const isHighlighted = state.account.preferences.showFocusRegionHighlight && focusedRegion === region;
+  const { showFocusRegionHighlight } = useWorkbenchPreferences();
+  const isHighlighted = showFocusRegionHighlight && focusedRegion === region;
 
   return {
     css: highlightStyles,

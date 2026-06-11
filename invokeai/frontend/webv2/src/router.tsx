@@ -15,6 +15,7 @@ import { LoginScreen } from './workbench/auth/components/LoginScreen';
 import { SetupScreen } from './workbench/auth/components/SetupScreen';
 import { HomeScreen } from './workbench/home/HomeScreen';
 import { peekOpenProjectIds, type WorkbenchSearch } from './workbench/projects/session';
+import { loadWorkbenchSettings } from './workbench/settings/store';
 
 /**
  * Code-based route tree. The authenticated layout route owns the auth guard,
@@ -39,17 +40,17 @@ const authenticatedRoute = createRoute({
   beforeLoad: async () => {
     const session = await ensureAuthSession();
 
-    if (!session.multiuserEnabled) {
-      return;
+    if (session.multiuserEnabled) {
+      if (session.setupRequired) {
+        throw redirect({ to: '/setup' });
+      }
+
+      if (session.user === null) {
+        throw redirect({ to: '/login' });
+      }
     }
 
-    if (session.setupRequired) {
-      throw redirect({ to: '/setup' });
-    }
-
-    if (session.user === null) {
-      throw redirect({ to: '/login' });
-    }
+    await loadWorkbenchSettings();
   },
   component: Outlet,
   getParentRoute: () => rootRoute,

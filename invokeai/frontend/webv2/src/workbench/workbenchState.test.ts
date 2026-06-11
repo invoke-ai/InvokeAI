@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { GenerateWidgetValues, MainModelConfig } from './generation/types';
+import { DEFAULT_PROJECT_SETTINGS } from './settings/store';
 import type { GeneratedImageContract, Project, WorkbenchState } from './types';
 import { createInitialWorkbenchState, workbenchReducer } from './workbenchState';
 
@@ -548,87 +549,50 @@ describe('workbenchReducer Phase 5 generation flow', () => {
   });
 });
 
-describe('workbench preferences', () => {
-  it('defaults to the dark theme with motion enabled', () => {
+describe('workbench account and project settings', () => {
+  it('starts with the default layout preset and legacy-matching project settings', () => {
     const state = createInitialWorkbenchState();
 
-    expect(state.account.preferences).toEqual({
-      confirmImageDeletion: true,
-      reduceMotion: false,
-      showFocusRegionHighlight: true,
-      themeId: 'dark',
-    });
+    expect(state.account).toEqual({ activeLayoutPresetId: 'canvas-default' });
+    expect(getActiveProject(state).settings).toEqual(DEFAULT_PROJECT_SETTINGS);
   });
 
-  it('updates the theme without dropping other preferences', () => {
-    let state = createInitialWorkbenchState();
-
-    state = workbenchReducer(state, { preferences: { reduceMotion: true }, type: 'setPreferences' });
-    state = workbenchReducer(state, { preferences: { showFocusRegionHighlight: false }, type: 'setPreferences' });
-    state = workbenchReducer(state, { preferences: { themeId: 'forest' }, type: 'setPreferences' });
-
-    expect(state.account.preferences).toEqual({
-      confirmImageDeletion: true,
-      reduceMotion: true,
-      showFocusRegionHighlight: false,
-      themeId: 'forest',
-    });
-  });
-
-  it('preserves preferences when applying a layout preset', () => {
-    let state = createInitialWorkbenchState();
-
-    state = workbenchReducer(state, { preferences: { themeId: 'mono' }, type: 'setPreferences' });
-    state = workbenchReducer(state, { presetId: 'gallery', type: 'applyPreset' });
-
-    expect(state.account.activeLayoutPresetId).toBe('gallery');
-    expect(state.account.preferences.themeId).toBe('mono');
-  });
-
-  it('heals hydrated state that predates preferences', () => {
+  it('drops legacy preferences carried inside persisted accounts on hydrate', () => {
     const initial = createInitialWorkbenchState();
     const legacy = {
       ...initial,
-      account: { activeLayoutPresetId: initial.account.activeLayoutPresetId },
+      account: { activeLayoutPresetId: 'gallery', preferences: { themeId: 'forest' } },
     } as unknown as WorkbenchState;
 
     const state = workbenchReducer(initial, { state: legacy, type: 'hydrateWorkbench' });
 
-    expect(state.account.preferences).toEqual({
-      confirmImageDeletion: true,
-      reduceMotion: false,
-      showFocusRegionHighlight: true,
-      themeId: 'dark',
-    });
+    expect(state.account).toEqual({ activeLayoutPresetId: 'gallery' });
   });
 
-  it('heals hydrated state with an unsupported theme id', () => {
+  it('heals hydrated accounts that are missing a layout preset', () => {
     const initial = createInitialWorkbenchState();
-    const persisted = {
-      ...initial,
-      account: {
-        ...initial.account,
-        preferences: { reduceMotion: true, showFocusRegionHighlight: false, themeId: 'sunset' },
-      },
-    } as unknown as WorkbenchState;
+    const legacy = { ...initial, account: {} } as unknown as WorkbenchState;
 
-    const state = workbenchReducer(initial, { state: persisted, type: 'hydrateWorkbench' });
+    const state = workbenchReducer(initial, { state: legacy, type: 'hydrateWorkbench' });
 
-    expect(state.account.preferences).toEqual({
-      confirmImageDeletion: true,
-      reduceMotion: true,
-      showFocusRegionHighlight: false,
-      themeId: 'dark',
-    });
+    expect(state.account.activeLayoutPresetId).toBe('canvas-default');
   });
 
-  it('rejects unsupported theme ids when updating preferences', () => {
-    const state = workbenchReducer(createInitialWorkbenchState(), {
-      preferences: { themeId: 'sunset' },
-      type: 'setPreferences',
-    } as unknown as Parameters<typeof workbenchReducer>[1]);
+  it('updates project settings on the active project only', () => {
+    let state = createInitialWorkbenchState();
 
-    expect(state.account.preferences.themeId).toBe('dark');
+    state = workbenchReducer(state, {
+      settings: { antialiasProgressImages: true, preferNumericAttentionStyle: true, useCpuNoise: false },
+      type: 'setActiveProjectSettings',
+    });
+
+    expect(getActiveProject(state).settings).toEqual({
+      antialiasProgressImages: true,
+      preferNumericAttentionStyle: true,
+      showProgressDetails: false,
+      showProgressImagesInViewer: true,
+      useCpuNoise: false,
+    });
   });
 });
 

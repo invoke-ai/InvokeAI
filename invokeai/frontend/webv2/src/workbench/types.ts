@@ -277,6 +277,7 @@ export interface Project {
    */
   recoveryOf?: string;
   recoveredAt?: string;
+  settings: ProjectSettings;
   layout: ProjectLayoutState;
   invocation: InvocationControllerState;
   projectGraph: GraphContract;
@@ -415,17 +416,71 @@ export interface AutosaveState {
  */
 export type WorkbenchThemeId = 'dark' | 'light' | 'forest' | 'mono' | 'ultradark';
 
+export type WorkbenchLanguage =
+  | 'ar'
+  | 'az'
+  | 'de'
+  | 'en'
+  | 'es'
+  | 'fi'
+  | 'fr'
+  | 'he'
+  | 'hu'
+  | 'it'
+  | 'ja'
+  | 'ko'
+  | 'nl'
+  | 'pl'
+  | 'pt'
+  | 'pt-BR'
+  | 'ru'
+  | 'sv'
+  | 'tr'
+  | 'ua'
+  | 'vi'
+  | 'zh-CN'
+  | 'zh-Hant';
+
+export type DeveloperLogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+
+export type DeveloperLogNamespace =
+  | 'canvas'
+  | 'canvas-workflow-integration'
+  | 'config'
+  | 'dnd'
+  | 'events'
+  | 'gallery'
+  | 'generation'
+  | 'metadata'
+  | 'models'
+  | 'system'
+  | 'queue'
+  | 'workflows';
+
+export interface ProjectSettings {
+  useCpuNoise: boolean;
+  showProgressDetails: boolean;
+  antialiasProgressImages: boolean;
+  showProgressImagesInViewer: boolean;
+  preferNumericAttentionStyle: boolean;
+}
+
 /** User-tunable appearance + behavior preferences surfaced in the Settings modal. */
 export interface WorkbenchPreferences {
   themeId: WorkbenchThemeId;
   reduceMotion: boolean;
   showFocusRegionHighlight: boolean;
   confirmImageDeletion: boolean;
+  language: WorkbenchLanguage;
+  enableInformationalPopovers: boolean;
+  enableModelDescriptions: boolean;
+  developerLogEnabled: boolean;
+  developerLogLevel: DeveloperLogLevel;
+  developerLogNamespaces: DeveloperLogNamespace[];
 }
 
 export interface AccountState {
   activeLayoutPresetId: LayoutPresetId;
-  preferences: WorkbenchPreferences;
 }
 
 export interface WorkbenchPersistenceSnapshot {

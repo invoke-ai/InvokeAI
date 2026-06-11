@@ -4,9 +4,9 @@ import { ChevronDownIcon, ListOrderedIcon, PauseIcon, PlayIcon, XIcon } from 'lu
 import { InvokeControl } from './InvokeControl';
 import { LayoutPresetMenu } from './LayoutPresetMenu';
 import { ProjectTabs } from './ProjectTabs';
-import { SettingsButton } from './SettingsDialog';
 import { IconButton } from './ui/Button';
-import { UserMenu } from '../auth/components/UserMenu';
+import { AccountMenu } from '../auth/components/AccountMenu';
+import { useWorkbenchPreferences } from '../settings/store';
 import { useWorkbench } from '../WorkbenchContext';
 import { DEFAULT_THEME_ID, THEMES_BY_ID } from '../../theme/themes';
 import { Tooltip } from './ui/Tooltip';
@@ -34,15 +34,14 @@ export const TopBar = () => (
     <Box w="1px" h="5" bg="border.subtle" mx="1" flexShrink={0} />
     <ProjectTabs />
     <LayoutPresetMenu />
-    <SettingsButton />
-    <UserMenu />
+    <AccountMenu />
   </Flex>
 );
 
 /** Compact legacy Invoke logo used as the workbench app-menu affordance. */
 const BrandMark = () => {
-  const { state } = useWorkbench();
-  const theme = THEMES_BY_ID[state.account.preferences.themeId] ?? THEMES_BY_ID[DEFAULT_THEME_ID];
+  const { themeId } = useWorkbenchPreferences();
+  const theme = THEMES_BY_ID[themeId] ?? THEMES_BY_ID[DEFAULT_THEME_ID];
 
   return (
     <Link

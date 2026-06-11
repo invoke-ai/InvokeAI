@@ -2,6 +2,7 @@ import type {
   BackendGraphContract,
   BackendGraphEdgeContract,
   BackendInvocationContract,
+  ProjectSettings,
   ResultDestination,
 } from '../types';
 import type { CompiledGenerateGraph, GenerateSettings, MainModelConfig, SupportedGenerateBase } from './types';
@@ -86,7 +87,8 @@ const addMetadata = (
   outputNode: BackendInvocationContract,
   settings: GenerateSettings,
   model: MainModelConfig,
-  generationMode: string
+  generationMode: string,
+  projectSettings: Pick<ProjectSettings, 'useCpuNoise'>
 ) => {
   const metadata = addNode(graph, {
     cfg_scale: settings.cfgScale,
@@ -95,7 +97,7 @@ const addMetadata = (
     height: settings.height,
     id: createId('core_metadata'),
     model,
-    rand_device: 'cuda',
+    rand_device: projectSettings.useCpuNoise ? 'cpu' : 'cuda',
     scheduler: settings.scheduler,
     steps: settings.steps,
     type: 'core_metadata',
@@ -111,7 +113,8 @@ const addMetadata = (
 const buildSDGraph = (
   settings: GenerateSettings,
   model: MainModelConfig,
-  outputIsIntermediate: boolean
+  outputIsIntermediate: boolean,
+  projectSettings: Pick<ProjectSettings, 'useCpuNoise'>
 ): BackendGraphContract => {
   const graph: BackendGraphContract = { edges: [], id: createId(`${model.base}_graph`), nodes: {} };
   const modelLoaderType = model.base === 'sdxl' ? 'sdxl_model_loader' : 'main_model_loader';
@@ -129,7 +132,7 @@ const buildSDGraph = (
     height: settings.height,
     id: 'noise',
     type: 'noise',
-    use_cpu: false,
+    use_cpu: projectSettings.useCpuNoise,
     width: settings.width,
   });
   const denoise = addNode(graph, {
@@ -178,7 +181,7 @@ const buildSDGraph = (
   addEdge(graph, noise, 'noise', denoise, 'noise');
   addEdge(graph, denoise, 'latents', output, 'latents');
   addEdge(graph, modelLoader, 'vae', output, 'vae');
-  addMetadata(graph, output, settings, model, model.base === 'sdxl' ? 'sdxl_txt2img' : 'txt2img');
+  addMetadata(graph, output, settings, model, model.base === 'sdxl' ? 'sdxl_txt2img' : 'txt2img', projectSettings);
 
   return graph;
 };
@@ -202,13 +205,14 @@ const toGraphContract = (backendGraph: BackendGraphContract, label: string) => (
 export const compileGenerateGraph = (
   settings: GenerateSettings,
   model: MainModelConfig,
-  destination: ResultDestination
+  destination: ResultDestination,
+  projectSettings: Pick<ProjectSettings, 'useCpuNoise'>
 ): CompiledGenerateGraph => {
   if (!isSupportedGenerateModel(model)) {
     throw new Error(`${model.base} generation is not wired into the V7 Generate widget yet.`);
   }
 
-  const backendGraph = buildSDGraph(settings, model, destination === 'canvas');
+  const backendGraph = buildSDGraph(settings, model, destination === 'canvas', projectSettings);
 
   return {
     backendGraph,

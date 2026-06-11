@@ -23,7 +23,7 @@ import {
  *
  * The backend database is the source of truth: each project is one
  * revision-versioned document on the server, and the small session blob
- * (preferences + open tabs + active project) lives in the per-user
+ * (open tabs + active project, with legacy account data) lives in the per-user
  * client-state KV. The user-scoped localStorage snapshot is kept as a
  * write-through cache so the workbench still loads and autosaves while the
  * backend is unreachable; un-pushed changes are replayed on the next save or

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
 import { THEMES_BY_ID } from '../theme/system';
-import { useWorkbench } from './WorkbenchContext';
+import { useWorkbenchSettings } from './settings/store';
 
 /**
  * Applies the persisted appearance preferences to the document root.
@@ -20,10 +20,17 @@ import { useWorkbench } from './WorkbenchContext';
 const THEME_HINT_STORAGE_KEY = 'invokeai:v7:webv2:theme';
 
 export const ThemeController = () => {
-  const { state } = useWorkbench();
-  const { reduceMotion, themeId } = state.account.preferences;
+  const { preferences, status } = useWorkbenchSettings();
+  const { reduceMotion, themeId } = preferences;
+  // Until the settings store has resolved, the pre-paint hint script owns the
+  // theme; applying the store's defaults here would flash and clobber it.
+  const hasResolved = status === 'ready' || status === 'error';
 
   useEffect(() => {
+    if (!hasResolved) {
+      return;
+    }
+
     const root = document.documentElement;
     const theme = THEMES_BY_ID[themeId] ?? THEMES_BY_ID.dark;
 
@@ -39,9 +46,13 @@ export const ThemeController = () => {
     } catch {
       // Storage unavailable — the next load just paints the default theme.
     }
-  }, [themeId]);
+  }, [hasResolved, themeId]);
 
   useEffect(() => {
+    if (!hasResolved) {
+      return;
+    }
+
     const root = document.documentElement;
 
     if (reduceMotion) {
@@ -49,7 +60,7 @@ export const ThemeController = () => {
     } else {
       delete root.dataset.reduceMotion;
     }
-  }, [reduceMotion]);
+  }, [hasResolved, reduceMotion]);
 
   return null;
 };
