@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Optional, Union
@@ -15,6 +16,8 @@ from invokeai.app.services.image_records.image_records_common import ImageRecord
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.util.misc import uuid_string
+
+_ZIP_STREAM_CHUNK_SIZE = 1024 * 1024  # 1 MiB copy buffer for streaming remote objects into the zip
 
 
 class BulkDownloadService(BulkDownloadBase):
@@ -98,11 +101,29 @@ class BulkDownloadService(BulkDownloadBase):
         zip_file_name = bulk_download_item_id + ".zip"
         zip_file_path = self._bulk_downloads_folder / (zip_file_name)
 
+        image_files = self._invoker.services.image_files
         with ZipFile(zip_file_path, "w") as zip_file:
             for image_dto in image_dtos:
                 image_zip_path = Path(image_dto.image_category.value) / image_dto.image_name
-                image_disk_path = self._invoker.services.images.get_path(image_dto.image_name)
-                zip_file.write(image_disk_path, arcname=image_zip_path)
+                # POSIX form so zip entry names use "/" on every platform (on Windows
+                # str(Path) would otherwise yield backslashes, which are non-portable).
+                arcname = image_zip_path.as_posix()
+                local_path = image_files.get_local_path(image_dto.image_name, image_subfolder=image_dto.image_subfolder)
+                # get_local_path() does not verify existence, so confirm the file is
+                # really present before ZipFile.write() (which would raise
+                # FileNotFoundError); otherwise fall through to the streaming path.
+                if local_path is not None and local_path.is_file():
+                    # Local backend (disk): stream the file straight into the zip.
+                    zip_file.write(local_path, arcname=arcname)
+                else:
+                    # Remote backend (e.g. S3), or a disk path whose file is missing:
+                    # stream the object into the zip in chunks instead of buffering.
+                    src = image_files.open_stream(image_dto.image_name, image_subfolder=image_dto.image_subfolder)
+                    try:
+                        with zip_file.open(arcname, "w") as dst:
+                            shutil.copyfileobj(src, dst, length=_ZIP_STREAM_CHUNK_SIZE)
+                    finally:
+                        src.close()
 
         return str(zip_file_name)
 

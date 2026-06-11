@@ -14343,7 +14343,8 @@
           }
         },
         "type": "object",
-        "title": "CacheStats"
+        "title": "CacheStats",
+        "description": "Collect statistics on cache performance."
       },
       "CalculateImageTilesEvenSplitInvocation": {
         "category": "tiles",
@@ -40937,6 +40938,49 @@
             "title": "Workflow Thumbnails Dir",
             "description": "Path to directory for workflow thumbnails.",
             "default": "workflow_thumbnails"
+          },
+          "storage_backend": {
+            "type": "string",
+            "enum": ["disk", "s3"],
+            "title": "Storage Backend",
+            "description": "Backend for storing generated images. \"disk\" uses the local filesystem; \"s3\" uses any S3-compatible object store (AWS S3, Backblaze B2, etc.).",
+            "default": "disk"
+          },
+          "s3_bucket": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "S3 Bucket",
+            "description": "Bucket name for the s3 storage backend. Required when storage_backend=\"s3\"."
+          },
+          "s3_endpoint_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "S3 Endpoint Url",
+            "description": "Endpoint URL for the s3 storage backend. Leave unset to talk to AWS S3; set to a provider-specific URL (e.g. https://s3.us-west-004.backblazeb2.com for Backblaze B2) for any other S3-compatible store."
+          },
+          "s3_region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "S3 Region",
+            "description": "Region name for the s3 storage backend. Optional; if unset, the standard AWS region resolution applies (AWS_REGION / AWS_DEFAULT_REGION / AWS config). For Backblaze B2, set the region embedded in your endpoint, e.g. us-west-004."
           },
           "log_handlers": {
             "items": {

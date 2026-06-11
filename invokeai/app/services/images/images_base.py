@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Optional
+from pathlib import Path
+from typing import BinaryIO, Callable, Optional
 
 from PIL.Image import Image as PILImageType
 
@@ -72,6 +73,21 @@ class ImageServiceABC(ABC):
     @abstractmethod
     def get_pil_image(self, image_name: str) -> PILImageType:
         """Gets an image as a PIL image."""
+        pass
+
+    @abstractmethod
+    def get_bytes(self, image_name: str, thumbnail: bool = False) -> bytes:
+        """Gets the raw bytes of an image or its thumbnail."""
+        pass
+
+    @abstractmethod
+    def get_local_path(self, image_name: str, thumbnail: bool = False) -> Optional[Path]:
+        """Gets a real local filesystem path for the image, or None if the backend has none (e.g. S3)."""
+        pass
+
+    @abstractmethod
+    def open_stream(self, image_name: str, thumbnail: bool = False) -> BinaryIO:
+        """Opens a readable binary stream of the image's bytes. The caller is responsible for closing it."""
         pass
 
     @abstractmethod
