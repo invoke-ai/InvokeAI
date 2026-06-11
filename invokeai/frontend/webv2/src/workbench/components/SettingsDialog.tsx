@@ -17,7 +17,7 @@ import { CheckIcon, RotateCcwIcon, SettingsIcon, Trash2Icon } from 'lucide-react
 
 import { themeCardRecipe } from '../../theme/recipes';
 import { THEMES, type ThemeDefinition } from '../../theme/system';
-import { localStorageWorkbenchPersistence } from '../persistence';
+import { syncedWorkbenchPersistence } from '../projects/syncedPersistence';
 import type { WorkbenchThemeId } from '../types';
 import { useWorkbench } from '../WorkbenchContext';
 import { Button, CloseButton, IconButton } from './ui/Button';
@@ -208,13 +208,13 @@ const WorkspaceSection = () => {
   const { dispatch } = useWorkbench();
 
   const clearSavedData = () => {
-    void localStorageWorkbenchPersistence.clearWorkbench().then(() => {
+    void syncedWorkbenchPersistence.clearWorkbench().then(() => {
       window.location.reload();
     });
   };
 
   return (
-    <SettingsSection description="Reset the layout or clear locally saved projects and preferences." title="Workspace">
+    <SettingsSection description="Reset the layout or clear your saved projects and preferences." title="Workspace">
       <HStack gap="2" wrap="wrap">
         <Button size="sm" variant="outline" onClick={() => dispatch({ type: 'resetActiveLayout' })}>
           <RotateCcwIcon />

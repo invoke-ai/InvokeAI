@@ -18,6 +18,7 @@ export type WidgetId =
   | 'models'
   | 'notifications'
   | 'preview'
+  | 'project'
   | 'queue'
   | 'server-status'
   | 'users'
@@ -269,6 +270,13 @@ export interface ProjectLayoutState {
 export interface Project {
   id: string;
   name: string;
+  /**
+   * Set on recovery forks created when a save loses a revision race: the id
+   * of the root project this recovered from (chains collapse to the root, so
+   * a recovery of a recovery still points at the original).
+   */
+  recoveryOf?: string;
+  recoveredAt?: string;
   layout: ProjectLayoutState;
   invocation: InvocationControllerState;
   projectGraph: GraphContract;

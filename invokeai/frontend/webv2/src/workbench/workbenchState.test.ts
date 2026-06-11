@@ -93,6 +93,7 @@ describe('workbench widget region defaults', () => {
       'layers',
       'models',
       'diagnostics',
+      'project',
     ]);
     expect(getActiveProject(hydratedCustomized).widgetRegions.right.enabledWidgetIds).toEqual(['gallery', 'layers']);
   });
@@ -105,6 +106,9 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     const queueItem = originProject.queue.items[0];
 
     expect(queueItem).toBeDefined();
+
+    state = workbenchReducer(state, { type: 'createProject' });
+    state = workbenchReducer(state, { projectId: originProject.id, type: 'switchProject' });
 
     const otherProjectId = state.projects.find((project) => project.id !== originProject.id)?.id;
 
@@ -301,6 +305,10 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     let state = submitGenerate(primeGenerate());
     const originProject = getActiveProject(state);
     const queueItem = originProject.queue.items[0];
+
+    state = workbenchReducer(state, { type: 'createProject' });
+    state = workbenchReducer(state, { projectId: originProject.id, type: 'switchProject' });
+
     const otherProjectId = state.projects.find((project) => project.id !== originProject.id)?.id;
 
     expect(otherProjectId).toBeDefined();

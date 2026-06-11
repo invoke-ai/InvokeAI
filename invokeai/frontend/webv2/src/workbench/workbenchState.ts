@@ -41,7 +41,9 @@ import type {
 
 type WorkbenchAction =
   | { type: 'createProject' }
+  | { type: 'openProject'; project: Project }
   | { type: 'closeProject'; projectId: string }
+  | { type: 'renameProject'; projectId: string; name: string }
   | { type: 'switchProject'; projectId: string }
   | { type: 'setCenterView'; centerViewId: CenterViewId }
   | { type: 'applyPreset'; presetId: LayoutPresetId }
@@ -93,6 +95,7 @@ type WorkbenchAction =
   | { type: 'undoProjectChange' }
   | { type: 'redoProjectChange' }
   | { type: 'hydrateWorkbench'; state: WorkbenchState }
+  | { type: 'reconcileProjectConflict'; projectId: string; serverProject: Project; recoveredProject: Project }
   | { type: 'autosaveStarted' }
   | { type: 'autosaveSucceeded'; savedAt: string }
   | { type: 'autosaveFailed'; error: string }
@@ -107,7 +110,6 @@ type WorkbenchAction =
   | { type: 'recordNotice'; kind: WorkbenchNotificationKind; title: string; message?: string };
 
 const HISTORY_LIMIT = 40;
-const INITIAL_PROJECT_COUNT = 3;
 const ERROR_LOG_LIMIT = 5;
 const NOTIFICATION_LIMIT = 100;
 const MIN_PANEL_SIZE_PX = 180;
@@ -311,6 +313,7 @@ const cloneWidgetStates = (
     models: cloneWidgetState(widgetStates.models ?? defaultWidgetStates.models),
     notifications: cloneWidgetState(widgetStates.notifications ?? defaultWidgetStates.notifications),
     preview: cloneWidgetState(widgetStates.preview ?? defaultWidgetStates.preview),
+    project: cloneWidgetState(widgetStates.project ?? defaultWidgetStates.project),
     queue: cloneWidgetState(widgetStates.queue ?? defaultWidgetStates.queue),
     'server-status': cloneWidgetState(widgetStates['server-status'] ?? defaultWidgetStates['server-status']),
     users: cloneWidgetState(widgetStates.users ?? defaultWidgetStates.users),
@@ -408,6 +411,7 @@ const createWidgetStates = (): Record<WidgetId, WidgetStateContract> => ({
   models: { id: 'models', label: 'Models', values: {}, version: 1 },
   notifications: { id: 'notifications', label: 'Notifications', values: {}, version: 1 },
   preview: { id: 'preview', label: 'Preview', values: {}, version: 1 },
+  project: { id: 'project', label: 'Project', values: {}, version: 1 },
   queue: { id: 'queue', label: 'Queue', values: {}, version: 1 },
   'server-status': { id: 'server-status', label: 'Server Status', values: {}, version: 1 },
   users: { id: 'users', label: 'Users', values: {}, version: 1 },
@@ -424,7 +428,7 @@ const createWidgetRegions = (): Record<WidgetRegion, WidgetRegionState> => ({
   },
   right: {
     activeWidgetId: 'layers',
-    enabledWidgetIds: ['queue', 'gallery', 'layers', 'models', 'diagnostics'],
+    enabledWidgetIds: ['queue', 'gallery', 'layers', 'models', 'diagnostics', 'project'],
     isCollapsed: false,
     sizePx: 240,
   },
@@ -565,6 +569,14 @@ const getNextProjectIndex = (projects: Project[]): number => {
 
   return Math.max(0, ...usedIndices) + 1;
 };
+
+/**
+ * A fresh, never-saved project. Ids carry entropy rather than an index so a
+ * draft can never collide with a project that already exists on the server
+ * (which an autosave would then silently overwrite).
+ */
+export const createDraftProject = (projects: Project[]): Project =>
+  createProject(getNextProjectIndex(projects), createId('project'));
 
 const updateActiveProject = (state: WorkbenchState, getProject: (project: Project) => Project): WorkbenchState => ({
   ...state,
@@ -919,23 +931,50 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   themeId: DEFAULT_THEME_ID,
 };
 
-export const createInitialWorkbenchState = (): WorkbenchState => ({
-  account: { activeLayoutPresetId: 'canvas-default', preferences: { ...DEFAULT_PREFERENCES } },
-  activeProjectId: 'project-1',
-  autosave: { status: 'idle' },
-  backendConnection: { status: 'connecting' },
-  errorLog: [],
-  notifications: [],
-  projects: Array.from({ length: INITIAL_PROJECT_COUNT }, (_value, index) => createProject(index + 1)),
-  widgetFailures: [],
-});
+export const createInitialWorkbenchState = (): WorkbenchState => {
+  const draft = createDraftProject([]);
+
+  return {
+    account: { activeLayoutPresetId: 'canvas-default', preferences: { ...DEFAULT_PREFERENCES } },
+    activeProjectId: draft.id,
+    autosave: { status: 'idle' },
+    backendConnection: { status: 'connecting' },
+    errorLog: [],
+    notifications: [],
+    projects: [draft],
+    widgetFailures: [],
+  };
+};
 
 export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction): WorkbenchState => {
   switch (action.type) {
     case 'createProject': {
-      const project = createProject(getNextProjectIndex(state.projects), createId('project'));
+      const project = createDraftProject(state.projects);
 
       return { ...state, activeProjectId: project.id, projects: [...state.projects, project] };
+    }
+    case 'openProject': {
+      // Hydrated from the library (Open dialog or a deep link). Opening an
+      // already-open project just focuses its tab.
+      if (state.projects.some((project) => project.id === action.project.id)) {
+        return { ...state, activeProjectId: action.project.id };
+      }
+
+      const project = ensureProjectWidgetContracts(action.project);
+
+      return { ...state, activeProjectId: project.id, projects: [...state.projects, project] };
+    }
+    case 'renameProject': {
+      const name = action.name.trim();
+
+      if (!name) {
+        return state;
+      }
+
+      return {
+        ...state,
+        projects: state.projects.map((project) => (project.id === action.projectId ? { ...project, name } : project)),
+      };
     }
     case 'closeProject': {
       if (state.projects.length === 1) {
@@ -1588,6 +1627,33 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
     }
     case 'hydrateWorkbench': {
       return normalizeWorkbenchState(action.state);
+    }
+    case 'reconcileProjectConflict': {
+      // A save lost the revision race against another tab/device. The server
+      // version takes over the original project id, and the local edits
+      // continue in the recovered fork — which stays the active project when
+      // the user was looking at it.
+      const serverProject = ensureProjectWidgetContracts(action.serverProject);
+      const recoveredProject = ensureProjectWidgetContracts(action.recoveredProject);
+      const hasOriginal = state.projects.some((project) => project.id === action.projectId);
+      const projects = hasOriginal
+        ? state.projects.flatMap((project) =>
+            project.id === action.projectId ? [serverProject, recoveredProject] : [project]
+          )
+        : [...state.projects, serverProject, recoveredProject];
+
+      return addNotification(
+        {
+          ...state,
+          activeProjectId: state.activeProjectId === action.projectId ? recoveredProject.id : state.activeProjectId,
+          projects,
+        },
+        createNotification({
+          kind: 'info',
+          message: `"${serverProject.name}" was changed elsewhere. Your local edits continue in "${recoveredProject.name}" — manage recoveries in the Project panel.`,
+          title: 'Project recovered',
+        })
+      );
     }
     case 'autosaveStarted': {
       return { ...state, autosave: { status: 'saving' } };

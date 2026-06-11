@@ -1,5 +1,5 @@
 import { getUserStorageScope } from './auth/session';
-import type { Project, WorkbenchPersistenceSnapshot, WorkbenchState } from './types';
+import type { WorkbenchPersistenceSnapshot, WorkbenchState } from './types';
 
 const BASE_STORAGE_KEY = 'invokeai:v7:webv2:workbench';
 const WORKBENCH_SCHEMA_VERSION = 1;
@@ -16,12 +16,6 @@ export interface WorkbenchPersistenceService {
   loadWorkbench(): Promise<WorkbenchPersistenceSnapshot | null>;
   saveWorkbench(state: WorkbenchState): Promise<WorkbenchPersistenceSnapshot>;
   clearWorkbench(): Promise<void>;
-}
-
-export interface ProjectPersistenceService {
-  loadProjects(): Promise<Project[]>;
-  saveProjects(projects: Project[]): Promise<Project[]>;
-  clearProjects(): Promise<void>;
 }
 
 const isBrowser = (): boolean => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
@@ -94,27 +88,5 @@ export const localStorageWorkbenchPersistence: WorkbenchPersistenceService = {
     window.localStorage.setItem(getStorageKey(), JSON.stringify(snapshot));
 
     return Promise.resolve(snapshot);
-  },
-};
-
-export const localStorageProjectPersistence: ProjectPersistenceService = {
-  async clearProjects() {
-    await localStorageWorkbenchPersistence.clearWorkbench();
-  },
-  async loadProjects() {
-    const snapshot = await localStorageWorkbenchPersistence.loadWorkbench();
-
-    return snapshot?.state.projects ?? [];
-  },
-  async saveProjects(projects) {
-    const snapshot = await localStorageWorkbenchPersistence.loadWorkbench();
-
-    if (!snapshot) {
-      return projects;
-    }
-
-    await localStorageWorkbenchPersistence.saveWorkbench({ ...snapshot.state, projects });
-
-    return projects;
   },
 };

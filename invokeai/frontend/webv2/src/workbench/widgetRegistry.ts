@@ -12,6 +12,7 @@ import { layersWidgetManifest } from './widgets/layers';
 import { modelsWidgetManifest } from './widgets/models';
 import { notificationsWidgetManifest } from './widgets/notifications';
 import { previewWidgetManifest } from './widgets/preview';
+import { projectWidgetManifest } from './widgets/project';
 import { queueWidgetManifest } from './widgets/queue';
 import { serverStatusWidgetManifest } from './widgets/server-status';
 import { usersWidgetManifest } from './widgets/users';
@@ -25,6 +26,7 @@ const firstPartyWidgetManifests: WidgetManifest[] = [
   diagnosticsWidgetManifest,
   galleryWidgetManifest,
   previewWidgetManifest,
+  projectWidgetManifest,
   layersWidgetManifest,
   modelsWidgetManifest,
   queueWidgetManifest,

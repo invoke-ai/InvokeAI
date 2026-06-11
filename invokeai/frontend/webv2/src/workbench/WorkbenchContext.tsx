@@ -10,7 +10,11 @@ import {
   type ReactNode,
 } from 'react';
 
-import { localStorageWorkbenchPersistence } from './persistence';
+import {
+  syncedWorkbenchPersistence,
+  type WorkbenchLoadOptions,
+  type WorkbenchSaveResult,
+} from './projects/syncedPersistence';
 import type { Project, WorkbenchState } from './types';
 import { createInitialWorkbenchState, workbenchReducer, type WorkbenchAction } from './workbenchState';
 
@@ -40,12 +44,22 @@ const getPersistedStateKey = (state: WorkbenchState): string =>
     widgetFailures: state.widgetFailures,
   });
 
-export const WorkbenchProvider = ({ children }: { children: ReactNode }) => {
+export const WorkbenchProvider = ({
+  children,
+  loadOptions,
+}: {
+  children: ReactNode;
+  /** Boot-time session options (deep-linked project, fresh draft). Read once at mount. */
+  loadOptions?: WorkbenchLoadOptions;
+}) => {
   const [state, dispatch] = useReducer(workbenchReducer, undefined, createInitialWorkbenchState);
   const [hasHydrated, setHasHydrated] = useState(false);
   const hasLoadedPersistenceRef = useRef(false);
   const latestStateRef = useRef(state);
   const lastSavedStateKeyRef = useRef(getPersistedStateKey(state));
+  // Captured once: the options describe how this mount of the editor boots.
+  // Later search-param changes are handled live by WorkbenchSessionController.
+  const bootOptionsRef = useRef(loadOptions);
   const persistedStateKey = getPersistedStateKey(state);
 
   latestStateRef.current = state;
@@ -54,8 +68,10 @@ export const WorkbenchProvider = ({ children }: { children: ReactNode }) => {
     let isCancelled = false;
 
     const loadPersistedState = async () => {
+      const bootOptions = bootOptionsRef.current;
+
       try {
-        const snapshot = await localStorageWorkbenchPersistence.loadWorkbench();
+        const snapshot = await syncedWorkbenchPersistence.loadWorkbench(bootOptions);
 
         if (isCancelled) {
           return;
@@ -64,6 +80,18 @@ export const WorkbenchProvider = ({ children }: { children: ReactNode }) => {
         if (snapshot) {
           lastSavedStateKeyRef.current = getPersistedStateKey(snapshot.state);
           dispatch({ state: snapshot.state, type: 'hydrateWorkbench' });
+        }
+
+        const requestedId = bootOptions?.openProjectId;
+        const projects = snapshot?.state.projects ?? latestStateRef.current.projects;
+
+        if (requestedId && !projects.some((project) => project.id === requestedId)) {
+          dispatch({
+            kind: 'info',
+            message: 'The linked project does not exist on this account — it may have been deleted.',
+            title: 'Project not found',
+            type: 'recordNotice',
+          });
         }
       } catch (error) {
         dispatch({
@@ -86,6 +114,25 @@ export const WorkbenchProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
+  // Revision conflicts surfaced by a save are applied to state here: the
+  // server version adopts the project id and the local edits continue in a
+  // recovered fork. The follow-up autosave is a no-op for both (the sync
+  // layer already acknowledged them).
+  const applySaveResult = (result: WorkbenchSaveResult): void => {
+    for (const conflict of result.conflicts) {
+      dispatch({
+        projectId: conflict.projectId,
+        recoveredProject: conflict.recoveredProject,
+        serverProject: conflict.serverProject,
+        type: 'reconcileProjectConflict',
+      });
+    }
+  };
+
+  const applySaveResultRef = useRef(applySaveResult);
+
+  applySaveResultRef.current = applySaveResult;
+
   useEffect(() => {
     if (!hasLoadedPersistenceRef.current) {
       return undefined;
@@ -100,15 +147,16 @@ export const WorkbenchProvider = ({ children }: { children: ReactNode }) => {
     dispatch({ type: 'autosaveStarted' });
 
     const timeoutId = window.setTimeout(() => {
-      localStorageWorkbenchPersistence
+      syncedWorkbenchPersistence
         .saveWorkbench(latestStateRef.current)
-        .then((snapshot) => {
+        .then((result) => {
           if (isStale) {
             return;
           }
 
           lastSavedStateKeyRef.current = persistedStateKey;
-          dispatch({ savedAt: snapshot.savedAt, type: 'autosaveSucceeded' });
+          dispatch({ savedAt: result.snapshot.savedAt, type: 'autosaveSucceeded' });
+          applySaveResultRef.current(result);
         })
         .catch((error: unknown) => {
           if (isStale) {
@@ -127,6 +175,24 @@ export const WorkbenchProvider = ({ children }: { children: ReactNode }) => {
       window.clearTimeout(timeoutId);
     };
   }, [persistedStateKey]);
+
+  // Replay changes that queued up while the backend was unreachable as soon
+  // as the socket reports it is back.
+  const backendConnectionStatus = state.backendConnection.status;
+
+  useEffect(() => {
+    if (
+      backendConnectionStatus !== 'connected' ||
+      !hasLoadedPersistenceRef.current ||
+      !syncedWorkbenchPersistence.hasPendingChanges()
+    ) {
+      return;
+    }
+
+    void syncedWorkbenchPersistence.saveWorkbench(latestStateRef.current).then((result) => {
+      applySaveResultRef.current(result);
+    });
+  }, [backendConnectionStatus]);
 
   const value = useMemo<WorkbenchContextValue>(() => {
     const activeProject = state.projects.find((project) => project.id === state.activeProjectId) ?? state.projects[0];

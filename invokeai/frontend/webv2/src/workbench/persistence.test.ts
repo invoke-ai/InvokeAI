@@ -20,7 +20,7 @@ describe('workbench persistence migration', () => {
     });
 
     expect(snapshot?.version).toBe(1);
-    expect(snapshot?.state.projects).toHaveLength(3);
+    expect(snapshot?.state.projects).toHaveLength(1);
   });
 
   it('rejects unsupported persistence snapshots', () => {
