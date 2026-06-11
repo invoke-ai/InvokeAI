@@ -2,8 +2,6 @@ import {
   Badge,
   Box,
   Flex,
-  Grid,
-  HoverCard,
   HStack,
   Icon,
   Input,
@@ -14,11 +12,13 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
-import { CheckIcon, DownloadIcon, PackageIcon, SearchIcon, SlidersHorizontalIcon } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { CheckIcon, DownloadIcon, PackageIcon, SearchIcon, SlidersHorizontalIcon, StarIcon } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { Button, IconButton } from '../../components/ui/Button';
+import { IconButton } from '../../components/ui/Button';
 import { MenuContent } from '../../components/ui/Menu';
+import { Scrollable } from '../../components/ui/Scrollable';
+import { Tooltip } from '../../components/ui/Tooltip';
 import { collectBases, collectTypes } from '../../models/library';
 import { ensureStartersLoaded, useStartersSnapshot } from '../../models/startersStore';
 import { getModelBaseColorPalette, getModelBaseLabel, getModelTypeLabel } from '../../models/taxonomy';
@@ -29,9 +29,10 @@ import { InstallSourceButton, SourceListItem } from './SourceListItem';
 import { useInstallActions } from './useInstallActions';
 
 /**
- * Curated starter models and one-click bundles, served from the cached
- * starters store (no refetch on revisit; installs revalidate in background).
- * Bundles queue every missing model and dependency in the bundle.
+ * Curated starter models, served from the cached starters store (no refetch
+ * on revisit; installs revalidate in background). Bundles sit in a sidebar
+ * like playlists: clicking one filters the list to its models, and each has
+ * a download action that queues every missing model in the pack.
  */
 export const StarterModelsTab = () => {
   const notify = useNotify();
@@ -41,22 +42,30 @@ export const StarterModelsTab = () => {
   const [typeFilter, setTypeFilter] = useState<ModelTaxonomyType | null>(null);
   const [baseFilter, setBaseFilter] = useState<string | null>(null);
   const [installingBundle, setInstallingBundle] = useState<string | null>(null);
+  const [selectedBundleName, setSelectedBundleName] = useState<string | null>(null);
 
   useEffect(() => {
     ensureStartersLoaded();
   }, []);
 
-  const availableTypes = useMemo(() => collectTypes(response?.starter_models ?? []), [response]);
-  const availableBases = useMemo(() => collectBases(response?.starter_models ?? []), [response]);
+  const bundles = useMemo(() => (response ? Object.values(response.starter_bundles) : []), [response]);
+  // Falls back to the full catalog if the selected bundle disappears on refresh.
+  const selectedBundle = useMemo(
+    () => bundles.find((bundle) => bundle.name === selectedBundleName) ?? null,
+    [bundles, selectedBundleName]
+  );
+  const sourceModels = useMemo(
+    () => selectedBundle?.models ?? response?.starter_models ?? [],
+    [response, selectedBundle]
+  );
+
+  const availableTypes = useMemo(() => collectTypes(sourceModels), [sourceModels]);
+  const availableBases = useMemo(() => collectBases(sourceModels), [sourceModels]);
 
   const filteredModels = useMemo(() => {
-    if (!response) {
-      return [];
-    }
-
     const terms = searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
 
-    return response.starter_models.filter((model) => {
+    return sourceModels.filter((model) => {
       if (typeFilter !== null && model.type !== typeFilter) {
         return false;
       }
@@ -73,7 +82,7 @@ export const StarterModelsTab = () => {
 
       return terms.every((term) => haystack.includes(term));
     });
-  }, [baseFilter, response, searchTerm, typeFilter]);
+  }, [baseFilter, searchTerm, sourceModels, typeFilter]);
 
   /** Queue a starter model plus its uninstalled dependencies; returns how many jobs were queued. */
   const queueStarter = async (model: StarterModel): Promise<number> => {
@@ -144,32 +153,41 @@ export const StarterModelsTab = () => {
     );
   }
 
-  const bundles = Object.values(response.starter_bundles);
-
   return (
-    <Stack gap="4">
+    <HStack align="stretch" gap="4" h="full" minH="0">
       {bundles.length > 0 ? (
-        <Stack gap="2">
+        <Stack flexShrink={0} gap="2" minH="0" w="16rem">
           <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
             Bundles
           </Text>
-          <Grid gap="2" templateColumns="repeat(auto-fill, minmax(15rem, 1fr))">
-            {bundles.map((bundle) => (
-              <BundleCard
-                key={bundle.name}
-                bundle={bundle}
-                isInstalling={installingBundle === bundle.name}
-                onInstall={() => void installBundle(bundle)}
+          <Scrollable flex="1" label="Starter bundles" minH="0">
+            <Stack gap="1">
+              <SidebarRow
+                icon={StarIcon}
+                isSelected={selectedBundle === null}
+                subtitle={`${response.starter_models.length} models`}
+                title="All starter models"
+                onSelect={() => setSelectedBundleName(null)}
               />
-            ))}
-          </Grid>
+              {bundles.map((bundle) => (
+                <BundleRow
+                  key={bundle.name}
+                  bundle={bundle}
+                  isInstalling={installingBundle === bundle.name}
+                  isSelected={selectedBundle?.name === bundle.name}
+                  onInstall={() => void installBundle(bundle)}
+                  onSelect={() => setSelectedBundleName(bundle.name)}
+                />
+              ))}
+            </Stack>
+          </Scrollable>
         </Stack>
       ) : null}
 
-      <Stack gap="2">
+      <Stack flex="1" gap="2" minH="0" minW="0">
         <HStack justify="space-between" wrap="wrap">
-          <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
-            Starter Models
+          <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase" truncate>
+            {selectedBundle?.name ?? 'Starter Models'}
           </Text>
           <HStack gap="1.5">
             <Box maxW="18rem" w="full">
@@ -246,147 +264,155 @@ export const StarterModelsTab = () => {
         </HStack>
         {filteredModels.length === 0 ? (
           <Text color="fg.subtle" fontSize="2xs" py="4" textAlign="center">
-            No starter models match your search or filters.
+            {selectedBundle
+              ? 'No models in this bundle match your search or filters.'
+              : 'No starter models match your search or filters.'}
           </Text>
         ) : (
-          <Stack gap="1.5">
-            {filteredModels.map((model) => {
-              const dependencyCount = model.dependencies?.length ?? 0;
+          <Scrollable flex="1" label="Starter models" minH="0" pr="1">
+            <Stack gap="1.5">
+              {filteredModels.map((model) => {
+                const dependencyCount = model.dependencies?.length ?? 0;
 
-              return (
-                <SourceListItem
-                  key={`${model.source}-${model.name}`}
-                  badges={
-                    <>
-                      <Badge
-                        colorPalette={getModelBaseColorPalette(model.base)}
-                        flexShrink={0}
-                        fontSize="2xs"
-                        size="sm"
-                        variant="surface"
-                      >
-                        {getModelBaseLabel(model.base)}
-                      </Badge>
-                      <Badge colorPalette="gray" flexShrink={0} fontSize="2xs" size="sm" variant="outline">
-                        {getModelTypeLabel(model.type)}
-                      </Badge>
-                    </>
-                  }
-                  description={`${model.description}${
-                    dependencyCount > 0
-                      ? ` (installs ${dependencyCount} dependenc${dependencyCount === 1 ? 'y' : 'ies'})`
-                      : ''
-                  }`}
-                  title={model.name}
-                  trailing={
-                    <InstallSourceButton
-                      isInstalled={model.is_installed}
-                      isPending={pendingSources.has(model.source)}
-                      source={model.source}
-                      onInstall={() => void installStarter(model)}
-                    />
-                  }
-                />
-              );
-            })}
-          </Stack>
+                return (
+                  <SourceListItem
+                    key={`${model.source}-${model.name}`}
+                    badges={
+                      <>
+                        <Badge
+                          colorPalette={getModelBaseColorPalette(model.base)}
+                          flexShrink={0}
+                          fontSize="2xs"
+                          size="sm"
+                          variant="surface"
+                        >
+                          {getModelBaseLabel(model.base)}
+                        </Badge>
+                        <Badge colorPalette="gray" flexShrink={0} fontSize="2xs" size="sm" variant="outline">
+                          {getModelTypeLabel(model.type)}
+                        </Badge>
+                      </>
+                    }
+                    description={`${model.description}${
+                      dependencyCount > 0
+                        ? ` (installs ${dependencyCount} dependenc${dependencyCount === 1 ? 'y' : 'ies'})`
+                        : ''
+                    }`}
+                    title={model.name}
+                    trailing={
+                      <InstallSourceButton
+                        isInstalled={model.is_installed}
+                        isPending={pendingSources.has(model.source)}
+                        source={model.source}
+                        onInstall={() => void installStarter(model)}
+                      />
+                    }
+                  />
+                );
+              })}
+            </Stack>
+          </Scrollable>
         )}
       </Stack>
-    </Stack>
+    </HStack>
   );
 };
 
-/**
- * Bundle card whose model list previews in a hover card. The whole card is
- * the hover trigger so the preview also works when the install button is
- * disabled (all models installed).
- */
-const BundleCard = ({
+/** Playlist-style sidebar row: icon, two-line label, optional trailing action. */
+const SidebarRow = ({
+  icon,
+  isSelected,
+  onSelect,
+  subtitle,
+  title,
+  trailing,
+}: {
+  icon: typeof StarIcon;
+  isSelected: boolean;
+  onSelect: () => void;
+  subtitle: string;
+  title: string;
+  trailing?: ReactNode;
+}) => (
+  <HStack
+    aria-current={isSelected || undefined}
+    bg={isSelected ? 'bg.surfaceRaised' : 'transparent'}
+    cursor="pointer"
+    gap="2"
+    minW="0"
+    p="2"
+    role="button"
+    rounded="md"
+    tabIndex={0}
+    _focusVisible={{ boxShadow: 'inset 0 0 0 2px var(--chakra-colors-accent-active)', outline: 'none' }}
+    _hover={{ bg: 'bg.surfaceRaised' }}
+    onClick={onSelect}
+    onKeyDown={(event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        onSelect();
+      }
+    }}
+  >
+    <Icon as={icon} boxSize="3.5" color={isSelected ? 'accent.invoke' : 'fg.muted'} flexShrink={0} />
+    <Stack flex="1" gap="0" minW="0">
+      <Text fontSize="xs" fontWeight="600" truncate>
+        {title}
+      </Text>
+      <Text color="fg.subtle" fontSize="2xs" truncate>
+        {subtitle}
+      </Text>
+    </Stack>
+    {trailing}
+  </HStack>
+);
+
+/** A bundle in the sidebar: select to browse its models, download to queue the pack. */
+const BundleRow = ({
   bundle,
   isInstalling,
+  isSelected,
   onInstall,
+  onSelect,
 }: {
   bundle: StarterModelBundle;
   isInstalling: boolean;
+  isSelected: boolean;
   onInstall: () => void;
+  onSelect: () => void;
 }) => {
   const missingCount = bundle.models.filter((model) => !model.is_installed).length;
 
   return (
-    <HoverCard.Root closeDelay={100} openDelay={250} positioning={{ placement: 'bottom' }}>
-      <HoverCard.Trigger asChild>
-        <Stack bg="bg.surface" borderColor="border.subtle" borderWidth="1px" gap="2" p="3" rounded="lg">
-          <HStack gap="2">
-            <Icon as={PackageIcon} boxSize="4" color="fg.muted" />
-            <Text flex="1" fontSize="xs" fontWeight="700" minW="0" truncate>
-              {bundle.name}
-            </Text>
-          </HStack>
-          <Text color="fg.subtle" fontSize="2xs">
-            {bundle.models.length} models · {missingCount === 0 ? 'all installed' : `${missingCount} to install`}
-          </Text>
-          <Button
-            disabled={missingCount === 0}
-            loading={isInstalling}
-            size="xs"
-            variant={missingCount === 0 ? 'outline' : 'solid'}
-            w="full"
-            onClick={onInstall}
-          >
-            <Icon as={DownloadIcon} boxSize="3" />
-            {missingCount === 0 ? 'Installed' : 'Install Bundle'}
-          </Button>
-        </Stack>
-      </HoverCard.Trigger>
-      <Portal>
-        <HoverCard.Positioner>
-          <HoverCard.Content
-            bg="bg.surfaceRaised"
-            borderColor="border.emphasis"
-            borderWidth="1px"
-            color="fg.default"
-            p="3"
-            rounded="lg"
-            shadow="lg"
-            w="22rem"
-          >
-            <HoverCard.Arrow>
-              <HoverCard.ArrowTip />
-            </HoverCard.Arrow>
-            {/* Plain overflow box: ScrollArea's content grows to fit long
-                unbroken names, which defeats truncation. */}
-            <Box aria-label={`Models in ${bundle.name}`} maxH="18rem" overflowY="auto">
-              <Stack gap="1.5">
-                <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
-                  In this bundle
-                </Text>
-                {bundle.models.map((model) => (
-                  <HStack key={`${model.source}-${model.name}`} gap="1.5" minW="0" w="full">
-                    <Icon
-                      as={model.is_installed ? CheckIcon : DownloadIcon}
-                      boxSize="3"
-                      color={model.is_installed ? 'green.400' : 'fg.subtle'}
-                      flexShrink={0}
-                    />
-                    <Text flex="1" fontSize="2xs" minW="0" title={model.name} truncate>
-                      {model.name}
-                    </Text>
-                    <Badge
-                      colorPalette={getModelBaseColorPalette(model.base)}
-                      flexShrink={0}
-                      fontSize="2xs"
-                      size="sm"
-                      variant="surface"
-                    >
-                      {getModelBaseLabel(model.base)}
-                    </Badge>
-                  </HStack>
-                ))}
-              </Stack>
-            </Box>
-          </HoverCard.Content>
-        </HoverCard.Positioner>
-      </Portal>
-    </HoverCard.Root>
+    <SidebarRow
+      icon={PackageIcon}
+      isSelected={isSelected}
+      subtitle={`${bundle.models.length} models · ${missingCount === 0 ? 'all installed' : `${missingCount} to install`}`}
+      title={bundle.name}
+      trailing={
+        missingCount === 0 ? (
+          <Tooltip content="All models in this bundle are installed">
+            <Icon as={CheckIcon} boxSize="3.5" color="green.400" flexShrink={0} />
+          </Tooltip>
+        ) : (
+          <Tooltip content={`Install ${missingCount} missing model${missingCount === 1 ? '' : 's'}`}>
+            <IconButton
+              aria-label={`Install bundle ${bundle.name}`}
+              flexShrink={0}
+              loading={isInstalling}
+              size="2xs"
+              variant="ghost"
+              onClick={(event) => {
+                event.stopPropagation();
+                onInstall();
+              }}
+            >
+              <Icon as={DownloadIcon} boxSize="3.5" />
+            </IconButton>
+          </Tooltip>
+        )
+      }
+      onSelect={onSelect}
+    />
   );
 };

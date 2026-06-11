@@ -1,4 +1,4 @@
-import { Stack } from '@chakra-ui/react';
+import { Box, Stack } from '@chakra-ui/react';
 
 import { Scrollable } from '../../components/ui/Scrollable';
 import { Tabs } from '../../components/ui/Tabs';
@@ -48,13 +48,19 @@ export const AddModelsView = () => {
           </Tabs.Trigger>
         </Tabs.List>
       </Tabs.Root>
-      <Scrollable flex="1" label="Add models" minH="0" pr="1">
-        {addTab === 'starter' ? <StarterModelsTab /> : null}
-        {addTab === 'url' ? <UrlInstallTab /> : null}
-        {addTab === 'huggingface' ? <HuggingFaceTab /> : null}
-        {addTab === 'scan' ? <ScanFolderTab /> : null}
-        {addTab === 'keys' ? <ApiKeysSection /> : null}
-      </Scrollable>
+      {addTab === 'starter' ? (
+        // Two-column layout (bundle sidebar + list) with its own scrolling.
+        <Box flex="1" minH="0">
+          <StarterModelsTab />
+        </Box>
+      ) : (
+        <Scrollable flex="1" label="Add models" minH="0" pr="1">
+          {addTab === 'url' ? <UrlInstallTab /> : null}
+          {addTab === 'huggingface' ? <HuggingFaceTab /> : null}
+          {addTab === 'scan' ? <ScanFolderTab /> : null}
+          {addTab === 'keys' ? <ApiKeysSection /> : null}
+        </Scrollable>
+      )}
     </Stack>
   );
 };
