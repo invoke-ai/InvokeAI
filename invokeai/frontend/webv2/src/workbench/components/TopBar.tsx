@@ -1,11 +1,12 @@
-import { Badge, Box, Flex, Group, HStack, Icon, Menu, NumberInput, Portal, Text } from '@chakra-ui/react';
-import { BoxIcon, ChevronDownIcon, CircleUserIcon, ListOrderedIcon, PauseIcon, PlayIcon, XIcon } from 'lucide-react';
+import { Badge, Box, Flex, Group, Icon, Menu, NumberInput, Portal } from '@chakra-ui/react';
+import { ChevronDownIcon, ListOrderedIcon, PauseIcon, PlayIcon, XIcon } from 'lucide-react';
 
 import { InvokeControl } from './InvokeControl';
 import { LayoutPresetMenu } from './LayoutPresetMenu';
 import { ProjectTabs } from './ProjectTabs';
 import { SettingsButton } from './SettingsDialog';
 import { IconButton } from './ui/Button';
+import { UserMenu } from '../auth/components/UserMenu';
 import { useWorkbench } from '../WorkbenchContext';
 import { DEFAULT_THEME_ID, THEMES_BY_ID } from '../../theme/themes';
 import { Tooltip } from './ui/Tooltip';
@@ -32,24 +33,8 @@ export const TopBar = () => (
     <Box w="1px" h="5" bg="border.subtle" mx="1" flexShrink={0} />
     <ProjectTabs />
     <LayoutPresetMenu />
-    <HStack gap="0.5" flexShrink={0}>
-      <IconButton
-        aria-label="Model manager"
-        color="fg.muted"
-        size="sm"
-        variant="ghost"
-        _hover={{ color: 'fg.default' }}
-      >
-        <BoxIcon />
-      </IconButton>
-      <SettingsButton />
-    </HStack>
-    <HStack as="button" gap="1.5" color="fg.default" flexShrink={0} px="1">
-      <Icon as={CircleUserIcon} boxSize="4" />
-      <Text fontSize="xs" fontWeight="600">
-        Josh
-      </Text>
-    </HStack>
+    <SettingsButton />
+    <UserMenu />
   </Flex>
 );
 

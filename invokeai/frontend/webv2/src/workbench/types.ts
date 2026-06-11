@@ -20,6 +20,7 @@ export type WidgetId =
   | 'preview'
   | 'queue'
   | 'server-status'
+  | 'users'
   | 'version-status'
   | 'workflow';
 
@@ -129,6 +130,8 @@ export interface WidgetManifest {
   icon: WidgetIconId;
   bottomPanel?: 'expandable' | 'tooltip';
   centerPlacement?: 'toolbar' | 'view';
+  /** Only offered while an admin is signed in to a multi-user backend. */
+  requiresAdmin?: boolean;
   chrome?: {
     header?: 'hidden' | 'visible';
   };

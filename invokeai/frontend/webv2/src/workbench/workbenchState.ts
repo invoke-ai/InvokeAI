@@ -313,6 +313,7 @@ const cloneWidgetStates = (
     preview: cloneWidgetState(widgetStates.preview ?? defaultWidgetStates.preview),
     queue: cloneWidgetState(widgetStates.queue ?? defaultWidgetStates.queue),
     'server-status': cloneWidgetState(widgetStates['server-status'] ?? defaultWidgetStates['server-status']),
+    users: cloneWidgetState(widgetStates.users ?? defaultWidgetStates.users),
     'version-status': cloneWidgetState(widgetStates['version-status'] ?? defaultWidgetStates['version-status']),
     workflow: cloneWidgetState(widgetStates.workflow ?? defaultWidgetStates.workflow),
   };
@@ -409,6 +410,7 @@ const createWidgetStates = (): Record<WidgetId, WidgetStateContract> => ({
   preview: { id: 'preview', label: 'Preview', values: {}, version: 1 },
   queue: { id: 'queue', label: 'Queue', values: {}, version: 1 },
   'server-status': { id: 'server-status', label: 'Server Status', values: {}, version: 1 },
+  users: { id: 'users', label: 'Users', values: {}, version: 1 },
   'version-status': { id: 'version-status', label: 'Version', values: {}, version: 1 },
   workflow: { graphId: 'workflow-graph', id: 'workflow', label: 'Workflow', values: {}, version: 1 },
 });

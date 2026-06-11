@@ -1,7 +1,16 @@
+import { getUserStorageScope } from './auth/session';
 import type { Project, WorkbenchPersistenceSnapshot, WorkbenchState } from './types';
 
-const STORAGE_KEY = 'invokeai:v7:webv2:workbench';
+const BASE_STORAGE_KEY = 'invokeai:v7:webv2:workbench';
 const WORKBENCH_SCHEMA_VERSION = 1;
+
+/**
+ * Projects, account preferences, and active layout are account-owned on
+ * multi-user backends (spec: State Ownership), so each signed-in user gets
+ * their own storage bucket on this browser. Single-user mode keeps the
+ * unscoped key, so existing data is untouched.
+ */
+const getStorageKey = (): string => `${BASE_STORAGE_KEY}${getUserStorageScope()}`;
 
 export interface WorkbenchPersistenceService {
   loadWorkbench(): Promise<WorkbenchPersistenceSnapshot | null>;
@@ -58,7 +67,7 @@ export const localStorageWorkbenchPersistence: WorkbenchPersistenceService = {
       return Promise.resolve();
     }
 
-    window.localStorage.removeItem(STORAGE_KEY);
+    window.localStorage.removeItem(getStorageKey());
 
     return Promise.resolve();
   },
@@ -67,7 +76,7 @@ export const localStorageWorkbenchPersistence: WorkbenchPersistenceService = {
       return Promise.resolve(null);
     }
 
-    const value = window.localStorage.getItem(STORAGE_KEY);
+    const value = window.localStorage.getItem(getStorageKey());
 
     if (!value) {
       return Promise.resolve(null);
@@ -82,7 +91,7 @@ export const localStorageWorkbenchPersistence: WorkbenchPersistenceService = {
       return Promise.resolve(snapshot);
     }
 
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+    window.localStorage.setItem(getStorageKey(), JSON.stringify(snapshot));
 
     return Promise.resolve(snapshot);
   },

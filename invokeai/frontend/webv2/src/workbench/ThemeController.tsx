@@ -12,6 +12,13 @@ import { useWorkbench } from './WorkbenchContext';
  * no component re-render. `data-reduce-motion` is read by the global CSS that
  * neutralizes transitions. Renders nothing.
  */
+/**
+ * Read by the pre-paint script in index.html. A dedicated key (rather than the
+ * workbench snapshot, which is per-user on multi-user backends) so the first
+ * paint can apply the last-used theme without knowing who is signed in.
+ */
+const THEME_HINT_STORAGE_KEY = 'invokeai:v7:webv2:theme';
+
 export const ThemeController = () => {
   const { state } = useWorkbench();
   const { reduceMotion, themeId } = state.account.preferences;
@@ -26,6 +33,12 @@ export const ThemeController = () => {
     // (scrollbars, native pickers) and any Chakra defaults we don't override.
     root.classList.toggle('dark', theme.colorScheme === 'dark');
     root.classList.toggle('light', theme.colorScheme === 'light');
+
+    try {
+      window.localStorage.setItem(THEME_HINT_STORAGE_KEY, theme.id);
+    } catch {
+      // Storage unavailable — the next load just paints the default theme.
+    }
   }, [themeId]);
 
   useEffect(() => {

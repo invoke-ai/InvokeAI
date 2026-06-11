@@ -7,6 +7,8 @@
     <script>
       // Apply the saved theme before first paint so non-default themes don't
       // flash the default dark surfaces. ThemeController re-applies it on mount.
+      // The theme hint key is user-agnostic (the workbench snapshot is per-user
+      // on multi-user backends); the snapshot read is a legacy fallback.
       (function () {
         try {
           var themeColorSchemes = {
@@ -16,8 +18,11 @@
             mono: 'dark',
             ultradark: 'dark',
           };
-          var raw = localStorage.getItem('invokeai:v7:webv2:workbench');
-          var id = raw && JSON.parse(raw).state.account.preferences.themeId;
+          var id = localStorage.getItem('invokeai:v7:webv2:theme');
+          if (!id) {
+            var raw = localStorage.getItem('invokeai:v7:webv2:workbench');
+            id = raw && JSON.parse(raw).state.account.preferences.themeId;
+          }
           var colorScheme = themeColorSchemes[id];
           if (colorScheme) {
             var isLight = colorScheme === 'light';

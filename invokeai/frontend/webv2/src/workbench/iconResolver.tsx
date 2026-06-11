@@ -20,6 +20,7 @@ const iconImporters = {
   'lucide-react:plug-zap': () => import('lucide-react/dist/esm/icons/plug-zap.mjs'),
   'lucide-react:sliders-horizontal': () => import('lucide-react/dist/esm/icons/sliders-horizontal.mjs'),
   'lucide-react:undo-2': () => import('lucide-react/dist/esm/icons/undo-2.mjs'),
+  'lucide-react:users': () => import('lucide-react/dist/esm/icons/users.mjs'),
   'lucide-react:wand-sparkles': () => import('lucide-react/dist/esm/icons/wand-sparkles.mjs'),
   'lucide-react:workflow': () => import('lucide-react/dist/esm/icons/workflow.mjs'),
 } satisfies Partial<Record<WidgetIconId, IconImporter>>;

@@ -14,6 +14,8 @@ export interface BackendBoardDTO {
   asset_count: number;
   archived: boolean;
   cover_image_name?: string | null;
+  /** Board owner's display name; populated only for admins on multi-user backends. */
+  owner_username?: string | null;
 }
 
 /**
@@ -32,6 +34,8 @@ export interface GalleryBoard {
   archived: boolean;
   coverImageName?: string | null;
   coverThumbnailUrl?: string;
+  /** Owner display name when the backend exposes it (admins in multi-user mode). */
+  ownerName?: string | null;
 }
 
 const DATE_BOARD_ID_PREFIX = 'by_date:';
@@ -102,6 +106,7 @@ const mapBoard = (board: BackendBoardDTO): GalleryBoard => ({
   imageCount: board.image_count,
   kind: 'board',
   name: board.board_name,
+  ownerName: board.owner_username ?? null,
 });
 
 const getGalleryTotal = async ({ boardId, categories }: { boardId: string; categories: string[] }): Promise<number> => {

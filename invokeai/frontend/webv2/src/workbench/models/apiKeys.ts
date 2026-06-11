@@ -1,15 +1,20 @@
+import { getUserStorageScope } from '../auth/session';
+
 /**
  * Client-side API key storage for remote model sources. The HuggingFace token
  * lives on the backend (`/api/v2/models/hf_login`); the Civitai key has no
  * backend home, so it is kept in this browser's localStorage and passed as the
- * `access_token` query param when installing from a matching URL.
+ * `access_token` query param when installing from a matching URL. The key is
+ * personal, so it is scoped per signed-in user on multi-user backends.
  */
 
-const CIVITAI_KEY_STORAGE_KEY = 'invokeai-webv2-civitai-api-key';
+const CIVITAI_KEY_BASE_STORAGE_KEY = 'invokeai-webv2-civitai-api-key';
+
+const getStorageKey = (): string => `${CIVITAI_KEY_BASE_STORAGE_KEY}${getUserStorageScope()}`;
 
 export const getCivitaiApiKey = (): string | null => {
   try {
-    return window.localStorage.getItem(CIVITAI_KEY_STORAGE_KEY);
+    return window.localStorage.getItem(getStorageKey());
   } catch {
     return null;
   }
@@ -17,7 +22,7 @@ export const getCivitaiApiKey = (): string | null => {
 
 export const setCivitaiApiKey = (key: string): void => {
   try {
-    window.localStorage.setItem(CIVITAI_KEY_STORAGE_KEY, key);
+    window.localStorage.setItem(getStorageKey(), key);
   } catch {
     // Storage unavailable (private mode/quota) — the key just is not persisted.
   }
@@ -25,7 +30,7 @@ export const setCivitaiApiKey = (key: string): void => {
 
 export const clearCivitaiApiKey = (): void => {
   try {
-    window.localStorage.removeItem(CIVITAI_KEY_STORAGE_KEY);
+    window.localStorage.removeItem(getStorageKey());
   } catch {
     // Ignore: nothing to clear if storage is unavailable.
   }

@@ -16,6 +16,33 @@ export const getAuthToken = (): string | null => {
   }
 };
 
+export const setAuthToken = (token: string): void => {
+  try {
+    window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+  } catch {
+    // Storage unavailable (private mode, quota): the session lasts until reload.
+  }
+};
+
+export const clearAuthToken = (): void => {
+  try {
+    window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+  } catch {
+    // Nothing to clear if storage is unavailable.
+  }
+};
+
+/**
+ * Called when an authenticated request comes back 401 — the stored token is no
+ * longer valid. The auth session store registers itself here so the HTTP layer
+ * stays unaware of session semantics.
+ */
+let unauthorizedHandler: (() => void) | null = null;
+
+export const setUnauthorizedHandler = (handler: (() => void) | null): void => {
+  unauthorizedHandler = handler;
+};
+
 export const getBackendSocketUrl = (): string => {
   if (!API_BASE_URL.trim()) {
     return window.location.origin;
@@ -66,8 +93,47 @@ export const apiFetchRaw = (path: string, init?: RequestInit): Promise<Response>
   return fetch(buildApiUrl(path), { ...init, headers });
 };
 
-export const apiFetch = async (path: string, init?: RequestInit): Promise<Response> =>
-  assertOk(await apiFetchRaw(path, init));
+export const apiFetch = async (path: string, init?: RequestInit): Promise<Response> => {
+  const hadToken = getAuthToken() !== null;
+  const response = await apiFetchRaw(path, init);
+
+  if (response.status === 401 && hadToken) {
+    unauthorizedHandler?.();
+  }
+
+  return assertOk(response);
+};
+
+/**
+ * Backend errors arrive as FastAPI JSON (`{"detail": "..."}`); `ApiError`
+ * carries the raw body. This unwraps `detail` into a human-readable message.
+ */
+export const getApiErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof ApiError) {
+    try {
+      const parsed = JSON.parse(error.message) as { detail?: unknown };
+
+      if (typeof parsed.detail === 'string' && parsed.detail) {
+        return parsed.detail;
+      }
+
+      // Validation errors come as a list of issues; surface the first one.
+      if (Array.isArray(parsed.detail)) {
+        const first = parsed.detail[0] as { msg?: unknown } | undefined;
+
+        if (first && typeof first.msg === 'string') {
+          return first.msg;
+        }
+      }
+    } catch {
+      // Not JSON — fall through to the raw message.
+    }
+
+    return error.message || fallback;
+  }
+
+  return error instanceof Error && error.message ? error.message : fallback;
+};
 
 export const apiFetchJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const headers = new Headers(init?.headers);

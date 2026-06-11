@@ -21,6 +21,7 @@
     "@chakra-ui/react": "^3.36.0",
     "@emotion/react": "^11.14.0",
     "@fontsource/inter": "^5.2.8",
+    "@tanstack/react-router": "^1.170.15",
     "@tanstack/react-virtual": "^3.14.2",
     "lucide-react": "^1.17.0",
     "react": "^19.2.7",

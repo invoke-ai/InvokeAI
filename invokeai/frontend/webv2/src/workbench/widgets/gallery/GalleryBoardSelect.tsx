@@ -361,7 +361,7 @@ const BoardRow = ({
         : undefined
     }
   >
-    <BoardOptionContent badge={badge} board={board} isSelected={isSelected} />
+    <BoardOptionContent badge={badge} board={board} isSelected={isSelected} showOwner />
     {onOpenMenu && (
       <IconButton
         aria-label={`Board actions for ${board.name}`}
@@ -392,19 +392,29 @@ const BoardOptionContent = ({
   badge,
   board,
   isSelected,
+  showOwner = false,
 }: {
   badge?: 'Project' | 'Archived';
   board: GalleryBoard;
   isSelected: boolean;
+  /** Render the owner line (admins on multi-user backends); off in the compact trigger. */
+  showOwner?: boolean;
 }) => {
   const counts = getBoardCounts(board);
 
   return (
     <HStack gap="2" minW="0" w="full">
       <BoardCover board={board} />
-      <Text flex="1" fontSize="xs" fontWeight={isSelected ? '700' : '500'} minW="0" truncate>
-        {board.name}
-      </Text>
+      <Stack flex="1" gap="1" minW="0">
+        <Text fontSize="xs" fontWeight={isSelected ? '700' : '500'} minW="0" lineHeight={1} truncate>
+          {board.name}
+        </Text>
+        {showOwner && board.ownerName ? (
+          <Text color="fg.subtle" fontSize="2xs" minW="0" lineHeight={1} truncate>
+            {board.ownerName}
+          </Text>
+        ) : null}
+      </Stack>
       {badge && (
         <Badge colorPalette={badge === 'Project' ? 'blue' : 'gray'} flexShrink={0} size="xs" variant="subtle">
           {badge}

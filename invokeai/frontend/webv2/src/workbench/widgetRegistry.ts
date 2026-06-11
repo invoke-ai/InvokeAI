@@ -1,3 +1,4 @@
+import { getAuthSession } from './auth/session';
 import { isSupportedIconId } from './iconResolver';
 import type { RegisteredWidget, WidgetFailure, WidgetId, WidgetManifest, WorkbenchRegion } from './types';
 import { autosaveStatusWidgetManifest } from './widgets/autosave-status';
@@ -13,6 +14,7 @@ import { notificationsWidgetManifest } from './widgets/notifications';
 import { previewWidgetManifest } from './widgets/preview';
 import { queueWidgetManifest } from './widgets/queue';
 import { serverStatusWidgetManifest } from './widgets/server-status';
+import { usersWidgetManifest } from './widgets/users';
 import { versionStatusWidgetManifest } from './widgets/version-status';
 import { workflowWidgetManifest } from './widgets/workflow';
 
@@ -32,6 +34,7 @@ const firstPartyWidgetManifests: WidgetManifest[] = [
   historyControlsWidgetManifest,
   layoutActionsWidgetManifest,
   versionStatusWidgetManifest,
+  usersWidgetManifest,
 ];
 
 const createFailure = (widgetId: WidgetId, error: unknown): WidgetFailure => ({
@@ -73,8 +76,26 @@ export const registerFirstPartyWidgets = (): RegisteredWidget[] =>
 
 export const registeredWidgets = registerFirstPartyWidgets();
 
+/**
+ * Admin-only widgets are offered only while an admin is signed in to a
+ * multi-user backend. The imperative session read is safe here: the route
+ * guard resolves the session before the workbench mounts, and a user change
+ * remounts the workbench route.
+ */
+const isWidgetAvailable = (widget: RegisteredWidget): boolean => {
+  if (!widget.manifest.requiresAdmin) {
+    return true;
+  }
+
+  const session = getAuthSession();
+
+  return session.multiuserEnabled && session.user?.is_admin === true;
+};
+
 export const getWidgetsForRegion = (region: WorkbenchRegion): RegisteredWidget[] =>
-  registeredWidgets.filter((widget) => widget.status !== 'hidden' && widget.manifest.regions.includes(region));
+  registeredWidgets.filter(
+    (widget) => widget.status !== 'hidden' && widget.manifest.regions.includes(region) && isWidgetAvailable(widget)
+  );
 
 export const getWidgetById = (widgetId: WidgetId): RegisteredWidget | undefined =>
   registeredWidgets.find((widget) => widget.manifest.id === widgetId);
