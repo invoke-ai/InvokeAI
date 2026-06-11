@@ -9,6 +9,7 @@ import {
   listAllQueueItems,
 } from '../generation/api';
 import type { EnqueueGenerateRequest, EnqueueGenerateResult, ImageDTO, QueueItemDTO } from '../generation/types';
+import { handleModelInstallSocketEvent, MODEL_INSTALL_SOCKET_EVENTS } from '../models/installsStore';
 import type { BackendConnectionStatus } from '../types';
 import {
   isTerminalBackendStatus,
@@ -326,6 +327,16 @@ export const createQueueCoordinator = (
     });
     socket.on('queue_item_status_changed', handleStatusChanged);
     socket.on('invocation_progress', handleProgress);
+
+    // Model install lifecycle events are broadcast to every connected client
+    // (no room subscription needed); forward them to the installs store so the
+    // model manager tracks downloads without a second socket.
+    for (const modelInstallEvent of MODEL_INSTALL_SOCKET_EVENTS) {
+      socket.on(modelInstallEvent, (payload: never) => {
+        handleModelInstallSocketEvent(modelInstallEvent, payload);
+      });
+    }
+
     socket.connect();
 
     sweepTimer = setInterval(() => {

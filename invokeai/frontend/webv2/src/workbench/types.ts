@@ -2,7 +2,7 @@ import type { ComponentType } from 'react';
 
 export type LayoutPresetId = 'canvas-default' | 'gallery' | 'workflow' | 'linear' | 'model-manager';
 
-export type CenterViewId = 'canvas' | 'gallery' | 'preview' | 'workflow';
+export type CenterViewId = 'canvas' | 'gallery' | 'preview' | 'workflow' | 'models';
 
 export type GraphId = string;
 
@@ -15,6 +15,7 @@ export type WidgetId =
   | 'history-controls'
   | 'layout-actions'
   | 'layers'
+  | 'models'
   | 'notifications'
   | 'preview'
   | 'queue'

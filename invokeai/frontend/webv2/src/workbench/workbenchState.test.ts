@@ -91,6 +91,7 @@ describe('workbench widget region defaults', () => {
       'queue',
       'gallery',
       'layers',
+      'models',
       'diagnostics',
     ]);
     expect(getActiveProject(hydratedCustomized).widgetRegions.right.enabledWidgetIds).toEqual(['gallery', 'layers']);

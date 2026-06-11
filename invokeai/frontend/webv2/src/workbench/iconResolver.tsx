@@ -7,6 +7,7 @@ import type { WidgetIconId } from './types';
 type IconImporter = () => Promise<{ default: ComponentType }>;
 
 const iconImporters = {
+  'lucide-react:box': () => import('lucide-react/dist/esm/icons/box.mjs'),
   'lucide-react:bug': () => import('lucide-react/dist/esm/icons/bug.mjs'),
   'lucide-react:cloud-check': () => import('lucide-react/dist/esm/icons/cloud-check.mjs'),
   'lucide-react:bell': () => import('lucide-react/dist/esm/icons/bell.mjs'),

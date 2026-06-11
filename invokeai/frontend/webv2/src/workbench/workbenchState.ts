@@ -308,6 +308,7 @@ const cloneWidgetStates = (
     'history-controls': cloneWidgetState(widgetStates['history-controls'] ?? defaultWidgetStates['history-controls']),
     'layout-actions': cloneWidgetState(widgetStates['layout-actions'] ?? defaultWidgetStates['layout-actions']),
     layers: cloneWidgetState(widgetStates.layers ?? defaultWidgetStates.layers),
+    models: cloneWidgetState(widgetStates.models ?? defaultWidgetStates.models),
     notifications: cloneWidgetState(widgetStates.notifications ?? defaultWidgetStates.notifications),
     preview: cloneWidgetState(widgetStates.preview ?? defaultWidgetStates.preview),
     queue: cloneWidgetState(widgetStates.queue ?? defaultWidgetStates.queue),
@@ -403,6 +404,7 @@ const createWidgetStates = (): Record<WidgetId, WidgetStateContract> => ({
   'history-controls': { id: 'history-controls', label: 'History Controls', values: {}, version: 1 },
   'layout-actions': { id: 'layout-actions', label: 'Layout Actions', values: {}, version: 1 },
   layers: { id: 'layers', label: 'Layers', values: {}, version: 1 },
+  models: { id: 'models', label: 'Models', values: {}, version: 1 },
   notifications: { id: 'notifications', label: 'Notifications', values: {}, version: 1 },
   preview: { id: 'preview', label: 'Preview', values: {}, version: 1 },
   queue: { id: 'queue', label: 'Queue', values: {}, version: 1 },
@@ -420,7 +422,7 @@ const createWidgetRegions = (): Record<WidgetRegion, WidgetRegionState> => ({
   },
   right: {
     activeWidgetId: 'layers',
-    enabledWidgetIds: ['queue', 'gallery', 'layers', 'diagnostics'],
+    enabledWidgetIds: ['queue', 'gallery', 'layers', 'models', 'diagnostics'],
     isCollapsed: false,
     sizePx: 240,
   },
@@ -442,7 +444,7 @@ const createWidgetRegions = (): Record<WidgetRegion, WidgetRegionState> => ({
   },
   center: {
     activeWidgetId: 'canvas',
-    enabledWidgetIds: ['canvas', 'gallery', 'preview', 'workflow'],
+    enabledWidgetIds: ['canvas', 'gallery', 'preview', 'workflow', 'models'],
     isCollapsed: false,
     sizePx: 0,
   },

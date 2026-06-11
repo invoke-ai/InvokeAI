@@ -41,6 +41,16 @@ export const layoutPresets: LayoutPreset[] = [
     },
     label: 'Linear UI',
   },
+  {
+    description: 'Full-width model library, installs, and download queue.',
+    id: 'model-manager',
+    initialLayout: {
+      centerViewId: 'models',
+      panels: { isBottomOpen: true, isLeftOpen: false, isRightOpen: false },
+      presetId: 'model-manager',
+    },
+    label: 'Model Manager',
+  },
 ];
 
 export const defaultLayoutPreset = layoutPresets[0];

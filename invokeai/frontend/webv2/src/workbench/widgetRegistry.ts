@@ -8,6 +8,7 @@ import { generateWidgetManifest } from './widgets/generate';
 import { historyControlsWidgetManifest } from './widgets/history-controls';
 import { layoutActionsWidgetManifest } from './widgets/layout-actions';
 import { layersWidgetManifest } from './widgets/layers';
+import { modelsWidgetManifest } from './widgets/models';
 import { notificationsWidgetManifest } from './widgets/notifications';
 import { previewWidgetManifest } from './widgets/preview';
 import { queueWidgetManifest } from './widgets/queue';
@@ -23,6 +24,7 @@ const firstPartyWidgetManifests: WidgetManifest[] = [
   galleryWidgetManifest,
   previewWidgetManifest,
   layersWidgetManifest,
+  modelsWidgetManifest,
   queueWidgetManifest,
   notificationsWidgetManifest,
   serverStatusWidgetManifest,
