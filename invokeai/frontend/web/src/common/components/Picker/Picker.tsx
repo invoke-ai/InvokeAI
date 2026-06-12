@@ -79,6 +79,12 @@ export type Group<T extends object> = {
    */
   getOptionCountString?: (count: number) => string;
   /**
+   * Optional: extract a subgroup label for an option. When provided, the picker will render a small inline subheader
+   * before each contiguous run of options sharing the same subgroup label. Options must be pre-sorted by subgroup for
+   * this to render correctly. Returning null/undefined/empty puts the option outside any subgroup (no header).
+   */
+  getOptionSubgroup?: (option: T) => string | null | undefined;
+  /**
    * A unique key used for type-checking the group. Use the `buildGroup` function to create a group, which will set this key.
    */
   [uniqueGroupKey]: true;
@@ -991,20 +997,60 @@ const PickerGroup = typedMemo(<T extends object>({ group }: { group: Group<T> })
   );
   const isGroupDisabled = useStore($isGroupDisabled);
 
+  const renderedItems = useMemo(() => {
+    const getOptionSubgroup = group.getOptionSubgroup;
+    const nodes: React.ReactNode[] = [];
+    let prevSubgroup: string | null = null;
+    for (const item of group.options) {
+      const rawSubgroup = getOptionSubgroup?.(item);
+      const subgroup = rawSubgroup ? rawSubgroup : null;
+      if (subgroup && subgroup !== prevSubgroup) {
+        nodes.push(
+          <PickerSubgroupHeader key={`__subgroup__${group.id}__${subgroup}`} name={subgroup} color={group.color} />
+        );
+      }
+      prevSubgroup = subgroup;
+      const id = getOptionId(item);
+      nodes.push(<PickerOption key={id} id={id} option={item} />);
+    }
+    return nodes;
+  }, [group.options, group.getOptionSubgroup, group.id, group.color, getOptionId]);
+
   if (isGroupDisabled) {
     return null;
   }
 
-  return (
-    <PickerGroupContainer group={group}>
-      {group.options.map((item) => {
-        const id = getOptionId(item);
-        return <PickerOption key={id} id={id} option={item} />;
-      })}
-    </PickerGroupContainer>
-  );
+  return <PickerGroupContainer group={group}>{renderedItems}</PickerGroupContainer>;
 });
 PickerGroup.displayName = 'PickerGroup';
+
+const subgroupHeaderSx = {
+  fontSize: 'xs',
+  fontWeight: 'semibold',
+  textTransform: 'uppercase',
+  letterSpacing: 'wider',
+  ps: 2,
+  pe: 2,
+  pt: 2,
+  pb: 1,
+  userSelect: 'none',
+  opacity: 0.8,
+  '&[data-is-compact="true"]': {
+    pt: 1,
+    pb: 0,
+    ps: 1,
+  },
+} satisfies SystemStyleObject;
+
+const PickerSubgroupHeader = typedMemo(({ name, color }: { name: string; color?: string }) => {
+  const { isCompactView } = usePickerContext();
+  return (
+    <Text sx={subgroupHeaderSx} color={color ?? 'base.300'} data-is-compact={isCompactView}>
+      {name}
+    </Text>
+  );
+});
+PickerSubgroupHeader.displayName = 'PickerSubgroupHeader';
 
 const PickerOption = typedMemo(<T extends object>(props: { id: string; option: T }) => {
   const { OptionComponent, $activeOptionId, $selectedItemId, onSelectById, getIsOptionDisabled } =

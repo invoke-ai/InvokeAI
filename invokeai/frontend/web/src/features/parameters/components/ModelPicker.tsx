@@ -30,6 +30,7 @@ import { setInstallModelsTabByName } from 'features/modelManagerV2/store/install
 import ModelImage from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelImage';
 import type { BaseModelType } from 'features/nodes/types/common';
 import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
+import { parseCategoryFromName } from 'features/parameters/components/modelPickerCategory';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { filesize } from 'filesize';
 import { memo, useCallback, useMemo, useRef } from 'react';
@@ -69,10 +70,13 @@ const selectSelectedModelKeys = createMemoizedSelector(selectParamsSlice, select
   return uniq(keys);
 });
 
-type WithStarred<T> = T & { starred?: boolean };
+type WithStarred<T> = T & { starred?: boolean; category?: string | null };
 
 // Type for models with starred field
 const getOptionId = <T extends AnyModelConfigWithExternal>(modelConfig: WithStarred<T>) => modelConfig.key;
+
+const getOptionSubgroupFromCategory = <T extends AnyModelConfigWithExternal>(option: WithStarred<T>) =>
+  option.category ?? null;
 
 const ModelManagerLink = memo((props: ButtonProps) => {
   const onClick = useCallback(() => {
@@ -160,7 +164,7 @@ const popperModifiers = [
 ];
 
 const removeStarred = <T,>(obj: WithStarred<T>): T => {
-  const { starred: _, ...rest } = obj;
+  const { starred: _starred, category: _category, ...rest } = obj;
   return rest as T;
 };
 
@@ -202,60 +206,33 @@ export const ModelPicker = typedMemo(
     });
 
     const options = useMemo<WithStarred<T>[] | Group<WithStarred<T>>[]>(() => {
+      // Enrich each model with starred + parsed category fields. The category is parsed from a "[category]name"
+      // prefix in the model's display name. Uncategorized models have category=null.
+      const enriched: WithStarred<T>[] = modelConfigs.map((model) => ({
+        ...model,
+        starred: relatedModelKeys.includes(model.key),
+        category: parseCategoryFromName(model.name).category,
+      }));
+
+      // Sort by (starred desc, name asc) within a slice that shares a category.
+      const sortByStarredAndName = (a: WithStarred<T>, b: WithStarred<T>) => {
+        if (a.starred && !b.starred) {
+          return -1;
+        }
+        if (!a.starred && b.starred) {
+          return 1;
+        }
+        return a.name.localeCompare(b.name);
+      };
+
       if (!grouped) {
-        // Add starred field to model options and sort them
-        const modelsWithStarred = modelConfigs.map((model) => ({
-          ...model,
-          starred: relatedModelKeys.includes(model.key),
-        }));
-
-        // Sort so starred models come first
-        return modelsWithStarred.sort((a, b) => {
-          if (a.starred && !b.starred) {
-            return -1;
-          }
-          if (!a.starred && b.starred) {
-            return 1;
-          }
-          return 0;
-        });
-      }
-
-      // When all groups are disabled, we show all models
-      const groups: Record<string, Group<WithStarred<T>>> = {};
-
-      for (const modelConfig of modelConfigs) {
-        const groupId = getGroupIDFromModelConfig(modelConfig);
-        let group = groups[groupId];
-        if (!group) {
-          group = buildGroup<WithStarred<T>>({
-            id: modelConfig.base,
-            color: `${getGroupColorSchemeFromModelConfig(modelConfig)}.300`,
-            shortName: getGroupShortNameFromModelConfig(modelConfig),
-            name: getGroupNameFromModelConfig(modelConfig),
-            getOptionCountString: (count) => t('common.model_withCount', { count }),
-            options: [],
-          });
-          groups[groupId] = group;
-        }
-        if (group) {
-          // Add starred field to the model
-          const modelWithStarred = {
-            ...modelConfig,
-            starred: relatedModelKeys.includes(modelConfig.key),
-          };
-          group.options.push(modelWithStarred);
-        }
-      }
-
-      const _options: Group<WithStarred<T>>[] = [];
-
-      // Add groups in the original order
-      for (const groupId of ['api', 'flux', 'z-image', 'qwen-image', 'cogview4', 'sdxl', 'sd-3', 'sd-2', 'sd-1']) {
-        const group = groups[groupId];
-        if (group) {
-          // Sort options within each group so starred ones come first
-          group.options.sort((a, b) => {
+        // Flat-list picker (e.g. LoRA selection, where compatible models are already filtered to one base).
+        // When at least one model carries a category, promote categories to top-level groups so the user can
+        // toggle / filter by category. Uncategorized models go into a final "Uncategorized" group.
+        const hasAnyCategory = enriched.some((m) => Boolean(m.category));
+        if (!hasAnyCategory) {
+          // Preserve previous behavior: a flat list sorted with starred models first.
+          return enriched.sort((a, b) => {
             if (a.starred && !b.starred) {
               return -1;
             }
@@ -264,11 +241,110 @@ export const ModelPicker = typedMemo(
             }
             return 0;
           });
+        }
+
+        const categoryGroups: Record<string, Group<WithStarred<T>>> = {};
+        const uncategorized: WithStarred<T>[] = [];
+
+        for (const model of enriched) {
+          if (model.category) {
+            let group = categoryGroups[model.category];
+            if (!group) {
+              group = buildGroup<WithStarred<T>>({
+                id: `__category__${model.category}`,
+                name: model.category,
+                shortName: model.category,
+                color: 'base.300',
+                options: [],
+                getOptionCountString: (count) => t('common.model_withCount', { count }),
+              });
+              categoryGroups[model.category] = group;
+            }
+            group.options.push(model);
+          } else {
+            uncategorized.push(model);
+          }
+        }
+
+        const result: Group<WithStarred<T>>[] = [];
+        const sortedCategoryNames = Object.keys(categoryGroups).sort((a, b) => a.localeCompare(b));
+        for (const catName of sortedCategoryNames) {
+          const group = categoryGroups[catName];
+          if (group) {
+            group.options.sort(sortByStarredAndName);
+            result.push(group);
+          }
+        }
+        if (uncategorized.length > 0) {
+          uncategorized.sort(sortByStarredAndName);
+          result.push(
+            buildGroup<WithStarred<T>>({
+              id: '__uncategorized__',
+              name: t('modelManager.uncategorized'),
+              shortName: t('modelManager.uncategorized'),
+              color: 'base.500',
+              options: uncategorized,
+              getOptionCountString: (count) => t('common.model_withCount', { count }),
+            })
+          );
+        }
+        return result;
+      }
+
+      // Grouped picker (main model selection): top-level groups by base (FLUX, SDXL, ...). Within each base group
+      // we further organize options by their parsed category as inline subgroup headers. Categorized models appear
+      // first (alphabetically by category); uncategorized models appear after, without a subgroup header.
+      const groups: Record<string, Group<WithStarred<T>>> = {};
+
+      for (const model of enriched) {
+        const groupId = getGroupIDFromModelConfig(model);
+        let group = groups[groupId];
+        if (!group) {
+          group = buildGroup<WithStarred<T>>({
+            id: model.base,
+            color: `${getGroupColorSchemeFromModelConfig(model)}.300`,
+            shortName: getGroupShortNameFromModelConfig(model),
+            name: getGroupNameFromModelConfig(model),
+            getOptionCountString: (count) => t('common.model_withCount', { count }),
+            options: [],
+            getOptionSubgroup: getOptionSubgroupFromCategory,
+          });
+          groups[groupId] = group;
+        }
+        group.options.push(model);
+      }
+
+      const sortWithinBaseGroup = (a: WithStarred<T>, b: WithStarred<T>) => {
+        const catA = a.category ?? null;
+        const catB = b.category ?? null;
+        // Categorized first; uncategorized at the end.
+        if (catA && !catB) {
+          return -1;
+        }
+        if (!catA && catB) {
+          return 1;
+        }
+        if (catA && catB && catA !== catB) {
+          return catA.localeCompare(catB);
+        }
+        return sortByStarredAndName(a, b);
+      };
+
+      const _options: Group<WithStarred<T>>[] = [];
+
+      // Add groups in the original order
+      for (const groupId of ['api', 'flux', 'z-image', 'qwen-image', 'cogview4', 'sdxl', 'sd-3', 'sd-2', 'sd-1']) {
+        const group = groups[groupId];
+        if (group) {
+          group.options.sort(sortWithinBaseGroup);
           _options.push(group);
           delete groups[groupId];
         }
       }
-      _options.push(...Object.values(groups));
+      for (const group of Object.values(groups)) {
+        group.options.sort(sortWithinBaseGroup);
+        _options.push(group);
+      }
 
       return _options;
     }, [grouped, modelConfigs, relatedModelKeys, t]);
@@ -338,7 +414,9 @@ export const ModelPicker = typedMemo(
             colorScheme={colorScheme}
             isDisabled={isDisabled}
           >
-            {selectedModelConfig?.name ?? placeholder ?? 'Select Model'}
+            {selectedModelConfig
+              ? parseCategoryFromName(selectedModelConfig.name).displayName
+              : (placeholder ?? 'Select Model')}
             <Spacer />
             <PiCaretDownBold />
           </Button>
@@ -421,6 +499,9 @@ const PickerOptionComponent = typedMemo(
     const { isCompactView } = usePickerContext<WithStarred<T>>();
     const externalOption = isExternalApiModelConfig(option) ? (option as ExternalApiModelConfig) : null;
     const providerLabel = externalOption ? externalOption.provider_id.toUpperCase() : null;
+    // Hide the "[category]" prefix in the picker list; the category is shown as a subgroup header instead. The
+    // underlying model name (and the name shown in the model manager) is unchanged.
+    const displayName = useMemo(() => parseCategoryFromName(option.name).displayName, [option.name]);
 
     return (
       <Flex {...rest} sx={optionSx} data-is-compact={isCompactView}>
@@ -429,7 +510,7 @@ const PickerOptionComponent = typedMemo(
           <Flex gap={2} alignItems="center">
             {option.starred && <Icon as={PiLinkSimple} color="invokeYellow.500" boxSize={4} />}
             <Text className="picker-option" sx={optionNameSx} data-is-compact={isCompactView}>
-              {option.name}
+              {displayName}
             </Text>
             {!isCompactView && externalOption && (
               <Badge
@@ -477,8 +558,9 @@ const isMatch = <T extends AnyModelConfigWithExternal>(model: WithStarred<T>, se
   const bases = BASE_KEYWORDS[model.base] ?? [model.base];
   const externalModel = isExternalApiModelConfig(model) ? (model as ExternalApiModelConfig) : null;
   const externalSearch = externalModel ? ` ${externalModel.provider_id} ${externalModel.provider_model_id}` : '';
+  const categorySearch = model.category ? ` ${model.category}` : '';
   const testString =
-    `${model.name} ${bases.join(' ')} ${model.type} ${model.description ?? ''} ${model.format}${externalSearch}`.toLowerCase();
+    `${model.name} ${bases.join(' ')} ${model.type} ${model.description ?? ''} ${model.format}${externalSearch}${categorySearch}`.toLowerCase();
 
   if (testString.includes(searchTerm) || regex.test(testString)) {
     return true;
