@@ -40,7 +40,9 @@ import pytest
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
-from invokeai.app.services.image_records.image_records_sqlmodel import SqlModelImageRecordStorage as _SqlModelImageRecordStorageBase
+from invokeai.app.services.image_records.image_records_sqlmodel import (
+    SqlModelImageRecordStorage as _SqlModelImageRecordStorageBase,
+)
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.virtual_boards.virtual_boards_common import VirtualSubBoardDTO
@@ -318,8 +320,9 @@ def test_image_query_scaling(tmp_path: Path) -> None:
         for op_name, op_factory in OPS.items():
             for impl_name, storage in (("sqlite", sqlite_storage), ("sqlmodel", sqlmodel_storage)):
                 # Build a fresh closure per iteration to vary the accessed key/offset.
-                def run_one(c: int = 0) -> None:
-                    op_factory(storage, inserted, c)()
+                # Loop variables are bound via defaults so each closure sees its own values.
+                def run_one(c: int = 0, _op=op_factory, _storage=storage, _inserted=inserted) -> None:
+                    _op(_storage, _inserted, c)()
 
                 samples_ms: list[float] = []
                 for c in range(QUERY_ITERS):

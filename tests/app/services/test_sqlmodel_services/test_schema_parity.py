@@ -13,7 +13,6 @@ drift that has repeatedly broken this branch (image_subfolder, status_sequence, 
 GENERATED columns). They also assert ``create_all()`` DDL compiles on every target dialect.
 """
 
-from logging import Logger
 
 import pytest
 from sqlalchemy import inspect

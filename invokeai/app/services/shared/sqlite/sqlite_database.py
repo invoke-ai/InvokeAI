@@ -4,6 +4,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from logging import Logger
 from pathlib import Path
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from sqlalchemy import event
@@ -11,6 +12,9 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, create_engine
 
 from invokeai.app.services.shared.sqlite.sqlite_common import sqlite_memory
+
+if TYPE_CHECKING:
+    from invokeai.app.services.shared.sqlite.db_queries import DbQueries
 
 
 class SqliteDatabase:
@@ -49,6 +53,7 @@ class SqliteDatabase:
         self._db_url = db_url
         self._is_sqlite = db_url is None
         self._lock = threading.RLock()
+        self._queries: "DbQueries | None" = None
         # Raw sqlite3 connection — only used on the SQLite path (migrations, VACUUM,
         # transaction()). Non-SQLite backends use the SQLAlchemy engine exclusively.
         self._conn: sqlite3.Connection | None = None
@@ -152,6 +157,19 @@ class SqliteDatabase:
         except Exception as e:
             self._logger.error(f"Error cleaning database: {e}")
             raise
+
+    @property
+    def queries(self) -> "DbQueries":
+        """The central query catalog — every SQL statement in the app lives on this object.
+
+        Lazily constructed: ``db_queries`` imports the table models and domain DTO modules,
+        which must not be pulled in while this module is being imported.
+        """
+        if self._queries is None:
+            from invokeai.app.services.shared.sqlite.db_queries import DbQueries
+
+            self._queries = DbQueries(self, self._logger)
+        return self._queries
 
     @contextmanager
     def get_session(self) -> Generator[Session, None, None]:

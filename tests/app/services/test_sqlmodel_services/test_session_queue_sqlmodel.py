@@ -18,7 +18,6 @@ from invokeai.app.services.shared.sqlite.models import SessionQueueTable
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from tests.test_nodes import PromptTestInvocation
 
-
 # ---- fixtures ----
 
 
@@ -131,15 +130,15 @@ def test_get_current_queue_size(session_queue: SqlModelSessionQueue) -> None:
     _insert_raw(session_queue)
     _insert_raw(session_queue)
     _insert_raw(session_queue, status="completed")
-    assert session_queue._get_current_queue_size("default") == 2
+    assert session_queue._q.queue_pending_count("default") == 2
 
 
 def test_get_highest_priority(session_queue: SqlModelSessionQueue) -> None:
-    assert session_queue._get_highest_priority("default") == 0
+    assert session_queue._q.queue_highest_pending_priority("default") == 0
     _insert_raw(session_queue, priority=3)
     _insert_raw(session_queue, priority=7)
     _insert_raw(session_queue, priority=10, status="completed")  # ignored
-    assert session_queue._get_highest_priority("default") == 7
+    assert session_queue._q.queue_highest_pending_priority("default") == 7
 
 
 # ---- enqueue / dequeue ----
@@ -328,7 +327,7 @@ def test_prune_terminal_to_limit_keeps_n_most_recent(
 ) -> None:
     for _ in range(5):
         _insert_raw(session_queue, status="completed")
-    deleted = session_queue._prune_terminal_to_limit("default", keep=2)
+    deleted = session_queue._q.queue_prune_terminal_to_limit("default", keep=2)
     assert deleted == 3
     assert session_queue.get_queue_status("default").completed == 2
 

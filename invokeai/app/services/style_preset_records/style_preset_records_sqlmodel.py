@@ -1,99 +1,41 @@
 import json
 from pathlib import Path
 
-from sqlmodel import col, select
-
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.shared.sqlite.models import StylePresetTable
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.style_preset_records.style_preset_records_base import StylePresetRecordsStorageBase
 from invokeai.app.services.style_preset_records.style_preset_records_common import (
     PresetType,
     StylePresetChanges,
-    StylePresetNotFoundError,
     StylePresetRecordDTO,
     StylePresetWithoutId,
 )
-from invokeai.app.util.misc import uuid_string
-
-
-def _to_dto(row: StylePresetTable) -> StylePresetRecordDTO:
-    return StylePresetRecordDTO.from_dict(
-        {
-            "id": row.id,
-            "name": row.name,
-            "preset_data": row.preset_data,
-            "type": row.type,
-            "user_id": row.user_id,
-            "is_public": row.is_public,
-            "created_at": str(row.created_at),
-            "updated_at": str(row.updated_at),
-        }
-    )
 
 
 class SqlModelStylePresetRecordsStorage(StylePresetRecordsStorageBase):
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
         self._db = db
+        self._q = db.queries
 
     def start(self, invoker: Invoker) -> None:
         self._invoker = invoker
         self._sync_default_style_presets()
 
     def get(self, style_preset_id: str) -> StylePresetRecordDTO:
-        with self._db.get_readonly_session() as session:
-            row = session.get(StylePresetTable, style_preset_id)
-            if row is None:
-                raise StylePresetNotFoundError(f"Style preset with id {style_preset_id} not found")
-            return _to_dto(row)
+        return self._q.style_presets_get(style_preset_id)
 
     def create(self, style_preset: StylePresetWithoutId, user_id: str = "system") -> StylePresetRecordDTO:
-        style_preset_id = uuid_string()
-        row = StylePresetTable(
-            id=style_preset_id,
-            name=style_preset.name,
-            preset_data=style_preset.preset_data.model_dump_json(),
-            type=style_preset.type,
-            user_id=user_id,
-            is_public=style_preset.is_public,
-        )
-        with self._db.get_session() as session:
-            session.add(row)
-        return self.get(style_preset_id)
+        return self._q.style_presets_create(style_preset, user_id)
 
     def create_many(self, style_presets: list[StylePresetWithoutId], user_id: str = "system") -> None:
-        with self._db.get_session() as session:
-            for style_preset in style_presets:
-                row = StylePresetTable(
-                    id=uuid_string(),
-                    name=style_preset.name,
-                    preset_data=style_preset.preset_data.model_dump_json(),
-                    type=style_preset.type,
-                    user_id=user_id,
-                    is_public=style_preset.is_public,
-                )
-                session.add(row)
+        self._q.style_presets_create_many(style_presets, user_id)
 
     def update(self, style_preset_id: str, changes: StylePresetChanges) -> StylePresetRecordDTO:
-        with self._db.get_session() as session:
-            row = session.get(StylePresetTable, style_preset_id)
-            if row is None:
-                raise StylePresetNotFoundError(f"Style preset with id {style_preset_id} not found")
-
-            if changes.name is not None:
-                row.name = changes.name
-            if changes.preset_data is not None:
-                row.preset_data = changes.preset_data.model_dump_json()
-
-            session.add(row)
-        return self.get(style_preset_id)
+        return self._q.style_presets_update(style_preset_id, changes)
 
     def delete(self, style_preset_id: str) -> None:
-        with self._db.get_session() as session:
-            row = session.get(StylePresetTable, style_preset_id)
-            if row is not None:
-                session.delete(row)
+        self._q.style_presets_delete(style_preset_id)
 
     def get_many(
         self,
@@ -101,30 +43,13 @@ class SqlModelStylePresetRecordsStorage(StylePresetRecordsStorageBase):
         user_id: str | None = None,
         is_admin: bool = False,
     ) -> list[StylePresetRecordDTO]:
-        with self._db.get_readonly_session() as session:
-            stmt = select(StylePresetTable)
-            if not is_admin:
-                # Visible to non-admin: default + public + own.
-                visibility = (col(StylePresetTable.type) == "default") | (col(StylePresetTable.is_public) == True)  # noqa: E712
-                if user_id is not None:
-                    visibility = visibility | (col(StylePresetTable.user_id) == user_id)
-                stmt = stmt.where(visibility)
-            if type is not None:
-                stmt = stmt.where(col(StylePresetTable.type) == type)
-            stmt = stmt.order_by(col(StylePresetTable.name).asc())
-            rows = session.exec(stmt).all()
-            return [_to_dto(r) for r in rows]
+        return self._q.style_presets_get_many(type=type, user_id=user_id, is_admin=is_admin)
 
     def _sync_default_style_presets(self) -> None:
         """Syncs default style presets to the database."""
-        # Delete existing defaults
-        with self._db.get_session() as session:
-            stmt = select(StylePresetTable).where(col(StylePresetTable.type) == "default")
-            rows = session.exec(stmt).all()
-            for row in rows:
-                session.delete(row)
+        # Delete existing defaults, then re-create them from file
+        self._q.style_presets_delete_defaults()
 
-        # Re-create from file
         with open(Path(__file__).parent / Path("default_style_presets.json"), "r") as file:
             presets = json.load(file)
             for preset in presets:

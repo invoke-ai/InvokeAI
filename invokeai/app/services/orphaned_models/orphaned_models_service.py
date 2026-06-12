@@ -10,10 +10,8 @@ from pathlib import Path
 from typing import Set
 
 from pydantic import BaseModel, Field
-from sqlmodel import select
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.shared.sqlite.models import ModelTable
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 
@@ -57,6 +55,7 @@ class OrphanedModelsService:
         """
         self._config = config
         self._db = db
+        self._q = db.queries
 
     def find_orphaned_models(self) -> list[OrphanedModelInfo]:
         """Find all orphaned model directories.
@@ -163,10 +162,7 @@ class OrphanedModelsService:
         """Get the set of all model directories from the database."""
         model_directories = set()
 
-        # Read via the ORM so this works on every backend (the raw transaction()/cursor path
-        # is SQLite-only). The config JSON is parsed in Python, exactly as before.
-        with self._db.get_readonly_session() as session:
-            configs = session.exec(select(ModelTable.config)).all()
+        configs = self._q.models_get_all_config_json()
 
         for config_json in configs:
             try:
