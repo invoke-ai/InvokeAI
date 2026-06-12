@@ -4,9 +4,9 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { selectAutoSwitch } from 'features/gallery/store/gallerySelectors';
 import type { ProgressImage as ProgressImageType } from 'features/nodes/types/common';
 import { LRUCache } from 'lru-cache';
-import { type Atom, atom, computed, map, type MapStore } from 'nanostores';
+import { type Atom, atom, computed, map, type MapStore, type WritableAtom } from 'nanostores';
 import type { PropsWithChildren } from 'react';
-import { createContext, memo, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { S } from 'services/api/types';
 import { $socket } from 'services/events/stores';
 import { assert } from 'tsafe';
@@ -30,6 +30,8 @@ type ImageViewerContextValue = {
   $progressData: MapStore<ViewerProgressDataMap>;
   /** Active sessions (those with a preview image), sorted by item id for a stable tile order. */
   $activeProgressData: Atom<ViewerProgressDatum[]>;
+  $isProgressImageResolving: Atom<boolean>;
+  $isTemporarilyShowingSelectedImage: WritableAtom<boolean>;
   onLoadImage: () => void;
 };
 
@@ -52,6 +54,9 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
         .sort((a, b) => a.itemId - b.itemId)
     )
   )[0];
+  const $isProgressImageResolving = useState(() => atom(false))[0];
+  const $isTemporarilyShowingSelectedImage = useState(() => atom(false))[0];
+  const shouldClearProgressImageOnLoadRef = useRef(false);
   // We can have race conditions where we receive a progress event for a queue item that has already finished. Easiest
   // way to handle this is to keep track of finished queue items in a cache and ignore progress events for those.
   const [finishedQueueItemIds] = useState(() => new LRUCache<number, boolean>({ max: 200 }));
@@ -69,6 +74,8 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
         );
         return;
       }
+      shouldClearProgressImageOnLoadRef.current = false;
+      $isProgressImageResolving.set(false);
       $progressEvent.set(data);
       if (data.image) {
         $progressImage.set(data.image);
@@ -86,7 +93,7 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
     return () => {
       socket.off('invocation_progress', onInvocationProgress);
     };
-  }, [$progressData, $progressEvent, $progressImage, finishedQueueItemIds, socket]);
+  }, [$isProgressImageResolving, $progressData, $progressEvent, $progressImage, finishedQueueItemIds, socket]);
 
   useEffect(() => {
     if (!socket) {
@@ -124,8 +131,13 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
           // will be stuck on the viewer.
           (data.origin === 'canvas' && data.destination !== 'canvas')
         ) {
+          shouldClearProgressImageOnLoadRef.current = false;
+          $isProgressImageResolving.set(false);
           $progressEvent.set(null);
           $progressImage.set(null);
+        } else {
+          shouldClearProgressImageOnLoadRef.current = true;
+          $isProgressImageResolving.set(true);
         }
       }
     };
@@ -135,16 +147,48 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
     return () => {
       socket.off('queue_item_status_changed', onQueueItemStatusChanged);
     };
-  }, [$progressData, $progressEvent, $progressImage, autoSwitch, finishedQueueItemIds, socket]);
+  }, [
+    $isProgressImageResolving,
+    $progressData,
+    $progressEvent,
+    $progressImage,
+    autoSwitch,
+    finishedQueueItemIds,
+    socket,
+  ]);
 
   const onLoadImage = useCallback(() => {
+    if (!shouldClearProgressImageOnLoadRef.current) {
+      return;
+    }
+
+    shouldClearProgressImageOnLoadRef.current = false;
+    $isProgressImageResolving.set(false);
     $progressEvent.set(null);
     $progressImage.set(null);
-  }, [$progressEvent, $progressImage]);
+  }, [$isProgressImageResolving, $progressEvent, $progressImage]);
 
   const value = useMemo(
-    () => ({ $progressEvent, $progressImage, $hasProgressImage, $progressData, $activeProgressData, onLoadImage }),
-    [$hasProgressImage, $progressEvent, $progressImage, $progressData, $activeProgressData, onLoadImage]
+    () => ({
+      $progressEvent,
+      $progressImage,
+      $hasProgressImage,
+      $progressData,
+      $activeProgressData,
+      $isProgressImageResolving,
+      $isTemporarilyShowingSelectedImage,
+      onLoadImage,
+    }),
+    [
+      $hasProgressImage,
+      $progressData,
+      $activeProgressData,
+      $isProgressImageResolving,
+      $isTemporarilyShowingSelectedImage,
+      $progressEvent,
+      $progressImage,
+      onLoadImage,
+    ]
   );
 
   return <ImageViewerContext.Provider value={value}>{props.children}</ImageViewerContext.Provider>;
