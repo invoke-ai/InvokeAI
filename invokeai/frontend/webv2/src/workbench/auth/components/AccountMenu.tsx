@@ -28,13 +28,11 @@ export const AccountMenu = () => {
   const label = user.display_name?.trim() || user.email;
 
   const openUserManagement = () => {
-    const activeProject = workbench?.activeProject;
-
-    if (!activeProject || !workbench) {
+    if (!workbench?.activeProject) {
       return;
     }
 
-    const centerRegion = activeProject.widgetRegions.center;
+    const centerRegion = workbench.activeProject.widgetRegions.center;
 
     if (centerRegion.enabledWidgetIds.includes('users')) {
       workbench.dispatch({ region: 'center', type: 'selectRegionWidget', widgetId: 'users' });

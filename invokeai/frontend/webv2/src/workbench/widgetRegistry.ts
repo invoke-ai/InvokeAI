@@ -15,7 +15,6 @@ import { previewWidgetManifest } from './widgets/preview';
 import { projectWidgetManifest } from './widgets/project';
 import { queueWidgetManifest } from './widgets/queue';
 import { serverStatusWidgetManifest } from './widgets/server-status';
-import { usersWidgetManifest } from './widgets/users';
 import { versionStatusWidgetManifest } from './widgets/version-status';
 import { workflowWidgetManifest } from './widgets/workflow';
 
@@ -36,7 +35,6 @@ const firstPartyWidgetManifests: WidgetManifest[] = [
   historyControlsWidgetManifest,
   layoutActionsWidgetManifest,
   versionStatusWidgetManifest,
-  usersWidgetManifest,
 ];
 
 const createFailure = (widgetId: WidgetId, error: unknown): WidgetFailure => ({

@@ -63,6 +63,18 @@ const homeRoute = createRoute({
   path: '/',
 });
 
+const projectsHomeRoute = createRoute({
+  component: HomeScreen,
+  getParentRoute: () => authenticatedRoute,
+  path: 'projects',
+});
+
+const usersHomeRoute = createRoute({
+  component: HomeScreen,
+  getParentRoute: () => authenticatedRoute,
+  path: 'users',
+});
+
 const workbenchRoute = createRoute({
   beforeLoad: async ({ cause, search }) => {
     // Photoshop semantics: the editor without documents is Home. A definite
@@ -135,7 +147,7 @@ export const router = createRouter({
   defaultPreload: 'intent',
   history: createHashHistory(),
   routeTree: rootRoute.addChildren([
-    authenticatedRoute.addChildren([homeRoute, workbenchRoute]),
+    authenticatedRoute.addChildren([homeRoute, projectsHomeRoute, usersHomeRoute, workbenchRoute]),
     loginRoute,
     setupRoute,
   ]),
