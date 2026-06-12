@@ -81,7 +81,12 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
     // This node needs to be updated, based on comparison of its version to the template version
     if (getNeedsUpdate(node.data, template)) {
       try {
-        const updatedNode = updateNode(node, template);
+        const connectedInputNames = new Set(
+          edges.flatMap((edge) =>
+            edge.type === 'default' && edge.target === node.id && edge.targetHandle ? [edge.targetHandle] : []
+          )
+        );
+        const updatedNode = updateNode(node, template, { connectedInputNames });
         node.data = updatedNode.data;
       } catch {
         const message = t('nodes.unableToUpdateNode', {
