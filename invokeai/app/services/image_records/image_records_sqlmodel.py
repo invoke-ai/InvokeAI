@@ -1,7 +1,8 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import func
+from sqlalchemy import case, func
+from sqlalchemy.orm import aliased
 from sqlmodel import col, select
 
 from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
@@ -21,6 +22,7 @@ from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.models import BoardImageTable, ImageTable
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.virtual_boards.virtual_boards_common import VirtualSubBoardDTO
 
 
 def _to_dict(row: ImageTable) -> dict:
@@ -302,6 +304,119 @@ class SqlModelImageRecordStorage(ImageRecordStorageBase):
                 starred_count = session.exec(starred_stmt).one()
 
             # Ordering
+            if starred_first:
+                stmt = stmt.order_by(
+                    col(ImageTable.starred).desc(),
+                    col(ImageTable.created_at).desc()
+                    if order_dir == SQLiteDirection.Descending
+                    else col(ImageTable.created_at).asc(),
+                )
+            else:
+                stmt = stmt.order_by(
+                    col(ImageTable.created_at).desc()
+                    if order_dir == SQLiteDirection.Descending
+                    else col(ImageTable.created_at).asc(),
+                )
+
+            results = session.exec(stmt).all()
+
+        return ImageNamesResult(
+            image_names=list(results),
+            starred_count=starred_count,
+            total_count=len(results),
+        )
+
+    def get_image_dates(
+        self,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
+    ) -> list[VirtualSubBoardDTO]:
+        # func.date() yields 'YYYY-MM-DD' on both SQLite (TEXT created_at) and MySQL (DATETIME),
+        # so this groups identically across backends.
+        date_col = func.date(col(ImageTable.created_at))
+
+        with self._db.get_readonly_session() as session:
+            # Correlated subquery: most recent non-intermediate image for each grouped date.
+            i2 = aliased(ImageTable)
+            cover_subq = (
+                select(i2.image_name)
+                .where(
+                    func.date(col(i2.created_at)) == date_col,
+                    col(i2.is_intermediate) == False,  # noqa: E712
+                )
+                .order_by(col(i2.created_at).desc())
+                .limit(1)
+                .correlate(ImageTable)
+                .scalar_subquery()
+            )
+
+            stmt = (
+                select(
+                    date_col.label("date"),
+                    func.sum(case((col(ImageTable.image_category) == "general", 1), else_=0)).label("image_count"),
+                    func.sum(case((col(ImageTable.image_category) != "general", 1), else_=0)).label("asset_count"),
+                    cover_subq.label("cover_image_name"),
+                )
+                .where(col(ImageTable.is_intermediate) == False)  # noqa: E712
+                .group_by(date_col)
+                .order_by(date_col.desc())
+            )
+
+            # User isolation for non-admin users
+            if user_id is not None and not is_admin:
+                stmt = stmt.where(col(ImageTable.user_id) == user_id)
+
+            rows = session.exec(stmt).all()
+
+        return [
+            VirtualSubBoardDTO(
+                virtual_board_id=f"by_date:{row.date}",
+                board_name=str(row.date),
+                date=str(row.date),
+                image_count=int(row.image_count or 0),
+                asset_count=int(row.asset_count or 0),
+                cover_image_name=row.cover_image_name,
+            )
+            for row in rows
+        ]
+
+    def get_image_names_by_date(
+        self,
+        date: str,
+        starred_first: bool = True,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        categories: Optional[list[ImageCategory]] = None,
+        search_term: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
+    ) -> ImageNamesResult:
+        with self._db.get_readonly_session() as session:
+            # Shared filter conditions for the count and the data query.
+            conditions = [
+                func.date(col(ImageTable.created_at)) == date,
+                col(ImageTable.is_intermediate) == False,  # noqa: E712
+            ]
+
+            if categories is not None:
+                category_strings = [c.value for c in set(categories)]
+                conditions.append(col(ImageTable.image_category).in_(category_strings))
+
+            # User isolation for non-admin users
+            if user_id is not None and not is_admin:
+                conditions.append(col(ImageTable.user_id) == user_id)
+
+            if search_term:
+                term = f"%{search_term.lower()}%"
+                conditions.append(col(ImageTable.metadata_).like(term) | col(ImageTable.created_at).like(term))
+
+            # Starred count
+            starred_count = 0
+            if starred_first:
+                starred_stmt = select(func.count()).select_from(ImageTable).where(*conditions)
+                starred_stmt = starred_stmt.where(col(ImageTable.starred) == True)  # noqa: E712
+                starred_count = session.exec(starred_stmt).one()
+
+            stmt = select(ImageTable.image_name).where(*conditions)
             if starred_first:
                 stmt = stmt.order_by(
                     col(ImageTable.starred).desc(),

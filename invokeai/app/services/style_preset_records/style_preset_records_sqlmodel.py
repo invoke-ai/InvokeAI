@@ -24,6 +24,8 @@ def _to_dto(row: StylePresetTable) -> StylePresetRecordDTO:
             "name": row.name,
             "preset_data": row.preset_data,
             "type": row.type,
+            "user_id": row.user_id,
+            "is_public": row.is_public,
             "created_at": str(row.created_at),
             "updated_at": str(row.updated_at),
         }

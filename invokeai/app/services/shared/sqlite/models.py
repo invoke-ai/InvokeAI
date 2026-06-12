@@ -8,9 +8,23 @@ these models are used only for querying via SQLModel/SQLAlchemy.
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Column, String
+from sqlalchemy import Column, String, Text
+from sqlalchemy.dialects import mysql
 from sqlalchemy.schema import FetchedValue
+from sqlalchemy.types import TypeEngine
 from sqlmodel import Field, SQLModel
+
+
+def _blob() -> TypeEngine[str]:
+    """Column type for JSON/text blobs.
+
+    Plain ``TEXT`` on SQLite/Postgres (effectively unbounded). On MySQL/MariaDB a bare
+    ``str`` would map to ``VARCHAR(255)`` and silently truncate large payloads (model
+    configs, session graphs, workflows), so we use ``LONGTEXT`` (up to 4 GiB) there.
+    Returns a fresh instance per call — a ``Column`` may not be shared across tables.
+    """
+    return Text().with_variant(mysql.LONGTEXT(), "mysql")
+
 
 # --- boards ---
 
@@ -70,7 +84,7 @@ class ImageTable(SQLModel, table=True):
     height: int
     session_id: Optional[str] = Field(default=None)
     node_id: Optional[str] = Field(default=None)
-    metadata_: Optional[str] = Field(default=None, sa_column_kwargs={"name": "metadata"})
+    metadata_: Optional[str] = Field(default=None, sa_column=Column("metadata", _blob(), nullable=True))
     is_intermediate: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -89,7 +103,7 @@ class WorkflowLibraryTable(SQLModel, table=True):
     __tablename__ = "workflow_library"
 
     workflow_id: str = Field(primary_key=True)
-    workflow: str  # JSON blob
+    workflow: str = Field(sa_column=Column(_blob(), nullable=False))  # JSON blob
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     opened_at: Optional[datetime] = Field(default=None)
@@ -126,22 +140,22 @@ class SessionQueueTable(SQLModel, table=True):
     batch_id: str
     queue_id: str
     session_id: str = Field(unique=True)
-    field_values: Optional[str] = Field(default=None)
-    session: str  # JSON blob
+    field_values: Optional[str] = Field(default=None, sa_column=Column(_blob(), nullable=True))
+    session: str = Field(sa_column=Column(_blob(), nullable=False))  # JSON blob
     status: str = Field(default="pending")
     priority: int = Field(default=0)
-    error_traceback: Optional[str] = Field(default=None)
+    error_traceback: Optional[str] = Field(default=None, sa_column=Column(_blob(), nullable=True))
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     started_at: Optional[datetime] = Field(default=None)
     completed_at: Optional[datetime] = Field(default=None)
     error_type: Optional[str] = Field(default=None)
-    error_message: Optional[str] = Field(default=None)
+    error_message: Optional[str] = Field(default=None, sa_column=Column(_blob(), nullable=True))
     origin: Optional[str] = Field(default=None)
     destination: Optional[str] = Field(default=None)
     retried_from_item_id: Optional[int] = Field(default=None)
     user_id: str = Field(default="system")
-    workflow: Optional[str] = Field(default=None)  # JSON blob
+    workflow: Optional[str] = Field(default=None, sa_column=Column(_blob(), nullable=True))  # JSON blob
 
 
 # --- models ---
@@ -157,7 +171,7 @@ class ModelTable(SQLModel, table=True):
     __tablename__ = "models"
 
     id: str = Field(primary_key=True)
-    config: str  # JSON blob — all model metadata is extracted from this via GENERATED ALWAYS columns
+    config: str = Field(sa_column=Column(_blob(), nullable=False))  # JSON blob — all model metadata is extracted from this
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     # NOTE: The `models` table has many GENERATED ALWAYS columns (hash, base, type, path, format, name, etc.)
@@ -197,7 +211,7 @@ class StylePresetTable(SQLModel, table=True):
 
     id: str = Field(primary_key=True)
     name: str
-    preset_data: str  # JSON blob
+    preset_data: str = Field(sa_column=Column(_blob(), nullable=False))  # JSON blob
     type: str = Field(default="user")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -233,7 +247,7 @@ class AppSettingTable(SQLModel, table=True):
     __tablename__ = "app_settings"
 
     key: str = Field(primary_key=True)
-    value: str
+    value: str = Field(sa_column=Column(_blob(), nullable=False))
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -248,5 +262,5 @@ class ClientStateTable(SQLModel, table=True):
 
     user_id: str = Field(primary_key=True, foreign_key="users.user_id")
     key: str = Field(primary_key=True)
-    value: str
+    value: str = Field(sa_column=Column(_blob(), nullable=False))
     updated_at: datetime = Field(default_factory=datetime.utcnow)

@@ -33,6 +33,27 @@ class ClientStatePersistenceSqlModel(ClientStatePersistenceABC):
                 return None
             return row.value
 
+    def get_keys_by_prefix(self, user_id: str, prefix: str) -> list[str]:
+        # Escape LIKE wildcards (%, _) and the escape char itself so callers can pass
+        # arbitrary strings as a literal prefix without accidental pattern matching.
+        escaped_prefix = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        with self._db.get_readonly_session() as session:
+            stmt = (
+                select(ClientStateTable.key)
+                .where(
+                    col(ClientStateTable.user_id) == user_id,
+                    col(ClientStateTable.key).like(f"{escaped_prefix}%", escape="\\"),
+                )
+                .order_by(col(ClientStateTable.updated_at).desc())
+            )
+            return list(session.exec(stmt).all())
+
+    def delete_by_key(self, user_id: str, key: str) -> None:
+        with self._db.get_session() as session:
+            row = session.get(ClientStateTable, (user_id, key))
+            if row is not None:
+                session.delete(row)
+
     def delete(self, user_id: str) -> None:
         with self._db.get_session() as session:
             stmt = select(ClientStateTable).where(col(ClientStateTable.user_id) == user_id)
