@@ -23,8 +23,10 @@ from typing import Callable, Iterator, Optional, Tuple
 import torch
 import torchvision.transforms as tv_transforms
 from torchvision.transforms.functional import resize as tv_resize
+from torchvision.transforms.functional import to_tensor
 from tqdm import tqdm
 
+from invokeai.app.invocations.anima_lllite import AnimaLLLiteField
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import (
     AnimaConditioningField,
@@ -40,6 +42,12 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.anima.anima_transformer_patch import patch_anima_for_regional_prompting
 from invokeai.backend.anima.conditioning_data import AnimaRegionalTextConditioning, AnimaTextConditioning
+from invokeai.backend.anima.control_net_lllite import (
+    AnimaControlNetLLLite,
+    build_inpaint_cond_image,
+    prepare_cond_image,
+    prepare_mask,
+)
 from invokeai.backend.anima.regional_prompting import AnimaRegionalPromptingExtension
 from invokeai.backend.anima.scheduler_driver import AnimaSchedulerDriver
 from invokeai.backend.flux.schedulers import (
@@ -167,7 +175,7 @@ class AnimaInpaintExtension(RectifiedFlowInpaintExtension):
     title="Denoise - Anima",
     tags=["image", "anima"],
     category="image",
-    version="1.6.0",
+    version="1.8.0",
     classification=Classification.Prototype,
 )
 class AnimaDenoiseInvocation(BaseInvocation):
@@ -212,6 +220,13 @@ class AnimaDenoiseInvocation(BaseInvocation):
     height: int = InputField(default=1024, multiple_of=8, description="Height of the generated image.")
     steps: int = InputField(default=30, gt=0, description="Number of denoising steps. 30 recommended for Anima.")
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
+    # ControlNet-LLLite support (e.g. model-level inpaint conditioning, control layers)
+    control_lllite: AnimaLLLiteField | list[AnimaLLLiteField] | None = InputField(
+        default=None,
+        description="Anima ControlNet-LLLite conditioning (e.g. inpaint adapter, control layers). Adapters are "
+        "applied in a deterministic order (sorted by model key); each model may be used at most once.",
+        input=Input.Connection,
+    )
     scheduler: ANIMA_SCHEDULER_NAME_VALUES = InputField(
         default="euler",
         description="Scheduler (sampler) for the denoising process.",
@@ -248,6 +263,100 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
         mask = mask.to(device=latents.device, dtype=latents.dtype)
         return mask
+
+    @staticmethod
+    def _normalize_control_lllite(
+        control_lllite: AnimaLLLiteField | list[AnimaLLLiteField] | None,
+    ) -> list[AnimaLLLiteField]:
+        """Normalize the control_lllite input to a sorted list and reject duplicate models.
+
+        The model cache returns ONE shared AnimaControlNetLLLite instance per
+        model key, so two adapters using the same model in one run would share
+        cond/multiplier state and clobber each other's bindings.
+
+        The list is sorted by model key: the frontend fans adapters into a
+        `collect` node whose output order follows graph node ids (random
+        UUIDs), not user intent, and composition is weakly order-sensitive
+        (each adapter's delta sees the perturbations of adapters applied after
+        it). Sorting makes the cascade deterministic and reproducible.
+        """
+        if control_lllite is None:
+            lllite_fields: list[AnimaLLLiteField] = []
+        elif isinstance(control_lllite, AnimaLLLiteField):
+            lllite_fields = [control_lllite]
+        elif isinstance(control_lllite, list):
+            lllite_fields = control_lllite
+        else:
+            raise ValueError(f"Unsupported control_lllite type: {type(control_lllite)}")
+
+        seen_keys: set[str] = set()
+        for lllite_field in lllite_fields:
+            key = lllite_field.control_model.key
+            if key in seen_keys:
+                raise ValueError(
+                    f"The Anima ControlNet-LLLite model '{lllite_field.control_model.name}' is used by more than "
+                    "one control input. Each LLLite model can only be applied once per generation — remove the "
+                    "duplicate, or select a different model for it."
+                )
+            seen_keys.add(key)
+        return sorted(lllite_fields, key=lambda f: f.control_model.key)
+
+    def _build_lllite_cond_image(
+        self,
+        context: InvocationContext,
+        lllite_field: AnimaLLLiteField,
+        lllite_model: AnimaControlNetLLLite,
+        latents: torch.Tensor,
+        patch_spatial: int = 2,
+    ) -> torch.Tensor:
+        """Build one adapter's LLLite conditioning image tensor (once per generation).
+
+        The cond image is sized from the ACTUAL latent H/W (mirroring the DiT's
+        patch padding) — see target_cond_hw in the backend module.
+        """
+        latent_h, latent_w = latents.shape[-2], latents.shape[-1]
+
+        image_pil = context.images.get_pil(lllite_field.image_name, "RGB")
+        rgb_01 = to_tensor(image_pil).unsqueeze(0)  # (1, 3, H, W) in [0, 1]
+        rgb_pm1 = prepare_cond_image(rgb_01, latent_h, latent_w, patch_spatial)
+
+        if lllite_model.cond_in_channels == 4:
+            if lllite_field.mask_name is None:
+                raise ValueError(
+                    "This Anima ControlNet-LLLite adapter is an inpainting adapter (4-channel conditioning) and "
+                    "requires a mask. Connect a mask (white = inpaint area) to the Anima ControlNet-LLLite node."
+                )
+            mask_pil = context.images.get_pil(lllite_field.mask_name, "L")
+            mask_01 = to_tensor(mask_pil).unsqueeze(0)  # (1, 1, H, W) in [0, 1]
+            mask_01 = prepare_mask(mask_01, latent_h, latent_w, patch_spatial)
+            return build_inpaint_cond_image(rgb_pm1, mask_01, lllite_model.inpaint_masked_input)
+
+        if lllite_model.cond_in_channels != 3:
+            raise ValueError(
+                f"Unsupported Anima ControlNet-LLLite adapter: expected 3 or 4 conditioning channels, got "
+                f"{lllite_model.cond_in_channels}."
+            )
+        if lllite_field.mask_name is not None:
+            context.logger.warning(
+                "The selected Anima ControlNet-LLLite adapter does not use a mask (3-channel conditioning); the "
+                "connected mask will be ignored."
+            )
+        return rgb_pm1
+
+    @staticmethod
+    def _get_lllite_multiplier(lllite_field: AnimaLLLiteField, step_index: int, total_steps: int) -> float:
+        """Step-range gate for one LLLite adapter's multiplier.
+
+        Uses the same user-facing step-index/percent convention as
+        BaseControlNetExtension._get_weight.
+        """
+        first_step = math.floor(lllite_field.begin_step_percent * total_steps)
+        last_step = math.ceil(lllite_field.end_step_percent * total_steps)
+
+        if step_index < first_step or step_index > last_step:
+            return 0.0
+
+        return lllite_field.weight
 
     def _get_noise(
         self,
@@ -407,6 +516,8 @@ class AnimaDenoiseInvocation(BaseInvocation):
                 f"denoising_start ({self.denoising_start}) must be less than denoising_end ({self.denoising_end})."
             )
 
+        lllite_fields = self._normalize_control_lllite(self.control_lllite)
+
         transformer_info = context.models.load(self.transformer.transformer)
 
         # Compute image token grid dimensions for regional prompting
@@ -530,6 +641,22 @@ class AnimaDenoiseInvocation(BaseInvocation):
         with ExitStack() as exit_stack:
             (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
 
+            # Prepare the ControlNet-LLLite adapters if provided. Each adapter's
+            # conditioning image is built ONCE per generation (not per step).
+            lllite_adapters: list[tuple[AnimaLLLiteField, AnimaControlNetLLLite, torch.Tensor]] = []
+            for lllite_field in lllite_fields:
+                lllite_info = context.models.load(lllite_field.control_model)
+                (_, lllite_model) = exit_stack.enter_context(lllite_info.model_on_device())
+                assert isinstance(lllite_model, AnimaControlNetLLLite)
+                lllite_cond = self._build_lllite_cond_image(
+                    context,
+                    lllite_field,
+                    lllite_model,
+                    latents,
+                    patch_spatial=int(getattr(transformer, "patch_spatial", 2)),
+                )
+                lllite_adapters.append((lllite_field, lllite_model, lllite_cond))
+
             # Apply LoRA models to the transformer.
             # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
             exit_stack.enter_context(
@@ -606,95 +733,130 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     # t5xxl_ids=None skips the LLM Adapter — context is already pre-computed
                 )
 
-            if driver is not None:
-                user_step = 0
-                pbar = tqdm(total=total_steps, desc="Denoising (Anima)")
-                for it in driver.iterations():
-                    timestep = torch.tensor(
-                        [it.sigma_curr * ANIMA_MULTIPLIER], device=device, dtype=inference_dtype
-                    ).expand(latents.shape[0])
+            try:
+                # Bind AFTER LoRA patching so the LLLite modules wrap the patched
+                # forwards. List order = apply order; restore must be the reverse.
+                for _, lllite_model, lllite_cond in lllite_adapters:
+                    lllite_model.apply_to(transformer)
+                    lllite_model.set_cond_image(lllite_cond)
 
-                    noise_pred_cond = _run_transformer(pos_context, latents, timestep).float()
+                if driver is not None:
+                    user_step = 0
+                    pbar = tqdm(total=total_steps, desc="Denoising (Anima)")
+                    for it in driver.iterations():
+                        # Gate on the user-facing step index so both halves of a
+                        # multi-pass step (e.g. Heun pairs) share one gate value.
+                        for lllite_field, lllite_model, _ in lllite_adapters:
+                            lllite_model.set_multiplier(
+                                self._get_lllite_multiplier(lllite_field, user_step, total_steps)
+                            )
 
-                    if do_cfg and neg_context is not None:
-                        noise_pred_uncond = _run_transformer(neg_context, latents, timestep).float()
-                        noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_cond - noise_pred_uncond)
-                    else:
-                        noise_pred = noise_pred_cond
+                        timestep = torch.tensor(
+                            [it.sigma_curr * ANIMA_MULTIPLIER], device=device, dtype=inference_dtype
+                        ).expand(latents.shape[0])
 
-                    latents_preview = self._estimate_preview_latents(
-                        latents=latents,
-                        sigma=it.sigma_curr,
-                        noise_pred=noise_pred,
-                    )
+                        noise_pred_cond = _run_transformer(pos_context, latents, timestep).float()
 
-                    latents = driver.step(model_output=noise_pred, timestep=it.sched_timestep, sample=latents)
+                        if do_cfg and neg_context is not None:
+                            noise_pred_uncond = _run_transformer(neg_context, latents, timestep).float()
+                            noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_cond - noise_pred_uncond)
+                        else:
+                            noise_pred = noise_pred_cond
 
-                    if it.completes_user_step:
-                        # RectifiedFlowInpaintExtension expects this once per user step (its
-                        # docstring), so for Heun we skip the FO half of each pair to avoid
-                        # corrupting the second-order corrector's input.
+                        latents_preview = self._estimate_preview_latents(
+                            latents=latents,
+                            sigma=it.sigma_curr,
+                            noise_pred=noise_pred,
+                        )
+
+                        latents = driver.step(model_output=noise_pred, timestep=it.sched_timestep, sample=latents)
+
+                        if it.completes_user_step:
+                            # RectifiedFlowInpaintExtension expects this once per user step (its
+                            # docstring), so for Heun we skip the FO half of each pair to avoid
+                            # corrupting the second-order corrector's input.
+                            if inpaint_extension is not None:
+                                latents_4d = latents.squeeze(2)
+                                latents_4d = inpaint_extension.merge_intermediate_latents_with_init_latents(
+                                    latents_4d, it.sigma_prev
+                                )
+                                latents = latents_4d.unsqueeze(2)
+
+                            user_step += 1
+                            pbar.update(1)
+                            step_callback(
+                                PipelineIntermediateState(
+                                    step=user_step,
+                                    order=it.order,
+                                    total_steps=total_steps,
+                                    timestep=int(it.sigma_curr * 1000),
+                                    latents=latents_preview.squeeze(2),
+                                )
+                            )
+                    pbar.close()
+                else:
+                    # Built-in Euler implementation (default for Anima)
+                    for step_idx in tqdm(range(total_steps), desc="Denoising (Anima)"):
+                        for lllite_field, lllite_model, _ in lllite_adapters:
+                            lllite_model.set_multiplier(
+                                self._get_lllite_multiplier(lllite_field, step_idx, total_steps)
+                            )
+
+                        sigma_curr = sigmas[step_idx]
+                        sigma_prev = sigmas[step_idx + 1]
+
+                        timestep = torch.tensor(
+                            [sigma_curr * ANIMA_MULTIPLIER], device=device, dtype=inference_dtype
+                        ).expand(latents.shape[0])
+
+                        noise_pred_cond = _run_transformer(pos_context, latents, timestep).float()
+
+                        if do_cfg and neg_context is not None:
+                            noise_pred_uncond = _run_transformer(neg_context, latents, timestep).float()
+                            noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_cond - noise_pred_uncond)
+                        else:
+                            noise_pred = noise_pred_cond
+
+                        latents_dtype = latents.dtype
+                        latents = latents.to(dtype=torch.float32)
+                        latents = latents + (sigma_prev - sigma_curr) * noise_pred
+                        latents = latents.to(dtype=latents_dtype)
+                        latents_preview = self._estimate_preview_latents(
+                            latents=latents, sigma=sigma_prev, noise_pred=noise_pred
+                        )
+
                         if inpaint_extension is not None:
                             latents_4d = latents.squeeze(2)
                             latents_4d = inpaint_extension.merge_intermediate_latents_with_init_latents(
-                                latents_4d, it.sigma_prev
+                                latents_4d, sigma_prev
                             )
                             latents = latents_4d.unsqueeze(2)
 
-                        user_step += 1
-                        pbar.update(1)
                         step_callback(
                             PipelineIntermediateState(
-                                step=user_step,
-                                order=it.order,
+                                step=step_idx + 1,
+                                order=1,
                                 total_steps=total_steps,
-                                timestep=int(it.sigma_curr * 1000),
+                                timestep=int(sigma_curr * 1000),
                                 latents=latents_preview.squeeze(2),
-                            )
+                            ),
                         )
-                pbar.close()
-            else:
-                # Built-in Euler implementation (default for Anima)
-                for step_idx in tqdm(range(total_steps), desc="Denoising (Anima)"):
-                    sigma_curr = sigmas[step_idx]
-                    sigma_prev = sigmas[step_idx + 1]
-
-                    timestep = torch.tensor(
-                        [sigma_curr * ANIMA_MULTIPLIER], device=device, dtype=inference_dtype
-                    ).expand(latents.shape[0])
-
-                    noise_pred_cond = _run_transformer(pos_context, latents, timestep).float()
-
-                    if do_cfg and neg_context is not None:
-                        noise_pred_uncond = _run_transformer(neg_context, latents, timestep).float()
-                        noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_cond - noise_pred_uncond)
-                    else:
-                        noise_pred = noise_pred_cond
-
-                    latents_dtype = latents.dtype
-                    latents = latents.to(dtype=torch.float32)
-                    latents = latents + (sigma_prev - sigma_curr) * noise_pred
-                    latents = latents.to(dtype=latents_dtype)
-                    latents_preview = self._estimate_preview_latents(
-                        latents=latents, sigma=sigma_prev, noise_pred=noise_pred
-                    )
-
-                    if inpaint_extension is not None:
-                        latents_4d = latents.squeeze(2)
-                        latents_4d = inpaint_extension.merge_intermediate_latents_with_init_latents(
-                            latents_4d, sigma_prev
+            finally:
+                # The adapter models are shared via the model cache — always undo
+                # the forward swaps and drop the per-run cond state. unbind() is
+                # only correct LIFO, so restore in REVERSE apply order (see
+                # AnimaControlNetLLLite.restore). Each restore is isolated so one
+                # failure cannot leave the remaining adapters bound to the
+                # cache-shared transformer.
+                for lllite_field, lllite_model, _ in reversed(lllite_adapters):
+                    try:
+                        lllite_model.restore()
+                        lllite_model.clear_cond_image()
+                    except Exception as e:
+                        context.logger.error(
+                            f"Failed to restore Anima ControlNet-LLLite adapter "
+                            f"'{lllite_field.control_model.name}': {e}"
                         )
-                        latents = latents_4d.unsqueeze(2)
-
-                    step_callback(
-                        PipelineIntermediateState(
-                            step=step_idx + 1,
-                            order=1,
-                            total_steps=total_steps,
-                            timestep=int(sigma_curr * 1000),
-                            latents=latents_preview.squeeze(2),
-                        ),
-                    )
 
         # Remove temporal dimension for output: [B, C, 1, H, W] -> [B, C, H, W]
         return latents.squeeze(2)
