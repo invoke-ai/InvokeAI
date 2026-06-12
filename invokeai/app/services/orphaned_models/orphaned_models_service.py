@@ -55,6 +55,7 @@ class OrphanedModelsService:
         """
         self._config = config
         self._db = db
+        self._q = db.queries
 
     def find_orphaned_models(self) -> list[OrphanedModelInfo]:
         """Find all orphaned model directories.
@@ -161,36 +162,34 @@ class OrphanedModelsService:
         """Get the set of all model directories from the database."""
         model_directories = set()
 
-        with self._db.transaction() as cursor:
-            cursor.execute("SELECT config FROM models")
-            rows = cursor.fetchall()
+        configs = self._q.models_get_all_config_json()
 
-            for row in rows:
-                try:
-                    config = json.loads(row[0])
-                    if "path" in config and config["path"]:
-                        path_str = config["path"]
-                        path = Path(path_str)
+        for config_json in configs:
+            try:
+                config = json.loads(config_json)
+                if "path" in config and config["path"]:
+                    path_str = config["path"]
+                    path = Path(path_str)
 
-                        # If the path is relative, resolve it relative to models_dir
-                        if not path.is_absolute():
-                            full_path = (models_dir / path).resolve()
-                        else:
-                            full_path = path.resolve()
+                    # If the path is relative, resolve it relative to models_dir
+                    if not path.is_absolute():
+                        full_path = (models_dir / path).resolve()
+                    else:
+                        full_path = path.resolve()
 
-                        # Extract the top-level directory under models_dir
-                        try:
-                            rel_path = full_path.relative_to(models_dir)
-                            if rel_path.parts:
-                                top_level_dir = models_dir / rel_path.parts[0]
-                                model_directories.add(top_level_dir.resolve())
-                        except ValueError:
-                            # Path is not relative to models_dir
-                            model_directories.add(full_path)
+                    # Extract the top-level directory under models_dir
+                    try:
+                        rel_path = full_path.relative_to(models_dir)
+                        if rel_path.parts:
+                            top_level_dir = models_dir / rel_path.parts[0]
+                            model_directories.add(top_level_dir.resolve())
+                    except ValueError:
+                        # Path is not relative to models_dir
+                        model_directories.add(full_path)
 
-                except (json.JSONDecodeError, KeyError, TypeError):
-                    # Skip invalid model configs
-                    continue
+            except (json.JSONDecodeError, KeyError, TypeError):
+                # Skip invalid model configs
+                continue
 
         return model_directories
 
