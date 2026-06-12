@@ -247,7 +247,13 @@ describe('queueCoordinator', () => {
       percentage: 0.5,
     });
 
-    expect(harness.progressEntries.get('local-1')).toEqual({ message: 'Denoising', percentage: 0.5 });
+    expect(harness.progressEntries.get('local-1')).toEqual({
+      activeItemIndex: 1,
+      completedItemCount: 0,
+      message: 'Denoising',
+      percentage: 0.5,
+      totalItemCount: 1,
+    });
 
     const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z');
 
@@ -255,6 +261,37 @@ describe('queueCoordinator', () => {
     await resultsPromise;
 
     expect(harness.progressEntries.has('local-1')).toBe(false);
+  });
+
+  it('tracks the active image index inside a submitted batch', async () => {
+    harness.api.enqueueGenerateGraph.mockResolvedValue({ batchId: 'batch-1', itemIds: [1, 2] });
+    harness.coordinator.connect();
+
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+
+    expect(harness.progressEntries.get('local-1')).toEqual({
+      activeItemIndex: 1,
+      completedItemCount: 0,
+      message: '',
+      percentage: null,
+      totalItemCount: 2,
+    });
+
+    const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z');
+
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 1 }));
+
+    expect(harness.progressEntries.get('local-1')).toEqual({
+      activeItemIndex: 2,
+      completedItemCount: 1,
+      message: '',
+      percentage: null,
+      totalItemCount: 2,
+    });
+
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 2 }));
+
+    await resultsPromise;
   });
 
   describe('reconcile', () => {

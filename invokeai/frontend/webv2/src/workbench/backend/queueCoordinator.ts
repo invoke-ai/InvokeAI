@@ -19,6 +19,7 @@ import {
   type TerminalBackendQueueItemStatus,
 } from './events';
 import { ApiError, getAuthToken, getBackendSocketUrl } from './http';
+import { modelLoadStore } from './modelLoadStore';
 import { queueItemProgressStore, type QueueItemProgressSink } from './progressStore';
 
 const SOCKET_PATH = '/ws/socket.io';
@@ -110,6 +111,14 @@ interface RunState {
   outcomePromises: Promise<TerminalOutcome>[];
 }
 
+interface RunProgressState {
+  activeBackendItemId?: number;
+  backendItemIds: number[];
+  completedBackendItemIds: Set<number>;
+  message: string;
+  percentage: number | null;
+}
+
 interface WaitState {
   localQueueItemId: string;
   settle: (outcome: TerminalOutcome) => void;
@@ -169,6 +178,7 @@ export const createQueueCoordinator = (
   const sweepIntervalMs = options.sweepIntervalMs ?? SAFETY_SWEEP_INTERVAL_MS;
 
   const runs = new Map<string, RunState>();
+  const runProgress = new Map<string, RunProgressState>();
   const waits = new Map<number, WaitState>();
   /**
    * Terminal events that arrived for items nobody tracks yet. Closes the race
@@ -209,6 +219,30 @@ export const createQueueCoordinator = (
     }
   };
 
+  const publishRunProgress = (localQueueItemId: string): void => {
+    const state = runProgress.get(localQueueItemId);
+
+    if (!state) {
+      return;
+    }
+
+    const activeBackendItemId =
+      state.activeBackendItemId !== undefined && !state.completedBackendItemIds.has(state.activeBackendItemId)
+        ? state.activeBackendItemId
+        : undefined;
+    const activeItemIndex = activeBackendItemId
+      ? state.backendItemIds.indexOf(activeBackendItemId) + 1
+      : Math.min(state.completedBackendItemIds.size + 1, state.backendItemIds.length);
+
+    progress.set(localQueueItemId, {
+      activeItemIndex: Math.max(1, activeItemIndex),
+      completedItemCount: state.completedBackendItemIds.size,
+      message: state.message,
+      percentage: state.percentage,
+      totalItemCount: state.backendItemIds.length,
+    });
+  };
+
   const settleWait = (backendItemId: number, outcome: TerminalOutcome): void => {
     const wait = waits.get(backendItemId);
 
@@ -218,7 +252,16 @@ export const createQueueCoordinator = (
     }
 
     waits.delete(backendItemId);
-    progress.clear(wait.localQueueItemId);
+    const state = runProgress.get(wait.localQueueItemId);
+
+    if (state) {
+      state.activeBackendItemId = undefined;
+      state.completedBackendItemIds.add(backendItemId);
+      state.message = '';
+      state.percentage = null;
+      publishRunProgress(wait.localQueueItemId);
+    }
+
     wait.settle(outcome);
   };
 
@@ -248,6 +291,14 @@ export const createQueueCoordinator = (
       backendItemIds,
       outcomePromises: backendItemIds.map((backendItemId) => trackBackendItem(localQueueItemId, backendItemId)),
     });
+
+    runProgress.set(localQueueItemId, {
+      backendItemIds,
+      completedBackendItemIds: new Set(),
+      message: '',
+      percentage: null,
+    });
+    publishRunProgress(localQueueItemId);
   };
 
   /** Slow safety net for events lost to disconnects; runs on reconnect and on a long interval. */
@@ -294,7 +345,16 @@ export const createQueueCoordinator = (
     const wait = waits.get(event.item_id);
 
     if (wait) {
-      progress.set(wait.localQueueItemId, { message: event.message, percentage: event.percentage });
+      const state = runProgress.get(wait.localQueueItemId);
+
+      if (state) {
+        state.activeBackendItemId = event.item_id;
+        state.message = event.message;
+        state.percentage = event.percentage;
+        publishRunProgress(wait.localQueueItemId);
+      } else {
+        progress.set(wait.localQueueItemId, { message: event.message, percentage: event.percentage });
+      }
     }
   };
 
@@ -314,19 +374,31 @@ export const createQueueCoordinator = (
     notifyConnection('connecting');
 
     socket.on('connect', () => {
+      modelLoadStore.reset();
+      progress.clearAll?.();
       notifyConnection('connected');
       socket?.emit('subscribe_queue', { queue_id: 'default' });
       scheduleGalleryRefresh();
       void sweep();
     });
     socket.on('connect_error', (error: { message: string }) => {
+      modelLoadStore.reset();
+      progress.clearAll?.();
       notifyConnection('disconnected', error.message);
     });
     socket.on('disconnect', (reason: string) => {
+      modelLoadStore.reset();
+      progress.clearAll?.();
       notifyConnection('disconnected', reason);
     });
     socket.on('queue_item_status_changed', handleStatusChanged);
     socket.on('invocation_progress', handleProgress);
+    socket.on('model_load_started', (payload: never) => {
+      modelLoadStore.started(payload);
+    });
+    socket.on('model_load_complete', (payload: never) => {
+      modelLoadStore.completed(payload);
+    });
 
     // Model install lifecycle events are broadcast to every connected client
     // (no room subscription needed); forward them to the installs store so the
@@ -454,6 +526,7 @@ export const createQueueCoordinator = (
       return imagesPerItem.flat();
     } finally {
       runs.delete(localQueueItemId);
+      runProgress.delete(localQueueItemId);
       progress.clear(localQueueItemId);
     }
   };

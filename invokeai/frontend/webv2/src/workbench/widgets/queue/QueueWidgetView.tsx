@@ -28,7 +28,7 @@ export const QueueWidgetView = ({ presentation, region }: WidgetViewProps) => {
 const QueueItemLiveProgress = ({ queueItemId }: { queueItemId: string }) => {
   const progress = useQueueItemProgress(queueItemId);
 
-  if (!progress) {
+  if (!progress || (!progress.message && progress.percentage === null)) {
     return null;
   }
 

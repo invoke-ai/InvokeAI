@@ -10,12 +10,17 @@ import { useSyncExternalStore } from 'react';
  */
 
 export interface QueueItemProgress {
+  /** 1-based image slot currently executing inside this local batch. */
+  activeItemIndex?: number;
+  completedItemCount?: number;
   message: string;
   /** 0..1, or null while indeterminate. */
   percentage: number | null;
+  totalItemCount?: number;
 }
 
 export interface QueueItemProgressSink {
+  clearAll?(): void;
   set(queueItemId: string, progress: QueueItemProgress): void;
   clear(queueItemId: string): void;
 }
@@ -38,6 +43,12 @@ const subscribe = (listener: () => void): (() => void) => {
 };
 
 export const queueItemProgressStore: QueueItemProgressSink = {
+  clearAll() {
+    if (progressByQueueItemId.size > 0) {
+      progressByQueueItemId.clear();
+      emit();
+    }
+  },
   clear(queueItemId) {
     if (progressByQueueItemId.delete(queueItemId)) {
       emit();

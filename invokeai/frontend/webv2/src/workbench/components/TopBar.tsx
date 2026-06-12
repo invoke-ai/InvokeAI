@@ -1,16 +1,35 @@
-import { Badge, Flex, Group, Icon, Menu, NumberInput, Portal, Separator } from '@chakra-ui/react';
+import {
+  Badge,
+  Flex,
+  Group,
+  HStack,
+  Icon,
+  Menu,
+  NumberInput,
+  Portal,
+  Progress,
+  Separator,
+  Stack,
+  Text,
+} from '@chakra-ui/react';
 import { ChevronDownIcon, ListOrderedIcon, PauseIcon, PlayIcon, XIcon } from 'lucide-react';
 
 import { InvokeControl } from './InvokeControl';
 import { LayoutPresetMenu } from './LayoutPresetMenu';
 import { ProjectTabs } from './ProjectTabs';
-import { IconButton } from './ui/Button';
+import { Button, IconButton } from './ui/Button';
+import { useModelLoads, type ModelLoadInfo } from '../backend/modelLoadStore';
 import { AccountMenu } from '../auth/components/AccountMenu';
+import { useQueueItemProgress, type QueueItemProgress } from '../backend/progressStore';
+import { getDestinationLabel, getSourceLabel } from '../invocation';
+import { getQueueItemExpectedImageCount, getQueueProgressBarState, getQueueSummary } from '../queueSummary';
 import { useWorkbenchPreferences } from '../settings/store';
+import type { QueueItem } from '../types';
 import { useWorkbench } from '../WorkbenchContext';
 import { DEFAULT_THEME_ID, THEMES_BY_ID } from '../../theme/themes';
 import { Tooltip } from './ui/Tooltip';
 import { Link } from '@tanstack/react-router';
+import { useOpenWorkbenchWidget } from '../useOpenWorkbenchWidget';
 
 /** Workbench top bar: brand, global Invoke command cluster, project tabs, layout + account controls. */
 export const TopBar = () => (
@@ -98,19 +117,206 @@ const BatchCountField = () => {
 };
 
 const QueueInfo = () => {
-  const { activeProject } = useWorkbench();
-  const activeCount = activeProject.queue.items.filter(
-    (item) => item.status === 'pending' || item.status === 'running'
-  ).length;
-  const totalCount = activeProject.queue.items.length;
+  const { activeProject, state } = useWorkbench();
+  const modelLoads = useModelLoads();
+  const openWorkbenchWidget = useOpenWorkbenchWidget();
+  const baseSummary = getQueueSummary(activeProject.queue.items);
+  const runningProgress = useQueueItemProgress(baseSummary.runningQueueItemId ?? '');
+  const summary = getQueueSummary(activeProject.queue.items, runningProgress);
+  const runningItem = summary.runningQueueItemId
+    ? activeProject.queue.items.find((item) => item.id === summary.runningQueueItemId)
+    : undefined;
+  const progressState = getQueueProgressBarState({
+    isConnected: state.backendConnection.status === 'connected',
+    isRunning: Boolean(runningItem),
+    loadingModelsCount: modelLoads.length,
+    progress: runningProgress,
+  });
+  const onClick = () => {
+    openWorkbenchWidget('queue');
+  };
 
   return (
-    <Badge variant="outline" h="9" borderColor="border.subtle" fontSize="xs" fontWeight="700" gap="1" px="2">
-      <ListOrderedIcon size="14" />
-      {activeCount}/{totalCount}
-    </Badge>
+    <Tooltip
+      content={
+        <QueueInfoTooltip
+          item={runningItem}
+          modelLoads={modelLoads}
+          progress={runningProgress}
+          total={summary.total}
+          current={summary.current}
+        />
+      }
+      contentProps={{ maxW: '22rem', p: '0' }}
+      openDelay={200}
+      showArrow
+    >
+      <Button
+        aria-label={`Queue progress ${summary.current} of ${summary.total}`}
+        variant="outline"
+        h="9"
+        borderColor="border.subtle"
+        fontSize="xs"
+        fontWeight="700"
+        gap="1"
+        overflow="hidden"
+        position="relative"
+        px="2"
+        onClick={onClick}
+      >
+        <Icon as={ListOrderedIcon} boxSize="4" flexShrink="0" />
+        {summary.current}/{summary.total}
+        <QueueBadgeProgressBar state={progressState} />
+      </Button>
+    </Tooltip>
   );
 };
+
+const QueueBadgeProgressBar = ({ state }: { state: ReturnType<typeof getQueueProgressBarState> }) => {
+  const isIdle = state.kind === 'idle';
+
+  return (
+    <Progress.Root
+      aria-label={isIdle ? 'Invoke progress idle' : 'Invoke progress'}
+      bottom="0"
+      colorPalette="accent"
+      h={1}
+      insetInline={0}
+      max={1}
+      pointerEvents="none"
+      position="absolute"
+      value={state.value}
+      visibility={state.kind !== 'idle' ? 'visible' : 'hidden'}
+    >
+      <Progress.Track bg={isIdle ? 'border.subtle' : 'bg.emphasized'} h="full">
+        <Progress.Range bg="accent.solid" />
+      </Progress.Track>
+    </Progress.Root>
+  );
+};
+
+const QueueInfoTooltip = ({
+  current,
+  item,
+  modelLoads,
+  progress,
+  total,
+}: {
+  current: number;
+  item?: QueueItem;
+  modelLoads: ModelLoadInfo[];
+  progress: QueueItemProgress | null;
+  total: number;
+}) => {
+  if (modelLoads.length > 0 && total === 0) {
+    return <ModelLoadsTooltipContent modelLoads={modelLoads} />;
+  }
+
+  if (total === 0) {
+    return (
+      <Stack gap="1" p="3">
+        <Text fontSize="xs" fontWeight="800">
+          Queue idle
+        </Text>
+        <Text color="fg.subtle" fontSize="2xs">
+          No active or pending generation batches.
+        </Text>
+      </Stack>
+    );
+  }
+
+  if (!item) {
+    return (
+      <Stack gap="2" p="3">
+        <Text fontSize="xs" fontWeight="800">
+          {modelLoads.length ? 'Loading models' : 'Waiting to start'}
+        </Text>
+        <Text color="fg.subtle" fontSize="2xs">
+          {total} image{total === 1 ? '' : 's'} queued.
+        </Text>
+        {modelLoads.length ? <ModelLoadList modelLoads={modelLoads} /> : null}
+      </Stack>
+    );
+  }
+
+  const generateValues = item.snapshot.widgetStates.generate.values;
+  const prompt = typeof generateValues.positivePrompt === 'string' ? generateValues.positivePrompt.trim() : '';
+  const expectedCount = getQueueItemExpectedImageCount(item);
+  const activeItemIndex = Math.min(expectedCount, Math.max(1, progress?.activeItemIndex ?? 1));
+  const activeBackendItemId = item.backendItemIds?.[activeItemIndex - 1];
+  const progressLabel = modelLoads.length
+    ? `Loading ${modelLoads.length} model${modelLoads.length === 1 ? '' : 's'}.`
+    : progress?.message?.trim() || 'Backend accepted batch; waiting for progress event.';
+
+  return (
+    <Stack gap="2" p="3" minW="18rem">
+      <HStack justify="space-between" gap="3">
+        <Text fontSize="xs" fontWeight="800">
+          Loading image {current}/{total}
+        </Text>
+        <Badge colorPalette="blue" fontSize="2xs">
+          {item.status}
+        </Badge>
+      </HStack>
+      <Stack gap="1">
+        <Text color="fg.subtle" fontSize="2xs">
+          {progressLabel}
+        </Text>
+        {modelLoads.length ? <ModelLoadList modelLoads={modelLoads} /> : null}
+        {progress?.percentage !== null && progress?.percentage !== undefined ? (
+          <Progress.Root aria-label="Current image progress" max={1} size="xs" value={progress.percentage}>
+            <Progress.Track>
+              <Progress.Range />
+            </Progress.Track>
+          </Progress.Root>
+        ) : null}
+      </Stack>
+      <Stack gap="1" color="fg.subtle" fontSize="2xs">
+        <Text>
+          Batch image {activeItemIndex}/{expectedCount}
+          {activeBackendItemId !== undefined ? ` · backend item ${activeBackendItemId}` : ''}
+        </Text>
+        <Text fontFamily="mono" truncate>
+          Queue item {item.id}
+        </Text>
+        {item.backendBatchId ? (
+          <Text fontFamily="mono" truncate>
+            Backend batch {item.backendBatchId}
+          </Text>
+        ) : null}
+        <Text truncate>
+          {getSourceLabel(item.snapshot.sourceId)} to {getDestinationLabel(item.snapshot.destination)} ·{' '}
+          {item.snapshot.graph.label || item.snapshot.graph.id}
+        </Text>
+      </Stack>
+      {prompt ? (
+        <Text color="fg.muted" fontSize="2xs" lineClamp={2}>
+          {prompt}
+        </Text>
+      ) : null}
+    </Stack>
+  );
+};
+
+const ModelLoadsTooltipContent = ({ modelLoads }: { modelLoads: ModelLoadInfo[] }) => (
+  <Stack gap="2" p="3" minW="18rem">
+    <Text fontSize="xs" fontWeight="800">
+      Loading {modelLoads.length} model{modelLoads.length === 1 ? '' : 's'}
+    </Text>
+    <ModelLoadList modelLoads={modelLoads} />
+  </Stack>
+);
+
+const ModelLoadList = ({ modelLoads }: { modelLoads: ModelLoadInfo[] }) => (
+  <Stack gap="0.5" color="fg.muted" fontSize="2xs">
+    {modelLoads.slice(0, 3).map((modelLoad, index) => (
+      <Text key={`${modelLoad.label}:${index}`} truncate>
+        {modelLoad.label}
+      </Text>
+    ))}
+    {modelLoads.length > 3 ? <Text>{modelLoads.length - 3} more...</Text> : null}
+  </Stack>
+);
 
 /**
  * Queue status + cancel cluster placeholder.
