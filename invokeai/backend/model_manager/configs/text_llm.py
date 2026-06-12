@@ -41,6 +41,16 @@ class TextLLM_Diffusers_Config(Diffusers_Config_Base, Config_Base):
         if not class_name.endswith("ForCausalLM"):
             raise NotAMatchError(f"model architecture '{class_name}' is not a causal language model")
 
+        # Defer to specialised text-encoder configs for models that have a
+        # dedicated wrapper. Without this both configs match the same
+        # directory and the user ends up with a `text_llm` entry even though
+        # a more specific type exists.
+        _SPECIALISED_CAUSAL_LM_ARCHITECTURES = {"Gemma2ForCausalLM"}
+        if class_name in _SPECIALISED_CAUSAL_LM_ARCHITECTURES:
+            raise NotAMatchError(
+                f"architecture '{class_name}' is handled by a dedicated encoder config, not TextLLM"
+            )
+
         # Verify tokenizer files exist to avoid runtime failures
         tokenizer_files = {"tokenizer.json", "tokenizer.model", "tokenizer_config.json"}
         if not any((mod.path / f).exists() for f in tokenizer_files):
