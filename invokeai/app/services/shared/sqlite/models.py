@@ -157,9 +157,7 @@ class WorkflowLibraryTable(SQLModel, table=True):
     category: Optional[str] = Field(default=None, sa_column=Column(Text, _generated("workflow", "$.meta.category")))
     name: Optional[str] = Field(default=None, sa_column=Column(Text, _generated("workflow", "$.name")))
     description: Optional[str] = Field(default=None, sa_column=Column(Text, _generated("workflow", "$.description")))
-    tags: Optional[str] = Field(
-        default=None, sa_column=Column(Text, _generated("workflow", "$.tags", unquote=False))
-    )
+    tags: Optional[str] = Field(default=None, sa_column=Column(Text, _generated("workflow", "$.tags", unquote=False)))
     user_id: str = Field(default="system")
     is_public: bool = Field(default=False)
 
@@ -208,7 +206,9 @@ class ModelTable(SQLModel, table=True):
     __tablename__ = "models"
 
     id: str = Field(primary_key=True)
-    config: str = Field(sa_column=Column(_blob(), nullable=False))  # JSON blob — all model metadata is extracted from this
+    config: str = Field(
+        sa_column=Column(_blob(), nullable=False)
+    )  # JSON blob — all model metadata is extracted from this
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"onupdate": datetime.utcnow})
     # Columns extracted from the `config` JSON blob. On SQLite the migrations create these as

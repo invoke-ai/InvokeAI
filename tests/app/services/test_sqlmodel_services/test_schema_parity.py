@@ -13,7 +13,6 @@ drift that has repeatedly broken this branch (image_subfolder, status_sequence, 
 GENERATED columns). They also assert ``create_all()`` DDL compiles on every target dialect.
 """
 
-
 import pytest
 from sqlalchemy import inspect
 from sqlalchemy.dialects import mysql, postgresql, sqlite
@@ -178,7 +177,9 @@ def test_copy_database_to_create_all_backend(tmp_path) -> None:
         s.add(ModelTable(id="m1", config=json.dumps(model_config)))
 
     # Target: create_all() backend (external path via db_url, a stand-in for MySQL/MariaDB).
-    target = init_db(config=InvokeAIAppConfig(db_url=f"sqlite:///{tmp_path / 'tgt.db'}"), logger=logger, image_files=image_files)
+    target = init_db(
+        config=InvokeAIAppConfig(db_url=f"sqlite:///{tmp_path / 'tgt.db'}"), logger=logger, image_files=image_files
+    )
 
     counts = copy_database(source, target, logger)
     assert counts["boards"] == 1

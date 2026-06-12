@@ -37,9 +37,7 @@ class SqliteDatabase:
     - `get_session()`: Returns a SQLModel Session for ORM-based queries.
     """
 
-    def __init__(
-        self, db_path: Path | None, logger: Logger, verbose: bool = False, db_url: str | None = None
-    ) -> None:
+    def __init__(self, db_path: Path | None, logger: Logger, verbose: bool = False, db_url: str | None = None) -> None:
         """Initializes the database. This is used internally by the class constructor.
 
         :param db_url: SQLAlchemy URL for a non-SQLite backend (e.g. ``mysql+pymysql://...``).
@@ -61,9 +59,7 @@ class SqliteDatabase:
         if db_url is not None:
             from sqlalchemy.engine import make_url
 
-            self._logger.info(
-                f"Initializing database engine: {make_url(db_url).render_as_string(hide_password=True)}"
-            )
+            self._logger.info(f"Initializing database engine: {make_url(db_url).render_as_string(hide_password=True)}")
             # pool_pre_ping recycles connections dropped by a networked server; the default
             # QueuePool (unlike SQLite's StaticPool) gives real concurrency on MySQL/Postgres.
             self._engine = create_engine(db_url, echo=self._verbose, pool_pre_ping=True)

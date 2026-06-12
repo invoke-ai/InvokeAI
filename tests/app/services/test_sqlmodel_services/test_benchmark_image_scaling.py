@@ -63,8 +63,14 @@ class SqlModelImageRecordStorage(_SqlModelImageRecordStorageBase):
         raise NotImplementedError("Not benchmarked")
 
     def get_image_names_by_date(
-        self, date, starred_first=True, order_dir=None, categories=None,
-        search_term=None, user_id=None, is_admin=False,
+        self,
+        date,
+        starred_first=True,
+        order_dir=None,
+        categories=None,
+        search_term=None,
+        user_id=None,
+        is_admin=False,
     ):
         raise NotImplementedError("Not benchmarked")
 
@@ -103,9 +109,9 @@ PAGE_LIMIT = int(os.environ.get("INVOKE_BENCH_PAGE_LIMIT", "20"))
 
 @dataclass
 class StepResult:
-    impl: str            # "sqlite" or "sqlmodel"
-    n_rows: int          # total rows in images table at this step
-    op: str              # which query
+    impl: str  # "sqlite" or "sqlmodel"
+    n_rows: int  # total rows in images table at this step
+    op: str  # which query
     median_ms: float
     p95_ms: float
     iters: int
@@ -200,10 +206,10 @@ def _op_intermediates_count(storage, n: int, c: int) -> Callable[[], None]:
 
 
 OPS: dict[str, Callable] = {
-    "get_by_pk":          _op_get_by_pk,
-    "get_many":           _op_get_many,
-    "get_image_names":    _op_get_image_names,
-    "intermediates_cnt":  _op_intermediates_count,
+    "get_by_pk": _op_get_by_pk,
+    "get_many": _op_get_many,
+    "get_image_names": _op_get_image_names,
+    "intermediates_cnt": _op_intermediates_count,
 }
 
 
@@ -223,12 +229,8 @@ def _format_table(results: list[StepResult]) -> str:
     for n in rows:
         cells = [f"{n:>8}"]
         for op in ops:
-            sqlite_r = next(
-                (r for r in results if r.n_rows == n and r.op == op and r.impl == "sqlite"), None
-            )
-            sqlmodel_r = next(
-                (r for r in results if r.n_rows == n and r.op == op and r.impl == "sqlmodel"), None
-            )
+            sqlite_r = next((r for r in results if r.n_rows == n and r.op == op and r.impl == "sqlite"), None)
+            sqlmodel_r = next((r for r in results if r.n_rows == n and r.op == op and r.impl == "sqlmodel"), None)
             s = f"{sqlite_r.median_ms:>7.2f}" if sqlite_r else "    n/a"
             m = f"{sqlmodel_r.median_ms:>7.2f}" if sqlmodel_r else "    n/a"
             cells.append(f"  {s} / {m}")  # ms median, sqlite/sqlmodel
@@ -263,9 +265,7 @@ def _write_markdown(path: Path, results: list[StepResult]) -> None:
             s = next((r for r in results if r.n_rows == n and r.op == op and r.impl == "sqlite"), None)
             m = next((r for r in results if r.n_rows == n and r.op == op and r.impl == "sqlmodel"), None)
             lines.append(
-                f"| {n} "
-                f"| {s.median_ms:.2f} | {s.p95_ms:.2f} "
-                f"| {m.median_ms:.2f} | {m.p95_ms:.2f} |"
+                f"| {n} | {s.median_ms:.2f} | {s.p95_ms:.2f} | {m.median_ms:.2f} | {m.p95_ms:.2f} |"
                 if s and m
                 else f"| {n} | n/a | n/a | n/a | n/a |"
             )
@@ -342,10 +342,7 @@ def test_image_query_scaling(tmp_path: Path) -> None:
                         iters=QUERY_ITERS,
                     )
                 )
-                print(
-                    f"  {impl_name:>8}  {op_name:>18}  "
-                    f"p50={median_ms:7.2f} ms  p95={p95_ms:7.2f} ms"
-                )
+                print(f"  {impl_name:>8}  {op_name:>18}  p50={median_ms:7.2f} ms  p95={p95_ms:7.2f} ms")
 
     # Report
     print("\n" + _format_table(results))

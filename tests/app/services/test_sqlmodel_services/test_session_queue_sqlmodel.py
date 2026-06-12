@@ -144,9 +144,7 @@ def test_get_highest_priority(session_queue: SqlModelSessionQueue) -> None:
 # ---- enqueue / dequeue ----
 
 
-def test_enqueue_batch_and_dequeue(
-    session_queue: SqlModelSessionQueue, batch_graph: Graph
-) -> None:
+def test_enqueue_batch_and_dequeue(session_queue: SqlModelSessionQueue, batch_graph: Graph) -> None:
     batch = Batch(graph=batch_graph, runs=2)
     result = asyncio.run(session_queue.enqueue_batch("default", batch, prepend=False))
     assert result.enqueued == 2
@@ -163,13 +161,9 @@ def test_enqueue_batch_and_dequeue(
     assert current is not None and current.item_id == dequeued.item_id
 
 
-def test_enqueue_batch_prepend_increases_priority(
-    session_queue: SqlModelSessionQueue, batch_graph: Graph
-) -> None:
+def test_enqueue_batch_prepend_increases_priority(session_queue: SqlModelSessionQueue, batch_graph: Graph) -> None:
     asyncio.run(session_queue.enqueue_batch("default", Batch(graph=batch_graph), prepend=False))
-    second = asyncio.run(
-        session_queue.enqueue_batch("default", Batch(graph=batch_graph), prepend=True)
-    )
+    second = asyncio.run(session_queue.enqueue_batch("default", Batch(graph=batch_graph), prepend=True))
     assert second.priority == 1
 
 
@@ -211,9 +205,7 @@ def test_delete_queue_item(session_queue: SqlModelSessionQueue) -> None:
         session_queue.get_queue_item(item_id)
 
 
-def test_set_queue_item_session(
-    session_queue: SqlModelSessionQueue, batch_graph: Graph
-) -> None:
+def test_set_queue_item_session(session_queue: SqlModelSessionQueue, batch_graph: Graph) -> None:
     item_id = _insert_raw(session_queue)
     new_session = GraphExecutionState(graph=batch_graph)
     session_queue.set_queue_item_session(item_id, new_session)
@@ -341,9 +333,7 @@ def test_list_queue_items_pagination(session_queue: SqlModelSessionQueue) -> Non
     assert len(page.items) == 2
     assert page.has_more is True
 
-    next_page = session_queue.list_queue_items(
-        "default", limit=2, priority=0, cursor=page.items[-1].item_id
-    )
+    next_page = session_queue.list_queue_items("default", limit=2, priority=0, cursor=page.items[-1].item_id)
     assert len(next_page.items) == 2
 
     # Make sure no item appears twice
@@ -358,9 +348,7 @@ def test_list_queue_items_filters_status_and_destination(
     _insert_raw(session_queue, destination="canvas", status="completed")
     _insert_raw(session_queue, destination="canvas", status="pending")
     _insert_raw(session_queue, destination="generate", status="completed")
-    page = session_queue.list_queue_items(
-        "default", limit=10, priority=0, status="completed", destination="canvas"
-    )
+    page = session_queue.list_queue_items("default", limit=10, priority=0, status="completed", destination="canvas")
     assert len(page.items) == 1
 
 
@@ -441,17 +429,13 @@ def test_get_counts_by_destination(session_queue: SqlModelSessionQueue) -> None:
 # ---- retry ----
 
 
-def test_retry_items_by_id_skips_non_terminal(
-    session_queue: SqlModelSessionQueue, batch_graph: Graph
-) -> None:
+def test_retry_items_by_id_skips_non_terminal(session_queue: SqlModelSessionQueue, batch_graph: Graph) -> None:
     pending_id = _insert_raw(session_queue, status="pending")
     result = session_queue.retry_items_by_id("default", [pending_id])
     assert result.retried_item_ids == []
 
 
-def test_retry_items_by_id_clones_failed(
-    session_queue: SqlModelSessionQueue, batch_graph: Graph
-) -> None:
+def test_retry_items_by_id_clones_failed(session_queue: SqlModelSessionQueue, batch_graph: Graph) -> None:
     # Use enqueue_batch so we get a valid `session` JSON, then fail it
     batch = Batch(graph=batch_graph, runs=1)
     enq = asyncio.run(session_queue.enqueue_batch("default", batch, prepend=False))
