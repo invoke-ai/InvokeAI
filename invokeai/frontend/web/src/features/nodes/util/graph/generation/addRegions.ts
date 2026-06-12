@@ -85,6 +85,7 @@ export const addRegions = async ({
 }: AddRegionsArg): Promise<AddedRegionResult[]> => {
   const isSDXL = model.base === 'sdxl';
   const isFLUX = model.base === 'flux';
+  const isFlux2 = model.base === 'flux2';
   const isZImage = model.base === 'z-image';
   const isAnima = model.base === 'anima';
 
@@ -128,7 +129,12 @@ export const addRegions = async ({
       // The main positive conditioning node
       result.addedPositivePrompt = true;
       let regionalPosCond: Invocation<
-        'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder' | 'z_image_text_encoder' | 'anima_text_encoder'
+        | 'compel'
+        | 'sdxl_compel_prompt'
+        | 'flux_text_encoder'
+        | 'flux2_klein_text_encoder'
+        | 'z_image_text_encoder'
+        | 'anima_text_encoder'
       >;
       if (isSDXL) {
         regionalPosCond = g.addNode({
@@ -140,6 +146,12 @@ export const addRegions = async ({
       } else if (isFLUX) {
         regionalPosCond = g.addNode({
           type: 'flux_text_encoder',
+          id: getPrefixedId('prompt_region_positive_cond'),
+          prompt: region.positivePrompt,
+        });
+      } else if (isFlux2) {
+        regionalPosCond = g.addNode({
+          type: 'flux2_klein_text_encoder',
           id: getPrefixedId('prompt_region_positive_cond'),
           prompt: region.positivePrompt,
         });
@@ -181,6 +193,12 @@ export const addRegions = async ({
         }
       } else if (posCond.type === 'flux_text_encoder') {
         for (const edge of g.getEdgesTo(posCond, ['clip', 't5_encoder', 't5_max_seq_len', 'mask'])) {
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalPosCond.id;
+          g.addEdgeFromObj(clone);
+        }
+      } else if (posCond.type === 'flux2_klein_text_encoder') {
+        for (const edge of g.getEdgesTo(posCond, ['qwen3_encoder', 'max_seq_len', 'mask'])) {
           const clone = deepClone(edge);
           clone.destination.node_id = regionalPosCond.id;
           g.addEdgeFromObj(clone);
