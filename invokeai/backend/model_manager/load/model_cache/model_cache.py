@@ -619,9 +619,13 @@ class ModelCache:
         loaded_percent = model_cur_vram_bytes / model_total_bytes if model_total_bytes > 0 else 0
         # Use the model's actual compute_device for logging, not the cache's default
         model_device = cache_entry.cached_model.compute_device
+        if model_device.type == "cuda":
+            device_label = f"cuda device #{model_device.index}" if model_device.index is not None else "cuda device"
+        else:
+            device_label = f"{model_device.type} device"
         self._logger.info(
             f"Loaded model '{cache_entry.key}' ({cache_entry.cached_model.model.__class__.__name__}) onto "
-            f"{model_device.type} device in {(time.time() - start_time):.2f}s. "
+            f"{device_label} in {(time.time() - start_time):.2f}s. "
             f"Total model size: {model_total_bytes / MB:.2f}MB, "
             f"VRAM: {model_cur_vram_bytes / MB:.2f}MB ({loaded_percent:.1%})"
         )

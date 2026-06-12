@@ -294,7 +294,7 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             assert isinstance(transformer, CogView4Transformer2DModel)
 
             # Denoising loop
-            for step_idx in tqdm(range(total_steps)):
+            for step_idx in tqdm(range(total_steps), desc=f"Denoising{TorchDevice.get_session_device_label()}"):
                 t_curr = timesteps[step_idx]
                 sigma_curr = sigmas[step_idx]
                 sigma_prev = sigmas[step_idx + 1]

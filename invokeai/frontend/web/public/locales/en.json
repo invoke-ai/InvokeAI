@@ -443,6 +443,7 @@
         "next": "Next",
         "status": "Status",
         "total": "Total",
+        "gpu": "GPU #",
         "time": "Time",
         "credits": "Credits",
         "pending": "Pending",

@@ -16115,6 +16115,12 @@ export type components = {
              * @default null
              */
             image: components["schemas"]["ProgressImage"] | null;
+            /**
+             * Device
+             * @description The device processing this session, e.g. 'cuda:1' (set only when running on a CUDA GPU)
+             * @default null
+             */
+            device: string | null;
         };
         /**
          * InvocationStartedEvent
@@ -28179,6 +28185,11 @@ export type components = {
              * @description The item_id of the queue item that this item was retried from
              */
             retried_from_item_id?: number | null;
+            /**
+             * Device
+             * @description The device that processed this queue item, e.g. 'cuda:1' (set only when running on a CUDA GPU)
+             */
+            device?: string | null;
             /** @description The fully-populated session to be executed */
             session: components["schemas"]["GraphExecutionState"];
             /** @description The workflow associated with this queue item */

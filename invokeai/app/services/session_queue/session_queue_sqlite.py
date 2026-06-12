@@ -216,7 +216,7 @@ class SqliteSessionQueue(SessionQueueBase):
         self.__invoker.services.events.emit_batch_enqueued(enqueue_result, user_id=user_id)
         return enqueue_result
 
-    def dequeue(self) -> Optional[SessionQueueItem]:
+    def dequeue(self, device: Optional[str] = None) -> Optional[SessionQueueItem]:
         # Hold the dequeue lock across the select-then-claim so concurrent workers (multi-GPU)
         # cannot select and claim the same pending item. `_set_queue_item_status` already no-ops
         # if the item was concurrently moved to a terminal state (e.g. canceled), so we only need
@@ -242,7 +242,8 @@ class SqliteSessionQueue(SessionQueueBase):
             if result is None:
                 return None
             queue_item = SessionQueueItem.queue_item_from_dict(dict(result))
-            queue_item = self._set_queue_item_status(item_id=queue_item.item_id, status="in_progress")
+            # Record the claiming worker's device so the UI can label the item by GPU.
+            queue_item = self._set_queue_item_status(item_id=queue_item.item_id, status="in_progress", device=device)
         return queue_item
 
     def get_next(self, queue_id: str) -> Optional[SessionQueueItem]:
@@ -299,6 +300,7 @@ class SqliteSessionQueue(SessionQueueBase):
         error_type: Optional[str] = None,
         error_message: Optional[str] = None,
         error_traceback: Optional[str] = None,
+        device: Optional[str] = None,
     ) -> SessionQueueItem:
         with self._db.transaction() as cursor:
             cursor.execute(
@@ -320,10 +322,10 @@ class SqliteSessionQueue(SessionQueueBase):
             cursor.execute(
                 """--sql
                 UPDATE session_queue
-                SET status = ?, status_sequence = COALESCE(status_sequence, 0) + 1, error_type = ?, error_message = ?, error_traceback = ?
+                SET status = ?, status_sequence = COALESCE(status_sequence, 0) + 1, error_type = ?, error_message = ?, error_traceback = ?, device = COALESCE(?, device)
                 WHERE item_id = ?
                 """,
-                (status, error_type, error_message, error_traceback, item_id),
+                (status, error_type, error_message, error_traceback, device, item_id),
             )
 
         queue_item = self.get_queue_item(item_id)

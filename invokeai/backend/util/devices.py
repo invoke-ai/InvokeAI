@@ -70,6 +70,23 @@ class TorchDevice:
             del cls._session_device.device
 
     @classmethod
+    def get_session_device_index(cls) -> Optional[int]:
+        """Return the CUDA index of the calling thread's effective device, or None if not on CUDA.
+
+        Resolves the thread-local session device when a worker has pinned one (multi-GPU), otherwise
+        falls back to the globally-configured device. Used to annotate logs/progress with the GPU
+        number so concurrent sessions can be told apart.
+        """
+        device = cls.get_session_device() or cls.choose_torch_device()
+        return device.index if device.type == "cuda" else None
+
+    @classmethod
+    def get_session_device_label(cls) -> str:
+        """Return a ``" (#N)"`` suffix for the calling thread's CUDA device, or ``""`` when not on CUDA."""
+        index = cls.get_session_device_index()
+        return f" (#{index})" if index is not None else ""
+
+    @classmethod
     def choose_torch_device(cls) -> torch.device:
         """Return the torch.device to use for accelerated inference."""
         # A worker thread pinned to a specific GPU takes precedence over the global config.

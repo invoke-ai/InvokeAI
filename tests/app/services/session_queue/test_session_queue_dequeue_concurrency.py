@@ -68,3 +68,23 @@ def test_concurrent_dequeue_never_claims_same_item_twice(session_queue: SqliteSe
     # Every item is claimed exactly once: no duplicates, none lost.
     assert len(claimed_ids) == item_count
     assert len(set(claimed_ids)) == item_count
+
+
+def test_dequeue_records_processing_device(session_queue: SqliteSessionQueue) -> None:
+    _insert_queue_item(session_queue)
+
+    item = session_queue.dequeue(device="cuda:1")
+    assert item is not None
+    assert item.device == "cuda:1"
+
+    # The device persists across later status transitions (which pass device=None).
+    completed = session_queue._set_queue_item_status(item.item_id, "completed")
+    assert completed.device == "cuda:1"
+
+
+def test_dequeue_without_device_leaves_device_unset(session_queue: SqliteSessionQueue) -> None:
+    _insert_queue_item(session_queue)
+
+    item = session_queue.dequeue()
+    assert item is not None
+    assert item.device is None

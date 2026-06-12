@@ -529,8 +529,11 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         break
 
                     # Get the next session to process. dequeue() atomically claims the item, so concurrent
-                    # workers never receive the same item.
-                    worker.queue_item = self._invoker.services.session_queue.dequeue()
+                    # workers never receive the same item. Pass this worker's device so the item is
+                    # tagged with the GPU that ran it (None in single-device/legacy mode).
+                    worker.queue_item = self._invoker.services.session_queue.dequeue(
+                        device=str(worker.device) if worker.device is not None else None
+                    )
 
                     if worker.queue_item is None:
                         # The queue was empty, wait for next polling interval or event to try again
