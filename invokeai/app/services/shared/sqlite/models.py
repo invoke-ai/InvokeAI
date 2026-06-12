@@ -10,6 +10,8 @@ from typing import Optional
 
 from sqlalchemy import Column, Computed, Integer, Text
 from sqlalchemy.dialects import mysql
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.sql.expression import FunctionElement
 from sqlalchemy.types import TypeEngine
 from sqlmodel import Field, SQLModel
 
@@ -25,20 +27,45 @@ def _blob() -> TypeEngine[str]:
     return Text().with_variant(mysql.LONGTEXT(), "mysql")
 
 
-def _generated(source: str, path: str, *, unquote: bool = True) -> Computed:
-    """A DB-generated column that mirrors the SQLite ``GENERATED ALWAYS`` columns.
+class _JsonField(FunctionElement):
+    """Dialect-aware JSON scalar extraction for GENERATED columns.
 
-    The raw-SQL migrations own the SQLite schema (these column defs are unused there);
-    this expression is only emitted by ``create_all()`` on MySQL/MariaDB/Postgres. SQLite's
-    ``json_extract`` auto-unquotes scalars, so for scalar string columns we wrap MySQL's
-    ``json_extract`` in ``json_unquote`` to get the same plain value (e.g. ``sdxl`` not
-    ``"sdxl"``); for arrays/numbers we keep the raw ``json_extract`` output. ``persisted``
-    (STORED) so Postgres — which has no VIRTUAL generated columns — can also compile it.
-
-    Returns a fresh instance per call — a ``Computed`` may not be shared across columns.
+    Mirrors the SQLite ``GENERATED ALWAYS AS (json_extract(...))`` columns the migrations
+    create. SQLite's ``json_extract`` auto-unquotes scalars; MySQL's does not, so on MySQL we
+    wrap it in ``json_unquote`` to get the same plain value (``sdxl`` not ``"sdxl"``). Arrays
+    and numbers (``unquote=False``) use the raw ``json_extract`` on both. Only emitted by
+    ``create_all()`` on non-SQLite backends — the SQLite schema is owned by the migrations.
     """
-    inner = f"json_extract({source}, '{path}')"
-    return Computed(f"json_unquote({inner})" if unquote else inner, persisted=True)
+
+    inherit_cache = True
+
+    def __init__(self, source: str, path: str, unquote: bool) -> None:
+        self.source = source
+        self.path = path
+        self.unquote = unquote
+        super().__init__()
+
+
+@compiles(_JsonField)
+def _compile_json_field(element: _JsonField, compiler, **kw) -> str:  # type: ignore[no-untyped-def]
+    # Default (SQLite/Postgres): json_extract already yields the bare scalar on SQLite.
+    return f"json_extract({element.source}, '{element.path}')"
+
+
+@compiles(_JsonField, "mysql")
+def _compile_json_field_mysql(element: _JsonField, compiler, **kw) -> str:  # type: ignore[no-untyped-def]
+    inner = f"json_extract({element.source}, '{element.path}')"
+    return f"json_unquote({inner})" if element.unquote else inner
+
+
+def _generated(source: str, path: str, *, unquote: bool = True) -> Computed:
+    """A DB-generated column mirroring the SQLite ``GENERATED ALWAYS`` columns, dialect-aware.
+
+    Only emitted by ``create_all()`` (MySQL/MariaDB/Postgres); on SQLite the migrations own
+    the table. ``persisted`` (STORED) so Postgres — which has no VIRTUAL generated columns —
+    can also compile it. Returns a fresh instance per call (a ``Computed`` may not be shared).
+    """
+    return Computed(_JsonField(source, path, unquote), persisted=True)
 
 
 # --- boards ---
@@ -136,18 +163,6 @@ class WorkflowLibraryTable(SQLModel, table=True):
     is_public: bool = Field(default=False)
 
 
-class WorkflowImageTable(SQLModel, table=True):
-    """Mirrors the `workflow_images` junction table."""
-
-    __tablename__ = "workflow_images"
-
-    image_name: str = Field(primary_key=True, foreign_key="images.image_name")
-    workflow_id: str = Field(foreign_key="workflow_library.workflow_id")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"onupdate": datetime.utcnow})
-    deleted_at: Optional[datetime] = Field(default=None)
-
-
 # --- session queue ---
 
 
@@ -217,15 +232,6 @@ class ModelTable(SQLModel, table=True):
     file_size: Optional[int] = Field(
         default=None, sa_column=Column(Integer, _generated("config", "$.file_size", unquote=False))
     )
-
-
-class ModelManagerMetadataTable(SQLModel, table=True):
-    """Mirrors the `model_manager_metadata` table."""
-
-    __tablename__ = "model_manager_metadata"
-
-    metadata_key: str = Field(primary_key=True)
-    metadata_value: str
 
 
 class ModelRelationshipTable(SQLModel, table=True):

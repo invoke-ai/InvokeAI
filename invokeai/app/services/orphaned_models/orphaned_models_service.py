@@ -10,8 +10,10 @@ from pathlib import Path
 from typing import Set
 
 from pydantic import BaseModel, Field
+from sqlmodel import select
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.shared.sqlite.models import ModelTable
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 
@@ -161,36 +163,37 @@ class OrphanedModelsService:
         """Get the set of all model directories from the database."""
         model_directories = set()
 
-        with self._db.transaction() as cursor:
-            cursor.execute("SELECT config FROM models")
-            rows = cursor.fetchall()
+        # Read via the ORM so this works on every backend (the raw transaction()/cursor path
+        # is SQLite-only). The config JSON is parsed in Python, exactly as before.
+        with self._db.get_readonly_session() as session:
+            configs = session.exec(select(ModelTable.config)).all()
 
-            for row in rows:
-                try:
-                    config = json.loads(row[0])
-                    if "path" in config and config["path"]:
-                        path_str = config["path"]
-                        path = Path(path_str)
+        for config_json in configs:
+            try:
+                config = json.loads(config_json)
+                if "path" in config and config["path"]:
+                    path_str = config["path"]
+                    path = Path(path_str)
 
-                        # If the path is relative, resolve it relative to models_dir
-                        if not path.is_absolute():
-                            full_path = (models_dir / path).resolve()
-                        else:
-                            full_path = path.resolve()
+                    # If the path is relative, resolve it relative to models_dir
+                    if not path.is_absolute():
+                        full_path = (models_dir / path).resolve()
+                    else:
+                        full_path = path.resolve()
 
-                        # Extract the top-level directory under models_dir
-                        try:
-                            rel_path = full_path.relative_to(models_dir)
-                            if rel_path.parts:
-                                top_level_dir = models_dir / rel_path.parts[0]
-                                model_directories.add(top_level_dir.resolve())
-                        except ValueError:
-                            # Path is not relative to models_dir
-                            model_directories.add(full_path)
+                    # Extract the top-level directory under models_dir
+                    try:
+                        rel_path = full_path.relative_to(models_dir)
+                        if rel_path.parts:
+                            top_level_dir = models_dir / rel_path.parts[0]
+                            model_directories.add(top_level_dir.resolve())
+                    except ValueError:
+                        # Path is not relative to models_dir
+                        model_directories.add(full_path)
 
-                except (json.JSONDecodeError, KeyError, TypeError):
-                    # Skip invalid model configs
-                    continue
+            except (json.JSONDecodeError, KeyError, TypeError):
+                # Skip invalid model configs
+                continue
 
         return model_directories
 

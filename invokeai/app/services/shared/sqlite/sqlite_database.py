@@ -33,12 +33,36 @@ class SqliteDatabase:
     - `get_session()`: Returns a SQLModel Session for ORM-based queries.
     """
 
-    def __init__(self, db_path: Path | None, logger: Logger, verbose: bool = False) -> None:
-        """Initializes the database. This is used internally by the class constructor."""
+    def __init__(
+        self, db_path: Path | None, logger: Logger, verbose: bool = False, db_url: str | None = None
+    ) -> None:
+        """Initializes the database. This is used internally by the class constructor.
+
+        :param db_url: SQLAlchemy URL for a non-SQLite backend (e.g. ``mysql+pymysql://...``).
+            When provided, only the SQLAlchemy engine is created — no raw sqlite3 connection,
+            PRAGMAs or migrations — and the schema is created from ``SQLModel.metadata`` by
+            ``init_db``. When ``None`` (the default), the existing SQLite behaviour is used.
+        """
         self._logger = logger
         self._db_path = db_path
         self._verbose = verbose
+        self._db_url = db_url
+        self._is_sqlite = db_url is None
         self._lock = threading.RLock()
+        # Raw sqlite3 connection — only used on the SQLite path (migrations, VACUUM,
+        # transaction()). Non-SQLite backends use the SQLAlchemy engine exclusively.
+        self._conn: sqlite3.Connection | None = None
+
+        if db_url is not None:
+            from sqlalchemy.engine import make_url
+
+            self._logger.info(
+                f"Initializing database engine: {make_url(db_url).render_as_string(hide_password=True)}"
+            )
+            # pool_pre_ping recycles connections dropped by a networked server; the default
+            # QueuePool (unlike SQLite's StaticPool) gives real concurrency on MySQL/Postgres.
+            self._engine = create_engine(db_url, echo=self._verbose, pool_pre_ping=True)
+            return
 
         if not self._db_path:
             logger.info("Initializing in-memory database")
@@ -159,12 +183,28 @@ class SqliteDatabase:
         with Session(self._engine, expire_on_commit=False, autoflush=False) as session:
             yield session
 
+    def create_tables(self) -> None:
+        """Creates all tables from ``SQLModel.metadata`` (used to bootstrap non-SQLite backends).
+
+        On SQLite the schema is owned by the raw-SQL migrations, so this is only used by
+        ``init_db`` for MySQL/MariaDB/Postgres, which have no migration history.
+        """
+        # Imported here to register all table models on SQLModel.metadata and avoid an
+        # import cycle at module load.
+        from invokeai.app.services.shared.sqlite.models import SQLModel
+
+        SQLModel.metadata.create_all(self._engine)
+
     @contextmanager
     def transaction(self) -> Generator[sqlite3.Cursor, None, None]:
         """
         Thread-safe context manager for DB work.
         Acquires the RLock, yields a Cursor, then commits or rolls back.
+
+        SQLite-only: raw cursors are not available on other backends — use get_session().
         """
+        if self._conn is None:
+            raise RuntimeError("transaction() is only available on the SQLite backend; use get_session() instead.")
         with self._lock:
             cursor = self._conn.cursor()
             try:
