@@ -69,8 +69,7 @@ class SqlModelSessionQueue(SessionQueueBase):
             deleted = self._q.queue_prune_terminal_to_limit(DEFAULT_QUEUE_ID, config.max_queue_history)
             if deleted > 0:
                 self.__invoker.services.logger.info(
-                    f"Pruned {deleted} completed/failed/canceled queue items "
-                    f"(kept up to {config.max_queue_history})"
+                    f"Pruned {deleted} completed/failed/canceled queue items (kept up to {config.max_queue_history})"
                 )
 
     # region: enqueue / dequeue / read single
@@ -266,9 +265,7 @@ class SqlModelSessionQueue(SessionQueueBase):
             self._set_queue_item_status(current_queue_item.item_id, "canceled")
         return CancelByQueueIDResult(canceled=count)
 
-    def cancel_all_except_current(
-        self, queue_id: str, user_id: Optional[str] = None
-    ) -> CancelAllExceptCurrentResult:
+    def cancel_all_except_current(self, queue_id: str, user_id: Optional[str] = None) -> CancelAllExceptCurrentResult:
         return CancelAllExceptCurrentResult(canceled=self._q.queue_cancel_pending(queue_id, user_id))
 
     # endregion
@@ -368,16 +365,12 @@ class SqlModelSessionQueue(SessionQueueBase):
             field_values_json = (
                 json.dumps(queue_item.field_values, default=to_jsonable_python) if queue_item.field_values else None
             )
-            workflow_json = (
-                json.dumps(queue_item.workflow, default=to_jsonable_python) if queue_item.workflow else None
-            )
+            workflow_json = json.dumps(queue_item.workflow, default=to_jsonable_python) if queue_item.workflow else None
             cloned_session = GraphExecutionState(graph=queue_item.session.graph)
             cloned_session_json = cloned_session.model_dump_json(warnings=False, exclude_none=True)
 
             retried_from_item_id = (
-                queue_item.retried_from_item_id
-                if queue_item.retried_from_item_id is not None
-                else queue_item.item_id
+                queue_item.retried_from_item_id if queue_item.retried_from_item_id is not None else queue_item.item_id
             )
 
             values_to_insert.append(

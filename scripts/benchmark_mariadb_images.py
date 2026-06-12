@@ -34,7 +34,6 @@ from pathlib import Path
 import pymysql
 import pymysql.cursors
 
-
 # ---------------------------------------------------------------------------
 # Schema — mirrors invokeai/app/services/shared/sqlite_migrator/migrations/migration_1.py
 # ---------------------------------------------------------------------------
@@ -142,10 +141,7 @@ INSERT_SQL = (
 
 
 def insert_batch(conn: pymysql.connections.Connection, start: int, count: int) -> None:
-    rows = [
-        (f"img_{i:08d}.png", 1 if i % 5 == 0 else 0, 1 if i % 10 == 0 else 0)
-        for i in range(start, start + count)
-    ]
+    rows = [(f"img_{i:08d}.png", 1 if i % 5 == 0 else 0, 1 if i % 10 == 0 else 0) for i in range(start, start + count)]
     with conn.cursor() as cur:
         # executemany is much faster than per-row INSERTs in pymysql.
         cur.executemany(INSERT_SQL, rows)
@@ -290,9 +286,9 @@ def main() -> None:
     print(f"[mariadb-bench] steps={steps}  iters={args.iters}  page={args.page}")
 
     ops = {
-        "get_by_pk":         lambda n, c: run_get_by_pk(conn, n, c),
-        "get_many":          lambda n, c: run_get_many(conn, n, c, args.page),
-        "get_image_names":   lambda n, c: run_get_image_names(conn, n, c),
+        "get_by_pk": lambda n, c: run_get_by_pk(conn, n, c),
+        "get_many": lambda n, c: run_get_many(conn, n, c, args.page),
+        "get_image_names": lambda n, c: run_get_image_names(conn, n, c),
         "intermediates_cnt": lambda n, c: run_intermediates_count(conn, n, c),
     }
 
@@ -319,7 +315,9 @@ def main() -> None:
                 samples_ms.append((time.perf_counter() - t_start) * 1000.0)
             median_ms = statistics.median(samples_ms)
             p95_ms = _percentile(samples_ms, 95)
-            results.append(StepResult(n_rows=inserted, op=op_name, median_ms=median_ms, p95_ms=p95_ms, iters=args.iters))
+            results.append(
+                StepResult(n_rows=inserted, op=op_name, median_ms=median_ms, p95_ms=p95_ms, iters=args.iters)
+            )
             print(f"  mariadb  {op_name:>18}  p50={median_ms:7.2f} ms  p95={p95_ms:7.2f} ms")
 
     csv_path = args.report_dir / "mariadb_scaling_benchmark.csv"

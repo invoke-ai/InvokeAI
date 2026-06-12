@@ -31,7 +31,6 @@ from typing import Callable
 import pymysql
 import pymysql.cursors
 
-
 # ---------------------------------------------------------------------------
 # Workload (subset of the main MariaDB bench, identical SQL)
 # ---------------------------------------------------------------------------
@@ -120,8 +119,7 @@ def run_read_ops(conn: pymysql.connections.Connection, n_rows: int, iters: int, 
         # Warm up once
         fn(0)
         p50, p95, p99 = _time_op(op_name, fn, iters)
-        results.append(OpResult(transport=transport, op=op_name, iters=iters,
-                                p50_ms=p50, p95_ms=p95, p99_ms=p99))
+        results.append(OpResult(transport=transport, op=op_name, iters=iters, p50_ms=p50, p95_ms=p95, p99_ms=p99))
         print(f"  {transport:>6}  {op_name:>18}  p50={p50:7.3f} ms  p95={p95:7.3f} ms  p99={p99:7.3f} ms")
 
     cur.close()
@@ -154,19 +152,32 @@ def main() -> None:
     ap.add_argument("--user", default="root")
     ap.add_argument("--password", default="bench")
     ap.add_argument("--database", default="invokeai_bench")
-    ap.add_argument("--rows-target", type=int, default=100_000,
-                    help="Expected row count in the images table (for offset calculation)")
+    ap.add_argument(
+        "--rows-target",
+        type=int,
+        default=100_000,
+        help="Expected row count in the images table (for offset calculation)",
+    )
     ap.add_argument("--read-iters", type=int, default=50, help="Iterations per read op")
     ap.add_argument("--insert-rows", type=int, default=500, help="Rows for the INSERT benchmark")
     args = ap.parse_args()
 
     conn_tcp = pymysql.connect(
-        host=args.host, port=args.port, user=args.user, password=args.password, database=args.database,
-        autocommit=False, cursorclass=pymysql.cursors.Cursor,
+        host=args.host,
+        port=args.port,
+        user=args.user,
+        password=args.password,
+        database=args.database,
+        autocommit=False,
+        cursorclass=pymysql.cursors.Cursor,
     )
     conn_sock = pymysql.connect(
-        unix_socket=args.socket, user=args.user, password=args.password, database=args.database,
-        autocommit=False, cursorclass=pymysql.cursors.Cursor,
+        unix_socket=args.socket,
+        user=args.user,
+        password=args.password,
+        database=args.database,
+        autocommit=False,
+        cursorclass=pymysql.cursors.Cursor,
     )
 
     # Verify row count so the random PK lookups hit existing rows.
@@ -201,7 +212,7 @@ def main() -> None:
     print("\n=== Socket vs TCP — speedup (TCP_p50 / socket_p50) ===")
     print(f"{'op':>20}  {'tcp p50 ms':>12}  {'sock p50 ms':>12}  {'speedup':>10}")
     print("-" * 60)
-    pairs = list(zip(tcp_reads, sock_reads)) + [(tcp_ins, sock_ins)]
+    pairs = list(zip(tcp_reads, sock_reads, strict=False)) + [(tcp_ins, sock_ins)]
     for t, s in pairs:
         speedup = t.p50_ms / s.p50_ms if s.p50_ms > 0 else float("inf")
         print(f"{t.op:>20}  {t.p50_ms:>12.3f}  {s.p50_ms:>12.3f}  {speedup:>9.2f}x")
