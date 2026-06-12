@@ -413,13 +413,13 @@ class SqlModelSessionQueue(SessionQueueBase):
         with self._db.get_session() as session:
             session.execute(delete(SessionQueueTable).where(SessionQueueTable.item_id == item_id))
 
-    def set_queue_item_session(self, item_id: int, session_state: GraphExecutionState) -> SessionQueueItem:
+    def set_queue_item_session(self, item_id: int, session: GraphExecutionState) -> SessionQueueItem:
         # Use exclude_none so we don't end up with a bunch of nulls in the graph - this can cause
         # validation errors when the graph is loaded. Graph execution occurs purely in memory - the
         # session saved here is not referenced during execution.
-        session_json = session_state.model_dump_json(warnings=False, exclude_none=True)
-        with self._db.get_session() as session:
-            session.execute(
+        session_json = session.model_dump_json(warnings=False, exclude_none=True)
+        with self._db.get_session() as db_session:
+            db_session.execute(
                 update(SessionQueueTable)
                 .where(SessionQueueTable.item_id == item_id)
                 .values(session=session_json)
@@ -696,7 +696,12 @@ class SqlModelSessionQueue(SessionQueueBase):
 
     # region: aggregations
 
-    def get_queue_status(self, queue_id: str, user_id: Optional[str] = None) -> SessionQueueStatus:
+    def get_queue_status(
+        self,
+        queue_id: str,
+        user_id: Optional[str] = None,
+        acting_user_id: Optional[str] = None,
+    ) -> SessionQueueStatus:
         stmt = (
             select(SessionQueueTable.status, func.count())
             .where(SessionQueueTable.queue_id == queue_id)
@@ -712,9 +717,11 @@ class SqlModelSessionQueue(SessionQueueBase):
         total = sum(int(row[1] or 0) for row in rows)
         counts: dict[str, int] = {row[0]: int(row[1]) for row in rows}
 
-        # For non-admin users, hide current item details if they don't own it
+        # user_id filters the counts; acting_user_id decides current-item redaction (who is asking),
+        # falling back to user_id. Hide current item details for non-admins who don't own it.
+        owner_user_id = user_id if acting_user_id is None else acting_user_id
         show_current_item = current_item is not None and (
-            user_id is None or current_item.user_id == user_id
+            owner_user_id is None or current_item.user_id == owner_user_id
         )
 
         return SessionQueueStatus(

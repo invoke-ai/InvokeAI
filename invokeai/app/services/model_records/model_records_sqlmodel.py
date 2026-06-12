@@ -20,9 +20,26 @@ from invokeai.app.services.model_records.model_records_base import (
 )
 from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.app.services.shared.sqlite.models import ModelTable
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
+
+# Columns to ORDER BY for each ModelRecordOrderBy (the SQLite GENERATED / create_all Computed columns).
+_ORDER_BY_COLUMNS = {
+    ModelRecordOrderBy.Type: ["type"],
+    ModelRecordOrderBy.Base: ["base"],
+    ModelRecordOrderBy.Name: ["name"],
+    ModelRecordOrderBy.Format: ["format"],
+}
+_DEFAULT_ORDER_COLUMNS = ["type", "base", "name", "format"]
+
+
+def _order_columns(order_by: ModelRecordOrderBy, direction: SQLiteDirection):
+    """Build the ORDER BY clause for the given key + direction over the generated columns."""
+    names = _ORDER_BY_COLUMNS.get(order_by, _DEFAULT_ORDER_COLUMNS)
+    descending = direction == SQLiteDirection.Descending
+    return [literal_column(n).desc() if descending else literal_column(n).asc() for n in names]
 
 # Mapping from ModelRecordOrderBy to column expressions
 _ORDER_COLS = {
@@ -128,6 +145,7 @@ class ModelRecordServiceSqlModel(ModelRecordServiceBase):
         model_type: Optional[ModelType] = None,
         model_format: Optional[ModelFormat] = None,
         order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default,
+        direction: SQLiteDirection = SQLiteDirection.Ascending,
     ) -> List[AnyModelConfig]:
         with self._db.get_readonly_session() as session:
             stmt = select(ModelTable)
@@ -142,21 +160,7 @@ class ModelRecordServiceSqlModel(ModelRecordServiceBase):
                 stmt = stmt.where(literal_column("format") == model_format)
 
             # Apply ordering via the generated columns
-            if order_by == ModelRecordOrderBy.Default:
-                stmt = stmt.order_by(
-                    literal_column("type"),
-                    literal_column("base"),
-                    literal_column("name"),
-                    literal_column("format"),
-                )
-            elif order_by == ModelRecordOrderBy.Type:
-                stmt = stmt.order_by(literal_column("type"))
-            elif order_by == ModelRecordOrderBy.Base:
-                stmt = stmt.order_by(literal_column("base"))
-            elif order_by == ModelRecordOrderBy.Name:
-                stmt = stmt.order_by(literal_column("name"))
-            elif order_by == ModelRecordOrderBy.Format:
-                stmt = stmt.order_by(literal_column("format"))
+            stmt = stmt.order_by(*_order_columns(order_by, direction))
 
             rows = session.exec(stmt).all()
             # Extract config strings while still in the session
@@ -196,36 +200,41 @@ class ModelRecordServiceSqlModel(ModelRecordServiceBase):
         return [ModelConfigFactory.from_dict(json.loads(c)) for c in configs]
 
     def list_models(
-        self, page: int = 0, per_page: int = 10, order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default
+        self,
+        page: int = 0,
+        per_page: int = 10,
+        order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default,
+        direction: SQLiteDirection = SQLiteDirection.Ascending,
     ) -> PaginatedResults[ModelSummary]:
         with self._db.get_readonly_session() as session:
-            # Total count
-            count_stmt = select(func.count()).select_from(ModelTable)
-            total = session.exec(count_stmt).one()
-
-            # Data query
-            stmt = select(ModelTable)
-            if order_by == ModelRecordOrderBy.Default:
-                stmt = stmt.order_by(
-                    literal_column("type"),
-                    literal_column("base"),
-                    literal_column("name"),
-                    literal_column("format"),
-                )
-            elif order_by == ModelRecordOrderBy.Type:
-                stmt = stmt.order_by(literal_column("type"))
-            elif order_by == ModelRecordOrderBy.Base:
-                stmt = stmt.order_by(literal_column("base"))
-            elif order_by == ModelRecordOrderBy.Name:
-                stmt = stmt.order_by(literal_column("name"))
-            elif order_by == ModelRecordOrderBy.Format:
-                stmt = stmt.order_by(literal_column("format"))
-
-            stmt = stmt.limit(per_page).offset(page * per_page)
+            total = session.exec(select(func.count()).select_from(ModelTable)).one()
+            stmt = (
+                select(ModelTable)
+                .order_by(*_order_columns(order_by, direction))
+                .limit(per_page)
+                .offset(page * per_page)
+            )
             rows = session.exec(stmt).all()
-            configs = [r.config for r in rows]
+            # Read the generated columns while the rows are still bound to the session.
+            summaries = [(r.id, r.type, r.base, r.format, r.name, r.description) for r in rows]
 
-        items = [ModelSummary.model_validate({"config": c}) for c in configs]
+        items: list[ModelSummary] = []
+        for key, model_type, base, model_format, name, description in summaries:
+            try:
+                items.append(
+                    ModelSummary(
+                        key=key,
+                        type=model_type,
+                        base=base,
+                        format=model_format,
+                        name=name,
+                        description=description or "",
+                        tags=set(),
+                    )
+                )
+            except pydantic.ValidationError:
+                # Skip models whose type/base/format are not recognised by the current build.
+                self._logger.warning(f"Skipping model summary for {key}: unsupported attributes")
         return PaginatedResults(
             page=page,
             pages=ceil(total / per_page),

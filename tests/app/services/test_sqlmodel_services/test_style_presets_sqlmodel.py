@@ -61,7 +61,8 @@ def test_delete(storage):
 def test_get_many(storage):
     storage.create(_make_preset("Preset A"))
     storage.create(_make_preset("Preset B"))
-    results = storage.get_many()
+    # is_admin=True bypasses the visibility filter (default + public + own) so we see all presets.
+    results = storage.get_many(is_admin=True)
     # Filter out any default presets
     user_presets = [r for r in results if r.type == "user"]
     assert len(user_presets) == 2
@@ -70,20 +71,20 @@ def test_get_many(storage):
 def test_get_many_filter_by_type(storage):
     storage.create(_make_preset("User Preset", "user"))
     # There may be defaults loaded; just verify filtering works
-    user_presets = storage.get_many(type="user")
+    user_presets = storage.get_many(type="user", is_admin=True)
     assert all(p.type == "user" for p in user_presets)
 
 
 def test_create_many(storage):
     presets = [_make_preset(f"Preset {i}") for i in range(3)]
     storage.create_many(presets)
-    all_presets = storage.get_many(type="user")
+    all_presets = storage.get_many(type="user", is_admin=True)
     assert len(all_presets) >= 3
 
 
 def test_get_many_ordered_by_name(storage):
     storage.create(_make_preset("Zebra"))
     storage.create(_make_preset("Alpha"))
-    results = storage.get_many(type="user")
+    results = storage.get_many(type="user", is_admin=True)
     names = [r.name for r in results]
     assert names == sorted(names, key=str.lower)

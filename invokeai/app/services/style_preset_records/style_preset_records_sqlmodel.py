@@ -48,19 +48,21 @@ class SqlModelStylePresetRecordsStorage(StylePresetRecordsStorageBase):
                 raise StylePresetNotFoundError(f"Style preset with id {style_preset_id} not found")
             return _to_dto(row)
 
-    def create(self, style_preset: StylePresetWithoutId) -> StylePresetRecordDTO:
+    def create(self, style_preset: StylePresetWithoutId, user_id: str = "system") -> StylePresetRecordDTO:
         style_preset_id = uuid_string()
         row = StylePresetTable(
             id=style_preset_id,
             name=style_preset.name,
             preset_data=style_preset.preset_data.model_dump_json(),
             type=style_preset.type,
+            user_id=user_id,
+            is_public=style_preset.is_public,
         )
         with self._db.get_session() as session:
             session.add(row)
         return self.get(style_preset_id)
 
-    def create_many(self, style_presets: list[StylePresetWithoutId]) -> None:
+    def create_many(self, style_presets: list[StylePresetWithoutId], user_id: str = "system") -> None:
         with self._db.get_session() as session:
             for style_preset in style_presets:
                 row = StylePresetTable(
@@ -68,6 +70,8 @@ class SqlModelStylePresetRecordsStorage(StylePresetRecordsStorageBase):
                     name=style_preset.name,
                     preset_data=style_preset.preset_data.model_dump_json(),
                     type=style_preset.type,
+                    user_id=user_id,
+                    is_public=style_preset.is_public,
                 )
                 session.add(row)
 
@@ -91,9 +95,20 @@ class SqlModelStylePresetRecordsStorage(StylePresetRecordsStorageBase):
             if row is not None:
                 session.delete(row)
 
-    def get_many(self, type: PresetType | None = None) -> list[StylePresetRecordDTO]:
+    def get_many(
+        self,
+        type: PresetType | None = None,
+        user_id: str | None = None,
+        is_admin: bool = False,
+    ) -> list[StylePresetRecordDTO]:
         with self._db.get_readonly_session() as session:
             stmt = select(StylePresetTable)
+            if not is_admin:
+                # Visible to non-admin: default + public + own.
+                visibility = (col(StylePresetTable.type) == "default") | (col(StylePresetTable.is_public) == True)  # noqa: E712
+                if user_id is not None:
+                    visibility = visibility | (col(StylePresetTable.user_id) == user_id)
+                stmt = stmt.where(visibility)
             if type is not None:
                 stmt = stmt.where(col(StylePresetTable.type) == type)
             stmt = stmt.order_by(col(StylePresetTable.name).asc())
