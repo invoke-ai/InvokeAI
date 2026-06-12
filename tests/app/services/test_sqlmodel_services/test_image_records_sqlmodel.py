@@ -131,7 +131,8 @@ def test_delete_intermediates(storage):
     _save(storage, "img2", intermediate=True)
     _save(storage, "img3", intermediate=False)
     deleted = storage.delete_intermediates()
-    assert set(deleted) == {"img1", "img2"}
+    # delete_intermediates returns (image_name, image_subfolder) pairs for file cleanup.
+    assert {name for name, _subfolder in deleted} == {"img1", "img2"}
     assert storage.get("img3").image_name == "img3"
 
 

@@ -8,9 +8,8 @@ these models are used only for querying via SQLModel/SQLAlchemy.
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Column, String, Text
+from sqlalchemy import Column, Computed, Integer, Text
 from sqlalchemy.dialects import mysql
-from sqlalchemy.schema import FetchedValue
 from sqlalchemy.types import TypeEngine
 from sqlmodel import Field, SQLModel
 
@@ -26,6 +25,22 @@ def _blob() -> TypeEngine[str]:
     return Text().with_variant(mysql.LONGTEXT(), "mysql")
 
 
+def _generated(source: str, path: str, *, unquote: bool = True) -> Computed:
+    """A DB-generated column that mirrors the SQLite ``GENERATED ALWAYS`` columns.
+
+    The raw-SQL migrations own the SQLite schema (these column defs are unused there);
+    this expression is only emitted by ``create_all()`` on MySQL/MariaDB/Postgres. SQLite's
+    ``json_extract`` auto-unquotes scalars, so for scalar string columns we wrap MySQL's
+    ``json_extract`` in ``json_unquote`` to get the same plain value (e.g. ``sdxl`` not
+    ``"sdxl"``); for arrays/numbers we keep the raw ``json_extract`` output. ``persisted``
+    (STORED) so Postgres — which has no VIRTUAL generated columns — can also compile it.
+
+    Returns a fresh instance per call — a ``Computed`` may not be shared across columns.
+    """
+    inner = f"json_extract({source}, '{path}')"
+    return Computed(f"json_unquote({inner})" if unquote else inner, persisted=True)
+
+
 # --- boards ---
 
 
@@ -38,7 +53,7 @@ class BoardTable(SQLModel, table=True):
     board_name: str
     cover_image_name: Optional[str] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"onupdate": datetime.utcnow})
     deleted_at: Optional[datetime] = Field(default=None)
     archived: bool = Field(default=False)
     user_id: str = Field(default="system")
@@ -54,7 +69,7 @@ class BoardImageTable(SQLModel, table=True):
     image_name: str = Field(primary_key=True)
     board_id: str = Field(foreign_key="boards.board_id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"onupdate": datetime.utcnow})
     deleted_at: Optional[datetime] = Field(default=None)
 
 
@@ -87,11 +102,12 @@ class ImageTable(SQLModel, table=True):
     metadata_: Optional[str] = Field(default=None, sa_column=Column("metadata", _blob(), nullable=True))
     is_intermediate: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"onupdate": datetime.utcnow})
     deleted_at: Optional[datetime] = Field(default=None)
     starred: bool = Field(default=False)
     has_workflow: bool = Field(default=False)
     user_id: str = Field(default="system")
+    image_subfolder: str = Field(default="")  # added by migration_31; subfolder strategy on disk
 
 
 # --- workflows ---
@@ -105,13 +121,17 @@ class WorkflowLibraryTable(SQLModel, table=True):
     workflow_id: str = Field(primary_key=True)
     workflow: str = Field(sa_column=Column(_blob(), nullable=False))  # JSON blob
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"onupdate": datetime.utcnow})
     opened_at: Optional[datetime] = Field(default=None)
-    # Generated columns — server-side, excluded from INSERT/UPDATE
-    category: Optional[str] = Field(default=None, sa_column=Column(String, FetchedValue(), server_default=None))
-    name: Optional[str] = Field(default=None, sa_column=Column(String, FetchedValue(), server_default=None))
-    description: Optional[str] = Field(default=None, sa_column=Column(String, FetchedValue(), server_default=None))
-    tags: Optional[str] = Field(default=None, sa_column=Column(String, FetchedValue(), server_default=None))
+    # DB-generated columns extracted from the `workflow` JSON (category lives at $.meta.category).
+    # Declared as Computed so create_all() reproduces them on MySQL/Postgres; on SQLite the
+    # migrations own them. tags is a JSON array, kept as raw json_extract text for LIKE search.
+    category: Optional[str] = Field(default=None, sa_column=Column(Text, _generated("workflow", "$.meta.category")))
+    name: Optional[str] = Field(default=None, sa_column=Column(Text, _generated("workflow", "$.name")))
+    description: Optional[str] = Field(default=None, sa_column=Column(Text, _generated("workflow", "$.description")))
+    tags: Optional[str] = Field(
+        default=None, sa_column=Column(Text, _generated("workflow", "$.tags", unquote=False))
+    )
     user_id: str = Field(default="system")
     is_public: bool = Field(default=False)
 
@@ -124,7 +144,7 @@ class WorkflowImageTable(SQLModel, table=True):
     image_name: str = Field(primary_key=True, foreign_key="images.image_name")
     workflow_id: str = Field(foreign_key="workflow_library.workflow_id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"onupdate": datetime.utcnow})
     deleted_at: Optional[datetime] = Field(default=None)
 
 
@@ -146,7 +166,7 @@ class SessionQueueTable(SQLModel, table=True):
     priority: int = Field(default=0)
     error_traceback: Optional[str] = Field(default=None, sa_column=Column(_blob(), nullable=True))
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"onupdate": datetime.utcnow})
     started_at: Optional[datetime] = Field(default=None)
     completed_at: Optional[datetime] = Field(default=None)
     error_type: Optional[str] = Field(default=None)
@@ -156,6 +176,7 @@ class SessionQueueTable(SQLModel, table=True):
     retried_from_item_id: Optional[int] = Field(default=None)
     user_id: str = Field(default="system")
     workflow: Optional[str] = Field(default=None, sa_column=Column(_blob(), nullable=True))  # JSON blob
+    status_sequence: int = Field(default=0)  # added by migration_30; incremented on each status change
 
 
 # --- models ---
@@ -173,13 +194,29 @@ class ModelTable(SQLModel, table=True):
     id: str = Field(primary_key=True)
     config: str = Field(sa_column=Column(_blob(), nullable=False))  # JSON blob — all model metadata is extracted from this
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    # NOTE: The `models` table has many GENERATED ALWAYS columns (hash, base, type, path, format, name, etc.)
-    # that are automatically extracted from the `config` JSON blob by SQLite.
-    # We intentionally do NOT define them here because SQLAlchemy would try to include them in
-    # INSERT/UPDATE statements, which fails on GENERATED columns.
-    # To query by these columns, use raw text filters or the `text()` function.
-    # The ModelRecordServiceSqlModel extracts all needed data from the `config` JSON blob directly.
+    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"onupdate": datetime.utcnow})
+    # Columns extracted from the `config` JSON blob. On SQLite the migrations create these as
+    # GENERATED ALWAYS columns; here they are declared as Computed so create_all() reproduces
+    # them as DB-generated columns on MySQL/MariaDB/Postgres too. Being Computed, SQLAlchemy
+    # excludes them from INSERT/UPDATE, so add_model() keeps writing only id+config everywhere.
+    hash: Optional[str] = Field(default=None, sa_column=Column(Text, _generated("config", "$.hash")))
+    base: Optional[str] = Field(default=None, sa_column=Column(Text, _generated("config", "$.base")))
+    type: Optional[str] = Field(default=None, sa_column=Column(Text, _generated("config", "$.type")))
+    path: Optional[str] = Field(default=None, sa_column=Column(Text, _generated("config", "$.path")))
+    format: Optional[str] = Field(default=None, sa_column=Column(Text, _generated("config", "$.format")))
+    name: Optional[str] = Field(default=None, sa_column=Column(Text, _generated("config", "$.name")))
+    description: Optional[str] = Field(default=None, sa_column=Column(Text, _generated("config", "$.description")))
+    source: Optional[str] = Field(default=None, sa_column=Column(Text, _generated("config", "$.source")))
+    source_type: Optional[str] = Field(default=None, sa_column=Column(Text, _generated("config", "$.source_type")))
+    source_api_response: Optional[str] = Field(
+        default=None, sa_column=Column(Text, _generated("config", "$.source_api_response"))
+    )
+    trigger_phrases: Optional[str] = Field(
+        default=None, sa_column=Column(Text, _generated("config", "$.trigger_phrases", unquote=False))
+    )
+    file_size: Optional[int] = Field(
+        default=None, sa_column=Column(Integer, _generated("config", "$.file_size", unquote=False))
+    )
 
 
 class ModelManagerMetadataTable(SQLModel, table=True):
@@ -214,7 +251,7 @@ class StylePresetTable(SQLModel, table=True):
     preset_data: str = Field(sa_column=Column(_blob(), nullable=False))  # JSON blob
     type: str = Field(default="user")
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"onupdate": datetime.utcnow})
     user_id: str = Field(default="system")
     is_public: bool = Field(default=False)
 
@@ -234,8 +271,36 @@ class UserTable(SQLModel, table=True):
     is_admin: bool = Field(default=False)
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"onupdate": datetime.utcnow})
     last_login_at: Optional[datetime] = Field(default=None)
+
+
+class UserSessionTable(SQLModel, table=True):
+    """Mirrors the `user_sessions` table (added by migration_27)."""
+
+    __tablename__ = "user_sessions"
+
+    session_id: str = Field(primary_key=True)
+    user_id: str = Field(foreign_key="users.user_id", index=True)
+    token_hash: str = Field(index=True)
+    expires_at: datetime = Field(index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_activity_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class UserInvitationTable(SQLModel, table=True):
+    """Mirrors the `user_invitations` table (added by migration_27)."""
+
+    __tablename__ = "user_invitations"
+
+    invitation_id: str = Field(primary_key=True)
+    email: str = Field(index=True)
+    invited_by: str = Field(foreign_key="users.user_id")
+    invitation_code: str = Field(unique=True, index=True)
+    is_admin: bool = Field(default=False)
+    expires_at: datetime = Field(index=True)
+    used_at: Optional[datetime] = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 # --- app settings ---
@@ -249,7 +314,7 @@ class AppSettingTable(SQLModel, table=True):
     key: str = Field(primary_key=True)
     value: str = Field(sa_column=Column(_blob(), nullable=False))
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"onupdate": datetime.utcnow})
 
 
 # --- client state ---
@@ -263,4 +328,4 @@ class ClientStateTable(SQLModel, table=True):
     user_id: str = Field(primary_key=True, foreign_key="users.user_id")
     key: str = Field(primary_key=True)
     value: str = Field(sa_column=Column(_blob(), nullable=False))
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"onupdate": datetime.utcnow})

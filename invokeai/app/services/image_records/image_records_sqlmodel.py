@@ -41,6 +41,7 @@ def _to_dict(row: ImageTable) -> dict:
         "deleted_at": row.deleted_at,
         "starred": row.starred,
         "has_workflow": row.has_workflow,
+        "image_subfolder": row.image_subfolder,
     }
 
 
@@ -189,17 +190,18 @@ class SqlModelImageRecordStorage(ImageRecordStorageBase):
             count = session.exec(stmt).one()
         return count
 
-    def delete_intermediates(self) -> list[str]:
+    def delete_intermediates(self) -> list[tuple[str, str]]:
         with self._db.get_session() as session:
             try:
                 stmt = select(ImageTable).where(col(ImageTable.is_intermediate) == True)  # noqa: E712
                 rows = session.exec(stmt).all()
-                names = [r.image_name for r in rows]
+                # Return (image_name, image_subfolder) pairs so the file storage can clean up.
+                pairs = [(r.image_name, r.image_subfolder) for r in rows]
                 for row in rows:
                     session.delete(row)
             except Exception as e:
                 raise ImageRecordDeleteException from e
-        return names
+        return pairs
 
     def save(
         self,
@@ -215,6 +217,7 @@ class SqlModelImageRecordStorage(ImageRecordStorageBase):
         node_id: Optional[str] = None,
         metadata: Optional[str] = None,
         user_id: Optional[str] = None,
+        image_subfolder: str = "",
     ) -> datetime:
         row = ImageTable(
             image_name=image_name,
@@ -229,6 +232,7 @@ class SqlModelImageRecordStorage(ImageRecordStorageBase):
             starred=starred or False,
             has_workflow=has_workflow,
             user_id=user_id or "system",
+            image_subfolder=image_subfolder,
         )
         with self._db.get_session() as session:
             try:

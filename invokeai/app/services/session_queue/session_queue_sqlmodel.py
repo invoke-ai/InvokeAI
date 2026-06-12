@@ -9,6 +9,7 @@ the raw-SQL implementation, including reliance on the existing DB triggers for
 
 import asyncio
 import json
+from datetime import datetime
 from typing import Any, Optional
 
 from pydantic_core import to_jsonable_python
@@ -71,7 +72,27 @@ _QUEUE_COLUMNS = (
     SessionQueueTable.destination,
     SessionQueueTable.retried_from_item_id,
     SessionQueueTable.user_id,
+    SessionQueueTable.status_sequence,
 )
+
+
+def _status_change_values(status: str) -> dict[str, Any]:
+    """Extra columns to set on a status-changing UPDATE.
+
+    On SQLite these are maintained by triggers (started_at/completed_at) and by the legacy
+    SQL (status_sequence). A fresh MySQL/Postgres DB built from create_all() has no triggers,
+    so we set them in Python on every backend. `updated_at` is handled by the model's
+    `onupdate`. Harmless on SQLite — the AFTER UPDATE triggers simply re-stamp the same values.
+    """
+    values: dict[str, Any] = {
+        # Monotonic per-item counter the UI uses to order cross-channel status snapshots.
+        "status_sequence": func.coalesce(SessionQueueTable.status_sequence, 0) + 1,
+    }
+    if status == "in_progress":
+        values["started_at"] = datetime.utcnow()
+    if status in _TERMINAL_STATUSES:
+        values["completed_at"] = datetime.utcnow()
+    return values
 
 
 def _row_to_queue_item_dict(row: Row) -> dict[str, Any]:
@@ -155,7 +176,7 @@ class SqlModelSessionQueue(SessionQueueBase):
             session.execute(
                 update(SessionQueueTable)
                 .where(SessionQueueTable.status == "in_progress")
-                .values(status="canceled")
+                .values(status="canceled", **_status_change_values("canceled"))
             )
 
     def _prune_terminal_to_limit(self, queue_id: str, keep: int) -> int:
@@ -350,6 +371,7 @@ class SqlModelSessionQueue(SessionQueueBase):
                         error_type=error_type,
                         error_message=error_message,
                         error_traceback=error_traceback,
+                        **_status_change_values(status),
                     )
                 )
 
@@ -527,7 +549,7 @@ class SqlModelSessionQueue(SessionQueueBase):
             count = session.execute(
                 select(func.count()).select_from(SessionQueueTable).where(*where)
             ).scalar_one()
-            session.execute(update(SessionQueueTable).where(*where).values(status="canceled"))
+            session.execute(update(SessionQueueTable).where(*where).values(status="canceled", **_status_change_values("canceled")))
 
         # Handle current item separately - check ownership if user_id is provided
         if current_queue_item is not None and current_queue_item.batch_id in batch_ids:
@@ -547,7 +569,7 @@ class SqlModelSessionQueue(SessionQueueBase):
             count = session.execute(
                 select(func.count()).select_from(SessionQueueTable).where(*where)
             ).scalar_one()
-            session.execute(update(SessionQueueTable).where(*where).values(status="canceled"))
+            session.execute(update(SessionQueueTable).where(*where).values(status="canceled", **_status_change_values("canceled")))
 
         if current_queue_item is not None and current_queue_item.destination == destination:
             if user_id is None or current_queue_item.user_id == user_id:
@@ -565,7 +587,7 @@ class SqlModelSessionQueue(SessionQueueBase):
             count = session.execute(
                 select(func.count()).select_from(SessionQueueTable).where(*where)
             ).scalar_one()
-            session.execute(update(SessionQueueTable).where(*where).values(status="canceled"))
+            session.execute(update(SessionQueueTable).where(*where).values(status="canceled", **_status_change_values("canceled")))
 
         if current_queue_item is not None and current_queue_item.queue_id == queue_id:
             self._set_queue_item_status(current_queue_item.item_id, "canceled")
@@ -585,7 +607,7 @@ class SqlModelSessionQueue(SessionQueueBase):
             count = session.execute(
                 select(func.count()).select_from(SessionQueueTable).where(*where)
             ).scalar_one()
-            session.execute(update(SessionQueueTable).where(*where).values(status="canceled"))
+            session.execute(update(SessionQueueTable).where(*where).values(status="canceled", **_status_change_values("canceled")))
         return CancelAllExceptCurrentResult(canceled=int(count))
 
     # endregion
