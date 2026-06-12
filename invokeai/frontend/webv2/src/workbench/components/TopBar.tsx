@@ -365,7 +365,7 @@ const QueueActions = () => {
     <Menu.Root>
       <Group attached>
         <Tooltip content="Cancel current item" showArrow>
-          <IconButton variant="outline" size="sm" roundedEnd="none">
+          <IconButton variant="outline" size="sm" roundedEnd="none" borderColor="border.subtle">
             <XIcon />
           </IconButton>
         </Tooltip>
@@ -378,6 +378,7 @@ const QueueActions = () => {
             aspectRatio="unset"
             minW="0"
             w="6"
+            borderColor="border.subtle"
           >
             <ChevronDownIcon />
           </IconButton>
