@@ -135,6 +135,16 @@ env/
 venv/
 ENV/
 
+# Generated stuff
+invokeai.yaml
+invokeai.example.yaml
+
+/models/
+/databases/
+/configs/
+/nodes/
+/outputs/
+
 # Spyder project settings
 .spyderproject
 .spyproject
