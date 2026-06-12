@@ -24,6 +24,7 @@ import type {
   StringFieldInputTemplate,
   StringGeneratorFieldInputTemplate,
   StylePresetFieldInputTemplate,
+  SystemPromptFieldInputTemplate,
 } from 'features/nodes/types/field';
 import {
   getFloatGeneratorArithmeticSequenceDefaults,
@@ -304,6 +305,20 @@ const buildStylePresetFieldInputTemplate: FieldInputTemplateBuilder<StylePresetF
   return template;
 };
 
+const buildSystemPromptFieldInputTemplate: FieldInputTemplateBuilder<SystemPromptFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: SystemPromptFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildImageFieldInputTemplate: FieldInputTemplateBuilder<ImageFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -476,6 +491,7 @@ const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputTemplate
   SchedulerField: buildSchedulerFieldInputTemplate,
   StringField: buildStringFieldInputTemplate,
   StylePresetField: buildStylePresetFieldInputTemplate,
+  SystemPromptField: buildSystemPromptFieldInputTemplate,
   FloatGeneratorField: buildFloatGeneratorFieldInputTemplate,
   IntegerGeneratorField: buildIntegerGeneratorFieldInputTemplate,
   StringGeneratorField: buildStringGeneratorFieldInputTemplate,

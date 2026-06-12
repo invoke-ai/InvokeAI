@@ -36,6 +36,7 @@ import { nodesSliceConfig } from 'features/nodes/store/nodesSlice';
 import { workflowLibrarySliceConfig } from 'features/nodes/store/workflowLibrarySlice';
 import { workflowSettingsSliceConfig } from 'features/nodes/store/workflowSettingsSlice';
 import { upscaleSliceConfig } from 'features/parameters/store/upscaleSlice';
+import { expandPromptSliceConfig } from 'features/prompt/store/expandPromptSlice';
 import { queueSliceConfig } from 'features/queue/store/queueSlice';
 import { stylePresetSliceConfig } from 'features/stylePresets/store/stylePresetSlice';
 import { hotkeysSliceConfig } from 'features/system/store/hotkeysSlice';
@@ -71,6 +72,7 @@ const SLICE_CONFIGS = {
   [canvasWorkflowIntegrationSliceConfig.slice.reducerPath]: canvasWorkflowIntegrationSliceConfig,
   [changeBoardModalSliceConfig.slice.reducerPath]: changeBoardModalSliceConfig,
   [dynamicPromptsSliceConfig.slice.reducerPath]: dynamicPromptsSliceConfig,
+  [expandPromptSliceConfig.slice.reducerPath]: expandPromptSliceConfig,
   [gallerySliceConfig.slice.reducerPath]: gallerySliceConfig,
   [hotkeysSliceConfig.slice.reducerPath]: hotkeysSliceConfig,
   [lorasSliceConfig.slice.reducerPath]: lorasSliceConfig,
@@ -103,6 +105,7 @@ const ALL_REDUCERS = {
   [canvasWorkflowIntegrationSliceConfig.slice.reducerPath]: canvasWorkflowIntegrationSliceConfig.slice.reducer,
   [changeBoardModalSliceConfig.slice.reducerPath]: changeBoardModalSliceConfig.slice.reducer,
   [dynamicPromptsSliceConfig.slice.reducerPath]: dynamicPromptsSliceConfig.slice.reducer,
+  [expandPromptSliceConfig.slice.reducerPath]: expandPromptSliceConfig.slice.reducer,
   [gallerySliceConfig.slice.reducerPath]: gallerySliceConfig.slice.reducer,
   [hotkeysSliceConfig.slice.reducerPath]: hotkeysSliceConfig.slice.reducer,
   [lorasSliceConfig.slice.reducerPath]: lorasSliceConfig.slice.reducer,
