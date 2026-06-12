@@ -334,8 +334,8 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
       {isDropActive && (
         <Flex
           align="center"
-          bg="bg.surfaceRaised/80"
-          borderColor="accent.active"
+          bg="bg.muted/80"
+          borderColor="accent.solid"
           borderStyle="dashed"
           borderWidth="2px"
           direction="column"
@@ -389,10 +389,10 @@ const GalleryThumbnail = ({
   return (
     <Box
       aspectRatio={1}
-      bg="bg.panel"
+      bg="bg.emphasized"
       borderWidth="2px"
-      borderColor={isSelected || isCompared ? 'accent.active' : 'border.subtle'}
-      boxShadow={isCompared ? 'inset 0 0 0 1px var(--chakra-colors-accent-active)' : undefined}
+      borderColor={isSelected || isCompared ? 'accent.solid' : 'border.subtle'}
+      boxShadow={isCompared ? 'inset 0 0 0 1px {colors.accent.solid}' : undefined}
       css={{ '&:hover .gallery-thumb-overlay': { opacity: 1 } }}
       minW="0"
       overflow="hidden"

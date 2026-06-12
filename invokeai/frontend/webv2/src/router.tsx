@@ -124,7 +124,7 @@ const setupRoute = createRoute({
 });
 
 const RouterPending = () => (
-  <Center bg="bg.shell" minH="100dvh">
+  <Center bg="bg" minH="100dvh">
     <Spinner color="fg.muted" size="sm" />
   </Center>
 );

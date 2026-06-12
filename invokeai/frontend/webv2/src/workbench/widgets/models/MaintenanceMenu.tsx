@@ -1,9 +1,10 @@
-import { Checkbox, Dialog, Flex, HStack, Icon, Menu, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Checkbox, Dialog, Flex, Icon, Menu, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { BrushCleaningIcon, FolderSearchIcon, MoreHorizontalIcon, RefreshCcwIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { Button, CloseButton, IconButton } from '../../components/ui/Button';
 import { MenuContent } from '../../components/ui/Menu';
+import { Panel } from '../../components/ui/Panel';
 import { deleteOrphanedModels, emptyModelCache, getOrphanedModels } from '../../models/api';
 import { refreshModels } from '../../models/modelsStore';
 import { formatBytes } from '../../models/taxonomy';
@@ -145,7 +146,7 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
-          <Dialog.Content bg="bg.surface" borderColor="border.subtle" borderWidth="1px" color="fg.default">
+          <Dialog.Content>
             <Dialog.Header borderBottomWidth="1px" borderColor="border.subtle">
               <Stack gap="0.5">
                 <Dialog.Title fontSize="sm" fontWeight="700">
@@ -159,7 +160,7 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
             </Dialog.Header>
             <Dialog.Body>
               {loadError ? (
-                <Text color="red.400" fontSize="xs" py="4">
+                <Text color="fg.error" fontSize="xs" py="4">
                   {loadError}
                 </Text>
               ) : orphans === null ? (
@@ -176,7 +177,7 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
                     checked={
                       selectedPaths.size === 0 ? false : selectedPaths.size === orphans.length ? true : 'indeterminate'
                     }
-                    colorPalette="theme"
+                    colorPalette="accent"
                     ps="2"
                     size="sm"
                     onCheckedChange={() => {
@@ -194,18 +195,10 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
                     </Checkbox.Label>
                   </Checkbox.Root>
                   {orphans.map((orphan) => (
-                    <HStack
-                      key={orphan.path}
-                      bg="bg.panel"
-                      borderColor="border.subtle"
-                      borderWidth="1px"
-                      gap="2"
-                      p="2"
-                      rounded="md"
-                    >
+                    <Panel key={orphan.path} alignItems="center" flexDirection="row" gap="2" p="2" tone="control">
                       <Checkbox.Root
                         checked={selectedPaths.has(orphan.path)}
-                        colorPalette="theme"
+                        colorPalette="accent"
                         size="sm"
                         onCheckedChange={() => togglePath(orphan.path)}
                       >
@@ -221,7 +214,7 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
                           {formatBytes(orphan.size_bytes)}
                         </Text>
                       </Stack>
-                    </HStack>
+                    </Panel>
                   ))}
                 </Stack>
               )}

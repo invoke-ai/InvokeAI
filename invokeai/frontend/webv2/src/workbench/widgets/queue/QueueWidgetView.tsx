@@ -77,9 +77,9 @@ const QueueContents = () => {
           return (
             <Stack
               key={item.id}
-              bg="bg.surface"
+              bg="bg.subtle"
               borderWidth="1px"
-              borderColor={item.status === 'failed' ? 'red.500' : 'border.subtle'}
+              borderColor={item.status === 'failed' ? 'fg.error' : 'border.subtle'}
               gap="1"
               p="2"
               rounded="md"
@@ -101,7 +101,7 @@ const QueueContents = () => {
               </Text>
               {item.status === 'running' ? <QueueItemLiveProgress queueItemId={item.id} /> : null}
               <HStack justify="space-between">
-                <Text color={item.status === 'failed' ? 'red.300' : 'fg.subtle'} fontSize="2xs">
+                <Text color={item.status === 'failed' ? 'fg.error' : 'fg.subtle'} fontSize="2xs">
                   {item.id}
                   {backendIds} · {resultCount}
                   {item.error ? ` · ${item.error}` : ''}

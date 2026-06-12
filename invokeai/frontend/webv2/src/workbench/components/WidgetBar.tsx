@@ -3,6 +3,7 @@ import { CheckIcon, MoreHorizontalIcon } from 'lucide-react';
 
 import { WidgetIcon } from '../iconResolver';
 import type { RegisteredWidget, WidgetIconId, WidgetId, WidgetRegion } from '../types';
+import { Row } from './ui/Row';
 import { Tooltip } from './ui/Tooltip';
 
 export interface WidgetBarItem {
@@ -35,7 +36,7 @@ export const WidgetBar = ({ activeId, menuItems, onSelect, onToggle, railItems, 
   <Flex
     align="center"
     as="nav"
-    bg="bg.surface"
+    bg="bg.subtle"
     borderColor="border.subtle"
     borderRightWidth={side === 'left' ? '1px' : '0'}
     borderLeftWidth={side === 'right' ? '1px' : '0'}
@@ -79,26 +80,22 @@ const WidgetSlot = ({
       openDelay={250}
       positioning={{ placement: tooltipPlacement }}
     >
-      <Flex
-        align="center"
+      <Row
+        active={isActive ? 'accent' : 'none'}
         aria-label={item.label}
         aria-disabled={item.status === 'disabled'}
         aria-pressed={isActive}
         as="button"
-        bg={isActive ? 'accent.widget' : 'transparent'}
-        color={isActive ? 'accent.widgetFg' : 'fg.default'}
         h="9"
-        justify="center"
-        rounded="md"
-        opacity={item.status === 'disabled' ? 0.4 : 1}
+        justifyContent="center"
         pointerEvents={item.status === 'disabled' ? 'none' : 'auto'}
-        transition="background 0.12s ease, color 0.12s ease"
+        rounded="md"
         w="9"
-        _hover={{ bg: isActive ? 'accent.widget' : 'bg.surfaceRaised' }}
+        _disabled={{ opacity: 0.4 }}
         onClick={() => onSelect(item.id)}
       >
         <WidgetIcon iconId={item.iconId} boxSize="5" />
-      </Flex>
+      </Row>
     </Tooltip>
   );
 };
@@ -118,28 +115,20 @@ const WidgetMenuButton = ({
         align="center"
         aria-label={`${region === 'left' ? 'Left' : 'Right'} widget visibility`}
         as="button"
-        color="fg.default"
+        color="fg"
         h="9"
         justify="center"
         rounded="md"
         transition="background 0.12s ease, color 0.12s ease"
         w="9"
-        _hover={{ bg: 'bg.surfaceRaised' }}
+        _hover={{ bg: 'bg.muted' }}
       >
         <Icon as={MoreHorizontalIcon} boxSize="5" />
       </Flex>
     </Menu.Trigger>
     <Portal>
       <Menu.Positioner>
-        <Menu.Content
-          bg="bg.surfaceRaised"
-          borderWidth="1px"
-          borderColor="border.emphasis"
-          color="fg.default"
-          minW="12rem"
-          rounded="lg"
-          shadow="lg"
-        >
+        <Menu.Content minW="12rem">
           <Menu.ItemGroup>
             <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
               Widgets

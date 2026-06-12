@@ -13,7 +13,7 @@ const FocusRegionContext = createContext<FocusRegionContextValue | null>(null);
 
 const highlightStyles = {
   '&[data-highlighted="true"]::after': {
-    borderColor: 'accent.active',
+    borderColor: 'accent.solid',
     opacity: 1,
   },
   '&::after': {

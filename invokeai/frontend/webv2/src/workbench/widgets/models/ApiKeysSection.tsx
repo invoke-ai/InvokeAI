@@ -103,11 +103,11 @@ const ApiKeyCard = ({
   };
 
   return (
-    <Stack bg="bg.surface" borderColor="border.subtle" borderWidth="1px" gap="2.5" p="3" rounded="lg">
+    <Stack bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" gap="2.5" p="3" rounded="lg">
       <HStack align="start" gap="2.5">
         <Flex
           align="center"
-          bg="bg.panel"
+          bg="bg.emphasized"
           borderColor="border.subtle"
           borderWidth="1px"
           boxSize="8"
@@ -292,7 +292,7 @@ const ExternalProviderKeyCards = ({ onError }: { onError: (title: string, messag
 
   if (loadError) {
     return (
-      <Text color="red.400" fontSize="2xs">
+      <Text color="fg.error" fontSize="2xs">
         External providers unavailable: {loadError}
       </Text>
     );

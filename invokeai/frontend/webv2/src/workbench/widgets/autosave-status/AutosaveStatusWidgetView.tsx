@@ -25,7 +25,7 @@ export const AutosaveStatusWidgetView = ({ presentation }: WidgetViewProps) => {
           </Text>
         ) : null}
         {state.autosave.error ? (
-          <Text color="red.300" fontSize="2xs">
+          <Text color="fg.error" fontSize="2xs">
             {state.autosave.error}
           </Text>
         ) : null}

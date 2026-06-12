@@ -36,8 +36,8 @@ export class WidgetFailureBoundary extends Component<WidgetFailureBoundaryProps,
     const copyableDetails = details ?? error.message;
 
     return (
-      <Stack bg="bg.surfaceRaised" borderColor="red.500" borderWidth="1px" gap="2" p="3" rounded="md">
-        <Text color="red.300" fontSize="xs" fontWeight="700">
+      <Stack bg="bg.muted" borderColor="border.error" borderWidth="1px" gap="2" p="3" rounded="md">
+        <Text color="fg.error" fontSize="xs" fontWeight="700">
           Widget failed: {widgetId}
         </Text>
         <ScrollArea.Root maxH="8rem" size="xs" variant="hover">

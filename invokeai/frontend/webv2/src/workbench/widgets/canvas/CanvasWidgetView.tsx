@@ -41,13 +41,13 @@ export const CanvasWidgetView = () => {
   return (
     <Box
       aria-label="Canvas surface"
-      bg="bg.canvas"
+      bg="bg.inset"
       h="full"
       overflow="hidden"
       position="relative"
       tabIndex={0}
       w="full"
-      bgImage="radial-gradient(var(--chakra-colors-canvas-dot) 1.5px, transparent 1.5px)"
+      bgImage="radial-gradient({colors.fg.grid} 1.5px, transparent 1.5px)"
       bgSize="28px 28px"
       onKeyDown={onKeyDown}
     >

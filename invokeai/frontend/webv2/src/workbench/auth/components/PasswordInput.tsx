@@ -31,9 +31,9 @@ export const PasswordInput = (props: InputProps) => {
 };
 
 const STRENGTH_META: Record<PasswordStrength, { filledSegments: number; label: string; tone: string }> = {
-  moderate: { filledSegments: 2, label: 'Moderate', tone: 'orange.400' },
-  strong: { filledSegments: 3, label: 'Strong', tone: 'green.400' },
-  weak: { filledSegments: 1, label: 'Weak', tone: 'red.400' },
+  moderate: { filledSegments: 2, label: 'Moderate', tone: 'fg.warning' },
+  strong: { filledSegments: 3, label: 'Strong', tone: 'fg.success' },
+  weak: { filledSegments: 1, label: 'Weak', tone: 'fg.error' },
 };
 
 /** Three-segment strength readout; renders nothing until the user types. */

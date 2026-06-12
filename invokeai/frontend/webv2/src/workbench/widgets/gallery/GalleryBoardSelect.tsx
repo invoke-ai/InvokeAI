@@ -128,15 +128,9 @@ export const GalleryBoardSelect = () => {
         <Portal>
           <Menu.Positioner>
             <Menu.Content
-              bg="bg.surfaceRaised"
-              borderWidth="1px"
-              borderColor="border.emphasis"
-              color="fg.default"
               maxH="min(30rem, calc(100vh - 6rem))"
               minW="min(22rem, calc(100vw - 2rem))"
               overflow="hidden"
-              rounded="lg"
-              shadow="lg"
               p="0"
             >
               <Stack gap="2" p="2">
@@ -430,7 +424,7 @@ const BoardOptionContent = ({
 const BoardCoverIcon = ({ icon }: { icon: LucideIcon }) => (
   <Flex
     align="center"
-    bg="bg.panel"
+    bg="bg.emphasized"
     borderWidth="1px"
     borderColor="border.subtle"
     boxSize="7"
@@ -448,7 +442,7 @@ const BoardCover = ({ board }: { board: GalleryBoard }) => {
     return (
       <Image
         alt=""
-        bg="bg.panel"
+        bg="bg.emphasized"
         borderWidth="1px"
         borderColor="border.subtle"
         boxSize="7"

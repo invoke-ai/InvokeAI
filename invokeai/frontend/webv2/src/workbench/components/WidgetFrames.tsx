@@ -1,4 +1,6 @@
-import { Box, Flex, HStack, Icon, Stack, Text } from '@chakra-ui/react';
+import { Box, Flex, HStack, Icon, Stack, Text, type RecipeVariantProps, useRecipe } from '@chakra-ui/react';
+
+import { chipRecipe } from '../../theme/recipes';
 import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -109,7 +111,7 @@ export const WidgetPanelFrame = ({
   return (
     <Flex
       as="aside"
-      bg="bg.shell"
+      bg="bg"
       borderColor="border.subtle"
       borderRightWidth={isLeft ? '1px' : '0'}
       borderLeftWidth={!isLeft && !isBottom ? '1px' : '0'}
@@ -139,8 +141,8 @@ export const WidgetPanelFrame = ({
         zIndex="1"
         {...(isBottom ? { h: '2', left: '0', right: '0', top: '-1' } : { bottom: '0', top: '0', w: '2' })}
         {...(!isBottom ? (isLeft ? { right: '-1' } : { left: '-1' }) : {})}
-        _hover={{ bg: 'accent.active', opacity: 0.45 }}
-        _focusVisible={{ bg: 'accent.active', opacity: 0.65, outline: '2px solid var(--chakra-colors-accent-active)' }}
+        _hover={{ bg: 'accent.solid', opacity: 0.45 }}
+        _focusVisible={{ bg: 'accent.solid', opacity: 0.65, outline: '2px solid {colors.accent.solid}' }}
         onKeyDown={handleKeyDown}
         onPointerDown={handlePointerDown}
       />
@@ -177,34 +179,25 @@ export const FieldPlaceholder = ({ label, h }: { label: string; h: string }) => 
     <Text color="fg.muted" fontSize="2xs" fontWeight="600" textTransform="uppercase">
       {label}
     </Text>
-    <Box bg="bg.surface" borderWidth="1px" borderColor="border.subtle" h={h} rounded="md" w="full" />
+    <Box bg="bg.subtle" borderWidth="1px" borderColor="border.subtle" h={h} rounded="md" w="full" />
   </Stack>
 );
 
 export const StatusWidgetChip = ({
-  borderColor = 'border.emphasis',
   children,
-  color,
   icon,
+  tone,
 }: {
-  borderColor?: string;
   children: ReactNode;
-  color?: string;
   icon: LucideIcon;
-}) => (
-  <HStack
-    borderWidth="1px"
-    borderColor={borderColor}
-    color={color}
-    gap="1.5"
-    py="0.5"
-    px="2"
-    rounded="sm"
-    flexShrink={0}
-  >
-    <Icon as={icon} boxSize="3" />
-    <Text fontSize="2xs" fontWeight="500" whiteSpace="nowrap">
-      {children}
-    </Text>
-  </HStack>
-);
+  tone?: NonNullable<RecipeVariantProps<typeof chipRecipe>>['tone'];
+}) => {
+  const recipe = useRecipe({ recipe: chipRecipe });
+
+  return (
+    <HStack css={recipe({ tone })}>
+      <Icon as={icon} boxSize="3" />
+      <Text whiteSpace="nowrap">{children}</Text>
+    </HStack>
+  );
+};

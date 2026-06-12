@@ -148,7 +148,7 @@ export const ModelEditForm = ({
         />
       </Field>
       {form.formError ? (
-        <Text color="red.400" fontSize="2xs" role="alert">
+        <Text color="fg.error" fontSize="2xs" role="alert">
           {form.formError}
         </Text>
       ) : null}

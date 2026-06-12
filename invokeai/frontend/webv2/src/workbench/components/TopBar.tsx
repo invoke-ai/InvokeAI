@@ -1,4 +1,4 @@
-import { Badge, Box, Flex, Group, Icon, Menu, NumberInput, Portal } from '@chakra-ui/react';
+import { Badge, Flex, Group, Icon, Menu, NumberInput, Portal, Separator } from '@chakra-ui/react';
 import { ChevronDownIcon, ListOrderedIcon, PauseIcon, PlayIcon, XIcon } from 'lucide-react';
 
 import { InvokeControl } from './InvokeControl';
@@ -17,13 +17,13 @@ export const TopBar = () => (
   <Flex
     align="center"
     as="header"
-    bg="bg.surfaceRaised"
+    bg="bg.muted"
     borderBottomWidth="1px"
     borderColor="border.subtle"
     flexShrink={0}
     gap="2"
     h="12"
-    pe="3"
+    pe="1.5"
     w="full"
   >
     <BrandMark />
@@ -31,14 +31,14 @@ export const TopBar = () => (
     <BatchCountField />
     <QueueInfo />
     <QueueActions />
-    <Box w="1px" h="5" bg="border.subtle" mx="1" flexShrink={0} />
+    <Separator orientation="vertical" h={5} />
     <ProjectTabs />
     <LayoutPresetMenu />
     <AccountMenu />
   </Flex>
 );
 
-/** Compact legacy Invoke logo used as the workbench app-menu affordance. */
+/** Compact Invoke logo used as a link to home screen. */
 const BrandMark = () => {
   const { themeId } = useWorkbenchPreferences();
   const theme = THEMES_BY_ID[themeId] ?? THEMES_BY_ID[DEFAULT_THEME_ID];
@@ -58,7 +58,7 @@ const BrandMark = () => {
       <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 44 44" width="20">
         <path
           d="M29.1951 10.6667H42V2H2V10.6667H14.8049L29.1951 33.3333H42V42H2V33.3333H14.8049"
-          stroke={theme.colors.accent}
+          stroke={theme.colors.brandFg}
           strokeWidth="2.8"
         />
       </svg>

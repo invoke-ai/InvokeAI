@@ -32,7 +32,7 @@ export const ServerStatusWidgetView = ({ presentation }: WidgetViewProps) => {
 
   if (isDisconnected) {
     return (
-      <StatusWidgetChip borderColor="fg.error" color="fg.error" icon={CircleXIcon}>
+      <StatusWidgetChip icon={CircleXIcon} tone="error">
         {label}
       </StatusWidgetChip>
     );

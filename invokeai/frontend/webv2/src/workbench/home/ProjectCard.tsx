@@ -88,14 +88,14 @@ export const ProjectCard = ({ summary }: { summary: ProjectSummary }) => {
 
   return (
     <Box
-      bg="bg.surface"
+      bg="bg.subtle"
       borderColor="border.subtle"
       borderWidth="1px"
       overflow="hidden"
       position="relative"
       rounded="lg"
       transition="border-color 0.15s ease, background 0.15s ease"
-      _hover={{ bg: 'bg.surfaceRaised', borderColor: 'border.emphasized' }}
+      _hover={{ bg: 'bg.muted', borderColor: 'border.emphasized' }}
     >
       <Link
         aria-label={`Open ${summary.name}`}
@@ -103,7 +103,7 @@ export const ProjectCard = ({ summary }: { summary: ProjectSummary }) => {
         style={{ inset: 0, position: 'absolute' }}
         to="/app"
       />
-      <Flex align="center" bg="bg.subtle" h="24" justify="center" pointerEvents="none">
+      <Flex align="center" bg="bg.muted" h="24" justify="center" pointerEvents="none">
         <Icon as={FolderIcon} boxSize="8" color="fg.subtle" opacity={0.6} />
       </Flex>
       <Flex align="center" gap="2" p="3" pointerEvents="none">

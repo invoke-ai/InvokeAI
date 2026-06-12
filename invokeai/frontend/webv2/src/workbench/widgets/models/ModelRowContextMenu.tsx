@@ -71,7 +71,7 @@ export const ModelRowContextMenu = ({
                   </Menu.Item>
                 ) : null}
                 <Menu.Separator />
-                <Menu.Item color="red.400" value="delete" onClick={() => setPendingConfirm({ kind: 'delete', model })}>
+                <Menu.Item color="fg.error" value="delete" onClick={() => setPendingConfirm({ kind: 'delete', model })}>
                   <Icon as={Trash2Icon} boxSize="3.5" />
                   <Menu.ItemText fontSize="xs">Delete model</Menu.ItemText>
                 </Menu.Item>

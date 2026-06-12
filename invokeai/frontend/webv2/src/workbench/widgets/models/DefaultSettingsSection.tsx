@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 
 import { Button } from '../../components/ui/Button';
 import { FieldLabel } from '../../components/ui/Field';
+import { Panel } from '../../components/ui/Panel';
 import { updateModel } from '../../models/api';
 import { replaceModelInStore } from '../../models/modelsStore';
 import { loraDefaultSettingsSchema, mainDefaultSettingsSchema } from '../../models/schemas';
@@ -310,7 +311,7 @@ export const DefaultSettingsSection = ({
         </Button>
       </HStack>
       {error ? (
-        <Text color="red.400" fontSize="2xs" role="alert">
+        <Text color="fg.error" fontSize="2xs" role="alert">
           {error}
         </Text>
       ) : null}
@@ -320,22 +321,14 @@ export const DefaultSettingsSection = ({
           const isEnabled = value !== null && value !== undefined;
 
           return (
-            <Stack
-              key={field.key}
-              bg="bg.panel"
-              borderColor="border.subtle"
-              borderWidth="1px"
-              gap="2"
-              p="2.5"
-              rounded="md"
-            >
+            <Panel key={field.key} gap="2" p="2.5" tone="control">
               <HStack justify="space-between">
                 <Text fontSize="2xs" fontWeight="600" textTransform="uppercase">
                   {field.label}
                 </Text>
                 <Switch.Root
                   checked={isEnabled}
-                  colorPalette="theme"
+                  colorPalette="accent"
                   size="xs"
                   onCheckedChange={(event) => setFieldValue(field.key, event.checked ? field.defaultValue : null)}
                 >
@@ -354,7 +347,7 @@ export const DefaultSettingsSection = ({
               <Text color="fg.subtle" fontSize="2xs">
                 {isEnabled ? 'Customized for this model' : field.inheritLabel}
               </Text>
-            </Stack>
+            </Panel>
           );
         })}
       </Grid>

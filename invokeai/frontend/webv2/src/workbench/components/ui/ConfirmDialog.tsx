@@ -53,7 +53,7 @@ export const ConfirmDialog = ({
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
-          <Dialog.Content bg="bg.surface" borderColor="border.subtle" borderWidth="1px" color="fg.default">
+          <Dialog.Content bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" color="fg">
             <Dialog.Header>
               <Dialog.Title fontSize="sm" fontWeight="700">
                 {title}
@@ -67,7 +67,7 @@ export const ConfirmDialog = ({
                 Cancel
               </Button>
               <Button
-                colorPalette={isDestructive ? 'red' : 'theme'}
+                colorPalette={isDestructive ? 'red' : 'accent'}
                 loading={isPending}
                 size="xs"
                 variant="solid"

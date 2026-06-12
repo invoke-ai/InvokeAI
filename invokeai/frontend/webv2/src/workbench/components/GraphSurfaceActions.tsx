@@ -32,15 +32,7 @@ export const GraphSurfaceActions = ({ surface }: GraphSurfaceActionsProps) => {
         </Menu.Trigger>
         <Portal>
           <Menu.Positioner>
-            <Menu.Content
-              bg="bg.surfaceRaised"
-              borderWidth="1px"
-              borderColor="border.emphasis"
-              color="fg.default"
-              minW="11rem"
-              rounded="lg"
-              shadow="lg"
-            >
+            <Menu.Content minW="11rem">
               <Menu.ItemGroup>
                 <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
                   Graph

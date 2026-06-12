@@ -101,7 +101,7 @@ export const TriggerPhrasesEditor = ({
       {phrases.length > 0 ? (
         <Wrap gap="1">
           {phrases.map((phrase) => (
-            <Tag.Root key={phrase} colorPalette="theme" size="sm" variant="surface">
+            <Tag.Root key={phrase} size="sm" variant="surface">
               <Tag.Label>{phrase}</Tag.Label>
               <Tag.EndElement>
                 <Tag.CloseTrigger

@@ -33,7 +33,7 @@ export const GraphPreviewDialog = ({
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
-          <Dialog.Content bg="bg.surfaceRaised" borderColor="border.emphasis" borderWidth="1px" color="fg.default">
+          <Dialog.Content>
             <Dialog.Header>
               <Dialog.Title>{title} Graph Preview</Dialog.Title>
             </Dialog.Header>
@@ -63,8 +63,6 @@ export const GraphPreviewDialog = ({
             <Dialog.Footer>
               {dialogRoute ? (
                 <Button
-                  bg="accent.invoke"
-                  color="accent.invokeFg"
                   disabled={!canInvoke}
                   size="sm"
                   title={dialogRoute.validationMessage}

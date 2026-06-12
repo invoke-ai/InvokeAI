@@ -57,7 +57,7 @@ export const UrlInstallTab = () => {
       {looksLocal ? (
         <Checkbox.Root
           checked={form.values.inplace}
-          colorPalette="theme"
+          colorPalette="accent"
           size="sm"
           onCheckedChange={(event) => form.setValue('inplace', event.checked === true)}
         >

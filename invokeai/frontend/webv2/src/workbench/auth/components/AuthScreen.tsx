@@ -17,7 +17,7 @@ export const AuthScreen = ({
   subtitle: string;
   title: string;
 }) => (
-  <Flex align="center" bg="bg.shell" color="fg.default" justify="center" minH="100dvh" p="6">
+  <Flex align="center" bg="bg" color="fg" justify="center" minH="100dvh" p="6">
     <Stack gap="6" maxW="sm" w="full">
       <Stack align="center" gap="4">
         <InvokeMark />
@@ -30,7 +30,7 @@ export const AuthScreen = ({
           </Text>
         </Stack>
       </Stack>
-      <Stack bg="bg.surface" borderColor="border.subtle" borderWidth="1px" gap="4" p="6" rounded="xl" shadow="lg">
+      <Stack bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" gap="4" p="6" rounded="xl" shadow="lg">
         {children}
       </Stack>
       {footer ? (
@@ -50,9 +50,9 @@ export const AuthFormAlert = ({ message, tone }: { message: string; tone: 'error
   </Alert.Root>
 );
 
-/** The Invoke logomark, drawn in the theme accent. Shared with the Home shell. */
+/** The Invoke logomark, drawn in the theme brand color. Shared with the Home shell. */
 export const InvokeMark = ({ size = 36 }: { size?: number }) => (
-  <Box color="accent.invoke">
+  <Box color="brand.fg">
     <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 44 44" width={size}>
       <path
         d="M29.1951 10.6667H42V2H2V10.6667H14.8049L29.1951 33.3333H42V42H2V33.3333H14.8049"

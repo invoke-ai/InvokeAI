@@ -4,66 +4,150 @@ import { defineRecipe, defineSlotRecipe } from '@chakra-ui/react';
  * Reusable, theme-aware recipes for the workbench design system.
  *
  * Recipes reference semantic tokens only, so every variant automatically tracks
- * the active theme. They are consumed inline with `useRecipe({ recipe })` /
- * `useSlotRecipe({ recipe })`, which keeps them fully typed without the Chakra
- * typegen step and lets components share one styling contract instead of
- * repeating prop soup.
+ * the active theme. Two kinds live here:
+ *
+ *   1. Overrides for Chakra's built-in component recipes (`tooltip`, `menu`,
+ *      `dialog`) — registered in `system.ts` so every instance app-wide gets
+ *      the workbench chrome with zero props at the call site.
+ *   2. Workbench-specific recipes (`panel`, `row`, `chip`, `fieldLabel`,
+ *      `themeCard`) — consumed via the wrappers in `workbench/components/ui`
+ *      with `useRecipe({ recipe })` / `useSlotRecipe({ recipe })`, which keeps
+ *      them fully typed without the Chakra typegen step.
+ *
+ * Either way, this file is the single place where shared component styling is
+ * edited.
  */
 
-/** Selectable theme swatch card used by the Settings appearance picker. */
-export const themeCardRecipe = defineSlotRecipe({
-  slots: ['root', 'preview', 'swatch', 'body', 'name', 'description', 'indicator'],
+/* -------------------------------------------------------------------------- *
+ * Built-in component overrides (registered in system.ts)
+ * -------------------------------------------------------------------------- */
+
+/** Tooltip chrome: raised surface with a hairline stroke instead of inverted fill. */
+export const tooltipSlotRecipe = defineSlotRecipe({
+  slots: ['content', 'arrowTip'],
   base: {
-    root: {
-      alignItems: 'stretch',
-      bg: 'bg.surface',
-      borderColor: 'border.subtle',
+    content: {
+      '--tooltip-bg': 'colors.bg.muted',
+      bg: 'var(--tooltip-bg)',
+      borderColor: 'border.emphasized',
+      borderWidth: '1px',
+      boxShadow: 'lg',
+      color: 'fg',
+    },
+    arrowTip: {
+      borderColor: 'border.emphasized',
+    },
+  },
+});
+
+/** Menu / context-menu chrome: popover surface with an emphasized stroke. */
+export const menuSlotRecipe = defineSlotRecipe({
+  slots: ['content'],
+  base: {
+    content: {
+      borderColor: 'border.emphasized',
       borderRadius: 'lg',
       borderWidth: '1px',
-      cursor: 'pointer',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '2.5',
-      overflow: 'hidden',
-      p: '3',
-      textAlign: 'left',
-      transition: 'border-color 0.12s ease, background 0.12s ease, transform 0.12s ease',
-      _hover: { borderColor: 'border.emphasis' },
-      _focusVisible: { outline: '2px solid', outlineColor: 'accent.active', outlineOffset: '2px' },
     },
-    preview: {
+  },
+});
+
+/** Dialog chrome: panel surface with a hairline stroke. */
+export const dialogSlotRecipe = defineSlotRecipe({
+  slots: ['content'],
+  base: {
+    content: {
       borderColor: 'border.subtle',
-      borderRadius: 'md',
       borderWidth: '1px',
-      display: 'flex',
-      h: '8',
-      overflow: 'hidden',
     },
-    swatch: { flex: '1' },
-    body: { alignItems: 'flex-start', display: 'flex', flexDirection: 'column', gap: '0.5' },
-    name: { color: 'fg.default', fontSize: 'sm', fontWeight: '600' },
-    description: { color: 'fg.subtle', fontSize: '2xs', lineHeight: '1.3' },
-    indicator: {
-      alignItems: 'center',
-      borderRadius: 'full',
-      color: 'accent.invoke',
-      display: 'flex',
-      h: '4',
-      justifyContent: 'center',
-      opacity: 0,
-      w: '4',
-    },
+  },
+});
+
+/* -------------------------------------------------------------------------- *
+ * Workbench recipes (consumed through workbench/components/ui wrappers)
+ * -------------------------------------------------------------------------- */
+
+/** Bordered surface container — panels, cards, wells. */
+export const panelRecipe = defineRecipe({
+  base: {
+    bg: 'bg.subtle',
+    borderColor: 'border.subtle',
+    borderRadius: 'md',
+    borderWidth: '1px',
+    display: 'flex',
+    flexDirection: 'column',
+    minH: '0',
+    minW: '0',
   },
   variants: {
-    selected: {
-      true: {
-        root: { borderColor: 'accent.invoke', bg: 'bg.surfaceRaised' },
-        indicator: { opacity: 1 },
-      },
-      false: {},
+    tone: {
+      surface: {},
+      raised: { bg: 'bg.muted' },
+      inset: { bg: 'bg.inset' },
+      control: { bg: 'bg.emphasized', borderColor: 'transparent' },
+    },
+    density: {
+      none: {},
+      sm: { gap: '1.5', p: '2' },
+      md: { gap: '2', p: '3' },
     },
   },
-  defaultVariants: { selected: false },
+  defaultVariants: { tone: 'surface', density: 'none' },
+});
+
+/** Interactive list / table row with hover, focus, and active fills. */
+export const rowRecipe = defineRecipe({
+  base: {
+    alignItems: 'center',
+    borderRadius: 'sm',
+    cursor: 'pointer',
+    display: 'flex',
+    gap: '2',
+    textAlign: 'start',
+    transition: 'background 0.12s ease, color 0.12s ease',
+    w: 'full',
+    _hover: { bg: 'bg.muted' },
+    _focusVisible: { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '-2px' },
+    _disabled: { cursor: 'not-allowed', opacity: 0.5 },
+  },
+  variants: {
+    active: {
+      none: {},
+      muted: { bg: 'bg.muted' },
+      brand: { bg: 'brand.subtle', color: 'brand.fg', _hover: { bg: 'brand.subtle' } },
+      accent: { bg: 'accent.solid', color: 'accent.contrast', _hover: { bg: 'accent.solid' } },
+    },
+  },
+  defaultVariants: { active: 'none' },
+});
+
+/** Compact status chip with intent tones — queue counts, server state, versions. */
+export const chipRecipe = defineRecipe({
+  base: {
+    alignItems: 'center',
+    borderColor: 'border.emphasized',
+    borderRadius: 'sm',
+    borderWidth: '1px',
+    display: 'inline-flex',
+    flexShrink: '0',
+    fontSize: '2xs',
+    fontWeight: '500',
+    gap: '1.5',
+    px: '2',
+    py: '0.5',
+    whiteSpace: 'nowrap',
+  },
+  variants: {
+    tone: {
+      neutral: {},
+      brand: { bg: 'brand.subtle', borderColor: 'transparent', color: 'brand.fg' },
+      accent: { borderColor: 'accent.solid', color: 'accent.solid' },
+      error: { borderColor: 'fg.error', color: 'fg.error' },
+      success: { borderColor: 'fg.success', color: 'fg.success' },
+      warning: { borderColor: 'fg.warning', color: 'fg.warning' },
+    },
+  },
+  defaultVariants: { tone: 'neutral' },
 });
 
 /** Compact uppercase field label shared across widget forms and the settings modal. */
@@ -77,22 +161,58 @@ export const fieldLabelRecipe = defineRecipe({
   },
 });
 
-/** Shared tooltip chrome for workbench controls. */
-export const workbenchTooltipRecipe = defineSlotRecipe({
-  slots: ['content', 'arrow', 'arrowTip'],
+/** Selectable theme swatch card used by the Settings appearance picker. */
+export const themeCardRecipe = defineSlotRecipe({
+  slots: ['root', 'preview', 'swatch', 'body', 'name', 'description', 'indicator'],
   base: {
-    content: {
-      bg: 'bg.surfaceRaised',
-      borderColor: 'border.emphasis',
+    root: {
+      alignItems: 'stretch',
+      bg: 'bg.subtle',
+      borderColor: 'border.subtle',
+      borderRadius: 'lg',
       borderWidth: '1px',
-      boxShadow: 'lg',
-      color: 'fg.default',
+      cursor: 'pointer',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '2.5',
+      overflow: 'hidden',
+      p: '3',
+      textAlign: 'left',
+      transition: 'border-color 0.12s ease, background 0.12s ease, transform 0.12s ease',
+      _hover: { borderColor: 'border.emphasized' },
+      _focusVisible: { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '2px' },
     },
-    arrow: {
-      '--arrow-background': 'colors.bg.surfaceRaised',
+    preview: {
+      borderColor: 'border.subtle',
+      borderRadius: 'md',
+      borderWidth: '1px',
+      display: 'flex',
+      h: '8',
+      overflow: 'hidden',
     },
-    arrowTip: {
-      borderColor: 'border.emphasis',
+    swatch: { flex: '1' },
+    body: { alignItems: 'flex-start', display: 'flex', flexDirection: 'column', gap: '0.5' },
+    name: { color: 'fg', fontSize: 'sm', fontWeight: '600' },
+    description: { color: 'fg.subtle', fontSize: '2xs', lineHeight: '1.3' },
+    indicator: {
+      alignItems: 'center',
+      borderRadius: 'full',
+      color: 'accent.solid',
+      display: 'flex',
+      h: '4',
+      justifyContent: 'center',
+      opacity: 0,
+      w: '4',
     },
   },
+  variants: {
+    selected: {
+      true: {
+        root: { borderColor: 'accent.solid', bg: 'bg.muted' },
+        indicator: { opacity: 1 },
+      },
+      false: {},
+    },
+  },
+  defaultVariants: { selected: false },
 });

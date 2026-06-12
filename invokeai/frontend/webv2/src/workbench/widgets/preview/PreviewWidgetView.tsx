@@ -336,10 +336,10 @@ const SelectedImagePreview = ({
   >
     <Flex
       align="center"
-      backgroundColor="bg.canvas"
+      backgroundColor="bg.inset"
       borderWidth="1px"
       borderColor="border.subtle"
-      color="canvas.dot"
+      color="fg.grid"
       css={previewGridCss}
       flex="1"
       justify="center"
@@ -353,7 +353,7 @@ const SelectedImagePreview = ({
         aspectRatio={getImageAspectRatio(image)}
         bg="transparent"
         borderWidth="1px"
-        borderColor="border.emphasis"
+        borderColor="border.emphasized"
         boxShadow="0 24px 80px rgba(0,0,0,0.42)"
         h={isCompact ? 'auto' : 'full'}
         maxH={isCompact ? undefined : 'full'}
@@ -381,7 +381,7 @@ const SelectedImagePreview = ({
         />
       </Box>
     </Flex>
-    <Stack bg="bg.surfaceRaised" borderWidth="1px" borderColor="border.subtle" gap="2" p="3" rounded="lg">
+    <Stack bg="bg.muted" borderWidth="1px" borderColor="border.subtle" gap="2" p="3" rounded="lg">
       <HStack align="center" justify="space-between">
         <HStack gap="2" minW="0">
           <Badge flexShrink={0} size="xs" variant="subtle">
@@ -434,14 +434,14 @@ const SelectedImagePreview = ({
 const EmptyPreview = () => (
   <Flex
     align="center"
-    backgroundColor="bg.canvas"
-    color="canvas.dot"
+    backgroundColor="bg.inset"
+    color="fg.grid"
     css={previewGridCss}
     h="full"
     justify="center"
     w="full"
   >
-    <Stack align="center" color="fg.default" gap="2" maxW="18rem" textAlign="center">
+    <Stack align="center" color="fg" gap="2" maxW="18rem" textAlign="center">
       <Text fontSize="sm" fontWeight="800">
         No gallery selection
       </Text>

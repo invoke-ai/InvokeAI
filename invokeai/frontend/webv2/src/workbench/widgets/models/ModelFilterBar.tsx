@@ -49,7 +49,7 @@ export const ModelFilterBar = ({
       <Menu.Trigger asChild>
         <IconButton
           aria-label="Filter and sort models"
-          color={isFiltering(filters) ? 'accent.invoke' : 'fg.muted'}
+          color={isFiltering(filters) ? 'accent.solid' : 'fg.muted'}
           size="sm"
           variant="ghost"
         >

@@ -127,10 +127,10 @@ export const ModelSelect = ({
       <Portal>
         <Combobox.Positioner>
           <Combobox.Content
-            bg="bg.surfaceRaised"
-            borderColor="border.emphasis"
+            bg="bg.muted"
+            borderColor="border.emphasized"
             borderWidth="1px"
-            color="fg.default"
+            color="fg"
             maxH="18rem"
             rounded="lg"
             shadow="lg"

@@ -79,17 +79,7 @@ export const GalleryBoardMenu = ({
         <Portal>
           <Menu.Positioner>
             {board && (
-              <Menu.Content
-                bg="bg.surfaceRaised"
-                borderColor="border.emphasis"
-                borderWidth="1px"
-                color="fg.default"
-                minW="12rem"
-                py="1"
-                px="0"
-                rounded="lg"
-                shadow="lg"
-              >
+              <Menu.Content minW="12rem" py="1" px="0">
                 <BoardMenuItem
                   icon={DownloadIcon}
                   label="Download Board"
@@ -141,7 +131,7 @@ export const GalleryBoardMenu = ({
         <Portal>
           <Dialog.Backdrop />
           <Dialog.Positioner>
-            <Dialog.Content bg="bg.surfaceRaised" borderColor="border.emphasis" borderWidth="1px" color="fg.default">
+            <Dialog.Content>
               <Dialog.Header>
                 <Dialog.Title fontSize="sm">Rename board</Dialog.Title>
               </Dialog.Header>
@@ -184,7 +174,7 @@ export const GalleryBoardMenu = ({
         <Portal>
           <Dialog.Backdrop />
           <Dialog.Positioner>
-            <Dialog.Content bg="bg.surfaceRaised" borderColor="border.emphasis" borderWidth="1px" color="fg.default">
+            <Dialog.Content>
               <Dialog.Header>
                 <Dialog.Title fontSize="sm">Delete board &ldquo;{deleteTarget?.name}&rdquo;?</Dialog.Title>
               </Dialog.Header>

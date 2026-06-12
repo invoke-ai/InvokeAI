@@ -80,7 +80,7 @@ export const InvokeControl = () => {
     <Flex>
       <Menu.Root positioning={{ placement: 'bottom-start' }}>
         <Group attached>
-          <Button size="sm" onClick={onInvoke} w={CONTROL_WIDTH} minW="0" justifyContent="start">
+          <Button colorPalette="brand" size="sm" onClick={onInvoke} w={CONTROL_WIDTH} minW="0" justifyContent="start">
             <Icon as={SparklesIcon} boxSize="4" flexShrink={0} />
             <VStack align="start" gap="0" minW="0">
               <Text fontSize="sm" fontWeight="700" lineHeight="1">
@@ -95,22 +95,14 @@ export const InvokeControl = () => {
             </VStack>
           </Button>
           <Menu.Trigger asChild>
-            <IconButton size="sm" minW="0" w="7">
+            <IconButton colorPalette="brand" size="sm" minW="0" w="7">
               <ChevronDownIcon />
             </IconButton>
           </Menu.Trigger>
         </Group>
         <Portal>
           <Menu.Positioner>
-            <Menu.Content
-              bg="bg.surfaceRaised"
-              borderWidth="1px"
-              borderColor="border.emphasis"
-              color="fg.default"
-              minW="15rem"
-              rounded="lg"
-              shadow="lg"
-            >
+            <Menu.Content minW="15rem">
               <Menu.RadioItemGroup
                 value={invocation.sourceId}
                 onValueChange={(event) =>

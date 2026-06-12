@@ -1,8 +1,9 @@
-import { chakra, Dialog, Icon, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Dialog, Icon, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { useEffect, useState } from 'react';
 import { ArrowRightIcon, FileUpIcon } from 'lucide-react';
 
 import { Button, CloseButton } from './ui/Button';
+import { Row } from './ui/Row';
 import { Scrollable } from './ui/Scrollable';
 import { formatRelativeTime } from '../home/formatRelativeTime';
 import { useNotify } from '../useNotify';
@@ -85,7 +86,7 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
-          <Dialog.Content bg="bg.surface" borderColor="border.subtle" borderWidth="1px" color="fg.default">
+          <Dialog.Content>
             <Dialog.Header>
               <Dialog.Title fontSize="sm" fontWeight="700">
                 Open project
@@ -95,36 +96,23 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
               <Scrollable maxH="72">
                 <Stack gap="1">
                   {available.map((summary) => (
-                    <chakra.button
-                      key={summary.id}
-                      alignItems="center"
-                      disabled={busyProjectId !== null}
-                      display="flex"
-                      gap="2.5"
-                      px="2.5"
-                      py="2"
-                      rounded="md"
-                      textAlign="start"
-                      type="button"
-                      w="full"
-                      _disabled={{ opacity: 0.6 }}
-                      _hover={{ bg: 'bg.surfaceRaised' }}
-                      onClick={() => void openProject(summary)}
-                    >
-                      <Stack flex="1" gap="0" minW="0">
-                        <Text fontSize="xs" fontWeight="600" truncate>
-                          {summary.name}
-                        </Text>
-                        <Text color="fg.muted" fontSize="2xs">
-                          Edited {formatRelativeTime(summary.updatedAt)}
-                        </Text>
-                      </Stack>
-                      {busyProjectId === summary.id ? (
-                        <Spinner color="fg.muted" size="xs" />
-                      ) : (
-                        <Icon as={ArrowRightIcon} boxSize="3.5" color="fg.muted" />
-                      )}
-                    </chakra.button>
+                    <Row key={summary.id} asChild gap="2.5" px="2.5" py="2" rounded="md" _disabled={{ opacity: 0.6 }}>
+                      <button disabled={busyProjectId !== null} type="button" onClick={() => void openProject(summary)}>
+                        <Stack flex="1" gap="0" minW="0">
+                          <Text fontSize="xs" fontWeight="600" truncate>
+                            {summary.name}
+                          </Text>
+                          <Text color="fg.muted" fontSize="2xs">
+                            Edited {formatRelativeTime(summary.updatedAt)}
+                          </Text>
+                        </Stack>
+                        {busyProjectId === summary.id ? (
+                          <Spinner color="fg.muted" size="xs" />
+                        ) : (
+                          <Icon as={ArrowRightIcon} boxSize="3.5" color="fg.muted" />
+                        )}
+                      </button>
+                    </Row>
                   ))}
                   {available.length === 0 ? (
                     <Text color="fg.muted" fontSize="xs" px="2.5" py="4" textAlign="center">

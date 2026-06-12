@@ -414,7 +414,7 @@ export interface AutosaveState {
  * `theme/themes.ts`; the active id is applied to `<html data-theme>` so the
  * semantic-token conditions in `theme/system.ts` resolve to the right colors.
  */
-export type WorkbenchThemeId = 'dark' | 'light' | 'forest' | 'mono' | 'ultradark';
+export type WorkbenchThemeId = 'classic' | 'light' | 'forest' | 'mono' | 'ultradark';
 
 export type WorkbenchLanguage =
   | 'ar'

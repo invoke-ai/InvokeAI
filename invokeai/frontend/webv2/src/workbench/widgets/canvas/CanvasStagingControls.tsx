@@ -67,9 +67,9 @@ export const CanvasStagingControls = ({
       </ScrollArea.Scrollbar>
     </ScrollArea.Root>
     <Stack
-      bg="bg.surfaceRaised"
+      bg="bg.muted"
       borderWidth="1px"
-      borderColor="border.emphasis"
+      borderColor="border.emphasized"
       gap="2"
       minW="18rem"
       p="2"
@@ -128,7 +128,7 @@ export const CanvasStagingControls = ({
           <Button size="xs" variant="outline" onClick={onDiscardAll}>
             Discard All
           </Button>
-          <Button bg="accent.invoke" color="accent.invokeFg" disabled={!isVisible} size="xs" onClick={onAccept}>
+          <Button disabled={!isVisible} size="xs" onClick={onAccept}>
             Accept to Layer
           </Button>
         </HStack>
@@ -139,9 +139,9 @@ export const CanvasStagingControls = ({
 
 export const EmptyStagingControls = () => (
   <Stack
-    bg="bg.surfaceRaised"
+    bg="bg.muted"
     borderWidth="1px"
-    borderColor="border.emphasis"
+    borderColor="border.emphasized"
     bottom="4"
     gap="2"
     left="50%"
@@ -173,15 +173,15 @@ const StagingThumbnail = ({
   <Box
     aria-label={`Select staged candidate ${index + 1}`}
     as="button"
-    bg="bg.panel"
+    bg="bg.emphasized"
     borderWidth="2px"
-    borderColor={isSelected ? 'accent.active' : 'border.subtle'}
+    borderColor={isSelected ? 'accent.solid' : 'border.subtle'}
     flex="0 0 auto"
     h="full"
     overflow="hidden"
     position="relative"
     rounded="md"
-    shadow={isSelected ? '0 0 0 1px var(--chakra-colors-accent-active)' : 'md'}
+    shadow={isSelected ? '0 0 0 1px {colors.accent.solid}' : 'md'}
     style={{ aspectRatio: '1 / 1' }}
     onClick={onSelect}
   >

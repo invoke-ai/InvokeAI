@@ -48,9 +48,9 @@ const NotificationsPanel = () => {
             return (
               <Stack
                 key={notification.id}
-                bg={notification.isRead ? 'bg.surface' : 'bg.surfaceRaised'}
+                bg={notification.isRead ? 'bg.subtle' : 'bg.muted'}
                 borderWidth="1px"
-                borderColor={notification.isRead ? 'border.subtle' : 'border.emphasis'}
+                borderColor={notification.isRead ? 'border.subtle' : 'border.emphasized'}
                 gap="1"
                 p="2"
                 rounded="md"

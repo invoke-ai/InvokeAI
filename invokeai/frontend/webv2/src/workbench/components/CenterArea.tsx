@@ -43,8 +43,8 @@ export const CenterArea = () => {
     : centerViewItems[0]?.id;
 
   return (
-    <Flex as="section" bg="bg.center" direction="column" flex="1" minH="0" minW="0" {...focusRegionProps}>
-      <HStack bg="bg.surfaceRaised" borderBottomWidth="1px" borderColor="border.subtle" h="10" px="1.5">
+    <Flex as="section" bg="bg.inset" direction="column" flex="1" minH="0" minW="0" {...focusRegionProps}>
+      <HStack bg="bg.muted" borderBottomWidth="1px" borderColor="border.subtle" h="10" px="1.5">
         <Tabs.Root
           value={activeCenterViewId}
           h="full"
@@ -119,15 +119,7 @@ const CenterWidgetMenu = ({
       </Menu.Trigger>
       <Portal>
         <Menu.Positioner>
-          <Menu.Content
-            bg="bg.surfaceRaised"
-            borderWidth="1px"
-            borderColor="border.emphasis"
-            color="fg.default"
-            minW="12rem"
-            rounded="lg"
-            shadow="lg"
-          >
+          <Menu.Content minW="12rem">
             <Menu.ItemGroup>
               <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
                 Center Widgets

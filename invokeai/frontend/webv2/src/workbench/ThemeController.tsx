@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-import { THEMES_BY_ID } from '../theme/system';
+import { DEFAULT_THEME, THEMES_BY_ID } from '../theme/system';
 import { useWorkbenchSettings } from './settings/store';
 
 /**
@@ -32,7 +32,7 @@ export const ThemeController = () => {
     }
 
     const root = document.documentElement;
-    const theme = THEMES_BY_ID[themeId] ?? THEMES_BY_ID.dark;
+    const theme = THEMES_BY_ID[themeId] ?? DEFAULT_THEME;
 
     root.dataset.theme = theme.id;
     root.style.colorScheme = theme.colorScheme;

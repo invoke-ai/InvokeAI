@@ -22,17 +22,17 @@ export const LayoutPresetMenu = () => {
     <Menu.Root positioning={{ placement: 'bottom-end' }}>
       <Menu.Trigger asChild>
         <Button
-          bg="bg.surface"
+          bg="bg.subtle"
           borderWidth="1px"
-          borderColor="border.emphasis"
-          color="fg.default"
+          borderColor="border.emphasized"
+          color="fg"
           fontSize="xs"
           fontWeight="500"
           justifyContent="space-between"
           size="xs"
           variant="outline"
           w="9rem"
-          _hover={{ bg: 'bg.surfaceRaised' }}
+          _hover={{ bg: 'bg.muted' }}
         >
           {activePreset.label}
           <Icon as={ChevronDownIcon} boxSize="3" />
@@ -40,15 +40,7 @@ export const LayoutPresetMenu = () => {
       </Menu.Trigger>
       <Portal>
         <Menu.Positioner>
-          <Menu.Content
-            bg="bg.surfaceRaised"
-            borderWidth="1px"
-            borderColor="border.emphasis"
-            color="fg.default"
-            maxW="18rem"
-            rounded="lg"
-            shadow="lg"
-          >
+          <Menu.Content maxW="18rem">
             <Menu.ItemGroup>
               <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
                 Layout presets
@@ -67,7 +59,7 @@ export const LayoutPresetMenu = () => {
                       {preset.description}
                     </Text>
                   </Stack>
-                  {preset.id === activePreset.id ? <Icon as={CheckIcon} boxSize="3" color="accent.active" /> : null}
+                  {preset.id === activePreset.id ? <Icon as={CheckIcon} boxSize="3" color="accent.solid" /> : null}
                 </Menu.Item>
               ))}
             </Menu.ItemGroup>

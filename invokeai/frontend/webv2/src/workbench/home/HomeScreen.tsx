@@ -60,7 +60,7 @@ export const HomeScreen = () => {
   };
 
   return (
-    <Flex bg="bg.shell" color="fg.default" direction="column" minH="100dvh">
+    <Flex bg="bg" color="fg" direction="column" minH="100dvh">
       <HomeTopBar />
       <Box css={HOME_SCREEN_CONTENT_WRAPPER_SX}>
         <Flex direction={{ base: 'column', md: 'row' }} gap={{ base: '8', md: '10' }}>

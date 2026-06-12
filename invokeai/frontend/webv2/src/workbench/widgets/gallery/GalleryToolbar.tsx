@@ -149,16 +149,7 @@ const GallerySettingsMenu = () => {
       </Menu.Trigger>
       <Portal>
         <Menu.Positioner>
-          <Menu.Content
-            bg="bg.surfaceRaised"
-            borderWidth="1px"
-            borderColor="border.emphasis"
-            color="fg.default"
-            minW="14rem"
-            p="3"
-            rounded="lg"
-            shadow="lg"
-          >
+          <Menu.Content minW="14rem" p="3">
             <Stack gap="3">
               <Stack gap="2">
                 <HStack justify="space-between">

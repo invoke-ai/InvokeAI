@@ -1,10 +1,11 @@
-import { Box, HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
+import { HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
 import { useState, type ReactNode } from 'react';
 import { ArrowRightIcon, CopyIcon, History as HistoryIcon, Trash2Icon } from 'lucide-react';
 
 import { Button, IconButton } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Field, FieldLabel } from '../../components/ui/Field';
+import { Panel } from '../../components/ui/Panel';
 import { useProjectSync } from '../../projects/syncStore';
 import { useProjectActions } from '../../projects/useProjectActions';
 import type { Project } from '../../types';
@@ -88,7 +89,7 @@ const RecoverySection = ({ project }: { project: Project }) => {
     <Stack gap="2">
       <FieldLabel>Recoveries</FieldLabel>
       {project.recoveryOf ? (
-        <Box bg="bg.surface" borderColor="border.subtle" borderWidth="1px" p="2.5" rounded="md">
+        <Panel p="2.5">
           <HStack gap="2">
             <Icon as={HistoryIcon} boxSize="3.5" color="fg.muted" flexShrink={0} />
             <Stack flex="1" gap="0" minW="0">
@@ -112,18 +113,10 @@ const RecoverySection = ({ project }: { project: Project }) => {
               Open original "{original.name}"
             </Button>
           ) : null}
-        </Box>
+        </Panel>
       ) : null}
       {recoveries.map((recovery) => (
-        <HStack
-          key={recovery.id}
-          bg="bg.surface"
-          borderColor="border.subtle"
-          borderWidth="1px"
-          gap="2"
-          p="2"
-          rounded="md"
-        >
+        <Panel key={recovery.id} alignItems="center" flexDirection="row" gap="2" p="2">
           <Stack flex="1" gap="0" minW="0">
             <Text fontSize="xs" fontWeight="600" truncate>
               {recovery.name}
@@ -151,7 +144,7 @@ const RecoverySection = ({ project }: { project: Project }) => {
           >
             <Trash2Icon />
           </IconButton>
-        </HStack>
+        </Panel>
       ))}
       <ConfirmDialog
         body={`Delete "${deleteTarget?.name ?? ''}"? The recovery copy is removed permanently.`}
@@ -194,7 +187,7 @@ const DetailsSection = ({ project }: { project: Project }) => {
   return (
     <Stack gap="2">
       <FieldLabel>Details</FieldLabel>
-      <Stack bg="bg.surface" borderColor="border.subtle" borderWidth="1px" gap="1.5" p="2.5" rounded="md">
+      <Panel gap="1.5" p="2.5">
         <DetailRow label="ID">
           <HStack gap="1" minW="0">
             <Text fontFamily="mono" fontSize="2xs" truncate>
@@ -218,7 +211,7 @@ const DetailsSection = ({ project }: { project: Project }) => {
         <DetailRow label="Graph nodes">{project.projectGraph.nodes.length}</DetailRow>
         <DetailRow label="Queue items">{project.queue.items.length}</DetailRow>
         <DetailRow label="Events">{project.events.length}</DetailRow>
-      </Stack>
+      </Panel>
     </Stack>
   );
 };

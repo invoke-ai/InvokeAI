@@ -32,7 +32,7 @@ export const Field = ({ children, error, helpText, label, ...rest }: FieldProps)
     <FieldLabel>{label}</FieldLabel>
     {children}
     {error ? (
-      <Text color="red.400" fontSize="2xs" role="alert">
+      <Text color="fg.error" fontSize="2xs" role="alert">
         {error}
       </Text>
     ) : helpText ? (

@@ -53,7 +53,7 @@ const WidgetShellFrame = ({
   }
 
   return (
-    <Flex bg="bg.canvas" direction="column" h="full" minH="0" w="full">
+    <Flex bg="bg.inset" direction="column" h="full" minH="0" w="full">
       <HeaderSlot presentation={presentation} region={region} widget={widget} />
       <Box flex="1" minH="0" overflow="hidden" position="relative">
         {content}
@@ -80,7 +80,7 @@ const HeaderSlot = ({
   const actions = HeaderActions ? (
     <HeaderActions manifest={widget.manifest} presentation={presentation} region={region} />
   ) : null;
-  const bg = region === 'center' ? 'bg.canvas' : 'bg.shell';
+  const bg = region === 'center' ? 'bg.inset' : 'bg';
 
   return (
     <Box bg={bg} flexShrink={0}>
@@ -109,7 +109,7 @@ const FooterSlot = ({
   if (!Footer) {
     return null;
   }
-  const bg = region === 'center' ? 'bg.canvas' : 'bg.shell';
+  const bg = region === 'center' ? 'bg.inset' : 'bg';
 
   return (
     <Box bg={bg} flexShrink={0}>

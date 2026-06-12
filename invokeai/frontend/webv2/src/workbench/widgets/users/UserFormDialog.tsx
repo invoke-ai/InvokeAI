@@ -47,7 +47,7 @@ export const UserFormDialog = ({
     <Portal>
       <Dialog.Backdrop />
       <Dialog.Positioner>
-        <Dialog.Content bg="bg.surface" borderColor="border.subtle" borderWidth="1px" color="fg.default">
+        <Dialog.Content>
           {target ? (
             <>
               <Dialog.Header borderBottomWidth="1px" borderColor="border.subtle">
@@ -224,7 +224,7 @@ const UserForm = ({
             onCheckedChange={(event) => form.setValue('isAdmin', event.checked)}
           >
             <Stack gap="0.5">
-              <Switch.Label color="fg.default" fontSize="sm" fontWeight="500" m="0">
+              <Switch.Label color="fg" fontSize="sm" fontWeight="500" m="0">
                 Administrator
               </Switch.Label>
               <Text color="fg.subtle" fontSize="xs">
@@ -232,7 +232,7 @@ const UserForm = ({
               </Text>
             </Stack>
             <Switch.HiddenInput />
-            <Switch.Control _checked={{ bg: 'accent.invoke' }}>
+            <Switch.Control _checked={{ bg: 'accent.solid' }}>
               <Switch.Thumb />
             </Switch.Control>
           </Switch.Root>

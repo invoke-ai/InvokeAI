@@ -4,17 +4,9 @@ import type { ComponentProps } from 'react';
 type MenuContentProps = ComponentProps<typeof Menu.Content>;
 
 /**
- * Menu.Content with the workbench popover surface styling applied, so every
- * menu (filter menus, context menus, action menus) renders the same surface.
+ * Menu.Content passthrough. The workbench popover chrome (surface, stroke,
+ * radius, shadow) is applied globally by the `menu` slot-recipe override in
+ * `theme/recipes.ts`; this wrapper only exists as the single import point
+ * for future menu-wide behavior.
  */
-export const MenuContent = (props: MenuContentProps) => (
-  <Menu.Content
-    bg="bg.surfaceRaised"
-    borderColor="border.emphasis"
-    borderWidth="1px"
-    color="fg.default"
-    rounded="lg"
-    shadow="lg"
-    {...props}
-  />
-);
+export const MenuContent = (props: MenuContentProps) => <Menu.Content {...props} />;

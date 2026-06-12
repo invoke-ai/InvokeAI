@@ -78,8 +78,8 @@ export const ModelImageUpload = ({
     <Box
       aria-busy={isBusy || undefined}
       aria-label={`Upload cover image for ${model.name}`}
-      bg="bg.panel"
-      borderColor={isDropActive ? 'accent.active' : 'border.subtle'}
+      bg="bg.emphasized"
+      borderColor={isDropActive ? 'accent.solid' : 'border.subtle'}
       borderStyle={hasImage ? 'solid' : 'dashed'}
       borderWidth={isDropActive ? '2px' : '1px'}
       boxSize="24"
@@ -91,7 +91,7 @@ export const ModelImageUpload = ({
       rounded="lg"
       tabIndex={0}
       className="group"
-      _focusVisible={{ outline: '2px solid var(--chakra-colors-accent-active)', outlineOffset: '2px' }}
+      _focusVisible={{ outline: '2px solid {colors.accent.solid}', outlineOffset: '2px' }}
       onClick={() => {
         if (!isBusy) {
           inputRef.current?.click();
@@ -167,14 +167,14 @@ export const ModelImageUpload = ({
       {isDropActive ? (
         <Flex
           align="center"
-          bg="bg.surfaceRaised/85"
+          bg="bg.muted/85"
           boxSize="full"
           inset="0"
           justify="center"
           pointerEvents="none"
           position="absolute"
         >
-          <Icon as={UploadIcon} boxSize="5" color="accent.active" />
+          <Icon as={UploadIcon} boxSize="5" color="accent.solid" />
         </Flex>
       ) : null}
       {hasImage && !isDropActive ? (

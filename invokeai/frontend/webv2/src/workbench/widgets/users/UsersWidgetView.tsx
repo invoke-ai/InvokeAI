@@ -101,7 +101,7 @@ const UsersDirectory = ({ currentUserId }: { currentUserId: string }) => {
                 Add user
               </Button>
             </HStack>
-            <Box bg="bg.surface" borderColor="border.subtle" borderWidth="1px" overflow="hidden" rounded="lg">
+            <Box bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" overflow="hidden" rounded="lg">
               {users === null ? (
                 <Center minH="40">
                   {loadError ? (
@@ -120,7 +120,7 @@ const UsersDirectory = ({ currentUserId }: { currentUserId: string }) => {
               ) : (
                 <Table.Root size="sm">
                   <Table.Header>
-                    <Table.Row bg="bg.surfaceRaised">
+                    <Table.Row bg="bg.muted">
                       <Table.ColumnHeader borderColor="border.subtle" color="fg.muted" ps="4">
                         User
                       </Table.ColumnHeader>
@@ -192,10 +192,10 @@ const UserRow = ({
   onSetActive: (isActive: boolean) => void;
   user: UserDTO;
 }) => (
-  <Table.Row bg="transparent" _hover={{ bg: 'bg.surfaceRaised' }}>
+  <Table.Row bg="transparent" _hover={{ bg: 'bg.muted' }}>
     <Table.Cell borderColor="border.subtle" ps="4">
       <HStack gap="2.5">
-        <Avatar.Root bg="accent.widget" color="fg.default" size="2xs">
+        <Avatar.Root bg="accent.subtle" color="fg" size="2xs">
           <Avatar.Fallback fontSize="2xs" name={getUserLabel(user)} />
         </Avatar.Root>
         <Stack gap="0">
@@ -204,7 +204,7 @@ const UserRow = ({
               {getUserLabel(user)}
             </Text>
             {isSelf ? (
-              <Badge colorPalette="theme" fontSize="2xs" variant="surface">
+              <Badge fontSize="2xs" variant="surface">
                 You
               </Badge>
             ) : null}
@@ -235,7 +235,7 @@ const UserRow = ({
           onCheckedChange={(event) => onSetActive(event.checked)}
         >
           <Switch.HiddenInput />
-          <Switch.Control _checked={{ bg: 'accent.invoke' }}>
+          <Switch.Control _checked={{ bg: 'accent.solid' }}>
             <Switch.Thumb />
           </Switch.Control>
         </Switch.Root>

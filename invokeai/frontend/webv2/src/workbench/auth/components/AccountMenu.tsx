@@ -55,7 +55,7 @@ export const AccountMenu = () => {
         <Menu.Trigger asChild>
           <chakra.button
             alignItems="center"
-            color="fg.default"
+            color="fg"
             display="flex"
             flexShrink={0}
             gap="1.5"
@@ -63,9 +63,9 @@ export const AccountMenu = () => {
             py="1"
             rounded="md"
             type="button"
-            _hover={{ bg: 'bg.surface' }}
+            _hover={{ bg: 'bg.subtle' }}
           >
-            <Avatar.Root bg="accent.widget" color="fg.default" size="2xs">
+            <Avatar.Root bg="accent.subtle" color="fg" size="2xs">
               <Avatar.Fallback fontSize="2xs" name={label} />
             </Avatar.Root>
             <Text fontSize="xs" fontWeight="600">

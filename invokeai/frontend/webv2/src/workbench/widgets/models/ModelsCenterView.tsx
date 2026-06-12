@@ -136,8 +136,8 @@ const LibraryMasterDetail = () => {
             every additional click. Floats over the list, never shifts it. */}
         {selectedKeys.size > 0 ? (
           <HStack
-            bg="bg.surfaceRaised"
-            borderColor="border.emphasis"
+            bg="bg.muted"
+            borderColor="border.emphasized"
             borderWidth="1px"
             bottom="2"
             gap="2"

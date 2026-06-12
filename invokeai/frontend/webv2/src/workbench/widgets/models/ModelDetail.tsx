@@ -132,7 +132,7 @@ export const ModelDetail = ({
                     <Menu.ItemText fontSize="xs">Re-identify model</Menu.ItemText>
                   </Menu.Item>
                   <Menu.Separator />
-                  <Menu.Item color="red.400" value="delete" onClick={() => setPendingAction('delete')}>
+                  <Menu.Item color="fg.error" value="delete" onClick={() => setPendingAction('delete')}>
                     <Icon as={Trash2Icon} boxSize="3.5" />
                     <Menu.ItemText fontSize="xs">Delete model</Menu.ItemText>
                   </Menu.Item>

@@ -99,7 +99,7 @@ export const ScanFolderTab = () => {
             <HStack gap="3">
               <Checkbox.Root
                 checked={inplace}
-                colorPalette="theme"
+                colorPalette="accent"
                 size="sm"
                 onCheckedChange={(event) => setInplace(event.checked === true)}
               >

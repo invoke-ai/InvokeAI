@@ -75,7 +75,7 @@ export const InstallQueueSection = () => {
   if (status === 'error') {
     return (
       <Stack align="center" gap="1" py="6">
-        <Text color="red.400" fontSize="xs" fontWeight="600">
+        <Text color="fg.error" fontSize="xs" fontWeight="600">
           Could not load the install queue
         </Text>
         <Text color="fg.subtle" fontSize="2xs">
@@ -161,8 +161,8 @@ const InstallJobRow = ({
 
   return (
     <Stack
-      bg="bg.surface"
-      borderColor={job.status === 'error' ? 'red.500' : 'border.subtle'}
+      bg="bg.subtle"
+      borderColor={job.status === 'error' ? 'border.error' : 'border.subtle'}
       borderWidth="1px"
       gap="1.5"
       p="2"
@@ -237,7 +237,7 @@ const InstallJobRow = ({
       ) : null}
       {job.status === 'downloading' || job.status === 'waiting' ? <InstallJobProgress job={job} /> : null}
       {job.status === 'error' && job.error ? (
-        <Text color="red.300" fontSize="2xs" overflowWrap="anywhere">
+        <Text color="fg.error" fontSize="2xs" overflowWrap="anywhere">
           {job.error_reason ? `${job.error_reason}: ` : ''}
           {job.error}
         </Text>

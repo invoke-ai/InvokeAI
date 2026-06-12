@@ -1,6 +1,7 @@
 import { Box, Flex, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { LayersIcon } from 'lucide-react';
 
+import { Panel } from '../../components/ui/Panel';
 import { useWorkbench } from '../../WorkbenchContext';
 
 export const LayersWidgetView = () => {
@@ -27,7 +28,7 @@ export const LayersWidgetView = () => {
           {layers.length} layers, {activeProject.canvas.stagingArea.pendingImageIds.length} staged images.
         </Text>
       </Flex>
-      <Stack bg="bg.surface" borderWidth="1px" borderColor="border.subtle" gap="2" p="2" rounded="md">
+      <Panel gap="2" p="2">
         {layers.length === 0 ? (
           <Text color="fg.subtle" fontSize="2xs">
             Accepted canvas layers will appear here.
@@ -36,7 +37,7 @@ export const LayersWidgetView = () => {
           layers.map((layer) => (
             <HStack key={layer.id} gap="2">
               <Box
-                bg="bg.panel"
+                bg="bg.emphasized"
                 borderWidth="1px"
                 borderColor="border.subtle"
                 h="10"
@@ -61,8 +62,8 @@ export const LayersWidgetView = () => {
             </HStack>
           ))
         )}
-      </Stack>
-      <Stack bg="bg.surface" borderWidth="1px" borderColor="border.subtle" gap="1" p="2" rounded="md">
+      </Panel>
+      <Panel gap="1" p="2">
         <Text color="fg.muted" fontSize="2xs" fontWeight="700" textTransform="uppercase">
           Project Contracts
         </Text>
@@ -75,7 +76,7 @@ export const LayersWidgetView = () => {
         <Text color="fg.subtle" fontSize="2xs">
           Undo: {activeProject.undoRedo.past.length} / Redo: {activeProject.undoRedo.future.length}
         </Text>
-      </Stack>
+      </Panel>
     </>
   );
 };

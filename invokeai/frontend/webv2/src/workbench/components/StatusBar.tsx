@@ -6,6 +6,7 @@ import type { RegisteredWidget, WidgetId } from '../types';
 import { getWidgetsForRegion } from '../widgetRegistry';
 import { useWorkbench } from '../WorkbenchContext';
 import { WidgetRenderer } from './WidgetRenderer';
+import { Row } from './ui/Row';
 import { Tooltip } from './ui/Tooltip';
 
 interface BottomWidgetItem {
@@ -36,7 +37,7 @@ export const StatusBar = () => {
     <Flex
       align="center"
       as="footer"
-      bg="bg.surface"
+      bg="bg.subtle"
       borderTopWidth="1px"
       borderColor="border.subtle"
       color="fg.muted"
@@ -79,22 +80,16 @@ const CompactBottomWidget = ({
   }
 
   const content = (
-    <Box
+    <Row
+      active={isActive ? 'accent' : 'none'}
       aria-label={item.label}
       aria-pressed={isActive}
-      bg={isActive ? 'accent.active' : 'transparent'}
-      color={isActive ? 'accent.activeFg' : 'fg.muted'}
       cursor={item.isExpandable ? 'pointer' : 'default'}
-      display="flex"
       h="full"
-      alignItems="center"
       role={item.isExpandable ? 'button' : undefined}
-      rounded="sm"
       tabIndex={item.isExpandable ? 0 : undefined}
-      _hover={{
-        bg: isActive ? 'accent.active' : 'bg.surfaceRaised',
-        color: isActive ? 'accent.activeFg' : 'fg.default',
-      }}
+      w="auto"
+      _hover={{ color: isActive ? 'accent.contrast' : 'fg' }}
       onClick={() => {
         if (item.isExpandable) {
           onSelect(item.id);
@@ -108,7 +103,7 @@ const CompactBottomWidget = ({
       }}
     >
       <WidgetRenderer widget={item.widget} presentation="compact" region="bottom" />
-    </Box>
+    </Row>
   );
 
   if (item.isExpandable) {
@@ -151,28 +146,20 @@ const BottomWidgetMenu = ({
         align="center"
         aria-label="Bottom widget visibility"
         as="button"
-        color="fg.default"
+        color="fg"
         h="5"
         justify="center"
         rounded="sm"
         transition="background 0.12s ease, color 0.12s ease"
         w="5"
-        _hover={{ bg: 'bg.surfaceRaised' }}
+        _hover={{ bg: 'bg.muted' }}
       >
         <Icon as={MoreHorizontalIcon} boxSize="4" />
       </Flex>
     </Menu.Trigger>
     <Portal>
       <Menu.Positioner>
-        <Menu.Content
-          bg="bg.surfaceRaised"
-          borderWidth="1px"
-          borderColor="border.emphasis"
-          color="fg.default"
-          minW="12rem"
-          rounded="lg"
-          shadow="lg"
-        >
+        <Menu.Content minW="12rem">
           <Menu.ItemGroup>
             <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
               Bottom Widgets

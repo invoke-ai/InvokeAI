@@ -9,6 +9,7 @@ import { useModelsSnapshot } from '../../models/modelsStore';
 import { formatBytes } from '../../models/taxonomy';
 import type { ModelConfig } from '../../models/types';
 import { getLibraryScrollOffset, saveLibraryScrollOffset } from '../../models/uiStore';
+import { Row } from '../../components/ui/Row';
 import { ModelBadgeRow } from './ModelBadges';
 import { ModelRowContextMenu, type ModelContextMenuTarget } from './ModelRowContextMenu';
 
@@ -97,7 +98,7 @@ export const ModelLibraryList = ({
   if (status === 'error') {
     return (
       <Stack align="center" gap="1" py="8">
-        <Text color="red.400" fontSize="xs" fontWeight="600">
+        <Text color="fg.error" fontSize="xs" fontWeight="600">
           Could not load models
         </Text>
         <Text color="fg.subtle" fontSize="2xs" maxW="20rem" textAlign="center">
@@ -172,7 +173,7 @@ export const ModelLibraryList = ({
       {/* Pinned copy of the current group's header, above the viewport.
           aria-hidden: it duplicates a header already in the list. */}
       {pinnedRow?.kind === 'header' ? (
-        <Box aria-hidden bg="bg.shell" left="0" pointerEvents="none" position="absolute" right="0" top="0" zIndex={1}>
+        <Box aria-hidden bg="bg" left="0" pointerEvents="none" position="absolute" right="0" top="0" zIndex={1}>
           <GroupHeader count={pinnedRow.group.models.length} label={pinnedRow.group.label} />
         </Box>
       ) : null}
@@ -182,7 +183,7 @@ export const ModelLibraryList = ({
 };
 
 const GroupHeader = ({ count, label }: { count: number; label: string }) => (
-  <HStack bg="bg.canvas" gap="1.5" h={`${HEADER_ROW_HEIGHT_PX}px`} pt="2" px="1" w="full">
+  <HStack bg="bg.inset" gap="1.5" h={`${HEADER_ROW_HEIGHT_PX}px`} pt="2" px="1" w="full">
     <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
       {label}
     </Text>
@@ -212,12 +213,9 @@ const ModelRow = ({
   onContextMenu: (model: ModelConfig, x: number, y: number) => void;
   onToggleSelected?: (model: ModelConfig) => void;
 }) => (
-  <HStack
+  <Row
+    active={isActive ? 'accent' : isSelected ? 'muted' : 'none'}
     aria-current={isActive || undefined}
-    bg={isActive ? 'accent.widget' : isSelected ? 'bg.surfaceRaised' : 'transparent'}
-    color={isActive ? 'accent.widgetFg' : 'fg.default'}
-    cursor="pointer"
-    gap="2"
     h={`${MODEL_ROW_HEIGHT_PX - 4}px`}
     mb="1"
     minW="0"
@@ -225,10 +223,7 @@ const ModelRow = ({
     role="button"
     rounded="md"
     tabIndex={0}
-    textAlign="start"
-    w="full"
-    _focusVisible={{ boxShadow: 'inset 0 0 0 2px var(--chakra-colors-accent-active)', outline: 'none' }}
-    _hover={{ bg: isActive ? 'accent.widget' : 'bg.surfaceRaised' }}
+    _focusVisible={{ boxShadow: 'inset 0 0 0 2px {colors.accent.solid}', outline: 'none' }}
     onClick={() => onActivate(model)}
     onContextMenu={(event) => {
       event.preventDefault();
@@ -245,7 +240,7 @@ const ModelRow = ({
       <Checkbox.Root
         aria-label={`Select ${model.name}`}
         checked={isSelected}
-        colorPalette="theme"
+        colorPalette="accent"
         size="xs"
         onCheckedChange={() => onToggleSelected(model)}
         onClick={(event) => event.stopPropagation()}
@@ -262,10 +257,10 @@ const ModelRow = ({
       </Text>
       <ModelBadgeRow isMissing={isMissing} model={model} />
     </Stack>
-    <Text color={isActive ? 'accent.widgetFg' : 'fg.subtle'} flexShrink={0} fontSize="2xs">
+    <Text color={isActive ? 'accent.solid' : 'fg.subtle'} flexShrink={0} fontSize="2xs">
       {formatBytes(model.file_size)}
     </Text>
-  </HStack>
+  </Row>
 );
 
 const ModelRowThumbnail = ({ imageVersion, model }: { imageVersion?: number; model: ModelConfig }) => {
@@ -276,7 +271,7 @@ const ModelRowThumbnail = ({ imageVersion, model }: { imageVersion?: number; mod
     return (
       <Flex
         align="center"
-        bg="bg.panel"
+        bg="bg.emphasized"
         borderColor="border.subtle"
         borderWidth="1px"
         boxSize="9"

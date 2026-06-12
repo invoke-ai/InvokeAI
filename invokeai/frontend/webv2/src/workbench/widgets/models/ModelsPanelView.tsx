@@ -45,7 +45,7 @@ export const ModelsPanelView = () => {
       {/* Drill-in renders as an overlay so the list below keeps its layout —
           and therefore its scroll position — for the trip back. */}
       {panelModelKey !== null ? (
-        <Scrollable bg="bg.shell" inset="0" label="Model details" position="absolute" px="3" zIndex={2}>
+        <Scrollable bg="bg" inset="0" label="Model details" position="absolute" px="3" zIndex={2}>
           <ModelDetail
             key={panelModelKey}
             density="panel"
@@ -115,7 +115,7 @@ const InstallSummaryFooter = ({ onOpen }: { onOpen: () => void }) => {
   return (
     <Stack
       as="button"
-      bg="bg.surface"
+      bg="bg.subtle"
       borderColor="border.subtle"
       borderWidth="1px"
       cursor="pointer"
@@ -125,7 +125,7 @@ const InstallSummaryFooter = ({ onOpen }: { onOpen: () => void }) => {
       rounded="md"
       textAlign="start"
       w="full"
-      _hover={{ bg: 'bg.surfaceRaised' }}
+      _hover={{ bg: 'bg.muted' }}
       onClick={onOpen}
     >
       <HStack gap="1.5" justify="space-between">
@@ -138,7 +138,7 @@ const InstallSummaryFooter = ({ onOpen }: { onOpen: () => void }) => {
           </Text>
         </HStack>
         {errorCount > 0 ? (
-          <Text color="red.400" flexShrink={0} fontSize="2xs" fontWeight="600">
+          <Text color="fg.error" flexShrink={0} fontSize="2xs" fontWeight="600">
             {errorCount} failed
           </Text>
         ) : null}

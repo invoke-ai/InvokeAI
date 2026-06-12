@@ -1,22 +1,23 @@
-import { Tooltip as ChakraTooltip, Portal, useSlotRecipe } from '@chakra-ui/react';
-import * as React from 'react';
-
-import { workbenchTooltipRecipe } from '../../../theme/recipes';
+import { Tooltip as ChakraTooltip, Portal } from '@chakra-ui/react';
+import type { ReactNode, Ref, RefObject } from 'react';
 
 export interface TooltipProps extends ChakraTooltip.RootProps {
   showArrow?: boolean;
   portalled?: boolean;
-  portalRef?: React.RefObject<HTMLElement | null>;
-  content: React.ReactNode;
+  portalRef?: RefObject<HTMLElement | null>;
+  content: ReactNode;
   contentProps?: ChakraTooltip.ContentProps;
   disabled?: boolean;
+  ref?: Ref<HTMLDivElement>;
 }
 
-export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(function Tooltip(props, ref) {
-  const { showArrow, children, disabled, portalled = true, content, contentProps, portalRef, ...rest } = props;
-  const recipe = useSlotRecipe({ recipe: workbenchTooltipRecipe });
-  const styles = recipe();
-  const { css: contentCss, ...restContentProps } = contentProps ?? {};
+/**
+ * Workbench tooltip. Chrome comes from the `tooltip` slot-recipe override in
+ * `theme/recipes.ts`, so this wrapper only provides the trigger/portal
+ * structure and the `content` convenience API.
+ */
+export const Tooltip = (props: TooltipProps) => {
+  const { showArrow, children, disabled, portalled = true, content, contentProps, portalRef, ref, ...rest } = props;
 
   if (disabled) {
     return children;
@@ -27,10 +28,10 @@ export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(function T
       <ChakraTooltip.Trigger asChild>{children}</ChakraTooltip.Trigger>
       <Portal disabled={!portalled} container={portalRef}>
         <ChakraTooltip.Positioner>
-          <ChakraTooltip.Content ref={ref} css={[styles.content, contentCss]} {...restContentProps}>
+          <ChakraTooltip.Content ref={ref} {...contentProps}>
             {showArrow && (
-              <ChakraTooltip.Arrow css={styles.arrow}>
-                <ChakraTooltip.ArrowTip css={styles.arrowTip} />
+              <ChakraTooltip.Arrow>
+                <ChakraTooltip.ArrowTip />
               </ChakraTooltip.Arrow>
             )}
             {content}
@@ -39,4 +40,4 @@ export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(function T
       </Portal>
     </ChakraTooltip.Root>
   );
-});
+};

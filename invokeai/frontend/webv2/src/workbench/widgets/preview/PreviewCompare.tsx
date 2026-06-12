@@ -59,10 +59,10 @@ export const PreviewCompare = ({
     <Stack gap="3" h="full" minH="0" w="full">
       <Flex
         align="center"
-        backgroundColor="bg.canvas"
+        backgroundColor="bg.inset"
         borderWidth="1px"
         borderColor="border.subtle"
-        color="canvas.dot"
+        color="fg.grid"
         css={previewGridCss}
         flex="1"
         justify="center"
@@ -128,7 +128,7 @@ export const PreviewCompare = ({
               />
             </Box>
             <Box
-              bg="accent.active"
+              bg="accent.solid"
               bottom="0"
               left={`${dividerPercent}%`}
               pointerEvents="none"

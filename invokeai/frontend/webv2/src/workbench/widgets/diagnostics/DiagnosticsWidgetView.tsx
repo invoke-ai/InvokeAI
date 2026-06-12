@@ -5,6 +5,7 @@ import { StatusWidgetChip } from '../../components/WidgetFrames';
 import type { WidgetViewProps } from '../../types';
 import { useWorkbench } from '../../WorkbenchContext';
 import { Button } from '../../components/ui/Button';
+import { Panel } from '../../components/ui/Panel';
 
 export const DiagnosticsWidgetView = ({ presentation, region }: WidgetViewProps) => {
   const { state } = useWorkbench();
@@ -32,15 +33,7 @@ const DiagnosticsPanel = () => {
       ) : (
         <Stack gap="2">
           {state.errorLog.map((message, index) => (
-            <Stack
-              key={`${message}-${index}`}
-              bg="bg.surface"
-              borderWidth="1px"
-              borderColor="border.subtle"
-              gap="2"
-              p="2"
-              rounded="md"
-            >
+            <Panel key={`${message}-${index}`} gap="2" p="2">
               <Text color="fg.muted" fontFamily="mono" fontSize="2xs" whiteSpace="pre-wrap">
                 {message}
               </Text>
@@ -49,7 +42,7 @@ const DiagnosticsPanel = () => {
                   Copy
                 </Button>
               </HStack>
-            </Stack>
+            </Panel>
           ))}
         </Stack>
       )}

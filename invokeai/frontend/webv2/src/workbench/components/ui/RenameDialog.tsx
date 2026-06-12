@@ -65,7 +65,7 @@ export const RenameDialog = ({
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
-          <Dialog.Content bg="bg.surface" borderColor="border.subtle" borderWidth="1px" color="fg.default">
+          <Dialog.Content bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" color="fg">
             <chakra.form
               onSubmit={(event) => {
                 event.preventDefault();

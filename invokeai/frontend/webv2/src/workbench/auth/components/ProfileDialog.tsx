@@ -31,7 +31,7 @@ export const ProfileDialog = ({ isOpen, onClose, user }: { isOpen: boolean; onCl
     <Portal>
       <Dialog.Backdrop />
       <Dialog.Positioner>
-        <Dialog.Content bg="bg.surface" borderColor="border.subtle" borderWidth="1px" color="fg.default">
+        <Dialog.Content>
           <Dialog.Header borderBottomWidth="1px" borderColor="border.subtle">
             <Stack gap="0.5">
               <Dialog.Title fontSize="md" fontWeight="700">

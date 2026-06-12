@@ -1,4 +1,4 @@
-import { Icon, Menu, Portal } from '@chakra-ui/react';
+import { Icon, Menu, Portal, Separator } from '@chakra-ui/react';
 import { useRef, useState, type MouseEvent } from 'react';
 import { FileDownIcon, FolderCogIcon, FolderOpenIcon, PencilIcon, PlusIcon, Trash2Icon, XIcon } from 'lucide-react';
 
@@ -69,6 +69,7 @@ export const ProjectTabs = () => {
               />
             </Tabs.Trigger>
           ))}
+          <Separator orientation="vertical" h={5} mx="1" alignSelf="center" />
           <Tooltip content="Create new project" showArrow>
             <IconButton
               aria-label="Create new project"
@@ -76,7 +77,6 @@ export const ProjectTabs = () => {
               size="xs"
               variant="ghost"
               alignSelf="center"
-              ms="2"
               onClick={() => dispatch({ type: 'createProject' })}
             >
               <PlusIcon />

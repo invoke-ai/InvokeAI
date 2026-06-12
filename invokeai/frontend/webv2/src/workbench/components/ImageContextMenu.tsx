@@ -143,7 +143,7 @@ export const ImageContextMenu = ({
         <Portal>
           <Dialog.Backdrop />
           <Dialog.Positioner>
-            <Dialog.Content bg="bg.surfaceRaised" borderColor="border.emphasis" borderWidth="1px" color="fg.default">
+            <Dialog.Content>
               <Dialog.Header>
                 <Dialog.Title fontSize="sm">
                   {pendingDeletion && pendingDeletion.length > 1
@@ -408,7 +408,7 @@ const QuickMenuItem = ({
     positioning={{ placement: 'top' }}
   >
     <Menu.Item aria-label={label} flex="1" justifyContent="center" value={value} onClick={onClick}>
-      <Icon as={icon} boxSize="4" color="fg.default" />
+      <Icon as={icon} boxSize="4" color="fg" />
     </Menu.Item>
   </Tooltip>
 );

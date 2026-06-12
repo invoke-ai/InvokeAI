@@ -3,6 +3,7 @@ import { DownloadIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { Button } from '../../components/ui/Button';
+import { Panel } from '../../components/ui/Panel';
 import { useActiveInstallSources } from '../../models/installsStore';
 import { openModelsCenterTab } from '../../models/uiStore';
 
@@ -24,7 +25,7 @@ export const SourceListItem = ({
   titleTooltip?: string;
   trailing?: ReactNode;
 }) => (
-  <HStack bg="bg.surface" borderColor="border.subtle" borderWidth="1px" gap="3" p="2.5" rounded="md">
+  <Panel alignItems="center" flexDirection="row" gap="3" p="2.5">
     <Stack flex="1" gap="0.5" minW="0">
       <HStack gap="1.5" minW="0">
         <Text fontSize="xs" fontWeight="600" title={titleTooltip} truncate>
@@ -39,7 +40,7 @@ export const SourceListItem = ({
       ) : null}
     </Stack>
     {trailing}
-  </HStack>
+  </Panel>
 );
 
 /**

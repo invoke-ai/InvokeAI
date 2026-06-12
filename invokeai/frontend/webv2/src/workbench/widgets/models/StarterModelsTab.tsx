@@ -17,6 +17,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { IconButton } from '../../components/ui/Button';
 import { MenuContent } from '../../components/ui/Menu';
+import { Row } from '../../components/ui/Row';
 import { Scrollable } from '../../components/ui/Scrollable';
 import { Tooltip } from '../../components/ui/Tooltip';
 import { collectBases, collectTypes } from '../../models/library';
@@ -135,7 +136,7 @@ export const StarterModelsTab = () => {
   if (status === 'error' && loadError) {
     return (
       <Stack align="center" gap="1" py="8">
-        <Text color="red.400" fontSize="xs" fontWeight="600">
+        <Text color="fg.error" fontSize="xs" fontWeight="600">
           Could not load starter models
         </Text>
         <Text color="fg.subtle" fontSize="2xs">
@@ -205,7 +206,7 @@ export const StarterModelsTab = () => {
               <Menu.Trigger asChild>
                 <IconButton
                   aria-label="Filter starter models"
-                  color={typeFilter !== null || baseFilter !== null ? 'accent.invoke' : 'fg.muted'}
+                  color={typeFilter !== null || baseFilter !== null ? 'accent.solid' : 'fg.muted'}
                   size="sm"
                   variant="ghost"
                 >
@@ -334,18 +335,15 @@ const SidebarRow = ({
   title: string;
   trailing?: ReactNode;
 }) => (
-  <HStack
+  <Row
+    active={isSelected ? 'muted' : 'none'}
     aria-current={isSelected || undefined}
-    bg={isSelected ? 'bg.surfaceRaised' : 'transparent'}
-    cursor="pointer"
-    gap="2"
     minW="0"
     p="2"
     role="button"
     rounded="md"
     tabIndex={0}
-    _focusVisible={{ boxShadow: 'inset 0 0 0 2px var(--chakra-colors-accent-active)', outline: 'none' }}
-    _hover={{ bg: 'bg.surfaceRaised' }}
+    _focusVisible={{ boxShadow: 'inset 0 0 0 2px {colors.accent.solid}', outline: 'none' }}
     onClick={onSelect}
     onKeyDown={(event) => {
       if (event.key === 'Enter' || event.key === ' ') {
@@ -354,7 +352,7 @@ const SidebarRow = ({
       }
     }}
   >
-    <Icon as={icon} boxSize="3.5" color={isSelected ? 'accent.invoke' : 'fg.muted'} flexShrink={0} />
+    <Icon as={icon} boxSize="3.5" color={isSelected ? 'accent.solid' : 'fg.muted'} flexShrink={0} />
     <Stack flex="1" gap="0" minW="0">
       <Text fontSize="xs" fontWeight="600" truncate>
         {title}
@@ -364,7 +362,7 @@ const SidebarRow = ({
       </Text>
     </Stack>
     {trailing}
-  </HStack>
+  </Row>
 );
 
 /** A bundle in the sidebar: select to browse its models, download to queue the pack. */
@@ -392,7 +390,7 @@ const BundleRow = ({
       trailing={
         missingCount === 0 ? (
           <Tooltip content="All models in this bundle are installed">
-            <Icon as={CheckIcon} boxSize="3.5" color="green.400" flexShrink={0} />
+            <Icon as={CheckIcon} boxSize="3.5" color="fg.success" flexShrink={0} />
           </Tooltip>
         ) : (
           <Tooltip content={`Install ${missingCount} missing model${missingCount === 1 ? '' : 's'}`}>

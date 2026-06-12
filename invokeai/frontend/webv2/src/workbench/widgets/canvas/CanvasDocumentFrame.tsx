@@ -17,9 +17,9 @@ export const CanvasDocumentFrame = ({
   hasContent: boolean;
 }) => (
   <Box
-    bg="bg.panel"
+    bg="bg.emphasized"
     borderWidth="1px"
-    borderColor="border.panel"
+    borderColor="border.emphasized"
     boxShadow="lg"
     maxH="calc(100vh - 15rem)"
     maxW="calc(100% - 4rem)"
@@ -50,8 +50,8 @@ export const CanvasPlaneImage = ({
 }) => (
   <Box
     borderWidth={isStaged ? '2px' : '0'}
-    borderColor="accent.active"
-    boxShadow={isStaged ? '0 0 0 1px var(--chakra-colors-accent-active), 0 18px 60px rgba(0,0,0,0.38)' : undefined}
+    borderColor="accent.solid"
+    boxShadow={isStaged ? '0 0 0 1px {colors.accent.solid}, 0 18px 60px rgba(0,0,0,0.38)' : undefined}
     left={toPercent(placement.x, planeWidth)}
     opacity={opacity}
     overflow="hidden"
@@ -72,9 +72,9 @@ export const CanvasPlaneImage = ({
 export const EmptyCanvasFrame = () => (
   <Flex
     align="center"
-    bg="bg.panel"
+    bg="bg.emphasized"
     borderWidth="1px"
-    borderColor="border.panel"
+    borderColor="border.emphasized"
     color="fg.subtle"
     h="min(56vh, 34rem)"
     justify="center"
@@ -86,9 +86,9 @@ export const EmptyCanvasFrame = () => (
 
 export const ToolScrubber = () => (
   <Box
-    bg="bg.shell"
+    bg="bg"
     borderWidth="1px"
-    borderColor="border.emphasis"
+    borderColor="border.emphasized"
     h="22rem"
     left="2.5"
     position="absolute"

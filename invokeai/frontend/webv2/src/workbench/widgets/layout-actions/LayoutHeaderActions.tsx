@@ -13,7 +13,7 @@ export const LayoutHeaderActions = () => {
         fontSize="2xs"
         size="2xs"
         variant="ghost"
-        _hover={{ color: 'fg.default' }}
+        _hover={{ color: 'fg' }}
         onClick={(event) => {
           event.stopPropagation();
           dispatch({ type: 'resetActiveLayout' });
@@ -26,7 +26,7 @@ export const LayoutHeaderActions = () => {
         fontSize="2xs"
         size="2xs"
         variant="ghost"
-        _hover={{ color: 'fg.default' }}
+        _hover={{ color: 'fg' }}
         onClick={(event) => {
           event.stopPropagation();
           dispatch({ type: 'recoverShellLayout' });

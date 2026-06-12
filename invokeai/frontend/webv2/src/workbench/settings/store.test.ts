@@ -114,11 +114,11 @@ describe('loadWorkbenchSettings', () => {
   });
 
   it('heals invalid stored values to defaults', async () => {
-    seedBackendPreferences({ developerLogLevel: 'shout', themeId: 'sunset' });
+    seedBackendPreferences({ developerLogLevel: 'shout', themeId: 'dark' });
 
     const preferences = await store.loadWorkbenchSettings();
 
-    expect(preferences.themeId).toBe('dark');
+    expect(preferences.themeId).toBe('classic');
     expect(preferences.developerLogLevel).toBe('debug');
   });
 
@@ -145,7 +145,7 @@ describe('loadWorkbenchSettings', () => {
 
     const preferences = await store.loadWorkbenchSettings();
 
-    expect(preferences.themeId).toBe('dark');
+    expect(preferences.themeId).toBe('classic');
   });
 });
 
@@ -187,7 +187,7 @@ describe('clearWorkbenchSettings', () => {
 
     await store.clearWorkbenchSettings();
 
-    expect(store.getWorkbenchPreferences().themeId).toBe('dark');
+    expect(store.getWorkbenchPreferences().themeId).toBe('classic');
     expect(api.__clientState.has(SETTINGS_KEY)).toBe(false);
   });
 });

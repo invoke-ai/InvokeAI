@@ -76,7 +76,7 @@ export const SettingsButton = () => {
         color="fg.muted"
         size="sm"
         variant="ghost"
-        _hover={{ color: 'fg.default' }}
+        _hover={{ color: 'fg' }}
         onClick={() => setIsOpen(true)}
       >
         <SettingsIcon />
@@ -111,14 +111,7 @@ const SettingsDialogContent = () => {
     <Portal>
       <Dialog.Backdrop />
       <Dialog.Positioner>
-        <Dialog.Content
-          bg="bg.surface"
-          borderColor="border.subtle"
-          borderWidth="1px"
-          color="fg.default"
-          h="min(46rem, calc(100dvh - 4rem))"
-          maxW="4xl"
-        >
+        <Dialog.Content h="min(46rem, calc(100dvh - 4rem))" maxW="4xl">
           <Dialog.Header borderBottomWidth="1px" borderColor="border.subtle">
             <Stack gap="0.5">
               <Dialog.Title fontSize="md" fontWeight="700">
@@ -188,7 +181,7 @@ const SettingsTabs = () => {
     <Tabs.Root defaultValue="appearance" display="flex" h="full" minH="0" orientation="vertical" variant="subtle">
       <Tabs.List
         alignItems="stretch"
-        bg="bg.shell"
+        bg="bg"
         borderColor="border.subtle"
         borderRightWidth="1px"
         flexShrink={0}
@@ -224,7 +217,7 @@ const SettingsTabTrigger = ({ icon, label, value }: { icon: LucideIcon; label: s
     textAlign="start"
     value={value}
     w="full"
-    _selected={{ bg: 'bg.surfaceRaised', color: 'fg.default' }}
+    _selected={{ bg: 'bg.muted', color: 'fg' }}
   >
     <Icon as={icon} boxSize="3.5" flexShrink={0} />
     <Text truncate>{label}</Text>
@@ -242,7 +235,7 @@ const SettingsSection = ({
 }) => (
   <Stack gap="3">
     <Stack gap="0.5">
-      <Text color="fg.default" fontSize="sm" fontWeight="600">
+      <Text color="fg" fontSize="sm" fontWeight="600">
         {title}
       </Text>
       <Text color="fg.subtle" fontSize="xs">
@@ -312,9 +305,9 @@ const ThemeCard = ({
     <chakra.button type="button" aria-pressed={selected} css={styles.root} onClick={() => onSelect(theme.id)}>
       <Flex css={styles.preview}>
         <Box css={styles.swatch} bg={theme.colors.surface} />
-        <Box css={styles.swatch} bg={theme.colors.panel} />
+        <Box css={styles.swatch} bg={theme.colors.control} />
+        <Box css={styles.swatch} bg={theme.colors.brand} />
         <Box css={styles.swatch} bg={theme.colors.accent} />
-        <Box css={styles.swatch} bg={theme.colors.active} />
       </Flex>
       <Box css={styles.body}>
         <HStack justify="space-between" w="full">
@@ -449,7 +442,7 @@ const DeveloperSection = () => {
         ))}
       </SettingSelect>
       <Stack gap="2">
-        <Text color="fg.default" fontSize="sm" fontWeight="500">
+        <Text color="fg" fontSize="sm" fontWeight="500">
           Log namespaces
         </Text>
         <SimpleGrid columns={{ base: 1, md: 2 }} gap="2">
@@ -497,11 +490,11 @@ const WorkspaceSection = () => {
           </Button>
         ) : null}
         <Button
-          borderColor="border.emphasis"
+          borderColor="border.emphasized"
           color="fg.error"
           size="sm"
           variant="outline"
-          _hover={{ bg: 'fg.error', color: 'bg.surface' }}
+          _hover={{ bg: 'fg.error', color: 'bg.subtle' }}
           onClick={() => setIsClearConfirmOpen(true)}
         >
           <Trash2Icon />
@@ -551,7 +544,7 @@ const SettingToggle = ({
       onCheckedChange={(event) => onChange(event.checked)}
     >
       <Stack gap="0.5">
-        <Switch.Label color="fg.default" fontSize="sm" fontWeight="500" m="0">
+        <Switch.Label color="fg" fontSize="sm" fontWeight="500" m="0">
           {label}
         </Switch.Label>
         <Text color="fg.subtle" fontSize="xs" id={descriptionId}>
@@ -559,7 +552,7 @@ const SettingToggle = ({
         </Text>
       </Stack>
       <Switch.HiddenInput aria-describedby={descriptionId} />
-      <Switch.Control flexShrink={0} _checked={{ bg: 'accent.invoke' }}>
+      <Switch.Control flexShrink={0} _checked={{ bg: 'accent.solid' }}>
         <Switch.Thumb />
       </Switch.Control>
     </Switch.Root>
@@ -590,7 +583,7 @@ const SettingSelect = ({
     justifyContent="space-between"
   >
     <Stack gap="0.5">
-      <Field.Label color="fg.default" fontSize="sm" fontWeight="500" m="0">
+      <Field.Label color="fg" fontSize="sm" fontWeight="500" m="0">
         {label}
       </Field.Label>
       <Field.HelperText color="fg.subtle" fontSize="xs" m="0">
