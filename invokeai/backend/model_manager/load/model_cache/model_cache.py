@@ -2,10 +2,11 @@ import gc
 import logging
 import threading
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import wraps
 from logging import Logger
-from typing import Any, Callable, Dict, List, Optional, Protocol
+from typing import Any, Callable, Dict, Generator, List, Optional, Protocol
 
 import psutil
 import torch
@@ -33,6 +34,73 @@ GB = 2**30
 
 # Size of a MB in bytes.
 MB = 2**20
+
+
+class _ModelLoadReadWriteLock:
+    """A write-preferring readers-writer lock that serializes model construction against VRAM moves.
+
+    The model load machinery depends on PROCESS-GLOBAL monkey-patches that are not thread-safe:
+    model CONSTRUCTION (diffusers `from_pretrained` / `accelerate.init_empty_weights`) temporarily
+    replaces `torch.nn.Module.register_parameter` so that every newly-registered parameter is routed
+    to the `meta` device. While that patch is installed, ANY `register_parameter` call in ANY thread
+    is hijacked onto `meta`. VRAM load/unload uses `nn.Module.load_state_dict(assign=True)`, which
+    assigns `Parameter`s via `__setattr__` -> `register_parameter` — so if it runs concurrently with
+    a construction on another worker thread, its real weights get stranded on `meta`. That surfaces
+    later as "Cannot copy out of meta tensor; no data!" or "unrecognized device meta".
+
+    - Construction takes the WRITE lock (exclusive — no reader and no other writer may run).
+    - VRAM load/unload takes the READ lock (shared, so concurrent moves on different GPUs still
+      overlap each other; they only block while a construction holds the write lock).
+
+    Write-preferring: once a construction is waiting, new readers queue behind it, so a steady stream
+    of VRAM moves from busy workers can't starve a pending load.
+
+    Lock-ordering contract: callers MUST acquire this lock *before* any `ModelCache._lock`, never
+    after. Readers do so by taking the read lock around the outer `ModelCache.lock()` call (see
+    `LoadedModelWithoutConfig`), and writers around the whole construction (see
+    `ModelLoader._load_and_cache`). Acquiring it in the other order — cache lock first, then this
+    lock — would risk an AB-BA deadlock with a writer that takes a cache lock during `put()`.
+    """
+
+    def __init__(self) -> None:
+        self._cond = threading.Condition(threading.Lock())
+        self._readers = 0
+        self._writers_waiting = 0
+        self._writer_active = False
+
+    @contextmanager
+    def read_lock(self) -> Generator[None, None, None]:
+        with self._cond:
+            # Defer to any active or waiting writer (write-preferring).
+            while self._writer_active or self._writers_waiting > 0:
+                self._cond.wait()
+            self._readers += 1
+        try:
+            yield
+        finally:
+            with self._cond:
+                self._readers -= 1
+                if self._readers == 0:
+                    self._cond.notify_all()
+
+    @contextmanager
+    def write_lock(self) -> Generator[None, None, None]:
+        with self._cond:
+            self._writers_waiting += 1
+            while self._writer_active or self._readers > 0:
+                self._cond.wait()
+            self._writers_waiting -= 1
+            self._writer_active = True
+        try:
+            yield
+        finally:
+            with self._cond:
+                self._writer_active = False
+                self._cond.notify_all()
+
+
+# Process-global lock guarding the non-thread-safe model load machinery. See _ModelLoadReadWriteLock.
+MODEL_LOAD_LOCK = _ModelLoadReadWriteLock()
 
 
 # TODO(ryand): Where should this go? The ModelCache shouldn't be concerned with submodels.
@@ -228,6 +296,11 @@ class ModelCache:
             self._on_cache_models_cleared_callbacks.discard(cb)
 
         return unsubscribe
+
+    @property
+    def execution_device(self) -> torch.device:
+        """Return the default execution device this cache loads models onto."""
+        return self._execution_device
 
     @property
     @synchronized
@@ -546,9 +619,13 @@ class ModelCache:
         loaded_percent = model_cur_vram_bytes / model_total_bytes if model_total_bytes > 0 else 0
         # Use the model's actual compute_device for logging, not the cache's default
         model_device = cache_entry.cached_model.compute_device
+        if model_device.type == "cuda":
+            device_label = f"cuda device #{model_device.index}" if model_device.index is not None else "cuda device"
+        else:
+            device_label = f"{model_device.type} device"
         self._logger.info(
             f"Loaded model '{cache_entry.key}' ({cache_entry.cached_model.model.__class__.__name__}) onto "
-            f"{model_device.type} device in {(time.time() - start_time):.2f}s. "
+            f"{device_label} in {(time.time() - start_time):.2f}s. "
             f"Total model size: {model_total_bytes / MB:.2f}MB, "
             f"VRAM: {model_cur_vram_bytes / MB:.2f}MB ({loaded_percent:.1%})"
         )

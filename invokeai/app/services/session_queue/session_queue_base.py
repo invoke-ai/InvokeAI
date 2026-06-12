@@ -31,8 +31,8 @@ class SessionQueueBase(ABC):
     """Base class for session queue"""
 
     @abstractmethod
-    def dequeue(self) -> Optional[SessionQueueItem]:
-        """Dequeues the next session queue item."""
+    def dequeue(self, device: Optional[str] = None) -> Optional[SessionQueueItem]:
+        """Dequeues the next session queue item, recording the processing device (e.g. 'cuda:1') if given."""
         pass
 
     @abstractmethod

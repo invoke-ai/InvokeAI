@@ -138,6 +138,10 @@ class InvocationProgressEvent(InvocationEventBase):
     image: ProgressImage | None = Field(
         default=None, description="An image representing the current state of the progress"
     )
+    device: str | None = Field(
+        default=None,
+        description="The device processing this session, e.g. 'cuda:1' (set only when running on a CUDA GPU)",
+    )
 
     @classmethod
     def build(
@@ -148,6 +152,13 @@ class InvocationProgressEvent(InvocationEventBase):
         percentage: float | None = None,
         image: ProgressImage | None = None,
     ) -> "InvocationProgressEvent":
+        # This is emitted from the session-processor worker thread, which pins its CUDA device via
+        # TorchDevice.set_session_device(). Resolve that here so the UI can label progress by GPU.
+        from invokeai.backend.util.devices import TorchDevice
+
+        session_device = TorchDevice.get_session_device()
+        device = str(session_device) if session_device is not None and session_device.type == "cuda" else None
+
         return cls(
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,
@@ -161,6 +172,7 @@ class InvocationProgressEvent(InvocationEventBase):
             percentage=percentage,
             image=image,
             message=message,
+            device=device,
         )
 
 

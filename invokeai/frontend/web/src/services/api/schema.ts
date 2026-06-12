@@ -1652,6 +1652,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app/generation_device_options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Generation Device Options
+         * @description List the devices available for generation, for use with the `generation_devices` setting.
+         */
+        get: operations["get_generation_device_options"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/app/runtime_config": {
         parameters: {
             query?: never;
@@ -12177,6 +12197,22 @@ export type components = {
             password: string;
         };
         /**
+         * GenerationDeviceOption
+         * @description A device that may be selected for generation.
+         */
+        GenerationDeviceOption: {
+            /**
+             * Device
+             * @description The device identifier, e.g. 'cuda:0', 'mps', or 'cpu'
+             */
+            device: string;
+            /**
+             * Name
+             * @description Human-readable device name
+             */
+            name: string;
+        };
+        /**
          * Get Image Mask Bounding Box
          * @description Gets the bounding box of the given mask image.
          */
@@ -16079,6 +16115,12 @@ export type components = {
              * @default null
              */
             image: components["schemas"]["ProgressImage"] | null;
+            /**
+             * Device
+             * @description The device processing this session, e.g. 'cuda:1' (set only when running on a CUDA GPU)
+             * @default null
+             */
+            device: string | null;
         };
         /**
          * InvocationStartedEvent
@@ -16492,6 +16534,12 @@ export type components = {
              * @default auto
              */
             device?: string;
+            /**
+             * Generation Devices
+             * @description Devices to use for parallel generation. `auto` (the default) uses every available GPU, running one generation session per GPU concurrently and distributing jobs fairly across users. Provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices, or a single-device list (e.g. `[cuda:0]`) to run serially. On systems without a GPU, `auto` resolves to the single `cpu`/`mps` device.<br>Valid values: `auto`, or a list whose entries are each `cpu`, `cuda`, `mps`, or `cuda:N` (where N is a device number)
+             * @default auto
+             */
+            generation_devices?: "auto" | string[];
             /**
              * Precision
              * @description Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.
@@ -28137,6 +28185,11 @@ export type components = {
              * @description The item_id of the queue item that this item was retried from
              */
             retried_from_item_id?: number | null;
+            /**
+             * Device
+             * @description The device that processed this queue item, e.g. 'cuda:1' (set only when running on a CUDA GPU)
+             */
+            device?: string | null;
             /** @description The fully-populated session to be executed */
             session: components["schemas"]["GraphExecutionState"];
             /** @description The workflow associated with this queue item */
@@ -30851,6 +30904,11 @@ export type components = {
              * @description Keep the last N completed, failed, and canceled queue items on startup. Set to 0 to prune all terminal items.
              */
             max_queue_history?: number | null;
+            /**
+             * Generation Devices
+             * @description Devices to use for parallel generation. `auto` uses every available GPU; provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices. Takes effect after restarting InvokeAI.
+             */
+            generation_devices?: unknown;
         };
         /**
          * UserDTO
@@ -36297,6 +36355,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": boolean;
+                };
+            };
+        };
+    };
+    get_generation_device_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerationDeviceOption"][];
                 };
             };
         };
