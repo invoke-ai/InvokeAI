@@ -8,8 +8,10 @@ import {
   clearModelSelection,
   type FilterableModelType,
   selectFilteredModelType,
+  selectOrderBy,
   selectSearchTerm,
   selectSelectedModelKeys,
+  selectSortDirection,
   setSelectedModelKey,
 } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { memo, useCallback, useMemo, useState } from 'react';
@@ -39,6 +41,8 @@ const ModelList = () => {
   const dispatch = useAppDispatch();
   const filteredModelType = useAppSelector(selectFilteredModelType);
   const searchTerm = useAppSelector(selectSearchTerm);
+  const orderBy = useAppSelector(selectOrderBy);
+  const direction = useAppSelector(selectSortDirection);
   const selectedModelKeys = useAppSelector(selectSelectedModelKeys);
   const { t } = useTranslation();
   const toast = useToast();
@@ -47,7 +51,8 @@ const ModelList = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isReidentifying, setIsReidentifying] = useState(false);
 
-  const { data: allModelsData, isLoading: isLoadingAll } = useGetModelConfigsQuery();
+  const queryArgs = useMemo(() => ({ order_by: orderBy, direction: direction.toUpperCase() }), [orderBy, direction]);
+  const { data: allModelsData, isLoading: isLoadingAll } = useGetModelConfigsQuery(queryArgs);
   const { data: missingModelsData, isLoading: isLoadingMissing } = useGetMissingModelsQuery();
   const [bulkDeleteModels] = useBulkDeleteModelsMutation();
   const [bulkReidentifyModels] = useBulkReidentifyModelsMutation();

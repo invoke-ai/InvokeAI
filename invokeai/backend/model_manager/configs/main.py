@@ -52,6 +52,10 @@ class MainModelDefaultSettings(BaseModel):
     height: int | None = Field(default=None, multiple_of=8, ge=64, description="Default height for this model")
     guidance: float | None = Field(default=None, ge=1, description="Default Guidance for this model")
     cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
+    fp8_storage: bool | None = Field(
+        default=None,
+        description="Store weights in FP8 to reduce VRAM usage (~50% savings). Weights are cast to compute dtype during inference.",
+    )
 
     model_config = ConfigDict(extra="forbid")
 
@@ -81,8 +85,8 @@ class MainModelDefaultSettings(BaseModel):
                 return cls(steps=35, cfg_scale=4.5, width=1024, height=1024)
             case BaseModelType.Flux2:
                 # Different defaults based on variant
-                if variant == Flux2VariantType.Klein9BBase:
-                    # Undistilled base model needs more steps
+                if variant in (Flux2VariantType.Klein4BBase, Flux2VariantType.Klein9BBase):
+                    # Undistilled base models need more steps
                     return cls(steps=28, cfg_scale=1.0, width=1024, height=1024)
                 else:
                     # Distilled models (Klein 4B, Klein 9B) use fewer steps
@@ -160,17 +164,20 @@ def _has_z_image_keys(state_dict: dict[str | int, Any]) -> bool:
         ".lora_A.weight",
         ".lora_B.weight",
         ".dora_scale",
+        ".alpha",
     )
 
+    # First pass: check if any key has LoRA suffixes - if so, this is a LoRA not a main model
     for key in state_dict.keys():
         if isinstance(key, int):
             continue
-
-        # If we find any LoRA-specific keys, this is not a main model
         if key.endswith(lora_suffixes):
             return False
 
-        # Check for Z-Image specific key prefixes
+    # Second pass: check for Z-Image specific key parts
+    for key in state_dict.keys():
+        if isinstance(key, int):
+            continue
         # Handle both direct keys (cap_embedder.0.weight) and
         # ComfyUI-style keys (model.diffusion_model.cap_embedder.0.weight)
         key_parts = key.split(".")
@@ -386,6 +393,7 @@ def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | N
                     # Default to Klein9B - callers use filename heuristics to detect Klein9BBase
                     return Flux2VariantType.Klein9B
                 elif context_in_dim == KLEIN_4B_CONTEXT_DIM:
+                    # Default to Klein4B - callers use filename heuristics to detect Klein4BBase
                     return Flux2VariantType.Klein4B
                 elif context_in_dim > 4096:
                     # Unknown FLUX.2 variant, default to 4B
@@ -570,10 +578,12 @@ class Main_Checkpoint_Flux2_Config(Checkpoint_Config_Base, Main_Config_Base, Con
         if variant is None:
             raise NotAMatchError("unable to determine FLUX.2 model variant from state dict")
 
-        # Klein 9B Base and Klein 9B have identical architectures.
-        # Use filename heuristic to detect the Base (undistilled) variant.
+        # Base (undistilled) and distilled variants share identical architectures.
+        # Use filename heuristic to detect the Base variant.
         if variant == Flux2VariantType.Klein9B and _filename_suggests_base(mod.name):
             return Flux2VariantType.Klein9BBase
+        if variant == Flux2VariantType.Klein4B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein4BBase
 
         return variant
 
@@ -742,10 +752,12 @@ class Main_GGUF_Flux2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Ba
         if variant is None:
             raise NotAMatchError("unable to determine FLUX.2 model variant from state dict")
 
-        # Klein 9B Base and Klein 9B have identical architectures.
-        # Use filename heuristic to detect the Base (undistilled) variant.
+        # Base (undistilled) and distilled variants share identical architectures.
+        # Use filename heuristic to detect the Base variant.
         if variant == Flux2VariantType.Klein9B and _filename_suggests_base(mod.name):
             return Flux2VariantType.Klein9BBase
+        if variant == Flux2VariantType.Klein4B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein4BBase
 
         return variant
 
@@ -853,11 +865,10 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
         """Determine the FLUX.2 variant from the transformer config.
 
         FLUX.2 Klein uses Qwen3 text encoder with larger joint_attention_dim:
-        - Klein 4B: joint_attention_dim = 7680 (3×Qwen3-4B hidden size)
+        - Klein 4B/4B Base: joint_attention_dim = 7680 (3×Qwen3-4B hidden size)
         - Klein 9B/9B Base: joint_attention_dim = 12288 (3×Qwen3-8B hidden size)
 
-        Klein 9B (distilled) and Klein 9B Base (undistilled) have identical architectures
-        and both have guidance_embeds=False. We use a filename heuristic to detect Base models.
+        Distilled and Base variants share identical architectures. We use a filename heuristic to detect Base models.
         """
         KLEIN_4B_CONTEXT_DIM = 7680  # 3 × 2560
         KLEIN_9B_CONTEXT_DIM = 12288  # 3 × 4096
@@ -872,6 +883,8 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
                 return Flux2VariantType.Klein9BBase
             return Flux2VariantType.Klein9B
         elif joint_attention_dim == KLEIN_4B_CONTEXT_DIM:
+            if _filename_suggests_base(mod.name):
+                return Flux2VariantType.Klein4BBase
             return Flux2VariantType.Klein4B
         elif joint_attention_dim > 4096:
             # Unknown FLUX.2 variant, default to 4B
@@ -1111,12 +1124,20 @@ def _has_anima_keys(state_dict: dict[str | int, Any]) -> bool:
     (unique to Anima - the LLM Adapter that bridges Qwen3 text encoder to the Cosmos DiT)
     alongside Cosmos Predict2 DiT keys (blocks, t_embedder, x_embedder, final_layer).
 
-    The checkpoint keys may have a `net.` prefix (e.g. `net.llm_adapter.`, `net.blocks.`).
+    The checkpoint keys may have a `net.` prefix (e.g. `net.llm_adapter.`, `net.blocks.`)
+    or a `model.diffusion_model.` prefix (ComfyUI bundled checkpoint format).
     """
     has_llm_adapter = False
     has_cosmos_dit = False
 
-    # Cosmos DiT key prefixes — support both with and without `net.` prefix
+    # LLM adapter key prefixes — support bare, `net.`, and `model.diffusion_model.` prefixes
+    llm_adapter_prefixes = (
+        "llm_adapter.",
+        "net.llm_adapter.",
+        "model.diffusion_model.llm_adapter.",
+    )
+
+    # Cosmos DiT key prefixes — support bare, `net.`, and `model.diffusion_model.` prefixes
     cosmos_prefixes = (
         "blocks.",
         "t_embedder.",
@@ -1126,16 +1147,19 @@ def _has_anima_keys(state_dict: dict[str | int, Any]) -> bool:
         "net.t_embedder.",
         "net.x_embedder.",
         "net.final_layer.",
+        "model.diffusion_model.blocks.",
+        "model.diffusion_model.t_embedder.",
+        "model.diffusion_model.x_embedder.",
+        "model.diffusion_model.final_layer.",
     )
 
     for key in state_dict.keys():
         if isinstance(key, int):
             continue
-        if key.startswith("llm_adapter.") or key.startswith("net.llm_adapter."):
+        if any(key.startswith(p) for p in llm_adapter_prefixes):
             has_llm_adapter = True
-        for prefix in cosmos_prefixes:
-            if key.startswith(prefix):
-                has_cosmos_dit = True
+        if any(key.startswith(p) for p in cosmos_prefixes):
+            has_cosmos_dit = True
         if has_llm_adapter and has_cosmos_dit:
             return True
 

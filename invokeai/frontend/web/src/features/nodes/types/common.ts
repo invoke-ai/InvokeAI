@@ -41,6 +41,7 @@ export const zSchedulerField = z.enum([
   'dpmpp_3m',
   'dpmpp_2m_sde',
   'dpmpp_sde',
+  'er_sde',
   'heun',
   'kdpm_2',
   'lms',
@@ -72,7 +73,7 @@ export const zFluxSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 // Note: LCM is only supported for Z-Image Turbo, not for Z-Image Base (undistilled)
 export const zZImageSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 // Anima scheduler options (same flow-matching schedulers, defined separately to avoid coupling)
-export const zAnimaSchedulerField = z.enum(['euler', 'heun', 'lcm']);
+export const zAnimaSchedulerField = z.enum(['euler', 'heun', 'dpmpp_2m', 'dpmpp_2m_sde', 'er_sde', 'lcm']);
 
 // Flux DyPE (Dynamic Position Extrapolation) preset options for high-resolution generation
 export const zFluxDypePresetField = z.enum(['off', 'manual', 'auto', 'area', '4k']);
@@ -121,6 +122,7 @@ export const zModelType = z.enum([
   'vae',
   'lora',
   'llava_onevision',
+  'text_llm',
   'control_lora',
   'controlnet',
   't2i_adapter',
@@ -131,6 +133,7 @@ export const zModelType = z.enum([
   'spandrel_image_to_image',
   't5_encoder',
   'qwen3_encoder',
+  'qwen_vl_encoder',
   'clip_embed',
   'siglip',
   'flux_redux',
@@ -157,7 +160,7 @@ export const zSubModelType = z.enum([
 export const zClipVariantType = z.enum(['large', 'gigantic']);
 export const zModelVariantType = z.enum(['normal', 'inpaint', 'depth']);
 export const zFluxVariantType = z.enum(['dev', 'dev_fill', 'schnell']);
-export const zFlux2VariantType = z.enum(['klein_4b', 'klein_9b', 'klein_9b_base']);
+export const zFlux2VariantType = z.enum(['klein_4b', 'klein_4b_base', 'klein_9b', 'klein_9b_base']);
 export const zZImageVariantType = z.enum(['turbo', 'zbase']);
 const zQwenImageVariantType = z.enum(['generate', 'edit']);
 export const zQwen3VariantType = z.enum(['qwen3_4b', 'qwen3_8b', 'qwen3_06b']);
@@ -183,6 +186,7 @@ export const zModelFormat = z.enum([
   'invokeai',
   't5_encoder',
   'qwen3_encoder',
+  'qwen_vl_encoder',
   'bnb_quantized_int8b',
   'bnb_quantized_nf4b',
   'gguf_quantized',

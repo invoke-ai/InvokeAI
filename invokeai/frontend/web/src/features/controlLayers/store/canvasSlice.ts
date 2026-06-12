@@ -70,7 +70,7 @@ import type {
   EntityLassoAddedPayload,
   EntityMovedToPayload,
   EntityRasterizedPayload,
-  EntityRectAddedPayload,
+  EntityShapeAddedPayload,
   IPMethodV2,
   T2IAdapterConfig,
   ZImageControlConfig,
@@ -1568,8 +1568,8 @@ const slice = createSlice({
         points: eraserLine.type === 'eraser_line' ? simplifyFlatNumbersArray(eraserLine.points) : eraserLine.points,
       });
     },
-    entityRectAdded: (state, action: PayloadAction<EntityRectAddedPayload>) => {
-      const { entityIdentifier, rect } = action.payload;
+    entityShapeAdded: (state, action: PayloadAction<EntityShapeAddedPayload>) => {
+      const { entityIdentifier, shape } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
@@ -1577,7 +1577,7 @@ const slice = createSlice({
 
       // TODO(psyche): If we add the object without splatting, the renderer will see it as the same object and not
       // re-render it (reference equality check). I don't like this behaviour.
-      entity.objects.push({ ...rect });
+      entity.objects.push({ ...shape });
     },
     entityLassoAdded: (state, action: PayloadAction<EntityLassoAddedPayload>) => {
       const { entityIdentifier, lasso } = action.payload;
@@ -1783,9 +1783,30 @@ const slice = createSlice({
       state.controlLayers.entities = controlLayers;
       state.inpaintMasks.entities = inpaintMasks;
       state.regionalGuidance.entities = regionalGuidance;
+      // Preserve the current modelBase to avoid desync with the currently selected model
+      // (same pattern as canvasSnapshotRestored and resetState).
+      const currentModelBase = state.bbox.modelBase;
       state.bbox = bbox;
+      state.bbox.modelBase = currentModelBase;
+      syncScaledSize(state);
       state.selectedEntityIdentifier = selectedEntityIdentifier;
       state.bookmarkedEntityIdentifier = bookmarkedEntityIdentifier;
+      return state;
+    },
+    canvasSnapshotRestored: (state, action: PayloadAction<CanvasState>) => {
+      const snapshot = action.payload;
+      state.controlLayers = snapshot.controlLayers;
+      state.inpaintMasks = snapshot.inpaintMasks;
+      state.rasterLayers = snapshot.rasterLayers;
+      state.regionalGuidance = snapshot.regionalGuidance;
+      // Restore bbox from snapshot but preserve the current modelBase to avoid desync
+      // with the currently selected model (same pattern as resetState).
+      const currentModelBase = state.bbox.modelBase;
+      state.bbox = snapshot.bbox;
+      state.bbox.modelBase = currentModelBase;
+      syncScaledSize(state);
+      state.selectedEntityIdentifier = snapshot.selectedEntityIdentifier;
+      state.bookmarkedEntityIdentifier = snapshot.bookmarkedEntityIdentifier;
       return state;
     },
     canvasUndo: () => {},
@@ -1869,6 +1890,7 @@ const resetState = (state: CanvasState) => {
 
 export const {
   canvasMetadataRecalled,
+  canvasSnapshotRestored,
   canvasProjectRecalled,
   canvasUndo,
   canvasRedo,
@@ -1888,7 +1910,7 @@ export const {
   entityRasterized,
   entityBrushLineAdded,
   entityEraserLineAdded,
-  entityRectAdded,
+  entityShapeAdded,
   entityLassoAdded,
   entityGradientAdded,
   // Raster layer adjustments
@@ -1997,6 +2019,10 @@ const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
     if (!action.type.startsWith(slice.name)) {
       return false;
     }
+    // Snapshot restore and project load replace the canvas state and should not be undoable
+    if (action.type === canvasSnapshotRestored.type || action.type === canvasProjectRecalled.type) {
+      return false;
+    }
     // Throttle rapid actions of the same type
     filter = actionsThrottlingFilter(action);
     return filter;
@@ -2020,7 +2046,7 @@ export const canvasSliceConfig: SliceConfig<typeof slice> = {
 const doNotGroupMatcher = isAnyOf(
   entityBrushLineAdded,
   entityEraserLineAdded,
-  entityRectAdded,
+  entityShapeAdded,
   entityLassoAdded,
   entityGradientAdded
 );

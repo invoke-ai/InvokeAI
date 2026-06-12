@@ -297,3 +297,148 @@ def test_complex_json_values(client: TestClient, admin_token: str):
     )
     assert get_response.status_code == status.HTTP_200_OK
     assert get_response.json() == complex_value
+
+
+def test_get_keys_by_prefix_without_auth(client: TestClient, monkeypatch, mock_invoker: Invoker):
+    """Test that keys can be retrieved by prefix without authentication."""
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+    monkeypatch.setattr("invokeai.app.api.routers.client_state.ApiDependencies", MockApiDependencies(mock_invoker))
+
+    # Set several keys with a common prefix directly
+    for i in range(3):
+        mock_invoker.services.client_state_persistence.set_by_key("system", f"canvas_snapshot:snap{i}", f"value{i}")
+    mock_invoker.services.client_state_persistence.set_by_key("system", "other_key", "other_value")
+
+    # Get keys by prefix
+    response = client.get("/api/v1/client_state/default/get_keys_by_prefix?prefix=canvas_snapshot:")
+    assert response.status_code == status.HTTP_200_OK
+    keys = response.json()
+    assert len(keys) == 3
+    assert "canvas_snapshot:snap0" in keys
+    assert "canvas_snapshot:snap1" in keys
+    assert "canvas_snapshot:snap2" in keys
+    assert "other_key" not in keys
+
+
+def test_get_keys_by_prefix_empty_without_auth(client: TestClient, monkeypatch, mock_invoker: Invoker):
+    """Test that an empty list is returned when no keys match the prefix."""
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+    monkeypatch.setattr("invokeai.app.api.routers.client_state.ApiDependencies", MockApiDependencies(mock_invoker))
+
+    response = client.get("/api/v1/client_state/default/get_keys_by_prefix?prefix=nonexistent_prefix:")
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == []
+
+
+def test_delete_by_key_without_auth(client: TestClient, monkeypatch, mock_invoker: Invoker):
+    """Test that a specific key can be deleted without affecting other keys."""
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+    monkeypatch.setattr("invokeai.app.api.routers.client_state.ApiDependencies", MockApiDependencies(mock_invoker))
+
+    # Set two keys directly
+    mock_invoker.services.client_state_persistence.set_by_key("system", "keep_key", "keep_value")
+    mock_invoker.services.client_state_persistence.set_by_key("system", "delete_key", "delete_value")
+
+    # Delete only one key via endpoint
+    delete_response = client.post("/api/v1/client_state/default/delete_by_key?key=delete_key")
+    assert delete_response.status_code == status.HTTP_200_OK
+
+    # Verify deleted key is gone
+    value = mock_invoker.services.client_state_persistence.get_by_key("system", "delete_key")
+    assert value is None
+
+    # Verify other key still exists
+    value = mock_invoker.services.client_state_persistence.get_by_key("system", "keep_key")
+    assert value == "keep_value"
+
+
+def test_get_keys_by_prefix(client: TestClient, admin_token: str):
+    """Test that keys can be retrieved by prefix with authentication."""
+    # Set several keys with a common prefix
+    for i in range(3):
+        client.post(
+            f"/api/v1/client_state/default/set_by_key?key=canvas_snapshot:snap{i}",
+            json=f"value{i}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+    # Set a key without the prefix
+    client.post(
+        "/api/v1/client_state/default/set_by_key?key=other_key",
+        json="other_value",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    # Get keys by prefix
+    response = client.get(
+        "/api/v1/client_state/default/get_keys_by_prefix?prefix=canvas_snapshot:",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    keys = response.json()
+    assert len(keys) == 3
+    assert "canvas_snapshot:snap0" in keys
+    assert "canvas_snapshot:snap1" in keys
+    assert "canvas_snapshot:snap2" in keys
+    assert "other_key" not in keys
+
+
+def test_delete_by_key(client: TestClient, admin_token: str):
+    """Test that a specific key can be deleted without affecting other keys."""
+    # Set two keys
+    client.post(
+        "/api/v1/client_state/default/set_by_key?key=keep_key",
+        json="keep_value",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    client.post(
+        "/api/v1/client_state/default/set_by_key?key=delete_key",
+        json="delete_value",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    # Delete only one key
+    delete_response = client.post(
+        "/api/v1/client_state/default/delete_by_key?key=delete_key",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert delete_response.status_code == status.HTTP_200_OK
+
+    # Verify deleted key is gone
+    get_response = client.get(
+        "/api/v1/client_state/default/get_by_key?key=delete_key",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert get_response.json() is None
+
+    # Verify other key still exists
+    get_response = client.get(
+        "/api/v1/client_state/default/get_by_key?key=keep_key",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert get_response.json() == "keep_value"
+
+
+def test_get_keys_by_prefix_isolation_between_users(client: TestClient, user1_token: str, user2_token: str):
+    """Test that get_keys_by_prefix is isolated between users."""
+    # User 1 sets keys
+    client.post(
+        "/api/v1/client_state/default/set_by_key?key=snapshot:u1",
+        json="user1_data",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    # User 2 sets keys
+    client.post(
+        "/api/v1/client_state/default/set_by_key?key=snapshot:u2",
+        json="user2_data",
+        headers={"Authorization": f"Bearer {user2_token}"},
+    )
+
+    # User 1 should only see their own keys
+    response = client.get(
+        "/api/v1/client_state/default/get_keys_by_prefix?prefix=snapshot:",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    keys = response.json()
+    assert "snapshot:u1" in keys
+    assert "snapshot:u2" not in keys

@@ -7,7 +7,13 @@ import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMul
 import { isPlainObject } from 'es-toolkit';
 import { clamp } from 'es-toolkit/compat';
 import { logout } from 'features/auth/store/authSlice';
-import type { AspectRatioID, InfillMethod, ParamsState, RgbaColor } from 'features/controlLayers/store/types';
+import type {
+  AspectRatioID,
+  InfillMethod,
+  ParamsState,
+  PromptHistoryItem,
+  RgbaColor,
+} from 'features/controlLayers/store/types';
 import {
   ASPECT_RATIO_MAP,
   DEFAULT_ASPECT_RATIO_CONFIG,
@@ -231,14 +237,10 @@ const slice = createSlice({
       }
       state.animaQwen3EncoderModel = result.data;
     },
-    animaT5EncoderModelSelected: (state, action: PayloadAction<ParameterT5EncoderModel | null>) => {
-      const result = zParamsState.shape.animaT5EncoderModel.safeParse(action.payload);
-      if (!result.success) {
-        return;
-      }
-      state.animaT5EncoderModel = result.data;
-    },
-    setAnimaScheduler: (state, action: PayloadAction<'euler' | 'heun' | 'lcm'>) => {
+    setAnimaScheduler: (
+      state,
+      action: PayloadAction<'euler' | 'heun' | 'dpmpp_2m' | 'dpmpp_2m_sde' | 'er_sde' | 'lcm'>
+    ) => {
       state.animaScheduler = action.payload;
     },
     kleinVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
@@ -265,6 +267,23 @@ const slice = createSlice({
       }
       state.qwenImageComponentSource = result.data;
     },
+    qwenImageVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      const result = zParamsState.shape.qwenImageVaeModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.qwenImageVaeModel = result.data;
+    },
+    qwenImageQwenVLEncoderModelSelected: (
+      state,
+      action: PayloadAction<{ key: string; name: string; base: string } | null>
+    ) => {
+      const result = zParamsState.shape.qwenImageQwenVLEncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.qwenImageQwenVLEncoderModel = result.data;
+    },
     qwenImageQuantizationChanged: (state, action: PayloadAction<'none' | 'int8' | 'nf4'>) => {
       state.qwenImageQuantization = action.payload;
     },
@@ -286,20 +305,33 @@ const slice = createSlice({
     positivePromptChanged: (state, action: PayloadAction<ParameterPositivePrompt>) => {
       state.positivePrompt = action.payload;
     },
-    positivePromptAddedToHistory: (state, action: PayloadAction<ParameterPositivePrompt>) => {
-      const prompt = action.payload.trim();
-      if (prompt.length === 0) {
+    positivePromptAddedToHistory: (state, action: PayloadAction<PromptHistoryItem>) => {
+      const prompt: PromptHistoryItem = {
+        positivePrompt: action.payload.positivePrompt.trim(),
+        negativePrompt: action.payload.negativePrompt?.trim() || null,
+      };
+      if (prompt.positivePrompt.length === 0 && !prompt.negativePrompt) {
         return;
       }
 
-      state.positivePromptHistory = [prompt, ...state.positivePromptHistory.filter((p) => p !== prompt)];
+      state.positivePromptHistory = [
+        prompt,
+        ...state.positivePromptHistory.filter(
+          (p) =>
+            p.positivePrompt !== prompt.positivePrompt || (p.negativePrompt ?? null) !== (prompt.negativePrompt ?? null)
+        ),
+      ];
 
       if (state.positivePromptHistory.length > MAX_POSITIVE_PROMPT_HISTORY) {
         state.positivePromptHistory = state.positivePromptHistory.slice(0, MAX_POSITIVE_PROMPT_HISTORY);
       }
     },
-    promptRemovedFromHistory: (state, action: PayloadAction<string>) => {
-      state.positivePromptHistory = state.positivePromptHistory.filter((p) => p !== action.payload);
+    promptRemovedFromHistory: (state, action: PayloadAction<PromptHistoryItem>) => {
+      state.positivePromptHistory = state.positivePromptHistory.filter(
+        (p) =>
+          p.positivePrompt !== action.payload.positivePrompt ||
+          (p.negativePrompt ?? null) !== (action.payload.negativePrompt ?? null)
+      );
     },
     promptHistoryCleared: (state) => {
       state.positivePromptHistory = [];
@@ -500,6 +532,15 @@ const slice = createSlice({
     geminiTemperatureChanged: (state, action: PayloadAction<number | null>) => {
       state.geminiTemperature = action.payload;
     },
+    geminiThinkingLevelChanged: (state, action: PayloadAction<'minimal' | 'high' | null>) => {
+      state.geminiThinkingLevel = action.payload;
+    },
+    seedreamWatermarkChanged: (state, action: PayloadAction<boolean>) => {
+      state.seedreamWatermark = action.payload;
+    },
+    seedreamOptimizePromptChanged: (state, action: PayloadAction<boolean>) => {
+      state.seedreamOptimizePrompt = action.payload;
+    },
     resolutionPresetSelected: (
       state,
       action: PayloadAction<{ imageSize: string; aspectRatio: string; width: number; height: number }>
@@ -573,10 +614,11 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.zImageQwen3SourceModel = oldState.zImageQwen3SourceModel;
   newState.animaVaeModel = oldState.animaVaeModel;
   newState.animaQwen3EncoderModel = oldState.animaQwen3EncoderModel;
-  newState.animaT5EncoderModel = oldState.animaT5EncoderModel;
   newState.kleinVaeModel = oldState.kleinVaeModel;
   newState.kleinQwen3EncoderModel = oldState.kleinQwen3EncoderModel;
   newState.qwenImageComponentSource = oldState.qwenImageComponentSource;
+  newState.qwenImageVaeModel = oldState.qwenImageVaeModel;
+  newState.qwenImageQwenVLEncoderModel = oldState.qwenImageQwenVLEncoderModel;
   newState.qwenImageQuantization = oldState.qwenImageQuantization;
   newState.qwenImageShift = oldState.qwenImageShift;
   return newState;
@@ -627,6 +669,8 @@ export const {
   kleinVaeModelSelected,
   kleinQwen3EncoderModelSelected,
   qwenImageComponentSourceSelected,
+  qwenImageVaeModelSelected,
+  qwenImageQwenVLEncoderModelSelected,
   qwenImageQuantizationChanged,
   qwenImageShiftChanged,
   setClipSkip,
@@ -663,10 +707,12 @@ export const {
   openaiBackgroundChanged,
   openaiInputFidelityChanged,
   geminiTemperatureChanged,
+  geminiThinkingLevelChanged,
+  seedreamWatermarkChanged,
+  seedreamOptimizePromptChanged,
   paramsRecalled,
   animaVaeModelSelected,
   animaQwen3EncoderModelSelected,
-  animaT5EncoderModelSelected,
   setAnimaScheduler,
 } = slice.actions;
 
@@ -689,6 +735,13 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         // v1 -> v2, add positive prompt history
         state._version = 2;
         state.positivePromptHistory = [];
+      }
+
+      if (state._version === 2) {
+        // v2 -> v3, add standalone Qwen Image VAE and Qwen VL encoder fields
+        state._version = 3;
+        state.qwenImageVaeModel = null;
+        state.qwenImageQwenVLEncoderModel = null;
       }
 
       return zParamsState.parse(state);
@@ -731,11 +784,12 @@ export const selectZImageQwen3EncoderModel = createParamsSelector((params) => pa
 export const selectZImageQwen3SourceModel = createParamsSelector((params) => params.zImageQwen3SourceModel);
 export const selectAnimaVaeModel = createParamsSelector((params) => params.animaVaeModel);
 export const selectAnimaQwen3EncoderModel = createParamsSelector((params) => params.animaQwen3EncoderModel);
-export const selectAnimaT5EncoderModel = createParamsSelector((params) => params.animaT5EncoderModel);
 export const selectAnimaScheduler = createParamsSelector((params) => params.animaScheduler);
 export const selectKleinVaeModel = createParamsSelector((params) => params.kleinVaeModel);
 export const selectKleinQwen3EncoderModel = createParamsSelector((params) => params.kleinQwen3EncoderModel);
 export const selectQwenImageComponentSource = createParamsSelector((params) => params.qwenImageComponentSource);
+export const selectQwenImageVaeModel = createParamsSelector((params) => params.qwenImageVaeModel);
+export const selectQwenImageQwenVLEncoderModel = createParamsSelector((params) => params.qwenImageQwenVLEncoderModel);
 export const selectQwenImageQuantization = createParamsSelector((params) => params.qwenImageQuantization);
 export const selectQwenImageShift = createParamsSelector((params) => params.qwenImageShift);
 
@@ -917,6 +971,9 @@ export const selectOpenaiQuality = createParamsSelector((params) => params.opena
 export const selectOpenaiBackground = createParamsSelector((params) => params.openaiBackground);
 export const selectOpenaiInputFidelity = createParamsSelector((params) => params.openaiInputFidelity);
 export const selectGeminiTemperature = createParamsSelector((params) => params.geminiTemperature);
+export const selectGeminiThinkingLevel = createParamsSelector((params) => params.geminiThinkingLevel);
+export const selectSeedreamWatermark = createParamsSelector((params) => params.seedreamWatermark);
+export const selectSeedreamOptimizePrompt = createParamsSelector((params) => params.seedreamOptimizePrompt);
 export const selectExternalProviderId = createSelector(selectModelConfig, (modelConfig) => {
   if (modelConfig && isExternalApiModelConfig(modelConfig)) {
     return modelConfig.provider_id;

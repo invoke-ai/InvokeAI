@@ -13,30 +13,41 @@ class StylePresetRecordsStorageBase(ABC):
 
     @abstractmethod
     def get(self, style_preset_id: str) -> StylePresetRecordDTO:
-        """Get style preset by id."""
+        """Get style preset by id. Authorization is the caller's responsibility."""
         pass
 
     @abstractmethod
-    def create(self, style_preset: StylePresetWithoutId) -> StylePresetRecordDTO:
-        """Creates a style preset."""
+    def create(self, style_preset: StylePresetWithoutId, user_id: str) -> StylePresetRecordDTO:
+        """Creates a style preset owned by user_id."""
         pass
 
     @abstractmethod
-    def create_many(self, style_presets: list[StylePresetWithoutId]) -> None:
-        """Creates many style presets."""
+    def create_many(self, style_presets: list[StylePresetWithoutId], user_id: str) -> None:
+        """Creates many style presets owned by user_id."""
         pass
 
     @abstractmethod
     def update(self, style_preset_id: str, changes: StylePresetChanges) -> StylePresetRecordDTO:
-        """Updates a style preset."""
+        """Updates a style preset. Authorization is the caller's responsibility."""
         pass
 
     @abstractmethod
     def delete(self, style_preset_id: str) -> None:
-        """Deletes a style preset."""
+        """Deletes a style preset. Authorization is the caller's responsibility."""
         pass
 
     @abstractmethod
-    def get_many(self, type: PresetType | None = None) -> list[StylePresetRecordDTO]:
-        """Gets many workflows."""
+    def get_many(
+        self,
+        type: PresetType | None = None,
+        user_id: str | None = None,
+        is_admin: bool = False,
+    ) -> list[StylePresetRecordDTO]:
+        """Gets style presets visible to user_id.
+
+        Visibility rules:
+        - is_admin=True: all presets.
+        - Else: presets owned by user_id, plus all `default` presets, plus any public preset.
+        - If user_id is None and is_admin is False: only `default` and public presets.
+        """
         pass

@@ -47,6 +47,7 @@ class GenericDiffusersLoader(ModelLoader):
                 result = model_class.from_pretrained(model_path, torch_dtype=self._torch_dtype, local_files_only=True)
             else:
                 raise e
+        result = self._apply_fp8_layerwise_casting(result, config, submodel_type)
         return result
 
     # TO DO: Add exception handling

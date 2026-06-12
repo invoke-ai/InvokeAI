@@ -1,6 +1,7 @@
 import type { AnyModelVariant, BaseModelType, ModelFormat, ModelType } from 'features/nodes/types/common';
 import {
   type AnyModelConfig,
+  isAnimaQwen3EncoderModelConfig,
   isCLIPEmbedModelConfig,
   isCLIPVisionModelConfig,
   isControlLoRAModelConfig,
@@ -12,11 +13,13 @@ import {
   isLoRAModelConfig,
   isNonRefinerMainModelConfig,
   isQwen3EncoderModelConfig,
+  isQwenVLEncoderModelConfig,
   isRefinerMainModelModelConfig,
   isSigLipModelConfig,
   isSpandrelImageToImageModelConfig,
   isT2IAdapterModelConfig,
   isT5EncoderModelConfig,
+  isTextLLMModelConfig,
   isTIModelConfig,
   isUnknownModelConfig,
   isVAEModelConfig,
@@ -31,7 +34,7 @@ export type ModelCategoryData = {
   filter: (config: AnyModelConfig) => boolean;
 };
 
-export const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
+const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
   unknown: {
     category: 'unknown',
     i18nKey: 'common.unknown',
@@ -75,7 +78,12 @@ export const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
   qwen3_encoder: {
     category: 'qwen3_encoder',
     i18nKey: 'modelManager.qwen3Encoder',
-    filter: isQwen3EncoderModelConfig,
+    filter: (config) => isQwen3EncoderModelConfig(config) || isAnimaQwen3EncoderModelConfig(config),
+  },
+  qwen_vl_encoder: {
+    category: 'qwen_vl_encoder',
+    i18nKey: 'modelManager.qwenVLEncoder',
+    filter: isQwenVLEncoderModelConfig,
   },
   control_lora: {
     category: 'control_lora',
@@ -121,6 +129,11 @@ export const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
     category: 'llava_onevision',
     i18nKey: 'modelManager.llavaOnevision',
     filter: isLLaVAModelConfig,
+  },
+  text_llm: {
+    category: 'text_llm',
+    i18nKey: 'modelManager.textLLM',
+    filter: isTextLLMModelConfig,
   },
   external_image_generator: {
     category: 'external_image_generator',
@@ -173,9 +186,11 @@ export const MODEL_TYPE_TO_LONG_NAME: Record<ModelType, string> = {
   spandrel_image_to_image: 'Spandrel (Image to Image)',
   t5_encoder: 'T5 Encoder',
   qwen3_encoder: 'Qwen3 Encoder',
+  qwen_vl_encoder: 'Qwen2.5-VL Encoder',
   clip_embed: 'CLIP Embed',
   siglip: 'SigLIP',
   flux_redux: 'FLUX Redux',
+  text_llm: 'Text LLM',
   external_image_generator: 'External Image Generator',
   unknown: 'Unknown',
 };
@@ -228,6 +243,7 @@ export const MODEL_VARIANT_TO_LONG_NAME: Record<AnyModelVariant, string> = {
   dev_fill: 'FLUX Dev - Fill',
   schnell: 'FLUX Schnell',
   klein_4b: 'FLUX.2 Klein 4B',
+  klein_4b_base: 'FLUX.2 Klein 4B Base',
   klein_9b: 'FLUX.2 Klein 9B',
   klein_9b_base: 'FLUX.2 Klein 9B Base',
   turbo: 'Z-Image Turbo',
@@ -254,13 +270,14 @@ export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
   invokeai: 'InvokeAI',
   t5_encoder: 'T5 Encoder',
   qwen3_encoder: 'Qwen3 Encoder',
+  qwen_vl_encoder: 'Qwen2.5-VL Encoder',
   bnb_quantized_int8b: 'BNB Quantized (int8b)',
   bnb_quantized_nf4b: 'BNB Quantized (nf4b)',
   gguf_quantized: 'GGUF Quantized',
   unknown: 'Unknown',
 };
 
-export const SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS: BaseModelType[] = ['flux', 'sd-3', 'z-image'];
+export const SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS: BaseModelType[] = ['flux', 'sd-3'];
 
 export const SUPPORTS_REF_IMAGES_BASE_MODELS: BaseModelType[] = ['sd-1', 'sdxl', 'flux', 'flux2', 'qwen-image'];
 

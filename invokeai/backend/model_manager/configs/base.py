@@ -10,7 +10,7 @@ from typing import (
     Type,
 )
 
-from pydantic import BaseModel, ConfigDict, Field, Tag
+from pydantic import BaseModel, ConfigDict, Field, Tag, field_validator
 from pydantic_core import PydanticUndefined
 
 from invokeai.app.util.misc import uuid_string
@@ -77,6 +77,22 @@ class Config_Base(ABC, BaseModel):
         default=None,
         description="The original API response from the source, as stringified JSON.",
     )
+    source_url: str | None = Field(
+        default=None,
+        description="Optional URL for the model (e.g. download page or model page).",
+    )
+
+    @field_validator("source_url", mode="before")
+    @classmethod
+    def validate_source_url(cls, v: Any) -> str | None:
+        if v is None or v == "":
+            return None
+        if not isinstance(v, str):
+            raise ValueError("source_url must be a string")
+        if not v.startswith(("https://", "http://")):
+            raise ValueError("source_url must be an http or https URL")
+        return v
+
     cover_image: str | None = Field(
         default=None,
         description="Url for image to preview model",

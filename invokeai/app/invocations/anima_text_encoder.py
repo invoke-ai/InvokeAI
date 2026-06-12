@@ -28,9 +28,10 @@ from invokeai.app.invocations.fields import (
     TensorField,
     UIComponent,
 )
-from invokeai.app.invocations.model import Qwen3EncoderField, T5EncoderField
+from invokeai.app.invocations.model import Qwen3EncoderField
 from invokeai.app.invocations.primitives import AnimaConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.anima.t5_tokenizer import load_bundled_t5_tokenizer
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import ANIMA_LORA_QWEN3_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -56,13 +57,13 @@ QWEN3_MAX_SEQ_LEN = 8192
     title="Prompt - Anima",
     tags=["prompt", "conditioning", "anima"],
     category="conditioning",
-    version="1.3.0",
+    version="1.4.0",
     classification=Classification.Prototype,
 )
 class AnimaTextEncoderInvocation(BaseInvocation):
     """Encodes and preps a prompt for an Anima image.
 
-    Uses Qwen3 0.6B for hidden state extraction and T5-XXL tokenizer for
+    Uses Qwen3 0.6B for hidden state extraction and a bundled T5-XXL tokenizer for
     token IDs (no T5 model weights needed). Both are combined by the
     LLM Adapter inside the Anima transformer during denoising.
     """
@@ -71,11 +72,6 @@ class AnimaTextEncoderInvocation(BaseInvocation):
     qwen3_encoder: Qwen3EncoderField = InputField(
         title="Qwen3 Encoder",
         description=FieldDescriptions.qwen3_encoder,
-        input=Input.Connection,
-    )
-    t5_encoder: T5EncoderField = InputField(
-        title="T5 Encoder",
-        description=FieldDescriptions.t5_encoder,
         input=Input.Connection,
     )
     mask: TensorField | None = InputField(
@@ -132,7 +128,7 @@ class AnimaTextEncoderInvocation(BaseInvocation):
             device = text_encoder.device
 
             # Apply LoRA models to the text encoder
-            lora_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
+            lora_dtype = TorchDevice.choose_anima_inference_dtype(device)
             exit_stack.enter_context(
                 LayerPatcher.apply_smart_model_patches(
                     model=text_encoder,
@@ -193,18 +189,17 @@ class AnimaTextEncoderInvocation(BaseInvocation):
             # Use last hidden state — only real tokens, no padding
             qwen3_embeds = outputs.hidden_states[-1][0]  # Shape: (seq_len, 1024)
 
-        # --- Step 2: Tokenize with T5-XXL tokenizer (IDs only, no model) ---
+        # --- Step 2: Tokenize with bundled T5-XXL tokenizer (IDs only, no model) ---
         context.util.signal_progress("Tokenizing with T5-XXL")
-        t5_tokenizer_info = context.models.load(self.t5_encoder.tokenizer)
-        with t5_tokenizer_info.model_on_device() as (_, t5_tokenizer):
-            t5_tokens = t5_tokenizer(
-                prompt,
-                padding=False,
-                truncation=True,
-                max_length=T5_MAX_SEQ_LEN,
-                return_tensors="pt",
-            )
-            t5xxl_ids = t5_tokens.input_ids[0]  # Shape: (seq_len,)
+        t5_tokenizer = load_bundled_t5_tokenizer()
+        t5_tokens = t5_tokenizer(
+            prompt,
+            padding=False,
+            truncation=True,
+            max_length=T5_MAX_SEQ_LEN,
+            return_tensors="pt",
+        )
+        t5xxl_ids = t5_tokens.input_ids[0]  # Shape: (seq_len,)
 
         return qwen3_embeds, t5xxl_ids, None
 

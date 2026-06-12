@@ -6,11 +6,12 @@ Abstract base class for storing and retrieving model configuration records.
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Set, Union
+from typing import Any, List, Optional, Set, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from invokeai.app.services.shared.pagination import PaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
 from invokeai.backend.model_manager.configs.external_api import (
@@ -60,6 +61,10 @@ class ModelRecordOrderBy(str, Enum):
     Base = "base"
     Name = "name"
     Format = "format"
+    Size = "size"
+    DateAdded = "created_at"
+    DateModified = "updated_at"
+    Path = "path"
 
 
 class ModelSummary(BaseModel):
@@ -81,6 +86,19 @@ class ModelRecordChanges(BaseModelExcludeNull):
     source: Optional[str] = Field(description="original source of the model", default=None)
     source_type: Optional[ModelSourceType] = Field(description="type of model source", default=None)
     source_api_response: Optional[str] = Field(description="metadata from remote source", default=None)
+    source_url: Optional[str] = Field(description="Optional URL for the model (e.g. download page)", default=None)
+
+    @field_validator("source_url", mode="before")
+    @classmethod
+    def validate_source_url(cls, v: Any) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        if not isinstance(v, str):
+            raise ValueError("source_url must be a string")
+        if not v.startswith(("https://", "http://")):
+            raise ValueError("source_url must be an http or https URL")
+        return v
+
     name: Optional[str] = Field(description="Name of the model.", default=None)
     path: Optional[str] = Field(description="Path to the model.", default=None)
     description: Optional[str] = Field(description="Model description", default=None)
@@ -200,7 +218,11 @@ class ModelRecordServiceBase(ABC):
 
     @abstractmethod
     def list_models(
-        self, page: int = 0, per_page: int = 10, order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default
+        self,
+        page: int = 0,
+        per_page: int = 10,
+        order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default,
+        direction: SQLiteDirection = SQLiteDirection.Ascending,
     ) -> PaginatedResults[ModelSummary]:
         """Return a paginated summary listing of each model in the database."""
         pass
@@ -237,6 +259,8 @@ class ModelRecordServiceBase(ABC):
         base_model: Optional[BaseModelType] = None,
         model_type: Optional[ModelType] = None,
         model_format: Optional[ModelFormat] = None,
+        order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default,
+        direction: SQLiteDirection = SQLiteDirection.Ascending,
     ) -> List[AnyModelConfig]:
         """
         Return models matching name, base and/or type.

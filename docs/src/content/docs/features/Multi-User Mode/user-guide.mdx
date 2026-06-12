@@ -1,0 +1,366 @@
+---
+title: Multi-User Guide
+description: How to use InvokeAI in multi-user mode as an end user.
+sidebar:
+  order: 3
+---
+import { Steps } from '@astrojs/starlight/components'
+
+## Overview
+
+Multi-User mode is a recent feature (introduced in version 6.12), which allows multiple individuals to share a single InvokeAI server while keeping their work separate and organized. Each user has their own username and login password, images, assets, image boards, customization settings and workflows.
+
+Two types of users are recognized:
+
+- A user with **Administrator** status can add, remove and modify other users, and can install models. They also have the ability to view the full session queue and pause or kill other users' jobs.
+- **Non-administrator** users can modify their own profile but not others. They also do not have the ability to install or configure models, but must ask an Administrator to do this task. When viewing the generation queue, they can see the full details of their own jobs, but jobs owned by other users will have the user id, generation parameters, and other details redacted.
+
+Multiple users can be granted Administrator status.
+
+---
+
+## Getting Started
+
+To activate Multi-User mode, open the `INVOKEAI_ROOT/invokeai.yaml` configuration file in a text editor. Add this line anywhere in the file:
+
+```yaml
+multiuser: true
+```
+
+You may also wish to make InvokeAI available to other machines on your local LAN. Add an additional line to `invokeai.yaml`:
+
+```yaml
+host: 0.0.0.0
+```
+
+Restart the server. It will now be in multi-user mode. If you enabled the `host` option, other users on your home or office LAN will be able to reach it by browsing to the IP address of the machine the backend is running on (`http://host-ip-address:9090`).
+
+:::tip[Do not expose InvokeAI to the internet]
+It is not recommended to expose the InvokeAI host to the internet due to security concerns.
+:::
+
+### Initial Setup (First Time in Multi-User Mode)
+
+If you're the first person to access a fresh InvokeAI installation in multi-user mode, you'll see the **Administrator Setup** dialog:
+
+![Administrator Setup Screen](./assets/admin-setup.png)
+
+Now:
+
+<Steps>
+1. Enter your email address (this will be your login name)
+2. Create a display name (this will be the name other users see)
+3. Choose a strong password. The following criteria are required with `strict_password_checking: true`.
+    - At least 8 characters long
+    - Contains uppercase letters
+    - Contains lowercase letters
+    - Contains numbers
+4. Confirm your password
+5. Click **Create Administrator Account**
+</Steps>
+
+With `strict_password_checking` disabled, you'll be warned if you choose a
+weak password, but not prevented from doing so.
+
+You'll now be taken to a login screen and can enter the credentials you just created.
+
+### Adding and Modifying Users
+
+If you are logged in as Administrator, you can add additional users. Click on the small "person silhouette" icon at the bottom left of the main Invoke screen and select "User Management"
+
+![Administrator Menu](./assets/admin-add-user-1.png)
+
+This will take you to the User Management screen...
+
+![User Management screen](./assets/admin-add-user-2.png)
+
+...where you can click "Create User" to add a new user.
+
+![Add User Screen](./assets/admin-add-user-3.png)
+
+The User Management screen also allows you to:
+
+<Steps>
+1. Temporarily change a user's status to Inactive, preventing them from logging in to Invoke.
+2. Edit a user (by clicking on the pencil icon) to change the user's display name or password.
+3. Permanently delete a user.
+4. Grant a user Administrator privileges.
+</Steps>
+
+---
+
+## Logging in as a Non-Administrative User
+
+If you are a registered user on the system, enter your email address and password to log in. The Administrator will be able to provide you with the values to use:
+
+![Login Screen](./assets/user-login-1.png)
+
+As an unprivileged user you can do pretty much anything that's allowed under single-user mode — generating images, using LoRAs, creating and running workflows, creating image boards — but you are restricted against installing new models, changing low-level server settings, or interfering with other users. More information on user roles is given below.
+
+### Changing your Profile
+
+To change your display name or profile, click on the person silhouette icon at the bottom left of the screen and choose "My Profile". This will take you to a screen that lets you change these values. At this time you can change your display name but not your login ID (ordinarily your contact email address).
+
+---
+
+## Understanding User Roles
+
+In single-user mode, you have access to all features without restrictions. In multi-user mode, InvokeAI has two user roles:
+
+### Regular User
+
+As a regular user, you can:
+
+- Create and manage your own image boards
+- Generate images using all AI tools (Linear, Canvas, Upscale, Workflows)
+- Create, save, and load your own workflows
+- View the full details of jobs you own on the session queue
+- View redacted information for jobs being run by other users
+- Customize your UI preferences (theme, hotkeys, etc.)
+- View available models (read-only access to Model Manager)
+- View shared and public boards created by other users
+- View and use workflows marked as shared by other users
+
+You cannot:
+
+- Add, delete, or modify models
+- View or modify other users' private boards, images, or workflows
+- Manage user accounts
+- Access system configuration
+- Cancel other users' generation jobs
+
+:::tip[The generation queue]
+When two or more users are accessing InvokeAI at the same time, their image generation jobs will be placed on the session queue on a first-come, first-serve basis. This means that you will have to wait for other users' image rendering jobs to complete before yours will start.
+
+While other users' jobs are running you will see the shared image generation progress bar, and the queue badge will show a single number — the count of your own jobs that are pending or in progress. It does not show other users' counts.
+
+Open the Queue tab to see where your job sits in relation to the other queued tasks.
+:::
+
+### Administrator
+
+Administrators have all regular user capabilities, plus:
+
+- Full model management (add, delete, configure models)
+- Create and manage user accounts
+- View and manage all users' generation queues
+- View and manage all users' boards, images, and workflows (including system-owned legacy content)
+- Access system configuration
+- Grant or revoke admin privileges
+
+---
+
+## Working with Your Content in Multi-User Mode
+
+### Image Boards
+
+In multi-user mode, each user can create an unlimited number of boards and organize their images and assets as they see fit. Boards have three visibility levels:
+
+- **Private** (default): Only you (and administrators) can see and modify the board.
+- **Shared**: All users can view the board and its contents, but only you (and administrators) can modify it (rename, archive, delete, or add/remove images).
+- **Public**: All users can view the board. Only you (and administrators) can modify the board's structure (rename, archive, delete).
+
+To change a board's visibility, right-click on the board and select the desired visibility option.
+
+Administrators can see and manage all users' image boards and their contents regardless of visibility settings.
+
+### Going From Multi-User to Single-User Mode
+
+If an InvokeAI instance was in multiuser mode and then restarted in single user mode (by setting `multiuser: false` in the configuration file), all users' boards will be consolidated in one place. Any images that were in "Uncategorized" will be merged together into a single Uncategorized board. If, at a later date, the server is restarted in multi-user mode, the boards and images will be assigned to the internal 'system' user. Admins can access this legacy content, and will not be restored to original owners.
+
+### Workflows
+
+Each user has their own private workflow library. Workflows you create are visible only to you by default.
+
+You can share a workflow with other users by marking it as **shared** (public). Shared workflows appear in all users' workflow libraries and can be opened by anyone, but only the owner (or an administrator) can modify or delete them.
+
+To share a workflow, open it and use the sharing controls to toggle its public/shared status.
+
+:::caution[Preexisting workflows after enabling multi-user mode]
+When you enable multi-user mode for the first time on an existing InvokeAI installation, all workflows that were created before multi-user mode was activated will appear in the **shared workflows** section. These preexisting workflows are owned by the internal "system" account and are visible to all users. Administrators can edit or delete these shared legacy workflows. Regular users can view and use them but cannot modify them.
+:::
+
+### The Generation Queue
+
+The queue shows your pending and running generation tasks.
+
+**Queue Features:**
+
+- View your current and completed generations
+- Cancel pending tasks
+- Re-run previous generations
+- Monitor progress in real-time
+
+**Queue Isolation:**
+
+- You will see your own queue items, as well as the items generated by other users, but the generation parameters (e.g. prompts) for other users' jobs are hidden for privacy reasons.
+- Administrators can view all queues for troubleshooting.
+- Your generations won't interfere with other users' tasks.
+
+---
+
+## Customizing Your Experience
+
+### Personal Preferences
+
+Your UI preferences are saved to your account and are restored when you log in:
+
+- **Hotkeys**: Customize keyboard shortcuts
+- **Canvas Settings**: Default zoom, grid visibility, etc.
+- **Generation Defaults**: Default values for width, height, steps, etc.
+
+These settings are stored per-user and won't affect other users.
+
+---
+
+## Troubleshooting
+
+### Cannot Log In
+
+**Issue:** Login fails with "Incorrect email or password"
+
+**Solutions:**
+
+- Verify you're entering the correct email address
+- Check that Caps Lock is off
+- Try typing the password slowly to avoid mistakes
+- Contact your administrator if you've forgotten your password
+
+**Issue:** Login fails with "Account is disabled"
+
+**Solution:** Contact your administrator to reactivate your account
+
+### Session Expired
+
+**Issue:** You're suddenly logged out and see "Session expired"
+
+**Explanation:** Sessions expire after 24 hours (or 7 days with "remember me")
+
+**Solution:** Simply log in again with your credentials
+
+### Cannot Access Features
+
+**Issue:** Features like Model Manager show "Admin privileges required"
+
+**Explanation:** Some features are restricted to administrators
+
+**Solution:**
+
+- For model viewing: You can view but not modify models
+- For user management: Contact an administrator
+- For system configuration: Contact an administrator
+
+### Missing Boards or Images
+
+**Issue:** Boards or images you created are not visible
+
+**Possible Causes:**
+
+<Steps>
+1. **Filter Applied:** Check if a filter is hiding content
+2. **Wrong User:** Ensure you're logged in with the correct account
+3. **Archived Board:** Check the "Show Archived" option
+</Steps>
+
+**Solution:**
+
+- Clear any active filters
+- Verify you're logged in as the right user
+- Check archived items
+
+### Slow Performance
+
+**Issue:** Generation or UI feels slower than expected
+
+**Possible Causes:**
+
+- Other users generating images simultaneously
+- Server resource limits
+- Network latency
+
+**Solutions:**
+
+- Check the queue to see if others are generating
+- Wait for current generations to complete
+- Contact administrator if persistent
+
+### Generation Stuck in Queue
+
+**Issue:** Your generation is queued but not starting
+
+**Possible Causes:**
+
+- Server is processing other users' generations
+- Server resources are fully utilized
+- Technical issue with the server
+
+**Solutions:**
+
+- Wait for your turn in the queue
+- Check if your generation is paused
+- Contact administrator if stuck for extended period
+
+---
+
+## Frequently Asked Questions
+
+### Can other users see my images?
+
+Not unless you change your board's visibility to "shared" or "public". All personal boards and images are private by default.
+
+### Can I share my workflows with others?
+
+Yes. You can mark any workflow as shared (public), which makes it visible to all users. Other users can view and use shared workflows, but only you or an administrator can modify or delete them.
+
+### How long do sessions last?
+
+- 24 hours by default
+- 7 days if you check "Remember me" during login
+
+### Can I use the API with multi-user mode?
+
+Yes, but you'll need to authenticate with a JWT token. See the [API Guide](./api-guide/) for details.
+
+### What happens if I forget my password?
+
+Contact your administrator. They can reset your password for you.
+
+### Can I have multiple sessions?
+
+Yes, you can log in from multiple devices or browsers simultaneously. All sessions will use the same account and see the same content.
+
+### Why can't I see the Model Manager "Add Models" tab?
+
+Regular users can see the Models tab but with read-only access. Check that you're logged in and try refreshing the page.
+
+### How do I know if I'm an administrator?
+
+Click the user icon near the bottom of the left-hand navigation bar to open the user menu. If you are an administrator, an "Admin" badge appears under your name in that menu and a "User Management" item is shown alongside the usual Profile and Logout actions.
+
+### Can I request admin privileges?
+
+Yes, ask your current administrator to grant you admin privileges. Admin privileges will give you the ability to see all other users' boards and images, as well as to add models and change various server-wide settings.
+
+## Getting Help
+
+### Support Channels
+
+- **Administrator:** Contact your system administrator for account issues
+- **Documentation:** Check the [FAQ](/troubleshooting/faq/) for common issues
+- **Community:** Join the [Discord](https://discord.gg/ZmtBAhwWhy) for help
+- **Bug Reports:** File issues on [GitHub](https://github.com/invoke-ai/InvokeAI/issues)
+
+### Reporting Issues
+
+When reporting an issue, include:
+
+- Your role (regular user or administrator)
+- What you were trying to do
+- What happened instead
+- Any error messages you saw
+- Your browser and operating system
+
+## Additional Resources
+
+- [Administrator Guide](./admin-guide/) — For administrators managing users and the system
+- [API Guide](./api-guide/) — For developers using the InvokeAI API

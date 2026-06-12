@@ -78,10 +78,12 @@ class ModelType(str, Enum):
     T2IAdapter = "t2i_adapter"
     T5Encoder = "t5_encoder"
     Qwen3Encoder = "qwen3_encoder"
+    QwenVLEncoder = "qwen_vl_encoder"
     SpandrelImageToImage = "spandrel_image_to_image"
     SigLIP = "siglip"
     FluxRedux = "flux_redux"
     LlavaOnevision = "llava_onevision"
+    TextLLM = "text_llm"
     ExternalImageGenerator = "external_image_generator"
     Unknown = "unknown"
 
@@ -131,7 +133,10 @@ class Flux2VariantType(str, Enum):
     """FLUX.2 model variants."""
 
     Klein4B = "klein_4b"
-    """Flux2 Klein 4B variant using Qwen3 4B text encoder."""
+    """Flux2 Klein 4B variant using Qwen3 4B text encoder (distilled)."""
+
+    Klein4BBase = "klein_4b_base"
+    """Flux2 Klein 4B Base variant - undistilled foundation model using Qwen3 4B text encoder."""
 
     Klein9B = "klein_9b"
     """Flux2 Klein 9B variant using Qwen3 8B text encoder (distilled)."""
@@ -187,6 +192,7 @@ class ModelFormat(str, Enum):
     InvokeAI = "invokeai"
     T5Encoder = "t5_encoder"
     Qwen3Encoder = "qwen3_encoder"
+    QwenVLEncoder = "qwen_vl_encoder"
     BnbQuantizedLlmInt8b = "bnb_quantized_int8b"
     BnbQuantizednf4b = "bnb_quantized_nf4b"
     GGUFQuantized = "gguf_quantized"

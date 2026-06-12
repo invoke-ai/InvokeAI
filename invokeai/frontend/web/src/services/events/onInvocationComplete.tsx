@@ -1,6 +1,5 @@
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, AppGetState } from 'app/store/store';
-import { deepClone } from 'common/util/deepClone';
 import { canvasWorkflowIntegrationProcessingCompleted } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
 import {
   selectAutoSwitch,
@@ -12,8 +11,6 @@ import {
 import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { isImageField, isImageFieldCollection } from 'features/nodes/types/common';
-import { zNodeStatus } from 'features/nodes/types/invocation';
-import type { LRUCache } from 'lru-cache';
 import { LIST_ALL_TAG } from 'services/api';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
@@ -21,6 +18,7 @@ import { queueApi } from 'services/api/endpoints/queue';
 import type { ImageDTO, S } from 'services/api/types';
 import { getCategories } from 'services/api/util';
 import { insertImageIntoNamesResult } from 'services/api/util/optimisticUpdates';
+import { getUpdatedNodeExecutionStateOnInvocationComplete } from 'services/events/nodeExecutionState';
 import { $lastProgressEvent } from 'services/events/stores';
 import stableHash from 'stable-hash';
 import type { Param0 } from 'tsafe';
@@ -38,13 +36,13 @@ const nodeTypeDenylist = ['load_image', 'image'];
  *
  * @param getState The Redux getState function.
  * @param dispatch The Redux dispatch function.
- * @param finishedQueueItemIds A cache of finished queue item IDs to prevent duplicate handling and avoid race
- * conditions that can happen when a graph finishes very quickly.
+ * @param completedInvocationKeysByItemId A listener-local map used to dedupe repeated invocation completion events
+ * and to share completion knowledge with the other invocation event handlers.
  */
 export const buildOnInvocationComplete = (
   getState: AppGetState,
   dispatch: AppDispatch,
-  finishedQueueItemIds: LRUCache<number, boolean>
+  completedInvocationKeysByItemId: Map<number, Set<string>>
 ) => {
   const addImagesToGallery = async (data: S['InvocationCompleteEvent']) => {
     if (nodeTypeDenylist.includes(data.invocation.type)) {
@@ -156,6 +154,11 @@ export const buildOnInvocationComplete = (
 
     // No need to invalidate tags since we're doing optimistic updates
     // Board totals are already updated above via upsertQueryEntries
+    // Exception: virtual board groupings aren't covered by the optimistic updates above, so
+    // their counts/cover thumbnails would otherwise lag behind until the next mutation.
+    if (Object.keys(boardTotalAdditions).length > 0) {
+      dispatch(imagesApi.util.invalidateTags(['VirtualBoards']));
+    }
 
     const autoSwitch = selectAutoSwitch(getState());
 
@@ -242,22 +245,24 @@ export const buildOnInvocationComplete = (
   };
 
   return async (data: S['InvocationCompleteEvent']) => {
-    if (finishedQueueItemIds.has(data.item_id)) {
-      log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
-      return;
-    }
     log.debug({ data } as JsonObject, `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`);
 
     const nodeExecutionState = $nodeExecutionStates.get()[data.invocation_source_id];
+    const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationComplete(
+      nodeExecutionState,
+      data,
+      completedInvocationKeysByItemId
+    );
 
-    if (nodeExecutionState) {
-      const _nodeExecutionState = deepClone(nodeExecutionState);
-      _nodeExecutionState.status = zNodeStatus.enum.COMPLETED;
-      if (_nodeExecutionState.progress !== null) {
-        _nodeExecutionState.progress = 1;
-      }
-      _nodeExecutionState.outputs.push(data.result);
-      upsertExecutionState(_nodeExecutionState.nodeId, _nodeExecutionState);
+    if (nodeExecutionState && !updatedNodeExecutionState) {
+      log.trace(
+        { data } as JsonObject,
+        `Ignoring duplicate invocation complete (${data.invocation.type}, ${data.invocation_source_id})`
+      );
+    }
+
+    if (updatedNodeExecutionState) {
+      upsertExecutionState(updatedNodeExecutionState.nodeId, updatedNodeExecutionState);
     }
 
     // Clear canvas workflow integration processing state if needed
