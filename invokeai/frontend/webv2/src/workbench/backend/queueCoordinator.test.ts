@@ -85,6 +85,7 @@ const generateRequest: EnqueueGenerateRequest = {
   positivePromptNodeId: 'positive_prompt',
   seed: 1,
   seedNodeId: 'seed',
+  shouldRandomizeSeed: false,
   sourceQueueItemId: 'local-1',
 };
 

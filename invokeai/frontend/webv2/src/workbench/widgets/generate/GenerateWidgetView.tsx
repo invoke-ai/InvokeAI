@@ -1,57 +1,30 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 
-import { listMainModels } from '../../generation/api';
 import { getDefaultGenerateSettings, isSupportedGenerateModel } from '../../generation/graph';
-import type { GenerateSettings, MainModelConfig } from '../../generation/types';
+import { normalizeGenerateSettings, normalizeGenerateWidgetValues } from '../../generation/settings';
+import type { GenerateSettings, VaeModelConfig } from '../../generation/types';
+import { ensureModelsLoaded, useModelsSnapshot } from '../../models/modelsStore';
+import type { ModelConfig } from '../../models/types';
 import { useWorkbench } from '../../WorkbenchContext';
 import { GenerateSettingsForm } from './GenerateSettingsForm';
-import { isGenerateSettings, isGenerateWidgetValues } from './generateWidgetGuards';
 
 export const GenerateWidgetView = () => {
   const { activeProject, dispatch } = useWorkbench();
-  const [models, setModels] = useState<MainModelConfig[]>([]);
-  const [isLoadingModels, setIsLoadingModels] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const supportedModels = useMemo(() => models.filter(isSupportedGenerateModel), [models]);
-  const storedValues = activeProject.widgetStates.generate.values;
-  const selectedModel = supportedModels.find(
-    (model) => model.key === activeProject.widgetStates.generate.values.modelKey
-  );
-  const settings = isGenerateSettings(storedValues)
-    ? storedValues
-    : getDefaultGenerateSettings(selectedModel ?? supportedModels[0]);
+  const { error, models, status } = useModelsSnapshot();
 
   useEffect(() => {
-    let isStale = false;
+    ensureModelsLoaded();
+  }, []);
 
-    listMainModels()
-      .then((nextModels) => {
-        if (isStale) {
-          return;
-        }
-
-        setModels(nextModels);
-        setLoadError(null);
-      })
-      .catch((error: unknown) => {
-        if (isStale) {
-          return;
-        }
-
-        const message = error instanceof Error ? error.message : 'Failed to load models.';
-        setLoadError(message);
-        dispatch({ message, type: 'recordError' });
-      })
-      .finally(() => {
-        if (!isStale) {
-          setIsLoadingModels(false);
-        }
-      });
-
-    return () => {
-      isStale = true;
-    };
-  }, [dispatch]);
+  const supportedModels = useMemo(() => models.filter(isSupportedGenerateModel), [models]);
+  const vaeModels = useMemo(
+    () => models.filter((model): model is ModelConfig & VaeModelConfig => model.type === 'vae'),
+    [models]
+  );
+  const storedValues = activeProject.widgetStates.generate.values;
+  const normalizedSettings = normalizeGenerateSettings(storedValues);
+  const selectedModel = supportedModels.find((model) => model.key === normalizedSettings?.modelKey);
+  const settings = normalizedSettings ?? getDefaultGenerateSettings(selectedModel ?? supportedModels[0]);
 
   useEffect(() => {
     const model = selectedModel ?? supportedModels[0];
@@ -60,7 +33,9 @@ export const GenerateWidgetView = () => {
       return;
     }
 
-    if (isGenerateWidgetValues(storedValues) && storedValues.model.key === model.key) {
+    const storedWidgetValues = normalizeGenerateWidgetValues(storedValues);
+
+    if (storedWidgetValues && storedWidgetValues.model.key === model.key) {
       return;
     }
 
@@ -81,10 +56,12 @@ export const GenerateWidgetView = () => {
 
   return (
     <GenerateSettingsForm
-      isLoadingModels={isLoadingModels}
-      loadError={loadError}
+      isLoadingModels={status === 'idle' || status === 'loading'}
+      loadError={error}
+      selectedModel={selectedModel}
       settings={settings}
       supportedModels={supportedModels}
+      vaeModels={vaeModels}
       onCommitSettings={commitSettings}
     />
   );

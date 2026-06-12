@@ -6,27 +6,11 @@ import {
   type QueueCoordinator,
   type ReconcileInput,
 } from './backend/queueCoordinator';
-import type { GenerateSettings } from './generation/types';
+import { normalizeGenerateSettings } from './generation/settings';
 import { addImagesToGalleryBoard } from './gallery/api';
 import type { Project, QueueItem } from './types';
 import { useWorkbench } from './WorkbenchContext';
 import type { WorkbenchAction } from './workbenchState';
-
-const isGenerateSettings = (value: unknown): value is GenerateSettings => {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-
-  const record = value as Record<string, unknown>;
-
-  return (
-    typeof record.modelKey === 'string' &&
-    typeof record.positivePrompt === 'string' &&
-    typeof record.negativePrompt === 'string' &&
-    typeof record.seed === 'number' &&
-    Number.isFinite(record.seed)
-  );
-};
 
 const getSnapshotGalleryBoardId = (queueItem: QueueItem): string | null => {
   const selectedBoardId = queueItem.snapshot.widgetStates.gallery.values.selectedBoardId;
@@ -84,9 +68,9 @@ const submitQueueItem = (
   dispatch: Dispatch<WorkbenchAction>
 ): void => {
   const graph = queueItem.snapshot.graph.backendGraph;
-  const generateValues = queueItem.snapshot.widgetStates.generate.values;
+  const generateValues = normalizeGenerateSettings(queueItem.snapshot.widgetStates.generate.values);
 
-  if (!graph || !isGenerateSettings(generateValues)) {
+  if (!graph || !generateValues) {
     dispatch({
       error: 'Generate queue item is missing a compiled backend graph.',
       projectId: project.id,
@@ -108,6 +92,7 @@ const submitQueueItem = (
       positivePromptNodeId: 'positive_prompt',
       seed: generateValues.seed,
       seedNodeId: 'seed',
+      shouldRandomizeSeed: generateValues.shouldRandomizeSeed,
       sourceQueueItemId: queueItem.id,
     })
     .then(({ batchId, itemIds }) => {

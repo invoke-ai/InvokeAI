@@ -1,6 +1,7 @@
-import { absolutizeApiUrl, apiFetchJson } from '../backend/http';
+import { absolutizeApiUrl, ApiError, apiFetchJson } from '../backend/http';
 import { buildQueueItemOrigin } from '../backend/events';
 import type { BackendGraphContract } from '../types';
+import { generateSeedSequence } from './graph';
 import type { EnqueueGenerateRequest, EnqueueGenerateResult, ImageDTO, MainModelConfig, QueueItemDTO } from './types';
 
 export const listMainModels = async (): Promise<MainModelConfig[]> => {
@@ -10,19 +11,25 @@ export const listMainModels = async (): Promise<MainModelConfig[]> => {
 };
 
 export const enqueueGenerateGraph = async (request: EnqueueGenerateRequest): Promise<EnqueueGenerateResult> => {
+  const batchCount = Math.max(1, Math.round(request.batchCount));
+  const seeds = request.shouldRandomizeSeed ? generateSeedSequence(request.seed, batchCount) : [request.seed];
+  const prompts = request.shouldRandomizeSeed ? seeds.map(() => request.positivePrompt) : [request.positivePrompt];
+  const negativePrompts = request.shouldRandomizeSeed
+    ? seeds.map(() => request.negativePrompt)
+    : [request.negativePrompt];
   const body = {
     batch: {
       data: [
         [
-          { field_name: 'value', items: [request.seed], node_path: request.seedNodeId },
-          { field_name: 'value', items: [request.positivePrompt], node_path: request.positivePromptNodeId },
-          { field_name: 'value', items: [request.negativePrompt], node_path: request.negativePromptNodeId },
+          { field_name: 'value', items: seeds, node_path: request.seedNodeId },
+          { field_name: 'value', items: prompts, node_path: request.positivePromptNodeId },
+          { field_name: 'value', items: negativePrompts, node_path: request.negativePromptNodeId },
         ],
       ],
       destination: request.destination,
       graph: request.graph satisfies BackendGraphContract,
       origin: buildQueueItemOrigin(request.sourceQueueItemId),
-      runs: request.batchCount,
+      runs: request.shouldRandomizeSeed ? 1 : batchCount,
     },
     prepend: false,
   };
@@ -40,26 +47,38 @@ export const getQueueItem = (itemId: number): Promise<QueueItemDTO> =>
 export const listAllQueueItems = (): Promise<QueueItemDTO[]> =>
   apiFetchJson<QueueItemDTO[]>('/api/v1/queue/default/list_all');
 
-const getImageDTO = async (imageName: string, queuedAt: string, sourceQueueItemId: string): Promise<ImageDTO> => {
-  const body = await apiFetchJson<{
-    image_name: string;
-    image_url: string;
-    thumbnail_url: string;
-    width: number;
-    height: number;
-    is_intermediate: boolean;
-  }>(`/api/v1/images/i/${encodeURIComponent(imageName)}`);
+const getImageDTO = async (
+  imageName: string,
+  queuedAt: string,
+  sourceQueueItemId: string
+): Promise<ImageDTO | null> => {
+  try {
+    const body = await apiFetchJson<{
+      image_name: string;
+      image_url: string;
+      thumbnail_url: string;
+      width: number;
+      height: number;
+      is_intermediate: boolean;
+    }>(`/api/v1/images/i/${encodeURIComponent(imageName)}`);
 
-  return {
-    height: body.height,
-    imageName: body.image_name,
-    imageUrl: absolutizeApiUrl(body.image_url),
-    isIntermediate: body.is_intermediate,
-    queuedAt,
-    sourceQueueItemId,
-    thumbnailUrl: absolutizeApiUrl(body.thumbnail_url),
-    width: body.width,
-  };
+    return {
+      height: body.height,
+      imageName: body.image_name,
+      imageUrl: absolutizeApiUrl(body.image_url),
+      isIntermediate: body.is_intermediate,
+      queuedAt,
+      sourceQueueItemId,
+      thumbnailUrl: absolutizeApiUrl(body.thumbnail_url),
+      width: body.width,
+    };
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return null;
+    }
+
+    throw error;
+  }
 };
 
 const getResultImageNames = (queueItem: QueueItemDTO): string[] => {
@@ -87,9 +106,11 @@ export const getQueueItemResultImages = async (
 ): Promise<ImageDTO[]> => {
   const queueItem = await getQueueItem(itemId);
 
-  return Promise.all(
+  const images = await Promise.all(
     getResultImageNames(queueItem).map((imageName) => getImageDTO(imageName, queuedAt, sourceQueueItemId))
   );
+
+  return images.filter((image): image is ImageDTO => image !== null);
 };
 
 export const cancelQueueItemsByBatchIds = async (batchIds: string[]): Promise<void> => {

@@ -5,8 +5,9 @@ import {
   resolveInvocationRoute,
 } from './invocation';
 import { compileGenerateGraph, resolveGenerateSeed } from './generation/graph';
+import { normalizeGenerateWidgetValues } from './generation/settings';
 import type { GallerySettings } from './gallery/settings';
-import type { GenerateWidgetValues, MainModelConfig } from './generation/types';
+import type { GenerateWidgetValues } from './generation/types';
 import { defaultLayoutPreset, getLayoutPreset } from './layoutPresets';
 import { normalizeProjectSettings } from './settings/store';
 import type {
@@ -673,40 +674,6 @@ const updateActiveInvocation = (
     };
   });
 
-const isMainModelConfig = (value: unknown): value is MainModelConfig => {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-
-  const record = value as Record<string, unknown>;
-
-  return typeof record.key === 'string' && typeof record.name === 'string' && record.type === 'main';
-};
-
-const isGenerateWidgetValues = (values: unknown): values is GenerateWidgetValues => {
-  if (!values || typeof values !== 'object') {
-    return false;
-  }
-
-  const record = values as Record<string, unknown>;
-  const hasFiniteNumber = (key: string) => typeof record[key] === 'number' && Number.isFinite(record[key]);
-
-  return (
-    typeof record.modelKey === 'string' &&
-    typeof record.positivePrompt === 'string' &&
-    typeof record.negativePrompt === 'string' &&
-    hasFiniteNumber('width') &&
-    hasFiniteNumber('height') &&
-    hasFiniteNumber('steps') &&
-    hasFiniteNumber('cfgScale') &&
-    hasFiniteNumber('cfgRescaleMultiplier') &&
-    typeof record.scheduler === 'string' &&
-    hasFiniteNumber('seed') &&
-    typeof record.shouldRandomizeSeed === 'boolean' &&
-    isMainModelConfig(record.model)
-  );
-};
-
 const selectGraphForInvocation = (project: Project, invocation: InvocationRoute): GraphContract => {
   const widgetGraph = project.widgetGraphs[invocation.sourceId as WidgetId];
 
@@ -723,16 +690,15 @@ const compileInvocationSnapshot = (
     return { graph: selectGraphForInvocation(project, route), widgetStates };
   }
 
-  const values = project.widgetStates.generate.values;
+  const values = normalizeGenerateWidgetValues(project.widgetStates.generate.values);
 
-  if (!isGenerateWidgetValues(values)) {
+  if (!values) {
     return null;
   }
 
   const resolvedSettings: GenerateWidgetValues = {
     ...values,
     seed: resolveGenerateSeed(values),
-    shouldRandomizeSeed: false,
   };
   const compiledGraph = compileGenerateGraph(
     resolvedSettings,

@@ -13,18 +13,26 @@ const model: MainModelConfig = {
 };
 
 const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWidgetValues => ({
+  aspectRatioId: '1:1',
+  aspectRatioIsLocked: false,
+  aspectRatioValue: 1,
   batchCount: 1,
   cfgRescaleMultiplier: 0,
   cfgScale: 7,
+  clipSkip: 0,
   height: 1024,
   model,
   modelKey: model.key,
   negativePrompt: '',
   positivePrompt: 'first prompt',
   scheduler: 'euler_a',
+  seamlessXAxis: false,
+  seamlessYAxis: false,
   seed: 123,
   shouldRandomizeSeed: false,
   steps: 30,
+  vae: null,
+  vaePrecision: 'fp32',
   width: 1024,
   ...overrides,
 });
@@ -229,7 +237,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     const secondValues = secondQueueItem?.snapshot.widgetStates.generate.values as unknown as GenerateWidgetValues;
 
     expect(firstValues.positivePrompt).toBe('first prompt');
-    expect(firstValues.shouldRandomizeSeed).toBe(false);
+    expect(firstValues.shouldRandomizeSeed).toBe(true);
     expect(typeof firstValues.seed).toBe('number');
     expect(secondValues.positivePrompt).toBe('second prompt');
     expect(secondValues.seed).toBe(999);

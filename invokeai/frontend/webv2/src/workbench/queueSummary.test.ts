@@ -22,7 +22,7 @@ const createQueueItem = ({
   id,
   snapshot: {
     canvas: {
-      document: { height: 1024, layers: [], width: 1024 },
+      document: { height: 1024, layers: [], version: 1, width: 1024 },
       stagingArea: {
         areThumbnailsVisible: false,
         isVisible: false,
@@ -38,7 +38,7 @@ const createQueueItem = ({
     submittedAt,
     widgetStates: {
       generate: { id: 'generate', label: 'Generate', values: { batchCount }, version: 1 },
-    } as QueueItem['snapshot']['widgetStates'],
+    } as unknown as QueueItem['snapshot']['widgetStates'],
   },
   status,
 });

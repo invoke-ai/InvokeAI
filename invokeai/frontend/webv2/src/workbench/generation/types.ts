@@ -15,10 +15,39 @@ export type MainModelConfig = {
     cfg_rescale_multiplier?: number | null;
     width?: number | null;
     height?: number | null;
+    vae?: string | null;
     vae_precision?: string | null;
   } | null;
   [key: string]: unknown;
 };
+
+export type VaeModelConfig = {
+  key: string;
+  name: string;
+  base: string;
+  type: 'vae';
+  [key: string]: unknown;
+};
+
+export type VaePrecision = 'fp16' | 'fp32';
+
+export type AspectRatioId =
+  | 'Free'
+  | '8:1'
+  | '4:1'
+  | '21:9'
+  | '16:9'
+  | '3:2'
+  | '5:4'
+  | '4:3'
+  | '1:1'
+  | '3:4'
+  | '4:5'
+  | '2:3'
+  | '9:16'
+  | '1:4'
+  | '9:21'
+  | '1:8';
 
 export interface GenerateSettings {
   batchCount: number;
@@ -27,12 +56,22 @@ export interface GenerateSettings {
   negativePrompt: string;
   width: number;
   height: number;
+  aspectRatioId: AspectRatioId;
+  /** width / height ratio enforced while locked. Tracks the preset, or the captured ratio in Free mode. */
+  aspectRatioValue: number;
+  aspectRatioIsLocked: boolean;
   steps: number;
   cfgScale: number;
   cfgRescaleMultiplier: number;
   scheduler: string;
+  clipSkip: number;
   seed: number;
   shouldRandomizeSeed: boolean;
+  seamlessXAxis: boolean;
+  seamlessYAxis: boolean;
+  /** Optional VAE override; null uses the VAE bundled with the main model. */
+  vae: VaeModelConfig | null;
+  vaePrecision: VaePrecision;
 }
 
 export interface GenerateWidgetValues extends GenerateSettings {
@@ -75,6 +114,7 @@ export interface EnqueueGenerateRequest {
   positivePromptNodeId: string;
   seed: number;
   seedNodeId: string;
+  shouldRandomizeSeed: boolean;
   sourceQueueItemId: string;
 }
 
