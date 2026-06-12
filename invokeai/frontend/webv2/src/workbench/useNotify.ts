@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
 
 import type { WorkbenchNotificationKind } from './types';
-import { useWorkbench } from './WorkbenchContext';
+import { useOptionalWorkbench } from './WorkbenchContext';
+import { toaster } from './components/ui/toaster';
 
 /**
- * Shell notification helper: `recordNotice` dispatch wrapped in one hook so
- * widgets never hand-roll the same notifyError/notifySuccess plumbing.
+ * Notification helper: records into the workbench shell when present, and
+ * falls back to global toasts for project-independent surfaces like Home.
  */
 export interface Notify {
   success: (title: string, message?: string) => void;
@@ -13,14 +14,25 @@ export interface Notify {
   info: (title: string, message?: string) => void;
 }
 
+const notificationToastType: Record<WorkbenchNotificationKind, 'error' | 'info' | 'success'> = {
+  error: 'error',
+  info: 'info',
+  success: 'success',
+};
+
 export const useNotify = (): Notify => {
-  const { dispatch } = useWorkbench();
+  const workbench = useOptionalWorkbench();
+  const dispatch = workbench?.dispatch;
 
   return useMemo(() => {
     const record =
       (kind: WorkbenchNotificationKind) =>
       (title: string, message?: string): void => {
-        dispatch({ kind, message, title, type: 'recordNotice' });
+        if (dispatch) {
+          dispatch({ kind, message, title, type: 'recordNotice' });
+        } else {
+          toaster.create({ description: message, title, type: notificationToastType[kind] });
+        }
       };
 
     return { error: record('error'), info: record('info'), success: record('success') };
