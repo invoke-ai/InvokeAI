@@ -9,9 +9,10 @@ import { OpenProjectDialog } from './OpenProjectDialog';
 import { RenameDialog } from './ui/RenameDialog';
 import { Tabs } from './ui/Tabs';
 import { Tooltip } from './ui/Tooltip';
-import type { Project } from '../types';
+import type { Project, WidgetRegion } from '../types';
 import { exportOpenProject } from '../projects/projectFile';
 import { useProjectActions } from '../projects/useProjectActions';
+import { useOpenWorkbenchWidget } from '../useOpenWorkbenchWidget';
 import { useWorkbench } from '../WorkbenchContext';
 
 /**
@@ -144,6 +145,7 @@ const ProjectTabContextMenu = ({
   target: { project: Project; x: number; y: number } | null;
 }) => {
   const { dispatch } = useWorkbench();
+  const openWorkbenchWidget = useOpenWorkbenchWidget();
   const targetRef = useRef(target);
 
   targetRef.current = target;
@@ -160,12 +162,9 @@ const ProjectTabContextMenu = ({
       : left.enabledWidgetIds.includes('project')
         ? 'left'
         : null;
+    const preferredRegions: WidgetRegion[] = [region ?? 'right'];
 
-    if (region) {
-      dispatch({ region, type: 'selectRegionWidget', widgetId: 'project' });
-    } else {
-      dispatch({ region: 'right', type: 'toggleRegionWidget', widgetId: 'project' });
-    }
+    openWorkbenchWidget('project', { preferredRegions });
   };
 
   return (

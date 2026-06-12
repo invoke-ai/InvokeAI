@@ -53,6 +53,7 @@ type WorkbenchAction =
   | { type: 'setInvocationDestination'; destination: ResultDestination }
   | { type: 'toggleSourceLock' }
   | { type: 'toggleDestinationLock' }
+  | { type: 'openRegionWidget'; region: WidgetRegion; widgetId: WidgetId }
   | { type: 'selectRegionWidget'; region: WidgetRegion; widgetId: WidgetId }
   | { type: 'toggleRegionWidget'; region: WidgetRegion; widgetId: WidgetId }
   | { type: 'setRegionWidgetCollapsed'; region: WidgetRegion; isCollapsed: boolean }
@@ -1050,6 +1051,28 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
         ...invocation,
         destinationLocked: !invocation.destinationLocked,
       }));
+    }
+    case 'openRegionWidget': {
+      return updateActiveProject(state, (project) => {
+        const region = project.widgetRegions[action.region];
+        const enabledWidgetIds = region.enabledWidgetIds.includes(action.widgetId)
+          ? region.enabledWidgetIds
+          : [...region.enabledWidgetIds, action.widgetId];
+
+        return {
+          ...project,
+          layout: openPanelForRegion(project.layout, action.region),
+          widgetRegions: {
+            ...project.widgetRegions,
+            [action.region]: {
+              ...region,
+              activeWidgetId: action.widgetId,
+              enabledWidgetIds,
+              isCollapsed: false,
+            },
+          },
+        };
+      });
     }
     case 'selectRegionWidget': {
       return updateActiveProject(state, (project) => {

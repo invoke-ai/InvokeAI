@@ -100,6 +100,81 @@ describe('workbench widget region defaults', () => {
   });
 });
 
+describe('workbench widget region opening', () => {
+  it('enables and selects a center widget without toggling it back off', () => {
+    let state = createInitialWorkbenchState();
+    const activeProject = getActiveProject(state);
+    const enabledWidgetIds: Project['widgetRegions']['center']['enabledWidgetIds'] = ['canvas'];
+
+    state = {
+      ...state,
+      projects: state.projects.map((project) =>
+        project.id === activeProject.id
+          ? {
+              ...project,
+              widgetRegions: {
+                ...project.widgetRegions,
+                center: {
+                  ...project.widgetRegions.center,
+                  activeWidgetId: 'canvas',
+                  enabledWidgetIds,
+                },
+              },
+            }
+          : project
+      ),
+    };
+
+    state = workbenchReducer(state, { region: 'center', type: 'openRegionWidget', widgetId: 'models' });
+
+    expect(getActiveProject(state).widgetRegions.center.activeWidgetId).toBe('models');
+    expect(getActiveProject(state).widgetRegions.center.enabledWidgetIds).toEqual(['canvas', 'models']);
+
+    state = workbenchReducer(state, { region: 'center', type: 'openRegionWidget', widgetId: 'models' });
+
+    expect(getActiveProject(state).widgetRegions.center.activeWidgetId).toBe('models');
+    expect(getActiveProject(state).widgetRegions.center.enabledWidgetIds).toEqual(['canvas', 'models']);
+    expect(getActiveProject(state).widgetRegions.center.isCollapsed).toBe(false);
+  });
+
+  it('opens and uncollapses the target panel region', () => {
+    let state = createInitialWorkbenchState();
+    const activeProject = getActiveProject(state);
+    const enabledWidgetIds: Project['widgetRegions']['bottom']['enabledWidgetIds'] = ['diagnostics'];
+
+    state = {
+      ...state,
+      projects: state.projects.map((project) =>
+        project.id === activeProject.id
+          ? {
+              ...project,
+              layout: {
+                ...project.layout,
+                panels: { ...project.layout.panels, isBottomOpen: false },
+              },
+              widgetRegions: {
+                ...project.widgetRegions,
+                bottom: {
+                  ...project.widgetRegions.bottom,
+                  activeWidgetId: 'diagnostics',
+                  enabledWidgetIds,
+                  isCollapsed: true,
+                },
+              },
+            }
+          : project
+      ),
+    };
+
+    state = workbenchReducer(state, { region: 'bottom', type: 'openRegionWidget', widgetId: 'queue' });
+
+    expect(getActiveProject(state).layout.panels.isBottomOpen).toBe(true);
+    expect(getActiveProject(state).widgetRegions.bottom.activeWidgetId).toBe('queue');
+    expect(getActiveProject(state).widgetRegions.bottom.enabledWidgetIds).toEqual(['diagnostics', 'queue']);
+    expect(getActiveProject(state).widgetRegions.bottom.isCollapsed).toBe(false);
+  });
+});
+
 describe('workbenchReducer Phase 5 generation flow', () => {
   it('routes queue results back to the originating project after the user switches projects', () => {
     let state = submitGenerate(primeGenerate());

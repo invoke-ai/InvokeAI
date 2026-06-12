@@ -5,6 +5,7 @@ import { ChevronDownIcon, LogOutIcon, UserRoundCogIcon, UsersIcon } from 'lucide
 
 import { MenuContent } from '../../components/ui/Menu';
 import { SettingsButton } from '../../settings/SettingsDialog';
+import { useOptionalOpenWorkbenchWidget } from '../../useOpenWorkbenchWidget';
 import { useOptionalWorkbench } from '../../WorkbenchContext';
 import { logoutSession, useAuthSession } from '../session';
 import { ProfileDialog } from './ProfileDialog';
@@ -17,6 +18,7 @@ import { ProfileDialog } from './ProfileDialog';
 export const AccountMenu = () => {
   const session = useAuthSession();
   const workbench = useOptionalWorkbench();
+  const openWorkbenchWidget = useOptionalOpenWorkbenchWidget();
   const navigate = useNavigate();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
@@ -32,13 +34,7 @@ export const AccountMenu = () => {
       return;
     }
 
-    const centerRegion = workbench.activeProject.widgetRegions.center;
-
-    if (centerRegion.enabledWidgetIds.includes('users')) {
-      workbench.dispatch({ region: 'center', type: 'selectRegionWidget', widgetId: 'users' });
-    } else {
-      workbench.dispatch({ region: 'center', type: 'toggleRegionWidget', widgetId: 'users' });
-    }
+    openWorkbenchWidget('users', { preferredRegions: ['center'], requireCenterView: true });
   };
 
   const signOut = async () => {

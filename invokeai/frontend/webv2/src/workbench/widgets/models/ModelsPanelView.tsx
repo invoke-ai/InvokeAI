@@ -15,10 +15,11 @@ import {
 import { collectBases, collectTypes } from '../../models/library';
 import { ensureModelsLoaded, useModelsSnapshot } from '../../models/modelsStore';
 import { openModelsCenterTab, updateModelsUi, useModelsUi } from '../../models/uiStore';
+import type { WidgetId } from '../../types';
+import { useOpenWorkbenchWidget } from '../../useOpenWorkbenchWidget';
 import { ModelDetail } from './ModelDetail';
 import { ModelFilterBar } from './ModelFilterBar';
 import { ModelLibraryList } from './ModelLibraryList';
-import { useOpenModelManager } from './useOpenModelManager';
 
 /**
  * Side-panel presentation: a searchable library browser with in-panel
@@ -27,10 +28,10 @@ import { useOpenModelManager } from './useOpenModelManager';
  * footer to its Queue tab. Filters and the drilled-in model persist in the
  * models UI store across panel/tab switches.
  */
-export const ModelsPanelView = () => {
+export const ModelsPanelView = ({ widgetId }: { widgetId: WidgetId }) => {
   const { missingModelKeys, models } = useModelsSnapshot();
   const { filters, panelModelKey } = useModelsUi();
-  const openModelManager = useOpenModelManager();
+  const openWorkbenchWidget = useOpenWorkbenchWidget();
 
   useEffect(() => {
     ensureModelsLoaded();
@@ -76,7 +77,7 @@ export const ModelsPanelView = () => {
               variant="solid"
               onClick={() => {
                 openModelsCenterTab('add');
-                openModelManager();
+                openWorkbenchWidget(widgetId, { preferredRegions: ['center'], requireCenterView: true });
               }}
             >
               <Icon as={PlusIcon} boxSize="3.5" />
@@ -93,7 +94,7 @@ export const ModelsPanelView = () => {
         <InstallSummaryFooter
           onOpen={() => {
             openModelsCenterTab('queue');
-            openModelManager();
+            openWorkbenchWidget(widgetId, { preferredRegions: ['center'], requireCenterView: true });
           }}
         />
       </Stack>

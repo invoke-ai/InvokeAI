@@ -11,6 +11,7 @@ import {
   type GalleryImage,
 } from '../gallery/api';
 import type { WorkbenchAction } from '../workbenchState';
+import { useOpenWorkbenchWidget } from '../useOpenWorkbenchWidget';
 
 /**
  * Image operations shared by every surface that shows backend images (gallery
@@ -69,6 +70,8 @@ export const useImageActions = ({
   /** Optional optimistic hook, called before the request and re-called inverted on failure. */
   onStarredChange?: (imageNames: string[], starred: boolean) => void;
 }): ImageActions => {
+  const openWorkbenchWidget = useOpenWorkbenchWidget();
+
   return useMemo<ImageActions>(() => {
     const recordError = (error: unknown) => dispatch({ message: toErrorMessage(error), type: 'recordError' });
     const recordSuccess = (title: string, message?: string) =>
@@ -150,7 +153,7 @@ export const useImageActions = ({
       },
       openImageInPreview: (image) => {
         dispatch({ image, type: 'selectGalleryImage' });
-        dispatch({ centerViewId: 'preview', type: 'setCenterView' });
+        openWorkbenchWidget('preview', { preferredRegions: ['center'], requireCenterView: true });
       },
       selectForCompare: (image) => {
         dispatch({ image, type: 'setGalleryCompareImage' });
@@ -167,5 +170,5 @@ export const useImageActions = ({
         }
       },
     };
-  }, [boards, dispatch, onImagesDeleted, onStarredChange]);
+  }, [boards, dispatch, onImagesDeleted, onStarredChange, openWorkbenchWidget]);
 };

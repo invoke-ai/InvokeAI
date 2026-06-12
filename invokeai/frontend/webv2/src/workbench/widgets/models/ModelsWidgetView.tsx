@@ -7,10 +7,10 @@ import { ModelsPanelView } from './ModelsPanelView';
  * manager (library, add models, install queue); side panels get the compact
  * browser with drill-in detail.
  */
-export const ModelsWidgetView = ({ region }: WidgetViewProps) => {
+export const ModelsWidgetView = ({ manifest, region }: WidgetViewProps) => {
   if (region === 'center') {
     return <ModelsCenterView />;
   }
 
-  return <ModelsPanelView />;
+  return <ModelsPanelView widgetId={manifest.id} />;
 };
