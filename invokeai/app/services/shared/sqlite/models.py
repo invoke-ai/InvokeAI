@@ -8,12 +8,13 @@ these models are used only for querying via SQLModel/SQLAlchemy.
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Column, Computed, Integer, Text
+from sqlalchemy import BigInteger, Column, Computed, String, Text
 from sqlalchemy.dialects import mysql
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import FunctionElement
 from sqlalchemy.types import TypeEngine
 from sqlmodel import Field, SQLModel
+from sqlmodel.sql.sqltypes import AutoString
 
 
 def _blob() -> TypeEngine[str]:
@@ -229,8 +230,10 @@ class ModelTable(SQLModel, table=True):
     trigger_phrases: Optional[str] = Field(
         default=None, sa_column=Column(Text, _generated("config", "$.trigger_phrases", unquote=False))
     )
+    # BigInteger (BIGINT) not Integer: file sizes exceed the 32-bit INT range for models >2 GB
+    # (SQLite's INTEGER is already 64-bit, so this is a no-op there).
     file_size: Optional[int] = Field(
-        default=None, sa_column=Column(Integer, _generated("config", "$.file_size", unquote=False))
+        default=None, sa_column=Column(BigInteger, _generated("config", "$.file_size", unquote=False))
     )
 
 
@@ -335,3 +338,25 @@ class ClientStateTable(SQLModel, table=True):
     key: str = Field(primary_key=True)
     value: str = Field(sa_column=Column(_blob(), nullable=False))
     updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"onupdate": datetime.utcnow})
+
+
+# --- MySQL/MariaDB index-key-length compatibility ---
+#
+# On MySQL/MariaDB with the legacy InnoDB limit an index key may be at most 767 bytes; a
+# utf8mb4 VARCHAR(255) is 1020 bytes, so PRIMARY KEY / UNIQUE / indexed string columns would
+# fail to CREATE. All large payloads already use TEXT/LONGTEXT (see `_blob` and the Computed
+# columns), so the remaining bare VARCHAR columns are short identifiers and names. We cap them
+# at 191 chars (191 * 4 = 764 < 767) — the well-known utf8mb4 safe length. SQLModel's unbounded
+# str maps to AutoString (a TypeDecorator whose `mysql_default_length` controls the MySQL VARCHAR
+# size); explicitly-sized String columns are narrowed directly. No-op on SQLite/Postgres.
+_MAX_VARCHAR = 191
+for _table in SQLModel.metadata.tables.values():
+    for _column in _table.columns:
+        # Only narrow real VARCHARs. Text/LONGTEXT (a String subclass) and the Computed
+        # columns must keep their unbounded type — a length on TEXT is invalid.
+        if isinstance(_column.type, Text):
+            continue
+        if isinstance(_column.type, AutoString) and _column.type.length is None:
+            _column.type.mysql_default_length = _MAX_VARCHAR
+        elif isinstance(_column.type, String) and (_column.type.length is None or _column.type.length > _MAX_VARCHAR):
+            _column.type.length = _MAX_VARCHAR
