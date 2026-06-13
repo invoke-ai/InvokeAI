@@ -1821,6 +1821,44 @@ class TestWebSocketAuth:
         rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
         assert "default" in rooms_emitted_to
 
+    def test_recall_parameters_emitted_once_to_owner_and_admin_rooms(self, socketio: Any) -> None:
+        """RecallParametersUpdatedEvent must be delivered to the owner + admin rooms
+        in a SINGLE emit call (room list), not two separate emits.
+
+        A socket that is in both rooms — e.g. the system user in single-user mode,
+        who is also an admin — would otherwise receive the event twice. That is
+        harmless for the idempotent scalar recall fields but doubles every entry
+        for the append-mode reference-image recall, which pushes rather than
+        replaces. python-socketio deduplicates recipients across a room list, so
+        a single emit to [user_room, "admin"] delivers exactly once per socket.
+        """
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import RecallParametersUpdatedEvent
+
+        event = RecallParametersUpdatedEvent.build(
+            queue_id="default",
+            user_id="owner-recall",
+            parameters={"reference_images": [{"image": {"image_name": "cat.png"}}], "append": True},
+        )
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("recall_parameters_updated", event)))
+
+        # Exactly one emit, targeting the union of the owner and admin rooms.
+        assert mock_emit.call_count == 1, (
+            "recall event must be emitted once to a room list, not once per room — "
+            "two emits double-deliver to a socket in both rooms"
+        )
+        room = mock_emit.call_args.kwargs.get("room")
+        assert isinstance(room, list)
+        assert set(room) == {"user:owner-recall", "admin"}
+        # And never to the shared queue room, which would leak to other users.
+        assert "default" not in room
+
 
 class TestCustomNodesAuthorization:
     """Tests that custom_nodes endpoints enforce AdminUserOrDefault.
