@@ -81,11 +81,10 @@ def test_path_defaults_are_normalized_to_forward_slashes() -> None:
         ]
     }
 
-    normalized_schema = normalize_path_defaults(schema)
+    normalize_path_defaults(schema)
 
-    assert normalized_schema["properties"]["convert_cache_dir"]["default"] == "models/.convert_cache"
-    assert normalized_schema["properties"]["download_cache_dir"]["default"] == "models/.download_cache"
+    assert schema["properties"]["convert_cache_dir"]["default"] == "models/.convert_cache"
+    assert schema["properties"]["download_cache_dir"]["default"] == "models/.download_cache"
     assert (
-        normalized_schema["properties"]["nested_path"]["oneOf"][0]["properties"]["cache_dir"]["default"]
-        == "models/.nested_cache"
+        schema["properties"]["nested_path"]["oneOf"][0]["properties"]["cache_dir"]["default"] == "models/.nested_cache"
     )
