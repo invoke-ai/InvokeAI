@@ -162,7 +162,7 @@ export const getCanvasToolModifierHintIds = ({
       'altScaleFromCenter',
       'modFineGrid',
     ],
-    move: () => ['arrowKeysNudgeSelection', ...SHARED_HINT_IDS],
+    move: () => ['arrowKeysNudgeSelection', 'modFineGrid', ...SHARED_HINT_IDS],
     text: ({ hasActiveTextSession: active }) =>
       active
         ? ['enterCommitText', 'shiftEnterNewLine', 'escCancelText', 'modDragText', 'shiftSnapRotation']
@@ -193,7 +193,14 @@ export const getCanvasToolModifierHintIds = ({
     return [];
   }
   return Array.from(
-    resolver({ tool, lassoMode, shapeType, bboxAspectRatioLocked, hasActiveTextSession, isPrimaryPointerDown })
+    resolver({
+      tool,
+      lassoMode,
+      shapeType,
+      bboxAspectRatioLocked,
+      hasActiveTextSession,
+      isPrimaryPointerDown,
+    })
   );
 };
 
