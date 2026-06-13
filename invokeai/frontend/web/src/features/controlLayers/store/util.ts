@@ -2,11 +2,13 @@ import { deepClone } from 'common/util/deepClone';
 import { merge } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type {
+  CanvasBezierPathState,
   CanvasControlLayerState,
   CanvasImageState,
   CanvasInpaintMaskState,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
+  CanvasVectorLayerState,
   ControlLoRAConfig,
   ControlNetConfig,
   CroppableImageWithDims,
@@ -268,6 +270,38 @@ export const getInpaintMaskState = (
     },
     noiseLevel: undefined,
     denoiseLimit: undefined,
+  };
+  merge(entityState, overrides);
+  return entityState;
+};
+
+export const getBezierPathState = (
+  id: string,
+  overrides?: PartialDeep<CanvasBezierPathState>
+): CanvasBezierPathState => {
+  const pathState: CanvasBezierPathState = {
+    id,
+    name: null,
+    isClosed: false,
+    points: [],
+  };
+  merge(pathState, overrides);
+  return pathState;
+};
+
+export const getVectorLayerState = (
+  id: string,
+  overrides?: PartialDeep<CanvasVectorLayerState>
+): CanvasVectorLayerState => {
+  const entityState: CanvasVectorLayerState = {
+    id,
+    name: null,
+    type: 'vector_layer',
+    isEnabled: true,
+    isLocked: false,
+    paths: [],
+    opacity: 1,
+    position: { x: 0, y: 0 },
   };
   merge(entityState, overrides);
   return entityState;

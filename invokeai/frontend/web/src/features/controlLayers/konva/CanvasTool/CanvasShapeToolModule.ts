@@ -199,6 +199,11 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       return;
     }
 
+    if (!this.parent.getCanDraw()) {
+      this.konva.startPointIndicator.visible(false);
+      return;
+    }
+
     if (tool === 'rect') {
       this.syncCursorStyle();
     }
@@ -229,7 +234,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
   onStagePointerDown = async (e: KonvaEventObject<PointerEvent>) => {
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
     const cursorPos = this.parent.$cursorPos.get();
-    if (!selectedEntity || !cursorPos) {
+    if (!selectedEntity || selectedEntity.state.type === 'vector_layer' || !cursorPos) {
       return;
     }
 

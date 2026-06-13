@@ -15,6 +15,7 @@ import {
   selectRegionalGuidanceReferenceImage,
 } from 'features/controlLayers/store/selectors';
 import type {
+  CanvasBezierPathState,
   CanvasEntityStateFromType,
   CanvasEntityType,
   CanvasInpaintMaskState,
@@ -23,6 +24,7 @@ import type {
   ChannelPoints,
   CompositeOperation,
   ControlLoRAConfig,
+  Coordinate,
   EntityMovedByPayload,
   FillStyle,
   FLUXReduxImageInfluence,
@@ -60,6 +62,7 @@ import type {
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
   CanvasState,
+  CanvasVectorLayerState,
   CLIPVisionModelV2,
   ControlModeV2,
   ControlNetConfig,
@@ -90,6 +93,7 @@ import {
   getInpaintMaskState,
   getRasterLayerState,
   getRegionalGuidanceState,
+  getVectorLayerState,
   imageDTOToImageWithDims,
   initialControlLoRA,
   initialControlNet,
@@ -106,6 +110,22 @@ const resetInpaintMasksHiddenIfEmpty = (state: CanvasState) => {
     state.inpaintMasks.isHidden = false;
   }
 };
+
+const offsetCoordinate = (coordinate: Coordinate, offset: Coordinate): Coordinate => ({
+  x: coordinate.x + offset.x,
+  y: coordinate.y + offset.y,
+});
+
+const translateBezierPathToLayer = (path: CanvasBezierPathState, offset: Coordinate): CanvasBezierPathState => ({
+  ...path,
+  id: getPrefixedId('bezier_path'),
+  points: path.points.map((point) => ({
+    ...point,
+    anchor: offsetCoordinate(point.anchor, offset),
+    inHandle: point.inHandle ? offsetCoordinate(point.inHandle, offset) : null,
+    outHandle: point.outHandle ? offsetCoordinate(point.outHandle, offset) : null,
+  })),
+});
 
 const slice = createSlice({
   name: 'canvas',
@@ -466,6 +486,95 @@ const slice = createSlice({
       const { data } = action.payload;
       state.controlLayers.entities.push(data);
       state.selectedEntityIdentifier = { type: 'control_layer', id: data.id };
+    },
+    vectorLayerAdded: {
+      reducer: (
+        state,
+        action: PayloadAction<{
+          id: string;
+          overrides?: Partial<CanvasVectorLayerState>;
+          isSelected?: boolean;
+          isBookmarked?: boolean;
+          addAfter?: string;
+        }>
+      ) => {
+        const { id, overrides, isSelected, isBookmarked, addAfter } = action.payload;
+        const entityState = getVectorLayerState(id, overrides);
+
+        const index = addAfter
+          ? state.vectorLayers.entities.findIndex((e) => e.id === addAfter) + 1
+          : state.vectorLayers.entities.length;
+        state.vectorLayers.entities.splice(index, 0, entityState);
+
+        const entityIdentifier = getEntityIdentifier(entityState);
+
+        if (isSelected) {
+          state.selectedEntityIdentifier = entityIdentifier;
+        }
+
+        if (isBookmarked) {
+          state.bookmarkedEntityIdentifier = entityIdentifier;
+        }
+      },
+      prepare: (payload: {
+        overrides?: Partial<CanvasVectorLayerState>;
+        isSelected?: boolean;
+        isBookmarked?: boolean;
+        addAfter?: string;
+      }) => ({
+        payload: { ...payload, id: getPrefixedId('vector_layer') },
+      }),
+    },
+    vectorPathAdded: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<{ path: CanvasBezierPathState }, 'vector_layer'>>
+    ) => {
+      const { entityIdentifier, path } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity || entity.type !== 'vector_layer') {
+        return;
+      }
+
+      entity.paths.push({ ...path });
+    },
+    vectorLayerPathsReplaced: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<{ paths: CanvasBezierPathState[] }, 'vector_layer'>>
+    ) => {
+      const { entityIdentifier, paths } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity || entity.type !== 'vector_layer') {
+        return;
+      }
+
+      entity.paths = paths.map((path) => ({ ...path }));
+    },
+    vectorLayersMergedDown: (
+      state,
+      action: PayloadAction<{
+        belowEntityIdentifier: CanvasEntityIdentifier<'vector_layer'>;
+        aboveEntityIdentifier: CanvasEntityIdentifier<'vector_layer'>;
+      }>
+    ) => {
+      const { belowEntityIdentifier, aboveEntityIdentifier } = action.payload;
+      if (belowEntityIdentifier.id === aboveEntityIdentifier.id) {
+        return;
+      }
+
+      const belowEntity = selectEntity(state, belowEntityIdentifier);
+      const aboveEntity = selectEntity(state, aboveEntityIdentifier);
+      if (!belowEntity || !aboveEntity || belowEntity.type !== 'vector_layer' || aboveEntity.type !== 'vector_layer') {
+        return;
+      }
+
+      const offset = {
+        x: aboveEntity.position.x - belowEntity.position.x,
+        y: aboveEntity.position.y - belowEntity.position.y,
+      };
+
+      belowEntity.paths.push(...aboveEntity.paths.map((path) => translateBezierPathToLayer(path, offset)));
+      state.vectorLayers.entities = state.vectorLayers.entities.filter((layer) => layer.id !== aboveEntity.id);
+      state.selectedEntityIdentifier = belowEntityIdentifier;
     },
     controlLayerConvertedToRasterLayer: {
       reducer: (
@@ -1419,7 +1528,11 @@ const slice = createSlice({
         return;
       }
       entity.isEnabled = true;
-      entity.objects = [];
+      if (entity.type === 'vector_layer') {
+        entity.paths = [];
+      } else {
+        entity.objects = [];
+      }
       entity.position = { x: 0, y: 0 };
     },
     entityDuplicated: (state, action: PayloadAction<EntityIdentifierPayload>) => {
@@ -1459,6 +1572,18 @@ const slice = createSlice({
           newEntity.id = getPrefixedId('inpaint_mask');
           const newEntityIndex = state.inpaintMasks.entities.findIndex((e) => e.id === entityIdentifier.id) + 1;
           state.inpaintMasks.entities.splice(newEntityIndex, 0, newEntity);
+          break;
+        }
+        case 'vector_layer': {
+          newEntity.id = getPrefixedId('vector_layer');
+          newEntity.paths = newEntity.paths.map(
+            (path): CanvasBezierPathState => ({
+              ...path,
+              id: getPrefixedId('bezier_path'),
+            })
+          );
+          const newEntityIndex = state.vectorLayers.entities.findIndex((e) => e.id === entityIdentifier.id) + 1;
+          state.vectorLayers.entities.splice(newEntityIndex, 0, newEntity);
           break;
         }
       }
@@ -1528,6 +1653,9 @@ const slice = createSlice({
       if (!entity) {
         return;
       }
+      if (entity.type === 'vector_layer') {
+        return;
+      }
 
       if (replaceObjects) {
         entity.objects = [imageObject];
@@ -1542,6 +1670,9 @@ const slice = createSlice({
       const { entityIdentifier, brushLine } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
+        return;
+      }
+      if (entity.type === 'vector_layer') {
         return;
       }
 
@@ -1559,6 +1690,9 @@ const slice = createSlice({
       if (!entity) {
         return;
       }
+      if (entity.type === 'vector_layer') {
+        return;
+      }
 
       // TODO(psyche): If we add the object without splatting, the renderer will see it as the same object and not
       // re-render it (reference equality check). I don't like this behaviour.
@@ -1574,6 +1708,9 @@ const slice = createSlice({
       if (!entity) {
         return;
       }
+      if (entity.type === 'vector_layer') {
+        return;
+      }
 
       // TODO(psyche): If we add the object without splatting, the renderer will see it as the same object and not
       // re-render it (reference equality check). I don't like this behaviour.
@@ -1585,6 +1722,9 @@ const slice = createSlice({
       if (!entity) {
         return;
       }
+      if (entity.type === 'vector_layer') {
+        return;
+      }
 
       // TODO(psyche): If we add the object without splatting, the renderer will see it as the same object and not
       // re-render it (reference equality check). I don't like this behaviour.
@@ -1594,6 +1734,9 @@ const slice = createSlice({
       const { entityIdentifier, gradient } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
+        return;
+      }
+      if (entity.type === 'vector_layer') {
         return;
       }
 
@@ -1621,6 +1764,9 @@ const slice = createSlice({
           break;
         case 'control_layer':
           state.controlLayers.entities = state.controlLayers.entities.filter((rg) => rg.id !== entityIdentifier.id);
+          break;
+        case 'vector_layer':
+          state.vectorLayers.entities = state.vectorLayers.entities.filter((layer) => layer.id !== entityIdentifier.id);
           break;
         case 'regional_guidance':
           state.regionalGuidance.entities = state.regionalGuidance.entities.filter(
@@ -1687,6 +1833,12 @@ const slice = createSlice({
             entityIdentifiers as CanvasEntityIdentifier<'control_layer'>[]
           );
           break;
+        case 'vector_layer':
+          state.vectorLayers.entities = reorderEntities(
+            state.vectorLayers.entities,
+            entityIdentifiers as CanvasEntityIdentifier<'vector_layer'>[]
+          );
+          break;
         case 'inpaint_mask':
           state.inpaintMasks.entities = reorderEntities(
             state.inpaintMasks.entities,
@@ -1719,6 +1871,9 @@ const slice = createSlice({
         case 'control_layer':
           state.controlLayers.isHidden = !state.controlLayers.isHidden;
           break;
+        case 'vector_layer':
+          state.vectorLayers.isHidden = !state.vectorLayers.isHidden;
+          break;
         case 'inpaint_mask':
           state.inpaintMasks.isHidden = !state.inpaintMasks.isHidden;
           resetInpaintMasksHiddenIfEmpty(state);
@@ -1731,12 +1886,14 @@ const slice = createSlice({
     allNonRasterLayersIsHiddenToggled: (state) => {
       const hasVisibleNonRasterLayers =
         (state.controlLayers.entities.length > 0 && !state.controlLayers.isHidden) ||
+        (state.vectorLayers.entities.length > 0 && !state.vectorLayers.isHidden) ||
         (state.inpaintMasks.entities.length > 0 && !state.inpaintMasks.isHidden) ||
         (state.regionalGuidance.entities.length > 0 && !state.regionalGuidance.isHidden);
 
       const shouldHide = hasVisibleNonRasterLayers;
 
       state.controlLayers.isHidden = shouldHide;
+      state.vectorLayers.isHidden = shouldHide;
       state.inpaintMasks.isHidden = shouldHide;
       state.regionalGuidance.isHidden = shouldHide;
       resetInpaintMasksHiddenIfEmpty(state);
@@ -1746,12 +1903,14 @@ const slice = createSlice({
       const initialState = getInitialCanvasState();
       state.rasterLayers = initialState.rasterLayers;
       state.controlLayers = initialState.controlLayers;
+      state.vectorLayers = initialState.vectorLayers;
       state.inpaintMasks = initialState.inpaintMasks;
       state.regionalGuidance = initialState.regionalGuidance;
     },
     canvasMetadataRecalled: (state, action: PayloadAction<CanvasMetadata>) => {
-      const { controlLayers, inpaintMasks, rasterLayers, regionalGuidance } = action.payload;
+      const { controlLayers, vectorLayers, inpaintMasks, rasterLayers, regionalGuidance } = action.payload;
       state.controlLayers.entities = controlLayers;
+      state.vectorLayers.entities = vectorLayers;
       state.inpaintMasks.entities = inpaintMasks;
       state.rasterLayers.entities = rasterLayers;
       state.regionalGuidance.entities = regionalGuidance;
@@ -1763,6 +1922,7 @@ const slice = createSlice({
       action: PayloadAction<{
         rasterLayers: CanvasRasterLayerState[];
         controlLayers: CanvasControlLayerState[];
+        vectorLayers: CanvasVectorLayerState[];
         inpaintMasks: CanvasInpaintMaskState[];
         regionalGuidance: CanvasRegionalGuidanceState[];
         bbox: CanvasState['bbox'];
@@ -1773,6 +1933,7 @@ const slice = createSlice({
       const {
         rasterLayers,
         controlLayers,
+        vectorLayers,
         inpaintMasks,
         regionalGuidance,
         bbox,
@@ -1781,6 +1942,7 @@ const slice = createSlice({
       } = action.payload;
       state.rasterLayers.entities = rasterLayers;
       state.controlLayers.entities = controlLayers;
+      state.vectorLayers.entities = vectorLayers;
       state.inpaintMasks.entities = inpaintMasks;
       state.regionalGuidance.entities = regionalGuidance;
       // Preserve the current modelBase to avoid desync with the currently selected model
@@ -1796,6 +1958,7 @@ const slice = createSlice({
     canvasSnapshotRestored: (state, action: PayloadAction<CanvasState>) => {
       const snapshot = action.payload;
       state.controlLayers = snapshot.controlLayers;
+      state.vectorLayers = snapshot.vectorLayers;
       state.inpaintMasks = snapshot.inpaintMasks;
       state.rasterLayers = snapshot.rasterLayers;
       state.regionalGuidance = snapshot.regionalGuidance;
@@ -1956,6 +2119,10 @@ export const {
   // Control layers
   controlLayerAdded,
   controlLayerRecalled,
+  vectorLayerAdded,
+  vectorPathAdded,
+  vectorLayerPathsReplaced,
+  vectorLayersMergedDown,
   controlLayerConvertedToRasterLayer,
   controlLayerConvertedToInpaintMask,
   controlLayerConvertedToRegionalGuidance,

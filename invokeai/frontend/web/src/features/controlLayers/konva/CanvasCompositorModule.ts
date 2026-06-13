@@ -19,6 +19,7 @@ import {
   selectActiveInpaintMaskEntities,
   selectActiveRasterLayerEntities,
   selectActiveRegionalGuidanceEntities,
+  selectActiveVectorLayerEntities,
 } from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityIdentifier,
@@ -28,7 +29,7 @@ import type {
   GenerationMode,
   Rect,
 } from 'features/controlLayers/store/types';
-import { getEntityIdentifier } from 'features/controlLayers/store/types';
+import { getEntityIdentifier, isVectorLayerEntityIdentifier } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
@@ -153,6 +154,9 @@ export class CanvasCompositorModule extends CanvasModuleBase {
         break;
       case 'control_layer':
         entities = this.manager.stateApi.getControlLayersState().entities;
+        break;
+      case 'vector_layer':
+        entities = this.manager.stateApi.getVectorLayersState().entities;
         break;
       case 'regional_guidance':
         entities = this.manager.stateApi.getRegionsState().entities;
@@ -394,6 +398,15 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       case 'control_layer':
         this.manager.stateApi.addControlLayer(addEntityArg);
         break;
+      case 'vector_layer':
+        this.log.warn('Merging into a vector layer is not supported');
+        toast({
+          id: 'MERGE_LAYERS_TOAST',
+          title: t('controlLayers.mergeVisibleError'),
+          status: 'error',
+          withCount: false,
+        });
+        return null;
       default:
         assert<Equals<typeof type, never>>(false, 'Unsupported type for merge');
     }
@@ -401,6 +414,52 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     toast({ id: 'MERGE_LAYERS_TOAST', title: t('controlLayers.mergeVisibleOk'), status: 'success', withCount: false });
 
     return result.value;
+  };
+
+  mergeDown = async (
+    belowEntityIdentifier: CanvasEntityIdentifier,
+    aboveEntityIdentifier: CanvasEntityIdentifier
+  ): Promise<ImageDTO | null> => {
+    if (isVectorLayerEntityIdentifier(belowEntityIdentifier) || isVectorLayerEntityIdentifier(aboveEntityIdentifier)) {
+      if (
+        isVectorLayerEntityIdentifier(belowEntityIdentifier) &&
+        isVectorLayerEntityIdentifier(aboveEntityIdentifier)
+      ) {
+        const editSession = this.manager.tool.tools.path.$editSession.get();
+        if (
+          editSession &&
+          (editSession.entityIdentifier.id === belowEntityIdentifier.id ||
+            editSession.entityIdentifier.id === aboveEntityIdentifier.id) &&
+          editSession.entityIdentifier.type === 'vector_layer'
+        ) {
+          this.manager.tool.tools.path.acceptEditSession();
+        }
+
+        toast({ id: 'MERGE_LAYERS_TOAST', title: t('controlLayers.mergingLayers'), withCount: false });
+        this.manager.stateApi.mergeVectorLayersDown({ belowEntityIdentifier, aboveEntityIdentifier });
+        toast({
+          id: 'MERGE_LAYERS_TOAST',
+          title: t('controlLayers.mergeVisibleOk'),
+          status: 'success',
+          withCount: false,
+        });
+        return null;
+      }
+
+      this.log.warn(
+        { belowEntityIdentifier, aboveEntityIdentifier },
+        'Merge down involving vector and non-vector layers is not supported'
+      );
+      toast({
+        id: 'MERGE_LAYERS_TOAST',
+        title: t('controlLayers.mergeVisibleError'),
+        status: 'error',
+        withCount: false,
+      });
+      return null;
+    }
+
+    return await this.mergeByEntityIdentifiers([belowEntityIdentifier, aboveEntityIdentifier], true);
   };
 
   /**
@@ -474,6 +533,9 @@ export class CanvasCompositorModule extends CanvasModuleBase {
         break;
       case 'regional_guidance':
         entities = this.manager.stateApi.runSelector(selectActiveRegionalGuidanceEntities);
+        break;
+      case 'vector_layer':
+        entities = this.manager.stateApi.runSelector(selectActiveVectorLayerEntities);
         break;
       case 'control_layer':
         entities = this.manager.stateApi.runSelector(selectActiveControlLayerEntities);
