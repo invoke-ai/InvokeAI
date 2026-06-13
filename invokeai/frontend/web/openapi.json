@@ -489,6 +489,73 @@
         ]
       }
     },
+    "/api/v1/utilities/fonts": {
+      "get": {
+        "tags": ["utilities"],
+        "summary": "List User Fonts",
+        "operationId": "list_user_fonts",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserFontsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/utilities/fonts/{font_path}": {
+      "get": {
+        "tags": ["utilities"],
+        "summary": "Get User Font File",
+        "operationId": "get_user_font_file",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "font_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Font Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/utilities/expand-prompt": {
       "post": {
         "tags": ["utilities"],
@@ -70178,6 +70245,77 @@
         "required": ["user_id", "email", "created_at", "updated_at"],
         "title": "UserDTO",
         "description": "User data transfer object."
+      },
+      "UserFont": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "family": {
+            "type": "string",
+            "title": "Family"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "faces": {
+            "items": {
+              "$ref": "#/components/schemas/UserFontFace"
+            },
+            "type": "array",
+            "title": "Faces"
+          }
+        },
+        "type": "object",
+        "required": ["id", "family", "label", "path", "url", "faces"],
+        "title": "UserFont"
+      },
+      "UserFontFace": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "weight": {
+            "type": "integer",
+            "title": "Weight"
+          },
+          "style": {
+            "type": "string",
+            "title": "Style"
+          }
+        },
+        "type": "object",
+        "required": ["path", "url", "weight", "style"],
+        "title": "UserFontFace"
+      },
+      "UserFontsResponse": {
+        "properties": {
+          "fonts": {
+            "items": {
+              "$ref": "#/components/schemas/UserFont"
+            },
+            "type": "array",
+            "title": "Fonts"
+          }
+        },
+        "type": "object",
+        "required": ["fonts"],
+        "title": "UserFontsResponse"
       },
       "UserProfileUpdateRequest": {
         "properties": {
