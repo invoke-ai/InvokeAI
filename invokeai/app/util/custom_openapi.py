@@ -30,26 +30,21 @@ def move_defs_to_top_level(openapi_schema: dict[str, Any], component_schema: dic
         openapi_schema["components"]["schemas"][schema_key] = json_schema
 
 
-def normalize_path_defaults(schema_node: Any) -> Any:
-    """Normalizes OpenAPI defaults for Path-typed fields to POSIX separators.
+def normalize_path_defaults(node: Any) -> None:
+    """Recursively normalize `default` strings on schema nodes whose `format` is `path` to use forward slashes.
 
-    Pydantic serializes ``pathlib.Path`` defaults using the host OS separator. That
-    makes generated OpenAPI, and therefore ``schema.ts``, differ between Windows and
-    Linux. OpenAPI is documentation/schema data rather than a runtime filesystem API,
-    so normalize ``format: path`` defaults to forward slashes for deterministic output.
+    Pydantic stringifies `Path` defaults using the host OS's separator, so a default declared as
+    `Path("models/.convert_cache")` serializes to `models\\.convert_cache` on Windows. That OS-dependent drift
+    pollutes diffs whenever schema is regenerated on Windows. We force POSIX form for path-typed defaults.
     """
-
-    if isinstance(schema_node, dict):
-        if schema_node.get("format") == "path" and isinstance(schema_node.get("default"), str):
-            schema_node["default"] = schema_node["default"].replace("\\", "/")
-
-        for value in schema_node.values():
-            normalize_path_defaults(value)
-    elif isinstance(schema_node, list):
-        for item in schema_node:
-            normalize_path_defaults(item)
-
-    return schema_node
+    if isinstance(node, dict):
+        if node.get("format") == "path" and isinstance(node.get("default"), str):
+            node["default"] = node["default"].replace("\\", "/")
+        for v in node.values():
+            normalize_path_defaults(v)
+    elif isinstance(node, list):
+        for v in node:
+            normalize_path_defaults(v)
 
 
 def get_openapi_func(
@@ -148,7 +143,8 @@ def get_openapi_func(
         if post_transform is not None:
             openapi_schema = post_transform(openapi_schema)
 
-        openapi_schema = normalize_path_defaults(openapi_schema)
+        normalize_path_defaults(openapi_schema)
+
         openapi_schema["components"]["schemas"] = dict(sorted(openapi_schema["components"]["schemas"].items()))
 
         app.openapi_schema = openapi_schema
