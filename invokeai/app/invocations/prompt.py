@@ -9,6 +9,7 @@ from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import InputField, UIComponent
 from invokeai.app.invocations.primitives import StringCollectionOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.dynamicprompts import find_missing_wildcards, get_wildcard_manager
 
 
 @invocation(
@@ -30,11 +31,19 @@ class DynamicPromptInvocation(BaseInvocation):
     combinatorial: bool = InputField(default=False, description="Whether to use the combinatorial generator")
 
     def invoke(self, context: InvocationContext) -> StringCollectionOutput:
+        wildcard_manager = get_wildcard_manager(context.config.get().wildcards_path)
+
+        # An unknown wildcard sends the combinatorial generator into an infinite loop, so fail fast
+        # with a clear message instead of hanging the invocation.
+        missing_wildcards = find_missing_wildcards(self.prompt, wildcard_manager)
+        if missing_wildcards:
+            raise ValueError(f"No values found for wildcard(s): {', '.join(missing_wildcards)}")
+
         if self.combinatorial:
-            generator = CombinatorialPromptGenerator()
+            generator = CombinatorialPromptGenerator(wildcard_manager=wildcard_manager)
             prompts = generator.generate(self.prompt, max_prompts=self.max_prompts)
         else:
-            generator = RandomPromptGenerator()
+            generator = RandomPromptGenerator(wildcard_manager=wildcard_manager)
             prompts = generator.generate(self.prompt, num_images=self.max_prompts)
 
         return StringCollectionOutput(collection=prompts)
