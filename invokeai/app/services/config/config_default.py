@@ -71,8 +71,8 @@ class InvokeAIAppConfig(BaseSettings):
         allow_credentials: Allow CORS credentials.
         allow_methods: Methods allowed for CORS.
         allow_headers: Headers allowed for CORS.
-        ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.org/settings/#https.
-        ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.
+        ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.
+        ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.
         log_tokenization: Enable logging of parsed prompt tokens.
         patchmatch: Enable patchmatch inpaint code.
         models_dir: Path to the models directory.
@@ -154,8 +154,8 @@ class InvokeAIAppConfig(BaseSettings):
     allow_credentials:             bool = Field(default=True,               description="Allow CORS credentials.")
     allow_methods:            list[str] = Field(default=["*"],              description="Methods allowed for CORS.")
     allow_headers:            list[str] = Field(default=["*"],              description="Headers allowed for CORS.")
-    ssl_certfile:        Optional[Path] = Field(default=None,               description="SSL certificate file for HTTPS. See https://www.uvicorn.org/settings/#https.")
-    ssl_keyfile:         Optional[Path] = Field(default=None,               description="SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.")
+    ssl_certfile:        Optional[Path] = Field(default=None,               description="SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.")
+    ssl_keyfile:         Optional[Path] = Field(default=None,               description="SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.")
 
     # MISC FEATURES
     log_tokenization:              bool = Field(default=False,              description="Enable logging of parsed prompt tokens.")

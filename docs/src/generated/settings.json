@@ -73,7 +73,7 @@
     {
       "category": "WEB",
       "default": null,
-      "description": "SSL certificate file for HTTPS. See https://www.uvicorn.org/settings/#https.",
+      "description": "SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.",
       "env_var": "INVOKEAI_SSL_CERTFILE",
       "literal_values": [],
       "name": "ssl_certfile",
@@ -84,7 +84,7 @@
     {
       "category": "WEB",
       "default": null,
-      "description": "SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.",
+      "description": "SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.",
       "env_var": "INVOKEAI_SSL_KEYFILE",
       "literal_values": [],
       "name": "ssl_keyfile",
