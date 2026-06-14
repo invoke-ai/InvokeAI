@@ -2,7 +2,14 @@ import { absolutizeApiUrl, ApiError, apiFetchJson } from '../backend/http';
 import { buildQueueItemOrigin } from '../backend/events';
 import type { BackendGraphContract } from '../types';
 import { generateSeedSequence } from './graph';
-import type { EnqueueGenerateRequest, EnqueueGenerateResult, ImageDTO, MainModelConfig, QueueItemDTO } from './types';
+import type {
+  EnqueueGenerateRequest,
+  EnqueueGenerateResult,
+  EnqueueWorkflowRequest,
+  ImageDTO,
+  MainModelConfig,
+  QueueItemDTO,
+} from './types';
 
 export const listMainModels = async (): Promise<MainModelConfig[]> => {
   const body = await apiFetchJson<{ models?: MainModelConfig[] }>('/api/v2/models/?model_type=main');
@@ -30,6 +37,25 @@ export const enqueueGenerateGraph = async (request: EnqueueGenerateRequest): Pro
       graph: request.graph satisfies BackendGraphContract,
       origin: buildQueueItemOrigin(request.sourceQueueItemId),
       runs: request.shouldRandomizeSeed ? 1 : batchCount,
+    },
+    prepend: false,
+  };
+  const result = await apiFetchJson<{ batch?: { batch_id?: string }; item_ids?: number[] }>(
+    '/api/v1/queue/default/enqueue_batch',
+    { body: JSON.stringify(body), method: 'POST' }
+  );
+
+  return { batchId: result.batch?.batch_id, itemIds: result.item_ids ?? [] };
+};
+
+/** Enqueue an arbitrary compiled graph as a single run — the workflow / project-graph path. */
+export const enqueueWorkflowGraph = async (request: EnqueueWorkflowRequest): Promise<EnqueueGenerateResult> => {
+  const body = {
+    batch: {
+      destination: request.destination,
+      graph: request.graph satisfies BackendGraphContract,
+      origin: buildQueueItemOrigin(request.sourceQueueItemId),
+      runs: 1,
     },
     prepend: false,
   };

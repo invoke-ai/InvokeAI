@@ -104,6 +104,13 @@ export interface QueueItemDTO {
   };
 }
 
+/** A source-agnostic graph submission (used by the project-graph / workflow source). */
+export interface EnqueueWorkflowRequest {
+  destination: ResultDestination;
+  graph: BackendGraphContract;
+  sourceQueueItemId: string;
+}
+
 export interface EnqueueGenerateRequest {
   batchCount: number;
   destination: ResultDestination;

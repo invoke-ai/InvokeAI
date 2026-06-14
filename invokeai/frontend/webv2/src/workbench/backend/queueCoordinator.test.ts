@@ -112,6 +112,7 @@ const createHarness = (options: { galleryRefreshCoalesceMs?: number } = {}): Har
     cancelQueueItems: vi.fn(() => Promise.resolve()),
     cancelQueueItemsByBatchIds: vi.fn(() => Promise.resolve()),
     enqueueGenerateGraph: vi.fn(() => Promise.resolve({ batchId: 'batch-1', itemIds: [1] })),
+    enqueueWorkflowGraph: vi.fn(() => Promise.resolve({ batchId: 'batch-1', itemIds: [1] })),
     getQueueItem: vi.fn((itemId: number) => Promise.resolve(createQueueItemDTO({ item_id: itemId }))),
     getQueueItemResultImages: vi.fn((itemId: number, sourceQueueItemId: string) =>
       Promise.resolve([createImage(`image-${itemId}.png`, sourceQueueItemId)])

@@ -77,6 +77,10 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   reduceMotion: false,
   showFocusRegionHighlight: true,
   themeId: DEFAULT_THEME_ID,
+  workflowEdgeStyle: 'curved',
+  workflowShowMinimap: true,
+  workflowSnapToGrid: false,
+  workflowValidateConnections: true,
 };
 
 interface WorkbenchSettingsSnapshot {
@@ -170,6 +174,22 @@ export const normalizeWorkbenchPreferences = (preferences?: Partial<WorkbenchPre
       ? preferences.showFocusRegionHighlight
       : DEFAULT_PREFERENCES.showFocusRegionHighlight,
   themeId: isWorkbenchThemeId(preferences?.themeId) ? preferences.themeId : DEFAULT_PREFERENCES.themeId,
+  workflowEdgeStyle:
+    preferences?.workflowEdgeStyle === 'straight' || preferences?.workflowEdgeStyle === 'curved'
+      ? preferences.workflowEdgeStyle
+      : DEFAULT_PREFERENCES.workflowEdgeStyle,
+  workflowShowMinimap:
+    typeof preferences?.workflowShowMinimap === 'boolean'
+      ? preferences.workflowShowMinimap
+      : DEFAULT_PREFERENCES.workflowShowMinimap,
+  workflowSnapToGrid:
+    typeof preferences?.workflowSnapToGrid === 'boolean'
+      ? preferences.workflowSnapToGrid
+      : DEFAULT_PREFERENCES.workflowSnapToGrid,
+  workflowValidateConnections:
+    typeof preferences?.workflowValidateConnections === 'boolean'
+      ? preferences.workflowValidateConnections
+      : DEFAULT_PREFERENCES.workflowValidateConnections,
 });
 
 const parsePreferences = (raw: string | null): WorkbenchPreferences | null => {

@@ -52,7 +52,8 @@ export const getQueueItemExpectedImageCount = (item: QueueItem): number => {
     return item.backendItemIds.length;
   }
 
-  const batchCount = item.snapshot.widgetStates.generate?.values.batchCount;
+  // Only Generate snapshots batch by count; other sources (project graph) run once.
+  const batchCount = item.snapshot.sourceId === 'generate' ? item.snapshot.widgetStates.generate?.values.batchCount : 1;
 
   return typeof batchCount === 'number' && Number.isFinite(batchCount) ? Math.max(1, Math.round(batchCount)) : 1;
 };

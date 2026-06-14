@@ -8,6 +8,7 @@ import {
 } from './backend/queueCoordinator';
 import { normalizeGenerateSettings } from './generation/settings';
 import { addImagesToGalleryBoard } from './gallery/api';
+import { ensureInvocationTemplatesLoaded } from './workflows/templates';
 import type { Project, QueueItem } from './types';
 import { useWorkbench } from './WorkbenchContext';
 import type { WorkbenchAction } from './workbenchState';
@@ -31,7 +32,11 @@ const routeRunResults = async (
   dispatch: Dispatch<WorkbenchAction>
 ): Promise<void> => {
   try {
-    const images = await coordinator.waitForResults(queueItem.id, queueItem.snapshot.submittedAt);
+    const allImages = await coordinator.waitForResults(queueItem.id, queueItem.snapshot.submittedAt);
+    // A workflow session reports every image its nodes produced; only the
+    // non-intermediate outputs are user-facing results.
+    const images =
+      queueItem.snapshot.sourceId === 'project-graph' ? allImages.filter((image) => !image.isIntermediate) : allImages;
 
     if (queueItem.snapshot.destination === 'gallery') {
       const selectedBoardId = getSnapshotGalleryBoardId(queueItem);
@@ -68,11 +73,14 @@ const submitQueueItem = (
   dispatch: Dispatch<WorkbenchAction>
 ): void => {
   const graph = queueItem.snapshot.graph.backendGraph;
-  const generateValues = normalizeGenerateSettings(queueItem.snapshot.widgetStates.generate.values);
+  const generateValues =
+    queueItem.snapshot.sourceId === 'generate'
+      ? normalizeGenerateSettings(queueItem.snapshot.widgetStates.generate.values)
+      : null;
 
-  if (!graph || !generateValues) {
+  if (!graph || (queueItem.snapshot.sourceId === 'generate' && !generateValues)) {
     dispatch({
-      error: 'Generate queue item is missing a compiled backend graph.',
+      error: `${queueItem.snapshot.sourceId} queue item is missing a compiled backend graph.`,
       projectId: project.id,
       queueItemId: queueItem.id,
       status: 'failed',
@@ -81,20 +89,27 @@ const submitQueueItem = (
     return;
   }
 
-  coordinator
-    .submitGenerate(queueItem.id, {
-      batchCount: generateValues.batchCount,
-      destination: queueItem.snapshot.destination,
-      graph,
-      negativePrompt: generateValues.negativePrompt,
-      negativePromptNodeId: 'negative_prompt',
-      positivePrompt: generateValues.positivePrompt,
-      positivePromptNodeId: 'positive_prompt',
-      seed: generateValues.seed,
-      seedNodeId: 'seed',
-      shouldRandomizeSeed: generateValues.shouldRandomizeSeed,
-      sourceQueueItemId: queueItem.id,
-    })
+  const submission = generateValues
+    ? coordinator.submitGenerate(queueItem.id, {
+        batchCount: generateValues.batchCount,
+        destination: queueItem.snapshot.destination,
+        graph,
+        negativePrompt: generateValues.negativePrompt,
+        negativePromptNodeId: 'negative_prompt',
+        positivePrompt: generateValues.positivePrompt,
+        positivePromptNodeId: 'positive_prompt',
+        seed: generateValues.seed,
+        seedNodeId: 'seed',
+        shouldRandomizeSeed: generateValues.shouldRandomizeSeed,
+        sourceQueueItemId: queueItem.id,
+      })
+    : coordinator.submitWorkflow(queueItem.id, {
+        destination: queueItem.snapshot.destination,
+        graph,
+        sourceQueueItemId: queueItem.id,
+      });
+
+  submission
     .then(({ batchId, itemIds }) => {
       dispatch({
         backendBatchId: batchId,
@@ -143,6 +158,9 @@ export const WorkbenchRuntime = () => {
 
     coordinatorRef.current = coordinator;
     coordinator.connect();
+    // Node definitions back project-graph route validation, which can be the
+    // persisted invocation source before any workflow surface has mounted.
+    ensureInvocationTemplatesLoaded();
 
     return () => {
       coordinatorRef.current = null;
@@ -261,7 +279,7 @@ export const WorkbenchRuntime = () => {
       for (const queueItem of project.queue.items) {
         if (
           queueItem.status === 'pending' &&
-          queueItem.snapshot.sourceId === 'generate' &&
+          (queueItem.snapshot.sourceId === 'generate' || queueItem.snapshot.sourceId === 'project-graph') &&
           !startedQueueItemIdsRef.current.has(queueItem.id)
         ) {
           startedQueueItemIdsRef.current.add(queueItem.id);

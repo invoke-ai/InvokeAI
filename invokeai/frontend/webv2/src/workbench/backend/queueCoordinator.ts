@@ -4,22 +4,34 @@ import {
   cancelQueueItems,
   cancelQueueItemsByBatchIds,
   enqueueGenerateGraph,
+  enqueueWorkflowGraph,
   getQueueItem,
   getQueueItemResultImages,
   listAllQueueItems,
 } from '../generation/api';
-import type { EnqueueGenerateRequest, EnqueueGenerateResult, ImageDTO, QueueItemDTO } from '../generation/types';
+import type {
+  EnqueueGenerateRequest,
+  EnqueueGenerateResult,
+  EnqueueWorkflowRequest,
+  ImageDTO,
+  QueueItemDTO,
+} from '../generation/types';
 import { handleModelInstallSocketEvent, MODEL_INSTALL_SOCKET_EVENTS } from '../models/installsStore';
 import type { BackendConnectionStatus } from '../types';
 import {
   isTerminalBackendStatus,
   parseQueueItemOrigin,
+  type InvocationCompleteEvent,
+  type InvocationErrorEvent,
   type InvocationProgressEvent,
+  type InvocationStartedEvent,
   type QueueItemStatusChangedEvent,
   type TerminalBackendQueueItemStatus,
 } from './events';
 import { ApiError, getAuthToken, getBackendSocketUrl } from './http';
 import { modelLoadStore } from './modelLoadStore';
+import { nodeExecutionStore, type NodeExecutionSink } from './nodeExecutionStore';
+import { progressImageStore, type ProgressImageSink } from './progressImageStore';
 import { queueItemProgressStore, type QueueItemProgressSink } from './progressStore';
 
 const SOCKET_PATH = '/ws/socket.io';
@@ -41,6 +53,7 @@ export interface QueueCoordinatorApi {
   cancelQueueItems: typeof cancelQueueItems;
   cancelQueueItemsByBatchIds: typeof cancelQueueItemsByBatchIds;
   enqueueGenerateGraph: typeof enqueueGenerateGraph;
+  enqueueWorkflowGraph: typeof enqueueWorkflowGraph;
   getQueueItem: typeof getQueueItem;
   getQueueItemResultImages: typeof getQueueItemResultImages;
   listAllQueueItems: typeof listAllQueueItems;
@@ -95,6 +108,8 @@ export interface QueueCoordinator {
   reconcile(items: ReconcileInput[]): Promise<Map<string, ReconcileOutcome>>;
   /** Enqueue a generate batch and track its backend items for event-driven settlement. */
   submitGenerate(localQueueItemId: string, request: EnqueueGenerateRequest): Promise<EnqueueGenerateResult>;
+  /** Enqueue a compiled workflow graph and track its backend items the same way. */
+  submitWorkflow(localQueueItemId: string, request: EnqueueWorkflowRequest): Promise<EnqueueGenerateResult>;
   /**
    * Resolve once every backend item of the run reaches a terminal status —
    * driven by socket events, with a slow safety sweep as the only polling.
@@ -128,6 +143,7 @@ const defaultApi: QueueCoordinatorApi = {
   cancelQueueItems,
   cancelQueueItemsByBatchIds,
   enqueueGenerateGraph,
+  enqueueWorkflowGraph,
   getQueueItem,
   getQueueItemResultImages,
   listAllQueueItems,
@@ -167,13 +183,17 @@ export const createQueueCoordinator = (
     api?: Partial<QueueCoordinatorApi>;
     createSocket?: () => BackendSocket;
     galleryRefreshCoalesceMs?: number;
+    nodeExecution?: NodeExecutionSink;
     progress?: QueueItemProgressSink;
+    progressImage?: ProgressImageSink;
     sweepIntervalMs?: number;
   } = {}
 ): QueueCoordinator => {
   const api: QueueCoordinatorApi = { ...defaultApi, ...options.api };
   const createSocket = options.createSocket ?? createDefaultSocket;
   const progress = options.progress ?? queueItemProgressStore;
+  const nodeExecution = options.nodeExecution ?? nodeExecutionStore;
+  const progressImage = options.progressImage ?? progressImageStore;
   const galleryRefreshCoalesceMs = options.galleryRefreshCoalesceMs ?? GALLERY_REFRESH_COALESCE_MS;
   const sweepIntervalMs = options.sweepIntervalMs ?? SAFETY_SWEEP_INTERVAL_MS;
 
@@ -334,6 +354,8 @@ export const createQueueCoordinator = (
       return;
     }
 
+    nodeExecution.settleRunning();
+    progressImage.clear();
     settleWait(event.item_id, toTerminalOutcome(event.status, event.error_message, event.error_type));
 
     if (event.status === 'completed') {
@@ -342,6 +364,12 @@ export const createQueueCoordinator = (
   };
 
   const handleProgress = (event: InvocationProgressEvent): void => {
+    nodeExecution.progress(event.invocation_source_id, event.percentage, event.message);
+
+    if (event.image?.dataURL) {
+      progressImage.set({ dataUrl: event.image.dataURL, height: event.image.height, width: event.image.width });
+    }
+
     const wait = waits.get(event.item_id);
 
     if (wait) {
@@ -376,6 +404,7 @@ export const createQueueCoordinator = (
     socket.on('connect', () => {
       modelLoadStore.reset();
       progress.clearAll?.();
+      nodeExecution.clearAll();
       notifyConnection('connected');
       socket?.emit('subscribe_queue', { queue_id: 'default' });
       scheduleGalleryRefresh();
@@ -384,15 +413,26 @@ export const createQueueCoordinator = (
     socket.on('connect_error', (error: { message: string }) => {
       modelLoadStore.reset();
       progress.clearAll?.();
+      nodeExecution.clearAll();
       notifyConnection('disconnected', error.message);
     });
     socket.on('disconnect', (reason: string) => {
       modelLoadStore.reset();
       progress.clearAll?.();
+      nodeExecution.clearAll();
       notifyConnection('disconnected', reason);
     });
     socket.on('queue_item_status_changed', handleStatusChanged);
     socket.on('invocation_progress', handleProgress);
+    socket.on('invocation_started', (event: InvocationStartedEvent) => {
+      nodeExecution.started(event);
+    });
+    socket.on('invocation_complete', (event: InvocationCompleteEvent) => {
+      nodeExecution.completed(event);
+    });
+    socket.on('invocation_error', (event: InvocationErrorEvent) => {
+      nodeExecution.failed(event);
+    });
     socket.on('model_load_started', (payload: never) => {
       modelLoadStore.started(payload);
     });
@@ -498,6 +538,17 @@ export const createQueueCoordinator = (
     return result;
   };
 
+  const submitWorkflow = async (
+    localQueueItemId: string,
+    request: EnqueueWorkflowRequest
+  ): Promise<EnqueueGenerateResult> => {
+    const result = await api.enqueueWorkflowGraph(request);
+
+    beginRun(localQueueItemId, result.itemIds, result.batchId);
+
+    return result;
+  };
+
   const waitForResults = async (localQueueItemId: string, queuedAt: string): Promise<ImageDTO[]> => {
     const run = runs.get(localQueueItemId);
 
@@ -542,5 +593,5 @@ export const createQueueCoordinator = (
     }
   };
 
-  return { cancelRun, connect, dispose, reconcile, submitGenerate, waitForResults };
+  return { cancelRun, connect, dispose, reconcile, submitGenerate, submitWorkflow, waitForResults };
 };

@@ -522,16 +522,96 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(state.errorLog).toEqual([]);
   });
 
-  it('does not queue unavailable workflow/project graph sources in Phase 5', () => {
+  it('accepts the project graph source but does not queue an empty project graph', () => {
     let state = createInitialWorkbenchState();
 
     state = workbenchReducer(state, { sourceId: 'project-graph', type: 'setInvocationSource' });
+
+    expect(getActiveProject(state).invocation.sourceId).toBe('project-graph');
+
+    state = workbenchReducer(state, {
+      backendSupportsCancellation: true,
+      route: { destination: 'canvas', destinationLocked: false, sourceId: 'project-graph', sourceLocked: true },
+      type: 'submitResolvedInvocationSnapshot',
+    });
+
+    expect(getActiveProject(state).queue.items).toEqual([]);
+  });
+
+  it('applies workflow edits to the project graph with undo and auto-source', () => {
+    let state = createInitialWorkbenchState();
+
+    expect(getActiveProject(state).invocation.sourceId).toBe('generate');
+
+    state = workbenchReducer(state, {
+      action: {
+        node: {
+          data: {
+            inputs: {},
+            isIntermediate: true,
+            isOpen: true,
+            label: '',
+            nodePack: 'invokeai',
+            notes: '',
+            type: 'add',
+            useCache: true,
+            version: '1.0.0',
+          },
+          id: 'node-1',
+          position: { x: 0, y: 0 },
+          type: 'invocation',
+        },
+        type: 'addNode',
+      },
+      type: 'applyProjectGraphAction',
+    });
+
+    const project = getActiveProject(state);
+
+    // A meaningful graph edit lands in the document, creates an undo entry,
+    // and steers the unlocked invocation source to the project graph.
+    expect(project.projectGraph.nodes).toHaveLength(1);
+    expect(project.undoRedo.past.at(-1)?.label).toBe('Add workflow node');
+    expect(project.invocation.sourceId).toBe('project-graph');
+
+    state = workbenchReducer(state, { type: 'undoProjectChange' });
+
+    expect(getActiveProject(state).projectGraph.nodes).toHaveLength(0);
+  });
+
+  it('replaceProjectGraph snapshots the previous document into graph history', () => {
+    let state = createInitialWorkbenchState();
+    const originalGraphId = getActiveProject(state).projectGraph.id;
+
+    state = workbenchReducer(state, {
+      document: { ...getActiveProject(state).projectGraph, id: 'replacement-graph', name: 'Replacement' },
+      label: 'Test replace',
+      type: 'replaceProjectGraph',
+    });
+
+    const project = getActiveProject(state);
+
+    expect(project.projectGraph.id).toBe('replacement-graph');
+    expect(project.graphHistory[0]?.document?.id).toBe(originalGraphId);
+
+    state = workbenchReducer(state, {
+      snapshotId: project.graphHistory[0]?.id ?? '',
+      type: 'restoreProjectGraphSnapshot',
+    });
+
+    expect(getActiveProject(state).projectGraph.id).toBe(originalGraphId);
+  });
+
+  it('does not queue sources that are still unavailable', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { sourceId: 'upscale', type: 'setInvocationSource' });
 
     expect(getActiveProject(state).invocation.sourceId).toBe('generate');
 
     state = workbenchReducer(state, {
       backendSupportsCancellation: true,
-      route: { destination: 'canvas', destinationLocked: false, sourceId: 'project-graph', sourceLocked: true },
+      route: { destination: 'canvas', destinationLocked: false, sourceId: 'upscale', sourceLocked: true },
       type: 'submitResolvedInvocationSnapshot',
     });
 

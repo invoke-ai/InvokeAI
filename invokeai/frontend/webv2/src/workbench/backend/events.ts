@@ -28,16 +28,39 @@ export interface QueueItemStatusChangedEvent extends QueueItemEventBase {
   session_id: string;
 }
 
-export interface InvocationProgressEvent extends QueueItemEventBase {
+/** Shared shape of per-invocation lifecycle events (`InvocationEventBase` on the backend). */
+export interface InvocationEventBase extends QueueItemEventBase {
   session_id: string;
+  /** The id of the executing invocation's source node — the editor's node id. */
+  invocation_source_id: string;
+}
+
+export interface InvocationStartedEvent extends InvocationEventBase {}
+
+export interface InvocationProgressEvent extends InvocationEventBase {
   message: string;
   /** 0..1, or null for indeterminate progress. */
   percentage: number | null;
+  /** Intermittent denoising preview, when the invocation produces one. */
+  image?: { width: number; height: number; dataURL: string } | null;
+}
+
+export interface InvocationCompleteEvent extends InvocationEventBase {
+  /** The invocation's output, discriminated by its `type` (e.g. `image_output`). */
+  result: { type: string } & Record<string, unknown>;
+}
+
+export interface InvocationErrorEvent extends InvocationEventBase {
+  error_type: string;
+  error_message: string;
 }
 
 export interface BackendSocketEvents {
   queue_item_status_changed: QueueItemStatusChangedEvent;
+  invocation_started: InvocationStartedEvent;
   invocation_progress: InvocationProgressEvent;
+  invocation_complete: InvocationCompleteEvent;
+  invocation_error: InvocationErrorEvent;
 }
 
 export const isTerminalBackendStatus = (status: BackendQueueItemStatus): status is TerminalBackendQueueItemStatus =>

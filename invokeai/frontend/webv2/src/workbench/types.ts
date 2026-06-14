@@ -1,5 +1,7 @@
 import type { ComponentType } from 'react';
 
+import type { ProjectGraphState } from './workflows/types';
+
 export type LayoutPresetId = 'canvas-default' | 'gallery' | 'workflow' | 'linear' | 'model-manager';
 
 export type CenterViewId = 'canvas' | 'gallery' | 'preview' | 'workflow' | 'models';
@@ -34,7 +36,9 @@ export type ProjectEventType =
   | 'layout-updated'
   | 'invocation-updated'
   | 'queue-submitted'
-  | 'canvas-layer-accepted';
+  | 'canvas-layer-accepted'
+  | 'graph-replaced'
+  | 'graph-snapshot-saved';
 
 export interface GraphNodeContract {
   id: string;
@@ -111,6 +115,7 @@ export interface WidgetViewProps {
 export type WidgetView = ComponentType<WidgetViewProps>;
 
 export type WidgetHeaderActions = ComponentType<WidgetViewProps>;
+export type WidgetHeaderMenu = ComponentType<WidgetViewProps>;
 export type WidgetFooter = ComponentType<WidgetViewProps>;
 
 export interface WidgetLabelProps {
@@ -121,6 +126,9 @@ export interface WidgetLabelProps {
 export type WidgetLabel = string | ComponentType<WidgetLabelProps>;
 
 export type WidgetIconId = `lucide-react:${string}`;
+
+/** Sections of the workbench settings dialog, addressable via `openWorkbenchSettings`. */
+export type SettingsSectionId = 'appearance' | 'behavior' | 'project' | 'workflow' | 'developer' | 'workspace';
 
 export interface WidgetManifest {
   id: WidgetId;
@@ -138,6 +146,15 @@ export interface WidgetManifest {
   };
   view?: WidgetView;
   headerActions?: WidgetHeaderActions;
+  /**
+   * Extra entries for the widget's shared header actions menu. Rendered inside
+   * the same menu as the universal graph actions, so widgets extend the frame
+   * menu instead of stacking their own. Render `Menu.Item`/`Menu.ItemGroup`
+   * children only; own any dialogs from `headerActions` (always mounted).
+   */
+  headerMenu?: WidgetHeaderMenu;
+  /** When set, the frame header shows a gear that opens this settings dialog section. */
+  settingsSection?: SettingsSectionId;
   footer?: WidgetFooter;
   graphBearing?: {
     sourceId: InvocationSourceId;
@@ -239,7 +256,10 @@ export interface ResolvedInvocationRoute extends InvocationRoute {
   mode: InvocationMode;
   sourceValid: boolean;
   destinationValid: boolean;
+  /** The top validation issue, shown on the fixed Invoke control's secondary line. */
   validationMessage?: string;
+  /** Every reason the route cannot run right now (legacy `reasonsWhyCannotEnqueue` equivalent). */
+  validationReasons: string[];
 }
 
 export interface InvocationControllerState extends InvocationRoute {
@@ -280,7 +300,8 @@ export interface Project {
   settings: ProjectSettings;
   layout: ProjectLayoutState;
   invocation: InvocationControllerState;
-  projectGraph: GraphContract;
+  /** The one active project graph: an editable workflow document, compiled to a `GraphContract` at invoke time. */
+  projectGraph: ProjectGraphState;
   widgetStates: Record<WidgetId, WidgetStateContract>;
   widgetRegions: Record<WidgetRegion, WidgetRegionState>;
   widgetGraphs: Partial<Record<WidgetId, GraphContract>>;
@@ -296,6 +317,8 @@ export interface LayoutPreset {
   label: string;
   description: string;
   initialLayout: ProjectLayoutState;
+  /** Widget to focus in the left rail when the preset is applied (e.g. the Linear UI for workflow presets). */
+  leftRegionWidgetId?: WidgetId;
 }
 
 export interface WorkbenchState {
@@ -330,11 +353,17 @@ export interface WorkbenchNotification {
   isRead: boolean;
 }
 
+/**
+ * One entry of the project's graph history. Queue submissions record the
+ * compiled `graph`; workflow snapshots (manual save, pre-replacement) record
+ * the editable `document`, which is what makes them restorable.
+ */
 export interface GraphHistorySnapshot {
   id: string;
   createdAt: string;
   label: string;
-  graph: GraphContract;
+  graph?: GraphContract;
+  document?: ProjectGraphState;
 }
 
 export interface UndoRedoEntry {
@@ -347,7 +376,7 @@ export interface UndoRedoEntry {
 export interface ProjectUndoSnapshot {
   layout: ProjectLayoutState;
   invocation: InvocationControllerState;
-  projectGraph: GraphContract;
+  projectGraph: ProjectGraphState;
   widgetStates: Record<WidgetId, WidgetStateContract>;
   widgetRegions: Record<WidgetRegion, WidgetRegionState>;
   widgetGraphs: Partial<Record<WidgetId, GraphContract>>;
@@ -477,6 +506,14 @@ export interface WorkbenchPreferences {
   developerLogEnabled: boolean;
   developerLogLevel: DeveloperLogLevel;
   developerLogNamespaces: DeveloperLogNamespace[];
+  /** Always snap workflow nodes to the grid (Ctrl snaps temporarily when off). */
+  workflowSnapToGrid: boolean;
+  /** Show the minimap in the workflow editor. */
+  workflowShowMinimap: boolean;
+  /** Reject workflow connections with incompatible field types. */
+  workflowValidateConnections: boolean;
+  /** Connection line rendering in the workflow editor. */
+  workflowEdgeStyle: 'curved' | 'straight';
 }
 
 export interface AccountState {

@@ -1,4 +1,4 @@
-import { Flex, Group, HStack, Icon, Menu, Portal, Text, VStack } from '@chakra-ui/react';
+import { Flex, Group, HStack, Icon, Menu, Portal, Stack, Text, VStack } from '@chakra-ui/react';
 import { useEffect, useRef } from 'react';
 import { CheckIcon, ChevronDownIcon, LockKeyholeIcon, SparklesIcon } from 'lucide-react';
 
@@ -10,8 +10,10 @@ import {
   resolveInvocationRoute,
   resultDestinations,
 } from '../invocation';
+import { useInvocationTemplatesSnapshot } from '../workflows/templates';
 import type { InvocationSourceId, ResultDestination } from '../types';
 import { Button, IconButton } from './ui/Button';
+import { Tooltip } from './ui/Tooltip';
 
 /**
  * Fixed-width global Invoke control.
@@ -26,12 +28,24 @@ import { Button, IconButton } from './ui/Button';
 const CONTROL_WIDTH = '12rem';
 
 export const InvokeControl = () => {
-  const { activeProject, dispatch } = useWorkbench();
+  const { activeProject, dispatch, state } = useWorkbench();
   const { invocation } = activeProject;
+
+  // Project-graph route validation reads the invocation templates imperatively;
+  // subscribing here keeps the resolved route live while they load.
+  useInvocationTemplatesSnapshot();
+
   const resolvedRoute = resolveInvocationRoute(activeProject);
   const isLocked = invocation.sourceLocked || invocation.destinationLocked;
-  const isValid = isInvocationRouteValid(resolvedRoute);
-  const routeLabel = formatRoute(resolvedRoute);
+  const isConnected = state.backendConnection.status === 'connected';
+  // Legacy parity: the queue button disables with the full list of reasons,
+  // including a disconnected backend.
+  const blockingReasons = [
+    ...(isConnected ? [] : ['The backend is disconnected.']),
+    ...resolvedRoute.validationReasons,
+  ];
+  const isValid = isInvocationRouteValid(resolvedRoute) && isConnected;
+  const routeLabel = isValid ? formatRoute(resolvedRoute) : (blockingReasons[0] ?? formatRoute(resolvedRoute));
   const resolvedRouteRef = useRef(resolvedRoute);
   const isValidRef = useRef(isValid);
 
@@ -78,22 +92,47 @@ export const InvokeControl = () => {
 
   return (
     <Flex>
-      <Menu.Root positioning={{ placement: 'bottom-start' }}>
+      <Menu.Root positioning={{ placement: 'bottom-end' }}>
         <Group attached>
-          <Button colorPalette="brand" size="sm" onClick={onInvoke} w={CONTROL_WIDTH} minW="0" justifyContent="start">
-            <Icon as={SparklesIcon} boxSize="4" flexShrink={0} />
-            <VStack align="start" gap="0" minW="0">
-              <Text fontSize="sm" fontWeight="700" lineHeight="1">
-                Invoke
-              </Text>
-              <HStack gap="1" maxW="full">
-                <Text fontSize="2xs" fontWeight="600" lineHeight="1.1" opacity="0.85" truncate>
-                  {routeLabel}
+          <Tooltip
+            content={
+              <Stack gap="0.5">
+                {blockingReasons.map((reason) => (
+                  <Text key={reason} fontSize="2xs">
+                    {reason}
+                  </Text>
+                ))}
+              </Stack>
+            }
+            disabled={isValid}
+          >
+            {/* aria-disabled (not disabled) keeps hover alive so the reasons tooltip can show. */}
+            <Button
+              aria-disabled={!isValid}
+              colorPalette="brand"
+              cursor={isValid ? undefined : 'not-allowed'}
+              opacity={isValid ? undefined : 0.6}
+              size="sm"
+              roundedEnd="none"
+              onClick={onInvoke}
+              w={CONTROL_WIDTH}
+              minW="0"
+              justifyContent="start"
+            >
+              <Icon as={SparklesIcon} boxSize="4" flexShrink={0} />
+              <VStack align="start" gap="0" minW="0">
+                <Text fontSize="sm" fontWeight="700" lineHeight="1">
+                  Invoke
                 </Text>
-                {isLocked ? <Icon as={LockKeyholeIcon} boxSize="2.5" flexShrink={0} /> : null}
-              </HStack>
-            </VStack>
-          </Button>
+                <HStack gap="1" maxW="full">
+                  <Text fontSize="2xs" fontWeight="600" lineHeight="1.1" opacity="0.85" truncate>
+                    {routeLabel}
+                  </Text>
+                  {isLocked ? <Icon as={LockKeyholeIcon} boxSize="2.5" flexShrink={0} /> : null}
+                </HStack>
+              </VStack>
+            </Button>
+          </Tooltip>
           <Menu.Trigger asChild>
             <IconButton colorPalette="brand" size="sm" minW="0" w="7">
               <ChevronDownIcon />
@@ -102,7 +141,7 @@ export const InvokeControl = () => {
         </Group>
         <Portal>
           <Menu.Positioner>
-            <Menu.Content minW="15rem">
+            <Menu.Content minW="14rem">
               <Menu.RadioItemGroup
                 value={invocation.sourceId}
                 onValueChange={(event) =>

@@ -10,6 +10,18 @@ import type { GallerySettings } from './gallery/settings';
 import type { GenerateWidgetValues } from './generation/types';
 import { defaultLayoutPreset, getLayoutPreset } from './layoutPresets';
 import { normalizeProjectSettings } from './settings/store';
+import { compileProjectGraph } from './workflows/buildGraph';
+import {
+  cloneProjectGraph,
+  createProjectGraph,
+  getProjectGraphUndoLabel,
+  isHighConfidenceGraphEdit,
+  normalizeProjectGraph,
+  projectGraphReducer,
+  type ProjectGraphAction,
+} from './workflows/document';
+import { getInvocationTemplatesSnapshot } from './workflows/templates';
+import type { ProjectGraphState } from './workflows/types';
 import type {
   CanvasDocumentContract,
   CanvasPlacementContract,
@@ -22,6 +34,7 @@ import type {
   GraphHistorySnapshot,
   InvocationRoute,
   InvocationSourceId,
+  LayoutPreset,
   LayoutPresetId,
   Project,
   ProjectLayoutState,
@@ -61,6 +74,12 @@ type WorkbenchAction =
   | { type: 'setRegionWidgetSize'; region: WidgetRegion; sizePx: number }
   | { type: 'setGenerateSettings'; values: GenerateWidgetValues }
   | { type: 'setGenerateBatchCount'; batchCount: number }
+  | { type: 'patchWidgetValues'; widgetId: WidgetId; values: Record<string, unknown> }
+  | { type: 'applyProjectGraphAction'; action: ProjectGraphAction }
+  | { type: 'replaceProjectGraph'; document: ProjectGraphState; label: string }
+  | { type: 'saveProjectGraphSnapshot' }
+  | { type: 'restoreProjectGraphSnapshot'; snapshotId: string }
+  | { type: 'setProjectGraphLibraryBinding'; libraryWorkflowId: string }
   | { type: 'submitInvocationSnapshot'; backendSupportsCancellation: boolean }
   | { type: 'submitResolvedInvocationSnapshot'; backendSupportsCancellation: boolean; route: InvocationRoute }
   | {
@@ -352,7 +371,7 @@ const createUndoSnapshot = (project: Project): ProjectUndoSnapshot => ({
   canvas: cloneCanvas(project.canvas),
   invocation: { ...project.invocation },
   layout: { ...project.layout, panels: { ...project.layout.panels } },
-  projectGraph: cloneGraph(project.projectGraph),
+  projectGraph: cloneProjectGraph(project.projectGraph),
   widgetGraphs: cloneWidgetGraphs(project.widgetGraphs),
   widgetRegions: cloneWidgetRegions(project.widgetRegions),
   widgetStates: cloneWidgetStates(project.widgetStates),
@@ -363,7 +382,7 @@ const restoreUndoSnapshot = (project: Project, snapshot: ProjectUndoSnapshot): P
   canvas: { ...cloneCanvas(snapshot.canvas), stagingArea: cloneCanvas(project.canvas).stagingArea },
   invocation: { ...snapshot.invocation },
   layout: { ...snapshot.layout, panels: { ...snapshot.layout.panels } },
-  projectGraph: cloneGraph(snapshot.projectGraph),
+  projectGraph: cloneProjectGraph(normalizeProjectGraph(snapshot.projectGraph)),
   widgetGraphs: cloneWidgetGraphs(snapshot.widgetGraphs),
   widgetRegions: cloneWidgetRegions(snapshot.widgetRegions),
   widgetStates: cloneWidgetStates(snapshot.widgetStates),
@@ -372,6 +391,14 @@ const restoreUndoSnapshot = (project: Project, snapshot: ProjectUndoSnapshot): P
 const createGraphHistorySnapshot = (label: string, graph: GraphContract): GraphHistorySnapshot => ({
   createdAt: now(),
   graph: cloneGraph(graph),
+  id: createId('graph-history'),
+  label,
+});
+
+/** A restorable history entry carrying the editable workflow document. */
+const createDocumentHistorySnapshot = (label: string, document: ProjectGraphState): GraphHistorySnapshot => ({
+  createdAt: now(),
+  document: cloneProjectGraph(document),
   id: createId('graph-history'),
   label,
 });
@@ -390,15 +417,6 @@ const pushUndo = (project: Project, label: string): Project => ({
       },
     ].slice(-HISTORY_LIMIT),
   },
-});
-
-const createProjectGraph = (index: number, projectId: string): GraphContract => ({
-  edges: [],
-  id: `${projectId}-graph`,
-  label: `Project ${index} Graph`,
-  nodes: [],
-  updatedAt: now(),
-  version: 1,
 });
 
 const createWidgetStates = (): Record<WidgetId, WidgetStateContract> => ({
@@ -446,6 +464,7 @@ const createWidgetRegions = (): Record<WidgetRegion, WidgetRegionState> => ({
       'history-controls',
       'layout-actions',
       'version-status',
+      'workflow',
     ],
     isCollapsed: true,
     sizePx: 180,
@@ -510,6 +529,7 @@ const ensureProjectWidgetContracts = (project: Project): Project => {
   return {
     ...project,
     canvas: cloneCanvas(project.canvas ?? createCanvasState()),
+    projectGraph: normalizeProjectGraph(project.projectGraph),
     settings: normalizeProjectSettings(project.settings),
     widgetRegions: {
       left: legacyWidgetRegions?.left ?? legacyWidgetRegions?.['left-panel'] ?? defaultWidgetRegions.left,
@@ -559,7 +579,7 @@ const createProject = (index: number, id = `project-${index}`): Project => ({
   invocation: { ...defaultInvocationRoute },
   layout: { ...defaultLayoutPreset.initialLayout, panels: { ...defaultLayoutPreset.initialLayout.panels } },
   name: `Project Name #${index}`,
-  projectGraph: createProjectGraph(index, id),
+  projectGraph: createProjectGraph(`${id}-graph`),
   queue: { items: [] },
   settings: normalizeProjectSettings(),
   undoRedo: { future: [], past: [] },
@@ -609,6 +629,27 @@ const updateActiveWidgetRegion = (
       [region]: getRegion(project.widgetRegions[region]),
     },
   }));
+
+/** Focuses the regions a layout preset names: the center view and, when declared, a left-rail widget. */
+const applyPresetRegionFocus = (state: WorkbenchState, preset: LayoutPreset): WorkbenchState => {
+  const centerWidgetId = getCenterWidgetIdFromViewId(preset.initialLayout.centerViewId);
+  const nextState = updateActiveWidgetRegion(state, 'center', (region) => ({
+    ...region,
+    activeWidgetId: region.enabledWidgetIds.includes(centerWidgetId) ? centerWidgetId : region.activeWidgetId,
+    isCollapsed: false,
+  }));
+  const leftWidgetId = preset.leftRegionWidgetId;
+
+  if (!leftWidgetId) {
+    return nextState;
+  }
+
+  return updateActiveWidgetRegion(nextState, 'left', (region) => ({
+    ...region,
+    activeWidgetId: region.enabledWidgetIds.includes(leftWidgetId) ? leftWidgetId : region.activeWidgetId,
+    isCollapsed: false,
+  }));
+};
 
 const openPanelForRegion = (layout: ProjectLayoutState, region: WidgetRegion): ProjectLayoutState => ({
   ...layout,
@@ -674,20 +715,28 @@ const updateActiveInvocation = (
     };
   });
 
-const selectGraphForInvocation = (project: Project, invocation: InvocationRoute): GraphContract => {
-  const widgetGraph = project.widgetGraphs[invocation.sourceId as WidgetId];
-
-  return widgetGraph ? cloneGraph(widgetGraph) : cloneGraph(project.projectGraph);
-};
-
 const compileInvocationSnapshot = (
   project: Project,
   route: InvocationRoute
 ): { graph: GraphContract; widgetStates: Record<WidgetId, WidgetStateContract> } | null => {
   const widgetStates = cloneWidgetStates(project.widgetStates);
 
+  if (route.sourceId === 'project-graph') {
+    // Compiles the workflow document into an immutable snapshot. Templates are
+    // read imperatively; route validation already guaranteed they are loaded.
+    const templatesSnapshot = getInvocationTemplatesSnapshot();
+
+    if (templatesSnapshot.status !== 'loaded') {
+      return null;
+    }
+
+    return { graph: compileProjectGraph(project.projectGraph, templatesSnapshot.templates), widgetStates };
+  }
+
   if (route.sourceId !== 'generate') {
-    return { graph: selectGraphForInvocation(project, route), widgetStates };
+    const widgetGraph = project.widgetGraphs[route.sourceId as WidgetId];
+
+    return widgetGraph ? { graph: cloneGraph(widgetGraph), widgetStates } : null;
   }
 
   const values = normalizeGenerateWidgetValues(project.widgetStates.generate.values);
@@ -962,18 +1011,13 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
     }
     case 'applyPreset': {
       const preset = getLayoutPreset(action.presetId);
-      const widgetId = getCenterWidgetIdFromViewId(preset.initialLayout.centerViewId);
       const nextState = updateActiveLayout(state, () => ({
         ...preset.initialLayout,
         panels: { ...preset.initialLayout.panels },
       }));
 
       return {
-        ...updateActiveWidgetRegion(nextState, 'center', (region) => ({
-          ...region,
-          activeWidgetId: region.enabledWidgetIds.includes(widgetId) ? widgetId : region.activeWidgetId,
-          isCollapsed: false,
-        })),
+        ...applyPresetRegionFocus(nextState, preset),
         account: { ...state.account, activeLayoutPresetId: action.presetId },
       };
     }
@@ -982,16 +1026,11 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
         state.projects.find((project) => project.id === state.activeProjectId)?.layout.presetId ??
           state.account.activeLayoutPresetId
       );
-      const widgetId = getCenterWidgetIdFromViewId(preset.initialLayout.centerViewId);
       const nextState = updateActiveLayout(state, () => {
         return { ...preset.initialLayout, panels: { ...preset.initialLayout.panels } };
       });
 
-      return updateActiveWidgetRegion(nextState, 'center', (region) => ({
-        ...region,
-        activeWidgetId: region.enabledWidgetIds.includes(widgetId) ? widgetId : region.activeWidgetId,
-        isCollapsed: false,
-      }));
+      return applyPresetRegionFocus(nextState, preset);
     }
     case 'recoverShellLayout': {
       return updateActiveLayout(state, (layout) => ({
@@ -1127,6 +1166,127 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
             values: { ...project.widgetStates.generate.values, batchCount },
           },
         },
+      }));
+    }
+    case 'patchWidgetValues': {
+      // Generic widget-owned UI state (panel modes, tabs, sizes). Not undoable.
+      return updateActiveProject(state, (project) => ({
+        ...project,
+        widgetStates: {
+          ...project.widgetStates,
+          [action.widgetId]: {
+            ...project.widgetStates[action.widgetId],
+            values: { ...project.widgetStates[action.widgetId].values, ...action.values },
+          },
+        },
+      }));
+    }
+    case 'applyProjectGraphAction': {
+      return updateActiveProject(state, (project) => {
+        const projectGraph = projectGraphReducer(project.projectGraph, action.action);
+
+        if (projectGraph === project.projectGraph) {
+          return project;
+        }
+
+        const undoLabel = getProjectGraphUndoLabel(action.action);
+        const nextProject = undoLabel ? pushUndo(project, undoLabel) : project;
+        // Meaningful workflow edits are high-confidence source events: they
+        // steer the global Invoke route to the project graph unless locked.
+        const shouldAutoSetSource =
+          !project.invocation.sourceLocked &&
+          project.invocation.sourceId !== 'project-graph' &&
+          isHighConfidenceGraphEdit(action.action) &&
+          isInvocationSourceAvailable('project-graph');
+
+        return {
+          ...nextProject,
+          invocation: shouldAutoSetSource
+            ? { ...nextProject.invocation, sourceId: 'project-graph' }
+            : nextProject.invocation,
+          projectGraph,
+        };
+      });
+    }
+    case 'replaceProjectGraph': {
+      const nextState = updateActiveProject(state, (project) => {
+        const nextProject = pushUndo(project, 'Replace project graph');
+
+        return {
+          ...nextProject,
+          events: [
+            {
+              createdAt: now(),
+              id: createId('event'),
+              summary: `Replaced the project graph with "${action.document.name || 'Untitled Workflow'}" (${action.label})`,
+              type: 'graph-replaced',
+            },
+            ...nextProject.events,
+          ],
+          graphHistory: [
+            createDocumentHistorySnapshot(`Before: ${action.label}`, project.projectGraph),
+            ...nextProject.graphHistory,
+          ].slice(0, HISTORY_LIMIT),
+          projectGraph: cloneProjectGraph(action.document),
+        };
+      });
+      const activeProject = nextState.projects.find((project) => project.id === nextState.activeProjectId);
+
+      return addNotification(
+        nextState,
+        createNotification({
+          kind: 'info',
+          message: `The previous project graph was saved to graph history.`,
+          projectId: activeProject?.id,
+          title: `Project graph replaced (${action.label})`,
+        })
+      );
+    }
+    case 'saveProjectGraphSnapshot': {
+      return updateActiveProject(state, (project) => ({
+        ...project,
+        events: [
+          {
+            createdAt: now(),
+            id: createId('event'),
+            summary: `Saved a graph history snapshot of "${project.projectGraph.name || 'Untitled Workflow'}"`,
+            type: 'graph-snapshot-saved',
+          },
+          ...project.events,
+        ],
+        graphHistory: [
+          createDocumentHistorySnapshot(
+            `Manual save: ${project.projectGraph.name || 'Untitled Workflow'}`,
+            project.projectGraph
+          ),
+          ...project.graphHistory,
+        ].slice(0, HISTORY_LIMIT),
+      }));
+    }
+    case 'restoreProjectGraphSnapshot': {
+      return updateActiveProject(state, (project) => {
+        const snapshot = project.graphHistory.find((entry) => entry.id === action.snapshotId);
+
+        if (!snapshot?.document) {
+          return project;
+        }
+
+        const nextProject = pushUndo(project, 'Restore graph history snapshot');
+
+        return {
+          ...nextProject,
+          graphHistory: [
+            createDocumentHistorySnapshot('Before restore', project.projectGraph),
+            ...nextProject.graphHistory,
+          ].slice(0, HISTORY_LIMIT),
+          projectGraph: cloneProjectGraph(normalizeProjectGraph(snapshot.document)),
+        };
+      });
+    }
+    case 'setProjectGraphLibraryBinding': {
+      return updateActiveProject(state, (project) => ({
+        ...project,
+        projectGraph: { ...project.projectGraph, libraryWorkflowId: action.libraryWorkflowId },
       }));
     }
     case 'submitInvocationSnapshot': {
