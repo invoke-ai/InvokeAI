@@ -1,5 +1,10 @@
 name: install frontend dependencies
 description: Installs frontend dependencies with pnpm, with caching
+inputs:
+  working-directory:
+    description: Directory to install dependencies in
+    required: false
+    default: invokeai/frontend/web
 runs:
   using: 'composite'
   steps:
@@ -30,4 +35,4 @@ runs:
     - name: install frontend dependencies
       run: pnpm install --prefer-frozen-lockfile
       shell: bash
-      working-directory: invokeai/frontend/web
+      working-directory: ${{ inputs.working-directory }}
