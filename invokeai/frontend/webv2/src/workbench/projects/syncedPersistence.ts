@@ -439,6 +439,20 @@ const loadFromBackend = async (
     activeProjectId = draft.id;
   }
 
+  const state: WorkbenchState = {
+    ...base,
+    account: sessionBlob?.account ?? base.account,
+    activeProjectId,
+    autosave: { status: 'idle' },
+    backendConnection: { status: 'connecting' },
+    notifications: [],
+    projects,
+  };
+
+  if (serializeSessionBlob(state) !== lastPushedAccount) {
+    hasPending = true;
+  }
+
   reportProjectSync({
     hasPendingChanges: hasPending,
     projects: Object.fromEntries(
@@ -449,16 +463,6 @@ const loadFromBackend = async (
       })
     ),
   });
-
-  const state: WorkbenchState = {
-    ...base,
-    account: sessionBlob?.account ?? base.account,
-    activeProjectId,
-    autosave: { status: 'idle' },
-    backendConnection: { status: 'connecting' },
-    notifications: [],
-    projects,
-  };
 
   persistSyncMap();
 

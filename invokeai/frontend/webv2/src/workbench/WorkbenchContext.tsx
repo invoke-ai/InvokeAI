@@ -110,7 +110,10 @@ export const WorkbenchProvider = ({
         }
 
         if (snapshot) {
-          lastSavedStateKeyRef.current = getPersistedStateKey(snapshot.state);
+          if (!syncedWorkbenchPersistence.hasPendingChanges()) {
+            lastSavedStateKeyRef.current = getPersistedStateKey(snapshot.state);
+          }
+
           dispatch({ state: snapshot.state, type: 'hydrateWorkbench' });
         }
 
@@ -148,8 +151,9 @@ export const WorkbenchProvider = ({
 
   // Revision conflicts surfaced by a save are applied to state here: the
   // server version adopts the project id and the local edits continue in a
-  // recovered fork. The follow-up autosave is a no-op for both (the sync
-  // layer already acknowledged them).
+  // recovered fork. The follow-up autosave still persists the reconciled
+  // session/cache, while project document pushes are no-ops because the sync
+  // layer already acknowledged them.
   const applySaveResult = (result: WorkbenchSaveResult): void => {
     for (const conflict of result.conflicts) {
       dispatch({

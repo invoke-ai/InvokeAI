@@ -192,6 +192,7 @@ describe('loadWorkbench session hydration', () => {
     expect(snapshot?.state.projects.map((project) => project.id)).toEqual([second.id]);
     expect(snapshot?.state.activeProjectId).toBe(second.id);
     expect(api.getProject).toHaveBeenCalledTimes(1);
+    expect(persistence.syncedWorkbenchPersistence.hasPendingChanges()).toBe(false);
 
     const libraryIds = library.getProjectLibrary().summaries.map((summary) => summary.id);
 
@@ -232,6 +233,7 @@ describe('loadWorkbench session hydration', () => {
     expect(snapshot?.state.projects).toHaveLength(1);
     expect(snapshot?.state.projects[0].id).not.toBe(existing.id);
     expect(snapshot?.state.activeProjectId).toBe(snapshot?.state.projects[0].id);
+    expect(persistence.syncedWorkbenchPersistence.hasPendingChanges()).toBe(true);
   });
 
   it('joins a deep-linked project into the open set and focuses it', async () => {
@@ -245,6 +247,7 @@ describe('loadWorkbench session hydration', () => {
 
     expect(snapshot?.state.projects.map((project) => project.id)).toEqual([first.id, second.id]);
     expect(snapshot?.state.activeProjectId).toBe(second.id);
+    expect(persistence.syncedWorkbenchPersistence.hasPendingChanges()).toBe(true);
   });
 
   it('appends and activates a draft when a new project is requested', async () => {
@@ -257,6 +260,7 @@ describe('loadWorkbench session hydration', () => {
 
     expect(snapshot?.state.projects).toHaveLength(2);
     expect(snapshot?.state.activeProjectId).not.toBe(first.id);
+    expect(persistence.syncedWorkbenchPersistence.hasPendingChanges()).toBe(true);
   });
 });
 
