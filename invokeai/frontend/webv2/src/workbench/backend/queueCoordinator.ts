@@ -291,6 +291,8 @@ export const createQueueCoordinator = (
     }
   };
 
+  const isTrackedEvent = (event: { item_id: number }): boolean => waits.has(event.item_id);
+
   const trackBackendItem = (localQueueItemId: string, backendItemId: number): Promise<TerminalOutcome> => {
     const bufferedOutcome = recentTerminalOutcomes.get(backendItemId);
 
@@ -354,6 +356,11 @@ export const createQueueCoordinator = (
       return;
     }
 
+    if (!isTrackedEvent(event)) {
+      bufferTerminalOutcome(event.item_id, toTerminalOutcome(event.status, event.error_message, event.error_type));
+      return;
+    }
+
     nodeExecution.settleRunning();
     progressImage.clear();
     settleWait(event.item_id, toTerminalOutcome(event.status, event.error_message, event.error_type));
@@ -364,25 +371,27 @@ export const createQueueCoordinator = (
   };
 
   const handleProgress = (event: InvocationProgressEvent): void => {
+    const wait = waits.get(event.item_id);
+
+    if (!wait) {
+      return;
+    }
+
     nodeExecution.progress(event.invocation_source_id, event.percentage, event.message);
 
     if (event.image?.dataURL) {
       progressImage.set({ dataUrl: event.image.dataURL, height: event.image.height, width: event.image.width });
     }
 
-    const wait = waits.get(event.item_id);
+    const state = runProgress.get(wait.localQueueItemId);
 
-    if (wait) {
-      const state = runProgress.get(wait.localQueueItemId);
-
-      if (state) {
-        state.activeBackendItemId = event.item_id;
-        state.message = event.message;
-        state.percentage = event.percentage;
-        publishRunProgress(wait.localQueueItemId);
-      } else {
-        progress.set(wait.localQueueItemId, { message: event.message, percentage: event.percentage });
-      }
+    if (state) {
+      state.activeBackendItemId = event.item_id;
+      state.message = event.message;
+      state.percentage = event.percentage;
+      publishRunProgress(wait.localQueueItemId);
+    } else {
+      progress.set(wait.localQueueItemId, { message: event.message, percentage: event.percentage });
     }
   };
 
@@ -425,12 +434,24 @@ export const createQueueCoordinator = (
     socket.on('queue_item_status_changed', handleStatusChanged);
     socket.on('invocation_progress', handleProgress);
     socket.on('invocation_started', (event: InvocationStartedEvent) => {
+      if (!isTrackedEvent(event)) {
+        return;
+      }
+
       nodeExecution.started(event);
     });
     socket.on('invocation_complete', (event: InvocationCompleteEvent) => {
+      if (!isTrackedEvent(event)) {
+        return;
+      }
+
       nodeExecution.completed(event);
     });
     socket.on('invocation_error', (event: InvocationErrorEvent) => {
+      if (!isTrackedEvent(event)) {
+        return;
+      }
+
       nodeExecution.failed(event);
     });
     socket.on('model_load_started', (payload: never) => {
@@ -480,7 +501,25 @@ export const createQueueCoordinator = (
       return outcomes;
     }
 
-    const backendItems = await api.listAllQueueItems();
+    const backendItems = items.every((item) => item.backendItemIds?.length)
+      ? (
+          await Promise.all(
+            items
+              .flatMap((item) => item.backendItemIds ?? [])
+              .map(async (itemId) => {
+                try {
+                  return await api.getQueueItem(itemId);
+                } catch (error) {
+                  if (error instanceof ApiError && error.status === 404) {
+                    return undefined;
+                  }
+
+                  throw error;
+                }
+              })
+          )
+        ).filter((item) => item !== undefined)
+      : await api.listAllQueueItems();
     const backendItemsById = new Map(backendItems.map((item) => [item.item_id, item]));
     const backendItemsByLocalId = new Map<string, QueueItemDTO[]>();
 

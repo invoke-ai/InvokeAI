@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EnqueueGenerateRequest, ImageDTO, QueueItemDTO } from '../generation/types';
 import { buildQueueItemOrigin, type QueueItemStatusChangedEvent } from './events';
 import { ApiError } from './http';
+import type { NodeExecutionSink } from './nodeExecutionStore';
 import type { QueueItemProgress, QueueItemProgressSink } from './progressStore';
 import {
   createQueueCoordinator,
@@ -93,6 +94,8 @@ interface Harness {
   api: { [Key in keyof QueueCoordinatorApi]: ReturnType<typeof vi.fn> };
   callbacks: { [Key in keyof QueueCoordinatorCallbacks]: ReturnType<typeof vi.fn> };
   coordinator: QueueCoordinator;
+  nodeExecution: { [Key in keyof NodeExecutionSink]: ReturnType<typeof vi.fn> };
+  progressImage: { clear: ReturnType<typeof vi.fn>; set: ReturnType<typeof vi.fn> };
   progressEntries: Map<string, QueueItemProgress>;
   socket: FakeSocket;
 }
@@ -123,14 +126,25 @@ const createHarness = (options: { galleryRefreshCoalesceMs?: number } = {}): Har
     onConnectionChange: vi.fn(),
     onGalleryRefresh: vi.fn(),
   };
+  const nodeExecution = {
+    clearAll: vi.fn(),
+    completed: vi.fn(),
+    failed: vi.fn(),
+    progress: vi.fn(),
+    settleRunning: vi.fn(),
+    started: vi.fn(),
+  };
+  const progressImage = { clear: vi.fn(), set: vi.fn() };
   const coordinator = createQueueCoordinator(callbacks, {
     api,
     createSocket: () => socket,
     galleryRefreshCoalesceMs: options.galleryRefreshCoalesceMs ?? 1,
+    nodeExecution,
     progress,
+    progressImage,
   });
 
-  return { api, callbacks, coordinator, progressEntries, socket };
+  return { api, callbacks, coordinator, nodeExecution, progressImage, progressEntries, socket };
 };
 
 describe('queueCoordinator', () => {
@@ -210,7 +224,12 @@ describe('queueCoordinator', () => {
   it('coalesces gallery refreshes across a burst of completions', async () => {
     vi.useFakeTimers();
     harness = createHarness({ galleryRefreshCoalesceMs: 400 });
+    harness.api.enqueueGenerateGraph.mockResolvedValue({
+      batchId: 'batch-1',
+      itemIds: Array.from({ length: 10 }, (_, index) => index + 1),
+    });
     harness.coordinator.connect();
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
     await vi.advanceTimersByTimeAsync(500); // flush the on-connect refresh
     harness.callbacks.onGalleryRefresh.mockClear();
 
@@ -226,7 +245,9 @@ describe('queueCoordinator', () => {
   it('does not refresh the gallery for failed or canceled items', async () => {
     vi.useFakeTimers();
     harness = createHarness({ galleryRefreshCoalesceMs: 400 });
+    harness.api.enqueueGenerateGraph.mockResolvedValue({ batchId: 'batch-1', itemIds: [1, 2] });
     harness.coordinator.connect();
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
     await vi.advanceTimersByTimeAsync(500); // flush the on-connect refresh
     harness.callbacks.onGalleryRefresh.mockClear();
 
@@ -263,6 +284,45 @@ describe('queueCoordinator', () => {
     await resultsPromise;
 
     expect(harness.progressEntries.has('local-1')).toBe(false);
+  });
+
+  it('ignores untracked queue events before mutating local execution state', () => {
+    vi.useFakeTimers();
+    harness = createHarness({ galleryRefreshCoalesceMs: 400 });
+    harness.coordinator.connect();
+    harness.callbacks.onGalleryRefresh.mockClear();
+
+    harness.socket.fire('invocation_started', {
+      ...createStatusEvent({ item_id: 99 }),
+      invocation_source_id: 'node-1',
+    });
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 99 }),
+      invocation_source_id: 'node-1',
+      message: 'other user progress',
+      percentage: 0.5,
+    });
+    harness.socket.fire('invocation_complete', {
+      ...createStatusEvent({ item_id: 99 }),
+      invocation_source_id: 'node-1',
+      result: { type: 'image_output' },
+    });
+    harness.socket.fire('invocation_error', {
+      ...createStatusEvent({ item_id: 99 }),
+      error_message: 'other user failure',
+      error_type: 'Error',
+      invocation_source_id: 'node-1',
+    });
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 99 }));
+
+    expect(harness.nodeExecution.started).not.toHaveBeenCalled();
+    expect(harness.nodeExecution.progress).not.toHaveBeenCalled();
+    expect(harness.nodeExecution.completed).not.toHaveBeenCalled();
+    expect(harness.nodeExecution.failed).not.toHaveBeenCalled();
+    expect(harness.nodeExecution.settleRunning).not.toHaveBeenCalled();
+    expect(harness.progressImage.clear).not.toHaveBeenCalled();
+    expect(harness.progressImage.set).not.toHaveBeenCalled();
+    expect(harness.callbacks.onGalleryRefresh).not.toHaveBeenCalled();
   });
 
   it('tracks the active image index inside a submitted batch', async () => {
@@ -309,11 +369,12 @@ describe('queueCoordinator', () => {
     });
 
     it('resumes running items and settles them from their listed terminal status', async () => {
-      harness.api.listAllQueueItems.mockResolvedValue([createQueueItemDTO({ item_id: 7, status: 'completed' })]);
+      harness.api.getQueueItem.mockResolvedValue(createQueueItemDTO({ item_id: 7, status: 'completed' }));
 
       const outcomes = await harness.coordinator.reconcile([{ backendItemIds: [7], id: 'local-1', status: 'running' }]);
 
       expect(outcomes.get('local-1')).toEqual({ kind: 'resumed' });
+      expect(harness.api.listAllQueueItems).not.toHaveBeenCalled();
 
       const images = await harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z');
 
@@ -321,11 +382,12 @@ describe('queueCoordinator', () => {
     });
 
     it('marks running items missing when their backend items vanished', async () => {
-      harness.api.listAllQueueItems.mockResolvedValue([]);
+      harness.api.getQueueItem.mockRejectedValue(new ApiError('not found', 404));
 
       const outcomes = await harness.coordinator.reconcile([{ backendItemIds: [7], id: 'local-1', status: 'running' }]);
 
       expect(outcomes.get('local-1')).toEqual({ kind: 'missing' });
+      expect(harness.api.listAllQueueItems).not.toHaveBeenCalled();
     });
 
     it('asks for a fresh enqueue when a pending item left no backend trace', async () => {
