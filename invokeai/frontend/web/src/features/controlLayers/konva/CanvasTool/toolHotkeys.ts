@@ -4,10 +4,10 @@ type ShapeType = 'rect' | 'oval' | 'polygon' | 'freehand';
 
 export const shouldPreserveSuspendableShapesSession = (
   tool: Tool,
-  toolBuffer: Tool | null,
+  baseTool: Tool | null,
   hasSuspendableShapeSession: boolean
 ): boolean => {
-  if (!hasSuspendableShapeSession || toolBuffer !== 'rect') {
+  if (!hasSuspendableShapeSession || baseTool !== 'rect') {
     return false;
   }
 
@@ -45,7 +45,7 @@ export const shouldTranslateShapeDragOnSpace = (
 
 export const getToolToCancelOnEscape = (
   tool: Tool,
-  toolBuffer: Tool | null,
+  baseTool: Tool | null,
   hasActiveLassoSession: boolean,
   hasSuspendableShapeSession: boolean
 ): Tool | null => {
@@ -53,11 +53,11 @@ export const getToolToCancelOnEscape = (
     return tool;
   }
 
-  if (tool === 'view' && toolBuffer === 'lasso' && hasActiveLassoSession) {
+  if (tool === 'view' && baseTool === 'lasso' && hasActiveLassoSession) {
     return 'lasso';
   }
 
-  if ((tool === 'view' || tool === 'colorPicker') && toolBuffer === 'rect' && hasSuspendableShapeSession) {
+  if ((tool === 'view' || tool === 'colorPicker') && baseTool === 'rect' && hasSuspendableShapeSession) {
     return 'rect';
   }
 
