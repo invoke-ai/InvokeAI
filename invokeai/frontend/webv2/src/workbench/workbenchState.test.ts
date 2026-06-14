@@ -804,4 +804,18 @@ describe('workbench backend connection recovery', () => {
 
     expect(state.backendConnection).toEqual({ status: 'connecting' });
   });
+
+  it('preserves live backend connection state when persistence hydrates late', () => {
+    const initial = createInitialWorkbenchState();
+    const connected = workbenchReducer(initial, { status: 'connected', type: 'setBackendConnectionStatus' });
+    const persisted = {
+      ...initial,
+      backendConnection: { status: 'connecting' },
+    } as WorkbenchState;
+
+    const state = workbenchReducer(connected, { state: persisted, type: 'hydrateWorkbench' });
+
+    expect(state.backendConnection.status).toBe('connected');
+    expect(state.backendConnection.lastConnectedAt).toBe(connected.backendConnection.lastConnectedAt);
+  });
 });

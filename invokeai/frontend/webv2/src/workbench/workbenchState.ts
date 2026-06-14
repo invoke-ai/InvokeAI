@@ -1756,7 +1756,7 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       });
     }
     case 'hydrateWorkbench': {
-      return normalizeWorkbenchState(action.state);
+      return { ...normalizeWorkbenchState(action.state), backendConnection: state.backendConnection };
     }
     case 'reconcileProjectConflict': {
       // A save lost the revision race against another tab/device. The server
