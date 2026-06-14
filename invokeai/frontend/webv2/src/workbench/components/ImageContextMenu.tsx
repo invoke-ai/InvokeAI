@@ -77,6 +77,7 @@ export const ImageContextMenu = ({
   const image = images[0] ?? null;
   const isBulk = images.length > 1;
   const imageNames = images.map((candidate) => candidate.imageName);
+  const menuTarget = image ? target : null;
 
   useEffect(() => {
     if (!image || isBulk) {
@@ -121,28 +122,28 @@ export const ImageContextMenu = ({
 
   return (
     <>
-      <Menu.Root
-        key={target ? `${image?.imageName ?? 'none'}:${images.length}` : 'closed'}
-        lazyMount
-        open={target !== null}
-        positioning={{
-          getAnchorRect: () => {
-            const currentTarget = targetRef.current;
+      {menuTarget && image ? (
+        <Menu.Root
+          key={`${image.imageName}:${images.length}`}
+          lazyMount
+          open
+          positioning={{
+            getAnchorRect: () => {
+              const currentTarget = targetRef.current ?? menuTarget;
 
-            return currentTarget ? { height: 1, width: 1, x: currentTarget.x, y: currentTarget.y } : null;
-          },
-          placement: 'bottom-start',
-        }}
-        unmountOnExit
-        onOpenChange={(event) => {
-          if (!event.open) {
-            onClose();
-          }
-        }}
-      >
-        <Portal>
-          <Menu.Positioner>
-            {image && (
+              return { height: 1, width: 1, x: currentTarget.x, y: currentTarget.y };
+            },
+            placement: 'bottom-start',
+          }}
+          unmountOnExit
+          onOpenChange={(event) => {
+            if (!event.open) {
+              onClose();
+            }
+          }}
+        >
+          <Portal>
+            <Menu.Positioner>
               <MenuContent
                 {...MENU_CONTENT_PROPS}
                 maxH="min(28rem, calc(100vh - 2rem))"
@@ -169,10 +170,10 @@ export const ImageContextMenu = ({
                   />
                 )}
               </MenuContent>
-            )}
-          </Menu.Positioner>
-        </Portal>
-      </Menu.Root>
+            </Menu.Positioner>
+          </Portal>
+        </Menu.Root>
+      ) : null}
       <Dialog.Root
         open={pendingDeletion !== null}
         role="alertdialog"
