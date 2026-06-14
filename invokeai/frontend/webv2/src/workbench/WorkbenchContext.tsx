@@ -32,6 +32,14 @@ interface WorkbenchContextValue {
 
 const WorkbenchContext = createContext<WorkbenchContextValue | null>(null);
 
+/**
+ * The reducer dispatch alone, on its own context. `dispatch` is stable for the
+ * provider's lifetime, so subscribers never re-render on state changes — the
+ * subscription of choice for hot, many-instance components (e.g. flow nodes)
+ * that only write.
+ */
+const WorkbenchDispatchContext = createContext<Dispatch<WorkbenchAction> | null>(null);
+
 const AUTOSAVE_DELAY_MS = 500;
 
 const getPersistedStateKey = (state: WorkbenchState): string =>
@@ -200,7 +208,11 @@ export const WorkbenchProvider = ({
     return { state, activeProject, dispatch, hasHydrated };
   }, [state, hasHydrated]);
 
-  return <WorkbenchContext value={value}>{children}</WorkbenchContext>;
+  return (
+    <WorkbenchContext value={value}>
+      <WorkbenchDispatchContext value={dispatch}>{children}</WorkbenchDispatchContext>
+    </WorkbenchContext>
+  );
 };
 
 export const useWorkbench = (): WorkbenchContextValue => {
@@ -214,3 +226,13 @@ export const useWorkbench = (): WorkbenchContextValue => {
 };
 
 export const useOptionalWorkbench = (): WorkbenchContextValue | null => use(WorkbenchContext);
+
+export const useWorkbenchDispatch = (): Dispatch<WorkbenchAction> => {
+  const dispatch = use(WorkbenchDispatchContext);
+
+  if (!dispatch) {
+    throw new Error('useWorkbenchDispatch must be used within a WorkbenchProvider.');
+  }
+
+  return dispatch;
+};

@@ -23,6 +23,7 @@
     "@fontsource/inter": "^5.2.8",
     "@tanstack/react-router": "^1.170.15",
     "@tanstack/react-virtual": "^3.14.2",
+    "@xyflow/react": "^12.11.0",
     "lucide-react": "^1.17.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

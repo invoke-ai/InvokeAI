@@ -1,0 +1,315 @@
+import { HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { HistoryIcon, LibraryIcon, PlusIcon } from 'lucide-react';
+import { useEffect, useId, useRef, type ChangeEvent } from 'react';
+
+import { IconButton } from '../../components/ui/Button';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { useNotify } from '../../useNotify';
+import { useWorkbench } from '../../WorkbenchContext';
+import {
+  buildCurrentImageNode,
+  buildInvocationNode,
+  buildNotesNode,
+  createProjectGraph,
+  createWorkflowId,
+} from '../../workflows/document';
+import type { InvocationTemplate, XYPosition } from '../../workflows/types';
+import { parseWorkflowJson } from '../../workflows/workflowJson';
+import type { WidgetLabelProps, WidgetViewProps } from '../../types';
+import { AddNodeDialog } from './editor/AddNodeDialog';
+import { getWorkflowFlowInstance } from './editor/flowInstanceStore';
+import { WorkflowLibraryDialog } from './library/WorkflowLibraryDialog';
+import { copyWorkflowJson, downloadWorkflowJson } from './workflowTransfer';
+import {
+  claimWorkflowDialogHost,
+  releaseWorkflowDialogHost,
+  requestWorkflowImport,
+  setAddNodeOpen,
+  setNewWorkflowConfirmOpen,
+  setWorkflowLibraryOpen,
+  workflowUiStore,
+} from './workflowUiStore';
+
+/**
+ * The workflow widget's frame chrome. The label renders the editable
+ * `Workflow / [name]` title; quick actions (add node, library, history) are
+ * header icon buttons; everything else contributes to the shared widget
+ * actions menu via the manifest's `headerMenu`. Dialogs live here (always
+ * mounted) and are driven through `workflowUiStore`.
+ */
+
+export const WorkflowWidgetLabel = ({ region }: WidgetLabelProps) => {
+  const { activeProject, dispatch } = useWorkbench();
+
+  if (region !== 'center') {
+    return (
+      <Text fontSize="xs" fontWeight="700">
+        Workflow
+      </Text>
+    );
+  }
+
+  return (
+    <HStack flex="1" gap="1" minW="0">
+      <Text flexShrink={0} fontSize="xs" fontWeight="700">
+        Workflow
+      </Text>
+      <Text color="fg.subtle" flexShrink={0} fontSize="xs">
+        /
+      </Text>
+      <Input
+        aria-label="Workflow name"
+        fontSize="xs"
+        fontWeight="600"
+        h="6"
+        maxW="16rem"
+        placeholder="Untitled Workflow"
+        size="2xs"
+        value={activeProject.projectGraph.name}
+        variant="flushed"
+        onChange={(event: ChangeEvent<HTMLInputElement>) =>
+          dispatch({
+            action: { patch: { name: event.currentTarget.value }, type: 'setMetadata' },
+            type: 'applyProjectGraphAction',
+          })
+        }
+      />
+    </HStack>
+  );
+};
+
+/** Entries contributed to the shared widget actions menu. */
+export const WorkflowMenuItems = (_props: WidgetViewProps) => {
+  const { activeProject, dispatch } = useWorkbench();
+  const notify = useNotify();
+  const projectGraph = activeProject.projectGraph;
+
+  const openDetailsPanel = () => {
+    dispatch({ region: 'left', type: 'openRegionWidget', widgetId: 'workflow' });
+    dispatch({ type: 'patchWidgetValues', values: { editTab: 'details', panelMode: 'edit' }, widgetId: 'workflow' });
+  };
+
+  return (
+    <Menu.ItemGroup>
+      <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+        Workflow
+      </Menu.ItemGroupLabel>
+      <Menu.Item value="snapshot" onClick={() => dispatch({ type: 'saveProjectGraphSnapshot' })}>
+        Save graph snapshot
+      </Menu.Item>
+      <Menu.Item value="details" onClick={openDetailsPanel}>
+        Workflow details…
+      </Menu.Item>
+      <Menu.Item value="import" onClick={requestWorkflowImport}>
+        Import workflow JSON…
+      </Menu.Item>
+      <Menu.Item value="export" onClick={() => downloadWorkflowJson(projectGraph)}>
+        Export workflow JSON
+      </Menu.Item>
+      <Menu.Item
+        value="copy"
+        onClick={() => {
+          copyWorkflowJson(projectGraph)
+            .then(() => notify.success('Workflow JSON copied'))
+            .catch(() => notify.error('Failed to copy workflow JSON'));
+        }}
+      >
+        Copy workflow JSON
+      </Menu.Item>
+      <Menu.Item color="fg.error" value="new" onClick={() => setNewWorkflowConfirmOpen(true)}>
+        New workflow…
+      </Menu.Item>
+    </Menu.ItemGroup>
+  );
+};
+
+export const WorkflowHeaderActions = ({ region }: WidgetViewProps) => {
+  const { activeProject, dispatch } = useWorkbench();
+  const notify = useNotify();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { dialogHostId, importRequestCount, isAddNodeOpen, isLibraryOpen, isNewWorkflowConfirmOpen } =
+    workflowUiStore.useSnapshot();
+  const restorableHistory = activeProject.graphHistory.filter((entry) => entry.document);
+
+  // Both workflow surfaces can be mounted at once; exactly one (the first to
+  // mount) hosts the shared dialogs and the import file input.
+  const hostId = useId();
+  const isDialogHost = dialogHostId === hostId;
+  const lastImportRequestRef = useRef(importRequestCount);
+
+  useEffect(() => {
+    claimWorkflowDialogHost(hostId);
+
+    return () => {
+      releaseWorkflowDialogHost(hostId);
+    };
+  }, [hostId]);
+
+  useEffect(() => {
+    if (isDialogHost && importRequestCount > lastImportRequestRef.current) {
+      fileInputRef.current?.click();
+    }
+
+    lastImportRequestRef.current = importRequestCount;
+  }, [importRequestCount, isDialogHost]);
+
+  const getInsertPosition = (): XYPosition => {
+    const instance = getWorkflowFlowInstance();
+    const center = instance
+      ? instance.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
+      : { x: 0, y: 0 };
+
+    // Slight scatter so repeated inserts do not stack perfectly.
+    return { x: center.x + (Math.random() - 0.5) * 80, y: center.y + (Math.random() - 0.5) * 80 };
+  };
+
+  const addNode = (template: InvocationTemplate) => {
+    dispatch({
+      action: { node: buildInvocationNode(template, getInsertPosition()), type: 'addNode' },
+      type: 'applyProjectGraphAction',
+    });
+  };
+
+  const addNote = () => {
+    dispatch({
+      action: { node: buildNotesNode(getInsertPosition()), type: 'addNode' },
+      type: 'applyProjectGraphAction',
+    });
+  };
+
+  const addCurrentImage = () => {
+    dispatch({
+      action: { node: buildCurrentImageNode(getInsertPosition()), type: 'addNode' },
+      type: 'applyProjectGraphAction',
+    });
+  };
+
+  const importFile = (file: File) => {
+    file
+      .text()
+      .then((text) => {
+        const { document, warnings } = parseWorkflowJson(JSON.parse(text));
+
+        dispatch({ document, label: `Imported "${file.name}"`, type: 'replaceProjectGraph' });
+
+        for (const warning of warnings) {
+          notify.info('Workflow import warning', warning);
+        }
+      })
+      .catch((error: unknown) => {
+        notify.error(
+          'Failed to import workflow',
+          error instanceof Error ? error.message : 'The file is not a valid workflow JSON.'
+        );
+      });
+  };
+
+  return (
+    <HStack gap="0.5">
+      {region === 'center' ? (
+        <IconButton
+          aria-label="Add node"
+          color="fg.muted"
+          size="2xs"
+          title="Add node"
+          variant="ghost"
+          onClick={() => setAddNodeOpen(true)}
+        >
+          <Icon as={PlusIcon} boxSize="3.5" />
+        </IconButton>
+      ) : null}
+      <IconButton
+        aria-label="Workflow library"
+        color="fg.muted"
+        size="2xs"
+        title="Workflow library"
+        variant="ghost"
+        onClick={() => setWorkflowLibraryOpen(true)}
+      >
+        <Icon as={LibraryIcon} boxSize="3.5" />
+      </IconButton>
+      <Menu.Root positioning={{ placement: 'bottom-end' }}>
+        <Menu.Trigger asChild>
+          <IconButton
+            aria-label="Graph history snapshots"
+            color="fg.muted"
+            disabled={restorableHistory.length === 0}
+            size="2xs"
+            title="Graph history snapshots"
+            variant="ghost"
+          >
+            <Icon as={HistoryIcon} boxSize="3.5" />
+          </IconButton>
+        </Menu.Trigger>
+        <Portal>
+          <Menu.Positioner>
+            <Menu.Content maxH="18rem" minW="16rem" overflowY="auto">
+              <Menu.ItemGroup>
+                <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                  Graph History Snapshots
+                </Menu.ItemGroupLabel>
+                {restorableHistory.map((entry) => (
+                  <Menu.Item
+                    key={entry.id}
+                    value={entry.id}
+                    onClick={() => dispatch({ snapshotId: entry.id, type: 'restoreProjectGraphSnapshot' })}
+                  >
+                    <Stack gap="0" minW="0">
+                      <Menu.ItemText fontSize="xs" truncate>
+                        {entry.label}
+                      </Menu.ItemText>
+                      <Text color="fg.subtle" fontSize="2xs">
+                        {new Date(entry.createdAt).toLocaleString()}
+                      </Text>
+                    </Stack>
+                  </Menu.Item>
+                ))}
+              </Menu.ItemGroup>
+            </Menu.Content>
+          </Menu.Positioner>
+        </Portal>
+      </Menu.Root>
+      {isDialogHost ? (
+        <>
+          <input
+            ref={fileInputRef}
+            accept=".json,application/json"
+            hidden
+            type="file"
+            onChange={(event: ChangeEvent<HTMLInputElement>) => {
+              const file = event.currentTarget.files?.[0];
+
+              event.currentTarget.value = '';
+
+              if (file) {
+                importFile(file);
+              }
+            }}
+          />
+          <AddNodeDialog
+            isOpen={isAddNodeOpen}
+            onAddCurrentImage={addCurrentImage}
+            onAddNode={addNode}
+            onAddNote={addNote}
+            onOpenChange={setAddNodeOpen}
+          />
+          <WorkflowLibraryDialog isOpen={isLibraryOpen} onOpenChange={setWorkflowLibraryOpen} />
+          <ConfirmDialog
+            body="Replace the project graph with an empty workflow? The current graph is saved to graph history first."
+            confirmLabel="New workflow"
+            isOpen={isNewWorkflowConfirmOpen}
+            title="New workflow"
+            onClose={() => setNewWorkflowConfirmOpen(false)}
+            onConfirm={() => {
+              dispatch({
+                document: createProjectGraph(createWorkflowId('project-graph')),
+                label: 'New workflow',
+                type: 'replaceProjectGraph',
+              });
+            }}
+          />
+        </>
+      ) : null}
+    </HStack>
+  );
+};

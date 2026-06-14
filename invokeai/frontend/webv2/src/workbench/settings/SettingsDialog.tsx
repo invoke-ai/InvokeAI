@@ -27,6 +27,7 @@ import {
   SettingsIcon,
   SlidersHorizontalIcon,
   Trash2Icon,
+  WorkflowIcon,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -39,11 +40,18 @@ import type {
   DeveloperLogLevel,
   DeveloperLogNamespace,
   ProjectSettings,
+  SettingsSectionId,
   WorkbenchLanguage,
   WorkbenchPreferences,
   WorkbenchThemeId,
 } from '../types';
 import { useOptionalWorkbench } from '../WorkbenchContext';
+import {
+  closeWorkbenchSettings,
+  openWorkbenchSettings,
+  setWorkbenchSettingsSection,
+  settingsDialogStore,
+} from './settingsDialogStore';
 import {
   clearWorkbenchSettings,
   DEVELOPER_LOG_LEVELS,
@@ -55,7 +63,7 @@ import {
 } from './store';
 
 interface SettingsTabDefinition {
-  value: string;
+  value: SettingsSectionId;
   label: string;
   icon: LucideIcon;
   condition?: boolean;
@@ -66,8 +74,13 @@ const updatePreferences = (patch: Partial<WorkbenchPreferences>): void => {
   void patchWorkbenchPreferences(patch);
 };
 
+/**
+ * The top bar's settings entry point. It also hosts the dialog itself, driven
+ * by `settingsDialogStore` so any surface can deep-link into a section via
+ * `openWorkbenchSettings('workflow')`.
+ */
 export const SettingsButton = () => {
-  const [isOpen, setIsOpen] = useState(false);
+  const { isOpen } = settingsDialogStore.useSnapshot();
 
   return (
     <>
@@ -77,11 +90,11 @@ export const SettingsButton = () => {
         size="sm"
         variant="ghost"
         _hover={{ color: 'fg' }}
-        onClick={() => setIsOpen(true)}
+        onClick={() => openWorkbenchSettings()}
       >
         <SettingsIcon />
       </IconButton>
-      <SettingsDialog isOpen={isOpen} onClose={() => setIsOpen(false)} />
+      <SettingsDialog isOpen={isOpen} onClose={closeWorkbenchSettings} />
     </>
   );
 };
@@ -143,7 +156,7 @@ const SettingsDialogContent = () => {
 
 const SettingsTabs = () => {
   const workbench = useOptionalWorkbench();
-  const tabs: SettingsTabDefinition[] = [
+  const allTabs: SettingsTabDefinition[] = [
     {
       children: <AppearanceSection />,
       icon: PaletteIcon,
@@ -164,6 +177,12 @@ const SettingsTabs = () => {
       value: 'project',
     },
     {
+      children: <WorkflowSection />,
+      icon: WorkflowIcon,
+      label: 'Workflow',
+      value: 'workflow',
+    },
+    {
       children: <DeveloperSection />,
       icon: Code2Icon,
       label: 'Developer',
@@ -175,10 +194,21 @@ const SettingsTabs = () => {
       label: 'Workspace',
       value: 'workspace',
     },
-  ].filter((tab) => tab.condition !== false);
+  ];
+  const tabs = allTabs.filter((tab) => tab.condition !== false);
+  const { sectionId } = settingsDialogStore.useSnapshot();
+  const activeSectionId = tabs.some((tab) => tab.value === sectionId) ? sectionId : 'appearance';
 
   return (
-    <Tabs.Root defaultValue="appearance" display="flex" h="full" minH="0" orientation="vertical" variant="subtle">
+    <Tabs.Root
+      display="flex"
+      h="full"
+      minH="0"
+      orientation="vertical"
+      value={activeSectionId}
+      variant="subtle"
+      onValueChange={(event) => setWorkbenchSettingsSection(event.value as SettingsSectionId)}
+    >
       <Tabs.List
         alignItems="stretch"
         bg="bg"
@@ -400,6 +430,43 @@ const ProjectSection = () => {
         description="Prefer numeric prompt attention syntax when controls insert attention weights."
         label="Prefer numeric attention style"
         onChange={(checked) => updateProjectSettings({ preferNumericAttentionStyle: checked })}
+      />
+    </SettingsSection>
+  );
+};
+
+const WorkflowSection = () => {
+  const { workflowEdgeStyle, workflowShowMinimap, workflowSnapToGrid, workflowValidateConnections } =
+    useWorkbenchPreferences();
+
+  return (
+    <SettingsSection description="Editing behavior for the project graph workflow editor." title="Workflow">
+      <SettingSelect
+        description="How connections between nodes are drawn in the editor."
+        label="Connection style"
+        value={workflowEdgeStyle}
+        onChange={(value) => updatePreferences({ workflowEdgeStyle: value === 'straight' ? 'straight' : 'curved' })}
+      >
+        <option value="curved">Curved</option>
+        <option value="straight">Straight</option>
+      </SettingSelect>
+      <SettingToggle
+        checked={workflowSnapToGrid}
+        description="Snap nodes to the grid while dragging. When off, hold Ctrl to snap temporarily."
+        label="Always snap to grid"
+        onChange={(checked) => updatePreferences({ workflowSnapToGrid: checked })}
+      />
+      <SettingToggle
+        checked={workflowShowMinimap}
+        description="Show the minimap overview in the corner of the workflow editor."
+        label="Show minimap"
+        onChange={(checked) => updatePreferences({ workflowShowMinimap: checked })}
+      />
+      <SettingToggle
+        checked={workflowValidateConnections}
+        description="Reject connections between incompatible field types while wiring nodes. Turn off to wire anything (runs may fail)."
+        label="Validate connections"
+        onChange={(checked) => updatePreferences({ workflowValidateConnections: checked })}
       />
     </SettingsSection>
   );

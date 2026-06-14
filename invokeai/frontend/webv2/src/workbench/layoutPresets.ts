@@ -22,7 +22,7 @@ export const layoutPresets: LayoutPreset[] = [
     label: 'Gallery',
   },
   {
-    description: 'Future graph authoring preset.',
+    description: 'Project graph editing with the Linear UI panel alongside.',
     id: 'workflow',
     initialLayout: {
       centerViewId: 'workflow',
@@ -30,9 +30,10 @@ export const layoutPresets: LayoutPreset[] = [
       presetId: 'workflow',
     },
     label: 'Workflow',
+    leftRegionWidgetId: 'workflow',
   },
   {
-    description: 'Future linear generation preset.',
+    description: 'The project graph as simple linear controls, generating to Canvas.',
     id: 'linear',
     initialLayout: {
       centerViewId: 'canvas',
@@ -40,6 +41,7 @@ export const layoutPresets: LayoutPreset[] = [
       presetId: 'linear',
     },
     label: 'Linear UI',
+    leftRegionWidgetId: 'workflow',
   },
   {
     description: 'Full-width model library, installs, and download queue.',

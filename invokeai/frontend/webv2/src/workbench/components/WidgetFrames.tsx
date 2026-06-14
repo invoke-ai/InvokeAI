@@ -7,13 +7,14 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
-import type { LucideIcon } from 'lucide-react';
+import { SettingsIcon, type LucideIcon } from 'lucide-react';
 
-import { createGraphBearingSurface } from '../graphSurfaces';
 import { useFocusRegionProps } from '../focusRegions';
+import { openWorkbenchSettings } from '../settings/settingsDialogStore';
 import type { WidgetManifest, WidgetRegion, WorkbenchRegion } from '../types';
 import { useWorkbench } from '../WorkbenchContext';
-import { GraphSurfaceActions } from './GraphSurfaceActions';
+import { WidgetActionsMenu } from './WidgetActionsMenu';
+import { IconButton } from './ui/Button';
 
 const PANEL_SIZE_STEP_PX = 16;
 const MIN_PANEL_SIZE_PX = 180;
@@ -118,7 +119,6 @@ export const WidgetPanelFrame = ({
       borderTopWidth={isBottom ? '1px' : '0'}
       direction="column"
       flexShrink={0}
-      gap="3"
       overflow="hidden"
       minW="0"
       {...focusRegionProps}
@@ -159,16 +159,36 @@ export const WidgetHeader = ({
   manifest: WidgetManifest;
   region: WorkbenchRegion;
 }) => {
-  const surface = manifest.graphBearing?.surfaces.includes(region) ? createGraphBearingSurface(manifest, region) : null;
+  // Manifests may provide a component label (e.g. Workflow's editable
+  // `Workflow / [name]`); plain strings render as the standard title.
+  const Label = manifest.label;
 
   return (
     <HStack justify="space-between" borderBottomWidth={1} h={10} ps="3" pe="2">
-      <Text fontSize="xs" fontWeight="700">
-        {manifest.labelText}
-      </Text>
+      <HStack flex="1" gap="1.5" minW="0">
+        {typeof Label === 'string' ? (
+          <Text fontSize="xs" fontWeight="700">
+            {Label}
+          </Text>
+        ) : (
+          <Label region={region} />
+        )}
+      </HStack>
       <HStack flexShrink={0} gap="1.5">
         {actions}
-        {surface ? <GraphSurfaceActions surface={surface} /> : null}
+        {manifest.settingsSection ? (
+          <IconButton
+            aria-label={`${manifest.labelText} settings`}
+            color="fg.muted"
+            size="2xs"
+            title={`${manifest.labelText} settings`}
+            variant="ghost"
+            onClick={() => openWorkbenchSettings(manifest.settingsSection)}
+          >
+            <Icon as={SettingsIcon} boxSize="3.5" />
+          </IconButton>
+        ) : null}
+        <WidgetActionsMenu manifest={manifest} region={region} />
       </HStack>
     </HStack>
   );

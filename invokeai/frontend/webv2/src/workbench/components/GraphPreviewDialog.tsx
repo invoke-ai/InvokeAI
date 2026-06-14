@@ -1,64 +1,77 @@
-import { Code, Dialog, Portal, ScrollArea, Stack, Text } from '@chakra-ui/react';
+import { Box, Dialog, Portal, SegmentGroup, Text } from '@chakra-ui/react';
+import { useState } from 'react';
 
 import { formatRoute, isInvocationRouteValid, resolveInvocationRoute } from '../invocation';
 import type { GraphContract, GraphId, InvocationSourceId } from '../types';
 import { useWorkbench } from '../WorkbenchContext';
+import type { XYPosition } from '../workflows/types';
+import { GraphPreviewFlow } from './GraphPreviewFlow';
 import { Button } from './ui/Button';
+import { JsonPreview } from './ui/JsonPreview';
 
 interface GraphPreviewDialogProps {
   graph: GraphContract | null;
   graphId: GraphId;
   isOpen: boolean;
+  /** Editor positions keyed by node id, when the graph mirrors an editable document. */
+  positionHints?: Record<string, XYPosition>;
   sourceId?: InvocationSourceId;
   title: string;
   onOpenChange: (isOpen: boolean) => void;
 }
 
+type PreviewMode = 'nodes' | 'json';
+
 export const GraphPreviewDialog = ({
   graph,
   graphId,
   isOpen,
+  positionHints,
   sourceId,
   title,
   onOpenChange,
 }: GraphPreviewDialogProps) => {
   const { activeProject, dispatch } = useWorkbench();
+  const [mode, setMode] = useState<PreviewMode>('nodes');
   const dialogRoute = sourceId
     ? resolveInvocationRoute(activeProject, 'dialog', { ...activeProject.invocation, sourceId, sourceLocked: true })
     : null;
   const canInvoke = dialogRoute ? isInvocationRouteValid(dialogRoute) : false;
 
   return (
-    <Dialog.Root open={isOpen} onOpenChange={(event) => onOpenChange(event.open)}>
+    <Dialog.Root open={isOpen} size="xl" onOpenChange={(event) => onOpenChange(event.open)}>
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
-          <Dialog.Content>
-            <Dialog.Header>
+          <Dialog.Content h="75vh" maxH="75vh">
+            <Dialog.Header alignItems="center" flexDirection="row" justifyContent="space-between">
               <Dialog.Title>{title} Graph Preview</Dialog.Title>
+              <SegmentGroup.Root
+                size="xs"
+                value={mode}
+                onValueChange={(event) => setMode(event.value === 'json' ? 'json' : 'nodes')}
+              >
+                <SegmentGroup.Indicator />
+                <SegmentGroup.Items
+                  items={[
+                    { label: 'Nodes', value: 'nodes' },
+                    { label: 'JSON', value: 'json' },
+                  ]}
+                />
+              </SegmentGroup.Root>
             </Dialog.Header>
-            <Dialog.Body>
-              <Stack gap="3">
+            <Dialog.Body display="flex" flexDirection="column" minH="0">
+              {!graph ? (
                 <Text color="fg.muted" fontSize="sm">
-                  Read-only shell for graph inspection. Full graph preview rendering lands in later phases.
+                  No compiled graph is available for "{graphId}" yet.
                 </Text>
-                <ScrollArea.Root maxH="20rem" size="xs" variant="hover">
-                  <ScrollArea.Viewport maxH="20rem">
-                    <ScrollArea.Content>
-                      <Code display="block" p="3" whiteSpace="pre-wrap">
-                        {JSON.stringify(graph ?? { id: graphId, status: 'not-created-yet' }, null, 2)}
-                      </Code>
-                    </ScrollArea.Content>
-                  </ScrollArea.Viewport>
-                  <ScrollArea.Scrollbar>
-                    <ScrollArea.Thumb />
-                  </ScrollArea.Scrollbar>
-                  <ScrollArea.Scrollbar orientation="horizontal">
-                    <ScrollArea.Thumb />
-                  </ScrollArea.Scrollbar>
-                  <ScrollArea.Corner />
-                </ScrollArea.Root>
-              </Stack>
+              ) : mode === 'nodes' ? (
+                <Box flex="1" minH="0">
+                  <GraphPreviewFlow graph={graph} positionHints={positionHints} />
+                </Box>
+              ) : (
+                <JsonPreview label={`${title} graph JSON`} value={graph} />
+              )}
             </Dialog.Body>
             <Dialog.Footer>
               {dialogRoute ? (
