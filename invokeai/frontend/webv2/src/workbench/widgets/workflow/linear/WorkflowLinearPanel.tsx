@@ -139,16 +139,18 @@ export const WorkflowLinearPanel = () => {
             }
           }}
         >
-          <Splitter.Panel id="content" minH="0" overflow="hidden">
-            <Scrollable flex="1" h="full" label="Workflow panel content" minH="0" w="full">
-              {editTab === 'form' ? (
-                <FormBuilderTab projectGraph={projectGraph} />
-              ) : editTab === 'details' ? (
-                <WorkflowDetailsTab metadata={projectGraph} />
-              ) : (
-                <WorkflowJsonTab projectGraph={projectGraph} />
-              )}
-            </Scrollable>
+          <Splitter.Panel id="content" minH="0" minW="0" overflow="hidden">
+            {editTab === 'json' ? (
+              <WorkflowJsonTab projectGraph={projectGraph} />
+            ) : (
+              <Scrollable flex="1" h="full" label="Workflow panel content" minH="0" minW="0" w="full">
+                {editTab === 'form' ? (
+                  <FormBuilderTab projectGraph={projectGraph} />
+                ) : (
+                  <WorkflowDetailsTab metadata={projectGraph} />
+                )}
+              </Scrollable>
+            )}
           </Splitter.Panel>
           <Splitter.ResizeTrigger aria-label="Resize node inspector" id="content:inspector" />
           <Splitter.Panel id="inspector" minH="0" overflow="hidden">
