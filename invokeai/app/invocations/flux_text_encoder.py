@@ -97,6 +97,7 @@ class FluxTextEncoderInvocation(BaseInvocation):
                 ModelFormat.BnbQuantizedLlmInt8b,
                 ModelFormat.BnbQuantizednf4b,
                 ModelFormat.GGUFQuantized,
+                ModelFormat.SDNQQuantized,
             ]:
                 model_is_quantized = True
             else:
@@ -152,6 +153,18 @@ class FluxTextEncoderInvocation(BaseInvocation):
                         prefix=FLUX_LORA_CLIP_PREFIX,
                         dtype=clip_text_encoder.dtype,
                         cached_weights=cached_weights,
+                    )
+                )
+            elif clip_text_encoder_config.format in [ModelFormat.SDNQQuantized]:
+                # SDNQ-quantized CLIP - apply LoRA as sidecar layers
+                exit_stack.enter_context(
+                    LayerPatcher.apply_smart_model_patches(
+                        model=clip_text_encoder,
+                        patches=self._clip_lora_iterator(context),
+                        prefix=FLUX_LORA_CLIP_PREFIX,
+                        dtype=clip_text_encoder.dtype,
+                        cached_weights=cached_weights,
+                        force_sidecar_patching=True,
                     )
                 )
             else:

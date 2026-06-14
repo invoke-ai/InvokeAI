@@ -19,6 +19,8 @@ from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlL
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch, Range
+from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
+from invokeai.backend.quantization.sdnq.utils import SDNQQuantizationType
 from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
 from tests.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.test_custom_invoke_linear_8_bit_lt import (
     build_linear_8bit_lt_layer,
@@ -37,6 +39,31 @@ def build_linear_layer_with_ggml_quantized_tensor(orig_layer: torch.nn.Linear | 
     orig_layer.weight = torch.nn.Parameter(ggml_quantized_weight)
     ggml_quantized_bias = quantize_tensor(orig_layer.bias, gguf.GGMLQuantizationType.Q8_0)
     orig_layer.bias = torch.nn.Parameter(ggml_quantized_bias)
+    return orig_layer
+
+
+def build_linear_layer_with_sdnq_quantized_tensor(orig_layer: torch.nn.Linear | None = None):
+    """Wrap orig_layer's weight in an SDNQTensor (per-tensor symmetric int8). Bias stays unquantized,
+    which matches how SDNQ-quantized checkpoints are typically produced (only Linear weights are quantized)."""
+    if orig_layer is None:
+        orig_layer = torch.nn.Linear(32, 64)
+
+    weight = orig_layer.weight.data
+    orig_dtype = weight.dtype
+    abs_max = weight.abs().max()
+    # Avoid div-by-zero on degenerate all-zero weights.
+    scale_value = (abs_max / 127.0).clamp(min=torch.finfo(torch.float32).tiny)
+    scale = scale_value.to(torch.float32).reshape(1)
+    quantized = (weight.float() / scale).round().clamp(-127, 127).to(torch.int8)
+
+    sdnq_weight = SDNQTensor(
+        data=quantized,
+        quantization_type=SDNQQuantizationType.INT8_SYM,
+        tensor_shape=weight.shape,
+        compute_dtype=orig_dtype,
+        scale=scale,
+    )
+    orig_layer.weight = torch.nn.Parameter(sdnq_weight, requires_grad=False)
     return orig_layer
 
 
@@ -74,6 +101,7 @@ LayerUnderTest = tuple[torch.nn.Module, torch.Tensor, bool]
         "embedding",
         "flux_rms_norm",
         "linear_with_ggml_quantized_tensor",
+        "linear_with_sdnq_quantized_tensor",
         "invoke_linear_8_bit_lt",
         "invoke_linear_nf4",
     ]
@@ -95,6 +123,8 @@ def layer_under_test(request: pytest.FixtureRequest) -> LayerUnderTest:
         return (RMSNorm(8), torch.randn(1, 8), True)
     elif layer_type == "linear_with_ggml_quantized_tensor":
         return (build_linear_layer_with_ggml_quantized_tensor(), torch.randn(1, 32), True)
+    elif layer_type == "linear_with_sdnq_quantized_tensor":
+        return (build_linear_layer_with_sdnq_quantized_tensor(), torch.randn(1, 32), True)
     elif layer_type == "invoke_linear_8_bit_lt":
         return (build_linear_8bit_lt_layer(), torch.randn(1, 32), False)
     elif layer_type == "invoke_linear_nf4":
@@ -532,6 +562,7 @@ def test_linear_sidecar_patches_with_autocast_from_cpu_to_device(device: str, pa
 @pytest.fixture(
     params=[
         "linear_ggml_quantized",
+        "linear_sdnq_quantized",
         "invoke_linear_8_bit_lt",
         "invoke_linear_nf4",
     ]
@@ -544,6 +575,10 @@ def quantized_linear_layer_under_test(request: pytest.FixtureRequest):
     orig_layer = torch.nn.Linear(in_features, out_features)
     if layer_type == "linear_ggml_quantized":
         return orig_layer, build_linear_layer_with_ggml_quantized_tensor(orig_layer)
+    elif layer_type == "linear_sdnq_quantized":
+        # Re-build so SDNQ gets its own clean orig_layer (the helper modifies in place).
+        sdnq_layer = build_linear_layer_with_sdnq_quantized_tensor(copy.deepcopy(orig_layer))
+        return orig_layer, sdnq_layer
     elif layer_type == "invoke_linear_8_bit_lt":
         return orig_layer, build_linear_8bit_lt_layer(orig_layer)
     elif layer_type == "invoke_linear_nf4":

@@ -1,9 +1,12 @@
 # Copyright (c) 2024, Lincoln D. Stein and the InvokeAI Development Team
 """Class for VAE model loading in InvokeAI."""
 
+from pathlib import Path
 from typing import Optional
 
+import accelerate
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
+from safetensors import safe_open
 
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.vae import (
@@ -20,6 +23,28 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     SubModelType,
 )
+from invokeai.backend.quantization.sdnq.loaders import sdnq_sd_loader
+
+
+def _is_sdnq_vae_folder(path: Path) -> bool:
+    """Check if a VAE folder contains SDNQ-quantized weights."""
+    model_file = path / "diffusion_pytorch_model.safetensors"
+    if not model_file.exists():
+        model_file = path / "model.safetensors"
+    if not model_file.exists():
+        return False
+
+    try:
+        with safe_open(model_file, framework="pt", device="cpu") as f:
+            keys = set(f.keys())
+            for key in keys:
+                if key.endswith(".weight"):
+                    base = key[:-7]
+                    if f"{base}.scale" in keys:
+                        return True
+    except Exception:
+        pass
+    return False
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.VAE, format=ModelFormat.Diffusers)
@@ -46,8 +71,14 @@ class VAELoader(GenericDiffusersLoader):
                 config.path,
                 torch_dtype=self._torch_dtype,
             )
-        else:
-            return super()._load_model(config, submodel_type)
+
+        model_path = Path(config.path)
+
+        # Check if this is an SDNQ-quantized VAE folder
+        if model_path.is_dir() and _is_sdnq_vae_folder(model_path):
+            return self._load_sdnq_vae(model_path)
+
+        return super()._load_model(config, submodel_type)
 
     def _load_qwen_image_vae(self, config: VAE_Checkpoint_QwenImage_Config) -> AnyModel:
         """Load a Qwen Image VAE from a single safetensors file.
@@ -77,4 +108,22 @@ class VAELoader(GenericDiffusersLoader):
 
         model.load_state_dict(sd, strict=True, assign=True)
         model.eval()
+        return model
+
+    def _load_sdnq_vae(self, model_path: Path) -> AnyModel:
+        """Load SDNQ-quantized VAE with on-the-fly dequantization."""
+        # Find the safetensors file
+        model_file = model_path / "diffusion_pytorch_model.safetensors"
+        if not model_file.exists():
+            model_file = model_path / "model.safetensors"
+
+        # Load SDNQ state dict
+        sd = sdnq_sd_loader(model_file, compute_dtype=self._torch_dtype)
+
+        # Create empty model from config
+        with accelerate.init_empty_weights():
+            model = AutoencoderKL.from_config(AutoencoderKL.load_config(model_path, local_files_only=True))
+
+        # Load state dict with SDNQTensor objects
+        model.load_state_dict(sd, strict=False, assign=True)
         return model

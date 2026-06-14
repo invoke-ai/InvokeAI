@@ -1,4 +1,5 @@
 import torch
+from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 from einops import rearrange
 from PIL import Image
 
@@ -40,15 +41,29 @@ class FluxVaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
     )
 
     def _vae_decode(self, vae_info: LoadedModel, latents: torch.Tensor) -> Image.Image:
-        assert isinstance(vae_info.model, AutoEncoder)
-        estimated_working_memory = estimate_vae_working_memory_flux(
-            operation="decode", image_tensor=latents, vae=vae_info.model
-        )
+        assert isinstance(vae_info.model, (AutoEncoder, AutoencoderKL))
+
+        # Only estimate working memory for BFL AutoEncoder (diffusers VAE handles this internally)
+        if isinstance(vae_info.model, AutoEncoder):
+            estimated_working_memory = estimate_vae_working_memory_flux(
+                operation="decode", image_tensor=latents, vae=vae_info.model
+            )
+        else:
+            estimated_working_memory = 0
+
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
-            assert isinstance(vae, AutoEncoder)
+            assert isinstance(vae, (AutoEncoder, AutoencoderKL))
             vae_dtype = next(iter(vae.parameters())).dtype
             latents = latents.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)
-            img = vae.decode(latents)
+
+            if isinstance(vae, AutoEncoder):
+                # BFL AutoEncoder returns tensor directly
+                img = vae.decode(latents)
+            else:
+                # Diffusers AutoencoderKL returns DecoderOutput with .sample attribute
+                # Scale latents for diffusers VAE (FLUX uses shift_factor and scale_factor)
+                latents = (latents / vae.config.scaling_factor) + vae.config.shift_factor
+                img = vae.decode(latents, return_dict=False)[0]
 
         img = img.clamp(-1, 1)
         img = rearrange(img[0], "c h w -> h w c")  # noqa: F821

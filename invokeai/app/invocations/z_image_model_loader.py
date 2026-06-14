@@ -126,10 +126,16 @@ class ZImageModelLoaderInvocation(BaseInvocation):
     def _validate_diffusers_format(
         self, context: InvocationContext, model: ModelIdentifierField, model_name: str
     ) -> None:
-        """Validate that a model is in Diffusers format."""
+        """Validate that a model exposes the diffusers-style submodel layout (transformer / vae /
+        text_encoder / tokenizer subfolders). Plain diffusers Z-Image pipelines satisfy this;
+        SDNQ-quantized ZImagePipeline folders do too because they ship the same submodels. Single-
+        file SDNQ Z-Image checkpoints don't have submodels populated and must still be rejected."""
         config = context.models.get_config(model)
-        if config.format != ModelFormat.Diffusers:
-            raise ValueError(
-                f"The {model_name} model must be a Diffusers format Z-Image model. "
-                f"The selected model '{config.name}' is in {config.format.value} format."
-            )
+        if config.format == ModelFormat.Diffusers:
+            return
+        if config.format == ModelFormat.SDNQQuantized and getattr(config, "submodels", None):
+            return
+        raise ValueError(
+            f"The {model_name} model must be a Diffusers-style Z-Image pipeline (with VAE / Qwen3 "
+            f"submodels). The selected model '{config.name}' is in {config.format.value} format."
+        )

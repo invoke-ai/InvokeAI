@@ -10,12 +10,28 @@ from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
+from invokeai.backend.quantization.sdnq.loaders import sdnq_sd_loader
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 StateDict: TypeAlias = dict[str | int, Any]  # When are the keys int?
 
 logger = InvokeAILogger.get_logger()
+
+
+def _is_sdnq_safetensors(path: Path) -> bool:
+    """Check if a safetensors file contains SDNQ-quantized weights by checking for weight+scale pairs."""
+    try:
+        with safe_open(path, framework="pt", device="cpu") as f:
+            keys = set(f.keys())
+            for key in keys:
+                if key.endswith(".weight"):
+                    base = key[:-7]
+                    if f"{base}.scale" in keys:
+                        return True
+    except Exception:
+        pass
+    return False
 
 
 class ModelOnDisk:
@@ -113,7 +129,10 @@ class ModelOnDisk:
             elif path.suffix.endswith(".gguf"):
                 checkpoint = gguf_sd_loader(path, compute_dtype=torch.float32)
             elif path.suffix.endswith(".safetensors"):
-                checkpoint = safetensors.torch.load_file(path)
+                if _is_sdnq_safetensors(path):
+                    checkpoint = sdnq_sd_loader(path, compute_dtype=torch.float32)
+                else:
+                    checkpoint = safetensors.torch.load_file(path)
             else:
                 raise ValueError(f"Unrecognized model extension: {path.suffix}")
 
