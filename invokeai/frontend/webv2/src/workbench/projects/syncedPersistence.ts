@@ -476,7 +476,13 @@ export const syncedWorkbenchPersistence = {
    * no backend); the caller then keeps its default boot state.
    */
   async loadWorkbench(options?: WorkbenchLoadOptions): Promise<WorkbenchPersistenceSnapshot | null> {
-    const local = await localStorageWorkbenchPersistence.loadWorkbench();
+    let local: WorkbenchPersistenceSnapshot | null = null;
+
+    try {
+      local = await localStorageWorkbenchPersistence.loadWorkbench();
+    } catch {
+      local = null;
+    }
 
     try {
       return await loadFromBackend(local, options);

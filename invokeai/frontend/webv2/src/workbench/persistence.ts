@@ -75,7 +75,13 @@ export const localStorageWorkbenchPersistence: WorkbenchPersistenceService = {
       return Promise.resolve(null);
     }
 
-    return Promise.resolve(migrateWorkbenchPersistenceSnapshot(JSON.parse(value)));
+    try {
+      return Promise.resolve(migrateWorkbenchPersistenceSnapshot(JSON.parse(value)));
+    } catch {
+      window.localStorage.removeItem(getStorageKey());
+
+      return Promise.resolve(null);
+    }
   },
   saveWorkbench(state) {
     const snapshot = createSnapshot(state);

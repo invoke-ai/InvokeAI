@@ -212,6 +212,15 @@ describe('loadWorkbench session hydration', () => {
     expect(snapshot?.state.projects).toHaveLength(2);
   });
 
+  it('ignores a corrupt local cache and still hydrates from the backend', async () => {
+    seedServerProject('Backend Project');
+    storage.set('invokeai:v7:webv2:workbench', '{not json');
+
+    const snapshot = await persistence.syncedWorkbenchPersistence.loadWorkbench();
+
+    expect(snapshot?.state.projects.map((project) => project.name)).toEqual(['Backend Project']);
+  });
+
   it('boots a fresh draft when the session is empty', async () => {
     const existing = seedServerProject('Closed project');
     const account = createInitialWorkbenchState().account;
