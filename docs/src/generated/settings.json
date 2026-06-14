@@ -230,6 +230,17 @@
       "validation": {}
     },
     {
+      "category": "PATHS",
+      "default": "wildcards",
+      "description": "Path to directory for dynamic prompt wildcard files.",
+      "env_var": "INVOKEAI_WILDCARDS_DIR",
+      "literal_values": [],
+      "name": "wildcards_dir",
+      "required": false,
+      "type": "<class 'pathlib.Path'>",
+      "validation": {}
+    },
+    {
       "category": "LOGGING",
       "default": [
         "console"
