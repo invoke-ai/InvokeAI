@@ -92,17 +92,19 @@ export const installModel = ({
   source,
 }: InstallModelRequest): Promise<ModelInstallJob> => {
   const params = new URLSearchParams({ source });
+  const headers: HeadersInit = {};
 
   if (inplace !== undefined) {
     params.set('inplace', String(inplace));
   }
 
   if (accessToken) {
-    params.set('access_token', accessToken);
+    headers['X-Model-Source-Access-Token'] = accessToken;
   }
 
   return apiFetchJson<ModelInstallJob>(`${MODELS_BASE}/install?${params.toString()}`, {
     body: JSON.stringify(config ?? {}),
+    headers,
     method: 'POST',
   });
 };

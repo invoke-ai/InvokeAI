@@ -11,7 +11,7 @@ from tempfile import TemporaryDirectory
 from typing import List, Optional, Type
 
 import huggingface_hub
-from fastapi import Body, Path, Query, Response, UploadFile
+from fastapi import Body, Header, Path, Query, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.routing import APIRouter
 from PIL import Image
@@ -761,6 +761,11 @@ async def install_model(
     source: str = Query(description="Model source to install, can be a local path, repo_id, or remote URL"),
     inplace: Optional[bool] = Query(description="Whether or not to install a local model in place", default=False),
     access_token: Optional[str] = Query(description="access token for the remote resource", default=None),
+    source_access_token: Optional[str] = Header(
+        alias="X-Model-Source-Access-Token",
+        description="access token for the remote resource",
+        default=None,
+    ),
     config: ModelRecordChanges = Body(
         description="Object containing fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
         examples=[{"name": "string", "description": "string"}],
@@ -800,7 +805,7 @@ async def install_model(
         result: ModelInstallJob = installer.heuristic_import(
             source=source,
             config=config,
-            access_token=access_token,
+            access_token=source_access_token or access_token,
             inplace=bool(inplace),
         )
         logger.info(f"Started installation of {source}")
