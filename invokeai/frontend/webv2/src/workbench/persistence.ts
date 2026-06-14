@@ -19,9 +19,14 @@ export interface WorkbenchPersistenceService {
 
 const isBrowser = (): boolean => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 
+export const stripTransientWorkbenchState = (state: WorkbenchState): WorkbenchState => ({
+  ...state,
+  notifications: [],
+});
+
 const createSnapshot = (state: WorkbenchState): WorkbenchPersistenceSnapshot => ({
   savedAt: new Date().toISOString(),
-  state,
+  state: stripTransientWorkbenchState(state),
   version: WORKBENCH_SCHEMA_VERSION,
 });
 
@@ -49,7 +54,7 @@ export const migrateWorkbenchPersistenceSnapshot = (value: unknown): WorkbenchPe
 
   return {
     savedAt: typeof record.savedAt === 'string' ? record.savedAt : new Date().toISOString(),
-    state: record.state,
+    state: stripTransientWorkbenchState(record.state),
     version: WORKBENCH_SCHEMA_VERSION,
   };
 };

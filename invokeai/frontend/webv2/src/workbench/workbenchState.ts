@@ -667,7 +667,7 @@ const normalizeWorkbenchState = (state: WorkbenchState): WorkbenchState => ({
   // Built explicitly: legacy snapshots carried preferences inside the account
   // (they live in the settings store now) and must not resurface here.
   account: { activeLayoutPresetId: state.account?.activeLayoutPresetId ?? defaultLayoutPreset.id },
-  notifications: state.notifications ?? [],
+  notifications: [],
   projects: state.projects.map(ensureProjectWidgetContracts),
 });
 

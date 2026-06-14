@@ -1,6 +1,6 @@
 import { getUserStorageScope } from '../auth/session';
 import { reportProjectSync, type ProjectSyncInfo } from './syncStore';
-import { localStorageWorkbenchPersistence } from '../persistence';
+import { localStorageWorkbenchPersistence, stripTransientWorkbenchState } from '../persistence';
 import { seedProjectLibrary, upsertProjectSummary } from './library';
 import { fetchSessionBlob, serializeSessionBlob, SESSION_STATE_KEY } from './session';
 import { createDraftProject, createInitialWorkbenchState } from '../workbenchState';
@@ -139,7 +139,7 @@ const loadPersistedRevisions = (): Record<string, number> => {
 
 const createSnapshot = (state: WorkbenchState): WorkbenchPersistenceSnapshot => ({
   savedAt: new Date().toISOString(),
-  state,
+  state: stripTransientWorkbenchState(state),
   version: 1,
 });
 
@@ -456,6 +456,7 @@ const loadFromBackend = async (
     activeProjectId,
     autosave: { status: 'idle' },
     backendConnection: { status: 'connecting' },
+    notifications: [],
     projects,
   };
 

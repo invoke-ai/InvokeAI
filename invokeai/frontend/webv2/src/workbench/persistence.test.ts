@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { localStorageWorkbenchPersistence, migrateWorkbenchPersistenceSnapshot } from './persistence';
-import { createInitialWorkbenchState } from './workbenchState';
+import { createInitialWorkbenchState, workbenchReducer } from './workbenchState';
 
 const storage = new Map<string, string>();
 
@@ -51,5 +51,24 @@ describe('workbench persistence migration', () => {
 
     await expect(localStorageWorkbenchPersistence.loadWorkbench()).resolves.toBeNull();
     expect(storage.has('invokeai:v7:webv2:workbench')).toBe(false);
+  });
+
+  it('does not persist transient toast notifications', async () => {
+    const state = workbenchReducer(createInitialWorkbenchState(), {
+      kind: 'success',
+      message: 'Old toast',
+      title: 'Saved before reload',
+      type: 'recordNotice',
+    });
+
+    const snapshot = await localStorageWorkbenchPersistence.saveWorkbench(state);
+
+    expect(state.notifications).toHaveLength(1);
+    expect(snapshot.state.notifications).toEqual([]);
+
+    const raw = storage.get('invokeai:v7:webv2:workbench');
+    const persisted = JSON.parse(raw ?? 'null') as { state: { notifications: unknown[] } };
+
+    expect(persisted.state.notifications).toEqual([]);
   });
 });

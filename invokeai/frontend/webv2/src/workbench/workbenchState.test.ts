@@ -818,4 +818,19 @@ describe('workbench backend connection recovery', () => {
     expect(state.backendConnection.status).toBe('connected');
     expect(state.backendConnection.lastConnectedAt).toBe(connected.backendConnection.lastConnectedAt);
   });
+
+  it('does not hydrate stale notifications that would toast again after reload', () => {
+    const initial = createInitialWorkbenchState();
+    const persisted = workbenchReducer(initial, {
+      kind: 'success',
+      message: 'Old success toast',
+      title: 'Invocation completed',
+      type: 'recordNotice',
+    });
+
+    const state = workbenchReducer(initial, { state: persisted, type: 'hydrateWorkbench' });
+
+    expect(persisted.notifications).toHaveLength(1);
+    expect(state.notifications).toEqual([]);
+  });
 });
