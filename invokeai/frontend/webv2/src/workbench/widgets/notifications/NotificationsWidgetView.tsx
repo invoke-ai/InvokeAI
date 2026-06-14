@@ -3,7 +3,7 @@ import { BellIcon, CircleCheckIcon, CircleXIcon, InfoIcon, TriangleAlertIcon, ty
 
 import { StatusWidgetChip } from '../../components/WidgetFrames';
 import type { WidgetViewProps, WorkbenchNotificationKind } from '../../types';
-import { useWorkbench } from '../../WorkbenchContext';
+import { useWorkbenchSelector } from '../../WorkbenchContext';
 
 const kindColorPalette: Record<WorkbenchNotificationKind, string> = {
   error: 'red',
@@ -18,10 +18,10 @@ const kindIcon = {
 } satisfies Record<WorkbenchNotificationKind, LucideIcon>;
 
 export const NotificationsWidgetView = ({ presentation, region }: WidgetViewProps) => {
-  const { state } = useWorkbench();
-  const unreadCount = state.notifications.filter((notification) => !notification.isRead).length;
-  const errorCount = state.notifications.filter((notification) => notification.kind === 'error').length;
-  const label = unreadCount > 0 ? `${unreadCount} new` : `${state.notifications.length} total`;
+  const notifications = useWorkbenchSelector((snapshot) => snapshot.state.notifications);
+  const unreadCount = notifications.filter((notification) => !notification.isRead).length;
+  const errorCount = notifications.filter((notification) => notification.kind === 'error').length;
+  const label = unreadCount > 0 ? `${unreadCount} new` : `${notifications.length} total`;
   const icon = errorCount > 0 ? TriangleAlertIcon : BellIcon;
 
   if (region === 'bottom' && presentation !== 'expanded') {
@@ -32,17 +32,17 @@ export const NotificationsWidgetView = ({ presentation, region }: WidgetViewProp
 };
 
 const NotificationsPanel = () => {
-  const { state } = useWorkbench();
+  const notifications = useWorkbenchSelector((snapshot) => snapshot.state.notifications);
 
   return (
     <Stack flex="1" gap="3" minH="0">
-      {state.notifications.length === 0 ? (
+      {notifications.length === 0 ? (
         <Text color="fg.subtle" fontSize="2xs">
           Successful operations, errors, and system messages appear here.
         </Text>
       ) : (
         <Stack gap="2">
-          {state.notifications.map((notification) => {
+          {notifications.map((notification) => {
             const IconComponent = kindIcon[notification.kind];
 
             return (

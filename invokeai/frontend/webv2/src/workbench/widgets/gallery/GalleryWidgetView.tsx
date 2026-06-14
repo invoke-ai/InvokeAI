@@ -5,7 +5,7 @@ import { StatusWidgetChip } from '../../components/WidgetFrames';
 import { useImageActions } from '../../components/useImageActions';
 import { getGallerySettings } from '../../gallery/settings';
 import type { WidgetViewProps } from '../../types';
-import { useWorkbench } from '../../WorkbenchContext';
+import { useActiveProject, useWorkbenchDispatch } from '../../WorkbenchContext';
 import { GalleryPanelContent } from './GalleryPanelContent';
 import {
   getGalleryPage,
@@ -23,7 +23,8 @@ import { useGalleryActions } from './useGalleryActions';
 import { GALLERY_PAGE_SIZE, useGalleryData } from './useGalleryData';
 
 export const GalleryWidgetView = ({ presentation, region }: WidgetViewProps) => {
-  const { activeProject, dispatch } = useWorkbench();
+  const activeProject = useActiveProject();
+  const dispatch = useWorkbenchDispatch();
   const galleryValues = activeProject.widgetStates.gallery.values;
   const galleryView = getGalleryView(galleryValues);
   const searchTerm = getGallerySearchTerm(galleryValues);

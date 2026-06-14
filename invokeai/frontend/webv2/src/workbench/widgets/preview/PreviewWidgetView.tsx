@@ -14,7 +14,7 @@ import {
 } from '../../gallery/api';
 import { getGallerySettings } from '../../gallery/settings';
 import type { GeneratedImageContract, WidgetViewProps } from '../../types';
-import { useWorkbench } from '../../WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '../../WorkbenchContext';
 import { getGalleryCompareImage, getGalleryRecentImagesKey, getGalleryRefreshToken } from '../gallery/galleryStateView';
 import { PreviewCompare } from './PreviewCompare';
 
@@ -93,8 +93,9 @@ const previewGridCss = {
 } as const;
 
 export const PreviewWidgetView = ({ region }: WidgetViewProps) => {
-  const { activeProject, dispatch } = useWorkbench();
-  const galleryValues = activeProject.widgetStates.gallery.values;
+  const galleryValues = useActiveProjectSelector((project) => project.widgetStates.gallery.values);
+  const generateValues = useActiveProjectSelector((project) => project.widgetStates.generate.values);
+  const dispatch = useWorkbenchDispatch();
   const selectedImage = useMemo(() => getSelectedImage(galleryValues), [galleryValues]);
   const compareImage = getGalleryCompareImage(galleryValues);
   const recentImages = Array.isArray(galleryValues.recentImages) ? galleryValues.recentImages : null;
@@ -235,7 +236,7 @@ export const PreviewWidgetView = ({ region }: WidgetViewProps) => {
   const imageActions = useImageActions({
     boards,
     dispatch,
-    generateValues: activeProject.widgetStates.generate.values,
+    generateValues,
     onImagesDeleted,
   });
   const contextMenuImage = useMemo<GalleryImage | null>(() => {

@@ -13,7 +13,7 @@ import type { Project, WidgetRegion } from '../types';
 import { exportOpenProject } from '../projects/projectFile';
 import { useProjectActions } from '../projects/useProjectActions';
 import { useOpenWorkbenchWidget } from '../useOpenWorkbenchWidget';
-import { useWorkbench } from '../WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '../WorkbenchContext';
 
 /**
  * Document-style tabs for the open projects (the session), immediately right
@@ -27,7 +27,9 @@ import { useWorkbench } from '../WorkbenchContext';
  * with rename, details, export, close, and delete.
  */
 export const ProjectTabs = () => {
-  const { state, activeProject, dispatch } = useWorkbench();
+  const projects = useWorkbenchSelector((snapshot) => snapshot.state.projects);
+  const activeProjectId = useActiveProjectSelector((project) => project.id);
+  const dispatch = useWorkbenchDispatch();
   const { closeProject, deleteProject } = useProjectActions();
   const [menuTarget, setMenuTarget] = useState<{ project: Project; x: number; y: number } | null>(null);
   const [renameTarget, setRenameTarget] = useState<Project | null>(null);
@@ -45,9 +47,9 @@ export const ProjectTabs = () => {
 
   return (
     <>
-      <Tabs.Root minW="max-content" variant="subtle" value={activeProject.id} h="full" w="full">
+      <Tabs.Root minW="max-content" variant="subtle" value={activeProjectId} h="full" w="full">
         <Tabs.List flex="1 1 auto" h="full" py="1">
-          {state.projects.map((project) => (
+          {projects.map((project) => (
             <Tabs.Trigger
               key={project.id}
               value={project.id}
@@ -144,7 +146,7 @@ const ProjectTabContextMenu = ({
   onRename: (project: Project) => void;
   target: { project: Project; x: number; y: number } | null;
 }) => {
-  const { dispatch } = useWorkbench();
+  const dispatch = useWorkbenchDispatch();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const targetRef = useRef(target);
 

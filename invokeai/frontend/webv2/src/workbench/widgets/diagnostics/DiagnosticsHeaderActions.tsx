@@ -2,21 +2,22 @@ import { Badge } from '@chakra-ui/react';
 import { BugIcon } from 'lucide-react';
 
 import { Button } from '../../components/ui/Button';
-import { useWorkbench } from '../../WorkbenchContext';
+import { useWorkbenchDispatch, useWorkbenchSelector } from '../../WorkbenchContext';
 
 export const DiagnosticsHeaderActions = () => {
-  const { dispatch, state } = useWorkbench();
+  const errorCount = useWorkbenchSelector((snapshot) => snapshot.state.errorLog.length);
+  const dispatch = useWorkbenchDispatch();
 
   return (
     <>
-      {state.errorLog.length ? (
+      {errorCount ? (
         <Badge colorPalette="red" size="xs">
           <BugIcon />
-          {state.errorLog.length}
+          {errorCount}
         </Badge>
       ) : null}
       <Button
-        disabled={state.errorLog.length === 0}
+        disabled={errorCount === 0}
         size="2xs"
         variant="outline"
         onClick={() => dispatch({ type: 'clearErrorLog' })}

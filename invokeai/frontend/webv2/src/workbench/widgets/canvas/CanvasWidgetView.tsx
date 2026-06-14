@@ -1,12 +1,13 @@
 import { Box, Flex } from '@chakra-ui/react';
 import type { KeyboardEvent } from 'react';
 
-import { useWorkbench } from '../../WorkbenchContext';
+import { useActiveProject, useWorkbenchDispatch } from '../../WorkbenchContext';
 import { CanvasDocumentFrame, CanvasPlaneImage, EmptyCanvasFrame, ToolScrubber } from './CanvasDocumentFrame';
 import { CanvasStagingControls, EmptyStagingControls } from './CanvasStagingControls';
 
 export const CanvasWidgetView = () => {
-  const { activeProject, dispatch } = useWorkbench();
+  const activeProject = useActiveProject();
+  const dispatch = useWorkbenchDispatch();
   const { document, stagingArea } = activeProject.canvas;
   const { layers } = document;
   const selectedCandidate = stagingArea.pendingImages[stagingArea.selectedImageIndex];

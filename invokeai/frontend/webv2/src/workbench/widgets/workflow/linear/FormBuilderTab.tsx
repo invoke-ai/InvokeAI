@@ -3,7 +3,7 @@ import { Columns2Icon, CrosshairIcon, GripVerticalIcon, InfoIcon, PlusIcon, Rows
 import { createContext, use, useMemo, useState, type ChangeEvent, type DragEvent, type ReactNode } from 'react';
 
 import { Button, IconButton } from '../../../components/ui/Button';
-import { useWorkbench } from '../../../WorkbenchContext';
+import { useWorkbenchDispatch } from '../../../WorkbenchContext';
 import { getFormChildren } from '../../../workflows/document';
 import type {
   ContainerFormElement,
@@ -52,7 +52,7 @@ const BuilderCard = ({
   parentId: string;
   title: string;
 }) => {
-  const { dispatch } = useWorkbench();
+  const dispatch = useWorkbenchDispatch();
   const { draggingElementId, setDraggingElementId } = use(BuilderDndContext);
   const [isDragArmed, setIsDragArmed] = useState(false);
   const [dropEdge, setDropEdge] = useState<DropEdge | null>(null);
@@ -166,7 +166,7 @@ const BuilderCard = ({
 
 /** Drop zone covering a container's body, appending at the end. Doubles as the empty-container hint. */
 const ContainerDropZone = ({ container, isEmpty }: { container: ContainerFormElement; isEmpty: boolean }) => {
-  const { dispatch } = useWorkbench();
+  const dispatch = useWorkbenchDispatch();
   const { draggingElementId } = use(BuilderDndContext);
   const [isActive, setIsActive] = useState(false);
   const canDrop = draggingElementId !== null && draggingElementId !== container.id;
@@ -255,7 +255,7 @@ const BuilderElement = ({
   parentId: string;
   projectGraph: ProjectGraphState;
 }) => {
-  const { dispatch } = useWorkbench();
+  const dispatch = useWorkbenchDispatch();
 
   switch (element.type) {
     case 'container': {
@@ -402,7 +402,7 @@ const BuilderElement = ({
 };
 
 const AddElementMenu = () => {
-  const { dispatch } = useWorkbench();
+  const dispatch = useWorkbenchDispatch();
   const add = (elementType: 'divider' | 'heading' | 'text' | 'container', layout?: 'row' | 'column') =>
     dispatch({ action: { elementType, layout, type: 'addFormElement' }, type: 'applyProjectGraphAction' });
 

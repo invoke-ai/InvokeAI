@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 import type { WorkbenchNotificationKind } from '../types';
-import { useWorkbench } from '../WorkbenchContext';
+import { useWorkbenchSelector } from '../WorkbenchContext';
 import { toaster } from './ui/toaster';
 
 const notificationToastType: Record<WorkbenchNotificationKind, 'error' | 'info' | 'success'> = {
@@ -11,16 +11,16 @@ const notificationToastType: Record<WorkbenchNotificationKind, 'error' | 'info' 
 };
 
 export const WorkbenchNotificationToaster = () => {
-  const { state } = useWorkbench();
+  const notifications = useWorkbenchSelector((snapshot) => snapshot.state.notifications);
   const toastedNotificationIdsRef = useRef<Set<string> | null>(null);
 
   useEffect(() => {
     if (toastedNotificationIdsRef.current === null) {
-      toastedNotificationIdsRef.current = new Set(state.notifications.map((notification) => notification.id));
+      toastedNotificationIdsRef.current = new Set(notifications.map((notification) => notification.id));
       return;
     }
 
-    for (const notification of [...state.notifications].reverse()) {
+    for (const notification of [...notifications].reverse()) {
       if (toastedNotificationIdsRef.current.has(notification.id)) {
         continue;
       }
@@ -34,7 +34,7 @@ export const WorkbenchNotificationToaster = () => {
         });
       });
     }
-  }, [state.notifications]);
+  }, [notifications]);
 
   return null;
 };

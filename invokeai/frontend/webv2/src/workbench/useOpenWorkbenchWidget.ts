@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 
 import type { RegisteredWidget, WidgetId, WidgetRegion } from './types';
-import { useOptionalWorkbench, useWorkbench } from './WorkbenchContext';
+import { useOptionalWorkbenchDispatch, useWorkbenchDispatch } from './WorkbenchContext';
 import { useOptionalWorkbenchWidgetRegistry, useWorkbenchWidgetRegistry } from './WorkbenchWidgetRegistryContext';
 
 const DEFAULT_OPEN_REGIONS: ReadonlyArray<WidgetRegion> = ['center', 'right', 'left', 'bottom'];
@@ -78,7 +78,7 @@ export const openWorkbenchWidget = (
 };
 
 export const useOpenWorkbenchWidget = () => {
-  const { dispatch } = useWorkbench();
+  const dispatch = useWorkbenchDispatch();
   const { getWidgetsForRegion } = useWorkbenchWidgetRegistry();
 
   return useCallback(
@@ -89,17 +89,17 @@ export const useOpenWorkbenchWidget = () => {
 };
 
 export const useOptionalOpenWorkbenchWidget = () => {
-  const workbench = useOptionalWorkbench();
+  const dispatch = useOptionalWorkbenchDispatch();
   const registry = useOptionalWorkbenchWidgetRegistry();
 
   return useCallback(
     (widgetId: WidgetId, options?: OpenWorkbenchWidgetOptions): OpenWorkbenchWidgetResult => {
-      if (!workbench || !registry) {
+      if (!dispatch || !registry) {
         return { ok: false, reason: 'unavailable' };
       }
 
-      return openWorkbenchWidget(workbench.dispatch, registry.getWidgetsForRegion, widgetId, options);
+      return openWorkbenchWidget(dispatch, registry.getWidgetsForRegion, widgetId, options);
     },
-    [registry, workbench]
+    [dispatch, registry]
   );
 };

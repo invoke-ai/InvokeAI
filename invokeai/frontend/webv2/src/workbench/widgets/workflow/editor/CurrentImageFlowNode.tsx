@@ -3,7 +3,7 @@ import type { NodeProps } from '@xyflow/react';
 import { memo } from 'react';
 
 import { useProgressImage } from '../../../backend/progressImageStore';
-import { useWorkbench } from '../../../WorkbenchContext';
+import { useActiveProjectSelector } from '../../../WorkbenchContext';
 import type { GeneratedImageContract } from '../../../types';
 import type { CurrentImageFlowNode as CurrentImageFlowNodeType } from './flowAdapters';
 
@@ -20,10 +20,10 @@ const getLatestImage = (values: Record<string, unknown>): GeneratedImageContract
 };
 
 const CurrentImageFlowNodeComponent = ({ data, selected }: NodeProps<CurrentImageFlowNodeType>) => {
-  const { activeProject } = useWorkbench();
+  const galleryValues = useActiveProjectSelector((project) => project.widgetStates.gallery.values);
   const progressImage = useProgressImage();
   const node = data.documentNode;
-  const latestImage = getLatestImage(activeProject.widgetStates.gallery.values);
+  const latestImage = getLatestImage(galleryValues);
   const src = progressImage?.dataUrl ?? latestImage?.imageUrl ?? null;
 
   return (

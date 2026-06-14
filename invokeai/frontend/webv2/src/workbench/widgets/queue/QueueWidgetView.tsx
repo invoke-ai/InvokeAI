@@ -5,14 +5,12 @@ import { useQueueItemProgress } from '../../backend/progressStore';
 import { StatusWidgetChip } from '../../components/WidgetFrames';
 import { Button } from '../../components/ui/Button';
 import type { WidgetViewProps } from '../../types';
-import { useWorkbench } from '../../WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '../../WorkbenchContext';
 import { getDestinationLabel, getSourceLabel } from '../../invocation';
 
 export const QueueWidgetView = ({ presentation, region }: WidgetViewProps) => {
-  const { activeProject } = useWorkbench();
-  const pendingQueueCount = activeProject.queue.items.filter(
-    (item) => item.status === 'pending' || item.status === 'running'
-  ).length;
+  const queueItems = useActiveProjectSelector((project) => project.queue.items);
+  const pendingQueueCount = queueItems.filter((item) => item.status === 'pending' || item.status === 'running').length;
 
   if (region === 'bottom' && presentation !== 'expanded') {
     return <StatusWidgetChip icon={ListOrderedIcon}>{pendingQueueCount} queued</StatusWidgetChip>;
@@ -54,8 +52,9 @@ const QueueItemLiveProgress = ({ queueItemId }: { queueItemId: string }) => {
 };
 
 const QueueContents = () => {
-  const { dispatch, state } = useWorkbench();
-  const queueRows = state.projects.flatMap((project) =>
+  const projects = useWorkbenchSelector((snapshot) => snapshot.state.projects);
+  const dispatch = useWorkbenchDispatch();
+  const queueRows = projects.flatMap((project) =>
     project.queue.items.map((item) => ({ item, projectName: project.name }))
   );
 

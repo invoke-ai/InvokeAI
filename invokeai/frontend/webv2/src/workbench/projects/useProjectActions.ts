@@ -10,7 +10,7 @@ import {
 } from './syncedPersistence';
 import type { Project } from '../types';
 import { useNotify } from '../useNotify';
-import { useWorkbench } from '../WorkbenchContext';
+import { useWorkbenchDispatch, useWorkbenchSelector } from '../WorkbenchContext';
 
 /**
  * Close and delete for projects that are open in the editor, shared by the
@@ -26,7 +26,8 @@ export const useProjectActions = (): {
   closeProject: (project: Project) => void;
   deleteProject: (project: Project) => Promise<void>;
 } => {
-  const { state, dispatch } = useWorkbench();
+  const state = useWorkbenchSelector((snapshot) => snapshot.state);
+  const dispatch = useWorkbenchDispatch();
   const navigate = useNavigate();
   const notify = useNotify();
 

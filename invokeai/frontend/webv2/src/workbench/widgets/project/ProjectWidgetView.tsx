@@ -10,7 +10,7 @@ import { useProjectSync } from '../../projects/syncStore';
 import { useProjectActions } from '../../projects/useProjectActions';
 import type { Project } from '../../types';
 import { useNotify } from '../../useNotify';
-import { useWorkbench } from '../../WorkbenchContext';
+import { useActiveProject, useWorkbenchDispatch, useWorkbenchSelector } from '../../WorkbenchContext';
 
 /**
  * The Project panel: rename the active project, see its sync/debug details,
@@ -19,7 +19,7 @@ import { useWorkbench } from '../../WorkbenchContext';
  * any of its members.
  */
 export const ProjectWidgetView = () => {
-  const { activeProject } = useWorkbench();
+  const activeProject = useActiveProject();
 
   return (
     <Stack gap="5" p="3">
@@ -31,7 +31,7 @@ export const ProjectWidgetView = () => {
 };
 
 const NameSection = ({ project }: { project: Project }) => {
-  const { dispatch } = useWorkbench();
+  const dispatch = useWorkbenchDispatch();
 
   const commitName = (value: string) => {
     const name = value.trim();
@@ -72,12 +72,13 @@ const formatTimestamp = (timestamp: string | undefined): string => {
 };
 
 const RecoverySection = ({ project }: { project: Project }) => {
-  const { dispatch, state } = useWorkbench();
+  const projects = useWorkbenchSelector((snapshot) => snapshot.state.projects);
+  const dispatch = useWorkbenchDispatch();
   const { deleteProject } = useProjectActions();
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
   const rootId = getRecoveryRootId(project);
-  const original = project.recoveryOf ? state.projects.find((candidate) => candidate.id === project.recoveryOf) : null;
-  const recoveries = state.projects.filter(
+  const original = project.recoveryOf ? projects.find((candidate) => candidate.id === project.recoveryOf) : null;
+  const recoveries = projects.filter(
     (candidate) => candidate.id !== project.id && getRecoveryRootId(candidate) === rootId && candidate.recoveryOf
   );
 
@@ -163,13 +164,14 @@ const RecoverySection = ({ project }: { project: Project }) => {
 };
 
 const DetailsSection = ({ project }: { project: Project }) => {
-  const { state } = useWorkbench();
+  const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection.status);
+  const lastSavedAt = useWorkbenchSelector((snapshot) => snapshot.state.autosave.lastSavedAt);
   const sync = useProjectSync();
   const notify = useNotify();
   const projectSync = sync.projects[project.id];
 
   const syncLabel =
-    state.backendConnection.status !== 'connected'
+    backendConnectionStatus !== 'connected'
       ? 'Offline — saved in this browser'
       : projectSync === undefined || projectSync.isPendingPush
         ? 'Waiting to sync'
@@ -205,9 +207,7 @@ const DetailsSection = ({ project }: { project: Project }) => {
           </HStack>
         </DetailRow>
         <DetailRow label="Sync">{syncLabel}</DetailRow>
-        <DetailRow label="Last saved">
-          {state.autosave.lastSavedAt ? formatTimestamp(state.autosave.lastSavedAt) : 'Not yet'}
-        </DetailRow>
+        <DetailRow label="Last saved">{lastSavedAt ? formatTimestamp(lastSavedAt) : 'Not yet'}</DetailRow>
         <DetailRow label="Graph nodes">{project.projectGraph.nodes.length}</DetailRow>
         <DetailRow label="Queue items">{project.queue.items.length}</DetailRow>
         <DetailRow label="Events">{project.events.length}</DetailRow>

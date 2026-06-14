@@ -12,7 +12,7 @@ import { SettingsIcon, type LucideIcon } from 'lucide-react';
 import { useFocusRegionProps } from '../focusRegions';
 import { openWorkbenchSettings } from '../settings/settingsDialogStore';
 import type { WidgetManifest, WidgetRegion, WorkbenchRegion } from '../types';
-import { useWorkbench } from '../WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '../WorkbenchContext';
 import { WidgetActionsMenu } from './WidgetActionsMenu';
 import { IconButton } from './ui/Button';
 
@@ -43,8 +43,8 @@ export const WidgetPanelFrame = ({
   children: ReactNode;
   region: Exclude<WidgetRegion, 'center'>;
 }) => {
-  const { activeProject, dispatch } = useWorkbench();
-  const regionState = activeProject.widgetRegions[region];
+  const regionState = useActiveProjectSelector((project) => project.widgetRegions[region]);
+  const dispatch = useWorkbenchDispatch();
   const [dragSizePx, setDragSizePx] = useState<number | null>(null);
   const isLeft = region === 'left';
   const isBottom = region === 'bottom';

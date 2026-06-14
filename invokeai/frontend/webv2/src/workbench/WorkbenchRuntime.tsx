@@ -10,7 +10,7 @@ import { normalizeGenerateSettings } from './generation/settings';
 import { addImagesToGalleryBoard } from './gallery/api';
 import { ensureInvocationTemplatesLoaded } from './workflows/templates';
 import type { Project, QueueItem } from './types';
-import { useWorkbench } from './WorkbenchContext';
+import { useWorkbenchDispatch, useWorkbenchHasHydrated, useWorkbenchSelector } from './WorkbenchContext';
 import type { WorkbenchAction } from './workbenchState';
 
 const getSnapshotGalleryBoardId = (queueItem: QueueItem): string | null => {
@@ -139,7 +139,9 @@ const submitQueueItem = (
  * inside the WorkbenchProvider; renders nothing.
  */
 export const WorkbenchRuntime = () => {
-  const { state, dispatch, hasHydrated } = useWorkbench();
+  const state = useWorkbenchSelector((snapshot) => snapshot.state);
+  const dispatch = useWorkbenchDispatch();
+  const hasHydrated = useWorkbenchHasHydrated();
   const coordinatorRef = useRef<QueueCoordinator | null>(null);
   const startedQueueItemIdsRef = useRef(new Set<string>());
   const cancelledQueueItemIdsRef = useRef(new Set<string>());

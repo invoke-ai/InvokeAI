@@ -2,7 +2,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef } from 'react';
 
 import { hydrateProjectFromServer } from './projects/syncedPersistence';
-import { useWorkbench } from './WorkbenchContext';
+import { useWorkbenchDispatch, useWorkbenchHasHydrated, useWorkbenchSelector } from './WorkbenchContext';
 import type { WorkbenchSearch } from './projects/session';
 
 /**
@@ -18,7 +18,9 @@ import type { WorkbenchSearch } from './projects/session';
  *   library and opens it if not.
  */
 export const WorkbenchSessionController = ({ search }: { search: WorkbenchSearch }) => {
-  const { state, dispatch, hasHydrated } = useWorkbench();
+  const state = useWorkbenchSelector((snapshot) => snapshot.state);
+  const dispatch = useWorkbenchDispatch();
+  const hasHydrated = useWorkbenchHasHydrated();
   const navigate = useNavigate();
   const latestStateRef = useRef(state);
   // The mount-time param was already handled by the boot load options.

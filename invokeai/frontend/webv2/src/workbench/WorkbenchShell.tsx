@@ -11,7 +11,7 @@ import { WidgetBar, type WidgetBarItem } from './components/WidgetBar';
 import { FocusRegionProvider } from './focusRegions';
 import { WorkbenchWidgetRegistryProvider } from './WorkbenchWidgetRegistryContext';
 import { getWidgetsForRegion, widgetRegistrationFailures } from './widgetRegistry';
-import { useWorkbench } from './WorkbenchContext';
+import { useActiveProject, useWorkbenchDispatch } from './WorkbenchContext';
 import type { WidgetId, WidgetRegion } from './types';
 
 const getWidgetBarItems = (region: WidgetRegion, enabledWidgetIds: WidgetId[]): WidgetBarItem[] =>
@@ -34,7 +34,8 @@ const getWidgetBarItems = (region: WidgetRegion, enabledWidgetIds: WidgetId[]): 
  * whose column template had to stay in lockstep with conditional children.
  */
 export const WorkbenchShell = () => {
-  const { activeProject, dispatch } = useWorkbench();
+  const activeProject = useActiveProject();
+  const dispatch = useWorkbenchDispatch();
   const { panels } = activeProject.layout;
   const leftRegion = activeProject.widgetRegions.left;
   const rightRegion = activeProject.widgetRegions.right;

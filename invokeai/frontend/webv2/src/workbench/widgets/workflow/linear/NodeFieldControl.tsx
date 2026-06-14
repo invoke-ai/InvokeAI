@@ -4,7 +4,7 @@ import { useState, type ChangeEvent } from 'react';
 
 import { FieldLabel } from '../../../components/ui/Field';
 import { Tooltip } from '../../../components/ui/Tooltip';
-import { useWorkbench } from '../../../WorkbenchContext';
+import { useWorkbenchDispatch } from '../../../WorkbenchContext';
 import { useInvocationTemplatesSnapshot } from '../../../workflows/templates';
 import type { NodeFieldFormElement, ProjectGraphState } from '../../../workflows/types';
 import { isInvocationNode } from '../../../workflows/types';
@@ -40,7 +40,7 @@ export const NodeFieldControl = ({
   isLabelEditable?: boolean;
   projectGraph: ProjectGraphState;
 }) => {
-  const { dispatch } = useWorkbench();
+  const dispatch = useWorkbenchDispatch();
   const { fieldName, instance, invocationNode, nodeContext, nodeId, template } = useNodeFieldBinding(
     element,
     projectGraph

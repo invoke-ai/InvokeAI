@@ -3,11 +3,10 @@ import { CircleXIcon, PlugZapIcon } from 'lucide-react';
 
 import { StatusWidgetChip } from '../../components/WidgetFrames';
 import type { WidgetViewProps } from '../../types';
-import { useWorkbench } from '../../WorkbenchContext';
+import { useWorkbenchSelector } from '../../WorkbenchContext';
 
 export const ServerStatusWidgetView = ({ presentation }: WidgetViewProps) => {
-  const { state } = useWorkbench();
-  const { backendConnection } = state;
+  const backendConnection = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection);
   const isConnected = backendConnection.status === 'connected';
   const isDisconnected = backendConnection.status === 'disconnected';
   const label = isConnected

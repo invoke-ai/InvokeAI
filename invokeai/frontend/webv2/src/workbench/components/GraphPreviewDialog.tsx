@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import { formatRoute, isInvocationRouteValid, resolveInvocationRoute } from '../invocation';
 import type { GraphContract, GraphId, InvocationSourceId } from '../types';
-import { useWorkbench } from '../WorkbenchContext';
+import { useActiveProject, useWorkbenchDispatch } from '../WorkbenchContext';
 import type { XYPosition } from '../workflows/types';
 import { GraphPreviewFlow } from './GraphPreviewFlow';
 import { Button } from './ui/Button';
@@ -31,7 +31,8 @@ export const GraphPreviewDialog = ({
   title,
   onOpenChange,
 }: GraphPreviewDialogProps) => {
-  const { activeProject, dispatch } = useWorkbench();
+  const activeProject = useActiveProject();
+  const dispatch = useWorkbenchDispatch();
   const [mode, setMode] = useState<PreviewMode>('nodes');
   const dialogRoute = sourceId
     ? resolveInvocationRoute(activeProject, 'dialog', { ...activeProject.invocation, sourceId, sourceLocked: true })

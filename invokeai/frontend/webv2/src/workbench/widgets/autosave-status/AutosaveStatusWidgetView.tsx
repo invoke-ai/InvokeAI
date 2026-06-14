@@ -3,12 +3,12 @@ import { CloudAlertIcon, CloudCheckIcon } from 'lucide-react';
 
 import { StatusWidgetChip } from '../../components/WidgetFrames';
 import type { WidgetViewProps } from '../../types';
-import { useWorkbench } from '../../WorkbenchContext';
+import { useWorkbenchSelector } from '../../WorkbenchContext';
 
 export const AutosaveStatusWidgetView = ({ presentation }: WidgetViewProps) => {
-  const { state } = useWorkbench();
-  const icon = state.autosave.status === 'error' ? CloudAlertIcon : CloudCheckIcon;
-  const label = state.autosave.status === 'saved' ? 'Saved' : state.autosave.status;
+  const autosave = useWorkbenchSelector((snapshot) => snapshot.state.autosave);
+  const icon = autosave.status === 'error' ? CloudAlertIcon : CloudCheckIcon;
+  const label = autosave.status === 'saved' ? 'Saved' : autosave.status;
 
   if (presentation === 'tooltip') {
     return (
@@ -19,14 +19,14 @@ export const AutosaveStatusWidgetView = ({ presentation }: WidgetViewProps) => {
         <Text color="fg.subtle" fontSize="2xs">
           Status: {label}
         </Text>
-        {state.autosave.lastSavedAt ? (
+        {autosave.lastSavedAt ? (
           <Text color="fg.subtle" fontSize="2xs">
-            Last saved: {state.autosave.lastSavedAt}
+            Last saved: {autosave.lastSavedAt}
           </Text>
         ) : null}
-        {state.autosave.error ? (
+        {autosave.error ? (
           <Text color="fg.error" fontSize="2xs">
-            {state.autosave.error}
+            {autosave.error}
           </Text>
         ) : null}
       </Stack>

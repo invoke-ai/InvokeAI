@@ -6,7 +6,7 @@ import { ChevronDownIcon, LogOutIcon, UserRoundCogIcon, UsersIcon } from 'lucide
 import { MenuContent } from '../../components/ui/Menu';
 import { SettingsButton } from '../../settings/SettingsDialog';
 import { useOptionalOpenWorkbenchWidget } from '../../useOpenWorkbenchWidget';
-import { useOptionalWorkbench } from '../../WorkbenchContext';
+import { useOptionalWorkbenchStore } from '../../WorkbenchContext';
 import { logoutSession, useAuthSession } from '../session';
 import { ProfileDialog } from './ProfileDialog';
 
@@ -17,7 +17,7 @@ import { ProfileDialog } from './ProfileDialog';
  */
 export const AccountMenu = () => {
   const session = useAuthSession();
-  const workbench = useOptionalWorkbench();
+  const hasWorkbench = useOptionalWorkbenchStore() !== null;
   const openWorkbenchWidget = useOptionalOpenWorkbenchWidget();
   const navigate = useNavigate();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -30,7 +30,7 @@ export const AccountMenu = () => {
   const label = user.display_name?.trim() || user.email;
 
   const openUserManagement = () => {
-    if (!workbench?.activeProject) {
+    if (!hasWorkbench) {
       return;
     }
 
@@ -93,7 +93,7 @@ export const AccountMenu = () => {
                 <Icon as={UserRoundCogIcon} boxSize="3.5" />
                 Account settings
               </Menu.Item>
-              {user.is_admin && workbench ? (
+              {user.is_admin && hasWorkbench ? (
                 <Menu.Item value="users" onClick={openUserManagement}>
                   <Icon as={UsersIcon} boxSize="3.5" />
                   Manage users

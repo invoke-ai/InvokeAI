@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, type ChangeEvent } from 'react';
 import { IconButton } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useNotify } from '../../useNotify';
-import { useWorkbench } from '../../WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '../../WorkbenchContext';
 import {
   buildCurrentImageNode,
   buildInvocationNode,
@@ -39,7 +39,8 @@ import {
  */
 
 export const WorkflowWidgetLabel = ({ region }: WidgetLabelProps) => {
-  const { activeProject, dispatch } = useWorkbench();
+  const workflowName = useActiveProjectSelector((project) => project.projectGraph.name);
+  const dispatch = useWorkbenchDispatch();
 
   if (region !== 'center') {
     return (
@@ -65,7 +66,7 @@ export const WorkflowWidgetLabel = ({ region }: WidgetLabelProps) => {
         maxW="16rem"
         placeholder="Untitled Workflow"
         size="2xs"
-        value={activeProject.projectGraph.name}
+        value={workflowName}
         variant="flushed"
         onChange={(event: ChangeEvent<HTMLInputElement>) =>
           dispatch({
@@ -80,9 +81,9 @@ export const WorkflowWidgetLabel = ({ region }: WidgetLabelProps) => {
 
 /** Entries contributed to the shared widget actions menu. */
 export const WorkflowMenuItems = (_props: WidgetViewProps) => {
-  const { activeProject, dispatch } = useWorkbench();
+  const projectGraph = useActiveProjectSelector((project) => project.projectGraph);
+  const dispatch = useWorkbenchDispatch();
   const notify = useNotify();
-  const projectGraph = activeProject.projectGraph;
 
   const openDetailsPanel = () => {
     dispatch({ region: 'left', type: 'openRegionWidget', widgetId: 'workflow' });
@@ -124,12 +125,13 @@ export const WorkflowMenuItems = (_props: WidgetViewProps) => {
 };
 
 export const WorkflowHeaderActions = ({ region }: WidgetViewProps) => {
-  const { activeProject, dispatch } = useWorkbench();
+  const graphHistory = useActiveProjectSelector((project) => project.graphHistory);
+  const dispatch = useWorkbenchDispatch();
   const notify = useNotify();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { dialogHostId, importRequestCount, isAddNodeOpen, isLibraryOpen, isNewWorkflowConfirmOpen } =
     workflowUiStore.useSnapshot();
-  const restorableHistory = activeProject.graphHistory.filter((entry) => entry.document);
+  const restorableHistory = graphHistory.filter((entry) => entry.document);
 
   // Both workflow surfaces can be mounted at once; exactly one (the first to
   // mount) hosts the shared dialogs and the import file input.

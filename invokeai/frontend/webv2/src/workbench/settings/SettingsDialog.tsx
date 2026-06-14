@@ -40,12 +40,17 @@ import type {
   DeveloperLogLevel,
   DeveloperLogNamespace,
   ProjectSettings,
+  Project,
   SettingsSectionId,
   WorkbenchLanguage,
   WorkbenchPreferences,
   WorkbenchThemeId,
 } from '../types';
-import { useOptionalWorkbench } from '../WorkbenchContext';
+import {
+  useOptionalWorkbenchDispatch,
+  useOptionalWorkbenchSelector,
+  useOptionalWorkbenchStore,
+} from '../WorkbenchContext';
 import {
   closeWorkbenchSettings,
   openWorkbenchSettings,
@@ -155,7 +160,7 @@ const SettingsDialogContent = () => {
 };
 
 const SettingsTabs = () => {
-  const workbench = useOptionalWorkbench();
+  const hasWorkbench = useOptionalWorkbenchStore() !== null;
   const allTabs: SettingsTabDefinition[] = [
     {
       children: <AppearanceSection />,
@@ -171,7 +176,7 @@ const SettingsTabs = () => {
     },
     {
       children: <ProjectSection />,
-      condition: Boolean(workbench),
+      condition: hasWorkbench,
       icon: FolderIcon,
       label: 'Project',
       value: 'project',
@@ -381,20 +386,21 @@ const BehaviorSection = () => {
 };
 
 const ProjectSection = () => {
-  const workbench = useOptionalWorkbench();
+  const activeProject = useOptionalWorkbenchSelector<Project | null>((snapshot) => snapshot.activeProject, null);
+  const dispatch = useOptionalWorkbenchDispatch();
 
-  if (!workbench) {
+  if (!activeProject || !dispatch) {
     return null;
   }
 
-  const settings = workbench.activeProject.settings;
+  const settings = activeProject.settings;
   const updateProjectSettings = (patch: Partial<ProjectSettings>) => {
-    workbench.dispatch({ settings: patch, type: 'setActiveProjectSettings' });
+    dispatch({ settings: patch, type: 'setActiveProjectSettings' });
   };
 
   return (
     <SettingsSection
-      description={`Settings saved with ${workbench.activeProject.name}. Future project-only settings can live here without becoming user preferences.`}
+      description={`Settings saved with ${activeProject.name}. Future project-only settings can live here without becoming user preferences.`}
       title="Project"
     >
       <SettingToggle
@@ -535,7 +541,7 @@ const DeveloperSection = () => {
 };
 
 const WorkspaceSection = () => {
-  const workbench = useOptionalWorkbench();
+  const dispatch = useOptionalWorkbenchDispatch();
   const { scope } = useWorkbenchSettings();
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
 
@@ -550,8 +556,8 @@ const WorkspaceSection = () => {
       title="Workspace"
     >
       <HStack gap="2" wrap="wrap">
-        {workbench ? (
-          <Button size="sm" variant="outline" onClick={() => workbench.dispatch({ type: 'resetActiveLayout' })}>
+        {dispatch ? (
+          <Button size="sm" variant="outline" onClick={() => dispatch({ type: 'resetActiveLayout' })}>
             <RotateCcwIcon />
             Reset layout
           </Button>

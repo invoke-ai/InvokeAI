@@ -4,7 +4,7 @@ import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { IconButton } from '../../components/ui/Button';
 import { getGallerySettings } from '../../gallery/settings';
 import type { WidgetViewProps } from '../../types';
-import { useWorkbench } from '../../WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '../../WorkbenchContext';
 import { getGalleryPage, getGalleryTotalImages } from './galleryStateView';
 import { GALLERY_PAGE_SIZE } from './useGalleryData';
 
@@ -14,8 +14,8 @@ import { GALLERY_PAGE_SIZE } from './useGalleryData';
  * decoupled from the view's data fetching.
  */
 export const GalleryWidgetFooter = (_props: WidgetViewProps) => {
-  const { activeProject, dispatch } = useWorkbench();
-  const galleryValues = activeProject.widgetStates.gallery.values;
+  const galleryValues = useActiveProjectSelector((project) => project.widgetStates.gallery.values);
+  const dispatch = useWorkbenchDispatch();
   const settings = getGallerySettings(galleryValues);
   const page = getGalleryPage(galleryValues);
   const totalImages = getGalleryTotalImages(galleryValues);

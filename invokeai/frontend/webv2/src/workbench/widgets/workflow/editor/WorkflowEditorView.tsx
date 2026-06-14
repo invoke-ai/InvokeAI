@@ -23,7 +23,7 @@ import { FlowMiniMap } from '../../../components/FlowMiniMap';
 import { flowThemeCss, getFlowColorMode } from '../../../components/flowTheme';
 import { useNotify } from '../../../useNotify';
 import { useWorkbenchPreferences } from '../../../settings/store';
-import { useWorkbench } from '../../../WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '../../../WorkbenchContext';
 import { getProjectGraphReadiness } from '../../../workflows/buildGraph';
 import { createWorkflowId } from '../../../workflows/document';
 import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSnapshot } from '../../../workflows/templates';
@@ -68,12 +68,12 @@ const isEditableTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"]') !== null;
 
 const WorkflowFlow = () => {
-  const { activeProject, dispatch } = useWorkbench();
+  const projectGraph = useActiveProjectSelector((project) => project.projectGraph);
+  const dispatch = useWorkbenchDispatch();
   const notify = useNotify();
   const { themeId, workflowEdgeStyle, workflowShowMinimap, workflowSnapToGrid, workflowValidateConnections } =
     useWorkbenchPreferences();
   const templatesSnapshot = useInvocationTemplatesSnapshot();
-  const projectGraph = activeProject.projectGraph;
   const edgeType: FlowEdgeType = workflowEdgeStyle === 'straight' ? 'straight' : 'default';
   const [flowNodes, setFlowNodes] = useState<WorkflowFlowNode[]>(() => toFlowNodes(projectGraph));
   const [flowEdges, setFlowEdges] = useState<FlowEdge[]>(() => toFlowEdges(projectGraph, [], edgeType));
@@ -455,14 +455,14 @@ const WorkflowFlow = () => {
 };
 
 const ReadinessBanner = () => {
-  const { activeProject } = useWorkbench();
+  const projectGraph = useActiveProjectSelector((project) => project.projectGraph);
   const templatesSnapshot = useInvocationTemplatesSnapshot();
   const readiness = useMemo(
-    () => getProjectGraphReadiness(activeProject.projectGraph, templatesSnapshot),
-    [activeProject.projectGraph, templatesSnapshot]
+    () => getProjectGraphReadiness(projectGraph, templatesSnapshot),
+    [projectGraph, templatesSnapshot]
   );
 
-  if (readiness.canInvoke || activeProject.projectGraph.nodes.length === 0) {
+  if (readiness.canInvoke || projectGraph.nodes.length === 0) {
     return null;
   }
 

@@ -8,7 +8,7 @@ import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import { JsonPreview } from '../../../components/ui/JsonPreview';
 import { Scrollable } from '../../../components/ui/Scrollable';
 import { useNotify } from '../../../useNotify';
-import { useWorkbench } from '../../../WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '../../../WorkbenchContext';
 import {
   createLibraryWorkflow,
   deleteLibraryWorkflow,
@@ -102,7 +102,8 @@ export const WorkflowLibraryDialog = ({
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
 }) => {
-  const { activeProject, dispatch } = useWorkbench();
+  const projectGraph = useActiveProjectSelector((project) => project.projectGraph);
+  const dispatch = useWorkbenchDispatch();
   const notify = useNotify();
   const [category, setCategory] = useState<WorkflowLibraryCategory>('user');
   const [searchTerm, setSearchTerm] = useState('');
@@ -117,7 +118,6 @@ export const WorkflowLibraryDialog = ({
   const [isSaving, setIsSaving] = useState(false);
   const hasAutoSwitchedRef = useRef(false);
   const refreshTokenRef = useRef(0);
-  const projectGraph = activeProject.projectGraph;
 
   const refresh = useCallback(
     (nextPage: number) => {

@@ -2,7 +2,7 @@ import { Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { useState } from 'react';
 import { GitBranchIcon, MoreHorizontalIcon, TargetIcon } from 'lucide-react';
 
-import { useWorkbench } from '../WorkbenchContext';
+import { useActiveProject, useWorkbenchDispatch } from '../WorkbenchContext';
 import { createGraphBearingSurface } from '../graphSurfaces';
 import { compileProjectGraph } from '../workflows/buildGraph';
 import { getInvocationTemplatesSnapshot } from '../workflows/templates';
@@ -44,7 +44,8 @@ const GraphSurfaceMenuItems = ({
   surface: GraphBearingSurfaceContract;
   onPreview: () => void;
 }) => {
-  const { activeProject, dispatch } = useWorkbench();
+  const activeProject = useActiveProject();
+  const dispatch = useWorkbenchDispatch();
   const isActiveSource = activeProject.invocation.sourceId === surface.sourceId;
 
   return (
@@ -75,7 +76,7 @@ const GraphSurfaceMenuItems = ({
 };
 
 export const WidgetActionsMenu = ({ manifest, region }: { manifest: WidgetManifest; region: WorkbenchRegion }) => {
-  const { activeProject } = useWorkbench();
+  const activeProject = useActiveProject();
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const surface = manifest.graphBearing?.surfaces.includes(region) ? createGraphBearingSurface(manifest, region) : null;
   const HeaderMenu = manifest.headerMenu;

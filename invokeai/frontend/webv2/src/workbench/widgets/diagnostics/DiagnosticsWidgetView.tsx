@@ -3,13 +3,13 @@ import { BugIcon, ClipboardListIcon } from 'lucide-react';
 
 import { StatusWidgetChip } from '../../components/WidgetFrames';
 import type { WidgetViewProps } from '../../types';
-import { useWorkbench } from '../../WorkbenchContext';
+import { useWorkbenchSelector } from '../../WorkbenchContext';
 import { Button } from '../../components/ui/Button';
 import { Panel } from '../../components/ui/Panel';
 
 export const DiagnosticsWidgetView = ({ presentation, region }: WidgetViewProps) => {
-  const { state } = useWorkbench();
-  const errorCount = state.errorLog.length;
+  const errorLog = useWorkbenchSelector((snapshot) => snapshot.state.errorLog);
+  const errorCount = errorLog.length;
   const label = errorCount === 0 ? 'Clean' : `${errorCount} issue${errorCount === 1 ? '' : 's'}`;
 
   if (region === 'bottom' && presentation !== 'expanded') {
@@ -22,17 +22,17 @@ export const DiagnosticsWidgetView = ({ presentation, region }: WidgetViewProps)
 };
 
 const DiagnosticsPanel = () => {
-  const { state } = useWorkbench();
+  const errorLog = useWorkbenchSelector((snapshot) => snapshot.state.errorLog);
 
   return (
     <Stack gap="3">
-      {state.errorLog.length === 0 ? (
+      {errorLog.length === 0 ? (
         <Text color="fg.subtle" fontSize="2xs">
           Shell errors and debugging details will appear here without covering the workbench.
         </Text>
       ) : (
         <Stack gap="2">
-          {state.errorLog.map((message, index) => (
+          {errorLog.map((message, index) => (
             <Panel key={`${message}-${index}`} gap="2" p="2">
               <Text color="fg.muted" fontFamily="mono" fontSize="2xs" whiteSpace="pre-wrap">
                 {message}

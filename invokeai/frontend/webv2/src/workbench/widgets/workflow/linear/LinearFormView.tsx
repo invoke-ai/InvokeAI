@@ -1,7 +1,7 @@
 import { Separator, Stack, Text } from '@chakra-ui/react';
 
 import { Button } from '../../../components/ui/Button';
-import { useWorkbench } from '../../../WorkbenchContext';
+import { useWorkbenchDispatch } from '../../../WorkbenchContext';
 import { getFormChildren } from '../../../workflows/document';
 import type { ProjectGraphState, WorkflowFormElement } from '../../../workflows/types';
 import { NodeFieldControl } from './NodeFieldControl';
@@ -41,7 +41,7 @@ const ViewElement = ({ element, projectGraph }: { element: WorkflowFormElement; 
 };
 
 export const LinearFormView = ({ projectGraph }: { projectGraph: ProjectGraphState }) => {
-  const { dispatch } = useWorkbench();
+  const dispatch = useWorkbenchDispatch();
   const rootChildren = getFormChildren(projectGraph.form);
 
   if (rootChildren.length === 0) {

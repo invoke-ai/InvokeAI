@@ -2,7 +2,7 @@ import { Flex, Group, HStack, Icon, Menu, Portal, Stack, Text, VStack } from '@c
 import { useEffect, useRef } from 'react';
 import { CheckIcon, ChevronDownIcon, LockKeyholeIcon, SparklesIcon } from 'lucide-react';
 
-import { useWorkbench } from '../WorkbenchContext';
+import { useActiveProject, useWorkbenchDispatch, useWorkbenchSelector } from '../WorkbenchContext';
 import {
   formatRoute,
   invocationSources,
@@ -28,7 +28,9 @@ import { Tooltip } from './ui/Tooltip';
 const CONTROL_WIDTH = '12rem';
 
 export const InvokeControl = () => {
-  const { activeProject, dispatch, state } = useWorkbench();
+  const activeProject = useActiveProject();
+  const dispatch = useWorkbenchDispatch();
+  const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection.status);
   const { invocation } = activeProject;
 
   // Project-graph route validation reads the invocation templates imperatively;
@@ -37,7 +39,7 @@ export const InvokeControl = () => {
 
   const resolvedRoute = resolveInvocationRoute(activeProject);
   const isLocked = invocation.sourceLocked || invocation.destinationLocked;
-  const isConnected = state.backendConnection.status === 'connected';
+  const isConnected = backendConnectionStatus === 'connected';
   // Legacy parity: the queue button disables with the full list of reasons,
   // including a disconnected backend.
   const blockingReasons = [

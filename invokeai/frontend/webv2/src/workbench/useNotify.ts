@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
 import type { WorkbenchNotificationKind } from './types';
-import { useOptionalWorkbench } from './WorkbenchContext';
+import { useOptionalWorkbenchDispatch } from './WorkbenchContext';
 import { toaster } from './components/ui/toaster';
 
 /**
@@ -21,8 +21,7 @@ const notificationToastType: Record<WorkbenchNotificationKind, 'error' | 'info' 
 };
 
 export const useNotify = (): Notify => {
-  const workbench = useOptionalWorkbench();
-  const dispatch = workbench?.dispatch;
+  const dispatch = useOptionalWorkbenchDispatch();
 
   return useMemo(() => {
     const record =

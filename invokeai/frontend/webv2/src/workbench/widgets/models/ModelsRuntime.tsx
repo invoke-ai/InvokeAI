@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { refreshInstalls, useInstallOutcomes } from '../../models/installsStore';
 import { refreshModels } from '../../models/modelsStore';
 import { useNotify } from '../../useNotify';
-import { useWorkbench } from '../../WorkbenchContext';
+import { useWorkbenchSelector } from '../../WorkbenchContext';
 
 /**
  * Renders nothing. Keeps the model stores honest across the app lifecycle:
@@ -13,10 +13,9 @@ import { useWorkbench } from '../../WorkbenchContext';
  */
 export const ModelsRuntime = () => {
   const notify = useNotify();
-  const { state } = useWorkbench();
+  const connectionStatus = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection.status);
   const outcomes = useInstallOutcomes();
   const seenOutcomeIdsRef = useRef<Set<number> | null>(null);
-  const connectionStatus = state.backendConnection.status;
 
   useEffect(() => {
     if (connectionStatus === 'connected') {

@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 
 import { Scrollable } from '../../../components/ui/Scrollable';
 import { Tabs } from '../../../components/ui/Tabs';
-import { useWorkbench } from '../../../WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '../../../WorkbenchContext';
 import { ensureInvocationTemplatesLoaded } from '../../../workflows/templates';
 import { FormBuilderTab } from './FormBuilderTab';
 import { LinearFormView } from './LinearFormView';
@@ -80,9 +80,9 @@ const PanelModeToggle = ({ mode, onChange }: { mode: PanelMode; onChange: (mode:
 };
 
 export const WorkflowLinearPanel = () => {
-  const { activeProject, dispatch } = useWorkbench();
-  const projectGraph = activeProject.projectGraph;
-  const widgetValues = activeProject.widgetStates.workflow.values;
+  const projectGraph = useActiveProjectSelector((project) => project.projectGraph);
+  const widgetValues = useActiveProjectSelector((project) => project.widgetStates.workflow.values);
+  const dispatch = useWorkbenchDispatch();
   const mode = getPanelMode(widgetValues);
   const editTab = getEditTab(widgetValues);
 

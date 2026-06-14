@@ -1,10 +1,10 @@
 import { HStack } from '@chakra-ui/react';
 
 import { Button } from '../../components/ui/Button';
-import { useWorkbench } from '../../WorkbenchContext';
+import { useWorkbenchDispatch } from '../../WorkbenchContext';
 
 export const LayoutHeaderActions = () => {
-  const { dispatch } = useWorkbench();
+  const dispatch = useWorkbenchDispatch();
 
   return (
     <HStack gap="1">

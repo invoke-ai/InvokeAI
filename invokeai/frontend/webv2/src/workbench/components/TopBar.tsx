@@ -25,7 +25,7 @@ import { getDestinationLabel, getSourceLabel } from '../invocation';
 import { getQueueItemExpectedImageCount, getQueueProgressBarState, getQueueSummary } from '../queueSummary';
 import { useWorkbenchPreferences } from '../settings/store';
 import type { QueueItem } from '../types';
-import { useWorkbench } from '../WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '../WorkbenchContext';
 import { DEFAULT_THEME_ID, THEMES_BY_ID } from '../../theme/themes';
 import { Tooltip } from './ui/Tooltip';
 import { Link } from '@tanstack/react-router';
@@ -92,8 +92,9 @@ const getBatchCount = (values: Record<string, unknown>): number => {
 };
 
 const BatchCountField = () => {
-  const { activeProject, dispatch } = useWorkbench();
-  const batchCount = getBatchCount(activeProject.widgetStates.generate.values);
+  const generateValues = useActiveProjectSelector((project) => project.widgetStates.generate.values);
+  const dispatch = useWorkbenchDispatch();
+  const batchCount = getBatchCount(generateValues);
 
   return (
     <NumberInput.Root
@@ -117,17 +118,18 @@ const BatchCountField = () => {
 };
 
 const QueueInfo = () => {
-  const { activeProject, state } = useWorkbench();
+  const queueItems = useActiveProjectSelector((project) => project.queue.items);
+  const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection.status);
   const modelLoads = useModelLoads();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
-  const baseSummary = getQueueSummary(activeProject.queue.items);
+  const baseSummary = getQueueSummary(queueItems);
   const runningProgress = useQueueItemProgress(baseSummary.runningQueueItemId ?? '');
-  const summary = getQueueSummary(activeProject.queue.items, runningProgress);
+  const summary = getQueueSummary(queueItems, runningProgress);
   const runningItem = summary.runningQueueItemId
-    ? activeProject.queue.items.find((item) => item.id === summary.runningQueueItemId)
+    ? queueItems.find((item) => item.id === summary.runningQueueItemId)
     : undefined;
   const progressState = getQueueProgressBarState({
-    isConnected: state.backendConnection.status === 'connected',
+    isConnected: backendConnectionStatus === 'connected',
     isRunning: Boolean(runningItem),
     loadingModelsCount: modelLoads.length,
     progress: runningProgress,

@@ -5,11 +5,12 @@ import { normalizeGenerateSettings, normalizeGenerateWidgetValues } from '../../
 import type { GenerateSettings, VaeModelConfig } from '../../generation/types';
 import { ensureModelsLoaded, useModelsSnapshot } from '../../models/modelsStore';
 import type { ModelConfig } from '../../models/types';
-import { useWorkbench } from '../../WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '../../WorkbenchContext';
 import { GenerateSettingsForm } from './GenerateSettingsForm';
 
 export const GenerateWidgetView = () => {
-  const { activeProject, dispatch } = useWorkbench();
+  const storedValues = useActiveProjectSelector((project) => project.widgetStates.generate.values);
+  const dispatch = useWorkbenchDispatch();
   const { error, models, status } = useModelsSnapshot();
 
   useEffect(() => {
@@ -21,7 +22,6 @@ export const GenerateWidgetView = () => {
     () => models.filter((model): model is ModelConfig & VaeModelConfig => model.type === 'vae'),
     [models]
   );
-  const storedValues = activeProject.widgetStates.generate.values;
   const normalizedSettings = normalizeGenerateSettings(storedValues);
   const selectedModel = supportedModels.find((model) => model.key === normalizedSettings?.modelKey);
   const settings = normalizedSettings ?? getDefaultGenerateSettings(selectedModel ?? supportedModels[0]);

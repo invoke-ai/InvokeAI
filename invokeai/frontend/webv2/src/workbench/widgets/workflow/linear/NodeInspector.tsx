@@ -4,7 +4,7 @@ import type { ChangeEvent } from 'react';
 import { JsonPreview } from '../../../components/ui/JsonPreview';
 import { Scrollable } from '../../../components/ui/Scrollable';
 import { Tabs } from '../../../components/ui/Tabs';
-import { useWorkbench } from '../../../WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '../../../WorkbenchContext';
 import { useInvocationTemplatesSnapshot } from '../../../workflows/templates';
 import type {
   InvocationTemplate,
@@ -41,7 +41,7 @@ const DetailRow = ({ label, value }: { label: string; value: string }) => (
 const JsonBlock = ({ label, value }: { label: string; value: unknown }) => <JsonPreview label={label} value={value} />;
 
 const DetailsTab = ({ node, template }: { node: WorkflowInvocationNode; template: InvocationTemplate | undefined }) => {
-  const { dispatch } = useWorkbench();
+  const dispatch = useWorkbenchDispatch();
 
   return (
     <Stack gap="2">
@@ -126,9 +126,10 @@ const InspectorBody = ({ node, tab }: { node: WorkflowNode; tab: InspectorTab })
 };
 
 export const NodeInspector = ({ projectGraph }: { projectGraph: ProjectGraphState }) => {
-  const { activeProject, dispatch } = useWorkbench();
+  const workflowWidgetValues = useActiveProjectSelector((project) => project.widgetStates.workflow.values);
+  const dispatch = useWorkbenchDispatch();
   const { selectedNodeIds } = workflowSelectionStore.useSnapshot();
-  const tab = getInspectorTab(activeProject.widgetStates.workflow.values);
+  const tab = getInspectorTab(workflowWidgetValues);
   const selectedNode = projectGraph.nodes.find((node) => node.id === selectedNodeIds[0]);
 
   return (

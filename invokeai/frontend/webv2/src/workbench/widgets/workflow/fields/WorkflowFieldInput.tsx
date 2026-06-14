@@ -7,7 +7,7 @@ import { SCHEDULER_OPTIONS } from '../../../generation/settings';
 import { listGalleryBoards, type GalleryBoard } from '../../../gallery/api';
 import type { ModelConfig, ModelTaxonomyType } from '../../../models/types';
 import type { GeneratedImageContract } from '../../../types';
-import { useWorkbench } from '../../../WorkbenchContext';
+import { useActiveProjectSelector } from '../../../WorkbenchContext';
 import type { FieldInputTemplate } from '../../../workflows/types';
 
 /**
@@ -214,16 +214,13 @@ const BoardInput = ({ onChange, template, value }: WorkflowFieldInputProps) => {
 };
 
 const ImageInput = ({ onChange, value }: WorkflowFieldInputProps) => {
-  const { activeProject } = useWorkbench();
+  const gallerySelection = useActiveProjectSelector(
+    (project) => project.widgetStates.gallery.values.selectedImage as GeneratedImageContract | null | undefined
+  );
   const imageName =
     typeof (value as { image_name?: unknown } | null)?.image_name === 'string'
       ? (value as { image_name: string }).image_name
       : null;
-  const gallerySelection = activeProject.widgetStates.gallery.values.selectedImage as
-    | GeneratedImageContract
-    | null
-    | undefined;
-
   return (
     <HStack gap="1.5" minW="0">
       {imageName ? (

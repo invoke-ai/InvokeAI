@@ -1,7 +1,7 @@
 import { Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { CheckIcon, ChevronDownIcon } from 'lucide-react';
 
-import { useWorkbench } from '../WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '../WorkbenchContext';
 import { getLayoutPreset, layoutPresets } from '../layoutPresets';
 import type { LayoutPresetId } from '../types';
 import { Button } from './ui/Button';
@@ -15,8 +15,9 @@ import { Button } from './ui/Button';
  * one mutates only the active project's layout state, per the spec.
  */
 export const LayoutPresetMenu = () => {
-  const { activeProject, dispatch } = useWorkbench();
-  const activePreset = getLayoutPreset(activeProject.layout.presetId);
+  const activePresetId = useActiveProjectSelector((project) => project.layout.presetId);
+  const dispatch = useWorkbenchDispatch();
+  const activePreset = getLayoutPreset(activePresetId);
 
   return (
     <Menu.Root positioning={{ placement: 'bottom-end' }}>

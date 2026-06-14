@@ -1,11 +1,10 @@
-import { useWorkbench } from '../WorkbenchContext';
+import { useActiveProjectSelector } from '../WorkbenchContext';
 import { getWidgetById } from '../widgetRegistry';
 import { MissingWidgetFrame, WidgetRenderer } from './WidgetRenderer';
 
 export const BottomPanel = () => {
-  const { activeProject } = useWorkbench();
-  const { panels } = activeProject.layout;
-  const bottomRegion = activeProject.widgetRegions.bottom;
+  const panels = useActiveProjectSelector((project) => project.layout.panels);
+  const bottomRegion = useActiveProjectSelector((project) => project.widgetRegions.bottom);
   const widget = getWidgetById(bottomRegion.activeWidgetId);
   const View = widget?.manifest.view;
   const canShowBottomPanel =

@@ -2,12 +2,12 @@ import { HStack, Input, Stack, Textarea } from '@chakra-ui/react';
 import type { ChangeEvent } from 'react';
 
 import { Field } from '../../../components/ui/Field';
-import { useWorkbench } from '../../../WorkbenchContext';
+import { useWorkbenchDispatch } from '../../../WorkbenchContext';
 import type { WorkflowMetadata } from '../../../workflows/types';
 
 /** Workflow metadata editing — the legacy "Details" tab. */
 export const WorkflowDetailsTab = ({ metadata }: { metadata: WorkflowMetadata }) => {
-  const { dispatch } = useWorkbench();
+  const dispatch = useWorkbenchDispatch();
   const commit = (patch: Partial<WorkflowMetadata>) =>
     dispatch({ action: { patch, type: 'setMetadata' }, type: 'applyProjectGraphAction' });
 

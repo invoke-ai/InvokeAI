@@ -2,7 +2,7 @@ import { Box, Flex, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { CheckIcon, MoreHorizontalIcon } from 'lucide-react';
 
 import { WidgetIcon } from '../iconResolver';
-import { useWorkbench } from '../WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '../WorkbenchContext';
 import type { RegisteredWidget, WidgetId } from '../types';
 import { getWidgetsForRegion } from '../widgetRegistry';
 import { useFocusRegionProps } from '../focusRegions';
@@ -29,9 +29,9 @@ const getCenterWidgetItems = (enabledWidgetIds: string[]): CenterWidgetItem[] =>
 
 /** Center work area: the view tab strip plus the active registered center view. */
 export const CenterArea = () => {
-  const { activeProject, dispatch } = useWorkbench();
+  const centerRegion = useActiveProjectSelector((project) => project.widgetRegions.center);
+  const dispatch = useWorkbenchDispatch();
   const focusRegionProps = useFocusRegionProps('center');
-  const centerRegion = activeProject.widgetRegions.center;
   const centerWidgetItems = getCenterWidgetItems(centerRegion.enabledWidgetIds);
   const enabledCenterWidgetItems = centerWidgetItems.filter((item) => item.isEnabled && item.status === 'enabled');
   const centerViewItems = enabledCenterWidgetItems.filter((item) => item.widget.manifest.centerPlacement !== 'toolbar');

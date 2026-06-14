@@ -1,7 +1,7 @@
 import { Box, HStack, Icon, Text } from '@chakra-ui/react';
 import { WorkflowIcon } from 'lucide-react';
 
-import { useWorkbench } from '../../WorkbenchContext';
+import { useActiveProjectSelector } from '../../WorkbenchContext';
 import type { WidgetViewProps } from '../../types';
 import { WorkflowEditorView } from './editor/WorkflowEditorView';
 import { WorkflowLinearPanel } from './linear/WorkflowLinearPanel';
@@ -15,8 +15,9 @@ import { WorkflowLinearPanel } from './linear/WorkflowLinearPanel';
  */
 
 const WorkflowStatusBarItem = () => {
-  const { activeProject } = useWorkbench();
-  const isRunning = activeProject.queue.items.some(
+  const queueItems = useActiveProjectSelector((project) => project.queue.items);
+  const workflowName = useActiveProjectSelector((project) => project.projectGraph.name);
+  const isRunning = queueItems.some(
     (item) => item.snapshot.sourceId === 'project-graph' && (item.status === 'running' || item.status === 'pending')
   );
 
@@ -24,7 +25,7 @@ const WorkflowStatusBarItem = () => {
     <HStack gap="1" maxW="14rem" minW="0">
       <Icon as={WorkflowIcon} boxSize="3" color={isRunning ? 'brand.solid' : undefined} flexShrink={0} />
       <Text fontSize="2xs" minW="0" truncate>
-        {activeProject.projectGraph.name || 'Untitled Workflow'}
+        {workflowName || 'Untitled Workflow'}
       </Text>
       {isRunning ? <Box bg="brand.solid" boxSize="1.5" flexShrink={0} rounded="full" /> : null}
     </HStack>

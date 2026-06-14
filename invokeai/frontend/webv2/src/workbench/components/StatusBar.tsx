@@ -4,7 +4,7 @@ import { CheckIcon, MoreHorizontalIcon } from 'lucide-react';
 import { WidgetIcon } from '../iconResolver';
 import type { RegisteredWidget, WidgetId } from '../types';
 import { getWidgetsForRegion } from '../widgetRegistry';
-import { useWorkbench } from '../WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '../WorkbenchContext';
 import { WidgetRenderer } from './WidgetRenderer';
 import { Row } from './ui/Row';
 import { Tooltip } from './ui/Tooltip';
@@ -20,8 +20,8 @@ interface BottomWidgetItem {
 }
 
 export const StatusBar = () => {
-  const { activeProject, dispatch } = useWorkbench();
-  const bottomRegion = activeProject.widgetRegions.bottom;
+  const bottomRegion = useActiveProjectSelector((project) => project.widgetRegions.bottom);
+  const dispatch = useWorkbenchDispatch();
   const items: BottomWidgetItem[] = getWidgetsForRegion('bottom').map((widget) => ({
     failureMessage: widget.failure?.message,
     id: widget.manifest.id,

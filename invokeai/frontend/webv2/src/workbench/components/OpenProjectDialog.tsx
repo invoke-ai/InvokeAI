@@ -7,7 +7,7 @@ import { Row } from './ui/Row';
 import { Scrollable } from './ui/Scrollable';
 import { formatRelativeTime } from '../home/formatRelativeTime';
 import { useNotify } from '../useNotify';
-import { useWorkbench } from '../WorkbenchContext';
+import { useWorkbenchDispatch, useWorkbenchSelector } from '../WorkbenchContext';
 import { refreshProjectLibrary, useProjectLibrary, type ProjectSummary } from '../projects/library';
 import { importProjectFile, pickProjectFile } from '../projects/projectFile';
 import { adoptProjectRecord, hydrateProjectFromServer } from '../projects/syncedPersistence';
@@ -18,7 +18,8 @@ import { adoptProjectRecord, hydrateProjectFromServer } from '../projects/synced
  * library and opens it in place — no navigation, the editor stays mounted.
  */
 export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
-  const { state, dispatch } = useWorkbench();
+  const projects = useWorkbenchSelector((snapshot) => snapshot.state.projects);
+  const dispatch = useWorkbenchDispatch();
   const notify = useNotify();
   const library = useProjectLibrary();
   const [busyProjectId, setBusyProjectId] = useState<string | null>(null);
@@ -29,7 +30,7 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
     }
   }, [isOpen]);
 
-  const openProjectIds = new Set(state.projects.map((project) => project.id));
+  const openProjectIds = new Set(projects.map((project) => project.id));
   const available = library.summaries.filter((summary) => !openProjectIds.has(summary.id));
 
   const openProject = async (summary: ProjectSummary) => {
