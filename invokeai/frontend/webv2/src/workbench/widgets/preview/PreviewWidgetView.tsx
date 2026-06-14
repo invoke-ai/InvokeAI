@@ -232,7 +232,12 @@ export const PreviewWidgetView = ({ region }: WidgetViewProps) => {
     },
     [dispatch]
   );
-  const imageActions = useImageActions({ boards, dispatch, onImagesDeleted });
+  const imageActions = useImageActions({
+    boards,
+    dispatch,
+    generateValues: activeProject.widgetStates.generate.values,
+    onImagesDeleted,
+  });
   const contextMenuImage = useMemo<GalleryImage | null>(() => {
     if (!selectedImage) {
       return null;

@@ -1,5 +1,5 @@
 import { Dialog, HStack, Icon, Menu, Portal, ScrollArea, Text } from '@chakra-ui/react';
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   AsteriskIcon,
   ChevronRightIcon,
@@ -13,7 +13,9 @@ import {
   ImagesIcon,
   LayersIcon,
   QuoteIcon,
+  RulerIcon,
   ScanIcon,
+  ScissorsIcon,
   ShuffleIcon,
   SproutIcon,
   StarIcon,
@@ -28,6 +30,7 @@ import { Button } from './ui/Button';
 import { MenuContent } from './ui/Menu';
 import { Tooltip } from './ui/Tooltip';
 import { useWorkbenchPreferences } from '../settings/store';
+import { EMPTY_IMAGE_RECALL_CAPABILITIES, type ImageRecallCapabilities } from './imageRecall';
 import type { ImageActions } from './useImageActions';
 
 export interface ImageContextMenuTarget {
@@ -62,6 +65,10 @@ export const ImageContextMenu = ({
 }) => {
   const { confirmImageDeletion } = useWorkbenchPreferences();
   const [pendingDeletion, setPendingDeletion] = useState<string[] | null>(null);
+  const [recallCapabilities, setRecallCapabilities] = useState<ImageRecallCapabilities>(
+    EMPTY_IMAGE_RECALL_CAPABILITIES
+  );
+  const [isLoadingRecallCapabilities, setIsLoadingRecallCapabilities] = useState(false);
   const targetRef = useRef(target);
 
   targetRef.current = target;
@@ -70,6 +77,39 @@ export const ImageContextMenu = ({
   const image = images[0] ?? null;
   const isBulk = images.length > 1;
   const imageNames = images.map((candidate) => candidate.imageName);
+
+  useEffect(() => {
+    if (!image || isBulk) {
+      setRecallCapabilities(EMPTY_IMAGE_RECALL_CAPABILITIES);
+      setIsLoadingRecallCapabilities(false);
+      return;
+    }
+
+    let isCancelled = false;
+
+    setIsLoadingRecallCapabilities(true);
+    actions
+      .getImageRecallCapabilities(image)
+      .then((capabilities) => {
+        if (!isCancelled) {
+          setRecallCapabilities(capabilities);
+        }
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setRecallCapabilities(EMPTY_IMAGE_RECALL_CAPABILITIES);
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsLoadingRecallCapabilities(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [actions, image, isBulk]);
 
   const requestDeletion = (names: string[]) => {
     if (confirmImageDeletion) {
@@ -123,7 +163,9 @@ export const ImageContextMenu = ({
                     actions={actions}
                     boards={boards}
                     image={image}
+                    isLoadingRecallCapabilities={isLoadingRecallCapabilities}
                     onRequestDeletion={requestDeletion}
+                    recallCapabilities={recallCapabilities}
                   />
                 )}
               </MenuContent>
@@ -188,12 +230,16 @@ const SingleImageMenuItems = ({
   actions,
   boards,
   image,
+  isLoadingRecallCapabilities,
   onRequestDeletion,
+  recallCapabilities,
 }: {
   actions: ImageActions;
   boards: GalleryBoard[];
   image: GalleryImage;
+  isLoadingRecallCapabilities: boolean;
   onRequestDeletion: (imageNames: string[]) => void;
+  recallCapabilities: ImageRecallCapabilities;
 }) => (
   <>
     <HStack gap="1" px="1">
@@ -231,10 +277,48 @@ const SingleImageMenuItems = ({
     <Menu.Separator borderColor="border.subtle" />
     <ContextMenuItem disabled icon={WorkflowIcon} label="Load Workflow" value="load-workflow" />
     <ContextSubMenu icon={AsteriskIcon} label="Recall Metadata">
-      <ContextMenuItem disabled icon={AsteriskIcon} label="Recall All" value="recall-all" />
-      <ContextMenuItem disabled icon={ShuffleIcon} label="Remix Image" value="remix" />
-      <ContextMenuItem disabled icon={QuoteIcon} label="Use Prompt" value="use-prompt" />
-      <ContextMenuItem disabled icon={SproutIcon} label="Use Seed" value="use-seed" />
+      <ContextMenuItem
+        disabled={isLoadingRecallCapabilities || !recallCapabilities.all}
+        icon={AsteriskIcon}
+        label="Recall All"
+        value="recall-all"
+        onClick={() => void actions.recallImageData(image, 'all')}
+      />
+      <ContextMenuItem
+        disabled={isLoadingRecallCapabilities || !recallCapabilities.remix}
+        icon={ShuffleIcon}
+        label="Remix Image"
+        value="remix"
+        onClick={() => void actions.recallImageData(image, 'remix')}
+      />
+      <ContextMenuItem
+        disabled={isLoadingRecallCapabilities || !recallCapabilities.prompts}
+        icon={QuoteIcon}
+        label="Use Prompt"
+        value="use-prompt"
+        onClick={() => void actions.recallImageData(image, 'prompts')}
+      />
+      <ContextMenuItem
+        disabled={isLoadingRecallCapabilities || !recallCapabilities.seed}
+        icon={SproutIcon}
+        label="Use Seed"
+        value="use-seed"
+        onClick={() => void actions.recallImageData(image, 'seed')}
+      />
+      <ContextMenuItem
+        disabled={isLoadingRecallCapabilities || !recallCapabilities.dimensions}
+        icon={RulerIcon}
+        label="Use Size"
+        value="use-size"
+        onClick={() => void actions.recallImageData(image, 'dimensions')}
+      />
+      <ContextMenuItem
+        disabled={isLoadingRecallCapabilities || !recallCapabilities.clipSkip}
+        icon={ScissorsIcon}
+        label="Use CLIP Skip"
+        value="use-clip-skip"
+        onClick={() => void actions.recallImageData(image, 'clipSkip')}
+      />
     </ContextSubMenu>
     <Menu.Separator borderColor="border.subtle" />
     <ContextMenuItem disabled icon={ScanIcon} label="Send to Upscale" value="send-to-upscale" />

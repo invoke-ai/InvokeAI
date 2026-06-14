@@ -96,7 +96,13 @@ export const GalleryWidgetView = ({ presentation, region }: WidgetViewProps) => 
     },
     [dispatch]
   );
-  const imageActions = useImageActions({ boards: data.boards, dispatch, onImagesDeleted, onStarredChange });
+  const imageActions = useImageActions({
+    boards: data.boards,
+    dispatch,
+    generateValues: activeProject.widgetStates.generate.values,
+    onImagesDeleted,
+    onStarredChange,
+  });
   const actions = useGalleryActions({
     boards: data.boards,
     dispatch,

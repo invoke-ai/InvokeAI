@@ -1,17 +1,32 @@
-import { useMemo, type Dispatch } from 'react';
+import { useEffect, useMemo, type Dispatch } from 'react';
 
 import {
   addImagesToGalleryBoard,
   deleteGalleryImages,
   downloadGalleryArchive,
+  getGalleryImageMetadata,
   removeImagesFromGalleryBoard,
   starGalleryImages,
   unstarGalleryImages,
   type GalleryBoard,
   type GalleryImage,
 } from '../gallery/api';
+import { getDefaultGenerateSettings, isSupportedGenerateModel } from '../generation/graph';
+import { isVaeModelConfig, normalizeGenerateWidgetValues } from '../generation/settings';
+import type { MainModelConfig, VaeModelConfig } from '../generation/types';
+import { ensureModelsLoaded, useModelsSnapshot } from '../models/modelsStore';
+import type { ModelConfig } from '../models/types';
 import type { WorkbenchAction } from '../workbenchState';
 import { useOpenWorkbenchWidget } from '../useOpenWorkbenchWidget';
+import {
+  buildImageRecallSettings,
+  EMPTY_IMAGE_RECALL_CAPABILITIES,
+  getImageRecallCapabilities,
+  getImageRecallMessage,
+  getImageRecallTitle,
+  type ImageRecallCapabilities,
+  type ImageRecallKind,
+} from './imageRecall';
 
 /**
  * Image operations shared by every surface that shows backend images (gallery
@@ -23,8 +38,10 @@ export interface ImageActions {
   deleteImages: (imageNames: string[]) => Promise<void>;
   downloadImage: (image: GalleryImage) => Promise<void>;
   downloadImages: (imageNames: string[]) => Promise<void>;
+  getImageRecallCapabilities: (image: GalleryImage) => Promise<ImageRecallCapabilities>;
   moveImagesToBoard: (imageNames: string[], boardId: string) => Promise<void>;
   openImageInPreview: (image: GalleryImage) => void;
+  recallImageData: (image: GalleryImage, kind: ImageRecallKind) => Promise<void>;
   selectForCompare: (image: GalleryImage) => void;
   setImagesStarred: (imageNames: string[], starred: boolean) => Promise<void>;
 }
@@ -60,24 +77,70 @@ const toPngBlob = async (blob: Blob): Promise<Blob> => {
 export const useImageActions = ({
   boards,
   dispatch,
+  generateValues,
   onImagesDeleted,
   onStarredChange,
 }: {
   boards: GalleryBoard[];
   dispatch: Dispatch<WorkbenchAction>;
+  generateValues: Record<string, unknown>;
   /** Called after a successful deletion so the host can select a neighboring image. */
   onImagesDeleted?: (imageNames: string[]) => void;
   /** Optional optimistic hook, called before the request and re-called inverted on failure. */
   onStarredChange?: (imageNames: string[], starred: boolean) => void;
 }): ImageActions => {
   const openWorkbenchWidget = useOpenWorkbenchWidget();
+  const { models } = useModelsSnapshot();
+  const supportedModels = useMemo<MainModelConfig[]>(
+    () => models.filter(isSupportedGenerateModel).map((model) => model as MainModelConfig),
+    [models]
+  );
+  const vaeModels = useMemo<VaeModelConfig[]>(
+    () => models.filter((model: ModelConfig) => isVaeModelConfig(model)).map((model) => model as VaeModelConfig),
+    [models]
+  );
+  const currentGenerateValues = useMemo(() => {
+    const normalizedValues = normalizeGenerateWidgetValues(generateValues);
+
+    if (normalizedValues) {
+      return normalizedValues;
+    }
+
+    const fallbackModelKey = typeof generateValues.modelKey === 'string' ? generateValues.modelKey : null;
+    const fallbackModel = supportedModels.find((model) => model.key === fallbackModelKey) ?? supportedModels[0];
+
+    return fallbackModel ? { ...getDefaultGenerateSettings(fallbackModel), model: fallbackModel } : null;
+  }, [generateValues, supportedModels]);
+
+  useEffect(() => {
+    ensureModelsLoaded();
+  }, []);
 
   return useMemo<ImageActions>(() => {
     const recordError = (error: unknown) => dispatch({ message: toErrorMessage(error), type: 'recordError' });
     const recordSuccess = (title: string, message?: string) =>
       dispatch({ kind: 'success', message, title, type: 'recordNotice' });
+    const recordInfo = (title: string, message?: string) =>
+      dispatch({ kind: 'info', message, title, type: 'recordNotice' });
     const refreshGallery = () => dispatch({ type: 'touchGalleryRefresh' });
     const getBoardName = (boardId: string) => boards.find((board) => board.id === boardId)?.name ?? 'Uncategorized';
+    const imageMetadataRequests = new Map<string, Promise<unknown>>();
+    const loadImageMetadata = (imageName: string): Promise<unknown> => {
+      const cachedRequest = imageMetadataRequests.get(imageName);
+
+      if (cachedRequest) {
+        return cachedRequest;
+      }
+
+      const request = getGalleryImageMetadata(imageName).catch((error: unknown) => {
+        imageMetadataRequests.delete(imageName);
+        throw error;
+      });
+
+      imageMetadataRequests.set(imageName, request);
+
+      return request;
+    };
 
     return {
       copyImage: async (image) => {
@@ -133,6 +196,29 @@ export const useImageActions = ({
           recordError(error);
         }
       },
+      getImageRecallCapabilities: async (image) => {
+        if (!currentGenerateValues) {
+          return EMPTY_IMAGE_RECALL_CAPABILITIES;
+        }
+
+        try {
+          const metadata = await loadImageMetadata(image.imageName);
+
+          return getImageRecallCapabilities({
+            currentValues: currentGenerateValues,
+            image,
+            metadata,
+            supportedModels,
+            vaeModels,
+          });
+        } catch {
+          return {
+            ...EMPTY_IMAGE_RECALL_CAPABILITIES,
+            dimensions:
+              Number.isFinite(image.width) && image.width >= 64 && Number.isFinite(image.height) && image.height >= 64,
+          };
+        }
+      },
       moveImagesToBoard: async (imageNames, boardId) => {
         try {
           if (boardId === 'none') {
@@ -155,6 +241,34 @@ export const useImageActions = ({
         dispatch({ image, type: 'selectGalleryImage' });
         openWorkbenchWidget('preview', { preferredRegions: ['center'], requireCenterView: true });
       },
+      recallImageData: async (image, kind) => {
+        try {
+          if (!currentGenerateValues) {
+            recordInfo('Cannot recall image data', 'Select a supported Generate model first.');
+            return;
+          }
+
+          const metadata = kind === 'dimensions' ? null : await loadImageMetadata(image.imageName);
+          const result = buildImageRecallSettings({
+            currentValues: currentGenerateValues,
+            image,
+            kind,
+            metadata,
+            supportedModels,
+            vaeModels,
+          });
+
+          if (!result) {
+            recordInfo('No recallable image data', 'This image does not include supported Generate metadata.');
+            return;
+          }
+
+          dispatch({ type: 'setGenerateSettings', values: result.values });
+          recordSuccess(getImageRecallTitle(kind), getImageRecallMessage(result.fields));
+        } catch (error: unknown) {
+          recordError(error);
+        }
+      },
       selectForCompare: (image) => {
         dispatch({ image, type: 'setGalleryCompareImage' });
       },
@@ -170,5 +284,14 @@ export const useImageActions = ({
         }
       },
     };
-  }, [boards, dispatch, onImagesDeleted, onStarredChange, openWorkbenchWidget]);
+  }, [
+    boards,
+    currentGenerateValues,
+    dispatch,
+    onImagesDeleted,
+    onStarredChange,
+    openWorkbenchWidget,
+    supportedModels,
+    vaeModels,
+  ]);
 };

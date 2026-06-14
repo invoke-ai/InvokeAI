@@ -63,6 +63,8 @@ export interface GalleryImage extends GeneratedImageContract {
   starred: boolean;
 }
 
+export type GalleryImageMetadata = Record<string, unknown>;
+
 interface ListImagesResponse {
   items: BackendImageDTO[];
   limit: number;
@@ -285,6 +287,12 @@ export const listGalleryImages = async ({
   const body = await apiFetchJson<ListImagesResponse>(`/api/v1/images/?${query}`);
 
   return { images: body.items.map(mapImage), total: body.total };
+};
+
+export const getGalleryImageMetadata = async (imageName: string): Promise<GalleryImageMetadata | null> => {
+  const body = await apiFetchJson<unknown>(`/api/v1/images/i/${encodeURIComponent(imageName)}/metadata`);
+
+  return body && typeof body === 'object' && !Array.isArray(body) ? (body as GalleryImageMetadata) : null;
 };
 
 export const createGalleryBoard = async (boardName: string): Promise<GalleryBoard> => {
