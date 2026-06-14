@@ -92,16 +92,16 @@ def _get_qwen3_variant_from_state_dict(state_dict: dict[str | int, Any]) -> Opti
     else:
         return None
 
-    # Determine variant based on hidden_size
+    # Determine variant based on hidden_size. Unknown sizes mean this is NOT a
+    # recognized Qwen3 variant (could be another causal LM in GGUF format such as
+    # Mistral or Llama, which use identical llama.cpp key naming).
     if hidden_size == QWEN3_06B_HIDDEN_SIZE:
         return Qwen3VariantType.Qwen3_06B
     elif hidden_size == QWEN3_4B_HIDDEN_SIZE:
         return Qwen3VariantType.Qwen3_4B
     elif hidden_size == QWEN3_8B_HIDDEN_SIZE:
         return Qwen3VariantType.Qwen3_8B
-    else:
-        # Unknown size, default to 4B (more common)
-        return Qwen3VariantType.Qwen3_4B
+    return None
 
 
 class Qwen3Encoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
@@ -130,10 +130,16 @@ class Qwen3Encoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
 
     @classmethod
     def _get_variant_or_default(cls, mod: ModelOnDisk) -> Qwen3VariantType:
-        """Get variant from state dict, defaulting to 4B if unknown."""
+        """Get the variant from state dict, raising NotAMatch when the size does not match a known Qwen3 variant.
+
+        We previously defaulted to 4B for unknown sizes, but that swallowed other causal-LM GGUFs
+        (Mistral, Llama, ...) which share llama.cpp tensor naming with Qwen3.
+        """
         state_dict = mod.load_state_dict()
         variant = _get_qwen3_variant_from_state_dict(state_dict)
-        return variant if variant is not None else Qwen3VariantType.Qwen3_4B
+        if variant is None:
+            raise NotAMatchError("hidden size does not match a known Qwen3 variant")
+        return variant
 
     @classmethod
     def _validate_looks_like_qwen3_model(cls, mod: ModelOnDisk) -> None:
@@ -217,7 +223,7 @@ class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
 
     @classmethod
     def _get_variant_from_config(cls, config_path) -> Qwen3VariantType:
-        """Get variant from config.json based on hidden_size."""
+        """Get variant from config.json based on hidden_size, or raise NotAMatch if unknown."""
         QWEN3_06B_HIDDEN_SIZE = 1024
         QWEN3_4B_HIDDEN_SIZE = 2560
         QWEN3_8B_HIDDEN_SIZE = 4096
@@ -225,18 +231,17 @@ class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
         try:
             with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
-            hidden_size = config.get("hidden_size")
-            if hidden_size == QWEN3_8B_HIDDEN_SIZE:
-                return Qwen3VariantType.Qwen3_8B
-            elif hidden_size == QWEN3_4B_HIDDEN_SIZE:
-                return Qwen3VariantType.Qwen3_4B
-            elif hidden_size == QWEN3_06B_HIDDEN_SIZE:
-                return Qwen3VariantType.Qwen3_06B
-            else:
-                # Default to 4B for unknown sizes
-                return Qwen3VariantType.Qwen3_4B
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, OSError) as e:
+            raise NotAMatchError(f"unable to read Qwen3 config.json: {e}") from e
+
+        hidden_size = config.get("hidden_size")
+        if hidden_size == QWEN3_8B_HIDDEN_SIZE:
+            return Qwen3VariantType.Qwen3_8B
+        elif hidden_size == QWEN3_4B_HIDDEN_SIZE:
             return Qwen3VariantType.Qwen3_4B
+        elif hidden_size == QWEN3_06B_HIDDEN_SIZE:
+            return Qwen3VariantType.Qwen3_06B
+        raise NotAMatchError(f"hidden_size {hidden_size} does not match a known Qwen3 variant")
 
 
 class Qwen3Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
@@ -265,10 +270,16 @@ class Qwen3Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
 
     @classmethod
     def _get_variant_or_default(cls, mod: ModelOnDisk) -> Qwen3VariantType:
-        """Get variant from state dict, defaulting to 4B if unknown."""
+        """Get the variant from state dict, raising NotAMatch when the size does not match a known Qwen3 variant.
+
+        We previously defaulted to 4B for unknown sizes, but that swallowed other causal-LM GGUFs
+        (Mistral, Llama, ...) which share llama.cpp tensor naming with Qwen3.
+        """
         state_dict = mod.load_state_dict()
         variant = _get_qwen3_variant_from_state_dict(state_dict)
-        return variant if variant is not None else Qwen3VariantType.Qwen3_4B
+        if variant is None:
+            raise NotAMatchError("hidden size does not match a known Qwen3 variant")
+        return variant
 
     @classmethod
     def _validate_looks_like_qwen3_model(cls, mod: ModelOnDisk) -> None:

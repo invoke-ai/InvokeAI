@@ -116,6 +116,8 @@ vi.mock('features/controlLayers/store/paramsSlice', () => ({
   selectParamsSlice: vi.fn(() => mockParams),
   selectKleinVaeModel: vi.fn(() => currentKleinVae),
   selectKleinQwen3EncoderModel: vi.fn(() => currentKleinQwen3),
+  selectFlux2DevVaeModel: vi.fn(() => null),
+  selectFlux2DevMistralEncoderModel: vi.fn(() => null),
 }));
 
 vi.mock('features/controlLayers/store/refImagesSlice', () => ({
@@ -186,6 +188,7 @@ vi.mock('features/nodes/util/graph/generation/addIPAdapters', () => ({
 
 vi.mock('services/api/hooks/modelsByType', () => ({
   selectFlux2DiffusersModels: vi.fn(() => diffusersModels),
+  selectFlux2DevDiffusersModels: vi.fn(() => []),
 }));
 
 vi.mock('services/api/types', async () => {

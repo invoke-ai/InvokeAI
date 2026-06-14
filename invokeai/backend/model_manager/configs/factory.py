@@ -85,6 +85,11 @@ from invokeai.backend.model_manager.configs.main import (
     Main_GGUF_ZImage_Config,
     MainModelDefaultSettings,
 )
+from invokeai.backend.model_manager.configs.mistral_encoder import (
+    MistralEncoder_Checkpoint_Config,
+    MistralEncoder_Diffusers_Config,
+    MistralEncoder_GGUF_Config,
+)
 from invokeai.backend.model_manager.configs.qwen3_encoder import (
     Qwen3Encoder_Checkpoint_Config,
     Qwen3Encoder_GGUF_Config,
@@ -248,6 +253,10 @@ AnyModelConfig = Annotated[
         Annotated[Qwen3Encoder_Qwen3Encoder_Config, Qwen3Encoder_Qwen3Encoder_Config.get_tag()],
         Annotated[Qwen3Encoder_Checkpoint_Config, Qwen3Encoder_Checkpoint_Config.get_tag()],
         Annotated[Qwen3Encoder_GGUF_Config, Qwen3Encoder_GGUF_Config.get_tag()],
+        # Mistral Encoder (used by FLUX.2 [dev])
+        Annotated[MistralEncoder_Diffusers_Config, MistralEncoder_Diffusers_Config.get_tag()],
+        Annotated[MistralEncoder_Checkpoint_Config, MistralEncoder_Checkpoint_Config.get_tag()],
+        Annotated[MistralEncoder_GGUF_Config, MistralEncoder_GGUF_Config.get_tag()],
         # Qwen VL Encoder (Qwen2.5-VL multimodal encoder for Qwen Image)
         Annotated[QwenVLEncoder_Diffusers_Config, QwenVLEncoder_Diffusers_Config.get_tag()],
         Annotated[QwenVLEncoder_Checkpoint_Config, QwenVLEncoder_Checkpoint_Config.get_tag()],

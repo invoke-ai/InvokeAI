@@ -1022,6 +1022,151 @@ flux2_klein_9b_gguf_q8 = StarterModel(
 )
 # endregion
 
+# region FLUX.2 [dev]
+#
+# FLUX.2 [dev] is BFL's 32B guidance-distilled rectified-flow model. The bf16
+# transformer alone is ~64 GB, so most users want the GGUF quantizations from
+# the curated `gguf-org/flux2-dev-gguf` repo (the same repo also ships the
+# matching "cow-mistral3-small" text encoder — a FLUX.2-specific 30-layer
+# Mistral distillation that BFL trained the joint attention against; the
+# README notes "Q2 works, but use a higher tier encoder for better prompt
+# adherence"). All FLUX.2 [dev] releases are governed by the FLUX.2
+# Non-Commercial License.
+
+# --- Text encoders ---
+# Only the 30-layer "cow-mistral3-small" distillation works for FLUX.2 [dev].
+# BFL's joint attention was trained against hidden states at indices (10, 20, 30)
+# of a 30-layer Mistral — extracting from upstream Mistral Small 3.1 / 3.2 (40
+# layers) samples at different relative depths and produces off-distribution
+# embeddings. Both the gguf-org cow GGUFs and Comfy-Org's safetensors are the
+# same 30-layer cow weights, just packaged differently.
+
+# Comfy-Org safetensors (single-file, 30-layer cow, with embedded Tekken tokenizer).
+# Higher precision than the cow GGUFs and avoids the Tekken-via-HF-Hub fetch.
+flux2_dev_comfy_mistral_fp8 = StarterModel(
+    name="FLUX.2 [dev] Mistral Encoder (Comfy FP8)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_fp8.safetensors",
+    description="Comfy-Org FP8 of BFL's 30-layer cow-mistral3-small. Best quality/size for prompt adherence; embeds Tekken tokenizer (no HF fetch needed). ~18GB",
+    type=ModelType.MistralEncoder,
+)
+
+flux2_dev_comfy_mistral_bf16 = StarterModel(
+    name="FLUX.2 [dev] Mistral Encoder (Comfy BF16)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_bf16.safetensors",
+    description="Comfy-Org BF16 of BFL's 30-layer cow-mistral3-small. Reference precision; embeds Tekken tokenizer. ~35.6GB",
+    type=ModelType.MistralEncoder,
+)
+
+flux2_dev_comfy_mistral_fp4 = StarterModel(
+    name="FLUX.2 [dev] Mistral Encoder (Comfy FP4 mixed)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_fp4_mixed.safetensors",
+    description="Comfy-Org FP4-mixed of BFL's 30-layer cow-mistral3-small. Smallest safetensors variant; embeds Tekken tokenizer. ~12.3GB",
+    type=ModelType.MistralEncoder,
+)
+
+# gguf-org cow GGUF variants (30-layer cow, llama.cpp packaging, also embed Tekken).
+# Lower memory footprint than the Comfy safetensors but slightly lower fidelity.
+flux2_dev_cow_mistral_q4 = StarterModel(
+    name="FLUX.2 [dev] cow Mistral Encoder (GGUF Q4)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/cow-mistral3-small-q4_0.gguf",
+    description="cow-mistral3-small Q4_0 — 30-layer cow distillation BFL trained against. ~11.6GB",
+    type=ModelType.MistralEncoder,
+    format=ModelFormat.GGUFQuantized,
+)
+
+flux2_dev_cow_mistral_q8 = StarterModel(
+    name="FLUX.2 [dev] cow Mistral Encoder (GGUF Q8)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/cow-mistral3-small-q8_0.gguf",
+    description="cow-mistral3-small Q8_0 — best prompt adherence among cow GGUF quants. ~20GB",
+    type=ModelType.MistralEncoder,
+    format=ModelFormat.GGUFQuantized,
+)
+
+flux2_dev_cow_mistral_iq4_xs = StarterModel(
+    name="FLUX.2 [dev] cow Mistral Encoder (GGUF IQ4_XS)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/cow-mistral3-small-iq4_xs.gguf",
+    description="cow-mistral3-small IQ4_XS — smallest usable quant with reasonable adherence. ~11.1GB",
+    type=ModelType.MistralEncoder,
+    format=ModelFormat.GGUFQuantized,
+)
+
+# --- Diffusers transformer ---
+flux2_dev_diffusers = StarterModel(
+    name="FLUX.2 [dev] (Diffusers)",
+    base=BaseModelType.Flux2,
+    source="black-forest-labs/FLUX.2-dev",
+    description="FLUX.2 [dev] full Diffusers pipeline - includes transformer, VAE, and Mistral text encoder. ~80GB. Non-Commercial License.",
+    type=ModelType.Main,
+)
+
+flux2_dev_diffusers_nf4 = StarterModel(
+    name="FLUX.2 [dev] (Diffusers, NF4)",
+    base=BaseModelType.Flux2,
+    source="diffusers/FLUX.2-dev-bnb-4bit",
+    description="FLUX.2 [dev] with NF4-quantized DiT and text encoder - runs on ~18GB VRAM with offload. Non-Commercial License.",
+    type=ModelType.Main,
+)
+
+# --- GGUF transformers from gguf-org/flux2-dev-gguf (canonical repo) ---
+# These are the GGUFs BFL/community curate for cow-paired inference. Default
+# encoder dependency is cow Q4 to make starter installs work out of the box.
+flux2_dev_gguf_q3_k_m = StarterModel(
+    name="FLUX.2 [dev] Transformer (GGUF Q3_K_M)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/flux2-dev-q3_k_m.gguf",
+    description="FLUX.2 [dev] transformer Q3_K_M — fits ~12GB VRAM with offload. ~15.9GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[flux2_vae, flux2_dev_cow_mistral_q4],
+)
+
+flux2_dev_gguf_q4_k_m = StarterModel(
+    name="FLUX.2 [dev] Transformer (GGUF Q4_K_M)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/flux2-dev-q4_k_m.gguf",
+    description="FLUX.2 [dev] transformer Q4_K_M — good quality / size tradeoff. ~20GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[flux2_vae, flux2_dev_cow_mistral_q4],
+)
+
+flux2_dev_gguf_q5_k_m = StarterModel(
+    name="FLUX.2 [dev] Transformer (GGUF Q5_K_M)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/flux2-dev-q5_k_m.gguf",
+    description="FLUX.2 [dev] transformer Q5_K_M — higher fidelity than Q4. ~24GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[flux2_vae, flux2_dev_cow_mistral_q8],
+)
+
+flux2_dev_gguf_q6_k = StarterModel(
+    name="FLUX.2 [dev] Transformer (GGUF Q6_K)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/flux2-dev-q6_k.gguf",
+    description="FLUX.2 [dev] transformer Q6_K — near-Q8 quality at lower size. ~27.9GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[flux2_vae, flux2_dev_cow_mistral_q8],
+)
+
+flux2_dev_gguf_q8_0 = StarterModel(
+    name="FLUX.2 [dev] Transformer (GGUF Q8_0)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/flux2-dev-q8_0.gguf",
+    description="FLUX.2 [dev] transformer Q8_0 — highest GGUF fidelity. ~35.5GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[flux2_vae, flux2_dev_cow_mistral_q8],
+)
+# endregion
+
 # region Z-Image
 z_image_qwen3_encoder = StarterModel(
     name="Z-Image Qwen3 Text Encoder",
@@ -1663,6 +1808,19 @@ STARTER_MODELS: list[StarterModel] = [
     flux2_klein_9b_gguf_q8,
     flux2_klein_qwen3_4b_encoder,
     flux2_klein_qwen3_8b_encoder,
+    flux2_dev_comfy_mistral_bf16,
+    flux2_dev_comfy_mistral_fp4,
+    flux2_dev_comfy_mistral_fp8,
+    flux2_dev_cow_mistral_iq4_xs,
+    flux2_dev_cow_mistral_q4,
+    flux2_dev_cow_mistral_q8,
+    flux2_dev_diffusers,
+    flux2_dev_diffusers_nf4,
+    flux2_dev_gguf_q3_k_m,
+    flux2_dev_gguf_q4_k_m,
+    flux2_dev_gguf_q5_k_m,
+    flux2_dev_gguf_q6_k,
+    flux2_dev_gguf_q8_0,
     cogview4,
     qwen_image_vae,
     qwen_vl_encoder_fp8,

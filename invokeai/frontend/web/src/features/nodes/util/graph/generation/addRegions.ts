@@ -37,6 +37,7 @@ type AddRegionsArg = {
     | 'sdxl_compel_prompt'
     | 'flux_text_encoder'
     | 'flux2_klein_text_encoder'
+    | 'flux2_dev_text_encoder'
     | 'z_image_text_encoder'
     | 'anima_text_encoder'
   >;
@@ -45,6 +46,7 @@ type AddRegionsArg = {
     | 'sdxl_compel_prompt'
     | 'flux_text_encoder'
     | 'flux2_klein_text_encoder'
+    | 'flux2_dev_text_encoder'
     | 'z_image_text_encoder'
     | 'anima_text_encoder'
   > | null;

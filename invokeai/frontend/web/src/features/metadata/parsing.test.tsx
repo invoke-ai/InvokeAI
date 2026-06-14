@@ -8,11 +8,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Module mocks
 //
 // We are testing only the *gating* logic of the model-related metadata
-// handlers (`VAEModel`, `KleinVAEModel`, `KleinQwen3EncoderModel`). The actual
-// model lookup goes through `parseModelIdentifier`, which dispatches RTK
-// Query thunks. We stub the models endpoint so that any lookup resolves to a
-// canned model identifier — the parse step then succeeds and the assertions
-// inside each handler become observable.
+// handlers (`VAEModel`, `KleinVAEModel`, `KleinQwen3EncoderModel`,
+// `Flux2DevVAEModel`, `Flux2DevMistralEncoderModel`). The model lookup goes
+// through `parseModelIdentifier`, which dispatches an RTK Query thunk. We stub
+// the models endpoint so any lookup resolves to a canned model identifier —
+// the parse step then succeeds and the assertions inside each handler become
+// observable.
 // ---------------------------------------------------------------------------
 
 let currentBase: string | null = 'flux2';
@@ -22,7 +23,7 @@ vi.mock('features/controlLayers/store/paramsSlice', async (importOriginal) => {
   return { ...mod, selectBase: () => currentBase };
 });
 
-const fakeModel = (type: 'vae' | 'qwen3_encoder', base: string) => ({
+const fakeModel = (type: 'vae' | 'qwen3_encoder' | 'mistral_encoder', base: string) => ({
   key: `${type}-key`,
   hash: 'hash',
   name: `Some ${type}`,
@@ -61,7 +62,7 @@ beforeEach(() => {
 
 describe('ImageMetadataHandlers — Klein recall gating', () => {
   describe('KleinVAEModel', () => {
-    it('parses metadata.vae when the current main model is FLUX.2 Klein', async () => {
+    it('parses metadata.vae for Klein images (no mistral_encoder field) when base is flux2', async () => {
       currentBase = 'flux2';
       nextResolved = fakeModel('vae', 'flux2');
       const store = makeStore();
@@ -72,17 +73,67 @@ describe('ImageMetadataHandlers — Klein recall gating', () => {
       expect(parsed.type).toBe('vae');
     });
 
-    it('rejects parsing when the current main model is not FLUX.2 Klein', async () => {
+    it('rejects when base is not flux2', async () => {
       currentBase = 'sdxl';
       nextResolved = fakeModel('vae', 'flux2');
       const store = makeStore();
 
       await expect(ImageMetadataHandlers.KleinVAEModel.parse({ vae: nextResolved }, store)).rejects.toThrow();
     });
+
+    it('rejects FLUX.2 [dev] images (mistral_encoder field present)', async () => {
+      currentBase = 'flux2';
+      nextResolved = fakeModel('vae', 'flux2');
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.KleinVAEModel.parse(
+          { vae: nextResolved, mistral_encoder: fakeModel('mistral_encoder', 'flux2') },
+          store
+        )
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('Flux2DevVAEModel', () => {
+    it('parses metadata.vae for [dev] images (mistral_encoder field present)', async () => {
+      currentBase = 'flux2';
+      nextResolved = fakeModel('vae', 'flux2');
+      const store = makeStore();
+
+      const parsed = await ImageMetadataHandlers.Flux2DevVAEModel.parse(
+        { vae: nextResolved, mistral_encoder: fakeModel('mistral_encoder', 'flux2') },
+        store
+      );
+
+      expect(parsed.key).toBe('vae-key');
+      expect(parsed.type).toBe('vae');
+    });
+
+    it('rejects Klein images (no mistral_encoder field)', async () => {
+      currentBase = 'flux2';
+      nextResolved = fakeModel('vae', 'flux2');
+      const store = makeStore();
+
+      await expect(ImageMetadataHandlers.Flux2DevVAEModel.parse({ vae: nextResolved }, store)).rejects.toThrow();
+    });
+
+    it('rejects when base is not flux2', async () => {
+      currentBase = 'sdxl';
+      nextResolved = fakeModel('vae', 'flux2');
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.Flux2DevVAEModel.parse(
+          { vae: nextResolved, mistral_encoder: fakeModel('mistral_encoder', 'flux2') },
+          store
+        )
+      ).rejects.toThrow();
+    });
   });
 
   describe('KleinQwen3EncoderModel', () => {
-    it('parses metadata.qwen3_encoder when the current main model is FLUX.2 Klein', async () => {
+    it('parses metadata.qwen3_encoder when base is flux2', async () => {
       currentBase = 'flux2';
       nextResolved = fakeModel('qwen3_encoder', 'flux2');
       const store = makeStore();
@@ -93,7 +144,7 @@ describe('ImageMetadataHandlers — Klein recall gating', () => {
       expect(parsed.type).toBe('qwen3_encoder');
     });
 
-    it('rejects parsing when the current main model is not FLUX.2 Klein', async () => {
+    it('rejects when base is not flux2', async () => {
       currentBase = 'sdxl';
       nextResolved = fakeModel('qwen3_encoder', 'flux2');
       const store = makeStore();
@@ -104,10 +155,36 @@ describe('ImageMetadataHandlers — Klein recall gating', () => {
     });
   });
 
+  describe('Flux2DevMistralEncoderModel', () => {
+    it('parses metadata.mistral_encoder when base is flux2', async () => {
+      currentBase = 'flux2';
+      nextResolved = fakeModel('mistral_encoder', 'flux2');
+      const store = makeStore();
+
+      const parsed = await ImageMetadataHandlers.Flux2DevMistralEncoderModel.parse(
+        { mistral_encoder: nextResolved },
+        store
+      );
+
+      expect(parsed.key).toBe('mistral_encoder-key');
+      expect(parsed.type).toBe('mistral_encoder');
+    });
+
+    it('rejects when base is not flux2', async () => {
+      currentBase = 'sdxl';
+      nextResolved = fakeModel('mistral_encoder', 'flux2');
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.Flux2DevMistralEncoderModel.parse({ mistral_encoder: nextResolved }, store)
+      ).rejects.toThrow();
+    });
+  });
+
   describe('VAEModel (generic)', () => {
     // The generic VAEModel handler must NOT also fire for FLUX.2 / Z-Image
     // images, otherwise the metadata viewer renders duplicate VAE rows next
-    // to the dedicated KleinVAEModel / ZImageVAEModel handlers.
+    // to the dedicated KleinVAEModel / Flux2DevVAEModel / ZImageVAEModel handlers.
     it.each(['flux2', 'z-image'])('rejects parsing when current base is %s', async (base) => {
       currentBase = base;
       nextResolved = fakeModel('vae', base);
