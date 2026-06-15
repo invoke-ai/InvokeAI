@@ -10,3 +10,8 @@ class SimpleNameService(NameServiceBase):
         uuid_str = uuid_string()
         filename = f"{uuid_str}.png"
         return filename
+
+    def create_video_name(self) -> str:
+        uuid_str = uuid_string()
+        filename = f"{uuid_str}.mp4"
+        return filename

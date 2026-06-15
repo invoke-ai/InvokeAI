@@ -131,6 +131,27 @@ class AnimaConditioningInfo:
 
 
 @dataclass
+class WanConditioningInfo:
+    """Wan 2.2 text conditioning information from the UMT5-XXL encoder.
+
+    The Wan transformer takes the encoder's last hidden state directly as
+    cross-attention context (``encoder_hidden_states``).
+    """
+
+    prompt_embeds: torch.Tensor
+    """UMT5-XXL hidden states. Shape: (seq_len, hidden_size) where hidden_size=4096."""
+
+    prompt_attention_mask: torch.Tensor | None = None
+    """Attention mask marking valid (non-padding) tokens. Shape: (seq_len,). 1 for valid, 0 for padding."""
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+        if self.prompt_attention_mask is not None:
+            self.prompt_attention_mask = self.prompt_attention_mask.to(device=device)
+        return self
+
+
+@dataclass
 class ConditioningFieldData:
     # If you change this class, adding more types, you _must_ update the instantiation of ObjectSerializerDisk in
     # invokeai/app/api/dependencies.py, adding the types to the list of safe globals. If you do not, torch will be
@@ -144,6 +165,7 @@ class ConditioningFieldData:
         | List[ZImageConditioningInfo]
         | List[QwenImageConditioningInfo]
         | List[AnimaConditioningInfo]
+        | List[WanConditioningInfo]
     )
 
 

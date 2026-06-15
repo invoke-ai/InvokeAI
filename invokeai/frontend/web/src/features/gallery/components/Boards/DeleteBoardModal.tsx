@@ -151,8 +151,11 @@ const DeleteBoardModal = () => {
                   bottomMessage={t('boards.bottomMessage')}
                 />
               )}
-              {boardToDelete !== 'none' && <Text>{t('boards.deletedBoardsCannotbeRestored')}</Text>}
-              <Text>{t('gallery.deleteImagePermanent')}</Text>
+              {boardToDelete !== 'none' ? (
+                <Text>{t('boards.deletedBoardsCannotbeRestored')}</Text>
+              ) : (
+                <Text>{t('gallery.deleteImagePermanent')}</Text>
+              )}
             </Flex>
           </AlertDialogBody>
           <AlertDialogFooter>
@@ -167,7 +170,7 @@ const DeleteBoardModal = () => {
               )}
               {boardToDelete !== 'none' && (
                 <Button colorScheme="error" isLoading={isLoading} onClick={handleDeleteBoardAndImages}>
-                  {t('boards.deleteBoardAndImages')}
+                  {t('boards.deleteBoardAndAssets')}
                 </Button>
               )}
               {boardToDelete === 'none' && (

@@ -48,3 +48,11 @@ const VIRTUAL_BOARD_ID_PREFIX = 'by_date:';
 export const isVirtualBoardId = (id: string): boolean => id.startsWith(VIRTUAL_BOARD_ID_PREFIX);
 
 export const getDateFromVirtualBoardId = (id: string): string => id.replace(VIRTUAL_BOARD_ID_PREFIX, '');
+
+/**
+ * The polymorphic gallery treats selection as `string[]` of names. The kind is recoverable from
+ * the filename extension since the backend names images with `.png` and videos with `.mp4` (see
+ * SimpleNameService). Centralizing the discriminator here so callers don't have to know about
+ * the extension contract.
+ */
+export const isVideoName = (name: string): boolean => name.toLowerCase().endsWith('.mp4');
