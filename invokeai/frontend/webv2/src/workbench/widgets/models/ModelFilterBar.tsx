@@ -1,4 +1,4 @@
-import { HStack, Icon, Input, InputGroup, Menu, Portal, ScrollArea, Text } from '@chakra-ui/react';
+import { HStack, Icon, Input, InputGroup, Menu, Portal, Text } from '@chakra-ui/react';
 import { CheckIcon, SearchIcon, SlidersHorizontalIcon } from 'lucide-react';
 
 import { IconButton } from '../../components/ui/Button';
@@ -58,95 +58,86 @@ export const ModelFilterBar = ({
       </Menu.Trigger>
       <Portal>
         <Menu.Positioner>
-          <MenuContent maxH="70vh" minW="13rem" overflow="hidden" p="0">
-            <ScrollArea.Root maxH="inherit" size="xs" variant="hover" w="full">
-              <ScrollArea.Viewport aria-label="Model filters" maxH="inherit" w="full">
-                <ScrollArea.Content py="1">
-                  <Menu.ItemGroup>
-                    <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
-                      Model Type
-                    </Menu.ItemGroupLabel>
-                    <FilterMenuItem
-                      isChecked={filters.typeFilter === null && !filters.missingOnly}
-                      label="All models"
-                      value="type-all"
-                      onSelect={() => onChange({ ...filters, missingOnly: false, typeFilter: null })}
-                    />
-                    {missingCount > 0 ? (
-                      <FilterMenuItem
-                        isChecked={filters.missingOnly}
-                        label={`Missing files (${missingCount})`}
-                        value="type-missing"
-                        onSelect={() => onChange({ ...filters, missingOnly: !filters.missingOnly, typeFilter: null })}
-                      />
-                    ) : null}
-                    {availableTypes.map((type) => (
-                      <FilterMenuItem
-                        key={type}
-                        isChecked={filters.typeFilter === type}
-                        label={getModelTypeLabel(type)}
-                        value={`type-${type}`}
-                        onSelect={() =>
-                          onChange({
-                            ...filters,
-                            missingOnly: false,
-                            typeFilter: filters.typeFilter === type ? null : type,
-                          })
-                        }
-                      />
-                    ))}
-                  </Menu.ItemGroup>
-                  <Menu.Separator />
-                  <Menu.ItemGroup>
-                    <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
-                      Base Architecture
-                    </Menu.ItemGroupLabel>
-                    <FilterMenuItem
-                      isChecked={filters.baseFilter === null}
-                      label="All bases"
-                      value="base-all"
-                      onSelect={() => onChange({ ...filters, baseFilter: null })}
-                    />
-                    {availableBases.map((base) => (
-                      <FilterMenuItem
-                        key={base}
-                        isChecked={filters.baseFilter === base}
-                        label={getModelBaseLabel(base)}
-                        value={`base-${base}`}
-                        onSelect={() => onChange({ ...filters, baseFilter: filters.baseFilter === base ? null : base })}
-                      />
-                    ))}
-                  </Menu.ItemGroup>
-                  <Menu.Separator />
-                  <Menu.ItemGroup>
-                    <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
-                      Sort By
-                    </Menu.ItemGroupLabel>
-                    {SORT_FIELDS.map(({ field, label }) => (
-                      <FilterMenuItem
-                        key={field}
-                        isChecked={filters.sortField === field}
-                        label={label}
-                        value={`sort-${field}`}
-                        onSelect={() =>
-                          onChange(
-                            filters.sortField === field
-                              ? { ...filters, sortDirection: filters.sortDirection === 'asc' ? 'desc' : 'asc' }
-                              : { ...filters, sortDirection: 'asc', sortField: field }
-                          )
-                        }
-                        trailing={
-                          filters.sortField === field ? (filters.sortDirection === 'asc' ? 'Asc' : 'Desc') : undefined
-                        }
-                      />
-                    ))}
-                  </Menu.ItemGroup>
-                </ScrollArea.Content>
-              </ScrollArea.Viewport>
-              <ScrollArea.Scrollbar>
-                <ScrollArea.Thumb />
-              </ScrollArea.Scrollbar>
-            </ScrollArea.Root>
+          <MenuContent maxH="70vh" minW="13rem" overflowY="auto" py="1">
+            <Menu.ItemGroup>
+              <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                Model Type
+              </Menu.ItemGroupLabel>
+              <FilterMenuItem
+                isChecked={filters.typeFilter === null && !filters.missingOnly}
+                label="All models"
+                value="type-all"
+                onSelect={() => onChange({ ...filters, missingOnly: false, typeFilter: null })}
+              />
+              {missingCount > 0 ? (
+                <FilterMenuItem
+                  isChecked={filters.missingOnly}
+                  label={`Missing files (${missingCount})`}
+                  value="type-missing"
+                  onSelect={() => onChange({ ...filters, missingOnly: !filters.missingOnly, typeFilter: null })}
+                />
+              ) : null}
+              {availableTypes.map((type) => (
+                <FilterMenuItem
+                  key={type}
+                  isChecked={filters.typeFilter === type}
+                  label={getModelTypeLabel(type)}
+                  value={`type-${type}`}
+                  onSelect={() =>
+                    onChange({
+                      ...filters,
+                      missingOnly: false,
+                      typeFilter: filters.typeFilter === type ? null : type,
+                    })
+                  }
+                />
+              ))}
+            </Menu.ItemGroup>
+            <Menu.Separator />
+            <Menu.ItemGroup>
+              <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                Base Architecture
+              </Menu.ItemGroupLabel>
+              <FilterMenuItem
+                isChecked={filters.baseFilter === null}
+                label="All bases"
+                value="base-all"
+                onSelect={() => onChange({ ...filters, baseFilter: null })}
+              />
+              {availableBases.map((base) => (
+                <FilterMenuItem
+                  key={base}
+                  isChecked={filters.baseFilter === base}
+                  label={getModelBaseLabel(base)}
+                  value={`base-${base}`}
+                  onSelect={() => onChange({ ...filters, baseFilter: filters.baseFilter === base ? null : base })}
+                />
+              ))}
+            </Menu.ItemGroup>
+            <Menu.Separator />
+            <Menu.ItemGroup>
+              <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                Sort By
+              </Menu.ItemGroupLabel>
+              {SORT_FIELDS.map(({ field, label }) => (
+                <FilterMenuItem
+                  key={field}
+                  isChecked={filters.sortField === field}
+                  label={label}
+                  value={`sort-${field}`}
+                  onSelect={() =>
+                    onChange(
+                      filters.sortField === field
+                        ? { ...filters, sortDirection: filters.sortDirection === 'asc' ? 'desc' : 'asc' }
+                        : { ...filters, sortDirection: 'asc', sortField: field }
+                    )
+                  }
+                  trailing={
+                    filters.sortField === field ? (filters.sortDirection === 'asc' ? 'Asc' : 'Desc') : undefined
+                  }
+                />
+              ))}
+            </Menu.ItemGroup>
           </MenuContent>
         </Menu.Positioner>
       </Portal>
