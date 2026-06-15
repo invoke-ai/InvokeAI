@@ -336,8 +336,9 @@ const SidebarRow = ({
   trailing?: ReactNode;
 }) => (
   <Row
-    active={isSelected ? 'muted' : 'none'}
+    active={isSelected ? 'accent' : 'none'}
     aria-current={isSelected || undefined}
+    alignItems="start"
     minW="0"
     p="2"
     role="button"
@@ -352,12 +353,17 @@ const SidebarRow = ({
       }
     }}
   >
-    <Icon as={icon} boxSize="3.5" color={isSelected ? 'accent.solid' : 'fg.muted'} flexShrink={0} />
+    <Icon as={icon} boxSize="3.5" flexShrink={0} />
     <Stack flex="1" gap="0" minW="0">
       <Text fontSize="xs" fontWeight="600" truncate>
         {title}
       </Text>
-      <Text color="fg.subtle" fontSize="2xs" truncate>
+      <Text
+        color={isSelected ? 'accent.contrast' : 'fg.subtle'}
+        opacity={isSelected ? 0.72 : undefined}
+        fontSize="2xs"
+        truncate
+      >
         {subtitle}
       </Text>
     </Stack>
@@ -390,16 +396,22 @@ const BundleRow = ({
       trailing={
         missingCount === 0 ? (
           <Tooltip content="All models in this bundle are installed">
-            <Icon as={CheckIcon} boxSize="3.5" color="fg.success" flexShrink={0} />
+            <Icon as={CheckIcon} boxSize="3.5" color={isSelected ? 'accent.contrast' : 'fg.success'} flexShrink={0} />
           </Tooltip>
         ) : (
-          <Tooltip content={`Install ${missingCount} missing model${missingCount === 1 ? '' : 's'}`}>
+          <Tooltip content={`Install ${missingCount} model${missingCount === 1 ? '' : 's'}`}>
             <IconButton
               aria-label={`Install bundle ${bundle.name}`}
               flexShrink={0}
               loading={isInstalling}
               size="2xs"
               variant="ghost"
+              color={isSelected ? 'accent.contrast' : undefined}
+              // On the accent row, rest at the row's own solid color so the hover
+              // transition has an opaque endpoint — animating background to
+              // `transparent` interpolates through black and flashes dark on leave.
+              bg={isSelected ? 'accent.solid' : undefined}
+              _hover={isSelected ? { bg: 'accent.contrast/20' } : undefined}
               onClick={(event) => {
                 event.stopPropagation();
                 onInstall();
