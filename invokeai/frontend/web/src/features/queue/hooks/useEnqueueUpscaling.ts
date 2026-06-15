@@ -6,8 +6,8 @@ import {
   selectNegativePrompt,
   selectPositivePrompt,
 } from 'features/controlLayers/store/paramsSlice';
-import { buildFluxMultidiffusionUpscaleGraph } from 'features/nodes/util/graph/buildFluxMultidiffusionUpscaleGraph';
 import type { BaseModelType } from 'features/nodes/types/common';
+import { buildFluxMultidiffusionUpscaleGraph } from 'features/nodes/util/graph/buildFluxMultidiffusionUpscaleGraph';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildMultidiffusionUpscaleGraph } from 'features/nodes/util/graph/buildMultidiffusionUpscaleGraph';
 import { buildZImageMultidiffusionUpscaleGraph } from 'features/nodes/util/graph/buildZImageMultidiffusionUpscaleGraph';
@@ -39,7 +39,7 @@ const enqueueUpscaling = async (store: AppStore, prepend: boolean) => {
   }
   const base = model.base;
 
-  const { g, seed, positivePrompt, negativePrompt } = await buildMultidiffusionUpscaleGraph(state);
+  const { g, seed, positivePrompt, negativePrompt } = await buildUpscaleGraph(state, base);
 
   const batchConfig = prepareLinearUIBatch({
     state,
