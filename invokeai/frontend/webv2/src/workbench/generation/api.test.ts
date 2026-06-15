@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { EnqueueGenerateRequest } from './types';
+import type { EnqueueGenerateRequest, EnqueueWorkflowRequest } from './types';
 
 const mocks = vi.hoisted(() => ({
   apiFetchJson: vi.fn(),
@@ -30,6 +30,14 @@ const createRequest = (overrides: Partial<EnqueueGenerateRequest> = {}): Enqueue
   seed: 10,
   seedNodeId: 'seed',
   shouldRandomizeSeed: false,
+  sourceQueueItemId: 'local-1',
+  ...overrides,
+});
+
+const createWorkflowRequest = (overrides: Partial<EnqueueWorkflowRequest> = {}): EnqueueWorkflowRequest => ({
+  batchCount: 2,
+  destination: 'gallery',
+  graph: { edges: [], id: 'graph-1', nodes: {} },
   sourceQueueItemId: 'local-1',
   ...overrides,
 });
@@ -85,5 +93,28 @@ describe('enqueueGenerateGraph', () => {
       },
       { field_name: 'value', items: ['low quality', 'low quality', 'low quality'], node_path: 'negative_prompt' },
     ]);
+  });
+});
+
+describe('enqueueWorkflowGraph', () => {
+  beforeEach(() => {
+    mocks.apiFetchJson.mockReset();
+    mocks.apiFetchJson.mockResolvedValue({ batch: { batch_id: 'batch-1' }, item_ids: [1, 2] });
+  });
+
+  it('submits workflow runs for the requested batch count', async () => {
+    const { enqueueWorkflowGraph } = await import('./api');
+
+    await enqueueWorkflowGraph(createWorkflowRequest());
+
+    expect(getSubmittedBody().batch.runs).toBe(2);
+  });
+
+  it('does not cap workflow runs', async () => {
+    const { enqueueWorkflowGraph } = await import('./api');
+
+    await enqueueWorkflowGraph(createWorkflowRequest({ batchCount: 10_000 }));
+
+    expect(getSubmittedBody().batch.runs).toBe(10_000);
   });
 });

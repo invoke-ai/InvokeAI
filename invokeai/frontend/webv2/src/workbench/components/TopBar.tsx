@@ -19,6 +19,7 @@ import { DEFAULT_THEME_ID, THEMES_BY_ID } from '@theme/themes';
 import { AccountMenu } from '@workbench/auth/components/AccountMenu';
 import { useModelLoads, type ModelLoadInfo } from '@workbench/backend/modelLoadStore';
 import { useQueueItemProgress, type QueueItemProgress } from '@workbench/backend/progressStore';
+import { MIN_BATCH_COUNT, sanitizeBatchCount } from '@workbench/generation/batch';
 import { getDestinationLabel, getSourceLabel } from '@workbench/invocation';
 import { getQueueItemExpectedImageCount, getQueueProgressBarState, getQueueSummary } from '@workbench/queueSummary';
 import { useWorkbenchPreferences } from '@workbench/settings/store';
@@ -89,7 +90,7 @@ const BrandMark = () => {
 const getBatchCount = (values: Record<string, unknown>): number => {
   const batchCount = values.batchCount;
 
-  return typeof batchCount === 'number' && Number.isFinite(batchCount) ? batchCount : 1;
+  return sanitizeBatchCount(batchCount);
 };
 
 const BatchCountField = () => {
@@ -101,8 +102,7 @@ const BatchCountField = () => {
     <NumberInput.Root
       allowMouseWheel
       flexShrink={0}
-      max={64}
-      min={1}
+      min={MIN_BATCH_COUNT}
       size="sm"
       value={String(batchCount)}
       w="14"
@@ -113,7 +113,7 @@ const BatchCountField = () => {
       }}
     >
       <NumberInput.Control />
-      <NumberInput.Input paddingStart="4" aria-label="Batch count" />
+      <NumberInput.Input paddingStart="2.5" aria-label="Batch count" />
     </NumberInput.Root>
   );
 };

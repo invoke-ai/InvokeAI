@@ -12,6 +12,7 @@ import type {
   QueueItemDTO,
 } from './types';
 
+import { sanitizeBatchCount } from './batch';
 import { generateSeedSequence } from './graph';
 
 export const listMainModels = async (): Promise<MainModelConfig[]> => {
@@ -21,7 +22,7 @@ export const listMainModels = async (): Promise<MainModelConfig[]> => {
 };
 
 export const enqueueGenerateGraph = async (request: EnqueueGenerateRequest): Promise<EnqueueGenerateResult> => {
-  const batchCount = Math.max(1, Math.round(request.batchCount));
+  const batchCount = sanitizeBatchCount(request.batchCount);
   const seeds = request.shouldRandomizeSeed ? generateSeedSequence(request.seed, batchCount) : [request.seed];
   const prompts = request.shouldRandomizeSeed ? seeds.map(() => request.positivePrompt) : [request.positivePrompt];
   const negativePrompts = request.shouldRandomizeSeed
@@ -51,14 +52,15 @@ export const enqueueGenerateGraph = async (request: EnqueueGenerateRequest): Pro
   return { batchId: result.batch?.batch_id, itemIds: result.item_ids ?? [] };
 };
 
-/** Enqueue an arbitrary compiled graph as a single run — the workflow / project-graph path. */
+/** Enqueue an arbitrary compiled graph — the workflow / project-graph path. */
 export const enqueueWorkflowGraph = async (request: EnqueueWorkflowRequest): Promise<EnqueueGenerateResult> => {
+  const batchCount = sanitizeBatchCount(request.batchCount);
   const body = {
     batch: {
       destination: request.destination,
       graph: request.graph satisfies BackendGraphContract,
       origin: buildQueueItemOrigin(request.sourceQueueItemId),
-      runs: 1,
+      runs: batchCount,
     },
     prepend: false,
   };

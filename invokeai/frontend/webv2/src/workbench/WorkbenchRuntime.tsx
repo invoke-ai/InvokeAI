@@ -10,6 +10,7 @@ import {
   type ReconcileInput,
 } from './backend/queueCoordinator';
 import { addImagesToGalleryBoard } from './gallery/api';
+import { sanitizeBatchCount } from './generation/batch';
 import { normalizeGenerateSettings } from './generation/settings';
 import { useWorkbenchDispatch, useWorkbenchHasHydrated, useWorkbenchSelector } from './WorkbenchContext';
 import { ensureInvocationTemplatesLoaded } from './workflows/templates';
@@ -21,6 +22,12 @@ const getSnapshotGalleryBoardId = (queueItem: QueueItem): string | null => {
 };
 
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
+const getSnapshotBatchCount = (queueItem: QueueItem): number => {
+  const batchCount = queueItem.snapshot.widgetStates.generate?.values.batchCount;
+
+  return sanitizeBatchCount(batchCount);
+};
 
 /**
  * Await a tracked run's terminal outcome, route its images to the queue item's
@@ -105,6 +112,7 @@ const submitQueueItem = (
         sourceQueueItemId: queueItem.id,
       })
     : coordinator.submitWorkflow(queueItem.id, {
+        batchCount: getSnapshotBatchCount(queueItem),
         destination: queueItem.snapshot.destination,
         graph,
         sourceQueueItemId: queueItem.id,

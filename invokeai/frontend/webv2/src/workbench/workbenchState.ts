@@ -32,6 +32,7 @@ import type {
 } from './types';
 import type { ProjectGraphState } from './workflows/types';
 
+import { sanitizeBatchCount } from './generation/batch';
 import { compileGenerateGraph, resolveGenerateSeed } from './generation/graph';
 import { normalizeGenerateWidgetValues } from './generation/settings';
 import {
@@ -1156,7 +1157,7 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       }));
     }
     case 'setGenerateBatchCount': {
-      const batchCount = Math.min(64, Math.max(1, Math.round(action.batchCount)));
+      const batchCount = sanitizeBatchCount(action.batchCount);
 
       return updateActiveProject(state, (project) => ({
         ...project,

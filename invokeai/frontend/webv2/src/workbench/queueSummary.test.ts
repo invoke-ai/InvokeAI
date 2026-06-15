@@ -9,12 +9,14 @@ const createQueueItem = ({
   backendItemIds,
   batchCount = 1,
   id,
+  sourceId = 'generate',
   status = 'pending',
   submittedAt,
 }: {
   backendItemIds?: number[];
   batchCount?: number;
   id: string;
+  sourceId?: QueueItem['snapshot']['sourceId'];
   status?: QueueItem['status'];
   submittedAt: string;
 }): QueueItem => ({
@@ -35,7 +37,7 @@ const createQueueItem = ({
     },
     destination: 'gallery',
     graph: { edges: [], id: 'graph-1', label: 'Graph', nodes: [], updatedAt: submittedAt, version: 1 },
-    sourceId: 'generate',
+    sourceId,
     submittedAt,
     widgetStates: {
       generate: { id: 'generate', label: 'Generate', values: { batchCount }, version: 1 },
@@ -115,6 +117,33 @@ describe('getQueueSummary', () => {
     ]);
 
     expect(summary).toEqual({ current: 0, runningQueueItemId: null, total: 0 });
+  });
+
+  it('uses the global batch count for workflow-sourced queue items', () => {
+    const summary = getQueueSummary([
+      createQueueItem({
+        batchCount: 2,
+        id: 'workflow-batch',
+        sourceId: 'project-graph',
+        status: 'pending',
+        submittedAt: '2026-06-10T00:00:00.000Z',
+      }),
+    ]);
+
+    expect(summary).toEqual({ current: 0, runningQueueItemId: null, total: 2 });
+  });
+
+  it('does not cap oversized batch counts', () => {
+    const summary = getQueueSummary([
+      createQueueItem({
+        batchCount: 10_000,
+        id: 'oversized-batch',
+        status: 'pending',
+        submittedAt: '2026-06-10T00:00:00.000Z',
+      }),
+    ]);
+
+    expect(summary).toEqual({ current: 0, runningQueueItemId: null, total: 10_000 });
   });
 });
 

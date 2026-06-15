@@ -1,6 +1,7 @@
 import type { InvocationSourceId, Project, ResultDestination } from '@workbench/types';
 
 import { Flex, Group, HStack, Icon, Menu, Portal, Separator, Stack, Text, VStack } from '@chakra-ui/react';
+import { sanitizeBatchCount } from '@workbench/generation/batch';
 import {
   formatRoute,
   getDestinationLabel,
@@ -32,7 +33,7 @@ const CONTROL_WIDTH = '12rem';
 const getBatchCount = (values: Record<string, unknown>): number => {
   const batchCount = values.batchCount;
 
-  return typeof batchCount === 'number' && Number.isFinite(batchCount) ? Math.max(1, Math.round(batchCount)) : 1;
+  return sanitizeBatchCount(batchCount);
 };
 
 const compactBlockingReason = (reason: string): string => {
@@ -57,7 +58,7 @@ const InvokeTooltipContent = ({
   const summary =
     project.invocation.sourceId === 'generate'
       ? `1 prompt × ${batchCount} iteration${batchCount === 1 ? '' : 's'} → ${batchCount} generation${batchCount === 1 ? '' : 's'}`
-      : `Workflow → 1 generation`;
+      : `Workflow × ${batchCount} run${batchCount === 1 ? '' : 's'} → ${batchCount} generation${batchCount === 1 ? '' : 's'}`;
 
   return (
     <Stack gap="1.5" minW="14rem" p="2">

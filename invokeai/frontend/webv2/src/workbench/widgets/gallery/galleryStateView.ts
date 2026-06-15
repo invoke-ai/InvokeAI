@@ -2,6 +2,7 @@ import type { GalleryBoard, GalleryImage, GalleryView } from '@workbench/gallery
 import type { GeneratedImageContract, QueueItem } from '@workbench/types';
 
 import { getGallerySettings, type GallerySettings } from '@workbench/gallery/settings';
+import { sanitizeBatchCount } from '@workbench/generation/batch';
 
 const UNCATEGORIZED_BOARD: GalleryBoard = {
   archived: false,
@@ -135,7 +136,7 @@ export const getGalleryQueuePlaceholders = (
     const generateValues = item.snapshot.widgetStates.generate?.values ?? {};
     const expectedImageCount = item.backendItemIds?.length
       ? item.backendItemIds.length
-      : Math.max(1, Math.round(getFiniteNumber(generateValues.batchCount, 1)));
+      : sanitizeBatchCount(generateValues.batchCount);
     const width = getFiniteNumber(generateValues.width, 1024);
     const height = getFiniteNumber(generateValues.height, 1024);
 
