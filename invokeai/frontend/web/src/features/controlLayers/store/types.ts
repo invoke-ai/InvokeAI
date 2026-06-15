@@ -765,8 +765,16 @@ const zDimensionsState = z.object({
 });
 
 export const MAX_POSITIVE_PROMPT_HISTORY = 100;
+const zPromptHistoryItem = z.union([
+  zParameterPositivePrompt.transform((positivePrompt) => ({ positivePrompt, negativePrompt: null })),
+  z.object({
+    positivePrompt: zParameterPositivePrompt,
+    negativePrompt: zParameterNegativePrompt,
+  }),
+]);
+export type PromptHistoryItem = z.infer<typeof zPromptHistoryItem>;
 const zPositivePromptHistory = z
-  .array(zParameterPositivePrompt)
+  .array(zPromptHistoryItem)
   .transform((arr) => arr.slice(0, MAX_POSITIVE_PROMPT_HISTORY));
 
 export const zInfillMethod = z.enum(['patchmatch', 'lama', 'cv2', 'color', 'tile']);
