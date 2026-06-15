@@ -14,11 +14,13 @@ import { IconButton } from './Button';
  * a flex parent and pass `maxH="100%"`) to control it.
  */
 export const JsonPreview = ({
+  h,
   label = 'JSON preview',
   maxH = '24rem',
   text,
   value,
 }: {
+  h?: string;
   /** Accessible name for the scroll viewport. */
   label?: string;
   maxH?: string;
@@ -61,6 +63,7 @@ export const JsonPreview = ({
       borderWidth="1px"
       display="flex"
       flexDirection="column"
+      h={h}
       maxH={maxH}
       maxW="full"
       minH="0"

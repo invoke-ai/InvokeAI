@@ -1,5 +1,5 @@
 import { Box, Dialog, Portal, SegmentGroup, Text } from '@chakra-ui/react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { formatRoute, isInvocationRouteValid, resolveInvocationRoute } from '../invocation';
 import type { GraphContract, GraphId, InvocationSourceId } from '../types';
@@ -21,6 +21,12 @@ interface GraphPreviewDialogProps {
 }
 
 type PreviewMode = 'nodes' | 'json';
+
+const PreviewPane = ({ children }: { children: ReactNode }) => (
+  <Box flex="1" h="full" minH="0" minW="0" w="full">
+    {children}
+  </Box>
+);
 
 export const GraphPreviewDialog = ({
   graph,
@@ -44,7 +50,7 @@ export const GraphPreviewDialog = ({
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
-          <Dialog.Content h="75vh" maxH="75vh">
+          <Dialog.Content h="62vh" maxH="62vh">
             <Dialog.Header alignItems="center" flexDirection="row" justifyContent="space-between">
               <Dialog.Title>{title} Graph Preview</Dialog.Title>
               <SegmentGroup.Root
@@ -61,17 +67,19 @@ export const GraphPreviewDialog = ({
                 />
               </SegmentGroup.Root>
             </Dialog.Header>
-            <Dialog.Body display="flex" flexDirection="column" minH="0">
+            <Dialog.Body display="flex" flex="1" flexDirection="column" minH="0">
               {!graph ? (
                 <Text color="fg.muted" fontSize="sm">
                   No compiled graph is available for "{graphId}" yet.
                 </Text>
               ) : mode === 'nodes' ? (
-                <Box flex="1" minH="0">
+                <PreviewPane>
                   <GraphPreviewFlow graph={graph} positionHints={positionHints} />
-                </Box>
+                </PreviewPane>
               ) : (
-                <JsonPreview label={`${title} graph JSON`} value={graph} />
+                <PreviewPane>
+                  <JsonPreview h="full" label={`${title} graph JSON`} maxH="100%" value={graph} />
+                </PreviewPane>
               )}
             </Dialog.Body>
             <Dialog.Footer>

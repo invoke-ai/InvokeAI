@@ -10,12 +10,13 @@ import {
   type NodeProps,
   type NodeTypes,
 } from '@xyflow/react';
-import { useMemo } from 'react';
+import { useId, useMemo } from 'react';
 
 import '@xyflow/react/dist/style.css';
 
 import { useWorkbenchPreferences } from '../settings/store';
 import type { GraphContract } from '../types';
+import { getResolvedWorkflowEdges } from '../workflows/connectors';
 import { isInvocationNode, type ProjectGraphState, type XYPosition } from '../workflows/types';
 import { flowThemeCss, getFlowColorMode } from './flowTheme';
 
@@ -35,27 +36,34 @@ type PreviewFlowNode = FlowNode<{ inputCount: number; nodeId: string; nodeType: 
  */
 export const documentToPreviewGraph = (
   document: ProjectGraphState
-): { graph: GraphContract; positionHints: Record<string, XYPosition> } => ({
-  graph: {
-    edges: document.edges.map((edge) => ({
-      id: edge.id,
-      sourceField: edge.sourceHandle,
-      sourceNodeId: edge.source,
-      targetField: edge.targetHandle,
-      targetNodeId: edge.target,
-    })),
-    id: document.id,
-    label: document.name || 'Workflow',
-    nodes: document.nodes.filter(isInvocationNode).map((node) => ({
-      id: node.id,
-      inputs: Object.fromEntries(Object.values(node.data.inputs).map((instance) => [instance.name, instance.value])),
-      type: node.data.type,
-    })),
-    updatedAt: document.updatedAt,
-    version: 1,
-  },
-  positionHints: Object.fromEntries(document.nodes.map((node) => [node.id, node.position])),
-});
+): { graph: GraphContract; positionHints: Record<string, XYPosition> } => {
+  const invocationNodes = document.nodes.filter(isInvocationNode);
+  const invocationNodeIds = new Set(invocationNodes.map((node) => node.id));
+
+  return {
+    graph: {
+      edges: getResolvedWorkflowEdges(document.nodes, document.edges)
+        .filter((edge) => invocationNodeIds.has(edge.source) && invocationNodeIds.has(edge.target))
+        .map((edge) => ({
+          id: edge.id,
+          sourceField: edge.sourceHandle,
+          sourceNodeId: edge.source,
+          targetField: edge.targetHandle,
+          targetNodeId: edge.target,
+        })),
+      id: document.id,
+      label: document.name || 'Workflow',
+      nodes: invocationNodes.map((node) => ({
+        id: node.id,
+        inputs: Object.fromEntries(Object.values(node.data.inputs).map((instance) => [instance.name, instance.value])),
+        type: node.data.type,
+      })),
+      updatedAt: document.updatedAt,
+      version: 1,
+    },
+    positionHints: Object.fromEntries(document.nodes.map((node) => [node.id, node.position])),
+  };
+};
 
 const LAYER_WIDTH = 300;
 const ROW_HEIGHT = 100;
@@ -160,6 +168,7 @@ export const GraphPreviewFlow = ({
   positionHints?: Record<string, XYPosition>;
 }) => {
   const { themeId } = useWorkbenchPreferences();
+  const backgroundId = useId().replace(/:/g, '');
   const nodes = useMemo(() => toPreviewNodes(graph, positionHints), [graph, positionHints]);
   const edges = useMemo(() => toPreviewEdges(graph), [graph]);
 
@@ -181,7 +190,14 @@ export const GraphPreviewFlow = ({
         proOptions={{ hideAttribution: true }}
         style={{ background: 'transparent' }}
       >
-        <Background color="var(--wb-flow-grid)" gap={24} size={1.5} variant={BackgroundVariant.Dots} />
+        <Background
+          bgColor="var(--xy-background-color)"
+          color="var(--wb-flow-grid)"
+          gap={24}
+          id={`preview-grid-${backgroundId}`}
+          size={1.5}
+          variant={BackgroundVariant.Dots}
+        />
       </ReactFlow>
     </Box>
   );

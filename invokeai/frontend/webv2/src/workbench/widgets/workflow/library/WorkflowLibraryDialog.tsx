@@ -296,15 +296,23 @@ export const WorkflowLibraryDialog = ({
                       />
                     </HStack>
                     <Scrollable label="Workflow library results" maxH="20rem" minH="8rem">
-                      <Stack gap="1">
+                      <Stack gap="1" minW="0" w="full">
                         {items.map((item) => (
-                          <HStack
+                          <Box
                             key={item.workflow_id}
                             _hover={{ bg: 'bg.emphasized' }}
+                            alignItems="center"
+                            display="grid"
                             gap="2"
+                            gridTemplateColumns={
+                              category === 'user' ? 'minmax(0, 1fr) auto auto auto' : 'minmax(0, 1fr) auto auto'
+                            }
+                            minW="0"
+                            overflow="hidden"
                             px="1"
                             rounded="md"
                             transition="background 0.12s ease"
+                            w="full"
                           >
                             <Box
                               as="button"
@@ -364,7 +372,7 @@ export const WorkflowLibraryDialog = ({
                                 Delete
                               </Button>
                             ) : null}
-                          </HStack>
+                          </Box>
                         ))}
                         {!isLoading && items.length === 0 ? (
                           <Text color="fg.subtle" fontSize="2xs" px="2" py="4" textAlign="center">
