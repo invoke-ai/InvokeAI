@@ -1,0 +1,395 @@
+{
+  "id": "default_wan22_i2v_lightning_b6f9c5d7-7a8b-9c0d-ef1f-c03b4c5d6e7f",
+  "name": "Image to Video - Wan 2.2 Lightning",
+  "author": "InvokeAI",
+  "description": "Fast image-to-video generation with Wan 2.2 I2V A14B + the Lightning LoRA pair. The reference image becomes frame 0 of the generated MP4 and the model animates outward from there; the Lightning distillation lets the denoise converge in 4 steps with CFG 1.0 (~20x faster than the standard I2V workflow). The 'Frames' on the Reference Image node must match the value on the Denoise Video node — both default to 81.",
+  "version": "1.0.0",
+  "contact": "",
+  "tags": "wan2.2, image to video, video, lightning, lora",
+  "notes": "Prerequisite model downloads: a Wan 2.2 I2V A14B main (Diffusers or GGUF expert pair), plus the matching I2V Lightning LoRA pair (distinct from the T2V Lightning LoRAs). For GGUF mains, also install the Component Source (Diffusers Wan I2V) OR the standalone Wan VAE + UMT5-XXL encoder. The reference image is VAE-encoded across the full latent temporal dim (frame 0 carries the image, remaining frames are zero pixels). If your Lightning LoRAs are untagged, set the 'Apply LoRA (High)' target to 'high' and 'Apply LoRA (Low)' target to 'low' manually. CFG=1.0 skips the negative-conditioning branch; the Negative Prompt content is ignored at runtime.",
+  "exposedFields": [
+    {
+      "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "fieldName": "model"
+    },
+    {
+      "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "fieldName": "transformer_low_noise_model"
+    },
+    {
+      "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "fieldName": "component_source"
+    },
+    {
+      "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "fieldName": "vae_model"
+    },
+    {
+      "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "fieldName": "wan_t5_encoder_model"
+    },
+    {
+      "nodeId": "3466ad11-a931-4adc-b394-9ec287f0c23b",
+      "fieldName": "lora"
+    },
+    {
+      "nodeId": "3466ad11-a931-4adc-b394-9ec287f0c23b",
+      "fieldName": "weight"
+    },
+    {
+      "nodeId": "3466ad11-a931-4adc-b394-9ec287f0c23b",
+      "fieldName": "target"
+    },
+    {
+      "nodeId": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
+      "fieldName": "lora"
+    },
+    {
+      "nodeId": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
+      "fieldName": "weight"
+    },
+    {
+      "nodeId": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
+      "fieldName": "target"
+    },
+    {
+      "nodeId": "7a6edc2d-f38e-a0c1-e27a-8f9dcbb20fce",
+      "fieldName": "image"
+    },
+    {
+      "nodeId": "7a6edc2d-f38e-a0c1-e27a-8f9dcbb20fce",
+      "fieldName": "num_frames"
+    },
+    {
+      "nodeId": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
+      "fieldName": "prompt"
+    },
+    {
+      "nodeId": "3c2a8e9d-bf4a-6d5e-af3c-4b5f6e7d8c9a",
+      "fieldName": "prompt"
+    },
+    {
+      "nodeId": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "fieldName": "steps"
+    },
+    {
+      "nodeId": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "fieldName": "guidance_scale"
+    },
+    {
+      "nodeId": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "fieldName": "guidance_scale_low_noise"
+    },
+    {
+      "nodeId": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "fieldName": "width"
+    },
+    {
+      "nodeId": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "fieldName": "height"
+    },
+    {
+      "nodeId": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "fieldName": "num_frames"
+    },
+    {
+      "nodeId": "6f5dcb1c-e27d-9fb0-d16f-7e8cbaa1fcbd",
+      "fieldName": "fps"
+    }
+  ],
+  "meta": {
+    "version": "3.0.0",
+    "category": "default"
+  },
+  "nodes": [
+    {
+      "id": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "type": "invocation",
+      "data": {
+        "id": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+        "type": "wan_model_loader",
+        "version": "1.0.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": false,
+        "inputs": {
+          "model": { "name": "model", "label": "" },
+          "transformer_low_noise_model": { "name": "transformer_low_noise_model", "label": "" },
+          "vae_model": { "name": "vae_model", "label": "" },
+          "wan_t5_encoder_model": { "name": "wan_t5_encoder_model", "label": "" },
+          "component_source": { "name": "component_source", "label": "" }
+        }
+      },
+      "position": { "x": 0, "y": 0 }
+    },
+    {
+      "id": "3466ad11-a931-4adc-b394-9ec287f0c23b",
+      "type": "invocation",
+      "data": {
+        "id": "3466ad11-a931-4adc-b394-9ec287f0c23b",
+        "type": "wan_lora_loader",
+        "version": "1.0.0",
+        "label": "Apply LoRA (High)",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "lora": { "name": "lora", "label": "" },
+          "weight": { "name": "weight", "label": "", "value": 1 },
+          "target": { "name": "target", "label": "", "value": "auto" }
+        }
+      },
+      "position": { "x": 300, "y": 0 }
+    },
+    {
+      "id": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
+      "type": "invocation",
+      "data": {
+        "id": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
+        "type": "wan_lora_loader",
+        "version": "1.0.0",
+        "label": "Apply LoRA (Low)",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "lora": { "name": "lora", "label": "" },
+          "weight": { "name": "weight", "label": "", "value": 1 },
+          "target": { "name": "target", "label": "", "value": "auto" }
+        }
+      },
+      "position": { "x": 600, "y": 0 }
+    },
+    {
+      "id": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
+      "type": "invocation",
+      "data": {
+        "id": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
+        "type": "wan_text_encoder",
+        "version": "1.0.0",
+        "label": "Positive Prompt",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "prompt": { "name": "prompt", "label": "", "value": "" },
+          "wan_t5_encoder": { "name": "wan_t5_encoder", "label": "" }
+        }
+      },
+      "position": { "x": 700, "y": -300 }
+    },
+    {
+      "id": "3c2a8e9d-bf4a-6d5e-af3c-4b5f6e7d8c9a",
+      "type": "invocation",
+      "data": {
+        "id": "3c2a8e9d-bf4a-6d5e-af3c-4b5f6e7d8c9a",
+        "type": "wan_text_encoder",
+        "version": "1.0.0",
+        "label": "Negative Prompt (unused at CFG=1.0)",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "prompt": { "name": "prompt", "label": "", "value": " " },
+          "wan_t5_encoder": { "name": "wan_t5_encoder", "label": "" }
+        }
+      },
+      "position": { "x": 700, "y": 100 }
+    },
+    {
+      "id": "7a6edc2d-f38e-a0c1-e27a-8f9dcbb20fce",
+      "type": "invocation",
+      "data": {
+        "id": "7a6edc2d-f38e-a0c1-e27a-8f9dcbb20fce",
+        "type": "wan_ref_image_encoder",
+        "version": "1.1.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "image": { "name": "image", "label": "Reference Image" },
+          "vae": { "name": "vae", "label": "" },
+          "width": { "name": "width", "label": "", "value": 832 },
+          "height": { "name": "height", "label": "", "value": 480 },
+          "num_frames": { "name": "num_frames", "label": "Frames", "value": 81 }
+        }
+      },
+      "position": { "x": 700, "y": 400 }
+    },
+    {
+      "id": "5e4cab0b-d16c-8faf-c05e-6d7baf90ebbc",
+      "type": "invocation",
+      "data": {
+        "id": "5e4cab0b-d16c-8faf-c05e-6d7baf90ebbc",
+        "type": "rand_int",
+        "version": "1.0.1",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": false,
+        "inputs": {
+          "low": { "name": "low", "label": "", "value": 0 },
+          "high": { "name": "high", "label": "", "value": 2147483647 }
+        }
+      },
+      "position": { "x": 700, "y": 650 }
+    },
+    {
+      "id": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "type": "invocation",
+      "data": {
+        "id": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+        "type": "wan_video_denoise",
+        "version": "1.0.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "transformer": { "name": "transformer", "label": "" },
+          "positive_conditioning": { "name": "positive_conditioning", "label": "" },
+          "negative_conditioning": { "name": "negative_conditioning", "label": "" },
+          "ref_image": { "name": "ref_image", "label": "" },
+          "guidance_scale": { "name": "guidance_scale", "label": "CFG", "value": 1.0 },
+          "guidance_scale_low_noise": { "name": "guidance_scale_low_noise", "label": "CFG (Low)", "value": 1.0 },
+          "width": { "name": "width", "label": "", "value": 832 },
+          "height": { "name": "height", "label": "", "value": 480 },
+          "num_frames": { "name": "num_frames", "label": "Frames", "value": 81 },
+          "steps": { "name": "steps", "label": "", "value": 4 },
+          "seed": { "name": "seed", "label": "", "value": 0 }
+        }
+      },
+      "position": { "x": 1100, "y": -50 }
+    },
+    {
+      "id": "6f5dcb1c-e27d-9fb0-d16f-7e8cbaa1fcbd",
+      "type": "invocation",
+      "data": {
+        "id": "6f5dcb1c-e27d-9fb0-d16f-7e8cbaa1fcbd",
+        "type": "wan_l2v",
+        "version": "1.0.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": true,
+        "inputs": {
+          "board": { "name": "board", "label": "" },
+          "metadata": { "name": "metadata", "label": "" },
+          "latents": { "name": "latents", "label": "" },
+          "vae": { "name": "vae", "label": "" },
+          "fps": { "name": "fps", "label": "FPS", "value": 16 }
+        }
+      },
+      "position": { "x": 1550, "y": -50 }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-loader-transformer-lora1",
+      "type": "default",
+      "source": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "target": "3466ad11-a931-4adc-b394-9ec287f0c23b",
+      "sourceHandle": "transformer",
+      "targetHandle": "transformer"
+    },
+    {
+      "id": "edge-lora1-lora2",
+      "type": "default",
+      "source": "3466ad11-a931-4adc-b394-9ec287f0c23b",
+      "target": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
+      "sourceHandle": "transformer",
+      "targetHandle": "transformer"
+    },
+    {
+      "id": "edge-lora2-denoise",
+      "type": "default",
+      "source": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
+      "target": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "sourceHandle": "transformer",
+      "targetHandle": "transformer"
+    },
+    {
+      "id": "edge-loader-t5-pos",
+      "type": "default",
+      "source": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "target": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
+      "sourceHandle": "wan_t5_encoder",
+      "targetHandle": "wan_t5_encoder"
+    },
+    {
+      "id": "edge-loader-t5-neg",
+      "type": "default",
+      "source": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "target": "3c2a8e9d-bf4a-6d5e-af3c-4b5f6e7d8c9a",
+      "sourceHandle": "wan_t5_encoder",
+      "targetHandle": "wan_t5_encoder"
+    },
+    {
+      "id": "edge-loader-vae-l2v",
+      "type": "default",
+      "source": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "target": "6f5dcb1c-e27d-9fb0-d16f-7e8cbaa1fcbd",
+      "sourceHandle": "vae",
+      "targetHandle": "vae"
+    },
+    {
+      "id": "edge-loader-vae-refenc",
+      "type": "default",
+      "source": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
+      "target": "7a6edc2d-f38e-a0c1-e27a-8f9dcbb20fce",
+      "sourceHandle": "vae",
+      "targetHandle": "vae"
+    },
+    {
+      "id": "edge-pos-cond-denoise",
+      "type": "default",
+      "source": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
+      "target": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "sourceHandle": "conditioning",
+      "targetHandle": "positive_conditioning"
+    },
+    {
+      "id": "edge-neg-cond-denoise",
+      "type": "default",
+      "source": "3c2a8e9d-bf4a-6d5e-af3c-4b5f6e7d8c9a",
+      "target": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "sourceHandle": "conditioning",
+      "targetHandle": "negative_conditioning"
+    },
+    {
+      "id": "edge-refenc-refimage-denoise",
+      "type": "default",
+      "source": "7a6edc2d-f38e-a0c1-e27a-8f9dcbb20fce",
+      "target": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "sourceHandle": "ref_image",
+      "targetHandle": "ref_image"
+    },
+    {
+      "id": "edge-rand-seed-denoise",
+      "type": "default",
+      "source": "5e4cab0b-d16c-8faf-c05e-6d7baf90ebbc",
+      "target": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "sourceHandle": "value",
+      "targetHandle": "seed"
+    },
+    {
+      "id": "edge-denoise-latents-l2v",
+      "type": "default",
+      "source": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
+      "target": "6f5dcb1c-e27d-9fb0-d16f-7e8cbaa1fcbd",
+      "sourceHandle": "latents",
+      "targetHandle": "latents"
+    }
+  ]
+}

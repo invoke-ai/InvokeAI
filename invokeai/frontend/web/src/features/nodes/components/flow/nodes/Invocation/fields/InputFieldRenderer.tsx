@@ -57,6 +57,8 @@ import {
   isStringGeneratorFieldInputTemplate,
   isStylePresetFieldInputInstance,
   isStylePresetFieldInputTemplate,
+  isVideoFieldInputInstance,
+  isVideoFieldInputTemplate,
 } from 'features/nodes/types/field';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { memo } from 'react';
@@ -70,6 +72,7 @@ import EnumFieldInputComponent from './inputs/EnumFieldInputComponent';
 import ImageFieldInputComponent from './inputs/ImageFieldInputComponent';
 import SchedulerFieldInputComponent from './inputs/SchedulerFieldInputComponent';
 import StylePresetFieldInputComponent from './inputs/StylePresetFieldInputComponent';
+import VideoFieldInputComponent from './inputs/VideoFieldInputComponent';
 
 type Props = {
   nodeId: string;
@@ -200,6 +203,13 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
       return null;
     }
     return <ImageFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isVideoFieldInputTemplate(template)) {
+    if (!isVideoFieldInputInstance(field)) {
+      return null;
+    }
+    return <VideoFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
   }
 
   if (isBoardFieldInputTemplate(template)) {

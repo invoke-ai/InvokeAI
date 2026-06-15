@@ -1,0 +1,104 @@
+---
+title: Canvas Projects
+description: Save and re-open complete canvas sessions — layers, masks, reference images, parameters and LoRAs — so you can pick up exactly where you left off.
+lastUpdated: 2026-05-14
+---
+
+import { Card, CardGrid, Steps } from '@astrojs/starlight/components';
+
+A **Canvas Project** is a snapshot of everything you have on the canvas at a given moment — every layer, mask, reference image, generation setting, and active LoRA. You can save a project, come back to it later, share it with someone else, or just keep multiple versions of the same scene side-by-side.
+
+![Canvas Project entry in the gallery](./assets/gallery.png)
+
+---
+
+## What's included in a project
+
+When you save, the project keeps:
+
+- All raster layers, control layers, inpaint masks and regional guidance regions
+- Global reference images and IP-Adapter / FLUX Redux setups
+- The current generation parameters — model, prompt, seed, scheduler, dimensions, etc.
+- Active LoRAs and their weights
+- The bounding box and your currently-selected layer
+
+It does **not** include items that are still in the staging area (generations you haven't accepted yet), pending queue items, or anything from other tabs like the workflow editor.
+
+---
+
+## Saving a project
+
+Open the save dialog from **File → Save Canvas Project** (or the matching entry in the canvas right-click menu).
+
+You have two choices for where the project goes:
+
+* **Save to Server** — keeps the project on InvokeAI. It shows up in the gallery alongside your images and videos, can be assigned to a board, and can be re-opened from any browser pointed at the same InvokeAI installation.
+* **Download as File** — saves the project as a `.invk` file in your browser's downloads folder. Useful for backups or sharing with someone else.
+
+When saving to the server, pick a board (or leave it as *Uncategorized*) before clicking **Save**.
+
+### Updating a project you already loaded
+
+If you opened the canvas by loading a project from the gallery, the save dialog automatically offers two save modes:
+
+* **Update Existing Project** — overwrites the project you opened with your current canvas. Its name, board, and starred state are preserved. The save dialog shows the project's thumbnail and name so you can double-check which one you're about to overwrite.
+* **Create New Project** — saves your work as a *new* project, leaving the original untouched. Use this as a "Save As".
+
+### About the gallery thumbnail
+
+The thumbnail you see in the gallery is automatically rendered from the visible raster content of your canvas at save time. If your canvas only contains control layers, masks, or reference images (no visible raster), the project saves without a thumbnail and shows a neutral placeholder until you re-save with some visible content.
+
+---
+
+## Loading a project
+
+Two ways to load:
+
+1. **From the gallery** — click a project in the gallery to preview its thumbnail in the viewer, then click **Load Canvas Project** in the viewer toolbar. You can also right-click the project and pick *Load Project*.
+2. **From a file** — use **File → Load Canvas Project from File** and pick a `.invk` file from your disk.
+
+Either way, a confirmation dialog appears first, because:
+
+:::caution
+Loading a project **replaces** your current canvas. Layers, masks, reference images, generation parameters and LoRAs are all overwritten. There is no undo. If you have unsaved work, save it first.
+:::
+
+After you confirm, InvokeAI switches you to the Canvas tab automatically so you can start editing right away.
+
+### What happens if some images are missing?
+
+When you load an older project, some of the images it references may no longer be on the server (especially intermediate generations, which get cleaned up over time). That's fine — every image is also embedded inside the project file, so InvokeAI automatically restores the missing ones and reconnects them to your layers. You don't need to do anything; it just works.
+
+---
+
+## Organizing projects in the gallery
+
+Projects show up in the same gallery grid as images and videos, marked with a small layer-stack badge so you can tell them apart at a glance.
+
+![Canvas Project gallery item with badge](./assets/gallery.png)
+
+### Right-click menu
+
+Right-click (or long-press on touch devices) a project for these actions:
+
+* **Load Canvas Project** — same as the toolbar button: opens the load confirmation dialog
+* **Download** — saves a `.invk` copy to your computer, handy as a backup or to share
+* **Delete** — permanently removes the project after a confirmation
+
+### Moving projects between boards
+
+Drag any project from the gallery onto a board in the boards list to move it there. Drag it onto *Uncategorized* to remove it from a board. You can also pick *Change Board* from the right-click menu after selecting one or more projects.
+
+A project can be on **one board at a time**. If you delete a board, all of its contents — images, videos, and canvas projects — are deleted with it, so download anything you want to keep beforehand.
+
+### Selecting multiple items
+
+Shift-click, Ctrl-click and Cmd-click work across all three kinds of gallery items. You can select a range that mixes images, videos and canvas projects together; bulk actions like delete will handle each kind correctly.
+
+---
+
+## Sharing and backing up
+
+Because **Download as File** produces a regular `.invk` file, sharing a project is as simple as sending that file to someone else. They can load it via **File → Load Canvas Project from File** and get an exact copy of your canvas (assuming the models and LoRAs you used are also available on their installation).
+
+For your own backups, the same download is the easiest option — pop the `.invk` files onto cloud storage or a USB drive.
