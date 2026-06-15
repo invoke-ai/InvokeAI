@@ -89,7 +89,7 @@ const previewGridCss = {
   backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1.5px)',
   backgroundPosition: 'center',
   backgroundRepeat: 'repeat',
-  backgroundSize: '14px 14px',
+  backgroundSize: '24px 24px',
 } as const;
 
 export const PreviewWidgetView = ({ region }: WidgetViewProps) => {
@@ -342,7 +342,6 @@ const SelectedImagePreview = ({
   >
     <Flex
       align="center"
-      backgroundColor="bg.inset"
       borderWidth="1px"
       borderColor="border.subtle"
       color="fg.grid"
@@ -387,7 +386,7 @@ const SelectedImagePreview = ({
         />
       </Box>
     </Flex>
-    <Stack bg="bg.muted" borderWidth="1px" borderColor="border.subtle" gap="2" p="3" rounded="lg">
+    <Stack borderWidth="1px" borderColor="border.subtle" gap="2" p="3" rounded="lg">
       <HStack align="center" justify="space-between">
         <HStack gap="2" minW="0">
           <Badge flexShrink={0} size="xs" variant="subtle">

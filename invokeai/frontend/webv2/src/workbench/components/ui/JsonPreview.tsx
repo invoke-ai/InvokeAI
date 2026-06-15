@@ -59,8 +59,6 @@ export const JsonPreview = ({
   return (
     <Box
       bg="bg.inset"
-      borderColor="border.subtle"
-      borderWidth="1px"
       display="flex"
       flexDirection="column"
       h={h}
@@ -70,7 +68,6 @@ export const JsonPreview = ({
       minW="0"
       overflow="hidden"
       position="relative"
-      rounded="md"
       w="full"
     >
       <IconButton

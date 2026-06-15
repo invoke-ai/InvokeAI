@@ -13,7 +13,7 @@ import type { WorkbenchThemeId } from '../types';
 export const flowThemeCss: SystemStyleObject = {
   '--wb-flow-grid': '{colors.fg.grid}',
   '--xy-attribution-background-color': 'transparent',
-  '--xy-background-color': '{colors.bg.inset}',
+  '--xy-background-color': '{colors.bg}',
   '--xy-connectionline-stroke': '{colors.accent.solid}',
   '--xy-edge-stroke': '{colors.border.emphasized}',
   '--xy-edge-stroke-selected': '{colors.accent.solid}',

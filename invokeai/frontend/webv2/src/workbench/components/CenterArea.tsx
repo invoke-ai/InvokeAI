@@ -43,8 +43,8 @@ export const CenterArea = () => {
     : centerViewItems[0]?.id;
 
   return (
-    <Flex as="section" bg="bg.inset" direction="column" flex="1" minH="0" minW="0" {...focusRegionProps}>
-      <HStack bg="bg.muted" borderBottomWidth="1px" borderColor="border.subtle" h="10" px="1.5">
+    <Flex as="section" bg="bg" direction="column" flex="1" minH="0" minW="0" {...focusRegionProps}>
+      <HStack bg="bg.subtle" borderBottomWidth="1px" borderColor="border.subtle" h="10" px="1.5">
         <Tabs.Root
           value={activeCenterViewId}
           h="full"

@@ -23,7 +23,7 @@ interface GraphPreviewDialogProps {
 type PreviewMode = 'nodes' | 'json';
 
 const PreviewPane = ({ children }: { children: ReactNode }) => (
-  <Box flex="1" h="full" minH="0" minW="0" w="full">
+  <Box flex="1" h="full" minH="0" minW="0" w="full" rounded="md" borderWidth={1} overflow="hidden">
     {children}
   </Box>
 );

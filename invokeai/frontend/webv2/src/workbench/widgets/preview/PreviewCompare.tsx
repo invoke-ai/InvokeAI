@@ -22,7 +22,7 @@ const previewGridCss = {
   backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1.5px)',
   backgroundPosition: 'center',
   backgroundRepeat: 'repeat',
-  backgroundSize: '14px 14px',
+  backgroundSize: '24px 24px',
 } as const;
 
 /**

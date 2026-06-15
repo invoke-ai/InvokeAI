@@ -80,7 +80,7 @@ const HeaderSlot = ({
   const actions = HeaderActions ? (
     <HeaderActions manifest={widget.manifest} presentation={presentation} region={region} />
   ) : null;
-  const bg = region === 'center' ? 'bg.inset' : 'bg';
+  const bg = region === 'center' ? 'bg' : 'bg.subtle';
 
   return (
     <Box bg={bg} flexShrink={0}>
@@ -109,7 +109,7 @@ const FooterSlot = ({
   if (!Footer) {
     return null;
   }
-  const bg = region === 'center' ? 'bg.inset' : 'bg';
+  const bg = region === 'center' ? 'bg.inset' : 'bg.subtle';
 
   return (
     <Box bg={bg} flexShrink={0}>

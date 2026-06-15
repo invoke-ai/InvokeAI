@@ -112,7 +112,7 @@ export const WidgetPanelFrame = ({
   return (
     <Flex
       as="aside"
-      bg="bg"
+      bg="bg.subtle"
       borderColor="border.subtle"
       borderRightWidth={isLeft ? '1px' : '0'}
       borderLeftWidth={!isLeft && !isBottom ? '1px' : '0'}
