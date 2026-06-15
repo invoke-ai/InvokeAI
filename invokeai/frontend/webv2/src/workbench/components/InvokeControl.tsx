@@ -1,17 +1,18 @@
-import { Flex, Group, HStack, Icon, Menu, Portal, Stack, Text, VStack } from '@chakra-ui/react';
+import { Flex, Group, HStack, Icon, Menu, Portal, Separator, Stack, Text, VStack } from '@chakra-ui/react';
 import { useEffect, useRef } from 'react';
 import { CheckIcon, ChevronDownIcon, LockKeyholeIcon, SparklesIcon } from 'lucide-react';
 
 import { useActiveProject, useWorkbenchDispatch, useWorkbenchSelector } from '../WorkbenchContext';
 import {
   formatRoute,
+  getDestinationLabel,
   invocationSources,
   isInvocationRouteValid,
   resolveInvocationRoute,
   resultDestinations,
 } from '../invocation';
 import { useInvocationTemplatesSnapshot } from '../workflows/templates';
-import type { InvocationSourceId, ResultDestination } from '../types';
+import type { InvocationSourceId, Project, ResultDestination } from '../types';
 import { Button, IconButton } from './ui/Button';
 import { Tooltip } from './ui/Tooltip';
 
@@ -26,6 +27,72 @@ import { Tooltip } from './ui/Tooltip';
  * state even though full invocation lands in Phase 4.
  */
 const CONTROL_WIDTH = '12rem';
+
+const getBatchCount = (values: Record<string, unknown>): number => {
+  const batchCount = values.batchCount;
+
+  return typeof batchCount === 'number' && Number.isFinite(batchCount) ? Math.max(1, Math.round(batchCount)) : 1;
+};
+
+const compactBlockingReason = (reason: string): string => {
+  if (reason === 'The project graph has no nodes. Add nodes in the Workflow view.') {
+    return 'No nodes in graph';
+  }
+
+  return reason.replace(/^The /, '').replace(/project graph/i, 'workflow');
+};
+
+const InvokeTooltipContent = ({
+  blockingReasons,
+  isValid,
+  project,
+}: {
+  blockingReasons: string[];
+  isValid: boolean;
+  project: Project;
+}) => {
+  const batchCount = getBatchCount(project.widgetStates.generate.values);
+  const destination = getDestinationLabel(project.invocation.destination);
+  const summary =
+    project.invocation.sourceId === 'generate'
+      ? `1 prompt × ${batchCount} iteration${batchCount === 1 ? '' : 's'} → ${batchCount} generation${batchCount === 1 ? '' : 's'}`
+      : `Workflow → 1 generation`;
+
+  return (
+    <Stack gap="1.5" minW="14rem" p="2">
+      <Text fontSize="xs" fontWeight="800">
+        {isValid ? 'Add to Queue' : 'Unable to Queue'}
+      </Text>
+      <Text color="fg.muted" fontSize="xs">
+        {summary}
+      </Text>
+      {blockingReasons.length > 0 ? (
+        <>
+          <Separator borderColor="border.subtle" />
+          <Stack gap="1">
+            {blockingReasons.map((reason) => (
+              <HStack key={reason} align="start" gap="1.5">
+                <Text color="fg.subtle" fontSize="xs" lineHeight="1.35">
+                  •
+                </Text>
+                <Text color="fg.muted" fontSize="xs" lineHeight="1.35">
+                  {compactBlockingReason(reason)}
+                </Text>
+              </HStack>
+            ))}
+          </Stack>
+        </>
+      ) : (
+        <>
+          <Separator borderColor="border.subtle" />
+          <Text color="fg.muted" fontSize="xs">
+            Adding images to {destination}
+          </Text>
+        </>
+      )}
+    </Stack>
+  );
+};
 
 export const InvokeControl = () => {
   const activeProject = useActiveProject();
@@ -98,15 +165,11 @@ export const InvokeControl = () => {
         <Group attached>
           <Tooltip
             content={
-              <Stack gap="0.5">
-                {blockingReasons.map((reason) => (
-                  <Text key={reason} fontSize="2xs">
-                    {reason}
-                  </Text>
-                ))}
-              </Stack>
+              <InvokeTooltipContent blockingReasons={blockingReasons} isValid={isValid} project={activeProject} />
             }
-            disabled={isValid}
+            contentProps={{ p: '0' }}
+            openDelay={200}
+            showArrow
           >
             {/* aria-disabled (not disabled) keeps hover alive so the reasons tooltip can show. */}
             <Button
