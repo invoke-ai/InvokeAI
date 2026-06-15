@@ -1,7 +1,5 @@
-import { Icon, Separator, Stack, type StackProps } from '@chakra-ui/react';
+import { Icon, Separator, Stack, type StackProps, IconButton } from '@chakra-ui/react';
 import type { ComponentProps } from 'react';
-
-import { IconButton } from './Button';
 
 /**
  * The workbench's floating tool strip, shared by canvas-like surfaces (the

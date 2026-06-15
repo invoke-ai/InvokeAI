@@ -1,8 +1,7 @@
-import { Icon, Popover, Portal, Stack, Text, Textarea } from '@chakra-ui/react';
+import { Icon, Popover, Portal, Stack, Text, Textarea, IconButton } from '@chakra-ui/react';
 import { FileTextIcon } from 'lucide-react';
 import type { ChangeEvent } from 'react';
 
-import { IconButton } from '../../../components/ui/Button';
 import { useWorkbenchDispatch } from '../../../WorkbenchContext';
 
 /**
@@ -42,7 +41,7 @@ export const FieldDescriptionPopover = ({
           <Popover.Content bg="bg.muted" borderColor="border.emphasized" borderWidth="1px" w="18rem">
             <Popover.Body p="2">
               <Stack gap="1">
-                <Text color="fg.subtle" fontSize="2xs">
+                <Text color="fg.subtle" fontSize="2xs" lineHeight={1.3}>
                   Field description — overrides the node's default. Clear to restore it.
                 </Text>
                 <Textarea
