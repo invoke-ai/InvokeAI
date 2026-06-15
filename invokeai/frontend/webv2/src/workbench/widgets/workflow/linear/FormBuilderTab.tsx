@@ -1,5 +1,16 @@
 import { Box, HStack, Icon, Input, Menu, Portal, Separator, Stack, Text, Textarea } from '@chakra-ui/react';
-import { Columns2Icon, CrosshairIcon, GripVerticalIcon, InfoIcon, PlusIcon, Rows2Icon, XIcon } from 'lucide-react';
+import {
+  Columns2Icon,
+  CrosshairIcon,
+  GripVerticalIcon,
+  HeadingIcon,
+  InfoIcon,
+  MinusIcon,
+  PlusIcon,
+  Rows2Icon,
+  TextIcon,
+  XIcon,
+} from 'lucide-react';
 import { createContext, use, useMemo, useState, type ChangeEvent, type DragEvent, type ReactNode } from 'react';
 
 import { Button, IconButton } from '../../../components/ui/Button';
@@ -123,9 +134,9 @@ const BuilderCard = ({
           {...(dropEdge === 'above' ? { top: '-1px' } : { bottom: '-1px' })}
         />
       ) : null}
-      <Box bg="bg" borderColor="border.subtle" borderWidth="1px" overflow="hidden" rounded="md">
+      <Box borderColor="border.subtle" borderWidth="1px" overflow="hidden" rounded="md">
         <HStack
-          bg="bg.subtle"
+          bg="bg.muted"
           borderBottomWidth="1px"
           borderColor="border.subtle"
           cursor="grab"
@@ -418,18 +429,23 @@ const AddElementMenu = () => {
         <Menu.Positioner>
           <Menu.Content minW="11rem">
             <Menu.Item value="heading" onClick={() => add('heading')}>
+              <Icon as={HeadingIcon} boxSize="3" />
               Heading
             </Menu.Item>
             <Menu.Item value="text" onClick={() => add('text')}>
+              <Icon as={TextIcon} boxSize="3" />
               Text
             </Menu.Item>
             <Menu.Item value="divider" onClick={() => add('divider')}>
+              <Icon as={MinusIcon} boxSize="3" />
               Divider
             </Menu.Item>
             <Menu.Item value="container-column" onClick={() => add('container', 'column')}>
+              <Icon as={Columns2Icon} boxSize="3" />
               Container (column)
             </Menu.Item>
             <Menu.Item value="container-row" onClick={() => add('container', 'row')}>
+              <Icon as={Rows2Icon} boxSize="3" />
               Container (row)
             </Menu.Item>
           </Menu.Content>

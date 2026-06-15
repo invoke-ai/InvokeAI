@@ -1,10 +1,9 @@
-import { Badge, Box, Flex, HStack, Icon, Image, Input, Stack, Text } from '@chakra-ui/react';
+import { Badge, Box, Flex, HStack, Icon, Image, Input, Stack, Text, IconButton } from '@chakra-ui/react';
 import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
 import { ChevronDownIcon, ChevronRightIcon, PinIcon, PinOffIcon, TriangleAlertIcon } from 'lucide-react';
 import { memo, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 
 import { useNodeExecutionState, type NodeExecutionState } from '../../../backend/nodeExecutionStore';
-import { IconButton } from '../../../components/ui/Button';
 import { Tooltip } from '../../../components/ui/Tooltip';
 import { useWorkbenchDispatch } from '../../../WorkbenchContext';
 import { getFieldTypeColor, getFieldTypeLabel, isDirectInputField, isExposableField } from '../../../workflows/fields';
@@ -368,7 +367,7 @@ const InvocationFlowNodeComponent = ({ data, selected }: NodeProps<InvocationFlo
       </Flex>
       <NodeProgressStrip execution={execution} />
       {isOpen ? (
-        <Box py="1">
+        <Box py="1" bg="bg.muted">
           {outputTemplates.map((outputTemplate) => (
             <OutputFieldRow key={outputTemplate.name} isSkeleton={isZoomedOut} template={outputTemplate} />
           ))}

@@ -49,14 +49,16 @@ const NodeResultRow = ({ row }: { row: NodeRow }) => (
   <Box
     as="button"
     _hover={{ bg: 'bg.emphasized' }}
-    px="3"
+    ps="3"
+    pe="2"
     py="2"
     rounded="md"
     textAlign="start"
     w="full"
     onClick={row.onAdd}
+    cursor="pointer"
   >
-    <HStack gap="2" justify="space-between">
+    <HStack gap="2" justify="space-between" alignItems="start">
       <Stack gap="0" minW="0">
         <HStack gap="1.5" minW="0">
           {row.isBeta ? (
@@ -74,9 +76,9 @@ const NodeResultRow = ({ row }: { row: NodeRow }) => (
           </Text>
         ) : null}
       </Stack>
-      <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
+      <Badge size="xs" variant="outline" fontFamily="mono">
         {row.nodePack}
-      </Text>
+      </Badge>
     </HStack>
   </Box>
 );
@@ -234,19 +236,19 @@ const AddNodeDialogContent = ({
           const isExpanded = accordionValue.includes(group.label);
 
           return (
-            <Accordion.Item key={group.label} value={group.label}>
-              <Accordion.ItemTrigger cursor="pointer" px="1" py="1.5">
+            <Accordion.Item key={group.label} value={group.label} _hover={{ bg: 'bg.muted' }} rounded="md">
+              <Accordion.ItemTrigger cursor="pointer" ps="1" pe="2" py="1.5">
                 <Accordion.ItemIndicator />
                 <Text flex="1" fontSize="xs" fontWeight="700" textAlign="start">
                   {group.label}
                 </Text>
-                <Badge size="sm" variant="surface">
+                <Badge size="sm" variant="surface" fontFamily="mono">
                   {group.rows.length}
                 </Badge>
               </Accordion.ItemTrigger>
               <Accordion.ItemContent>
                 {isExpanded ? (
-                  <Stack gap="0.5" pb="2">
+                  <Stack gap="0">
                     {group.rows.map((row) => (
                       <NodeResultRow key={`${group.label}:${row.title}`} row={row} />
                     ))}
