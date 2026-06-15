@@ -53,10 +53,11 @@ To install a different SDNQ model from HuggingFace:
 1. Open the **Model Manager** → **Add Model** → **HuggingFace** tab.
 2. Enter the repo, e.g. `Disty0/FLUX.2-klein-9B-SDNQ-4bit-dynamic-svd-r32`.
 3. Click **Install**. The whole pipeline folder downloads (transformer + text encoder + tokenizer + VAE).
+</Steps>
+
 :::tip
 For very large SDNQ models, you can also pre-download with `huggingface-cli` and then point InvokeAI at the local folder via **Add Model** → **Folder**.
 :::
-</Steps>
 
 InvokeAI auto-detects the SDNQ format from `transformer/quantization_config.json` (the `quant_method: "sdnq"` marker). The Model Manager shows the format as **sdnq** in the model badge once installed.
 
