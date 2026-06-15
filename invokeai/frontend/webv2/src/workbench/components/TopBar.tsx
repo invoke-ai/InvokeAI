@@ -36,7 +36,7 @@ export const TopBar = () => (
   <Flex
     align="center"
     as="header"
-    bg="bg.muted"
+    bg="bg.subtle"
     borderBottomWidth="1px"
     borderColor="border.subtle"
     flexShrink={0}
@@ -77,7 +77,7 @@ const BrandMark = () => {
       <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 44 44" width="20">
         <path
           d="M29.1951 10.6667H42V2H2V10.6667H14.8049L29.1951 33.3333H42V42H2V33.3333H14.8049"
-          stroke={theme.colors.brandFg}
+          stroke={theme.colors.brand.solid}
           strokeWidth="2.8"
         />
       </svg>

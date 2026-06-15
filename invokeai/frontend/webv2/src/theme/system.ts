@@ -1,29 +1,33 @@
 import { createSystem, defaultConfig, defineConfig } from '@chakra-ui/react';
 
 import { dialogSlotRecipe, menuSlotRecipe, tooltipSlotRecipe } from './recipes';
-import { DEFAULT_THEME, DEFAULT_THEME_ID, THEMES, THEMES_BY_ID, type ThemeColors } from './themes';
+import { DEFAULT_THEME, DEFAULT_THEME_ID, type NeutralStep, THEMES, type ThemeDefinition } from './themes';
 
 /**
  * Workbench design system.
  *
- * The shell is theme-able across several presets (dark, light, forest, mono,
- * ultra dark). Rather than hand-author one token set per theme, we derive the
- * semantic-token layer from the theme registry in `themes.ts`:
+ * Each theme (`themes.ts`) is authored as one neutral ramp (`neutral.50…neutral.950`,
+ * lightest → darkest) plus a few seeds (brand, accent, status) and four off-ramp
+ * neutrals (`inset`, `fill`, `grid`, `control`). This module turns that into two
+ * token layers:
  *
- *   - the default theme (`DEFAULT_THEME_ID`) becomes each token's `base` value;
- *   - every other theme contributes a conditional value keyed on a custom
- *     `[data-theme=<id>]` condition.
+ *   1. The **ramp** is emitted verbatim as conditional semantic tokens
+ *      (`neutral.*`), one value per theme keyed on a custom `[data-theme=<id>]`
+ *      condition. Chakra base `tokens.colors` only hold plain strings, so anything
+ *      that varies per theme must live in `semanticTokens`.
+ *   2. The **semantic contract** (`bg`, `fg.muted`, `border.emphasized`, the
+ *      `gray`/`brand`/`accent` palettes, …) is theme-agnostic: it references ramp
+ *      steps and flips by light/dark mode only. `bg` is `neutral.950` in dark mode and
+ *      `neutral.200` in light — the light ramp is not a mirror of the dark one, because
+ *      light panels go *whiter* than the app background.
  *
- * `ThemeController` sets `data-theme` on `<html>`, so flipping themes is a single
- * attribute change with zero re-render of the React tree. Components reference
- * only the semantic tokens below — they never know which theme is active.
+ * `ThemeController` sets `data-theme` (and the `.dark`/`.light` class) on `<html>`,
+ * so switching themes is a single attribute change with zero React re-render.
+ * Components reference only the semantic tokens — never the ramp or a theme.
  *
- * The token contract deliberately reuses Chakra's own semantic names (`bg`,
- * `bg.subtle`, `fg.muted`, `border.emphasized`, …) and re-points its neutral
- * `gray` palette at the theme ladder, so built-in components (Dialog, Menu,
- * Input, Button, Tooltip) follow the active theme with no per-component
- * overrides. Workbench-specific additions are intent-based (`bg.inset`,
- * `fg.grid`, the `brand` and `accent` palettes) — never named after a widget.
+ * Re-pointing Chakra's neutral `gray` palette at the ramp makes every built-in
+ * component (Dialog, Menu, Input, Button, Tooltip, Badge) follow the active theme
+ * with no per-component overrides.
  */
 
 const NON_DEFAULT_THEMES = THEMES.filter((theme) => theme.id !== DEFAULT_THEME_ID);
@@ -32,121 +36,156 @@ const NON_DEFAULT_THEMES = THEMES.filter((theme) => theme.id !== DEFAULT_THEME_I
 const conditionName = (id: string): string => `theme${id.charAt(0).toUpperCase()}${id.slice(1)}`;
 
 type TokenValue = { value: Record<string, string> };
+type Compute = (theme: ThemeDefinition) => string;
 
-/** Build a semantic-token value object: default theme as `base`, the rest as conditions. */
-const buildToken = (compute: (colors: ThemeColors) => string): TokenValue => {
-  const value: Record<string, string> = { base: compute(DEFAULT_THEME.colors) };
-
+/** Build a semantic-token value object: default theme as `base`, the rest as `[data-theme]` conditions. */
+const colorToken = (compute: Compute): TokenValue => {
+  const value: Record<string, string> = { base: compute(DEFAULT_THEME) };
   for (const theme of NON_DEFAULT_THEMES) {
-    value[`_${conditionName(theme.id)}`] = compute(theme.colors);
+    value[`_${conditionName(theme.id)}`] = compute(theme);
   }
-
   return { value };
 };
 
-const colorToken = (slot: keyof ThemeColors): TokenValue => buildToken((colors) => colors[slot]);
+/** Blend `pct`% of one computed color into another — used for derived hover/tint steps. */
+const mix = (top: Compute, pct: number, bottom: Compute): TokenValue =>
+  colorToken((theme) => `color-mix(in oklab, ${top(theme)} ${pct}%, ${bottom(theme)})`);
 
-/** Blend `pct`% of a slot color into another slot — used for derived hover/tint steps. */
-const mixToken = (slot: keyof ThemeColors, pct: number, baseSlot: keyof ThemeColors): TokenValue =>
-  buildToken((colors) => `color-mix(in oklab, ${colors[slot]} ${pct}%, ${colors[baseSlot]})`);
-
-const LIGHT_FALLBACK_THEME = THEMES.find((theme) => theme.colorScheme === 'light') ?? THEMES_BY_ID[DEFAULT_THEME_ID];
+const LIGHT_FALLBACK_THEME = THEMES.find((theme) => theme.colorScheme === 'light') ?? DEFAULT_THEME;
 
 /**
  * Like `colorToken`, but additionally shadows Chakra's `_light`/`_dark`
  * class-conditional values. Nested palette tokens (`gray.*`) deep-merge with
  * `defaultConfig` instead of replacing it, so without these keys the default
  * gray values would survive the merge and outrank our zero-specificity `base`
- * value whenever `ThemeController` sets the `.dark`/`.light` class. The
- * explicit `:root[data-theme=…]` conditions still win over both.
+ * value whenever `ThemeController` sets the `.dark`/`.light` class. The explicit
+ * `:root[data-theme=…]` conditions still win over both.
  */
-const colorTokenWithModeFallback = (slot: keyof ThemeColors): TokenValue => {
-  const token = colorToken(slot);
-  token.value._light = LIGHT_FALLBACK_THEME.colors[slot];
-  token.value._dark = DEFAULT_THEME.colors[slot];
+const grayToken = (compute: Compute): TokenValue => {
+  const token = colorToken(compute);
+  token.value._light = compute(LIGHT_FALLBACK_THEME);
+  token.value._dark = compute(DEFAULT_THEME);
   return token;
 };
 
 /**
- * The semantic-token contract. Where a Chakra built-in name exists for a
- * concept we use it verbatim; the handful of workbench-specific tokens
- * (`bg.inset`, `fg.grid`) describe elevation or intent, never a widget.
+ * A token that reads a ramp step, chosen per theme by `colorScheme`. Emitted as
+ * per-`[data-theme]` conditions, NOT Chakra's `_light`/`_dark`: the built-in
+ * `_light` selector is `:root &, .light &`, and its `:root &` arm matches under
+ * EVERY theme — so a mode-flip token leaks its light value into the dark themes.
+ * Per-theme conditions sidestep the cascade entirely (this is how the pre-refactor
+ * system worked, and why dark themes rendered correctly).
  */
-const colorSlotByToken: Record<string, keyof ThemeColors> = {
-  // Surface ladder, deepest to most lifted
-  bg: 'base',
-  'bg.subtle': 'surface',
-  'bg.muted': 'raised',
-  'bg.emphasized': 'control',
-  // Popover / dialog surface used by Chakra's built-in components
-  'bg.panel': 'raised',
-  // Recessed work-area floor framed by the chrome
-  'bg.inset': 'inset',
-  // Foreground
-  fg: 'text',
-  'fg.muted': 'textMuted',
-  'fg.subtle': 'textSubtle',
-  // Dot-grid decoration drawn on inset surfaces
-  'fg.grid': 'grid',
-  // Borders
-  border: 'line',
-  'border.subtle': 'line',
-  'border.muted': 'line',
-  'border.emphasized': 'lineStrong',
-  // Status intent
-  'fg.error': 'danger',
-  'border.error': 'danger',
-  'fg.success': 'success',
-  'fg.warning': 'warning',
-};
+const ref = (step: NeutralStep): string => `{colors.neutral.${step}}`;
+const stepRef = (darkStep: NeutralStep, lightStep: NeutralStep): TokenValue =>
+  colorToken((theme) => ref(theme.colorScheme === 'light' ? lightStep : darkStep));
 
+const STEPS: NeutralStep[] = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
+
+/** The default panel surface of a theme — `bg.subtle`'s step. Used as the floor for tints. */
+const surface: Compute = (theme) =>
+  theme.colorScheme === 'light' ? theme.colors.neutral[50] : theme.colors.neutral[900];
+
+// Seed accessors.
+const danger: Compute = (theme) => theme.colors.danger;
+const success: Compute = (theme) => theme.colors.success;
+const warning: Compute = (theme) => theme.colors.warning;
+const brandSolid: Compute = (theme) => theme.colors.brand.solid;
+const accentSolid: Compute = (theme) => theme.colors.accent.solid;
+
+/** The neutral ramp, emitted as `neutral.50…neutral.950`, one value per theme. */
+const neutralRamp = Object.fromEntries(STEPS.map((step) => [step, colorToken((theme) => theme.colors.neutral[step])]));
+
+/**
+ * The semantic-token contract. Backgrounds/foregrounds/borders reference ramp
+ * steps (`stepRef`); the four off-ramp neutrals and the status/identity hues read
+ * their per-theme seed directly. Where a Chakra built-in name exists we use it
+ * verbatim so built-ins inherit the theme for free.
+ */
 const semanticColors = {
-  ...Object.fromEntries(Object.entries(colorSlotByToken).map(([token, slot]) => [token, colorToken(slot)])),
-  // Soft status fills for alerts/banners, derived from each theme's palette.
-  'bg.error': mixToken('danger', 14, 'surface'),
-  'bg.success': mixToken('success', 14, 'surface'),
-  'bg.warning': mixToken('warning', 14, 'surface'),
+  neutral: neutralRamp,
+
+  // Surface ladder. Light panels are whiter than the app bg, so the light steps
+  // are not a mirror of the dark ones.
+  bg: stepRef(950, 200),
+  'bg.subtle': stepRef(900, 50),
+  'bg.muted': stepRef(800, 100),
+  'bg.panel': stepRef(800, 100),
+  'bg.emphasized': colorToken((theme) => theme.colors.control),
+  'bg.inset': colorToken((theme) => theme.colors.inset),
+  // Soft status fills for alerts/banners, mixed into the panel surface.
+  'bg.error': mix(danger, 14, surface),
+  'bg.success': mix(success, 14, surface),
+  'bg.warning': mix(warning, 14, surface),
+
+  // Foreground.
+  fg: stepRef(50, 950),
+  'fg.muted': stepRef(300, 700),
+  'fg.subtle': stepRef(400, 500),
+  'fg.grid': colorToken((theme) => theme.colors.grid),
+  'fg.error': colorToken(danger),
+  'fg.success': colorToken(success),
+  'fg.warning': colorToken(warning),
+
+  // Borders.
+  border: stepRef(600, 300),
+  'border.subtle': stepRef(600, 300),
+  'border.muted': stepRef(600, 300),
+  'border.emphasized': stepRef(500, 400),
+  'border.error': colorToken(danger),
+
   /**
    * Chakra's default `colorPalette` is `gray`; re-pointing its virtual-palette
-   * keys at the theme ladder makes every un-palettized component (ghost
-   * buttons, menu items, badges, …) theme-aware with zero props.
+   * keys at the ramp makes every un-palettized component (ghost buttons, menu
+   * items, badges, …) theme-aware with zero props.
    *
    * Palette tokens must stay NESTED — the `colorPalette` virtual-token map is
-   * built from the nested structure and ignores flat dotted keys. Because
-   * nesting deep-merges with the defaults, every gray key shadows the default
-   * `_light`/`_dark` values via `colorTokenWithModeFallback`.
+   * built from the nested structure and ignores flat dotted keys. Because nesting
+   * deep-merges with the defaults, every gray key shadows the default
+   * `_light`/`_dark` values via `grayToken`.
    */
   gray: {
-    contrast: colorTokenWithModeFallback('base'),
-    fg: colorTokenWithModeFallback('text'),
-    subtle: colorTokenWithModeFallback('fill'),
-    muted: colorTokenWithModeFallback('control'),
-    emphasized: colorTokenWithModeFallback('lineStrong'),
-    solid: colorTokenWithModeFallback('text'),
-    focusRing: colorTokenWithModeFallback('accent'),
-    border: colorTokenWithModeFallback('lineStrong'),
+    contrast: grayToken((theme) =>
+      theme.colorScheme === 'light' ? theme.colors.neutral[200] : theme.colors.neutral[950]
+    ),
+    fg: grayToken((theme) => (theme.colorScheme === 'light' ? theme.colors.neutral[950] : theme.colors.neutral[50])),
+    subtle: grayToken((theme) => theme.colors.fill),
+    muted: grayToken((theme) => theme.colors.control),
+    emphasized: grayToken((theme) =>
+      theme.colorScheme === 'light' ? theme.colors.neutral[400] : theme.colors.neutral[500]
+    ),
+    solid: grayToken((theme) => (theme.colorScheme === 'light' ? theme.colors.neutral[950] : theme.colors.neutral[50])),
+    focusRing: grayToken(accentSolid),
+    border: grayToken((theme) =>
+      theme.colorScheme === 'light' ? theme.colors.neutral[400] : theme.colors.neutral[500]
+    ),
   },
-  /** Invoke identity palette. Use sparingly for the logo and global Invoke action. */
+  /**
+   * Invoke identity palette (lime). Authored from two seeds (`solid` + `contrast`),
+   * like `accent`; the rest derive. NOTE: `brand.fg` is the bright `solid` fill, so
+   * `brand.fg` on `brand.subtle` reads well on the dark themes but is low-contrast in
+   * the light theme — brand is meant for emphasis fills, not body text.
+   */
   brand: {
-    solid: colorToken('brand'),
-    contrast: colorToken('brandContrast'),
-    fg: colorToken('brandFg'),
-    subtle: colorToken('brandSubtle'),
-    muted: mixToken('brandFg', 12, 'brandSubtle'),
-    emphasized: mixToken('brandFg', 22, 'brandSubtle'),
-    focusRing: colorToken('accent'),
-    border: mixToken('brandFg', 50, 'surface'),
+    solid: colorToken(brandSolid),
+    contrast: colorToken((theme) => theme.colors.brand.contrast),
+    fg: colorToken(brandSolid),
+    subtle: mix(brandSolid, 16, surface),
+    muted: mix(brandSolid, 26, surface),
+    emphasized: mix(brandSolid, 36, surface),
+    focusRing: colorToken(accentSolid),
+    border: colorToken(brandSolid),
   },
   /** Selection / focus palette (blue). Use via `accent.solid` or `colorPalette="accent"`. */
   accent: {
-    solid: colorToken('accent'),
-    contrast: colorToken('accentContrast'),
-    fg: colorToken('accent'),
-    subtle: mixToken('accent', 16, 'surface'),
-    muted: mixToken('accent', 26, 'surface'),
-    emphasized: mixToken('accent', 36, 'surface'),
-    focusRing: colorToken('accent'),
-    border: colorToken('accent'),
+    solid: colorToken(accentSolid),
+    contrast: colorToken((theme) => theme.colors.accent.contrast),
+    fg: colorToken(accentSolid),
+    subtle: mix(accentSolid, 16, surface),
+    muted: mix(accentSolid, 26, surface),
+    emphasized: mix(accentSolid, 36, surface),
+    focusRing: colorToken(accentSolid),
+    border: colorToken(accentSolid),
   },
 };
 
@@ -207,5 +246,5 @@ const config = defineConfig({
 export const system = createSystem(defaultConfig, config);
 
 /** Theme metadata re-exported so UI can import a single module. */
-export { THEMES, THEMES_BY_ID, DEFAULT_THEME, DEFAULT_THEME_ID } from './themes';
-export type { ThemeColors, ThemeDefinition } from './themes';
+export { THEMES, THEMES_BY_ID, DEFAULT_THEME, DEFAULT_THEME_ID, previewSwatches } from './themes';
+export type { ThemeColors, ThemeDefinition, NeutralStep } from './themes';

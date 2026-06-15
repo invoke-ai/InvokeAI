@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 
 import { themeCardRecipe } from '../../theme/recipes';
-import { THEMES, type ThemeDefinition } from '../../theme/system';
+import { previewSwatches, THEMES, type ThemeDefinition } from '../../theme/system';
 import { Button, CloseButton, IconButton } from '../components/ui/Button';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { syncedWorkbenchPersistence } from '../projects/syncedPersistence';
@@ -335,14 +335,15 @@ const ThemeCard = ({
 }) => {
   const recipe = useSlotRecipe({ recipe: themeCardRecipe });
   const styles = recipe({ selected });
+  const [surface, control, brandColor, accentColor] = previewSwatches(theme);
 
   return (
     <chakra.button type="button" aria-pressed={selected} css={styles.root} onClick={() => onSelect(theme.id)}>
       <Flex css={styles.preview}>
-        <Box css={styles.swatch} bg={theme.colors.surface} />
-        <Box css={styles.swatch} bg={theme.colors.control} />
-        <Box css={styles.swatch} bg={theme.colors.brand} />
-        <Box css={styles.swatch} bg={theme.colors.accent} />
+        <Box css={styles.swatch} bg={surface} />
+        <Box css={styles.swatch} bg={control} />
+        <Box css={styles.swatch} bg={brandColor} />
+        <Box css={styles.swatch} bg={accentColor} />
       </Flex>
       <Box css={styles.body}>
         <HStack justify="space-between" w="full">
