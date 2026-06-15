@@ -7,9 +7,7 @@ import type {
 import type { ChangeEvent } from 'react';
 
 import { Flex, HStack, Stack, Text, Textarea } from '@chakra-ui/react';
-import { JsonPreview } from '@workbench/components/ui/JsonPreview';
-import { Scrollable } from '@workbench/components/ui/Scrollable';
-import { Tabs } from '@workbench/components/ui/Tabs';
+import { JsonPreview, Scrollable, Tabs } from '@workbench/components/ui';
 import { workflowSelectionStore } from '@workbench/widgets/workflow/editor/selectionStore';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';

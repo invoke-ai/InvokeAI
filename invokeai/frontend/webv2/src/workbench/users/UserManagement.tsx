@@ -2,10 +2,7 @@ import { Avatar, Badge, Box, Center, Flex, HStack, Spinner, Stack, Switch, Table
 import { deleteUser, listUsers, updateUser, type UserDTO } from '@workbench/auth/api';
 import { useAuthSession } from '@workbench/auth/session';
 import { getApiErrorMessage } from '@workbench/backend/http';
-import { Button, IconButton } from '@workbench/components/ui/Button';
-import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
-import { Scrollable } from '@workbench/components/ui/Scrollable';
-import { Tooltip } from '@workbench/components/ui/Tooltip';
+import { Button, IconButton, ConfirmDialog, Scrollable, Tooltip } from '@workbench/components/ui';
 import { useNotify } from '@workbench/useNotify';
 import { PencilIcon, Trash2Icon, UserPlusIcon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';

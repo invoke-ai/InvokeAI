@@ -3,8 +3,7 @@ import { generatePassword, updateCurrentUser, type ProfileUpdateRequest, type Us
 import { createProfileSchema, PASSWORD_RULES_HINT, type ProfileFormValues } from '@workbench/auth/schemas';
 import { setSessionUser, useAuthSession } from '@workbench/auth/session';
 import { getApiErrorMessage } from '@workbench/backend/http';
-import { Button, CloseButton } from '@workbench/components/ui/Button';
-import { Field, FieldLabel } from '@workbench/components/ui/Field';
+import { Button, CloseButton, Field, FieldLabel } from '@workbench/components/ui';
 import { useZodForm } from '@workbench/models/useZodForm';
 import { useNotify } from '@workbench/useNotify';
 import { WandSparklesIcon } from 'lucide-react';

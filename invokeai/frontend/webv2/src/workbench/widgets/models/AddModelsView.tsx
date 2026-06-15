@@ -1,6 +1,5 @@
 import { Box, Stack } from '@chakra-ui/react';
-import { Scrollable } from '@workbench/components/ui/Scrollable';
-import { Tabs } from '@workbench/components/ui/Tabs';
+import { Scrollable, Tabs } from '@workbench/components/ui';
 import { updateModelsUi, useModelsUi, type AddModelsTab } from '@workbench/models/uiStore';
 import { FolderSearchIcon, KeyIcon, LinkIcon, StarIcon } from 'lucide-react';
 import { SiHuggingface } from 'react-icons/si';

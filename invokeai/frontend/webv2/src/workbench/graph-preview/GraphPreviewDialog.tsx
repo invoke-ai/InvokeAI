@@ -2,13 +2,12 @@ import type { GraphContract, GraphId, InvocationSourceId } from '@workbench/type
 import type { XYPosition } from '@workbench/workflows/types';
 
 import { Box, Dialog, Portal, SegmentGroup, Text } from '@chakra-ui/react';
+import { Button, JsonPreview } from '@workbench/components/ui';
 import { formatRoute, isInvocationRouteValid, resolveInvocationRoute } from '@workbench/invocation';
 import { useActiveProject, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { useState, type ReactNode } from 'react';
 
 import { GraphPreviewFlow } from './GraphPreviewFlow';
-import { Button } from './ui/Button';
-import { JsonPreview } from './ui/JsonPreview';
 
 interface GraphPreviewDialogProps {
   graph: GraphContract | null;

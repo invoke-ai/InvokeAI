@@ -2,7 +2,7 @@ import type { ModelConfig } from '@workbench/models/types';
 
 import { Box, Checkbox, Flex, HStack, Icon, Image, ScrollArea, Spinner, Stack, Text } from '@chakra-ui/react';
 import { defaultRangeExtractor, useVirtualizer, type Range } from '@tanstack/react-virtual';
-import { Row } from '@workbench/components/ui/Row';
+import { Row } from '@workbench/components/ui';
 import { getModelImageUrl } from '@workbench/models/api';
 import {
   filterModels,

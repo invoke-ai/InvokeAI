@@ -14,7 +14,7 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
-import { Button, CloseButton, IconButton } from '@workbench/components/ui/Button';
+import { Button, CloseButton, IconButton } from '@workbench/components/ui';
 import {
   ArchiveIcon,
   ArrowDownAZIcon,

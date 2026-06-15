@@ -1,15 +1,13 @@
 import type { RegisteredWidget, WidgetId } from '@workbench/types';
 
 import { Box, Flex, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
+import { IconButton, Tabs } from '@workbench/components/ui';
 import { useFocusRegionProps } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
+import { WidgetRenderer } from '@workbench/widget-frame';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { CheckIcon, MoreHorizontalIcon } from 'lucide-react';
-
-import { IconButton } from './ui/Button';
-import { Tabs } from './ui/Tabs';
-import { WidgetRenderer } from './WidgetRenderer';
 
 interface CenterWidgetItem {
   id: WidgetId;

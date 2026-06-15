@@ -1,11 +1,9 @@
 import type { ModelConfig, ModelTaxonomyType } from '@workbench/models/types';
 
 import { Badge, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
-import { ModelSelect } from '@workbench/components/ModelSelect';
-import { IconButton } from '@workbench/components/ui/Button';
-import { FieldLabel } from '@workbench/components/ui/Field';
-import { Tooltip } from '@workbench/components/ui/Tooltip';
+import { IconButton, FieldLabel, Tooltip } from '@workbench/components/ui';
 import { addModelRelationship, getRelatedModelKeys, removeModelRelationship } from '@workbench/models/api';
+import { ModelSelect } from '@workbench/models/components';
 import { useModelsSnapshot } from '@workbench/models/modelsStore';
 import { getModelBaseColorPalette, getModelBaseLabel, getModelTypeLabel } from '@workbench/models/taxonomy';
 import { Link2OffIcon } from 'lucide-react';

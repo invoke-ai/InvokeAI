@@ -1,5 +1,5 @@
 import { Box, Flex, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { Panel } from '@workbench/components/ui/Panel';
+import { Panel } from '@workbench/components/ui';
 import { useActiveProject } from '@workbench/WorkbenchContext';
 import { LayersIcon } from 'lucide-react';
 

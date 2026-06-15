@@ -1,6 +1,6 @@
-import type { ImageActions } from '@workbench/components/useImageActions';
 import type { GalleryImage, GalleryView } from '@workbench/gallery/api';
 import type { GallerySettings } from '@workbench/gallery/settings';
+import type { ImageActions } from '@workbench/image-actions';
 
 import { createContext, use } from 'react';
 

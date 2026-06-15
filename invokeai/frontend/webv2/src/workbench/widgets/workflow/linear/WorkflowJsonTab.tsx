@@ -1,7 +1,7 @@
 import type { ProjectGraphState } from '@workbench/workflows/types';
 
 import { Flex } from '@chakra-ui/react';
-import { JsonPreview } from '@workbench/components/ui/JsonPreview';
+import { JsonPreview } from '@workbench/components/ui';
 import { getWorkflowJsonText } from '@workbench/widgets/workflow/workflowTransfer';
 
 /** Read-only view of the serialized workflow — the legacy "JSON" tab. */

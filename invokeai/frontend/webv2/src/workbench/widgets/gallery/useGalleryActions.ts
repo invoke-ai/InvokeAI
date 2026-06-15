@@ -1,6 +1,5 @@
 import type { WorkbenchAction } from '@workbench/workbenchState';
 
-import { saveBlobToDisk } from '@workbench/components/useImageActions';
 import {
   createGalleryBoard,
   deleteGalleryBoard,
@@ -9,6 +8,7 @@ import {
   uploadGalleryImage,
   type GalleryBoard,
 } from '@workbench/gallery/api';
+import { saveBlobToDisk } from '@workbench/image-actions';
 import { useMemo, type Dispatch } from 'react';
 
 import type { GalleryActions } from './GalleryWidgetContext';

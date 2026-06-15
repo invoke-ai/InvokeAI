@@ -6,7 +6,7 @@ import type {
 } from '@workbench/workflows/types';
 
 import { Box, HStack, Icon, Input, Menu, Portal, Separator, Stack, Text, Textarea } from '@chakra-ui/react';
-import { Button, IconButton } from '@workbench/components/ui/Button';
+import { Button, IconButton } from '@workbench/components/ui';
 import { requestNodeSelection, workflowSelectionStore } from '@workbench/widgets/workflow/editor/selectionStore';
 import { FieldDescriptionPopover } from '@workbench/widgets/workflow/fields/FieldDescriptionPopover';
 import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';

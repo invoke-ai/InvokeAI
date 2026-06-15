@@ -1,6 +1,5 @@
 import { Checkbox, HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
-import { Button } from '@workbench/components/ui/Button';
-import { Field } from '@workbench/components/ui/Field';
+import { Button, Field } from '@workbench/components/ui';
 import { isCivitaiUrl } from '@workbench/models/apiKeys';
 import { installSourceSchema } from '@workbench/models/schemas';
 import { useZodForm } from '@workbench/models/useZodForm';

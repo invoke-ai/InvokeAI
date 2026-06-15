@@ -13,9 +13,7 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
-import { IconButton } from '@workbench/components/ui/Button';
-import { Field } from '@workbench/components/ui/Field';
-import { Tooltip } from '@workbench/components/ui/Tooltip';
+import { IconButton, Field, Tooltip } from '@workbench/components/ui';
 import {
   ASPECT_RATIO_MAP,
   ASPECT_RATIO_OPTIONS,

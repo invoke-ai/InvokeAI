@@ -5,8 +5,8 @@ import { Badge, Box, Flex, ProgressCircle, ScrollArea, Skeleton, Spinner, Text }
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useQueueItemProgressImage } from '@workbench/backend/progressImageStore';
 import { useQueueItemProgress } from '@workbench/backend/progressStore';
-import { ImageContextMenu, type ImageContextMenuTarget } from '@workbench/components/ImageContextMenu';
-import { IconButton } from '@workbench/components/ui/Button';
+import { IconButton } from '@workbench/components/ui';
+import { ImageContextMenu, type ImageContextMenuTarget } from '@workbench/image-actions';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { StarIcon, UploadIcon } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react';

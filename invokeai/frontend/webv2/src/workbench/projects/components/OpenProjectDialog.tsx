@@ -1,4 +1,5 @@
 import { Dialog, Icon, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Button, CloseButton, Row, Scrollable } from '@workbench/components/ui';
 import { formatRelativeTime } from '@workbench/home/formatRelativeTime';
 import { refreshProjectLibrary, useProjectLibrary, type ProjectSummary } from '@workbench/projects/library';
 import { importProjectFile, pickProjectFile } from '@workbench/projects/projectFile';
@@ -7,10 +8,6 @@ import { useNotify } from '@workbench/useNotify';
 import { useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { ArrowRightIcon, FileUpIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
-
-import { Button, CloseButton } from './ui/Button';
-import { Row } from './ui/Row';
-import { Scrollable } from './ui/Scrollable';
 
 /**
  * "Open project…" from the tab bar: the saved projects that are not already

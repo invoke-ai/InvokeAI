@@ -1,8 +1,7 @@
 import type { WidgetId, WorkbenchRegion } from '@workbench/types';
 
+import { MissingWidgetFrame, WidgetRenderer } from '@workbench/widget-frame';
 import { getWidgetById } from '@workbench/widgetRegistry';
-
-import { MissingWidgetFrame, WidgetRenderer } from './WidgetRenderer';
 
 /** Left panel — hosts the active registered widget panel view. */
 export const LeftPanel = ({ widgetId }: { widgetId: WidgetId }) => (

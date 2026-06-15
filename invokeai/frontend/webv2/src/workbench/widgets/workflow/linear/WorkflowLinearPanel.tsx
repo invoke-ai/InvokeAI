@@ -1,6 +1,5 @@
 import { Flex, HStack, Icon, SegmentGroup, Splitter } from '@chakra-ui/react';
-import { Scrollable } from '@workbench/components/ui/Scrollable';
-import { Tabs } from '@workbench/components/ui/Tabs';
+import { Scrollable, Tabs } from '@workbench/components/ui';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { ensureInvocationTemplatesLoaded } from '@workbench/workflows/templates';
 import { EyeIcon, PencilIcon } from 'lucide-react';

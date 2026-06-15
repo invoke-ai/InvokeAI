@@ -7,15 +7,14 @@ import type {
 } from '@workbench/types';
 
 import { Icon, Menu, Portal, Text } from '@chakra-ui/react';
+import { IconButton } from '@workbench/components/ui';
+import { GraphPreviewDialog } from '@workbench/graph-preview';
 import { createGraphBearingSurface } from '@workbench/graphSurfaces';
 import { useActiveProject, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { compileProjectGraph } from '@workbench/workflows/buildGraph';
 import { getInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
 import { GitBranchIcon, MoreHorizontalIcon, TargetIcon } from 'lucide-react';
 import { useState } from 'react';
-
-import { GraphPreviewDialog } from './GraphPreviewDialog';
-import { IconButton } from './ui/Button';
 
 /**
  * The widget frame's shared header actions menu. It hosts the universal

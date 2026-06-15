@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { Badge, HStack, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
-import { Button } from '@workbench/components/ui/Button';
-import { Panel } from '@workbench/components/ui/Panel';
+import { Button, Panel } from '@workbench/components/ui';
 import { useActiveInstallSources } from '@workbench/models/installsStore';
 import { openModelsCenterTab } from '@workbench/models/uiStore';
 import { DownloadIcon } from 'lucide-react';

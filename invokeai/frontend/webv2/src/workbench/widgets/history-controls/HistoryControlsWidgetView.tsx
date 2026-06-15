@@ -1,5 +1,5 @@
 import { HStack } from '@chakra-ui/react';
-import { IconButton } from '@workbench/components/ui/Button';
+import { IconButton } from '@workbench/components/ui';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { Redo2Icon, Undo2Icon } from 'lucide-react';
 

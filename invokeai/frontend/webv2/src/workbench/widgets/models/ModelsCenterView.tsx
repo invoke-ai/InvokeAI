@@ -1,8 +1,5 @@
 import { Badge, Box, Flex, HStack, Icon, Separator, Stack, Text } from '@chakra-ui/react';
-import { Button, IconButton } from '@workbench/components/ui/Button';
-import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
-import { Scrollable } from '@workbench/components/ui/Scrollable';
-import { Tabs } from '@workbench/components/ui/Tabs';
+import { Button, IconButton, ConfirmDialog, Scrollable, Tabs } from '@workbench/components/ui';
 import { bulkDeleteModels } from '@workbench/models/api';
 import { ensureInstallsLoaded, isActiveInstallStatus, useInstallsSnapshot } from '@workbench/models/installsStore';
 import { collectBases, collectTypes } from '@workbench/models/library';

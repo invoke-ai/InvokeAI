@@ -3,8 +3,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { loginSchema } from '@workbench/auth/schemas';
 import { loginWithCredentials, useAuthSession } from '@workbench/auth/session';
 import { getApiErrorMessage } from '@workbench/backend/http';
-import { Button } from '@workbench/components/ui/Button';
-import { Field } from '@workbench/components/ui/Field';
+import { Button, Field } from '@workbench/components/ui';
 import { useZodForm } from '@workbench/models/useZodForm';
 
 import { AuthFormAlert, AuthScreen } from './AuthScreen';

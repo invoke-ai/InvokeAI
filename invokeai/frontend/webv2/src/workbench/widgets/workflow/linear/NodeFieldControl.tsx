@@ -1,8 +1,7 @@
 import type { NodeFieldFormElement, ProjectGraphState } from '@workbench/workflows/types';
 
 import { Alert, Field, Input, Stack, Text } from '@chakra-ui/react';
-import { FieldLabel } from '@workbench/components/ui/Field';
-import { Tooltip } from '@workbench/components/ui/Tooltip';
+import { FieldLabel, Tooltip } from '@workbench/components/ui';
 import { WorkflowFieldInput } from '@workbench/widgets/workflow/fields/WorkflowFieldInput';
 import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { getResolvedWorkflowEdges } from '@workbench/workflows/connectors';

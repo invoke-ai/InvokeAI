@@ -1,6 +1,7 @@
 import type { GalleryBoard, GalleryImage } from '@workbench/gallery/api';
 
 import { Dialog, HStack, Icon, Menu, Portal, ScrollArea, Text } from '@chakra-ui/react';
+import { Button, MenuContent, Tooltip } from '@workbench/components/ui';
 import { useWorkbenchPreferences } from '@workbench/settings/store';
 import {
   AsteriskIcon,
@@ -31,9 +32,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ImageActions } from './useImageActions';
 
 import { EMPTY_IMAGE_RECALL_CAPABILITIES, type ImageRecallCapabilities } from './imageRecall';
-import { Button } from './ui/Button';
-import { MenuContent } from './ui/Menu';
-import { Tooltip } from './ui/Tooltip';
 
 export interface ImageContextMenuTarget {
   /** Right-clicked image first; more entries switch the menu into bulk mode. */

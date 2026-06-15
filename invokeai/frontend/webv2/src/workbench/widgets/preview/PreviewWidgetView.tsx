@@ -2,9 +2,7 @@ import type { GeneratedImageContract, WidgetViewProps } from '@workbench/types';
 
 import { Badge, Box, Flex, HStack, Stack, Text } from '@chakra-ui/react';
 import { useProgressImage, type ProgressImageSnapshot } from '@workbench/backend/progressImageStore';
-import { ImageContextMenu, type ImageContextMenuTarget } from '@workbench/components/ImageContextMenu';
-import { Button } from '@workbench/components/ui/Button';
-import { useImageActions } from '@workbench/components/useImageActions';
+import { Button } from '@workbench/components/ui';
 import {
   listGalleryBoards,
   listGalleryImages,
@@ -13,6 +11,7 @@ import {
   type GalleryView,
 } from '@workbench/gallery/api';
 import { getGallerySettings } from '@workbench/gallery/settings';
+import { ImageContextMenu, useImageActions, type ImageContextMenuTarget } from '@workbench/image-actions';
 import {
   getGalleryCompareImage,
   getGalleryRecentImagesKey,

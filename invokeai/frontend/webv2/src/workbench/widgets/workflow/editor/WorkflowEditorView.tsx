@@ -1,9 +1,8 @@
 import type { XYPosition } from '@workbench/workflows/types';
 
 import { Box, Flex, Stack, Text } from '@chakra-ui/react';
-import { FlowMiniMap } from '@workbench/components/FlowMiniMap';
+import { FlowMiniMap, flowThemeCss, getFlowColorMode } from '@workbench/graph-preview';
 import '@xyflow/react/dist/style.css';
-import { flowThemeCss, getFlowColorMode } from '@workbench/components/flowTheme';
 import { useWorkbenchPreferences } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
 import { setAddNodeOpen } from '@workbench/widgets/workflow/workflowUiStore';

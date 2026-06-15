@@ -1,9 +1,7 @@
 import type { ModelInstallJob, ModelInstallStatus } from '@workbench/models/types';
 
 import { Badge, Box, Flex, HStack, Icon, Progress, Spinner, Stack, Text } from '@chakra-ui/react';
-import { Button, IconButton } from '@workbench/components/ui/Button';
-import { Scrollable } from '@workbench/components/ui/Scrollable';
-import { Tooltip } from '@workbench/components/ui/Tooltip';
+import { Button, IconButton, Scrollable, Tooltip } from '@workbench/components/ui';
 import {
   cancelModelInstall,
   pauseModelInstall,

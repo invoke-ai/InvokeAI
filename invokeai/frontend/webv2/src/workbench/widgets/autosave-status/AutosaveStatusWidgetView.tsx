@@ -1,7 +1,7 @@
 import type { WidgetViewProps } from '@workbench/types';
 
 import { Stack, Text } from '@chakra-ui/react';
-import { StatusWidgetChip } from '@workbench/components/WidgetFrames';
+import { StatusWidgetChip } from '@workbench/widget-frame';
 import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { CloudAlertIcon, CloudCheckIcon } from 'lucide-react';
 

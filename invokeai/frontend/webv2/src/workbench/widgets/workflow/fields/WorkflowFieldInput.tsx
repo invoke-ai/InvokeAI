@@ -3,10 +3,10 @@ import type { GeneratedImageContract } from '@workbench/types';
 import type { FieldInputTemplate } from '@workbench/workflows/types';
 
 import { HStack, Input, NativeSelect, Switch, Text, Textarea } from '@chakra-ui/react';
-import { ModelSelect } from '@workbench/components/ModelSelect';
-import { Button } from '@workbench/components/ui/Button';
+import { Button } from '@workbench/components/ui';
 import { listGalleryBoards, type GalleryBoard } from '@workbench/gallery/api';
 import { SCHEDULER_OPTIONS } from '@workbench/generation/settings';
+import { ModelSelect } from '@workbench/models/components';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useEffect, useState, type ChangeEvent } from 'react';
 

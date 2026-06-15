@@ -5,8 +5,7 @@ import { PasswordInput, PasswordStrengthMeter } from '@workbench/auth/components
 import { createUserFormSchema, PASSWORD_RULES_HINT, type UserFormValues } from '@workbench/auth/schemas';
 import { useAuthSession } from '@workbench/auth/session';
 import { getApiErrorMessage } from '@workbench/backend/http';
-import { Button, CloseButton } from '@workbench/components/ui/Button';
-import { Field } from '@workbench/components/ui/Field';
+import { Button, CloseButton, Field } from '@workbench/components/ui';
 import { useZodForm } from '@workbench/models/useZodForm';
 import { useNotify } from '@workbench/useNotify';
 import { WandSparklesIcon } from 'lucide-react';

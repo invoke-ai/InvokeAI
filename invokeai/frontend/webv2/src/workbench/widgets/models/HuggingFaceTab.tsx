@@ -1,6 +1,5 @@
 import { HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
-import { Button } from '@workbench/components/ui/Button';
-import { Field } from '@workbench/components/ui/Field';
+import { Button, Field } from '@workbench/components/ui';
 import { getHuggingFaceModels } from '@workbench/models/api';
 import { huggingFaceRepoSchema } from '@workbench/models/schemas';
 import { updateModelsUi, useModelsUi } from '@workbench/models/uiStore';

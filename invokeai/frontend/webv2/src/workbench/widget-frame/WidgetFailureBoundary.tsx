@@ -1,9 +1,8 @@
 import type { WidgetId } from '@workbench/types';
 
 import { Code, ScrollArea, Stack, Text } from '@chakra-ui/react';
+import { Button } from '@workbench/components/ui';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-
-import { Button } from './ui/Button';
 
 interface WidgetFailureBoundaryProps {
   widgetId: WidgetId;

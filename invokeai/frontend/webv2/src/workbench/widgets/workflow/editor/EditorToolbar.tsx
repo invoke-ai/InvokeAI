@@ -1,5 +1,5 @@
 import { Box, Popover, Portal, Slider, Stack, Text } from '@chakra-ui/react';
-import { Toolbar, ToolbarButton, ToolbarSeparator } from '@workbench/components/ui/Toolbar';
+import { Toolbar, ToolbarButton, ToolbarSeparator } from '@workbench/components/ui';
 import { useReactFlow } from '@xyflow/react';
 import {
   BlendIcon,

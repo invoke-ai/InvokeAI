@@ -1,10 +1,7 @@
 import type { Project } from '@workbench/types';
 
 import { HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
-import { Button, IconButton } from '@workbench/components/ui/Button';
-import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
-import { Field, FieldLabel } from '@workbench/components/ui/Field';
-import { Panel } from '@workbench/components/ui/Panel';
+import { Button, IconButton, ConfirmDialog, Field, FieldLabel, Panel } from '@workbench/components/ui';
 import { useProjectSync } from '@workbench/projects/syncStore';
 import { useProjectActions } from '@workbench/projects/useProjectActions';
 import { useNotify } from '@workbench/useNotify';

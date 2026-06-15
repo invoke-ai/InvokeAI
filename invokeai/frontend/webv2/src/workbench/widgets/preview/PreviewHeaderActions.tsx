@@ -1,6 +1,6 @@
 import { Icon } from '@chakra-ui/react';
 import { useProgressImage } from '@workbench/backend/progressImageStore';
-import { IconButton } from '@workbench/components/ui/Button';
+import { IconButton } from '@workbench/components/ui';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { HourglassIcon } from 'lucide-react';
 

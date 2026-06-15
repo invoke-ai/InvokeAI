@@ -14,8 +14,7 @@ import {
   Switch,
   Text,
 } from '@chakra-ui/react';
-import { Button, CloseButton, IconButton } from '@workbench/components/ui/Button';
-import { Tabs } from '@workbench/components/ui/Tabs';
+import { Button, CloseButton, IconButton, Tabs } from '@workbench/components/ui';
 import { isDateBoardId } from '@workbench/gallery/api';
 import { SearchIcon, SettingsIcon, UploadIcon } from 'lucide-react';
 import { useRef } from 'react';

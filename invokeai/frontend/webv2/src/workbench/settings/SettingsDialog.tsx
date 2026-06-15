@@ -29,8 +29,7 @@ import {
 } from '@chakra-ui/react';
 import { themeCardRecipe } from '@theme/recipes';
 import { previewSwatches, THEMES, type ThemeDefinition } from '@theme/system';
-import { Button, CloseButton, IconButton } from '@workbench/components/ui/Button';
-import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
+import { Button, CloseButton, IconButton, ConfirmDialog } from '@workbench/components/ui';
 import { syncedWorkbenchPersistence } from '@workbench/projects/syncedPersistence';
 import {
   useOptionalWorkbenchDispatch,

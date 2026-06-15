@@ -2,8 +2,7 @@ import type { ModelLibraryFilters, ModelSortField } from '@workbench/models/libr
 import type { ModelTaxonomyType } from '@workbench/models/types';
 
 import { HStack, Icon, Input, InputGroup, Menu, Portal, Text } from '@chakra-ui/react';
-import { IconButton } from '@workbench/components/ui/Button';
-import { MenuContent } from '@workbench/components/ui/Menu';
+import { IconButton, MenuContent } from '@workbench/components/ui';
 import { getModelBaseLabel, getModelTypeLabel } from '@workbench/models/taxonomy';
 import { CheckIcon, SearchIcon, SlidersHorizontalIcon } from 'lucide-react';
 

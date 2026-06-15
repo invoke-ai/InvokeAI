@@ -2,8 +2,7 @@ import type { WidgetLabelProps, WidgetViewProps } from '@workbench/types';
 import type { InvocationTemplate, XYPosition } from '@workbench/workflows/types';
 
 import { HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
-import { IconButton } from '@workbench/components/ui/Button';
-import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
+import { IconButton, ConfirmDialog } from '@workbench/components/ui';
 import { useNotify } from '@workbench/useNotify';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from '@workbench/workflows/connectors';

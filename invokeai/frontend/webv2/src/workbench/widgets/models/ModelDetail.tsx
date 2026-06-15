@@ -1,9 +1,7 @@
 import type { ModelConfig } from '@workbench/models/types';
 
 import { DataList, HStack, Icon, Menu, Portal, Separator, Stack, Text } from '@chakra-ui/react';
-import { Button, IconButton } from '@workbench/components/ui/Button';
-import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
-import { MenuContent } from '@workbench/components/ui/Menu';
+import { Button, IconButton, ConfirmDialog, MenuContent } from '@workbench/components/ui';
 import { useModelsSnapshot } from '@workbench/models/modelsStore';
 import { formatBytes, isConvertibleToDiffusers } from '@workbench/models/taxonomy';
 import { useNotify } from '@workbench/useNotify';

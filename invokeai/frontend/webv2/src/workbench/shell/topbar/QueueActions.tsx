@@ -1,8 +1,7 @@
 import type { QueueItem } from '@workbench/types';
 
 import { Group, Icon, Menu, Portal } from '@chakra-ui/react';
-import { IconButton } from '@workbench/components/ui/Button';
-import { Tooltip } from '@workbench/components/ui/Tooltip';
+import { IconButton, Tooltip } from '@workbench/components/ui';
 import {
   cancelAllExceptCurrentQueueItems,
   cancelCurrentQueueItem,

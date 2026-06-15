@@ -1,6 +1,6 @@
 import { Box, HStack, Input, InputGroup, Text } from '@chakra-ui/react';
 import { getPasswordStrength, type PasswordStrength } from '@workbench/auth/schemas';
-import { IconButton } from '@workbench/components/ui/Button';
+import { IconButton } from '@workbench/components/ui';
 import { EyeIcon, EyeOffIcon } from 'lucide-react';
 import { useState, type ComponentProps } from 'react';
 

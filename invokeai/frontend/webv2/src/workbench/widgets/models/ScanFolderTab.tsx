@@ -1,7 +1,5 @@
 import { Checkbox, HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
-import { Button } from '@workbench/components/ui/Button';
-import { Field } from '@workbench/components/ui/Field';
-import { Scrollable } from '@workbench/components/ui/Scrollable';
+import { Button, Field, Scrollable } from '@workbench/components/ui';
 import { scanFolderForModels } from '@workbench/models/api';
 import { scanFolderSchema } from '@workbench/models/schemas';
 import { updateModelsUi, useModelsUi } from '@workbench/models/uiStore';

@@ -1,7 +1,7 @@
 import type { HFTokenStatus } from '@workbench/models/types';
 
 import { Badge, Flex, Grid, HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
-import { Button } from '@workbench/components/ui/Button';
+import { Button } from '@workbench/components/ui';
 import {
   getExternalProviderConfigs,
   getHFTokenStatus,

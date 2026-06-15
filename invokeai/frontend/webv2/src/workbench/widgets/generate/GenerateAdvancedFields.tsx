@@ -2,9 +2,9 @@ import type { GenerateSettings, MainModelConfig, VaePrecision } from '@workbench
 import type { ChangeEvent } from 'react';
 
 import { Badge, HStack, Input, NativeSelect, Switch, Text } from '@chakra-ui/react';
-import { ModelSelect } from '@workbench/components/ModelSelect';
-import { Field } from '@workbench/components/ui/Field';
+import { Field } from '@workbench/components/ui';
 import { CLIP_SKIP_MAX, isVaeModelConfig } from '@workbench/generation/settings';
+import { ModelSelect } from '@workbench/models/components';
 
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 

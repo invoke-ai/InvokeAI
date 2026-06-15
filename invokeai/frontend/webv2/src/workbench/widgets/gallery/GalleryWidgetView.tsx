@@ -1,8 +1,8 @@
 import type { WidgetViewProps } from '@workbench/types';
 
-import { useImageActions } from '@workbench/components/useImageActions';
-import { StatusWidgetChip } from '@workbench/components/WidgetFrames';
 import { getGallerySettings } from '@workbench/gallery/settings';
+import { useImageActions } from '@workbench/image-actions';
+import { StatusWidgetChip } from '@workbench/widget-frame';
 import { useActiveProject, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { ImageIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef } from 'react';

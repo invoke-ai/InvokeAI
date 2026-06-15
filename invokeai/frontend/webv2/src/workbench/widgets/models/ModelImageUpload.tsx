@@ -1,8 +1,7 @@
 import type { ModelConfig } from '@workbench/models/types';
 
 import { Box, Flex, Icon, Image, Stack, Text } from '@chakra-ui/react';
-import { IconButton } from '@workbench/components/ui/Button';
-import { Tooltip } from '@workbench/components/ui/Tooltip';
+import { IconButton, Tooltip } from '@workbench/components/ui';
 import { deleteModelImage, getModelImageUrl, updateModelImage } from '@workbench/models/api';
 import { markCoverImageChanged, useModelsSnapshot } from '@workbench/models/modelsStore';
 import { ImageIcon, UploadIcon, XIcon } from 'lucide-react';

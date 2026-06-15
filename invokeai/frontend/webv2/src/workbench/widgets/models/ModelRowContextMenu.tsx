@@ -1,8 +1,7 @@
 import type { ModelConfig } from '@workbench/models/types';
 
 import { Icon, Menu, Portal } from '@chakra-ui/react';
-import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
-import { MenuContent } from '@workbench/components/ui/Menu';
+import { ConfirmDialog, MenuContent } from '@workbench/components/ui';
 import { isConvertibleToDiffusers } from '@workbench/models/taxonomy';
 import { RefreshCcwIcon, Trash2Icon } from 'lucide-react';
 import { useRef, useState } from 'react';

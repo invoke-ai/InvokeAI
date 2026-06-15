@@ -1,7 +1,7 @@
 import type { WidgetViewProps, WorkbenchNotificationKind } from '@workbench/types';
 
 import { Badge, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { StatusWidgetChip } from '@workbench/components/WidgetFrames';
+import { StatusWidgetChip } from '@workbench/widget-frame';
 import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { BellIcon, CircleCheckIcon, CircleXIcon, InfoIcon, TriangleAlertIcon, type LucideIcon } from 'lucide-react';
 

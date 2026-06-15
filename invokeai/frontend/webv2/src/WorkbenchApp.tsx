@@ -1,4 +1,5 @@
 import { useSearch } from '@tanstack/react-router';
+import { WorkbenchShell } from '@workbench/shell';
 
 import type { WorkbenchSearch } from './workbench/projects/session';
 
@@ -7,7 +8,6 @@ import { ModelsRuntime } from './workbench/widgets/models/ModelsRuntime';
 import { WorkbenchProvider } from './workbench/WorkbenchContext';
 import { WorkbenchRuntime } from './workbench/WorkbenchRuntime';
 import { WorkbenchSessionController } from './workbench/WorkbenchSessionController';
-import { WorkbenchShell } from './workbench/WorkbenchShell';
 
 /**
  * The authenticated editor: providers, runtimes, and the shell. Mounted by

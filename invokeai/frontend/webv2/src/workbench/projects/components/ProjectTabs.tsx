@@ -1,6 +1,15 @@
 import type { Project, WidgetRegion } from '@workbench/types';
 
 import { Icon, Menu, Portal, Separator } from '@chakra-ui/react';
+import {
+  CloseButton,
+  IconButton,
+  ConfirmDialog,
+  MenuContent,
+  RenameDialog,
+  Tabs,
+  Tooltip,
+} from '@workbench/components/ui';
 import { exportOpenProject } from '@workbench/projects/projectFile';
 import { useProjectActions } from '@workbench/projects/useProjectActions';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
@@ -9,12 +18,6 @@ import { FileDownIcon, FolderCogIcon, FolderOpenIcon, PencilIcon, PlusIcon, Tras
 import { useRef, useState, type MouseEvent } from 'react';
 
 import { OpenProjectDialog } from './OpenProjectDialog';
-import { CloseButton, IconButton } from './ui/Button';
-import { ConfirmDialog } from './ui/ConfirmDialog';
-import { MenuContent } from './ui/Menu';
-import { RenameDialog } from './ui/RenameDialog';
-import { Tabs } from './ui/Tabs';
-import { Tooltip } from './ui/Tooltip';
 
 /**
  * Document-style tabs for the open projects (the session), immediately right

@@ -1,8 +1,8 @@
+import { toaster } from '@workbench/components/ui';
 import { useMemo } from 'react';
 
 import type { WorkbenchNotificationKind } from './types';
 
-import { toaster } from './components/ui/toaster';
 import { useOptionalWorkbenchDispatch } from './WorkbenchContext';
 
 /**

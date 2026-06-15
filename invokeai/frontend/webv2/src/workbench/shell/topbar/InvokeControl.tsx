@@ -1,6 +1,7 @@
 import type { InvocationSourceId, Project, ResultDestination } from '@workbench/types';
 
 import { Flex, Group, HStack, Icon, Menu, Portal, Separator, Stack, Text, VStack } from '@chakra-ui/react';
+import { Button, IconButton, Tooltip } from '@workbench/components/ui';
 import { sanitizeBatchCount } from '@workbench/generation/batch';
 import {
   formatRoute,
@@ -14,9 +15,6 @@ import { useActiveProject, useWorkbenchDispatch, useWorkbenchSelector } from '@w
 import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
 import { CheckIcon, ChevronDownIcon, LockKeyholeIcon, SparklesIcon } from 'lucide-react';
 import { useEffect, useRef } from 'react';
-
-import { Button, IconButton } from './ui/Button';
-import { Tooltip } from './ui/Tooltip';
 
 /**
  * Fixed-width global Invoke control.

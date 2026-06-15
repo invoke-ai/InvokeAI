@@ -7,7 +7,7 @@ import type {
 
 import { Badge, Box, Field, Flex, HStack, Icon, Image, Input, Stack, Text, IconButton } from '@chakra-ui/react';
 import { useNodeExecutionState, type NodeExecutionState } from '@workbench/backend/nodeExecutionStore';
-import { Tooltip } from '@workbench/components/ui/Tooltip';
+import { Tooltip } from '@workbench/components/ui';
 import { FieldDescriptionPopover } from '@workbench/widgets/workflow/fields/FieldDescriptionPopover';
 import { WorkflowFieldInput } from '@workbench/widgets/workflow/fields/WorkflowFieldInput';
 import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';

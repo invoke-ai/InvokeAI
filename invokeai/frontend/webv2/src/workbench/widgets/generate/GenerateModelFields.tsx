@@ -2,12 +2,10 @@ import type { GenerateSettings, MainModelConfig, VaeModelConfig } from '@workben
 import type { ChangeEvent } from 'react';
 
 import { HStack, NativeSelect, NumberInput, Stack } from '@chakra-ui/react';
-import { ModelSelect } from '@workbench/components/ModelSelect';
-import { Button, IconButton } from '@workbench/components/ui/Button';
-import { Field } from '@workbench/components/ui/Field';
-import { Tooltip } from '@workbench/components/ui/Tooltip';
+import { Button, IconButton, Field, Tooltip } from '@workbench/components/ui';
 import { getSettingsWithModelDefaults, isSupportedGenerateModel } from '@workbench/generation/graph';
 import { isKnownScheduler, isMainModelConfig, SCHEDULER_OPTIONS, SEED_MAX } from '@workbench/generation/settings';
+import { ModelSelect } from '@workbench/models/components';
 import { DicesIcon } from 'lucide-react';
 
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';

@@ -2,9 +2,9 @@ import type { WidgetViewProps } from '@workbench/types';
 
 import { Badge, HStack, Progress, Stack, Text } from '@chakra-ui/react';
 import { useQueueItemProgress } from '@workbench/backend/progressStore';
-import { Button } from '@workbench/components/ui/Button';
-import { StatusWidgetChip } from '@workbench/components/WidgetFrames';
+import { Button } from '@workbench/components/ui';
 import { getDestinationLabel, getSourceLabel } from '@workbench/invocation';
+import { StatusWidgetChip } from '@workbench/widget-frame';
 import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { ListOrderedIcon } from 'lucide-react';
 

@@ -1,9 +1,9 @@
 import { Box, Code, Icon, ScrollArea } from '@chakra-ui/react';
-import { useNotify } from '@workbench/useNotify';
 import { CheckIcon, CopyIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { IconButton } from './Button';
+import { toaster } from './toaster';
 
 /**
  * The workbench's standard JSON preview: a monospace block with a copy button
@@ -27,7 +27,6 @@ export const JsonPreview = ({
   text?: string;
   value?: unknown;
 }) => {
-  const notify = useNotify();
   const [hasCopied, setHasCopied] = useState(false);
   const copyResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const json = useMemo(() => text ?? JSON.stringify(value, null, 2) ?? 'null', [text, value]);
@@ -53,7 +52,7 @@ export const JsonPreview = ({
 
         copyResetTimerRef.current = setTimeout(() => setHasCopied(false), 1500);
       })
-      .catch(() => notify.error('Failed to copy JSON'));
+      .catch(() => toaster.create({ title: 'Failed to copy JSON', type: 'error' }));
   };
 
   return (

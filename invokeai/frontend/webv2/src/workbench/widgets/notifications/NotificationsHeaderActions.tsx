@@ -1,5 +1,5 @@
 import { HStack } from '@chakra-ui/react';
-import { Button } from '@workbench/components/ui/Button';
+import { Button } from '@workbench/components/ui';
 import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 
 export const NotificationsHeaderActions = () => {

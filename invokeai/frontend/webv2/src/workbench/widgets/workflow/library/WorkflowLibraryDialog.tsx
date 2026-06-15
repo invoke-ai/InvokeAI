@@ -2,11 +2,8 @@ import type { ProjectGraphState } from '@workbench/workflows/types';
 
 import { Box, Dialog, HStack, Input, Portal, SegmentGroup, Stack, Tabs, Text } from '@chakra-ui/react';
 import { getApiErrorMessage } from '@workbench/backend/http';
-import { documentToPreviewGraph, GraphPreviewFlow } from '@workbench/components/GraphPreviewFlow';
-import { Button, CloseButton } from '@workbench/components/ui/Button';
-import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
-import { JsonPreview } from '@workbench/components/ui/JsonPreview';
-import { Scrollable } from '@workbench/components/ui/Scrollable';
+import { Button, CloseButton, ConfirmDialog, JsonPreview, Scrollable } from '@workbench/components/ui';
+import { documentToPreviewGraph, GraphPreviewFlow } from '@workbench/graph-preview';
 import { useNotify } from '@workbench/useNotify';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import {

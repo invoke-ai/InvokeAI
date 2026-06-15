@@ -1,4 +1,4 @@
-import { IconButton } from '@workbench/components/ui/Button';
+import { IconButton } from '@workbench/components/ui';
 import { MoreHorizontalIcon } from 'lucide-react';
 
 export const LayersHeaderActions = () => (

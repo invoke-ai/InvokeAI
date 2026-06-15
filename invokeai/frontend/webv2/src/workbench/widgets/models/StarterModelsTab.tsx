@@ -14,11 +14,7 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
-import { IconButton } from '@workbench/components/ui/Button';
-import { MenuContent } from '@workbench/components/ui/Menu';
-import { Row } from '@workbench/components/ui/Row';
-import { Scrollable } from '@workbench/components/ui/Scrollable';
-import { Tooltip } from '@workbench/components/ui/Tooltip';
+import { IconButton, MenuContent, Row, Scrollable, Tooltip } from '@workbench/components/ui';
 import { collectBases, collectTypes } from '@workbench/models/library';
 import { ensureStartersLoaded, useStartersSnapshot } from '@workbench/models/startersStore';
 import { getModelBaseColorPalette, getModelBaseLabel, getModelTypeLabel } from '@workbench/models/taxonomy';

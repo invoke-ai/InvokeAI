@@ -1,7 +1,7 @@
 import type { FieldType } from '@workbench/workflows/types';
 
 import { Box, Flex } from '@chakra-ui/react';
-import { Tooltip } from '@workbench/components/ui/Tooltip';
+import { Tooltip } from '@workbench/components/ui';
 import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from '@workbench/workflows/connectors';
 import { getFieldTypeColor, getFieldTypeLabel, isModelFieldType } from '@workbench/workflows/fields';
 import { Handle, Position, type NodeProps } from '@xyflow/react';

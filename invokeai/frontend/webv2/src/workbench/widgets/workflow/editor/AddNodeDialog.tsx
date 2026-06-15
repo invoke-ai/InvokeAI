@@ -2,9 +2,7 @@ import type { AddNodeConnectionFilter } from '@workbench/widgets/workflow/workfl
 import type { InvocationTemplate } from '@workbench/workflows/types';
 
 import { Accordion, Badge, Box, Dialog, HStack, Icon, Input, Portal, Stack, Text } from '@chakra-ui/react';
-import { Button } from '@workbench/components/ui/Button';
-import { Scrollable } from '@workbench/components/ui/Scrollable';
-import { Tooltip } from '@workbench/components/ui/Tooltip';
+import { Button, Scrollable, Tooltip } from '@workbench/components/ui';
 import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
 import { getCompatibleInputTemplate, getCompatibleOutputTemplate } from '@workbench/workflows/validation';
 import { HammerIcon } from 'lucide-react';

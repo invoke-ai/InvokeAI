@@ -2,6 +2,7 @@ import type { WidgetManifest, WidgetRegion, WorkbenchRegion } from '@workbench/t
 
 import { Box, Flex, HStack, Icon, Stack, Text, type RecipeVariantProps, useRecipe } from '@chakra-ui/react';
 import { chipRecipe } from '@theme/recipes';
+import { IconButton } from '@workbench/components/ui';
 import { useFocusRegionProps } from '@workbench/focusRegions';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
@@ -13,7 +14,6 @@ import {
   type ReactNode,
 } from 'react';
 
-import { IconButton } from './ui/Button';
 import { WidgetActionsMenu } from './WidgetActionsMenu';
 
 const PANEL_SIZE_STEP_PX = 16;

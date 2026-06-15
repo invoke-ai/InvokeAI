@@ -1,11 +1,9 @@
 import type { RegisteredWidget, WidgetIconId, WidgetId, WidgetRegion } from '@workbench/types';
 
 import { Flex, Icon, Menu, Portal, Text } from '@chakra-ui/react';
+import { Row, Tooltip } from '@workbench/components/ui';
 import { WidgetIcon } from '@workbench/iconResolver';
 import { CheckIcon, MoreHorizontalIcon } from 'lucide-react';
-
-import { Row } from './ui/Row';
-import { Tooltip } from './ui/Tooltip';
 
 export interface WidgetBarItem {
   id: WidgetId;

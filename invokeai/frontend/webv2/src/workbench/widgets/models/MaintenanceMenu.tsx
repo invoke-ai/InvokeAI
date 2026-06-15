@@ -1,9 +1,7 @@
 import type { OrphanedModelInfo } from '@workbench/models/types';
 
 import { Checkbox, Dialog, Flex, Icon, Menu, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
-import { Button, CloseButton, IconButton } from '@workbench/components/ui/Button';
-import { MenuContent } from '@workbench/components/ui/Menu';
-import { Panel } from '@workbench/components/ui/Panel';
+import { Button, CloseButton, IconButton, MenuContent, Panel } from '@workbench/components/ui';
 import { deleteOrphanedModels, emptyModelCache, getOrphanedModels } from '@workbench/models/api';
 import { refreshModels } from '@workbench/models/modelsStore';
 import { formatBytes } from '@workbench/models/taxonomy';

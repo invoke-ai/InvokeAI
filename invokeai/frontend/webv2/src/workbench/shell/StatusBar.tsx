@@ -1,14 +1,12 @@
 import type { RegisteredWidget, WidgetId } from '@workbench/types';
 
 import { Box, Flex, Icon, Menu, Portal, Text } from '@chakra-ui/react';
+import { Row, Tooltip } from '@workbench/components/ui';
 import { WidgetIcon } from '@workbench/iconResolver';
+import { WidgetRenderer } from '@workbench/widget-frame';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { CheckIcon, MoreHorizontalIcon } from 'lucide-react';
-
-import { Row } from './ui/Row';
-import { Tooltip } from './ui/Tooltip';
-import { WidgetRenderer } from './WidgetRenderer';
 
 interface BottomWidgetItem {
   failureMessage?: string;

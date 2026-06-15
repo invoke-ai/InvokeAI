@@ -1,8 +1,7 @@
 import type { ModelConfig } from '@workbench/models/types';
 
 import { HStack, Icon, Input, Tag, Text, Wrap } from '@chakra-ui/react';
-import { Button } from '@workbench/components/ui/Button';
-import { Field } from '@workbench/components/ui/Field';
+import { Button, Field } from '@workbench/components/ui';
 import { updateModel } from '@workbench/models/api';
 import { replaceModelInStore } from '@workbench/models/modelsStore';
 import { triggerPhraseSchema } from '@workbench/models/schemas';

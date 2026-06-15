@@ -1,9 +1,7 @@
 import type { WidgetId } from '@workbench/types';
 
 import { Box, HStack, Icon, Progress, Stack, Text } from '@chakra-ui/react';
-import { Button } from '@workbench/components/ui/Button';
-import { Scrollable } from '@workbench/components/ui/Scrollable';
-import { Tooltip } from '@workbench/components/ui/Tooltip';
+import { Button, Scrollable, Tooltip } from '@workbench/components/ui';
 import {
   ensureInstallsLoaded,
   isActiveInstallStatus,

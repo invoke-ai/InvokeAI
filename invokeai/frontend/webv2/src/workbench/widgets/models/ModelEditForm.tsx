@@ -1,8 +1,7 @@
 import type { ModelConfig, PredictionType } from '@workbench/models/types';
 
 import { HStack, Input, NativeSelect, Stack, Text, Textarea } from '@chakra-ui/react';
-import { Button } from '@workbench/components/ui/Button';
-import { Field } from '@workbench/components/ui/Field';
+import { Button, Field } from '@workbench/components/ui';
 import { updateModel } from '@workbench/models/api';
 import { replaceModelInStore } from '@workbench/models/modelsStore';
 import { modelEditSchema, type ModelEditFormValues } from '@workbench/models/schemas';

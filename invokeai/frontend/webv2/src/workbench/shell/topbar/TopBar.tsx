@@ -1,11 +1,11 @@
 import { Flex, Separator } from '@chakra-ui/react';
 import { AccountMenu } from '@workbench/auth/components/AccountMenu';
-import { InvokeControl } from '@workbench/components/InvokeControl';
-import { LayoutPresetMenu } from '@workbench/components/LayoutPresetMenu';
-import { ProjectTabs } from '@workbench/components/ProjectTabs';
+import { ProjectTabs } from '@workbench/projects/components';
 
 import { BatchCountField } from './BatchCountField';
 import { BrandMark } from './BrandMark';
+import { InvokeControl } from './InvokeControl';
+import { LayoutPresetMenu } from './LayoutPresetMenu';
 import { QueueActions } from './QueueActions';
 import { QueueInfo } from './QueueInfo';
 

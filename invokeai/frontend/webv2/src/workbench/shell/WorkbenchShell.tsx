@@ -1,19 +1,19 @@
+import type { WidgetId, WidgetRegion } from '@workbench/types';
+
 import { Flex } from '@chakra-ui/react';
+import { FocusRegionProvider } from '@workbench/focusRegions';
+import { WidgetBar, type WidgetBarItem } from '@workbench/widget-frame';
+import { getWidgetsForRegion, widgetRegistrationFailures } from '@workbench/widgetRegistry';
+import { useActiveProject, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { WorkbenchWidgetRegistryProvider } from '@workbench/WorkbenchWidgetRegistryContext';
 import { useEffect } from 'react';
 
-import type { WidgetId, WidgetRegion } from './types';
-
-import { BottomPanel } from './components/BottomPanel';
-import { CenterArea } from './components/CenterArea';
-import { LeftPanel, RightPanel } from './components/Panels';
-import { StatusBar } from './components/StatusBar';
-import { TopBar } from './components/TopBar';
-import { WidgetBar, type WidgetBarItem } from './components/WidgetBar';
-import { WorkbenchNotificationToaster } from './components/WorkbenchNotificationToaster';
-import { FocusRegionProvider } from './focusRegions';
-import { getWidgetsForRegion, widgetRegistrationFailures } from './widgetRegistry';
-import { useActiveProject, useWorkbenchDispatch } from './WorkbenchContext';
-import { WorkbenchWidgetRegistryProvider } from './WorkbenchWidgetRegistryContext';
+import { BottomPanel } from './BottomPanel';
+import { CenterArea } from './CenterArea';
+import { WorkbenchNotificationToaster } from './notifications';
+import { LeftPanel, RightPanel } from './Panels';
+import { StatusBar } from './StatusBar';
+import { TopBar } from './topbar';
 
 const getWidgetBarItems = (region: WidgetRegion, enabledWidgetIds: WidgetId[]): WidgetBarItem[] =>
   getWidgetsForRegion(region).map((widget) => ({

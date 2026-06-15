@@ -1,9 +1,8 @@
 import type { WidgetViewProps } from '@workbench/types';
 
 import { HStack, Stack, Text } from '@chakra-ui/react';
-import { Button } from '@workbench/components/ui/Button';
-import { Panel } from '@workbench/components/ui/Panel';
-import { StatusWidgetChip } from '@workbench/components/WidgetFrames';
+import { Button, Panel } from '@workbench/components/ui';
+import { StatusWidgetChip } from '@workbench/widget-frame';
 import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { BugIcon, ClipboardListIcon } from 'lucide-react';
 

@@ -1,9 +1,8 @@
 import type { WorkbenchNotificationKind } from '@workbench/types';
 
+import { toaster } from '@workbench/components/ui';
 import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { useEffect, useRef } from 'react';
-
-import { toaster } from './ui/toaster';
 
 const notificationToastType: Record<WorkbenchNotificationKind, 'error' | 'info' | 'success'> = {
   error: 'error',
