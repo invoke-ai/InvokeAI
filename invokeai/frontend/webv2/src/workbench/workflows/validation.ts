@@ -7,6 +7,7 @@ import type {
   WorkflowEdge,
   WorkflowNode,
 } from './types';
+
 import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE, resolveConnectorSource } from './connectors';
 import { isConnectorNode, isInvocationNode } from './types';
 

@@ -1,4 +1,5 @@
 import type { WidgetManifest } from '@workbench/types';
+
 import { VersionStatusWidgetView } from './VersionStatusWidgetView';
 
 export const versionStatusWidgetManifest: WidgetManifest = {

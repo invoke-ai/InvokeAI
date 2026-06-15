@@ -1,9 +1,8 @@
-import { useCallback, useState } from 'react';
-
-import { getAccessTokenForSource } from '@workbench/models/apiKeys';
 import { installModel, type InstallModelRequest } from '@workbench/models/api';
+import { getAccessTokenForSource } from '@workbench/models/apiKeys';
 import { addInstallJob } from '@workbench/models/installsStore';
 import { useNotify } from '@workbench/useNotify';
+import { useCallback, useState } from 'react';
 
 /**
  * Shared install entry point: queues an install job, optimistically adds it to

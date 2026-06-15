@@ -1,8 +1,8 @@
-import { Icon, Popover, Portal, Stack, Text, Textarea, IconButton } from '@chakra-ui/react';
-import { FileTextIcon } from 'lucide-react';
 import type { ChangeEvent } from 'react';
 
+import { Icon, Popover, Portal, Stack, Text, Textarea, IconButton } from '@chakra-ui/react';
 import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { FileTextIcon } from 'lucide-react';
 
 /**
  * Small textarea popover overriding a field's template description ("field

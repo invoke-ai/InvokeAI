@@ -1,19 +1,20 @@
-import { Icon, Menu, Portal, Separator } from '@chakra-ui/react';
-import { useRef, useState, type MouseEvent } from 'react';
-import { FileDownIcon, FolderCogIcon, FolderOpenIcon, PencilIcon, PlusIcon, Trash2Icon, XIcon } from 'lucide-react';
-
-import { CloseButton, IconButton } from './ui/Button';
-import { ConfirmDialog } from './ui/ConfirmDialog';
-import { MenuContent } from './ui/Menu';
-import { OpenProjectDialog } from './OpenProjectDialog';
-import { RenameDialog } from './ui/RenameDialog';
-import { Tabs } from './ui/Tabs';
-import { Tooltip } from './ui/Tooltip';
 import type { Project, WidgetRegion } from '@workbench/types';
+
+import { Icon, Menu, Portal, Separator } from '@chakra-ui/react';
 import { exportOpenProject } from '@workbench/projects/projectFile';
 import { useProjectActions } from '@workbench/projects/useProjectActions';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { FileDownIcon, FolderCogIcon, FolderOpenIcon, PencilIcon, PlusIcon, Trash2Icon, XIcon } from 'lucide-react';
+import { useRef, useState, type MouseEvent } from 'react';
+
+import { OpenProjectDialog } from './OpenProjectDialog';
+import { CloseButton, IconButton } from './ui/Button';
+import { ConfirmDialog } from './ui/ConfirmDialog';
+import { MenuContent } from './ui/Menu';
+import { RenameDialog } from './ui/RenameDialog';
+import { Tabs } from './ui/Tabs';
+import { Tooltip } from './ui/Tooltip';
 
 /**
  * Document-style tabs for the open projects (the session), immediately right

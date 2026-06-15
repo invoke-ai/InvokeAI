@@ -1,8 +1,7 @@
 import { Box, Flex, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { LayersIcon } from 'lucide-react';
-
 import { Panel } from '@workbench/components/ui/Panel';
 import { useActiveProject } from '@workbench/WorkbenchContext';
+import { LayersIcon } from 'lucide-react';
 
 export const LayersWidgetView = () => {
   const activeProject = useActiveProject();

@@ -1,14 +1,14 @@
 import { chakra, Checkbox, Input } from '@chakra-ui/react';
 import { useNavigate } from '@tanstack/react-router';
-
-import { AuthFormAlert, AuthScreen } from './AuthScreen';
-import { PasswordInput } from './PasswordInput';
+import { loginSchema } from '@workbench/auth/schemas';
+import { loginWithCredentials, useAuthSession } from '@workbench/auth/session';
 import { getApiErrorMessage } from '@workbench/backend/http';
 import { Button } from '@workbench/components/ui/Button';
 import { Field } from '@workbench/components/ui/Field';
 import { useZodForm } from '@workbench/models/useZodForm';
-import { loginSchema } from '@workbench/auth/schemas';
-import { loginWithCredentials, useAuthSession } from '@workbench/auth/session';
+
+import { AuthFormAlert, AuthScreen } from './AuthScreen';
+import { PasswordInput } from './PasswordInput';
 
 /** Sign-in screen, shown only when the backend runs in multi-user mode. */
 export const LoginScreen = () => {

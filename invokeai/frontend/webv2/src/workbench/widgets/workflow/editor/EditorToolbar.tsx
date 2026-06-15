@@ -1,4 +1,5 @@
 import { Box, Popover, Portal, Slider, Stack, Text } from '@chakra-ui/react';
+import { Toolbar, ToolbarButton, ToolbarSeparator } from '@workbench/components/ui/Toolbar';
 import { useReactFlow } from '@xyflow/react';
 import {
   BlendIcon,
@@ -10,8 +11,6 @@ import {
   ZoomInIcon,
   ZoomOutIcon,
 } from 'lucide-react';
-
-import { Toolbar, ToolbarButton, ToolbarSeparator } from '@workbench/components/ui/Toolbar';
 
 /**
  * The editor's single tool strip, docked to the left edge: interaction tools

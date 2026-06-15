@@ -1,4 +1,5 @@
 import type { WidgetManifest } from '@workbench/types';
+
 import { QueueWidgetView } from './QueueWidgetView';
 
 export const queueWidgetManifest: WidgetManifest = {

@@ -1,3 +1,5 @@
+import type { XYPosition } from '@workbench/workflows/types';
+
 import { Box } from '@chakra-ui/react';
 import {
   useEffect,
@@ -8,7 +10,6 @@ import {
   type ReactNode,
 } from 'react';
 
-import type { XYPosition } from '@workbench/workflows/types';
 import type { WorkflowFlowInstance } from './flowInstanceStore';
 
 /**

@@ -1,8 +1,7 @@
-import { Badge, Combobox, createListCollection, HStack, Portal, Stack, Text } from '@chakra-ui/react';
-import { useEffect, useMemo, useState } from 'react';
+import type { ModelConfig, ModelTaxonomyType } from '@workbench/models/types';
 
+import { Badge, Combobox, createListCollection, HStack, Portal, Stack, Text } from '@chakra-ui/react';
 import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsStore';
-import { useWorkbenchPreferences } from '@workbench/settings/store';
 import {
   formatBytes,
   getModelBaseColorPalette,
@@ -10,7 +9,8 @@ import {
   getModelCategoryRank,
   getModelTypePluralLabel,
 } from '@workbench/models/taxonomy';
-import type { ModelConfig, ModelTaxonomyType } from '@workbench/models/types';
+import { useWorkbenchPreferences } from '@workbench/settings/store';
+import { useEffect, useMemo, useState } from 'react';
 
 /**
  * Universal single-model picker: a searchable combobox over the installed

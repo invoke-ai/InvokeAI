@@ -1,8 +1,8 @@
 import { Box, Code, Icon, ScrollArea } from '@chakra-ui/react';
+import { useNotify } from '@workbench/useNotify';
 import { CheckIcon, CopyIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { useNotify } from '@workbench/useNotify';
 import { IconButton } from './Button';
 
 /**

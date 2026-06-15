@@ -1,8 +1,6 @@
+import type { WidgetId } from '@workbench/types';
+
 import { Box, HStack, Icon, Progress, Stack, Text } from '@chakra-ui/react';
-
-import { DownloadIcon, PlusIcon } from 'lucide-react';
-import { useEffect, useMemo } from 'react';
-
 import { Button } from '@workbench/components/ui/Button';
 import { Scrollable } from '@workbench/components/ui/Scrollable';
 import { Tooltip } from '@workbench/components/ui/Tooltip';
@@ -15,8 +13,10 @@ import {
 import { collectBases, collectTypes } from '@workbench/models/library';
 import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsStore';
 import { openModelsCenterTab, updateModelsUi, useModelsUi } from '@workbench/models/uiStore';
-import type { WidgetId } from '@workbench/types';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { DownloadIcon, PlusIcon } from 'lucide-react';
+import { useEffect, useMemo } from 'react';
+
 import { ModelDetail } from './ModelDetail';
 import { ModelFilterBar } from './ModelFilterBar';
 import { ModelLibraryList } from './ModelLibraryList';

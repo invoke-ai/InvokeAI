@@ -1,8 +1,10 @@
 import type { FocusEvent, PointerEvent, ReactNode } from 'react';
+
 import { createContext, use, useState } from 'react';
 
-import { useWorkbenchPreferences } from './settings/store';
 import type { WidgetRegion } from './types';
+
+import { useWorkbenchPreferences } from './settings/store';
 
 interface FocusRegionContextValue {
   focusedRegion: WidgetRegion | null;

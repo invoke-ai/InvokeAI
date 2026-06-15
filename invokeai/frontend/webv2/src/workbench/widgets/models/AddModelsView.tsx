@@ -1,15 +1,15 @@
 import { Box, Stack } from '@chakra-ui/react';
-
 import { Scrollable } from '@workbench/components/ui/Scrollable';
 import { Tabs } from '@workbench/components/ui/Tabs';
 import { updateModelsUi, useModelsUi, type AddModelsTab } from '@workbench/models/uiStore';
+import { FolderSearchIcon, KeyIcon, LinkIcon, StarIcon } from 'lucide-react';
+import { SiHuggingface } from 'react-icons/si';
+
 import { ApiKeysSection } from './ApiKeysSection';
 import { HuggingFaceTab } from './HuggingFaceTab';
 import { ScanFolderTab } from './ScanFolderTab';
 import { StarterModelsTab } from './StarterModelsTab';
 import { UrlInstallTab } from './UrlInstallTab';
-import { FolderSearchIcon, KeyIcon, LinkIcon, StarIcon } from 'lucide-react';
-import { SiHuggingface } from 'react-icons/si';
 
 /**
  * Every way to acquire a model, one tab per source kind, plus credentials.

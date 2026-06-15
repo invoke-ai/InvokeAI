@@ -1,4 +1,5 @@
 import type { WidgetManifest } from '@workbench/types';
+
 import { AutosaveStatusWidgetView } from './AutosaveStatusWidgetView';
 
 export const autosaveStatusWidgetManifest: WidgetManifest = {

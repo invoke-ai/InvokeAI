@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 
 import type { WorkbenchNotificationKind } from './types';
-import { useOptionalWorkbenchDispatch } from './WorkbenchContext';
+
 import { toaster } from './components/ui/toaster';
+import { useOptionalWorkbenchDispatch } from './WorkbenchContext';
 
 /**
  * Notification helper: records into the workbench shell when present, and

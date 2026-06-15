@@ -1,6 +1,7 @@
 import type { GalleryBoard, GalleryImage, GalleryView } from '@workbench/gallery/api';
-import { getGallerySettings, type GallerySettings } from '@workbench/gallery/settings';
 import type { GeneratedImageContract, QueueItem } from '@workbench/types';
+
+import { getGallerySettings, type GallerySettings } from '@workbench/gallery/settings';
 
 const UNCATEGORIZED_BOARD: GalleryBoard = {
   archived: false,

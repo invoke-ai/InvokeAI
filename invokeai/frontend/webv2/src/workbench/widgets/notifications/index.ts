@@ -1,4 +1,5 @@
 import type { WidgetManifest } from '@workbench/types';
+
 import { NotificationsHeaderActions } from './NotificationsHeaderActions';
 import { NotificationsWidgetView } from './NotificationsWidgetView';
 

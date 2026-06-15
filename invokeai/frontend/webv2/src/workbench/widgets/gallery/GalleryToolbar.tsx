@@ -1,3 +1,5 @@
+import type { GalleryView } from '@workbench/gallery/api';
+
 import {
   Box,
   HStack,
@@ -12,13 +14,12 @@ import {
   Switch,
   Text,
 } from '@chakra-ui/react';
-import { useRef } from 'react';
-import { SearchIcon, SettingsIcon, UploadIcon } from 'lucide-react';
-
 import { Button, CloseButton, IconButton } from '@workbench/components/ui/Button';
 import { Tabs } from '@workbench/components/ui/Tabs';
 import { isDateBoardId } from '@workbench/gallery/api';
-import type { GalleryView } from '@workbench/gallery/api';
+import { SearchIcon, SettingsIcon, UploadIcon } from 'lucide-react';
+import { useRef } from 'react';
+
 import { GalleryBoardSelect } from './GalleryBoardSelect';
 import { useGalleryWidget } from './GalleryWidgetContext';
 

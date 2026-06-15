@@ -1,20 +1,20 @@
-import { Box, Flex, HStack, Icon, Stack, Text, type RecipeVariantProps, useRecipe } from '@chakra-ui/react';
+import type { WidgetManifest, WidgetRegion, WorkbenchRegion } from '@workbench/types';
 
+import { Box, Flex, HStack, Icon, Stack, Text, type RecipeVariantProps, useRecipe } from '@chakra-ui/react';
 import { chipRecipe } from '@theme/recipes';
+import { useFocusRegionProps } from '@workbench/focusRegions';
+import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { SettingsIcon, type LucideIcon } from 'lucide-react';
 import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
-import { SettingsIcon, type LucideIcon } from 'lucide-react';
 
-import { useFocusRegionProps } from '@workbench/focusRegions';
-import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
-import type { WidgetManifest, WidgetRegion, WorkbenchRegion } from '@workbench/types';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { WidgetActionsMenu } from './WidgetActionsMenu';
 import { IconButton } from './ui/Button';
+import { WidgetActionsMenu } from './WidgetActionsMenu';
 
 const PANEL_SIZE_STEP_PX = 16;
 const MIN_PANEL_SIZE_PX = 180;

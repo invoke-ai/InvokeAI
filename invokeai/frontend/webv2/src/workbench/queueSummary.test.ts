@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import type { QueueItem } from './types';
 import type { QueueItemProgress } from './backend/progressStore';
+import type { QueueItem } from './types';
+
 import { getQueueProgressBarState, getQueueProgressBarValue, getQueueSummary } from './queueSummary';
 
 const createQueueItem = ({

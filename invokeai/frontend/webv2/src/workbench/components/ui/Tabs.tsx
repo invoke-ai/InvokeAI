@@ -1,5 +1,6 @@
-import { Tabs as ChakraTabs } from '@chakra-ui/react';
 import type { ComponentProps } from 'react';
+
+import { Tabs as ChakraTabs } from '@chakra-ui/react';
 
 type TabsRootProps = ComponentProps<typeof ChakraTabs.Root>;
 

@@ -5,8 +5,10 @@ import type {
   ProjectSettings,
   ResultDestination,
 } from '@workbench/types';
-import { clampDimension, deriveAspectRatioId, getOptimalDimension, SEED_MAX } from './settings';
+
 import type { CompiledGenerateGraph, GenerateSettings, MainModelConfig, SupportedGenerateBase } from './types';
+
+import { clampDimension, deriveAspectRatioId, getOptimalDimension, SEED_MAX } from './settings';
 
 const now = (): string => new Date().toISOString();
 

@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { compileGenerateGraph, generateSeedSequence, getDefaultGenerateSettings, resolveGenerateSeed } from './graph';
 import type { GenerateSettings, MainModelConfig, VaeModelConfig } from './types';
+
+import { compileGenerateGraph, generateSeedSequence, getDefaultGenerateSettings, resolveGenerateSeed } from './graph';
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
 const sdxlModel: MainModelConfig = { base: 'sdxl', key: 'sdxl-model', name: 'SDXL', type: 'main' };

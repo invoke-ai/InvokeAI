@@ -1,5 +1,7 @@
 import type { WidgetId, WorkbenchRegion } from '@workbench/types';
+
 import { getWidgetById } from '@workbench/widgetRegistry';
+
 import { MissingWidgetFrame, WidgetRenderer } from './WidgetRenderer';
 
 /** Left panel — hosts the active registered widget panel view. */

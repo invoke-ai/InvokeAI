@@ -1,6 +1,8 @@
 import { createExternalStore } from '@workbench/externalStore';
-import { DEFAULT_LIBRARY_FILTERS, type ModelLibraryFilters } from './library';
+
 import type { FoundModel } from './types';
+
+import { DEFAULT_LIBRARY_FILTERS, type ModelLibraryFilters } from './library';
 
 /**
  * Session-lived UI state for the model manager. Widget views unmount whenever

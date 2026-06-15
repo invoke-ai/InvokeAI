@@ -1,6 +1,8 @@
 import { createExternalStore } from '@workbench/externalStore';
-import { getStarterModels } from './api';
+
 import type { StarterModelResponse } from './types';
+
+import { getStarterModels } from './api';
 
 /**
  * Cached starter-models catalog. The list is large and rarely changes, so it

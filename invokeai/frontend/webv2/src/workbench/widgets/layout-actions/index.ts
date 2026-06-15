@@ -1,6 +1,7 @@
 import type { WidgetManifest } from '@workbench/types';
-import { LayoutHeaderActions } from './LayoutHeaderActions';
+
 import { LayoutActionsWidgetView } from './LayoutActionsWidgetView';
+import { LayoutHeaderActions } from './LayoutHeaderActions';
 
 export const layoutActionsWidgetManifest: WidgetManifest = {
   failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },

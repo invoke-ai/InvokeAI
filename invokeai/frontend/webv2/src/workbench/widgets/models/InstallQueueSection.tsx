@@ -1,7 +1,6 @@
-import { Badge, Box, Flex, HStack, Icon, Progress, Spinner, Stack, Text } from '@chakra-ui/react';
-import { PauseIcon, PlayIcon, RotateCcwIcon, Trash2Icon, XIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import type { ModelInstallJob, ModelInstallStatus } from '@workbench/models/types';
 
+import { Badge, Box, Flex, HStack, Icon, Progress, Spinner, Stack, Text } from '@chakra-ui/react';
 import { Button, IconButton } from '@workbench/components/ui/Button';
 import { Scrollable } from '@workbench/components/ui/Scrollable';
 import { Tooltip } from '@workbench/components/ui/Tooltip';
@@ -21,8 +20,9 @@ import {
   useInstallsSnapshot,
 } from '@workbench/models/installsStore';
 import { formatBytes, getInstallSourceLabel } from '@workbench/models/taxonomy';
-import type { ModelInstallJob, ModelInstallStatus } from '@workbench/models/types';
 import { useNotify } from '@workbench/useNotify';
+import { PauseIcon, PlayIcon, RotateCcwIcon, Trash2Icon, XIcon } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 const STATUS_BADGES: Record<ModelInstallStatus, { label: string; palette: string }> = {
   cancelled: { label: 'Cancelled', palette: 'gray' },

@@ -1,7 +1,6 @@
-import { Badge, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
-import { Link2OffIcon } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import type { ModelConfig, ModelTaxonomyType } from '@workbench/models/types';
 
+import { Badge, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
 import { ModelSelect } from '@workbench/components/ModelSelect';
 import { IconButton } from '@workbench/components/ui/Button';
 import { FieldLabel } from '@workbench/components/ui/Field';
@@ -9,7 +8,9 @@ import { Tooltip } from '@workbench/components/ui/Tooltip';
 import { addModelRelationship, getRelatedModelKeys, removeModelRelationship } from '@workbench/models/api';
 import { useModelsSnapshot } from '@workbench/models/modelsStore';
 import { getModelBaseColorPalette, getModelBaseLabel, getModelTypeLabel } from '@workbench/models/taxonomy';
-import type { ModelConfig, ModelTaxonomyType } from '@workbench/models/types';
+import { Link2OffIcon } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+
 import { SourceListItem } from './SourceListItem';
 
 /** Types offered when linking related models, grouped in one picker. */

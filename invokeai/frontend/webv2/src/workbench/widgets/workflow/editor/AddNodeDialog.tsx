@@ -1,14 +1,14 @@
-import { Accordion, Badge, Box, Dialog, HStack, Icon, Input, Portal, Stack, Text } from '@chakra-ui/react';
-import { HammerIcon } from 'lucide-react';
-import { useCallback, useMemo, useState, type ChangeEvent, type ReactNode } from 'react';
+import type { AddNodeConnectionFilter } from '@workbench/widgets/workflow/workflowUiStore';
+import type { InvocationTemplate } from '@workbench/workflows/types';
 
+import { Accordion, Badge, Box, Dialog, HStack, Icon, Input, Portal, Stack, Text } from '@chakra-ui/react';
 import { Button } from '@workbench/components/ui/Button';
 import { Scrollable } from '@workbench/components/ui/Scrollable';
 import { Tooltip } from '@workbench/components/ui/Tooltip';
 import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
-import type { InvocationTemplate } from '@workbench/workflows/types';
 import { getCompatibleInputTemplate } from '@workbench/workflows/validation';
-import type { AddNodeConnectionFilter } from '@workbench/widgets/workflow/workflowUiStore';
+import { HammerIcon } from 'lucide-react';
+import { useCallback, useMemo, useState, type ChangeEvent, type ReactNode } from 'react';
 
 /**
  * Command-palette-style node picker: a centered search dialog whose results

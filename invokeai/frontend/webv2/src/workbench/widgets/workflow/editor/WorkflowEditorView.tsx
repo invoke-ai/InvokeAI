@@ -1,4 +1,17 @@
+import type { XYPosition } from '@workbench/workflows/types';
+
 import { Box, Flex, Stack, Text } from '@chakra-ui/react';
+import { FlowMiniMap } from '@workbench/components/FlowMiniMap';
+import '@xyflow/react/dist/style.css';
+import { flowThemeCss, getFlowColorMode } from '@workbench/components/flowTheme';
+import { useWorkbenchPreferences } from '@workbench/settings/store';
+import { useNotify } from '@workbench/useNotify';
+import { setAddNodeOpen } from '@workbench/widgets/workflow/workflowUiStore';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { getProjectGraphReadiness } from '@workbench/workflows/buildGraph';
+import { buildConnectorNode, createWorkflowId } from '@workbench/workflows/document';
+import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
+import { getWorkflowSourceFieldType, validateConnection } from '@workbench/workflows/validation';
 import {
   Background,
   BackgroundVariant,
@@ -27,19 +40,8 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from 'react';
 
-import '@xyflow/react/dist/style.css';
-
-import { FlowMiniMap } from '@workbench/components/FlowMiniMap';
-import { flowThemeCss, getFlowColorMode } from '@workbench/components/flowTheme';
-import { useNotify } from '@workbench/useNotify';
-import { useWorkbenchPreferences } from '@workbench/settings/store';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { getProjectGraphReadiness } from '@workbench/workflows/buildGraph';
-import { buildConnectorNode, createWorkflowId } from '@workbench/workflows/document';
-import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
-import type { XYPosition } from '@workbench/workflows/types';
-import { getWorkflowSourceFieldType, validateConnection } from '@workbench/workflows/validation';
 import { buildDuplicateElements, buildPasteElements, copyNodesToClipboard, useHasClipboardNodes } from './clipboard';
+import { ConnectorFlowNode } from './ConnectorFlowNode';
 import { CurrentImageFlowNode } from './CurrentImageFlowNode';
 import { EditorToolbar, type EditorTool } from './EditorToolbar';
 import { toFlowEdges, toFlowNodes, withNodeSelection, type FlowEdgeType, type WorkflowFlowNode } from './flowAdapters';
@@ -49,14 +51,12 @@ import {
   type WorkflowFlowInstance,
 } from './flowInstanceStore';
 import { InvocationFlowNode } from './InvocationFlowNode';
-import { ConnectorFlowNode } from './ConnectorFlowNode';
 import { NodeContextMenu, type WorkflowContextMenuState } from './NodeContextMenu';
 import { NotesFlowNode } from './NotesFlowNode';
 import { clearNodeSelectionRequest, reportNodeSelection, workflowSelectionStore } from './selectionStore';
 import { useEraser } from './useEraser';
 import { useLasso } from './useLasso';
 import { useModifierHeld } from './useModifierHeld';
-import { setAddNodeOpen } from '@workbench/widgets/workflow/workflowUiStore';
 
 const nodeTypes: NodeTypes = {
   connector: ConnectorFlowNode,

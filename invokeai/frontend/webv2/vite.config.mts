@@ -1,9 +1,7 @@
-import { fileURLToPath, URL } from 'node:url';
-
-import react, { reactCompilerPreset } from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
-
 import babel from '@rolldown/plugin-babel';
+import react, { reactCompilerPreset } from '@vitejs/plugin-react';
+import { fileURLToPath, URL } from 'node:url';
+import { defineConfig } from 'vite';
 
 // Override with e.g. INVOKEAI_DEV_BACKEND=http://127.0.0.1:9091 when the
 // backend dev server runs on a non-default port.

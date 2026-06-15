@@ -1,5 +1,6 @@
-import { getModelBaseLabel, getModelCategoryRank, getModelTypePluralLabel } from './taxonomy';
 import type { ModelConfig, ModelTaxonomyType } from './types';
+
+import { getModelBaseLabel, getModelCategoryRank, getModelTypePluralLabel } from './taxonomy';
 
 /**
  * Pure filtering/grouping/sorting for the model library. Kept free of React so

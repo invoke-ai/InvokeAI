@@ -1,6 +1,7 @@
+import type { ComponentType } from 'react';
+
 import { Card, Flex, Icon, Link, Stack, Text } from '@chakra-ui/react';
 import { BookOpenTextIcon, ClapperboardIcon, CodeIcon, ExternalLinkIcon, MessagesSquareIcon } from 'lucide-react';
-import type { ComponentType } from 'react';
 
 /**
  * Home's side rail: pointers out to the docs and community, plus the

@@ -1,8 +1,3 @@
-import { DEFAULT_THEME_ID, isWorkbenchThemeId } from '@theme/themes';
-import { getUserStorageScope } from '@workbench/auth/session';
-import { createExternalStore } from '@workbench/externalStore';
-import { deleteClientStateValue, getClientStateValue, setClientStateValue } from '@workbench/projects/api';
-import { fetchSessionBlob } from '@workbench/projects/session';
 import type {
   DeveloperLogLevel,
   DeveloperLogNamespace,
@@ -10,6 +5,12 @@ import type {
   WorkbenchLanguage,
   WorkbenchPreferences,
 } from '@workbench/types';
+
+import { DEFAULT_THEME_ID, isWorkbenchThemeId } from '@theme/themes';
+import { getUserStorageScope } from '@workbench/auth/session';
+import { createExternalStore } from '@workbench/externalStore';
+import { deleteClientStateValue, getClientStateValue, setClientStateValue } from '@workbench/projects/api';
+import { fetchSessionBlob } from '@workbench/projects/session';
 
 const SETTINGS_BASE_STORAGE_KEY = 'invokeai:v7:webv2:settings';
 const LEGACY_WORKBENCH_BASE_STORAGE_KEY = 'invokeai:v7:webv2:workbench';

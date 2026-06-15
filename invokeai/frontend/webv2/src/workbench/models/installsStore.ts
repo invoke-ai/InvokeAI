@@ -1,10 +1,11 @@
+import { createExternalStore, createListenerChannel } from '@workbench/externalStore';
 import { useSyncExternalStore } from 'react';
 
-import { createExternalStore, createListenerChannel } from '@workbench/externalStore';
+import type { ModelInstallJob, ModelInstallStatus } from './types';
+
 import { listModelInstalls } from './api';
 import { refreshModels } from './modelsStore';
 import { refreshStartersIfLoaded } from './startersStore';
-import type { ModelInstallJob, ModelInstallStatus } from './types';
 
 /**
  * Live store for model install jobs. The job list itself is REST-owned

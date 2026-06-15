@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import type { InvocationTemplatesSnapshot } from './templates';
+import type { FieldInputTemplate, InvocationTemplate, ProjectGraphState } from './types';
+
 import { compileProjectGraph, getProjectGraphReadiness } from './buildGraph';
 import {
   buildConnectorNode,
@@ -8,8 +11,6 @@ import {
   createProjectGraph,
   projectGraphReducer,
 } from './document';
-import type { InvocationTemplatesSnapshot } from './templates';
-import type { FieldInputTemplate, InvocationTemplate, ProjectGraphState } from './types';
 
 const input = (name: string, overrides: Partial<FieldInputTemplate> = {}): FieldInputTemplate => ({
   default: undefined,

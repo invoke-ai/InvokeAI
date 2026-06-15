@@ -1,4 +1,5 @@
 import type { FieldType, InvocationTemplates, WorkflowEdge, WorkflowNode } from './types';
+
 import { isConnectorNode, isInvocationNode } from './types';
 
 export const CONNECTOR_INPUT_HANDLE = 'in';

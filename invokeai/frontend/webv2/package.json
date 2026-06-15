@@ -4,17 +4,17 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "pnpm run lint && vite build",
     "dev": "vite dev",
     "dev:host": "vite dev --host",
-    "build": "pnpm run lint && vite build",
     "fix": "pnpm run lint:oxc:fix && pnpm run format:write",
     "format:check": "oxfmt --check .",
     "format:write": "oxfmt --write .",
     "lint": "pnpm run format:check && pnpm run lint:oxc && pnpm run lint:tsc",
     "lint:oxc": "oxlint --react-plugin --import-plugin --deny-warnings .",
     "lint:oxc:fix": "oxlint --react-plugin --import-plugin --fix .",
-    "preview": "vite preview",
     "lint:tsc": "tsc --noEmit",
+    "preview": "vite preview",
     "test": "vitest run"
   },
   "dependencies": {

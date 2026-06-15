@@ -1,4 +1,5 @@
 import type { WidgetManifest } from '@workbench/types';
+
 import { WorkflowHeaderActions, WorkflowMenuItems, WorkflowWidgetLabel } from './WorkflowWidgetChrome';
 import { WorkflowWidgetView } from './WorkflowWidgetView';
 

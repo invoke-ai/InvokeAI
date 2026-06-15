@@ -1,15 +1,15 @@
 import { chakra, Input, Stack } from '@chakra-ui/react';
 import { useNavigate } from '@tanstack/react-router';
-import { useMemo } from 'react';
-
-import { AuthFormAlert, AuthScreen } from './AuthScreen';
-import { PasswordInput, PasswordStrengthMeter } from './PasswordInput';
+import { createSetupSchema, PASSWORD_RULES_HINT, type SetupFormValues } from '@workbench/auth/schemas';
+import { completeAdminSetup, useAuthSession } from '@workbench/auth/session';
 import { getApiErrorMessage } from '@workbench/backend/http';
 import { Button } from '@workbench/components/ui/Button';
 import { Field } from '@workbench/components/ui/Field';
 import { useZodForm } from '@workbench/models/useZodForm';
-import { createSetupSchema, PASSWORD_RULES_HINT, type SetupFormValues } from '@workbench/auth/schemas';
-import { completeAdminSetup, useAuthSession } from '@workbench/auth/session';
+import { useMemo } from 'react';
+
+import { AuthFormAlert, AuthScreen } from './AuthScreen';
+import { PasswordInput, PasswordStrengthMeter } from './PasswordInput';
 
 const INITIAL_VALUES: SetupFormValues = { confirmPassword: '', displayName: '', email: '', password: '' };
 

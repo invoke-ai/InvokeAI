@@ -1,15 +1,16 @@
-import { DataList, HStack, Icon, Menu, Portal, Separator, Stack, Text } from '@chakra-ui/react';
-import { ArrowLeftIcon, MoreHorizontalIcon, PencilIcon, RefreshCcwIcon, Trash2Icon } from 'lucide-react';
-import { SiHuggingface } from 'react-icons/si';
-import { useCallback, useState } from 'react';
+import type { ModelConfig } from '@workbench/models/types';
 
+import { DataList, HStack, Icon, Menu, Portal, Separator, Stack, Text } from '@chakra-ui/react';
 import { Button, IconButton } from '@workbench/components/ui/Button';
 import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
 import { MenuContent } from '@workbench/components/ui/Menu';
 import { useModelsSnapshot } from '@workbench/models/modelsStore';
 import { formatBytes, isConvertibleToDiffusers } from '@workbench/models/taxonomy';
-import type { ModelConfig } from '@workbench/models/types';
 import { useNotify } from '@workbench/useNotify';
+import { ArrowLeftIcon, MoreHorizontalIcon, PencilIcon, RefreshCcwIcon, Trash2Icon } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { SiHuggingface } from 'react-icons/si';
+
 import { DefaultSettingsSection, supportsDefaultSettings } from './DefaultSettingsSection';
 import { MissingFileBadge, ModelBadgeRow } from './ModelBadges';
 import { ModelEditForm } from './ModelEditForm';

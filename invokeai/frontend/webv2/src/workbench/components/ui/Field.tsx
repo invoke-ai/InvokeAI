@@ -1,6 +1,6 @@
-import { Stack, Text, useRecipe, type StackProps } from '@chakra-ui/react';
 import type { ReactNode } from 'react';
 
+import { Stack, Text, useRecipe, type StackProps } from '@chakra-ui/react';
 import { fieldLabelRecipe } from '@theme/recipes';
 
 /**

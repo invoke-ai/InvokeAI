@@ -1,5 +1,6 @@
-import { getClientStateValue } from './api';
 import type { AccountState, WorkbenchPreferences, WorkbenchState } from '@workbench/types';
+
+import { getClientStateValue } from './api';
 
 /**
  * The per-user session blob in the client-state KV: the editor session — which

@@ -1,8 +1,9 @@
-import { createContext, use } from 'react';
-
 import type { ImageActions } from '@workbench/components/useImageActions';
 import type { GalleryImage, GalleryView } from '@workbench/gallery/api';
 import type { GallerySettings } from '@workbench/gallery/settings';
+
+import { createContext, use } from 'react';
+
 import type { GalleryStateView } from './galleryStateView';
 
 /**

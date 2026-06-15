@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { WorkbenchSnapshot, WorkbenchStore } from './workbenchStore';
+
 import { createWorkbenchStore } from './workbenchStore';
 
 const watchSelector = <Selected>(

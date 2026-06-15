@@ -1,13 +1,13 @@
 import { Avatar, Badge, Box, chakra, HStack, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { useNavigate } from '@tanstack/react-router';
-import { useState } from 'react';
-import { ChevronDownIcon, LogOutIcon, UserRoundCogIcon, UsersIcon } from 'lucide-react';
-
+import { logoutSession, useAuthSession } from '@workbench/auth/session';
 import { MenuContent } from '@workbench/components/ui/Menu';
 import { SettingsButton } from '@workbench/settings/SettingsDialog';
 import { useOptionalOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useOptionalWorkbenchStore } from '@workbench/WorkbenchContext';
-import { logoutSession, useAuthSession } from '@workbench/auth/session';
+import { ChevronDownIcon, LogOutIcon, UserRoundCogIcon, UsersIcon } from 'lucide-react';
+import { useState } from 'react';
+
 import { ProfileDialog } from './ProfileDialog';
 
 /**

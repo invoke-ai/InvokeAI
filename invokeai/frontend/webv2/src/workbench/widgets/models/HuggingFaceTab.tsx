@@ -1,12 +1,12 @@
 import { HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
-import { DownloadIcon, KeyRoundIcon } from 'lucide-react';
-
 import { Button } from '@workbench/components/ui/Button';
 import { Field } from '@workbench/components/ui/Field';
 import { getHuggingFaceModels } from '@workbench/models/api';
 import { huggingFaceRepoSchema } from '@workbench/models/schemas';
 import { updateModelsUi, useModelsUi } from '@workbench/models/uiStore';
 import { useZodForm } from '@workbench/models/useZodForm';
+import { DownloadIcon, KeyRoundIcon } from 'lucide-react';
+
 import { InstallSourceButton, SourceListItem } from './SourceListItem';
 import { useInstallActions } from './useInstallActions';
 

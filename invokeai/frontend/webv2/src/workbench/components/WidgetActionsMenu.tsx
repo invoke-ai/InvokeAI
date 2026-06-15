@@ -1,11 +1,3 @@
-import { Icon, Menu, Portal, Text } from '@chakra-ui/react';
-import { useState } from 'react';
-import { GitBranchIcon, MoreHorizontalIcon, TargetIcon } from 'lucide-react';
-
-import { useActiveProject, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { createGraphBearingSurface } from '@workbench/graphSurfaces';
-import { compileProjectGraph } from '@workbench/workflows/buildGraph';
-import { getInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
 import type {
   GraphBearingSurfaceContract,
   GraphContract,
@@ -13,6 +5,15 @@ import type {
   WidgetManifest,
   WorkbenchRegion,
 } from '@workbench/types';
+
+import { Icon, Menu, Portal, Text } from '@chakra-ui/react';
+import { createGraphBearingSurface } from '@workbench/graphSurfaces';
+import { useActiveProject, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { compileProjectGraph } from '@workbench/workflows/buildGraph';
+import { getInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
+import { GitBranchIcon, MoreHorizontalIcon, TargetIcon } from 'lucide-react';
+import { useState } from 'react';
+
 import { GraphPreviewDialog } from './GraphPreviewDialog';
 import { IconButton } from './ui/Button';
 

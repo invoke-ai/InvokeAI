@@ -1,9 +1,10 @@
+import type { LayoutPresetId } from '@workbench/types';
+
 import { Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { getLayoutPreset, layoutPresets } from '@workbench/layoutPresets';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { CheckIcon, ChevronDownIcon } from 'lucide-react';
 
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { getLayoutPreset, layoutPresets } from '@workbench/layoutPresets';
-import type { LayoutPresetId } from '@workbench/types';
 import { Button } from './ui/Button';
 
 /**

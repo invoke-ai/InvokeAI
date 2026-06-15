@@ -1,11 +1,11 @@
-import { HStack, Stack, Text } from '@chakra-ui/react';
-import { BugIcon, ClipboardListIcon } from 'lucide-react';
-
-import { StatusWidgetChip } from '@workbench/components/WidgetFrames';
 import type { WidgetViewProps } from '@workbench/types';
-import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
+
+import { HStack, Stack, Text } from '@chakra-ui/react';
 import { Button } from '@workbench/components/ui/Button';
 import { Panel } from '@workbench/components/ui/Panel';
+import { StatusWidgetChip } from '@workbench/components/WidgetFrames';
+import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { BugIcon, ClipboardListIcon } from 'lucide-react';
 
 export const DiagnosticsWidgetView = ({ presentation, region }: WidgetViewProps) => {
   const errorLog = useWorkbenchSelector((snapshot) => snapshot.state.errorLog);

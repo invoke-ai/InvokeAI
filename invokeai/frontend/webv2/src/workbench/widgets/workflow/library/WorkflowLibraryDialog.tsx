@@ -1,6 +1,6 @@
-import { Box, Dialog, HStack, Input, Portal, SegmentGroup, Stack, Tabs, Text } from '@chakra-ui/react';
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
+import type { ProjectGraphState } from '@workbench/workflows/types';
 
+import { Box, Dialog, HStack, Input, Portal, SegmentGroup, Stack, Tabs, Text } from '@chakra-ui/react';
 import { getApiErrorMessage } from '@workbench/backend/http';
 import { documentToPreviewGraph, GraphPreviewFlow } from '@workbench/components/GraphPreviewFlow';
 import { Button, CloseButton } from '@workbench/components/ui/Button';
@@ -23,8 +23,8 @@ import {
   invalidateWorkflowLibraryCache,
   listLibraryWorkflowsCached,
 } from '@workbench/workflows/libraryCache';
-import type { ProjectGraphState } from '@workbench/workflows/types';
 import { parseWorkflowJson, serializeWorkflowJson } from '@workbench/workflows/workflowJson';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 
 /**
  * Backend workflow library browser: list/search user and default workflows,

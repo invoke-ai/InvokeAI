@@ -1,7 +1,4 @@
 import { Dialog, HStack, Input, Portal, Stack, Switch, Text } from '@chakra-ui/react';
-import { useMemo, useState } from 'react';
-import { WandSparklesIcon } from 'lucide-react';
-
 import { createUser, generatePassword, updateUser, type UserDTO, type UserUpdateRequest } from '@workbench/auth/api';
 import { AuthFormAlert } from '@workbench/auth/components/AuthScreen';
 import { PasswordInput, PasswordStrengthMeter } from '@workbench/auth/components/PasswordInput';
@@ -12,6 +9,8 @@ import { Button, CloseButton } from '@workbench/components/ui/Button';
 import { Field } from '@workbench/components/ui/Field';
 import { useZodForm } from '@workbench/models/useZodForm';
 import { useNotify } from '@workbench/useNotify';
+import { WandSparklesIcon } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 export type UserFormTarget = { mode: 'create' } | { mode: 'edit'; user: UserDTO };
 

@@ -1,9 +1,10 @@
 import { useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef } from 'react';
 
+import type { WorkbenchSearch } from './projects/session';
+
 import { hydrateProjectFromServer } from './projects/syncedPersistence';
 import { useWorkbenchDispatch, useWorkbenchHasHydrated, useWorkbenchSelector } from './WorkbenchContext';
-import type { WorkbenchSearch } from './projects/session';
 
 /**
  * Keeps a mounted editor in line with the /app search params. Renders nothing.

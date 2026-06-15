@@ -1,11 +1,11 @@
-import { HStack, Icon, Input, InputGroup, Menu, Portal, Text } from '@chakra-ui/react';
-import { CheckIcon, SearchIcon, SlidersHorizontalIcon } from 'lucide-react';
+import type { ModelLibraryFilters, ModelSortField } from '@workbench/models/library';
+import type { ModelTaxonomyType } from '@workbench/models/types';
 
+import { HStack, Icon, Input, InputGroup, Menu, Portal, Text } from '@chakra-ui/react';
 import { IconButton } from '@workbench/components/ui/Button';
 import { MenuContent } from '@workbench/components/ui/Menu';
-import type { ModelLibraryFilters, ModelSortField } from '@workbench/models/library';
 import { getModelBaseLabel, getModelTypeLabel } from '@workbench/models/taxonomy';
-import type { ModelTaxonomyType } from '@workbench/models/types';
+import { CheckIcon, SearchIcon, SlidersHorizontalIcon } from 'lucide-react';
 
 const SORT_FIELDS: { field: ModelSortField; label: string }[] = [
   { field: 'default', label: 'Default' },

@@ -1,5 +1,7 @@
+import type { GalleryBoard, GalleryImage } from '@workbench/gallery/api';
+
 import { Dialog, HStack, Icon, Menu, Portal, ScrollArea, Text } from '@chakra-ui/react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useWorkbenchPreferences } from '@workbench/settings/store';
 import {
   AsteriskIcon,
   ChevronRightIcon,
@@ -24,14 +26,14 @@ import {
   WorkflowIcon,
   type LucideIcon,
 } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
-import type { GalleryBoard, GalleryImage } from '@workbench/gallery/api';
+import type { ImageActions } from './useImageActions';
+
+import { EMPTY_IMAGE_RECALL_CAPABILITIES, type ImageRecallCapabilities } from './imageRecall';
 import { Button } from './ui/Button';
 import { MenuContent } from './ui/Menu';
 import { Tooltip } from './ui/Tooltip';
-import { useWorkbenchPreferences } from '@workbench/settings/store';
-import { EMPTY_IMAGE_RECALL_CAPABILITIES, type ImageRecallCapabilities } from './imageRecall';
-import type { ImageActions } from './useImageActions';
 
 export interface ImageContextMenuTarget {
   /** Right-clicked image first; more entries switch the menu into bulk mode. */

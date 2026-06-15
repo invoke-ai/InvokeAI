@@ -10,9 +10,9 @@ import {
   redirect,
 } from '@tanstack/react-router';
 
-import { ensureAuthSession } from './workbench/auth/session';
 import { LoginScreen } from './workbench/auth/components/LoginScreen';
 import { SetupScreen } from './workbench/auth/components/SetupScreen';
+import { ensureAuthSession } from './workbench/auth/session';
 import { HomeScreen } from './workbench/home/HomeScreen';
 import { peekOpenProjectIds, type WorkbenchSearch } from './workbench/projects/session';
 import { loadWorkbenchSettings } from './workbench/settings/store';

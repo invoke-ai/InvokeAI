@@ -1,15 +1,21 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "react", "import", "unicorn", "oxc"],
+  "plugins": ["typescript", "react", "import", "unicorn", "oxc", "react-perf", "unicorn"],
   "categories": {
     "correctness": "error"
   },
   "rules": {
     "curly": "error",
     "eqeqeq": "error",
+
     "import/no-cycle": "error",
     "import/no-duplicates": "error",
     "import/no-relative-parent-imports": "error",
+    "import/no-absolute-path": "error",
+    "import/no-amd": "error",
+    "import/no-commonjs": "error",
+    "import/no-mutable-exports": "error",
+
     "no-console": "warn",
     "no-eval": "error",
     "no-extend-native": "error",
@@ -23,7 +29,9 @@
     "no-unmodified-loop-condition": "error",
     "no-var": "error",
     "prefer-template": "error",
+
     "radix": "error",
+
     "react/jsx-curly-brace-presence": [
       "error",
       {
@@ -31,9 +39,16 @@
         "children": "never"
       }
     ],
+    "react/no-children-prop": "error",
+    "react/no-danger": "error",
+    "react/no-unknown-property": "error",
+    "react/jsx-no-useless-fragment": "error",
+
     "react-hooks/exhaustive-deps": "error",
     "react-hooks/rules-of-hooks": "error",
+
     "require-await": "error",
+
     "typescript/consistent-type-imports": [
       "error",
       {
@@ -46,7 +61,14 @@
       {
         "allowSingleExtends": true
       }
-    ]
+    ],
+
+    "unicorn/no-abusive-eslint-disable": "error",
+    "unicorn/error-message": "error",
+    "unicorn/throw-new-error": "error",
+    "unicorn/prefer-type-error": "error",
+
+    "vitest/require-mock-type-parameters": "off"
   },
   "env": {
     "browser": true,

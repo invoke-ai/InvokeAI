@@ -1,5 +1,5 @@
 import { createExternalStore } from '@workbench/externalStore';
-import { createProjectId } from './ids';
+
 import {
   createProject as apiCreateProject,
   deleteProject as apiDeleteProject,
@@ -8,6 +8,7 @@ import {
   updateProject as apiUpdateProject,
   type ProjectSummaryDTO,
 } from './api';
+import { createProjectId } from './ids';
 
 /**
  * The project library: every project saved on the server for the current

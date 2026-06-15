@@ -8,6 +8,7 @@ import type {
   WorkflowEdge,
   WorkflowInvocationNode,
 } from './types';
+
 import {
   getCompatibleInputTemplate,
   hasAnyCycle,

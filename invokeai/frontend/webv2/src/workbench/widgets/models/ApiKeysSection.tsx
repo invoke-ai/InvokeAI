@@ -1,10 +1,7 @@
-import { Badge, Flex, Grid, HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
-import { HexagonIcon } from 'lucide-react';
-import { useEffect, useState, type ElementType } from 'react';
-import { SiAlibabacloud, SiBytedance, SiGooglegemini, SiHuggingface, SiOpenai } from 'react-icons/si';
+import type { HFTokenStatus } from '@workbench/models/types';
 
+import { Badge, Flex, Grid, HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
 import { Button } from '@workbench/components/ui/Button';
-import { clearCivitaiApiKey, getCivitaiApiKey, setCivitaiApiKey } from '@workbench/models/apiKeys';
 import {
   getExternalProviderConfigs,
   getHFTokenStatus,
@@ -14,8 +11,11 @@ import {
   setHFToken,
   type ExternalProviderConfig,
 } from '@workbench/models/api';
-import type { HFTokenStatus } from '@workbench/models/types';
+import { clearCivitaiApiKey, getCivitaiApiKey, setCivitaiApiKey } from '@workbench/models/apiKeys';
 import { useNotify } from '@workbench/useNotify';
+import { HexagonIcon } from 'lucide-react';
+import { useEffect, useState, type ElementType } from 'react';
+import { SiAlibabacloud, SiBytedance, SiGooglegemini, SiHuggingface, SiOpenai } from 'react-icons/si';
 
 /**
  * Credentials for every model source, as one uniform grid of key cards:

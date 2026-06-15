@@ -1,9 +1,9 @@
-import { Badge, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { BellIcon, CircleCheckIcon, CircleXIcon, InfoIcon, TriangleAlertIcon, type LucideIcon } from 'lucide-react';
-
-import { StatusWidgetChip } from '@workbench/components/WidgetFrames';
 import type { WidgetViewProps, WorkbenchNotificationKind } from '@workbench/types';
+
+import { Badge, HStack, Icon, Stack, Text } from '@chakra-ui/react';
+import { StatusWidgetChip } from '@workbench/components/WidgetFrames';
 import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { BellIcon, CircleCheckIcon, CircleXIcon, InfoIcon, TriangleAlertIcon, type LucideIcon } from 'lucide-react';
 
 const kindColorPalette: Record<WorkbenchNotificationKind, string> = {
   error: 'red',

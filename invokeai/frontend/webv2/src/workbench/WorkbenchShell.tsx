@@ -1,18 +1,19 @@
 import { Flex } from '@chakra-ui/react';
 import { useEffect } from 'react';
 
+import type { WidgetId, WidgetRegion } from './types';
+
 import { BottomPanel } from './components/BottomPanel';
 import { CenterArea } from './components/CenterArea';
 import { LeftPanel, RightPanel } from './components/Panels';
 import { StatusBar } from './components/StatusBar';
 import { TopBar } from './components/TopBar';
-import { WorkbenchNotificationToaster } from './components/WorkbenchNotificationToaster';
 import { WidgetBar, type WidgetBarItem } from './components/WidgetBar';
+import { WorkbenchNotificationToaster } from './components/WorkbenchNotificationToaster';
 import { FocusRegionProvider } from './focusRegions';
-import { WorkbenchWidgetRegistryProvider } from './WorkbenchWidgetRegistryContext';
 import { getWidgetsForRegion, widgetRegistrationFailures } from './widgetRegistry';
 import { useActiveProject, useWorkbenchDispatch } from './WorkbenchContext';
-import type { WidgetId, WidgetRegion } from './types';
+import { WorkbenchWidgetRegistryProvider } from './WorkbenchWidgetRegistryContext';
 
 const getWidgetBarItems = (region: WidgetRegion, enabledWidgetIds: WidgetId[]): WidgetBarItem[] =>
   getWidgetsForRegion(region).map((widget) => ({

@@ -1,3 +1,5 @@
+import type { AspectRatioId, GenerateSettings, MainModelConfig } from '@workbench/generation/types';
+
 import {
   Badge,
   Box,
@@ -11,9 +13,6 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeftRightIcon, LockIcon, LockOpenIcon, RulerDimensionLineIcon, ScalingIcon } from 'lucide-react';
-
 import { IconButton } from '@workbench/components/ui/Button';
 import { Field } from '@workbench/components/ui/Field';
 import { Tooltip } from '@workbench/components/ui/Tooltip';
@@ -25,7 +24,9 @@ import {
   getOptimalDimension,
   isAspectRatioId,
 } from '@workbench/generation/settings';
-import type { AspectRatioId, GenerateSettings, MainModelConfig } from '@workbench/generation/types';
+import { ArrowLeftRightIcon, LockIcon, LockOpenIcon, RulerDimensionLineIcon, ScalingIcon } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
 import { AspectRatioPreview } from './shared/AspectRatioPreview';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 

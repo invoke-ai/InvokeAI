@@ -1,4 +1,5 @@
 import type { WidgetManifest } from '@workbench/types';
+
 import { ProjectWidgetView } from './ProjectWidgetView';
 
 export const projectWidgetManifest: WidgetManifest = {

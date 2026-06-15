@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-import { createWorkflowForm, createWorkflowId } from './document';
 import type {
   ProjectGraphState,
   WorkflowEdge,
@@ -9,6 +8,8 @@ import type {
   WorkflowFormElement,
   WorkflowNode,
 } from './types';
+
+import { createWorkflowForm, createWorkflowId } from './document';
 
 /**
  * Import/export between the project graph document and the legacy WorkflowV3

@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import type { ProjectGraphState, WorkflowEdge, WorkflowInvocationNode } from '@workbench/workflows/types';
 
 import { buildCurrentImageNode, createProjectGraph } from '@workbench/workflows/document';
-import type { ProjectGraphState, WorkflowEdge, WorkflowInvocationNode } from '@workbench/workflows/types';
+import { describe, expect, it } from 'vitest';
+
 import { toFlowEdges, toFlowNodes, withNodeSelection } from './flowAdapters';
 
 const createNode = (id: string): WorkflowInvocationNode => ({

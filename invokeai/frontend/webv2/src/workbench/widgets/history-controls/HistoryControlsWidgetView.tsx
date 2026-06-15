@@ -1,8 +1,7 @@
 import { HStack } from '@chakra-ui/react';
-import { Redo2Icon, Undo2Icon } from 'lucide-react';
-
 import { IconButton } from '@workbench/components/ui/Button';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { Redo2Icon, Undo2Icon } from 'lucide-react';
 
 export const HistoryControlsWidgetView = () => {
   const canUndo = useActiveProjectSelector((project) => project.undoRedo.past.length > 0);

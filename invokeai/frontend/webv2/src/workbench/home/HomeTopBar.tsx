@@ -1,5 +1,4 @@
 import { Flex, HStack, Text } from '@chakra-ui/react';
-
 import { AccountMenu } from '@workbench/auth/components/AccountMenu';
 import { InvokeMark } from '@workbench/auth/components/AuthScreen';
 

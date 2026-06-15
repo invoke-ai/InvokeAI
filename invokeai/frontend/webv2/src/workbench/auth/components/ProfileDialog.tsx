@@ -1,17 +1,17 @@
 import { Dialog, HStack, Input, Portal, Stack, Text } from '@chakra-ui/react';
-import { useMemo, useState } from 'react';
-import { WandSparklesIcon } from 'lucide-react';
-
-import { AuthFormAlert } from './AuthScreen';
-import { PasswordInput, PasswordStrengthMeter } from './PasswordInput';
+import { generatePassword, updateCurrentUser, type ProfileUpdateRequest, type UserDTO } from '@workbench/auth/api';
+import { createProfileSchema, PASSWORD_RULES_HINT, type ProfileFormValues } from '@workbench/auth/schemas';
+import { setSessionUser, useAuthSession } from '@workbench/auth/session';
 import { getApiErrorMessage } from '@workbench/backend/http';
 import { Button, CloseButton } from '@workbench/components/ui/Button';
 import { Field, FieldLabel } from '@workbench/components/ui/Field';
 import { useZodForm } from '@workbench/models/useZodForm';
 import { useNotify } from '@workbench/useNotify';
-import { generatePassword, updateCurrentUser, type ProfileUpdateRequest, type UserDTO } from '@workbench/auth/api';
-import { createProfileSchema, PASSWORD_RULES_HINT, type ProfileFormValues } from '@workbench/auth/schemas';
-import { setSessionUser, useAuthSession } from '@workbench/auth/session';
+import { WandSparklesIcon } from 'lucide-react';
+import { useMemo, useState } from 'react';
+
+import { AuthFormAlert } from './AuthScreen';
+import { PasswordInput, PasswordStrengthMeter } from './PasswordInput';
 
 /** Account settings: display name and password change for the signed-in user. */
 export const ProfileDialog = ({ isOpen, onClose, user }: { isOpen: boolean; onClose: () => void; user: UserDTO }) => (

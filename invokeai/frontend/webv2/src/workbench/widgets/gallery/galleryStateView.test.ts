@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
-
 import type { GalleryBoard } from '@workbench/gallery/api';
 import type { GeneratedImageContract, QueueItem, QueueItemStatus } from '@workbench/types';
+
+import { describe, expect, it } from 'vitest';
+
 import {
   getBoardCounts,
   getGalleryQueuePlaceholders,

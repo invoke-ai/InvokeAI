@@ -1,8 +1,10 @@
 import type { BackendGraphContract, GraphContract } from '@workbench/types';
-import { getResolvedWorkflowEdges } from './connectors';
-import { createWorkflowId } from './document';
+
 import type { InvocationTemplatesSnapshot } from './templates';
 import type { FieldInputTemplate, InvocationTemplates, ProjectGraphState, WorkflowInvocationNode } from './types';
+
+import { getResolvedWorkflowEdges } from './connectors';
+import { createWorkflowId } from './document';
 import { isInvocationNode } from './types';
 import { hasAnyCycle } from './validation';
 

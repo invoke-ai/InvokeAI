@@ -1,13 +1,15 @@
-import { Badge, Box, Flex, ScrollArea, Skeleton, Spinner, Text } from '@chakra-ui/react';
-import { useVirtualizer } from '@tanstack/react-virtual';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react';
-import { StarIcon, UploadIcon } from 'lucide-react';
-
-import { ImageContextMenu, type ImageContextMenuTarget } from '@workbench/components/ImageContextMenu';
-import { IconButton } from '@workbench/components/ui/Button';
 import type { GalleryImage } from '@workbench/gallery/api';
 import type { GalleryThumbnailFit } from '@workbench/gallery/settings';
+
+import { Badge, Box, Flex, ScrollArea, Skeleton, Spinner, Text } from '@chakra-ui/react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { ImageContextMenu, type ImageContextMenuTarget } from '@workbench/components/ImageContextMenu';
+import { IconButton } from '@workbench/components/ui/Button';
+import { StarIcon, UploadIcon } from 'lucide-react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react';
+
 import type { GalleryQueuePlaceholder } from './galleryStateView';
+
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 const GRID_GAP_PX = 4;

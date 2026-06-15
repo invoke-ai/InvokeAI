@@ -1,8 +1,6 @@
-import { Flex, Group, HStack, Icon, Menu, Portal, Separator, Stack, Text, VStack } from '@chakra-ui/react';
-import { useEffect, useRef } from 'react';
-import { CheckIcon, ChevronDownIcon, LockKeyholeIcon, SparklesIcon } from 'lucide-react';
+import type { InvocationSourceId, Project, ResultDestination } from '@workbench/types';
 
-import { useActiveProject, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { Flex, Group, HStack, Icon, Menu, Portal, Separator, Stack, Text, VStack } from '@chakra-ui/react';
 import {
   formatRoute,
   getDestinationLabel,
@@ -11,8 +9,11 @@ import {
   resolveInvocationRoute,
   resultDestinations,
 } from '@workbench/invocation';
+import { useActiveProject, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
-import type { InvocationSourceId, Project, ResultDestination } from '@workbench/types';
+import { CheckIcon, ChevronDownIcon, LockKeyholeIcon, SparklesIcon } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+
 import { Button, IconButton } from './ui/Button';
 import { Tooltip } from './ui/Tooltip';
 

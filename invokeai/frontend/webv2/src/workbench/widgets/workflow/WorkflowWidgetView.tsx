@@ -1,8 +1,9 @@
+import type { WidgetViewProps } from '@workbench/types';
+
 import { Box, HStack, Icon, Text } from '@chakra-ui/react';
+import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { WorkflowIcon } from 'lucide-react';
 
-import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
-import type { WidgetViewProps } from '@workbench/types';
 import { WorkflowEditorView } from './editor/WorkflowEditorView';
 import { WorkflowLinearPanel } from './linear/WorkflowLinearPanel';
 

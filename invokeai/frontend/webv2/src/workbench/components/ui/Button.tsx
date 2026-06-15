@@ -1,9 +1,10 @@
+import type { ComponentProps } from 'react';
+
 import {
   Button as ChakraButton,
   CloseButton as ChakraCloseButton,
   IconButton as ChakraIconButton,
 } from '@chakra-ui/react';
-import type { ComponentProps } from 'react';
 
 type ButtonProps = ComponentProps<typeof ChakraButton>;
 type IconButtonProps = ComponentProps<typeof ChakraIconButton>;

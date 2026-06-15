@@ -1,7 +1,7 @@
-import { HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
-import { HistoryIcon, LibraryIcon, PlusIcon } from 'lucide-react';
-import { useEffect, useId, useRef, type ChangeEvent } from 'react';
+import type { WidgetLabelProps, WidgetViewProps } from '@workbench/types';
+import type { InvocationTemplate, XYPosition } from '@workbench/workflows/types';
 
+import { HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { IconButton } from '@workbench/components/ui/Button';
 import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
 import { useNotify } from '@workbench/useNotify';
@@ -13,10 +13,11 @@ import {
   createProjectGraph,
   createWorkflowId,
 } from '@workbench/workflows/document';
-import type { InvocationTemplate, XYPosition } from '@workbench/workflows/types';
 import { getCompatibleInputTemplate } from '@workbench/workflows/validation';
 import { parseWorkflowJson } from '@workbench/workflows/workflowJson';
-import type { WidgetLabelProps, WidgetViewProps } from '@workbench/types';
+import { HistoryIcon, LibraryIcon, PlusIcon } from 'lucide-react';
+import { useEffect, useId, useRef, type ChangeEvent } from 'react';
+
 import { AddNodeDialog } from './editor/AddNodeDialog';
 import { getWorkflowFlowInstance } from './editor/flowInstanceStore';
 import { WorkflowLibraryDialog } from './library/WorkflowLibraryDialog';

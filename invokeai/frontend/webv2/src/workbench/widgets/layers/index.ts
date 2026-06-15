@@ -1,4 +1,5 @@
 import type { WidgetManifest } from '@workbench/types';
+
 import { LayersHeaderActions } from './LayersHeaderActions';
 import { LayersWidgetView } from './LayersWidgetView';
 

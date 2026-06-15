@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import type { GenerateWidgetValues, MainModelConfig } from './generation/types';
-import { DEFAULT_PROJECT_SETTINGS } from './settings/store';
 import type { GeneratedImageContract, Project, WorkbenchState } from './types';
+
+import { DEFAULT_PROJECT_SETTINGS } from './settings/store';
 import { createInitialWorkbenchState, workbenchReducer } from './workbenchState';
 
 const model: MainModelConfig = {

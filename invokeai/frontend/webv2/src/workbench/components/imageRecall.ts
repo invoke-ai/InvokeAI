@@ -1,3 +1,11 @@
+import type { GalleryImage } from '@workbench/gallery/api';
+import type {
+  GenerateWidgetValues,
+  MainModelConfig,
+  SupportedGenerateBase,
+  VaeModelConfig,
+} from '@workbench/generation/types';
+
 import { getSettingsWithModelDefaults } from '@workbench/generation/graph';
 import {
   CLIP_SKIP_MAX,
@@ -6,13 +14,6 @@ import {
   isKnownScheduler,
   SEED_MAX,
 } from '@workbench/generation/settings';
-import type {
-  GenerateWidgetValues,
-  MainModelConfig,
-  SupportedGenerateBase,
-  VaeModelConfig,
-} from '@workbench/generation/types';
-import type { GalleryImage } from '@workbench/gallery/api';
 
 export type ImageRecallKind = 'all' | 'remix' | 'prompts' | 'seed' | 'dimensions' | 'clipSkip';
 

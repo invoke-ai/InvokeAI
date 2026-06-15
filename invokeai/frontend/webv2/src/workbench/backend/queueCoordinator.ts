@@ -1,4 +1,11 @@
-import { io } from 'socket.io-client';
+import type {
+  EnqueueGenerateRequest,
+  EnqueueGenerateResult,
+  EnqueueWorkflowRequest,
+  ImageDTO,
+  QueueItemDTO,
+} from '@workbench/generation/types';
+import type { BackendConnectionStatus } from '@workbench/types';
 
 import {
   cancelQueueItems,
@@ -9,15 +16,9 @@ import {
   getQueueItemResultImages,
   listAllQueueItems,
 } from '@workbench/generation/api';
-import type {
-  EnqueueGenerateRequest,
-  EnqueueGenerateResult,
-  EnqueueWorkflowRequest,
-  ImageDTO,
-  QueueItemDTO,
-} from '@workbench/generation/types';
 import { handleModelInstallSocketEvent, MODEL_INSTALL_SOCKET_EVENTS } from '@workbench/models/installsStore';
-import type { BackendConnectionStatus } from '@workbench/types';
+import { io } from 'socket.io-client';
+
 import {
   isTerminalBackendStatus,
   parseQueueItemOrigin,

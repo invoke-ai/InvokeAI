@@ -1,4 +1,5 @@
 import type { WidgetManifest } from '@workbench/types';
+
 import { ServerStatusWidgetView } from './ServerStatusWidgetView';
 
 export const serverStatusWidgetManifest: WidgetManifest = {

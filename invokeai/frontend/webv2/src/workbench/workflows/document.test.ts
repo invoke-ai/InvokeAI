@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import type { InvocationTemplate, ProjectGraphState, WorkflowEdge } from './types';
+
 import {
   buildInvocationNode,
   createProjectGraph,
@@ -8,7 +10,6 @@ import {
   normalizeProjectGraph,
   projectGraphReducer,
 } from './document';
-import type { InvocationTemplate, ProjectGraphState, WorkflowEdge } from './types';
 
 const template: InvocationTemplate = {
   category: 'math',

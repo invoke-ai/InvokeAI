@@ -1,6 +1,7 @@
+import type { ProjectGraphState, WorkflowEdge, WorkflowNode, XYPosition } from '@workbench/workflows/types';
+
 import { createExternalStore } from '@workbench/externalStore';
 import { createWorkflowId } from '@workbench/workflows/document';
-import type { ProjectGraphState, WorkflowEdge, WorkflowNode, XYPosition } from '@workbench/workflows/types';
 
 /**
  * Session-lived clipboard for workflow nodes. Copies hold deep clones of the

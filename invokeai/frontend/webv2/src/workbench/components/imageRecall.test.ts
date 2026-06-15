@@ -1,7 +1,8 @@
+import type { GalleryImage } from '@workbench/gallery/api';
+import type { GenerateWidgetValues, MainModelConfig, VaeModelConfig } from '@workbench/generation/types';
+
 import { describe, expect, it } from 'vitest';
 
-import type { GenerateWidgetValues, MainModelConfig, VaeModelConfig } from '@workbench/generation/types';
-import type { GalleryImage } from '@workbench/gallery/api';
 import { buildImageRecallSettings, getImageRecallCapabilities } from './imageRecall';
 
 const sdxlModel: MainModelConfig = { base: 'sdxl', key: 'sdxl-model', name: 'SDXL', type: 'main' };

@@ -1,5 +1,4 @@
 import { Box, type BoxProps, type RecipeVariantProps, useRecipe } from '@chakra-ui/react';
-
 import { rowRecipe } from '@theme/recipes';
 
 export type RowProps = BoxProps & RecipeVariantProps<typeof rowRecipe>;

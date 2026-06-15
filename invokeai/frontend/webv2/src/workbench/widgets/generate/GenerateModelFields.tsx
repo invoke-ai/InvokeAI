@@ -1,14 +1,15 @@
-import { HStack, NativeSelect, NumberInput, Stack } from '@chakra-ui/react';
-import { DicesIcon } from 'lucide-react';
+import type { GenerateSettings, MainModelConfig, VaeModelConfig } from '@workbench/generation/types';
 import type { ChangeEvent } from 'react';
 
+import { HStack, NativeSelect, NumberInput, Stack } from '@chakra-ui/react';
+import { ModelSelect } from '@workbench/components/ModelSelect';
 import { Button, IconButton } from '@workbench/components/ui/Button';
 import { Field } from '@workbench/components/ui/Field';
-import { ModelSelect } from '@workbench/components/ModelSelect';
 import { Tooltip } from '@workbench/components/ui/Tooltip';
 import { getSettingsWithModelDefaults, isSupportedGenerateModel } from '@workbench/generation/graph';
 import { isKnownScheduler, isMainModelConfig, SCHEDULER_OPTIONS, SEED_MAX } from '@workbench/generation/settings';
-import type { GenerateSettings, MainModelConfig, VaeModelConfig } from '@workbench/generation/types';
+import { DicesIcon } from 'lucide-react';
+
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 
 interface GenerateModelFieldsProps {

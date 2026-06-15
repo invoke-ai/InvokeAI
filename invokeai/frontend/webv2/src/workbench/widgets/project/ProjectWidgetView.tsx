@@ -1,16 +1,16 @@
-import { HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
-import { useState, type ReactNode } from 'react';
-import { ArrowRightIcon, CopyIcon, History as HistoryIcon, Trash2Icon } from 'lucide-react';
+import type { Project } from '@workbench/types';
 
+import { HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
 import { Button, IconButton } from '@workbench/components/ui/Button';
 import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
 import { Field, FieldLabel } from '@workbench/components/ui/Field';
 import { Panel } from '@workbench/components/ui/Panel';
 import { useProjectSync } from '@workbench/projects/syncStore';
 import { useProjectActions } from '@workbench/projects/useProjectActions';
-import type { Project } from '@workbench/types';
 import { useNotify } from '@workbench/useNotify';
 import { useActiveProject, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { ArrowRightIcon, CopyIcon, History as HistoryIcon, Trash2Icon } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 
 /**
  * The Project panel: rename the active project, see its sync/debug details,

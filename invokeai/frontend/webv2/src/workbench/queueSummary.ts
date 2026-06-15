@@ -1,5 +1,5 @@
-import type { QueueItem } from './types';
 import type { QueueItemProgress } from './backend/progressStore';
+import type { QueueItem } from './types';
 
 export interface QueueSummary {
   current: number;

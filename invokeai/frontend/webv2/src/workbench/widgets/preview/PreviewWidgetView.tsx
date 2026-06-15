@@ -1,7 +1,6 @@
-import { Badge, Box, Flex, HStack, Stack, Text } from '@chakra-ui/react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
+import type { GeneratedImageContract, WidgetViewProps } from '@workbench/types';
 
+import { Badge, Box, Flex, HStack, Stack, Text } from '@chakra-ui/react';
 import { ImageContextMenu, type ImageContextMenuTarget } from '@workbench/components/ImageContextMenu';
 import { Button } from '@workbench/components/ui/Button';
 import { useImageActions } from '@workbench/components/useImageActions';
@@ -13,13 +12,15 @@ import {
   type GalleryView,
 } from '@workbench/gallery/api';
 import { getGallerySettings } from '@workbench/gallery/settings';
-import type { GeneratedImageContract, WidgetViewProps } from '@workbench/types';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import {
   getGalleryCompareImage,
   getGalleryRecentImagesKey,
   getGalleryRefreshToken,
 } from '@workbench/widgets/gallery/galleryStateView';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
 import { PreviewCompare } from './PreviewCompare';
 
 type PreviewImage = GeneratedImageContract & Partial<Pick<GalleryImage, 'boardId' | 'imageCategory' | 'starred'>>;

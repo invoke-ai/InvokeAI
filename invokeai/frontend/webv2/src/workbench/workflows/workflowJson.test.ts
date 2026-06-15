@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import type { InvocationTemplate } from './types';
+
 import {
   buildCurrentImageNode,
   buildConnectorNode,
@@ -9,7 +11,6 @@ import {
   getFormChildren,
   projectGraphReducer,
 } from './document';
-import type { InvocationTemplate } from './types';
 import { parseWorkflowJson, serializeWorkflowJson } from './workflowJson';
 
 const template: InvocationTemplate = {

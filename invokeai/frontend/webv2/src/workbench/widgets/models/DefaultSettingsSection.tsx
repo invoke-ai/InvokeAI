@@ -1,14 +1,14 @@
-import { Grid, HStack, Icon, NativeSelect, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
-import { MoveHorizontalIcon } from 'lucide-react';
-import { useMemo, useState, type ReactNode } from 'react';
+import type { AnyModelDefaultSettings, ModelConfig } from '@workbench/models/types';
 
+import { Grid, HStack, Icon, NativeSelect, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
 import { Button } from '@workbench/components/ui/Button';
 import { FieldLabel } from '@workbench/components/ui/Field';
 import { Panel } from '@workbench/components/ui/Panel';
 import { updateModel } from '@workbench/models/api';
 import { replaceModelInStore } from '@workbench/models/modelsStore';
 import { loraDefaultSettingsSchema, mainDefaultSettingsSchema } from '@workbench/models/schemas';
-import type { AnyModelDefaultSettings, ModelConfig } from '@workbench/models/types';
+import { MoveHorizontalIcon } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
 
 /**
  * Per-model generation defaults ("use these settings when this model is

@@ -1,5 +1,6 @@
-import { ScrollArea } from '@chakra-ui/react';
 import type { ComponentProps, ReactNode } from 'react';
+
+import { ScrollArea } from '@chakra-ui/react';
 
 type ScrollAreaRootProps = ComponentProps<typeof ScrollArea.Root>;
 

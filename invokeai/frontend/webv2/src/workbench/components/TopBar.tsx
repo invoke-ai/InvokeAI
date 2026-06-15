@@ -1,3 +1,5 @@
+import type { QueueItem } from '@workbench/types';
+
 import {
   Badge,
   Flex,
@@ -12,24 +14,23 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
+import { Link } from '@tanstack/react-router';
+import { DEFAULT_THEME_ID, THEMES_BY_ID } from '@theme/themes';
+import { AccountMenu } from '@workbench/auth/components/AccountMenu';
+import { useModelLoads, type ModelLoadInfo } from '@workbench/backend/modelLoadStore';
+import { useQueueItemProgress, type QueueItemProgress } from '@workbench/backend/progressStore';
+import { getDestinationLabel, getSourceLabel } from '@workbench/invocation';
+import { getQueueItemExpectedImageCount, getQueueProgressBarState, getQueueSummary } from '@workbench/queueSummary';
+import { useWorkbenchPreferences } from '@workbench/settings/store';
+import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { ChevronDownIcon, ListOrderedIcon, PauseIcon, PlayIcon, XIcon } from 'lucide-react';
 
 import { InvokeControl } from './InvokeControl';
 import { LayoutPresetMenu } from './LayoutPresetMenu';
 import { ProjectTabs } from './ProjectTabs';
 import { Button, IconButton } from './ui/Button';
-import { useModelLoads, type ModelLoadInfo } from '@workbench/backend/modelLoadStore';
-import { AccountMenu } from '@workbench/auth/components/AccountMenu';
-import { useQueueItemProgress, type QueueItemProgress } from '@workbench/backend/progressStore';
-import { getDestinationLabel, getSourceLabel } from '@workbench/invocation';
-import { getQueueItemExpectedImageCount, getQueueProgressBarState, getQueueSummary } from '@workbench/queueSummary';
-import { useWorkbenchPreferences } from '@workbench/settings/store';
-import type { QueueItem } from '@workbench/types';
-import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
-import { DEFAULT_THEME_ID, THEMES_BY_ID } from '@theme/themes';
 import { Tooltip } from './ui/Tooltip';
-import { Link } from '@tanstack/react-router';
-import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 
 /** Workbench top bar: brand, global Invoke command cluster, project tabs, layout + account controls. */
 export const TopBar = () => (

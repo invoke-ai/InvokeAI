@@ -1,4 +1,16 @@
+import type {
+  ContainerFormElement,
+  NodeFieldFormElement,
+  ProjectGraphState,
+  WorkflowFormElement,
+} from '@workbench/workflows/types';
+
 import { Box, HStack, Icon, Input, Menu, Portal, Separator, Stack, Text, Textarea } from '@chakra-ui/react';
+import { Button, IconButton } from '@workbench/components/ui/Button';
+import { requestNodeSelection } from '@workbench/widgets/workflow/editor/selectionStore';
+import { FieldDescriptionPopover } from '@workbench/widgets/workflow/fields/FieldDescriptionPopover';
+import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { getFormChildren } from '@workbench/workflows/document';
 import {
   Columns2Icon,
   CrosshairIcon,
@@ -13,17 +25,6 @@ import {
 } from 'lucide-react';
 import { createContext, use, useMemo, useState, type ChangeEvent, type DragEvent, type ReactNode } from 'react';
 
-import { Button, IconButton } from '@workbench/components/ui/Button';
-import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { getFormChildren } from '@workbench/workflows/document';
-import type {
-  ContainerFormElement,
-  NodeFieldFormElement,
-  ProjectGraphState,
-  WorkflowFormElement,
-} from '@workbench/workflows/types';
-import { FieldDescriptionPopover } from '@workbench/widgets/workflow/fields/FieldDescriptionPopover';
-import { requestNodeSelection } from '@workbench/widgets/workflow/editor/selectionStore';
 import { NodeFieldControl, useNodeFieldBinding } from './NodeFieldControl';
 
 /**

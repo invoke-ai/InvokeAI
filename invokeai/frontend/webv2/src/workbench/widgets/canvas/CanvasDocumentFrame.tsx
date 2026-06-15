@@ -1,7 +1,7 @@
-import { Box, Flex, Text } from '@chakra-ui/react';
+import type { CanvasPlacementContract, GeneratedImageContract } from '@workbench/types';
 import type { ReactNode } from 'react';
 
-import type { CanvasPlacementContract, GeneratedImageContract } from '@workbench/types';
+import { Box, Flex, Text } from '@chakra-ui/react';
 
 const toPercent = (value: number, max: number) => `${(value / max) * 100}%`;
 

@@ -1,4 +1,10 @@
+import type { GraphContract } from '@workbench/types';
+
 import { Badge, Box, Stack, Text } from '@chakra-ui/react';
+import { useWorkbenchPreferences } from '@workbench/settings/store';
+import '@xyflow/react/dist/style.css';
+import { getResolvedWorkflowEdges } from '@workbench/workflows/connectors';
+import { isInvocationNode, type ProjectGraphState, type XYPosition } from '@workbench/workflows/types';
 import {
   Background,
   BackgroundVariant,
@@ -12,12 +18,6 @@ import {
 } from '@xyflow/react';
 import { useId, useMemo } from 'react';
 
-import '@xyflow/react/dist/style.css';
-
-import { useWorkbenchPreferences } from '@workbench/settings/store';
-import type { GraphContract } from '@workbench/types';
-import { getResolvedWorkflowEdges } from '@workbench/workflows/connectors';
-import { isInvocationNode, type ProjectGraphState, type XYPosition } from '@workbench/workflows/types';
 import { flowThemeCss, getFlowColorMode } from './flowTheme';
 
 /**

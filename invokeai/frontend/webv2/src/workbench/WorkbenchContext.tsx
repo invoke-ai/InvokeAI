@@ -1,11 +1,12 @@
 import { createContext, use, useEffect, useRef, useSyncExternalStore, type Dispatch, type ReactNode } from 'react';
 
+import type { Project, WorkbenchState } from './types';
+
 import {
   syncedWorkbenchPersistence,
   type WorkbenchLoadOptions,
   type WorkbenchSaveResult,
 } from './projects/syncedPersistence';
-import type { Project, WorkbenchState } from './types';
 import { getAutosaveScheduleDecision } from './workbenchAutosave';
 import {
   createWorkbenchStore,

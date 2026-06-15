@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 
 import type { RegisteredWidget, WidgetId, WidgetRegion } from './types';
+
 import { useOptionalWorkbenchDispatch, useWorkbenchDispatch } from './WorkbenchContext';
 import { useOptionalWorkbenchWidgetRegistry, useWorkbenchWidgetRegistry } from './WorkbenchWidgetRegistryContext';
 

@@ -1,4 +1,5 @@
 import type { GraphBearingSurfaceContract, WidgetManifest, WorkbenchRegion } from './types';
+
 import { isInvocationSourceAvailable } from './invocation';
 
 export const createGraphBearingSurface = (

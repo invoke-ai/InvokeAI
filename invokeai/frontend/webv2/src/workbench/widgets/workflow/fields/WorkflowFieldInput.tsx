@@ -1,14 +1,14 @@
-import { HStack, Input, NativeSelect, Switch, Text, Textarea } from '@chakra-ui/react';
-import { useEffect, useState, type ChangeEvent } from 'react';
-
-import { ModelSelect } from '@workbench/components/ModelSelect';
-import { Button } from '@workbench/components/ui/Button';
-import { SCHEDULER_OPTIONS } from '@workbench/generation/settings';
-import { listGalleryBoards, type GalleryBoard } from '@workbench/gallery/api';
 import type { ModelConfig, ModelTaxonomyType } from '@workbench/models/types';
 import type { GeneratedImageContract } from '@workbench/types';
-import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import type { FieldInputTemplate } from '@workbench/workflows/types';
+
+import { HStack, Input, NativeSelect, Switch, Text, Textarea } from '@chakra-ui/react';
+import { ModelSelect } from '@workbench/components/ModelSelect';
+import { Button } from '@workbench/components/ui/Button';
+import { listGalleryBoards, type GalleryBoard } from '@workbench/gallery/api';
+import { SCHEDULER_OPTIONS } from '@workbench/generation/settings';
+import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { useEffect, useState, type ChangeEvent } from 'react';
 
 /**
  * Direct-input controls for workflow fields, shared between the node editor

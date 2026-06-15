@@ -1,7 +1,4 @@
 import { Badge, Box, Flex, HStack, Icon, Separator, Stack, Text } from '@chakra-ui/react';
-import { BoxIcon, Trash2Icon, XIcon } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-
 import { Button, IconButton } from '@workbench/components/ui/Button';
 import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
 import { Scrollable } from '@workbench/components/ui/Scrollable';
@@ -23,6 +20,9 @@ import {
   type ModelsCenterTab,
 } from '@workbench/models/uiStore';
 import { useNotify } from '@workbench/useNotify';
+import { BoxIcon, Trash2Icon, XIcon } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+
 import { AddModelsView } from './AddModelsView';
 import { InstallQueueSection } from './InstallQueueSection';
 import { ModelDetail } from './ModelDetail';

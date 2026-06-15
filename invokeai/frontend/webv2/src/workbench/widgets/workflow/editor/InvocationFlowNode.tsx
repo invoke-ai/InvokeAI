@@ -1,10 +1,10 @@
-import { Badge, Box, Flex, HStack, Icon, Image, Input, Stack, Text, IconButton } from '@chakra-ui/react';
-import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
-import { ChevronDownIcon, ChevronRightIcon, PinIcon, PinOffIcon, TriangleAlertIcon } from 'lucide-react';
-import { memo, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import type { FieldInputTemplate, FieldOutputTemplate, WorkflowInvocationNode } from '@workbench/workflows/types';
 
+import { Badge, Box, Flex, HStack, Icon, Image, Input, Stack, Text, IconButton } from '@chakra-ui/react';
 import { useNodeExecutionState, type NodeExecutionState } from '@workbench/backend/nodeExecutionStore';
 import { Tooltip } from '@workbench/components/ui/Tooltip';
+import { FieldDescriptionPopover } from '@workbench/widgets/workflow/fields/FieldDescriptionPopover';
+import { WorkflowFieldInput } from '@workbench/widgets/workflow/fields/WorkflowFieldInput';
 import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import {
   getFieldTypeColor,
@@ -13,9 +13,10 @@ import {
   isExposableField,
 } from '@workbench/workflows/fields';
 import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
-import type { FieldInputTemplate, FieldOutputTemplate, WorkflowInvocationNode } from '@workbench/workflows/types';
-import { FieldDescriptionPopover } from '@workbench/widgets/workflow/fields/FieldDescriptionPopover';
-import { WorkflowFieldInput } from '@workbench/widgets/workflow/fields/WorkflowFieldInput';
+import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
+import { ChevronDownIcon, ChevronRightIcon, PinIcon, PinOffIcon, TriangleAlertIcon } from 'lucide-react';
+import { memo, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+
 import type { InvocationFlowNode as InvocationFlowNodeType } from './flowAdapters';
 
 const NODE_WIDTH = '18rem';

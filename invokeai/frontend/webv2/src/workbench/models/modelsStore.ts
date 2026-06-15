@@ -1,6 +1,8 @@
 import { createExternalStore } from '@workbench/externalStore';
-import { getModelsDir, listMissingModels, listModels } from './api';
+
 import type { ModelConfig } from './types';
+
+import { getModelsDir, listMissingModels, listModels } from './api';
 
 /**
  * Shared library store for installed model configs. Lives outside the

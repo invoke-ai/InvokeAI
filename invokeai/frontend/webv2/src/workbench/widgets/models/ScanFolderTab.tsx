@@ -1,7 +1,4 @@
 import { Checkbox, HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
-import { DownloadIcon, FolderSearchIcon } from 'lucide-react';
-import { useState } from 'react';
-
 import { Button } from '@workbench/components/ui/Button';
 import { Field } from '@workbench/components/ui/Field';
 import { Scrollable } from '@workbench/components/ui/Scrollable';
@@ -10,6 +7,9 @@ import { scanFolderSchema } from '@workbench/models/schemas';
 import { updateModelsUi, useModelsUi } from '@workbench/models/uiStore';
 import { useZodForm } from '@workbench/models/useZodForm';
 import { useNotify } from '@workbench/useNotify';
+import { DownloadIcon, FolderSearchIcon } from 'lucide-react';
+import { useState } from 'react';
+
 import { InstallSourceButton, SourceListItem } from './SourceListItem';
 import { useInstallActions } from './useInstallActions';
 

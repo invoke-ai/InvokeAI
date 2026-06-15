@@ -1,5 +1,6 @@
-import { Alert, Box, Flex, Heading, Stack, Text } from '@chakra-ui/react';
 import type { ReactNode } from 'react';
+
+import { Alert, Box, Flex, Heading, Stack, Text } from '@chakra-ui/react';
 
 /**
  * Centered scaffold shared by the login and first-run setup screens. These

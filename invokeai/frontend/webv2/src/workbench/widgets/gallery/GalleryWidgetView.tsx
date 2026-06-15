@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { ImageIcon } from 'lucide-react';
-
-import { StatusWidgetChip } from '@workbench/components/WidgetFrames';
-import { useImageActions } from '@workbench/components/useImageActions';
-import { getGallerySettings } from '@workbench/gallery/settings';
 import type { WidgetViewProps } from '@workbench/types';
+
+import { useImageActions } from '@workbench/components/useImageActions';
+import { StatusWidgetChip } from '@workbench/components/WidgetFrames';
+import { getGallerySettings } from '@workbench/gallery/settings';
 import { useActiveProject, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { ImageIcon } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+
 import { GalleryPanelContent } from './GalleryPanelContent';
 import {
   getGalleryPage,

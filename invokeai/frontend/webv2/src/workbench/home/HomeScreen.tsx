@@ -1,18 +1,19 @@
 import type { SystemStyleObject } from '@chakra-ui/react';
+
 import { Box, Flex, Heading, HStack, Icon, Stack, Tabs, Text } from '@chakra-ui/react';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
-import { useEffect, type ReactNode } from 'react';
-import { FileUpIcon, FolderIcon, PlusIcon, UsersIcon, type LucideIcon } from 'lucide-react';
-
+import { useAuthSession } from '@workbench/auth/session';
 import { Button } from '@workbench/components/ui/Button';
+import { toaster } from '@workbench/components/ui/toaster';
+import { refreshProjectLibrary } from '@workbench/projects/library';
+import { importProjectFile, pickProjectFile } from '@workbench/projects/projectFile';
+import { UsersManagementPanel } from '@workbench/users';
+import { FileUpIcon, FolderIcon, PlusIcon, UsersIcon, type LucideIcon } from 'lucide-react';
+import { useEffect, type ReactNode } from 'react';
+
 import { HomeTopBar } from './HomeTopBar';
 import { ProjectsGrid } from './ProjectsGrid';
 import { ResourceLinks } from './ResourceLinks';
-import { toaster } from '@workbench/components/ui/toaster';
-import { refreshProjectLibrary } from '@workbench/projects/library';
-import { useAuthSession } from '@workbench/auth/session';
-import { importProjectFile, pickProjectFile } from '@workbench/projects/projectFile';
-import { UsersManagementPanel } from '@workbench/users';
 
 const HOME_SCREEN_CONTENT_WRAPPER_SX: SystemStyleObject = {
   flex: 1,

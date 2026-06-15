@@ -1,9 +1,9 @@
-import { Stack, Text } from '@chakra-ui/react';
-import { CloudAlertIcon, CloudCheckIcon } from 'lucide-react';
-
-import { StatusWidgetChip } from '@workbench/components/WidgetFrames';
 import type { WidgetViewProps } from '@workbench/types';
+
+import { Stack, Text } from '@chakra-ui/react';
+import { StatusWidgetChip } from '@workbench/components/WidgetFrames';
 import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { CloudAlertIcon, CloudCheckIcon } from 'lucide-react';
 
 export const AutosaveStatusWidgetView = ({ presentation }: WidgetViewProps) => {
   const autosave = useWorkbenchSelector((snapshot) => snapshot.state.autosave);

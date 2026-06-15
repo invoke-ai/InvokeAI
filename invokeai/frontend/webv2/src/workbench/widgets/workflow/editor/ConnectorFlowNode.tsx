@@ -1,8 +1,8 @@
 import { Box, Flex } from '@chakra-ui/react';
+import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from '@workbench/workflows/connectors';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { memo } from 'react';
 
-import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from '@workbench/workflows/connectors';
 import type { ConnectorFlowNode as ConnectorFlowNodeType } from './flowAdapters';
 
 const HANDLE_SIZE = 10;

@@ -1,7 +1,8 @@
-import { Box, Flex } from '@chakra-ui/react';
 import type { KeyboardEvent } from 'react';
 
+import { Box, Flex } from '@chakra-ui/react';
 import { useActiveProject, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+
 import { CanvasDocumentFrame, CanvasPlaneImage, EmptyCanvasFrame, ToolScrubber } from './CanvasDocumentFrame';
 import { CanvasStagingControls, EmptyStagingControls } from './CanvasStagingControls';
 

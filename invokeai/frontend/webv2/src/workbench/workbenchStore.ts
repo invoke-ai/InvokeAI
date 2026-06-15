@@ -1,6 +1,7 @@
 import type { Dispatch } from 'react';
 
 import type { Project, WorkbenchState } from './types';
+
 import { createInitialWorkbenchState, workbenchReducer, type WorkbenchAction } from './workbenchState';
 
 export interface WorkbenchSnapshot {

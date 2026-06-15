@@ -1,3 +1,5 @@
+import type { XYPosition } from '@workbench/workflows/types';
+
 import { Icon, Menu, Portal } from '@chakra-ui/react';
 import {
   ChevronDownIcon,
@@ -8,8 +10,6 @@ import {
   PlusIcon,
   Trash2Icon,
 } from 'lucide-react';
-
-import type { XYPosition } from '@workbench/workflows/types';
 
 /**
  * Right-click utilities for the flow pane and nodes, anchored at the pointer.

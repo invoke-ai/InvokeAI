@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import type { GallerySettings } from '@workbench/gallery/settings';
 
 import {
   listGalleryBoards,
@@ -8,7 +8,7 @@ import {
   type GalleryImage,
   type GalleryView,
 } from '@workbench/gallery/api';
-import type { GallerySettings } from '@workbench/gallery/settings';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export const GALLERY_PAGE_SIZE = 60;
 

@@ -1,5 +1,3 @@
-import type { Edge as FlowEdge, Node as FlowNode } from '@xyflow/react';
-
 import type {
   ProjectGraphState,
   WorkflowConnectorNode,
@@ -7,6 +5,7 @@ import type {
   WorkflowInvocationNode,
   WorkflowNotesNode,
 } from '@workbench/workflows/types';
+import type { Edge as FlowEdge, Node as FlowNode } from '@xyflow/react';
 
 /**
  * Adapters between the project graph document and xyflow's node/edge state.

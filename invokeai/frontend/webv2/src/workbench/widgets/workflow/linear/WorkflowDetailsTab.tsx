@@ -1,9 +1,9 @@
-import { HStack, Input, Stack, Textarea } from '@chakra-ui/react';
+import type { WorkflowMetadata } from '@workbench/workflows/types';
 import type { ChangeEvent } from 'react';
 
+import { HStack, Input, Stack, Textarea } from '@chakra-ui/react';
 import { Field } from '@workbench/components/ui/Field';
 import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import type { WorkflowMetadata } from '@workbench/workflows/types';
 
 /** Workflow metadata editing — the legacy "Details" tab. */
 export const WorkflowDetailsTab = ({ metadata }: { metadata: WorkflowMetadata }) => {

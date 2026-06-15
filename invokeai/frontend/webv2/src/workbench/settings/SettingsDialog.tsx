@@ -1,3 +1,14 @@
+import type {
+  DeveloperLogLevel,
+  DeveloperLogNamespace,
+  ProjectSettings,
+  Project,
+  SettingsSectionId,
+  WorkbenchLanguage,
+  WorkbenchPreferences,
+  WorkbenchThemeId,
+} from '@workbench/types';
+
 import {
   Box,
   chakra,
@@ -16,7 +27,16 @@ import {
   Text,
   useSlotRecipe,
 } from '@chakra-ui/react';
-import { useId, useState, type ReactNode } from 'react';
+import { themeCardRecipe } from '@theme/recipes';
+import { previewSwatches, THEMES, type ThemeDefinition } from '@theme/system';
+import { Button, CloseButton, IconButton } from '@workbench/components/ui/Button';
+import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
+import { syncedWorkbenchPersistence } from '@workbench/projects/syncedPersistence';
+import {
+  useOptionalWorkbenchDispatch,
+  useOptionalWorkbenchSelector,
+  useOptionalWorkbenchStore,
+} from '@workbench/WorkbenchContext';
 import {
   CheckIcon,
   Code2Icon,
@@ -30,27 +50,8 @@ import {
   WorkflowIcon,
   type LucideIcon,
 } from 'lucide-react';
+import { useId, useState, type ReactNode } from 'react';
 
-import { themeCardRecipe } from '@theme/recipes';
-import { previewSwatches, THEMES, type ThemeDefinition } from '@theme/system';
-import { Button, CloseButton, IconButton } from '@workbench/components/ui/Button';
-import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
-import { syncedWorkbenchPersistence } from '@workbench/projects/syncedPersistence';
-import type {
-  DeveloperLogLevel,
-  DeveloperLogNamespace,
-  ProjectSettings,
-  Project,
-  SettingsSectionId,
-  WorkbenchLanguage,
-  WorkbenchPreferences,
-  WorkbenchThemeId,
-} from '@workbench/types';
-import {
-  useOptionalWorkbenchDispatch,
-  useOptionalWorkbenchSelector,
-  useOptionalWorkbenchStore,
-} from '@workbench/WorkbenchContext';
 import {
   closeWorkbenchSettings,
   openWorkbenchSettings,

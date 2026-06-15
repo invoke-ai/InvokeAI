@@ -1,16 +1,16 @@
 import { Dialog, Icon, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
-import { useEffect, useState } from 'react';
+import { formatRelativeTime } from '@workbench/home/formatRelativeTime';
+import { refreshProjectLibrary, useProjectLibrary, type ProjectSummary } from '@workbench/projects/library';
+import { importProjectFile, pickProjectFile } from '@workbench/projects/projectFile';
+import { adoptProjectRecord, hydrateProjectFromServer } from '@workbench/projects/syncedPersistence';
+import { useNotify } from '@workbench/useNotify';
+import { useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { ArrowRightIcon, FileUpIcon } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 import { Button, CloseButton } from './ui/Button';
 import { Row } from './ui/Row';
 import { Scrollable } from './ui/Scrollable';
-import { formatRelativeTime } from '@workbench/home/formatRelativeTime';
-import { useNotify } from '@workbench/useNotify';
-import { useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
-import { refreshProjectLibrary, useProjectLibrary, type ProjectSummary } from '@workbench/projects/library';
-import { importProjectFile, pickProjectFile } from '@workbench/projects/projectFile';
-import { adoptProjectRecord, hydrateProjectFromServer } from '@workbench/projects/syncedPersistence';
 
 /**
  * "Open project…" from the tab bar: the saved projects that are not already

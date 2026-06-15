@@ -1,7 +1,4 @@
 import { Avatar, Badge, Box, Center, Flex, HStack, Spinner, Stack, Switch, Table, Text } from '@chakra-ui/react';
-import { useCallback, useEffect, useState } from 'react';
-import { PencilIcon, Trash2Icon, UserPlusIcon } from 'lucide-react';
-
 import { deleteUser, listUsers, updateUser, type UserDTO } from '@workbench/auth/api';
 import { useAuthSession } from '@workbench/auth/session';
 import { getApiErrorMessage } from '@workbench/backend/http';
@@ -10,6 +7,9 @@ import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
 import { Scrollable } from '@workbench/components/ui/Scrollable';
 import { Tooltip } from '@workbench/components/ui/Tooltip';
 import { useNotify } from '@workbench/useNotify';
+import { PencilIcon, Trash2Icon, UserPlusIcon } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+
 import { UserFormDialog, type UserFormTarget } from './UserFormDialog';
 
 /**

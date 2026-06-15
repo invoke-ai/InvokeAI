@@ -1,5 +1,6 @@
-import { Menu } from '@chakra-ui/react';
 import type { ComponentProps } from 'react';
+
+import { Menu } from '@chakra-ui/react';
 
 type MenuContentProps = ComponentProps<typeof Menu.Content>;
 

@@ -1,5 +1,6 @@
-import { getUserStorageScope } from './auth/session';
 import type { WorkbenchPersistenceSnapshot, WorkbenchState } from './types';
+
+import { getUserStorageScope } from './auth/session';
 
 const BASE_STORAGE_KEY = 'invokeai:v7:webv2:workbench';
 const WORKBENCH_SCHEMA_VERSION = 1;

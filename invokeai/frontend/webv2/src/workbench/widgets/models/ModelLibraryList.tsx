@@ -1,8 +1,8 @@
+import type { ModelConfig } from '@workbench/models/types';
+
 import { Box, Checkbox, Flex, HStack, Icon, Image, ScrollArea, Spinner, Stack, Text } from '@chakra-ui/react';
 import { defaultRangeExtractor, useVirtualizer, type Range } from '@tanstack/react-virtual';
-import { BoxIcon } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
+import { Row } from '@workbench/components/ui/Row';
 import { getModelImageUrl } from '@workbench/models/api';
 import {
   filterModels,
@@ -12,9 +12,10 @@ import {
 } from '@workbench/models/library';
 import { useModelsSnapshot } from '@workbench/models/modelsStore';
 import { formatBytes } from '@workbench/models/taxonomy';
-import type { ModelConfig } from '@workbench/models/types';
 import { getLibraryScrollOffset, saveLibraryScrollOffset } from '@workbench/models/uiStore';
-import { Row } from '@workbench/components/ui/Row';
+import { BoxIcon } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
 import { ModelBadgeRow } from './ModelBadges';
 import { ModelRowContextMenu, type ModelContextMenuTarget } from './ModelRowContextMenu';
 

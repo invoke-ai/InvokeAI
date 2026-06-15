@@ -1,3 +1,5 @@
+import type { ModelTaxonomyType, StarterModel, StarterModelBundle } from '@workbench/models/types';
+
 import {
   Badge,
   Box,
@@ -12,9 +14,6 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
-import { CheckIcon, DownloadIcon, PackageIcon, SearchIcon, SlidersHorizontalIcon, StarIcon } from 'lucide-react';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-
 import { IconButton } from '@workbench/components/ui/Button';
 import { MenuContent } from '@workbench/components/ui/Menu';
 import { Row } from '@workbench/components/ui/Row';
@@ -23,8 +22,10 @@ import { Tooltip } from '@workbench/components/ui/Tooltip';
 import { collectBases, collectTypes } from '@workbench/models/library';
 import { ensureStartersLoaded, useStartersSnapshot } from '@workbench/models/startersStore';
 import { getModelBaseColorPalette, getModelBaseLabel, getModelTypeLabel } from '@workbench/models/taxonomy';
-import type { ModelTaxonomyType, StarterModel, StarterModelBundle } from '@workbench/models/types';
 import { useNotify } from '@workbench/useNotify';
+import { CheckIcon, DownloadIcon, PackageIcon, SearchIcon, SlidersHorizontalIcon, StarIcon } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+
 import { FilterMenuItem } from './ModelFilterBar';
 import { InstallSourceButton, SourceListItem } from './SourceListItem';
 import { useInstallActions } from './useInstallActions';

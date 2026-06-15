@@ -1,7 +1,7 @@
 import type { SystemStyleObject } from '@chakra-ui/react';
+import type { WorkbenchThemeId } from '@workbench/types';
 
 import { THEMES_BY_ID } from '@theme/themes';
-import type { WorkbenchThemeId } from '@workbench/types';
 
 /**
  * Theme bridge for xyflow surfaces. xyflow's stylesheet only knows light/dark,

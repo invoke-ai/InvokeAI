@@ -1,4 +1,5 @@
 import type { WidgetManifest } from '@workbench/types';
+
 import { MaintenanceMenu } from './MaintenanceMenu';
 import { ModelsWidgetView } from './ModelsWidgetView';
 

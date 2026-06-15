@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Project, WorkbenchState } from '@workbench/types';
 
 import { createDraftProject, createInitialWorkbenchState } from '@workbench/workbenchState';
-import type { Project, WorkbenchState } from '@workbench/types';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import type * as libraryModule from './library';
 import type * as persistenceModule from './syncedPersistence';
 

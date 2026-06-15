@@ -1,4 +1,5 @@
 import type { WidgetManifest } from '@workbench/types';
+
 import { DiagnosticsHeaderActions } from './DiagnosticsHeaderActions';
 import { DiagnosticsWidgetView } from './DiagnosticsWidgetView';
 

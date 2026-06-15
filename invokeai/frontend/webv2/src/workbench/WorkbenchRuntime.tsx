@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState, type Dispatch } from 'react';
 
+import type { Project, QueueItem } from './types';
+import type { WorkbenchAction } from './workbenchState';
+
 import {
   createQueueCoordinator,
   QueueItemCancelledError,
   type QueueCoordinator,
   type ReconcileInput,
 } from './backend/queueCoordinator';
-import { normalizeGenerateSettings } from './generation/settings';
 import { addImagesToGalleryBoard } from './gallery/api';
-import { ensureInvocationTemplatesLoaded } from './workflows/templates';
-import type { Project, QueueItem } from './types';
+import { normalizeGenerateSettings } from './generation/settings';
 import { useWorkbenchDispatch, useWorkbenchHasHydrated, useWorkbenchSelector } from './WorkbenchContext';
-import type { WorkbenchAction } from './workbenchState';
+import { ensureInvocationTemplatesLoaded } from './workflows/templates';
 
 const getSnapshotGalleryBoardId = (queueItem: QueueItem): string | null => {
   const selectedBoardId = queueItem.snapshot.widgetStates.gallery.values.selectedBoardId;

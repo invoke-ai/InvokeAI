@@ -1,18 +1,18 @@
-import { Flex, HStack, Stack, Text, Textarea } from '@chakra-ui/react';
-import type { ChangeEvent } from 'react';
-
-import { JsonPreview } from '@workbench/components/ui/JsonPreview';
-import { Scrollable } from '@workbench/components/ui/Scrollable';
-import { Tabs } from '@workbench/components/ui/Tabs';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
 import type {
   InvocationTemplate,
   ProjectGraphState,
   WorkflowInvocationNode,
   WorkflowNode,
 } from '@workbench/workflows/types';
+import type { ChangeEvent } from 'react';
+
+import { Flex, HStack, Stack, Text, Textarea } from '@chakra-ui/react';
+import { JsonPreview } from '@workbench/components/ui/JsonPreview';
+import { Scrollable } from '@workbench/components/ui/Scrollable';
+import { Tabs } from '@workbench/components/ui/Tabs';
 import { workflowSelectionStore } from '@workbench/widgets/workflow/editor/selectionStore';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
 
 /**
  * Edit-mode inspector for the editor's selected node, with the legacy tab

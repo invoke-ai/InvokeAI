@@ -1,7 +1,8 @@
-import { absolutizeApiUrl, ApiError, apiFetchJson } from '@workbench/backend/http';
-import { buildQueueItemOrigin } from '@workbench/backend/events';
 import type { BackendGraphContract } from '@workbench/types';
-import { generateSeedSequence } from './graph';
+
+import { buildQueueItemOrigin } from '@workbench/backend/events';
+import { absolutizeApiUrl, ApiError, apiFetchJson } from '@workbench/backend/http';
+
 import type {
   EnqueueGenerateRequest,
   EnqueueGenerateResult,
@@ -10,6 +11,8 @@ import type {
   MainModelConfig,
   QueueItemDTO,
 } from './types';
+
+import { generateSeedSequence } from './graph';
 
 export const listMainModels = async (): Promise<MainModelConfig[]> => {
   const body = await apiFetchJson<{ models?: MainModelConfig[] }>('/api/v2/models/?model_type=main');

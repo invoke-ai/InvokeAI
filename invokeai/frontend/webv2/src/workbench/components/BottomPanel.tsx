@@ -1,5 +1,6 @@
-import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { getWidgetById } from '@workbench/widgetRegistry';
+import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
+
 import { MissingWidgetFrame, WidgetRenderer } from './WidgetRenderer';
 
 export const BottomPanel = () => {

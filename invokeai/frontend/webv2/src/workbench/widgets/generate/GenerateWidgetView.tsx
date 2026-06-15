@@ -1,11 +1,12 @@
-import { useEffect, useMemo } from 'react';
+import type { GenerateSettings, VaeModelConfig } from '@workbench/generation/types';
+import type { ModelConfig } from '@workbench/models/types';
 
 import { getDefaultGenerateSettings, isSupportedGenerateModel } from '@workbench/generation/graph';
 import { normalizeGenerateSettings, normalizeGenerateWidgetValues } from '@workbench/generation/settings';
-import type { GenerateSettings, VaeModelConfig } from '@workbench/generation/types';
 import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsStore';
-import type { ModelConfig } from '@workbench/models/types';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { useEffect, useMemo } from 'react';
+
 import { GenerateSettingsForm } from './GenerateSettingsForm';
 
 export const GenerateWidgetView = () => {

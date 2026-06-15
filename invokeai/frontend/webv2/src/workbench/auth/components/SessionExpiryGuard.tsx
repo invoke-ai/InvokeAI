@@ -1,7 +1,6 @@
 import { useNavigate } from '@tanstack/react-router';
-import { useEffect } from 'react';
-
 import { useAuthSession } from '@workbench/auth/session';
+import { useEffect } from 'react';
 
 /**
  * Watches for mid-session token rejection (a 401 on any authenticated request)

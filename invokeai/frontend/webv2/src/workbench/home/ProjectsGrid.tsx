@@ -1,9 +1,9 @@
 import { Alert, SimpleGrid, Skeleton, Stack } from '@chakra-ui/react';
-
 import { Button } from '@workbench/components/ui/Button';
+import { refreshProjectLibrary, useProjectLibrary } from '@workbench/projects/library';
+
 import { NewProjectCard } from './NewProjectCard';
 import { ProjectCard } from './ProjectCard';
-import { refreshProjectLibrary, useProjectLibrary } from '@workbench/projects/library';
 
 /**
  * The saved-projects grid, fed by the project library store (summaries are

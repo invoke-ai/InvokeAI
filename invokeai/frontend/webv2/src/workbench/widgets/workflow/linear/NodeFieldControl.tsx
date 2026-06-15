@@ -1,14 +1,14 @@
-import { HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
-import { TriangleAlertIcon } from 'lucide-react';
-import { useState, type ChangeEvent } from 'react';
+import type { NodeFieldFormElement, ProjectGraphState } from '@workbench/workflows/types';
 
+import { HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
 import { FieldLabel } from '@workbench/components/ui/Field';
 import { Tooltip } from '@workbench/components/ui/Tooltip';
+import { WorkflowFieldInput } from '@workbench/widgets/workflow/fields/WorkflowFieldInput';
 import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
-import type { NodeFieldFormElement, ProjectGraphState } from '@workbench/workflows/types';
 import { isInvocationNode } from '@workbench/workflows/types';
-import { WorkflowFieldInput } from '@workbench/widgets/workflow/fields/WorkflowFieldInput';
+import { TriangleAlertIcon } from 'lucide-react';
+import { useState, type ChangeEvent } from 'react';
 
 /**
  * One exposed node field, shared by the Linear UI's view mode and the form

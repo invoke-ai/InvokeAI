@@ -1,11 +1,11 @@
 import { Flex, HStack, Icon, SegmentGroup, Splitter } from '@chakra-ui/react';
-import { EyeIcon, PencilIcon } from 'lucide-react';
-import { useEffect } from 'react';
-
 import { Scrollable } from '@workbench/components/ui/Scrollable';
 import { Tabs } from '@workbench/components/ui/Tabs';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { ensureInvocationTemplatesLoaded } from '@workbench/workflows/templates';
+import { EyeIcon, PencilIcon } from 'lucide-react';
+import { useEffect } from 'react';
+
 import { FormBuilderTab } from './FormBuilderTab';
 import { LinearFormView } from './LinearFormView';
 import { NodeInspector } from './NodeInspector';

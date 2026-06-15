@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import type { ModelConfig } from './types';
+
 import {
   collectBases,
   collectTypes,
@@ -8,7 +10,6 @@ import {
   flattenGroupsToRows,
   groupModelsByType,
 } from './library';
-import type { ModelConfig } from './types';
 
 const createModel = (overrides: Partial<ModelConfig>): ModelConfig => ({
   base: 'sdxl',

@@ -1,6 +1,17 @@
 import { Box, Flex, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { Link } from '@tanstack/react-router';
-import { useState } from 'react';
+import { IconButton } from '@workbench/components/ui/Button';
+import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
+import { MenuContent } from '@workbench/components/ui/Menu';
+import { RenameDialog } from '@workbench/components/ui/RenameDialog';
+import { toaster } from '@workbench/components/ui/toaster';
+import {
+  deleteLibraryProject,
+  duplicateLibraryProject,
+  renameLibraryProject,
+  type ProjectSummary,
+} from '@workbench/projects/library';
+import { exportLibraryProject } from '@workbench/projects/projectFile';
 import {
   ArrowRightIcon,
   CopyIcon,
@@ -10,20 +21,9 @@ import {
   PencilIcon,
   Trash2Icon,
 } from 'lucide-react';
+import { useState } from 'react';
 
-import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
-import { IconButton } from '@workbench/components/ui/Button';
-import { MenuContent } from '@workbench/components/ui/Menu';
-import { RenameDialog } from '@workbench/components/ui/RenameDialog';
 import { formatRelativeTime } from './formatRelativeTime';
-import { toaster } from '@workbench/components/ui/toaster';
-import { exportLibraryProject } from '@workbench/projects/projectFile';
-import {
-  deleteLibraryProject,
-  duplicateLibraryProject,
-  renameLibraryProject,
-  type ProjectSummary,
-} from '@workbench/projects/library';
 
 /**
  * One saved project in the Home grid. The whole card is a deep link into the

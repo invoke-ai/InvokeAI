@@ -1,27 +1,5 @@
-import {
-  defaultInvocationRoute,
-  isInvocationRouteValid,
-  isInvocationSourceAvailable,
-  resolveInvocationRoute,
-} from './invocation';
-import { compileGenerateGraph, resolveGenerateSeed } from './generation/graph';
-import { normalizeGenerateWidgetValues } from './generation/settings';
 import type { GallerySettings } from './gallery/settings';
 import type { GenerateWidgetValues } from './generation/types';
-import { defaultLayoutPreset, getLayoutPreset } from './layoutPresets';
-import { normalizeProjectSettings } from './settings/store';
-import { compileProjectGraph } from './workflows/buildGraph';
-import {
-  cloneProjectGraph,
-  createProjectGraph,
-  getProjectGraphUndoLabel,
-  isHighConfidenceGraphEdit,
-  normalizeProjectGraph,
-  projectGraphReducer,
-  type ProjectGraphAction,
-} from './workflows/document';
-import { getInvocationTemplatesSnapshot } from './workflows/templates';
-import type { ProjectGraphState } from './workflows/types';
 import type {
   CanvasDocumentContract,
   CanvasPlacementContract,
@@ -52,6 +30,29 @@ import type {
   WorkbenchNotificationKind,
   WorkbenchState,
 } from './types';
+import type { ProjectGraphState } from './workflows/types';
+
+import { compileGenerateGraph, resolveGenerateSeed } from './generation/graph';
+import { normalizeGenerateWidgetValues } from './generation/settings';
+import {
+  defaultInvocationRoute,
+  isInvocationRouteValid,
+  isInvocationSourceAvailable,
+  resolveInvocationRoute,
+} from './invocation';
+import { defaultLayoutPreset, getLayoutPreset } from './layoutPresets';
+import { normalizeProjectSettings } from './settings/store';
+import { compileProjectGraph } from './workflows/buildGraph';
+import {
+  cloneProjectGraph,
+  createProjectGraph,
+  getProjectGraphUndoLabel,
+  isHighConfidenceGraphEdit,
+  normalizeProjectGraph,
+  projectGraphReducer,
+  type ProjectGraphAction,
+} from './workflows/document';
+import { getInvocationTemplatesSnapshot } from './workflows/templates';
 
 type WorkbenchAction =
   | { type: 'createProject' }

@@ -1,10 +1,9 @@
-import { getUserStorageScope } from '@workbench/auth/session';
-import { reportProjectSync, type ProjectSyncInfo } from './syncStore';
-import { localStorageWorkbenchPersistence, stripTransientWorkbenchState } from '@workbench/persistence';
-import { seedProjectLibrary, upsertProjectSummary } from './library';
-import { fetchSessionBlob, serializeSessionBlob, SESSION_STATE_KEY } from './session';
-import { createDraftProject, createInitialWorkbenchState } from '@workbench/workbenchState';
 import type { Project, WorkbenchPersistenceSnapshot, WorkbenchState } from '@workbench/types';
+
+import { getUserStorageScope } from '@workbench/auth/session';
+import { localStorageWorkbenchPersistence, stripTransientWorkbenchState } from '@workbench/persistence';
+import { createDraftProject, createInitialWorkbenchState } from '@workbench/workbenchState';
+
 import {
   createProject as apiCreateProject,
   deleteClientStateValue,
@@ -17,6 +16,9 @@ import {
   updateProject as apiUpdateProject,
   type ProjectRecordDTO,
 } from './api';
+import { seedProjectLibrary, upsertProjectSummary } from './library';
+import { fetchSessionBlob, serializeSessionBlob, SESSION_STATE_KEY } from './session';
+import { reportProjectSync, type ProjectSyncInfo } from './syncStore';
 
 /**
  * Backend-first workbench persistence (spec: Persistence Model).

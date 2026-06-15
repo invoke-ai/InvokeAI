@@ -1,3 +1,5 @@
+import type { GalleryBoard } from '@workbench/gallery/api';
+
 import {
   Badge,
   Flex,
@@ -12,7 +14,7 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
-import { useRef, useState, type MouseEvent } from 'react';
+import { Button, CloseButton, IconButton } from '@workbench/components/ui/Button';
 import {
   ArchiveIcon,
   ArrowDownAZIcon,
@@ -27,9 +29,8 @@ import {
   SearchIcon,
   XIcon,
 } from 'lucide-react';
+import { useRef, useState, type MouseEvent } from 'react';
 
-import { Button, CloseButton, IconButton } from '@workbench/components/ui/Button';
-import type { GalleryBoard } from '@workbench/gallery/api';
 import { GalleryBoardMenu, type GalleryBoardMenuTarget } from './GalleryBoardMenu';
 import { getBoardCounts } from './galleryStateView';
 import { useGalleryWidget } from './GalleryWidgetContext';
