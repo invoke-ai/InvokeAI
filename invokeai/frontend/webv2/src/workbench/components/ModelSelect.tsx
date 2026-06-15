@@ -21,6 +21,8 @@ import { useEffect, useMemo, useState } from 'react';
 export const ModelSelect = ({
   excludeKeys,
   filter,
+  id,
+  invalid,
   modelTypes,
   onChange,
   placeholder,
@@ -31,6 +33,8 @@ export const ModelSelect = ({
   excludeKeys?: ReadonlySet<string>;
   /** Extra predicate, e.g. base-architecture compatibility. */
   filter?: (model: ModelConfig) => boolean;
+  id?: string;
+  invalid?: boolean;
   /** The model types this instance searches. */
   modelTypes: ModelTaxonomyType[];
   onChange: (model: ModelConfig | null) => void;
@@ -106,6 +110,7 @@ export const ModelSelect = ({
   return (
     <Combobox.Root
       collection={collection}
+      invalid={invalid}
       openOnClick
       placeholder={placeholder ?? `Search ${scopeLabel}…`}
       selectionBehavior="replace"
@@ -118,7 +123,7 @@ export const ModelSelect = ({
       }}
     >
       <Combobox.Control>
-        <Combobox.Input />
+        <Combobox.Input id={id} />
         <Combobox.IndicatorGroup>
           <Combobox.ClearTrigger />
           <Combobox.Trigger />

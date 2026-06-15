@@ -1,6 +1,11 @@
-import type { FieldInputTemplate, FieldOutputTemplate, WorkflowInvocationNode } from '@workbench/workflows/types';
+import type {
+  FieldInputTemplate,
+  FieldOutputTemplate,
+  FieldType,
+  WorkflowInvocationNode,
+} from '@workbench/workflows/types';
 
-import { Badge, Box, Flex, HStack, Icon, Image, Input, Stack, Text, IconButton } from '@chakra-ui/react';
+import { Badge, Box, Field, Flex, HStack, Icon, Image, Input, Stack, Text, IconButton } from '@chakra-ui/react';
 import { useNodeExecutionState, type NodeExecutionState } from '@workbench/backend/nodeExecutionStore';
 import { Tooltip } from '@workbench/components/ui/Tooltip';
 import { FieldDescriptionPopover } from '@workbench/widgets/workflow/fields/FieldDescriptionPopover';
@@ -9,8 +14,10 @@ import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import {
   getFieldTypeColor,
   getFieldTypeLabel,
+  getWorkflowFieldInvalidReason,
   isDirectInputField,
   isExposableField,
+  isModelFieldType,
 } from '@workbench/workflows/fields';
 import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
 import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
@@ -19,19 +26,32 @@ import { memo, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 
 import type { InvocationFlowNode as InvocationFlowNodeType } from './flowAdapters';
 
+import { getHandleTypeTooltip } from './handleTooltip';
+
 const NODE_WIDTH = '18rem';
-const HANDLE_SIZE = 10;
+const HANDLE_SIZE = 12;
+type HandleSide = 'left' | 'right';
 /** Row padding-x in px; inline handles sit in the label rows, so they pull back out past it. */
 const ROW_PADDING_X = 12;
 /** Below this viewport zoom, field content renders as skeleton bars (ComfyUI-style) for performance/readability. */
 const CONTENT_VISIBILITY_ZOOM = 0.4;
 
-const handleStyle = (color: string): React.CSSProperties => ({
-  background: color,
-  border: 'none',
-  height: HANDLE_SIZE,
-  width: HANDLE_SIZE,
-});
+const handleStyle = (type: FieldType, side: HandleSide): React.CSSProperties => {
+  const color = getFieldTypeColor(type);
+  const isFilled = type.cardinality === 'SINGLE';
+  const isAngular = isModelFieldType(type) || type.batch;
+  const centeredDiamondTransform = `translate(${side === 'left' ? '-' : ''}50%, -50%) rotate(45deg)`;
+
+  return {
+    background: isFilled ? color : 'var(--xy-background-color)',
+    border: isFilled ? 'none' : `3px solid ${color}`,
+    borderRadius: isAngular ? 3 : '50%',
+    boxShadow: '0 0 0 1.5px var(--xy-background-color)',
+    height: HANDLE_SIZE,
+    transform: type.batch ? centeredDiamondTransform : undefined,
+    width: HANDLE_SIZE,
+  };
+};
 
 const sortByUiOrder = <T extends { uiOrder?: number | null }>(templates: T[]): T[] =>
   [...templates].sort((a, b) => (a.uiOrder ?? Number.MAX_SAFE_INTEGER) - (b.uiOrder ?? Number.MAX_SAFE_INTEGER));
@@ -42,29 +62,53 @@ const useIsZoomedOut = (): boolean => useStore((state) => state.transform[2] < C
 /** Static placeholder bar standing in for text/controls at far zoom. No animation — there may be hundreds. */
 const SkeletonBar = ({ h = '2', w }: { h?: string; w?: string }) => <Box bg="bg.emphasized" h={h} rounded="sm" w={w} />;
 
+const hasMissingRequiredInputs = (
+  node: WorkflowInvocationNode,
+  templateInputs: FieldInputTemplate[],
+  connectedFieldNames: Set<string>
+): boolean =>
+  templateInputs.some(
+    (inputTemplate) =>
+      getWorkflowFieldInvalidReason({
+        isConnected: connectedFieldNames.has(inputTemplate.name),
+        template: inputTemplate,
+        value: node.data.inputs[inputTemplate.name]?.value,
+      }) !== null
+  );
+
 const NodeShell = ({
+  hasMissingRequiredInput,
   children,
   isMissing,
   isRunning,
   selected,
 }: {
+  hasMissingRequiredInput?: boolean;
   children: React.ReactNode;
   isMissing?: boolean;
   isRunning?: boolean;
   selected: boolean;
-}) => (
-  <Box
-    bg="bg"
-    borderColor={isMissing ? 'red.solid' : isRunning ? 'brand.solid' : selected ? 'accent.solid' : 'border.emphasized'}
-    borderWidth="1px"
-    fontSize="xs"
-    rounded="lg"
-    shadow={isRunning ? '0 0 10px {colors.brand.solid/50}' : selected ? 'md' : 'sm'}
-    w={NODE_WIDTH}
-  >
-    {children}
-  </Box>
-);
+}) => {
+  const isInvalid = isMissing || hasMissingRequiredInput;
+
+  return (
+    <Box
+      bg="bg"
+      borderColor={
+        isInvalid ? 'red.solid' : selected ? 'accent.solid' : isRunning ? 'brand.solid' : 'border.emphasized'
+      }
+      borderWidth="1px"
+      fontSize="xs"
+      rounded="lg"
+      shadow={isRunning ? '0 0 10px {colors.brand.solid/50}' : selected ? 'md' : 'sm'}
+      transition="border-color 0.12s ease, box-shadow 0.12s ease"
+      w={NODE_WIDTH}
+      _hover={selected || isInvalid ? undefined : { borderColor: 'brand.solid', shadow: 'md' }}
+    >
+      {children}
+    </Box>
+  );
+};
 
 /** Thin progress strip under the header while the node's invocation executes. */
 const NodeProgressStrip = ({ execution }: { execution: NodeExecutionState | null }) => {
@@ -133,6 +177,54 @@ const NodeTitle = ({ node }: { node: WorkflowInvocationNode }) => {
   );
 };
 
+const getInputModeLabel = (input: FieldInputTemplate['input']): string => {
+  if (input === 'connection') {
+    return 'Connection only';
+  }
+
+  if (input === 'direct') {
+    return 'Direct value only';
+  }
+
+  return 'Direct value or connection';
+};
+
+const InputFieldTooltip = ({
+  description,
+  isConnected,
+  isExposed,
+  label,
+  template,
+}: {
+  description: string;
+  isConnected: boolean;
+  isExposed: boolean;
+  label: string;
+  template: FieldInputTemplate;
+}) => (
+  <Stack gap="0.5" maxW="18rem">
+    <Text fontWeight="700">{label}</Text>
+    <Text color="fg.subtle">Field: {template.name}</Text>
+    <Text color="fg.subtle">Type: {getFieldTypeLabel(template.type)}</Text>
+    <Text color="fg.subtle">
+      {template.required ? 'Required' : 'Optional'} · {getInputModeLabel(template.input)}
+    </Text>
+    {isConnected ? <Text color="fg.subtle">Connected by graph edge.</Text> : null}
+    {isExposed ? <Text color="fg.subtle">Pinned to Linear UI.</Text> : null}
+    {description ? <Text>{description}</Text> : null}
+  </Stack>
+);
+
+const OutputFieldTooltip = ({ template }: { template: FieldOutputTemplate }) => (
+  <Stack gap="0.5" maxW="18rem">
+    <Text fontWeight="700">{template.title}</Text>
+    <Text color="fg.subtle">Field: {template.name}</Text>
+    <Text color="fg.subtle">Type: {getFieldTypeLabel(template.type)}</Text>
+    <Text color="fg.subtle">Output</Text>
+    {template.description ? <Text>{template.description}</Text> : null}
+  </Stack>
+);
+
 const InputFieldRow = ({
   isConnected,
   isExposed,
@@ -151,18 +243,27 @@ const InputFieldRow = ({
   const fieldIdentifier = { fieldName: template.name, nodeId: node.id };
   const showsControl = !isConnected && isDirectInputField(template);
   const label = instance?.label || template.title;
+  const invalidReason = getWorkflowFieldInvalidReason({
+    isConnected,
+    template,
+    value: instance?.value,
+  });
+  const isInvalid = invalidReason !== null;
+  const handleTooltip = getHandleTypeTooltip(template.type);
 
   if (isSkeleton) {
     return (
       <Box px="3" py="1.5">
         <HStack gap="1.5" h="5" position="relative">
           {template.input !== 'direct' ? (
-            <Handle
-              id={template.name}
-              position={Position.Left}
-              style={{ ...handleStyle(getFieldTypeColor(template.type)), left: -ROW_PADDING_X, top: '50%' }}
-              type="target"
-            />
+            <Tooltip content={handleTooltip} showArrow>
+              <Handle
+                id={template.name}
+                position={Position.Left}
+                style={{ ...handleStyle(template.type, 'left'), left: -ROW_PADDING_X, top: '50%' }}
+                type="target"
+              />
+            </Tooltip>
           ) : null}
           <SkeletonBar w="55%" />
         </HStack>
@@ -172,98 +273,137 @@ const InputFieldRow = ({
   }
 
   return (
-    <Box px="3" py="1.5">
-      {/* The handle lives inside the label row so it stays centered on the
-          label even when the value control below grows the row. */}
-      <HStack gap="1.5" justify="space-between" position="relative">
-        {template.input !== 'direct' ? (
-          <Handle
-            id={template.name}
-            position={Position.Left}
-            style={{ ...handleStyle(getFieldTypeColor(template.type)), left: -ROW_PADDING_X, top: '50%' }}
-            type="target"
-          />
-        ) : null}
-        <Tooltip
-          content={`${instance?.description || template.description || label} — ${getFieldTypeLabel(template.type)}`}
-        >
-          <Text color={isConnected ? 'fg.muted' : 'fg'} fontSize="2xs" minW="0" truncate>
-            {label}
-            {template.required ? (
-              <Text as="span" color="fg.error">
-                {' *'}
-              </Text>
+    <Box px="3" py="1.5" w="full">
+      <Field.Root gap="0" invalid={isInvalid} minW="0" w="full">
+        {/* The handle lives inside the label row so it stays centered on the
+            label even when the value control below grows the row. */}
+        <HStack gap="1.5" h="5" justify="space-between" minW="0" position="relative" w="full">
+          {template.input !== 'direct' ? (
+            <Tooltip content={handleTooltip} showArrow>
+              <Handle
+                id={template.name}
+                position={Position.Left}
+                style={{ ...handleStyle(template.type, 'left'), left: -ROW_PADDING_X, top: '50%' }}
+                type="target"
+              />
+            </Tooltip>
+          ) : null}
+          <Tooltip
+            positioning={{ placement: 'top-start' }}
+            content={
+              <InputFieldTooltip
+                description={instance?.description || template.description}
+                isConnected={isConnected}
+                isExposed={isExposed}
+                label={label}
+                template={template}
+              />
+            }
+          >
+            <Text
+              color={isInvalid ? 'fg.error' : isConnected ? 'fg.muted' : 'fg'}
+              fontSize="2xs"
+              lineHeight="1"
+              minW="0"
+              truncate
+            >
+              {label}
+              {template.required ? (
+                <Text as="span" color="fg.error">
+                  {' *'}
+                </Text>
+              ) : null}
+            </Text>
+          </Tooltip>
+          <HStack flexShrink={0} gap="0" ml="auto">
+            <FieldDescriptionPopover
+              description={instance?.description}
+              fieldName={template.name}
+              nodeId={node.id}
+              templateDescription={template.description}
+            />
+            {isExposableField(template) ? (
+              <IconButton
+                aria-label={isExposed ? `Remove ${label} from Linear UI` : `Expose ${label} in Linear UI`}
+                className="nodrag"
+                color={isExposed ? 'accent.solid' : 'fg.subtle'}
+                size="2xs"
+                title={isExposed ? 'Remove from Linear UI form' : 'Expose in Linear UI form'}
+                variant="ghost"
+                onClick={() =>
+                  dispatch({
+                    action: { fieldIdentifier, type: isExposed ? 'unexposeField' : 'exposeField' },
+                    type: 'applyProjectGraphAction',
+                  })
+                }
+              >
+                <Icon as={isExposed ? PinOffIcon : PinIcon} boxSize="3" />
+              </IconButton>
             ) : null}
-          </Text>
-        </Tooltip>
-        <HStack flexShrink={0} gap="0">
-          <FieldDescriptionPopover
-            description={instance?.description}
-            fieldName={template.name}
-            nodeId={node.id}
-            templateDescription={template.description}
-          />
-          {isExposableField(template) ? (
-            <IconButton
-              aria-label={isExposed ? `Remove ${label} from Linear UI` : `Expose ${label} in Linear UI`}
-              className="nodrag"
-              color={isExposed ? 'accent.solid' : 'fg.subtle'}
-              size="2xs"
-              title={isExposed ? 'Remove from Linear UI form' : 'Expose in Linear UI form'}
-              variant="ghost"
-              onClick={() =>
+          </HStack>
+        </HStack>
+        {showsControl ? (
+          <Box mt="0.5" w="full">
+            <WorkflowFieldInput
+              id={`${node.id}-${template.name}-value`}
+              invalid={isInvalid}
+              template={template}
+              value={instance?.value}
+              onChange={(value) =>
                 dispatch({
-                  action: { fieldIdentifier, type: isExposed ? 'unexposeField' : 'exposeField' },
+                  action: { fieldName: template.name, nodeId: node.id, type: 'setFieldValue', value },
                   type: 'applyProjectGraphAction',
                 })
               }
-            >
-              <Icon as={isExposed ? PinOffIcon : PinIcon} boxSize="3" />
-            </IconButton>
-          ) : null}
-        </HStack>
-      </HStack>
-      {showsControl ? (
-        <Box mt="1">
-          <WorkflowFieldInput
-            template={template}
-            value={instance?.value}
-            onChange={(value) =>
-              dispatch({
-                action: { fieldName: template.name, nodeId: node.id, type: 'setFieldValue', value },
-                type: 'applyProjectGraphAction',
-              })
-            }
-          />
-        </Box>
-      ) : null}
+            />
+          </Box>
+        ) : null}
+        {invalidReason ? <Field.ErrorText fontSize="2xs">{invalidReason}</Field.ErrorText> : null}
+      </Field.Root>
     </Box>
   );
 };
 
-const OutputFieldRow = ({ isSkeleton, template }: { isSkeleton: boolean; template: FieldOutputTemplate }) => (
-  <Box px="3" py="1">
-    <Box position="relative">
-      <Handle
-        id={template.name}
-        position={Position.Right}
-        style={{ ...handleStyle(getFieldTypeColor(template.type)), right: -ROW_PADDING_X, top: '50%' }}
-        type="source"
-      />
-      {isSkeleton ? (
-        <Flex h="4" justify="flex-end">
-          <SkeletonBar w="40%" />
-        </Flex>
-      ) : (
-        <Tooltip content={`${template.description || template.title} — ${getFieldTypeLabel(template.type)}`}>
-          <Text color="fg.muted" fontSize="2xs" textAlign="end" truncate>
-            {template.title}
-          </Text>
+const OutputFieldRow = ({ isSkeleton, template }: { isSkeleton: boolean; template: FieldOutputTemplate }) => {
+  const handleTooltip = getHandleTypeTooltip(template.type);
+
+  return (
+    <Box px="3" py="1">
+      <Flex align="center" h="5" justify="flex-end" position="relative">
+        <Tooltip content={handleTooltip} positioning={{ placement: 'left-start' }} showArrow>
+          <Handle
+            id={template.name}
+            position={Position.Right}
+            style={{ ...handleStyle(template.type, 'right'), right: -ROW_PADDING_X, top: '50%' }}
+            type="source"
+          />
         </Tooltip>
-      )}
+        {isSkeleton ? (
+          <Flex justify="flex-end" w="full">
+            <SkeletonBar w="40%" />
+          </Flex>
+        ) : (
+          <Box textAlign="end">
+            <Tooltip content={<OutputFieldTooltip template={template} />} positioning={{ placement: 'top-end' }}>
+              <Text
+                as="span"
+                color="fg.muted"
+                display="inline-block"
+                fontSize="2xs"
+                lineHeight="1"
+                maxW="full"
+                textAlign="end"
+                truncate
+              >
+                {template.title}
+              </Text>
+            </Tooltip>
+          </Box>
+        )}
+      </Flex>
     </Box>
-  </Box>
-);
+  );
+};
 
 /** Keeps every handle mounted (invisible) so edges stay attached when rows are not rendered. */
 const HiddenHandles = ({
@@ -279,7 +419,7 @@ const HiddenHandles = ({
         key={outputTemplate.name}
         id={outputTemplate.name}
         position={Position.Right}
-        style={{ ...handleStyle(getFieldTypeColor(outputTemplate.type)), opacity: 0, right: 0, top: -14 }}
+        style={{ ...handleStyle(outputTemplate.type, 'right'), opacity: 0, right: 0, top: -14 }}
         type="source"
       />
     ))}
@@ -289,7 +429,7 @@ const HiddenHandles = ({
           key={inputTemplate.name}
           id={inputTemplate.name}
           position={Position.Left}
-          style={{ ...handleStyle(getFieldTypeColor(inputTemplate.type)), left: 0, opacity: 0, top: -14 }}
+          style={{ ...handleStyle(inputTemplate.type, 'left'), left: 0, opacity: 0, top: -14 }}
           type="target"
         />
       ) : null
@@ -327,9 +467,10 @@ const InvocationFlowNodeComponent = ({ data, selected }: NodeProps<InvocationFlo
   const outputTemplates = Object.values(template.outputs);
   const isOpen = node.data.isOpen;
   const isRunning = execution?.status === 'running';
+  const isMissingRequiredInput = hasMissingRequiredInputs(node, Object.values(template.inputs), connectedFieldNames);
 
   return (
-    <NodeShell isRunning={isRunning} selected={selected ?? false}>
+    <NodeShell hasMissingRequiredInput={isMissingRequiredInput} isRunning={isRunning} selected={selected ?? false}>
       <Flex
         align="center"
         bg="bg.subtle"
@@ -338,7 +479,8 @@ const InvocationFlowNodeComponent = ({ data, selected }: NodeProps<InvocationFlo
         borderTopRadius="lg"
         borderBottomRadius={isOpen ? 'none' : 'lg'}
         gap="1"
-        px="2"
+        ps="1.5"
+        pe="2"
         py="1.5"
       >
         <IconButton
@@ -373,7 +515,7 @@ const InvocationFlowNodeComponent = ({ data, selected }: NodeProps<InvocationFlo
       </Flex>
       <NodeProgressStrip execution={execution} />
       {isOpen ? (
-        <Box py="1" bg="bg.muted">
+        <Box bg="bg.muted" borderBottomRadius={execution?.outputImageUrl ? 'none' : 'lg'} py="1">
           {outputTemplates.map((outputTemplate) => (
             <OutputFieldRow key={outputTemplate.name} isSkeleton={isZoomedOut} template={outputTemplate} />
           ))}

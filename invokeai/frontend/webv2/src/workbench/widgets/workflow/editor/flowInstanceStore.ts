@@ -1,6 +1,6 @@
-import type { Edge as FlowEdge, ReactFlowInstance } from '@xyflow/react';
+import type { ReactFlowInstance } from '@xyflow/react';
 
-import type { WorkflowFlowNode } from './flowAdapters';
+import type { WorkflowFlowEdge, WorkflowFlowNode } from './flowAdapters';
 
 /**
  * Module-level handle to the mounted workflow editor's ReactFlow instance, so
@@ -9,7 +9,7 @@ import type { WorkflowFlowNode } from './flowAdapters';
  * editor's nanostore-held instance.
  */
 
-export type WorkflowFlowInstance = ReactFlowInstance<WorkflowFlowNode, FlowEdge>;
+export type WorkflowFlowInstance = ReactFlowInstance<WorkflowFlowNode, WorkflowFlowEdge>;
 
 let flowInstance: WorkflowFlowInstance | null = null;
 

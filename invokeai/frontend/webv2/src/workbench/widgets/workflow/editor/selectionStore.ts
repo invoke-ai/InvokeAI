@@ -8,12 +8,14 @@ import { createExternalStore } from '@workbench/externalStore';
  */
 
 export interface WorkflowSelectionSnapshot {
+  hoveredNodeId: string | null;
   selectedNodeIds: string[];
   /** A pending outside request: the editor selects + zooms to these, then clears. */
   selectionRequest: { nodeIds: string[]; token: number } | null;
 }
 
 export const workflowSelectionStore = createExternalStore<WorkflowSelectionSnapshot>({
+  hoveredNodeId: null,
   selectedNodeIds: [],
   selectionRequest: null,
 });
@@ -23,6 +25,12 @@ const areSameIds = (a: string[], b: string[]): boolean => a.length === b.length 
 export const reportNodeSelection = (selectedNodeIds: string[]): void => {
   if (!areSameIds(workflowSelectionStore.getSnapshot().selectedNodeIds, selectedNodeIds)) {
     workflowSelectionStore.patchSnapshot({ selectedNodeIds });
+  }
+};
+
+export const reportNodeHover = (hoveredNodeId: string | null): void => {
+  if (workflowSelectionStore.getSnapshot().hoveredNodeId !== hoveredNodeId) {
+    workflowSelectionStore.patchSnapshot({ hoveredNodeId });
   }
 };
 

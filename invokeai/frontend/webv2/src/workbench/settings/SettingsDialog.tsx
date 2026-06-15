@@ -453,10 +453,10 @@ const WorkflowSection = () => {
         description="How connections between nodes are drawn in the editor."
         label="Connection style"
         value={workflowEdgeStyle}
-        onChange={(value) => updatePreferences({ workflowEdgeStyle: value === 'straight' ? 'straight' : 'curved' })}
+        onChange={(value) => updatePreferences({ workflowEdgeStyle: value === 'square' ? 'square' : 'curved' })}
       >
         <option value="curved">Curved</option>
-        <option value="straight">Straight</option>
+        <option value="square">Square</option>
       </SettingSelect>
       <SettingToggle
         checked={workflowSnapToGrid}

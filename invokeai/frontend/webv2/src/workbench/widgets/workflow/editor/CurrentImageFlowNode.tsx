@@ -36,7 +36,9 @@ const CurrentImageFlowNodeComponent = ({ data, selected }: NodeProps<CurrentImag
       overflow="hidden"
       rounded="lg"
       shadow={selected ? 'md' : 'sm'}
+      transition="border-color 0.12s ease, box-shadow 0.12s ease"
       w="20rem"
+      _hover={selected ? undefined : { borderColor: 'brand.solid', shadow: 'md' }}
     >
       <Flex align="center" bg="bg.subtle" borderBottomWidth="1px" borderColor="border.subtle" px="3" py="1.5">
         <Text fontWeight="700">{node.data.label || 'Current Image'}</Text>

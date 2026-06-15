@@ -1,9 +1,62 @@
-import type { ProjectGraphState, WorkflowEdge, WorkflowInvocationNode } from '@workbench/workflows/types';
+import type {
+  FieldType,
+  InvocationTemplate,
+  InvocationTemplates,
+  ProjectGraphState,
+  WorkflowConnectorNode,
+  WorkflowEdge,
+  WorkflowInvocationNode,
+} from '@workbench/workflows/types';
 
+import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from '@workbench/workflows/connectors';
 import { buildCurrentImageNode, createProjectGraph } from '@workbench/workflows/document';
 import { describe, expect, it } from 'vitest';
 
-import { toFlowEdges, toFlowNodes, withNodeSelection } from './flowAdapters';
+import { getWorkflowEdgeData, toFlowEdges, toFlowNodes, withNodeSelection } from './flowAdapters';
+
+const single = (name: string): FieldType => ({ batch: false, cardinality: 'SINGLE', name });
+const collection = (name: string): FieldType => ({ batch: false, cardinality: 'COLLECTION', name });
+
+const createTemplate = (outputType: FieldType = single('IntegerField')): InvocationTemplate => ({
+  category: 'test',
+  classification: 'stable',
+  description: '',
+  inputs: {
+    a: {
+      default: undefined,
+      description: '',
+      exclusiveMaximum: null,
+      exclusiveMinimum: null,
+      input: 'any',
+      maximum: null,
+      minimum: null,
+      multipleOf: null,
+      name: 'a',
+      options: null,
+      required: true,
+      title: 'A',
+      type: outputType,
+      uiChoiceLabels: null,
+      uiComponent: null,
+      uiHidden: false,
+      uiModelBase: null,
+      uiModelType: null,
+      uiOrder: null,
+    },
+  },
+  nodePack: 'invokeai',
+  outputType: 'test',
+  outputs: {
+    value: { description: '', name: 'value', title: 'Value', type: outputType },
+  },
+  tags: [],
+  title: 'Add',
+  type: 'add',
+  useCache: true,
+  version: '1.0.0',
+});
+
+const createTemplates = (outputType?: FieldType): InvocationTemplates => ({ add: createTemplate(outputType) });
 
 const createNode = (id: string): WorkflowInvocationNode => ({
   data: {
@@ -22,13 +75,26 @@ const createNode = (id: string): WorkflowInvocationNode => ({
   type: 'invocation',
 });
 
-const createEdge = (id: string, source: string, target: string): WorkflowEdge => ({
+const createEdge = (
+  id: string,
+  source: string,
+  target: string,
+  sourceHandle = 'value',
+  targetHandle = 'a'
+): WorkflowEdge => ({
   id,
   source,
-  sourceHandle: 'value',
+  sourceHandle,
   target,
-  targetHandle: 'a',
+  targetHandle,
   type: 'default',
+});
+
+const createConnector = (id: string): WorkflowConnectorNode => ({
+  data: { label: '' },
+  id,
+  position: { x: 0, y: 0 },
+  type: 'connector',
 });
 
 const createDoc = (overrides?: Partial<ProjectGraphState>): ProjectGraphState => ({
@@ -94,6 +160,39 @@ describe('flowAdapters identity preservation', () => {
     expect(nodeB?.type === 'invocation' && nodeB.data.exposedFieldNames).toEqual(['a']);
   });
 
+  it('precomputes resolved connector field types onto connector node data', () => {
+    const fieldType = single('ImageField');
+    const templates = createTemplates(fieldType);
+    const doc = createDoc({
+      edges: [
+        createEdge('e1', 'a', 'c', 'value', CONNECTOR_INPUT_HANDLE),
+        createEdge('e2', 'c', 'b', CONNECTOR_OUTPUT_HANDLE, 'a'),
+      ],
+      nodes: [createNode('a'), createConnector('c'), createNode('b')],
+    });
+    const untyped = toFlowNodes(doc);
+    const typed = toFlowNodes(doc, untyped, templates);
+    const connector = typed[1];
+
+    expect(connector?.type).toBe('connector');
+    expect(connector?.type === 'connector' && connector.data.inputFieldType).toBe(fieldType);
+    expect(connector?.type === 'connector' && connector.data.outputFieldType).toBe(fieldType);
+    expect(connector).not.toBe(untyped[1]);
+    expect(toFlowNodes(doc, typed, templates)[1]).toBe(connector);
+  });
+
+  it('does not mark a target as connected through an unresolved connector output', () => {
+    const doc = createDoc({
+      edges: [createEdge('e1', 'c', 'b', CONNECTOR_OUTPUT_HANDLE, 'a')],
+      nodes: [createConnector('c'), createNode('b')],
+    });
+    const nodes = toFlowNodes(doc);
+    const target = nodes.find((node) => node.id === 'b');
+
+    expect(target?.type).toBe('invocation');
+    expect(target?.type === 'invocation' ? target.data.connectedTargetHandles : []).toEqual([]);
+  });
+
   it('carries selection across rebuilds and toggles it without copying unchanged nodes', () => {
     const doc = createDoc();
     const selected = withNodeSelection(toFlowNodes(doc), new Set(['a']));
@@ -126,9 +225,64 @@ describe('flowAdapters identity preservation', () => {
 
     expect(same[0]).toBe(first[0]);
 
-    const restyled = toFlowEdges(doc, first, 'straight');
+    const restyled = toFlowEdges(doc, first, 'step');
 
     expect(restyled[0]).not.toBe(first[0]);
-    expect(restyled[0]?.type).toBe('straight');
+    expect(restyled[0]?.type).toBe('step');
+  });
+
+  it('adds field type metadata for custom edge rendering', () => {
+    const doc = createDoc();
+    const edge = toFlowEdges(doc, [], 'default', new Set(), createTemplates())[0];
+
+    expect(edge?.data).toMatchObject({
+      fieldTypeLabel: 'Integer',
+      pathType: 'default',
+      stroke: '#f87171',
+      strokeWidth: 2,
+      tooltip: 'Integer',
+    });
+  });
+
+  it('uses line pattern metadata for collection field types', () => {
+    const doc = createDoc();
+    const data = getWorkflowEdgeData(doc, doc.edges[0]!, 'step', createTemplates(collection('ImageField')));
+
+    expect(data).toMatchObject({
+      fieldTypeLabel: 'Image Collection',
+      pathType: 'step',
+      stroke: '#c4b5fd',
+      strokeDasharray: '8 4',
+      strokeWidth: 2.5,
+      tooltip: 'Image Collection',
+    });
+  });
+
+  it('replaces edges when templates resolve their field type styling', () => {
+    const doc = createDoc();
+    const untyped = toFlowEdges(doc, [], 'default');
+    const typed = toFlowEdges(doc, untyped, 'default', new Set(), createTemplates());
+
+    expect(typed[0]).not.toBe(untyped[0]);
+    expect(typed[0]?.data?.tooltip).toBe('Integer');
+  });
+
+  it('styles edges connected to selected nodes without persisting the highlight after deselection', () => {
+    const doc = createDoc();
+    const highlighted = toFlowEdges(doc, [], 'default', new Set(['a']));
+
+    expect(highlighted[0]?.animated).toBe(true);
+    expect(highlighted[0]?.className).toBe('workflow-selected-node-edge');
+    expect(highlighted[0]?.zIndex).toBe(1000);
+    expect(highlighted[0]?.style).toEqual({ strokeWidth: 2 });
+    expect(toFlowEdges(doc, highlighted, 'default', new Set(['a']))[0]).toBe(highlighted[0]);
+
+    const cleared = toFlowEdges(doc, highlighted, 'default');
+
+    expect(cleared[0]).not.toBe(highlighted[0]);
+    expect(cleared[0]?.animated).toBeUndefined();
+    expect(cleared[0]?.className).toBeUndefined();
+    expect(cleared[0]?.zIndex).toBeUndefined();
+    expect(cleared[0]?.style).toBeUndefined();
   });
 });

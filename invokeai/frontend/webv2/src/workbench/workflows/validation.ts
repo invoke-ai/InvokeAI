@@ -1,5 +1,6 @@
 import type {
   FieldInputTemplate,
+  FieldOutputTemplate,
   FieldType,
   InvocationTemplate,
   InvocationTemplates,
@@ -8,7 +9,12 @@ import type {
   WorkflowNode,
 } from './types';
 
-import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE, resolveConnectorSource } from './connectors';
+import {
+  CONNECTOR_INPUT_HANDLE,
+  CONNECTOR_OUTPUT_HANDLE,
+  resolveConnectorSource,
+  resolveConnectorTargets,
+} from './connectors';
 import { isConnectorNode, isInvocationNode } from './types';
 
 /**
@@ -158,7 +164,7 @@ const allowsMultipleInboundEdges = (node: WorkflowNode, fieldName: string): bool
 
 export const getCompatibleInputTemplate = (
   template: InvocationTemplate,
-  sourceType: FieldType
+  sourceType: FieldType | null
 ): FieldInputTemplate | null => {
   const inputTemplates = Object.values(template.inputs).sort(
     (a, b) => (a.uiOrder ?? Number.MAX_SAFE_INTEGER) - (b.uiOrder ?? Number.MAX_SAFE_INTEGER)
@@ -169,9 +175,41 @@ export const getCompatibleInputTemplate = (
       (inputTemplate) =>
         !inputTemplate.uiHidden &&
         inputTemplate.input !== 'direct' &&
-        validateConnectionTypes(sourceType, inputTemplate.type)
+        (sourceType === null || validateConnectionTypes(sourceType, inputTemplate.type))
     ) ?? null
   );
+};
+
+export const getCompatibleOutputTemplate = (
+  template: InvocationTemplate,
+  targetType: FieldType | null
+): FieldOutputTemplate | null => {
+  return (
+    Object.values(template.outputs).find(
+      (outputTemplate) => targetType === null || validateConnectionTypes(outputTemplate.type, targetType)
+    ) ?? null
+  );
+};
+
+const isSameFieldType = (left: FieldType, right: FieldType): boolean =>
+  left.name === right.name && left.cardinality === right.cardinality && left.batch === right.batch;
+
+const getCommonConnectorTargetType = (
+  connectorId: string,
+  document: Pick<ProjectGraphState, 'edges' | 'nodes'>,
+  templates: InvocationTemplates
+): FieldType | null => {
+  const targets = resolveConnectorTargets(connectorId, document.nodes, document.edges, templates);
+
+  if (targets.length === 0 || targets.some((target) => target.type === null)) {
+    return null;
+  }
+
+  const firstType = targets[0]?.type;
+
+  return firstType && targets.every((target) => target.type !== null && isSameFieldType(firstType, target.type))
+    ? firstType
+    : null;
 };
 
 const getSourceFieldType = (
@@ -185,7 +223,9 @@ const getSourceFieldType = (
   }
 
   if (isConnectorNode(node) && handle === CONNECTOR_OUTPUT_HANDLE) {
-    return resolveConnectorSource(node.id, document.nodes, document.edges, templates)?.type ?? null;
+    const source = resolveConnectorSource(node.id, document.nodes, document.edges, templates);
+
+    return source ? source.type : getCommonConnectorTargetType(node.id, document, templates);
   }
 
   return undefined;
@@ -200,6 +240,42 @@ export const getWorkflowSourceFieldType = (
   const sourceNode = document.nodes.find((node) => node.id === sourceNodeId);
 
   return sourceNode ? getSourceFieldType(sourceNode, sourceHandle, document, templates) : undefined;
+};
+
+const getTargetFieldType = (
+  node: WorkflowNode,
+  handle: string,
+  document: Pick<ProjectGraphState, 'edges' | 'nodes'>,
+  templates: InvocationTemplates
+): FieldType | null | undefined => {
+  if (isInvocationNode(node)) {
+    const inputTemplate = templates[node.data.type]?.inputs[handle];
+
+    return inputTemplate && inputTemplate.input !== 'direct' ? inputTemplate.type : undefined;
+  }
+
+  if (isConnectorNode(node) && handle === CONNECTOR_INPUT_HANDLE) {
+    const targetType = getCommonConnectorTargetType(node.id, document, templates);
+
+    if (targetType) {
+      return targetType;
+    }
+
+    return resolveConnectorSource(node.id, document.nodes, document.edges, templates)?.type ?? null;
+  }
+
+  return undefined;
+};
+
+export const getWorkflowTargetFieldType = (
+  document: Pick<ProjectGraphState, 'edges' | 'nodes'>,
+  templates: InvocationTemplates,
+  targetNodeId: string,
+  targetHandle: string
+): FieldType | null | undefined => {
+  const targetNode = document.nodes.find((node) => node.id === targetNodeId);
+
+  return targetNode ? getTargetFieldType(targetNode, targetHandle, document, templates) : undefined;
 };
 
 const hasValidSourceHandle = (node: WorkflowNode, handle: string, templates: InvocationTemplates): boolean => {
@@ -240,6 +316,17 @@ export const validateConnection = (
 
     if (document.edges.some((edge) => edge.target === targetNodeId && edge.targetHandle === targetHandle)) {
       return 'Connector already has an input.';
+    }
+
+    const sourceFieldType = getSourceFieldType(sourceNode, sourceHandle, document, templates);
+    const targetFieldTypes = resolveConnectorTargets(targetNodeId, document.nodes, document.edges, templates)
+      .map((target) => target.type)
+      .filter((type): type is FieldType => type !== null);
+
+    for (const targetFieldType of targetFieldTypes) {
+      if (sourceFieldType && !validateConnectionTypes(sourceFieldType, targetFieldType)) {
+        return `${sourceFieldType.name} cannot connect to ${targetFieldType.name}.`;
+      }
     }
 
     if (wouldCreateCycle(sourceNodeId, targetNodeId, document.edges)) {

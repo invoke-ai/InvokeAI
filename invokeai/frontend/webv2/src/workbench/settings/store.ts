@@ -146,7 +146,11 @@ export const normalizeProjectSettings = (settings?: Partial<ProjectSettings>): P
   useCpuNoise: typeof settings?.useCpuNoise === 'boolean' ? settings.useCpuNoise : DEFAULT_PROJECT_SETTINGS.useCpuNoise,
 });
 
-export const normalizeWorkbenchPreferences = (preferences?: Partial<WorkbenchPreferences>): WorkbenchPreferences => ({
+type WorkbenchPreferencesInput = Omit<Partial<WorkbenchPreferences>, 'workflowEdgeStyle'> & {
+  workflowEdgeStyle?: unknown;
+};
+
+export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferencesInput): WorkbenchPreferences => ({
   confirmImageDeletion:
     typeof preferences?.confirmImageDeletion === 'boolean'
       ? preferences.confirmImageDeletion
@@ -176,9 +180,11 @@ export const normalizeWorkbenchPreferences = (preferences?: Partial<WorkbenchPre
       : DEFAULT_PREFERENCES.showFocusRegionHighlight,
   themeId: isWorkbenchThemeId(preferences?.themeId) ? preferences.themeId : DEFAULT_PREFERENCES.themeId,
   workflowEdgeStyle:
-    preferences?.workflowEdgeStyle === 'straight' || preferences?.workflowEdgeStyle === 'curved'
-      ? preferences.workflowEdgeStyle
-      : DEFAULT_PREFERENCES.workflowEdgeStyle,
+    preferences?.workflowEdgeStyle === 'square' || preferences?.workflowEdgeStyle === 'straight'
+      ? 'square'
+      : preferences?.workflowEdgeStyle === 'curved'
+        ? preferences.workflowEdgeStyle
+        : DEFAULT_PREFERENCES.workflowEdgeStyle,
   workflowShowMinimap:
     typeof preferences?.workflowShowMinimap === 'boolean'
       ? preferences.workflowShowMinimap

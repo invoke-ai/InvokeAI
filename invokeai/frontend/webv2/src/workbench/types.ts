@@ -513,7 +513,7 @@ export interface WorkbenchPreferences {
   /** Reject workflow connections with incompatible field types. */
   workflowValidateConnections: boolean;
   /** Connection line rendering in the workflow editor. */
-  workflowEdgeStyle: 'curved' | 'straight';
+  workflowEdgeStyle: 'curved' | 'square';
 }
 
 export interface AccountState {

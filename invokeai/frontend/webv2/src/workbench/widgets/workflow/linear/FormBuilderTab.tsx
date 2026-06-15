@@ -7,10 +7,14 @@ import type {
 
 import { Box, HStack, Icon, Input, Menu, Portal, Separator, Stack, Text, Textarea } from '@chakra-ui/react';
 import { Button, IconButton } from '@workbench/components/ui/Button';
-import { requestNodeSelection } from '@workbench/widgets/workflow/editor/selectionStore';
+import { requestNodeSelection, workflowSelectionStore } from '@workbench/widgets/workflow/editor/selectionStore';
 import { FieldDescriptionPopover } from '@workbench/widgets/workflow/fields/FieldDescriptionPopover';
 import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { getResolvedWorkflowEdges } from '@workbench/workflows/connectors';
 import { getFormChildren } from '@workbench/workflows/document';
+import { getWorkflowFieldInvalidReason } from '@workbench/workflows/fields';
+import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
+import { isInvocationNode } from '@workbench/workflows/types';
 import {
   Columns2Icon,
   CrosshairIcon,
@@ -54,6 +58,9 @@ const BuilderCard = ({
   element,
   extraActions,
   index,
+  isHovered,
+  isInvalid,
+  isSelected,
   parentId,
   title,
 }: {
@@ -61,6 +68,9 @@ const BuilderCard = ({
   element: WorkflowFormElement;
   extraActions?: ReactNode;
   index: number;
+  isHovered?: boolean;
+  isInvalid?: boolean;
+  isSelected?: boolean;
   parentId: string;
   title: string;
 }) => {
@@ -135,7 +145,33 @@ const BuilderCard = ({
           {...(dropEdge === 'above' ? { top: '-1px' } : { bottom: '-1px' })}
         />
       ) : null}
-      <Box borderColor="border.subtle" borderWidth="1px" overflow="hidden" rounded="md">
+      <Box
+        borderColor={isInvalid ? 'red.solid' : isHovered || isSelected ? 'accent.solid' : 'border.subtle'}
+        borderWidth="1px"
+        overflow="hidden"
+        position="relative"
+        rounded="md"
+        shadow={
+          isInvalid
+            ? '0 0 0 1px {colors.red.solid/45}'
+            : isHovered || isSelected
+              ? '0 0 0 1px {colors.accent.solid/45}'
+              : undefined
+        }
+        transition="border-color 0.12s ease, box-shadow 0.12s ease"
+        _before={
+          isHovered
+            ? {
+                bg: 'accent.solid/10',
+                content: '""',
+                inset: '0',
+                pointerEvents: 'none',
+                position: 'absolute',
+                zIndex: '1',
+              }
+            : undefined
+        }
+      >
         <HStack
           bg="bg.muted"
           borderBottomWidth="1px"
@@ -144,6 +180,8 @@ const BuilderCard = ({
           gap="1"
           px="1.5"
           py="0.5"
+          position="relative"
+          zIndex="2"
           _active={{ cursor: 'grabbing' }}
           onPointerDown={() => setIsDragArmed(true)}
           onPointerUp={() => setIsDragArmed(false)}
@@ -170,7 +208,9 @@ const BuilderCard = ({
             </IconButton>
           </HStack>
         </HStack>
-        <Box p="2">{children}</Box>
+        <Box p="2" position="relative" zIndex="2">
+          {children}
+        </Box>
       </Box>
     </Box>
   );
@@ -259,13 +299,19 @@ const FieldDescriptionAction = ({
 const BuilderElement = ({
   element,
   index,
+  hoveredNodeId,
   parentId,
   projectGraph,
+  invalidElementIds,
+  selectedNodeIds,
 }: {
   element: WorkflowFormElement;
   index: number;
+  hoveredNodeId: string | null;
+  invalidElementIds: Set<string>;
   parentId: string;
   projectGraph: ProjectGraphState;
+  selectedNodeIds: Set<string>;
 }) => {
   const dispatch = useWorkbenchDispatch();
 
@@ -301,9 +347,12 @@ const BuilderElement = ({
               <BuilderElement
                 key={child.id}
                 element={child}
+                hoveredNodeId={hoveredNodeId}
+                invalidElementIds={invalidElementIds}
                 index={childIndex}
                 parentId={element.id}
                 projectGraph={projectGraph}
+                selectedNodeIds={selectedNodeIds}
               />
             ))}
             <ContainerDropZone container={element} isEmpty={element.data.children.length === 0} />
@@ -352,6 +401,9 @@ const BuilderElement = ({
             </>
           }
           index={index}
+          isHovered={element.data.fieldIdentifier.nodeId === hoveredNodeId}
+          isInvalid={invalidElementIds.has(element.id)}
+          isSelected={selectedNodeIds.has(element.data.fieldIdentifier.nodeId)}
           parentId={parentId}
           title="Node Field"
         >
@@ -456,11 +508,64 @@ const AddElementMenu = () => {
   );
 };
 
+const getInvalidNodeFieldElementIds = (
+  projectGraph: ProjectGraphState,
+  templatesSnapshot: ReturnType<typeof useInvocationTemplatesSnapshot>
+): Set<string> => {
+  const invalidElementIds = new Set<string>();
+
+  if (templatesSnapshot.status !== 'loaded') {
+    return invalidElementIds;
+  }
+
+  const connectedInputKeys = new Set(
+    getResolvedWorkflowEdges(projectGraph.nodes, projectGraph.edges).map(
+      (edge) => `${edge.target}:${edge.targetHandle}`
+    )
+  );
+
+  for (const element of Object.values(projectGraph.form.elements)) {
+    if (element.type !== 'node-field') {
+      continue;
+    }
+
+    const { fieldName, nodeId } = element.data.fieldIdentifier;
+    const node = projectGraph.nodes.find((candidate) => candidate.id === nodeId);
+
+    if (!node || !isInvocationNode(node)) {
+      invalidElementIds.add(element.id);
+      continue;
+    }
+
+    const template = templatesSnapshot.templates[node.data.type]?.inputs[fieldName];
+
+    if (!template) {
+      invalidElementIds.add(element.id);
+      continue;
+    }
+
+    const isConnected = connectedInputKeys.has(`${nodeId}:${fieldName}`);
+
+    if (getWorkflowFieldInvalidReason({ isConnected, template, value: node.data.inputs[fieldName]?.value }) !== null) {
+      invalidElementIds.add(element.id);
+    }
+  }
+
+  return invalidElementIds;
+};
+
 export const FormBuilderTab = ({ projectGraph }: { projectGraph: ProjectGraphState }) => {
+  const templatesSnapshot = useInvocationTemplatesSnapshot();
+  const { hoveredNodeId, selectedNodeIds } = workflowSelectionStore.useSnapshot();
   const [draggingElementId, setDraggingElementId] = useState<string | null>(null);
   const dndContextValue = useMemo<BuilderDndContextValue>(
     () => ({ draggingElementId, setDraggingElementId }),
     [draggingElementId]
+  );
+  const selectedNodeIdSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
+  const invalidElementIds = useMemo(
+    () => getInvalidNodeFieldElementIds(projectGraph, templatesSnapshot),
+    [projectGraph, templatesSnapshot]
   );
   const rootChildren = getFormChildren(projectGraph.form);
 
@@ -477,9 +582,12 @@ export const FormBuilderTab = ({ projectGraph }: { projectGraph: ProjectGraphSta
           <BuilderElement
             key={element.id}
             element={element}
+            hoveredNodeId={hoveredNodeId}
+            invalidElementIds={invalidElementIds}
             index={index}
             parentId={projectGraph.form.rootElementId}
             projectGraph={projectGraph}
+            selectedNodeIds={selectedNodeIdSet}
           />
         ))}
         <AddElementMenu />

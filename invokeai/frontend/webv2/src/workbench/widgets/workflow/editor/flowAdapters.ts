@@ -1,11 +1,23 @@
 import type {
+  FieldType,
+  InvocationTemplates,
   ProjectGraphState,
   WorkflowConnectorNode,
   WorkflowCurrentImageNode,
+  WorkflowEdge,
   WorkflowInvocationNode,
   WorkflowNotesNode,
 } from '@workbench/workflows/types';
 import type { Edge as FlowEdge, Node as FlowNode } from '@xyflow/react';
+import type { CSSProperties } from 'react';
+
+import {
+  CONNECTOR_INPUT_HANDLE,
+  CONNECTOR_OUTPUT_HANDLE,
+  getResolvedWorkflowEdges,
+} from '@workbench/workflows/connectors';
+import { getFieldTypeColor, getFieldTypeLabel } from '@workbench/workflows/fields';
+import { getWorkflowSourceFieldType, getWorkflowTargetFieldType } from '@workbench/workflows/validation';
 
 /**
  * Adapters between the project graph document and xyflow's node/edge state.
@@ -32,17 +44,23 @@ export type InvocationFlowNode = FlowNode<
 >;
 export type NotesFlowNode = FlowNode<{ documentNode: WorkflowNotesNode }, 'notes'>;
 export type CurrentImageFlowNode = FlowNode<{ documentNode: WorkflowCurrentImageNode }, 'current_image'>;
-export type ConnectorFlowNode = FlowNode<{ documentNode: WorkflowConnectorNode }, 'connector'>;
+export type ConnectorFlowNode = FlowNode<
+  { documentNode: WorkflowConnectorNode; inputFieldType: FieldType | null; outputFieldType: FieldType | null },
+  'connector'
+>;
 export type WorkflowFlowNode = InvocationFlowNode | NotesFlowNode | CurrentImageFlowNode | ConnectorFlowNode;
 
 const EMPTY_NAMES: string[] = [];
+const EMPTY_NODE_IDS = new Set<string>();
+const SELECTED_NODE_EDGE_CLASS = 'workflow-selected-node-edge';
+const SELECTED_NODE_EDGE_STYLE: CSSProperties = { strokeWidth: 2 };
 
 const sameNames = (a: string[], b: string[]): boolean => a.length === b.length && a.every((name, i) => name === b[i]);
 
 const getConnectedHandlesByNode = (document: ProjectGraphState): Map<string, string[]> => {
   const byNode = new Map<string, string[]>();
 
-  for (const edge of document.edges) {
+  for (const edge of getResolvedWorkflowEdges(document.nodes, document.edges)) {
     byNode.set(edge.target, [...(byNode.get(edge.target) ?? []), edge.targetHandle]);
   }
 
@@ -73,7 +91,8 @@ const getExposedFieldsByNode = (document: ProjectGraphState): Map<string, string
 
 export const toFlowNodes = (
   document: ProjectGraphState,
-  previousNodes: WorkflowFlowNode[] = []
+  previousNodes: WorkflowFlowNode[] = [],
+  templates?: InvocationTemplates
 ): WorkflowFlowNode[] => {
   const previousById = new Map(previousNodes.map((node) => [node.id, node]));
   const connectedByNode = getConnectedHandlesByNode(document);
@@ -120,12 +139,24 @@ export const toFlowNodes = (
     }
 
     if (documentNode.type === 'connector') {
-      if (previous?.type === 'connector' && previous.data.documentNode === documentNode) {
+      const inputFieldType = templates
+        ? (getWorkflowTargetFieldType(document, templates, documentNode.id, CONNECTOR_INPUT_HANDLE) ?? null)
+        : null;
+      const outputFieldType = templates
+        ? (getWorkflowSourceFieldType(document, templates, documentNode.id, CONNECTOR_OUTPUT_HANDLE) ?? null)
+        : null;
+
+      if (
+        previous?.type === 'connector' &&
+        previous.data.documentNode === documentNode &&
+        previous.data.inputFieldType === inputFieldType &&
+        previous.data.outputFieldType === outputFieldType
+      ) {
         return previous;
       }
 
       return {
-        data: { documentNode },
+        data: { documentNode, inputFieldType, outputFieldType },
         id: documentNode.id,
         position: documentNode.position,
         selected,
@@ -173,17 +204,99 @@ export const withNodeSelection = (nodes: WorkflowFlowNode[], selectedIds: Set<st
   });
 
 /** xyflow edge component per the user's connection-style preference. */
-export type FlowEdgeType = 'default' | 'straight';
+export type FlowEdgeType = 'default' | 'step';
+
+export interface WorkflowEdgeData extends Record<string, unknown> {
+  fieldTypeLabel: string;
+  pathType: FlowEdgeType;
+  stroke: string;
+  strokeDasharray?: string;
+  strokeWidth: number;
+  tooltip: string;
+}
+
+export type WorkflowFlowEdge = FlowEdge<WorkflowEdgeData, FlowEdgeType>;
+
+const UNKNOWN_EDGE_DATA = (pathType: FlowEdgeType): WorkflowEdgeData => ({
+  fieldTypeLabel: 'Unknown',
+  pathType,
+  stroke: 'var(--xy-edge-stroke)',
+  strokeWidth: 2,
+  tooltip: 'Unknown field type',
+});
+
+const getWorkflowEdgeFieldType = (
+  document: ProjectGraphState,
+  templates: InvocationTemplates | undefined,
+  edge: WorkflowEdge
+): FieldType | null => {
+  if (!templates) {
+    return null;
+  }
+
+  return (
+    getWorkflowSourceFieldType(document, templates, edge.source, edge.sourceHandle) ??
+    getWorkflowTargetFieldType(document, templates, edge.target, edge.targetHandle) ??
+    null
+  );
+};
+
+export const getWorkflowEdgeData = (
+  document: ProjectGraphState,
+  edge: WorkflowEdge,
+  pathType: FlowEdgeType,
+  templates?: InvocationTemplates
+): WorkflowEdgeData => {
+  const fieldType = getWorkflowEdgeFieldType(document, templates, edge);
+
+  if (!fieldType) {
+    return UNKNOWN_EDGE_DATA(pathType);
+  }
+
+  const fieldTypeLabel = getFieldTypeLabel(fieldType);
+  const strokeDasharray = fieldType.batch
+    ? '2 5'
+    : fieldType.cardinality === 'COLLECTION'
+      ? '8 4'
+      : fieldType.cardinality === 'SINGLE_OR_COLLECTION'
+        ? '8 3 2 3'
+        : undefined;
+
+  return {
+    fieldTypeLabel,
+    pathType,
+    stroke: getFieldTypeColor(fieldType),
+    strokeDasharray,
+    strokeWidth: fieldType.cardinality === 'SINGLE' && !fieldType.batch ? 2 : 2.5,
+    tooltip: fieldType.batch ? `${fieldTypeLabel} batch` : fieldTypeLabel,
+  };
+};
+
+const isSameEdgeData = (a: WorkflowEdgeData | undefined, b: WorkflowEdgeData): boolean =>
+  a?.fieldTypeLabel === b.fieldTypeLabel &&
+  a.pathType === b.pathType &&
+  a.stroke === b.stroke &&
+  a.strokeDasharray === b.strokeDasharray &&
+  a.strokeWidth === b.strokeWidth &&
+  a.tooltip === b.tooltip;
 
 export const toFlowEdges = (
   document: ProjectGraphState,
-  previousEdges: FlowEdge[] = [],
-  edgeType: FlowEdgeType = 'default'
-): FlowEdge[] => {
+  previousEdges: WorkflowFlowEdge[] = [],
+  edgeType: FlowEdgeType = 'default',
+  selectedNodeIds: Set<string> = EMPTY_NODE_IDS,
+  templates?: InvocationTemplates
+): WorkflowFlowEdge[] => {
   const previousById = new Map(previousEdges.map((edge) => [edge.id, edge]));
 
   return document.edges.map((edge) => {
     const previous = previousById.get(edge.id);
+    const data = getWorkflowEdgeData(document, edge, edgeType, templates);
+    const isConnectedToSelectedNode = selectedNodeIds.has(edge.source) || selectedNodeIds.has(edge.target);
+    const animated = isConnectedToSelectedNode || undefined;
+    const className = isConnectedToSelectedNode ? SELECTED_NODE_EDGE_CLASS : undefined;
+    const style = isConnectedToSelectedNode ? SELECTED_NODE_EDGE_STYLE : undefined;
+    const zIndex = isConnectedToSelectedNode ? 1000 : undefined;
 
     if (
       previous &&
@@ -191,19 +304,29 @@ export const toFlowEdges = (
       previous.source === edge.source &&
       previous.sourceHandle === edge.sourceHandle &&
       previous.target === edge.target &&
-      previous.targetHandle === edge.targetHandle
+      previous.targetHandle === edge.targetHandle &&
+      previous.animated === animated &&
+      previous.className === className &&
+      isSameEdgeData(previous.data, data) &&
+      previous.style === style &&
+      previous.zIndex === zIndex
     ) {
       return previous;
     }
 
     return {
       id: edge.id,
+      animated,
+      className,
+      data,
       selected: previous?.selected ?? false,
       source: edge.source,
       sourceHandle: edge.sourceHandle,
+      style,
       target: edge.target,
       targetHandle: edge.targetHandle,
       type: edgeType,
+      zIndex,
     };
   });
 };

@@ -2,11 +2,19 @@ import type { FieldType, XYPosition } from '@workbench/workflows/types';
 
 import { createExternalStore } from '@workbench/externalStore';
 
-export interface AddNodeConnectionFilter {
-  sourceHandle: string;
-  sourceNodeId: string;
-  sourceType: FieldType;
-}
+export type AddNodeConnectionFilter =
+  | {
+      kind: 'source';
+      sourceHandle: string;
+      sourceNodeId: string;
+      sourceType: FieldType | null;
+    }
+  | {
+      kind: 'target';
+      targetHandle: string;
+      targetNodeId: string;
+      targetType: FieldType | null;
+    };
 
 /**
  * Session-lived UI coordination for the workflow widget. Menu items live

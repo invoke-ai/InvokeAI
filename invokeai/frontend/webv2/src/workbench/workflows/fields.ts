@@ -22,12 +22,135 @@ const STATEFUL_FIELD_TYPE_NAMES = new Set([
 
 export const isStatefulFieldType = (type: FieldType): boolean => STATEFUL_FIELD_TYPE_NAMES.has(type.name);
 
+const MODEL_FIELD_TYPE_NAMES = new Set([
+  'CLIPField',
+  'ControlLoRAField',
+  'ModelIdentifierField',
+  'T5EncoderField',
+  'TransformerField',
+  'UNetField',
+  'VAEField',
+]);
+
+export const isModelFieldType = (type: FieldType): boolean => MODEL_FIELD_TYPE_NAMES.has(type.name);
+
 /** True when the field renders an editable control on the node / linear form. */
 export const isDirectInputField = (template: FieldInputTemplate): boolean =>
   template.input !== 'connection' && isStatefulFieldType(template.type) && template.type.cardinality !== 'COLLECTION';
 
 /** A field can be exposed to the Linear UI when it can be edited directly. */
 export const isExposableField = (template: FieldInputTemplate): boolean => isDirectInputField(template);
+
+const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
+
+const hasNonEmptyStringProp = (value: unknown, prop: string): boolean =>
+  typeof value === 'object' && value !== null && isNonEmptyString((value as Record<string, unknown>)[prop]);
+
+const isNumberFieldValueValid = (template: FieldInputTemplate, value: unknown): boolean => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return false;
+  }
+
+  if (template.type.name === 'IntegerField' && !Number.isInteger(value)) {
+    return false;
+  }
+
+  if (template.minimum !== null && value < template.minimum) {
+    return false;
+  }
+
+  if (template.maximum !== null && value > template.maximum) {
+    return false;
+  }
+
+  if (template.exclusiveMinimum !== null && value <= template.exclusiveMinimum) {
+    return false;
+  }
+
+  if (template.exclusiveMaximum !== null && value >= template.exclusiveMaximum) {
+    return false;
+  }
+
+  if (template.multipleOf !== null) {
+    const quotient = value / template.multipleOf;
+
+    if (Math.abs(quotient - Math.round(quotient)) > Number.EPSILON * 100) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+const isColorValueValid = (value: unknown): boolean => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const channels = value as Record<string, unknown>;
+
+  return ['r', 'g', 'b', 'a'].every((channel) => {
+    const channelValue = channels[channel];
+
+    return typeof channelValue === 'number' && channelValue >= 0 && channelValue <= 255;
+  });
+};
+
+export const isWorkflowFieldValueValid = (template: FieldInputTemplate, value: unknown): boolean => {
+  switch (template.type.name) {
+    case 'StringField':
+      return isNonEmptyString(value);
+    case 'IntegerField':
+    case 'FloatField':
+      return isNumberFieldValueValid(template, value);
+    case 'BooleanField':
+      return typeof value === 'boolean';
+    case 'EnumField':
+      return isNonEmptyString(value) && (template.options === null || template.options.includes(value));
+    case 'ModelIdentifierField':
+      return hasNonEmptyStringProp(value, 'key');
+    case 'SchedulerField':
+      return isNonEmptyString(value);
+    case 'BoardField':
+      return (
+        value === undefined ||
+        value === null ||
+        value === 'auto' ||
+        value === 'none' ||
+        hasNonEmptyStringProp(value, 'board_id')
+      );
+    case 'ImageField':
+      return hasNonEmptyStringProp(value, 'image_name');
+    case 'ColorField':
+      return isColorValueValid(value);
+    default:
+      return value !== undefined && value !== null;
+  }
+};
+
+export const getWorkflowFieldInvalidReason = ({
+  isConnected,
+  template,
+  value,
+}: {
+  isConnected: boolean;
+  template: FieldInputTemplate;
+  value: unknown;
+}): string | null => {
+  if (!template.required || isConnected) {
+    return null;
+  }
+
+  if (template.input === 'connection') {
+    return 'Required connection.';
+  }
+
+  if (isWorkflowFieldValueValid(template, value)) {
+    return null;
+  }
+
+  return isDirectInputField(template) ? 'Required value.' : 'Required connection.';
+};
 
 // Raw hex (not Chakra tokens) because xyflow handles are styled inline.
 const FIELD_TYPE_COLORS: Record<string, string> = {

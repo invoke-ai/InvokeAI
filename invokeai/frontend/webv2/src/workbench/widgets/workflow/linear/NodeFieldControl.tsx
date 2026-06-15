@@ -1,13 +1,14 @@
 import type { NodeFieldFormElement, ProjectGraphState } from '@workbench/workflows/types';
 
-import { HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
+import { Alert, Field, Input, Stack, Text } from '@chakra-ui/react';
 import { FieldLabel } from '@workbench/components/ui/Field';
 import { Tooltip } from '@workbench/components/ui/Tooltip';
 import { WorkflowFieldInput } from '@workbench/widgets/workflow/fields/WorkflowFieldInput';
 import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { getResolvedWorkflowEdges } from '@workbench/workflows/connectors';
+import { getWorkflowFieldInvalidReason } from '@workbench/workflows/fields';
 import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
 import { isInvocationNode } from '@workbench/workflows/types';
-import { TriangleAlertIcon } from 'lucide-react';
 import { useState, type ChangeEvent } from 'react';
 
 /**
@@ -52,71 +53,82 @@ export const NodeFieldControl = ({
 
   if (!invocationNode || !template) {
     return (
-      <HStack gap="1.5">
-        <Icon as={TriangleAlertIcon} boxSize="3" color="fg.error" />
-        <Text color="fg.subtle" fontSize="2xs">
-          This field no longer exists in the project graph.
-        </Text>
-      </HStack>
+      <Alert.Root status="error" size="sm" variant="surface">
+        <Alert.Indicator />
+        <Alert.Title>This field no longer exists in the project graph.</Alert.Title>
+      </Alert.Root>
     );
   }
 
-  const isConnected = projectGraph.edges.some((edge) => edge.target === nodeId && edge.targetHandle === fieldName);
+  const isConnected = getResolvedWorkflowEdges(projectGraph.nodes, projectGraph.edges).some(
+    (edge) => edge.target === nodeId && edge.targetHandle === fieldName
+  );
   const label = instance?.label || template.title;
   const description = instance?.description || template.description;
+  const invalidReason = getWorkflowFieldInvalidReason({ isConnected, template, value: instance?.value });
+  const isInvalid = invalidReason !== null;
+  const labelInputId = `${element.id}-label-input`;
+  const valueInputId = `${element.id}-value`;
 
   return (
-    <Stack gap="1">
-      {isLabelEditable ? (
-        <Input
-          aria-label="Field label"
-          color="fg.muted"
-          fontSize="2xs"
-          fontWeight="600"
-          h="5"
-          placeholder={template.title}
-          size="2xs"
-          textTransform="uppercase"
-          value={draftLabel ?? label}
-          variant="flushed"
-          onBlur={() => setDraftLabel(null)}
-          onChange={(event: ChangeEvent<HTMLInputElement>) => {
-            setDraftLabel(event.currentTarget.value);
-            dispatch({
-              action: { fieldName, label: event.currentTarget.value, nodeId, type: 'setFieldLabel' },
-              type: 'applyProjectGraphAction',
-            });
-          }}
-          onFocus={() => setDraftLabel(label)}
-        />
-      ) : (
-        <Tooltip content={`${nodeContext} → ${template.title}`}>
-          <Stack gap="0" w="fit-content">
-            <FieldLabel>{label}</FieldLabel>
-          </Stack>
-        </Tooltip>
-      )}
-      {element.data.showDescription && description ? (
-        <Text color="fg.subtle" fontSize="2xs">
-          {description}
-        </Text>
-      ) : null}
-      {isConnected ? (
-        <Text color="fg.subtle" fontSize="2xs">
-          Driven by a graph connection.
-        </Text>
-      ) : (
-        <WorkflowFieldInput
-          template={template}
-          value={instance?.value}
-          onChange={(value) =>
-            dispatch({
-              action: { fieldName, nodeId, type: 'setFieldValue', value },
-              type: 'applyProjectGraphAction',
-            })
-          }
-        />
-      )}
-    </Stack>
+    <Field.Root invalid={isInvalid} minW="0" w="full">
+      <Stack gap="1" minW="0" w="full">
+        {isLabelEditable ? (
+          <Input
+            aria-label="Field label"
+            color={isInvalid ? 'fg.error' : 'fg.muted'}
+            fontSize="2xs"
+            fontWeight="600"
+            h="5"
+            id={labelInputId}
+            placeholder={template.title}
+            size="2xs"
+            textTransform="uppercase"
+            value={draftLabel ?? label}
+            variant="flushed"
+            w="full"
+            onBlur={() => setDraftLabel(null)}
+            onChange={(event: ChangeEvent<HTMLInputElement>) => {
+              setDraftLabel(event.currentTarget.value);
+              dispatch({
+                action: { fieldName, label: event.currentTarget.value, nodeId, type: 'setFieldLabel' },
+                type: 'applyProjectGraphAction',
+              });
+            }}
+            onFocus={() => setDraftLabel(label)}
+          />
+        ) : (
+          <Tooltip content={`${nodeContext} → ${template.title}`}>
+            <Stack color={isInvalid ? 'fg.error' : undefined} gap="0" minW="0" w="full">
+              <FieldLabel>{label}</FieldLabel>
+            </Stack>
+          </Tooltip>
+        )}
+        {element.data.showDescription && description ? (
+          <Text color="fg.subtle" fontSize="2xs">
+            {description}
+          </Text>
+        ) : null}
+        {isConnected ? (
+          <Text color="fg.subtle" fontSize="2xs">
+            Driven by a graph connection.
+          </Text>
+        ) : (
+          <WorkflowFieldInput
+            id={valueInputId}
+            invalid={isInvalid}
+            template={template}
+            value={instance?.value}
+            onChange={(value) =>
+              dispatch({
+                action: { fieldName, nodeId, type: 'setFieldValue', value },
+                type: 'applyProjectGraphAction',
+              })
+            }
+          />
+        )}
+        {invalidReason ? <Field.ErrorText fontSize="2xs">{invalidReason}</Field.ErrorText> : null}
+      </Stack>
+    </Field.Root>
   );
 };

@@ -6,14 +6,16 @@ import { IconButton } from '@workbench/components/ui/Button';
 import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
 import { useNotify } from '@workbench/useNotify';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from '@workbench/workflows/connectors';
 import {
+  buildConnectorNode,
   buildCurrentImageNode,
   buildInvocationNode,
   buildNotesNode,
   createProjectGraph,
   createWorkflowId,
 } from '@workbench/workflows/document';
-import { getCompatibleInputTemplate } from '@workbench/workflows/validation';
+import { getCompatibleInputTemplate, getCompatibleOutputTemplate } from '@workbench/workflows/validation';
 import { parseWorkflowJson } from '@workbench/workflows/workflowJson';
 import { HistoryIcon, LibraryIcon, PlusIcon } from 'lucide-react';
 import { useEffect, useId, useRef, type ChangeEvent } from 'react';
@@ -189,9 +191,38 @@ export const WorkflowHeaderActions = ({ region }: WidgetViewProps) => {
       return;
     }
 
-    const targetInput = getCompatibleInputTemplate(template, addNodeConnection.sourceType);
+    if (addNodeConnection.kind === 'source') {
+      const targetInput = getCompatibleInputTemplate(template, addNodeConnection.sourceType);
 
-    if (!targetInput) {
+      if (!targetInput) {
+        dispatch({
+          action: { node, type: 'addNode' },
+          type: 'applyProjectGraphAction',
+        });
+        return;
+      }
+
+      dispatch({
+        action: {
+          edge: {
+            id: createWorkflowId('edge'),
+            source: addNodeConnection.sourceNodeId,
+            sourceHandle: addNodeConnection.sourceHandle,
+            target: node.id,
+            targetHandle: targetInput.name,
+            type: 'default',
+          },
+          node,
+          type: 'addNodeAndEdge',
+        },
+        type: 'applyProjectGraphAction',
+      });
+      return;
+    }
+
+    const sourceOutput = getCompatibleOutputTemplate(template, addNodeConnection.targetType);
+
+    if (!sourceOutput) {
       dispatch({
         action: { node, type: 'addNode' },
         type: 'applyProjectGraphAction',
@@ -203,10 +234,10 @@ export const WorkflowHeaderActions = ({ region }: WidgetViewProps) => {
       action: {
         edge: {
           id: createWorkflowId('edge'),
-          source: addNodeConnection.sourceNodeId,
-          sourceHandle: addNodeConnection.sourceHandle,
-          target: node.id,
-          targetHandle: targetInput.name,
+          source: node.id,
+          sourceHandle: sourceOutput.name,
+          target: addNodeConnection.targetNodeId,
+          targetHandle: addNodeConnection.targetHandle,
           type: 'default',
         },
         node,
@@ -219,6 +250,44 @@ export const WorkflowHeaderActions = ({ region }: WidgetViewProps) => {
   const addNote = () => {
     dispatch({
       action: { node: buildNotesNode(getInsertPosition()), type: 'addNode' },
+      type: 'applyProjectGraphAction',
+    });
+  };
+
+  const addConnector = () => {
+    const node = buildConnectorNode(getInsertPosition());
+
+    if (!addNodeConnection) {
+      dispatch({
+        action: { node, type: 'addNode' },
+        type: 'applyProjectGraphAction',
+      });
+      return;
+    }
+
+    dispatch({
+      action: {
+        edge:
+          addNodeConnection.kind === 'source'
+            ? {
+                id: createWorkflowId('edge'),
+                source: addNodeConnection.sourceNodeId,
+                sourceHandle: addNodeConnection.sourceHandle,
+                target: node.id,
+                targetHandle: CONNECTOR_INPUT_HANDLE,
+                type: 'default',
+              }
+            : {
+                id: createWorkflowId('edge'),
+                source: node.id,
+                sourceHandle: CONNECTOR_OUTPUT_HANDLE,
+                target: addNodeConnection.targetNodeId,
+                targetHandle: addNodeConnection.targetHandle,
+                type: 'default',
+              },
+        node,
+        type: 'addNodeAndEdge',
+      },
       type: 'applyProjectGraphAction',
     });
   };
@@ -336,6 +405,7 @@ export const WorkflowHeaderActions = ({ region }: WidgetViewProps) => {
             connectionFilter={addNodeConnection}
             isOpen={isAddNodeOpen}
             onAddCurrentImage={addCurrentImage}
+            onAddConnector={addConnector}
             onAddNode={addNode}
             onAddNote={addNote}
             onOpenChange={setAddNodeOpen}

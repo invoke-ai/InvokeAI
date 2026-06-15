@@ -6,7 +6,7 @@ import { Button } from '@workbench/components/ui/Button';
 import { Scrollable } from '@workbench/components/ui/Scrollable';
 import { Tooltip } from '@workbench/components/ui/Tooltip';
 import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
-import { getCompatibleInputTemplate } from '@workbench/workflows/validation';
+import { getCompatibleInputTemplate, getCompatibleOutputTemplate } from '@workbench/workflows/validation';
 import { HammerIcon } from 'lucide-react';
 import { useCallback, useMemo, useState, type ChangeEvent, type ReactNode } from 'react';
 
@@ -30,6 +30,29 @@ const matchesSearch = (template: InvocationTemplate, terms: string[]): boolean =
   const haystack = `${template.title} ${template.type} ${template.tags.join(' ')} ${template.category}`.toLowerCase();
 
   return terms.every((term) => haystack.includes(term));
+};
+
+const isCompatibleConnectionTemplate = (
+  template: InvocationTemplate,
+  connectionFilter: AddNodeConnectionFilter | null
+): boolean => {
+  if (!connectionFilter) {
+    return true;
+  }
+
+  if (connectionFilter.kind === 'source') {
+    return getCompatibleInputTemplate(template, connectionFilter.sourceType) !== null;
+  }
+
+  return getCompatibleOutputTemplate(template, connectionFilter.targetType) !== null;
+};
+
+const getConnectionFilterName = (connectionFilter: AddNodeConnectionFilter): string => {
+  if (connectionFilter.kind === 'source') {
+    return connectionFilter.sourceType?.name ?? 'connector';
+  }
+
+  return connectionFilter.targetType?.name ?? 'connector';
 };
 
 interface NodeRow {
@@ -87,6 +110,7 @@ export const AddNodeDialog = ({
   connectionFilter,
   isOpen,
   onAddCurrentImage,
+  onAddConnector,
   onAddNode,
   onAddNote,
   onOpenChange,
@@ -94,6 +118,7 @@ export const AddNodeDialog = ({
   connectionFilter: AddNodeConnectionFilter | null;
   isOpen: boolean;
   onAddCurrentImage: () => void;
+  onAddConnector: () => void;
   onAddNode: (template: InvocationTemplate) => void;
   onAddNote: () => void;
   onOpenChange: (isOpen: boolean) => void;
@@ -103,6 +128,7 @@ export const AddNodeDialog = ({
       connectionFilter={connectionFilter}
       isOpen={isOpen}
       onAddCurrentImage={onAddCurrentImage}
+      onAddConnector={onAddConnector}
       onAddNode={onAddNode}
       onAddNote={onAddNote}
       onOpenChange={onOpenChange}
@@ -113,6 +139,7 @@ const AddNodeDialogContent = ({
   connectionFilter,
   isOpen,
   onAddCurrentImage,
+  onAddConnector,
   onAddNode,
   onAddNote,
   onOpenChange,
@@ -120,6 +147,7 @@ const AddNodeDialogContent = ({
   connectionFilter: AddNodeConnectionFilter | null;
   isOpen: boolean;
   onAddCurrentImage: () => void;
+  onAddConnector: () => void;
   onAddNode: (template: InvocationTemplate) => void;
   onAddNote: () => void;
   onOpenChange: (isOpen: boolean) => void;
@@ -144,30 +172,42 @@ const AddNodeDialogContent = ({
 
   const groups = useMemo<CategoryGroup[]>(() => {
     const terms = searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    const utilityRows: NodeRow[] = connectionFilter
-      ? []
-      : [
-          {
-            description: 'Annotate the workflow with a free-text note.',
-            isBeta: false,
-            nodePack: 'invokeai',
-            onAdd: () => {
-              onAddNote();
-              close(true);
+    const utilityRows: NodeRow[] = [
+      {
+        description: 'Route a connection through a compact pass-through handle.',
+        isBeta: false,
+        nodePack: 'invokeai',
+        onAdd: () => {
+          onAddConnector();
+          close(true);
+        },
+        title: 'Connector',
+      },
+      ...(connectionFilter
+        ? []
+        : [
+            {
+              description: 'Annotate the workflow with a free-text note.',
+              isBeta: false,
+              nodePack: 'invokeai',
+              onAdd: () => {
+                onAddNote();
+                close(true);
+              },
+              title: 'Notes',
             },
-            title: 'Notes',
-          },
-          {
-            description: 'Show the latest generated image (and live progress) inside the graph.',
-            isBeta: false,
-            nodePack: 'invokeai',
-            onAdd: () => {
-              onAddCurrentImage();
-              close(true);
+            {
+              description: 'Show the latest generated image (and live progress) inside the graph.',
+              isBeta: false,
+              nodePack: 'invokeai',
+              onAdd: () => {
+                onAddCurrentImage();
+                close(true);
+              },
+              title: 'Current Image',
             },
-            title: 'Current Image',
-          },
-        ].filter((row) => terms.every((term) => row.title.toLowerCase().includes(term)));
+          ]),
+    ].filter((row) => terms.every((term) => row.title.toLowerCase().includes(term)));
 
     const byCategory = new Map<string, NodeRow[]>();
 
@@ -175,7 +215,7 @@ const AddNodeDialogContent = ({
       if (
         template.classification === 'internal' ||
         (terms.length > 0 && !matchesSearch(template, terms)) ||
-        (connectionFilter && !getCompatibleInputTemplate(template, connectionFilter.sourceType))
+        !isCompatibleConnectionTemplate(template, connectionFilter)
       ) {
         continue;
       }
@@ -205,7 +245,7 @@ const AddNodeDialogContent = ({
     return utilityRows.length > 0
       ? [{ label: UTILITY_CATEGORY, rows: utilityRows }, ...categoryGroups]
       : categoryGroups;
-  }, [close, connectionFilter, onAddCurrentImage, onAddNode, onAddNote, searchTerm, templates]);
+  }, [close, connectionFilter, onAddConnector, onAddCurrentImage, onAddNode, onAddNote, searchTerm, templates]);
 
   const totalCount = groups.reduce((sum, group) => sum + group.rows.length, 0);
   const accordionValue = isSearching ? groups.map((group) => group.label) : expandedCategories;
@@ -221,7 +261,9 @@ const AddNodeDialogContent = ({
   } else if (totalCount === 0) {
     body = (
       <Text color="fg.subtle" fontSize="xs" px="1" py="4" textAlign="center">
-        {connectionFilter ? `No nodes accept ${connectionFilter.sourceType.name}.` : 'No nodes match your search.'}
+        {connectionFilter
+          ? `No compatible ${getConnectionFilterName(connectionFilter)} nodes.`
+          : 'No nodes match your search.'}
       </Text>
     );
   } else {
@@ -285,7 +327,7 @@ const AddNodeDialogContent = ({
                   aria-label="Search for nodes"
                   placeholder={
                     connectionFilter
-                      ? `Search compatible ${connectionFilter.sourceType.name} nodes…`
+                      ? `Search compatible ${getConnectionFilterName(connectionFilter)} nodes…`
                       : 'Search for nodes…'
                   }
                   size="md"

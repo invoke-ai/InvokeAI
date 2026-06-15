@@ -11,7 +11,11 @@ import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/Workb
 import { getProjectGraphReadiness } from '@workbench/workflows/buildGraph';
 import { buildConnectorNode, createWorkflowId } from '@workbench/workflows/document';
 import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
-import { getWorkflowSourceFieldType, validateConnection } from '@workbench/workflows/validation';
+import {
+  getWorkflowSourceFieldType,
+  getWorkflowTargetFieldType,
+  validateConnection,
+} from '@workbench/workflows/validation';
 import {
   Background,
   BackgroundVariant,
@@ -22,8 +26,8 @@ import {
   applyEdgeChanges,
   applyNodeChanges,
   type Connection,
-  type Edge as FlowEdge,
   type EdgeChange,
+  type EdgeTypes,
   type IsValidConnection,
   type NodeChange,
   type NodeTypes,
@@ -44,7 +48,14 @@ import { buildDuplicateElements, buildPasteElements, copyNodesToClipboard, useHa
 import { ConnectorFlowNode } from './ConnectorFlowNode';
 import { CurrentImageFlowNode } from './CurrentImageFlowNode';
 import { EditorToolbar, type EditorTool } from './EditorToolbar';
-import { toFlowEdges, toFlowNodes, withNodeSelection, type FlowEdgeType, type WorkflowFlowNode } from './flowAdapters';
+import {
+  toFlowEdges,
+  toFlowNodes,
+  withNodeSelection,
+  type FlowEdgeType,
+  type WorkflowFlowEdge,
+  type WorkflowFlowNode,
+} from './flowAdapters';
 import {
   registerWorkflowFlowInstance,
   releaseWorkflowFlowInstance,
@@ -53,16 +64,27 @@ import {
 import { InvocationFlowNode } from './InvocationFlowNode';
 import { NodeContextMenu, type WorkflowContextMenuState } from './NodeContextMenu';
 import { NotesFlowNode } from './NotesFlowNode';
-import { clearNodeSelectionRequest, reportNodeSelection, workflowSelectionStore } from './selectionStore';
+import {
+  clearNodeSelectionRequest,
+  reportNodeHover,
+  reportNodeSelection,
+  workflowSelectionStore,
+} from './selectionStore';
 import { useEraser } from './useEraser';
 import { useLasso } from './useLasso';
 import { useModifierHeld } from './useModifierHeld';
+import { WorkflowEdge } from './WorkflowEdge';
 
 const nodeTypes: NodeTypes = {
   connector: ConnectorFlowNode,
   current_image: CurrentImageFlowNode,
   invocation: InvocationFlowNode,
   notes: NotesFlowNode,
+};
+
+const edgeTypes: EdgeTypes = {
+  default: WorkflowEdge,
+  step: WorkflowEdge,
 };
 
 /**
@@ -76,7 +98,7 @@ const SNAP_GRID: [number, number] = [24, 24];
 
 const DELETE_KEY_CODES = ['Backspace', 'Delete'];
 
-const DEFAULT_EDGE_OPTIONS = { style: { strokeWidth: 1.5 } };
+const DEFAULT_EDGE_OPTIONS = { style: { strokeWidth: 2 } };
 
 const isEditableTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"]') !== null;
@@ -91,6 +113,9 @@ const getEventClientPosition = (event: MouseEvent | TouchEvent): { x: number; y:
   return touch ? { x: touch.clientX, y: touch.clientY } : null;
 };
 
+const getSelectedNodeIdSet = (nodes: WorkflowFlowNode[]): Set<string> =>
+  new Set(nodes.filter((node) => node.selected).map((node) => node.id));
+
 const WorkflowFlow = () => {
   const projectGraph = useActiveProjectSelector((project) => project.projectGraph);
   const dispatch = useWorkbenchDispatch();
@@ -98,24 +123,35 @@ const WorkflowFlow = () => {
   const { themeId, workflowEdgeStyle, workflowShowMinimap, workflowSnapToGrid, workflowValidateConnections } =
     useWorkbenchPreferences();
   const templatesSnapshot = useInvocationTemplatesSnapshot();
-  const edgeType: FlowEdgeType = workflowEdgeStyle === 'straight' ? 'straight' : 'default';
-  const [flowNodes, setFlowNodes] = useState<WorkflowFlowNode[]>(() => toFlowNodes(projectGraph));
-  const [flowEdges, setFlowEdges] = useState<FlowEdge[]>(() => toFlowEdges(projectGraph, [], edgeType));
+  const invocationTemplates = templatesSnapshot.status === 'loaded' ? templatesSnapshot.templates : undefined;
+  const edgeType: FlowEdgeType = workflowEdgeStyle === 'square' ? 'step' : 'default';
+  const [flowNodes, setFlowNodes] = useState<WorkflowFlowNode[]>(() =>
+    toFlowNodes(projectGraph, [], invocationTemplates)
+  );
+  const [flowEdges, setFlowEdges] = useState<WorkflowFlowEdge[]>(() =>
+    toFlowEdges(projectGraph, [], edgeType, new Set<string>(), invocationTemplates)
+  );
   const [flowInstance, setFlowInstance] = useState<WorkflowFlowInstance | null>(null);
   const [tool, setTool] = useState<EditorTool>('pan');
   const [nodeOpacity, setNodeOpacity] = useState(1);
   const [contextMenu, setContextMenu] = useState<WorkflowContextMenuState | null>(null);
-  const { selectionRequest } = workflowSelectionStore.useSnapshot();
+  const { selectedNodeIds, selectionRequest } = workflowSelectionStore.useSnapshot();
   const isSnapHeld = useModifierHeld('Control');
   const hasClipboardNodes = useHasClipboardNodes();
   const backgroundId = useId().replace(/:/g, '');
   /** Node ids to select once the next document-driven rebuild lands (fresh paste/duplicate results). */
   const pendingSelectionRef = useRef<string[] | null>(null);
 
-  const selectNodes = useCallback((nodeIds: string[]) => {
-    setFlowNodes((current) => withNodeSelection(current, new Set(nodeIds)));
-    reportNodeSelection(nodeIds);
-  }, []);
+  const selectNodes = useCallback(
+    (nodeIds: string[]) => {
+      const selectedNodeIdSet = new Set(nodeIds);
+
+      setFlowNodes((current) => withNodeSelection(current, selectedNodeIdSet));
+      setFlowEdges((current) => toFlowEdges(projectGraph, current, edgeType, selectedNodeIdSet, invocationTemplates));
+      reportNodeSelection(nodeIds);
+    },
+    [edgeType, invocationTemplates, projectGraph]
+  );
 
   const { lassoHandlers, lassoOverlay } = useLasso({
     enabled: tool === 'lasso',
@@ -157,17 +193,20 @@ const WorkflowFlow = () => {
     const pendingSelection = pendingSelectionRef.current;
 
     pendingSelectionRef.current = null;
-    setFlowNodes((current) => {
-      const next = toFlowNodes(projectGraph, current);
+    const nextSelectedNodeIds = pendingSelection ?? selectedNodeIds;
+    const nextSelectedNodeIdSet = new Set(nextSelectedNodeIds);
 
-      return pendingSelection ? withNodeSelection(next, new Set(pendingSelection)) : next;
+    setFlowNodes((current) => {
+      const next = toFlowNodes(projectGraph, current, invocationTemplates);
+
+      return pendingSelection ? withNodeSelection(next, nextSelectedNodeIdSet) : next;
     });
-    setFlowEdges((current) => toFlowEdges(projectGraph, current, edgeType));
+    setFlowEdges((current) => toFlowEdges(projectGraph, current, edgeType, nextSelectedNodeIdSet, invocationTemplates));
 
     if (pendingSelection) {
       reportNodeSelection(pendingSelection);
     }
-  }, [edgeType, projectGraph]);
+  }, [edgeType, invocationTemplates, projectGraph, selectedNodeIds]);
 
   // Expose the instance to the widget header's actions (outside this provider).
   useEffect(() => {
@@ -294,7 +333,7 @@ const WorkflowFlow = () => {
   );
 
   const onEdgesChange = useCallback(
-    (changes: EdgeChange<FlowEdge>[]) => {
+    (changes: EdgeChange<WorkflowFlowEdge>[]) => {
       const removedEdgeIds = changes.flatMap((change) => (change.type === 'remove' ? [change.id] : []));
 
       if (removedEdgeIds.length > 0) {
@@ -306,7 +345,7 @@ const WorkflowFlow = () => {
     [dispatch]
   );
 
-  const isValidConnection: IsValidConnection<FlowEdge> = useCallback(
+  const isValidConnection: IsValidConnection<WorkflowFlowEdge> = useCallback(
     (connection) => {
       if (!connection.sourceHandle || !connection.targetHandle) {
         return false;
@@ -363,21 +402,15 @@ const WorkflowFlow = () => {
         return;
       }
 
-      const sourceHandle = connectionState.fromHandle?.id;
-      const sourceNodeId = connectionState.fromHandle?.nodeId ?? connectionState.fromNode?.id;
-
-      if (!sourceHandle || !sourceNodeId || connectionState.fromHandle?.type !== 'source') {
+      if (connectionState.isValid || connectionState.toHandle || connectionState.toNode) {
         return;
       }
 
-      const sourceType = getWorkflowSourceFieldType(
-        projectGraph,
-        templatesSnapshot.templates,
-        sourceNodeId,
-        sourceHandle
-      );
+      const handle = connectionState.fromHandle;
+      const handleId = handle?.id;
+      const nodeId = handle?.nodeId ?? connectionState.fromNode?.id;
 
-      if (!sourceType) {
+      if (!handleId || !nodeId) {
         return;
       }
 
@@ -387,7 +420,36 @@ const WorkflowFlow = () => {
         return;
       }
 
-      setAddNodeOpen(true, flowInstance.screenToFlowPosition(position), { sourceHandle, sourceNodeId, sourceType });
+      if (handle.type === 'source') {
+        const sourceType = getWorkflowSourceFieldType(projectGraph, templatesSnapshot.templates, nodeId, handleId);
+
+        if (sourceType === undefined) {
+          return;
+        }
+
+        setAddNodeOpen(true, flowInstance.screenToFlowPosition(position), {
+          kind: 'source',
+          sourceHandle: handleId,
+          sourceNodeId: nodeId,
+          sourceType,
+        });
+        return;
+      }
+
+      if (handle.type === 'target') {
+        const targetType = getWorkflowTargetFieldType(projectGraph, templatesSnapshot.templates, nodeId, handleId);
+
+        if (targetType === undefined) {
+          return;
+        }
+
+        setAddNodeOpen(true, flowInstance.screenToFlowPosition(position), {
+          kind: 'target',
+          targetHandle: handleId,
+          targetNodeId: nodeId,
+          targetType,
+        });
+      }
     },
     [flowInstance, projectGraph, templatesSnapshot.templates]
   );
@@ -464,7 +526,7 @@ const WorkflowFlow = () => {
   );
 
   const onEdgeClick = useCallback(
-    (_: ReactMouseEvent, edge: FlowEdge) => {
+    (_: ReactMouseEvent, edge: WorkflowFlowEdge) => {
       if (tool === 'eraser') {
         eraseElements({ edgeIds: [edge.id], nodeIds: [] });
       }
@@ -473,14 +535,35 @@ const WorkflowFlow = () => {
   );
 
   const onSelectionChange = useCallback(
-    ({ nodes }: { nodes: WorkflowFlowNode[] }) => reportNodeSelection(nodes.map((node) => node.id)),
-    []
+    ({ nodes }: { nodes: WorkflowFlowNode[] }) => {
+      const nodeIds = nodes.map((node) => node.id);
+
+      setFlowEdges((current) =>
+        toFlowEdges(projectGraph, current, edgeType, getSelectedNodeIdSet(nodes), invocationTemplates)
+      );
+      reportNodeSelection(nodeIds);
+    },
+    [edgeType, invocationTemplates, projectGraph]
   );
+
+  const onNodeMouseEnter = useCallback((_: ReactMouseEvent, node: WorkflowFlowNode) => {
+    reportNodeHover(node.id);
+  }, []);
+
+  const onNodeMouseLeave = useCallback((_: ReactMouseEvent, node: WorkflowFlowNode) => {
+    if (workflowSelectionStore.getSnapshot().hoveredNodeId === node.id) {
+      reportNodeHover(null);
+    }
+  }, []);
 
   const editorCss = useMemo(
     () => ({
       ...flowThemeCss,
       '& .react-flow__node': { opacity: nodeOpacity },
+      '& .react-flow__edge.workflow-selected-node-edge .react-flow__edge-path': {
+        animation: 'dashdraw 0.5s linear infinite',
+        strokeDasharray: '5',
+      },
       ...(tool === 'eraser'
         ? { '& .react-flow__edge, & .react-flow__node, & .react-flow__pane': { cursor: 'crosshair' } }
         : {}),
@@ -500,12 +583,14 @@ const WorkflowFlow = () => {
       onKeyDown={onEditorKeyDown}
       {...pointerToolHandlers}
     >
-      <ReactFlow
+      <ReactFlow<WorkflowFlowNode, WorkflowFlowEdge>
         colorMode={getFlowColorMode(themeId)}
-        connectionLineType={edgeType === 'straight' ? ConnectionLineType.Straight : ConnectionLineType.Bezier}
+        connectionLineType={edgeType === 'step' ? ConnectionLineType.Step : ConnectionLineType.Bezier}
         defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
         deleteKeyCode={DELETE_KEY_CODES}
+        elevateEdgesOnSelect
         edges={flowEdges}
+        edgeTypes={edgeTypes}
         fitView
         isValidConnection={isValidConnection}
         maxZoom={2}
@@ -526,6 +611,8 @@ const WorkflowFlow = () => {
         onInit={setFlowInstance}
         onNodeClick={onNodeClick}
         onNodeContextMenu={onNodeContextMenu}
+        onNodeMouseEnter={onNodeMouseEnter}
+        onNodeMouseLeave={onNodeMouseLeave}
         onNodesChange={onNodesChange}
         onPaneContextMenu={onPaneContextMenu}
         onSelectionChange={onSelectionChange}

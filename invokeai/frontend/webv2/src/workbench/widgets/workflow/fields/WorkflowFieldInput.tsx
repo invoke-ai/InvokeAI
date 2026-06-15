@@ -17,10 +17,14 @@ import { useEffect, useState, type ChangeEvent } from 'react';
  */
 
 export interface WorkflowFieldInputProps {
+  id?: string;
+  invalid?: boolean;
   template: FieldInputTemplate;
   value: unknown;
   onChange: (value: unknown) => void;
 }
+
+const invalidProps = (invalid: boolean | undefined) => (invalid ? { 'aria-invalid': true } : {});
 
 const toFiniteNumber = (raw: string): number | null => {
   if (raw.trim() === '') {
@@ -32,7 +36,7 @@ const toFiniteNumber = (raw: string): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-const StringInput = ({ onChange, template, value }: WorkflowFieldInputProps) => {
+const StringInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => {
   const text = typeof value === 'string' ? value : '';
 
   if (template.uiComponent === 'textarea') {
@@ -41,10 +45,13 @@ const StringInput = ({ onChange, template, value }: WorkflowFieldInputProps) => 
         aria-label={template.title}
         className="nodrag nowheel"
         fontFamily="mono"
+        id={id ? `${id}-textarea` : undefined}
         minH="4.5rem"
         resize="vertical"
         size="xs"
         value={text}
+        w="full"
+        {...invalidProps(invalid)}
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange(event.currentTarget.value)}
       />
     );
@@ -54,14 +61,17 @@ const StringInput = ({ onChange, template, value }: WorkflowFieldInputProps) => 
     <Input
       aria-label={template.title}
       className="nodrag"
+      id={id ? `${id}-input` : undefined}
       size="xs"
       value={text}
+      w="full"
+      {...invalidProps(invalid)}
       onChange={(event: ChangeEvent<HTMLInputElement>) => onChange(event.currentTarget.value)}
     />
   );
 };
 
-const NumberInput = ({ onChange, template, value }: WorkflowFieldInputProps) => {
+const NumberInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => {
   const isInteger = template.type.name === 'IntegerField';
   const numericValue = typeof value === 'number' && Number.isFinite(value) ? value : '';
   const min = template.minimum ?? template.exclusiveMinimum ?? undefined;
@@ -71,12 +81,15 @@ const NumberInput = ({ onChange, template, value }: WorkflowFieldInputProps) => 
     <Input
       aria-label={template.title}
       className="nodrag"
+      id={id ? `${id}-number-input` : undefined}
       max={max !== undefined ? String(max) : undefined}
       min={min !== undefined ? String(min) : undefined}
       size="xs"
       step={template.multipleOf !== null ? String(template.multipleOf) : isInteger ? '1' : 'any'}
       type="number"
       value={numericValue}
+      w="full"
+      {...invalidProps(invalid)}
       onChange={(event: ChangeEvent<HTMLInputElement>) => {
         const parsed = toFiniteNumber(event.currentTarget.value);
 
@@ -88,14 +101,19 @@ const NumberInput = ({ onChange, template, value }: WorkflowFieldInputProps) => 
   );
 };
 
-const BooleanInput = ({ onChange, template, value }: WorkflowFieldInputProps) => (
+const BooleanInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => (
   <Switch.Root
     checked={value === true}
     className="nodrag"
+    invalid={invalid}
     size="sm"
     onCheckedChange={(event) => onChange(event.checked)}
   >
-    <Switch.HiddenInput aria-label={template.title} />
+    <Switch.HiddenInput
+      aria-label={template.title}
+      id={id ? `${id}-switch-input` : undefined}
+      {...invalidProps(invalid)}
+    />
     <Switch.Control _checked={{ bg: 'accent.solid' }}>
       <Switch.Thumb />
     </Switch.Control>
@@ -103,19 +121,24 @@ const BooleanInput = ({ onChange, template, value }: WorkflowFieldInputProps) =>
 );
 
 const SelectInput = ({
+  id,
+  invalid,
   onChange,
   options,
   title,
   value,
 }: {
+  id?: string;
   onChange: (value: string) => void;
+  invalid?: boolean;
   options: { label: string; value: string }[];
   title: string;
   value: unknown;
 }) => (
-  <NativeSelect.Root className="nodrag" size="xs">
+  <NativeSelect.Root className="nodrag" invalid={invalid} size="xs" w="full">
     <NativeSelect.Field
       aria-label={title}
+      id={id ? `${id}-select` : undefined}
       value={typeof value === 'string' ? value : ''}
       onChange={(event: ChangeEvent<HTMLSelectElement>) => onChange(event.currentTarget.value)}
     >
@@ -132,8 +155,10 @@ const SelectInput = ({
   </NativeSelect.Root>
 );
 
-const EnumInput = ({ onChange, template, value }: WorkflowFieldInputProps) => (
+const EnumInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => (
   <SelectInput
+    id={id}
+    invalid={invalid}
     options={(template.options ?? []).map((option) => ({
       label: template.uiChoiceLabels?.[option] ?? option,
       value: option,
@@ -146,7 +171,7 @@ const EnumInput = ({ onChange, template, value }: WorkflowFieldInputProps) => (
 
 const DEFAULT_MODEL_TYPES: ModelTaxonomyType[] = ['main', 'vae', 'lora', 'controlnet', 't2i_adapter', 'ip_adapter'];
 
-const ModelIdentifierInput = ({ onChange, template, value }: WorkflowFieldInputProps) => {
+const ModelIdentifierInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => {
   const selectedKey =
     typeof (value as { key?: unknown } | null)?.key === 'string' ? (value as { key: string }).key : null;
   const modelTypes = (template.uiModelType as ModelTaxonomyType[] | null) ?? DEFAULT_MODEL_TYPES;
@@ -155,6 +180,8 @@ const ModelIdentifierInput = ({ onChange, template, value }: WorkflowFieldInputP
   return (
     <ModelSelect
       filter={allowedBases ? (model: ModelConfig) => allowedBases.includes(model.base) : undefined}
+      id={id ? `${id}-model-combobox` : undefined}
+      invalid={invalid}
       modelTypes={modelTypes}
       size="xs"
       value={selectedKey}
@@ -167,11 +194,18 @@ const ModelIdentifierInput = ({ onChange, template, value }: WorkflowFieldInputP
   );
 };
 
-const SchedulerInput = ({ onChange, template, value }: WorkflowFieldInputProps) => (
-  <SelectInput options={SCHEDULER_OPTIONS} title={template.title} value={value} onChange={onChange} />
+const SchedulerInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => (
+  <SelectInput
+    id={id}
+    invalid={invalid}
+    options={SCHEDULER_OPTIONS}
+    title={template.title}
+    value={value}
+    onChange={onChange}
+  />
 );
 
-const BoardInput = ({ onChange, template, value }: WorkflowFieldInputProps) => {
+const BoardInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => {
   const [boards, setBoards] = useState<GalleryBoard[]>([]);
 
   useEffect(() => {
@@ -201,6 +235,8 @@ const BoardInput = ({ onChange, template, value }: WorkflowFieldInputProps) => {
 
   return (
     <SelectInput
+      id={id}
+      invalid={invalid}
       options={[
         { label: 'Auto', value: 'auto' },
         { label: 'None', value: 'none' },
@@ -213,7 +249,7 @@ const BoardInput = ({ onChange, template, value }: WorkflowFieldInputProps) => {
   );
 };
 
-const ImageInput = ({ onChange, value }: WorkflowFieldInputProps) => {
+const ImageInput = ({ invalid, onChange, value }: WorkflowFieldInputProps) => {
   const gallerySelection = useActiveProjectSelector(
     (project) => project.widgetStates.gallery.values.selectedImage as GeneratedImageContract | null | undefined
   );
@@ -222,7 +258,14 @@ const ImageInput = ({ onChange, value }: WorkflowFieldInputProps) => {
       ? (value as { image_name: string }).image_name
       : null;
   return (
-    <HStack gap="1.5" minW="0">
+    <HStack
+      boxShadow={invalid ? '0 0 0 1px {colors.red.solid}' : undefined}
+      gap="1.5"
+      minW="0"
+      rounded="sm"
+      w="full"
+      {...(invalid ? { 'aria-invalid': true } : {})}
+    >
       {imageName ? (
         <Text color="fg.muted" flex="1" fontSize="2xs" minW="0" title={imageName} truncate>
           {imageName}
@@ -257,22 +300,25 @@ const ImageInput = ({ onChange, value }: WorkflowFieldInputProps) => {
 
 const COLOR_CHANNELS = ['r', 'g', 'b', 'a'] as const;
 
-const ColorInput = ({ onChange, value }: WorkflowFieldInputProps) => {
+const ColorInput = ({ id, invalid, onChange, value }: WorkflowFieldInputProps) => {
   const color = (typeof value === 'object' && value !== null ? value : {}) as Partial<Record<string, number>>;
 
   return (
-    <HStack gap="1">
+    <HStack gap="1" w="full">
       {COLOR_CHANNELS.map((channel) => (
         <Input
           key={channel}
           aria-label={`Color ${channel.toUpperCase()}`}
           className="nodrag"
+          id={id ? `${id}-color-${channel}-input` : undefined}
           max="255"
           min="0"
           placeholder={channel.toUpperCase()}
           size="xs"
           type="number"
           value={typeof color[channel] === 'number' ? color[channel] : ''}
+          w="full"
+          {...invalidProps(invalid)}
           onChange={(event: ChangeEvent<HTMLInputElement>) => {
             const parsed = toFiniteNumber(event.currentTarget.value);
 

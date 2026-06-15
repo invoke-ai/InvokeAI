@@ -11,6 +11,9 @@ import type {
 
 import {
   getCompatibleInputTemplate,
+  getCompatibleOutputTemplate,
+  getWorkflowSourceFieldType,
+  getWorkflowTargetFieldType,
   hasAnyCycle,
   validateConnection,
   validateConnectionTypes,
@@ -197,6 +200,148 @@ describe('getCompatibleInputTemplate', () => {
 
     expect(getCompatibleInputTemplate(template, single('IntegerField'))?.name).toBe('early');
     expect(getCompatibleInputTemplate(template, single('ImageField'))).toBeNull();
+    expect(getCompatibleInputTemplate(template, null)?.name).toBe('early');
+  });
+});
+
+describe('getWorkflowSourceFieldType', () => {
+  it('resolves typed and untyped connector outputs', () => {
+    const document: Pick<ProjectGraphState, 'edges' | 'nodes'> = {
+      edges: [],
+      nodes: [makeConnector('connector')],
+    };
+
+    expect(getWorkflowSourceFieldType(document, templates, 'connector', 'out')).toBeNull();
+
+    const upstreamDocument: Pick<ProjectGraphState, 'edges' | 'nodes'> = {
+      edges: [
+        {
+          id: 'e1',
+          source: 'n1',
+          sourceHandle: 'value',
+          target: 'connector',
+          targetHandle: 'in',
+          type: 'default',
+        },
+      ],
+      nodes: [makeNode('n1', 'number'), makeConnector('connector')],
+    };
+
+    expect(getWorkflowSourceFieldType(upstreamDocument, templates, 'connector', 'out')).toEqual(single('IntegerField'));
+  });
+
+  it('resolves connector outputs from downstream targets when no input is connected', () => {
+    const document: Pick<ProjectGraphState, 'edges' | 'nodes'> = {
+      edges: [
+        {
+          id: 'connector-out',
+          source: 'connector',
+          sourceHandle: 'out',
+          target: 'n1',
+          targetHandle: 'value',
+          type: 'default',
+        },
+      ],
+      nodes: [makeConnector('connector'), makeNode('n1', 'number')],
+    };
+
+    expect(getWorkflowSourceFieldType(document, templates, 'connector', 'out')).toEqual(single('IntegerField'));
+  });
+
+  it('leaves fan-out connector outputs untyped when downstream targets disagree', () => {
+    const mixedTemplates: InvocationTemplates = {
+      ...templates,
+      text: {
+        ...templates.number,
+        inputs: {
+          value: { ...templates.number.inputs.value, type: single('StringField') },
+        },
+        outputs: {
+          value: { ...templates.number.outputs.value, type: single('StringField') },
+        },
+        type: 'text',
+      },
+    };
+    const document: Pick<ProjectGraphState, 'edges' | 'nodes'> = {
+      edges: [
+        {
+          id: 'connector-out-string',
+          source: 'connector',
+          sourceHandle: 'out',
+          target: 'text-1',
+          targetHandle: 'value',
+          type: 'default',
+        },
+        {
+          id: 'connector-out-number',
+          source: 'connector',
+          sourceHandle: 'out',
+          target: 'number-1',
+          targetHandle: 'value',
+          type: 'default',
+        },
+      ],
+      nodes: [makeConnector('connector'), makeNode('text-1', 'text'), makeNode('number-1', 'number')],
+    };
+
+    expect(getWorkflowSourceFieldType(document, mixedTemplates, 'connector', 'out')).toBeNull();
+  });
+});
+
+describe('getCompatibleOutputTemplate', () => {
+  it('returns the first output compatible with the target type', () => {
+    expect(getCompatibleOutputTemplate(templates.number, single('IntegerField'))?.name).toBe('value');
+    expect(getCompatibleOutputTemplate(templates.number, single('ImageField'))).toBeNull();
+  });
+
+  it('accepts any output for untyped connector targets', () => {
+    expect(getCompatibleOutputTemplate(templates.number, null)?.name).toBe('value');
+    expect(getCompatibleOutputTemplate(templates.collect, null)).toBeNull();
+  });
+});
+
+describe('getWorkflowTargetFieldType', () => {
+  it('resolves connectable invocation inputs and connector inputs', () => {
+    const document: Pick<ProjectGraphState, 'edges' | 'nodes'> = {
+      edges: [],
+      nodes: [makeNode('n1', 'number'), makeConnector('connector')],
+    };
+
+    expect(getWorkflowTargetFieldType(document, templates, 'n1', 'value')).toEqual(single('IntegerField'));
+    expect(getWorkflowTargetFieldType(document, templates, 'connector', 'in')).toBeNull();
+  });
+
+  it('rejects direct-only inputs', () => {
+    const directTemplates: InvocationTemplates = {
+      number: {
+        ...templates.number,
+        inputs: {
+          value: { ...templates.number.inputs.value, input: 'direct' },
+        },
+      },
+    };
+
+    expect(
+      getWorkflowTargetFieldType({ edges: [], nodes: [makeNode('n1', 'number')] }, directTemplates, 'n1', 'value')
+    ).toBe(undefined);
+  });
+
+  it('resolves connector inputs from downstream targets', () => {
+    const document: Pick<ProjectGraphState, 'edges' | 'nodes'> = {
+      edges: [
+        {
+          id: 'connector-out',
+          source: 'connector',
+          sourceHandle: 'out',
+          target: 'n1',
+          targetHandle: 'value',
+          type: 'default',
+        },
+      ],
+      nodes: [makeConnector('connector'), makeNode('n1', 'number')],
+    };
+
+    expect(getWorkflowTargetFieldType(document, templates, 'connector', 'in')).toEqual(single('IntegerField'));
   });
 });
 
@@ -335,5 +480,92 @@ describe('validateConnection', () => {
         templates
       )
     ).toMatch(/already has an input/);
+  });
+
+  it('rejects connector input sources incompatible with an existing downstream target', () => {
+    const stringTemplates: InvocationTemplates = {
+      ...templates,
+      text: {
+        ...templates.number,
+        inputs: {
+          value: { ...templates.number.inputs.value, type: single('StringField') },
+        },
+        outputs: {
+          value: { ...templates.number.outputs.value, type: single('StringField') },
+        },
+        type: 'text',
+      },
+    };
+    const connectorDocument: Pick<ProjectGraphState, 'edges' | 'nodes'> = {
+      edges: [
+        {
+          id: 'connector-out',
+          source: 'connector-1',
+          sourceHandle: 'out',
+          target: 'n1',
+          targetHandle: 'value',
+          type: 'default',
+        },
+      ],
+      nodes: [makeNode('n1', 'number'), makeNode('text-1', 'text'), makeConnector('connector-1')],
+    };
+
+    expect(
+      validateConnection(
+        { sourceHandle: 'value', sourceNodeId: 'text-1', targetHandle: 'in', targetNodeId: 'connector-1' },
+        connectorDocument,
+        stringTemplates
+      )
+    ).toMatch(/StringField cannot connect to IntegerField/);
+  });
+
+  it('rejects connector input sources incompatible with any downstream fan-out target', () => {
+    const stringTemplates: InvocationTemplates = {
+      ...templates,
+      text: {
+        ...templates.number,
+        inputs: {
+          value: { ...templates.number.inputs.value, type: single('StringField') },
+        },
+        outputs: {
+          value: { ...templates.number.outputs.value, type: single('StringField') },
+        },
+        type: 'text',
+      },
+    };
+    const connectorDocument: Pick<ProjectGraphState, 'edges' | 'nodes'> = {
+      edges: [
+        {
+          id: 'connector-out-string',
+          source: 'connector-1',
+          sourceHandle: 'out',
+          target: 'text-target',
+          targetHandle: 'value',
+          type: 'default',
+        },
+        {
+          id: 'connector-out-number',
+          source: 'connector-1',
+          sourceHandle: 'out',
+          target: 'number-target',
+          targetHandle: 'value',
+          type: 'default',
+        },
+      ],
+      nodes: [
+        makeNode('number-target', 'number'),
+        makeNode('text-source', 'text'),
+        makeNode('text-target', 'text'),
+        makeConnector('connector-1'),
+      ],
+    };
+
+    expect(
+      validateConnection(
+        { sourceHandle: 'value', sourceNodeId: 'text-source', targetHandle: 'in', targetNodeId: 'connector-1' },
+        connectorDocument,
+        stringTemplates
+      )
+    ).toMatch(/StringField cannot connect to IntegerField/);
   });
 });

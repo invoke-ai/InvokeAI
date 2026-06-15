@@ -18,7 +18,9 @@ const NotesFlowNodeComponent = ({ data, selected }: NodeProps<NotesFlowNodeType>
       p="2"
       rounded="lg"
       shadow={selected ? 'md' : 'sm'}
+      transition="border-color 0.12s ease, box-shadow 0.12s ease"
       w="16rem"
+      _hover={selected ? undefined : { borderColor: 'brand.solid', shadow: 'md' }}
     >
       <Input
         aria-label="Note title"

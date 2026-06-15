@@ -11,6 +11,12 @@ export interface ResolvedConnectorSource {
   type: FieldType | null;
 }
 
+export interface ResolvedConnectorTarget {
+  fieldName: string;
+  nodeId: string;
+  type: FieldType | null;
+}
+
 export interface ResolvedWorkflowEdge extends WorkflowEdge {
   source: string;
   sourceHandle: string;
@@ -66,6 +72,59 @@ export const resolveConnectorSource = (
     }
 
     return null;
+  };
+
+  return resolve(connectorId);
+};
+
+export const resolveConnectorTarget = (
+  connectorId: string,
+  nodes: WorkflowNode[],
+  edges: WorkflowEdge[],
+  templates?: InvocationTemplates
+): ResolvedConnectorTarget | null => {
+  return resolveConnectorTargets(connectorId, nodes, edges, templates)[0] ?? null;
+};
+
+export const resolveConnectorTargets = (
+  connectorId: string,
+  nodes: WorkflowNode[],
+  edges: WorkflowEdge[],
+  templates?: InvocationTemplates
+): ResolvedConnectorTarget[] => {
+  const visited = new Set<string>();
+
+  const resolve = (nodeId: string): ResolvedConnectorTarget[] => {
+    if (visited.has(nodeId)) {
+      return [];
+    }
+
+    visited.add(nodeId);
+
+    const targets: ResolvedConnectorTarget[] = [];
+
+    for (const outboundEdge of getConnectorOutputEdges(nodeId, edges)) {
+      const targetNode = nodes.find((node) => node.id === outboundEdge.target);
+
+      if (!targetNode) {
+        continue;
+      }
+
+      if (isInvocationNode(targetNode)) {
+        targets.push({
+          fieldName: outboundEdge.targetHandle,
+          nodeId: targetNode.id,
+          type: templates?.[targetNode.data.type]?.inputs[outboundEdge.targetHandle]?.type ?? null,
+        });
+        continue;
+      }
+
+      if (isConnectorNode(targetNode) && outboundEdge.targetHandle === CONNECTOR_INPUT_HANDLE) {
+        targets.push(...resolve(targetNode.id));
+      }
+    }
+
+    return targets;
   };
 
   return resolve(connectorId);
