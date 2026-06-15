@@ -72,14 +72,6 @@ export const getImageContextMenuRecallRequestKey = (image: GalleryImage | null, 
   return `${image.imageName}:${image.width}:${image.height}`;
 };
 
-const areRecallCapabilitiesEqual = (left: ImageRecallCapabilities, right: ImageRecallCapabilities): boolean =>
-  left.all === right.all &&
-  left.clipSkip === right.clipSkip &&
-  left.dimensions === right.dimensions &&
-  left.prompts === right.prompts &&
-  left.remix === right.remix &&
-  left.seed === right.seed;
-
 /**
  * Shared right-click menu for backend images, usable from any widget (gallery
  * grid, preview, ...). Anchored to the cursor through a virtual rect, so it
@@ -96,6 +88,41 @@ export const ImageContextMenu = ({
   target: ImageContextMenuTarget | null;
   onClose: () => void;
 }) => {
+  const images = getImageContextMenuImages(target);
+  const image = images[0] ?? null;
+
+  if (!target || !image) {
+    return null;
+  }
+
+  return (
+    <ImageContextMenuContent
+      key={`${image.imageName}:${images.length}`}
+      actions={actions}
+      boards={boards}
+      image={image}
+      images={images}
+      target={target}
+      onClose={onClose}
+    />
+  );
+};
+
+const ImageContextMenuContent = ({
+  actions,
+  boards,
+  image,
+  images,
+  target,
+  onClose,
+}: {
+  actions: ImageActions;
+  boards: GalleryBoard[];
+  image: GalleryImage;
+  images: GalleryImage[];
+  target: ImageContextMenuTarget;
+  onClose: () => void;
+}) => {
   const { confirmImageDeletion } = useWorkbenchPreferences();
   const [pendingDeletion, setPendingDeletion] = useState<string[] | null>(null);
   const [recallCapabilities, setRecallCapabilities] = useState<ImageRecallCapabilities>(
@@ -107,11 +134,8 @@ export const ImageContextMenu = ({
 
   targetRef.current = target;
 
-  const images = getImageContextMenuImages(target);
-  const image = images[0] ?? null;
   const isBulk = images.length > 1;
   const imageNames = images.map((candidate) => candidate.imageName);
-  const menuTarget = image ? target : null;
   const recallRequestKey = getImageContextMenuRecallRequestKey(image, isBulk);
   const getImageRecallCapabilities = actions.getImageRecallCapabilities;
 
@@ -119,10 +143,6 @@ export const ImageContextMenu = ({
 
   useEffect(() => {
     if (!recallRequestKey) {
-      setRecallCapabilities((current) =>
-        areRecallCapabilitiesEqual(current, EMPTY_IMAGE_RECALL_CAPABILITIES) ? current : EMPTY_IMAGE_RECALL_CAPABILITIES
-      );
-      setIsLoadingRecallCapabilities((current) => (current ? false : current));
       return;
     }
 
@@ -166,58 +186,55 @@ export const ImageContextMenu = ({
 
   return (
     <>
-      {menuTarget && image ? (
-        <Menu.Root
-          key={`${image.imageName}:${images.length}`}
-          lazyMount
-          open
-          positioning={{
-            getAnchorRect: () => {
-              const currentTarget = targetRef.current ?? menuTarget;
+      <Menu.Root
+        lazyMount
+        open
+        positioning={{
+          getAnchorRect: () => {
+            const currentTarget = targetRef.current;
 
-              return { height: 1, width: 1, x: currentTarget.x, y: currentTarget.y };
-            },
-            placement: 'bottom-start',
-          }}
-          unmountOnExit
-          onOpenChange={(event) => {
-            if (!event.open) {
-              onClose();
-            }
-          }}
-        >
-          <Portal>
-            <Menu.Positioner>
-              <MenuContent
-                {...MENU_CONTENT_PROPS}
-                maxH="min(28rem, calc(100vh - 2rem))"
-                minW="16rem"
-                overflowY="auto"
-                py="1"
-              >
-                {isBulk ? (
-                  <BulkMenuItems
-                    actions={actions}
-                    boards={boards}
-                    imageNames={imageNames}
-                    images={images}
-                    onRequestDeletion={requestDeletion}
-                  />
-                ) : (
-                  <SingleImageMenuItems
-                    actions={actions}
-                    boards={boards}
-                    image={image}
-                    isLoadingRecallCapabilities={isLoadingRecallCapabilities}
-                    onRequestDeletion={requestDeletion}
-                    recallCapabilities={recallCapabilities}
-                  />
-                )}
-              </MenuContent>
-            </Menu.Positioner>
-          </Portal>
-        </Menu.Root>
-      ) : null}
+            return { height: 1, width: 1, x: currentTarget.x, y: currentTarget.y };
+          },
+          placement: 'bottom-start',
+        }}
+        unmountOnExit
+        onOpenChange={(event) => {
+          if (!event.open) {
+            onClose();
+          }
+        }}
+      >
+        <Portal>
+          <Menu.Positioner>
+            <MenuContent
+              {...MENU_CONTENT_PROPS}
+              maxH="min(28rem, calc(100vh - 2rem))"
+              minW="16rem"
+              overflowY="auto"
+              py="1"
+            >
+              {isBulk ? (
+                <BulkMenuItems
+                  actions={actions}
+                  boards={boards}
+                  imageNames={imageNames}
+                  images={images}
+                  onRequestDeletion={requestDeletion}
+                />
+              ) : (
+                <SingleImageMenuItems
+                  actions={actions}
+                  boards={boards}
+                  image={image}
+                  isLoadingRecallCapabilities={isLoadingRecallCapabilities}
+                  onRequestDeletion={requestDeletion}
+                  recallCapabilities={recallCapabilities}
+                />
+              )}
+            </MenuContent>
+          </Menu.Positioner>
+        </Portal>
+      </Menu.Root>
       <Dialog.Root
         open={pendingDeletion !== null}
         role="alertdialog"
