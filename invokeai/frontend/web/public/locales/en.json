@@ -227,6 +227,7 @@
         "direction": "Direction",
         "ipAdapter": "IP Adapter",
         "t2iAdapter": "T2I Adapter",
+        "prompt": "Prompt",
         "positivePrompt": "Positive Prompt",
         "negativePrompt": "Negative Prompt",
         "removeNegativePrompt": "Remove Negative Prompt",
