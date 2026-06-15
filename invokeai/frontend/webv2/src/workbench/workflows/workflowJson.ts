@@ -14,8 +14,7 @@ import type {
  * Import/export between the project graph document and the legacy WorkflowV3
  * JSON format — the format used by workflow files, image-embedded workflows,
  * and the backend workflow library. Parsing is tolerant: recoverable problems
- * (unknown elements, dangling edges, connector nodes) become warnings instead
- * of failures.
+ * (unknown elements and dangling edges) become warnings instead of failures.
  */
 
 const zXYPosition = z.object({ x: z.number().catch(0), y: z.number().catch(0) }).catch({ x: 0, y: 0 });
@@ -64,6 +63,11 @@ const zCurrentImageNode = z.object({
 });
 
 const zConnectorNode = z.object({
+  data: z
+    .looseObject({
+      label: z.string().catch('Connector'),
+    })
+    .catch({ label: 'Connector' }),
   id: z.string().min(1),
   position: zXYPosition,
   type: z.literal('connector'),
@@ -148,64 +152,6 @@ export interface ParsedWorkflow {
   warnings: string[];
 }
 
-/**
- * Resolves edges that pass through legacy connector nodes by walking each
- * connector chain back to its real invocation source.
- */
-const resolveConnectorEdges = (
-  edges: Array<z.infer<typeof zDefaultEdge>>,
-  connectorIds: Set<string>
-): { resolved: Array<z.infer<typeof zDefaultEdge>>; dropped: number } => {
-  if (connectorIds.size === 0) {
-    return { dropped: 0, resolved: edges };
-  }
-
-  const findRealSource = (nodeId: string, visited: Set<string>): { source: string; sourceHandle: string } | null => {
-    if (visited.has(nodeId)) {
-      return null;
-    }
-
-    visited.add(nodeId);
-
-    const inboundEdge = edges.find((edge) => edge.target === nodeId);
-
-    if (!inboundEdge) {
-      return null;
-    }
-
-    if (!connectorIds.has(inboundEdge.source)) {
-      return { source: inboundEdge.source, sourceHandle: inboundEdge.sourceHandle };
-    }
-
-    return findRealSource(inboundEdge.source, visited);
-  };
-
-  let dropped = 0;
-  const resolved: Array<z.infer<typeof zDefaultEdge>> = [];
-
-  for (const edge of edges) {
-    if (connectorIds.has(edge.target)) {
-      continue; // Edges into connectors are consumed by the resolution walk.
-    }
-
-    if (!connectorIds.has(edge.source)) {
-      resolved.push(edge);
-      continue;
-    }
-
-    const realSource = findRealSource(edge.source, new Set());
-
-    if (!realSource) {
-      dropped += 1;
-      continue;
-    }
-
-    resolved.push({ ...edge, source: realSource.source, sourceHandle: realSource.sourceHandle });
-  }
-
-  return { dropped, resolved };
-};
-
 const parseForm = (
   rawForm: z.infer<typeof zWorkflowJson>['form'],
   exposedFields: Array<z.infer<typeof zFieldIdentifier>>,
@@ -286,7 +232,6 @@ export const parseWorkflowJson = (raw: unknown): ParsedWorkflow => {
 
   const warnings: string[] = [];
   const nodes: WorkflowNode[] = [];
-  const connectorIds = new Set<string>();
 
   for (const rawNode of parsed.data.nodes) {
     const nodeResult = zAnyNode.safeParse(rawNode);
@@ -299,7 +244,12 @@ export const parseWorkflowJson = (raw: unknown): ParsedWorkflow => {
     const node = nodeResult.data;
 
     if (node.type === 'connector') {
-      connectorIds.add(node.id);
+      nodes.push({
+        data: { label: node.data.label },
+        id: node.id,
+        position: node.position,
+        type: 'connector',
+      });
       continue;
     }
 
@@ -352,25 +302,16 @@ export const parseWorkflowJson = (raw: unknown): ParsedWorkflow => {
     });
   }
 
-  if (connectorIds.size > 0) {
-    warnings.push(`Flattened ${connectorIds.size} connector node(s); connectors are not part of this editor.`);
-  }
-
   const rawEdges = parsed.data.edges.flatMap((rawEdge) => {
     const edgeResult = zDefaultEdge.safeParse(rawEdge);
 
     return edgeResult.success ? [edgeResult.data] : [];
   });
-  const { dropped, resolved } = resolveConnectorEdges(rawEdges, connectorIds);
-
-  if (dropped > 0) {
-    warnings.push(`Dropped ${dropped} connection(s) that could not be resolved through connectors.`);
-  }
 
   const nodeIds = new Set(nodes.map((node) => node.id));
   const edges: WorkflowEdge[] = [];
 
-  for (const edge of resolved) {
+  for (const edge of rawEdges) {
     if (!nodeIds.has(edge.source) || !nodeIds.has(edge.target)) {
       warnings.push('Dropped a connection that referenced a missing node.');
       continue;
@@ -421,19 +362,26 @@ export const serializeWorkflowJson = (document: ProjectGraphState): Record<strin
   meta: { category: 'user', version: '3.0.0' },
   name: document.name,
   nodes: document.nodes.map((node) =>
-    node.type === 'notes' || node.type === 'current_image'
+    node.type === 'connector'
       ? {
-          data: { ...node.data, id: node.id, isOpen: true },
+          data: { ...node.data, id: node.id, isOpen: true, type: 'connector' },
           id: node.id,
           position: { ...node.position },
           type: node.type,
         }
-      : {
-          data: { ...structuredClone(node.data), id: node.id },
-          id: node.id,
-          position: { ...node.position },
-          type: node.type,
-        }
+      : node.type === 'notes' || node.type === 'current_image'
+        ? {
+            data: { ...node.data, id: node.id, isOpen: true },
+            id: node.id,
+            position: { ...node.position },
+            type: node.type,
+          }
+        : {
+            data: { ...structuredClone(node.data), id: node.id },
+            id: node.id,
+            position: { ...node.position },
+            type: node.type,
+          }
   ),
   notes: document.notes,
   tags: document.tags,

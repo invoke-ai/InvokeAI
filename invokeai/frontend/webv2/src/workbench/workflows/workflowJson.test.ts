@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildCurrentImageNode,
+  buildConnectorNode,
   buildInvocationNode,
   buildNotesNode,
   createProjectGraph,
@@ -96,21 +97,27 @@ describe('workflow JSON round-trip', () => {
     expect(serialized).toHaveProperty('form');
   });
 
-  it('round-trips notes and current_image UI nodes', () => {
+  it('round-trips notes, current_image, and connector UI nodes', () => {
     let doc = createProjectGraph('ui-nodes');
 
     doc = projectGraphReducer(doc, { node: buildNotesNode({ x: 1, y: 2 }), type: 'addNode' });
     doc = projectGraphReducer(doc, { node: buildCurrentImageNode({ x: 3, y: 4 }), type: 'addNode' });
+    doc = projectGraphReducer(doc, { node: buildConnectorNode({ x: 5, y: 6 }), type: 'addNode' });
 
     const { document: parsed, warnings } = parseWorkflowJson(serializeWorkflowJson(doc));
 
     expect(warnings).toEqual([]);
-    expect(parsed.nodes.map((node) => node.type).sort()).toEqual(['current_image', 'notes']);
+    expect(parsed.nodes.map((node) => node.type).sort()).toEqual(['connector', 'current_image', 'notes']);
 
     const currentImage = parsed.nodes.find((node) => node.type === 'current_image');
 
     expect(currentImage?.position).toEqual({ x: 3, y: 4 });
     expect(currentImage?.type === 'current_image' && currentImage.data.label).toBe('Current Image');
+
+    const connector = parsed.nodes.find((node) => node.type === 'connector');
+
+    expect(connector?.position).toEqual({ x: 5, y: 6 });
+    expect(connector?.type === 'connector' && connector.data.label).toBe('');
   });
 });
 
@@ -142,7 +149,7 @@ describe('parseWorkflowJson tolerance', () => {
     });
   });
 
-  it('flattens connector chains back to their real source', () => {
+  it('preserves connector nodes and edges', () => {
     const { document, warnings } = parseWorkflowJson({
       edges: [
         { id: 'e1', source: 'n1', sourceHandle: 'out', target: 'conn1', targetHandle: 'in', type: 'default' },
@@ -152,14 +159,16 @@ describe('parseWorkflowJson tolerance', () => {
       nodes: [
         { data: { id: 'n1', inputs: {}, type: 'a' }, id: 'n1', position: { x: 0, y: 0 }, type: 'invocation' },
         { data: { id: 'n2', inputs: {}, type: 'b' }, id: 'n2', position: { x: 0, y: 0 }, type: 'invocation' },
-        { id: 'conn1', position: { x: 0, y: 0 }, type: 'connector' },
+        { data: { label: 'Connector' }, id: 'conn1', position: { x: 4, y: 5 }, type: 'connector' },
       ],
     });
 
-    expect(warnings.some((warning) => warning.includes('connector'))).toBe(true);
-    expect(document.nodes).toHaveLength(2);
+    expect(warnings).toEqual([]);
+    expect(document.nodes.map((node) => node.type).sort()).toEqual(['connector', 'invocation', 'invocation']);
+    expect(document.nodes.find((node) => node.type === 'connector')?.position).toEqual({ x: 4, y: 5 });
     expect(document.edges).toEqual([
-      { id: 'e2', source: 'n1', sourceHandle: 'out', target: 'n2', targetHandle: 'text', type: 'default' },
+      { id: 'e1', source: 'n1', sourceHandle: 'out', target: 'conn1', targetHandle: 'in', type: 'default' },
+      { id: 'e2', source: 'conn1', sourceHandle: 'out', target: 'n2', targetHandle: 'text', type: 'default' },
     ]);
   });
 

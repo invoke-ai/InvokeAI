@@ -97,11 +97,14 @@ const OutputsTab = ({ template }: { template: InvocationTemplate | undefined }) 
 const InspectorBody = ({ node, tab }: { node: WorkflowNode; tab: InspectorTab }) => {
   const { templates } = useInvocationTemplatesSnapshot();
 
-  if (node.type === 'notes' || node.type === 'current_image') {
+  if (node.type === 'notes' || node.type === 'current_image' || node.type === 'connector') {
+    const typeLabel =
+      node.type === 'notes' ? 'Notes node' : node.type === 'current_image' ? 'Current Image node' : 'Connector node';
+
     return tab === 'data' ? (
       <JsonBlock label="Node data" value={node.data} />
     ) : (
-      <DetailRow label="Type" value={node.type === 'notes' ? 'Notes node' : 'Current Image node'} />
+      <DetailRow label="Type" value={typeLabel} />
     );
   }
 

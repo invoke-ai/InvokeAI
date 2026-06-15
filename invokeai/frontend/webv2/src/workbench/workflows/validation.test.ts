@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
-import type { FieldType, InvocationTemplates, ProjectGraphState, WorkflowEdge, WorkflowInvocationNode } from './types';
-import { hasAnyCycle, validateConnection, validateConnectionTypes, wouldCreateCycle } from './validation';
+import type {
+  FieldType,
+  InvocationTemplates,
+  ProjectGraphState,
+  WorkflowConnectorNode,
+  WorkflowEdge,
+  WorkflowInvocationNode,
+} from './types';
+import {
+  getCompatibleInputTemplate,
+  hasAnyCycle,
+  validateConnection,
+  validateConnectionTypes,
+  wouldCreateCycle,
+} from './validation';
 
 const single = (name: string): FieldType => ({ batch: false, cardinality: 'SINGLE', name });
 const collection = (name: string): FieldType => ({ batch: false, cardinality: 'COLLECTION', name });
@@ -77,6 +90,13 @@ const makeNode = (id: string, type: string): WorkflowInvocationNode => ({
   id,
   position: { x: 0, y: 0 },
   type: 'invocation',
+});
+
+const makeConnector = (id: string): WorkflowConnectorNode => ({
+  data: { label: 'Connector' },
+  id,
+  position: { x: 0, y: 0 },
+  type: 'connector',
 });
 
 const templates: InvocationTemplates = {
@@ -160,6 +180,24 @@ const templates: InvocationTemplates = {
     version: '1.0.0',
   },
 };
+
+describe('getCompatibleInputTemplate', () => {
+  it('returns the first visible connectable input by UI order', () => {
+    const baseInput = templates.number.inputs.value;
+    const template = {
+      ...templates.number,
+      inputs: {
+        direct: { ...baseInput, input: 'direct' as const, name: 'direct', title: 'Direct', uiOrder: 0 },
+        hidden: { ...baseInput, name: 'hidden', title: 'Hidden', uiHidden: true, uiOrder: 1 },
+        late: { ...baseInput, name: 'late', title: 'Late', uiOrder: 3 },
+        early: { ...baseInput, name: 'early', title: 'Early', uiOrder: 2 },
+      },
+    };
+
+    expect(getCompatibleInputTemplate(template, single('IntegerField'))?.name).toBe('early');
+    expect(getCompatibleInputTemplate(template, single('ImageField'))).toBeNull();
+  });
+});
 
 describe('validateConnection', () => {
   const baseDocument: Pick<ProjectGraphState, 'edges' | 'nodes'> = {
@@ -248,5 +286,53 @@ describe('validateConnection', () => {
         templates
       )
     ).toMatch(/cycle/);
+  });
+
+  it('accepts connectors as pass-through routing nodes', () => {
+    const connectorDocument: Pick<ProjectGraphState, 'edges' | 'nodes'> = {
+      edges: [
+        {
+          id: 'connector-in',
+          source: 'n1',
+          sourceHandle: 'value',
+          target: 'connector-1',
+          targetHandle: 'in',
+          type: 'default',
+        },
+      ],
+      nodes: [makeNode('n1', 'number'), makeNode('n2', 'number'), makeConnector('connector-1')],
+    };
+
+    expect(
+      validateConnection(
+        { sourceHandle: 'out', sourceNodeId: 'connector-1', targetHandle: 'value', targetNodeId: 'n2' },
+        connectorDocument,
+        templates
+      )
+    ).toBeNull();
+  });
+
+  it('rejects a second connector input', () => {
+    const connectorDocument: Pick<ProjectGraphState, 'edges' | 'nodes'> = {
+      edges: [
+        {
+          id: 'connector-in',
+          source: 'n1',
+          sourceHandle: 'value',
+          target: 'connector-1',
+          targetHandle: 'in',
+          type: 'default',
+        },
+      ],
+      nodes: [makeNode('n1', 'number'), makeNode('n2', 'number'), makeConnector('connector-1')],
+    };
+
+    expect(
+      validateConnection(
+        { sourceHandle: 'value', sourceNodeId: 'n2', targetHandle: 'in', targetNodeId: 'connector-1' },
+        connectorDocument,
+        templates
+      )
+    ).toMatch(/already has an input/);
   });
 });

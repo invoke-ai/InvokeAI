@@ -120,7 +120,20 @@ export interface WorkflowCurrentImageNode {
   };
 }
 
-export type WorkflowNode = WorkflowInvocationNode | WorkflowNotesNode | WorkflowCurrentImageNode;
+export interface WorkflowConnectorNode {
+  id: string;
+  type: 'connector';
+  position: XYPosition;
+  data: {
+    label: string;
+  };
+}
+
+export type WorkflowNode =
+  | WorkflowInvocationNode
+  | WorkflowNotesNode
+  | WorkflowCurrentImageNode
+  | WorkflowConnectorNode;
 
 export interface WorkflowEdge {
   id: string;
@@ -222,3 +235,5 @@ export const isNotesNode = (node: WorkflowNode): node is WorkflowNotesNode => no
 
 export const isCurrentImageNode = (node: WorkflowNode): node is WorkflowCurrentImageNode =>
   node.type === 'current_image';
+
+export const isConnectorNode = (node: WorkflowNode): node is WorkflowConnectorNode => node.type === 'connector';

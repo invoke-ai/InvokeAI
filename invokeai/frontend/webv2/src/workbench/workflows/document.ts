@@ -4,6 +4,7 @@ import type {
   InvocationTemplate,
   ProjectGraphState,
   WorkflowCurrentImageNode,
+  WorkflowConnectorNode,
   WorkflowEdge,
   WorkflowFieldInstance,
   WorkflowForm,
@@ -109,6 +110,13 @@ export const buildCurrentImageNode = (position: XYPosition): WorkflowCurrentImag
   id: createWorkflowId('current-image'),
   position,
   type: 'current_image',
+});
+
+export const buildConnectorNode = (position: XYPosition): WorkflowConnectorNode => ({
+  data: { label: '' },
+  id: createWorkflowId('connector'),
+  position,
+  type: 'connector',
 });
 
 // #region Form manipulation
@@ -275,6 +283,7 @@ const removeNodeFieldElements = (form: WorkflowForm, removedNodeIds: Set<string>
 
 export type ProjectGraphAction =
   | { type: 'addNode'; node: WorkflowNode }
+  | { type: 'addNodeAndEdge'; node: WorkflowNode; edge: WorkflowEdge }
   | { type: 'addGraphElements'; nodes: WorkflowNode[]; edges: WorkflowEdge[] }
   | { type: 'removeNodes'; nodeIds: string[] }
   | { type: 'setNodePosition'; nodeId: string; position: XYPosition }
@@ -308,6 +317,7 @@ const undoLabels: Partial<Record<ProjectGraphAction['type'], string>> = {
   addFormElement: 'Edit workflow form',
   addGraphElements: 'Paste workflow nodes',
   addNode: 'Add workflow node',
+  addNodeAndEdge: 'Add workflow node',
   exposeField: 'Expose workflow field',
   moveFormElement: 'Edit workflow form',
   moveFormElementTo: 'Edit workflow form',
@@ -325,6 +335,7 @@ export const getProjectGraphUndoLabel = (action: ProjectGraphAction): string | n
 /** Edits meaningful enough to auto-select the project graph as the invocation source. */
 export const isHighConfidenceGraphEdit = (action: ProjectGraphAction): boolean =>
   action.type === 'addNode' ||
+  action.type === 'addNodeAndEdge' ||
   action.type === 'addGraphElements' ||
   action.type === 'removeNodes' ||
   action.type === 'addEdge' ||
@@ -361,6 +372,20 @@ const setFieldInstance = (
     };
   });
 
+const addEdgeToDocument = (document: ProjectGraphState, edge: WorkflowEdge): ProjectGraphState => {
+  // A non-collect input holds at most one connection; connecting replaces it.
+  const targetNode = document.nodes.find((node) => node.id === edge.target);
+  const keepsExisting =
+    targetNode && isInvocationNode(targetNode) && targetNode.data.type === 'collect' && edge.targetHandle === 'item';
+  const edges = keepsExisting
+    ? document.edges
+    : document.edges.filter(
+        (existingEdge) => !(existingEdge.target === edge.target && existingEdge.targetHandle === edge.targetHandle)
+      );
+
+  return { ...document, edges: [...edges, edge] };
+};
+
 export const projectGraphReducer = (document: ProjectGraphState, action: ProjectGraphAction): ProjectGraphState => {
   const next = applyProjectGraphAction(document, action);
 
@@ -371,6 +396,13 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
   switch (action.type) {
     case 'addNode': {
       return { ...document, nodes: [...document.nodes, action.node] };
+    }
+    case 'addNodeAndEdge': {
+      if (document.nodes.some((node) => node.id === action.node.id)) {
+        return document;
+      }
+
+      return addEdgeToDocument({ ...document, nodes: [...document.nodes, action.node] }, action.edge);
     }
     case 'addGraphElements': {
       if (action.nodes.length === 0 && action.edges.length === 0) {
@@ -469,20 +501,7 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
       }));
     }
     case 'addEdge': {
-      // A non-collect input holds at most one connection; connecting replaces it.
-      const targetNode = document.nodes.find((node) => node.id === action.edge.target);
-      const keepsExisting =
-        targetNode &&
-        isInvocationNode(targetNode) &&
-        targetNode.data.type === 'collect' &&
-        action.edge.targetHandle === 'item';
-      const edges = keepsExisting
-        ? document.edges
-        : document.edges.filter(
-            (edge) => !(edge.target === action.edge.target && edge.targetHandle === action.edge.targetHandle)
-          );
-
-      return { ...document, edges: [...edges, action.edge] };
+      return addEdgeToDocument(document, action.edge);
     }
     case 'removeEdges': {
       const removedEdgeIds = new Set(action.edgeIds);

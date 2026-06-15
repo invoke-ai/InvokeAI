@@ -1,11 +1,20 @@
-import type { FieldType, InvocationTemplates, ProjectGraphState, WorkflowEdge, WorkflowNode } from './types';
-import { isInvocationNode } from './types';
+import type {
+  FieldInputTemplate,
+  FieldType,
+  InvocationTemplate,
+  InvocationTemplates,
+  ProjectGraphState,
+  WorkflowEdge,
+  WorkflowNode,
+} from './types';
+import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE, resolveConnectorSource } from './connectors';
+import { isConnectorNode, isInvocationNode } from './types';
 
 /**
  * Connection validation, ported from the legacy editor's
- * `validateConnectionTypes` / `validateConnection`. Connector and batch node
- * special cases are intentionally absent — those node kinds are not part of
- * the v7 document model.
+ * `validateConnectionTypes` / `validateConnection`. Connector nodes are
+ * pass-through routing nodes: their source type is resolved from the first
+ * upstream invocation output when one exists.
  */
 
 const isSingle = (type: FieldType): boolean => type.cardinality === 'SINGLE';
@@ -146,6 +155,60 @@ export interface ConnectionCandidate {
 const allowsMultipleInboundEdges = (node: WorkflowNode, fieldName: string): boolean =>
   isInvocationNode(node) && node.data.type === 'collect' && fieldName === 'item';
 
+export const getCompatibleInputTemplate = (
+  template: InvocationTemplate,
+  sourceType: FieldType
+): FieldInputTemplate | null => {
+  const inputTemplates = Object.values(template.inputs).sort(
+    (a, b) => (a.uiOrder ?? Number.MAX_SAFE_INTEGER) - (b.uiOrder ?? Number.MAX_SAFE_INTEGER)
+  );
+
+  return (
+    inputTemplates.find(
+      (inputTemplate) =>
+        !inputTemplate.uiHidden &&
+        inputTemplate.input !== 'direct' &&
+        validateConnectionTypes(sourceType, inputTemplate.type)
+    ) ?? null
+  );
+};
+
+const getSourceFieldType = (
+  node: WorkflowNode,
+  handle: string,
+  document: Pick<ProjectGraphState, 'edges' | 'nodes'>,
+  templates: InvocationTemplates
+): FieldType | null | undefined => {
+  if (isInvocationNode(node)) {
+    return templates[node.data.type]?.outputs[handle]?.type;
+  }
+
+  if (isConnectorNode(node) && handle === CONNECTOR_OUTPUT_HANDLE) {
+    return resolveConnectorSource(node.id, document.nodes, document.edges, templates)?.type ?? null;
+  }
+
+  return undefined;
+};
+
+export const getWorkflowSourceFieldType = (
+  document: Pick<ProjectGraphState, 'edges' | 'nodes'>,
+  templates: InvocationTemplates,
+  sourceNodeId: string,
+  sourceHandle: string
+): FieldType | null | undefined => {
+  const sourceNode = document.nodes.find((node) => node.id === sourceNodeId);
+
+  return sourceNode ? getSourceFieldType(sourceNode, sourceHandle, document, templates) : undefined;
+};
+
+const hasValidSourceHandle = (node: WorkflowNode, handle: string, templates: InvocationTemplates): boolean => {
+  if (isInvocationNode(node)) {
+    return templates[node.data.type]?.outputs[handle] !== undefined;
+  }
+
+  return isConnectorNode(node) && handle === CONNECTOR_OUTPUT_HANDLE;
+};
+
 /** Returns a human-readable rejection reason, or null when the connection is valid. */
 export const validateConnection = (
   candidate: ConnectionCandidate,
@@ -161,16 +224,39 @@ export const validateConnection = (
   const sourceNode = document.nodes.find((node) => node.id === sourceNodeId);
   const targetNode = document.nodes.find((node) => node.id === targetNodeId);
 
-  if (!sourceNode || !isInvocationNode(sourceNode) || !targetNode || !isInvocationNode(targetNode)) {
-    return 'Both ends of a connection must be invocation nodes.';
+  if (!sourceNode || !targetNode) {
+    return 'Both ends of a connection must be workflow nodes.';
   }
 
-  const sourceTemplate = templates[sourceNode.data.type];
+  if (!hasValidSourceHandle(sourceNode, sourceHandle, templates)) {
+    return 'One of the fields has no known definition.';
+  }
+
+  if (isConnectorNode(targetNode)) {
+    if (targetHandle !== CONNECTOR_INPUT_HANDLE) {
+      return 'Connectors only accept input on their left handle.';
+    }
+
+    if (document.edges.some((edge) => edge.target === targetNodeId && edge.targetHandle === targetHandle)) {
+      return 'Connector already has an input.';
+    }
+
+    if (wouldCreateCycle(sourceNodeId, targetNodeId, document.edges)) {
+      return 'This connection would create a cycle.';
+    }
+
+    return null;
+  }
+
+  if (!isInvocationNode(targetNode)) {
+    return 'The target node cannot receive connections.';
+  }
+
   const targetTemplate = templates[targetNode.data.type];
-  const sourceField = sourceTemplate?.outputs[sourceHandle];
+  const sourceFieldType = getSourceFieldType(sourceNode, sourceHandle, document, templates);
   const targetField = targetTemplate?.inputs[targetHandle];
 
-  if (!sourceField || !targetField) {
+  if (sourceFieldType === undefined || !targetField) {
     return 'One of the fields has no known definition.';
   }
 
@@ -198,8 +284,8 @@ export const validateConnection = (
     return `${targetField.title} already has a connection.`;
   }
 
-  if (!validateConnectionTypes(sourceField.type, targetField.type)) {
-    return `${sourceField.type.name} cannot connect to ${targetField.type.name}.`;
+  if (sourceFieldType && !validateConnectionTypes(sourceFieldType, targetField.type)) {
+    return `${sourceFieldType.name} cannot connect to ${targetField.type.name}.`;
   }
 
   if (wouldCreateCycle(sourceNodeId, targetNodeId, document.edges)) {

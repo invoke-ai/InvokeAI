@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { compileProjectGraph, getProjectGraphReadiness } from './buildGraph';
-import { buildInvocationNode, buildNotesNode, createProjectGraph, projectGraphReducer } from './document';
+import {
+  buildConnectorNode,
+  buildInvocationNode,
+  buildNotesNode,
+  createProjectGraph,
+  projectGraphReducer,
+} from './document';
 import type { InvocationTemplatesSnapshot } from './templates';
 import type { FieldInputTemplate, InvocationTemplate, ProjectGraphState } from './types';
 
@@ -99,6 +105,41 @@ describe('getProjectGraphReadiness', () => {
     expect(getProjectGraphReadiness(doc, loadedSnapshot)).toEqual({ canInvoke: true, reasons: [] });
   });
 
+  it('treats resolved connector output edges as connected required inputs', () => {
+    const sourceNode = buildInvocationNode(templates.source, { x: 0, y: 0 });
+    const sinkNode = buildInvocationNode(templates.sink, { x: 10, y: 0 });
+    const connector = buildConnectorNode({ x: 5, y: 0 });
+    let doc = createProjectGraph('connector-readiness');
+
+    doc = projectGraphReducer(doc, { node: sourceNode, type: 'addNode' });
+    doc = projectGraphReducer(doc, { node: sinkNode, type: 'addNode' });
+    doc = projectGraphReducer(doc, { node: connector, type: 'addNode' });
+    doc = projectGraphReducer(doc, {
+      edge: {
+        id: 'connector-in',
+        source: sourceNode.id,
+        sourceHandle: 'out',
+        target: connector.id,
+        targetHandle: 'in',
+        type: 'default',
+      },
+      type: 'addEdge',
+    });
+    doc = projectGraphReducer(doc, {
+      edge: {
+        id: 'connector-out',
+        source: connector.id,
+        sourceHandle: 'out',
+        target: sinkNode.id,
+        targetHandle: 'text',
+        type: 'default',
+      },
+      type: 'addEdge',
+    });
+
+    expect(getProjectGraphReadiness(doc, loadedSnapshot)).toEqual({ canInvoke: true, reasons: [] });
+  });
+
   it('reports missing required inputs and unknown node types', () => {
     const { doc, sourceId } = buildDocument();
     const withEmptyValue = projectGraphReducer(doc, {
@@ -163,5 +204,42 @@ describe('compileProjectGraph', () => {
     expect(compileProjectGraph(withExplicitBoard, templates).backendGraph?.nodes[sinkId]).toMatchObject({
       board: { board_id: 'board-1' },
     });
+  });
+
+  it('resolves connector chains into executable backend edges', () => {
+    const sourceNode = buildInvocationNode(templates.source, { x: 0, y: 0 });
+    const sinkNode = buildInvocationNode(templates.sink, { x: 10, y: 0 });
+    const connector = buildConnectorNode({ x: 5, y: 0 });
+    let doc = createProjectGraph('connector-compile');
+
+    doc = projectGraphReducer(doc, { node: sourceNode, type: 'addNode' });
+    doc = projectGraphReducer(doc, { node: sinkNode, type: 'addNode' });
+    doc = projectGraphReducer(doc, { node: connector, type: 'addNode' });
+    doc = projectGraphReducer(doc, {
+      edge: {
+        id: 'connector-in',
+        source: sourceNode.id,
+        sourceHandle: 'out',
+        target: connector.id,
+        targetHandle: 'in',
+        type: 'default',
+      },
+      type: 'addEdge',
+    });
+    doc = projectGraphReducer(doc, {
+      edge: {
+        id: 'connector-out',
+        source: connector.id,
+        sourceHandle: 'out',
+        target: sinkNode.id,
+        targetHandle: 'text',
+        type: 'default',
+      },
+      type: 'addEdge',
+    });
+
+    expect(compileProjectGraph(doc, templates).backendGraph?.edges).toEqual([
+      { destination: { field: 'text', node_id: sinkNode.id }, source: { field: 'out', node_id: sourceNode.id } },
+    ]);
   });
 });

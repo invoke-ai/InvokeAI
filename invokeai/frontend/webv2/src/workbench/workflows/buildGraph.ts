@@ -1,4 +1,5 @@
 import type { BackendGraphContract, GraphContract } from '../types';
+import { getResolvedWorkflowEdges } from './connectors';
 import { createWorkflowId } from './document';
 import type { InvocationTemplatesSnapshot } from './templates';
 import type { FieldInputTemplate, InvocationTemplates, ProjectGraphState, WorkflowInvocationNode } from './types';
@@ -7,9 +8,9 @@ import { hasAnyCycle } from './validation';
 
 /**
  * Compiles the project graph document into the immutable, queue-facing
- * `GraphContract`. Ported from the legacy `buildNodesGraph`, minus connector
- * resolution (connectors are not part of the v7 document) and batch handling
- * (batch/generator nodes are rejected by readiness until batching lands).
+ * `GraphContract`. Ported from the legacy `buildNodesGraph`, with connector
+ * resolution and without batch handling (batch/generator nodes are rejected by
+ * readiness until batching lands).
  */
 
 /** Client-resolved batch/generator nodes from the legacy editor; executing them server-side is meaningless. */
@@ -70,7 +71,11 @@ export const getProjectGraphReadiness = (
   }
 
   const reasons: string[] = [];
-  const connectedInputs = new Set(document.edges.map((edge) => `${edge.target}:${edge.targetHandle}`));
+  const connectedInputs = new Set(
+    getResolvedWorkflowEdges(document.nodes, document.edges, templates)
+      .filter((edge) => executableNodes.some((node) => node.id === edge.target))
+      .map((edge) => `${edge.target}:${edge.targetHandle}`)
+  );
 
   for (const node of executableNodes) {
     const template = templates[node.data.type];
@@ -154,7 +159,7 @@ export const compileProjectGraph = (document: ProjectGraphState, templates: Invo
 
   const seenEdgeKeys = new Set<string>();
 
-  for (const edge of document.edges) {
+  for (const edge of getResolvedWorkflowEdges(document.nodes, document.edges, templates)) {
     if (!executableNodeIds.has(edge.source) || !executableNodeIds.has(edge.target)) {
       continue;
     }
@@ -182,13 +187,15 @@ export const compileProjectGraph = (document: ProjectGraphState, templates: Invo
 
   return {
     backendGraph,
-    edges: document.edges.map((edge) => ({
-      id: edge.id,
-      sourceField: edge.sourceHandle,
-      sourceNodeId: edge.source,
-      targetField: edge.targetHandle,
-      targetNodeId: edge.target,
-    })),
+    edges: getResolvedWorkflowEdges(document.nodes, document.edges, templates)
+      .filter((edge) => executableNodeIds.has(edge.source) && executableNodeIds.has(edge.target))
+      .map((edge) => ({
+        id: edge.id,
+        sourceField: edge.sourceHandle,
+        sourceNodeId: edge.source,
+        targetField: edge.targetHandle,
+        targetNodeId: edge.target,
+      })),
     id: backendGraph.id,
     label: document.name || 'Workflow',
     nodes: executableNodes.map((node) => ({

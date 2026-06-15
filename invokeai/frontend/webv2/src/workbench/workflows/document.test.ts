@@ -113,6 +113,19 @@ describe('projectGraphReducer', () => {
     expect(next.edges).toHaveLength(1);
   });
 
+  it('adds a new node connected to an existing node in one action', () => {
+    const { doc, nodeAId, nodeBId } = createDocWithNodes();
+    const insertedNode = buildInvocationNode(template, { x: 200, y: 0 });
+    const next = projectGraphReducer(doc, {
+      edge: createEdge(nodeAId, insertedNode.id),
+      node: insertedNode,
+      type: 'addNodeAndEdge',
+    });
+
+    expect(next.nodes.map((node) => node.id)).toEqual([nodeAId, nodeBId, insertedNode.id]);
+    expect(next.edges).toEqual([createEdge(nodeAId, insertedNode.id)]);
+  });
+
   it('addGraphElements drops colliding node ids and their edges', () => {
     const { doc, nodeAId, nodeBId } = createDocWithNodes();
     const existingNode = doc.nodes[0];

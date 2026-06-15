@@ -2,6 +2,7 @@ import type { Edge as FlowEdge, Node as FlowNode } from '@xyflow/react';
 
 import type {
   ProjectGraphState,
+  WorkflowConnectorNode,
   WorkflowCurrentImageNode,
   WorkflowInvocationNode,
   WorkflowNotesNode,
@@ -32,7 +33,8 @@ export type InvocationFlowNode = FlowNode<
 >;
 export type NotesFlowNode = FlowNode<{ documentNode: WorkflowNotesNode }, 'notes'>;
 export type CurrentImageFlowNode = FlowNode<{ documentNode: WorkflowCurrentImageNode }, 'current_image'>;
-export type WorkflowFlowNode = InvocationFlowNode | NotesFlowNode | CurrentImageFlowNode;
+export type ConnectorFlowNode = FlowNode<{ documentNode: WorkflowConnectorNode }, 'connector'>;
+export type WorkflowFlowNode = InvocationFlowNode | NotesFlowNode | CurrentImageFlowNode | ConnectorFlowNode;
 
 const EMPTY_NAMES: string[] = [];
 
@@ -118,6 +120,20 @@ export const toFlowNodes = (
       };
     }
 
+    if (documentNode.type === 'connector') {
+      if (previous?.type === 'connector' && previous.data.documentNode === documentNode) {
+        return previous;
+      }
+
+      return {
+        data: { documentNode },
+        id: documentNode.id,
+        position: documentNode.position,
+        selected,
+        type: 'connector' as const,
+      };
+    }
+
     if (previous?.type === 'current_image' && previous.data.documentNode === documentNode) {
       return previous;
     }
@@ -147,6 +163,10 @@ export const withNodeSelection = (nodes: WorkflowFlowNode[], selectedIds: Set<st
     }
 
     if (node.type === 'notes') {
+      return { ...node, selected };
+    }
+
+    if (node.type === 'connector') {
       return { ...node, selected };
     }
 

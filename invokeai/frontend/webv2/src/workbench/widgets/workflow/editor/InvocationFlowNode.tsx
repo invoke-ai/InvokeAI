@@ -155,7 +155,7 @@ const InputFieldRow = ({
             <Handle
               id={template.name}
               position={Position.Left}
-              style={{ ...handleStyle(getFieldTypeColor(template.type)), left: -(ROW_PADDING_X + HANDLE_SIZE / 2) }}
+              style={{ ...handleStyle(getFieldTypeColor(template.type)), left: -ROW_PADDING_X, top: '50%' }}
               type="target"
             />
           ) : null}
@@ -175,7 +175,7 @@ const InputFieldRow = ({
           <Handle
             id={template.name}
             position={Position.Left}
-            style={{ ...handleStyle(getFieldTypeColor(template.type)), left: -(ROW_PADDING_X + HANDLE_SIZE / 2) }}
+            style={{ ...handleStyle(getFieldTypeColor(template.type)), left: -ROW_PADDING_X, top: '50%' }}
             type="target"
           />
         ) : null}
@@ -242,7 +242,7 @@ const OutputFieldRow = ({ isSkeleton, template }: { isSkeleton: boolean; templat
       <Handle
         id={template.name}
         position={Position.Right}
-        style={{ ...handleStyle(getFieldTypeColor(template.type)), right: -(ROW_PADDING_X + HANDLE_SIZE / 2) }}
+        style={{ ...handleStyle(getFieldTypeColor(template.type)), right: -ROW_PADDING_X, top: '50%' }}
         type="source"
       />
       {isSkeleton ? (
