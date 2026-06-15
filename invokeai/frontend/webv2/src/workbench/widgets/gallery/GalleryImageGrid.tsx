@@ -138,6 +138,18 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
     }
   }, [actions, lastVisibleRowIndex, paginationMode, rowCount]);
 
+  useEffect(() => {
+    const primaryTargetImageName = contextMenuTarget?.images[0]?.imageName;
+
+    if (!primaryTargetImageName) {
+      return;
+    }
+
+    if (!gallery.images.some((image) => image.imageName === primaryTargetImageName)) {
+      setContextMenuTarget(null);
+    }
+  }, [contextMenuTarget, gallery.images]);
+
   const handleThumbnailClick = (image: GalleryImage, event: MouseEvent) => {
     if (event.shiftKey) {
       const targetIndex = gallery.images.findIndex((candidate) => candidate.imageName === image.imageName);

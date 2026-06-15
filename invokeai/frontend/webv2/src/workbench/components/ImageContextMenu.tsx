@@ -49,6 +49,37 @@ const MENU_CONTENT_PROPS = {
   p: '0',
 } as const;
 
+const isUsableGalleryImage = (value: unknown): value is GalleryImage =>
+  Boolean(value) &&
+  typeof value === 'object' &&
+  typeof (value as GalleryImage).imageName === 'string' &&
+  typeof (value as GalleryImage).imageUrl === 'string' &&
+  typeof (value as GalleryImage).thumbnailUrl === 'string';
+
+export const getImageContextMenuImages = (target: ImageContextMenuTarget | null): GalleryImage[] => {
+  if (!Array.isArray(target?.images)) {
+    return [];
+  }
+
+  return target.images.filter(isUsableGalleryImage);
+};
+
+export const getImageContextMenuRecallRequestKey = (image: GalleryImage | null, isBulk: boolean): string | null => {
+  if (!image || isBulk) {
+    return null;
+  }
+
+  return `${image.imageName}:${image.width}:${image.height}`;
+};
+
+const areRecallCapabilitiesEqual = (left: ImageRecallCapabilities, right: ImageRecallCapabilities): boolean =>
+  left.all === right.all &&
+  left.clipSkip === right.clipSkip &&
+  left.dimensions === right.dimensions &&
+  left.prompts === right.prompts &&
+  left.remix === right.remix &&
+  left.seed === right.seed;
+
 /**
  * Shared right-click menu for backend images, usable from any widget (gallery
  * grid, preview, ...). Anchored to the cursor through a virtual rect, so it
@@ -72,27 +103,38 @@ export const ImageContextMenu = ({
   );
   const [isLoadingRecallCapabilities, setIsLoadingRecallCapabilities] = useState(false);
   const targetRef = useRef(target);
+  const imageRef = useRef<GalleryImage | null>(null);
 
   targetRef.current = target;
 
-  const images = target?.images ?? [];
+  const images = getImageContextMenuImages(target);
   const image = images[0] ?? null;
   const isBulk = images.length > 1;
   const imageNames = images.map((candidate) => candidate.imageName);
   const menuTarget = image ? target : null;
+  const recallRequestKey = getImageContextMenuRecallRequestKey(image, isBulk);
+  const getImageRecallCapabilities = actions.getImageRecallCapabilities;
+
+  imageRef.current = image;
 
   useEffect(() => {
-    if (!image || isBulk) {
-      setRecallCapabilities(EMPTY_IMAGE_RECALL_CAPABILITIES);
-      setIsLoadingRecallCapabilities(false);
+    if (!recallRequestKey) {
+      setRecallCapabilities((current) =>
+        areRecallCapabilitiesEqual(current, EMPTY_IMAGE_RECALL_CAPABILITIES) ? current : EMPTY_IMAGE_RECALL_CAPABILITIES
+      );
+      setIsLoadingRecallCapabilities((current) => (current ? false : current));
       return;
     }
 
     let isCancelled = false;
+    const recallImage = imageRef.current;
 
-    setIsLoadingRecallCapabilities(true);
-    actions
-      .getImageRecallCapabilities(image)
+    if (!recallImage) {
+      return;
+    }
+
+    setIsLoadingRecallCapabilities((current) => (current ? current : true));
+    getImageRecallCapabilities(recallImage)
       .then((capabilities) => {
         if (!isCancelled) {
           setRecallCapabilities(capabilities);
@@ -112,7 +154,7 @@ export const ImageContextMenu = ({
     return () => {
       isCancelled = true;
     };
-  }, [actions, image, isBulk]);
+  }, [getImageRecallCapabilities, recallRequestKey]);
 
   const requestDeletion = (names: string[]) => {
     if (confirmImageDeletion) {
