@@ -10,6 +10,7 @@ import {
   type ReconcileInput,
 } from './backend/queueCoordinator';
 import { addImagesToGalleryBoard } from './gallery/api';
+import { getQueueItemResultImages } from './generation/api';
 import { sanitizeBatchCount } from './generation/batch';
 import { normalizeGenerateSettings } from './generation/settings';
 import { useWorkbenchDispatch, useWorkbenchHasHydrated, useWorkbenchSelector } from './WorkbenchContext';
@@ -71,6 +72,37 @@ const routeRunResults = async (
       status: 'failed',
       type: 'setQueueItemStatus',
     });
+  }
+};
+
+/** Route one completed backend item from a still-running local batch into Gallery. */
+const routeBackendItemResults = async (
+  projectId: string,
+  queueItem: QueueItem,
+  backendItemId: number,
+  dispatch: Dispatch<WorkbenchAction>
+): Promise<void> => {
+  if (queueItem.snapshot.destination !== 'gallery') {
+    return;
+  }
+
+  try {
+    const allImages = await getQueueItemResultImages(backendItemId, queueItem.id, queueItem.snapshot.submittedAt);
+    const images =
+      queueItem.snapshot.sourceId === 'project-graph' ? allImages.filter((image) => !image.isIntermediate) : allImages;
+    const selectedBoardId = getSnapshotGalleryBoardId(queueItem);
+
+    if (selectedBoardId && selectedBoardId !== 'none') {
+      await addImagesToGalleryBoard(
+        selectedBoardId,
+        images.map((image) => image.imageName)
+      );
+    }
+
+    dispatch({ backendItemId, images, projectId, queueItemId: queueItem.id, type: 'routeQueueItemPartialResults' });
+    dispatch({ type: 'refreshBackendData' });
+  } catch (error) {
+    dispatch({ message: toErrorMessage(error), type: 'recordError' });
   }
 };
 
@@ -152,13 +184,43 @@ export const WorkbenchRuntime = () => {
   const dispatch = useWorkbenchDispatch();
   const hasHydrated = useWorkbenchHasHydrated();
   const coordinatorRef = useRef<QueueCoordinator | null>(null);
+  const stateRef = useRef(state);
   const startedQueueItemIdsRef = useRef(new Set<string>());
   const cancelledQueueItemIdsRef = useRef(new Set<string>());
   const reconcileStateRef = useRef<'idle' | 'running' | 'done'>('idle');
   const [isReconciled, setIsReconciled] = useState(false);
 
+  stateRef.current = state;
+
   useEffect(() => {
     const coordinator = createQueueCoordinator({
+      onBackendItemComplete: (localQueueItemId, backendItemId) => {
+        const routeTarget = stateRef.current.projects
+          .map((project) => ({ project, queueItem: project.queue.items.find((item) => item.id === localQueueItemId) }))
+          .find((target) => target.queueItem !== undefined);
+
+        if (!routeTarget?.queueItem || routeTarget.queueItem.completedBackendItemIds?.includes(backendItemId)) {
+          return;
+        }
+
+        void routeBackendItemResults(routeTarget.project.id, routeTarget.queueItem, backendItemId, dispatch);
+      },
+      onBackendItemCancelled: (localQueueItemId, backendItemId) => {
+        const routeTarget = stateRef.current.projects
+          .map((project) => ({ project, queueItem: project.queue.items.find((item) => item.id === localQueueItemId) }))
+          .find((target) => target.queueItem !== undefined);
+
+        if (!routeTarget?.queueItem || routeTarget.queueItem.cancelledBackendItemIds?.includes(backendItemId)) {
+          return;
+        }
+
+        dispatch({
+          backendItemId,
+          projectId: routeTarget.project.id,
+          queueItemId: localQueueItemId,
+          type: 'markQueueItemBackendCancelled',
+        });
+      },
       onConnectionChange: (status, error) => {
         dispatch({ error, status, type: 'setBackendConnectionStatus' });
       },

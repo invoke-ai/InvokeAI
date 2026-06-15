@@ -92,6 +92,14 @@ type WorkbenchAction =
       backendBatchId?: string;
     }
   | { type: 'setQueueItemStatus'; projectId: string; queueItemId: string; status: QueueItemStatus; error?: string }
+  | {
+      type: 'routeQueueItemPartialResults';
+      projectId: string;
+      queueItemId: string;
+      backendItemId: number;
+      images: GeneratedImageContract[];
+    }
+  | { type: 'markQueueItemBackendCancelled'; projectId: string; queueItemId: string; backendItemId: number }
   | { type: 'routeQueueItemResults'; projectId: string; queueItemId: string; images: GeneratedImageContract[] }
   | { type: 'setStagedImageIndex'; imageIndex: number }
   | { type: 'cycleStagedImage'; direction: -1 | 1 }
@@ -114,7 +122,10 @@ type WorkbenchAction =
   | { type: 'setGalleryProjectBoardId'; boardId: string }
   | { type: 'acceptStagedImage' }
   | { type: 'clearCanvasStaging' }
-  | { type: 'cancelQueueItem'; queueItemId: string }
+  | { type: 'cancelQueueItem'; queueItemId: string; projectId?: string }
+  | { type: 'cancelAllQueueItems'; projectId?: string }
+  | { type: 'cancelAllQueueItemsExceptCurrent'; projectId?: string; currentQueueItemId?: string | null }
+  | { type: 'clearCompletedQueueItems' }
   | { type: 'undoProjectChange' }
   | { type: 'redoProjectChange' }
   | { type: 'hydrateWorkbench'; state: WorkbenchState }
@@ -814,37 +825,109 @@ const updateQueueItem = (project: Project, queueItemId: string, getItem: (item: 
   },
 });
 
+const isCancellableQueueItem = (item: QueueItem): boolean =>
+  item.cancellable && (item.status === 'pending' || item.status === 'running');
+
+const isClearableQueueItem = (item: QueueItem): boolean => item.status === 'completed' || item.status === 'failed';
+
+const shouldApplyQueueBulkActionToProject = (project: Project, projectId?: string): boolean =>
+  projectId === undefined || project.id === projectId;
+
+const mergeImageResults = (
+  existingImages: GeneratedImageContract[] | undefined,
+  incomingImages: GeneratedImageContract[]
+): GeneratedImageContract[] => {
+  const existing = existingImages ?? [];
+  const existingNames = new Set(existing.map((image) => image.imageName));
+
+  return [...existing, ...incomingImages.filter((image) => !existingNames.has(image.imageName))];
+};
+
+const mergeBackendItemId = (ids: number[] | undefined, backendItemId: number): number[] =>
+  ids?.includes(backendItemId) ? ids : [...(ids ?? []), backendItemId];
+
+const getQueueItemStatusAfterBackendCancellation = (
+  item: QueueItem,
+  cancelledBackendItemIds: number[]
+): QueueItemStatus => {
+  if (!item.backendItemIds?.length) {
+    return item.status;
+  }
+
+  const completedBackendItemIds = new Set(item.completedBackendItemIds ?? []);
+  const terminalBackendItemIds = new Set([...completedBackendItemIds, ...cancelledBackendItemIds]);
+  const isEveryBackendItemTerminal = item.backendItemIds.every((backendItemId) =>
+    terminalBackendItemIds.has(backendItemId)
+  );
+
+  if (!isEveryBackendItemTerminal) {
+    return item.status;
+  }
+
+  return completedBackendItemIds.size > 0 || (item.resultImages?.length ?? 0) > 0 ? 'completed' : 'cancelled';
+};
+
+const updateGalleryWithResultImages = (project: Project, images: GeneratedImageContract[]): Project => {
+  if (images.length === 0) {
+    return project;
+  }
+
+  const galleryValues = project.widgetStates.gallery.values;
+  const existingImages = getGalleryImages(galleryValues).filter(
+    (image) => !images.some((incomingImage) => incomingImage.imageName === image.imageName)
+  );
+
+  return {
+    ...project,
+    widgetStates: {
+      ...project.widgetStates,
+      gallery: {
+        ...project.widgetStates.gallery,
+        values: {
+          ...galleryValues,
+          recentImages: [...images, ...existingImages],
+          selectedImage: images[0] ?? galleryValues.selectedImage,
+          selectedImageName: images[0]?.imageName ?? project.widgetStates.gallery.values.selectedImageName,
+          selectedImageNames: images[0] ? [images[0].imageName] : getGallerySelectedImageNames(galleryValues),
+        },
+      },
+    },
+  };
+};
+
+const routeQueueItemPartialResults = (
+  project: Project,
+  queueItemId: string,
+  backendItemId: number,
+  images: GeneratedImageContract[]
+): Project => {
+  const queueItem = project.queue.items.find((item) => item.id === queueItemId);
+  const destination = queueItem?.snapshot.destination ?? project.invocation.destination;
+  const nextProject = updateQueueItem(project, queueItemId, (item) => ({
+    ...item,
+    completedBackendItemIds: item.completedBackendItemIds?.includes(backendItemId)
+      ? item.completedBackendItemIds
+      : [...(item.completedBackendItemIds ?? []), backendItemId],
+    resultImages: mergeImageResults(item.resultImages, images),
+  }));
+
+  return destination === 'gallery' ? updateGalleryWithResultImages(nextProject, images) : nextProject;
+};
+
 const routeQueueItemResults = (project: Project, queueItemId: string, images: GeneratedImageContract[]): Project => {
   const queueItem = project.queue.items.find((item) => item.id === queueItemId);
   const destination = queueItem?.snapshot.destination ?? project.invocation.destination;
   const nextProject = updateQueueItem(project, queueItemId, (item) => ({
     ...item,
+    completedBackendItemIds: item.backendItemIds
+      ? item.backendItemIds.filter((backendItemId) => !item.cancelledBackendItemIds?.includes(backendItemId))
+      : item.completedBackendItemIds,
     resultImages: images,
     status: 'completed',
   }));
 
   if (destination === 'gallery') {
-    const galleryValues = nextProject.widgetStates.gallery.values;
-    const existingImages = getGalleryImages(galleryValues).filter(
-      (image) => !images.some((incomingImage) => incomingImage.imageName === image.imageName)
-    );
-
-    return {
-      ...nextProject,
-      widgetStates: {
-        ...nextProject.widgetStates,
-        gallery: {
-          ...nextProject.widgetStates.gallery,
-          values: {
-            ...galleryValues,
-            recentImages: [...images, ...existingImages],
-            selectedImage: images[0] ?? galleryValues.selectedImage,
-            selectedImageName: images[0]?.imageName ?? nextProject.widgetStates.gallery.values.selectedImageName,
-            selectedImageNames: images[0] ? [images[0].imageName] : getGallerySelectedImageNames(galleryValues),
-          },
-        },
-      },
-    };
+    return updateGalleryWithResultImages(nextProject, images);
   }
 
   const incomingImages = images.map((image) => normalizeStagingCandidate(image, nextProject.canvas.document));
@@ -1363,6 +1446,38 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
         })
       );
     }
+    case 'routeQueueItemPartialResults': {
+      const project = state.projects.find((project) => project.id === action.projectId);
+      const queueItem = project?.queue.items.find((item) => item.id === action.queueItemId);
+
+      if (queueItem?.status === 'cancelled' || queueItem?.status === 'completed') {
+        return state;
+      }
+
+      return updateProjectById(state, action.projectId, (project) =>
+        routeQueueItemPartialResults(project, action.queueItemId, action.backendItemId, action.images)
+      );
+    }
+    case 'markQueueItemBackendCancelled': {
+      const project = state.projects.find((project) => project.id === action.projectId);
+      const queueItem = project?.queue.items.find((item) => item.id === action.queueItemId);
+
+      if (queueItem?.status === 'cancelled' || queueItem?.status === 'completed') {
+        return state;
+      }
+
+      return updateProjectById(state, action.projectId, (project) =>
+        updateQueueItem(project, action.queueItemId, (item) => {
+          const cancelledBackendItemIds = mergeBackendItemId(item.cancelledBackendItemIds, action.backendItemId);
+
+          return {
+            ...item,
+            cancelledBackendItemIds,
+            status: getQueueItemStatusAfterBackendCancellation(item, cancelledBackendItemIds),
+          };
+        })
+      );
+    }
     case 'routeQueueItemResults': {
       const project = state.projects.find((project) => project.id === action.projectId);
       const queueItem = project?.queue.items.find((item) => item.id === action.queueItemId);
@@ -1662,19 +1777,15 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       }));
     }
     case 'cancelQueueItem': {
-      const activeProject = state.projects.find((project) => project.id === state.activeProjectId);
-      const queueItem = activeProject?.queue.items.find((item) => item.id === action.queueItemId);
-      const canCancelQueueItem =
-        Boolean(queueItem?.cancellable) && (queueItem?.status === 'pending' || queueItem?.status === 'running');
-      const nextState = updateActiveProject(state, (project) => ({
+      const targetProjectId = action.projectId ?? state.activeProjectId;
+      const targetProject = state.projects.find((project) => project.id === targetProjectId);
+      const queueItem = targetProject?.queue.items.find((item) => item.id === action.queueItemId);
+      const canCancelQueueItem = queueItem ? isCancellableQueueItem(queueItem) : false;
+      const nextState = updateProjectById(state, targetProjectId, (project) => ({
         ...project,
         queue: {
           items: project.queue.items.map((item) => {
-            if (
-              item.id !== action.queueItemId ||
-              !item.cancellable ||
-              (item.status !== 'pending' && item.status !== 'running')
-            ) {
+            if (item.id !== action.queueItemId || !isCancellableQueueItem(item)) {
               return item;
             }
 
@@ -1683,7 +1794,7 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
         },
       }));
 
-      if (!activeProject || !queueItem || !canCancelQueueItem) {
+      if (!targetProject || !queueItem || !canCancelQueueItem) {
         return nextState;
       }
 
@@ -1691,11 +1802,97 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
         nextState,
         createNotification({
           kind: 'info',
-          message: `${activeProject.name}: ${action.queueItemId}`,
-          projectId: activeProject.id,
+          message: `${targetProject.name}: ${action.queueItemId}`,
+          projectId: targetProject.id,
           title: 'Invocation cancellation requested',
         })
       );
+    }
+    case 'cancelAllQueueItems': {
+      const cancellableCount = state.projects.reduce(
+        (count, project) =>
+          shouldApplyQueueBulkActionToProject(project, action.projectId)
+            ? count + project.queue.items.filter(isCancellableQueueItem).length
+            : count,
+        0
+      );
+
+      if (cancellableCount === 0) {
+        return state;
+      }
+
+      const nextState: WorkbenchState = {
+        ...state,
+        projects: state.projects.map((project) => ({
+          ...project,
+          queue: {
+            items: shouldApplyQueueBulkActionToProject(project, action.projectId)
+              ? project.queue.items.map((item) =>
+                  isCancellableQueueItem(item) ? { ...item, status: 'cancelled' } : item
+                )
+              : project.queue.items,
+          },
+        })),
+      };
+
+      return addNotification(
+        nextState,
+        createNotification({
+          kind: 'info',
+          message: `${cancellableCount} queue item${cancellableCount === 1 ? '' : 's'}.`,
+          title: 'Invocation cancellation requested',
+        })
+      );
+    }
+    case 'cancelAllQueueItemsExceptCurrent': {
+      const cancellableCount = state.projects.reduce(
+        (count, project) =>
+          shouldApplyQueueBulkActionToProject(project, action.projectId)
+            ? count +
+              project.queue.items.filter(
+                (item) => isCancellableQueueItem(item) && item.id !== action.currentQueueItemId
+              ).length
+            : count,
+        0
+      );
+
+      if (cancellableCount === 0) {
+        return state;
+      }
+
+      const nextState: WorkbenchState = {
+        ...state,
+        projects: state.projects.map((project) => ({
+          ...project,
+          queue: {
+            items: shouldApplyQueueBulkActionToProject(project, action.projectId)
+              ? project.queue.items.map((item) =>
+                  isCancellableQueueItem(item) && item.id !== action.currentQueueItemId
+                    ? { ...item, status: 'cancelled' }
+                    : item
+                )
+              : project.queue.items,
+          },
+        })),
+      };
+
+      return addNotification(
+        nextState,
+        createNotification({
+          kind: 'info',
+          message: `${cancellableCount} queue item${cancellableCount === 1 ? '' : 's'}.`,
+          title: 'Invocation cancellation requested',
+        })
+      );
+    }
+    case 'clearCompletedQueueItems': {
+      return {
+        ...state,
+        projects: state.projects.map((project) => ({
+          ...project,
+          queue: { items: project.queue.items.filter((item) => !isClearableQueueItem(item)) },
+        })),
+      };
     }
     case 'undoProjectChange': {
       return updateActiveProject(state, (project) => {

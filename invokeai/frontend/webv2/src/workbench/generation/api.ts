@@ -155,8 +155,31 @@ export const cancelQueueItemsByBatchIds = async (batchIds: string[]): Promise<vo
   });
 };
 
+export const getCurrentQueueItem = (): Promise<QueueItemDTO | null> =>
+  apiFetchJson<QueueItemDTO | null>('/api/v1/queue/default/current');
+
+export const cancelQueueItem = (itemId: number): Promise<QueueItemDTO> =>
+  apiFetchJson<QueueItemDTO>(`/api/v1/queue/default/i/${itemId}/cancel`, { method: 'PUT' });
+
 export const cancelQueueItems = async (itemIds: number[]): Promise<void> => {
-  await Promise.all(
-    itemIds.map((itemId) => apiFetchJson(`/api/v1/queue/default/i/${itemId}/cancel`, { method: 'PUT' }))
-  );
+  await Promise.all(itemIds.map(cancelQueueItem));
 };
+
+export const cancelCurrentQueueItem = async (): Promise<QueueItemDTO | null> => {
+  const currentQueueItem = await getCurrentQueueItem();
+
+  if (!currentQueueItem) {
+    return null;
+  }
+
+  return cancelQueueItem(currentQueueItem.item_id);
+};
+
+export const cancelAllExceptCurrentQueueItems = (): Promise<unknown> =>
+  apiFetchJson('/api/v1/queue/default/cancel_all_except_current', { method: 'PUT' });
+
+export const resumeQueueProcessor = (): Promise<unknown> =>
+  apiFetchJson('/api/v1/queue/default/processor/resume', { method: 'PUT' });
+
+export const pauseQueueProcessor = (): Promise<unknown> =>
+  apiFetchJson('/api/v1/queue/default/processor/pause', { method: 'PUT' });

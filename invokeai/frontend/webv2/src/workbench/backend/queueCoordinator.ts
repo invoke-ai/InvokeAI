@@ -32,7 +32,7 @@ import {
 import { ApiError, getAuthToken, getBackendSocketUrl } from './http';
 import { modelLoadStore } from './modelLoadStore';
 import { nodeExecutionStore, type NodeExecutionSink } from './nodeExecutionStore';
-import { progressImageStore, type ProgressImageSink } from './progressImageStore';
+import { progressImageStore, type ProgressImageSink, type ProgressImageTarget } from './progressImageStore';
 import { queueItemProgressStore, type QueueItemProgressSink } from './progressStore';
 
 const SOCKET_PATH = '/ws/socket.io';
@@ -62,6 +62,10 @@ export interface QueueCoordinatorApi {
 
 export interface QueueCoordinatorCallbacks {
   onConnectionChange(status: BackendConnectionStatus, error?: string): void;
+  /** Fired when one backend item in a local batch completes, before the whole local batch necessarily settles. */
+  onBackendItemComplete?(localQueueItemId: string, backendItemId: number): void;
+  /** Fired when one backend item in a local batch is canceled. */
+  onBackendItemCancelled?(localQueueItemId: string, backendItemId: number): void;
   /** Coalesced signal that completed generations may have added gallery images. */
   onGalleryRefresh(): void;
 }
@@ -130,6 +134,7 @@ interface RunState {
 interface RunProgressState {
   activeBackendItemId?: number;
   backendItemIds: number[];
+  cancelledBackendItemIds: Set<number>;
   completedBackendItemIds: Set<number>;
   message: string;
   percentage: number | null;
@@ -247,21 +252,29 @@ export const createQueueCoordinator = (
       return;
     }
 
+    const terminalBackendItemIds = new Set([...state.completedBackendItemIds, ...state.cancelledBackendItemIds]);
     const activeBackendItemId =
-      state.activeBackendItemId !== undefined && !state.completedBackendItemIds.has(state.activeBackendItemId)
+      state.activeBackendItemId !== undefined && !terminalBackendItemIds.has(state.activeBackendItemId)
         ? state.activeBackendItemId
         : undefined;
     const activeItemIndex = activeBackendItemId
       ? state.backendItemIds.indexOf(activeBackendItemId) + 1
-      : Math.min(state.completedBackendItemIds.size + 1, state.backendItemIds.length);
+      : Math.min(terminalBackendItemIds.size + 1, state.backendItemIds.length);
 
     progress.set(localQueueItemId, {
       activeItemIndex: Math.max(1, activeItemIndex),
-      completedItemCount: state.completedBackendItemIds.size,
+      completedItemCount: terminalBackendItemIds.size,
       message: state.message,
       percentage: state.percentage,
       totalItemCount: state.backendItemIds.length,
     });
+  };
+
+  const getProgressImageTarget = (localQueueItemId: string, backendItemId: number): ProgressImageTarget => {
+    const backendItemIds = runProgress.get(localQueueItemId)?.backendItemIds ?? [backendItemId];
+    const itemIndex = backendItemIds.indexOf(backendItemId);
+
+    return { itemIndex: itemIndex === -1 ? 1 : itemIndex + 1, queueItemId: localQueueItemId };
   };
 
   const settleWait = (backendItemId: number, outcome: TerminalOutcome): void => {
@@ -273,14 +286,28 @@ export const createQueueCoordinator = (
     }
 
     waits.delete(backendItemId);
+    progressImage.clear(getProgressImageTarget(wait.localQueueItemId, backendItemId));
     const state = runProgress.get(wait.localQueueItemId);
 
     if (state) {
       state.activeBackendItemId = undefined;
-      state.completedBackendItemIds.add(backendItemId);
+      if (outcome.status === 'completed') {
+        state.completedBackendItemIds.add(backendItemId);
+      }
+      if (outcome.status === 'canceled') {
+        state.cancelledBackendItemIds.add(backendItemId);
+      }
       state.message = '';
       state.percentage = null;
       publishRunProgress(wait.localQueueItemId);
+    }
+
+    if (outcome.status === 'completed') {
+      callbacks.onBackendItemComplete?.(wait.localQueueItemId, backendItemId);
+    }
+
+    if (outcome.status === 'canceled') {
+      callbacks.onBackendItemCancelled?.(wait.localQueueItemId, backendItemId);
     }
 
     wait.settle(outcome);
@@ -317,6 +344,7 @@ export const createQueueCoordinator = (
 
     runProgress.set(localQueueItemId, {
       backendItemIds,
+      cancelledBackendItemIds: new Set(),
       completedBackendItemIds: new Set(),
       message: '',
       percentage: null,
@@ -363,7 +391,6 @@ export const createQueueCoordinator = (
     }
 
     nodeExecution.settleRunning();
-    progressImage.clear();
     settleWait(event.item_id, toTerminalOutcome(event.status, event.error_message, event.error_type));
 
     if (event.status === 'completed') {
@@ -381,7 +408,10 @@ export const createQueueCoordinator = (
     nodeExecution.progress(event.invocation_source_id, event.percentage, event.message);
 
     if (event.image?.dataURL) {
-      progressImage.set({ dataUrl: event.image.dataURL, height: event.image.height, width: event.image.width });
+      progressImage.set(
+        { dataUrl: event.image.dataURL, height: event.image.height, width: event.image.width },
+        getProgressImageTarget(wait.localQueueItemId, event.item_id)
+      );
     }
 
     const state = runProgress.get(wait.localQueueItemId);
@@ -604,12 +634,16 @@ export const createQueueCoordinator = (
         throw new Error(failure.error);
       }
 
-      if (outcomes.some((outcome) => outcome.status === 'canceled')) {
+      const completedBackendItemIds = run.backendItemIds.filter(
+        (_backendItemId, index) => outcomes[index]?.status === 'completed'
+      );
+
+      if (completedBackendItemIds.length === 0 && outcomes.some((outcome) => outcome.status === 'canceled')) {
         throw new QueueItemCancelledError(localQueueItemId);
       }
 
       const imagesPerItem = await Promise.all(
-        run.backendItemIds.map((backendItemId) =>
+        completedBackendItemIds.map((backendItemId) =>
           api.getQueueItemResultImages(backendItemId, localQueueItemId, queuedAt)
         )
       );
@@ -623,13 +657,13 @@ export const createQueueCoordinator = (
   };
 
   const cancelRun = async ({ backendBatchId, backendItemIds }: CancelRunRequest): Promise<void> => {
-    if (backendBatchId) {
-      await api.cancelQueueItemsByBatchIds([backendBatchId]);
+    if (backendItemIds?.length) {
+      await api.cancelQueueItems(backendItemIds);
       return;
     }
 
-    if (backendItemIds?.length) {
-      await api.cancelQueueItems(backendItemIds);
+    if (backendBatchId) {
+      await api.cancelQueueItemsByBatchIds([backendBatchId]);
     }
   };
 

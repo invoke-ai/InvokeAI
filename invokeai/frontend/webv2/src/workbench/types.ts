@@ -403,6 +403,8 @@ export interface QueueItem {
   cancellable: boolean;
   snapshot: QueueSubmissionSnapshot;
   backendItemIds?: number[];
+  completedBackendItemIds?: number[];
+  cancelledBackendItemIds?: number[];
   backendBatchId?: string;
   error?: string;
   resultImages?: GeneratedImageContract[];

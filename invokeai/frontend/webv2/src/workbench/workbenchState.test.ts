@@ -429,6 +429,147 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(getActiveProject(state).queue.items[0]?.status).toBe('cancelled');
   });
 
+  it('cancels queue items from inactive projects when a project id is provided', () => {
+    let state = submitGenerate(primeGenerate());
+    const originProject = getActiveProject(state);
+    const queueItem = originProject.queue.items[0];
+
+    state = workbenchReducer(state, { type: 'createProject' });
+    expect(getActiveProject(state).id).not.toBe(originProject.id);
+
+    state = workbenchReducer(state, {
+      projectId: originProject.id,
+      queueItemId: queueItem.id,
+      type: 'cancelQueueItem',
+    });
+
+    expect(getProject(state, originProject.id).queue.items[0]?.status).toBe('cancelled');
+  });
+
+  it('cancels all active cancellable queue items from the queue actions menu', () => {
+    let state = submitGenerate(primeGenerate());
+
+    state = workbenchReducer(state, { type: 'createProject' });
+    state = submitGenerate(primeGenerate(state));
+    state = workbenchReducer(state, { type: 'cancelAllQueueItems' });
+
+    expect(state.projects.flatMap((project) => project.queue.items.map((item) => item.status))).toEqual([
+      'cancelled',
+      'cancelled',
+    ]);
+  });
+
+  it('cancels active queue items except the current one', () => {
+    let state = submitGenerate(primeGenerate());
+    const firstQueueItemId = getActiveProject(state).queue.items[0].id;
+
+    state = submitGenerate(primeGenerate(state));
+    state = workbenchReducer(state, {
+      currentQueueItemId: firstQueueItemId,
+      type: 'cancelAllQueueItemsExceptCurrent',
+    });
+
+    expect(getActiveProject(state).queue.items.map((item) => ({ id: item.id, status: item.status }))).toEqual([
+      { id: getActiveProject(state).queue.items[0].id, status: 'cancelled' },
+      { id: firstQueueItemId, status: 'pending' },
+    ]);
+  });
+
+  it('records backend item cancellation without cancelling the whole local batch', () => {
+    let state = submitGenerate(primeGenerate(undefined, { batchCount: 3 }));
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0];
+
+    state = workbenchReducer(state, {
+      backendItemIds: [11, 12, 13],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    state = workbenchReducer(state, {
+      backendItemId: 12,
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'markQueueItemBackendCancelled',
+    });
+
+    expect(getActiveProject(state).queue.items[0]).toMatchObject({
+      cancelledBackendItemIds: [12],
+      status: 'running',
+    });
+  });
+
+  it('marks a local queue item cancelled only when all backend items were cancelled', () => {
+    let state = submitGenerate(primeGenerate(undefined, { batchCount: 2 }));
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0];
+
+    state = workbenchReducer(state, {
+      backendItemIds: [11, 12],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    state = workbenchReducer(state, {
+      backendItemId: 11,
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'markQueueItemBackendCancelled',
+    });
+    state = workbenchReducer(state, {
+      backendItemId: 12,
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'markQueueItemBackendCancelled',
+    });
+
+    expect(getActiveProject(state).queue.items[0]).toMatchObject({
+      cancelledBackendItemIds: [11, 12],
+      status: 'cancelled',
+    });
+  });
+
+  it('scopes cancel all queue items to a project when requested', () => {
+    let state = submitGenerate(primeGenerate());
+    const originProject = getActiveProject(state);
+
+    state = workbenchReducer(state, { type: 'createProject' });
+    state = submitGenerate(primeGenerate(state));
+    state = workbenchReducer(state, { projectId: originProject.id, type: 'cancelAllQueueItems' });
+
+    expect(getProject(state, originProject.id).queue.items.map((item) => item.status)).toEqual(['cancelled']);
+    expect(getActiveProject(state).queue.items.map((item) => item.status)).toEqual(['pending']);
+  });
+
+  it('clears completed and failed queue items while preserving active and cancelled items', () => {
+    let state = submitGenerate(primeGenerate());
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0];
+
+    state = workbenchReducer(state, {
+      images: [createImage('completed-result.png', queueItem.id)],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+    state = submitGenerate(primeGenerate(state));
+    const activeQueueItem = getActiveProject(state).queue.items[0];
+    state = workbenchReducer(state, { queueItemId: activeQueueItem.id, type: 'cancelQueueItem' });
+    state = submitGenerate(primeGenerate(state));
+    const failedQueueItem = getActiveProject(state).queue.items[0];
+    state = workbenchReducer(state, {
+      error: 'failed',
+      projectId: project.id,
+      queueItemId: failedQueueItem.id,
+      status: 'failed',
+      type: 'setQueueItemStatus',
+    });
+
+    state = workbenchReducer(state, { type: 'clearCompletedQueueItems' });
+
+    expect(getActiveProject(state).queue.items.map((item) => item.status)).toEqual(['cancelled']);
+  });
+
   it('keeps cancellation terminal when backend item ids arrive late', () => {
     let state = submitGenerate(primeGenerate());
     const project = getActiveProject(state);
@@ -687,6 +828,34 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       'gallery-image-1.png',
     ]);
     expect(values.imageBoards).toBeUndefined();
+  });
+
+  it('routes partial Gallery destination results without completing the local queue item', () => {
+    let state = primeGenerate(undefined, { batchCount: 2 });
+
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = submitGenerate(state);
+
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0];
+
+    state = workbenchReducer(state, {
+      backendItemId: 11,
+      images: [createImage('gallery-image-1.png', queueItem.id)],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemPartialResults',
+    });
+
+    const updatedQueueItem = getActiveProject(state).queue.items[0];
+    const galleryValues = getActiveProject(state).widgetStates.gallery.values;
+
+    expect(updatedQueueItem.status).toBe('pending');
+    expect(updatedQueueItem.completedBackendItemIds).toEqual([11]);
+    expect(updatedQueueItem.resultImages).toEqual([createImage('gallery-image-1.png', queueItem.id)]);
+    expect((galleryValues.recentImages as GeneratedImageContract[]).map((image) => image.imageName)).toEqual([
+      'gallery-image-1.png',
+    ]);
   });
 
   it('stores selected backend board id for gallery submissions', () => {

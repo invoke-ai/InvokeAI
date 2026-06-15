@@ -210,6 +210,41 @@ describe('queueCoordinator', () => {
     await expect(resultsPromise).rejects.toBeInstanceOf(QueueItemCancelledError);
   });
 
+  it('returns completed batch item results when sibling backend items are canceled', async () => {
+    harness.callbacks.onBackendItemCancelled = vi.fn();
+    harness.api.enqueueGenerateGraph.mockResolvedValue({ batchId: 'batch-1', itemIds: [1, 2, 3] });
+    harness.coordinator.connect();
+
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z');
+
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 1, status: 'canceled' }));
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 2 }));
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 3, status: 'canceled' }));
+
+    const images = await resultsPromise;
+
+    expect(images.map((image) => image.imageName)).toEqual(['image-2.png']);
+    expect(harness.api.getQueueItemResultImages).toHaveBeenCalledTimes(1);
+    expect(harness.api.getQueueItemResultImages).toHaveBeenCalledWith(2, 'local-1', '2026-06-10T00:00:00Z');
+    expect(harness.callbacks.onBackendItemCancelled).toHaveBeenCalledWith('local-1', 1);
+    expect(harness.callbacks.onBackendItemCancelled).toHaveBeenCalledWith('local-1', 3);
+  });
+
+  it('rejects with QueueItemCancelledError when every backend item in a batch is canceled', async () => {
+    harness.api.enqueueGenerateGraph.mockResolvedValue({ batchId: 'batch-1', itemIds: [1, 2] });
+    harness.coordinator.connect();
+
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z');
+
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 1, status: 'canceled' }));
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 2, status: 'canceled' }));
+
+    await expect(resultsPromise).rejects.toBeInstanceOf(QueueItemCancelledError);
+    expect(harness.api.getQueueItemResultImages).not.toHaveBeenCalled();
+  });
+
   it('settles runs whose terminal event arrived before tracking began', async () => {
     harness.coordinator.connect();
 
@@ -286,6 +321,39 @@ describe('queueCoordinator', () => {
     await resultsPromise;
 
     expect(harness.progressEntries.has('local-1')).toBe(false);
+    expect(harness.progressImage.clear).toHaveBeenCalledWith({ itemIndex: 1, queueItemId: 'local-1' });
+  });
+
+  it('notifies when one backend item in a batch completes', async () => {
+    harness.callbacks.onBackendItemComplete = vi.fn();
+    harness.api.enqueueGenerateGraph.mockResolvedValue({ batchId: 'batch-1', itemIds: [1, 2] });
+    harness.coordinator.connect();
+
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 1 }));
+
+    expect(harness.callbacks.onBackendItemComplete).toHaveBeenCalledWith('local-1', 1);
+  });
+
+  it('routes progress images to the active image slot inside a submitted batch', async () => {
+    harness.api.enqueueGenerateGraph.mockResolvedValue({ batchId: 'batch-1', itemIds: [1, 2] });
+    harness.coordinator.connect();
+
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 2 }),
+      image: { dataURL: 'data:image/png;base64,abc', height: 32, width: 64 },
+      invocation_source_id: 'denoise',
+      message: 'Denoising',
+      percentage: 0.5,
+    });
+
+    expect(harness.progressImage.set).toHaveBeenCalledWith(
+      { dataUrl: 'data:image/png;base64,abc', height: 32, width: 64 },
+      { itemIndex: 2, queueItemId: 'local-1' }
+    );
   });
 
   it('ignores untracked queue events before mutating local execution state', () => {
@@ -436,15 +504,15 @@ describe('queueCoordinator', () => {
     await expect(resultsPromise).rejects.toThrow('no longer on the backend queue');
   });
 
-  it('cancels by batch id when available, falling back to item ids', async () => {
+  it('prefers precise item ids for cancellation, falling back to batch id', async () => {
     await harness.coordinator.cancelRun({ backendBatchId: 'batch-1', backendItemIds: [1, 2] });
 
-    expect(harness.api.cancelQueueItemsByBatchIds).toHaveBeenCalledWith(['batch-1']);
-    expect(harness.api.cancelQueueItems).not.toHaveBeenCalled();
-
-    await harness.coordinator.cancelRun({ backendItemIds: [1, 2] });
-
     expect(harness.api.cancelQueueItems).toHaveBeenCalledWith([1, 2]);
+    expect(harness.api.cancelQueueItemsByBatchIds).not.toHaveBeenCalled();
+
+    await harness.coordinator.cancelRun({ backendBatchId: 'batch-2' });
+
+    expect(harness.api.cancelQueueItemsByBatchIds).toHaveBeenCalledWith(['batch-2']);
   });
 
   it('stops notifying after dispose', () => {

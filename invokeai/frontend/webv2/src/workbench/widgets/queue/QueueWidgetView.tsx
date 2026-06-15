@@ -1,6 +1,6 @@
 import type { WidgetViewProps } from '@workbench/types';
 
-import { Badge, Progress, Stack, Text, HStack } from '@chakra-ui/react';
+import { Badge, HStack, Progress, Stack, Text } from '@chakra-ui/react';
 import { useQueueItemProgress } from '@workbench/backend/progressStore';
 import { Button } from '@workbench/components/ui/Button';
 import { StatusWidgetChip } from '@workbench/components/WidgetFrames';
@@ -55,7 +55,7 @@ const QueueContents = () => {
   const projects = useWorkbenchSelector((snapshot) => snapshot.state.projects);
   const dispatch = useWorkbenchDispatch();
   const queueRows = projects.flatMap((project) =>
-    project.queue.items.map((item) => ({ item, projectName: project.name }))
+    project.queue.items.map((item) => ({ item, projectId: project.id, projectName: project.name }))
   );
 
   return (
@@ -65,7 +65,7 @@ const QueueContents = () => {
           Queue submissions will appear here.
         </Text>
       ) : (
-        queueRows.map(({ item, projectName }) => {
+        queueRows.map(({ item, projectId, projectName }) => {
           const backendIds = item.backendItemIds?.length ? ` backend ${item.backendItemIds.join(', ')}` : '';
           const resultCount = item.resultImages?.length ? `${item.resultImages.length} image(s)` : 'No results yet';
           const generateValues = item.snapshot.widgetStates.generate.values as Record<string, unknown>;
@@ -109,7 +109,7 @@ const QueueContents = () => {
                   <Button
                     size="2xs"
                     variant="outline"
-                    onClick={() => dispatch({ queueItemId: item.id, type: 'cancelQueueItem' })}
+                    onClick={() => dispatch({ projectId, queueItemId: item.id, type: 'cancelQueueItem' })}
                   >
                     Cancel
                   </Button>
