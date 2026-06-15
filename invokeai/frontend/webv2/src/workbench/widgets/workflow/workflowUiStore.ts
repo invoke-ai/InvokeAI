@@ -1,4 +1,11 @@
 import { createExternalStore } from '../../externalStore';
+import type { FieldType, XYPosition } from '../../workflows/types';
+
+export interface AddNodeConnectionFilter {
+  sourceHandle: string;
+  sourceNodeId: string;
+  sourceType: FieldType;
+}
 
 /**
  * Session-lived UI coordination for the workflow widget. Menu items live
@@ -8,6 +15,8 @@ import { createExternalStore } from '../../externalStore';
  */
 
 export interface WorkflowUiSnapshot {
+  addNodeConnection: AddNodeConnectionFilter | null;
+  addNodePosition: XYPosition | null;
   isAddNodeOpen: boolean;
   isLibraryOpen: boolean;
   isNewWorkflowConfirmOpen: boolean;
@@ -22,6 +31,8 @@ export interface WorkflowUiSnapshot {
 }
 
 export const workflowUiStore = createExternalStore<WorkflowUiSnapshot>({
+  addNodeConnection: null,
+  addNodePosition: null,
   dialogHostId: null,
   importRequestCount: 0,
   isAddNodeOpen: false,
@@ -50,8 +61,16 @@ export const setWorkflowLibraryOpen = (isOpen: boolean): void => {
   workflowUiStore.patchSnapshot({ isLibraryOpen: isOpen });
 };
 
-export const setAddNodeOpen = (isOpen: boolean): void => {
-  workflowUiStore.patchSnapshot({ isAddNodeOpen: isOpen });
+export const setAddNodeOpen = (
+  isOpen: boolean,
+  position: XYPosition | null = null,
+  connection: AddNodeConnectionFilter | null = null
+): void => {
+  workflowUiStore.patchSnapshot({
+    addNodeConnection: isOpen ? connection : null,
+    addNodePosition: isOpen ? position : null,
+    isAddNodeOpen: isOpen,
+  });
 };
 
 export const setNewWorkflowConfirmOpen = (isOpen: boolean): void => {

@@ -14,8 +14,18 @@ import {
   type IsValidConnection,
   type NodeChange,
   type NodeTypes,
+  type OnConnectEnd,
 } from '@xyflow/react';
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
 
 import '@xyflow/react/dist/style.css';
 
@@ -25,9 +35,10 @@ import { useNotify } from '../../../useNotify';
 import { useWorkbenchPreferences } from '../../../settings/store';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '../../../WorkbenchContext';
 import { getProjectGraphReadiness } from '../../../workflows/buildGraph';
-import { createWorkflowId } from '../../../workflows/document';
+import { buildConnectorNode, createWorkflowId } from '../../../workflows/document';
 import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSnapshot } from '../../../workflows/templates';
-import { validateConnection } from '../../../workflows/validation';
+import type { XYPosition } from '../../../workflows/types';
+import { getWorkflowSourceFieldType, validateConnection } from '../../../workflows/validation';
 import { buildDuplicateElements, buildPasteElements, copyNodesToClipboard, useHasClipboardNodes } from './clipboard';
 import { CurrentImageFlowNode } from './CurrentImageFlowNode';
 import { EditorToolbar, type EditorTool } from './EditorToolbar';
@@ -38,14 +49,17 @@ import {
   type WorkflowFlowInstance,
 } from './flowInstanceStore';
 import { InvocationFlowNode } from './InvocationFlowNode';
-import { NodeContextMenu, type NodeContextMenuState } from './NodeContextMenu';
+import { ConnectorFlowNode } from './ConnectorFlowNode';
+import { NodeContextMenu, type WorkflowContextMenuState } from './NodeContextMenu';
 import { NotesFlowNode } from './NotesFlowNode';
 import { clearNodeSelectionRequest, reportNodeSelection, workflowSelectionStore } from './selectionStore';
 import { useEraser } from './useEraser';
 import { useLasso } from './useLasso';
 import { useModifierHeld } from './useModifierHeld';
+import { setAddNodeOpen } from '../workflowUiStore';
 
 const nodeTypes: NodeTypes = {
+  connector: ConnectorFlowNode,
   current_image: CurrentImageFlowNode,
   invocation: InvocationFlowNode,
   notes: NotesFlowNode,
@@ -67,6 +81,16 @@ const DEFAULT_EDGE_OPTIONS = { style: { strokeWidth: 1.5 } };
 const isEditableTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"]') !== null;
 
+const getEventClientPosition = (event: MouseEvent | TouchEvent): { x: number; y: number } | null => {
+  if (event instanceof MouseEvent) {
+    return { x: event.clientX, y: event.clientY };
+  }
+
+  const touch = event.changedTouches[0];
+
+  return touch ? { x: touch.clientX, y: touch.clientY } : null;
+};
+
 const WorkflowFlow = () => {
   const projectGraph = useActiveProjectSelector((project) => project.projectGraph);
   const dispatch = useWorkbenchDispatch();
@@ -80,10 +104,11 @@ const WorkflowFlow = () => {
   const [flowInstance, setFlowInstance] = useState<WorkflowFlowInstance | null>(null);
   const [tool, setTool] = useState<EditorTool>('pan');
   const [nodeOpacity, setNodeOpacity] = useState(1);
-  const [contextMenu, setContextMenu] = useState<NodeContextMenuState | null>(null);
+  const [contextMenu, setContextMenu] = useState<WorkflowContextMenuState | null>(null);
   const { selectionRequest } = workflowSelectionStore.useSnapshot();
   const isSnapHeld = useModifierHeld('Control');
   const hasClipboardNodes = useHasClipboardNodes();
+  const backgroundId = useId().replace(/:/g, '');
   /** Node ids to select once the next document-driven rebuild lands (fresh paste/duplicate results). */
   const pendingSelectionRef = useRef<string[] | null>(null);
 
@@ -174,15 +199,18 @@ const WorkflowFlow = () => {
   }, [flowInstance, selectNodes, selectionRequest]);
 
   /** The context-menu node acts alone unless it is part of the current selection. */
-  const getActionNodeIds = (nodeId?: string): string[] => {
-    const selectedIds = flowNodes.filter((node) => node.selected).map((node) => node.id);
+  const getActionNodeIds = useCallback(
+    (nodeId?: string): string[] => {
+      const selectedIds = flowNodes.filter((node) => node.selected).map((node) => node.id);
 
-    if (nodeId && !selectedIds.includes(nodeId)) {
-      return [nodeId];
-    }
+      if (nodeId && !selectedIds.includes(nodeId)) {
+        return [nodeId];
+      }
 
-    return selectedIds;
-  };
+      return selectedIds;
+    },
+    [flowNodes]
+  );
 
   const copyNodes = (nodeId?: string) => {
     const copiedCount = copyNodesToClipboard(projectGraph, getActionNodeIds(nodeId));
@@ -220,6 +248,10 @@ const WorkflowFlow = () => {
     if (nodeIds.length > 0) {
       dispatch({ action: { nodeIds, type: 'removeNodes' }, type: 'applyProjectGraphAction' });
     }
+  };
+
+  const addConnector = (position: XYPosition) => {
+    dispatch({ action: { node: buildConnectorNode(position), type: 'addNode' }, type: 'applyProjectGraphAction' });
   };
 
   const onEditorKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -325,9 +357,45 @@ const WorkflowFlow = () => {
     [dispatch]
   );
 
-  const onNodeContextMenu = useCallback((event: MouseEvent, node: WorkflowFlowNode) => {
+  const onConnectEnd = useCallback<OnConnectEnd>(
+    (event, connectionState) => {
+      if (!flowInstance || !(event.target instanceof Element) || !event.target.closest('.react-flow__pane')) {
+        return;
+      }
+
+      const sourceHandle = connectionState.fromHandle?.id;
+      const sourceNodeId = connectionState.fromHandle?.nodeId ?? connectionState.fromNode?.id;
+
+      if (!sourceHandle || !sourceNodeId || connectionState.fromHandle?.type !== 'source') {
+        return;
+      }
+
+      const sourceType = getWorkflowSourceFieldType(
+        projectGraph,
+        templatesSnapshot.templates,
+        sourceNodeId,
+        sourceHandle
+      );
+
+      if (!sourceType) {
+        return;
+      }
+
+      const position = getEventClientPosition(event);
+
+      if (!position) {
+        return;
+      }
+
+      setAddNodeOpen(true, flowInstance.screenToFlowPosition(position), { sourceHandle, sourceNodeId, sourceType });
+    },
+    [flowInstance, projectGraph, templatesSnapshot.templates]
+  );
+
+  const onNodeContextMenu = useCallback((event: ReactMouseEvent, node: WorkflowFlowNode) => {
     event.preventDefault();
     setContextMenu({
+      kind: 'node',
       isNodeOpen: node.type === 'invocation' ? node.data.documentNode.data.isOpen : null,
       nodeId: node.id,
       x: event.clientX,
@@ -335,8 +403,59 @@ const WorkflowFlow = () => {
     });
   }, []);
 
+  const onPaneContextMenu = useCallback(
+    (event: ReactMouseEvent | globalThis.MouseEvent) => {
+      if (!flowInstance) {
+        return;
+      }
+
+      event.preventDefault();
+      if (
+        event.target instanceof Element &&
+        event.target.closest('.react-flow__nodesselection') &&
+        getActionNodeIds().length > 0
+      ) {
+        setContextMenu({
+          kind: 'node',
+          isNodeOpen: null,
+          x: event.clientX,
+          y: event.clientY,
+        });
+        return;
+      }
+
+      setContextMenu({
+        kind: 'pane',
+        position: flowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY }),
+        x: event.clientX,
+        y: event.clientY,
+      });
+    },
+    [flowInstance, getActionNodeIds]
+  );
+
+  const onEditorContextMenuCapture = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      if (
+        event.target instanceof Element &&
+        event.target.closest('.react-flow__nodesselection') &&
+        getActionNodeIds().length > 0
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        setContextMenu({
+          kind: 'node',
+          isNodeOpen: null,
+          x: event.clientX,
+          y: event.clientY,
+        });
+      }
+    },
+    [getActionNodeIds]
+  );
+
   const onNodeClick = useCallback(
-    (_: MouseEvent, node: WorkflowFlowNode) => {
+    (_: ReactMouseEvent, node: WorkflowFlowNode) => {
       if (tool === 'eraser') {
         eraseElements({ edgeIds: [], nodeIds: [node.id] });
       }
@@ -345,7 +464,7 @@ const WorkflowFlow = () => {
   );
 
   const onEdgeClick = useCallback(
-    (_: MouseEvent, edge: FlowEdge) => {
+    (_: ReactMouseEvent, edge: FlowEdge) => {
       if (tool === 'eraser') {
         eraseElements({ edgeIds: [edge.id], nodeIds: [] });
       }
@@ -377,6 +496,7 @@ const WorkflowFlow = () => {
       h="full"
       position="relative"
       w="full"
+      onContextMenuCapture={onEditorContextMenuCapture}
       onKeyDown={onEditorKeyDown}
       {...pointerToolHandlers}
     >
@@ -400,15 +520,24 @@ const WorkflowFlow = () => {
         snapToGrid={workflowSnapToGrid || isSnapHeld}
         style={{ background: 'transparent' }}
         onConnect={onConnect}
+        onConnectEnd={onConnectEnd}
         onEdgeClick={onEdgeClick}
         onEdgesChange={onEdgesChange}
         onInit={setFlowInstance}
         onNodeClick={onNodeClick}
         onNodeContextMenu={onNodeContextMenu}
         onNodesChange={onNodesChange}
+        onPaneContextMenu={onPaneContextMenu}
         onSelectionChange={onSelectionChange}
       >
-        <Background color="var(--wb-flow-grid)" gap={24} size={1.5} variant={BackgroundVariant.Dots} />
+        <Background
+          bgColor="var(--xy-background-color)"
+          color="var(--wb-flow-grid)"
+          gap={24}
+          id={`workflow-grid-${backgroundId}`}
+          size={1.5}
+          variant={BackgroundVariant.Dots}
+        />
         <EditorToolbar
           nodeOpacity={nodeOpacity}
           tool={tool}
@@ -422,17 +551,21 @@ const WorkflowFlow = () => {
       <NodeContextMenu
         canPaste={hasClipboardNodes}
         menuState={contextMenu}
+        onAddConnector={(position) => {
+          addConnector(position);
+          setContextMenu(null);
+        }}
         onClose={() => setContextMenu(null)}
         onCopy={() => {
-          copyNodes(contextMenu?.nodeId);
+          copyNodes(contextMenu?.kind === 'node' ? contextMenu.nodeId : undefined);
           setContextMenu(null);
         }}
         onDelete={() => {
-          deleteNodes(contextMenu?.nodeId);
+          deleteNodes(contextMenu?.kind === 'node' ? contextMenu.nodeId : undefined);
           setContextMenu(null);
         }}
         onDuplicate={() => {
-          duplicateNodes(contextMenu?.nodeId);
+          duplicateNodes(contextMenu?.kind === 'node' ? contextMenu.nodeId : undefined);
           setContextMenu(null);
         }}
         onPaste={() => {
@@ -440,7 +573,7 @@ const WorkflowFlow = () => {
           setContextMenu(null);
         }}
         onToggleOpen={() => {
-          if (contextMenu && contextMenu.isNodeOpen !== null) {
+          if (contextMenu?.kind === 'node' && contextMenu.nodeId && contextMenu.isNodeOpen !== null) {
             dispatch({
               action: { isOpen: !contextMenu.isNodeOpen, nodeId: contextMenu.nodeId, type: 'setNodeIsOpen' },
               type: 'applyProjectGraphAction',

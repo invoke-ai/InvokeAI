@@ -14,6 +14,7 @@ import {
   createWorkflowId,
 } from '../../workflows/document';
 import type { InvocationTemplate, XYPosition } from '../../workflows/types';
+import { getCompatibleInputTemplate } from '../../workflows/validation';
 import { parseWorkflowJson } from '../../workflows/workflowJson';
 import type { WidgetLabelProps, WidgetViewProps } from '../../types';
 import { AddNodeDialog } from './editor/AddNodeDialog';
@@ -129,8 +130,15 @@ export const WorkflowHeaderActions = ({ region }: WidgetViewProps) => {
   const dispatch = useWorkbenchDispatch();
   const notify = useNotify();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { dialogHostId, importRequestCount, isAddNodeOpen, isLibraryOpen, isNewWorkflowConfirmOpen } =
-    workflowUiStore.useSnapshot();
+  const {
+    addNodeConnection,
+    addNodePosition,
+    dialogHostId,
+    importRequestCount,
+    isAddNodeOpen,
+    isLibraryOpen,
+    isNewWorkflowConfirmOpen,
+  } = workflowUiStore.useSnapshot();
   const restorableHistory = graphHistory.filter((entry) => entry.document);
 
   // Both workflow surfaces can be mounted at once; exactly one (the first to
@@ -156,6 +164,10 @@ export const WorkflowHeaderActions = ({ region }: WidgetViewProps) => {
   }, [importRequestCount, isDialogHost]);
 
   const getInsertPosition = (): XYPosition => {
+    if (addNodePosition) {
+      return addNodePosition;
+    }
+
     const instance = getWorkflowFlowInstance();
     const center = instance
       ? instance.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
@@ -166,8 +178,39 @@ export const WorkflowHeaderActions = ({ region }: WidgetViewProps) => {
   };
 
   const addNode = (template: InvocationTemplate) => {
+    const node = buildInvocationNode(template, getInsertPosition());
+
+    if (!addNodeConnection) {
+      dispatch({
+        action: { node, type: 'addNode' },
+        type: 'applyProjectGraphAction',
+      });
+      return;
+    }
+
+    const targetInput = getCompatibleInputTemplate(template, addNodeConnection.sourceType);
+
+    if (!targetInput) {
+      dispatch({
+        action: { node, type: 'addNode' },
+        type: 'applyProjectGraphAction',
+      });
+      return;
+    }
+
     dispatch({
-      action: { node: buildInvocationNode(template, getInsertPosition()), type: 'addNode' },
+      action: {
+        edge: {
+          id: createWorkflowId('edge'),
+          source: addNodeConnection.sourceNodeId,
+          sourceHandle: addNodeConnection.sourceHandle,
+          target: node.id,
+          targetHandle: targetInput.name,
+          type: 'default',
+        },
+        node,
+        type: 'addNodeAndEdge',
+      },
       type: 'applyProjectGraphAction',
     });
   };
@@ -289,6 +332,7 @@ export const WorkflowHeaderActions = ({ region }: WidgetViewProps) => {
             }}
           />
           <AddNodeDialog
+            connectionFilter={addNodeConnection}
             isOpen={isAddNodeOpen}
             onAddCurrentImage={addCurrentImage}
             onAddNode={addNode}

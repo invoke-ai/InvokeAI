@@ -7,6 +7,8 @@ import { Scrollable } from '../../../components/ui/Scrollable';
 import { Tooltip } from '../../../components/ui/Tooltip';
 import { useInvocationTemplatesSnapshot } from '../../../workflows/templates';
 import type { InvocationTemplate } from '../../../workflows/types';
+import { getCompatibleInputTemplate } from '../../../workflows/validation';
+import type { AddNodeConnectionFilter } from '../workflowUiStore';
 
 /**
  * Command-palette-style node picker: a centered search dialog whose results
@@ -80,12 +82,40 @@ const NodeResultRow = ({ row }: { row: NodeRow }) => (
 );
 
 export const AddNodeDialog = ({
+  connectionFilter,
   isOpen,
   onAddCurrentImage,
   onAddNode,
   onAddNote,
   onOpenChange,
 }: {
+  connectionFilter: AddNodeConnectionFilter | null;
+  isOpen: boolean;
+  onAddCurrentImage: () => void;
+  onAddNode: (template: InvocationTemplate) => void;
+  onAddNote: () => void;
+  onOpenChange: (isOpen: boolean) => void;
+}) =>
+  isOpen ? (
+    <AddNodeDialogContent
+      connectionFilter={connectionFilter}
+      isOpen={isOpen}
+      onAddCurrentImage={onAddCurrentImage}
+      onAddNode={onAddNode}
+      onAddNote={onAddNote}
+      onOpenChange={onOpenChange}
+    />
+  ) : null;
+
+const AddNodeDialogContent = ({
+  connectionFilter,
+  isOpen,
+  onAddCurrentImage,
+  onAddNode,
+  onAddNote,
+  onOpenChange,
+}: {
+  connectionFilter: AddNodeConnectionFilter | null;
   isOpen: boolean;
   onAddCurrentImage: () => void;
   onAddNode: (template: InvocationTemplate) => void;
@@ -112,33 +142,39 @@ export const AddNodeDialog = ({
 
   const groups = useMemo<CategoryGroup[]>(() => {
     const terms = searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    const utilityRows: NodeRow[] = [
-      {
-        description: 'Annotate the workflow with a free-text note.',
-        isBeta: false,
-        nodePack: 'invokeai',
-        onAdd: () => {
-          onAddNote();
-          close(true);
-        },
-        title: 'Notes',
-      },
-      {
-        description: 'Show the latest generated image (and live progress) inside the graph.',
-        isBeta: false,
-        nodePack: 'invokeai',
-        onAdd: () => {
-          onAddCurrentImage();
-          close(true);
-        },
-        title: 'Current Image',
-      },
-    ].filter((row) => terms.every((term) => row.title.toLowerCase().includes(term)));
+    const utilityRows: NodeRow[] = connectionFilter
+      ? []
+      : [
+          {
+            description: 'Annotate the workflow with a free-text note.',
+            isBeta: false,
+            nodePack: 'invokeai',
+            onAdd: () => {
+              onAddNote();
+              close(true);
+            },
+            title: 'Notes',
+          },
+          {
+            description: 'Show the latest generated image (and live progress) inside the graph.',
+            isBeta: false,
+            nodePack: 'invokeai',
+            onAdd: () => {
+              onAddCurrentImage();
+              close(true);
+            },
+            title: 'Current Image',
+          },
+        ].filter((row) => terms.every((term) => row.title.toLowerCase().includes(term)));
 
     const byCategory = new Map<string, NodeRow[]>();
 
     for (const template of Object.values(templates)) {
-      if (template.classification === 'internal' || (terms.length > 0 && !matchesSearch(template, terms))) {
+      if (
+        template.classification === 'internal' ||
+        (terms.length > 0 && !matchesSearch(template, terms)) ||
+        (connectionFilter && !getCompatibleInputTemplate(template, connectionFilter.sourceType))
+      ) {
         continue;
       }
 
@@ -167,7 +203,7 @@ export const AddNodeDialog = ({
     return utilityRows.length > 0
       ? [{ label: UTILITY_CATEGORY, rows: utilityRows }, ...categoryGroups]
       : categoryGroups;
-  }, [close, onAddCurrentImage, onAddNode, onAddNote, searchTerm, templates]);
+  }, [close, connectionFilter, onAddCurrentImage, onAddNode, onAddNote, searchTerm, templates]);
 
   const totalCount = groups.reduce((sum, group) => sum + group.rows.length, 0);
   const accordionValue = isSearching ? groups.map((group) => group.label) : expandedCategories;
@@ -183,7 +219,7 @@ export const AddNodeDialog = ({
   } else if (totalCount === 0) {
     body = (
       <Text color="fg.subtle" fontSize="xs" px="1" py="4" textAlign="center">
-        No nodes match your search.
+        {connectionFilter ? `No nodes accept ${connectionFilter.sourceType.name}.` : 'No nodes match your search.'}
       </Text>
     );
   } else {
@@ -194,26 +230,32 @@ export const AddNodeDialog = ({
         variant="plain"
         onValueChange={(event) => setExpandedCategories(event.value)}
       >
-        {groups.map((group) => (
-          <Accordion.Item key={group.label} value={group.label}>
-            <Accordion.ItemTrigger cursor="pointer" px="1" py="1.5">
-              <Accordion.ItemIndicator />
-              <Text flex="1" fontSize="xs" fontWeight="700" textAlign="start">
-                {group.label}
-              </Text>
-              <Badge size="sm" variant="surface">
-                {group.rows.length}
-              </Badge>
-            </Accordion.ItemTrigger>
-            <Accordion.ItemContent>
-              <Stack gap="0.5" pb="2">
-                {group.rows.map((row) => (
-                  <NodeResultRow key={`${group.label}:${row.title}`} row={row} />
-                ))}
-              </Stack>
-            </Accordion.ItemContent>
-          </Accordion.Item>
-        ))}
+        {groups.map((group) => {
+          const isExpanded = accordionValue.includes(group.label);
+
+          return (
+            <Accordion.Item key={group.label} value={group.label}>
+              <Accordion.ItemTrigger cursor="pointer" px="1" py="1.5">
+                <Accordion.ItemIndicator />
+                <Text flex="1" fontSize="xs" fontWeight="700" textAlign="start">
+                  {group.label}
+                </Text>
+                <Badge size="sm" variant="surface">
+                  {group.rows.length}
+                </Badge>
+              </Accordion.ItemTrigger>
+              <Accordion.ItemContent>
+                {isExpanded ? (
+                  <Stack gap="0.5" pb="2">
+                    {group.rows.map((row) => (
+                      <NodeResultRow key={`${group.label}:${row.title}`} row={row} />
+                    ))}
+                  </Stack>
+                ) : null}
+              </Accordion.ItemContent>
+            </Accordion.Item>
+          );
+        })}
       </Accordion.Root>
     );
   }
@@ -239,7 +281,11 @@ export const AddNodeDialog = ({
                 <Input
                   autoFocus
                   aria-label="Search for nodes"
-                  placeholder="Search for nodes…"
+                  placeholder={
+                    connectionFilter
+                      ? `Search compatible ${connectionFilter.sourceType.name} nodes…`
+                      : 'Search for nodes…'
+                  }
                   size="md"
                   value={searchTerm}
                   onChange={(event: ChangeEvent<HTMLInputElement>) => setSearchTerm(event.currentTarget.value)}
