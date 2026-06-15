@@ -2,14 +2,14 @@ import { Checkbox, HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
 import { DownloadIcon, FolderSearchIcon } from 'lucide-react';
 import { useState } from 'react';
 
-import { Button } from '../../components/ui/Button';
-import { Field } from '../../components/ui/Field';
-import { Scrollable } from '../../components/ui/Scrollable';
-import { scanFolderForModels } from '../../models/api';
-import { scanFolderSchema } from '../../models/schemas';
-import { updateModelsUi, useModelsUi } from '../../models/uiStore';
-import { useZodForm } from '../../models/useZodForm';
-import { useNotify } from '../../useNotify';
+import { Button } from '@workbench/components/ui/Button';
+import { Field } from '@workbench/components/ui/Field';
+import { Scrollable } from '@workbench/components/ui/Scrollable';
+import { scanFolderForModels } from '@workbench/models/api';
+import { scanFolderSchema } from '@workbench/models/schemas';
+import { updateModelsUi, useModelsUi } from '@workbench/models/uiStore';
+import { useZodForm } from '@workbench/models/useZodForm';
+import { useNotify } from '@workbench/useNotify';
 import { InstallSourceButton, SourceListItem } from './SourceListItem';
 import { useInstallActions } from './useInstallActions';
 

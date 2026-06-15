@@ -9,11 +9,11 @@ import { OpenProjectDialog } from './OpenProjectDialog';
 import { RenameDialog } from './ui/RenameDialog';
 import { Tabs } from './ui/Tabs';
 import { Tooltip } from './ui/Tooltip';
-import type { Project, WidgetRegion } from '../types';
-import { exportOpenProject } from '../projects/projectFile';
-import { useProjectActions } from '../projects/useProjectActions';
-import { useOpenWorkbenchWidget } from '../useOpenWorkbenchWidget';
-import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '../WorkbenchContext';
+import type { Project, WidgetRegion } from '@workbench/types';
+import { exportOpenProject } from '@workbench/projects/projectFile';
+import { useProjectActions } from '@workbench/projects/useProjectActions';
+import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 
 /**
  * Document-style tabs for the open projects (the session), immediately right

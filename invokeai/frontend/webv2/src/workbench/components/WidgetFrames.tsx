@@ -1,6 +1,6 @@
 import { Box, Flex, HStack, Icon, Stack, Text, type RecipeVariantProps, useRecipe } from '@chakra-ui/react';
 
-import { chipRecipe } from '../../theme/recipes';
+import { chipRecipe } from '@theme/recipes';
 import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -9,10 +9,10 @@ import {
 } from 'react';
 import { SettingsIcon, type LucideIcon } from 'lucide-react';
 
-import { useFocusRegionProps } from '../focusRegions';
-import { openWorkbenchSettings } from '../settings/settingsDialogStore';
-import type { WidgetManifest, WidgetRegion, WorkbenchRegion } from '../types';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '../WorkbenchContext';
+import { useFocusRegionProps } from '@workbench/focusRegions';
+import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
+import type { WidgetManifest, WidgetRegion, WorkbenchRegion } from '@workbench/types';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { WidgetActionsMenu } from './WidgetActionsMenu';
 import { IconButton } from './ui/Button';
 

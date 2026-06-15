@@ -14,9 +14,9 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeftRightIcon, LockIcon, LockOpenIcon, RulerDimensionLineIcon, ScalingIcon } from 'lucide-react';
 
-import { IconButton } from '../../components/ui/Button';
-import { Field } from '../../components/ui/Field';
-import { Tooltip } from '../../components/ui/Tooltip';
+import { IconButton } from '@workbench/components/ui/Button';
+import { Field } from '@workbench/components/ui/Field';
+import { Tooltip } from '@workbench/components/ui/Tooltip';
 import {
   ASPECT_RATIO_MAP,
   ASPECT_RATIO_OPTIONS,
@@ -24,8 +24,8 @@ import {
   clampDimension,
   getOptimalDimension,
   isAspectRatioId,
-} from '../../generation/settings';
-import type { AspectRatioId, GenerateSettings, MainModelConfig } from '../../generation/types';
+} from '@workbench/generation/settings';
+import type { AspectRatioId, GenerateSettings, MainModelConfig } from '@workbench/generation/types';
 import { AspectRatioPreview } from './shared/AspectRatioPreview';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 

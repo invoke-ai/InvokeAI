@@ -2,7 +2,7 @@ import { Icon, Popover, Portal, Stack, Text, Textarea, IconButton } from '@chakr
 import { FileTextIcon } from 'lucide-react';
 import type { ChangeEvent } from 'react';
 
-import { useWorkbenchDispatch } from '../../../WorkbenchContext';
+import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 
 /**
  * Small textarea popover overriding a field's template description ("field

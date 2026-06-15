@@ -3,11 +3,11 @@ import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ChevronDownIcon, LogOutIcon, UserRoundCogIcon, UsersIcon } from 'lucide-react';
 
-import { MenuContent } from '../../components/ui/Menu';
-import { SettingsButton } from '../../settings/SettingsDialog';
-import { useOptionalOpenWorkbenchWidget } from '../../useOpenWorkbenchWidget';
-import { useOptionalWorkbenchStore } from '../../WorkbenchContext';
-import { logoutSession, useAuthSession } from '../session';
+import { MenuContent } from '@workbench/components/ui/Menu';
+import { SettingsButton } from '@workbench/settings/SettingsDialog';
+import { useOptionalOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { useOptionalWorkbenchStore } from '@workbench/WorkbenchContext';
+import { logoutSession, useAuthSession } from '@workbench/auth/session';
 import { ProfileDialog } from './ProfileDialog';
 
 /**

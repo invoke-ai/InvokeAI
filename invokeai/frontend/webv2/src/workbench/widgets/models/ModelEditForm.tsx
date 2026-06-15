@@ -1,13 +1,13 @@
 import { HStack, Input, NativeSelect, Stack, Text, Textarea } from '@chakra-ui/react';
 
-import { Button } from '../../components/ui/Button';
-import { Field } from '../../components/ui/Field';
-import { updateModel } from '../../models/api';
-import { replaceModelInStore } from '../../models/modelsStore';
-import { modelEditSchema, type ModelEditFormValues } from '../../models/schemas';
-import { getModelBaseLabel, getModelTypeLabel, MODEL_CATEGORIES } from '../../models/taxonomy';
-import type { ModelConfig, PredictionType } from '../../models/types';
-import { useZodForm } from '../../models/useZodForm';
+import { Button } from '@workbench/components/ui/Button';
+import { Field } from '@workbench/components/ui/Field';
+import { updateModel } from '@workbench/models/api';
+import { replaceModelInStore } from '@workbench/models/modelsStore';
+import { modelEditSchema, type ModelEditFormValues } from '@workbench/models/schemas';
+import { getModelBaseLabel, getModelTypeLabel, MODEL_CATEGORIES } from '@workbench/models/taxonomy';
+import type { ModelConfig, PredictionType } from '@workbench/models/types';
+import { useZodForm } from '@workbench/models/useZodForm';
 
 const KNOWN_BASES = [
   'sd-1',

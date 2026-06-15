@@ -1,4 +1,4 @@
-import { getUserStorageScope } from '../auth/session';
+import { getUserStorageScope } from '@workbench/auth/session';
 
 /**
  * Client-side API key storage for remote model sources. The HuggingFace token

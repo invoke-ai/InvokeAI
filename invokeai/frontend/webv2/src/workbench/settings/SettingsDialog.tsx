@@ -31,11 +31,11 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-import { themeCardRecipe } from '../../theme/recipes';
-import { previewSwatches, THEMES, type ThemeDefinition } from '../../theme/system';
-import { Button, CloseButton, IconButton } from '../components/ui/Button';
-import { ConfirmDialog } from '../components/ui/ConfirmDialog';
-import { syncedWorkbenchPersistence } from '../projects/syncedPersistence';
+import { themeCardRecipe } from '@theme/recipes';
+import { previewSwatches, THEMES, type ThemeDefinition } from '@theme/system';
+import { Button, CloseButton, IconButton } from '@workbench/components/ui/Button';
+import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
+import { syncedWorkbenchPersistence } from '@workbench/projects/syncedPersistence';
 import type {
   DeveloperLogLevel,
   DeveloperLogNamespace,
@@ -45,12 +45,12 @@ import type {
   WorkbenchLanguage,
   WorkbenchPreferences,
   WorkbenchThemeId,
-} from '../types';
+} from '@workbench/types';
 import {
   useOptionalWorkbenchDispatch,
   useOptionalWorkbenchSelector,
   useOptionalWorkbenchStore,
-} from '../WorkbenchContext';
+} from '@workbench/WorkbenchContext';
 import {
   closeWorkbenchSettings,
   openWorkbenchSettings,

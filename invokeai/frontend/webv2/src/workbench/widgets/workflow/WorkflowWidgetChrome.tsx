@@ -2,21 +2,21 @@ import { HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react
 import { HistoryIcon, LibraryIcon, PlusIcon } from 'lucide-react';
 import { useEffect, useId, useRef, type ChangeEvent } from 'react';
 
-import { IconButton } from '../../components/ui/Button';
-import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
-import { useNotify } from '../../useNotify';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '../../WorkbenchContext';
+import { IconButton } from '@workbench/components/ui/Button';
+import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
+import { useNotify } from '@workbench/useNotify';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import {
   buildCurrentImageNode,
   buildInvocationNode,
   buildNotesNode,
   createProjectGraph,
   createWorkflowId,
-} from '../../workflows/document';
-import type { InvocationTemplate, XYPosition } from '../../workflows/types';
-import { getCompatibleInputTemplate } from '../../workflows/validation';
-import { parseWorkflowJson } from '../../workflows/workflowJson';
-import type { WidgetLabelProps, WidgetViewProps } from '../../types';
+} from '@workbench/workflows/document';
+import type { InvocationTemplate, XYPosition } from '@workbench/workflows/types';
+import { getCompatibleInputTemplate } from '@workbench/workflows/validation';
+import { parseWorkflowJson } from '@workbench/workflows/workflowJson';
+import type { WidgetLabelProps, WidgetViewProps } from '@workbench/types';
 import { AddNodeDialog } from './editor/AddNodeDialog';
 import { getWorkflowFlowInstance } from './editor/flowInstanceStore';
 import { WorkflowLibraryDialog } from './library/WorkflowLibraryDialog';

@@ -1,8 +1,8 @@
 import { Stack, Text } from '@chakra-ui/react';
 import { InfoIcon } from 'lucide-react';
 
-import { StatusWidgetChip } from '../../components/WidgetFrames';
-import type { WidgetViewProps } from '../../types';
+import { StatusWidgetChip } from '@workbench/components/WidgetFrames';
+import type { WidgetViewProps } from '@workbench/types';
 
 export const VersionStatusWidgetView = ({ presentation }: WidgetViewProps) => {
   if (presentation === 'tooltip') {

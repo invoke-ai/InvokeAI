@@ -2,15 +2,15 @@ import { HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
 import { useState, type ReactNode } from 'react';
 import { ArrowRightIcon, CopyIcon, History as HistoryIcon, Trash2Icon } from 'lucide-react';
 
-import { Button, IconButton } from '../../components/ui/Button';
-import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
-import { Field, FieldLabel } from '../../components/ui/Field';
-import { Panel } from '../../components/ui/Panel';
-import { useProjectSync } from '../../projects/syncStore';
-import { useProjectActions } from '../../projects/useProjectActions';
-import type { Project } from '../../types';
-import { useNotify } from '../../useNotify';
-import { useActiveProject, useWorkbenchDispatch, useWorkbenchSelector } from '../../WorkbenchContext';
+import { Button, IconButton } from '@workbench/components/ui/Button';
+import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
+import { Field, FieldLabel } from '@workbench/components/ui/Field';
+import { Panel } from '@workbench/components/ui/Panel';
+import { useProjectSync } from '@workbench/projects/syncStore';
+import { useProjectActions } from '@workbench/projects/useProjectActions';
+import type { Project } from '@workbench/types';
+import { useNotify } from '@workbench/useNotify';
+import { useActiveProject, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 
 /**
  * The Project panel: rename the active project, see its sync/debug details,

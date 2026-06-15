@@ -1,8 +1,8 @@
 import { Stack, Textarea } from '@chakra-ui/react';
 import type { ChangeEvent } from 'react';
 
-import { Field } from '../../components/ui/Field';
-import type { GenerateSettings } from '../../generation/types';
+import { Field } from '@workbench/components/ui/Field';
+import type { GenerateSettings } from '@workbench/generation/types';
 
 interface GeneratePromptFieldsProps {
   settings: GenerateSettings;

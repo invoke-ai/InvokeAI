@@ -11,19 +11,19 @@ import {
   Trash2Icon,
 } from 'lucide-react';
 
-import { ConfirmDialog } from '../components/ui/ConfirmDialog';
-import { IconButton } from '../components/ui/Button';
-import { MenuContent } from '../components/ui/Menu';
-import { RenameDialog } from '../components/ui/RenameDialog';
+import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
+import { IconButton } from '@workbench/components/ui/Button';
+import { MenuContent } from '@workbench/components/ui/Menu';
+import { RenameDialog } from '@workbench/components/ui/RenameDialog';
 import { formatRelativeTime } from './formatRelativeTime';
-import { toaster } from '../components/ui/toaster';
-import { exportLibraryProject } from '../projects/projectFile';
+import { toaster } from '@workbench/components/ui/toaster';
+import { exportLibraryProject } from '@workbench/projects/projectFile';
 import {
   deleteLibraryProject,
   duplicateLibraryProject,
   renameLibraryProject,
   type ProjectSummary,
-} from '../projects/library';
+} from '@workbench/projects/library';
 
 /**
  * One saved project in the Home grid. The whole card is a deep link into the

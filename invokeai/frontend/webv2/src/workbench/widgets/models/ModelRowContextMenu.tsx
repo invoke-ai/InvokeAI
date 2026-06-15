@@ -3,10 +3,10 @@ import { RefreshCcwIcon, Trash2Icon } from 'lucide-react';
 import { SiHuggingface } from 'react-icons/si';
 import { useRef, useState } from 'react';
 
-import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
-import { MenuContent } from '../../components/ui/Menu';
-import { isConvertibleToDiffusers } from '../../models/taxonomy';
-import type { ModelConfig } from '../../models/types';
+import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
+import { MenuContent } from '@workbench/components/ui/Menu';
+import { isConvertibleToDiffusers } from '@workbench/models/taxonomy';
+import type { ModelConfig } from '@workbench/models/types';
 import { useModelActions } from './useModelActions';
 
 export interface ModelContextMenuTarget {

@@ -1,10 +1,10 @@
 import { ButtonGroup, HStack, Pagination } from '@chakra-ui/react';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 
-import { IconButton } from '../../components/ui/Button';
-import { getGallerySettings } from '../../gallery/settings';
-import type { WidgetViewProps } from '../../types';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '../../WorkbenchContext';
+import { IconButton } from '@workbench/components/ui/Button';
+import { getGallerySettings } from '@workbench/gallery/settings';
+import type { WidgetViewProps } from '@workbench/types';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { getGalleryPage, getGalleryTotalImages } from './galleryStateView';
 import { GALLERY_PAGE_SIZE } from './useGalleryData';
 

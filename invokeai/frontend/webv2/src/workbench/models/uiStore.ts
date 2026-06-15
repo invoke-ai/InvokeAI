@@ -1,4 +1,4 @@
-import { createExternalStore } from '../externalStore';
+import { createExternalStore } from '@workbench/externalStore';
 import { DEFAULT_LIBRARY_FILTERS, type ModelLibraryFilters } from './library';
 import type { FoundModel } from './types';
 

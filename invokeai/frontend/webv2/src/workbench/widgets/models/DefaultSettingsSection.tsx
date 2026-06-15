@@ -2,13 +2,13 @@ import { Grid, HStack, Icon, NativeSelect, NumberInput, Stack, Switch, Text } fr
 import { MoveHorizontalIcon } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 
-import { Button } from '../../components/ui/Button';
-import { FieldLabel } from '../../components/ui/Field';
-import { Panel } from '../../components/ui/Panel';
-import { updateModel } from '../../models/api';
-import { replaceModelInStore } from '../../models/modelsStore';
-import { loraDefaultSettingsSchema, mainDefaultSettingsSchema } from '../../models/schemas';
-import type { AnyModelDefaultSettings, ModelConfig } from '../../models/types';
+import { Button } from '@workbench/components/ui/Button';
+import { FieldLabel } from '@workbench/components/ui/Field';
+import { Panel } from '@workbench/components/ui/Panel';
+import { updateModel } from '@workbench/models/api';
+import { replaceModelInStore } from '@workbench/models/modelsStore';
+import { loraDefaultSettingsSchema, mainDefaultSettingsSchema } from '@workbench/models/schemas';
+import type { AnyModelDefaultSettings, ModelConfig } from '@workbench/models/types';
 
 /**
  * Per-model generation defaults ("use these settings when this model is

@@ -2,8 +2,8 @@ import { Dialog, HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-
 import { useEffect, useRef, useState } from 'react';
 import { ArchiveIcon, DownloadIcon, PencilIcon, Trash2Icon, type LucideIcon } from 'lucide-react';
 
-import type { GalleryBoard } from '../../gallery/api';
-import { Button } from '../../components/ui/Button';
+import type { GalleryBoard } from '@workbench/gallery/api';
+import { Button } from '@workbench/components/ui/Button';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 export interface GalleryBoardMenuTarget {

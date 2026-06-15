@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { createRecoveredDocument, deserializeProjectDocument, serializeProjectDocument } from './syncedPersistence';
-import { createInitialWorkbenchState, workbenchReducer } from '../workbenchState';
-import type { Project } from '../types';
+import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState';
+import type { Project } from '@workbench/types';
 
 const getProject = (overrides: Partial<Project> = {}): Project => {
   const state = createInitialWorkbenchState();

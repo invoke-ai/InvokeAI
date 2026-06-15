@@ -1,7 +1,7 @@
 import { Flex, HStack, Text } from '@chakra-ui/react';
 
-import { AccountMenu } from '../auth/components/AccountMenu';
-import { InvokeMark } from '../auth/components/AuthScreen';
+import { AccountMenu } from '@workbench/auth/components/AccountMenu';
+import { InvokeMark } from '@workbench/auth/components/AuthScreen';
 
 /**
  * Home's slim header: brand on the left, shared account/settings controls on the right.

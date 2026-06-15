@@ -3,14 +3,19 @@ import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
 import { ChevronDownIcon, ChevronRightIcon, PinIcon, PinOffIcon, TriangleAlertIcon } from 'lucide-react';
 import { memo, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 
-import { useNodeExecutionState, type NodeExecutionState } from '../../../backend/nodeExecutionStore';
-import { Tooltip } from '../../../components/ui/Tooltip';
-import { useWorkbenchDispatch } from '../../../WorkbenchContext';
-import { getFieldTypeColor, getFieldTypeLabel, isDirectInputField, isExposableField } from '../../../workflows/fields';
-import { useInvocationTemplatesSnapshot } from '../../../workflows/templates';
-import type { FieldInputTemplate, FieldOutputTemplate, WorkflowInvocationNode } from '../../../workflows/types';
-import { FieldDescriptionPopover } from '../fields/FieldDescriptionPopover';
-import { WorkflowFieldInput } from '../fields/WorkflowFieldInput';
+import { useNodeExecutionState, type NodeExecutionState } from '@workbench/backend/nodeExecutionStore';
+import { Tooltip } from '@workbench/components/ui/Tooltip';
+import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import {
+  getFieldTypeColor,
+  getFieldTypeLabel,
+  isDirectInputField,
+  isExposableField,
+} from '@workbench/workflows/fields';
+import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
+import type { FieldInputTemplate, FieldOutputTemplate, WorkflowInvocationNode } from '@workbench/workflows/types';
+import { FieldDescriptionPopover } from '@workbench/widgets/workflow/fields/FieldDescriptionPopover';
+import { WorkflowFieldInput } from '@workbench/widgets/workflow/fields/WorkflowFieldInput';
 import type { InvocationFlowNode as InvocationFlowNodeType } from './flowAdapters';
 
 const NODE_WIDTH = '18rem';

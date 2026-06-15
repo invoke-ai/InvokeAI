@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 
-import { refreshInstalls, useInstallOutcomes } from '../../models/installsStore';
-import { refreshModels } from '../../models/modelsStore';
-import { useNotify } from '../../useNotify';
-import { useWorkbenchSelector } from '../../WorkbenchContext';
+import { refreshInstalls, useInstallOutcomes } from '@workbench/models/installsStore';
+import { refreshModels } from '@workbench/models/modelsStore';
+import { useNotify } from '@workbench/useNotify';
+import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
 
 /**
  * Renders nothing. Keeps the model stores honest across the app lifecycle:

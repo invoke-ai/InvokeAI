@@ -1,6 +1,6 @@
 import { Stack, Text } from '@chakra-ui/react';
 
-import type { GenerateSettings, MainModelConfig, VaeModelConfig } from '../../generation/types';
+import type { GenerateSettings, MainModelConfig, VaeModelConfig } from '@workbench/generation/types';
 import { GenerateAdvancedFields } from './GenerateAdvancedFields';
 import { GenerateDimensionFields } from './GenerateDimensionFields';
 import { GenerateModelFields } from './GenerateModelFields';

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createDraftProject } from '../workbenchState';
+import { createDraftProject } from '@workbench/workbenchState';
 import type * as projectFileModule from './projectFile';
 import type * as persistenceModule from './syncedPersistence';
 

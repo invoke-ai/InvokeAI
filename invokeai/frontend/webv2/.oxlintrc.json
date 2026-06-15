@@ -9,6 +9,7 @@
     "eqeqeq": "error",
     "import/no-cycle": "error",
     "import/no-duplicates": "error",
+    "import/no-relative-parent-imports": "error",
     "no-console": "warn",
     "no-eval": "error",
     "no-extend-native": "error",

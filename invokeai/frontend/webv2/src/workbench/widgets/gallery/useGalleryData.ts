@@ -7,8 +7,8 @@ import {
   type GalleryBoard,
   type GalleryImage,
   type GalleryView,
-} from '../../gallery/api';
-import type { GallerySettings } from '../../gallery/settings';
+} from '@workbench/gallery/api';
+import type { GallerySettings } from '@workbench/gallery/settings';
 
 export const GALLERY_PAGE_SIZE = 60;
 

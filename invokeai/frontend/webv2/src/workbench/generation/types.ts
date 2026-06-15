@@ -1,4 +1,4 @@
-import type { BackendGraphContract, GeneratedImageContract, GraphContract, ResultDestination } from '../types';
+import type { BackendGraphContract, GeneratedImageContract, GraphContract, ResultDestination } from '@workbench/types';
 
 export type SupportedGenerateBase = 'sd-1' | 'sd-2' | 'sdxl';
 

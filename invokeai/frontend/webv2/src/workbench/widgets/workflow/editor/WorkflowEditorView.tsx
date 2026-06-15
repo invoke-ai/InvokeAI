@@ -29,16 +29,16 @@ import {
 
 import '@xyflow/react/dist/style.css';
 
-import { FlowMiniMap } from '../../../components/FlowMiniMap';
-import { flowThemeCss, getFlowColorMode } from '../../../components/flowTheme';
-import { useNotify } from '../../../useNotify';
-import { useWorkbenchPreferences } from '../../../settings/store';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '../../../WorkbenchContext';
-import { getProjectGraphReadiness } from '../../../workflows/buildGraph';
-import { buildConnectorNode, createWorkflowId } from '../../../workflows/document';
-import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSnapshot } from '../../../workflows/templates';
-import type { XYPosition } from '../../../workflows/types';
-import { getWorkflowSourceFieldType, validateConnection } from '../../../workflows/validation';
+import { FlowMiniMap } from '@workbench/components/FlowMiniMap';
+import { flowThemeCss, getFlowColorMode } from '@workbench/components/flowTheme';
+import { useNotify } from '@workbench/useNotify';
+import { useWorkbenchPreferences } from '@workbench/settings/store';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { getProjectGraphReadiness } from '@workbench/workflows/buildGraph';
+import { buildConnectorNode, createWorkflowId } from '@workbench/workflows/document';
+import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
+import type { XYPosition } from '@workbench/workflows/types';
+import { getWorkflowSourceFieldType, validateConnection } from '@workbench/workflows/validation';
 import { buildDuplicateElements, buildPasteElements, copyNodesToClipboard, useHasClipboardNodes } from './clipboard';
 import { CurrentImageFlowNode } from './CurrentImageFlowNode';
 import { EditorToolbar, type EditorTool } from './EditorToolbar';
@@ -56,7 +56,7 @@ import { clearNodeSelectionRequest, reportNodeSelection, workflowSelectionStore 
 import { useEraser } from './useEraser';
 import { useLasso } from './useLasso';
 import { useModifierHeld } from './useModifierHeld';
-import { setAddNodeOpen } from '../workflowUiStore';
+import { setAddNodeOpen } from '@workbench/widgets/workflow/workflowUiStore';
 
 const nodeTypes: NodeTypes = {
   connector: ConnectorFlowNode,

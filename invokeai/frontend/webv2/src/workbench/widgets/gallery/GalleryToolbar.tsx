@@ -15,10 +15,10 @@ import {
 import { useRef } from 'react';
 import { SearchIcon, SettingsIcon, UploadIcon } from 'lucide-react';
 
-import { Button, CloseButton, IconButton } from '../../components/ui/Button';
-import { Tabs } from '../../components/ui/Tabs';
-import { isDateBoardId } from '../../gallery/api';
-import type { GalleryView } from '../../gallery/api';
+import { Button, CloseButton, IconButton } from '@workbench/components/ui/Button';
+import { Tabs } from '@workbench/components/ui/Tabs';
+import { isDateBoardId } from '@workbench/gallery/api';
+import type { GalleryView } from '@workbench/gallery/api';
 import { GalleryBoardSelect } from './GalleryBoardSelect';
 import { useGalleryWidget } from './GalleryWidgetContext';
 

@@ -1,4 +1,4 @@
-import { apiFetch, apiFetchJson } from '../backend/http';
+import { apiFetch, apiFetchJson } from '@workbench/backend/http';
 
 /**
  * REST surface for the backend's multi-user endpoints (`/api/v1/auth`). Field

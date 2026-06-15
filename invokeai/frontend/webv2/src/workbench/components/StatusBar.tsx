@@ -1,10 +1,10 @@
 import { Box, Flex, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { CheckIcon, MoreHorizontalIcon } from 'lucide-react';
 
-import { WidgetIcon } from '../iconResolver';
-import type { RegisteredWidget, WidgetId } from '../types';
-import { getWidgetsForRegion } from '../widgetRegistry';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '../WorkbenchContext';
+import { WidgetIcon } from '@workbench/iconResolver';
+import type { RegisteredWidget, WidgetId } from '@workbench/types';
+import { getWidgetsForRegion } from '@workbench/widgetRegistry';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { WidgetRenderer } from './WidgetRenderer';
 import { Row } from './ui/Row';
 import { Tooltip } from './ui/Tooltip';

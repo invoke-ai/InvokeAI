@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ApiError, getApiErrorMessage } from '../backend/http';
+import { ApiError, getApiErrorMessage } from '@workbench/backend/http';
 import {
   createProfileSchema,
   createSetupSchema,

@@ -2,10 +2,10 @@ import { Badge, HStack, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
 import { DownloadIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { Button } from '../../components/ui/Button';
-import { Panel } from '../../components/ui/Panel';
-import { useActiveInstallSources } from '../../models/installsStore';
-import { openModelsCenterTab } from '../../models/uiStore';
+import { Button } from '@workbench/components/ui/Button';
+import { Panel } from '@workbench/components/ui/Panel';
+import { useActiveInstallSources } from '@workbench/models/installsStore';
+import { openModelsCenterTab } from '@workbench/models/uiStore';
 
 /**
  * The shared row used by every installable-source list (starter models,

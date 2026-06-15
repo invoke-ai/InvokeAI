@@ -1,4 +1,4 @@
-import { apiFetch, apiFetchJson } from '../backend/http';
+import { apiFetch, apiFetchJson } from '@workbench/backend/http';
 
 /**
  * Client for the backend workflow library (`/api/v1/workflows`). The library

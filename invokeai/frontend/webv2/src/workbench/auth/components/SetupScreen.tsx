@@ -4,12 +4,12 @@ import { useMemo } from 'react';
 
 import { AuthFormAlert, AuthScreen } from './AuthScreen';
 import { PasswordInput, PasswordStrengthMeter } from './PasswordInput';
-import { getApiErrorMessage } from '../../backend/http';
-import { Button } from '../../components/ui/Button';
-import { Field } from '../../components/ui/Field';
-import { useZodForm } from '../../models/useZodForm';
-import { createSetupSchema, PASSWORD_RULES_HINT, type SetupFormValues } from '../schemas';
-import { completeAdminSetup, useAuthSession } from '../session';
+import { getApiErrorMessage } from '@workbench/backend/http';
+import { Button } from '@workbench/components/ui/Button';
+import { Field } from '@workbench/components/ui/Field';
+import { useZodForm } from '@workbench/models/useZodForm';
+import { createSetupSchema, PASSWORD_RULES_HINT, type SetupFormValues } from '@workbench/auth/schemas';
+import { completeAdminSetup, useAuthSession } from '@workbench/auth/session';
 
 const INITIAL_VALUES: SetupFormValues = { confirmPassword: '', displayName: '', email: '', password: '' };
 

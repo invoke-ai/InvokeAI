@@ -2,16 +2,16 @@ import { Dialog, HStack, Input, Portal, Stack, Switch, Text } from '@chakra-ui/r
 import { useMemo, useState } from 'react';
 import { WandSparklesIcon } from 'lucide-react';
 
-import { createUser, generatePassword, updateUser, type UserDTO, type UserUpdateRequest } from '../auth/api';
-import { AuthFormAlert } from '../auth/components/AuthScreen';
-import { PasswordInput, PasswordStrengthMeter } from '../auth/components/PasswordInput';
-import { createUserFormSchema, PASSWORD_RULES_HINT, type UserFormValues } from '../auth/schemas';
-import { useAuthSession } from '../auth/session';
-import { getApiErrorMessage } from '../backend/http';
-import { Button, CloseButton } from '../components/ui/Button';
-import { Field } from '../components/ui/Field';
-import { useZodForm } from '../models/useZodForm';
-import { useNotify } from '../useNotify';
+import { createUser, generatePassword, updateUser, type UserDTO, type UserUpdateRequest } from '@workbench/auth/api';
+import { AuthFormAlert } from '@workbench/auth/components/AuthScreen';
+import { PasswordInput, PasswordStrengthMeter } from '@workbench/auth/components/PasswordInput';
+import { createUserFormSchema, PASSWORD_RULES_HINT, type UserFormValues } from '@workbench/auth/schemas';
+import { useAuthSession } from '@workbench/auth/session';
+import { getApiErrorMessage } from '@workbench/backend/http';
+import { Button, CloseButton } from '@workbench/components/ui/Button';
+import { Field } from '@workbench/components/ui/Field';
+import { useZodForm } from '@workbench/models/useZodForm';
+import { useNotify } from '@workbench/useNotify';
 
 export type UserFormTarget = { mode: 'create' } | { mode: 'edit'; user: UserDTO };
 

@@ -2,11 +2,11 @@ import { Box, Flex, Icon, Image, Stack, Text } from '@chakra-ui/react';
 import { ImageIcon, UploadIcon, XIcon } from 'lucide-react';
 import { useRef, useState, type DragEvent } from 'react';
 
-import { IconButton } from '../../components/ui/Button';
-import { Tooltip } from '../../components/ui/Tooltip';
-import { deleteModelImage, getModelImageUrl, updateModelImage } from '../../models/api';
-import { markCoverImageChanged, useModelsSnapshot } from '../../models/modelsStore';
-import type { ModelConfig } from '../../models/types';
+import { IconButton } from '@workbench/components/ui/Button';
+import { Tooltip } from '@workbench/components/ui/Tooltip';
+import { deleteModelImage, getModelImageUrl, updateModelImage } from '@workbench/models/api';
+import { markCoverImageChanged, useModelsSnapshot } from '@workbench/models/modelsStore';
+import type { ModelConfig } from '@workbench/models/types';
 
 const ACCEPTED_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 

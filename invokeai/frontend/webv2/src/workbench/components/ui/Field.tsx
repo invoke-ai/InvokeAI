@@ -1,7 +1,7 @@
 import { Stack, Text, useRecipe, type StackProps } from '@chakra-ui/react';
 import type { ReactNode } from 'react';
 
-import { fieldLabelRecipe } from '../../../theme/recipes';
+import { fieldLabelRecipe } from '@theme/recipes';
 
 /**
  * The shared, theme-aware uppercase field label. Backed by `fieldLabelRecipe` so

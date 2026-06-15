@@ -6,7 +6,7 @@ import type {
   WorkflowCurrentImageNode,
   WorkflowInvocationNode,
   WorkflowNotesNode,
-} from '../../../workflows/types';
+} from '@workbench/workflows/types';
 
 /**
  * Adapters between the project graph document and xyflow's node/edge state.

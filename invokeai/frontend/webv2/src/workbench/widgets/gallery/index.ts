@@ -1,4 +1,4 @@
-import type { WidgetManifest } from '../../types';
+import type { WidgetManifest } from '@workbench/types';
 import { GalleryWidgetFooter } from './GalleryWidgetFooter';
 import { GalleryWidgetView } from './GalleryWidgetView';
 

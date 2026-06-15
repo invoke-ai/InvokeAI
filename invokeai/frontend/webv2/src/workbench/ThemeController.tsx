@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-import { DEFAULT_THEME, THEMES_BY_ID } from '../theme/system';
+import { DEFAULT_THEME, THEMES_BY_ID } from '@theme/system';
 import { useWorkbenchSettings } from './settings/store';
 
 /**

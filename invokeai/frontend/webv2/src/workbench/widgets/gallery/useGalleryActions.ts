@@ -1,6 +1,6 @@
 import { useMemo, type Dispatch } from 'react';
 
-import { saveBlobToDisk } from '../../components/useImageActions';
+import { saveBlobToDisk } from '@workbench/components/useImageActions';
 import {
   createGalleryBoard,
   deleteGalleryBoard,
@@ -8,8 +8,8 @@ import {
   updateGalleryBoard,
   uploadGalleryImage,
   type GalleryBoard,
-} from '../../gallery/api';
-import type { WorkbenchAction } from '../../workbenchState';
+} from '@workbench/gallery/api';
+import type { WorkbenchAction } from '@workbench/workbenchState';
 import type { GalleryActions } from './GalleryWidgetContext';
 
 const ACCEPTED_UPLOAD_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);

@@ -1,4 +1,4 @@
-import type { WidgetManifest } from '../../types';
+import type { WidgetManifest } from '@workbench/types';
 import { PreviewWidgetView } from './PreviewWidgetView';
 
 export const previewWidgetManifest: WidgetManifest = {

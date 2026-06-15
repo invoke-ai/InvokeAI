@@ -1,8 +1,8 @@
 import { Box, Stack } from '@chakra-ui/react';
 
-import { Scrollable } from '../../components/ui/Scrollable';
-import { Tabs } from '../../components/ui/Tabs';
-import { updateModelsUi, useModelsUi, type AddModelsTab } from '../../models/uiStore';
+import { Scrollable } from '@workbench/components/ui/Scrollable';
+import { Tabs } from '@workbench/components/ui/Tabs';
+import { updateModelsUi, useModelsUi, type AddModelsTab } from '@workbench/models/uiStore';
 import { ApiKeysSection } from './ApiKeysSection';
 import { HuggingFaceTab } from './HuggingFaceTab';
 import { ScanFolderTab } from './ScanFolderTab';

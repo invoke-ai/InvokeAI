@@ -1,4 +1,4 @@
-import type { WorkbenchThemeId } from '../workbench/types';
+import type { WorkbenchThemeId } from '@workbench/types';
 
 /**
  * Steps of the neutral ramp. `50` is the lightest, `950` the darkest — the same

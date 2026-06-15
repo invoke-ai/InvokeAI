@@ -1,6 +1,6 @@
 import { Box, type BoxProps, type RecipeVariantProps, useRecipe } from '@chakra-ui/react';
 
-import { panelRecipe } from '../../../theme/recipes';
+import { panelRecipe } from '@theme/recipes';
 
 export type PanelProps = BoxProps & RecipeVariantProps<typeof panelRecipe>;
 

@@ -1,4 +1,4 @@
-import type { WidgetManifest } from '../../types';
+import type { WidgetManifest } from '@workbench/types';
 import { HistoryControlsWidgetView } from './HistoryControlsWidgetView';
 
 export const historyControlsWidgetManifest: WidgetManifest = {

@@ -2,9 +2,9 @@ import { Box, Flex, Image, Text } from '@chakra-ui/react';
 import type { NodeProps } from '@xyflow/react';
 import { memo } from 'react';
 
-import { useProgressImage } from '../../../backend/progressImageStore';
-import { useActiveProjectSelector } from '../../../WorkbenchContext';
-import type { GeneratedImageContract } from '../../../types';
+import { useProgressImage } from '@workbench/backend/progressImageStore';
+import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import type { GeneratedImageContract } from '@workbench/types';
 import type { CurrentImageFlowNode as CurrentImageFlowNodeType } from './flowAdapters';
 
 /**

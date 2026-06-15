@@ -1,10 +1,10 @@
 import { Badge, HStack, Input, NativeSelect, Switch, Text } from '@chakra-ui/react';
 import type { ChangeEvent } from 'react';
 
-import { Field } from '../../components/ui/Field';
-import { ModelSelect } from '../../components/ModelSelect';
-import { CLIP_SKIP_MAX, isVaeModelConfig } from '../../generation/settings';
-import type { GenerateSettings, MainModelConfig, VaePrecision } from '../../generation/types';
+import { Field } from '@workbench/components/ui/Field';
+import { ModelSelect } from '@workbench/components/ModelSelect';
+import { CLIP_SKIP_MAX, isVaeModelConfig } from '@workbench/generation/settings';
+import type { GenerateSettings, MainModelConfig, VaePrecision } from '@workbench/generation/types';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 
 interface GenerateAdvancedFieldsProps {

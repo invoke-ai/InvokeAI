@@ -11,7 +11,7 @@ import {
   ZoomOutIcon,
 } from 'lucide-react';
 
-import { Toolbar, ToolbarButton, ToolbarSeparator } from '../../../components/ui/Toolbar';
+import { Toolbar, ToolbarButton, ToolbarSeparator } from '@workbench/components/ui/Toolbar';
 
 /**
  * The editor's single tool strip, docked to the left edge: interaction tools

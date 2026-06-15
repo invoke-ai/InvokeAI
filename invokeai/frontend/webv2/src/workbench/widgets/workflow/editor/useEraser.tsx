@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 
-import type { XYPosition } from '../../../workflows/types';
+import type { XYPosition } from '@workbench/workflows/types';
 import type { WorkflowFlowInstance } from './flowInstanceStore';
 
 const ERASER_RADIUS_PX = 14;

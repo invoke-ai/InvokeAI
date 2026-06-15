@@ -3,20 +3,20 @@ import { Box, HStack, Icon, Progress, Stack, Text } from '@chakra-ui/react';
 import { DownloadIcon, PlusIcon } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 
-import { Button } from '../../components/ui/Button';
-import { Scrollable } from '../../components/ui/Scrollable';
-import { Tooltip } from '../../components/ui/Tooltip';
+import { Button } from '@workbench/components/ui/Button';
+import { Scrollable } from '@workbench/components/ui/Scrollable';
+import { Tooltip } from '@workbench/components/ui/Tooltip';
 import {
   ensureInstallsLoaded,
   isActiveInstallStatus,
   useInstallProgress,
   useInstallsSnapshot,
-} from '../../models/installsStore';
-import { collectBases, collectTypes } from '../../models/library';
-import { ensureModelsLoaded, useModelsSnapshot } from '../../models/modelsStore';
-import { openModelsCenterTab, updateModelsUi, useModelsUi } from '../../models/uiStore';
-import type { WidgetId } from '../../types';
-import { useOpenWorkbenchWidget } from '../../useOpenWorkbenchWidget';
+} from '@workbench/models/installsStore';
+import { collectBases, collectTypes } from '@workbench/models/library';
+import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsStore';
+import { openModelsCenterTab, updateModelsUi, useModelsUi } from '@workbench/models/uiStore';
+import type { WidgetId } from '@workbench/types';
+import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { ModelDetail } from './ModelDetail';
 import { ModelFilterBar } from './ModelFilterBar';
 import { ModelLibraryList } from './ModelLibraryList';

@@ -2,12 +2,12 @@ import { HStack, Icon, Input, Tag, Text, Wrap } from '@chakra-ui/react';
 import { PlusIcon } from 'lucide-react';
 import { useState } from 'react';
 
-import { Button } from '../../components/ui/Button';
-import { Field } from '../../components/ui/Field';
-import { updateModel } from '../../models/api';
-import { replaceModelInStore } from '../../models/modelsStore';
-import { triggerPhraseSchema } from '../../models/schemas';
-import type { ModelConfig } from '../../models/types';
+import { Button } from '@workbench/components/ui/Button';
+import { Field } from '@workbench/components/ui/Field';
+import { updateModel } from '@workbench/models/api';
+import { replaceModelInStore } from '@workbench/models/modelsStore';
+import { triggerPhraseSchema } from '@workbench/models/schemas';
+import type { ModelConfig } from '@workbench/models/types';
 
 /**
  * Tag-style editor for a model's trigger phrases. Each add/remove persists

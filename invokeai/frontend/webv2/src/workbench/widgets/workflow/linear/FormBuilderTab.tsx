@@ -13,17 +13,17 @@ import {
 } from 'lucide-react';
 import { createContext, use, useMemo, useState, type ChangeEvent, type DragEvent, type ReactNode } from 'react';
 
-import { Button, IconButton } from '../../../components/ui/Button';
-import { useWorkbenchDispatch } from '../../../WorkbenchContext';
-import { getFormChildren } from '../../../workflows/document';
+import { Button, IconButton } from '@workbench/components/ui/Button';
+import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { getFormChildren } from '@workbench/workflows/document';
 import type {
   ContainerFormElement,
   NodeFieldFormElement,
   ProjectGraphState,
   WorkflowFormElement,
-} from '../../../workflows/types';
-import { FieldDescriptionPopover } from '../fields/FieldDescriptionPopover';
-import { requestNodeSelection } from '../editor/selectionStore';
+} from '@workbench/workflows/types';
+import { FieldDescriptionPopover } from '@workbench/widgets/workflow/fields/FieldDescriptionPopover';
+import { requestNodeSelection } from '@workbench/widgets/workflow/editor/selectionStore';
 import { NodeFieldControl, useNodeFieldBinding } from './NodeFieldControl';
 
 /**

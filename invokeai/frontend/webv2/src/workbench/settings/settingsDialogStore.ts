@@ -1,5 +1,5 @@
-import { createExternalStore } from '../externalStore';
-import type { SettingsSectionId } from '../types';
+import { createExternalStore } from '@workbench/externalStore';
+import type { SettingsSectionId } from '@workbench/types';
 
 /**
  * Open/close state for the workbench settings dialog, addressable from

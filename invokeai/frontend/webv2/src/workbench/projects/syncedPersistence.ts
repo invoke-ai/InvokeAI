@@ -1,10 +1,10 @@
-import { getUserStorageScope } from '../auth/session';
+import { getUserStorageScope } from '@workbench/auth/session';
 import { reportProjectSync, type ProjectSyncInfo } from './syncStore';
-import { localStorageWorkbenchPersistence, stripTransientWorkbenchState } from '../persistence';
+import { localStorageWorkbenchPersistence, stripTransientWorkbenchState } from '@workbench/persistence';
 import { seedProjectLibrary, upsertProjectSummary } from './library';
 import { fetchSessionBlob, serializeSessionBlob, SESSION_STATE_KEY } from './session';
-import { createDraftProject, createInitialWorkbenchState } from '../workbenchState';
-import type { Project, WorkbenchPersistenceSnapshot, WorkbenchState } from '../types';
+import { createDraftProject, createInitialWorkbenchState } from '@workbench/workbenchState';
+import type { Project, WorkbenchPersistenceSnapshot, WorkbenchState } from '@workbench/types';
 import {
   createProject as apiCreateProject,
   deleteClientStateValue,

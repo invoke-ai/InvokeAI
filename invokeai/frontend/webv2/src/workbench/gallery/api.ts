@@ -1,5 +1,5 @@
-import { absolutizeApiUrl, apiFetch, apiFetchJson, apiFetchRaw, sleep } from '../backend/http';
-import type { GeneratedImageContract } from '../types';
+import { absolutizeApiUrl, apiFetch, apiFetchJson, apiFetchRaw, sleep } from '@workbench/backend/http';
+import type { GeneratedImageContract } from '@workbench/types';
 
 export type GalleryView = 'images' | 'assets';
 

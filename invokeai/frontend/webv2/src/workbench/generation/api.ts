@@ -1,6 +1,6 @@
-import { absolutizeApiUrl, ApiError, apiFetchJson } from '../backend/http';
-import { buildQueueItemOrigin } from '../backend/events';
-import type { BackendGraphContract } from '../types';
+import { absolutizeApiUrl, ApiError, apiFetchJson } from '@workbench/backend/http';
+import { buildQueueItemOrigin } from '@workbench/backend/events';
+import type { BackendGraphContract } from '@workbench/types';
 import { generateSeedSequence } from './graph';
 import type {
   EnqueueGenerateRequest,

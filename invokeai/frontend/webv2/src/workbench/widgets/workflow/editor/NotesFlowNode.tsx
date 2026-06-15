@@ -2,7 +2,7 @@ import { Box, Input, Textarea } from '@chakra-ui/react';
 import type { NodeProps } from '@xyflow/react';
 import { memo, type ChangeEvent } from 'react';
 
-import { useWorkbenchDispatch } from '../../../WorkbenchContext';
+import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import type { NotesFlowNode as NotesFlowNodeType } from './flowAdapters';
 
 const NotesFlowNodeComponent = ({ data, selected }: NodeProps<NotesFlowNodeType>) => {

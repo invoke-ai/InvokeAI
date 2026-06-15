@@ -2,13 +2,13 @@ import { Accordion, Badge, Box, Dialog, HStack, Icon, Input, Portal, Stack, Text
 import { HammerIcon } from 'lucide-react';
 import { useCallback, useMemo, useState, type ChangeEvent, type ReactNode } from 'react';
 
-import { Button } from '../../../components/ui/Button';
-import { Scrollable } from '../../../components/ui/Scrollable';
-import { Tooltip } from '../../../components/ui/Tooltip';
-import { useInvocationTemplatesSnapshot } from '../../../workflows/templates';
-import type { InvocationTemplate } from '../../../workflows/types';
-import { getCompatibleInputTemplate } from '../../../workflows/validation';
-import type { AddNodeConnectionFilter } from '../workflowUiStore';
+import { Button } from '@workbench/components/ui/Button';
+import { Scrollable } from '@workbench/components/ui/Scrollable';
+import { Tooltip } from '@workbench/components/ui/Tooltip';
+import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
+import type { InvocationTemplate } from '@workbench/workflows/types';
+import { getCompatibleInputTemplate } from '@workbench/workflows/validation';
+import type { AddNodeConnectionFilter } from '@workbench/widgets/workflow/workflowUiStore';
 
 /**
  * Command-palette-style node picker: a centered search dialog whose results

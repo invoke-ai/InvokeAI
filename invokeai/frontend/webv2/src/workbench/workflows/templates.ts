@@ -1,5 +1,5 @@
-import { apiFetchJson, getApiErrorMessage } from '../backend/http';
-import { createExternalStore } from '../externalStore';
+import { apiFetchJson, getApiErrorMessage } from '@workbench/backend/http';
+import { createExternalStore } from '@workbench/externalStore';
 import type {
   FieldInputTemplate,
   FieldOutputTemplate,

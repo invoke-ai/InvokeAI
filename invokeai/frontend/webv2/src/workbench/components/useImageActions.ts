@@ -10,14 +10,14 @@ import {
   unstarGalleryImages,
   type GalleryBoard,
   type GalleryImage,
-} from '../gallery/api';
-import { getDefaultGenerateSettings, isSupportedGenerateModel } from '../generation/graph';
-import { isVaeModelConfig, normalizeGenerateWidgetValues } from '../generation/settings';
-import type { MainModelConfig, VaeModelConfig } from '../generation/types';
-import { ensureModelsLoaded, useModelsSnapshot } from '../models/modelsStore';
-import type { ModelConfig } from '../models/types';
-import type { WorkbenchAction } from '../workbenchState';
-import { useOpenWorkbenchWidget } from '../useOpenWorkbenchWidget';
+} from '@workbench/gallery/api';
+import { getDefaultGenerateSettings, isSupportedGenerateModel } from '@workbench/generation/graph';
+import { isVaeModelConfig, normalizeGenerateWidgetValues } from '@workbench/generation/settings';
+import type { MainModelConfig, VaeModelConfig } from '@workbench/generation/types';
+import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsStore';
+import type { ModelConfig } from '@workbench/models/types';
+import type { WorkbenchAction } from '@workbench/workbenchState';
+import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import {
   buildImageRecallSettings,
   EMPTY_IMAGE_RECALL_CAPABILITIES,

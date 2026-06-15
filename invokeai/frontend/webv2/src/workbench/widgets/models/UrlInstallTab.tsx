@@ -1,11 +1,11 @@
 import { Checkbox, HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
 import { DownloadIcon } from 'lucide-react';
 
-import { Button } from '../../components/ui/Button';
-import { Field } from '../../components/ui/Field';
-import { isCivitaiUrl } from '../../models/apiKeys';
-import { installSourceSchema } from '../../models/schemas';
-import { useZodForm } from '../../models/useZodForm';
+import { Button } from '@workbench/components/ui/Button';
+import { Field } from '@workbench/components/ui/Field';
+import { isCivitaiUrl } from '@workbench/models/apiKeys';
+import { installSourceSchema } from '@workbench/models/schemas';
+import { useZodForm } from '@workbench/models/useZodForm';
 import { useInstallActions } from './useInstallActions';
 
 /**

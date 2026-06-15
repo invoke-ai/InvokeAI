@@ -2,20 +2,24 @@ import { Badge, Box, Flex, HStack, Stack, Text } from '@chakra-ui/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 
-import { ImageContextMenu, type ImageContextMenuTarget } from '../../components/ImageContextMenu';
-import { Button } from '../../components/ui/Button';
-import { useImageActions } from '../../components/useImageActions';
+import { ImageContextMenu, type ImageContextMenuTarget } from '@workbench/components/ImageContextMenu';
+import { Button } from '@workbench/components/ui/Button';
+import { useImageActions } from '@workbench/components/useImageActions';
 import {
   listGalleryBoards,
   listGalleryImages,
   type GalleryBoard,
   type GalleryImage,
   type GalleryView,
-} from '../../gallery/api';
-import { getGallerySettings } from '../../gallery/settings';
-import type { GeneratedImageContract, WidgetViewProps } from '../../types';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '../../WorkbenchContext';
-import { getGalleryCompareImage, getGalleryRecentImagesKey, getGalleryRefreshToken } from '../gallery/galleryStateView';
+} from '@workbench/gallery/api';
+import { getGallerySettings } from '@workbench/gallery/settings';
+import type { GeneratedImageContract, WidgetViewProps } from '@workbench/types';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import {
+  getGalleryCompareImage,
+  getGalleryRecentImagesKey,
+  getGalleryRefreshToken,
+} from '@workbench/widgets/gallery/galleryStateView';
 import { PreviewCompare } from './PreviewCompare';
 
 type PreviewImage = GeneratedImageContract & Partial<Pick<GalleryImage, 'boardId' | 'imageCategory' | 'starred'>>;

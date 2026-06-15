@@ -1,12 +1,12 @@
 import { Badge, Progress, Stack, Text, HStack } from '@chakra-ui/react';
 import { ListOrderedIcon } from 'lucide-react';
 
-import { useQueueItemProgress } from '../../backend/progressStore';
-import { StatusWidgetChip } from '../../components/WidgetFrames';
-import { Button } from '../../components/ui/Button';
-import type { WidgetViewProps } from '../../types';
-import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '../../WorkbenchContext';
-import { getDestinationLabel, getSourceLabel } from '../../invocation';
+import { useQueueItemProgress } from '@workbench/backend/progressStore';
+import { StatusWidgetChip } from '@workbench/components/WidgetFrames';
+import { Button } from '@workbench/components/ui/Button';
+import type { WidgetViewProps } from '@workbench/types';
+import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { getDestinationLabel, getSourceLabel } from '@workbench/invocation';
 
 export const QueueWidgetView = ({ presentation, region }: WidgetViewProps) => {
   const queueItems = useActiveProjectSelector((project) => project.queue.items);

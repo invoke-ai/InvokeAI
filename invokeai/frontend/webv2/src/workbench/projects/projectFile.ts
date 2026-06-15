@@ -2,7 +2,7 @@ import { createProjectId } from './ids';
 import { upsertProjectSummary } from './library';
 import { deserializeProjectDocument, serializeProjectDocument } from './syncedPersistence';
 import { createProject as apiCreateProject, getProject as apiGetProject, type ProjectRecordDTO } from './api';
-import type { Project } from '../types';
+import type { Project } from '@workbench/types';
 
 /**
  * The portable project file: a versioned envelope around the same document

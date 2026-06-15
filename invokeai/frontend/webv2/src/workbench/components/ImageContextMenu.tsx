@@ -25,11 +25,11 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-import type { GalleryBoard, GalleryImage } from '../gallery/api';
+import type { GalleryBoard, GalleryImage } from '@workbench/gallery/api';
 import { Button } from './ui/Button';
 import { MenuContent } from './ui/Menu';
 import { Tooltip } from './ui/Tooltip';
-import { useWorkbenchPreferences } from '../settings/store';
+import { useWorkbenchPreferences } from '@workbench/settings/store';
 import { EMPTY_IMAGE_RECALL_CAPABILITIES, type ImageRecallCapabilities } from './imageRecall';
 import type { ImageActions } from './useImageActions';
 

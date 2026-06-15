@@ -2,22 +2,27 @@ import { Badge, Box, Flex, HStack, Icon, Separator, Stack, Text } from '@chakra-
 import { BoxIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-import { Button, IconButton } from '../../components/ui/Button';
-import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
-import { Scrollable } from '../../components/ui/Scrollable';
-import { Tabs } from '../../components/ui/Tabs';
-import { bulkDeleteModels } from '../../models/api';
-import { ensureInstallsLoaded, isActiveInstallStatus, useInstallsSnapshot } from '../../models/installsStore';
-import { collectBases, collectTypes } from '../../models/library';
-import { ensureModelsLoaded, refreshModels, removeModelsFromStore, useModelsSnapshot } from '../../models/modelsStore';
+import { Button, IconButton } from '@workbench/components/ui/Button';
+import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
+import { Scrollable } from '@workbench/components/ui/Scrollable';
+import { Tabs } from '@workbench/components/ui/Tabs';
+import { bulkDeleteModels } from '@workbench/models/api';
+import { ensureInstallsLoaded, isActiveInstallStatus, useInstallsSnapshot } from '@workbench/models/installsStore';
+import { collectBases, collectTypes } from '@workbench/models/library';
+import {
+  ensureModelsLoaded,
+  refreshModels,
+  removeModelsFromStore,
+  useModelsSnapshot,
+} from '@workbench/models/modelsStore';
 import {
   pruneModelsUiKeys,
   toggleModelSelection,
   updateModelsUi,
   useModelsUi,
   type ModelsCenterTab,
-} from '../../models/uiStore';
-import { useNotify } from '../../useNotify';
+} from '@workbench/models/uiStore';
+import { useNotify } from '@workbench/useNotify';
 import { AddModelsView } from './AddModelsView';
 import { InstallQueueSection } from './InstallQueueSection';
 import { ModelDetail } from './ModelDetail';

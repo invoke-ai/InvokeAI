@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { EnqueueGenerateRequest, ImageDTO, QueueItemDTO } from '../generation/types';
+import type { EnqueueGenerateRequest, ImageDTO, QueueItemDTO } from '@workbench/generation/types';
 import { buildQueueItemOrigin, type QueueItemStatusChangedEvent } from './events';
 import { ApiError } from './http';
 import type { NodeExecutionSink } from './nodeExecutionStore';

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 
-import { createExternalStore, createListenerChannel } from '../externalStore';
+import { createExternalStore, createListenerChannel } from '@workbench/externalStore';
 import { listModelInstalls } from './api';
 import { refreshModels } from './modelsStore';
 import { refreshStartersIfLoaded } from './startersStore';

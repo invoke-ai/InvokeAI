@@ -3,13 +3,13 @@ import { ArrowLeftIcon, MoreHorizontalIcon, PencilIcon, RefreshCcwIcon, Trash2Ic
 import { SiHuggingface } from 'react-icons/si';
 import { useCallback, useState } from 'react';
 
-import { Button, IconButton } from '../../components/ui/Button';
-import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
-import { MenuContent } from '../../components/ui/Menu';
-import { useModelsSnapshot } from '../../models/modelsStore';
-import { formatBytes, isConvertibleToDiffusers } from '../../models/taxonomy';
-import type { ModelConfig } from '../../models/types';
-import { useNotify } from '../../useNotify';
+import { Button, IconButton } from '@workbench/components/ui/Button';
+import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
+import { MenuContent } from '@workbench/components/ui/Menu';
+import { useModelsSnapshot } from '@workbench/models/modelsStore';
+import { formatBytes, isConvertibleToDiffusers } from '@workbench/models/taxonomy';
+import type { ModelConfig } from '@workbench/models/types';
+import { useNotify } from '@workbench/useNotify';
 import { DefaultSettingsSection, supportsDefaultSettings } from './DefaultSettingsSection';
 import { MissingFileBadge, ModelBadgeRow } from './ModelBadges';
 import { ModelEditForm } from './ModelEditForm';

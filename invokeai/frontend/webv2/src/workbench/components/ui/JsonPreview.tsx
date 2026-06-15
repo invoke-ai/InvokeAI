@@ -2,7 +2,7 @@ import { Box, Code, Icon, ScrollArea } from '@chakra-ui/react';
 import { CheckIcon, CopyIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { useNotify } from '../../useNotify';
+import { useNotify } from '@workbench/useNotify';
 import { IconButton } from './Button';
 
 /**

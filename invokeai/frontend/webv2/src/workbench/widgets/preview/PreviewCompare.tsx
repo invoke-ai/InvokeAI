@@ -2,8 +2,8 @@ import { Badge, Box, Flex, HStack, Stack } from '@chakra-ui/react';
 import { useRef, useState, type CSSProperties } from 'react';
 import { ArrowLeftRightIcon, Columns2Icon, XIcon } from 'lucide-react';
 
-import type { GeneratedImageContract } from '../../types';
-import { Button } from '../../components/ui/Button';
+import type { GeneratedImageContract } from '@workbench/types';
+import { Button } from '@workbench/components/ui/Button';
 
 type CompareMode = 'slider' | 'side-by-side';
 

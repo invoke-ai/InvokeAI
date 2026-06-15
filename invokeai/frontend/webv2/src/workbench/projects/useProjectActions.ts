@@ -8,9 +8,9 @@ import {
   releaseProjectSync,
   unmarkProjectDeleted,
 } from './syncedPersistence';
-import type { Project } from '../types';
-import { useNotify } from '../useNotify';
-import { useWorkbenchDispatch, useWorkbenchSelector } from '../WorkbenchContext';
+import type { Project } from '@workbench/types';
+import { useNotify } from '@workbench/useNotify';
+import { useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 
 /**
  * Close and delete for projects that are open in the editor, shared by the

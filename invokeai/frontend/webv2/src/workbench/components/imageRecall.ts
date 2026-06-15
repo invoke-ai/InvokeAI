@@ -1,7 +1,18 @@
-import { getSettingsWithModelDefaults } from '../generation/graph';
-import { CLIP_SKIP_MAX, clampDimension, deriveAspectRatioId, isKnownScheduler, SEED_MAX } from '../generation/settings';
-import type { GenerateWidgetValues, MainModelConfig, SupportedGenerateBase, VaeModelConfig } from '../generation/types';
-import type { GalleryImage } from '../gallery/api';
+import { getSettingsWithModelDefaults } from '@workbench/generation/graph';
+import {
+  CLIP_SKIP_MAX,
+  clampDimension,
+  deriveAspectRatioId,
+  isKnownScheduler,
+  SEED_MAX,
+} from '@workbench/generation/settings';
+import type {
+  GenerateWidgetValues,
+  MainModelConfig,
+  SupportedGenerateBase,
+  VaeModelConfig,
+} from '@workbench/generation/types';
+import type { GalleryImage } from '@workbench/gallery/api';
 
 export type ImageRecallKind = 'all' | 'remix' | 'prompts' | 'seed' | 'dimensions' | 'clipSkip';
 

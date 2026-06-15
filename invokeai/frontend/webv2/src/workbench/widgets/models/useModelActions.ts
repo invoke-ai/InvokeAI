@@ -1,10 +1,10 @@
 import { useCallback } from 'react';
 
-import { convertModelToDiffusers, deleteModel, reidentifyModel } from '../../models/api';
-import { removeModelsFromStore, replaceModelInStore } from '../../models/modelsStore';
-import type { ModelConfig } from '../../models/types';
-import { pruneModelsUiKeys } from '../../models/uiStore';
-import { useNotify } from '../../useNotify';
+import { convertModelToDiffusers, deleteModel, reidentifyModel } from '@workbench/models/api';
+import { removeModelsFromStore, replaceModelInStore } from '@workbench/models/modelsStore';
+import type { ModelConfig } from '@workbench/models/types';
+import { pruneModelsUiKeys } from '@workbench/models/uiStore';
+import { useNotify } from '@workbench/useNotify';
 
 /**
  * Lifecycle actions for a single model, shared by the detail page and the

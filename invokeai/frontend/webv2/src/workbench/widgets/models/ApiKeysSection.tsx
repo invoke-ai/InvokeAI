@@ -3,8 +3,8 @@ import { HexagonIcon } from 'lucide-react';
 import { useEffect, useState, type ElementType } from 'react';
 import { SiAlibabacloud, SiBytedance, SiGooglegemini, SiHuggingface, SiOpenai } from 'react-icons/si';
 
-import { Button } from '../../components/ui/Button';
-import { clearCivitaiApiKey, getCivitaiApiKey, setCivitaiApiKey } from '../../models/apiKeys';
+import { Button } from '@workbench/components/ui/Button';
+import { clearCivitaiApiKey, getCivitaiApiKey, setCivitaiApiKey } from '@workbench/models/apiKeys';
 import {
   getExternalProviderConfigs,
   getHFTokenStatus,
@@ -13,9 +13,9 @@ import {
   setExternalProviderConfig,
   setHFToken,
   type ExternalProviderConfig,
-} from '../../models/api';
-import type { HFTokenStatus } from '../../models/types';
-import { useNotify } from '../../useNotify';
+} from '@workbench/models/api';
+import type { HFTokenStatus } from '@workbench/models/types';
+import { useNotify } from '@workbench/useNotify';
 
 /**
  * Credentials for every model source, as one uniform grid of key cards:

@@ -1,9 +1,9 @@
 import { Stack, Text } from '@chakra-ui/react';
 import { CircleXIcon, PlugZapIcon } from 'lucide-react';
 
-import { StatusWidgetChip } from '../../components/WidgetFrames';
-import type { WidgetViewProps } from '../../types';
-import { useWorkbenchSelector } from '../../WorkbenchContext';
+import { StatusWidgetChip } from '@workbench/components/WidgetFrames';
+import type { WidgetViewProps } from '@workbench/types';
+import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
 
 export const ServerStatusWidgetView = ({ presentation }: WidgetViewProps) => {
   const backendConnection = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection);

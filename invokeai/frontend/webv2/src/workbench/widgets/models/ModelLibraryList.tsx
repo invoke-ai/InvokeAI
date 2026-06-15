@@ -3,13 +3,18 @@ import { defaultRangeExtractor, useVirtualizer, type Range } from '@tanstack/rea
 import { BoxIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { getModelImageUrl } from '../../models/api';
-import { filterModels, flattenGroupsToRows, groupModelsByType, type ModelLibraryFilters } from '../../models/library';
-import { useModelsSnapshot } from '../../models/modelsStore';
-import { formatBytes } from '../../models/taxonomy';
-import type { ModelConfig } from '../../models/types';
-import { getLibraryScrollOffset, saveLibraryScrollOffset } from '../../models/uiStore';
-import { Row } from '../../components/ui/Row';
+import { getModelImageUrl } from '@workbench/models/api';
+import {
+  filterModels,
+  flattenGroupsToRows,
+  groupModelsByType,
+  type ModelLibraryFilters,
+} from '@workbench/models/library';
+import { useModelsSnapshot } from '@workbench/models/modelsStore';
+import { formatBytes } from '@workbench/models/taxonomy';
+import type { ModelConfig } from '@workbench/models/types';
+import { getLibraryScrollOffset, saveLibraryScrollOffset } from '@workbench/models/uiStore';
+import { Row } from '@workbench/components/ui/Row';
 import { ModelBadgeRow } from './ModelBadges';
 import { ModelRowContextMenu, type ModelContextMenuTarget } from './ModelRowContextMenu';
 

@@ -1,4 +1,4 @@
-import type { WidgetViewProps } from '../../types';
+import type { WidgetViewProps } from '@workbench/types';
 import { ModelsCenterView } from './ModelsCenterView';
 import { ModelsPanelView } from './ModelsPanelView';
 

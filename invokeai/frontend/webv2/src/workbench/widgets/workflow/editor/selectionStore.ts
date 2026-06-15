@@ -1,4 +1,4 @@
-import { createExternalStore } from '../../../externalStore';
+import { createExternalStore } from '@workbench/externalStore';
 
 /**
  * Session-lived editor selection, shared with surfaces outside the flow (the

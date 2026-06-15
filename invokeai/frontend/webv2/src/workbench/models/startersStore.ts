@@ -1,4 +1,4 @@
-import { createExternalStore } from '../externalStore';
+import { createExternalStore } from '@workbench/externalStore';
 import { getStarterModels } from './api';
 import type { StarterModelResponse } from './types';
 

@@ -1,4 +1,4 @@
-import { createExternalStore } from '../externalStore';
+import { createExternalStore } from '@workbench/externalStore';
 import { getModelsDir, listMissingModels, listModels } from './api';
 import type { ModelConfig } from './types';
 

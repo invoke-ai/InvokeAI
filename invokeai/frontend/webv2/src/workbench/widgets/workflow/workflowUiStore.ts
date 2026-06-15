@@ -1,5 +1,5 @@
-import { createExternalStore } from '../../externalStore';
-import type { FieldType, XYPosition } from '../../workflows/types';
+import { createExternalStore } from '@workbench/externalStore';
+import type { FieldType, XYPosition } from '@workbench/workflows/types';
 
 export interface AddNodeConnectionFilter {
   sourceHandle: string;

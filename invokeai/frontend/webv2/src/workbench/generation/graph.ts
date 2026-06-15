@@ -4,7 +4,7 @@ import type {
   BackendInvocationContract,
   ProjectSettings,
   ResultDestination,
-} from '../types';
+} from '@workbench/types';
 import { clampDimension, deriveAspectRatioId, getOptimalDimension, SEED_MAX } from './settings';
 import type { CompiledGenerateGraph, GenerateSettings, MainModelConfig, SupportedGenerateBase } from './types';
 

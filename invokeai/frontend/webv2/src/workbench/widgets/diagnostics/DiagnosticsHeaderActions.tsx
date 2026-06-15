@@ -1,8 +1,8 @@
 import { Badge } from '@chakra-ui/react';
 import { BugIcon } from 'lucide-react';
 
-import { Button } from '../../components/ui/Button';
-import { useWorkbenchDispatch, useWorkbenchSelector } from '../../WorkbenchContext';
+import { Button } from '@workbench/components/ui/Button';
+import { useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 
 export const DiagnosticsHeaderActions = () => {
   const errorCount = useWorkbenchSelector((snapshot) => snapshot.state.errorLog.length);

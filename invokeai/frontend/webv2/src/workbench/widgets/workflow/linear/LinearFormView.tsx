@@ -1,9 +1,9 @@
 import { Separator, Stack, Text } from '@chakra-ui/react';
 
-import { Button } from '../../../components/ui/Button';
-import { useWorkbenchDispatch } from '../../../WorkbenchContext';
-import { getFormChildren } from '../../../workflows/document';
-import type { ProjectGraphState, WorkflowFormElement } from '../../../workflows/types';
+import { Button } from '@workbench/components/ui/Button';
+import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { getFormChildren } from '@workbench/workflows/document';
+import type { ProjectGraphState, WorkflowFormElement } from '@workbench/workflows/types';
 import { NodeFieldControl } from './NodeFieldControl';
 
 /**

@@ -1,4 +1,4 @@
-import type { BackendGraphContract, GraphContract } from '../types';
+import type { BackendGraphContract, GraphContract } from '@workbench/types';
 import { getResolvedWorkflowEdges } from './connectors';
 import { createWorkflowId } from './document';
 import type { InvocationTemplatesSnapshot } from './templates';

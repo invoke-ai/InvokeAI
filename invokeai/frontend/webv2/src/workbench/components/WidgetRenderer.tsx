@@ -1,6 +1,6 @@
 import { Box, Flex, Text } from '@chakra-ui/react';
 
-import type { RegisteredWidget, WidgetViewProps } from '../types';
+import type { RegisteredWidget, WidgetViewProps } from '@workbench/types';
 import { WidgetFailureBoundary } from './WidgetFailureBoundary';
 import { WidgetHeader, WidgetPanelFrame } from './WidgetFrames';
 

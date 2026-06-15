@@ -1,14 +1,14 @@
 import { Box, Dialog, HStack, Input, Portal, SegmentGroup, Stack, Tabs, Text } from '@chakra-ui/react';
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 
-import { getApiErrorMessage } from '../../../backend/http';
-import { documentToPreviewGraph, GraphPreviewFlow } from '../../../components/GraphPreviewFlow';
-import { Button, CloseButton } from '../../../components/ui/Button';
-import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
-import { JsonPreview } from '../../../components/ui/JsonPreview';
-import { Scrollable } from '../../../components/ui/Scrollable';
-import { useNotify } from '../../../useNotify';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '../../../WorkbenchContext';
+import { getApiErrorMessage } from '@workbench/backend/http';
+import { documentToPreviewGraph, GraphPreviewFlow } from '@workbench/components/GraphPreviewFlow';
+import { Button, CloseButton } from '@workbench/components/ui/Button';
+import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
+import { JsonPreview } from '@workbench/components/ui/JsonPreview';
+import { Scrollable } from '@workbench/components/ui/Scrollable';
+import { useNotify } from '@workbench/useNotify';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import {
   createLibraryWorkflow,
   deleteLibraryWorkflow,
@@ -16,15 +16,15 @@ import {
   updateLibraryWorkflow,
   type WorkflowLibraryCategory,
   type WorkflowLibraryListItem,
-} from '../../../workflows/api';
+} from '@workbench/workflows/api';
 import {
   getCachedWorkflowPage,
   getLibraryWorkflowCached,
   invalidateWorkflowLibraryCache,
   listLibraryWorkflowsCached,
-} from '../../../workflows/libraryCache';
-import type { ProjectGraphState } from '../../../workflows/types';
-import { parseWorkflowJson, serializeWorkflowJson } from '../../../workflows/workflowJson';
+} from '@workbench/workflows/libraryCache';
+import type { ProjectGraphState } from '@workbench/workflows/types';
+import { parseWorkflowJson, serializeWorkflowJson } from '@workbench/workflows/workflowJson';
 
 /**
  * Backend workflow library browser: list/search user and default workflows,

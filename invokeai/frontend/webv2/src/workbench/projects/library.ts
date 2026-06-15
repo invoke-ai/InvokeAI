@@ -1,4 +1,4 @@
-import { createExternalStore } from '../externalStore';
+import { createExternalStore } from '@workbench/externalStore';
 import { createProjectId } from './ids';
 import {
   createProject as apiCreateProject,

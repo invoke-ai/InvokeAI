@@ -8,16 +8,16 @@ import {
   getQueueItem,
   getQueueItemResultImages,
   listAllQueueItems,
-} from '../generation/api';
+} from '@workbench/generation/api';
 import type {
   EnqueueGenerateRequest,
   EnqueueGenerateResult,
   EnqueueWorkflowRequest,
   ImageDTO,
   QueueItemDTO,
-} from '../generation/types';
-import { handleModelInstallSocketEvent, MODEL_INSTALL_SOCKET_EVENTS } from '../models/installsStore';
-import type { BackendConnectionStatus } from '../types';
+} from '@workbench/generation/types';
+import { handleModelInstallSocketEvent, MODEL_INSTALL_SOCKET_EVENTS } from '@workbench/models/installsStore';
+import type { BackendConnectionStatus } from '@workbench/types';
 import {
   isTerminalBackendStatus,
   parseQueueItemOrigin,

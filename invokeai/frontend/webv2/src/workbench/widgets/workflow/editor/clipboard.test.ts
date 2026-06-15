@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { createProjectGraph } from '../../../workflows/document';
-import type { ProjectGraphState, WorkflowEdge, WorkflowInvocationNode } from '../../../workflows/types';
+import { createProjectGraph } from '@workbench/workflows/document';
+import type { ProjectGraphState, WorkflowEdge, WorkflowInvocationNode } from '@workbench/workflows/types';
 import { buildDuplicateElements, buildPasteElements, copyNodesToClipboard, hasClipboardNodes } from './clipboard';
 
 const createNode = (id: string, x: number, y: number): WorkflowInvocationNode => ({

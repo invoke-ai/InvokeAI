@@ -1,8 +1,8 @@
 import { Box, HStack, ScrollArea, Stack, Text } from '@chakra-ui/react';
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, EyeIcon, EyeOffIcon } from 'lucide-react';
 
-import type { CanvasStagingCandidateContract, GeneratedImageContract } from '../../types';
-import { Button, IconButton } from '../../components/ui/Button';
+import type { CanvasStagingCandidateContract, GeneratedImageContract } from '@workbench/types';
+import { Button, IconButton } from '@workbench/components/ui/Button';
 
 const THUMBNAIL_STRIP_HEIGHT = '5.5rem';
 

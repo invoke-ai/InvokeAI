@@ -1,10 +1,10 @@
 import { Box, Dialog, Portal, SegmentGroup, Text } from '@chakra-ui/react';
 import { useState, type ReactNode } from 'react';
 
-import { formatRoute, isInvocationRouteValid, resolveInvocationRoute } from '../invocation';
-import type { GraphContract, GraphId, InvocationSourceId } from '../types';
-import { useActiveProject, useWorkbenchDispatch } from '../WorkbenchContext';
-import type { XYPosition } from '../workflows/types';
+import { formatRoute, isInvocationRouteValid, resolveInvocationRoute } from '@workbench/invocation';
+import type { GraphContract, GraphId, InvocationSourceId } from '@workbench/types';
+import { useActiveProject, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import type { XYPosition } from '@workbench/workflows/types';
 import { GraphPreviewFlow } from './GraphPreviewFlow';
 import { Button } from './ui/Button';
 import { JsonPreview } from './ui/JsonPreview';

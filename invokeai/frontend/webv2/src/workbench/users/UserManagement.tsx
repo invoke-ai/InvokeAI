@@ -2,14 +2,14 @@ import { Avatar, Badge, Box, Center, Flex, HStack, Spinner, Stack, Switch, Table
 import { useCallback, useEffect, useState } from 'react';
 import { PencilIcon, Trash2Icon, UserPlusIcon } from 'lucide-react';
 
-import { deleteUser, listUsers, updateUser, type UserDTO } from '../auth/api';
-import { useAuthSession } from '../auth/session';
-import { getApiErrorMessage } from '../backend/http';
-import { Button, IconButton } from '../components/ui/Button';
-import { ConfirmDialog } from '../components/ui/ConfirmDialog';
-import { Scrollable } from '../components/ui/Scrollable';
-import { Tooltip } from '../components/ui/Tooltip';
-import { useNotify } from '../useNotify';
+import { deleteUser, listUsers, updateUser, type UserDTO } from '@workbench/auth/api';
+import { useAuthSession } from '@workbench/auth/session';
+import { getApiErrorMessage } from '@workbench/backend/http';
+import { Button, IconButton } from '@workbench/components/ui/Button';
+import { ConfirmDialog } from '@workbench/components/ui/ConfirmDialog';
+import { Scrollable } from '@workbench/components/ui/Scrollable';
+import { Tooltip } from '@workbench/components/ui/Tooltip';
+import { useNotify } from '@workbench/useNotify';
 import { UserFormDialog, type UserFormTarget } from './UserFormDialog';
 
 /**

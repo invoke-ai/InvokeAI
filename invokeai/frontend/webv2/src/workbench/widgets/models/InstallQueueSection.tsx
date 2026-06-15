@@ -2,16 +2,16 @@ import { Badge, Box, Flex, HStack, Icon, Progress, Spinner, Stack, Text } from '
 import { PauseIcon, PlayIcon, RotateCcwIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { Button, IconButton } from '../../components/ui/Button';
-import { Scrollable } from '../../components/ui/Scrollable';
-import { Tooltip } from '../../components/ui/Tooltip';
+import { Button, IconButton } from '@workbench/components/ui/Button';
+import { Scrollable } from '@workbench/components/ui/Scrollable';
+import { Tooltip } from '@workbench/components/ui/Tooltip';
 import {
   cancelModelInstall,
   pauseModelInstall,
   pruneCompletedModelInstalls,
   restartFailedModelInstall,
   resumeModelInstall,
-} from '../../models/api';
+} from '@workbench/models/api';
 import {
   ensureInstallsLoaded,
   isActiveInstallStatus,
@@ -19,10 +19,10 @@ import {
   replaceInstallJob,
   useInstallProgress,
   useInstallsSnapshot,
-} from '../../models/installsStore';
-import { formatBytes, getInstallSourceLabel } from '../../models/taxonomy';
-import type { ModelInstallJob, ModelInstallStatus } from '../../models/types';
-import { useNotify } from '../../useNotify';
+} from '@workbench/models/installsStore';
+import { formatBytes, getInstallSourceLabel } from '@workbench/models/taxonomy';
+import type { ModelInstallJob, ModelInstallStatus } from '@workbench/models/types';
+import { useNotify } from '@workbench/useNotify';
 
 const STATUS_BADGES: Record<ModelInstallStatus, { label: string; palette: string }> = {
   cancelled: { label: 'Cancelled', palette: 'gray' },

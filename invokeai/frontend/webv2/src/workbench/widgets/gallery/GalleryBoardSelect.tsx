@@ -28,8 +28,8 @@ import {
   XIcon,
 } from 'lucide-react';
 
-import { Button, CloseButton, IconButton } from '../../components/ui/Button';
-import type { GalleryBoard } from '../../gallery/api';
+import { Button, CloseButton, IconButton } from '@workbench/components/ui/Button';
+import type { GalleryBoard } from '@workbench/gallery/api';
 import { GalleryBoardMenu, type GalleryBoardMenuTarget } from './GalleryBoardMenu';
 import { getBoardCounts } from './galleryStateView';
 import { useGalleryWidget } from './GalleryWidgetContext';

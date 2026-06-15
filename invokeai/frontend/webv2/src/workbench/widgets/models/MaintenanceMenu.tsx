@@ -2,14 +2,14 @@ import { Checkbox, Dialog, Flex, Icon, Menu, Portal, Spinner, Stack, Text } from
 import { BrushCleaningIcon, FolderSearchIcon, MoreHorizontalIcon, RefreshCcwIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { Button, CloseButton, IconButton } from '../../components/ui/Button';
-import { MenuContent } from '../../components/ui/Menu';
-import { Panel } from '../../components/ui/Panel';
-import { deleteOrphanedModels, emptyModelCache, getOrphanedModels } from '../../models/api';
-import { refreshModels } from '../../models/modelsStore';
-import { formatBytes } from '../../models/taxonomy';
-import type { OrphanedModelInfo } from '../../models/types';
-import { useNotify } from '../../useNotify';
+import { Button, CloseButton, IconButton } from '@workbench/components/ui/Button';
+import { MenuContent } from '@workbench/components/ui/Menu';
+import { Panel } from '@workbench/components/ui/Panel';
+import { deleteOrphanedModels, emptyModelCache, getOrphanedModels } from '@workbench/models/api';
+import { refreshModels } from '@workbench/models/modelsStore';
+import { formatBytes } from '@workbench/models/taxonomy';
+import type { OrphanedModelInfo } from '@workbench/models/types';
+import { useNotify } from '@workbench/useNotify';
 
 /**
  * Library maintenance: refresh, clean up orphaned model folders (files on disk

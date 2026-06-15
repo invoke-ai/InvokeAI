@@ -2,7 +2,7 @@ import { Flex, Group, HStack, Icon, Menu, Portal, Separator, Stack, Text, VStack
 import { useEffect, useRef } from 'react';
 import { CheckIcon, ChevronDownIcon, LockKeyholeIcon, SparklesIcon } from 'lucide-react';
 
-import { useActiveProject, useWorkbenchDispatch, useWorkbenchSelector } from '../WorkbenchContext';
+import { useActiveProject, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import {
   formatRoute,
   getDestinationLabel,
@@ -10,9 +10,9 @@ import {
   isInvocationRouteValid,
   resolveInvocationRoute,
   resultDestinations,
-} from '../invocation';
-import { useInvocationTemplatesSnapshot } from '../workflows/templates';
-import type { InvocationSourceId, Project, ResultDestination } from '../types';
+} from '@workbench/invocation';
+import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
+import type { InvocationSourceId, Project, ResultDestination } from '@workbench/types';
 import { Button, IconButton } from './ui/Button';
 import { Tooltip } from './ui/Tooltip';
 

@@ -1,4 +1,4 @@
-import { apiFetch, apiFetchJson, buildApiUrl } from '../backend/http';
+import { apiFetch, apiFetchJson, buildApiUrl } from '@workbench/backend/http';
 import type {
   BulkDeleteModelsResponse,
   DeleteOrphanedModelsResponse,

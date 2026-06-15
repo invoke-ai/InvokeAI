@@ -9,7 +9,7 @@ import {
   Trash2Icon,
 } from 'lucide-react';
 
-import type { XYPosition } from '../../../workflows/types';
+import type { XYPosition } from '@workbench/workflows/types';
 
 /**
  * Right-click utilities for the flow pane and nodes, anchored at the pointer.
