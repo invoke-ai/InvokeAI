@@ -29,18 +29,24 @@ const createQueueItem = ({
   backendItemIds,
   batchCount = 1,
   boardId = 'none',
+  completedBackendItemIds,
+  cancelledBackendItemIds,
   destination = 'gallery',
   status = 'pending',
 }: {
   backendItemIds?: number[];
   batchCount?: number;
   boardId?: string;
+  completedBackendItemIds?: number[];
+  cancelledBackendItemIds?: number[];
   destination?: 'gallery' | 'canvas';
   status?: QueueItemStatus;
 }): QueueItem =>
   ({
     backendItemIds,
     cancellable: true,
+    cancelledBackendItemIds,
+    completedBackendItemIds,
     id: `queue-item-${status}-${boardId}`,
     snapshot: {
       destination,
@@ -117,7 +123,51 @@ describe('gallery state view', () => {
     });
 
     expect(placeholders).toHaveLength(5);
-    expect(placeholders[0]).toMatchObject({ height: 768, width: 512 });
+    expect(placeholders[0]).toMatchObject({
+      height: 768,
+      itemIndex: 1,
+      queueItemId: 'queue-item-pending-board-1',
+      width: 512,
+    });
+  });
+
+  it('skips completed backend item slots when creating placeholders', () => {
+    const queueItems = [
+      createQueueItem({
+        backendItemIds: [11, 12, 13],
+        boardId: 'board-1',
+        completedBackendItemIds: [11],
+        status: 'running',
+      }),
+    ];
+
+    const placeholders = getGalleryQueuePlaceholders(queueItems, {
+      galleryView: 'images',
+      searchTerm: '',
+      selectedBoardId: 'board-1',
+    });
+
+    expect(placeholders.map((placeholder) => placeholder.itemIndex)).toEqual([2, 3]);
+  });
+
+  it('skips cancelled backend item slots when creating placeholders', () => {
+    const queueItems = [
+      createQueueItem({
+        backendItemIds: [11, 12, 13],
+        boardId: 'board-1',
+        cancelledBackendItemIds: [12],
+        completedBackendItemIds: [11],
+        status: 'running',
+      }),
+    ];
+
+    const placeholders = getGalleryQueuePlaceholders(queueItems, {
+      galleryView: 'images',
+      searchTerm: '',
+      selectedBoardId: 'board-1',
+    });
+
+    expect(placeholders.map((placeholder) => placeholder.itemIndex)).toEqual([3]);
   });
 
   it('does not create placeholders for other boards, finished items, or canvas runs', () => {

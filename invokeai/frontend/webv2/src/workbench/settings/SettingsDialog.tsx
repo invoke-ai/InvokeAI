@@ -420,14 +420,12 @@ const ProjectSection = () => {
       />
       <SettingToggle
         checked={settings.antialiasProgressImages}
-        comingSoon
         description="Smooth progress previews instead of rendering them pixelated."
         label="Antialias progress images"
         onChange={(checked) => updateProjectSettings({ antialiasProgressImages: checked })}
       />
       <SettingToggle
         checked={settings.showProgressImagesInViewer}
-        comingSoon
         description="Show progress images in the viewer when an image is still generating."
         label="Show progress images in viewer"
         onChange={(checked) => updateProjectSettings({ showProgressImagesInViewer: checked })}

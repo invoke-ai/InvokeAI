@@ -1,6 +1,7 @@
 import type { GeneratedImageContract, WidgetViewProps } from '@workbench/types';
 
 import { Badge, Box, Flex, HStack, Stack, Text } from '@chakra-ui/react';
+import { useProgressImage, type ProgressImageSnapshot } from '@workbench/backend/progressImageStore';
 import { ImageContextMenu, type ImageContextMenuTarget } from '@workbench/components/ImageContextMenu';
 import { Button } from '@workbench/components/ui/Button';
 import { useImageActions } from '@workbench/components/useImageActions';
@@ -24,8 +25,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PreviewCompare } from './PreviewCompare';
 
 type PreviewImage = GeneratedImageContract & Partial<Pick<GalleryImage, 'boardId' | 'imageCategory' | 'starred'>>;
-
-const getImageAspectRatio = (image: GeneratedImageContract): number => image.width / image.height;
 
 const fallbackBoards: GalleryBoard[] = [
   { archived: false, assetCount: 0, id: 'none', imageCount: 0, kind: 'uncategorized', name: 'Uncategorized' },
@@ -100,6 +99,10 @@ const previewGridCss = {
 export const PreviewWidgetView = ({ region }: WidgetViewProps) => {
   const galleryValues = useActiveProjectSelector((project) => project.widgetStates.gallery.values);
   const generateValues = useActiveProjectSelector((project) => project.widgetStates.generate.values);
+  const { antialiasProgressImages, showProgressImagesInViewer } = useActiveProjectSelector(
+    (project) => project.settings
+  );
+  const progressImage = useProgressImage();
   const dispatch = useWorkbenchDispatch();
   const selectedImage = useMemo(() => getSelectedImage(galleryValues), [galleryValues]);
   const compareImage = getGalleryCompareImage(galleryValues);
@@ -260,6 +263,7 @@ export const PreviewWidgetView = ({ region }: WidgetViewProps) => {
   }, [boardImages, displayBoardId, selectedImage]);
   const isComparing =
     selectedImage !== null && compareImage !== null && compareImage.imageName !== selectedImage.imageName;
+  const shouldShowProgressImage = showProgressImagesInViewer && progressImage !== null && !isComparing;
 
   return (
     <Box p="2" h="full">
@@ -282,7 +286,9 @@ export const PreviewWidgetView = ({ region }: WidgetViewProps) => {
               image={selectedImage}
               isCompact={isSidePanel}
               isLoadingBoard={isLoadingBoard}
+              progressImage={shouldShowProgressImage ? progressImage : null}
               selectedIndex={selectedIndex}
+              shouldAntialiasProgressImage={antialiasProgressImages}
               onContextMenu={(x, y) => {
                 if (contextMenuImage) {
                   setContextMenuTarget({ images: [contextMenuImage], x, y });
@@ -300,7 +306,10 @@ export const PreviewWidgetView = ({ region }: WidgetViewProps) => {
           />
         </>
       ) : (
-        <EmptyPreview />
+        <EmptyPreview
+          progressImage={shouldShowProgressImage ? progressImage : null}
+          shouldAntialiasProgressImage={antialiasProgressImages}
+        />
       )}
     </Box>
   );
@@ -312,7 +321,9 @@ const SelectedImagePreview = ({
   image,
   isCompact,
   isLoadingBoard,
+  progressImage,
   selectedIndex,
+  shouldAntialiasProgressImage,
   onContextMenu,
   onNext,
   onPrevious,
@@ -322,126 +333,152 @@ const SelectedImagePreview = ({
   image: GeneratedImageContract;
   isCompact: boolean;
   isLoadingBoard: boolean;
+  progressImage: ProgressImageSnapshot | null;
   selectedIndex: number;
+  shouldAntialiasProgressImage: boolean;
   onContextMenu: (x: number, y: number) => void;
   onNext: () => void;
   onPrevious: () => void;
-}) => (
-  <Stack
-    gap="3"
-    h="full"
-    minH="0"
-    tabIndex={0}
-    w="full"
-    onKeyDown={(event) => {
-      if (event.key === 'ArrowLeft') {
-        event.preventDefault();
-        onPrevious();
+}) => {
+  const previewImage = progressImage
+    ? {
+        alt: 'In-progress diffusion preview',
+        height: progressImage.height,
+        isProgress: true,
+        src: progressImage.dataUrl,
+        width: progressImage.width,
       }
+    : { alt: image.imageName, height: image.height, isProgress: false, src: image.imageUrl, width: image.width };
 
-      if (event.key === 'ArrowRight') {
-        event.preventDefault();
-        onNext();
-      }
-    }}
-  >
-    <Flex
-      align="center"
-      borderWidth="1px"
-      borderColor="border.subtle"
-      color="fg.grid"
-      css={previewGridCss}
-      flex="1"
-      justify="center"
+  return (
+    <Stack
+      gap="3"
+      h="full"
       minH="0"
-      overflow="hidden"
-      p={isCompact ? '3' : '6'}
-      rounded="lg"
+      tabIndex={0}
       w="full"
-    >
-      <Box
-        aspectRatio={getImageAspectRatio(image)}
-        bg="transparent"
-        borderWidth="1px"
-        borderColor="border.emphasized"
-        boxShadow="0 24px 80px rgba(0,0,0,0.42)"
-        h={isCompact ? 'auto' : 'full'}
-        maxH={isCompact ? undefined : 'full'}
-        maxW="full"
-        overflow="hidden"
-        position="relative"
-        rounded="lg"
-        w={isCompact ? 'full' : 'auto'}
-        onContextMenu={(event) => {
+      onKeyDown={(event) => {
+        if (event.key === 'ArrowLeft') {
           event.preventDefault();
-          onContextMenu(event.clientX, event.clientY);
-        }}
+          onPrevious();
+        }
+
+        if (event.key === 'ArrowRight') {
+          event.preventDefault();
+          onNext();
+        }
+      }}
+    >
+      <Flex
+        align="center"
+        borderWidth="1px"
+        borderColor="border.subtle"
+        color="fg.grid"
+        css={previewGridCss}
+        flex="1"
+        justify="center"
+        minH="0"
+        overflow="hidden"
+        p={isCompact ? '3' : '6'}
+        rounded="lg"
+        w="full"
       >
-        <img
-          alt={image.imageName}
-          src={image.imageUrl}
-          style={{
-            display: 'block',
-            height: '100%',
-            inset: 0,
-            objectFit: 'contain',
-            position: 'absolute',
-            width: '100%',
+        <Box
+          aspectRatio={previewImage.width / previewImage.height}
+          bg="transparent"
+          borderWidth="1px"
+          borderColor={previewImage.isProgress ? 'accent.solid' : 'border.emphasized'}
+          boxShadow="0 24px 80px rgba(0,0,0,0.42)"
+          h={isCompact ? 'auto' : 'full'}
+          maxH={isCompact ? undefined : 'full'}
+          maxW="full"
+          overflow="hidden"
+          position="relative"
+          rounded="lg"
+          w={isCompact ? 'full' : 'auto'}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            onContextMenu(event.clientX, event.clientY);
           }}
-        />
-      </Box>
-    </Flex>
-    <Stack borderWidth="1px" borderColor="border.subtle" gap="2" p="3" rounded="lg">
-      <HStack align="center" justify="space-between">
-        <HStack gap="2" minW="0">
-          <Badge flexShrink={0} size="xs" variant="subtle">
-            {boardName}
-          </Badge>
-          <Text color="fg.subtle" fontSize="2xs" truncate>
-            {isLoadingBoard
-              ? 'Loading board'
-              : selectedIndex === -1
-                ? `${boardImageCount} image${boardImageCount === 1 ? '' : 's'}`
-                : `${selectedIndex + 1} of ${boardImageCount}`}
+        >
+          <img
+            alt={previewImage.alt}
+            src={previewImage.src}
+            style={{
+              display: 'block',
+              height: '100%',
+              imageRendering: previewImage.isProgress && !shouldAntialiasProgressImage ? 'pixelated' : 'auto',
+              inset: 0,
+              objectFit: 'contain',
+              position: 'absolute',
+              width: '100%',
+            }}
+          />
+          {previewImage.isProgress ? (
+            <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
+              Generating
+            </Badge>
+          ) : null}
+        </Box>
+      </Flex>
+      <Stack borderWidth="1px" borderColor="border.subtle" gap="2" p="3" rounded="lg">
+        <HStack align="center" justify="space-between">
+          <HStack gap="2" minW="0">
+            <Badge flexShrink={0} size="xs" variant="subtle">
+              {boardName}
+            </Badge>
+            <Text color="fg.subtle" fontSize="2xs" truncate>
+              {isLoadingBoard
+                ? 'Loading board'
+                : selectedIndex === -1
+                  ? `${boardImageCount} image${boardImageCount === 1 ? '' : 's'}`
+                  : `${selectedIndex + 1} of ${boardImageCount}`}
+            </Text>
+          </HStack>
+          <HStack flexShrink={0} gap="1">
+            <Button
+              aria-label="Previous image in board"
+              disabled={selectedIndex <= 0}
+              size="2xs"
+              variant="outline"
+              onClick={onPrevious}
+            >
+              <ChevronLeftIcon />
+            </Button>
+            <Button
+              aria-label="Next image in board"
+              disabled={selectedIndex === -1 || selectedIndex >= boardImageCount - 1}
+              size="2xs"
+              variant="outline"
+              onClick={onNext}
+            >
+              <ChevronRightIcon />
+            </Button>
+          </HStack>
+        </HStack>
+        <Stack>
+          <Text fontSize="xs" fontWeight="800" truncate>
+            {image.imageName}
           </Text>
-        </HStack>
-        <HStack flexShrink={0} gap="1">
-          <Button
-            aria-label="Previous image in board"
-            disabled={selectedIndex <= 0}
-            size="2xs"
-            variant="outline"
-            onClick={onPrevious}
-          >
-            <ChevronLeftIcon />
-          </Button>
-          <Button
-            aria-label="Next image in board"
-            disabled={selectedIndex === -1 || selectedIndex >= boardImageCount - 1}
-            size="2xs"
-            variant="outline"
-            onClick={onNext}
-          >
-            <ChevronRightIcon />
-          </Button>
-        </HStack>
-      </HStack>
-      <Stack>
-        <Text fontSize="xs" fontWeight="800" truncate>
-          {image.imageName}
-        </Text>
-        <Text color="fg.subtle" fontSize="2xs">
-          Source run {image.sourceQueueItemId}
-        </Text>
-        <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
-          {image.width} x {image.height}
-        </Text>
+          <Text color="fg.subtle" fontSize="2xs">
+            Source run {image.sourceQueueItemId}
+          </Text>
+          <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
+            {previewImage.isProgress ? 'Generating' : `${image.width} x ${image.height}`}
+          </Text>
+        </Stack>
       </Stack>
     </Stack>
-  </Stack>
-);
+  );
+};
 
-const EmptyPreview = () => (
+const EmptyPreview = ({
+  progressImage,
+  shouldAntialiasProgressImage,
+}: {
+  progressImage: ProgressImageSnapshot | null;
+  shouldAntialiasProgressImage: boolean;
+}) => (
   <Flex
     align="center"
     backgroundColor="bg.inset"
@@ -451,13 +488,43 @@ const EmptyPreview = () => (
     justify="center"
     w="full"
   >
-    <Stack align="center" color="fg" gap="2" maxW="18rem" textAlign="center">
-      <Text fontSize="sm" fontWeight="800">
-        No gallery selection
-      </Text>
-      <Text color="fg.subtle" fontSize="2xs">
-        Generate to Gallery, then select a thumbnail in the Gallery widget to inspect it here.
-      </Text>
-    </Stack>
+    {progressImage ? (
+      <Box
+        aspectRatio={progressImage.width / progressImage.height}
+        borderColor="accent.solid"
+        borderWidth="1px"
+        boxShadow="0 24px 80px rgba(0,0,0,0.42)"
+        maxH="full"
+        maxW="full"
+        overflow="hidden"
+        position="relative"
+        rounded="lg"
+      >
+        <img
+          alt="In-progress diffusion preview"
+          draggable={false}
+          src={progressImage.dataUrl}
+          style={{
+            display: 'block',
+            height: '100%',
+            imageRendering: shouldAntialiasProgressImage ? 'auto' : 'pixelated',
+            objectFit: 'contain',
+            width: '100%',
+          }}
+        />
+        <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
+          Generating
+        </Badge>
+      </Box>
+    ) : (
+      <Stack align="center" color="fg" gap="2" maxW="18rem" textAlign="center">
+        <Text fontSize="sm" fontWeight="800">
+          No gallery selection
+        </Text>
+        <Text color="fg.subtle" fontSize="2xs">
+          Generate to Gallery, then select a thumbnail in the Gallery widget to inspect it here.
+        </Text>
+      </Stack>
+    )}
   </Flex>
 );

@@ -1,0 +1,31 @@
+import { Icon } from '@chakra-ui/react';
+import { useProgressImage } from '@workbench/backend/progressImageStore';
+import { IconButton } from '@workbench/components/ui/Button';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { HourglassIcon } from 'lucide-react';
+
+export const PreviewHeaderActions = () => {
+  const showProgressImagesInViewer = useActiveProjectSelector((project) => project.settings.showProgressImagesInViewer);
+  const hasProgressImage = useProgressImage() !== null;
+  const dispatch = useWorkbenchDispatch();
+  const label = showProgressImagesInViewer ? 'Hide in-progress diffusion' : 'Show in-progress diffusion';
+
+  return (
+    <IconButton
+      aria-label={label}
+      colorPalette={showProgressImagesInViewer ? 'accent' : 'gray'}
+      opacity={hasProgressImage || showProgressImagesInViewer ? 1 : 0.7}
+      size="2xs"
+      title={label}
+      variant={showProgressImagesInViewer ? 'solid' : 'ghost'}
+      onClick={() =>
+        dispatch({
+          settings: { showProgressImagesInViewer: !showProgressImagesInViewer },
+          type: 'setActiveProjectSettings',
+        })
+      }
+    >
+      <Icon as={HourglassIcon} boxSize="3.5" />
+    </IconButton>
+  );
+};

@@ -19,6 +19,8 @@ const UNCATEGORIZED_BOARD: GalleryBoard = {
  */
 export interface GalleryQueuePlaceholder {
   id: string;
+  queueItemId: string;
+  itemIndex: number;
   width: number;
   height: number;
 }
@@ -139,9 +141,29 @@ export const getGalleryQueuePlaceholders = (
       : sanitizeBatchCount(generateValues.batchCount);
     const width = getFiniteNumber(generateValues.width, 1024);
     const height = getFiniteNumber(generateValues.height, 1024);
+    const completedBackendItemIds = new Set(item.completedBackendItemIds ?? []);
+    const cancelledBackendItemIds = new Set(item.cancelledBackendItemIds ?? []);
+
+    if (item.backendItemIds?.length) {
+      for (let index = 0; index < item.backendItemIds.length; index += 1) {
+        const backendItemId = item.backendItemIds[index];
+
+        if (
+          backendItemId === undefined ||
+          completedBackendItemIds.has(backendItemId) ||
+          cancelledBackendItemIds.has(backendItemId)
+        ) {
+          continue;
+        }
+
+        placeholders.push({ height, id: `${item.id}:${index}`, itemIndex: index + 1, queueItemId: item.id, width });
+      }
+
+      continue;
+    }
 
     for (let index = 0; index < expectedImageCount; index++) {
-      placeholders.push({ height, id: `${item.id}:${index}`, width });
+      placeholders.push({ height, id: `${item.id}:${index}`, itemIndex: index + 1, queueItemId: item.id, width });
     }
   }
 

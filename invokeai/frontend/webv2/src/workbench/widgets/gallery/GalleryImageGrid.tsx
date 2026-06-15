@@ -1,10 +1,13 @@
 import type { GalleryImage } from '@workbench/gallery/api';
 import type { GalleryThumbnailFit } from '@workbench/gallery/settings';
 
-import { Badge, Box, Flex, ScrollArea, Skeleton, Spinner, Text } from '@chakra-ui/react';
+import { Badge, Box, Flex, ProgressCircle, ScrollArea, Skeleton, Spinner, Text } from '@chakra-ui/react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { useQueueItemProgressImage } from '@workbench/backend/progressImageStore';
+import { useQueueItemProgress } from '@workbench/backend/progressStore';
 import { ImageContextMenu, type ImageContextMenuTarget } from '@workbench/components/ImageContextMenu';
 import { IconButton } from '@workbench/components/ui/Button';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { StarIcon, UploadIcon } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 
@@ -32,6 +35,7 @@ type GridCell =
 
 export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => {
   const { actions, gallery, imageActions } = useGalleryWidget();
+  const dispatch = useWorkbenchDispatch();
   const [contextMenuTarget, setContextMenuTarget] = useState<ImageContextMenuTarget | null>(null);
   const [isDropActive, setIsDropActive] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(() => viewportWidthCache.get(layout) ?? 0);
@@ -39,6 +43,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const { imageDensityPercent, imageOrderDir, paginationMode, showImageDimensions, starredFirst, thumbnailFit } =
     gallery.settings;
+  const antialiasProgressImages = useActiveProjectSelector((project) => project.settings.antialiasProgressImages);
   const columnCount = getGalleryColumnCount(imageDensityPercent, layout);
   const selectedNames = useMemo(() => new Set(gallery.selectedImageNames), [gallery.selectedImageNames]);
   const isComparisonActive =
@@ -302,34 +307,43 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
                     transform={`translateY(${virtualRow.start}px)`}
                     w="full"
                   >
-                    {cells
-                      .slice(virtualRow.index * columnCount, (virtualRow.index + 1) * columnCount)
-                      .map((cell) =>
-                        cell.kind === 'placeholder' ? (
-                          <Skeleton key={cell.placeholder.id} aspectRatio={1} minW="0" rounded="md" w="full" />
-                        ) : (
-                          <GalleryThumbnail
-                            key={cell.image.imageName}
-                            alwaysShowDimensions={showImageDimensions}
-                            compareRole={
-                              isComparisonActive && cell.image.imageName === gallery.selectedImageName
-                                ? 'Viewing'
-                                : isComparisonActive && cell.image.imageName === gallery.compareImageName
-                                  ? 'Compare'
-                                  : null
-                            }
-                            fit={thumbnailFit}
-                            image={cell.image}
-                            isPrimary={cell.image.imageName === gallery.selectedImageName}
-                            isSelected={selectedNames.has(cell.image.imageName)}
-                            onClick={handleThumbnailClick}
-                            onContextMenu={handleThumbnailContextMenu}
-                            onToggleStarred={(image) =>
-                              void imageActions.setImagesStarred([image.imageName], !image.starred)
-                            }
-                          />
-                        )
-                      )}
+                    {cells.slice(virtualRow.index * columnCount, (virtualRow.index + 1) * columnCount).map((cell) =>
+                      cell.kind === 'placeholder' ? (
+                        <GalleryQueuePlaceholderCell
+                          key={cell.placeholder.id}
+                          antialiasProgressImages={antialiasProgressImages}
+                          fit={thumbnailFit}
+                          placeholder={cell.placeholder}
+                          onClick={() =>
+                            dispatch({
+                              settings: { showProgressImagesInViewer: true },
+                              type: 'setActiveProjectSettings',
+                            })
+                          }
+                        />
+                      ) : (
+                        <GalleryThumbnail
+                          key={cell.image.imageName}
+                          alwaysShowDimensions={showImageDimensions}
+                          compareRole={
+                            isComparisonActive && cell.image.imageName === gallery.selectedImageName
+                              ? 'Viewing'
+                              : isComparisonActive && cell.image.imageName === gallery.compareImageName
+                                ? 'Compare'
+                                : null
+                          }
+                          fit={thumbnailFit}
+                          image={cell.image}
+                          isPrimary={cell.image.imageName === gallery.selectedImageName}
+                          isSelected={selectedNames.has(cell.image.imageName)}
+                          onClick={handleThumbnailClick}
+                          onContextMenu={handleThumbnailContextMenu}
+                          onToggleStarred={(image) =>
+                            void imageActions.setImagesStarred([image.imageName], !image.starred)
+                          }
+                        />
+                      )
+                    )}
                   </Box>
                 ))}
               </Box>
@@ -374,6 +388,87 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
         onClose={() => setContextMenuTarget(null)}
       />
     </Box>
+  );
+};
+
+const GalleryQueuePlaceholderCell = ({
+  antialiasProgressImages,
+  fit,
+  onClick,
+  placeholder,
+}: {
+  antialiasProgressImages: boolean;
+  fit: GalleryThumbnailFit;
+  onClick: () => void;
+  placeholder: GalleryQueuePlaceholder;
+}) => {
+  const progressImage = useQueueItemProgressImage(placeholder.queueItemId, placeholder.itemIndex);
+  const progress = useQueueItemProgress(placeholder.queueItemId);
+  const isActive = progress?.activeItemIndex === placeholder.itemIndex;
+  const percentage = typeof progress?.percentage === 'number' ? Math.round(progress.percentage * 100) : null;
+
+  return (
+    <Box
+      as="button"
+      aria-label="Show in-progress diffusion in Preview"
+      aspectRatio={1}
+      bg="bg.emphasized"
+      borderColor={isActive ? 'accent.solid' : 'border.subtle'}
+      borderWidth="1px"
+      cursor="pointer"
+      minW="0"
+      overflow="hidden"
+      position="relative"
+      rounded="md"
+      w="full"
+      onClick={onClick}
+    >
+      {progressImage ? (
+        <img
+          alt="In-progress diffusion preview"
+          draggable={false}
+          src={progressImage.dataUrl}
+          style={{
+            display: 'block',
+            height: '100%',
+            imageRendering: antialiasProgressImages ? 'auto' : 'pixelated',
+            inset: 0,
+            maxWidth: 'none',
+            objectFit: fit === 'aspect' ? 'contain' : 'cover',
+            position: 'absolute',
+            width: '100%',
+          }}
+        />
+      ) : (
+        <Skeleton h="full" w="full" />
+      )}
+      {/*<Badge left="1" pointerEvents="none" position="absolute" size="xs" top="1" variant="solid" zIndex="1">
+        {isActive ? 'Generating' : 'Queued'}
+      </Badge>*/}
+      {isActive ? <GalleryPlaceholderCircularProgress percentage={percentage} /> : null}
+    </Box>
+  );
+};
+
+const GalleryPlaceholderCircularProgress = ({ percentage }: { percentage: number | null }) => {
+  return (
+    <Flex
+      align="center"
+      aria-label={percentage === null ? 'Generation progress' : `Generation ${percentage}%`}
+      justify="center"
+      alignItems="center"
+      pointerEvents="none"
+      position="absolute"
+      inset="0"
+      zIndex="1"
+    >
+      <ProgressCircle.Root value={percentage} size="xs" bg="bg/85" rounded="full" borderWidth={1} p={0.5}>
+        <ProgressCircle.Circle>
+          <ProgressCircle.Track />
+          <ProgressCircle.Range />
+        </ProgressCircle.Circle>
+      </ProgressCircle.Root>
+    </Flex>
   );
 };
 
