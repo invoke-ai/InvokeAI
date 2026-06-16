@@ -4331,10 +4331,21 @@ export type components = {
              */
             board_visibility?: components["schemas"]["BoardVisibility"];
             /**
+             * Cover Video Name
+             * @description The name of the board's cover video, when the most recent item is a video.
+             */
+            cover_video_name?: string | null;
+            /**
              * Image Count
              * @description The number of images in the board.
              */
             image_count: number;
+            /**
+             * Video Count
+             * @description The number of videos in the board.
+             * @default 0
+             */
+            video_count?: number;
             /**
              * Asset Count
              * @description The number of assets in the board.

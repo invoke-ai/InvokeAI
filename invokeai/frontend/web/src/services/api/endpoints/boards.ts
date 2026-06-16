@@ -6,9 +6,10 @@ import type {
   ImageCategory,
   ListBoardsArgs,
   OffsetPaginatedResults_ImageDTO_,
+  OffsetPaginatedResults_VideoDTO_,
   UpdateBoardArg,
 } from 'services/api/types';
-import { getListImagesUrl } from 'services/api/util';
+import { getListImagesUrl, getListVideosUrl } from 'services/api/util';
 
 import type { ApiTagDescription } from '..';
 import { api, buildV1Url, LIST_TAG } from '..';
@@ -95,6 +96,22 @@ export const boardsApi = api.injectEndpoints({
       },
     }),
 
+    getBoardVideosTotal: build.query<{ total: number }, string | undefined>({
+      query: (board_id) => ({
+        url: getListVideosUrl({
+          board_id: board_id ?? 'none',
+          is_intermediate: false,
+          limit: 0,
+          offset: 0,
+        }),
+        method: 'GET',
+      }),
+      providesTags: (result, error, arg) => [{ type: 'BoardVideosTotal', id: arg ?? 'none' }, 'FetchOnReconnect'],
+      transformResponse: (response: OffsetPaginatedResults_VideoDTO_) => {
+        return { total: response.total };
+      },
+    }),
+
     /**
      * Boards Mutations
      */
@@ -132,6 +149,7 @@ export const {
   useListAllBoardsQuery,
   useGetBoardImagesTotalQuery,
   useGetBoardAssetsTotalQuery,
+  useGetBoardVideosTotalQuery,
   useCreateBoardMutation,
   useUpdateBoardMutation,
   useListAllImageNamesForBoardQuery,

@@ -57,6 +57,25 @@ class SqliteVideoRecordStorage(VideoRecordStorageBase):
                 return None
             return cast(Optional[str], dict(result).get("user_id"))
 
+    def get_most_recent_video_for_board(self, board_id: str) -> Optional[VideoRecord]:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                f"""--sql
+                SELECT {VIDEO_DTO_COLS}
+                FROM videos
+                JOIN board_videos ON videos.video_name = board_videos.video_name
+                WHERE board_videos.board_id = ?
+                AND videos.is_intermediate = FALSE
+                ORDER BY videos.starred DESC, videos.created_at DESC
+                LIMIT 1;
+                """,
+                (board_id,),
+            )
+            result = cast(Optional[sqlite3.Row], cursor.fetchone())
+        if result is None:
+            return None
+        return deserialize_video_record(dict(result))
+
     def get_metadata(self, video_name: str) -> Optional[MetadataField]:
         with self._db.transaction() as cursor:
             try:

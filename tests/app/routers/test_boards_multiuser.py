@@ -79,7 +79,12 @@ def enable_multiuser_for_tests(monkeypatch: Any, mock_invoker: Invoker):
     # so the route doesn't hit AttributeError on the None placeholders in mock_services.
     mock_board_video_records = MagicMock()
     mock_board_video_records.get_all_board_video_names_for_board.return_value = []
+    mock_board_video_records.get_video_count_for_board.return_value = 0
     mock_invoker.services.board_video_records = mock_board_video_records
+    # The board service also consults video_records for cover-image selection (most recent video).
+    mock_video_records = MagicMock()
+    mock_video_records.get_most_recent_video_for_board.return_value = None
+    mock_invoker.services.video_records = mock_video_records
     mock_invoker.services.videos = MagicMock()
     # delete_videos_on_board now returns the authoritative ``deleted_videos`` list (only the
     # videos whose file deletion actually succeeded). Default to an empty list so pydantic

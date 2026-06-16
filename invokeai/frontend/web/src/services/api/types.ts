@@ -647,7 +647,6 @@ export type ImageUploadEntryRequest = paths['/api/v1/images/']['post']['requestB
 export type VideoDTO = S['VideoDTO'];
 /** @knipignore Used by Phase 4+ video gallery mutations. */
 export type VideoRecordChanges = S['VideoRecordChanges'];
-/** @knipignore Used by listVideos RTK response typing; surfaced in Phase 4+. */
 export type OffsetPaginatedResults_VideoDTO_ = S['OffsetPaginatedResults_VideoDTO_'];
 export type ListVideosArgs = NonNullable<paths['/api/v1/videos/']['get']['parameters']['query']>;
 export type ListVideosResponse = paths['/api/v1/videos/']['get']['responses']['200']['content']['application/json'];

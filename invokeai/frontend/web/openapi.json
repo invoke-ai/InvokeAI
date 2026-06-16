@@ -14045,10 +14045,28 @@
             "description": "The visibility of the board.",
             "default": "private"
           },
+          "cover_video_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Video Name",
+            "description": "The name of the board's cover video, when the most recent item is a video."
+          },
           "image_count": {
             "type": "integer",
             "title": "Image Count",
             "description": "The number of images in the board."
+          },
+          "video_count": {
+            "type": "integer",
+            "title": "Video Count",
+            "description": "The number of videos in the board.",
+            "default": 0
           },
           "asset_count": {
             "type": "integer",

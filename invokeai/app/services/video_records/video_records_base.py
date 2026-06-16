@@ -87,6 +87,11 @@ class VideoRecordStorageBase(ABC):
         pass
 
     @abstractmethod
+    def get_most_recent_video_for_board(self, board_id: str) -> Optional[VideoRecord]:
+        """Gets the most recent non-intermediate video on a board, preferring starred videos."""
+        pass
+
+    @abstractmethod
     def get_video_names(
         self,
         starred_first: bool = True,
