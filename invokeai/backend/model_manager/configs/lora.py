@@ -28,14 +28,23 @@ from invokeai.backend.model_manager.taxonomy import (
     FluxLoRAFormat,
     ModelFormat,
     ModelType,
+    WanLoRAVariantType,
     ZImageVariantType,
 )
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     has_cosmos_dit_kohya_keys,
+    has_cosmos_dit_kohya_keys_strict,
     has_cosmos_dit_peft_keys,
+    has_cosmos_dit_peft_keys_strict,
 )
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
+from invokeai.backend.patches.lora_conversions.wan_lora_constants import (
+    detect_wan_lora_variant,
+    has_non_wan_architecture_keys,
+    has_wan_kohya_keys,
+    has_wan_peft_keys,
+)
 
 
 class LoraModelDefaultSettings(BaseModel):
@@ -885,16 +894,20 @@ class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         Anima LoRAs have keys like:
         - lora_unet_blocks_0_cross_attn_k_proj.lora_down.weight (Kohya format)
         - diffusion_model.blocks.0.cross_attn.k_proj.lora_A.weight (diffusers PEFT format)
-        - transformer.blocks.0.cross_attn.k_proj.lora_A.weight (diffusers PEFT format)
+        - transformer.blocks.0.mlp.layer_0.lora_A.weight (Anima-only MLP layer)
 
-        Detection requires Cosmos DiT-specific subcomponent names (cross_attn,
-        self_attn, mlp, adaln_modulation) to avoid false-positives on other
-        architectures that also use ``blocks`` in their paths.
+        Uses the **strict** Cosmos-DiT detectors, which require an
+        Anima-exclusive subcomponent name (``mlp``, ``adaln_modulation``, or
+        ``_proj``-suffixed attention). The loose detectors would also accept
+        Wan-native LoRAs (which use ``cross_attn``/``self_attn`` too but with
+        bare ``.q``/``.k``/``.v``/``.o`` rather than ``_proj``), so they're not
+        safe for first-match-wins probing — see the regression tests in
+        ``test_wan_lora_probe_independence.py``.
         """
         state_dict = mod.load_state_dict()
         str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
 
-        has_cosmos_keys = has_cosmos_dit_kohya_keys(str_keys) or has_cosmos_dit_peft_keys(str_keys)
+        has_cosmos_keys = has_cosmos_dit_kohya_keys_strict(str_keys) or has_cosmos_dit_peft_keys_strict(str_keys)
 
         # Also check for LoRA/LoKR weight suffixes
         has_lora_suffix = state_dict_has_any_keys_ending_with(
@@ -917,17 +930,110 @@ class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
-        """Anima LoRAs target Cosmos DiT blocks (blocks.X.cross_attn, blocks.X.self_attn, etc.).
+        """Anima LoRAs target Cosmos DiT blocks (blocks.X.mlp, blocks.X.adaln_modulation,
+        blocks.X.cross_attn.q_proj, etc.).
 
-        Uses Cosmos DiT-specific subcomponent names to avoid false-positives.
+        Uses the strict Cosmos-DiT detectors to be mutually exclusive with
+        Wan-LoRA detection — see ``_validate_looks_like_lora`` for rationale.
         """
         state_dict = mod.load_state_dict()
         str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
 
-        if has_cosmos_dit_kohya_keys(str_keys) or has_cosmos_dit_peft_keys(str_keys):
+        if has_cosmos_dit_kohya_keys_strict(str_keys) or has_cosmos_dit_peft_keys_strict(str_keys):
             return BaseModelType.Anima
 
         raise NotAMatchError("model does not look like an Anima LoRA")
+
+
+class LoRA_LyCORIS_Wan_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for Wan 2.2 LoRA models in LyCORIS format.
+
+    Wan LoRAs target ``WanTransformer3DModel`` blocks. The Wan 2.2 A14B family
+    is dual-expert (high-noise + low-noise) — LoRAs are typically trained
+    against one expert. ``expert`` records which one so the model loader
+    invocation can wire it to the correct ``loras`` / ``loras_low_noise`` list.
+    Many LoRAs are expert-agnostic (TI2V-5B family, or community LoRAs that
+    just don't tag the expert) — these get ``expert=None`` and are applied to
+    both experts by default.
+    """
+
+    base: Literal[BaseModelType.Wan] = Field(default=BaseModelType.Wan)
+    expert: Literal["high", "low"] | None = Field(
+        default=None,
+        description="For Wan 2.2 A14B dual-expert LoRAs: 'high' targets the high-noise expert, "
+        "'low' targets the low-noise expert. None means the LoRA is expert-agnostic "
+        "(TI2V-5B, or community LoRAs without explicit tagging) and is applied to both.",
+    )
+    variant: WanLoRAVariantType | None = Field(
+        default=None,
+        description="The Wan model family this LoRA targets, detected from its inner-dim "
+        "(5120 -> A14B, 3072 -> TI2V-5B). A14B LoRAs are incompatible with TI2V-5B mains "
+        "(and vice versa) — they crash with a shape mismatch in the layer patcher. The "
+        "linear-view graph builder filters LoRAs on variant when building the LoRA "
+        "collection. None means the LoRA's inner-dim couldn't be identified.",
+    )
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        """Wan LoRAs target attn1/attn2/ffn.net (diffusers form) or self_attn/cross_attn/ffn.N (native form)."""
+        state_dict = mod.load_state_dict()
+        str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+
+        has_wan_keys = has_wan_kohya_keys(str_keys) or has_wan_peft_keys(str_keys)
+        has_lora_suffix = state_dict_has_any_keys_ending_with(
+            state_dict,
+            {
+                "lora_A.weight",
+                "lora_B.weight",
+                "lora_down.weight",
+                "lora_up.weight",
+                "dora_scale",
+                ".lokr_w1",
+                ".lokr_w2",
+            },
+        )
+
+        # Reject if any non-Wan architecture signature is present. Without this
+        # guard a Wan LoRA could be falsely identified by Anima (cross_attn /
+        # self_attn name collision) or vice versa.
+        if has_wan_keys and has_lora_suffix and not has_non_wan_architecture_keys(str_keys):
+            return
+
+        raise NotAMatchError("model does not match Wan LoRA heuristics")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        state_dict = mod.load_state_dict()
+        str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+
+        if (has_wan_kohya_keys(str_keys) or has_wan_peft_keys(str_keys)) and not has_non_wan_architecture_keys(
+            str_keys
+        ):
+            return BaseModelType.Wan
+
+        raise NotAMatchError("model does not look like a Wan LoRA")
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        # Run the base-class probe (file-check, lora-suffix, base detection).
+        instance = super().from_model_on_disk(mod, override_fields)
+
+        # Auto-detect the expert tag from the filename if the user didn't
+        # override it. ``high_noise`` / ``low_noise`` / hyphenated / concatenated
+        # variants — mirrors the GGUF transformer probe's heuristic.
+        if instance.expert is None:
+            name = mod.path.stem.lower()
+            if any(s in name for s in ("high_noise", "high-noise", "highnoise")):
+                instance.expert = "high"
+            elif any(s in name for s in ("low_noise", "low-noise", "lownoise")):
+                instance.expert = "low"
+
+        # Auto-detect the model-family variant from inner_dim in the state
+        # dict. The override field skips this if the user has set it.
+        if instance.variant is None:
+            instance.variant = detect_wan_lora_variant(mod.load_state_dict())
+
+        return instance
 
 
 class ControlAdapter_Config_Base(ABC, BaseModel):

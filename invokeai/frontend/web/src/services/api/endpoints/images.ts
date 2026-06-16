@@ -296,7 +296,9 @@ export const imagesApi = api.injectEndpoints({
       query: ({ board_id }) => ({ url: buildBoardsUrl(board_id), method: 'DELETE' }),
       invalidatesTags: () => [
         { type: 'Board', id: LIST_TAG },
-        // invalidate the 'No Board' cache
+        // Both images and videos on the board cascade to the 'No Board' bucket on the
+        // backend side; invalidate the 'none' caches for both kinds so the polymorphic
+        // gallery surfaces them. The Gallery* tags refresh the unified gallery list view.
         {
           type: 'ImageList',
           id: getListImagesUrl({
@@ -311,6 +313,10 @@ export const imagesApi = api.injectEndpoints({
             categories: ASSETS_CATEGORIES,
           }),
         },
+        { type: 'VideoList', id: LIST_TAG },
+        'VideoNameList',
+        'GalleryItemList',
+        'GalleryItemNameList',
       ],
     }),
 
@@ -323,7 +329,15 @@ export const imagesApi = api.injectEndpoints({
         method: 'DELETE',
         params: { include_images: true },
       }),
-      invalidatesTags: () => [{ type: 'Board', id: LIST_TAG }],
+      // The backend now also cascade-deletes videos on the board, so the unified gallery
+      // and the video list both need invalidation in addition to the board tag.
+      invalidatesTags: () => [
+        { type: 'Board', id: LIST_TAG },
+        { type: 'VideoList', id: LIST_TAG },
+        'VideoNameList',
+        'GalleryItemList',
+        'GalleryItemNameList',
+      ],
     }),
     addImageToBoard: build.mutation<
       paths['/api/v1/board_images/']['post']['responses']['201']['content']['application/json'],
@@ -484,7 +498,6 @@ export const {
   useStarImagesMutation,
   useUnstarImagesMutation,
   useBulkDownloadImagesMutation,
-  useGetImageNamesQuery,
   useGetImageDTOsByNamesMutation,
 } = imagesApi;
 

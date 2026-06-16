@@ -68,12 +68,14 @@ def client():
 def mock_services() -> InvocationServices:
     from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
     from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+    from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
     from invokeai.app.services.boards.boards_default import BoardService
     from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
     from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import (
         ClientStatePersistenceSqlite,
     )
     from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+    from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
     from invokeai.app.services.images.images_default import ImageService
     from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
     from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
@@ -116,6 +118,11 @@ def mock_services() -> InvocationServices:
         client_state_persistence=ClientStatePersistenceSqlite(db=db),
         users=UserService(db),
         external_generation=None,  # type: ignore
+        videos=None,  # type: ignore
+        video_files=None,  # type: ignore
+        video_records=SqliteVideoRecordStorage(db=db),
+        board_video_records=SqliteBoardVideoRecordStorage(db=db),
+        gallery=None,  # type: ignore
     )
 
 
@@ -664,6 +671,11 @@ class TestImageMutationAuth:
     def test_non_owner_cannot_batch_delete_image(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
     ):
+        """Batch delete tolerates foreign items by skipping them in-loop and returning the
+        per-item delete list to the client. Previously the route re-raised the first 403,
+        dropping any partial successes — see PR #9163 review (finding 3). The non-owner
+        must still not destroy the image; only the response shape changes.
+        """
         user1 = mock_invoker.services.users.get_by_email("user1@test.com")
         assert user1 is not None
         _save_image(mock_invoker, "user1-batch-del", user1.user_id)
@@ -673,7 +685,12 @@ class TestImageMutationAuth:
             json={"image_names": ["user1-batch-del"]},
             headers=_auth(user2_token),
         )
-        assert r.status_code == status.HTTP_403_FORBIDDEN
+        assert r.status_code == status.HTTP_200_OK
+        body = r.json()
+        # Auth failure must not advertise the foreign image as deleted, and the underlying
+        # record must still exist.
+        assert body["deleted_images"] == []
+        mock_invoker.services.image_records.get("user1-batch-del")
 
     def test_non_owner_can_delete_image_from_public_board(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str

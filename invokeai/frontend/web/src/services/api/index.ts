@@ -17,6 +17,7 @@ const tagTypes = [
   'Board',
   'BoardImagesTotal',
   'BoardAssetsTotal',
+  'BoardVideosTotal',
   'HFTokenStatus',
   'Image',
   'ImageNameList',
@@ -62,6 +63,15 @@ const tagTypes = [
   'UserList',
   'CustomNodePacks',
   'VirtualBoards',
+  // Video tags (parallel to Image tags).
+  'Video',
+  'VideoList',
+  'VideoMetadata',
+  'VideoNameList',
+  'BoardVideosTotal',
+  // Polymorphic gallery list (images + videos interleaved by created_at).
+  'GalleryItemList',
+  'GalleryItemNameList',
 ] as const;
 export type ApiTagDescription = TagDescription<(typeof tagTypes)[number]>;
 export const LIST_TAG = 'LIST';
