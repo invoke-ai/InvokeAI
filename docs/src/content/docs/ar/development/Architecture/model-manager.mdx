@@ -1,0 +1,1181 @@
+---
+title: مقدمة إلى مدير النماذج
+sidebar:
+  label: مدير النماذج
+lastUpdated: 2026-02-18
+---
+
+import { FileTree, Code, Steps } from '@astrojs/starlight/components';
+
+مدير النماذج مسؤول عن تنظيم نماذج التعلم الآلي المختلفة المستخدمة من قبل InvokeAI. يتكون من سلسلة من الخدمات المترابطة التي تتعامل معًا مع دورة الحياة الكاملة للنموذج. هذه هي:
+
+- **ModelRecordServiceBase:** مسؤول عن إدارة بيانات النموذج الوصفية ومعلومات التكوين. من بين أمور أخرى، تتعقب خدمة السجلات نوع النموذج ومصدره ومكان العثور عليه على القرص.
+- **ModelInstallServiceBase:** خدمة لتثبيت النماذج على القرص. تستخدم `DownloadQueueServiceBase` لتنزيل النماذج وبياناتها الوصفية، و `ModelRecordServiceBase` لتخزين تلك المعلومات. وهي مسؤولة أيضًا عن إدارة دليل `models` في InvokeAI ومحتوياته.
+- **DownloadQueueServiceBase:** أداة تنزيل متعددة الخيوط مسؤولة عن تنزيل النماذج من مصدر بعيد إلى القرص. تحتوي قائمة انتظار التنزيل على طرق خاصة لتنزيل مجلدات repo_id من Hugging Face، بالإضافة إلى التمييز بين إصدارات النماذج في Civitai، ولكن يمكن استخدامها لمحتوى عشوائي.
+- **ModelLoadServiceBase:** مسؤول عن تحميل نموذج من القرص إلى RAM و VRAM وتجهيزه للاستدلال.
+
+## موقع الكود
+
+يمكن العثور على الخدمات الأربع الرئيسية في `invokeai/app/services` في الدلائل التالية:
+
+<FileTree>
+- invokeai
+  - app
+    - services خدمات مدير النماذج
+      - model_records/
+      - model_install/
+      - downloads/
+      - model_load/
+  - api
+    - routers
+      - model_manager_v2.py واجهة برمجة تطبيقات ويب FastAPI لإدارة النماذج
+</FileTree>
+
+---
+
+## ما هو في النموذج؟ ModelRecordService
+
+يدير `ModelRecordService` البيانات الوصفية للنموذج. يدعم تسلسل هرمي من كائنات تكوين البيانات الوصفية من Pydantic، والتي تصبح متخصصة بشكل متزايد لدعم أنواع نماذج معينة.
+
+### ModelConfigBase
+
+جميع فئات البيانات الوصفية للنموذج ترث من فئة Pydantic هذه. توفر الحقول التالية:
+
+| **اسم الحقل** | **النوع** | **الوصف** |
+|----------------|-----------------|------------------|
+| `key` | str | معرف فريد للنموذج |
+| `name` | str | اسم النموذج (ليس فريدًا) |
+| `model_type` | ModelType | نوع النموذج |
+| `model_format` | ModelFormat | تنسيق النموذج (مثل "diffusers")؛ يُستخدم أيضًا كمميّز للاتحاد |
+| `base_model` | BaseModelType | النموذج الأساسي الذي يتوافق معه النموذج |
+| `path` | str | موقع النموذج على القرص |
+| `hash` | str | تجزئة (hash) للنموذج |
+| `description` | str | وصف قابل للقراءة البشرية للنموذج (اختياري) |
+| `source` | str | عنوان URL المصدر للنموذج أو معرف المستودع (اختياري) |
+
+`key` هو معرف عشوائي فريد مكون من 32 حرفًا تم إنشاؤه في وقت التثبيت. حقل `hash` يخزن تجزئة لمحتويات النموذج في وقت التثبيت تم الحصول عليها عن طريق أخذ عينات من عدة أجزاء من ملفات النموذج باستخدام مكتبة `imohash`. على مدار عمر النموذج، قد يتم تحويله بطرق مختلفة، مثل تغيير دقته أو تحويله من نموذج .safetensors إلى نموذج diffusers.
+
+حقل `path` يمكن أن يكون مطلقًا أو نسبيًا. إذا كان نسبيًا، يُعتبر نسبيًا إلى إعداد `models_dir` في ملف `invokeai.yaml` الخاص بالمستخدم.
+
+`ModelType` و `ModelFormat` و `BaseModelType` هي تعدادات نصية محددة في `invokeai.backend.model_manager.config`. كما يتم استيرادها من، ويمكن إعادة تصديرها من، `invokeai.app.services.model_manager.model_records`:
+
+```py title="invokeai.backend.model_manager.config"
+from invokeai.app.services.model_records import ModelType, ModelFormat, BaseModelType
+```
+
+### CheckpointConfig
+
+يضيف هذا دعمًا لتكوينات نقاط التفتيش، ويضيف الحقل التالي:
+
+| **اسم الحقل** | **النوع** | **الوصف** |
+|----------------|-----------------|------------------|
+| `config` | str | المسار إلى ملف تكوين نقطة التفتيش |
+
+`config` هو المسار إلى ملف تكوين نقطة التفتيش. إذا كان نسبيًا، يُعتبر نسبيًا إلى دليل جذر InvokeAI (مثل `configs/stable-diffusion/v1-inference.yaml`)
+
+### MainConfig
+
+يضيف هذا دعمًا لنماذج Stable Diffusion "الرئيسية"، ويضيف هذه الحقول:
+
+| **اسم الحقل** | **النوع** | **الوصف** |
+|----------------|-----------------|------------------|
+| `vae` | str | المسار إلى VAE لاستخدامه بدلاً من المضمن |
+| `variant` | ModelVariantType | نوع متغير النموذج، مثل "inpainting" |
+
+يمكن أن يكون `vae` مسارًا مطلقًا أو نسبيًا. إذا كان نسبيًا، فإن أساسه يعتبر دليل `models_dir`.
+
+`variant` هو فئة سلسلة نصية معدودة بقيم `normal` و `inpaint` و `depth`. إذا لزم الأمر، يمكن استيراده من `invokeai.app.services.model_records` أو `invokeai.backend.model_manager.config`.
+
+### ONNXSD2Config
+
+| **اسم الحقل** | **النوع** | **الوصف** |
+|----------------|-----------------|------------------|
+| `prediction_type` | SchedulerPredictionType | نوع توقع الجدولة المراد استخدامه، مثل "epsilon" |
+| `upcast_attention` | bool | يتطلب النموذج ترقية وحدة الانتباه الخاصة به |
+
+يمكن استيراد تعداد `SchedulerPredictionType` من `invokeai.app.services.model_records` أو `invokeai.backend.model_manager.config`.
+
+### فئات التكوين الأخرى
+
+هناك سلسلة من هذه الفئات كل منها مميّز بـ `ModelFormat` الخاص به، بما في ذلك `LoRAConfig` و `IPAdapterConfig` وما إلى ذلك. نادرًا ما تكون هذه مطلوبة خارج الكود الداخلي لمدير النماذج، ولكنها متاحة في `invokeai.backend.model_manager.config` إذا لزم الأمر. هناك أيضًا اتحاد لجميع فئات ModelConfig، يسمى `AnyModelConfig` يمكن استيراده من نفس الملف.
+
+### قيود نموذج البيانات
+
+التسلسل الهرمي للتكوين له قيد رئيسي في معالجته لنوع النموذج الأساسي. يمكن لكل نموذج أن يكون متوافقًا مع نموذج أساسي واحد فقط، وهو ما ينهار في حالة النماذج المتوافقة مع نموذجين أساسيين أو أكثر. على سبيل المثال، تعمل vaes SD-1 أيضًا مع نماذج SD-2. الحل البديل الجزئي هو استخدام `BaseModelType.Any`، الذي يشير إلى أن النموذج متوافق مع أي من النماذج الأساسية. يعمل هذا بشكل جيد لبعض النماذج، مثل مشفرات صور IP Adapter، لكنه مقترح الكل أو لا شيء.
+
+## قراءة وكتابة سجلات تكوين النموذج
+
+يوفر `ModelRecordService` القدرة على استرداد سجلات تكوين النموذج من قواعد بيانات SQL أو YAML، وتحديثها، وكتابتها مرة أخرى.
+
+يتم إنشاء `ModelRecordService` على مستوى التطبيق أثناء تهيئة API ويمكن استرداده داخل استدعاء من كائن `InvocationContext`:
+
+```py
+store = context.services.model_manager.store
+```
+
+أو من أي مكان آخر في الكود عن طريق الوصول إلى `ApiDependencies.invoker.services.model_manager.store`.
+
+### إنشاء `ModelRecordService`
+
+لإنشاء قاعدة بيانات `ModelRecordService` جديدة أو فتح قاعدة بيانات موجودة، يمكنك إنشاء كائن `ModelRecordServiceSQL` أو `ModelRecordServiceFile` مباشرة:
+
+```py
+from invokeai.app.services.model_records import ModelRecordServiceSQL, ModelRecordServiceFile
+
+store = ModelRecordServiceSQL.from_connection(connection, lock)
+store = ModelRecordServiceSQL.from_db_file('/path/to/sqlite_database.db')
+store = ModelRecordServiceFile.from_db_file('/path/to/database.yaml')
+```
+
+نموذج `from_connection()` متاح فقط من فئة `ModelRecordServiceSQL`، ويستخدم لإدارة السجلات في قاعدة بيانات SQLITE3 تم فتحها مسبقًا باستخدام كائن `sqlite3.connection` وكائن `threading.lock`. مخصص لحالة الاستخدام المحددة لتخزين معلومات السجل في قاعدة بيانات InvokeAI الرئيسية، عادةً `databases/invokeai.db`.
+
+يمكن استخدام طرق `from_db_file()` لفتح اتصالات جديدة بملفات قاعدة البيانات المسماة. إذا كان الملف غير موجود، سيتم إنشاؤه وتهيئته.
+
+كخدمة إضافية، تقدم `ModelRecordServiceBase` طريقتين، `from_db_file` و `open`، واللتان ستعيدان إما تطبيق SQL أو تطبيق ملف اعتمادًا على السياق. الطريقة الأولى تنظر إلى امتداد الملف لتحديد ما إذا كان سيتم فتح الملف كقاعدة بيانات SQL (".db") أو كقاعدة بيانات ملف (".yaml"). إذا كان الملف موجودًا، ولكنه إما من النوع الخطأ أو لا يحتوي على معلومات المخطط الوصفية المتوقعة، فسيتم رفع `AssertionError` المناسب:
+
+```py
+store = ModelRecordServiceBase.from_db_file('/path/to/a/file.{yaml,db}')
+```
+
+طريقة `ModelRecordServiceBase.open()` مصممة خصيصًا للاستخدام في خادم ويب InvokeAI. توقيعها هو:
+
+```py
+def open(
+    cls,
+    config: InvokeAIAppConfig,
+    conn: Optional[sqlite3.Connection] = None,
+    lock: Optional[threading.Lock] = None
+    ) -> Union[ModelRecordServiceSQL, ModelRecordServiceFile]:
+```
+
+طريقة عملها كالتالي:
+
+1. استرجع قيمة خيار `model_config_db` من ملف تكوين `invokeai.yaml` الخاص بالمستخدم.
+2. إذا كانت `model_config_db` هي `auto` (الافتراضي)، فـ:
+   - استخدم قيم `conn` و `lock` لإرجاع كائن `ModelRecordServiceSQL` مفتوح على الاتصال والقفل المُمررين.
+   - افتح اتصالاً جديدًا إلى `databases/invokeai.db` إذا كانت `conn` و/أو `lock` مفقودة (انظر الملاحظة أدناه).
+3. إذا كانت `model_config_db` هي مسار، فاستخدم `from_db_file` لإرجاع النوع المناسب من ModelRecordService.
+4. إذا كانت `model_config_db` هي None، فاسترجع خيار `conf_path` القديم من `invokeai.yaml` واستخدم المسار المشار إليه هناك. سيكون الافتراضي هو `configs/models.yaml`.
+
+لذا فإن نمط بدء التشغيل النموذجي سيكون:
+
+```py
+import sqlite3
+from invokeai.app.services.thread import lock
+from invokeai.app.services.model_records import ModelRecordServiceBase
+from invokeai.app.services.config import InvokeAIAppConfig
+
+config = InvokeAIAppConfig.get_config()
+db_conn = sqlite3.connect(config.db_path.as_posix(), check_same_thread=False)
+store = ModelRecordServiceBase.open(config, db_conn, lock)
+```
+
+### جلب تكوين نموذج من `ModelRecordServiceBase`
+
+يمكن استرداد التكوينات بعدة طرق.
+
+#### get_model(key) -> AnyModelConfig
+
+الوظيفة الأساسية هي استدعاء طريقة `get_model()` لكائن مخزن السجلات مع المفتاح الفريد للنموذج المطلوب. تقوم بإرجاع الفئة الفرعية المناسبة من ModelConfigBase:
+
+```py
+model_conf = store.get_model('f13dd932c0c35c22dcb8d6cda4203764')
+print(model_conf.path)
+
+>> '/tmp/models/ckpts/v1-5-pruned-emaonly.safetensors'
+
+```
+
+إذا كان المفتاح غير معروف، يثير هذا الاستدعاء استثناء `UnknownModelException`.
+
+#### exists(key) -> AnyModelConfig
+
+يعيد True إذا كان النموذج ذو المفتاح المحدد موجودًا في قاعدة البيانات.
+
+#### search_by_path(path) -> AnyModelConfig
+
+يعيد تكوين النموذج الذي مساره هو `path`. يتم مطابقة المسار باستخدام مقارنة سلسلة بسيطة ولن يطابق النماذج المشار إليها بمسارات مختلفة بشكل صحيح (مثل استخدام الروابط الرمزية).
+
+#### search_by_name(name, base, type) -> List[AnyModelConfig]
+
+تبحث هذه الطريقة عن النماذج التي تطابق مجموعة من `name` و `BaseType` و `ModelType`. الاستدعاء دون أي وسائط سيعيد جميع النماذج في قاعدة البيانات.
+
+#### all_models() -> List[AnyModelConfig]
+
+يعيد جميع تكوينات النماذج في قاعدة البيانات. مكافئ تمامًا لاستدعاء `search_by_name()` بدون وسائط.
+
+#### search_by_tag(tags) -> List[AnyModelConfig]
+
+`tags` هي قائمة من السلاسل النصية. تعيد هذه الطريقة قائمة بتكوينات النماذج التي تحتوي على جميع الوسوم المعطاة. أمثلة:
+
+```py
+# العثور على جميع النماذج الموسومة بأنها SFW والتي تولد
+# مشاهد خلفية
+configs = store.search_by_tag(['sfw', 'scenery'])
+```
+
+لاحظ أنه يمكن البحث عن الوسوم فقط بهذه الطريقة. يمكن البحث في الحقول الأخرى باستخدام مرشح:
+
+```py
+commercializable_models = [x for x in store.all_models() \
+                           if x.license.contains('allowCommercialUse=Sell')]
+```
+
+#### version() -> str
+
+يعيد إصدار قاعدة البيانات، حاليًا عند `3.2`
+
+#### model_info_by_name(name, base_model, model_type) -> ModelConfigBase
+
+توجد هذه الطريقة لتسهيل الانتقال من الإصدار السابق لمدير النماذج، حيث كانت `get_model()` تأخذ الوسائط الثلاثة الموضحة أعلاه. تبحث هذه عن نموذج فريد محدد بالاسم والنموذج الأساسي ونوع النموذج وتعيده.
+
+ستولد الطريقة استثناء `DuplicateModelException` إذا كان هناك أكثر من نموذج يشتركون في نفس النوع والأساس والاسم. بينما هو غير مرجح، من الممكن بالتأكيد وجود موقف أضاف فيه المستخدم نموذجين بنفس الاسم والأساس والنوع، أحدهما موجود في المسار `/foo/my_model` والآخر في `/bar/my_model`. يوصى بشدة بالبحث عن النماذج باستخدام `search_by_name()`، التي يمكنها إرجاع نتائج متعددة، ثم تحديد النموذج المطلوب وتمرير مفتاحه إلى `get_model()`.
+
+### كتابة تكوينات النموذج إلى قاعدة البيانات
+
+تسمح لك عدة طرق بإنشاء وتحديث سجلات تكوين النموذج المخزنة.
+
+#### add_model(key, config) -> AnyModelConfig
+
+بالنظر إلى مفتاح وتكوين، سيضيف هذا سجل تكوين النموذج إلى قاعدة البيانات. يمكن أن يكون `config` إما فئة فرعية من `ModelConfigBase` (أي أي فئة مدرجة في `AnyModelConfig`)، أو `dict` من أزواج المفتاح/القيمة. في الحالة الأخيرة، سيتم اختيار فئة التكوين الصحيحة بواسطة آلية الاتحاد المُميَّز لـ Pydantic.
+
+إذا نجحت، ستعيد الطريقة الفئة الفرعية المناسبة من `ModelConfigBase`. ستثير استثناء `DuplicateModelException` إذا كان النموذج بنفس المفتاح موجودًا بالفعل في قاعدة البيانات، أو `InvalidModelConfigException` إذا تم تمرير قاموس وعانى Pydantic من خطأ في التحليل أو التحقق.
+
+#### update_model(key, config) -> AnyModelConfig
+
+بالنظر إلى مفتاح وتكوين، سيقوم هذا بتحديث سجل تكوين النموذج في قاعدة البيانات. يمكن أن يكون `config` إما مثيلاً من `ModelConfigBase`، أو `dict` متفرقًا يحتوي على الحقول المطلوب تحديثها. سيعيد `AnyModelConfig` عند النجاح، أو يثير استثناءات `InvalidModelConfigException` أو `UnknownModelException` عند الفشل.
+
+---
+
+## تثبيت النموذج
+
+تنفذ فئة `ModelInstallService` الفئة الأساسية المجردة `ModelInstallServiceBase`، وتوفر متجرًا شاملاً لجميع احتياجات تثبيت النماذج. توفر الوظائف التالية:
+
+- تسجيل سجل تكوين نموذج لنموذج موجود بالفعل على نظام الملفات المحلي، دون نقله أو تغيير مساره.
+
+- تثبيت نموذج موجود بالفعل على نظام الملفات المحلي، عن طريق نقله إلى دليل جذر InvokeAI تحت مجلد `models` (أو أينما يحدد معامل التكوين `models_dir`).
+
+- فحص النماذج لتحديد نوعها ونوعها الأساسي ومعلومات رئيسية أخرى.
+
+- الواجهة مع ناقل أحداث InvokeAI لتوفير تحديثات الحالة حول عملية التنزيل والتثبيت والتسجيل.
+
+- تنزيل نموذج من أي عنوان URL وتثبيته في `models_dir`.
+
+- معالجة خاصة لمعرفات مستودعات HuggingFace لتنزيل محتويات المستودع بشكل متكرر، مع الانتباه إلى المتغيرات البديلة مثل fp16.
+
+- حفظ الوسوم والبيانات الوصفية الأخرى حول النموذج في قاعدة بيانات invokeai عند الجلب من مستودع يوفر هذا النوع من المعلومات (حاليًا HuggingFace فقط).
+
+### تهيئة المثبت
+
+يتم إنشاء مثبت افتراضي عند بدء تشغيل API لـ InvokeAI ويتم تخزينه في `ApiDependencies.invoker.services.model_install` ويمكن استرداده أيضًا من وسيطة `context` للاستدعاء باستخدام `context.services.model_install`.
+
+في حال رغبتك في إنشاء مثبت جديد، يمكنك استخدام نمط التهيئة التالي:
+
+```py
+from invokeai.app.services.config import get_config
+from invokeai.app.services.model_records import ModelRecordServiceSQL
+from invokeai.app.services.model_install import ModelInstallService
+from invokeai.app.services.download import DownloadQueueService
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.backend.util.logging import InvokeAILogger
+
+config = get_config()
+
+logger = InvokeAILogger.get_logger(config=config)
+db = SqliteDatabase(config.db_path, logger)
+record_store = ModelRecordServiceSQL(db, logger)
+queue = DownloadQueueService()
+queue.start()
+
+installer = ModelInstallService(app_config=config,
+                                record_store=record_store,
+                                download_queue=queue
+                                )
+installer.start()
+```
+
+النموذج الكامل لـ `ModelInstallService()` يأخذ المعاملات المطلوبة التالية:
+
+| **الوسيط** | **النوع** | **الوصف** |
+|------------------|------------------------------|------------------------------|
+| `app_config` | InvokeAIAppConfig | كائن تكوين تطبيق InvokeAI |
+| `record_store` | ModelRecordServiceBase | قاعدة بيانات تخزين سجلات التكوين |
+| `download_queue` | DownloadQueueServiceBase | كائن قائمة انتظار التنزيل |
+| `session` | Optional[requests.Session] | تبديل كائن Session مختلف (عادةً للتصحيح) |
+
+بمجرد التهيئة، سيوفر المثبت الطرق التالية:
+
+#### install_job = installer.heuristic_import(source, [config], [access_token])
+
+هذه واجهة مبسطة للمثبت تأخذ سلسلة مصدر، وقاموس تكوين نموذج اختياري ورمز وصول اختياري.
+
+`source` هي سلسلة نصية يمكن أن تكون أيًا من هذه الأشكال:
+
+1. مسار على نظام الملفات المحلي (`C:\\users\\fred\\model.safetensors`)
+2. عنوان URL يشير إلى ملف نموذج واحد قابل للتنزيل (`https://civitai.com/models/58390/detail-tweaker-lora-lora`)
+3. معرف مستودع HuggingFace بأي من التنسيقات التالية:
+   * `model/name` — النموذج بأكمله
+   * `model/name:fp32` — النموذج بأكمله، باستخدام متغير fp32
+   * `model/name:fp16:vae` — النموذج الفرعي vae، باستخدام متغير fp16
+   * `model/name::vae` — النموذج الفرعي vae، باستخدام الدقة الافتراضية
+   * `model/name:fp16:path/to/model.safetensors` — ملف نموذج فردي، متغير fp16
+   * `model/name::path/to/model.safetensors` — ملف نموذج فردي، المتغير الافتراضي
+
+لاحظ أنه من خلال تحديد مسار نسبي إلى أعلى مستودع HuggingFace، يمكنك تنزيل وتثبيت ملفات نماذج عشوائية.
+
+سيتم ملء المتغير تلقائيًا بـ `fp32` إذا طلب المستخدم الدقة الكاملة، و `fp16` خلاف ذلك. إذا تم طلب متغير غير موجود، فستقوم الطريقة بتثبيت ما يعيده HuggingFace كمراجعته الافتراضية.
+
+`config` هو قاموس اختياري من القيم التي ستتجاوز القيم التي تم فحصها تلقائيًا لنوع النموذج والأساس ونوع توقع الجدولة وما إلى ذلك. راجع [تكوين النموذج وفحصه](#تكوين-النموذج-وفحصه) للتفاصيل.
+
+`access_token` هو رمز وصول اختياري للوصول إلى الموارد التي تحتاج إلى مصادقة.
+
+ستعيد الطريقة `ModelInstallJob`. تتم مناقشة هذا الكائن مطولاً في القسم التالي.
+
+#### install_job = installer.import_model()
+
+طريقة `import_model()` هي جوهر المثبت. ما يلي يوضح الاستخدام الأساسي:
+
+```py
+from invokeai.app.services.model_install import (
+ LocalModelSource,
+ HFModelSource,
+ URLModelSource,
+)
+
+source1 = LocalModelSource(path='/opt/models/sushi.safetensors')   # ملف safetensors محلي
+source2 = LocalModelSource(path='/opt/models/sushi_diffusers')     # مجلد diffusers محلي
+
+source3 = HFModelSource(repo_id='runwayml/stable-diffusion-v1-5')  # معرف مستودع
+source4 = HFModelSource(repo_id='runwayml/stable-diffusion-v1-5', subfolder='vae')  # مجلد فرعي داخل معرف مستودع
+source5 = HFModelSource(repo_id='runwayml/stable-diffusion-v1-5', variant='fp16')   # متغير مسمى لنموذج HF
+source6 = HFModelSource(repo_id='runwayml/stable-diffusion-v1-5', subfolder='OrangeMix/OrangeMix1.ckpt')   # مسار إلى ملف نموذج فردي
+
+source7 = URLModelSource(url='https://civitai.com/api/download/models/63006')       # نموذج موجود في عنوان URL
+source8 = URLModelSource(url='https://civitai.com/api/download/models/63006', access_token='letmein') # مع رمز وصول
+
+for source in [source1, source2, source3, source4, source5, source6, source7]:
+   install_job = installer.install_model(source)
+
+source2job = installer.wait_for_installs(timeout=120)
+for source in sources:
+    job = source2job[source]
+ if job.complete:
+  model_config = job.config_out
+  model_key = model_config.key
+  print(f"{source} مثبت كـ {model_key}")
+ elif job.errored:
+     print(f"{source}: {job.error_type}.\nتتبع المكدس:\n{job.error}")
+
+```
+
+كما هو موضح هنا، تقبل طريقة `import_model()` مجموعة متنوعة من المصادر، بما في ذلك ملفات safetensors المحلية ومجلدات diffusers المحلية ومعرفات مستودعات HuggingFace مع وبدون تسمية مجلد فرعي وعناوين URL لنماذج Civitai وعناوين URL عشوائية تشير إلى ملفات نقاط التفتيش (ولكن ليس المجلدات).
+
+كل استدعاء لـ `import_model()` يعيد وظيفة `ModelInstallJob`، كائن يتتبع تقدم التثبيت.
+
+إذا تم طلب نموذج بعيد، يتم تنزيل ملفات النموذج بالتوازي عبر مجموعة من الخيوط باستخدام قائمة انتظار التنزيل. أثناء عملية التنزيل، يتم تحديث `ModelInstallJob` لتوفير معلومات الحالة والتقدم. بعد تنزيل الملفات (إن وجدت)، يتم تشغيل باقي التثبيت في خلفية مسلسلة واحدة. هذه هي خطوات فحص النموذج ونسخ الملف وتحديث قاعدة بيانات سجل التكوين.
+
+يمكن وضع وظائف تثبيت متعددة في قائمة الانتظار. يمكنك الحظر حتى تكتمل جميع وظائف التثبيت (أو يحدث خطأ) عن طريق استدعاء طريقة `wait_for_installs()` كما هو موضح في مثال الكود. ستعيد `wait_for_installs()` قاموسًا `dict` يربط المصدر المطلوب بوظيفته. يمكن استجواب هذا الكائن لتحديد حالته. إذا فشلت الوظيفة، يمكن استرداد نوع الخطأ والتفاصيل من `job.error_type` و `job.error`.
+
+القائمة الكاملة لوسائط `import_model()` هي كالتالي:
+
+| الوسيط | النوع | الافتراضي | الوصف |
+|----------|-------|---------|-------------|
+| `source` | ModelSource | None | مصدر النموذج، مسار أو URL أو معرف مستودع |
+| `config` | Dict[str, Any] | None | تجاوز كل أو جزء من سمات النموذج التي تم فحصها |
+
+تصف الأقسام القليلة التالية الأنواع المختلفة من ModelSource التي يمكن تمريرها إلى `import_model()`.
+
+يمكن استخدام `config` لتجاوز كل أو جزء من سمات التكوين التي أرجعها فاحص النموذج. راجع القسم أدناه للتفاصيل.
+
+#### LocalModelSource
+
+يستخدم هذا لنموذج موجود على نظام ملفات Posix يمكن الوصول إليه محليًا، مثل قرص محلي أو مشاركة ملفات شبكية.
+
+| الوسيط | النوع | الافتراضي | الوصف |
+|----------|------|---------|-------------|
+| `path` | str | Path | None | المسار إلى ملف النموذج أو الدليل |
+| `inplace` | bool | False | إذا تم تعيينه، سيتم ترك ملف (ملفات) النموذج في موقعها؛ وإلا سيتم نسخها إلى دليل `models` الخاص بجذر InvokeAI |
+
+#### URLModelSource
+
+يستخدم هذا لنموذج ذي ملف واحد يمكن الوصول إليه عبر URL. الحقول هي:
+
+| الوسيط | النوع | الافتراضي | الوصف |
+|----------|------|---------|-------------|
+| `url` | AnyHttpUrl | None | عنوان URL لملف النموذج. |
+| `access_token` | str | None | رمز وصول مطلوب للوصول إلى هذا الملف. |
+
+يمكن استيراد فئة `AnyHttpUrl` من `pydantic.networks`.
+
+عادةً، لا يتم استرداد أي بيانات وصفية من هذه المصادر. ومع ذلك، هناك كود حالة خاصة في المثبت يبحث عن HuggingFace ويجلب بيانات النموذج الوصفية المقابلة من المستودع المقابل.
+
+#### HFModelSource
+
+HuggingFace لديها أكثر هيكل `ModelSource` تعقيدًا:
+
+| الوسيط | النوع | الافتراضي | الوصف |
+|----------|------|---------|-------------|
+| `repo_id` | str | None | معرف النموذج المطلوب. |
+| `variant` | ModelRepoVariant | ModelRepoVariant('fp16') | المتغير المطلوب. |
+| `subfolder` | Path | None | ابحث عن النموذج في مجلد فرعي من المستودع. |
+| `access_token` | str | None | رمز وصول مطلوب للوصول إلى نموذج المشتركين فقط. |
+
+`repo_id` هو معرف المستودع، مثل `stabilityai/sdxl-turbo`.
+
+`variant` هو أحد تنسيقات diffusers المختلفة التي يدعمها HuggingFace ويستخدم لاختيار من بين خليط الملفات الموجودة في مستودع HuggingFace نموذجي المكونات المحددة اللازمة لنموذج diffusers كامل. `ModelRepoVariant` هو تعداد يمكن استيراده من `invokeai.backend.model_manager` وله القيم التالية:
+
+| الاسم | قيمة السلسلة |
+|------|--------------|
+| ModelRepoVariant.DEFAULT | "default" |
+| ModelRepoVariant.FP16 | "fp16" |
+| ModelRepoVariant.FP32 | "fp32" |
+| ModelRepoVariant.ONNX | "onnx" |
+| ModelRepoVariant.OPENVINO | "openvino" |
+| ModelRepoVariant.FLAX | "flax" |
+
+يمكنك أيضًا تمرير نماذج السلاسل النصية إلى `variant` مباشرة. لاحظ أن InvokeAI قد لا يكون قادرًا على تحميل وتشغيل جميع المتغيرات. في الوقت الحالي، تحديد `ModelRepoVariant.DEFAULT` سيسترد ملفات النموذج غير المؤهلة، مثل `pytorch_model.safetensors` بدلاً من `pytorch_model.fp16.safetensors`. عادةً ما تكون هذه هي أشكال safetensors 32 بت من النموذج.
+
+إذا تم تحديد `subfolder`، فإن النموذج المطلوب موجود في مجلد فرعي من مستودع النموذج الرئيسي. يستخدم هذا عادةً لجلب وتثبيت VAEs.
+
+بعض النماذج تتطلب منك أن تكون مسجلاً في HuggingFace وداخلًا. لتنزيل هذه الملفات، يجب عليك توفير `access_token`. داخليًا، إذا لم يتم توفير رمز وصول، فسيتم استدعاء `HfFolder.get_token()` لملئه بالرمز المخزن مؤقتًا.
+
+#### مراقبة عملية وظيفة التثبيت
+
+عند إنشاء وظيفة تثبيت باستخدام `import_model()`، فإنها تطلق عملية التنزيل والتثبيت في الخلفية وتعيد كائن `ModelInstallJob` لمراقبة العملية.
+
+فئة `ModelInstallJob` لها الهيكل التالي:
+
+| السمة | النوع | الوصف |
+|-----------|------|-------------|
+| `id` | `int` | معرف رقمي لهذه الوظيفة |
+| `status` | `InstallStatus` | تعداد لـ [waiting, downloading, running, completed, error, cancelled] |
+| `config_in` | `dict` | تجاوز قيم التكوين المقدمة من قبل المتصل |
+| `config_out` | `AnyModelConfig` | بعد الاكتمال الناجح، يحتوي على سجل التكوين المكتوب في قاعدة البيانات |
+| `inplace` | `boolean` | صحيح إذا طلب المتصل تثبيت النموذج في مكانه باستخدام مساره المحلي |
+| `source` | `ModelSource` | المسار المحلي أو URL البعيد أو معرف مستودع النموذج المراد تثبيته |
+| `local_path` | `Path` | إذا كان نموذجًا بعيدًا، يحمل مسار النموذج بعد تنزيله؛ إذا كان نموذجًا محليًا، نفس `source` |
+| `error_type` | `str` | اسم الاستثناء الذي أدى إلى حالة الخطأ |
+| `error` | `str` | تتبع الخطأ |
+
+إذا تم توفير وسيطة `event_bus`، فسيتم أيضًا بث الأحداث إلى ناقل أحداث InvokeAI. ستظهر الأحداث على الناقل كحدث من نوع `EventServiceBase.model_event`، وطابع زمني وأسماء الأحداث التالية:
+
+##### `model_install_downloading`
+
+للنماذج البعيدة فقط، سيتم إصدار أحداث `model_install_downloading` على فترات منتظمة مع تقدم التنزيل. يحتوي حمولة الحدث على المفاتيح التالية:
+
+| المفتاح | النوع | الوصف |
+|-----|------|-------------|
+| `source` | str | تمثيل نصي للمصدر المطلوب |
+| `local_path` | str | تمثيل نصي للمسار إلى النموذج الجاري تنزيله (عادةً دليل مؤقت) |
+| `bytes` | int | عدد البايتات التي تم تنزيلها حتى الآن |
+| `total_bytes` | int | الحجم الإجمالي لجميع الملفات التي يتكون منها النموذج |
+| `parts` | List[Dict] | معلومات حول تقدم الملفات الفردية التي يتكون منها النموذج |
+
+الأجزاء هي قائمة من القواميس التي تعطي معلومات عن كل قطعة من مكونات التنزيل. مفاتيح القاموس هي `source` و `local_path` و `bytes` و `total_bytes`، وتتوافق مع المفاتيح المماثلة في الحدث الرئيسي.
+
+لاحظ أن أحداث التنزيل لن تصدر للنماذج المحلية، وأن أحداث التنزيل تحدث _قبل_ حدث التشغيل.
+
+##### `model_install_running`
+
+يتم إصدار `model_install_running` عند اكتمال جميع التنزيلات المطلوبة (إن وجدت) وبدأت عملية فحص النموذج ونسخه وتسجيله.
+
+ستحتوي الحمولة على المفتاح `source`.
+
+##### `model_install_completed`
+
+يتم إصدار `model_install_completed` مرة واحدة في نهاية التثبيت الناجح. ستحتوي الحمولة على المفاتيح `source` و `total_bytes` و `key`، حيث `key` هو المعرف الذي تم تسجيل النموذج به.
+
+##### `model_install_error`
+
+يتم إصدار `model_install_error` إذا فشلت عملية التثبيت لسبب ما. ستحتوي الحمولة على المفاتيح `source` و `error_type` و `error`. `error_type` هي رسالة قصيرة تشير إلى طبيعة الخطأ، و `error` هو تتبع الخطأ الطويل للمساعدة في تصحيح المشكلة.
+
+##### `model_install_cancelled`
+
+يتم إصدار `model_install_cancelled` إذا تم إلغاء تثبيت النموذج، أو إذا تم إلغاء تنزيل ملف واحد أو أكثر من ملفاته. ستحتوي الحمولة على `source`.
+
+##### متابعة حالة النموذج
+
+يمكنك استقصاء كائن `ModelInstallJob` الذي تم إرجاعه بواسطة `import_model()` للتأكد من حالة التثبيت. يمكن قراءة حالة الوظيفة من سمة `status` الخاصة بالوظيفة، وهي تعداد `InstallStatus` الذي له القيم المعدودة `WAITING` و `DOWNLOADING` و `RUNNING` و `COMPLETED` و `ERROR` و `CANCELLED`.
+
+للراحة، توفر وظائف التثبيت أيضًا الخصائص المنطقية التالية: `waiting` و `downloading` و `running` و `complete` و `errored` و `cancelled`، بالإضافة إلى `in_terminal_state`. الأخير سيعيد True إذا كانت الوظيفة في الحالات المكتملة أو الخاطئة أو الملغاة.
+
+#### تكوين النموذج وفحصه
+
+تستخدم خدمة التثبيت وحدة `invokeai.backend.model_manager.probe` أثناء الاستيراد لتحديد نوع النموذج ونوعه الأساسي ومعلمات التكوين الأخرى. من بين أمور أخرى، تقوم بتعيين اسم ووصف افتراضيين للنموذج بناءً على الحقول التي تم فحصها.
+
+عند تنفيذ تنزيل النماذج البعيدة، سيتم استرداد معلومات تكوين إضافية، مثل قائمة مصطلحات التشغيل، من مستودعات نماذج HuggingFace و Civitai.
+
+يمكن تجاوز القيم التي تم فحصها عن طريق توفير قاموس في الوسيطة الاختيارية `config` التي تم تمريرها إلى `import_model()`. يمكنك توفير قيم متجاوزة لأي من سمات تكوين النموذج. هنا مثال على تعيين `SchedulerPredictionType` و `name` لنموذج sd-2:
+
+```py
+install_job = installer.import_model(
+               source=HFModelSource(repo_id='stabilityai/stable-diffusion-2-1',variant='fp32'),
+      config=dict(
+            prediction_type=SchedulerPredictionType('v_prediction')
+      name='stable diffusion 2 base model',
+            )
+       )
+```
+
+### طرق المثبت الأخرى
+
+يصف هذا القسم طرقًا إضافية توفرها فئة المثبت.
+
+#### jobs = installer.wait_for_installs([timeout])
+
+حظر حتى اكتمال جميع التثبيتات المعلقة أو حدوث خطأ ثم إرجاع قائمة بالوظائف المكتملة. وسيطة `timeout` الاختيارية ستعيد من الاستدعاء إذا لم تكتمل الوظائف في الوقت المحدد. وسيطة 0 (الافتراضي) ستحظر إلى أجل غير مسمى.
+
+#### jobs = installer.wait_for_job(job, [timeout])
+
+مثل `wait_for_installs()`، ولكن حظر حتى تكتمل وظيفة محددة أو يحدث خطأ، ثم إرجاع الوظيفة. وسيطة `timeout` الاختيارية ستعيد من الاستدعاء إذا لم تكتمل الوظيفة في الوقت المحدد. وسيطة 0 (الافتراضي) ستحظر إلى أجل غير مسمى.
+
+#### jobs = installer.list_jobs()
+
+إرجاع قائمة بجميع `ModelInstallJobs` النشطة والمكتملة.
+
+#### jobs = installer.get_job_by_source(source)
+
+إرجاع قائمة من `ModelInstallJob` المقابلة لمصدر النموذج المشار إليه.
+
+#### jobs = installer.get_job_by_id(id)
+
+إرجاع قائمة من `ModelInstallJob` المقابلة لمعرف النموذج المشار إليه.
+
+#### jobs = installer.cancel_job(job)
+
+إلغاء الوظيفة المشار إليها.
+
+#### installer.prune_jobs
+
+إزالة الوظائف في حالة نهائية (أي مكتملة أو خاطئة أو ملغاة) من قائمة الوظائف التي أرجعتها `list_jobs()` و `get_job()`.
+
+#### installer.app_config, installer.record_store, installer.event_bus
+
+خصائص توفر الوصول إلى كائنات `InvokeAIAppConfig` و `ModelRecordServiceBase` و `EventServiceBase` الخاصة بالمثبت.
+
+#### key = installer.register_path(model_path, config), key = installer.install_path(model_path, config)
+
+تتجاوز هذه الطرق قائمة انتظار التنزيل وتقوم مباشرة بتسجيل أو تثبيت النموذج في المسار المشار إليه، مع إعادة المعرف الفريد للنموذج المثبت.
+
+تقبل كلتا الطريقتين كائن Path يتوافق مع نقطة تفتيش أو مجلد diffusers، وقاموسًا اختياريًا من سمات التكوين لاستخدامها في تجاوز القيم المشتقة من فحص النموذج.
+
+الفرق بين `register_path()` و `install_path()` هو أن الأولى تنشئ سجل تكوين نموذج دون تغيير موقع النموذج في نظام الملفات. الأخيرة تقوم بعمل نسخة من النموذج داخل دليل نماذج InvokeAI قبل تسجيله.
+
+#### installer.unregister(key)
+
+سيزيل هذا سجل تكوين النموذج للنموذج في المفتاح، وهو مكافئ لـ `installer.record_store.del_model(key)`
+
+#### installer.delete(key)
+
+هذا مشابه لـ `unregister()` ولكن له تأثير إضافي يتمثل في حذف ملف (ملفات) النموذج الأساسية بشكل مشروط إذا كانت موجودة ضمن دليل نماذج InvokeAI
+
+#### installer.unconditionally_delete(key)
+
+هذه الطريقة مشابهة لـ `unregister()`، ولكنها تحذف أيضًا بشكل غير مشروط ملف (ملفات) أوزان النموذج المقابلة، بغض النظر عما إذا كانت داخل أو خارج هيكل نماذج InvokeAI.
+
+#### path = installer.download_and_cache(remote_source, [access_token], [timeout])
+
+سيعمل روتين الأداة المساعدة هذا على تنزيل ملف النموذج الموجود في المصدر، وتخزينه مؤقتًا، وإرجاع المسار إلى الملف المخزن مؤقتًا. لا يحاول تحديد نوع النموذج أو فحص قيم تكوينه أو تسجيله في قاعدة بيانات النماذج.
+
+يمكنك توفير رمز وصول إذا كان المصدر البعيد يتطلب تفويضًا. ستحظر المكالمة إلى أجل غير مسمى حتى يتم تنزيل الملف بالكامل أو إلغاؤه أو إثارة خطأ من نوع ما. إذا قمت بتوفير مهلة (بالثواني)، ستثير المكالمة استثناء `TimeoutError` إذا لم يكتمل التنزيل في الفترة المحددة.
+
+يمكنك استخدام هذه الآلية لطلب أي نوع من الملفات، وليس فقط نموذجًا. سيتم تخزين الملف في دليل فرعي من `INVOKEAI_ROOT/models/.cache`. إذا تم العثور على الملف المطلوب في ذاكرة التخزين المؤقتة، فسيتم إرجاع مساره دون إعادة تنزيله.
+
+كن على علم بأن ذاكرة التخزين المؤقتة للنماذج يتم مسحها من الملفات والدلائل قليلة الاستخدام على فترات منتظمة عندما يتجاوز حجم ذاكرة التخزين المؤقتة القيمة المحددة في متغير تكوين `convert_cache` الخاص بـ Invoke.
+
+#### installer.start(invoker)
+
+طريقة `start` تُستدعى من قبل روتينات تهيئة API عند بدء تشغيل API. تأثيرها هو استدعاء `sync_to_config()` لمزامنة قاعدة بيانات مخزن سجلات النموذج مع ما هو موجود حاليًا على القرص.
+
+---
+
+## احصل على الخط: قائمة انتظار التنزيل
+
+يمكن لـ InvokeAI تنزيل ملفات عشوائية باستخدام قائمة انتظار تنزيل خلفية متعددة الخيوط. داخليًا، تُستخدم قائمة انتظار التنزيل لتثبيت النماذج الموجودة في المواقع البعيدة. يتم تنفيذ قائمة الانتظار بواسطة `DownloadQueueService` المعرفة في `invokeai.app.services.download_manager`. ومع ذلك، فإن معظم التنفيذ موزع على عدة ملفات في `invokeai/backend/model_manager/download/*`
+
+توجد قائمة انتظار تنزيل افتراضية في `ApiDependencies.invoker.services.download_queue`. ومع ذلك، يمكنك إنشاء مثيلات إضافية إذا كنت بحاجة إلى عزل قائمة الانتظار الخاصة بك عن القائمة الرئيسية.
+
+### وظيفة لكل مهمة
+
+تعمل قائمة الانتظار على سلسلة من كائنات وظائف التنزيل. تحدد هذه الكائنات مصدر ووجهة التنزيل، وتتتبع تقدم التنزيل. تأتي الوظائف في مجموعة متنوعة من الأشكال والألوان حيث يتم تخصصيها تدريجيًا لمهمة تنزيل معينة.
+
+الوظيفة الأساسية هي `DownloadJobBase`، كائن pydantic مع الحقول التالية:
+
+| الحقل | النوع | الافتراضي | الوصف |
+|-------|------|---------|-------------|
+| `id` | int | | معرف الوظيفة، عدد صحيح >= 0 |
+| `priority` | int | 10 | أولوية الوظيفة. الأولويات الأقل تعمل قبل الأولويات الأعلى |
+| `source` | str | | من أين يتم التنزيل (أنواع متخصصة مستخدمة في الفئات الفرعية) |
+| `destination` | Path | | أين يتم التنزيل |
+| `status` | DownloadJobStatus | Idle | حالة الوظيفة (انظر أدناه) |
+| `event_handlers` | List[DownloadEventHandler] | | معالجات الأحداث (انظر أدناه) |
+| `job_started` | float | | طابع زمني وقت بدء الوظيفة |
+| `job_ended` | float | | طابع زمني وقت اكتمال الوظيفة أو حدوث خطأ |
+| `job_sequence` | int | | عداد يزداد في كل مرة يتم فيها إخراج نموذج من قائمة الانتظار |
+| `error` | Exception | | نسخة من الاستثناء الذي تسبب في خطأ أثناء التنزيل |
+
+عند إنشاء وظيفة، يمكنك تعيين `priority` لها. إذا كانت وظائف متعددة في قائمة الانتظار، فإن الوظيفة ذات الأولوية الأقل تعمل أولاً. (لا تلومنا! مطورو Unix جاءوا بهذه الاتفاقية.)
+
+كل وظيفة لها `source` و `destination`. `source` هي سلسلة نصية في الفئة الأساسية، ولكن الفئات الفرعية تعيد تعريفها بشكل أكثر تحديدًا.
+
+يجب أن يكون `destination` مسارًا لملف أو دليل على نظام الملفات المحلي. إذا كان المسار يشير إلى ملف جديد أو موجود، فسيتم تخزين المصدر تحت اسم الملف هذا. إذا كان المسار يشير إلى دليل موجود، فسيتم تخزين الملف الذي تم تنزيله داخل الدليل، عادةً باستخدام الاسم المخصص له في الموقع البعيد في حقل `content-disposition` في HTTP.
+
+عند تقديم الوظيفة، يتم تعيين `id` رقمي لها. يمكن بعد ذلك استخدام المعرف للتحكم في الوظيفة، مثل بدء تنزيلها وإيقافه وإلغائه.
+
+يتم تحديث حقل `status` بواسطة قائمة الانتظار للإشارة إلى مكان الوظيفة في دورة حياتها. يتم تعريف القيم في التعداد النصي `DownloadJobStatus`، وهو رمز متاح من `invokeai.app.services.download_manager`. القيم الممكنة هي:
+
+| القيمة | قيمة السلسلة | الوصف |
+|-------|--------------|-------------|
+| `IDLE` | idle | تم إنشاء الوظيفة، لكن لم يتم تقديمها إلى قائمة الانتظار |
+| `ENQUEUED` | enqueued | الوظيفة تنتظر بصبر في قائمة الانتظار |
+| `RUNNING` | running | الوظيفة قيد التشغيل! |
+| `PAUSED` | paused | تم إيقاف الوظيفة مؤقتًا ويمكن إعادة تشغيلها |
+| `COMPLETED` | completed | أكملت الوظيفة عملها دون خطأ |
+| `ERROR` | error | واجهت الوظيفة خطأ ولن تعمل مرة أخرى |
+| `CANCELLED` | cancelled | تم إلغاء الوظيفة ولن تعمل (مرة أخرى) |
+
+`job_started` و `job_ended` و `job_sequence` تشير إلى وقت بدء الوظيفة (باستخدام طابع زمني لبايثون)، ووقت اكتمالها، والترتيب الذي تم به إخراجها من قائمة الانتظار. تُستخدم هذه في الغالب لتصحيح الأخطاء واختبار الأداء.
+
+في حالة حدوث خطأ، سيتم وضع الاستثناء الذي تسبب في الخطأ في حقل `error`، وسيتم تعيين حالة الوظيفة إلى `DownloadJobStatus.ERROR`.
+
+بعد حدوث خطأ، سيتم حذف أي ملفات تم تنزيلها جزئيًا من القرص، ما لم يتم تعيين `preserve_partial_downloads` على True في وقت إنشاء الوظيفة (أو تعيين على True في أي وقت قبل حدوث الخطأ). لاحظ أنه نظرًا لأن جميع عمليات تثبيت نماذج InvokeAI تتضمن تنزيل ملفات إلى دليل مؤقت له عمر محدود، فإن هذا العلم لا يستخدمه مثبت النموذج.
+
+هناك سلسلة من الفئات الفرعية لـ `DownloadJobBase` التي توفر الدعم لأنواع محددة من التنزيلات. هذه هي:
+
+#### DownloadJobPath
+
+تعيد هذه الفئة الفرعية تعريف `source` ليكون مسار نظام ملفات. تُستخدم لنقل ملف أو دليل من `source` إلى مسار `destination` في الخلفية باستخدام بنية تحتية موحدة قائمة على الأحداث.
+
+#### DownloadJobRemoteSource
+
+تضيف هذه الفئة الفرعية الحقول التالية إلى الوظيفة:
+
+| الحقل | النوع | الافتراضي | الوصف |
+|-------|------|---------|-------------|
+| `bytes` | int | 0 | البايتات التي تم تنزيلها حتى الآن |
+| `total_bytes` | int | 0 | الحجم الإجمالي للتنزيل |
+| `access_token` | Any | None | رمز تفويض لتقديمه إلى المصدر البعيد |
+
+ستبدأ الوظيفة بـ 0/0 في حقول البايتات/إجمالي البايتات. بمجرد بدء التشغيل، سيتم ملء `total_bytes` من المعلومات المقدمة في رأس تنزيل HTTP (إن وجدت)، وسيزداد عدد البايتات التي تم تنزيلها حتى الآن تدريجيًا.
+
+#### DownloadJobURL
+
+هذه فئة فرعية من `DownloadJobBase`. تعيد تعريف `source` ليكون كائن Pydantic `AnyHttpUrl`، والذي يفرض التحقق من صحة عنوان URL على الحقل.
+
+لاحظ أن خدمة المثبت تعرف فئة فرعية إضافية من `DownloadJobRemoteSource` تقبل معرفات مستودعات HuggingFace بالإضافة إلى عناوين URL. تتم مناقشة هذا لاحقًا في هذا المستند.
+
+### معالجات الأحداث
+
+أثناء تنزيل وظيفة، ستصدر قائمة الانتظار أحداثًا على فترات دورية. ستبدو سلسلة نموذجية من الأحداث أثناء جلسة تنزيل ناجحة هكذا:
+
+<Steps>
+  1. `enqueued`
+  2. `running`
+  3. `running`
+  4. `running`
+  5. `completed`
+</Steps>
+
+سيكون هناك حدث enqueued واحد، متبوعًا بحدث تشغيل واحد أو أكثر، وأخيرًا حدث واحد `completed` أو `error` أو `cancelled`.
+
+من الممكن للمتصل إيقاف التنزيل مؤقتًا بشكل مؤقت، وفي هذه الحالة قد تبدو الأحداث شيئًا كهذا:
+
+<Steps>
+  1. `enqueued`
+  2. `running`
+  3. `running`
+  4. `paused` المستخدم أوقف التنزيل مؤقتًا
+  5. `running`
+  6. `completed`
+</Steps>
+
+تقوم قائمة انتظار التنزيل بتسجيل عند بدء التنزيلات وانتهائها (ما لم يتم تعيين `quiet` على True في وقت التهيئة) ولكنها لا تسجل أي أحداث تقدم. ربما سترغب في أن يتم تنبيهك للأحداث أثناء وظيفة التنزيل وتقديم ردود فعل أكثر للمستخدم. من أجل اعتراض الأحداث والاستجابة لها، يمكنك تثبيت سلسلة من معالج أحداث واحد أو أكثر في الوظيفة. عندما تتغير حالة الوظيفة، يتم اجتياز سلسلة معالجات الأحداث وتنفيذها في نفس الخيط الذي تعمل فيه وظيفة التنزيل.
+
+معالجات الأحداث لها التوقيع `Callable[["DownloadJobBase"], None]`، أي:
+
+```py
+def handler(job: DownloadJobBase):
+   pass
+```
+
+سيفحص معالج نموذجي `job.status` ويقرر ما إذا كان هناك شيء يجب فعله. يمكن أن يشمل ذلك إلغاء الوظيفة أو إحداث خطأ، ولكن الأكثر شيوعًا يُستخدم للإبلاغ عن حالة الوظيفة لواجهة المستخدم أو لأداء إجراءات معينة عند الاكتمال الناجح للوظيفة.
+
+يمكن إرفاق معالجات الأحداث بوظيفة في وقت الإنشاء. بالإضافة إلى ذلك، يمكنك إنشاء سلسلة من المعالجات الافتراضية التي يتم إرفاقها بكائن قائمة الانتظار نفسه. سيتم تنفيذ هذه المعالجات لكل وظيفة بعد تشغيل معالجات الوظيفة نفسها (إن وجدت).
+
+أثناء التنزيل، يتم إصدار أحداث التشغيل كلما تم نقل حوالي 1٪ من الملف. هذا لتوفير دقة كافية لتحديث شريط تقدم tqdm بسلاسة.
+
+يمكن إضافة المعالجات إلى وظيفة بعد ذلك باستخدام طريقة `add_event_handler` الخاصة بالوظيفة:
+
+```py
+job.add_event_handler(my_handler)
+```
+
+يمكن مسح جميع المعالجات باستخدام طريقة `clear_event_handlers()` الخاصة بالوظيفة. لاحظ أنه قد يكون من الجيد إيقاف الوظيفة مؤقتًا قبل تغيير معالجاتها.
+
+### إنشاء كائن قائمة انتظار التنزيل
+
+يأخذ مُنشئ `DownloadQueueService` الوسائط التالية:
+
+| الوسيط | النوع | الافتراضي | الوصف |
+|----------|------|---------|-------------|
+| `event_handlers` | List[DownloadEventHandler] | [] | معالجات الأحداث |
+| `max_parallel_dl` | int | 5 | الحد الأقصى لعدد التنزيلات المتزامنة المسموح بها |
+| `requests_session` | requests.sessions.Session | None | كائن Session بديل لاستخدامه في التنزيل |
+| `quiet` | bool | False | قم بالعمل بهدوء دون إصدار رسائل سجل |
+
+سيبدو تسلسل التهيئة النموذجي كما يلي:
+
+```py
+from invokeai.app.services.download_manager import DownloadQueueService
+
+def log_download_event(job: DownloadJobBase):
+ logger.info(f'job={job.id}: status={job.status}')
+
+queue = DownloadQueueService(
+       event_handlers=[log_download_event]
+        )
+```
+
+يمكن توفير معالجات الأحداث لقائمة الانتظار في وقت التهيئة كما هو موضح في المثال. سيتم إلحاق هذه تلقائيًا بقائمة المعالجات لأي وظيفة يتم تقديمها إلى قائمة الانتظار هذه.
+
+`max_parallel_dl` يحدد عدد التنزيلات النشطة المتزامنة المسموح بها. لم يتم قياس الأداء للقيمة الافتراضية خمسة بأي شكل من الأشكال، لكنها تبدو تعطي أداءً مقبولاً.
+
+يمكن استخدام `requests_session` لتوفير كائن Session من وحدة `requests` الذي سيستخدم لدفق عناوين URL البعيدة إلى القرص. تمت إضافة هذه الميزة للاستخدام في اختبارات الوحدة للوحدة النمطية لمحاكاة خادم ويب بعيد، ولكنها قد تكون مفيدة في سياقات أخرى.
+
+`quiet` سيمنع قائمة الانتظار من إصدار أي رسائل سجل على مستوى INFO أو أعلى.
+
+### تقديم وظيفة تنزيل
+
+يمكنك تقديم وظيفة تنزيل إلى قائمة الانتظار إما عن طريق إنشاء الوظيفة يدويًا وتمريرها إلى طريقة `submit_download_job()` الخاصة بقائمة الانتظار، أو باستخدام طريقة `create_download_job()`، التي ستفعل الشيء نفسه بالنيابة عنك.
+
+لاستخدام الطريقة الأولى، اتبع هذا المثال:
+
+```py
+job = DownloadJobRemoteSource(
+   source='http://www.civitai.com/models/13456',
+   destination='/tmp/models/',
+   event_handlers=[my_handler1, my_handler2], # إذا رغبت
+)
+queue.submit_download_job(job, start=True)
+```
+
+`submit_download_job()` تأخذ وسيطتين فقط: الوظيفة المراد تقديمها، وعلم يشير إلى ما إذا كان سيتم بدء الوظيفة على الفور (الافتراضي هو True). إذا اخترت عدم بدء الوظيفة على الفور، يمكنك بدؤها لاحقًا عن طريق استدعاء طرق `start_job()` أو `start_all_jobs()` الخاصة بقائمة الانتظار، والتي تم وصفها لاحقًا.
+
+لجعل قائمة الانتظار تنشئ الوظيفة لك، اتبع هذا المثال بدلاً من ذلك:
+
+```py
+job = queue.create_download_job(
+   source='http://www.civitai.com/models/13456',
+   destdir='/tmp/models/',
+   filename='my_model.safetensors',
+   event_handlers=[my_handler1, my_handler2], # إذا رغبت
+   start=True,
+ )
+```
+
+وسيطة `filename` تجبر أداة التنزيل على استخدام الاسم المحدد للملف بدلاً من الاسم الذي يوفره المصدر البعيد، وهي مكافئة لتحديد وجهة يدويًا مثل `/tmp/models/my_model.safetensors` في الوظيفة المقدمة.
+
+هذه هي القائمة الكاملة للوسائط التي يمكن توفيرها لـ `create_download_job()`:
+
+| الوسيط | النوع | الافتراضي | الوصف |
+|----------|------|---------|-------------|
+| `source` | Union[str, Path, AnyHttpUrl] | | مصدر التنزيل البعيد أو المحلي |
+| `destdir` | Path | | دليل الوجهة للملف الذي تم تنزيله |
+| `filename` | Path | None | اسم ملف للملف الذي تم تنزيله |
+| `start` | bool | True | ضع الوظيفة في قائمة الانتظار فورًا |
+| `priority` | int | 10 | الأولوية الابتدائية لهذه الوظيفة |
+| `access_token` | str | None | رمز التفويض لهذا المورد |
+| `event_handlers` | List[DownloadEventHandler] | [] | معالجات الأحداث لهذه الوظيفة |
+
+داخليًا، لدى `create_download_job()` القليل من المنطق الداخلي الذي ينظر إلى نوع المصدر ويختار الفئة الفرعية الصحيحة من `DownloadJobBase` لإنشائها ووضعها في قائمة الانتظار.
+
+**TODO**: نقل هذا المنطق إلى طريقته الخاصة لتجاوزه في الفئات الفرعية.
+
+### التحكم في الوظائف
+
+قبل الاكتمال، يمكن التحكم في الوظائف بسلسلة من استدعاءات طرق قائمة الانتظار. لا تحاول تعديل الوظائف عن طريق الكتابة مباشرة في حقولها، حيث من المرجح أن يؤدي هذا إلى نتائج غير متوقعة.
+
+أي طريقة تقبل وسيطة وظيفة قد تثير استثناء `UnknownJobIDException` إذا لم يتم تقديم الوظيفة بعد إلى قائمة الانتظار أو لم يتم إنشاؤها بواسطة قائمة الانتظار هذه.
+
+#### queue.join()
+
+ستحظر هذه الطريقة حتى تصل جميع الوظائف النشطة في قائمة الانتظار إلى حالة نهائية (مكتملة أو خاطئة أو ملغاة).
+
+#### queue.wait_for_job(job, [timeout])
+
+ستحظر هذه الطريقة حتى تصل الوظيفة المشار إليها إلى حالة نهائية (مكتملة أو خاطئة أو ملغاة). إذا تم توفير المهلة الاختيارية، فستحظر المكالمة لمدة أقصاها timeout ثانية، وستثير TimeoutError بخلاف ذلك.
+
+#### jobs = queue.list_jobs()
+
+سيعيد هذا قائمة بجميع الوظائف، بما في ذلك تلك التي لم يتم وضعها في قائمة الانتظار بعد وتلك التي اكتملت أو حدث بها خطأ.
+
+#### job = queue.id_to_job(int)
+
+تسمح لك هذه الطريقة باستعادة وظيفة مقدمة باستخدام معرفها.
+
+#### queue.prune_jobs()
+
+إزالة الوظائف المكتملة والخاطئة من قائمة الوظائف.
+
+#### queue.start_job(job)
+
+إذا تم تقديم الوظيفة مع `start=False`، يمكن بدؤها باستخدام هذه الطريقة.
+
+#### queue.pause_job(job)
+
+سيؤدي هذا إلى إيقاف الوظيفة مؤقتًا، إذا كان ذلك ممكنًا. يمكن إعادة تشغيلها لاحقًا واستئنافها من حيث توقفت باستخدام `queue.start_job()`.
+
+#### queue.cancel_job(job)
+
+سيؤدي هذا إلى إلغاء الوظيفة إذا كان ذلك ممكنًا وتنظيف الملفات المؤقتة والموارد الأخرى التي ربما كانت تستخدمها.
+
+#### queue.start_all_jobs(), queue.pause_all_jobs(), queue.cancel_all_jobs()
+
+سيؤدي هذا إلى بدء/إيقاف/إلغاء جميع الوظائف التي تم تقديمها إلى قائمة الانتظار ولم تصل بعد إلى حالة نهائية.
+
+---
+
+## هذه البيانات الوصفية جيدة: تخزين البيانات الوصفية للنموذج
+
+توفر الوحدات الموجودة تحت `invokeai.backend.model_manager.metadata` واجهة برمجة تطبيقات مباشرة لجلب البيانات الوصفية للنموذج من المستودعات عبر الإنترنت. حاليًا، يتم دعم HuggingFace فقط. ومع ذلك، يمكن تمديد الوحدات بسهولة لمستودعات إضافية، بشرط أن تكون لديهم واجهات برمجة تطبيقات محددة للوصول إلى البيانات الوصفية.
+
+تتكون البيانات الوصفية من أي معلومات وصفية غير ضرورية لتشغيل النموذج. على سبيل المثال، "المؤلف" هو بيانات وصفية، بينما "النوع" و "الأساس" و "التنسيق" ليست كذلك. الحقول الأخيرة هي جزء من تكوين النموذج، كما هو محدد في `invokeai.backend.model_manager.config`.
+
+### مثال على الاستخدام
+
+```py
+from invokeai.backend.model_manager.metadata import (
+   AnyModelRepoMetadata,
+)
+# للوصول إلى قاعدة بيانات sql المهيأة
+from invokeai.app.api.dependencies import ApiDependencies
+
+hf = HuggingFaceMetadataFetch()
+
+# جلب البيانات الوصفية
+model_metadata = hf.from_id("<repo_id>")
+
+assert isinstance(model_metadata, HuggingFaceMetadata)
+```
+
+### هيكل كائنات البيانات الوصفية
+
+هناك تسلسل هرمي قصير لكائنات البيانات الوصفية، وكلها تنحدر من `BaseModel` من Pydantic.
+
+#### `ModelMetadataBase`
+
+هذه هي الفئة الأساسية المشتركة للبيانات الوصفية:
+
+| اسم الحقل | النوع | الوصف |
+|------------|------|-------------|
+| `name` | str | اسم المستودع للنموذج |
+| `author` | str | مؤلف النموذج |
+| `tags` | Set[str] | وسوم النموذج |
+
+لاحظ أن سجل تكوين النموذج له أيضًا حقل `name`. من المقصود أن يكون إصدار سجل التكوين قابلاً للتخصيص محليًا، بينما إصدار البيانات الوصفية للقراءة فقط. ومع ذلك، من المتوقع أن يكون فرض هذا جزءًا من منطق الأعمال.
+
+النسل من القاعدة يضيف حقولًا إضافية.
+
+#### `HuggingFaceMetadata`
+
+ينحدر هذا من `ModelMetadataBase` ويضيف الحقول التالية:
+
+| اسم الحقل | النوع | الوصف |
+|------------|------|-------------|
+| `type` | Literal["huggingface"] | يُستخدم للاتحاد المُميَّز لفئات البيانات الوصفية |
+| `id` | str | معرف مستودع HuggingFace |
+| `tag_dict` | Dict[str, Any] | قاموس من أزواج الوسم/القيمة المقدمة بالإضافة إلى `tags` |
+| `last_modified` | datetime | تاريخ آخر التزام لهذا النموذج في المستودع |
+| `files` | List[Path] | قائمة بالملفات في مستودع النموذج |
+
+#### `AnyModelRepoMetadata`
+
+هذا اتحاد مُميَّز من `HuggingFaceMetadata`.
+
+### جلب البيانات الوصفية من المستودعات عبر الإنترنت
+
+ستقوم فئة `HuggingFaceMetadataFetch` باسترداد البيانات الوصفية من مستودعها المقابل وإرجاع كائنات `AnyModelRepoMetadata`. فئتها الأساسية `ModelMetadataFetchBase` هي فئة مجردة تحدد طريقتين: `from_url()` و `from_id()`. الأولى تقبل نوع عناوين URL للنماذج التي سيحاول المستخدم قصها ولصقها في نموذج استيراد النموذج. الأخيرة تقبل معرف سلسلة بالتنسيق المعترف به من قبل المستودع الذي تم اختياره. تعيد كلتا الطريقتين `AnyModelRepoMetadata`.
+
+تحتوي الفئة الأساسية أيضًا على طريقة فئة `from_json()` التي ستأخذ تمثيل JSON لكائن `ModelMetadata`، وتتحقق من صحته، وتعيد كائن `AnyModelRepoMetadata` المقابل.
+
+عند تهيئة إحدى فئات جلب البيانات الوصفية، يمكنك توفير وسيطة `requests.Session`. يتيح لك هذا تخصيص طلبات HTTP منخفضة المستوى ويُستخدم، على سبيل المثال، في مجموعة الاختبارات لتجنب الاتصال بالإنترنت.
+
+تضيف الفئة الفرعية لجالب HuggingFace طرق جلب إضافية خاصة بالمستودع:
+
+#### HuggingFaceMetadataFetch
+
+يتجاوز هذا طريقة `from_json()` لفئته الأساسية لإرجاع كائن `HuggingFaceMetadata` مباشرة.
+
+### تخزين البيانات الوصفية
+
+يخزن `ModelConfigBase` هذه الاستجابة في حقل `source_api_response` ككتلة JSON.
+
+---
+
+## المعلومات الأساسية حول ModelLoadService
+
+`ModelLoadService` مسؤول عن تحميل نموذج مسمى في الذاكرة بحيث يمكن استخدامه للاستدلال. على الرغم من حقيقة أنه يفعل الكثير تحت الغطاء، إلا أنه سهل الاستخدام للغاية.
+
+يتم إنشاء محمل نموذج على مستوى التطبيق في وقت تهيئة API ويتم تخزينه في `ApiDependencies.invoker.services.model_loader`. ومع ذلك، يمكنك إنشاء مثيلات بديلة إذا كنت ترغب في ذلك.
+
+### إنشاء كائن ModelLoadService
+
+يتم تعريف الفئة في `invokeai.app.services.model_load`. تتم تهيئتها بكائن InvokeAIAppConfig، الذي تحصل منه على معلومات التكوين مثل GPU المطلوب للمستخدم والدقة، وكائن `ModelRecordServiceBase` تم إنشاؤه مسبقًا، والذي تحمل منه معلومات تكوين النموذج المطلوب.
+
+هذا نمط تهيئة نموذجي:
+
+```py
+from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.model_load import ModelLoadService, ModelLoaderRegistry
+
+config = InvokeAIAppConfig.get_config()
+
+ram_cache = ModelCache(
+  max_cache_size=config.ram_cache_size, max_vram_cache_size=config.vram_cache_size, logger=logger
+)
+
+convert_cache = ModelConvertCache(
+  cache_path=config.models_convert_cache_path, max_size=config.convert_cache_size
+)
+
+loader = ModelLoadService(
+  app_config=config,
+  ram_cache=ram_cache,
+  convert_cache=convert_cache,
+  registry=ModelLoaderRegistry
+)
+```
+
+### load_model(model_config, [submodel_type], [context]) -> LoadedModel
+
+تأخذ طريقة `load_model()` كائن `AnyModelConfig` الذي أعادته `ModelRecordService.get_model()` وتعيد النموذج المحمل المقابل. تقوم بتحميل النموذج في الذاكرة، وتجهز النموذج للاستخدام، وتعيد كائن `LoadedModel`.
+
+الوسيطة الثانية الاختيارية، `subtype` هي تعداد نصي `SubModelType`، مثل "vae". وهي إلزامية عند استخدامها مع نموذج رئيسي، وتستخدم لاختيار أي جزء من النموذج الرئيسي لتحميله.
+
+الوسيطة الثالثة الاختيارية، `context` يمكن أن يوفرها استدعاء لتفعيل الإبلاغ عن حدث تحميل النموذج. انظر أدناه للتفاصيل.
+
+كائن `LoadedModel` الذي تم إرجاعه يحتوي على نسخة من سجل التكوين الذي أعادته طريقة `get_model()` لسجل النموذج، بالإضافة إلى النموذج المحمل في الذاكرة:
+
+| اسم السمة | النوع | الوصف |
+|----------------|------|-------------|
+| `config` | AnyModelConfig | نسخة من سجل تكوين النموذج لاسترداد النوع الأساسي، إلخ. |
+| `model` | AnyModel | النموذج الذي تم إنشاء مثيل له (التفاصيل أدناه) |
+
+### get_model_by_key(key, [submodel]) -> LoadedModel
+
+طريقة `get_model_by_key()` ستسترد النموذج باستخدام مفتاح قاعدة البيانات الفريد الخاص به. على سبيل المثال:
+
+```py
+loaded_model = loader.get_model_by_key('f13dd932c0c35c22dcb8d6cda4203764', SubModelType('vae'))
+```
+
+قد تثير `get_model_by_key()` أيًا من الاستثناءات التالية:
+
+* `UnknownModelException` -- المفتاح غير موجود في قاعدة البيانات
+* `ModelNotFoundException` -- المفتاح موجود في قاعدة البيانات ولكن النموذج غير موجود في المسار
+* `NotImplementedException` -- لا يعرف المحمل كيفية تحميل هذا النوع من النماذج
+
+### استخدام النموذج المحمل في الاستدلال
+
+يعمل `LoadedModel` كمدير سياق. يقوم السياق بتحميل النموذج في جهاز التنفيذ (مثل VRAM على أنظمة CUDA)، ويقفل النموذج في جهاز التنفيذ طوال مدة السياق، ويعيد النموذج. استخدمه هكذا:
+
+```py
+loaded_model_= loader.get_model_by_key('f13dd932c0c35c22dcb8d6cda4203764', SubModelType('vae'))
+with loaded_model as vae:
+ image = vae.decode(latents)[0]
+```
+
+الكائن الذي يعيده مدير السياق LoadedModel هو `AnyModel`، وهو اتحاد من `ModelMixin` و `torch.nn.Module` و `IAIOnnxRuntimeModel` و `IPAdapter` و `IPAdapterPlus` و `EmbeddingModelRaw`. `ModelMixin` هي الفئة الأساسية لجميع نماذج diffusers، و `EmbeddingModelRaw` يستخدم لنماذج LoRA و TextualInversion. الأخرى واضحة.
+
+بالإضافة إلى ذلك، يمكنك استدعاء `LoadedModel.model_on_device()`، وهو مدير سياق يعيد مجموعة (tuple) من قاموس حالة النموذج في CPU والنموذج نفسه في VRAM. يُستخدم لتحسين عملية تصحيح وتصحيح LoRA:
+
+```py
+loaded_model_= loader.get_model_by_key('f13dd932c0c35c22dcb8d6cda4203764', SubModelType('vae'))
+with loaded_model.model_on_device() as (state_dict, vae):
+ image = vae.decode(latents)[0]
+```
+
+نظرًا لأنه ليست كل النماذج تحتوي على قواميس حالة، فإن قيمة الإرجاع `state_dict` يمكن أن تكون None.
+
+### إصدار أحداث تحميل النموذج
+
+عند تمرير وسيطة `context` إلى `load_model_*()`، ستسترجع ناقل حدث الاستدعاء من كائن `InvocationContext` المُمرر لإصدار أحداث على ناقل الاستدعاء. الحدثان هما "model_load_started" و "model_load_completed". كلاهما يحمل الحمولة التالية:
+
+```py
+payload=dict(
+  queue_id=queue_id,
+  queue_item_id=queue_item_id,
+  queue_batch_id=queue_batch_id,
+  graph_execution_state_id=graph_execution_state_id,
+  model_key=model_key,
+  submodel_type=submodel,
+  hash=model_info.hash,
+  location=str(model_info.location),
+  precision=str(model_info.precision),
+)
+```
+
+### إضافة محملات النماذج
+
+محملات النماذج هي فئات صغيرة ترث من الفئة الأساسية `ModelLoader`. تنفذ عادةً طريقة واحدة `_load_model()` التي توقيعها:
+
+```py
+def _load_model(
+  self,
+  model_path: Path,
+  model_variant: Optional[ModelRepoVariant] = None,
+  submodel_type: Optional[SubModelType] = None,
+) -> AnyModel:
+```
+
+سيتم تمرير `_load_model()` إلى مسار النموذج على القرص، ومتغير مستودع اختياري (يستخدمه محملات diffusers لاختيار متغير fp16 مثلاً)، ونوع نموذج فرعي اختياري للنماذج الرئيسية و onnx.
+
+لتثبيت محمل جديد، ضعه في `invokeai/backend/model_manager/load/model_loaders`. ورث من `ModelLoader` واستخدم ديكور `@ModelLoaderRegistry.register()` للإشارة إلى نوع النماذج التي يمكن للمحمل معالجتها.
+
+هذا مثال كامل من `generic_diffusers.py`، القادر على تحميل عدة أنواع مختلفة من diffusers:
+
+```py
+from pathlib import Path
+from typing import Optional
+
+from invokeai.backend.model_manager import (
+  AnyModel,
+  BaseModelType,
+  ModelFormat,
+  ModelRepoVariant,
+  ModelType,
+  SubModelType,
+)
+from .. import ModelLoader, ModelLoaderRegistry
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.CLIPVision, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T2IAdapter, format=ModelFormat.Diffusers)
+class GenericDiffusersLoader(ModelLoader):
+    """فئة لتحميل نماذج diffusers البسيطة."""
+
+    def _load_model(
+        self,
+        model_path: Path,
+        model_variant: Optional[ModelRepoVariant] = None,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        model_class = self._get_hf_load_class(model_path)
+        if submodel_type is not None:
+            raise Exception(f"لا توجد نماذج فرعية في نماذج من نوع {model_class}")
+        variant = model_variant.value if model_variant else None
+        result: AnyModel = model_class.from_pretrained(model_path, torch_dtype=self._torch_dtype, variant=variant)
+        return result
+```
+
+:::note
+يمكن للمحمل تسجيل نفسه للتعامل مع عدة أنواع نماذج مختلفة. سيتم إثارة استثناء إذا حاول أكثر من محمل تسجيل نفس نوع النموذج.
+:::
+
+#### التحويل
+
+تتطلب بعض النماذج التحويل إلى تنسيق diffusers قبل أن يمكن تحميلها. يجب أن تتجاوز هذه المحملات طريقتين إضافيتين:
+
+```py
+_needs_conversion(self, config: AnyModelConfig, model_path: Path, dest_path: Path) -> bool
+_convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Path) -> Path:
+```
+
+تقبل الطريقة الأولى تكوين النموذج، والمسار إلى حيث تم تثبيت النموذج غير المعدل حاليًا، ووجهة مقترحة للنموذج المحول. تعيد هذه الطريقة True إذا كان النموذج بحاجة إلى التحويل. تقوم بذلك عادةً عن طريق مقارنة وقت التعديل الأخير لملف النموذج الأصلي بوقت تعديل النموذج المحول. في بعض الحالات، ستحتاج أيضًا إلى التحقق من تاريخ تعديل سجل التكوين، في حال قام المستخدم بتغيير شيء مثل نوع توقع الجدولة الذي سيتطلب إعادة تحويل النموذج. راجع `controlnet.py` للحصول على مثال على هذا المنطق.
+
+تقبل الطريقة الثانية تكوين النموذج، والمسار إلى النموذج الأصلي على القرص، ومسار الإخراج المطلوب للنموذج المحول. تفعل ما يلزم للحصول على النموذج في تنسيق diffusers، وتعيد مسار النموذج الناتج. (يجب أن يكون المسار عادةً نفس `output_path`.)
+
+## كائن ModelManagerService
+
+للراحة، يوفر API كائن `ModelManagerService` الذي يعطي نقطة وصول واحدة لخدمات مدير النماذج الرئيسية. يتم إنشاء هذا الكائن في وقت التهيئة ويمكن العثور عليه في الكائن العام `ApiDependencies.invoker.services.model_manager`، أو في `context.services.model_manager` من داخل استدعاء.
+
+في الأمثلة أدناه، قمنا باسترداد المدير باستخدام:
+
+```py
+mm = ApiDependencies.invoker.services.model_manager
+```
+
+الخصائص والطرق التالية ستكون متاحة:
+
+### mm.store
+
+يسترد هذا `ModelRecordService` المرتبط بالمدير. مثال:
+
+```py
+configs = mm.store.get_model_by_attr(name='stable-diffusion-v1-5')
+```
+
+### mm.install
+
+يسترد هذا `ModelInstallService` المرتبط بالمدير. مثال:
+
+```py
+job = mm.install.heuristic_import(`https://civitai.com/models/58390/detail-tweaker-lora-lora`)
+```
+
+### mm.load
+
+يسترد هذا `ModelLoaderService` المرتبط بالمدير. مثال:
+
+```py
+configs = mm.store.get_model_by_attr(name='stable-diffusion-v1-5')
+assert len(configs) > 0
+
+loaded_model = mm.load.load_model(configs[0])
+```
+
+يقدم مدير النماذج أيضًا بعض الاختصارات المريحة لتحميل النماذج:
+
+### mm.load_model_by_config(model_config, [submodel], [context]) -> LoadedModel
+
+نفس `mm.load.load_model()`.
+
+### mm.load_model_by_attr(model_name, base_model, model_type, [submodel], [context]) -> LoadedModel
+
+يقبل هذا مجموعة من اسم النموذج ونوعه وأساسه، ويمررها إلى مخزن سجل تكوين النموذج لاستردادها. إذا تم العثور على تكوين نموذج فريد، تعيد هذه الطريقة `LoadedModel`. يمكن أن تثير الاستثناءات التالية:
+
+- `UnknownModelException` -- النموذج بهذه السمات غير معروف
+- `NotImplementedException` -- لا يعرف المحمل كيفية تحميل هذا النوع من النماذج
+- `ValueError` -- أكثر من نموذج يطابق هذه المجموعة من الأساس/النوع/الاسم
+
+### mm.load_model_by_key(key, [submodel], [context]) -> LoadedModel
+
+تأخذ هذه الطريقة مفتاح نموذج، وتبحث عنه باستخدام كائن `ModelRecordServiceBase` في `mm.store`، وتمرر تكوين النموذج الذي تم إرجاعه إلى `load_model_by_config()`. قد تثير `NotImplementedException`.
+
+## واجهة برمجة تطبيقات مدير النماذج لسياق الاستدعاء
+
+داخل الاستدعاءات، الطرق التالية متاحة من كائن `InvocationContext`:
+
+### context.download_and_cache_model(source) -> Path
+
+تقبل هذه الطريقة `source` لنموذج بعيد، وتقوم بتنزيله وتخزينه مؤقتًا محليًا، ثم تعيد مسارًا إلى النموذج المحلي. يمكن أن يكون المصدر عنوان URL تنزيل مباشر أو معرف مستودع HuggingFace.
+
+في حالة معرف مستودع HuggingFace، يتم التعرف على المتغيرات التالية:
+
+* stabilityai/stable-diffusion-v4 -- النموذج الافتراضي
+* stabilityai/stable-diffusion-v4:fp16 -- متغير fp16
+* stabilityai/stable-diffusion-v4:fp16:vae -- المجلد الفرعي vae لـ fp16
+* stabilityai/stable-diffusion-v4:onnx:vae -- المجلد الفرعي vae لمتغير onnx
+
+يمكنك أيضًا الإشارة إلى ملف فردي عشوائي داخل دليل معرف مستودع باستخدام هذا الصيغة:
+
+* stabilityai/stable-diffusion-v4::/checkpoints/sd4.safetensors
+
+### context.load_local_model(model_path, [loader]) -> LoadedModel
+
+تقوم هذه الطريقة بتحميل نموذج محلي من المسار المشار إليه، مع إرجاع `LoadedModel`. المحمل الاختياري هو Callable يقبل مسارًا للكائن، ويعيد كائن `AnyModel`. إذا لم يتم توفير محمل، فستستخدم الطريقة `torch.load()` لملف نقطة تفتيش .ckpt أو .bin، أو `safetensors.torch.load_file()` لملف نقطة تفتيش safetensors، أو `cls.from_pretrained()` لدليل يشبه دليل diffusers.
+
+### context.load_remote_model(source, [loader]) -> LoadedModel
+
+تقبل هذه الطريقة `source` لنموذج بعيد، وتقوم بتنزيله وتخزينه مؤقتًا محليًا، وتحميله، وإرجاع `LoadedModel`. يمكن أن يكون المصدر عنوان URL تنزيل مباشر أو معرف مستودع HuggingFace.
+
+في حالة معرف مستودع HuggingFace، يتم التعرف على المتغيرات التالية:
+
+* stabilityai/stable-diffusion-v4 -- النموذج الافتراضي
+* stabilityai/stable-diffusion-v4:fp16 -- متغير fp16
+* stabilityai/stable-diffusion-v4:fp16:vae -- المجلد الفرعي vae لـ fp16
+* stabilityai/stable-diffusion-v4:onnx:vae -- المجلد الفرعي vae لمتغير onnx
+
+يمكنك أيضًا الإشارة إلى ملف فردي عشوائي داخل دليل معرف مستودع باستخدام هذا الصيغة:
+
+* stabilityai/stable-diffusion-v4::/checkpoints/sd4.safetensors

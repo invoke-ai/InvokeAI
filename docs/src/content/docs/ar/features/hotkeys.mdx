@@ -1,0 +1,202 @@
+---
+title: الاختصارات
+description: تعلم كيفية استخدام وتخصيص الاختصارات في InvokeAI، وكيف يمكن للمطورين التفاعل مع نظام الاختصارات.
+lastUpdated: 2026-02-19
+sidebar:
+  order: 2
+---
+
+import { Tabs, TabItem, Steps, Card, CardGrid, Icon } from '@astrojs/starlight/components';
+
+يتيح لك InvokeAI تخصيص جميع اختصارات لوحة المفاتيح (الاختصارات السريعة) لتتناسب مع تفضيلات سير العمل لديك. يغطي هذا الدليل كيفية استخدام وتخصيص الاختصارات كمستخدم، بالإضافة إلى توفير توثيق فني للمطورين.
+
+## دليل المستخدم
+
+<CardGrid>
+  <Card title="عرض جميع الاختصارات" icon="magnifier">
+    شاهد جميع اختصارات لوحة المفاتيح المتاحة منظمة حسب الفئة في مكان واحد.
+  </Card>
+  <Card title="تخصيص أي اختصار" icon="pencil">
+    غيّر أي اختصار حسب تفضيلك، أو خصص مجموعات مفاتيح متعددة لنفس الإجراء.
+  </Card>
+  <Card title="تحقق ذكي" icon="approve-check-circle">
+    التحقق المدمج يمنع المجموعات غير الصالحة.
+  </Card>
+  <Card title="إعدادات دائمة" icon="setting">
+    يتم تخزين الاختصارات المخصصة بأمان واستعادتها عبر الجلسات.
+  </Card>
+</CardGrid>
+
+### فتح نافذة الاختصارات
+
+اضغط <kbd>Shift</kbd> + <kbd>?</kbd> أو انقر على **أيقونة لوحة المفاتيح** في التطبيق لفتح نافذة الاختصارات.
+
+### إدارة الاختصارات
+
+<Tabs>
+  <TabItem label="العرض">
+    - تصفح جميع الاختصارات المتاحة منظمة حسب الفئة (التطبيق، اللوحة، المعرض، سير العمل، إلخ).
+    - ابحث عن اختصارات محددة باستخدام شريط البحث.
+    - شاهد مجموعة المفاتيح الحالية لكل إجراء.
+  </TabItem>
+  <TabItem label="التخصيص">
+    <Steps>
+    1. انقر على زر **القلم الرصاص** بجانب الاختصار الذي تريد تغييره، أو انقر على زر **العلامة الزائد** لإضافة اختصار جديد.
+    2. أدخل مجموعة الاختصار الجديدة في المحرر.
+       - استخدم أزرار المعدّلات للإدراج السريع (<kbd>Mod</kbd>, <kbd>Ctrl</kbd>, <kbd>Shift</kbd>, <kbd>Alt</kbd>).
+       - تحقق من المعاينة المباشرة لترى كيف سيبدو اختصارك.
+    3. انقر على **علامة الصح** أو اضغط <kbd>Enter</kbd> للحفظ.
+    </Steps>
+  </TabItem>
+  <TabItem label="إعادة التعيين">
+    - **إعادة تعيين اختصار واحد:** انقر على أيقونة السهم بعكس عقارب الساعة بجانب الاختصارات المخصصة.
+    - **إعادة تعيين جميع الاختصارات:** في وضع التحرير، انقر على زر **إعادة تعيين الكل إلى الافتراضي** في الأسفل.
+  </TabItem>
+</Tabs>
+
+### مرجع تنسيق الاختصار
+
+عند تخصيص الاختصارات، استخدم التنسيقات التالية:
+
+- **المعدّلات الصالحة:** `mod` (Ctrl على Windows/Linux، Cmd على Mac)، `ctrl`، `shift`، `alt`
+- **المفاتيح الصالحة:** أحرف (`a-z`)، أرقام (`0-9`)، مفاتيح الوظائف (`f1-f12`)، مفاتيح خاصة (`enter`، `space`، `tab`، `backspace`، `delete`، `escape`)، مفاتيح الأسهم (`up`، `down`، `left`، `right`)
+- **بدائل متعددة:** افصل بفواصل (مثال: `mod+enter, ctrl+enter`)
+
+:::tip
+  **اختصارات صالحة:** `mod+s`، `ctrl+shift+p`، `f5, mod+r`<br/>
+  **اختصارات غير صالحة:** `mod+` (بدون مفتاح بعد المعدّل)، `shift+ctrl+` (ينتهي بمعدّل)
+:::
+
+---
+
+## دليل المطور
+
+يسمح نظام الاختصارات للمطورين بتعريف وإدارة والتحقق من صحة الاختصارات مركزياً في جميع أنحاء التطبيق. إنه مبني على `react-hotkeys-hook`.
+
+### البنية المعمارية
+
+تتكون ميزة الاختصارات القابلة للتخصيص من المكونات التالية:
+
+<Tabs>
+  <TabItem label="الحالة والاستمرارية">
+    **شريحة حالة الاختصارات (`hotkeysSlice.ts`)**
+    - تخزين تعيينات الاختصارات المخصصة في حالة Redux.
+    - استمرارها إلى IndexedDB باستخدام `redux-remember`.
+    - توفير إجراءات لتغيير وإعادة تعيين فردي أو إعادة تعيين جميع الاختصارات.
+  </TabItem>
+  <TabItem label="الخطافات">
+    **خطاف `useHotkeyData` (`useHotkeyData.ts`)**
+    - تعريف جميع الاختصارات الافتراضية ودمجها مع الاختصارات المخصصة من المتجر.
+    - إرجاع الاختصارات الفعالة المراد استخدامها.
+    - توفير ترجمات مفاتيح خاصة بالمنصة.
+  </TabItem>
+  <TabItem label="مكونات واجهة المستخدم">
+    - **`HotkeyEditor.tsx`**: محرر مضمن مع معاينة مباشرة وتحقق وإدخال معدّلات.
+    - **`HotkeysModal.tsx`**: واجهة النافذة المنبثقة التي تدعم أوضاع العرض/التحرير والبحث والفئات.
+  </TabItem>
+</Tabs>
+
+### إضافة اختصارات جديدة
+
+لإضافة اختصار جديد إلى النظام، اتبع هذه الخطوات:
+
+<Steps>
+1. **إضافة سلاسل الترجمة**
+   في `invokeai/frontend/web/public/locales/en.json`:
+   ```json
+   {
+     "hotkeys": {
+       "app": {
+         "myAction": {
+           "title": "إجراءي",
+           "desc": "وصف ما يفعله هذا الاختصار"
+         }
+       }
+     }
+   }
+   ```
+
+2. **تسجيل الاختصار**
+   في `invokeai/frontend/web/src/features/system/components/HotkeysModal/useHotkeyData.ts`:
+   ```typescript
+   // داخل دالة بناء الفئة المناسبة
+   addHotkey('app', 'myAction', ['mod+k']); // الربط الافتراضي
+   ```
+
+3. **استخدام الاختصار في المكونات**
+   ```tsx
+   import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
+
+   const MyComponent = () => {
+     const handleAction = useCallback(() => {
+       // الإجراء الخاص بك هنا
+     }, []);
+
+     // يستخدم تلقائياً الاختصارات المخصصة إذا تم تكوينها
+     useRegisteredHotkeys({
+       id: 'myAction',
+       category: 'app', // 'app', 'canvas', 'viewer', 'gallery', 'workflows'
+       callback: handleAction,
+       options: { enabled: true, preventDefault: true },
+       dependencies: [handleAction]
+     });
+
+     // ...
+   };
+   ```
+</Steps>
+
+### الأنماط الشائعة
+
+<Tabs>
+  <TabItem label="الاختصارات الشرطية">
+    تفعيل الاختصارات فقط عند استيفاء شروط معينة:
+    ```typescript
+    useRegisteredHotkeys({
+      id: 'save',
+      category: 'app',
+      callback: handleSave,
+      options: {
+        enabled: hasUnsavedChanges && !isLoading, // فقط عندما يكون صالحاً
+        preventDefault: true
+      },
+      dependencies: [hasUnsavedChanges, isLoading, handleSave]
+    });
+    ```
+  </TabItem>
+  <TabItem label="الاختصارات محددة التركيز">
+    التأكد من أن الاختصارات نشطة فقط عند التركيز على منطقة معينة:
+    ```tsx
+    import { useFocusRegion } from 'common/hooks/focus';
+
+    const MyComponent = () => {
+      const focusRegionRef = useFocusRegion('myRegion');
+
+      // الاختصار يعمل فقط عندما تكون هذه المنطقة في التركيز
+      useRegisteredHotkeys({
+        id: 'myAction',
+        category: 'app',
+        callback: handleAction,
+        options: { enabled: true }
+      });
+
+      return <div ref={focusRegionRef}>...</div>;
+    };
+    ```
+  </TabItem>
+  <TabItem label="بدائل متعددة">
+    توفير بدائل متعددة لنفس الإجراء:
+    ```typescript
+    // في useHotkeyData.ts
+    addHotkey('canvas', 'redo', ['mod+shift+z', 'mod+y']); // بديلان
+    ```
+  </TabItem>
+</Tabs>
+
+:::caution[أفضل الممارسات]
+- **استخدم `mod` بدلاً من `ctrl`**: يرتبط تلقائياً بـ <kbd>Cmd</kbd> على Mac، و <kbd>Ctrl</kbd> في مكان آخر.
+- **قدم ترجمات وصفية**: ساعد المستخدمين على فهم ما يفعله كل اختصار.
+- **تجنب التعارضات**: تحقق من الاختصارات الموجودة قبل إضافة جديدة.
+- **تحقق من الحالة الممكنة**: فعّل الاختصارات فقط عندما يكون الإجراء متاحاً.
+- **استخدم التبعيات بشكل صحيح**: تأكد من استقرار callbacks مع `useCallback`.
+:::

@@ -1,0 +1,275 @@
+---
+title: بيئة التطوير
+lastUpdated: 2026-02-19
+---
+
+import { LinkCard, Steps, Tabs, TabItem, FileTree, LinkButton } from '@astrojs/starlight/components'
+import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
+
+:::caution
+  يستخدم Invoke قاعدة بيانات SQLite. عند تشغيل التطبيق كتثبيت تطويري، فإنك تتحمل مسؤولية قاعدة البيانات الخاصة بك. هذا يعني عمل نسخ احتياطية منتظمة (خاصة قبل السحب) و/أو إصلاحها بنفسك في حال قدم طلب سحب تغييرًا في هيكل المخطط.
+
+  إذا لم تكن بحاجة إلى الاحتفاظ بقاعدة البيانات الخاصة بك، يمكنك استخدام قاعدة بيانات مؤقتة في الذاكرة عن طريق تعيين `use_memory_db: true` في ملف `invokeai.yaml`. ستحتاج أيضًا إلى تعيين `scan_models_on_startup: true` لتسجيل نماذجك عند بدء التشغيل.
+:::
+
+## الإعداد الأولي
+
+<Steps>
+  1. راجع متطلبات النظام.
+
+      <SystemRequirementsLink />
+
+  2. انسخ (Fork) واستنسخ (Clone) مستودع InvokeAI git.
+
+      <LinkButton
+        icon="github"
+        iconPlacement="start"
+        href="https://github.com/invoke-ai/InvokeAI/fork"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        نسخ المستودع
+      </LinkButton>
+
+      بعد ذلك، استنسخ المستودع المنسوخ إلى جهازك المحلي. يمكنك استخدام HTTPS أو SSH، حسب إعدادات git الخاصة بك.
+
+  3. يستخدم هذا المستودع Git LFS لإدارة الملفات الكبيرة. لضمان تنزيل جميع الأصول:
+        - ثبّت git-lfs → [تنزيل من هنا](https://git-lfs.com/)
+        - فعّل الجلب التلقائي لـ LFS لهذا المستودع:
+          ```shell
+          git config lfs.fetchinclude "*"
+          ```
+        - جلب الملفات من LFS (يتم ذلك مرة واحدة فقط؛ عمليات `git pull` اللاحقة ستجلب التغييرات تلقائيًا):
+          ```shell
+          git lfs pull
+          ```
+  4. أنشئ دليلًا لبيانات المستخدم (الصور، النماذج، قاعدة البيانات، إلخ). يكون هذا عادةً في `~/invokeai`، ولكن إذا كان لديك بالفعل تثبيت غير تطويري، فقد ترغب في إنشاء دليل منفصل للتثبيت التطويري.
+  5. اتبع دليل [التثبيت اليدوي](/start-here/manual/)، مع بعض التعديلات على أمر التثبيت:
+
+      - استخدم `.` بدلاً من `invokeai` للتثبيت من الدليل الحالي. لا تحتاج إلى تحديد الإصدار.
+      - استخدم `uv sync` بدلاً من `uv pip install` لمزامنة البيئة من ملف قفل المستودع.
+      - يتم تثبيت المشروع الحالي كتثبيت قابل للتعديل افتراضيًا. هذا يعني أن تغييراتك على كود بايثون ستنعكس عند إعادة تشغيل خادم Invoke.
+      - أضف خيارات الحزمة `dev` و `test` و `docs` و GPU المناسبة باستخدام `--extra`. قد تحتاج أو لا تحتاج إلى خيار `xformers` - اتبع دليل التثبيت اليدوي لمعرفة ذلك.
+
+      مع إجراء التعديلات، يجب أن يبدو أمر المزامنة شيئًا كهذا:
+
+        ```sh
+        uv sync --frozen \
+          --python 3.12 \
+          --managed-python \
+          --extra dev \
+          --extra test \
+          --extra docs \
+          --extra cuda \
+          --extra xformers
+        ```
+  6. في هذه المرحلة، يجب أن يكون Invoke مثبتًا، وتم إعداد وتفعيل البيئة الافتراضية، والخادم قيد التشغيل. ولكن ستظهر رسالة تحذير في الطرفية تفيد بعدم العثور على واجهة المستخدم. إذا ذهبت إلى رابط الخادم، لن تحصل على واجهة المستخدم.
+
+        هذا لأن بناء واجهة المستخدم لا يتم توزيعه مع الكود المصدري. تحتاج إلى بنائه يدويًا. أنهِ تشغيل الخادم الحالي.
+
+        *(إذا كنت ترغب فقط في تحرير الوثائق، يمكنك التوقف هنا والانتقال إلى قسم **الوثائق** أدناه.)*
+
+  7. ثبّت مجموعة أدوات تطوير الواجهة الأمامية، مع الانتباه إلى الإصدارات:
+
+        - [`nodejs`](https://nodejs.org/) (تم اختباره على LTS، v22)
+        - [`pnpm`](https://pnpm.io/installation) (تم اختباره على v10)
+
+  8. قم ببناء إنتاجي للواجهة الأمامية:
+
+        ```sh
+        cd <PATH_TO_INVOKEAI_REPO>/invokeai/frontend/web
+        pnpm i
+        pnpm build
+        ```
+
+  9. أعد تشغيل الخادم وانتقل إلى الرابط. يجب أن تحصل على واجهة المستخدم. بعد إجراء تغييرات على كود بايثون، أعد تشغيل الخادم لرؤية تلك التغييرات.
+</Steps>
+
+## تطوير الواجهة الخلفية
+
+تجربة التغييرات على كود بايثون المصدر تكون مملة إذا كان عليك إعادة تشغيل الخادم وإعادة تحميل نماذج بحجم غيغابايت متعددة بعد كل تغيير.
+
+لسير عمل تطوير أسرع، أضف العلامة `--dev_reload` عند تشغيل الخادم. سيقوم الخادم بمراقبة التغييرات على جميع ملفات بايثون في دليل `invokeai` وتطبيق تلك التغييرات على الخادم الجاري أثناء العمل.
+
+سيسمح لك هذا بتجنب إعادة تشغيل الخادم (وإعادة تحميل النماذج) في معظم الحالات، ولكن هناك بعض المحاذير؛ راجع [وثائق jurigged](https://github.com/breuleux/jurigged#caveats) للتفاصيل.
+
+### الاختبارات
+
+تتطلب اختبارات الواجهة الخلفية مجموعة تبعيات `test`، والتي قمت بتثبيتها أثناء الإعداد الأولي.
+
+راجع وثائق [الاختبارات](../tests) للحصول على معلومات حول تشغيل الاختبارات وكتابتها.
+
+## تطوير الواجهة الأمامية
+
+ستحتاج إلى تشغيل `pnpm build` في كل مرة تسحب فيها تغييرات جديدة إلى الواجهة الأمامية.
+
+خيار آخر هو تخطي البناء وتشغيل واجهة المستخدم في وضع التطوير بدلاً من ذلك:
+
+```sh
+cd invokeai/frontend/web
+pnpm dev
+```
+
+يبدأ هذا خادم تطوير vite لواجهة المستخدم على `127.0.0.1:5173`، والذي ستستخدمه بدلاً من `127.0.0.1:9090`.
+
+وضع التطوير أبطأ بشكل ملحوظ من البناء الإنتاجي ولكنه قد يكون أكثر ملاءمة إذا كنت تحتاج فقط إلى اختبار الأشياء. سيقوم بإعادة التحميل الساخن لواجهة المستخدم أثناء إجراء تغييرات على كود الواجهة الأمامية. في بعض الأحيان لا تعمل إعادة التحميل الساخن، وتحتاج إلى تحديث علامة تبويب المتصفح يدويًا.
+
+## الوثائق
+
+تم بناء هذه الوثائق على [Astro Starlight](https://starlight.astro.build/). إنها توفر بيئة تطوير ممتعة لكتابة وثائق جذابة، وهي مبنية على أعلى مولد المواقع الثابتة Astro، الذي يوفر إطار عمل قوي ومرن لبناء مواقع سريعة وحديثة.
+
+للمساهمة في الوثائق، ببساطة قم بتحرير ملفات markdown في دليل `./docs`. يمكنك تشغيل خادم تطوير محلي مع إعادة التحميل الساخن للتغييرات التي تجريها على الوثائق.
+
+<FileTree>
+  - **docs**
+    - public/
+    - src
+      - content docs content lives here
+        - docs
+      - lib
+        - components/
+        - utils/
+      - content.config.ts
+  - scripts/
+  - tests/
+  - invokeai/
+  - docker/
+  - coverage/
+</FileTree>
+
+<Steps>
+  1. انتقل إلى دليل `docs` وقم بتثبيت التبعيات:
+
+      ```sh
+      cd docs
+      pnpm install
+      ```
+  2. ابدأ خادم التطوير:
+
+      ```sh
+      pnpm run dev
+      ```
+</Steps>
+
+## إعداد VSCode
+
+يقدم VSCode أدوات ممتازة لتطوير InvokeAI، بما في ذلك مصحح أخطاء بايثون، وتفعيل البيئة الافتراضية تلقائيًا، وإمكانيات التطوير عن بُعد.
+
+### المتطلبات الأساسية
+
+أولاً، تأكد من تثبيت الإضافات التالية:
+- [Python](https://marketplace.visualstudio.com/items?itemName=ms-python.python)
+- [Pylance](https://marketplace.visualstudio.com/items?itemName=ms-python.vscode-pylance)
+
+يوصى أيضًا بشدة بتثبيت إضافات Jupyter إذا كنت تخطط للعمل مع الدفاتر:
+- [Jupyter](https://marketplace.visualstudio.com/items?itemName=ms-toolsai.jupyter)
+- [Jupyter Cell Tags](https://marketplace.visualstudio.com/items?itemName=ms-toolsai.vscode-jupyter-cell-tags)
+- [Jupyter Notebook Renderers](https://marketplace.visualstudio.com/items?itemName=ms-toolsai.jupyter-renderers)
+- [Jupyter Slide Show](https://marketplace.visualstudio.com/items?itemName=ms-toolsai.vscode-jupyter-slideshow)
+
+### الإعدادات
+
+<Tabs>
+  <TabItem label="مساحة العمل والمفسر">
+    يُوصى بشدة بإنشاء مساحة عمل VSCode للعمل على InvokeAI لحفظ الإعدادات والتكوينات الخاصة بـ InvokeAI.
+
+    1. افتح دليل مستودع InvokeAI في VSCode
+    2. اذهب إلى `File` > `Save Workspace As` واحفظها *خارج* المستودع
+
+    **مفسر بايثون الافتراضي**
+
+    لتفعيل البيئة الافتراضية تلقائيًا:
+    1. افتح لوحة الأوامر (`Ctrl+Shift+P` / `Cmd+Shift+P`) وشغّل `Preferences: Open Workspace Settings (JSON)`
+    2. أضف `python.defaultInterpreterPath` إلى إعداداتك، مشيرًا إلى ملف بايثون القابل للتنفيذ في بيئتك الافتراضية:
+
+    ```jsonc
+    {
+      "folders": [
+        { "path": "InvokeAI" },
+        { "path": "/path/to/invokeai_root" }
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/path/to/invokeai_root/.venv/bin/python"
+      }
+    }
+    ```
+    الآن، فتح الطرفية المدمجة أو تشغيل بايثون سيستخدم تلقائيًا بيئة InvokeAI الافتراضية الخاصة بك.
+  </TabItem>
+
+  <TabItem label="التحقق من الأنواع (Pylance)">
+    نستخدم نظام الأنواع في بايثون في InvokeAI. ستتضمن مراجعات طلبات السحب التحقق من وجود الأنواع وصحتها.
+
+    يوفر Pylance التحقق من الأنواع في المحرر. لتفعيله:
+
+    1. افتح ملف بايثون
+    2. انظر على طول شريط الحالة في VSCode للعثور على `{ } Python`
+    3. انقر على `{ }`
+    4. شغّل التحقق من الأنواع (Basic كافٍ)
+
+    سترى الآن خطوطًا متعرجة حمراء حيث يتم اكتشاف مشكلات في الأنواع. حرّك مؤشرك فوق الرموز المشار إليها لترى ما هو الخطأ.
+  </TabItem>
+
+  <TabItem label="إعدادات التصحيح">
+    تتم إدارة إعدادات التصحيح في ملف `launch.json`. اتبع [الدليل الرسمي](https://code.visualstudio.com/docs/python/debugging) لإعداد ملف `launch.json` الخاص بك وتجربته.
+
+    أضف تكوينات تصحيح InvokeAI هذه إلى ملف `launch.json` الخاص بك:
+
+    ```jsonc
+    {
+      "version": "0.2.0",
+      "configurations": [
+        {
+          "name": "InvokeAI Web",
+          "type": "python",
+          "request": "launch",
+          "program": "scripts/invokeai-web.py",
+          "args": [
+            "--root", "/path/to/invokeai_root",
+            "--host", "0.0.0.0"
+          ],
+          "justMyCode": true
+        },
+        {
+          "name": "InvokeAI CLI",
+          "type": "python",
+          "request": "launch",
+          "program": "scripts/invokeai-cli.py",
+          "justMyCode": true
+        },
+        {
+          "name": "InvokeAI Test",
+          "type": "python",
+          "request": "launch",
+          "module": "pytest",
+          "args": ["--capture=no"],
+          "justMyCode": true
+        },
+        {
+          "name": "InvokeAI Single Test",
+          "type": "python",
+          "request": "launch",
+          "module": "pytest",
+          "args": ["tests/nodes/test_invoker.py"],
+          "justMyCode": true
+        }
+      ]
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="التطوير عن بُعد">
+    يوفر هذا تجربة سلسة لتشغيل الواجهة الخلفية على جهاز Linux قوي أثناء التطوير على جهاز آخر.
+
+    استشر [الدليل الرسمي](https://code.visualstudio.com/docs/remote/remote-overview) لإعداده. نقترح استخدام مزامنة الإعدادات المضمنة في VSCode بحيث يكون لدى مضيف التطوير عن بُعد الخاص بك نفس إعدادات التطبيق والإضافات تلقائيًا.
+
+    :::tip[إعادة توجيه المنافذ]
+      قد تكون إعادة توجيه المنافذ التلقائية غير مستقرة. يمكنك تعطيلها في `Preferences: Open Remote Settings (ssh: hostname)` عن طريق إلغاء تحديد `remote.autoForwardPorts`.
+
+      لإعادة توجيه المنافذ بشكل موثوق، استخدم SSH على عميل التطوير عن بُعد:
+      ```bash
+      ssh -L 9090:localhost:9090 -L 5173:localhost:5173 user@remote-dev-host
+      ```
+      قم بتشغيل هذا خارج الطرفية المدمجة في VSCode ليستمر عبر عمليات إعادة تشغيل VSCode.
+    :::
+  </TabItem>
+</Tabs>
