@@ -83,7 +83,12 @@ def enable_multiuser_for_videos(monkeypatch: Any, mock_invoker: Invoker):
     # board_video_records is touched by remove_video_from_board; not exercised by the
     # list tests but stub it defensively so unrelated routes don't blow up.
     mock_invoker.services.board_video_records = MagicMock()
+    # The board service computes video_count + cover_video_name on every get_dto/update;
+    # an unconfigured MagicMock returns nested MagicMocks that fail Pydantic validation and
+    # the boards route swallows the exception as a 404. Pin sane defaults.
+    mock_invoker.services.board_video_records.get_video_count_for_board.return_value = 0
     mock_invoker.services.video_records = MagicMock()
+    mock_invoker.services.video_records.get_most_recent_video_for_board.return_value = None
     mock_invoker.services.board_images = MagicMock()
     mock_invoker.services.board_images.get_all_board_image_names_for_board.return_value = []
 
