@@ -48,8 +48,16 @@ def _strip_comfyui_prefix(sd: dict) -> dict:
     return stripped
 
 
-def _dequantize_comfyui_fp8(sd: dict) -> int:
+def _dequantize_comfyui_fp8(sd: dict, compute_dtype: torch.dtype) -> int:
     """Dequantize ComfyUI-style fp8_scaled weights in-place. Returns count of dequantized tensors.
+
+    Weights are dequantized directly to `compute_dtype` (typically bf16) instead of via a
+    full-precision float32 intermediate. The previous float32 path materialised a complete
+    4-byte/param copy of the model before a separate downcast pass, spiking peak RAM to ~2x the
+    final bf16 size (~80GB for the 20B Qwen-Image transformer). Multiplying in the target dtype
+    keeps the dict at the bf16 model size plus a single transient tensor. fp8 has only 3 mantissa
+    bits and bf16 shares float32's exponent range, so the bf16 multiply loses no meaningful
+    precision here.
 
     Two key naming schemes are in the wild:
       - `<path>.weight` + `<path>.weight_scale`  (FLUX, Z-Image style)
@@ -66,17 +74,15 @@ def _dequantize_comfyui_fp8(sd: dict) -> int:
                 break
         if weight_key not in sd:
             continue
-        weight = sd[weight_key]
-        scale = sd[scale_key]
-        weight_float = weight.float()
-        scale_float = scale.float()
-        if scale_float.shape != weight_float.shape and scale_float.numel() > 1:
-            for dim in range(len(weight_float.shape)):
-                if dim < len(scale_float.shape) and scale_float.shape[dim] != weight_float.shape[dim]:
-                    block_size = weight_float.shape[dim] // scale_float.shape[dim]
+        weight = sd[weight_key].to(compute_dtype)
+        scale = sd[scale_key].to(compute_dtype)
+        if scale.shape != weight.shape and scale.numel() > 1:
+            for dim in range(len(weight.shape)):
+                if dim < len(scale.shape) and scale.shape[dim] != weight.shape[dim]:
+                    block_size = weight.shape[dim] // scale.shape[dim]
                     if block_size > 1:
-                        scale_float = scale_float.repeat_interleave(block_size, dim=dim)
-        sd[weight_key] = weight_float * scale_float
+                        scale = scale.repeat_interleave(block_size, dim=dim)
+        sd[weight_key] = weight * scale
         count += 1
     return count
 
@@ -291,7 +297,7 @@ class QwenImageCheckpointModel(ModelLoader):
         sd = load_file(str(model_path))
         sd = _strip_comfyui_prefix(sd)
 
-        dequantized = _dequantize_comfyui_fp8(sd)
+        dequantized = _dequantize_comfyui_fp8(sd, model_dtype)
         if dequantized > 0:
             logger.info(f"Dequantized {dequantized} ComfyUI-quantized weights")
         _strip_quantization_metadata(sd)
@@ -302,9 +308,9 @@ class QwenImageCheckpointModel(ModelLoader):
         with accelerate.init_empty_weights():
             model = QwenImageTransformer2DModel(**model_config)
 
-        # Cast to compute dtype first, then size the cache reservation from the actual
-        # post-cast tensors. Dequantized weights are transiently float32, so sizing
-        # before the cast (with model_dtype.itemsize) would undercount by ~2x.
+        # Dequantized fp8 weights are already at model_dtype; this only casts any remaining
+        # non-quantized float weights (e.g. a plain fp16/fp32 checkpoint) to the compute dtype
+        # so the cache reservation below is sized from the actual post-cast tensors.
         for k in list(sd.keys()):
             if sd[k].is_floating_point():
                 sd[k] = sd[k].to(model_dtype)
@@ -428,7 +434,7 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
         # Dequantize ComfyUI-style fp8 weights, then strip the now-unused quantization
         # metadata (`scale_input` is the activation scale ComfyUI's fp8 matmul kernels
         # use at runtime — we run the encoder in bf16 after dequantization).
-        dequantized_count = _dequantize_comfyui_fp8(sd)
+        dequantized_count = _dequantize_comfyui_fp8(sd, model_dtype)
         if dequantized_count > 0:
             logger.info(f"Dequantized {dequantized_count} ComfyUI-quantized weights")
         _strip_quantization_metadata(sd)
