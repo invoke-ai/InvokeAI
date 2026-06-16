@@ -16,9 +16,10 @@ export const ToggleMetadataViewerButton = memo(() => {
   const dispatch = useAppDispatch();
   const ctx = useImageViewerContext();
   const hasProgressImage = useStore(ctx.$hasProgressImage);
+  const isTemporarilyShowingSelectedImage = useStore(ctx.$isTemporarilyShowingSelectedImage);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
 
-  const isDisabledOverride = hasProgressImage && shouldShowProgressInViewer;
+  const isDisabledOverride = hasProgressImage && shouldShowProgressInViewer && !isTemporarilyShowingSelectedImage;
 
   const shouldShowItemDetails = useAppSelector(selectShouldShowItemDetails);
   const imageDTO = useAppSelector(selectLastSelectedItem);
