@@ -160,8 +160,7 @@ class Qwen3Encoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
         # classified as QwenVLEncoder (text-only Qwen3 encoders never have one).
         if _has_qwen_vl_visual_tower(state_dict):
             raise NotAMatchError(
-                "state dict bundles a Qwen-VL visual tower; this is a Qwen-VL encoder, "
-                "not a text-only Qwen3 encoder"
+                "state dict bundles a Qwen-VL visual tower; this is a Qwen-VL encoder, not a text-only Qwen3 encoder"
             )
 
     @classmethod
@@ -302,8 +301,7 @@ class Qwen3Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
         # classified as QwenVLEncoder (text-only Qwen3 encoders never have one).
         if _has_qwen_vl_visual_tower(state_dict):
             raise NotAMatchError(
-                "state dict bundles a Qwen-VL visual tower; this is a Qwen-VL encoder, "
-                "not a text-only Qwen3 encoder"
+                "state dict bundles a Qwen-VL visual tower; this is a Qwen-VL encoder, not a text-only Qwen3 encoder"
             )
 
     @classmethod
