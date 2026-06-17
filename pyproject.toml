@@ -90,12 +90,23 @@ dependencies = [
   # torch 2.4+cu carries its own triton dependency
 ]
 
-"cpu" = ["torch==2.7.1+cpu", "torchvision==0.22.1+cpu"]
-"cuda" = ["torch==2.7.1+cu128", "torchvision==0.22.1+cu128"]
+# The +cpu/+cu128/+rocm6.3 wheels live on PyTorch's WHL indexes, which only
+# publish linux_x86_64 / win_amd64. On linux_aarch64 these pins are unsatisfiable,
+# so they're gated behind a marker that excludes only linux_aarch64; every other
+# platform (Windows, macOS, Linux x86_64) is unaffected. On linux_aarch64 the base
+# `torch~=2.7.0` / `torchvision` declarations resolve from PyPI instead.
+"cpu" = [
+  "torch==2.7.1+cpu; sys_platform != 'linux' or platform_machine != 'aarch64'",
+  "torchvision==0.22.1+cpu; sys_platform != 'linux' or platform_machine != 'aarch64'",
+]
+"cuda" = [
+  "torch==2.7.1+cu128; sys_platform != 'linux' or platform_machine != 'aarch64'",
+  "torchvision==0.22.1+cu128; sys_platform != 'linux' or platform_machine != 'aarch64'",
+]
 "rocm" = [
-  "torch==2.7.1+rocm6.3",
-  "torchvision==0.22.1+rocm6.3",
-  "pytorch-triton-rocm",
+  "torch==2.7.1+rocm6.3; sys_platform != 'linux' or platform_machine != 'aarch64'",
+  "torchvision==0.22.1+rocm6.3; sys_platform != 'linux' or platform_machine != 'aarch64'",
+  "pytorch-triton-rocm; sys_platform != 'linux' or platform_machine != 'aarch64'",
 ]
 
 "onnx" = ["onnxruntime"]
@@ -126,18 +137,21 @@ conflicts = [[{ extra = "cpu" }, { extra = "cuda" }, { extra = "rocm" }]]
 index-strategy = "unsafe-best-match"
 
 [tool.uv.sources]
+# Exclude linux_aarch64 from the PyTorch WHL indexes (which have no aarch64 wheels)
+# so that uv falls back to PyPI for torch / torchvision on that platform.
+# All other platforms (Windows, macOS, Linux x86_64) are unaffected.
 torch = [
-  { index = "torch-cpu", extra = "cpu" },
-  { index = "torch-cuda", extra = "cuda" },
-  { index = "torch-rocm", extra = "rocm" },
+  { index = "torch-cpu", extra = "cpu", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
+  { index = "torch-cuda", extra = "cuda", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
+  { index = "torch-rocm", extra = "rocm", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
 ]
 torchvision = [
-  { index = "torch-cpu", extra = "cpu" },
-  { index = "torch-cuda", extra = "cuda" },
-  { index = "torch-rocm", extra = "rocm" },
+  { index = "torch-cpu", extra = "cpu", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
+  { index = "torch-cuda", extra = "cuda", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
+  { index = "torch-rocm", extra = "rocm", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
 ]
 pytorch-triton-rocm = [
-  { index = "torch-rocm", extra = "rocm", marker = "sys_platform == 'linux'" },
+  { index = "torch-rocm", extra = "rocm", marker = "sys_platform == 'linux' and platform_machine != 'aarch64'" },
 ]
 
 [[tool.uv.index]]
