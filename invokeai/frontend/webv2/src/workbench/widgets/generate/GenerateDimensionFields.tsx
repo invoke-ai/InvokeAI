@@ -1,4 +1,4 @@
-import type { AspectRatioId, GenerateSettings, MainModelConfig } from '@workbench/generation/types';
+import type { AspectRatioId, GenerateModelConfig, GenerateSettings } from '@workbench/generation/types';
 
 import {
   Badge,
@@ -14,30 +14,31 @@ import {
   Text,
 } from '@chakra-ui/react';
 import { IconButton, Field, Tooltip } from '@workbench/components/ui';
+import { getDefaultGenerateSettings, getGenerationDimensions } from '@workbench/generation/baseGenerationPolicies';
 import {
   ASPECT_RATIO_MAP,
   ASPECT_RATIO_OPTIONS,
   calculateNewSize,
   clampDimension,
-  getOptimalDimension,
   isAspectRatioId,
+  MAX_DIMENSION,
+  MIN_DIMENSION,
 } from '@workbench/generation/settings';
 import { ArrowLeftRightIcon, LockIcon, LockOpenIcon, RulerDimensionLineIcon, ScalingIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { AspectRatioPreview } from './shared/AspectRatioPreview';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
+import { ModelDefaultButton } from './shared/ModelDefaultButton';
 
 interface GenerateDimensionFieldsProps {
   settings: GenerateSettings;
-  selectedModel: MainModelConfig | undefined;
+  selectedModel: GenerateModelConfig | undefined;
   onCommit: (patch: Partial<GenerateSettings>) => void;
 }
 
 type Dimensions = Pick<GenerateSettings, 'height' | 'width'>;
 type AspectRatioOption = { id: AspectRatioId; ratio: number };
-
-const DIMENSION_COMMIT_DEBOUNCE_MS = 150;
 
 /** The ratio to enforce, preferring the stored value and falling back to the current dimensions. */
 const getActiveRatio = (settings: GenerateSettings): number =>
@@ -52,11 +53,13 @@ const getAspectRatioOptionRatio = (id: AspectRatioId, fallbackRatio: number): nu
 
 export const GenerateDimensionFields = ({ onCommit, selectedModel, settings }: GenerateDimensionFieldsProps) => {
   const [draftDimensions, setDraftDimensions] = useState<Dimensions | null>(null);
+  const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
+  const dimensions = getGenerationDimensions(selectedModel);
+  const dimensionGrid = dimensions.grid;
   const isRatioConstrained = settings.aspectRatioId !== 'Free' || settings.aspectRatioIsLocked;
   const displayDimensions = draftDimensions ?? { height: settings.height, width: settings.width };
   const onCommitRef = useRef(onCommit);
   const pendingDimensionsRef = useRef<Dimensions | null>(null);
-  const commitTimeoutRef = useRef<number | null>(null);
   const previousSettingsDimensionsRef = useRef<Dimensions>({ height: settings.height, width: settings.width });
   const dimensionRatio = displayDimensions.height > 0 ? displayDimensions.width / displayDimensions.height : 1;
   const aspectRatioOptions = useMemo<AspectRatioOption[]>(
@@ -82,43 +85,10 @@ export const GenerateDimensionFields = ({ onCommit, selectedModel, settings }: G
     onCommitRef.current = onCommit;
   }, [onCommit]);
 
-  const clearPendingDimensionCommit = useCallback(() => {
-    if (commitTimeoutRef.current !== null) {
-      window.clearTimeout(commitTimeoutRef.current);
-      commitTimeoutRef.current = null;
-    }
+  const commitDimensions = useCallback((dimensions: Dimensions) => {
+    pendingDimensionsRef.current = dimensions;
+    onCommitRef.current(dimensions);
   }, []);
-
-  const commitDimensions = useCallback(
-    (dimensions: Dimensions) => {
-      clearPendingDimensionCommit();
-      pendingDimensionsRef.current = dimensions;
-      onCommitRef.current(dimensions);
-    },
-    [clearPendingDimensionCommit]
-  );
-
-  const scheduleDimensionCommit = useCallback(
-    (dimensions: Dimensions) => {
-      clearPendingDimensionCommit();
-      pendingDimensionsRef.current = dimensions;
-      commitTimeoutRef.current = window.setTimeout(() => {
-        commitTimeoutRef.current = null;
-
-        if (pendingDimensionsRef.current) {
-          onCommitRef.current(pendingDimensionsRef.current);
-        }
-      }, DIMENSION_COMMIT_DEBOUNCE_MS);
-    },
-    [clearPendingDimensionCommit]
-  );
-
-  useEffect(
-    () => () => {
-      clearPendingDimensionCommit();
-    },
-    [clearPendingDimensionCommit]
-  );
 
   useEffect(() => {
     const previousSettingsDimensions = previousSettingsDimensionsRef.current;
@@ -139,20 +109,21 @@ export const GenerateDimensionFields = ({ onCommit, selectedModel, settings }: G
     }
 
     pendingDimensionsRef.current = null;
-    clearPendingDimensionCommit();
     setDraftDimensions(null);
-  }, [clearPendingDimensionCommit, draftDimensions, settings.height, settings.width]);
+  }, [draftDimensions, settings.height, settings.width]);
 
-  const getNextDimensions = (key: 'height' | 'width', value: number): Dimensions => {
+  const getNextDimensions = (key: 'height' | 'width', value: number, shouldSnap: boolean): Dimensions => {
+    const nextValue = shouldSnap ? clampDimension(value, dimensionGrid) : value;
+
     if (!isRatioConstrained) {
-      return { ...displayDimensions, [key]: value };
+      return { ...displayDimensions, [key]: nextValue };
     }
 
     const ratio = getActiveRatio({ ...settings, ...displayDimensions });
 
     return key === 'width'
-      ? { height: clampDimension(value / ratio), width: value }
-      : { height: value, width: clampDimension(value * ratio) };
+      ? { height: shouldSnap ? clampDimension(nextValue / ratio, dimensionGrid) : nextValue / ratio, width: nextValue }
+      : { height: nextValue, width: shouldSnap ? clampDimension(nextValue * ratio, dimensionGrid) : nextValue * ratio };
   };
 
   const setDimension =
@@ -164,10 +135,9 @@ export const GenerateDimensionFields = ({ onCommit, selectedModel, settings }: G
         return;
       }
 
-      const dimensions = getNextDimensions(key, value);
+      const dimensions = getNextDimensions(key, value, false);
 
       setDraftDimensions(dimensions);
-      scheduleDimensionCommit(dimensions);
     };
 
   const commitDimension =
@@ -179,25 +149,35 @@ export const GenerateDimensionFields = ({ onCommit, selectedModel, settings }: G
         return;
       }
 
-      const dimensions = getNextDimensions(key, value);
+      const dimensions = getNextDimensions(key, value, true);
 
       setDraftDimensions(dimensions);
       commitDimensions(dimensions);
     };
 
   const snapDimension = (key: 'height' | 'width') => () => {
-    const snapped = clampDimension(displayDimensions[key]);
+    const snapped = clampDimension(displayDimensions[key], dimensionGrid);
 
     if (snapped !== displayDimensions[key]) {
-      const dimensions = getNextDimensions(key, snapped);
+      const dimensions = getNextDimensions(key, snapped, true);
 
       setDraftDimensions(dimensions);
       commitDimensions(dimensions);
     }
   };
 
+  const setDimensionToModelDefault = (key: 'height' | 'width') => {
+    if (!modelDefaults) {
+      return;
+    }
+
+    const dimensions = getNextDimensions(key, modelDefaults[key], true);
+
+    setDraftDimensions(dimensions);
+    commitDimensions(dimensions);
+  };
+
   const commitSettings = (patch: Partial<GenerateSettings>) => {
-    clearPendingDimensionCommit();
     pendingDimensionsRef.current = null;
     setDraftDimensions(null);
     onCommit(patch);
@@ -226,7 +206,7 @@ export const GenerateDimensionFields = ({ onCommit, selectedModel, settings }: G
       aspectRatioId: id,
       aspectRatioIsLocked: true,
       aspectRatioValue: ratio,
-      ...calculateNewSize(ratio, displayDimensions.width * displayDimensions.height),
+      ...calculateNewSize(ratio, displayDimensions.width * displayDimensions.height, dimensionGrid),
     });
   };
 
@@ -255,14 +235,14 @@ export const GenerateDimensionFields = ({ onCommit, selectedModel, settings }: G
   };
 
   const optimizeSize = () => {
-    const optimal = getOptimalDimension(selectedModel?.base ?? 'sdxl');
+    const optimal = dimensions.optimal;
     const ratio = isRatioConstrained
       ? getActiveRatio({ ...settings, ...displayDimensions })
       : displayDimensions.height > 0
         ? displayDimensions.width / displayDimensions.height
         : 1;
 
-    commitSettings(calculateNewSize(ratio, optimal * optimal));
+    commitSettings(calculateNewSize(ratio, optimal * optimal, dimensionGrid));
   };
 
   const badges = (
@@ -307,16 +287,7 @@ export const GenerateDimensionFields = ({ onCommit, selectedModel, settings }: G
             </Select.Control>
             <Portal>
               <Select.Positioner>
-                <Select.Content
-                  bg="bg.muted"
-                  borderColor="border.emphasized"
-                  borderWidth="1px"
-                  color="fg"
-                  maxH="18rem"
-                  rounded="lg"
-                  shadow="lg"
-                  zIndex="popover"
-                >
+                <Select.Content maxH="18rem">
                   {aspectRatioOptions.map((option) => (
                     <Select.Item key={option.id} item={option}>
                       <Select.ItemText>
@@ -358,18 +329,27 @@ export const GenerateDimensionFields = ({ onCommit, selectedModel, settings }: G
       </Field>
       <HStack alignItems="flex-start" gap="2" p="2">
         <Stack w="full">
-          <Field label="Width">
+          <Field label="Width" helpText={`Multiple of ${dimensionGrid}`}>
             <NumberInput.Root
               size="xs"
               allowMouseWheel
+              max={MAX_DIMENSION}
+              min={MIN_DIMENSION}
               value={String(displayDimensions.width)}
-              step={8}
+              step={dimensionGrid}
               onBlur={snapDimension('width')}
               onValueCommit={commitDimension('width')}
               onValueChange={setDimension('width')}
             >
-              <NumberInput.Control />
               <InputGroup
+                endElement={
+                  <ModelDefaultButton
+                    disabled={!modelDefaults || displayDimensions.width === modelDefaults.width}
+                    label="Use model default width"
+                    onClick={() => setDimensionToModelDefault('width')}
+                  />
+                }
+                endElementProps={{ pointerEvents: 'auto' }}
                 startElementProps={{ pointerEvents: 'auto' }}
                 startElement={
                   <NumberInput.Scrubber>
@@ -381,18 +361,27 @@ export const GenerateDimensionFields = ({ onCommit, selectedModel, settings }: G
               </InputGroup>
             </NumberInput.Root>
           </Field>
-          <Field label="Height">
+          <Field label="Height" helpText={`Multiple of ${dimensionGrid}`}>
             <NumberInput.Root
               size="xs"
               allowMouseWheel
+              max={MAX_DIMENSION}
+              min={MIN_DIMENSION}
               value={String(displayDimensions.height)}
-              step={8}
+              step={dimensionGrid}
               onBlur={snapDimension('height')}
               onValueCommit={commitDimension('height')}
               onValueChange={setDimension('height')}
             >
-              <NumberInput.Control />
               <InputGroup
+                endElement={
+                  <ModelDefaultButton
+                    disabled={!modelDefaults || displayDimensions.height === modelDefaults.height}
+                    label="Use model default height"
+                    onClick={() => setDimensionToModelDefault('height')}
+                  />
+                }
+                endElementProps={{ pointerEvents: 'auto' }}
                 startElementProps={{ pointerEvents: 'auto' }}
                 startElement={
                   <NumberInput.Scrubber>

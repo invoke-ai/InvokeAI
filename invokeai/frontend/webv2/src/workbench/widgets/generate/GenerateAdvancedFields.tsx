@@ -1,16 +1,18 @@
-import type { GenerateSettings, MainModelConfig, VaePrecision } from '@workbench/generation/types';
+import type { GenerateModelConfig, GenerateSettings, VaePrecision } from '@workbench/generation/types';
 import type { ChangeEvent } from 'react';
 
-import { Badge, HStack, Input, NativeSelect, Switch, Text } from '@chakra-ui/react';
+import { Badge, HStack, Input, InputGroup, NativeSelect, Switch } from '@chakra-ui/react';
 import { Field } from '@workbench/components/ui';
-import { CLIP_SKIP_MAX, isVaeModelConfig } from '@workbench/generation/settings';
+import { getDefaultGenerateSettings, getGenerationUiPolicy } from '@workbench/generation/baseGenerationPolicies';
+import { isVaeModelConfig } from '@workbench/generation/settings';
 import { ModelSelect } from '@workbench/models/components';
 
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
+import { ModelDefaultButton } from './shared/ModelDefaultButton';
 
 interface GenerateAdvancedFieldsProps {
   settings: GenerateSettings;
-  selectedModel: MainModelConfig | undefined;
+  selectedModel: GenerateModelConfig | undefined;
   onCommit: (patch: Partial<GenerateSettings>) => void;
 }
 
@@ -34,9 +36,9 @@ const SeamlessSwitch = ({
 
 export const GenerateAdvancedFields = ({ onCommit, selectedModel, settings }: GenerateAdvancedFieldsProps) => {
   const modelBase = selectedModel?.base;
-  // CLIP skip and CFG rescale target the SD1/SD2 text encoder; SDXL conditioning does not use them.
-  const supportsClipSkip = modelBase === 'sd-1' || modelBase === 'sd-2';
-  const clipSkipMax = supportsClipSkip ? CLIP_SKIP_MAX[modelBase] : 0;
+  const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
+  const policy = getGenerationUiPolicy(selectedModel, settings);
+  const clipSkipMax = policy.clipSkipMax ?? 0;
 
   const updateNumber =
     (key: 'cfgRescaleMultiplier' | 'clipSkip', max: number) => (event: ChangeEvent<HTMLInputElement>) => {
@@ -49,7 +51,17 @@ export const GenerateAdvancedFields = ({ onCommit, selectedModel, settings }: Ge
       onCommit({ [key]: Math.min(max, Math.max(0, value)) });
     };
 
-  const customVae = Boolean(settings.vae?.key);
+  const customVae = policy.sdVaeVisible && Boolean(settings.vae?.key);
+
+  if (
+    !policy.sdVaeVisible &&
+    !policy.vaePrecisionVisible &&
+    !policy.seamlessVisible &&
+    !policy.clipSkipMax &&
+    !policy.cfgRescaleVisible
+  ) {
+    return null;
+  }
 
   const badges = (
     <>
@@ -65,77 +77,119 @@ export const GenerateAdvancedFields = ({ onCommit, selectedModel, settings }: Ge
 
   return (
     <GenerateCollapsibleSection label="Advanced" defaultOpen={false} badges={badges}>
-      <HStack alignItems="flex-start" gap="2" p="2">
-        <Field flex="2" label="VAE" helpText={settings.vae ? undefined : 'Using the VAE bundled with the model.'}>
-          <ModelSelect
-            filter={(model) => model.base === modelBase}
-            modelTypes={['vae']}
-            size="xs"
-            placeholder="Model default"
-            value={settings.vae?.key ?? null}
-            onChange={(model) => onCommit({ vae: isVaeModelConfig(model) ? model : null })}
-          />
-        </Field>
-        <Field flex="1" label="VAE precision">
-          <NativeSelect.Root size="xs">
-            <NativeSelect.Field
-              aria-label="VAE precision"
-              value={settings.vaePrecision}
-              onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-                onCommit({ vaePrecision: event.currentTarget.value as VaePrecision })
-              }
-            >
-              <option value="fp16">FP16</option>
-              <option value="fp32">FP32</option>
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
-        </Field>
-      </HStack>
-
-      {supportsClipSkip ? (
-        <HStack gap="2" p="2">
-          <Field label="CLIP skip">
-            <Input
-              max={String(clipSkipMax)}
-              min="0"
-              size="xs"
-              type="number"
-              value={settings.clipSkip}
-              onChange={updateNumber('clipSkip', clipSkipMax)}
-            />
-          </Field>
-          <Field label="CFG rescale">
-            <Input
-              max="0.99"
-              min="0"
-              size="xs"
-              step="0.05"
-              type="number"
-              value={settings.cfgRescaleMultiplier}
-              onChange={updateNumber('cfgRescaleMultiplier', 0.99)}
-            />
-          </Field>
+      {policy.sdVaeVisible || policy.vaePrecisionVisible ? (
+        <HStack alignItems="flex-start" gap="2" p="2">
+          {policy.sdVaeVisible ? (
+            <Field flex="2" label="VAE" helpText={settings.vae ? undefined : 'Using the VAE bundled with the model.'}>
+              <HStack gap="1">
+                <ModelSelect
+                  filter={(model) => model.base === modelBase}
+                  modelTypes={['vae']}
+                  size="xs"
+                  placeholder="Model default"
+                  value={settings.vae?.key ?? null}
+                  onChange={(model) => onCommit({ vae: isVaeModelConfig(model) ? model : null })}
+                />
+                <ModelDefaultButton
+                  disabled={!settings.vae}
+                  label="Use model default VAE"
+                  onClick={() => onCommit({ vae: null })}
+                />
+              </HStack>
+            </Field>
+          ) : null}
+          {policy.vaePrecisionVisible ? (
+            <Field flex="1" label="VAE precision">
+              <HStack gap="1">
+                <NativeSelect.Root flex="1" size="xs">
+                  <NativeSelect.Field
+                    aria-label="VAE precision"
+                    value={settings.vaePrecision}
+                    onChange={(event: ChangeEvent<HTMLSelectElement>) =>
+                      onCommit({ vaePrecision: event.currentTarget.value as VaePrecision })
+                    }
+                  >
+                    <option value="fp16">FP16</option>
+                    <option value="fp32">FP32</option>
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+                <ModelDefaultButton
+                  disabled={!modelDefaults || settings.vaePrecision === modelDefaults.vaePrecision}
+                  label="Use model default VAE precision"
+                  onClick={() => {
+                    if (modelDefaults) {
+                      onCommit({ vaePrecision: modelDefaults.vaePrecision });
+                    }
+                  }}
+                />
+              </HStack>
+            </Field>
+          ) : null}
         </HStack>
       ) : null}
 
-      <Field label="Seamless tiling" p="2">
-        <HStack gap="4">
-          <SeamlessSwitch
-            checked={settings.seamlessXAxis}
-            label="X axis"
-            onCheckedChange={(checked) => onCommit({ seamlessXAxis: checked })}
-          />
-          <SeamlessSwitch
-            checked={settings.seamlessYAxis}
-            label="Y axis"
-            onCheckedChange={(checked) => onCommit({ seamlessYAxis: checked })}
-          />
+      {policy.clipSkipMax || policy.cfgRescaleVisible ? (
+        <HStack gap="2" p="2">
+          {policy.clipSkipMax ? (
+            <Field label="CLIP skip">
+              <Input
+                max={String(clipSkipMax)}
+                min="0"
+                size="xs"
+                type="number"
+                value={settings.clipSkip}
+                onChange={updateNumber('clipSkip', clipSkipMax)}
+              />
+            </Field>
+          ) : null}
+          {policy.cfgRescaleVisible ? (
+            <Field label="CFG rescale">
+              <InputGroup
+                endElement={
+                  <ModelDefaultButton
+                    disabled={!modelDefaults || settings.cfgRescaleMultiplier === modelDefaults.cfgRescaleMultiplier}
+                    label="Use model default CFG rescale"
+                    onClick={() => {
+                      if (modelDefaults) {
+                        onCommit({ cfgRescaleMultiplier: modelDefaults.cfgRescaleMultiplier });
+                      }
+                    }}
+                  />
+                }
+                endElementProps={{ pointerEvents: 'auto' }}
+              >
+                <Input
+                  max="0.99"
+                  min="0"
+                  size="xs"
+                  step="0.05"
+                  type="number"
+                  value={settings.cfgRescaleMultiplier}
+                  onChange={updateNumber('cfgRescaleMultiplier', 0.99)}
+                />
+              </InputGroup>
+            </Field>
+          ) : null}
         </HStack>
-      </Field>
-      <Text color="fg.subtle" fontSize="2xs" p="2">
-        LoRAs, reference images, and the SDXL refiner are not wired into the Generate graph yet.
-      </Text>
+      ) : null}
+
+      {policy.seamlessVisible ? (
+        <Field label="Seamless tiling" p="2">
+          <HStack gap="4">
+            <SeamlessSwitch
+              checked={settings.seamlessXAxis}
+              label="X axis"
+              onCheckedChange={(checked) => onCommit({ seamlessXAxis: checked })}
+            />
+            <SeamlessSwitch
+              checked={settings.seamlessYAxis}
+              label="Y axis"
+              onCheckedChange={(checked) => onCommit({ seamlessYAxis: checked })}
+            />
+          </HStack>
+        </Field>
+      ) : null}
     </GenerateCollapsibleSection>
   );
 };

@@ -1,15 +1,18 @@
-import type { GenerateSettings } from '@workbench/generation/types';
+import type { GenerateModelConfig, GenerateSettings } from '@workbench/generation/types';
 import type { ChangeEvent } from 'react';
 
 import { Stack, Textarea } from '@chakra-ui/react';
 import { Field } from '@workbench/components/ui';
+import { getPromptPolicy } from '@workbench/generation/baseGenerationPolicies';
 
 interface GeneratePromptFieldsProps {
   settings: GenerateSettings;
+  selectedModel: GenerateModelConfig | undefined;
   onCommit: (patch: Partial<GenerateSettings>) => void;
 }
 
 interface PromptFieldProps {
+  helpText?: string;
   value: string;
   onChange: (value: string) => void;
 }
@@ -28,8 +31,8 @@ const PositivePromptField = ({ onChange, value }: PromptFieldProps) => (
   </Field>
 );
 
-const NegativePromptField = ({ onChange, value }: PromptFieldProps) => (
-  <Field label="Negative prompt">
+const NegativePromptField = ({ helpText, onChange, value }: PromptFieldProps) => (
+  <Field label="Negative prompt" helpText={helpText}>
     <Textarea
       aria-label="Negative prompt"
       minH="3.5rem"
@@ -42,17 +45,22 @@ const NegativePromptField = ({ onChange, value }: PromptFieldProps) => (
   </Field>
 );
 
-export const GeneratePromptFields = ({ onCommit, settings }: GeneratePromptFieldsProps) => {
+export const GeneratePromptFields = ({ onCommit, selectedModel, settings }: GeneratePromptFieldsProps) => {
+  const promptPolicy = getPromptPolicy(selectedModel, settings);
+
   return (
     <Stack gap="1">
       <PositivePromptField
         value={settings.positivePrompt}
         onChange={(positivePrompt) => onCommit({ positivePrompt })}
       />
-      <NegativePromptField
-        value={settings.negativePrompt}
-        onChange={(negativePrompt) => onCommit({ negativePrompt })}
-      />
+      {promptPolicy.negativeVisible ? (
+        <NegativePromptField
+          helpText={promptPolicy.negativeHelpText}
+          value={settings.negativePrompt}
+          onChange={(negativePrompt) => onCommit({ negativePrompt })}
+        />
+      ) : null}
     </Stack>
   );
 };
