@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   getResetNodeExecutionStatesOnQueueItemStarted,
+  getCompletedInvocationIdsFromCompletedSession,
+  getNodeExecutionStatesFromCompletedSession,
   getUpdatedNodeExecutionStateOnInvocationComplete,
   getUpdatedNodeExecutionStateOnInvocationError,
   getUpdatedNodeExecutionStateOnInvocationProgress,
@@ -320,5 +322,58 @@ describe(getUpdatedNodeExecutionStateOnInvocationError.name, () => {
       error_message: event.error_message,
       error_traceback: event.error_traceback,
     });
+  });
+});
+
+describe(getNodeExecutionStatesFromCompletedSession.name, () => {
+  it('builds completed node execution states from a completed session', () => {
+    const result = { type: 'integer_output', value: 42 } as unknown as S['GraphExecutionState']['results'][string];
+    const states = getNodeExecutionStatesFromCompletedSession({
+      source_prepared_mapping: {
+        'node-1': ['prepared-node-1'],
+      },
+      results: {
+        'prepared-node-1': result,
+      },
+    } as unknown as S['GraphExecutionState']);
+
+    expect(states).toEqual([
+      {
+        nodeId: 'node-1',
+        status: zNodeStatus.enum.COMPLETED,
+        progress: null,
+        progressImage: null,
+        outputs: [result],
+        error: null,
+      },
+    ]);
+  });
+
+  it('does not create a completed state for source nodes with no results', () => {
+    const states = getNodeExecutionStatesFromCompletedSession({
+      source_prepared_mapping: {
+        'node-1': ['prepared-node-1'],
+      },
+      results: {},
+    } as unknown as S['GraphExecutionState']);
+
+    expect(states).toEqual([]);
+  });
+});
+
+describe(getCompletedInvocationIdsFromCompletedSession.name, () => {
+  it('returns prepared invocation ids that have persisted results', () => {
+    const result = { type: 'integer_output', value: 42 } as unknown as S['GraphExecutionState']['results'][string];
+    const invocationIds = getCompletedInvocationIdsFromCompletedSession({
+      source_prepared_mapping: {
+        'node-1': ['prepared-node-1'],
+        'node-2': ['prepared-node-2'],
+      },
+      results: {
+        'prepared-node-1': result,
+      },
+    } as unknown as S['GraphExecutionState']);
+
+    expect(invocationIds).toEqual(['prepared-node-1']);
   });
 });

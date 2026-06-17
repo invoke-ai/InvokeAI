@@ -110,3 +110,42 @@ export const getUpdatedNodeExecutionStateOnInvocationError = (
 
   return _nodeExecutionState;
 };
+
+export const getNodeExecutionStatesFromCompletedSession = (
+  session: S['SessionQueueItem']['session']
+): NodeExecutionState[] => {
+  const nodeExecutionStates: NodeExecutionState[] = [];
+
+  for (const [nodeId, preparedNodeIds] of Object.entries(session.source_prepared_mapping)) {
+    const outputs = preparedNodeIds.flatMap((preparedNodeId) => {
+      const result = session.results[preparedNodeId];
+      return result ? [result] : [];
+    });
+
+    if (outputs.length === 0) {
+      continue;
+    }
+
+    nodeExecutionStates.push({
+      ...getInitialNodeExecutionState(nodeId),
+      status: zNodeStatus.enum.COMPLETED,
+      outputs,
+    });
+  }
+
+  return nodeExecutionStates;
+};
+
+export const getCompletedInvocationIdsFromCompletedSession = (session: S['SessionQueueItem']['session']): string[] => {
+  const completedInvocationIds: string[] = [];
+
+  for (const preparedNodeIds of Object.values(session.source_prepared_mapping)) {
+    for (const preparedNodeId of preparedNodeIds) {
+      if (session.results[preparedNodeId]) {
+        completedInvocationIds.push(preparedNodeId);
+      }
+    }
+  }
+
+  return completedInvocationIds;
+};
