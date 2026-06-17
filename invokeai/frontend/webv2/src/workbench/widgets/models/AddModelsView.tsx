@@ -1,4 +1,4 @@
-import { Box, Stack } from '@chakra-ui/react';
+import { Box, Icon, Stack } from '@chakra-ui/react';
 import { Scrollable, Tabs } from '@workbench/components/ui';
 import { updateModelsUi, useModelsUi, type AddModelsTab } from '@workbench/models/uiStore';
 import { FolderSearchIcon, KeyIcon, LinkIcon, StarIcon } from 'lucide-react';
@@ -26,23 +26,23 @@ export const AddModelsView = () => {
       >
         <Tabs.List>
           <Tabs.Trigger fontSize="xs" value="starter">
-            <StarIcon size={12} />
+            <Icon as={StarIcon} boxSize="3" />
             Starter Models
           </Tabs.Trigger>
           <Tabs.Trigger fontSize="xs" value="url">
-            <LinkIcon size={12} />
+            <Icon as={LinkIcon} boxSize="3" />
             URL / Local Path
           </Tabs.Trigger>
           <Tabs.Trigger fontSize="xs" value="huggingface">
-            <SiHuggingface size={12} />
+            <Icon as={SiHuggingface} boxSize="3" />
             HuggingFace
           </Tabs.Trigger>
           <Tabs.Trigger fontSize="xs" value="scan">
-            <FolderSearchIcon size={12} />
+            <Icon as={FolderSearchIcon} boxSize="3" />
             Scan Folder
           </Tabs.Trigger>
           <Tabs.Trigger fontSize="xs" value="keys">
-            <KeyIcon size={12} />
+            <Icon as={KeyIcon} boxSize="3" />
             API Keys
           </Tabs.Trigger>
         </Tabs.List>

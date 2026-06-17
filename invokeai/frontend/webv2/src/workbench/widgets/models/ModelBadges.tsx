@@ -1,7 +1,8 @@
 import type { ModelConfig } from '@workbench/models/types';
 
 import { Badge, HStack } from '@chakra-ui/react';
-import { getModelBaseColorPalette, getModelBaseLabel, getModelFormatLabel } from '@workbench/models/taxonomy';
+import { getModelBaseColorPalette, getModelBaseLabel } from '@workbench/models/baseIdentity';
+import { getModelFormatLabel } from '@workbench/models/taxonomy';
 
 export const ModelBaseBadge = ({ base }: { base: ModelConfig['base'] }) => (
   <Badge colorPalette={getModelBaseColorPalette(base)} flexShrink={0} fontSize="2xs" size="sm" variant="surface">

@@ -2,7 +2,7 @@ import type { ModelConfig } from '@workbench/models/types';
 
 import { Icon, Menu, Portal } from '@chakra-ui/react';
 import { ConfirmDialog, MenuContent } from '@workbench/components/ui';
-import { isConvertibleToDiffusers } from '@workbench/models/taxonomy';
+import { isConvertibleToDiffusers } from '@workbench/models/baseIdentity';
 import { RefreshCcwIcon, Trash2Icon } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { SiHuggingface } from 'react-icons/si';

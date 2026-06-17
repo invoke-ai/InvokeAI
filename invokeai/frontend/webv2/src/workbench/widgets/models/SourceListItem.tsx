@@ -78,7 +78,14 @@ export const InstallSourceButton = ({
           <Spinner borderWidth="1.5px" boxSize="2.5" />
           Installing
         </Badge>
-        <Button size="2xs" variant="ghost" onClick={() => openModelsCenterTab('queue')}>
+        <Button
+          size="2xs"
+          variant="ghost"
+          onClick={(event) => {
+            event.stopPropagation();
+            openModelsCenterTab('queue');
+          }}
+        >
           View queue
         </Button>
       </HStack>
@@ -86,7 +93,15 @@ export const InstallSourceButton = ({
   }
 
   return (
-    <Button flexShrink={0} size="2xs" variant="outline" onClick={onInstall}>
+    <Button
+      flexShrink={0}
+      size="2xs"
+      variant="outline"
+      onClick={(event) => {
+        event.stopPropagation();
+        onInstall();
+      }}
+    >
       <Icon as={DownloadIcon} boxSize="3" />
       Install
     </Button>

@@ -3,9 +3,10 @@ import type { ModelConfig, ModelTaxonomyType } from '@workbench/models/types';
 import { Badge, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
 import { IconButton, FieldLabel, Tooltip } from '@workbench/components/ui';
 import { addModelRelationship, getRelatedModelKeys, removeModelRelationship } from '@workbench/models/api';
+import { getModelBaseColorPalette, getModelBaseLabel } from '@workbench/models/baseIdentity';
 import { ModelSelect } from '@workbench/models/components';
 import { useModelsSnapshot } from '@workbench/models/modelsStore';
-import { getModelBaseColorPalette, getModelBaseLabel, getModelTypeLabel } from '@workbench/models/taxonomy';
+import { getModelTypeLabel } from '@workbench/models/taxonomy';
 import { Link2OffIcon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 

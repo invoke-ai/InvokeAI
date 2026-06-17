@@ -3,9 +3,10 @@ import type { ModelConfig, PredictionType } from '@workbench/models/types';
 import { HStack, Input, NativeSelect, Stack, Text, Textarea } from '@chakra-ui/react';
 import { Button, Field } from '@workbench/components/ui';
 import { updateModel } from '@workbench/models/api';
+import { getModelBaseLabel } from '@workbench/models/baseIdentity';
 import { replaceModelInStore } from '@workbench/models/modelsStore';
 import { modelEditSchema, type ModelEditFormValues } from '@workbench/models/schemas';
-import { getModelBaseLabel, getModelTypeLabel, MODEL_CATEGORIES } from '@workbench/models/taxonomy';
+import { getModelTypeLabel, MODEL_CATEGORIES } from '@workbench/models/taxonomy';
 import { useZodForm } from '@workbench/models/useZodForm';
 
 const KNOWN_BASES = [

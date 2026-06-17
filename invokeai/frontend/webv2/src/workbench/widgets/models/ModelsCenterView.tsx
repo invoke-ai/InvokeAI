@@ -17,7 +17,7 @@ import {
   type ModelsCenterTab,
 } from '@workbench/models/uiStore';
 import { useNotify } from '@workbench/useNotify';
-import { BoxIcon, Trash2Icon, XIcon } from 'lucide-react';
+import { BoxIcon, LibraryIcon, ListOrderedIcon, PlusIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { AddModelsView } from './AddModelsView';
@@ -51,15 +51,18 @@ export const ModelsCenterView = () => {
       >
         <Tabs.List>
           <Tabs.Trigger fontSize="xs" value="library">
+            <Icon as={LibraryIcon} boxSize="3" />
             Library
           </Tabs.Trigger>
           <Tabs.Trigger fontSize="xs" value="add">
+            <Icon as={PlusIcon} boxSize="3" />
             Add Models
           </Tabs.Trigger>
           <Tabs.Trigger fontSize="xs" value="queue">
+            <Icon as={ListOrderedIcon} boxSize="3" />
             Queue
             {activeInstallCount > 0 ? (
-              <Badge colorPalette="blue" fontSize="2xs" ms="1" size="sm" variant="solid">
+              <Badge fontSize="2xs" ms="1" size="sm" variant="solid">
                 {activeInstallCount}
               </Badge>
             ) : null}

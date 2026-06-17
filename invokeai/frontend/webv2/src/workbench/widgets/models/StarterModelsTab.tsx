@@ -15,15 +15,17 @@ import {
   Text,
 } from '@chakra-ui/react';
 import { IconButton, MenuContent, Row, Scrollable, Tooltip } from '@workbench/components/ui';
+import { getModelBaseColorPalette, getModelBaseLabel } from '@workbench/models/baseIdentity';
 import { collectBases, collectTypes } from '@workbench/models/library';
 import { ensureStartersLoaded, useStartersSnapshot } from '@workbench/models/startersStore';
-import { getModelBaseColorPalette, getModelBaseLabel, getModelTypeLabel } from '@workbench/models/taxonomy';
+import { getModelTypeLabel } from '@workbench/models/taxonomy';
 import { useNotify } from '@workbench/useNotify';
 import { CheckIcon, DownloadIcon, PackageIcon, SearchIcon, SlidersHorizontalIcon, StarIcon } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { FilterMenuItem } from './ModelFilterBar';
 import { InstallSourceButton, SourceListItem } from './SourceListItem';
+import { getStarterBundleInstallSources, getStarterModelInstallSources } from './starterModelInstallSources';
 import { useInstallActions } from './useInstallActions';
 
 /**
@@ -56,6 +58,10 @@ export const StarterModelsTab = () => {
     () => selectedBundle?.models ?? response?.starter_models ?? [],
     [response, selectedBundle]
   );
+  const selectedBundleSources = useMemo(
+    () => (selectedBundle ? new Set(selectedBundle.models.map((model) => model.source)) : undefined),
+    [selectedBundle]
+  );
 
   const availableTypes = useMemo(() => collectTypes(sourceModels), [sourceModels]);
   const availableBases = useMemo(() => collectBases(sourceModels), [sourceModels]);
@@ -82,12 +88,8 @@ export const StarterModelsTab = () => {
     });
   }, [baseFilter, searchTerm, sourceModels, typeFilter]);
 
-  /** Queue a starter model plus its uninstalled dependencies; returns how many jobs were queued. */
-  const queueStarter = async (model: StarterModel): Promise<number> => {
-    const sources = [
-      ...(model.dependencies ?? []).filter((dependency) => !dependency.is_installed).map((dep) => dep.source),
-      model.source,
-    ];
+  /** Queue a starter source list; returns how many jobs were queued. */
+  const queueSources = async (sources: string[]): Promise<number> => {
     let queued = 0;
 
     for (const source of sources) {
@@ -98,6 +100,10 @@ export const StarterModelsTab = () => {
 
     return queued;
   };
+
+  /** Queue a starter model plus its uninstalled dependencies; returns how many jobs were queued. */
+  const queueStarter = (model: StarterModel): Promise<number> =>
+    queueSources(getStarterModelInstallSources(model, { dependencySourcesToSkip: selectedBundleSources }));
 
   const installStarter = async (model: StarterModel) => {
     const queued = await queueStarter(model);
@@ -114,13 +120,7 @@ export const StarterModelsTab = () => {
     setInstallingBundle(bundle.name);
 
     try {
-      let queued = 0;
-
-      for (const model of bundle.models) {
-        if (!model.is_installed) {
-          queued += await queueStarter(model);
-        }
-      }
+      const queued = await queueSources(getStarterBundleInstallSources(bundle));
 
       if (queued > 0) {
         notify.success('Bundle install queued', `${bundle.name}: ${queued} install${queued === 1 ? '' : 's'} queued.`);
@@ -193,7 +193,7 @@ export const StarterModelsTab = () => {
                 <Input
                   aria-label="Search starter models"
                   placeholder="Search starter models…"
-                  size="sm"
+                  size="xs"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.currentTarget.value)}
                 />
@@ -204,7 +204,7 @@ export const StarterModelsTab = () => {
                 <IconButton
                   aria-label="Filter starter models"
                   color={typeFilter !== null || baseFilter !== null ? 'accent.solid' : 'fg.muted'}
-                  size="sm"
+                  size="xs"
                   variant="ghost"
                 >
                   <Icon as={SlidersHorizontalIcon} boxSize="4" />
@@ -270,7 +270,9 @@ export const StarterModelsTab = () => {
           <Scrollable flex="1" label="Starter models" minH="0" pr="1">
             <Stack gap="1.5">
               {filteredModels.map((model) => {
-                const dependencyCount = model.dependencies?.length ?? 0;
+                const dependencyCount = (model.dependencies ?? []).filter(
+                  (dependency) => !dependency.is_installed && !selectedBundleSources?.has(dependency.source)
+                ).length;
 
                 return (
                   <SourceListItem

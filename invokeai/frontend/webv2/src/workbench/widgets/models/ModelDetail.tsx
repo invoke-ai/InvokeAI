@@ -2,8 +2,9 @@ import type { ModelConfig } from '@workbench/models/types';
 
 import { DataList, HStack, Icon, Menu, Portal, Separator, Stack, Text } from '@chakra-ui/react';
 import { Button, IconButton, ConfirmDialog, MenuContent } from '@workbench/components/ui';
+import { isConvertibleToDiffusers } from '@workbench/models/baseIdentity';
 import { useModelsSnapshot } from '@workbench/models/modelsStore';
-import { formatBytes, isConvertibleToDiffusers } from '@workbench/models/taxonomy';
+import { formatBytes } from '@workbench/models/taxonomy';
 import { useNotify } from '@workbench/useNotify';
 import { ArrowLeftIcon, MoreHorizontalIcon, PencilIcon, RefreshCcwIcon, Trash2Icon } from 'lucide-react';
 import { useCallback, useState } from 'react';

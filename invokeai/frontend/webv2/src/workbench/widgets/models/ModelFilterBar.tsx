@@ -3,7 +3,8 @@ import type { ModelTaxonomyType } from '@workbench/models/types';
 
 import { HStack, Icon, Input, InputGroup, Menu, Portal, Text } from '@chakra-ui/react';
 import { IconButton, MenuContent } from '@workbench/components/ui';
-import { getModelBaseLabel, getModelTypeLabel } from '@workbench/models/taxonomy';
+import { getModelBaseLabel } from '@workbench/models/baseIdentity';
+import { getModelTypeLabel } from '@workbench/models/taxonomy';
 import { CheckIcon, SearchIcon, SlidersHorizontalIcon } from 'lucide-react';
 
 const SORT_FIELDS: { field: ModelSortField; label: string }[] = [
