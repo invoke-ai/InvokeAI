@@ -8,6 +8,7 @@ import {
   DEFAULT_LIBRARY_FILTERS,
   filterModels,
   flattenGroupsToRows,
+  getModelPickerGroups,
   groupModelsByType,
 } from './library';
 
@@ -89,6 +90,34 @@ describe('groupModelsByType', () => {
 
     expect(rows[0]).toMatchObject({ kind: 'header' });
     expect(rows).toHaveLength(groups.length + library.length);
+  });
+});
+
+describe('getModelPickerGroups', () => {
+  it('filters by allowed type, exclusions, custom predicate, and multi-term search', () => {
+    const result = getModelPickerGroups(library, {
+      excludeKeys: new Set(['b']),
+      filter: (model) => model.base !== 'any',
+      modelTypes: ['main', 'lora', 'vae'],
+      searchTerm: 'sd detail',
+    });
+
+    expect(result.candidates.map((m) => m.key)).toEqual(['a', 'c']);
+    expect(result.groups.map((group) => group.type)).toEqual(['lora']);
+    expect(result.groups[0]?.models.map((m) => m.key)).toEqual(['c']);
+  });
+
+  it('sorts picker results by taxonomy rank then name', () => {
+    const result = getModelPickerGroups(library, {
+      modelTypes: ['main', 'lora', 'vae'],
+      searchTerm: '',
+    });
+
+    expect(result.groups.map((group) => [group.type, group.models.map((m) => m.key)])).toEqual([
+      ['main', ['b', 'a']],
+      ['lora', ['c']],
+      ['vae', ['d']],
+    ]);
   });
 });
 

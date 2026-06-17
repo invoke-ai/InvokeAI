@@ -1,4 +1,4 @@
-import type { ModelBase, ModelConfig, ModelFileFormat, ModelInstallJob, ModelTaxonomyType } from './types';
+import type { ModelFileFormat, ModelInstallJob, ModelTaxonomyType } from './types';
 
 /**
  * Display metadata for the model taxonomy. Open-union friendly: unknown bases,
@@ -55,45 +55,6 @@ export const getModelCategoryRank = (type: ModelTaxonomyType): number => {
   return index === -1 ? MODEL_CATEGORIES.length : index;
 };
 
-const BASE_LABELS: Record<string, string> = {
-  anima: 'Anima',
-  any: 'Any',
-  cogview4: 'CogView4',
-  external: 'External',
-  flux: 'FLUX',
-  flux2: 'FLUX.2',
-  'qwen-image': 'Qwen Image',
-  'sd-1': 'SD 1.x',
-  'sd-2': 'SD 2.x',
-  'sd-3': 'SD 3.x',
-  sdxl: 'SDXL',
-  'sdxl-refiner': 'SDXL Refiner',
-  unknown: 'Unknown',
-  'z-image': 'Z-Image',
-};
-
-export const getModelBaseLabel = (base: ModelBase): string => BASE_LABELS[base] ?? toTitleCase(base);
-
-/** Chakra color palette per base, so architecture is scannable at a glance. */
-const BASE_COLOR_PALETTES: Record<string, string> = {
-  anima: 'pink',
-  any: 'gray',
-  cogview4: 'red',
-  external: 'gray',
-  flux: 'yellow',
-  flux2: 'orange',
-  'qwen-image': 'cyan',
-  'sd-1': 'green',
-  'sd-2': 'teal',
-  'sd-3': 'purple',
-  sdxl: 'blue',
-  'sdxl-refiner': 'blue',
-  unknown: 'gray',
-  'z-image': 'pink',
-};
-
-export const getModelBaseColorPalette = (base: ModelBase): string => BASE_COLOR_PALETTES[base] ?? 'gray';
-
 const FORMAT_LABELS: Record<string, string> = {
   bnb_quantized_int8b: 'BnB int8',
   bnb_quantized_nf4b: 'BnB nf4',
@@ -115,10 +76,6 @@ const FORMAT_LABELS: Record<string, string> = {
 };
 
 export const getModelFormatLabel = (format: ModelFileFormat): string => FORMAT_LABELS[format] ?? toTitleCase(format);
-
-/** Checkpoint→diffusers conversion is only supported for these bases. */
-export const isConvertibleToDiffusers = (model: ModelConfig): boolean =>
-  model.format === 'checkpoint' && model.type === 'main' && ['sd-1', 'sd-2', 'sdxl'].includes(model.base);
 
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const;
 

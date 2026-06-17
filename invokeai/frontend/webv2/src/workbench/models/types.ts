@@ -71,7 +71,7 @@ export type ModelFileFormat =
 
 export type PredictionType = 'epsilon' | 'v_prediction' | 'sample';
 
-/** Per-model defaults applied when the model is selected for generation. */
+/** Per-model defaults that Generate can apply explicitly. */
 export interface MainModelDefaultSettings {
   vae?: string | null;
   vae_precision?: 'fp16' | 'fp32' | null;

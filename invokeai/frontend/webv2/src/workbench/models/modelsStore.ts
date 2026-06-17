@@ -83,6 +83,8 @@ export const ensureModelsLoaded = (): void => {
   }
 };
 
+export const getModelsSnapshot = (): ModelsSnapshot => store.getSnapshot();
+
 /** Patch one model in place after a successful update/convert. */
 export const replaceModelInStore = (model: ModelConfig): void => {
   store.patchSnapshot({

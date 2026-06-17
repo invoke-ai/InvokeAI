@@ -1,6 +1,7 @@
 import type { ModelConfig, ModelTaxonomyType } from './types';
 
-import { getModelBaseLabel, getModelCategoryRank, getModelTypePluralLabel } from './taxonomy';
+import { getModelBaseLabel } from './baseIdentity';
+import { getModelCategoryRank, getModelTypePluralLabel } from './taxonomy';
 
 /**
  * Pure filtering/grouping/sorting for the model library. Kept free of React so
@@ -34,6 +35,21 @@ export interface ModelGroup {
   type: ModelTaxonomyType;
   label: string;
   models: ModelConfig[];
+}
+
+export interface ModelPickerOptions {
+  /** Hide specific models, e.g. the current model or already-linked choices. */
+  excludeKeys?: ReadonlySet<string>;
+  /** Extra predicate supplied by the owning form, e.g. base compatibility. */
+  filter?: (model: ModelConfig) => boolean;
+  modelTypes: ModelTaxonomyType[];
+  searchTerm: string;
+}
+
+export interface ModelPickerResult {
+  /** Models available before text search, used for empty-state copy. */
+  candidates: ModelConfig[];
+  groups: ModelGroup[];
 }
 
 const matchesSearch = (model: ModelConfig, searchTerm: string): boolean => {
@@ -100,6 +116,38 @@ export const groupModelsByType = (models: ModelConfig[]): ModelGroup[] => {
   return [...groupsByType.entries()]
     .sort(([a], [b]) => getModelCategoryRank(a) - getModelCategoryRank(b))
     .map(([type, groupModels]) => ({ label: getModelTypePluralLabel(type), models: groupModels, type }));
+};
+
+const matchesPickerSearch = (model: ModelConfig, searchTerm: string): boolean => {
+  const terms = searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
+
+  if (terms.length === 0) {
+    return true;
+  }
+
+  const haystack = `${model.name} ${model.base} ${model.type}`.toLowerCase();
+
+  return terms.every((term) => haystack.includes(term));
+};
+
+/** Candidate, search, sort, and grouping rules shared by every model picker instance. */
+export const getModelPickerGroups = (models: ModelConfig[], options: ModelPickerOptions): ModelPickerResult => {
+  const allowedTypes = new Set(options.modelTypes);
+  const candidates = models.filter(
+    (model) =>
+      allowedTypes.has(model.type) &&
+      !options.excludeKeys?.has(model.key) &&
+      (options.filter ? options.filter(model) : true)
+  );
+  const visibleModels = candidates
+    .filter((model) => matchesPickerSearch(model, options.searchTerm))
+    .sort(
+      (a, b) =>
+        getModelCategoryRank(a.type) - getModelCategoryRank(b.type) ||
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+    );
+
+  return { candidates, groups: groupModelsByType(visibleModels) };
 };
 
 /** Distinct bases present in a model list, for base filter menus. */
