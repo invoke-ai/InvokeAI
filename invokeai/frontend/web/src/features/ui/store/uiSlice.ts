@@ -6,6 +6,7 @@ import { isPlainObject } from 'es-toolkit';
 import { assert } from 'tsafe';
 
 import { getInitialUIState, type UIState, zUIState } from './uiTypes';
+import { selectStageViewerMode } from './uiSelectors';
 
 const slice = createSlice({
   name: 'ui',
@@ -70,6 +71,9 @@ const slice = createSlice({
     shouldShowNotificationChanged: (state, action: PayloadAction<UIState['shouldShowNotificationV2']>) => {
       state.shouldShowNotificationV2 = action.payload;
     },
+    stageViewerModeChanged: (state, action: PayloadAction<UIState['stageViewerMode']>) => {
+      state.stageViewerMode = action.payload;
+    },
     pickerCompactViewStateChanged: (state, action: PayloadAction<{ pickerId: string; isCompact: boolean }>) => {
       state.pickerCompactViewStates[action.payload.pickerId] = action.payload.isCompact;
     },
@@ -86,6 +90,7 @@ export const {
   shouldShowNotificationChanged,
   textAreaSizesStateChanged,
   dockviewStorageKeyChanged,
+  stageViewerModeChanged,
   pickerCompactViewStateChanged,
 } = slice.actions;
 

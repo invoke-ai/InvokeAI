@@ -1,4 +1,5 @@
 import { isPlainObject } from 'es-toolkit';
+import { zStageViewerMode } from 'features/gallery/components/StageViewer/common';
 import { z } from 'zod';
 
 const zTabName = z.enum(['generate', 'canvas', 'upscaling', 'workflows', 'models', 'customNodes', 'queue']);
@@ -23,6 +24,7 @@ export const zUIState = z.object({
   textAreaSizes: z.record(z.string(), zPartialDimensions),
   panels: z.record(z.string(), zSerializable),
   shouldShowNotificationV2: z.boolean(),
+  stageViewerMode: zStageViewerMode,
   pickerCompactViewStates: z.record(z.string(), z.boolean()),
 });
 export type UIState = z.infer<typeof zUIState>;
@@ -37,5 +39,6 @@ export const getInitialUIState = (): UIState => ({
   textAreaSizes: {},
   panels: {},
   shouldShowNotificationV2: true,
+  stageViewerMode: 'grid',
   pickerCompactViewStates: {},
 });
