@@ -124,6 +124,20 @@ const getResultImageNames = (queueItem: QueueItemDTO): string[] => {
     if (typeof image?.image_name === 'string') {
       imageNames.add(image.image_name);
     }
+
+    const collection = (result as { collection?: unknown }).collection;
+    if (Array.isArray(collection)) {
+      for (const item of collection) {
+        if (!item || typeof item !== 'object') {
+          continue;
+        }
+
+        const imageName = (item as { image_name?: unknown }).image_name;
+        if (typeof imageName === 'string') {
+          imageNames.add(imageName);
+        }
+      }
+    }
   }
 
   return [...imageNames];

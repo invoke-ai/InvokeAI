@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   getBoardCounts,
+  getGalleryImagesRefreshToken,
   getGalleryQueuePlaceholders,
   getGallerySelectedBoardId,
   getGalleryStateView,
@@ -102,6 +103,13 @@ describe('gallery state view', () => {
     });
   });
 
+  it('falls back to the full gallery refresh token when image refresh token is absent', () => {
+    expect(getGalleryImagesRefreshToken({ galleryRefreshToken: 'full-refresh' })).toBe('full-refresh');
+    expect(
+      getGalleryImagesRefreshToken({ galleryImagesRefreshToken: 'image-refresh', galleryRefreshToken: 'full-refresh' })
+    ).toBe('image-refresh');
+  });
+
   it('derives the multi-selection from persisted values with a single-selection fallback', () => {
     expect(
       getGalleryStateView({ selectedImageNames: ['a.png', 'b.png', 7] }, boards, [], false).selectedImageNames
@@ -109,6 +117,19 @@ describe('gallery state view', () => {
     expect(getGalleryStateView({ selectedImageName: 'a.png' }, boards, [], false).selectedImageNames).toEqual([
       'a.png',
     ]);
+  });
+
+  it('restores the selection set from a visible primary image after tab switches clear it', () => {
+    const image = createImage('selected.png');
+    const gallery = getGalleryStateView(
+      { selectedImageName: image.imageName, selectedImageNames: [] },
+      boards,
+      [{ ...image, boardId: 'none', imageCategory: 'general', starred: false }],
+      false
+    );
+
+    expect(gallery.selectedImageName).toBe(image.imageName);
+    expect(gallery.selectedImageNames).toEqual([image.imageName]);
   });
 
   it('creates placeholders for in-flight gallery queue items on the viewed board', () => {

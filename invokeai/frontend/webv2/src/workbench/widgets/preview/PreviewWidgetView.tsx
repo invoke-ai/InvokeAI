@@ -14,8 +14,8 @@ import { getGallerySettings } from '@workbench/gallery/settings';
 import { ImageContextMenu, useImageActions, type ImageContextMenuTarget } from '@workbench/image-actions';
 import {
   getGalleryCompareImage,
+  getGalleryImagesRefreshToken,
   getGalleryRecentImagesKey,
-  getGalleryRefreshToken,
 } from '@workbench/widgets/gallery/galleryStateView';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
@@ -113,7 +113,7 @@ export const PreviewWidgetView = ({ region }: WidgetViewProps) => {
   const hasSelectedImage = selectedImage !== null;
   const isBackendImage = selectedImage ? shouldLoadBackendBoard(selectedImage) : false;
   const { imageOrderDir, starredFirst } = getGallerySettings(galleryValues);
-  const refreshToken = getGalleryRefreshToken(galleryValues);
+  const imageRefreshToken = getGalleryImagesRefreshToken(galleryValues);
   const recentImagesKey = getGalleryRecentImagesKey(galleryValues);
   const [boards, setBoards] = useState<GalleryBoard[]>(fallbackBoards);
   const [boardImages, setBoardImages] = useState<PreviewImage[]>(localImages);
@@ -191,10 +191,10 @@ export const PreviewWidgetView = ({ region }: WidgetViewProps) => {
     hasSelectedImage,
     imageBoardId,
     imageOrderDir,
+    imageRefreshToken,
     isBackendImage,
     localImages,
     recentImagesKey,
-    refreshToken,
     selectedGalleryView,
     starredFirst,
   ]);

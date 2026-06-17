@@ -50,9 +50,6 @@ export const GalleryToolbar = ({ layout }: { layout: 'stacked' | 'wide' }) => {
 
   const toolbarActions = (
     <HStack gap="2">
-      <Text color="fg.subtle" fontSize="2xs">
-        {gallery.images.length} loaded
-      </Text>
       <GalleryUploadButton />
       <GallerySettingsMenu />
     </HStack>
@@ -60,6 +57,17 @@ export const GalleryToolbar = ({ layout }: { layout: 'stacked' | 'wide' }) => {
   const searchClearButton = gallery.searchTerm ? (
     <CloseButton size="2xs" aria-label="Clear search" onClick={() => actions.setSearchTerm('')} me="-2" />
   ) : null;
+  const searchInput = (
+    <InputGroup startElement={<Icon as={SearchIcon} size="sm" />} endElement={searchClearButton}>
+      <Input
+        aria-label="Search gallery images"
+        placeholder="Search images"
+        size="xs"
+        value={gallery.searchTerm}
+        onChange={(event) => actions.setSearchTerm(event.currentTarget.value)}
+      />
+    </InputGroup>
+  );
 
   return (
     <Stack gap="2">
@@ -70,6 +78,9 @@ export const GalleryToolbar = ({ layout }: { layout: 'stacked' | 'wide' }) => {
           </Box>
           {viewTabs}
           <Spacer />
+          <Box flex="1" maxW="20rem" minW="12rem">
+            {searchInput}
+          </Box>
           {toolbarActions}
         </HStack>
       ) : (
@@ -81,15 +92,7 @@ export const GalleryToolbar = ({ layout }: { layout: 'stacked' | 'wide' }) => {
           </HStack>
         </>
       )}
-      <InputGroup startElement={<Icon as={SearchIcon} size="sm" />} endElement={searchClearButton}>
-        <Input
-          aria-label="Search gallery images"
-          placeholder="Search images"
-          size="xs"
-          value={gallery.searchTerm}
-          onChange={(event) => actions.setSearchTerm(event.currentTarget.value)}
-        />
-      </InputGroup>
+      {!isWide && searchInput}
     </Stack>
   );
 };

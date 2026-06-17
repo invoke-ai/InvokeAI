@@ -11,6 +11,7 @@ import { GalleryPanelContent } from './GalleryPanelContent';
 import {
   getGalleryPage,
   getGalleryProjectBoardId,
+  getGalleryImagesRefreshToken,
   getGalleryRecentImagesKey,
   getGalleryRefreshToken,
   getGallerySearchTerm,
@@ -31,12 +32,14 @@ export const GalleryWidgetView = ({ presentation, region }: WidgetViewProps) => 
   const searchTerm = getGallerySearchTerm(galleryValues);
   const recentImagesKey = getGalleryRecentImagesKey(galleryValues);
   const refreshToken = getGalleryRefreshToken(galleryValues);
+  const imageRefreshToken = getGalleryImagesRefreshToken(galleryValues);
   const page = getGalleryPage(galleryValues);
   const knownTotalImages = getGalleryTotalImages(galleryValues);
   const settings = getGallerySettings(galleryValues);
   const onError = useCallback((message: string) => dispatch({ message, type: 'recordError' }), [dispatch]);
   const data = useGalleryData({
     galleryView,
+    imageRefreshToken,
     onError,
     page,
     recentImagesKey,
@@ -123,7 +126,7 @@ export const GalleryWidgetView = ({ presentation, region }: WidgetViewProps) => 
   // render page navigation without its own fetch, and clamp the page when the
   // query shrinks (e.g. after deletions).
   useEffect(() => {
-    if (total !== null && total !== knownTotalImages) {
+    if (typeof total === 'number' && Number.isFinite(total) && total !== knownTotalImages) {
       dispatch({ totalImages: total, type: 'setGalleryPageInfo' });
     }
   }, [dispatch, knownTotalImages, total]);

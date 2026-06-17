@@ -113,7 +113,7 @@ export const GalleryBoardSelect = () => {
         }}
       >
         <Menu.Trigger asChild>
-          <Button justifyContent="space-between" minW="0" size="sm" variant="outline" w="full" px="1">
+          <Button minW="0" size="sm" variant="outline" w="full" px="1">
             {selectedBoard ? (
               <BoardOptionContent
                 badge={selectedBoard.id === gallery.projectBoardId ? 'Project' : undefined}
@@ -121,7 +121,9 @@ export const GalleryBoardSelect = () => {
                 isSelected={false}
               />
             ) : (
-              <Text fontSize="xs">Loading board...</Text>
+              <Text fontSize="xs" me="auto">
+                Loading board...
+              </Text>
             )}
             <Icon as={ChevronDownIcon} boxSize="3" flexShrink={0} />
           </Button>
@@ -400,7 +402,7 @@ const BoardOptionContent = ({
   return (
     <HStack gap="2" minW="0" w="full">
       <BoardCover board={board} />
-      <Stack flex="1" gap="1" minW="0">
+      <Stack gap="1" minW="0">
         <Text fontSize="xs" fontWeight={isSelected ? '700' : '500'} minW="0" lineHeight={1} truncate>
           {board.name}
         </Text>
@@ -410,14 +412,16 @@ const BoardOptionContent = ({
           </Text>
         ) : null}
       </Stack>
-      {badge && (
-        <Badge colorPalette={badge === 'Project' ? 'blue' : 'gray'} flexShrink={0} size="xs" variant="subtle">
-          {badge}
+      <Flex ms="auto">
+        {badge && (
+          <Badge colorPalette={badge === 'Project' ? 'blue' : 'gray'} flexShrink={0} size="xs" variant="subtle">
+            {badge}
+          </Badge>
+        )}
+        <Badge flexShrink={0} size="xs" variant={isSelected ? 'solid' : 'subtle'}>
+          {counts.imageCount} | {counts.assetCount}
         </Badge>
-      )}
-      <Badge flexShrink={0} size="xs" variant={isSelected ? 'solid' : 'subtle'}>
-        {counts.imageCount} | {counts.assetCount}
-      </Badge>
+      </Flex>
     </HStack>
   );
 };

@@ -77,6 +77,11 @@ export const getGalleryTotalImages = (values: Record<string, unknown>): number |
 export const getGalleryRefreshToken = (values: Record<string, unknown>): string =>
   typeof values.galleryRefreshToken === 'string' ? values.galleryRefreshToken : '';
 
+export const getGalleryImagesRefreshToken = (values: Record<string, unknown>): string =>
+  typeof values.galleryImagesRefreshToken === 'string'
+    ? values.galleryImagesRefreshToken
+    : getGalleryRefreshToken(values);
+
 export const getGalleryProjectBoardId = (values: Record<string, unknown>): string | null =>
   typeof values.projectBoardId === 'string' ? values.projectBoardId : null;
 
@@ -187,6 +192,10 @@ export const getGalleryStateView = (
     : [];
   const images = backendImages ?? (isLoading ? [] : localImages);
   const selectedImageName = typeof values.selectedImageName === 'string' ? values.selectedImageName : null;
+  const visibleSelectedImageName = images.some((image) => image.imageName === selectedImageName)
+    ? selectedImageName
+    : null;
+  const selectedImageNames = getGallerySelectedImageNames(values);
   const galleryView = getGalleryView(values);
   const settings = getGallerySettings(values);
   const searchTerm = getGallerySearchTerm(values);
@@ -204,8 +213,11 @@ export const getGalleryStateView = (
     projectBoardId: getGalleryProjectBoardId(values),
     searchTerm,
     selectedBoardId,
-    selectedImageName: images.some((image) => image.imageName === selectedImageName) ? selectedImageName : null,
-    selectedImageNames: getGallerySelectedImageNames(values),
+    selectedImageName: visibleSelectedImageName,
+    selectedImageNames:
+      visibleSelectedImageName && !selectedImageNames.includes(visibleSelectedImageName)
+        ? [visibleSelectedImageName, ...selectedImageNames]
+        : selectedImageNames,
     settings,
   };
 };

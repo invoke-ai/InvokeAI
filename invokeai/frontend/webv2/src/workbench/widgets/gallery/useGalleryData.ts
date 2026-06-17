@@ -92,6 +92,7 @@ export interface GalleryData {
 
 export const useGalleryData = ({
   galleryView,
+  imageRefreshToken,
   onError,
   page,
   recentImagesKey,
@@ -101,6 +102,7 @@ export const useGalleryData = ({
   settings,
 }: {
   galleryView: GalleryView;
+  imageRefreshToken: string;
   onError: (message: string) => void;
   page: number;
   recentImagesKey: string;
@@ -124,7 +126,6 @@ export const useGalleryData = ({
     boardOrderDir,
     String(showDateBoards),
     refreshToken,
-    recentImagesKey,
   ].join('\0');
   const cachedBoardsEntry = boardsCache.get(boardsKey);
   const isBoardsCacheFresh = isCacheEntryFresh(cachedBoardsEntry);
@@ -144,7 +145,7 @@ export const useGalleryData = ({
   const pageCount = infiniteWindow.baseKey === baseKey ? infiniteWindow.pageCount : cachedPageCount;
   const offset = isPaginated ? page * GALLERY_PAGE_SIZE : 0;
   const limit = isPaginated ? GALLERY_PAGE_SIZE : pageCount * GALLERY_PAGE_SIZE;
-  const fetchKey = [baseKey, String(offset), String(limit), refreshToken, recentImagesKey].join('\0');
+  const fetchKey = [baseKey, String(offset), String(limit), imageRefreshToken, recentImagesKey].join('\0');
   const exactCachedImageResultEntry = imageResultByFetchKeyCache.get(fetchKey);
   const baseCachedImageResultEntry = imageResultByBaseKeyCache.get(baseKey);
   const cachedImageResultEntry = exactCachedImageResultEntry ?? baseCachedImageResultEntry;

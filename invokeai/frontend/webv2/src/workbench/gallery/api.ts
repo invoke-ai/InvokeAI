@@ -138,6 +138,9 @@ const mapImage = (image: BackendImageDTO): GalleryImage => ({
   width: image.width,
 });
 
+const normalizeTotal = (value: unknown, fallback: number): number =>
+  typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : Math.max(0, fallback);
+
 export const listGalleryBoards = async ({
   includeArchived = false,
   orderBy = 'created_at',
@@ -251,7 +254,7 @@ const listGalleryDateBoardImages = async ({
   );
   const images = await getGalleryImagesByNames(body.image_names.slice(offset, offset + limit));
 
-  return { images, total: body.total_count };
+  return { images, total: normalizeTotal(body.total_count, body.image_names.length) };
 };
 
 export const listGalleryImages = async ({
@@ -285,9 +288,16 @@ export const listGalleryImages = async ({
     search_term: searchTerm.trim() || undefined,
     starred_first: starredFirst,
   });
-  const body = await apiFetchJson<ListImagesResponse>(`/api/v1/images/?${query}`);
+  const body = await apiFetchJson<ListImagesResponse | BackendImageDTO[]>(`/api/v1/images/?${query}`);
+  const items = Array.isArray(body) ? body : (body.items ?? []);
 
-  return { images: body.items.map(mapImage), total: body.total };
+  return {
+    images: items.map(mapImage),
+    total: normalizeTotal(
+      Array.isArray(body) ? undefined : body.total,
+      offset + items.length + (Array.isArray(body) && items.length >= limit ? 1 : 0)
+    ),
+  };
 };
 
 export const getGalleryImageMetadata = async (imageName: string): Promise<GalleryImageMetadata | null> => {

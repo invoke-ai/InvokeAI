@@ -412,7 +412,7 @@ const GalleryQueuePlaceholderCell = ({
       as="button"
       aria-label="Show in-progress diffusion in Preview"
       aspectRatio={1}
-      bg="bg.emphasized"
+      bg="bg"
       borderColor={isActive ? 'accent.solid' : 'border.subtle'}
       borderWidth="1px"
       cursor="pointer"
@@ -498,7 +498,7 @@ const GalleryThumbnail = ({
   return (
     <Box
       aspectRatio={1}
-      bg="bg.emphasized"
+      bg="bg"
       borderWidth="2px"
       borderColor={isSelected || isCompared ? 'accent.solid' : 'border.subtle'}
       boxShadow={isCompared ? 'inset 0 0 0 1px {colors.accent.solid}' : undefined}

@@ -1,4 +1,4 @@
-import type { MainModelConfig, VaeModelConfig } from '@workbench/generation/types';
+import type { GenerateModelConfig, VaeModelConfig } from '@workbench/generation/types';
 import type { ModelConfig } from '@workbench/models/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';
 
@@ -13,7 +13,7 @@ import {
   type GalleryBoard,
   type GalleryImage,
 } from '@workbench/gallery/api';
-import { getDefaultGenerateSettings, isSupportedGenerateModel } from '@workbench/generation/graph';
+import { getDefaultGenerateSettings, isSupportedGenerateModel } from '@workbench/generation/baseGenerationPolicies';
 import { isVaeModelConfig, normalizeGenerateWidgetValues } from '@workbench/generation/settings';
 import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsStore';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
@@ -32,7 +32,7 @@ import {
 /**
  * Image operations shared by every surface that shows backend images (gallery
  * grid, preview, image context menus). Each mutation notifies the gallery via
- * `touchGalleryRefresh` so any mounted gallery widget refetches.
+ * a refresh action so any mounted gallery widget refetches affected backend data.
  */
 export interface ImageActions {
   copyImage: (image: GalleryImage) => Promise<void>;
@@ -92,10 +92,7 @@ export const useImageActions = ({
 }): ImageActions => {
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const { models } = useModelsSnapshot();
-  const supportedModels = useMemo<MainModelConfig[]>(
-    () => models.filter(isSupportedGenerateModel).map((model) => model as MainModelConfig),
-    [models]
-  );
+  const supportedModels = useMemo<GenerateModelConfig[]>(() => models.filter(isSupportedGenerateModel), [models]);
   const vaeModels = useMemo<VaeModelConfig[]>(
     () => models.filter((model: ModelConfig) => isVaeModelConfig(model)).map((model) => model as VaeModelConfig),
     [models]
@@ -124,6 +121,7 @@ export const useImageActions = ({
     const recordInfo = (title: string, message?: string) =>
       dispatch({ kind: 'info', message, title, type: 'recordNotice' });
     const refreshGallery = () => dispatch({ type: 'touchGalleryRefresh' });
+    const refreshGalleryImages = () => dispatch({ type: 'touchGalleryImagesRefresh' });
     const getBoardName = (boardId: string) => boards.find((board) => board.id === boardId)?.name ?? 'Uncategorized';
     const imageMetadataRequests = new Map<string, Promise<unknown>>();
     const loadImageMetadata = (imageName: string): Promise<unknown> => {
@@ -209,6 +207,7 @@ export const useImageActions = ({
             currentValues: currentGenerateValues,
             image,
             metadata,
+            models,
             supportedModels,
             vaeModels,
           });
@@ -255,6 +254,7 @@ export const useImageActions = ({
             image,
             kind,
             metadata,
+            models,
             supportedModels,
             vaeModels,
           });
@@ -278,7 +278,7 @@ export const useImageActions = ({
 
         try {
           await (starred ? starGalleryImages : unstarGalleryImages)(imageNames);
-          refreshGallery();
+          refreshGalleryImages();
         } catch (error: unknown) {
           onStarredChange?.(imageNames, !starred);
           recordError(error);
@@ -289,6 +289,7 @@ export const useImageActions = ({
     boards,
     currentGenerateValues,
     dispatch,
+    models,
     onImagesDeleted,
     onStarredChange,
     openWorkbenchWidget,

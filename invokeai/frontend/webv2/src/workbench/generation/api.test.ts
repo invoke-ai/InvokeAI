@@ -118,3 +118,43 @@ describe('enqueueWorkflowGraph', () => {
     expect(getSubmittedBody().batch.runs).toBe(10_000);
   });
 });
+
+describe('getQueueItemResultImages', () => {
+  beforeEach(() => {
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('extracts image names from image collection outputs', async () => {
+    mocks.apiFetchJson.mockImplementation((url: string) => {
+      if (url === '/api/v1/queue/default/i/1') {
+        return Promise.resolve({
+          item_id: 1,
+          session: {
+            results: {
+              external: {
+                collection: [{ image_name: 'external-a.png' }, { image_name: 'external-b.png' }],
+              },
+            },
+          },
+          status: 'completed',
+        });
+      }
+
+      const imageName = decodeURIComponent(url.replace('/api/v1/images/i/', ''));
+      return Promise.resolve({
+        height: 768,
+        image_name: imageName,
+        image_url: `/images/${imageName}`,
+        is_intermediate: false,
+        thumbnail_url: `/thumbs/${imageName}`,
+        width: 1024,
+      });
+    });
+
+    const { getQueueItemResultImages } = await import('./api');
+
+    const images = await getQueueItemResultImages(1, 'source-1', '2026-06-15T00:00:00.000Z');
+
+    expect(images.map((image) => image.imageName)).toEqual(['external-a.png', 'external-b.png']);
+  });
+});

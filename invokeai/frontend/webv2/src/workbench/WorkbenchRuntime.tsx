@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type Dispatch } from 'react';
 import type { Project, QueueItem } from './types';
 import type { WorkbenchAction } from './workbenchState';
 
+import { getApiErrorMessage } from './backend/http';
 import {
   createQueueCoordinator,
   QueueItemCancelledError,
@@ -22,7 +23,8 @@ const getSnapshotGalleryBoardId = (queueItem: QueueItem): string | null => {
   return typeof selectedBoardId === 'string' ? selectedBoardId : null;
 };
 
-const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+const toErrorMessage = (error: unknown): string =>
+  getApiErrorMessage(error, error instanceof Error ? error.message : String(error));
 
 const getSnapshotBatchCount = (queueItem: QueueItem): number => {
   const batchCount = queueItem.snapshot.widgetStates.generate?.values.batchCount;
@@ -59,6 +61,9 @@ const routeRunResults = async (
     }
 
     dispatch({ images, projectId, queueItemId: queueItem.id, type: 'routeQueueItemResults' });
+    if (queueItem.snapshot.destination === 'gallery') {
+      dispatch({ type: 'refreshBackendData' });
+    }
   } catch (error) {
     if (error instanceof QueueItemCancelledError) {
       dispatch({ projectId, queueItemId: queueItem.id, status: 'cancelled', type: 'setQueueItemStatus' });

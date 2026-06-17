@@ -1,17 +1,26 @@
 import type { GalleryImage } from '@workbench/gallery/api';
 import type {
+  ComponentModelConfig,
+  GenerateModelConfig,
   GenerateWidgetValues,
   MainModelConfig,
-  SupportedGenerateBase,
   VaeModelConfig,
 } from '@workbench/generation/types';
 
-import { getSettingsWithModelDefaults } from '@workbench/generation/graph';
 import {
-  CLIP_SKIP_MAX,
+  getGenerationDimensions,
+  getGenerationUiPolicy,
+  getSettingsWithModelDefaults,
+  isKnownScheduler,
+} from '@workbench/generation/baseGenerationPolicies';
+import { isVaeCompatibleWithGenerateModel } from '@workbench/generation/componentCompatibility';
+import {
+  cloneGenerateWidgetValues,
+  getModelDefaultVae,
+  isMainModelConfig,
+  isModelIdentifierConfig,
   clampDimension,
   deriveAspectRatioId,
-  isKnownScheduler,
   SEED_MAX,
 } from '@workbench/generation/settings';
 
@@ -45,7 +54,8 @@ type RecalledField =
   | 'cfg'
   | 'scheduler'
   | 'seamless'
-  | 'clipSkip';
+  | 'clipSkip'
+  | 'components';
 
 export interface ImageRecallResult {
   fields: RecalledField[];
@@ -121,16 +131,16 @@ const getSeed = (metadata: unknown): number | null => {
   return seed !== null && seed >= 0 && seed <= SEED_MAX ? seed : null;
 };
 
-const getDimension = (metadata: unknown, key: 'height' | 'width'): number | null => {
+const getDimension = (metadata: unknown, key: 'height' | 'width', grid: number): number | null => {
   const dimension = getNumber(metadata, key);
 
-  return dimension !== null && dimension >= 64 ? clampDimension(dimension) : null;
+  return dimension !== null && dimension >= 64 ? clampDimension(dimension, grid) : null;
 };
 
-const getImageDimension = (image: GalleryImage, key: 'height' | 'width'): number | null => {
+const getImageDimension = (image: GalleryImage, key: 'height' | 'width', grid: number): number | null => {
   const dimension = image[key];
 
-  return Number.isFinite(dimension) && dimension >= 64 ? clampDimension(dimension) : null;
+  return Number.isFinite(dimension) && dimension >= 64 ? clampDimension(dimension, grid) : null;
 };
 
 const getSteps = (metadata: unknown): number | null => {
@@ -165,22 +175,27 @@ const getClipSkip = (metadata: unknown): number | null => {
   return clipSkip !== null && clipSkip >= 0 ? clipSkip : null;
 };
 
-const supportsClipSkip = (base: string): base is Exclude<SupportedGenerateBase, 'sdxl'> =>
-  base === 'sd-1' || base === 'sd-2';
+const getClipSkipMax = (model: GenerateModelConfig): number | null =>
+  getGenerationUiPolicy(model, { cfgScale: 1 }).clipSkipMax;
 
-const getClipSkipMax = (model: Pick<MainModelConfig, 'base'>): number | null =>
-  supportsClipSkip(model.base) ? CLIP_SKIP_MAX[model.base] : null;
-
-const getImageSize = (image: GalleryImage): Pick<GenerateWidgetValues, 'height' | 'width'> | null => {
-  const width = getImageDimension(image, 'width');
-  const height = getImageDimension(image, 'height');
+const getImageSize = (
+  image: GalleryImage,
+  model: GenerateModelConfig
+): Pick<GenerateWidgetValues, 'height' | 'width'> | null => {
+  const grid = getGenerationDimensions(model).grid;
+  const width = getImageDimension(image, 'width', grid);
+  const height = getImageDimension(image, 'height', grid);
 
   return width !== null && height !== null ? { height, width } : null;
 };
 
-const getMetadataSize = (metadata: unknown): Partial<Pick<GenerateWidgetValues, 'height' | 'width'>> => {
-  const width = getDimension(metadata, 'width');
-  const height = getDimension(metadata, 'height');
+const getMetadataSize = (
+  metadata: unknown,
+  model: GenerateModelConfig
+): Partial<Pick<GenerateWidgetValues, 'height' | 'width'>> => {
+  const grid = getGenerationDimensions(model).grid;
+  const width = getDimension(metadata, 'width', grid);
+  const height = getDimension(metadata, 'height', grid);
 
   return {
     ...(width !== null ? { width } : {}),
@@ -194,15 +209,55 @@ const getMetadataModelKey = (metadata: unknown, key: 'model' | 'vae'): string | 
   return typeof model?.key === 'string' ? model.key : null;
 };
 
-const getSupportedMetadataModel = (metadata: unknown, supportedModels: MainModelConfig[]): MainModelConfig | null => {
+const getSupportedMetadataModel = (
+  metadata: unknown,
+  supportedModels: GenerateModelConfig[]
+): GenerateModelConfig | null => {
   const modelKey = getMetadataModelKey(metadata, 'model');
 
   return modelKey ? (supportedModels.find((model) => model.key === modelKey) ?? null) : null;
 };
 
+const getModelFromMetadata = <T extends ComponentModelConfig>(
+  metadata: unknown,
+  key: string,
+  models: readonly ComponentModelConfig[],
+  guard: (model: unknown) => model is T
+): T | null | undefined => {
+  if (!isRecord(metadata) || !(key in metadata)) {
+    return undefined;
+  }
+
+  if (metadata[key] === null) {
+    return null;
+  }
+
+  const modelKey = getMetadataModelKey(metadata, key as 'model' | 'vae');
+
+  if (!modelKey) {
+    return undefined;
+  }
+
+  const model = models.find((candidate) => candidate.key === modelKey);
+
+  return guard(model) ? model : undefined;
+};
+
+const getMetadataComponent = (
+  metadata: unknown,
+  key: string,
+  models: readonly ComponentModelConfig[]
+): ComponentModelConfig | null | undefined => getModelFromMetadata(metadata, key, models, isModelIdentifierConfig);
+
+const getMetadataMainModel = (
+  metadata: unknown,
+  key: string,
+  models: readonly ComponentModelConfig[]
+): MainModelConfig | null | undefined => getModelFromMetadata(metadata, key, models, isMainModelConfig);
+
 const getMetadataVae = (
   metadata: unknown,
-  model: MainModelConfig,
+  model: GenerateModelConfig,
   vaeModels: VaeModelConfig[]
 ): VaeModelConfig | null | undefined => {
   if (!isRecord(metadata) || !('vae' in metadata)) {
@@ -219,13 +274,9 @@ const getMetadataVae = (
     return undefined;
   }
 
-  return vaeModels.find((vae) => vae.key === vaeKey && vae.base === model.base) ?? undefined;
-};
+  const vae = vaeModels.find((vae) => vae.key === vaeKey);
 
-const getDefaultVae = (model: MainModelConfig, vaeModels: VaeModelConfig[]): VaeModelConfig | null => {
-  const defaultVaeKey = model.default_settings?.vae;
-
-  return defaultVaeKey ? (vaeModels.find((vae) => vae.key === defaultVaeKey && vae.base === model.base) ?? null) : null;
+  return vae && isVaeCompatibleWithGenerateModel(model, vae) ? vae : undefined;
 };
 
 const getPromptPatch = (
@@ -242,7 +293,8 @@ const getPromptPatch = (
 
 const hasPrompt = (metadata: unknown): boolean => Object.keys(getPromptPatch(metadata)).length > 0;
 
-const hasMetadataSize = (metadata: unknown): boolean => Object.keys(getMetadataSize(metadata)).length > 0;
+const hasMetadataSize = (metadata: unknown, model: GenerateModelConfig): boolean =>
+  Object.keys(getMetadataSize(metadata, model)).length > 0;
 
 const hasGenerationSettings = (metadata: unknown): boolean =>
   getSteps(metadata) !== null ||
@@ -251,6 +303,12 @@ const hasGenerationSettings = (metadata: unknown): boolean =>
   getScheduler(metadata) !== null ||
   getBoolean(metadata, 'seamless_x') !== null ||
   getBoolean(metadata, 'seamless_y') !== null;
+
+const hasComponentModels = (metadata: unknown, models: readonly ComponentModelConfig[]): boolean =>
+  getMetadataMainModel(metadata, 'qwen3_source', models) !== undefined ||
+  getMetadataMainModel(metadata, 'qwen_image_component_source', models) !== undefined ||
+  getMetadataComponent(metadata, 'qwen3_encoder', models) !== undefined ||
+  getMetadataComponent(metadata, 'qwen_image_qwen_vl_encoder', models) !== undefined;
 
 const withDimensions = (
   values: GenerateWidgetValues,
@@ -267,7 +325,7 @@ const withDimensions = (
   };
 };
 
-const getSupportedClipSkip = (metadata: unknown, model: MainModelConfig): number | null => {
+const getSupportedClipSkip = (metadata: unknown, model: GenerateModelConfig): number | null => {
   const clipSkip = getClipSkip(metadata);
   const clipSkipMax = getClipSkipMax(model);
 
@@ -278,13 +336,15 @@ export const getImageRecallCapabilities = ({
   currentValues,
   image,
   metadata,
+  models,
   supportedModels,
   vaeModels,
 }: {
   currentValues: GenerateWidgetValues;
   image: GalleryImage;
   metadata: unknown;
-  supportedModels: MainModelConfig[];
+  supportedModels: GenerateModelConfig[];
+  models: ComponentModelConfig[];
   vaeModels: VaeModelConfig[];
 }): ImageRecallCapabilities => {
   const supportedMetadataModel = getSupportedMetadataModel(metadata, supportedModels);
@@ -293,16 +353,18 @@ export const getImageRecallCapabilities = ({
   const hasClipSkip = getSupportedClipSkip(metadata, clipSkipModel) !== null;
   const hasSeed = getSeed(metadata) !== null;
   const hasPrompts = hasPrompt(metadata);
-  const hasSize = hasMetadataSize(metadata);
+  const hasSize = hasMetadataSize(metadata, currentValues.model);
   const hasSettings = hasGenerationSettings(metadata);
+  const hasComponents = hasComponentModels(metadata, models);
   const hasModel = supportedMetadataModel !== null;
-  const hasAnyMetadata = hasModel || hasVae || hasPrompts || hasSeed || hasSize || hasSettings || hasClipSkip;
-  const hasNonSeedMetadata = hasModel || hasVae || hasPrompts || hasSize || hasSettings || hasClipSkip;
+  const hasAnyMetadata =
+    hasModel || hasVae || hasPrompts || hasSeed || hasSize || hasSettings || hasClipSkip || hasComponents;
+  const hasNonSeedMetadata = hasModel || hasVae || hasPrompts || hasSize || hasSettings || hasClipSkip || hasComponents;
 
   return {
     all: hasAnyMetadata,
     clipSkip: getSupportedClipSkip(metadata, currentValues.model) !== null,
-    dimensions: getImageSize(image) !== null,
+    dimensions: getImageSize(image, currentValues.model) !== null,
     prompts: hasPrompts,
     remix: hasNonSeedMetadata,
     seed: hasSeed,
@@ -315,28 +377,46 @@ export const buildImageRecallSettings = ({
   kind,
   metadata,
   supportedModels,
+  models,
   vaeModels,
 }: {
   currentValues: GenerateWidgetValues;
   image: GalleryImage;
   kind: ImageRecallKind;
   metadata: unknown;
-  supportedModels: MainModelConfig[];
+  supportedModels: GenerateModelConfig[];
+  models: ComponentModelConfig[];
   vaeModels: VaeModelConfig[];
 }): ImageRecallResult | null => {
   const fields: RecalledField[] = [];
-  let values: GenerateWidgetValues = {
-    ...currentValues,
-    model: { ...currentValues.model },
-    vae: currentValues.vae ? { ...currentValues.vae } : null,
-  };
+  let values: GenerateWidgetValues = cloneGenerateWidgetValues(currentValues);
 
   if (kind === 'all' || kind === 'remix') {
     const model = getSupportedMetadataModel(metadata, supportedModels);
 
     if (model) {
-      values = { ...getSettingsWithModelDefaults(values, model), model, vae: getDefaultVae(model, vaeModels) };
+      values = { ...getSettingsWithModelDefaults(values, model), model, vae: getModelDefaultVae(model, vaeModels) };
       fields.push('model');
+    }
+
+    const qwen3SourceModel = getMetadataMainModel(metadata, 'qwen3_source', models);
+    const qwenImageSourceModel = getMetadataMainModel(metadata, 'qwen_image_component_source', models);
+    const componentSourceModel = qwen3SourceModel !== undefined ? qwen3SourceModel : qwenImageSourceModel;
+    const qwen3EncoderModel = getMetadataComponent(metadata, 'qwen3_encoder', models);
+    const qwenVLEncoderModel = getMetadataComponent(metadata, 'qwen_image_qwen_vl_encoder', models);
+    const componentPatch = {
+      componentSourceModel: componentSourceModel !== undefined ? componentSourceModel : values.componentSourceModel,
+      qwen3EncoderModel: qwen3EncoderModel !== undefined ? qwen3EncoderModel : values.qwen3EncoderModel,
+      qwenVLEncoderModel: qwenVLEncoderModel !== undefined ? qwenVLEncoderModel : values.qwenVLEncoderModel,
+    };
+
+    if (
+      componentPatch.componentSourceModel !== values.componentSourceModel ||
+      componentPatch.qwen3EncoderModel !== values.qwen3EncoderModel ||
+      componentPatch.qwenVLEncoderModel !== values.qwenVLEncoderModel
+    ) {
+      values = { ...values, ...componentPatch };
+      fields.push('components');
     }
 
     const vae = getMetadataVae(metadata, values.model, vaeModels);
@@ -366,14 +446,14 @@ export const buildImageRecallSettings = ({
   }
 
   if (kind === 'dimensions') {
-    const size = getImageSize(image);
+    const size = getImageSize(image, values.model);
 
     if (size) {
       values = withDimensions(values, size);
       fields.push('size');
     }
   } else if (kind === 'all' || kind === 'remix') {
-    const size = getMetadataSize(metadata);
+    const size = getMetadataSize(metadata, values.model);
 
     if (Object.keys(size).length > 0) {
       values = withDimensions(values, size);
