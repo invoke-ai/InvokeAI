@@ -23,3 +23,8 @@ class UrlServiceBase(ABC):
     def get_workflow_thumbnail_url(self, workflow_id: str) -> str:
         """Gets the URL for a workflow thumbnail"""
         pass
+
+    @abstractmethod
+    def get_asset_url(self, asset_name: str) -> str:
+        """Gets the URL for a 3D asset file"""
+        pass

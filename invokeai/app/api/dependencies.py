@@ -41,6 +41,7 @@ from invokeai.app.services.style_preset_images.style_preset_images_disk import S
 from invokeai.app.services.style_preset_records.style_preset_records_sqlite import SqliteStylePresetRecordsStorage
 from invokeai.app.services.urls.urls_default import LocalUrlService
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
+from invokeai.app.services.asset_files.asset_files_disk import DiskAssetFileStorage
 from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_disk import WorkflowThumbnailFileStorageDisk
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
@@ -94,6 +95,7 @@ class ApiDependencies:
             raise ValueError("Output folder is not set")
 
         image_files = DiskImageFileStorage(f"{output_folder}/images")
+        asset_files = DiskAssetFileStorage(output_folder / "assets")
 
         model_images_folder = config.models_path
         style_presets_folder = config.style_presets_path
@@ -157,6 +159,7 @@ class ApiDependencies:
         client_state_persistence = ClientStatePersistenceSqlite(db=db)
 
         services = InvocationServices(
+            asset_files=asset_files,
             board_image_records=board_image_records,
             board_images=board_images,
             board_records=board_records,

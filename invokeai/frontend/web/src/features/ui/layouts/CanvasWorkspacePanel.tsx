@@ -13,6 +13,7 @@ import { Filter } from 'features/controlLayers/components/Filters/Filter';
 import { CanvasHUD } from 'features/controlLayers/components/HUD/CanvasHUD';
 import { InvokeCanvasComponent } from 'features/controlLayers/components/InvokeCanvasComponent';
 import { SelectObject } from 'features/controlLayers/components/SelectObject/SelectObject';
+import { CanvasSplatOverlay } from 'features/controlLayers/components/SplatOverlay/CanvasSplatOverlay';
 import { StagingAreaContextProvider } from 'features/controlLayers/components/StagingArea/context';
 import { PinnedFillColorPickerOverlay } from 'features/controlLayers/components/Tool/PinnedFillColorPickerOverlay';
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
@@ -105,6 +106,7 @@ export const CanvasWorkspacePanel = memo(() => {
                 </Flex>
                 <CanvasBusySpinner position="absolute" insetInlineEnd={2} bottom={2} />
               </CanvasManagerProviderGate>
+              <CanvasSplatOverlay />
             </Flex>
           )}
         </ContextMenu>

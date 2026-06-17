@@ -33,6 +33,7 @@ def mock_services() -> InvocationServices:
 
     # NOTE: none of these are actually called by the test invocations
     return InvocationServices(
+        asset_files=None,  # type: ignore
         board_image_records=SqliteBoardImageRecordStorage(db=db),
         board_images=None,  # type: ignore
         board_records=SqliteBoardRecordStorage(db=db),
