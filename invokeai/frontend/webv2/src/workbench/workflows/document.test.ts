@@ -161,6 +161,14 @@ describe('projectGraphReducer', () => {
     expect(node?.type === 'invocation' && node.data.inputs.a?.value).toBe(42);
   });
 
+  it('sets invocation cache preference', () => {
+    const { doc, nodeAId } = createDocWithNodes();
+    const next = projectGraphReducer(doc, { nodeId: nodeAId, type: 'setNodeUseCache', useCache: false });
+    const node = next.nodes.find((candidate) => candidate.id === nodeAId);
+
+    expect(node?.type === 'invocation' && node.data.useCache).toBe(false);
+  });
+
   it('sets and clears field description overrides', () => {
     const { doc, nodeAId } = createDocWithNodes();
     let next = projectGraphReducer(doc, {

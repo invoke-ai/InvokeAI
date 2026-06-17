@@ -128,6 +128,8 @@ export const isWorkflowFieldValueValid = (template: FieldInputTemplate, value: u
   }
 };
 
+const isEmptyOptionalValue = (value: unknown): boolean => value === undefined || value === null || value === '';
+
 export const getWorkflowFieldInvalidReason = ({
   isConnected,
   template,
@@ -137,8 +139,16 @@ export const getWorkflowFieldInvalidReason = ({
   template: FieldInputTemplate;
   value: unknown;
 }): string | null => {
-  if (!template.required || isConnected) {
+  if (isConnected) {
     return null;
+  }
+
+  if (!template.required && isEmptyOptionalValue(value)) {
+    return null;
+  }
+
+  if (!template.required) {
+    return isDirectInputField(template) && !isWorkflowFieldValueValid(template, value) ? 'Invalid value.' : null;
   }
 
   if (template.input === 'connection') {

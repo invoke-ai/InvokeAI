@@ -292,6 +292,7 @@ export type ProjectGraphAction =
   | { type: 'setNodeNotes'; nodeId: string; notes: string }
   | { type: 'setNodeIsOpen'; nodeId: string; isOpen: boolean }
   | { type: 'setNodeIsIntermediate'; nodeId: string; isIntermediate: boolean }
+  | { type: 'setNodeUseCache'; nodeId: string; useCache: boolean }
   | { type: 'setFieldValue'; nodeId: string; fieldName: string; value: unknown }
   | { type: 'setFieldLabel'; nodeId: string; fieldName: string; label: string }
   | { type: 'setFieldDescription'; nodeId: string; fieldName: string; description: string }
@@ -480,6 +481,12 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
       return updateInvocationNode(document, action.nodeId, (node) => ({
         ...node,
         data: { ...node.data, isIntermediate: action.isIntermediate },
+      }));
+    }
+    case 'setNodeUseCache': {
+      return updateInvocationNode(document, action.nodeId, (node) => ({
+        ...node,
+        data: { ...node.data, useCache: action.useCache },
       }));
     }
     case 'setFieldValue': {

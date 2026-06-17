@@ -69,6 +69,13 @@ describe('workflow field validation', () => {
     expect(isWorkflowFieldValueValid(template, 5.5)).toBe(false);
   });
 
+  it('allows empty optional direct values but flags populated invalid optional values', () => {
+    const template = input({ maximum: 10, minimum: 1, required: false, type: single('IntegerField') });
+
+    expect(getWorkflowFieldInvalidReason({ isConnected: false, template, value: undefined })).toBe(null);
+    expect(getWorkflowFieldInvalidReason({ isConnected: false, template, value: 20 })).toBe('Invalid value.');
+  });
+
   it('validates object-backed model and image fields', () => {
     expect(isWorkflowFieldValueValid(input({ type: single('ModelIdentifierField') }), { key: 'model-key' })).toBe(true);
     expect(isWorkflowFieldValueValid(input({ type: single('ModelIdentifierField') }), {})).toBe(false);

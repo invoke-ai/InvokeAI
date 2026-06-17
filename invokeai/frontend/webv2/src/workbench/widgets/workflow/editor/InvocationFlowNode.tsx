@@ -2,15 +2,18 @@ import type {
   FieldInputTemplate,
   FieldOutputTemplate,
   FieldType,
+  InvocationTemplate,
   WorkflowInvocationNode,
 } from '@workbench/workflows/types';
 
-import { Badge, Box, Field, Flex, HStack, Icon, Image, Input, Stack, Text, IconButton } from '@chakra-ui/react';
+import { Box, Checkbox, Field, Flex, HStack, Icon, IconButton, Image, Input, Stack, Text } from '@chakra-ui/react';
+import { useAuthSession } from '@workbench/auth/session';
 import { useNodeExecutionState, type NodeExecutionState } from '@workbench/backend/nodeExecutionStore';
 import { Tooltip } from '@workbench/components/ui';
 import { FieldDescriptionPopover } from '@workbench/widgets/workflow/fields/FieldDescriptionPopover';
 import { WorkflowFieldInput } from '@workbench/widgets/workflow/fields/WorkflowFieldInput';
 import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { isExecutableInvocationType } from '@workbench/workflows/buildGraph';
 import {
   getFieldTypeColor,
   getFieldTypeLabel,
@@ -21,7 +24,7 @@ import {
 } from '@workbench/workflows/fields';
 import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
 import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
-import { ChevronDownIcon, ChevronRightIcon, PinIcon, PinOffIcon, TriangleAlertIcon } from 'lucide-react';
+import { ChevronDownIcon, ChevronRightIcon, InfoIcon, PinIcon, PinOffIcon, TriangleAlertIcon } from 'lucide-react';
 import { memo, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 
 import type { InvocationFlowNode as InvocationFlowNodeType } from './flowAdapters';
@@ -225,6 +228,105 @@ const OutputFieldTooltip = ({ template }: { template: FieldOutputTemplate }) => 
   </Stack>
 );
 
+const hasImageOutput = (template: InvocationTemplate): boolean =>
+  template.type !== 'image' && Object.values(template.outputs).some((output) => output.type.name === 'ImageField');
+
+const NodeInfoTooltipContent = ({ node, template }: { node: WorkflowInvocationNode; template: InvocationTemplate }) => {
+  const title = node.data.label ? `${node.data.label} (${template.title})` : template.title;
+  const nodePack = node.data.nodePack || template.nodePack;
+
+  return (
+    <Stack gap="1" maxW="20rem">
+      <Text fontWeight="700">{title}</Text>
+      <Text color="fg.subtle">Type: {template.type}</Text>
+      <Text color="fg.subtle">Node pack: {nodePack}</Text>
+      <Text color="fg.subtle">Version: {node.data.version}</Text>
+      <Text color="fg.subtle">Classification: {template.classification}</Text>
+      <Text color="fg.subtle">Category: {template.category}</Text>
+      {template.description ? <Text fontStyle="italic">{template.description}</Text> : null}
+      {node.data.notes ? <Text>{node.data.notes}</Text> : null}
+    </Stack>
+  );
+};
+
+const NodeInfoButton = ({ node, template }: { node: WorkflowInvocationNode; template: InvocationTemplate }) => (
+  <Tooltip
+    content={<NodeInfoTooltipContent node={node} template={template} />}
+    positioning={{ placement: 'top-end' }}
+    showArrow
+  >
+    <IconButton
+      aria-label={`Show details for ${node.data.label || template.title}`}
+      className="nodrag"
+      size="2xs"
+      variant="ghost"
+    >
+      <Icon as={InfoIcon} boxSize="3.5" />
+    </IconButton>
+  </Tooltip>
+);
+
+const NodeFooter = ({ node, template }: { node: WorkflowInvocationNode; template: InvocationTemplate }) => {
+  const dispatch = useWorkbenchDispatch();
+  const session = useAuthSession();
+  const canUseCache = !session.multiuserEnabled || session.user?.is_admin === true;
+
+  if (!isExecutableInvocationType(template.type) || !hasImageOutput(template)) {
+    return null;
+  }
+
+  return (
+    <Flex
+      align="center"
+      bg="bg.subtle"
+      borderBottomRadius="lg"
+      borderColor="border.subtle"
+      borderTopWidth="1px"
+      className="nodrag"
+      gap="3"
+      justify="space-between"
+      minH="8"
+      px="2.5"
+      py="1"
+    >
+      <HStack gap="4">
+        {canUseCache ? (
+          <Checkbox.Root
+            checked={node.data.useCache}
+            colorPalette="accent"
+            size="xs"
+            onCheckedChange={(event) =>
+              dispatch({
+                action: { nodeId: node.id, type: 'setNodeUseCache', useCache: event.checked === true },
+                type: 'applyProjectGraphAction',
+              })
+            }
+          >
+            <Checkbox.HiddenInput />
+            <Checkbox.Control />
+            <Checkbox.Label fontSize="2xs">Use Cache</Checkbox.Label>
+          </Checkbox.Root>
+        ) : null}
+        <Checkbox.Root
+          checked={!node.data.isIntermediate}
+          colorPalette="accent"
+          size="xs"
+          onCheckedChange={(event) =>
+            dispatch({
+              action: { isIntermediate: event.checked !== true, nodeId: node.id, type: 'setNodeIsIntermediate' },
+              type: 'applyProjectGraphAction',
+            })
+          }
+        >
+          <Checkbox.HiddenInput />
+          <Checkbox.Control />
+          <Checkbox.Label fontSize="2xs">Save to Gallery</Checkbox.Label>
+        </Checkbox.Root>
+      </HStack>
+    </Flex>
+  );
+};
+
 const InputFieldRow = ({
   isConnected,
   isExposed,
@@ -279,7 +381,7 @@ const InputFieldRow = ({
             label even when the value control below grows the row. */}
         <HStack gap="1.5" h="5" justify="space-between" minW="0" position="relative" w="full">
           {template.input !== 'direct' ? (
-            <Tooltip content={handleTooltip} showArrow>
+            <Tooltip content={handleTooltip} positioning={{ placement: 'right-end' }} showArrow>
               <Handle
                 id={template.name}
                 position={Position.Left}
@@ -468,6 +570,8 @@ const InvocationFlowNodeComponent = ({ data, selected }: NodeProps<InvocationFlo
   const isOpen = node.data.isOpen;
   const isRunning = execution?.status === 'running';
   const isMissingRequiredInput = hasMissingRequiredInputs(node, Object.values(template.inputs), connectedFieldNames);
+  const withFooter = !isZoomedOut && isExecutableInvocationType(template.type) && hasImageOutput(template);
+  const withOutputPreview = Boolean(execution?.outputImageUrl);
 
   return (
     <NodeShell hasMissingRequiredInput={isMissingRequiredInput} isRunning={isRunning} selected={selected ?? false}>
@@ -505,17 +609,13 @@ const InvocationFlowNodeComponent = ({ data, selected }: NodeProps<InvocationFlo
           <>
             <NodeTitle node={node} />
             <Box flex="1" />
-            <Tooltip content={template.description || template.type}>
-              <Badge size="xs" fontFamily="mono">
-                {template.type}
-              </Badge>
-            </Tooltip>
+            <NodeInfoButton node={node} template={template} />
           </>
         )}
       </Flex>
       <NodeProgressStrip execution={execution} />
       {isOpen ? (
-        <Box bg="bg.muted" borderBottomRadius={execution?.outputImageUrl ? 'none' : 'lg'} py="1">
+        <Box bg="bg.muted" borderBottomRadius={withFooter || withOutputPreview ? 'none' : 'lg'} py="1">
           {outputTemplates.map((outputTemplate) => (
             <OutputFieldRow key={outputTemplate.name} isSkeleton={isZoomedOut} template={outputTemplate} />
           ))}
@@ -534,7 +634,7 @@ const InvocationFlowNodeComponent = ({ data, selected }: NodeProps<InvocationFlo
         <HiddenHandles inputTemplates={inputTemplates} outputTemplates={outputTemplates} />
       )}
       {isOpen && execution?.outputImageUrl ? (
-        <Box borderColor="border.subtle" borderTopWidth="1px" p="1.5">
+        <Box borderBottomRadius={withFooter ? 'none' : 'lg'} borderColor="border.subtle" borderTopWidth="1px" p="1.5">
           {isZoomedOut ? (
             <SkeletonBar h="6rem" w="full" />
           ) : (
@@ -550,6 +650,7 @@ const InvocationFlowNodeComponent = ({ data, selected }: NodeProps<InvocationFlo
           )}
         </Box>
       ) : null}
+      {isOpen && withFooter ? <NodeFooter node={node} template={template} /> : null}
     </NodeShell>
   );
 };

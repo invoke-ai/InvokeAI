@@ -160,6 +160,73 @@ describe('getProjectGraphReadiness', () => {
 
     expect(getProjectGraphReadiness(doc, unknownTemplates).reasons[0]).toMatch(/Unknown node type "sink"/);
   });
+
+  it('reports invalid required direct values', () => {
+    const constrainedTemplate = template('constrained', {
+      choice: input('choice', {
+        options: ['a', 'b'],
+        required: true,
+        type: { batch: false, cardinality: 'SINGLE', name: 'EnumField' },
+      }),
+      count: input('count', {
+        maximum: 4,
+        minimum: 1,
+        required: true,
+        type: { batch: false, cardinality: 'SINGLE', name: 'IntegerField' },
+      }),
+    });
+    const node = buildInvocationNode(constrainedTemplate, { x: 0, y: 0 });
+    let doc = createProjectGraph('invalid-values');
+
+    doc = projectGraphReducer(doc, { node, type: 'addNode' });
+    doc = projectGraphReducer(doc, { fieldName: 'choice', nodeId: node.id, type: 'setFieldValue', value: 'z' });
+    doc = projectGraphReducer(doc, { fieldName: 'count', nodeId: node.id, type: 'setFieldValue', value: 10 });
+
+    const readiness = getProjectGraphReadiness(doc, {
+      error: null,
+      status: 'loaded',
+      templates: { constrained: constrainedTemplate },
+    });
+
+    expect(readiness.canInvoke).toBe(false);
+    expect(readiness.reasons).toEqual([
+      '"constrained" has invalid input "choice".',
+      '"constrained" has invalid input "count".',
+    ]);
+  });
+
+  it('reports invalid optional direct values when they are populated', () => {
+    const constrainedTemplate = template('optional-constrained', {
+      count: input('count', {
+        maximum: 4,
+        minimum: 1,
+        required: false,
+        type: { batch: false, cardinality: 'SINGLE', name: 'IntegerField' },
+      }),
+    });
+    const node = buildInvocationNode(constrainedTemplate, { x: 0, y: 0 });
+    let doc = createProjectGraph('invalid-optional-values');
+
+    doc = projectGraphReducer(doc, { node, type: 'addNode' });
+
+    expect(
+      getProjectGraphReadiness(doc, {
+        error: null,
+        status: 'loaded',
+        templates: { 'optional-constrained': constrainedTemplate },
+      })
+    ).toEqual({ canInvoke: true, reasons: [] });
+
+    doc = projectGraphReducer(doc, { fieldName: 'count', nodeId: node.id, type: 'setFieldValue', value: 10 });
+
+    expect(
+      getProjectGraphReadiness(doc, {
+        error: null,
+        status: 'loaded',
+        templates: { 'optional-constrained': constrainedTemplate },
+      })
+    ).toEqual({ canInvoke: false, reasons: ['"optional-constrained" has invalid input "count".'] });
+  });
 });
 
 describe('compileProjectGraph', () => {

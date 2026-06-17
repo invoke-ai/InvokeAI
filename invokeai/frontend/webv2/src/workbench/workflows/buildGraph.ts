@@ -5,6 +5,7 @@ import type { FieldInputTemplate, InvocationTemplates, ProjectGraphState, Workfl
 
 import { getResolvedWorkflowEdges } from './connectors';
 import { createWorkflowId } from './document';
+import { getWorkflowFieldInvalidReason } from './fields';
 import { isInvocationNode } from './types';
 import { hasAnyCycle } from './validation';
 
@@ -26,6 +27,8 @@ const UNSUPPORTED_NODE_TYPES = new Set([
   'string_batch',
   'string_generator',
 ]);
+
+export const isExecutableInvocationType = (type: string): boolean => !UNSUPPORTED_NODE_TYPES.has(type);
 
 const getExecutableNodes = (document: ProjectGraphState): WorkflowInvocationNode[] =>
   document.nodes.filter(isInvocationNode);
@@ -87,27 +90,35 @@ export const getProjectGraphReadiness = (
       continue;
     }
 
-    if (UNSUPPORTED_NODE_TYPES.has(node.data.type)) {
+    if (!isExecutableInvocationType(node.data.type)) {
       reasons.push(`Batch/generator node "${getNodeDisplayName(node, templates)}" is not supported yet.`);
       continue;
     }
 
     for (const inputTemplate of Object.values(template.inputs)) {
-      if (!inputTemplate.required) {
-        continue;
-      }
-
       if (connectedInputs.has(`${node.id}:${inputTemplate.name}`)) {
         continue;
       }
 
       if (inputTemplate.input === 'connection') {
-        reasons.push(`"${getNodeDisplayName(node, templates)}" is missing a connection for "${inputTemplate.title}".`);
+        if (inputTemplate.required) {
+          reasons.push(
+            `"${getNodeDisplayName(node, templates)}" is missing a connection for "${inputTemplate.title}".`
+          );
+        }
         continue;
       }
 
-      if (isEmptyValue(node.data.inputs[inputTemplate.name]?.value)) {
+      const invalidReason = getWorkflowFieldInvalidReason({
+        isConnected: false,
+        template: inputTemplate,
+        value: node.data.inputs[inputTemplate.name]?.value,
+      });
+
+      if (inputTemplate.required && isEmptyValue(node.data.inputs[inputTemplate.name]?.value)) {
         reasons.push(`"${getNodeDisplayName(node, templates)}" is missing required input "${inputTemplate.title}".`);
+      } else if (invalidReason) {
+        reasons.push(`"${getNodeDisplayName(node, templates)}" has invalid input "${inputTemplate.title}".`);
       }
     }
   }

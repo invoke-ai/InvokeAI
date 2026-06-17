@@ -5,7 +5,7 @@ import type { FieldInputTemplate } from '@workbench/workflows/types';
 import { HStack, Input, NativeSelect, Switch, Text, Textarea } from '@chakra-ui/react';
 import { Button } from '@workbench/components/ui';
 import { listGalleryBoards, type GalleryBoard } from '@workbench/gallery/api';
-import { SCHEDULER_OPTIONS } from '@workbench/generation/settings';
+import { SCHEDULER_OPTIONS } from '@workbench/generation/baseGenerationPolicies';
 import { ModelSelect } from '@workbench/models/components';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useEffect, useState, type ChangeEvent } from 'react';
@@ -179,6 +179,7 @@ const ModelIdentifierInput = ({ id, invalid, onChange, template, value }: Workfl
 
   return (
     <ModelSelect
+      className="nodrag nowheel"
       filter={allowedBases ? (model: ModelConfig) => allowedBases.includes(model.base) : undefined}
       id={id ? `${id}-model-combobox` : undefined}
       invalid={invalid}
@@ -205,16 +206,31 @@ const SchedulerInput = ({ id, invalid, onChange, template, value }: WorkflowFiel
   />
 );
 
+let boardOptionsRequest: Promise<GalleryBoard[]> | null = null;
+
+const getBoardOptions = (): Promise<GalleryBoard[]> => {
+  if (!boardOptionsRequest) {
+    boardOptionsRequest = listGalleryBoards()
+      .then((loadedBoards) => loadedBoards.filter((board) => board.kind === 'board'))
+      .catch((error: unknown) => {
+        boardOptionsRequest = null;
+        throw error;
+      });
+  }
+
+  return boardOptionsRequest;
+};
+
 const BoardInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => {
   const [boards, setBoards] = useState<GalleryBoard[]>([]);
 
   useEffect(() => {
     let isCancelled = false;
 
-    listGalleryBoards()
+    getBoardOptions()
       .then((loadedBoards) => {
         if (!isCancelled) {
-          setBoards(loadedBoards.filter((board) => board.kind === 'board'));
+          setBoards(loadedBoards);
         }
       })
       .catch(() => {
