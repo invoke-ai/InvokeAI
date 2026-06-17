@@ -1095,108 +1095,11 @@ class AdaptiveInvokeAIClient:
         return response.json()
 ```
 
-## Running a Graph Programmatically
+## Programmatic Graph Execution
 
-InvokeAI's HTTP API is primarily designed to support the InvokeAI application itself. It can still be used programmatically, but one important detail is easy to miss:
+If you are building an external client against the HTTP API, see the dedicated [Workflow Execution guide](/development/guides/workflow-api/).
 
-- A saved **workflow** is not executed directly.
-- The queue accepts an executable **graph**.
-- If you fetch a saved workflow from `/api/v1/workflows/`, you still need to enqueue a graph with `POST /api/v1/queue/default/enqueue_batch`.
-
-This distinction is the main reason users often get stuck when they can successfully read workflow records but cannot execute them.
-
-### Minimal `enqueue_batch` Example
-
-The smallest useful "hello world" is a simple graph with one math node. This avoids any image-model setup and lets you verify that your client can enqueue work and poll for completion.
-
-In multi-user mode, include your `Authorization: Bearer <token>` header on these requests.
-
-```python
-import requests
-import time
-
-BASE_URL = "http://localhost:9090"
-
-graph = {
-    "id": "hello-graph",
-    "nodes": {
-        "add-node": {
-            "id": "add-node",
-            "type": "add",
-            "a": 2,
-            "b": 3,
-            "is_intermediate": False,
-            "use_cache": True,
-        }
-    },
-    "edges": [],
-}
-
-payload = {
-    "batch": {
-        "graph": graph,
-        "runs": 1,
-        "origin": "external-client",
-    }
-}
-
-enqueue_response = requests.post(
-    f"{BASE_URL}/api/v1/queue/default/enqueue_batch",
-    json=payload,
-)
-enqueue_response.raise_for_status()
-
-item_id = enqueue_response.json()["item_ids"][0]
-
-while True:
-    item_response = requests.get(f"{BASE_URL}/api/v1/queue/default/i/{item_id}")
-    item_response.raise_for_status()
-    item = item_response.json()
-
-    status = item["status"]
-    if status == "completed":
-        print(item["session"]["results"])
-        break
-    if status == "failed":
-        raise RuntimeError(item["error_message"])
-    if status == "canceled":
-        raise RuntimeError("Queue item was canceled")
-
-    time.sleep(0.5)
-```
-
-For the graph above, the completed queue item will contain the output in `session.results`.
-
-### Getting an Image Output
-
-For image-generation graphs, the completed queue item also includes `session.results`, but the output object will typically contain an image reference instead of a plain integer value.
-
-For example, an image output may look like this:
-
-```json
-{
-  "type": "image_output",
-  "image": {
-    "image_name": "abc123.png"
-  }
-}
-```
-
-Once you have the `image_name`, you can download the generated file from:
-
-```text
-GET /api/v1/images/i/{image_name}/full
-```
-
-If you only need the file preview, you can also use:
-
-```text
-GET /api/v1/images/i/{image_name}/thumbnail
-```
-
-### Polling vs. WebSockets
-
-The example above uses polling because it is the easiest way to get started from an external client. If you need lower-latency updates, you can also use the socket events emitted during queue execution.
+In multi-user mode, remember to include your `Authorization: Bearer <token>` header on queue and workflow requests.
 
 ## OpenAPI/Swagger Documentation
 
