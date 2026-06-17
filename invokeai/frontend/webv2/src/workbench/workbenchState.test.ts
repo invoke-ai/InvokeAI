@@ -20,18 +20,26 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   batchCount: 1,
   cfgRescaleMultiplier: 0,
   cfgScale: 7,
+  clipEmbedModel: null,
+  clipGEmbedModel: null,
+  clipLEmbedModel: null,
   clipSkip: 0,
+  componentSourceModel: null,
   height: 1024,
+  loras: [],
   model,
   modelKey: model.key,
   negativePrompt: '',
   positivePrompt: 'first prompt',
+  qwen3EncoderModel: null,
+  qwenVLEncoderModel: null,
   scheduler: 'euler_a',
   seamlessXAxis: false,
   seamlessYAxis: false,
   seed: 123,
   shouldRandomizeSeed: false,
   steps: 30,
+  t5EncoderModel: null,
   vae: null,
   vaePrecision: 'fp32',
   width: 1024,
@@ -185,6 +193,18 @@ describe('workbench widget region opening', () => {
 });
 
 describe('workbenchReducer Phase 5 generation flow', () => {
+  it('does not notify gallery total subscribers for unchanged or non-finite totals', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { totalImages: 3, type: 'setGalleryPageInfo' });
+
+    const unchanged = workbenchReducer(state, { totalImages: 3, type: 'setGalleryPageInfo' });
+    const nonFinite = workbenchReducer(state, { totalImages: Number.NaN, type: 'setGalleryPageInfo' });
+
+    expect(unchanged).toBe(state);
+    expect(nonFinite).toBe(state);
+  });
+
   it('routes queue results back to the originating project after the user switches projects', () => {
     let state = submitGenerate(primeGenerate());
     const originProject = getActiveProject(state);
@@ -953,6 +973,9 @@ describe('workbench backend connection recovery', () => {
   it('refreshes every project gallery when backend data may have changed', () => {
     const initial = createInitialWorkbenchState();
     const previousTokens = initial.projects.map((project) => project.widgetStates.gallery.values.galleryRefreshToken);
+    const previousImageTokens = initial.projects.map(
+      (project) => project.widgetStates.gallery.values.galleryImagesRefreshToken
+    );
     const state = workbenchReducer(initial, { type: 'refreshBackendData' });
 
     expect(state.projects).toHaveLength(initial.projects.length);
@@ -960,7 +983,20 @@ describe('workbench backend connection recovery', () => {
     for (const [index, project] of state.projects.entries()) {
       expect(project.widgetStates.gallery.values.galleryRefreshToken).toBeDefined();
       expect(project.widgetStates.gallery.values.galleryRefreshToken).not.toBe(previousTokens[index]);
+      expect(project.widgetStates.gallery.values.galleryImagesRefreshToken).toBeDefined();
+      expect(project.widgetStates.gallery.values.galleryImagesRefreshToken).not.toBe(previousImageTokens[index]);
     }
+  });
+
+  it('can refresh gallery images without invalidating board data', () => {
+    const initial = createInitialWorkbenchState();
+    const state = workbenchReducer(initial, { type: 'touchGalleryImagesRefresh' });
+    const previousValues = getActiveProject(initial).widgetStates.gallery.values;
+    const values = getActiveProject(state).widgetStates.gallery.values;
+
+    expect(values.galleryRefreshToken).toBe(previousValues.galleryRefreshToken);
+    expect(values.galleryImagesRefreshToken).toBeDefined();
+    expect(values.galleryImagesRefreshToken).not.toBe(previousValues.galleryImagesRefreshToken);
   });
 
   it('does not hydrate stale persisted backend connection state', () => {

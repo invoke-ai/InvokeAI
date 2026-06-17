@@ -4,8 +4,9 @@ import type { XYPosition } from '@workbench/workflows/types';
 import { Box, Dialog, Portal, SegmentGroup, Text } from '@chakra-ui/react';
 import { Button, JsonPreview } from '@workbench/components/ui';
 import { formatRoute, isInvocationRouteValid, resolveInvocationRoute } from '@workbench/invocation';
+import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsStore';
 import { useActiveProject, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { GraphPreviewFlow } from './GraphPreviewFlow';
 
@@ -39,11 +40,22 @@ export const GraphPreviewDialog = ({
 }: GraphPreviewDialogProps) => {
   const activeProject = useActiveProject();
   const dispatch = useWorkbenchDispatch();
+  const { models, status: modelsStatus } = useModelsSnapshot();
+  const availabilityModels = modelsStatus === 'loaded' ? models : undefined;
   const [mode, setMode] = useState<PreviewMode>('nodes');
   const dialogRoute = sourceId
-    ? resolveInvocationRoute(activeProject, 'dialog', { ...activeProject.invocation, sourceId, sourceLocked: true })
+    ? resolveInvocationRoute(
+        activeProject,
+        'dialog',
+        { ...activeProject.invocation, sourceId, sourceLocked: true },
+        availabilityModels
+      )
     : null;
   const canInvoke = dialogRoute ? isInvocationRouteValid(dialogRoute) : false;
+
+  useEffect(() => {
+    ensureModelsLoaded();
+  }, []);
 
   return (
     <Dialog.Root open={isOpen} size="xl" onOpenChange={(event) => onOpenChange(event.open)}>
@@ -95,6 +107,7 @@ export const GraphPreviewDialog = ({
 
                     dispatch({
                       backendSupportsCancellation: true,
+                      models: availabilityModels,
                       route: dialogRoute,
                       type: 'submitResolvedInvocationSnapshot',
                     });

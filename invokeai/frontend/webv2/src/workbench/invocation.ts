@@ -1,3 +1,4 @@
+import type { ModelConfig } from './models/types';
 import type {
   InvocationMode,
   InvocationRoute,
@@ -8,6 +9,12 @@ import type {
   WidgetId,
 } from './types';
 
+import {
+  getGenerationModelAvailabilityReasons,
+  getGenerationValidationReasons,
+  isSupportedGenerateModel,
+} from './generation/baseGenerationPolicies';
+import { normalizeGenerateWidgetValues } from './generation/settings';
 import { getProjectGraphReadiness } from './workflows/buildGraph';
 import { getInvocationTemplatesSnapshot } from './workflows/templates';
 
@@ -74,25 +81,17 @@ const sourceWidgetIds: Partial<Record<InvocationSourceId, WidgetId>> = {
 const isWidgetMounted = (project: Project, widgetId: WidgetId): boolean =>
   Object.values(project.widgetRegions).some((region) => region.enabledWidgetIds.includes(widgetId));
 
-const hasGenerateSnapshotInputs = (project: Project): boolean => {
-  const values = project.widgetStates.generate.values;
-  const model = values.model;
-  const hasFiniteNumber = (key: string) => typeof values[key] === 'number' && Number.isFinite(values[key]);
+const getGenerateSnapshotValidationReasons = (project: Project, models?: readonly ModelConfig[]): string[] => {
+  const values = normalizeGenerateWidgetValues(project.widgetStates.generate.values);
 
-  return (
-    typeof values.modelKey === 'string' &&
-    typeof values.positivePrompt === 'string' &&
-    typeof values.negativePrompt === 'string' &&
-    hasFiniteNumber('width') &&
-    hasFiniteNumber('height') &&
-    hasFiniteNumber('steps') &&
-    hasFiniteNumber('cfgScale') &&
-    hasFiniteNumber('cfgRescaleMultiplier') &&
-    typeof values.scheduler === 'string' &&
-    hasFiniteNumber('seed') &&
-    typeof values.shouldRandomizeSeed === 'boolean' &&
-    Boolean(model && typeof model === 'object' && (model as Record<string, unknown>).type === 'main')
-  );
+  if (!values || !isSupportedGenerateModel(values.model)) {
+    return ['Generate needs a supported model before it can be invoked.'];
+  }
+
+  return [
+    ...getGenerationValidationReasons(values.model, values),
+    ...(models ? getGenerationModelAvailabilityReasons(values.model, values, models) : []),
+  ];
 };
 
 export const isResultDestinationAvailable = (destination: ResultDestination): boolean =>
@@ -101,7 +100,8 @@ export const isResultDestinationAvailable = (destination: ResultDestination): bo
 export const resolveInvocationRoute = (
   project: Project,
   mode: InvocationMode = 'global',
-  route: InvocationRoute = project.invocation
+  route: InvocationRoute = project.invocation,
+  models?: readonly ModelConfig[]
 ): ResolvedInvocationRoute => {
   const sourceId = route.sourceId;
   const destination = route.destination;
@@ -121,8 +121,8 @@ export const resolveInvocationRoute = (
     validationReasons.push(`The ${getSourceLabel(sourceId)} widget is not mounted in this project.`);
   }
 
-  if (sourceId === 'generate' && !hasGenerateSnapshotInputs(project)) {
-    validationReasons.push('Generate needs a supported model before it can be invoked.');
+  if (sourceId === 'generate') {
+    validationReasons.push(...getGenerateSnapshotValidationReasons(project, models));
   }
 
   if (projectGraphReadiness && !projectGraphReadiness.canInvoke) {

@@ -1,5 +1,6 @@
 import type { GallerySettings } from './gallery/settings';
 import type { GenerateWidgetValues } from './generation/types';
+import type { ModelConfig } from './models/types';
 import type {
   CanvasDocumentContract,
   CanvasPlacementContract,
@@ -32,9 +33,14 @@ import type {
 } from './types';
 import type { ProjectGraphState } from './workflows/types';
 
+import { getGenerationModelAvailabilityReasons } from './generation/baseGenerationPolicies';
 import { sanitizeBatchCount } from './generation/batch';
 import { compileGenerateGraph, resolveGenerateSeed } from './generation/graph';
-import { normalizeGenerateWidgetValues } from './generation/settings';
+import {
+  cloneGenerateWidgetValues,
+  normalizeGenerateWidgetValues,
+  syncGenerateWidgetValuesWithModels,
+} from './generation/settings';
 import {
   defaultInvocationRoute,
   isInvocationRouteValid,
@@ -82,8 +88,13 @@ type WorkbenchAction =
   | { type: 'saveProjectGraphSnapshot' }
   | { type: 'restoreProjectGraphSnapshot'; snapshotId: string }
   | { type: 'setProjectGraphLibraryBinding'; libraryWorkflowId: string }
-  | { type: 'submitInvocationSnapshot'; backendSupportsCancellation: boolean }
-  | { type: 'submitResolvedInvocationSnapshot'; backendSupportsCancellation: boolean; route: InvocationRoute }
+  | { type: 'submitInvocationSnapshot'; backendSupportsCancellation: boolean; models?: readonly ModelConfig[] }
+  | {
+      type: 'submitResolvedInvocationSnapshot';
+      backendSupportsCancellation: boolean;
+      route: InvocationRoute;
+      models?: readonly ModelConfig[];
+    }
   | {
       type: 'markQueueItemBackendSubmitted';
       projectId: string;
@@ -118,6 +129,7 @@ type WorkbenchAction =
   | { type: 'setGalleryPage'; page: number }
   | { type: 'setGalleryPageInfo'; totalImages: number }
   | { type: 'touchGalleryRefresh' }
+  | { type: 'touchGalleryImagesRefresh' }
   | { type: 'removeGalleryImages'; imageNames: string[] }
   | { type: 'setGalleryProjectBoardId'; boardId: string }
   | { type: 'acceptStagedImage' }
@@ -730,7 +742,8 @@ const updateActiveInvocation = (
 
 const compileInvocationSnapshot = (
   project: Project,
-  route: InvocationRoute
+  route: InvocationRoute,
+  models?: readonly ModelConfig[]
 ): { graph: GraphContract; widgetStates: Record<WidgetId, WidgetStateContract> } | null => {
   const widgetStates = cloneWidgetStates(project.widgetStates);
 
@@ -758,9 +771,18 @@ const compileInvocationSnapshot = (
     return null;
   }
 
+  const currentValues = models ? syncGenerateWidgetValuesWithModels(values, models) : values;
+  const availabilityReasons = models
+    ? getGenerationModelAvailabilityReasons(currentValues.model, currentValues, models)
+    : [];
+
+  if (availabilityReasons.length > 0) {
+    return null;
+  }
+
   const resolvedSettings: GenerateWidgetValues = {
-    ...values,
-    seed: resolveGenerateSeed(values),
+    ...currentValues,
+    seed: resolveGenerateSeed(currentValues),
   };
   const compiledGraph = compileGenerateGraph(
     resolvedSettings,
@@ -772,7 +794,7 @@ const compileInvocationSnapshot = (
   widgetStates.generate = {
     ...widgetStates.generate,
     graphId: compiledGraph.id,
-    values: { ...resolvedSettings, model: { ...resolvedSettings.model } },
+    values: cloneGenerateWidgetValues(resolvedSettings),
   };
 
   return { graph: compiledGraph, widgetStates };
@@ -792,17 +814,33 @@ const updateProjectById = (
 const updateGalleryValues = (
   state: WorkbenchState,
   getValues: (values: Record<string, unknown>) => Record<string, unknown>
-): WorkbenchState =>
-  updateActiveProject(state, (project) => ({
-    ...project,
-    widgetStates: {
-      ...project.widgetStates,
-      gallery: {
-        ...project.widgetStates.gallery,
-        values: getValues(project.widgetStates.gallery.values),
+): WorkbenchState => {
+  const activeProject = state.projects.find((project) => project.id === state.activeProjectId);
+  const values = activeProject?.widgetStates.gallery.values;
+
+  if (!activeProject || !values) {
+    return state;
+  }
+
+  const nextValues = getValues(values);
+
+  if (nextValues === values) {
+    return state;
+  }
+
+  return updateActiveProject(state, (project) => {
+    return {
+      ...project,
+      widgetStates: {
+        ...project.widgetStates,
+        gallery: {
+          ...project.widgetStates.gallery,
+          values: nextValues,
+        },
       },
-    },
-  }));
+    };
+  });
+};
 
 const refreshProjectBackendData = (project: Project): Project => ({
   ...project,
@@ -812,6 +850,7 @@ const refreshProjectBackendData = (project: Project): Project => ({
       ...project.widgetStates.gallery,
       values: {
         ...project.widgetStates.gallery.values,
+        galleryImagesRefreshToken: createId('gallery-images-refresh'),
         galleryRefreshToken: createId('gallery-refresh'),
       },
     },
@@ -958,7 +997,8 @@ const routeQueueItemResults = (project: Project, queueItemId: string, images: Ge
 const submitInvocationSnapshot = (
   project: Project,
   backendSupportsCancellation: boolean,
-  route = resolveInvocationRoute(project)
+  route = resolveInvocationRoute(project),
+  models?: readonly ModelConfig[]
 ): Project => {
   if (!isInvocationRouteValid(route)) {
     return project;
@@ -966,7 +1006,7 @@ const submitInvocationSnapshot = (
 
   const submittedAt = now();
   const queueItemId = createId('queue-item');
-  const compiledSnapshot = compileInvocationSnapshot(project, route);
+  const compiledSnapshot = compileInvocationSnapshot(project, route, models);
 
   if (!compiledSnapshot) {
     return project;
@@ -1234,7 +1274,7 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
           ...project.widgetStates,
           generate: {
             ...project.widgetStates.generate,
-            values: { ...action.values, model: { ...action.values.model } },
+            values: cloneGenerateWidgetValues(action.values),
           },
         },
       }));
@@ -1377,7 +1417,7 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
     case 'submitInvocationSnapshot': {
       const beforeProject = state.projects.find((project) => project.id === state.activeProjectId);
       const nextState = updateActiveProject(state, (project) =>
-        submitInvocationSnapshot(project, action.backendSupportsCancellation)
+        submitInvocationSnapshot(project, action.backendSupportsCancellation, undefined, action.models)
       );
       const afterProject = nextState.projects.find((project) => project.id === nextState.activeProjectId);
 
@@ -1402,7 +1442,8 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
         submitInvocationSnapshot(
           project,
           action.backendSupportsCancellation,
-          resolveInvocationRoute(project, 'global', action.route)
+          resolveInvocationRoute(project, 'global', action.route, action.models),
+          action.models
         )
       );
     }
@@ -1654,10 +1695,28 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       return updateGalleryValues(state, (values) => ({ ...values, galleryPage: Math.max(0, action.page) }));
     }
     case 'setGalleryPageInfo': {
-      return updateGalleryValues(state, (values) => ({ ...values, galleryTotalImages: action.totalImages }));
+      if (!Number.isFinite(action.totalImages)) {
+        return state;
+      }
+
+      return updateGalleryValues(state, (values) => {
+        const totalImages = Math.max(0, action.totalImages);
+
+        return values.galleryTotalImages === totalImages ? values : { ...values, galleryTotalImages: totalImages };
+      });
     }
     case 'touchGalleryRefresh': {
-      return updateGalleryValues(state, (values) => ({ ...values, galleryRefreshToken: createId('gallery-refresh') }));
+      return updateGalleryValues(state, (values) => ({
+        ...values,
+        galleryImagesRefreshToken: createId('gallery-images-refresh'),
+        galleryRefreshToken: createId('gallery-refresh'),
+      }));
+    }
+    case 'touchGalleryImagesRefresh': {
+      return updateGalleryValues(state, (values) => ({
+        ...values,
+        galleryImagesRefreshToken: createId('gallery-images-refresh'),
+      }));
     }
     case 'removeGalleryImages': {
       const removedImageNames = new Set(action.imageNames);

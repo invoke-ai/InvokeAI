@@ -11,6 +11,7 @@ import {
   resolveInvocationRoute,
   resultDestinations,
 } from '@workbench/invocation';
+import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsStore';
 import { useActiveProject, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
 import { CheckIcon, ChevronDownIcon, LockKeyholeIcon, SparklesIcon } from 'lucide-react';
@@ -98,13 +99,15 @@ export const InvokeControl = () => {
   const activeProject = useActiveProject();
   const dispatch = useWorkbenchDispatch();
   const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection.status);
+  const { models, status: modelsStatus } = useModelsSnapshot();
+  const availabilityModels = modelsStatus === 'loaded' ? models : undefined;
   const { invocation } = activeProject;
 
   // Project-graph route validation reads the invocation templates imperatively;
   // subscribing here keeps the resolved route live while they load.
   useInvocationTemplatesSnapshot();
 
-  const resolvedRoute = resolveInvocationRoute(activeProject);
+  const resolvedRoute = resolveInvocationRoute(activeProject, 'global', activeProject.invocation, availabilityModels);
   const isLocked = invocation.sourceLocked || invocation.destinationLocked;
   const isConnected = backendConnectionStatus === 'connected';
   // Legacy parity: the queue button disables with the full list of reasons,
@@ -117,9 +120,15 @@ export const InvokeControl = () => {
   const routeLabel = isValid ? formatRoute(resolvedRoute) : (blockingReasons[0] ?? formatRoute(resolvedRoute));
   const resolvedRouteRef = useRef(resolvedRoute);
   const isValidRef = useRef(isValid);
+  const modelsRef = useRef(availabilityModels);
 
   resolvedRouteRef.current = resolvedRoute;
   isValidRef.current = isValid;
+  modelsRef.current = availabilityModels;
+
+  useEffect(() => {
+    ensureModelsLoaded();
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -135,6 +144,7 @@ export const InvokeControl = () => {
 
       dispatch({
         backendSupportsCancellation: true,
+        models: modelsRef.current,
         route: resolvedRouteRef.current,
         type: 'submitResolvedInvocationSnapshot',
       });
@@ -154,6 +164,7 @@ export const InvokeControl = () => {
 
     dispatch({
       backendSupportsCancellation: true,
+      models: availabilityModels,
       route: resolvedRouteRef.current,
       type: 'submitResolvedInvocationSnapshot',
     });
