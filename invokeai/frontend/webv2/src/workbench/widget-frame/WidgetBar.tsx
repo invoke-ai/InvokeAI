@@ -42,7 +42,7 @@ export const WidgetBar = ({ activeId, menuItems, onSelect, onToggle, railItems, 
     direction="column"
     flexShrink={0}
     gap="1.5"
-    pt="2.5"
+    pt="1.5"
     w="12"
   >
     {railItems.map((item) => (
@@ -70,6 +70,7 @@ const WidgetSlot = ({
   tooltipPlacement: 'left' | 'right';
 }) => {
   const tooltipLabel = item.failureMessage ? `${item.label}: ${item.failureMessage}` : item.label;
+  const isDisabled = item.status === 'disabled';
 
   return (
     <Tooltip
@@ -82,16 +83,21 @@ const WidgetSlot = ({
       <Row
         active={isActive ? 'accent' : 'none'}
         aria-label={item.label}
-        aria-disabled={item.status === 'disabled'}
+        aria-disabled={isDisabled}
         aria-pressed={isActive}
         as="button"
+        data-disabled={isDisabled ? '' : undefined}
         h="9"
         justifyContent="center"
-        pointerEvents={item.status === 'disabled' ? 'none' : 'auto'}
         rounded="md"
+        tabIndex={isDisabled ? -1 : undefined}
         w="9"
         _disabled={{ opacity: 0.4 }}
-        onClick={() => onSelect(item.id)}
+        onClick={() => {
+          if (!isDisabled) {
+            onSelect(item.id);
+          }
+        }}
       >
         <WidgetIcon iconId={item.iconId} boxSize="5" />
       </Row>

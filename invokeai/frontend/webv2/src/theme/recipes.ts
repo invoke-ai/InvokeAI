@@ -1,4 +1,5 @@
 import { defineRecipe, defineSlotRecipe } from '@chakra-ui/react';
+import { slotRecipes as chakraSlotRecipes } from '@chakra-ui/react/theme';
 
 /**
  * Reusable, theme-aware recipes for the workbench design system.
@@ -7,8 +8,9 @@ import { defineRecipe, defineSlotRecipe } from '@chakra-ui/react';
  * the active theme. Two kinds live here:
  *
  *   1. Overrides for Chakra's built-in component recipes (`tooltip`, `menu`,
- *      `dialog`) — registered in `system.ts` so every instance app-wide gets
- *      the workbench chrome with zero props at the call site.
+ *      `select`, `combobox`, `dialog`) — registered in `system.ts` so every
+ *      instance app-wide gets the workbench chrome with zero props at the call
+ *      site.
  *   2. Workbench-specific recipes (`panel`, `row`, `chip`, `fieldLabel`,
  *      `themeCard`) — consumed via the wrappers in `workbench/components/ui`
  *      with `useRecipe({ recipe })` / `useSlotRecipe({ recipe })`, which keeps
@@ -40,14 +42,92 @@ export const tooltipSlotRecipe = defineSlotRecipe({
   },
 });
 
+const dropdownContent = {
+  bg: 'bg.muted',
+  borderColor: 'border.emphasized',
+  borderRadius: 'lg',
+  borderWidth: '1px',
+  boxShadow: 'lg',
+  color: 'fg',
+};
+
+const dropdownItem = {
+  _highlighted: { bg: 'bg.subtle' },
+  _focusVisible: { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '-2px' },
+};
+
+const dropdownGroupLabel = {
+  color: 'fg.subtle',
+  fontSize: '2xs',
+  fontWeight: '600',
+  letterSpacing: '0.02em',
+  textTransform: 'uppercase',
+};
+
 /** Menu / context-menu chrome: popover surface with an emphasized stroke. */
 export const menuSlotRecipe = defineSlotRecipe({
-  slots: ['content'],
+  ...chakraSlotRecipes.menu,
   base: {
+    ...chakraSlotRecipes.menu.base,
     content: {
-      borderColor: 'border.emphasized',
-      borderRadius: 'lg',
-      borderWidth: '1px',
+      ...chakraSlotRecipes.menu.base?.content,
+      ...dropdownContent,
+    },
+    item: {
+      ...chakraSlotRecipes.menu.base?.item,
+      ...dropdownItem,
+    },
+    itemGroupLabel: {
+      ...chakraSlotRecipes.menu.base?.itemGroupLabel,
+      ...dropdownGroupLabel,
+    },
+    separator: {
+      ...chakraSlotRecipes.menu.base?.separator,
+      bg: 'border.subtle',
+    },
+  },
+});
+
+/** Select dropdown chrome: same surface and item treatment as menus. */
+export const selectSlotRecipe = defineSlotRecipe({
+  ...chakraSlotRecipes.select,
+  base: {
+    ...chakraSlotRecipes.select.base,
+    content: {
+      ...chakraSlotRecipes.select.base?.content,
+      ...dropdownContent,
+    },
+    item: {
+      ...chakraSlotRecipes.select.base?.item,
+      ...dropdownItem,
+    },
+    itemGroupLabel: {
+      ...chakraSlotRecipes.select.base?.itemGroupLabel,
+      ...dropdownGroupLabel,
+    },
+  },
+});
+
+/** Combobox chrome: kept aligned with Select for future searchable fields. */
+export const comboboxSlotRecipe = defineSlotRecipe({
+  ...chakraSlotRecipes.combobox,
+  base: {
+    ...chakraSlotRecipes.combobox.base,
+    content: {
+      ...chakraSlotRecipes.combobox.base?.content,
+      ...dropdownContent,
+    },
+    input: {
+      ...chakraSlotRecipes.combobox.base?.input,
+      _hover: { borderColor: 'border.emphasized' },
+    },
+    item: {
+      ...chakraSlotRecipes.combobox.base?.item,
+      ...dropdownItem,
+    },
+    itemGroupLabel: {
+      ...chakraSlotRecipes.combobox.base?.itemGroupLabel,
+      ...dropdownGroupLabel,
     },
   },
 });
@@ -59,6 +139,20 @@ export const dialogSlotRecipe = defineSlotRecipe({
     content: {
       borderColor: 'border.subtle',
       borderWidth: '1px',
+    },
+  },
+});
+
+/** Slider marks: compact auxiliary labels for dense widget controls. */
+export const sliderSlotRecipe = defineSlotRecipe({
+  ...chakraSlotRecipes.slider,
+  base: {
+    ...chakraSlotRecipes.slider.base,
+    markerLabel: {
+      ...chakraSlotRecipes.slider.base?.markerLabel,
+      color: 'fg.subtle',
+      fontSize: '0.5rem',
+      lineHeight: '1',
     },
   },
 });

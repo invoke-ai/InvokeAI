@@ -1,4 +1,4 @@
-import { Flex, Separator } from '@chakra-ui/react';
+import { Box, Flex, Separator } from '@chakra-ui/react';
 import { AccountMenu } from '@workbench/auth/components/AccountMenu';
 import { ProjectTabs } from '@workbench/projects/components';
 
@@ -20,10 +20,14 @@ export const TopBar = () => (
     flexShrink={0}
     gap="2"
     h="12"
+    ps="0.5"
     pe="1.5"
     w="full"
   >
-    <BrandMark />
+    <Box h="12" w="12">
+      <BrandMark />
+    </Box>
+    <Separator orientation="vertical" h={5} ms="-2" />
     <InvokeControl />
     <BatchCountField />
     <QueueInfo />

@@ -1,6 +1,13 @@
 import { createSystem, defaultConfig, defineConfig } from '@chakra-ui/react';
 
-import { dialogSlotRecipe, menuSlotRecipe, tooltipSlotRecipe } from './recipes';
+import {
+  comboboxSlotRecipe,
+  dialogSlotRecipe,
+  menuSlotRecipe,
+  selectSlotRecipe,
+  sliderSlotRecipe,
+  tooltipSlotRecipe,
+} from './recipes';
 import { DEFAULT_THEME, DEFAULT_THEME_ID, type NeutralStep, THEMES, type ThemeDefinition } from './themes';
 
 /**
@@ -236,8 +243,11 @@ const config = defineConfig({
     // Chrome-level overrides for Chakra's built-in components, so popover and
     // dialog surfaces are consistent everywhere without per-instance props.
     slotRecipes: {
+      combobox: comboboxSlotRecipe,
       dialog: dialogSlotRecipe,
       menu: menuSlotRecipe,
+      select: selectSlotRecipe,
+      slider: sliderSlotRecipe,
       tooltip: tooltipSlotRecipe,
     },
   },
