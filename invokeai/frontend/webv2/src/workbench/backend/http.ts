@@ -72,6 +72,49 @@ export class ApiError extends Error {
   }
 }
 
+const humanizeFieldName = (value: string): string => value.replaceAll('_', ' ');
+
+const getLastString = (values: unknown[]): string | null => {
+  for (let index = values.length - 1; index >= 0; index -= 1) {
+    const value = values[index];
+
+    if (typeof value === 'string') {
+      return value;
+    }
+  }
+
+  return null;
+};
+
+const getValidationIssueMessage = (issue: unknown): string | null => {
+  if (!issue || typeof issue !== 'object') {
+    return null;
+  }
+
+  const record = issue as { ctx?: unknown; input?: unknown; loc?: unknown; msg?: unknown; type?: unknown };
+  const loc = Array.isArray(record.loc) ? record.loc : [];
+  const lastLoc = getLastString(loc);
+  const field = lastLoc ? humanizeFieldName(lastLoc) : null;
+
+  if (record.type === 'multiple_of') {
+    const ctx = record.ctx && typeof record.ctx === 'object' ? (record.ctx as { multiple_of?: unknown }) : null;
+    const multipleOf = ctx?.multiple_of;
+
+    if (field && typeof multipleOf === 'number') {
+      const received =
+        typeof record.input === 'number' || typeof record.input === 'string' ? ` (received ${record.input})` : '';
+
+      return `${field} must be a multiple of ${multipleOf}${received}.`;
+    }
+  }
+
+  if (typeof record.msg === 'string' && record.msg) {
+    return field ? `${field}: ${record.msg}` : record.msg;
+  }
+
+  return null;
+};
+
 export const assertOk = async (response: Response): Promise<Response> => {
   if (response.ok) {
     return response;
@@ -119,10 +162,10 @@ export const getApiErrorMessage = (error: unknown, fallback: string): string => 
 
       // Validation errors come as a list of issues; surface the first one.
       if (Array.isArray(parsed.detail)) {
-        const first = parsed.detail[0] as { msg?: unknown } | undefined;
+        const message = getValidationIssueMessage(parsed.detail[0]);
 
-        if (first && typeof first.msg === 'string') {
-          return first.msg;
+        if (message) {
+          return message;
         }
       }
     } catch {

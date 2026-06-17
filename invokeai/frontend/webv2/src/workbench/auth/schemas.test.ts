@@ -116,7 +116,25 @@ describe('getApiErrorMessage', () => {
   it('unwraps the first validation issue', () => {
     const body = JSON.stringify({ detail: [{ loc: ['body', 'email'], msg: 'value is not a valid email address' }] });
 
-    expect(getApiErrorMessage(new ApiError(body, 422), 'fallback')).toBe('value is not a valid email address');
+    expect(getApiErrorMessage(new ApiError(body, 422), 'fallback')).toBe('email: value is not a valid email address');
+  });
+
+  it('formats multiple-of validation issues with the field and received value', () => {
+    const body = JSON.stringify({
+      detail: [
+        {
+          ctx: { multiple_of: 16 },
+          input: 888,
+          loc: ['body', 'batch', 'graph', 'nodes', 'denoise_latents', 'flux2_denoise', 'height'],
+          msg: 'Input should be a multiple of 16',
+          type: 'multiple_of',
+        },
+      ],
+    });
+
+    expect(getApiErrorMessage(new ApiError(body, 422), 'fallback')).toBe(
+      'height must be a multiple of 16 (received 888).'
+    );
   });
 
   it('falls back for non-JSON bodies and unknown errors', () => {
