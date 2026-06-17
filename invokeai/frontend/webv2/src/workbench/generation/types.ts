@@ -1,33 +1,71 @@
 import type { BackendGraphContract, GeneratedImageContract, GraphContract, ResultDestination } from '@workbench/types';
 
-export type SupportedGenerateBase = 'sd-1' | 'sd-2' | 'sdxl';
-
-export type MainModelConfig = {
+export type ModelIdentifierConfig = {
   key: string;
   name: string;
   base: string;
-  type: 'main';
+  type: string;
   format?: string;
+  variant?: string | null;
+  hash?: string;
+  submodel_type?: string;
+  [key: string]: unknown;
+};
+
+export type MainModelConfig = ModelIdentifierConfig & {
+  type: 'main';
   default_settings?: {
     scheduler?: string | null;
     steps?: number | null;
     cfg_scale?: number | null;
+    guidance?: number | null;
     cfg_rescale_multiplier?: number | null;
     width?: number | null;
     height?: number | null;
     vae?: string | null;
     vae_precision?: string | null;
   } | null;
-  [key: string]: unknown;
 };
 
-export type VaeModelConfig = {
-  key: string;
-  name: string;
-  base: string;
-  type: 'vae';
-  [key: string]: unknown;
+export type ExternalImageGeneratorModelConfig = ModelIdentifierConfig & {
+  base: 'external';
+  type: 'external_image_generator';
+  format: 'external_api';
+  provider_id?: string;
+  capabilities?: {
+    modes?: string[];
+    supports_seed?: boolean;
+    supports_negative_prompt?: boolean;
+  } | null;
+  default_settings?: {
+    width?: number | null;
+    height?: number | null;
+    num_images?: number | null;
+  } | null;
 };
+
+export type GenerateModelConfig = MainModelConfig | ExternalImageGeneratorModelConfig;
+
+export type ComponentModelConfig = ModelIdentifierConfig;
+
+export type VaeModelConfig = ModelIdentifierConfig & {
+  type: 'vae';
+};
+
+export type LoraModelConfig = ModelIdentifierConfig & {
+  type: 'lora';
+  trigger_phrases?: string[] | null;
+  default_settings?: {
+    weight?: number | null;
+  } | null;
+  variant?: string | null;
+};
+
+export interface GenerateLora {
+  isEnabled: boolean;
+  model: LoraModelConfig;
+  weight: number;
+}
 
 export type VaePrecision = 'fp16' | 'fp32';
 
@@ -72,10 +110,19 @@ export interface GenerateSettings {
   /** Optional VAE override; null uses the VAE bundled with the main model. */
   vae: VaeModelConfig | null;
   vaePrecision: VaePrecision;
+  loras: GenerateLora[];
+  t5EncoderModel: ComponentModelConfig | null;
+  clipEmbedModel: ComponentModelConfig | null;
+  clipLEmbedModel: ComponentModelConfig | null;
+  clipGEmbedModel: ComponentModelConfig | null;
+  qwen3EncoderModel: ComponentModelConfig | null;
+  qwenVLEncoderModel: ComponentModelConfig | null;
+  /** Optional Diffusers main model used as a component source for split/quantized model families. */
+  componentSourceModel: MainModelConfig | null;
 }
 
 export interface GenerateWidgetValues extends GenerateSettings {
-  model: MainModelConfig;
+  model: GenerateModelConfig;
 }
 
 export interface CompiledGenerateGraph {
