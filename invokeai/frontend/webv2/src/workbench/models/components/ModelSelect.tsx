@@ -1,40 +1,42 @@
 import type { ModelConfig, ModelTaxonomyType } from '@workbench/models/types';
 
-import { Badge, Combobox, createListCollection, HStack, Portal, Stack, Text } from '@chakra-ui/react';
+import { Badge, HStack, Icon, Input, InputGroup, Popover, Portal, ScrollArea, Stack, Text } from '@chakra-ui/react';
+import { Button, CloseButton } from '@workbench/components/ui';
+import { getModelBaseColorPalette, getModelBaseLabel } from '@workbench/models/baseIdentity';
+import { getModelPickerGroups } from '@workbench/models/library';
 import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsStore';
-import {
-  formatBytes,
-  getModelBaseColorPalette,
-  getModelBaseLabel,
-  getModelCategoryRank,
-  getModelTypePluralLabel,
-} from '@workbench/models/taxonomy';
+import { formatBytes, getModelTypePluralLabel } from '@workbench/models/taxonomy';
 import { useWorkbenchPreferences } from '@workbench/settings/store';
-import { useEffect, useMemo, useState } from 'react';
+import { CheckIcon, ChevronDownIcon, SearchIcon, XIcon } from 'lucide-react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 
 /**
- * Universal single-model picker: a searchable combobox over the installed
- * library. Scope it with `modelTypes` — one type for dedicated pickers (a
- * LoRA picker, a main-model picker) or several for cross-type pickers, in
- * which case results are grouped by type.
+ * Universal single-model picker: a button-triggered searchable list over the
+ * installed library. Scope it with `modelTypes` — one type for dedicated
+ * pickers (a LoRA picker, a main-model picker) or several for cross-type
+ * pickers, in which case results are grouped by type.
  */
 export const ModelSelect = ({
+  className,
   excludeKeys,
   filter,
   id,
   invalid,
+  isClearable = true,
   modelTypes,
   onChange,
   placeholder,
   size = 'sm',
   value,
 }: {
+  className?: string;
   /** Hide specific models (e.g. the current model and already-linked ones). */
   excludeKeys?: ReadonlySet<string>;
   /** Extra predicate, e.g. base-architecture compatibility. */
   filter?: (model: ModelConfig) => boolean;
   id?: string;
   invalid?: boolean;
+  isClearable?: boolean;
   /** The model types this instance searches. */
   modelTypes: ModelTaxonomyType[];
   onChange: (model: ModelConfig | null) => void;
@@ -45,148 +47,292 @@ export const ModelSelect = ({
 }) => {
   const { enableModelDescriptions } = useWorkbenchPreferences();
   const { models } = useModelsSnapshot();
+  const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const deferredSearchTerm = useDeferredValue(searchTerm);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const optionRefs = useRef<HTMLElement[]>([]);
 
   useEffect(() => {
     ensureModelsLoaded();
   }, []);
 
-  const candidates = useMemo(() => {
-    const allowedTypes = new Set(modelTypes);
-
-    return models.filter(
-      (model) => allowedTypes.has(model.type) && !excludeKeys?.has(model.key) && (filter ? filter(model) : true)
-    );
-  }, [excludeKeys, filter, modelTypes, models]);
-
-  const visibleItems = useMemo(() => {
-    const terms = searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    const matches =
-      terms.length === 0
-        ? candidates
-        : candidates.filter((model) => {
-            const haystack = `${model.name} ${model.base} ${model.type}`.toLowerCase();
-
-            return terms.every((term) => haystack.includes(term));
-          });
-
-    return [...matches].sort(
-      (a, b) =>
-        getModelCategoryRank(a.type) - getModelCategoryRank(b.type) ||
-        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-    );
-  }, [candidates, searchTerm]);
-
-  /** Items grouped by type, preserving the canonical category order. */
-  const groups = useMemo(() => {
-    const byType = new Map<ModelTaxonomyType, ModelConfig[]>();
-
-    for (const model of visibleItems) {
-      const group = byType.get(model.type);
-
-      if (group) {
-        group.push(model);
-      } else {
-        byType.set(model.type, [model]);
-      }
-    }
-
-    return [...byType.entries()];
-  }, [visibleItems]);
-
-  const collection = useMemo(
+  const { candidates, groups } = useMemo(
     () =>
-      createListCollection({
-        itemToString: (item: ModelConfig) => item.name,
-        itemToValue: (item: ModelConfig) => item.key,
-        items: visibleItems,
-      }),
-    [visibleItems]
+      isOpen
+        ? getModelPickerGroups(models, { excludeKeys, filter, modelTypes, searchTerm: deferredSearchTerm })
+        : { candidates: [], groups: [] },
+    [deferredSearchTerm, excludeKeys, filter, isOpen, modelTypes, models]
   );
+
+  const selectedModel = useMemo(() => models.find((model) => model.key === value) ?? null, [models, value]);
 
   const scopeLabel =
     modelTypes.length === 1 ? getModelTypePluralLabel(modelTypes[0] ?? 'main').toLowerCase() : 'models';
+  const closeAndReset = () => {
+    setIsOpen(false);
+    setSearchTerm('');
+  };
+  const selectModel = (model: ModelConfig) => {
+    onChange(model);
+    closeAndReset();
+  };
+  const clearSelection = () => {
+    onChange(null);
+    closeAndReset();
+  };
+  const focusSearchInput = () => {
+    window.requestAnimationFrame(() => searchInputRef.current?.focus());
+  };
+  const focusOption = (edge: 'first' | 'last') => {
+    const options = optionRefs.current.filter(Boolean);
+
+    options[edge === 'first' ? 0 : options.length - 1]?.focus();
+  };
+  const focusAdjacentOption = (currentIndex: number, direction: 1 | -1) => {
+    const options = optionRefs.current.filter(Boolean);
+    const nextIndex = currentIndex + direction;
+
+    if (nextIndex < 0) {
+      searchInputRef.current?.focus();
+      return;
+    }
+
+    options[nextIndex]?.focus();
+  };
+
+  optionRefs.current = [];
+  let optionIndex = 0;
 
   return (
-    <Combobox.Root
-      collection={collection}
-      invalid={invalid}
-      openOnClick
-      placeholder={placeholder ?? `Search ${scopeLabel}…`}
-      selectionBehavior="replace"
-      size={size}
-      value={value === null ? [] : [value]}
-      w="full"
-      onInputValueChange={(details) => setSearchTerm(details.inputValue)}
-      onValueChange={(details) => {
-        onChange(details.items[0] ?? null);
-      }}
-    >
-      <Combobox.Control>
-        <Combobox.Input id={id} />
-        <Combobox.IndicatorGroup>
-          <Combobox.ClearTrigger />
-          <Combobox.Trigger />
-        </Combobox.IndicatorGroup>
-      </Combobox.Control>
-      <Portal>
-        <Combobox.Positioner>
-          <Combobox.Content
-            bg="bg.muted"
-            borderColor="border.emphasized"
-            borderWidth="1px"
-            color="fg"
-            maxH="18rem"
-            rounded="lg"
-            shadow="lg"
-            zIndex="popover"
+    <HStack className={className} gap="1" w="full">
+      <Popover.Root
+        ids={id ? { trigger: id } : undefined}
+        open={isOpen}
+        positioning={{
+          fitViewport: true,
+          gutter: 4,
+          hideWhenDetached: true,
+          overflowPadding: 8,
+          placement: 'bottom-start',
+          sameWidth: true,
+          strategy: 'fixed',
+        }}
+        onOpenChange={(event) => {
+          if (event.open) {
+            setSearchTerm('');
+            setIsOpen(true);
+            focusSearchInput();
+            return;
+          }
+
+          closeAndReset();
+        }}
+      >
+        <Popover.Trigger asChild>
+          <Button
+            aria-invalid={invalid ? true : undefined}
+            aria-haspopup="listbox"
+            className={className}
+            colorPalette={invalid ? 'red' : isOpen ? 'accent' : 'gray'}
+            justifyContent="space-between"
+            minW="0"
+            size={size}
+            variant="outline"
+            w="full"
+            px="2"
           >
-            <Combobox.Empty color="fg.subtle" fontSize="2xs" p="2">
-              {candidates.length === 0
-                ? `No compatible ${scopeLabel} installed.`
-                : `No ${scopeLabel} match your search.`}
-            </Combobox.Empty>
-            {groups.map(([type, groupModels]) => (
-              <Combobox.ItemGroup key={type}>
-                {modelTypes.length > 1 ? (
-                  <Combobox.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
-                    {getModelTypePluralLabel(type)}
-                  </Combobox.ItemGroupLabel>
-                ) : null}
-                {groupModels.map((model) => (
-                  <Combobox.Item key={model.key} item={model}>
-                    <HStack flex="1" gap="2" minW="0">
-                      <Stack flex="1" gap="0" minW="0">
-                        <Text fontSize="xs" minW="0" truncate>
-                          {model.name}
-                        </Text>
-                        {enableModelDescriptions && model.description ? (
-                          <Text color="fg.subtle" fontSize="2xs" truncate>
-                            {model.description}
+            {selectedModel ? (
+              <ModelButtonContent model={selectedModel} />
+            ) : (
+              <Text as="span" color="fg.subtle" fontSize="xs" minW="0" truncate>
+                {placeholder ?? `Select ${scopeLabel}…`}
+              </Text>
+            )}
+            <Icon as={ChevronDownIcon} boxSize="3" flexShrink={0} />
+          </Button>
+        </Popover.Trigger>
+        <Portal>
+          <Popover.Positioner>
+            <Popover.Content
+              bg="bg.muted"
+              borderColor="border.emphasized"
+              borderRadius="lg"
+              borderWidth="1px"
+              boxShadow="lg"
+              color="fg"
+              maxH="min(18rem, var(--available-height))"
+              minW="min(18rem, calc(100vw - 1rem))"
+              overflow="hidden"
+              p="0"
+            >
+              <Stack gap="2" p="2">
+                <InputGroup startElement={<Icon as={SearchIcon} size="xs" />}>
+                  <Input
+                    ref={searchInputRef}
+                    aria-label={`Search ${scopeLabel}`}
+                    placeholder={`Search ${scopeLabel}...`}
+                    size="xs"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.currentTarget.value)}
+                    onKeyDown={(event) => {
+                      event.stopPropagation();
+
+                      if (event.key === 'Escape') {
+                        event.preventDefault();
+                        closeAndReset();
+                        return;
+                      }
+
+                      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                        event.preventDefault();
+                        focusOption(event.key === 'ArrowDown' ? 'first' : 'last');
+                      }
+                    }}
+                  />
+                </InputGroup>
+              </Stack>
+              <HStack borderTopWidth="1px" borderColor="border.subtle" />
+              <ScrollArea.Root maxH="14rem" size="xs" variant="hover" w="full">
+                <ScrollArea.Viewport maxH="inherit" w="full">
+                  <ScrollArea.Content py="1" role="listbox" aria-label={`Available ${scopeLabel}`}>
+                    {groups.length === 0 ? (
+                      <Text color="fg.subtle" fontSize="2xs" p="2">
+                        {candidates.length === 0
+                          ? `No compatible ${scopeLabel} installed.`
+                          : `No ${scopeLabel} match your search.`}
+                      </Text>
+                    ) : null}
+                    {groups.map((group) => (
+                      <Stack key={group.type} gap="0">
+                        {modelTypes.length > 1 ? (
+                          <Text
+                            color="fg.subtle"
+                            fontSize="2xs"
+                            fontWeight="600"
+                            letterSpacing="0.02em"
+                            px="2"
+                            py="1"
+                            textTransform="uppercase"
+                          >
+                            {group.label}
                           </Text>
                         ) : null}
+                        {group.models.map((model) => {
+                          const currentOptionIndex = optionIndex;
+                          optionIndex += 1;
+
+                          return (
+                            <Button
+                              key={model.key}
+                              ref={(element) => {
+                                if (element) {
+                                  optionRefs.current[currentOptionIndex] = element;
+                                }
+                              }}
+                              aria-selected={value === model.key}
+                              borderRadius="0"
+                              gap="2"
+                              justifyContent="start"
+                              truncate
+                              role="option"
+                              size="2xs"
+                              variant="ghost"
+                              w="full"
+                              _highlighted={{ bg: 'bg.subtle' }}
+                              _focusVisible={{
+                                outline: '2px solid',
+                                outlineColor: 'accent.solid',
+                                outlineOffset: '-2px',
+                              }}
+                              onClick={() => selectModel(model)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Escape') {
+                                  event.preventDefault();
+                                  closeAndReset();
+                                  return;
+                                }
+
+                                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                                  event.preventDefault();
+                                  focusAdjacentOption(currentOptionIndex, event.key === 'ArrowDown' ? 1 : -1);
+                                }
+                              }}
+                              transitionDuration="faster"
+                            >
+                              <Icon
+                                as={CheckIcon}
+                                aria-hidden
+                                boxSize="3"
+                                color="accent.solid"
+                                flexShrink={0}
+                                opacity={value === model.key ? 1 : 0}
+                              />
+                              <ModelOptionContent enableDescription={enableModelDescriptions} model={model} />
+                            </Button>
+                          );
+                        })}
                       </Stack>
-                      <Badge
-                        colorPalette={getModelBaseColorPalette(model.base)}
-                        flexShrink={0}
-                        fontSize="2xs"
-                        size="sm"
-                        variant="surface"
-                      >
-                        {getModelBaseLabel(model.base)}
-                      </Badge>
-                      <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
-                        {formatBytes(model.file_size)}
-                      </Text>
-                    </HStack>
-                    <Combobox.ItemIndicator />
-                  </Combobox.Item>
-                ))}
-              </Combobox.ItemGroup>
-            ))}
-          </Combobox.Content>
-        </Combobox.Positioner>
-      </Portal>
-    </Combobox.Root>
+                    ))}
+                  </ScrollArea.Content>
+                </ScrollArea.Viewport>
+                <ScrollArea.Scrollbar>
+                  <ScrollArea.Thumb />
+                </ScrollArea.Scrollbar>
+              </ScrollArea.Root>
+            </Popover.Content>
+          </Popover.Positioner>
+        </Portal>
+      </Popover.Root>
+      {isClearable && value ? (
+        <CloseButton aria-label="Clear selected model" size="2xs" onClick={clearSelection}>
+          <XIcon />
+        </CloseButton>
+      ) : null}
+    </HStack>
   );
 };
+
+const ModelButtonContent = ({ model }: { model: ModelConfig }) => (
+  <HStack as="span" flex="1" gap="2" minW="0">
+    <Text as="span" fontSize="xs" minW="0" truncate>
+      {model.name}
+    </Text>
+    <Badge
+      colorPalette={getModelBaseColorPalette(model.base)}
+      flexShrink={0}
+      fontSize="2xs"
+      size="sm"
+      variant="surface"
+    >
+      {getModelBaseLabel(model.base)}
+    </Badge>
+  </HStack>
+);
+
+const ModelOptionContent = ({ enableDescription, model }: { enableDescription: boolean; model: ModelConfig }) => (
+  <HStack flex="1" gap="2" minW="0" textAlign="left" w="full">
+    <Stack flex="1" gap="0" minW="0">
+      <Text fontSize="xs" minW="0" truncate>
+        {model.name}
+      </Text>
+      {enableDescription && model.description ? (
+        <Text color="fg.subtle" fontSize="2xs" truncate>
+          {model.description}
+        </Text>
+      ) : null}
+    </Stack>
+    <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
+      {formatBytes(model.file_size)}
+    </Text>
+    <Badge
+      colorPalette={getModelBaseColorPalette(model.base)}
+      flexShrink={0}
+      fontSize="2xs"
+      size="xs"
+      variant="surface"
+    >
+      {getModelBaseLabel(model.base)}
+    </Badge>
+  </HStack>
+);
