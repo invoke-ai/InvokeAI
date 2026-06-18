@@ -1,27 +1,29 @@
-import type { RegisteredWidget, WidgetIconId, WidgetId, WidgetRegion } from '@workbench/types';
+import type { WidgetInstanceId, WidgetRegion } from '@workbench/types';
+import type { WidgetRegionDropState } from '@workbench/widgetDnd';
+import type { WidgetPlacementInstanceMeta, WidgetRegionItem } from '@workbench/widgetRegionViewModel';
 
-import { Flex, Icon, Menu, Portal, Text } from '@chakra-ui/react';
+import { Box } from '@chakra-ui/react';
+import { verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Row, Tooltip } from '@workbench/components/ui';
 import { WidgetIcon } from '@workbench/iconResolver';
-import { CheckIcon, MoreHorizontalIcon } from 'lucide-react';
+import { type MouseEvent, useState } from 'react';
 
-export interface WidgetBarItem {
-  id: WidgetId;
-  label: string;
-  iconId: WidgetIconId;
-  status?: RegisteredWidget['status'];
-  failureMessage?: string;
-  isEnabled: boolean;
-}
+import { useWidgetSortable } from './useWidgetSortable';
+import { WidgetEnableMenu } from './WidgetEnableMenu';
+import { WidgetInstanceContextMenu, type WidgetInstanceContextMenuTarget } from './WidgetInstanceContextMenu';
+import { WidgetStrip } from './WidgetStrip';
+
+export type WidgetBarItem = WidgetRegionItem<WidgetPlacementInstanceMeta>;
 
 interface WidgetBarProps {
   side: 'left' | 'right';
   region: Exclude<WidgetRegion, 'bottom' | 'center'>;
-  activeId: WidgetId | null;
+  activeId: WidgetInstanceId | null;
+  dropState: WidgetRegionDropState;
   railItems: WidgetBarItem[];
   menuItems: WidgetBarItem[];
-  onSelect: (widgetId: WidgetId) => void;
-  onToggle: (widgetId: WidgetId) => void;
+  onSelect: (instanceId: WidgetInstanceId) => void;
+  onToggle: (item: WidgetBarItem) => void;
 }
 
 /**
@@ -31,46 +33,103 @@ interface WidgetBarProps {
  * real views land in Phase 3. Each slot is a labelled button so the placeholders
  * are accessible and ready to bind to registered widgets later.
  */
-export const WidgetBar = ({ activeId, menuItems, onSelect, onToggle, railItems, region, side }: WidgetBarProps) => (
-  <Flex
-    align="center"
-    as="nav"
-    bg="bg.subtle"
-    borderColor="border.subtle"
-    borderRightWidth={side === 'left' ? '1px' : '0'}
-    borderLeftWidth={side === 'right' ? '1px' : '0'}
-    direction="column"
-    flexShrink={0}
-    gap="1.5"
-    pt="1.5"
-    w="12"
-  >
-    {railItems.map((item) => (
-      <WidgetSlot
-        key={item.id}
-        item={item}
-        isActive={item.id === activeId}
-        tooltipPlacement={side === 'left' ? 'right' : 'left'}
-        onSelect={onSelect}
+export const WidgetBar = ({
+  activeId,
+  dropState,
+  menuItems,
+  onSelect,
+  onToggle,
+  railItems,
+  region,
+  side,
+}: WidgetBarProps) => {
+  const [enableMenuTarget, setEnableMenuTarget] = useState<{ x: number; y: number } | null>(null);
+  const [instanceMenuTarget, setInstanceMenuTarget] = useState<WidgetInstanceContextMenuTarget | null>(null);
+
+  const openEnableMenu = (event: MouseEvent) => {
+    event.preventDefault();
+    setEnableMenuTarget({ x: event.clientX, y: event.clientY });
+  };
+
+  const openInstanceMenu = (item: WidgetBarItem, event: MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setInstanceMenuTarget({ item, x: event.clientX, y: event.clientY });
+  };
+
+  return (
+    <WidgetStrip
+      align="center"
+      as="nav"
+      bg="bg.subtle"
+      borderColor="border.subtle"
+      borderRightWidth={side === 'left' ? '1px' : '0'}
+      borderLeftWidth={side === 'right' ? '1px' : '0'}
+      direction="column"
+      dropState={dropState}
+      flexShrink={0}
+      pt="1.5"
+      region={region}
+      sortableInstanceIds={railItems.map((item) => item.id)}
+      strategy={verticalListSortingStrategy}
+      w="12"
+      onContextMenu={openEnableMenu}
+    >
+      {railItems.map((item) => (
+        <WidgetSlot
+          key={item.id}
+          item={item}
+          isActive={item.id === activeId}
+          region={region}
+          tooltipPlacement={side === 'left' ? 'right' : 'left'}
+          onContextMenu={openInstanceMenu}
+          onSelect={onSelect}
+        />
+      ))}
+      <Box mt="1.5">
+        <WidgetEnableMenu
+          contextTarget={enableMenuTarget}
+          groupLabel="Widgets"
+          items={menuItems}
+          positioning={{ placement: region === 'left' ? 'right-start' : 'left-start' }}
+          trigger={{ kind: 'rail', region }}
+          triggerLabel={`${region === 'left' ? 'Left' : 'Right'} widget visibility`}
+          onContextClose={() => setEnableMenuTarget(null)}
+          onToggle={(item) => onToggle(item as WidgetBarItem)}
+        />
+      </Box>
+      <WidgetInstanceContextMenu
+        target={instanceMenuTarget}
+        onClose={() => setInstanceMenuTarget(null)}
+        onRemove={(item) => onToggle(item as WidgetBarItem)}
       />
-    ))}
-    <WidgetMenuButton region={region} items={menuItems} onToggle={onToggle} />
-  </Flex>
-);
+    </WidgetStrip>
+  );
+};
 
 const WidgetSlot = ({
   item,
   isActive,
+  onContextMenu,
   onSelect,
+  region,
   tooltipPlacement,
 }: {
   item: WidgetBarItem;
   isActive: boolean;
-  onSelect: (widgetId: WidgetId) => void;
+  onContextMenu: (item: WidgetBarItem, event: MouseEvent) => void;
+  onSelect: (instanceId: WidgetInstanceId) => void;
+  region: WidgetRegion;
   tooltipPlacement: 'left' | 'right';
 }) => {
   const tooltipLabel = item.failureMessage ? `${item.label}: ${item.failureMessage}` : item.label;
   const isDisabled = item.status === 'disabled';
+  const { dragHandleProps, setNodeRef, style } = useWidgetSortable({
+    disabled: isDisabled,
+    instanceId: item.id,
+    region,
+    typeId: item.typeId,
+  });
 
   return (
     <Tooltip
@@ -80,87 +139,31 @@ const WidgetSlot = ({
       openDelay={250}
       positioning={{ placement: tooltipPlacement }}
     >
-      <Row
-        active={isActive ? 'accent' : 'none'}
-        aria-label={item.label}
-        aria-disabled={isDisabled}
-        aria-pressed={isActive}
-        as="button"
-        data-disabled={isDisabled ? '' : undefined}
-        h="9"
-        justifyContent="center"
-        rounded="md"
-        tabIndex={isDisabled ? -1 : undefined}
-        w="9"
-        _disabled={{ opacity: 0.4 }}
-        onClick={() => {
-          if (!isDisabled) {
-            onSelect(item.id);
-          }
-        }}
-      >
-        <WidgetIcon iconId={item.iconId} boxSize="5" />
-      </Row>
+      <Box ref={setNodeRef} pb="1.5" style={style}>
+        <Row
+          {...dragHandleProps}
+          active={isActive ? 'accent' : 'none'}
+          aria-label={item.label}
+          aria-disabled={isDisabled}
+          aria-pressed={isActive}
+          as="button"
+          data-disabled={isDisabled ? '' : undefined}
+          h="9"
+          justifyContent="center"
+          rounded="md"
+          tabIndex={isDisabled ? -1 : undefined}
+          w="9"
+          _disabled={{ opacity: 0.4 }}
+          onClick={() => {
+            if (!isDisabled) {
+              onSelect(item.id);
+            }
+          }}
+          onContextMenu={(event) => onContextMenu(item, event)}
+        >
+          <WidgetIcon icon={item.icon} boxSize="5" />
+        </Row>
+      </Box>
     </Tooltip>
   );
 };
-
-const WidgetMenuButton = ({
-  items,
-  onToggle,
-  region,
-}: {
-  items: WidgetBarItem[];
-  onToggle: (widgetId: WidgetId) => void;
-  region: Exclude<WidgetRegion, 'bottom' | 'center'>;
-}) => (
-  <Menu.Root positioning={{ placement: region === 'left' ? 'right-start' : 'left-start' }}>
-    <Menu.Trigger asChild>
-      <Flex
-        align="center"
-        aria-label={`${region === 'left' ? 'Left' : 'Right'} widget visibility`}
-        as="button"
-        color="fg"
-        h="9"
-        justify="center"
-        rounded="md"
-        transition="background 0.12s ease, color 0.12s ease"
-        w="9"
-        _hover={{ bg: 'bg.muted' }}
-      >
-        <Icon as={MoreHorizontalIcon} boxSize="5" />
-      </Flex>
-    </Menu.Trigger>
-    <Portal>
-      <Menu.Positioner>
-        <Menu.Content minW="12rem">
-          <Menu.ItemGroup>
-            <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
-              Widgets
-            </Menu.ItemGroupLabel>
-            {items.map((item) => (
-              <Menu.Item
-                key={item.id}
-                role="menuitemcheckbox"
-                aria-checked={item.isEnabled}
-                value={item.id}
-                closeOnSelect={false}
-                disabled={item.status === 'disabled'}
-                _disabled={{ opacity: 0.4 }}
-                onClick={() => onToggle(item.id)}
-              >
-                <Icon as={CheckIcon} boxSize="3" opacity={item.isEnabled ? 1 : 0} />
-                <Menu.ItemText>{item.label}</Menu.ItemText>
-                {item.failureMessage ? (
-                  <Text color="fg.subtle" fontSize="2xs" ms="auto">
-                    Failed
-                  </Text>
-                ) : null}
-              </Menu.Item>
-            ))}
-          </Menu.ItemGroup>
-        </Menu.Content>
-      </Menu.Positioner>
-    </Portal>
-  </Menu.Root>
-);

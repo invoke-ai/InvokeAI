@@ -5,12 +5,13 @@ import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 export const BottomPanel = () => {
   const panels = useActiveProjectSelector((project) => project.layout.panels);
   const bottomRegion = useActiveProjectSelector((project) => project.widgetRegions.bottom);
-  const widget = getWidgetById(bottomRegion.activeWidgetId);
+  const instance = useActiveProjectSelector((project) => project.widgetInstances[bottomRegion.activeInstanceId]);
+  const widget = instance ? getWidgetById(instance.typeId) : undefined;
   const View = widget?.manifest.view;
   const canShowBottomPanel =
     panels.isBottomOpen &&
     !bottomRegion.isCollapsed &&
-    bottomRegion.enabledWidgetIds.includes(bottomRegion.activeWidgetId) &&
+    bottomRegion.instanceIds.includes(bottomRegion.activeInstanceId) &&
     widget?.status === 'enabled' &&
     widget.manifest.bottomPanel !== 'tooltip';
 
@@ -18,9 +19,9 @@ export const BottomPanel = () => {
     return null;
   }
 
-  if (!widget || !View) {
-    return <MissingWidgetFrame label={widget?.manifest.labelText ?? bottomRegion.activeWidgetId} region="bottom" />;
+  if (!instance || !widget || !View) {
+    return <MissingWidgetFrame label={widget?.manifest.labelText ?? bottomRegion.activeInstanceId} region="bottom" />;
   }
 
-  return <WidgetRenderer widget={widget} presentation="expanded" region="bottom" />;
+  return <WidgetRenderer instance={instance} widget={widget} presentation="expanded" region="bottom" />;
 };

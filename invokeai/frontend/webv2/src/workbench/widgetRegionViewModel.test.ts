@@ -1,0 +1,121 @@
+import { describe, expect, it, vi } from 'vitest';
+
+import type { NormalizedWidgetManifest, RegisteredWidget, WidgetInstanceContract, WidgetTypeId } from './types';
+
+import {
+  canRemoveItem,
+  createWidgetRegionViewModel,
+  getWidgetRegionItems,
+  isRequiredCenterView,
+} from './widgetRegionViewModel';
+
+const TestIcon = () => null;
+const TestView = () => null;
+
+const createWidget = (
+  overrides: Partial<NormalizedWidgetManifest> & Pick<NormalizedWidgetManifest, 'id' | 'labelText'>
+): RegisteredWidget => ({
+  manifest: {
+    apiVersion: 1,
+    allowMultiple: false,
+    allowedRegions: ['left', 'center', 'bottom'],
+    failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
+    icon: TestIcon,
+    label: overrides.labelText,
+    state: { createInitial: () => ({}), persistence: 'project', version: 1 },
+    version: 1,
+    view: TestView,
+    ...overrides,
+  },
+  status: 'enabled',
+});
+
+const createInstance = (id: string, typeId: WidgetTypeId): WidgetInstanceContract => ({
+  createdAt: '2026-01-01T00:00:00.000Z',
+  id,
+  state: { id: typeId, label: typeId, values: {}, version: 1 },
+  typeId,
+});
+
+describe('widget region view model', () => {
+  it('separates placed items from available items', () => {
+    const viewModel = createWidgetRegionViewModel({
+      activeInstanceId: 'alpha',
+      instanceIds: ['alpha'],
+      region: 'left',
+      widgetInstances: { alpha: createInstance('alpha', 'alpha') },
+      widgets: [createWidget({ id: 'alpha', labelText: 'Alpha' }), createWidget({ id: 'beta', labelText: 'Beta' })],
+    });
+
+    expect(viewModel.placedItems.map((item) => item.id)).toEqual(['alpha']);
+    expect(viewModel.availableItems.map((item) => item.typeId)).toEqual(['beta']);
+    expect(viewModel.activeItem?.id).toBe('alpha');
+    expect(viewModel.sortableInstanceIds).toEqual(['alpha']);
+    expect(getWidgetRegionItems(viewModel).map((item) => item.label)).toEqual(['Alpha', 'Beta']);
+  });
+
+  it('filters already placed singleton widget types from available items', () => {
+    const viewModel = createWidgetRegionViewModel({
+      instanceIds: ['alpha'],
+      region: 'left',
+      widgetInstances: { alpha: createInstance('alpha', 'alpha') },
+      widgets: [createWidget({ id: 'alpha', labelText: 'Alpha' })],
+    });
+
+    expect(viewModel.availableItems).toEqual([]);
+  });
+
+  it('keeps allowMultiple widget types available after one placement', () => {
+    const viewModel = createWidgetRegionViewModel({
+      instanceIds: ['alpha'],
+      region: 'left',
+      widgetInstances: { alpha: createInstance('alpha', 'alpha') },
+      widgets: [createWidget({ allowMultiple: true, id: 'alpha', labelText: 'Alpha' })],
+    });
+
+    expect(viewModel.availableItems).toHaveLength(1);
+    expect(viewModel.availableItems[0]).toMatchObject({ allowMultiple: true, isEnabled: false, typeId: 'alpha' });
+  });
+
+  it('identifies the last enabled center view as required', () => {
+    const viewModel = createWidgetRegionViewModel({
+      instanceIds: ['canvas', 'layout-actions'],
+      region: 'center',
+      widgetInstances: {
+        canvas: createInstance('canvas', 'canvas'),
+        'layout-actions': createInstance('layout-actions', 'layout-actions'),
+      },
+      widgets: [
+        createWidget({ centerPlacement: 'view', id: 'canvas', labelText: 'Canvas' }),
+        createWidget({ centerPlacement: 'toolbar', id: 'layout-actions', labelText: 'Layout Actions' }),
+      ],
+    });
+    const canvas = viewModel.placedItems.find((item) => item.id === 'canvas');
+    const toolbar = viewModel.placedItems.find((item) => item.id === 'layout-actions');
+
+    expect(canvas).toBeDefined();
+    expect(toolbar).toBeDefined();
+    expect(isRequiredCenterView(canvas!, 1)).toBe(true);
+    expect(canRemoveItem(canvas!, viewModel)).toBe(false);
+    expect(canRemoveItem(toolbar!, viewModel)).toBe(true);
+  });
+
+  it('does not call createInitial while deriving available items', () => {
+    const createInitial = vi.fn(() => ({ seeded: true }));
+    const viewModel = createWidgetRegionViewModel({
+      instanceIds: [],
+      region: 'left',
+      widgetInstances: {},
+      widgets: [
+        createWidget({
+          id: 'alpha',
+          labelText: 'Alpha',
+          state: { createInitial, persistence: 'project', version: 1 },
+        }),
+      ],
+    });
+
+    expect(createInitial).not.toHaveBeenCalled();
+    expect(viewModel.availableItems[0]).not.toHaveProperty('initialValues');
+  });
+});

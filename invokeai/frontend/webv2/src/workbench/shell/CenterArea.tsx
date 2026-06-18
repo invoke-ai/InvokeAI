@@ -1,85 +1,181 @@
-import type { RegisteredWidget, WidgetId } from '@workbench/types';
+import type { WidgetRegionDropState } from '@workbench/widgetDnd';
+import type { PlacedWidgetRegionItem, WidgetRegionItem } from '@workbench/widgetRegionViewModel';
 
-import { Box, Flex, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
-import { IconButton, Tabs } from '@workbench/components/ui';
+import { Box, Flex, Text } from '@chakra-ui/react';
+import { horizontalListSortingStrategy } from '@dnd-kit/sortable';
+import { Tabs } from '@workbench/components/ui';
 import { useFocusRegionProps } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
-import { WidgetRenderer } from '@workbench/widget-frame';
-import { getWidgetsForRegion } from '@workbench/widgetRegistry';
+import {
+  WidgetEnableMenu,
+  WidgetInstanceContextMenu,
+  WidgetRenderer,
+  WidgetStrip,
+  useWidgetSortable,
+  type WidgetEnableMenuItem,
+  type WidgetInstanceContextMenuTarget,
+} from '@workbench/widget-frame';
+import { closeWidgetPlacement, openWidgetPlacement, revealWidgetPlacement } from '@workbench/widgetPlacementCommands';
+import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
+import {
+  createWidgetRegionViewModelFromState,
+  getWidgetRegionItems,
+  isRequiredCenterView,
+} from '@workbench/widgetRegionViewModel';
+import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { CheckIcon, MoreHorizontalIcon } from 'lucide-react';
+import { type MouseEvent, useState } from 'react';
 
-interface CenterWidgetItem {
-  id: WidgetId;
-  isEnabled: boolean;
-  label: string;
-  status: RegisteredWidget['status'];
-  widget: RegisteredWidget;
-}
-
-const getCenterWidgetItems = (enabledWidgetIds: string[]): CenterWidgetItem[] =>
-  getWidgetsForRegion('center').map((widget) => ({
-    id: widget.manifest.id,
-    isEnabled: enabledWidgetIds.includes(widget.manifest.id),
-    label: widget.manifest.labelText,
-    status: widget.status,
-    widget,
-  }));
+type CenterWidgetItem = PlacedWidgetRegionItem;
 
 /** Center work area: the view tab strip plus the active registered center view. */
-export const CenterArea = () => {
+export const CenterArea = ({ dropState }: { dropState: WidgetRegionDropState }) => {
+  const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const centerRegion = useActiveProjectSelector((project) => project.widgetRegions.center);
+  const widgetInstances = useActiveProjectSelector((project) => project.widgetInstances);
   const dispatch = useWorkbenchDispatch();
+  const [enableMenuTarget, setEnableMenuTarget] = useState<{ x: number; y: number } | null>(null);
+  const [instanceMenuTarget, setInstanceMenuTarget] = useState<WidgetInstanceContextMenuTarget | null>(null);
   const focusRegionProps = useFocusRegionProps('center');
-  const centerWidgetItems = getCenterWidgetItems(centerRegion.enabledWidgetIds);
-  const enabledCenterWidgetItems = centerWidgetItems.filter((item) => item.isEnabled && item.status === 'enabled');
+  const centerRegionViewModel = createWidgetRegionViewModelFromState({
+    region: 'center',
+    regionState: centerRegion,
+    widgetInstances,
+    widgets: getWidgetsForRegion('center'),
+  });
+  const centerWidgetMenuItems = getWidgetRegionItems(centerRegionViewModel);
+  const enabledCenterWidgetItems = centerRegionViewModel.placedItems.filter((item) => item.status === 'enabled');
   const centerViewItems = enabledCenterWidgetItems.filter((item) => item.widget.manifest.centerPlacement !== 'toolbar');
   const centerToolbarItems = enabledCenterWidgetItems.filter(
     (item) => item.widget.manifest.centerPlacement === 'toolbar'
   );
-  const activeCenterViewId = centerViewItems.some((item) => item.id === centerRegion.activeWidgetId)
-    ? centerRegion.activeWidgetId
+  const activeCenterViewId = centerViewItems.some((item) => item.id === centerRegion.activeInstanceId)
+    ? centerRegion.activeInstanceId
     : centerViewItems[0]?.id;
+  const openEnableMenu = (event: MouseEvent) => {
+    event.preventDefault();
+    setEnableMenuTarget({ x: event.clientX, y: event.clientY });
+  };
+  const openInstanceMenu = (item: CenterWidgetItem, event: MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setInstanceMenuTarget({ item, x: event.clientX, y: event.clientY });
+  };
+  const toggleCenterWidget = (item: WidgetEnableMenuItem) =>
+    item.isEnabled
+      ? closeWidgetPlacement({
+          dispatch,
+          getWidgetById,
+          instanceId: item.id,
+          project: placementProject,
+          region: 'center',
+        })
+      : openWidgetPlacement({
+          dispatch,
+          getWidgetsForRegion,
+          options: { createNew: item.allowMultiple, preferredRegions: ['center'] },
+          typeId: item.typeId,
+        });
 
   return (
     <Flex as="section" bg="bg" direction="column" flex="1" minH="0" minW="0" {...focusRegionProps}>
-      <HStack bg="bg.subtle" borderBottomWidth="1px" borderColor="border.subtle" h="10" px="1.5">
+      <WidgetStrip
+        align="center"
+        bg="bg.subtle"
+        borderBottomWidth="1px"
+        borderColor="border.subtle"
+        dropState={dropState}
+        h="10"
+        px="1.5"
+        region="center"
+        sortableInstanceIds={centerRegionViewModel.sortableInstanceIds.filter((instanceId) =>
+          centerViewItems.some((item) => item.id === instanceId)
+        )}
+        strategy={horizontalListSortingStrategy}
+        onContextMenu={openEnableMenu}
+      >
         <Tabs.Root
           value={activeCenterViewId}
           h="full"
           w="full"
           onValueChange={(event) =>
-            dispatch({ region: 'center', type: 'selectRegionWidget', widgetId: event.value as CenterWidgetItem['id'] })
+            revealWidgetPlacement({
+              dispatch,
+              instanceId: event.value as CenterWidgetItem['id'],
+              project: placementProject,
+              region: 'center',
+            })
           }
         >
           <Tabs.List>
             {centerViewItems.map((item) => (
-              <Tabs.Trigger key={item.id} value={item.id} disabled={item.status === 'disabled'} fontSize="xs" px="3">
-                <WidgetIcon iconId={item.widget.manifest.icon} boxSize="3.5" />
-                {item.label}
-              </Tabs.Trigger>
+              <SortableCenterTab key={item.id} item={item} onContextMenu={openInstanceMenu} />
             ))}
           </Tabs.List>
         </Tabs.Root>
         <Box flex="1" />
         {centerToolbarItems.map((item) => (
           <Flex key={item.id} align="center" h="full">
-            <WidgetRenderer widget={item.widget} presentation="compact" region="center" />
+            <WidgetRenderer instance={item.instance} widget={item.widget} presentation="compact" region="center" />
           </Flex>
         ))}
-        <CenterWidgetMenu
-          enabledViewCount={centerViewItems.length}
-          items={centerWidgetItems}
-          onToggle={(centerWidgetId) =>
-            dispatch({ region: 'center', type: 'toggleRegionWidget', widgetId: centerWidgetId })
+        <WidgetEnableMenu
+          contextTarget={enableMenuTarget}
+          getItemMeta={(item) =>
+            isRequiredCenterView(item as WidgetRegionItem, centerViewItems.length) ? 'Required' : null
           }
+          groupLabel="Center Widgets"
+          isItemDisabled={(item) => isRequiredCenterView(item as WidgetRegionItem, centerViewItems.length)}
+          items={centerWidgetMenuItems}
+          positioning={{ placement: 'bottom-end' }}
+          trigger={{ kind: 'center' }}
+          triggerLabel="Center widget menu"
+          onContextClose={() => setEnableMenuTarget(null)}
+          onToggle={toggleCenterWidget}
         />
-      </HStack>
+        <WidgetInstanceContextMenu
+          isRemoveDisabled={(item) => isRequiredCenterView(item as WidgetRegionItem, centerViewItems.length)}
+          target={instanceMenuTarget}
+          onClose={() => setInstanceMenuTarget(null)}
+          onRemove={toggleCenterWidget}
+        />
+      </WidgetStrip>
 
       <Box flex="1" minH="0" position="relative">
         <CenterViewSlot activeWidgetId={activeCenterViewId} items={centerViewItems} />
       </Box>
     </Flex>
+  );
+};
+
+const SortableCenterTab = ({
+  item,
+  onContextMenu,
+}: {
+  item: CenterWidgetItem;
+  onContextMenu: (item: CenterWidgetItem, event: MouseEvent) => void;
+}) => {
+  const { dragHandleProps, setNodeRef, style } = useWidgetSortable({
+    disabled: item.status === 'disabled',
+    instanceId: item.id,
+    region: 'center',
+    typeId: item.instance.typeId,
+  });
+
+  return (
+    <Tabs.Trigger
+      ref={setNodeRef}
+      value={item.id}
+      disabled={item.status === 'disabled'}
+      fontSize="xs"
+      px="3"
+      style={style}
+      {...dragHandleProps}
+      onContextMenu={(event) => onContextMenu(item, event)}
+    >
+      <WidgetIcon icon={item.widget.manifest.icon} boxSize="3.5" />
+      {item.label}
+    </Tabs.Trigger>
   );
 };
 
@@ -91,70 +187,14 @@ const CenterViewSlot = ({
   items: CenterWidgetItem[];
 }) => {
   const widget = items.find((item) => item.id === activeWidgetId)?.widget;
+  const instance = items.find((item) => item.id === activeWidgetId)?.instance;
   const View = widget?.manifest.view;
 
-  if (!widget || widget.status !== 'enabled' || !View) {
+  if (!instance || !widget || widget.status !== 'enabled' || !View) {
     return <FallbackCenterView label="Center widget unavailable" />;
   }
 
-  return <WidgetRenderer widget={widget} region="center" />;
-};
-
-const CenterWidgetMenu = ({
-  enabledViewCount,
-  items,
-  onToggle,
-}: {
-  enabledViewCount: number;
-  items: CenterWidgetItem[];
-  onToggle: (centerWidgetId: CenterWidgetItem['id']) => void;
-}) => {
-  return (
-    <Menu.Root positioning={{ placement: 'bottom-end' }}>
-      <Menu.Trigger asChild>
-        <IconButton aria-label="Center widget menu" size="xs" variant="ghost">
-          <Icon as={MoreHorizontalIcon} boxSize="4" />
-        </IconButton>
-      </Menu.Trigger>
-      <Portal>
-        <Menu.Positioner>
-          <Menu.Content minW="12rem">
-            <Menu.ItemGroup>
-              <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
-                Center Widgets
-              </Menu.ItemGroupLabel>
-              {items.map((item) => {
-                const isView = item.widget.manifest.centerPlacement !== 'toolbar';
-                const isRequiredView = isView && item.isEnabled && enabledViewCount === 1;
-
-                return (
-                  <Menu.Item
-                    key={item.id}
-                    role="menuitemcheckbox"
-                    aria-checked={item.isEnabled}
-                    value={item.id}
-                    closeOnSelect={false}
-                    disabled={item.status === 'disabled' || isRequiredView}
-                    _disabled={{ opacity: 0.4 }}
-                    onClick={() => onToggle(item.id)}
-                  >
-                    <Icon as={CheckIcon} boxSize="3" opacity={item.isEnabled ? 1 : 0} />
-                    <WidgetIcon iconId={item.widget.manifest.icon} boxSize="3.5" />
-                    <Menu.ItemText>{item.label}</Menu.ItemText>
-                    {isRequiredView ? (
-                      <Text color="fg.subtle" fontSize="2xs" ms="auto">
-                        Required
-                      </Text>
-                    ) : null}
-                  </Menu.Item>
-                );
-              })}
-            </Menu.ItemGroup>
-          </Menu.Content>
-        </Menu.Positioner>
-      </Portal>
-    </Menu.Root>
-  );
+  return <WidgetRenderer instance={instance} widget={widget} region="center" />;
 };
 
 const FallbackCenterView = ({ label }: { label: string }) => (

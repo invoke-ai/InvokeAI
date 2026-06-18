@@ -1,16 +1,17 @@
-import type { WidgetId, WorkbenchRegion } from '@workbench/types';
+import type { WidgetInstanceId, WorkbenchRegion } from '@workbench/types';
 
 import { MissingWidgetFrame, WidgetRenderer } from '@workbench/widget-frame';
 import { getWidgetById } from '@workbench/widgetRegistry';
+import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 
 /** Left panel — hosts the active registered widget panel view. */
-export const LeftPanel = ({ widgetId }: { widgetId: WidgetId }) => (
-  <WidgetPanelSlot widgetId={widgetId} panel="leftPanel" />
+export const LeftPanel = ({ instanceId }: { instanceId: WidgetInstanceId }) => (
+  <WidgetPanelSlot instanceId={instanceId} panel="leftPanel" />
 );
 
 /** Right panel — hosts the active registered widget panel view. */
-export const RightPanel = ({ widgetId }: { widgetId: WidgetId }) => (
-  <WidgetPanelSlot widgetId={widgetId} panel="rightPanel" />
+export const RightPanel = ({ instanceId }: { instanceId: WidgetInstanceId }) => (
+  <WidgetPanelSlot instanceId={instanceId} panel="rightPanel" />
 );
 
 const panelRegions = {
@@ -18,14 +19,15 @@ const panelRegions = {
   rightPanel: 'right',
 } as const satisfies Record<string, WorkbenchRegion>;
 
-const WidgetPanelSlot = ({ widgetId, panel }: { widgetId: WidgetId; panel: keyof typeof panelRegions }) => {
-  const widget = getWidgetById(widgetId);
+const WidgetPanelSlot = ({ instanceId, panel }: { instanceId: WidgetInstanceId; panel: keyof typeof panelRegions }) => {
+  const instance = useActiveProjectSelector((project) => project.widgetInstances[instanceId]);
+  const widget = instance ? getWidgetById(instance.typeId) : undefined;
   const View = widget?.manifest.view;
   const region = panelRegions[panel];
 
-  if (!widget || widget.status !== 'enabled' || !View) {
-    return <MissingWidgetFrame label={widget?.manifest.labelText ?? widgetId} region={region} />;
+  if (!instance || !widget || widget.status !== 'enabled' || !View) {
+    return <MissingWidgetFrame label={widget?.manifest.labelText ?? instanceId} region={region} />;
   }
 
-  return <WidgetRenderer widget={widget} region={region} />;
+  return <WidgetRenderer instance={instance} widget={widget} region={region} />;
 };
