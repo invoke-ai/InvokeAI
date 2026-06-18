@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { WorkbenchSnapshot, WorkbenchStore } from './workbenchStore';
 
+import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from './widgetPlacementMeta';
+import { getProjectWidgetValues } from './widgetState';
 import { createWorkbenchStore } from './workbenchStore';
 
 const watchSelector = <Selected>(
@@ -111,7 +113,7 @@ describe('createWorkbenchStore', () => {
     const activeProjectIdWatcher = watchSelector(store, (snapshot) => snapshot.activeProject.id);
     const projectCountWatcher = watchSelector(store, (snapshot) => snapshot.state.projects.length);
     const batchCountWatcher = watchSelector(store, (snapshot) =>
-      Number(snapshot.activeProject.widgetStates.generate.values.batchCount ?? 1)
+      Number(getProjectWidgetValues(snapshot.activeProject, 'generate').batchCount ?? 1)
     );
 
     store.dispatch({ status: 'connected', type: 'setBackendConnectionStatus' });
@@ -156,5 +158,20 @@ describe('createWorkbenchStore', () => {
 
     expect(statusObjectWatcher.current).toEqual({ status: 'connected' });
     expect(statusObjectWatcher.changeCount).toBe(1);
+  });
+
+  it('keeps widget placement metadata stable across widget value updates', () => {
+    const store = createWorkbenchStore();
+    const placementWatcher = watchSelector(
+      store,
+      (snapshot) => getWidgetPlacementProject(snapshot.activeProject),
+      areWidgetPlacementProjectsEqual
+    );
+    const widgetInstancesWatcher = watchSelector(store, (snapshot) => snapshot.activeProject.widgetInstances);
+
+    store.dispatch({ instanceId: 'generate', type: 'patchWidgetInstanceValues', values: { prompt: 'updated' } });
+
+    expect(widgetInstancesWatcher.changeCount).toBe(1);
+    expect(placementWatcher.changeCount).toBe(0);
   });
 });
