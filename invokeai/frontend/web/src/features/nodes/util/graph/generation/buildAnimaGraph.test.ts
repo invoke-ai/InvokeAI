@@ -246,7 +246,9 @@ describe('buildAnimaGraph', () => {
     beforeEach(() => {
       vi.mocked(selectCanvasSlice).mockReturnValue(inpaintCanvas as never);
       // addInpaint is mocked; return the real l2i node it receives so it is a valid canvas output.
-      vi.mocked(addInpaint).mockImplementation((async ({ l2i }) => l2i) as never);
+      // addInpaint really returns the paste-back node; for the test the l2i node it receives is a
+      // sufficient (and valid) stand-in canvas output, hence the return cast.
+      vi.mocked(addInpaint).mockImplementation((arg) => Promise.resolve(arg.l2i as never));
     });
 
     afterEach(() => {
