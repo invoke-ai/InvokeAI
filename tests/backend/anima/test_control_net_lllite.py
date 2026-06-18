@@ -651,6 +651,58 @@ def test_normalize_control_lllite_rejects_duplicate_model_keys() -> None:
 
 
 # ----------------------------------------------------------------------------
+# Step-range gate (_get_lllite_multiplier)
+# ----------------------------------------------------------------------------
+
+
+def _stepped_field(weight: float, begin_step_percent: float, end_step_percent: float) -> AnimaLLLiteField:
+    return AnimaLLLiteField(
+        image_name="cond_image",
+        control_model=ModelIdentifierField(
+            key="key-a",
+            hash="blake3:0000",
+            name="adapter",
+            base=BaseModelType.Anima,
+            type=ModelType.ControlNet,
+        ),
+        weight=weight,
+        begin_step_percent=begin_step_percent,
+        end_step_percent=end_step_percent,
+    )
+
+
+def test_lllite_multiplier_full_range_returns_weight() -> None:
+    """A 0%..100% window returns the field weight at every step, boundaries included."""
+    field = _stepped_field(weight=0.7, begin_step_percent=0.0, end_step_percent=1.0)
+    for step_index in (0, 1, 10, 19, 20):
+        assert AnimaDenoiseInvocation._get_lllite_multiplier(field, step_index, total_steps=20) == 0.7
+
+
+def test_lllite_multiplier_zero_outside_window() -> None:
+    """A 25%..75% window over 20 steps gates to first_step=5, last_step=15 (both inclusive)."""
+    field = _stepped_field(weight=0.5, begin_step_percent=0.25, end_step_percent=0.75)
+    # Below the window.
+    assert AnimaDenoiseInvocation._get_lllite_multiplier(field, 4, total_steps=20) == 0.0
+    # First applied step (floor(0.25 * 20) = 5) is inclusive.
+    assert AnimaDenoiseInvocation._get_lllite_multiplier(field, 5, total_steps=20) == 0.5
+    assert AnimaDenoiseInvocation._get_lllite_multiplier(field, 10, total_steps=20) == 0.5
+    # Last applied step (ceil(0.75 * 20) = 15) is inclusive.
+    assert AnimaDenoiseInvocation._get_lllite_multiplier(field, 15, total_steps=20) == 0.5
+    # Above the window.
+    assert AnimaDenoiseInvocation._get_lllite_multiplier(field, 16, total_steps=20) == 0.0
+
+
+def test_lllite_multiplier_floor_ceil_rounding() -> None:
+    """A non-integer step boundary floors the start and ceils the end (widening, not truncating)."""
+    # 0.34 * 10 = 3.4 -> first_step = floor(3.4) = 3, last_step = ceil(3.4) = 4.
+    field = _stepped_field(weight=1.0, begin_step_percent=0.34, end_step_percent=0.34)
+    assert AnimaDenoiseInvocation._get_lllite_multiplier(field, 2, total_steps=10) == 0.0
+    assert AnimaDenoiseInvocation._get_lllite_multiplier(field, 3, total_steps=10) == 1.0
+    assert AnimaDenoiseInvocation._get_lllite_multiplier(field, 4, total_steps=10) == 1.0
+    assert AnimaDenoiseInvocation._get_lllite_multiplier(field, 5, total_steps=10) == 0.0
+
+
+# ----------------------------------------------------------------------------
 # Real weight file (optional; skipped when the file is not present)
 # ----------------------------------------------------------------------------
 
