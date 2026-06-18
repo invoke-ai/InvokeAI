@@ -39,6 +39,7 @@ const createQueueItem = ({
     graph: { edges: [], id: 'graph-1', label: 'Graph', nodes: [], updatedAt: submittedAt, version: 1 },
     sourceId,
     submittedAt,
+    widgetInstances: {},
     widgetStates: {
       generate: { id: 'generate', label: 'Generate', values: { batchCount }, version: 1 },
     } as unknown as QueueItem['snapshot']['widgetStates'],

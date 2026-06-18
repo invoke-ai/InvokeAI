@@ -59,7 +59,7 @@ const QueueContents = () => {
   );
 
   return (
-    <Stack gap="2">
+    <Stack gap="2" p="2">
       {queueRows.length === 0 ? (
         <Text color="fg.subtle" fontSize="2xs">
           Queue submissions will appear here.

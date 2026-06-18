@@ -6,18 +6,31 @@ import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 interface WidgetFailureBoundaryProps {
   widgetId: WidgetId;
+  resetKey: string;
   children: ReactNode;
 }
 
 interface WidgetFailureBoundaryState {
   error?: Error;
   details?: string;
+  resetKey: string;
 }
 
 export class WidgetFailureBoundary extends Component<WidgetFailureBoundaryProps, WidgetFailureBoundaryState> {
-  state: WidgetFailureBoundaryState = {};
+  state: WidgetFailureBoundaryState = { resetKey: this.props.resetKey };
 
-  static getDerivedStateFromError(error: Error): WidgetFailureBoundaryState {
+  static getDerivedStateFromProps(
+    props: WidgetFailureBoundaryProps,
+    state: WidgetFailureBoundaryState
+  ): Partial<WidgetFailureBoundaryState> | null {
+    if (props.resetKey !== state.resetKey) {
+      return { details: undefined, error: undefined, resetKey: props.resetKey };
+    }
+
+    return null;
+  }
+
+  static getDerivedStateFromError(error: Error): Partial<WidgetFailureBoundaryState> {
     return { error };
   }
 
@@ -56,14 +69,24 @@ export class WidgetFailureBoundary extends Component<WidgetFailureBoundaryProps,
           </ScrollArea.Scrollbar>
           <ScrollArea.Corner />
         </ScrollArea.Root>
-        <Button
-          alignSelf="start"
-          size="2xs"
-          variant="outline"
-          onClick={() => void navigator.clipboard?.writeText(copyableDetails)}
-        >
-          Copy Error
-        </Button>
+        <Stack direction="row" gap="2">
+          <Button
+            alignSelf="start"
+            size="2xs"
+            variant="outline"
+            onClick={() => this.setState({ details: undefined, error: undefined, resetKey: this.props.resetKey })}
+          >
+            Retry
+          </Button>
+          <Button
+            alignSelf="start"
+            size="2xs"
+            variant="outline"
+            onClick={() => void navigator.clipboard?.writeText(copyableDetails)}
+          >
+            Copy Error
+          </Button>
+        </Stack>
       </Stack>
     );
   }

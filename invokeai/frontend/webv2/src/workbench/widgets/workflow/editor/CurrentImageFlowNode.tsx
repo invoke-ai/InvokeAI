@@ -3,6 +3,7 @@ import type { NodeProps } from '@xyflow/react';
 
 import { Box, Flex, Image, Text } from '@chakra-ui/react';
 import { useProgressImage } from '@workbench/backend/progressImageStore';
+import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { memo } from 'react';
 
@@ -21,7 +22,7 @@ const getLatestImage = (values: Record<string, unknown>): GeneratedImageContract
 };
 
 const CurrentImageFlowNodeComponent = ({ data, selected }: NodeProps<CurrentImageFlowNodeType>) => {
-  const galleryValues = useActiveProjectSelector((project) => project.widgetStates.gallery.values);
+  const galleryValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'gallery'));
   const progressImage = useProgressImage();
   const node = data.documentNode;
   const latestImage = getLatestImage(galleryValues);

@@ -24,9 +24,13 @@ import type {
   ResultDestination,
   WidgetFailure,
   WidgetId,
+  WidgetInstanceContract,
+  WidgetInstanceId,
   WidgetRegion,
   WidgetRegionState,
   WidgetStateContract,
+  WidgetStateMap,
+  WidgetTypeId,
   WorkbenchNotification,
   WorkbenchNotificationKind,
   WorkbenchState,
@@ -75,14 +79,35 @@ type WorkbenchAction =
   | { type: 'setInvocationDestination'; destination: ResultDestination }
   | { type: 'toggleSourceLock' }
   | { type: 'toggleDestinationLock' }
-  | { type: 'openRegionWidget'; region: WidgetRegion; widgetId: WidgetId }
-  | { type: 'selectRegionWidget'; region: WidgetRegion; widgetId: WidgetId }
-  | { type: 'toggleRegionWidget'; region: WidgetRegion; widgetId: WidgetId }
+  | {
+      type: 'openRegionWidget';
+      region: WidgetRegion;
+      widgetId: WidgetTypeId;
+      createNew?: boolean;
+      initialValues?: Record<string, unknown>;
+    }
+  | { type: 'selectRegionWidget'; region: WidgetRegion; widgetId: WidgetInstanceId }
+  | { type: 'toggleRegionWidget'; region: WidgetRegion; widgetId: WidgetInstanceId }
+  | {
+      type: 'moveWidgetInstance';
+      instanceId: WidgetInstanceId;
+      fromRegion: WidgetRegion;
+      toRegion: WidgetRegion;
+      toIndex: number;
+    }
+  | {
+      type: 'reorderWidgetInstances';
+      region: WidgetRegion;
+      activeInstanceId?: WidgetInstanceId;
+      instanceIds: WidgetInstanceId[];
+    }
   | { type: 'setRegionWidgetCollapsed'; region: WidgetRegion; isCollapsed: boolean }
   | { type: 'setRegionWidgetSize'; region: WidgetRegion; sizePx: number }
   | { type: 'setGenerateSettings'; values: GenerateWidgetValues }
   | { type: 'setGenerateBatchCount'; batchCount: number }
-  | { type: 'patchWidgetValues'; widgetId: WidgetId; values: Record<string, unknown> }
+  | { type: 'patchWidgetValues'; widgetId: WidgetTypeId; values: Record<string, unknown> }
+  | { type: 'patchWidgetInstanceValues'; instanceId: WidgetInstanceId; values: Record<string, unknown> }
+  | { type: 'setWidgetInstanceValues'; instanceId: WidgetInstanceId; values: Record<string, unknown> }
   | { type: 'applyProjectGraphAction'; action: ProjectGraphAction }
   | { type: 'replaceProjectGraph'; document: ProjectGraphState; label: string }
   | { type: 'saveProjectGraphSnapshot' }
@@ -342,50 +367,93 @@ const cloneWidgetState = (widgetState: WidgetStateContract): WidgetStateContract
   values: { ...widgetState.values },
 });
 
-const cloneWidgetStates = (
-  widgetStates: Record<WidgetId, WidgetStateContract>
-): Record<WidgetId, WidgetStateContract> => {
-  const defaultWidgetStates = createWidgetStates();
+const cloneWidgetInstance = (widgetInstance: WidgetInstanceContract): WidgetInstanceContract => ({
+  ...widgetInstance,
+  state: cloneWidgetState(widgetInstance.state),
+});
+
+const cloneWidgetInstances = (
+  widgetInstances: Record<WidgetInstanceId, WidgetInstanceContract>
+): Record<WidgetInstanceId, WidgetInstanceContract> =>
+  Object.fromEntries(
+    Object.entries({ ...createWidgetInstances(), ...widgetInstances }).map(([instanceId, widgetInstance]) => [
+      instanceId,
+      cloneWidgetInstance(widgetInstance),
+    ])
+  );
+
+const getWidgetStatesSnapshot = (widgetInstances: Record<WidgetInstanceId, WidgetInstanceContract>): WidgetStateMap => {
+  const widgetStates: WidgetStateMap = {};
+
+  for (const widgetInstance of Object.values(widgetInstances)) {
+    widgetStates[widgetInstance.typeId] ??= cloneWidgetState(widgetInstance.state);
+  }
+
+  return widgetStates;
+};
+
+const getWidgetState = (project: Project, widgetId: WidgetTypeId): WidgetStateContract => {
+  const widgetInstance =
+    project.widgetInstances[widgetId] ??
+    Object.values(project.widgetInstances).find((instance) => instance.typeId === widgetId);
+
+  return widgetInstance?.state ?? createWidgetState(widgetId);
+};
+
+const getWidgetValues = (project: Project, widgetId: WidgetTypeId): Record<string, unknown> =>
+  getWidgetState(project, widgetId).values;
+
+const updateProjectWidgetState = (
+  project: Project,
+  widgetId: WidgetTypeId,
+  getState: (state: WidgetStateContract) => WidgetStateContract
+): Project => {
+  const instance =
+    project.widgetInstances[widgetId] ??
+    Object.values(project.widgetInstances).find((candidate) => candidate.typeId === widgetId);
+  const instanceId = instance?.id ?? widgetId;
+  const currentInstance = instance ?? createWidgetInstance(widgetId, instanceId);
 
   return {
-    'autosave-status': cloneWidgetState(widgetStates['autosave-status'] ?? defaultWidgetStates['autosave-status']),
-    canvas: cloneWidgetState(widgetStates.canvas ?? defaultWidgetStates.canvas),
-    diagnostics: cloneWidgetState(widgetStates.diagnostics ?? defaultWidgetStates.diagnostics),
-    gallery: cloneWidgetState(widgetStates.gallery ?? defaultWidgetStates.gallery),
-    generate: cloneWidgetState(widgetStates.generate ?? defaultWidgetStates.generate),
-    'history-controls': cloneWidgetState(widgetStates['history-controls'] ?? defaultWidgetStates['history-controls']),
-    'layout-actions': cloneWidgetState(widgetStates['layout-actions'] ?? defaultWidgetStates['layout-actions']),
-    layers: cloneWidgetState(widgetStates.layers ?? defaultWidgetStates.layers),
-    models: cloneWidgetState(widgetStates.models ?? defaultWidgetStates.models),
-    notifications: cloneWidgetState(widgetStates.notifications ?? defaultWidgetStates.notifications),
-    preview: cloneWidgetState(widgetStates.preview ?? defaultWidgetStates.preview),
-    project: cloneWidgetState(widgetStates.project ?? defaultWidgetStates.project),
-    queue: cloneWidgetState(widgetStates.queue ?? defaultWidgetStates.queue),
-    'server-status': cloneWidgetState(widgetStates['server-status'] ?? defaultWidgetStates['server-status']),
-    users: cloneWidgetState(widgetStates.users ?? defaultWidgetStates.users),
-    'version-status': cloneWidgetState(widgetStates['version-status'] ?? defaultWidgetStates['version-status']),
-    workflow: cloneWidgetState(widgetStates.workflow ?? defaultWidgetStates.workflow),
+    ...project,
+    widgetInstances: {
+      ...project.widgetInstances,
+      [instanceId]: {
+        ...currentInstance,
+        state: getState(currentInstance.state),
+      },
+    },
   };
 };
+
+const updateProjectWidgetValues = (
+  project: Project,
+  widgetId: WidgetTypeId,
+  getValues: (values: Record<string, unknown>) => Record<string, unknown>
+): Project =>
+  updateProjectWidgetState(project, widgetId, (widgetState) => ({
+    ...widgetState,
+    values: getValues(widgetState.values),
+  }));
 
 const cloneWidgetRegions = (
   widgetRegions: Record<WidgetRegion, WidgetRegionState>
 ): Record<WidgetRegion, WidgetRegionState> => ({
   center: {
     ...widgetRegions.center,
-    enabledWidgetIds: [...widgetRegions.center.enabledWidgetIds],
+    instanceIds: [...widgetRegions.center.instanceIds],
   },
   left: {
     ...widgetRegions.left,
-    enabledWidgetIds: [...widgetRegions.left.enabledWidgetIds],
+    instanceIds: [...widgetRegions.left.instanceIds],
   },
   right: {
     ...widgetRegions.right,
-    enabledWidgetIds: [...widgetRegions.right.enabledWidgetIds],
+    instanceIds: [...widgetRegions.right.instanceIds],
   },
   bottom: {
     ...widgetRegions.bottom,
-    enabledWidgetIds: [...widgetRegions.bottom.enabledWidgetIds],
+    instanceIds: [...widgetRegions.bottom.instanceIds],
   },
 });
 
@@ -398,8 +466,8 @@ const createUndoSnapshot = (project: Project): ProjectUndoSnapshot => ({
   layout: { ...project.layout, panels: { ...project.layout.panels } },
   projectGraph: cloneProjectGraph(project.projectGraph),
   widgetGraphs: cloneWidgetGraphs(project.widgetGraphs),
+  widgetInstances: cloneWidgetInstances(project.widgetInstances),
   widgetRegions: cloneWidgetRegions(project.widgetRegions),
-  widgetStates: cloneWidgetStates(project.widgetStates),
 });
 
 const restoreUndoSnapshot = (project: Project, snapshot: ProjectUndoSnapshot): Project => ({
@@ -409,8 +477,8 @@ const restoreUndoSnapshot = (project: Project, snapshot: ProjectUndoSnapshot): P
   layout: { ...snapshot.layout, panels: { ...snapshot.layout.panels } },
   projectGraph: cloneProjectGraph(normalizeProjectGraph(snapshot.projectGraph)),
   widgetGraphs: cloneWidgetGraphs(snapshot.widgetGraphs),
+  widgetInstances: cloneWidgetInstances(snapshot.widgetInstances),
   widgetRegions: cloneWidgetRegions(snapshot.widgetRegions),
-  widgetStates: cloneWidgetStates(snapshot.widgetStates),
 });
 
 const createGraphHistorySnapshot = (label: string, graph: GraphContract): GraphHistorySnapshot => ({
@@ -444,13 +512,12 @@ const pushUndo = (project: Project, label: string): Project => ({
   },
 });
 
-const createWidgetStates = (): Record<WidgetId, WidgetStateContract> => ({
+const createWidgetStates = (): WidgetStateMap => ({
   'autosave-status': { id: 'autosave-status', label: 'Autosave', values: {}, version: 1 },
   canvas: { id: 'canvas', label: 'Canvas', values: {}, version: 1 },
   diagnostics: { id: 'diagnostics', label: 'Diagnostics', values: {}, version: 1 },
   gallery: { id: 'gallery', label: 'Gallery', values: {}, version: 1 },
   generate: { graphId: 'generate-graph', id: 'generate', label: 'Generate', values: {}, version: 1 },
-  'history-controls': { id: 'history-controls', label: 'History Controls', values: {}, version: 1 },
   'layout-actions': { id: 'layout-actions', label: 'Layout Actions', values: {}, version: 1 },
   layers: { id: 'layers', label: 'Layers', values: {}, version: 1 },
   models: { id: 'models', label: 'Models', values: {}, version: 1 },
@@ -464,39 +531,92 @@ const createWidgetStates = (): Record<WidgetId, WidgetStateContract> => ({
   workflow: { graphId: 'workflow-graph', id: 'workflow', label: 'Workflow', values: {}, version: 1 },
 });
 
+const createWidgetState = (widgetId: WidgetTypeId): WidgetStateContract =>
+  cloneWidgetState(
+    createWidgetStates()[widgetId] ?? {
+      id: widgetId,
+      label: widgetId,
+      values: {},
+      version: 1,
+    }
+  );
+
+const createWidgetInstance = (
+  widgetId: WidgetTypeId,
+  instanceId: WidgetInstanceId = widgetId,
+  values?: Record<string, unknown>
+): WidgetInstanceContract => ({
+  createdAt: now(),
+  id: instanceId,
+  state: values ? { ...createWidgetState(widgetId), values } : createWidgetState(widgetId),
+  typeId: widgetId,
+});
+
+const defaultWidgetInstanceTypes: Record<WidgetInstanceId, WidgetTypeId> = {
+  'autosave-status': 'autosave-status',
+  canvas: 'canvas',
+  diagnostics: 'diagnostics',
+  'diagnostics:bottom': 'diagnostics',
+  gallery: 'gallery',
+  'gallery:bottom': 'gallery',
+  'gallery:center': 'gallery',
+  generate: 'generate',
+  'layout-actions': 'layout-actions',
+  layers: 'layers',
+  models: 'models',
+  'models:center': 'models',
+  notifications: 'notifications',
+  preview: 'preview',
+  project: 'project',
+  queue: 'queue',
+  'queue:bottom': 'queue',
+  'server-status': 'server-status',
+  'version-status': 'version-status',
+  workflow: 'workflow',
+  'workflow:bottom': 'workflow',
+  'workflow:center': 'workflow',
+};
+
+const createWidgetInstances = (): Record<WidgetInstanceId, WidgetInstanceContract> =>
+  Object.fromEntries(
+    Object.entries(defaultWidgetInstanceTypes).map(([instanceId, widgetId]) => [
+      instanceId,
+      createWidgetInstance(widgetId, instanceId),
+    ])
+  );
+
 const createWidgetRegions = (): Record<WidgetRegion, WidgetRegionState> => ({
   left: {
-    activeWidgetId: 'generate',
-    enabledWidgetIds: ['generate', 'workflow'],
+    activeInstanceId: 'generate',
+    instanceIds: ['generate', 'workflow'],
     isCollapsed: false,
     sizePx: 288,
   },
   right: {
-    activeWidgetId: 'layers',
-    enabledWidgetIds: ['queue', 'gallery', 'layers', 'models', 'diagnostics', 'project'],
+    activeInstanceId: 'layers',
+    instanceIds: ['queue', 'gallery', 'layers', 'models', 'diagnostics', 'project'],
     isCollapsed: false,
     sizePx: 240,
   },
   bottom: {
-    activeWidgetId: 'queue',
-    enabledWidgetIds: [
+    activeInstanceId: 'queue',
+    instanceIds: [
       'server-status',
-      'diagnostics',
-      'queue',
-      'gallery',
+      'diagnostics:bottom',
+      'queue:bottom',
+      'gallery:bottom',
       'notifications',
       'autosave-status',
-      'history-controls',
       'layout-actions',
       'version-status',
-      'workflow',
+      'workflow:bottom',
     ],
     isCollapsed: true,
     sizePx: 180,
   },
   center: {
-    activeWidgetId: 'canvas',
-    enabledWidgetIds: ['canvas', 'gallery', 'preview', 'workflow', 'models'],
+    activeInstanceId: 'canvas',
+    instanceIds: ['canvas', 'gallery:center', 'preview', 'workflow:center', 'models:center'],
     isCollapsed: false,
     sizePx: 0,
   },
@@ -505,8 +625,8 @@ const createWidgetRegions = (): Record<WidgetRegion, WidgetRegionState> => ({
 const LEGACY_RIGHT_REGION_WIDGET_IDS: WidgetId[] = ['queue', 'gallery', 'layers'];
 
 const isLegacyDefaultRightRegion = (region: WidgetRegionState): boolean =>
-  region.enabledWidgetIds.length === LEGACY_RIGHT_REGION_WIDGET_IDS.length &&
-  region.enabledWidgetIds.every((widgetId, index) => widgetId === LEGACY_RIGHT_REGION_WIDGET_IDS[index]);
+  region.instanceIds.length === LEGACY_RIGHT_REGION_WIDGET_IDS.length &&
+  region.instanceIds.every((widgetId, index) => widgetId === LEGACY_RIGHT_REGION_WIDGET_IDS[index]);
 
 const ensureRightRegion = (rightRegion: WidgetRegionState | undefined): WidgetRegionState => {
   const defaultRightRegion = createWidgetRegions().right;
@@ -516,40 +636,52 @@ const ensureRightRegion = (rightRegion: WidgetRegionState | undefined): WidgetRe
   }
 
   if (isLegacyDefaultRightRegion(rightRegion)) {
-    return { ...rightRegion, enabledWidgetIds: defaultRightRegion.enabledWidgetIds };
+    return { ...rightRegion, instanceIds: defaultRightRegion.instanceIds };
   }
 
   return rightRegion;
 };
 
-const getCenterWidgetIdFromViewId = (centerViewId: CenterViewId): WidgetId => centerViewId;
+const getCenterWidgetIdFromViewId = (centerViewId: CenterViewId): WidgetInstanceId => {
+  if (centerViewId === 'gallery') {
+    return 'gallery:center';
+  }
+
+  if (centerViewId === 'models') {
+    return 'models:center';
+  }
+
+  if (centerViewId === 'workflow') {
+    return 'workflow:center';
+  }
+
+  return centerViewId;
+};
 
 const ensureCenterRegion = (
   centerRegion: WidgetRegionState | undefined,
   fallbackCenterViewId: CenterViewId
 ): WidgetRegionState => {
   const defaultCenterRegion = createWidgetRegions().center;
-  const activeWidgetId = centerRegion?.activeWidgetId ?? getCenterWidgetIdFromViewId(fallbackCenterViewId);
-  const enabledWidgetIds = centerRegion?.enabledWidgetIds.length
-    ? centerRegion.enabledWidgetIds
-    : defaultCenterRegion.enabledWidgetIds;
-  const normalizedActiveWidgetId = enabledWidgetIds.includes(activeWidgetId) ? activeWidgetId : enabledWidgetIds[0];
+  const activeInstanceId = centerRegion?.activeInstanceId ?? getCenterWidgetIdFromViewId(fallbackCenterViewId);
+  const instanceIds = centerRegion?.instanceIds.length ? centerRegion.instanceIds : defaultCenterRegion.instanceIds;
+  const normalizedActiveInstanceId = instanceIds.includes(activeInstanceId) ? activeInstanceId : instanceIds[0];
 
   return {
     ...defaultCenterRegion,
     ...centerRegion,
-    activeWidgetId: normalizedActiveWidgetId,
-    enabledWidgetIds,
+    activeInstanceId: normalizedActiveInstanceId,
+    instanceIds,
     isCollapsed: false,
   };
 };
 
 const ensureProjectWidgetContracts = (project: Project): Project => {
   const defaultWidgetRegions = createWidgetRegions();
-  const defaultWidgetStates = createWidgetStates();
   const legacyWidgetRegions = project.widgetRegions as
     | Partial<Record<WidgetRegion | 'left-panel' | 'right-panel' | 'status-bar', WidgetRegionState>>
     | undefined;
+  const widgetInstances = project.widgetInstances ?? createWidgetInstances();
 
   return {
     ...project,
@@ -562,10 +694,7 @@ const ensureProjectWidgetContracts = (project: Project): Project => {
       bottom: legacyWidgetRegions?.bottom ?? legacyWidgetRegions?.['status-bar'] ?? defaultWidgetRegions.bottom,
       center: ensureCenterRegion(legacyWidgetRegions?.center, project.layout.centerViewId),
     },
-    widgetStates: {
-      ...defaultWidgetStates,
-      ...project.widgetStates,
-    },
+    widgetInstances: cloneWidgetInstances(widgetInstances),
   };
 };
 
@@ -609,8 +738,8 @@ const createProject = (index: number, id = `project-${index}`): Project => ({
   settings: normalizeProjectSettings(),
   undoRedo: { future: [], past: [] },
   widgetGraphs: {},
+  widgetInstances: createWidgetInstances(),
   widgetRegions: createWidgetRegions(),
-  widgetStates: createWidgetStates(),
 });
 
 const getNextProjectIndex = (projects: Project[]): number => {
@@ -634,12 +763,21 @@ const updateActiveProject = (state: WorkbenchState, getProject: (project: Projec
   ),
 });
 
-const getNextEnabledWidgetId = (region: WidgetRegionState, widgetId: WidgetId): WidgetId | null => {
-  if (region.activeWidgetId !== widgetId) {
-    return region.activeWidgetId;
+const getNextInstanceId = (region: WidgetRegionState, instanceId: WidgetInstanceId): WidgetInstanceId | null => {
+  if (region.activeInstanceId !== instanceId) {
+    return region.activeInstanceId;
   }
 
-  return region.enabledWidgetIds.find((enabledWidgetId) => enabledWidgetId !== widgetId) ?? null;
+  return region.instanceIds.find((enabledInstanceId) => enabledInstanceId !== instanceId) ?? null;
+};
+
+const insertAt = <Value>(values: Value[], value: Value, index: number): Value[] => {
+  const nextValues = values.filter((candidate) => candidate !== value);
+  const nextIndex = Math.min(nextValues.length, Math.max(0, index));
+
+  nextValues.splice(nextIndex, 0, value);
+
+  return nextValues;
 };
 
 const updateActiveWidgetRegion = (
@@ -660,7 +798,7 @@ const applyPresetRegionFocus = (state: WorkbenchState, preset: LayoutPreset): Wo
   const centerWidgetId = getCenterWidgetIdFromViewId(preset.initialLayout.centerViewId);
   const nextState = updateActiveWidgetRegion(state, 'center', (region) => ({
     ...region,
-    activeWidgetId: region.enabledWidgetIds.includes(centerWidgetId) ? centerWidgetId : region.activeWidgetId,
+    activeInstanceId: region.instanceIds.includes(centerWidgetId) ? centerWidgetId : region.activeInstanceId,
     isCollapsed: false,
   }));
   const leftWidgetId = preset.leftRegionWidgetId;
@@ -671,7 +809,7 @@ const applyPresetRegionFocus = (state: WorkbenchState, preset: LayoutPreset): Wo
 
   return updateActiveWidgetRegion(nextState, 'left', (region) => ({
     ...region,
-    activeWidgetId: region.enabledWidgetIds.includes(leftWidgetId) ? leftWidgetId : region.activeWidgetId,
+    activeInstanceId: region.instanceIds.includes(leftWidgetId) ? leftWidgetId : region.activeInstanceId,
     isCollapsed: false,
   }));
 };
@@ -744,8 +882,8 @@ const compileInvocationSnapshot = (
   project: Project,
   route: InvocationRoute,
   models?: readonly ModelConfig[]
-): { graph: GraphContract; widgetStates: Record<WidgetId, WidgetStateContract> } | null => {
-  const widgetStates = cloneWidgetStates(project.widgetStates);
+): { graph: GraphContract; widgetStates: WidgetStateMap } | null => {
+  const widgetStates = getWidgetStatesSnapshot(project.widgetInstances);
 
   if (route.sourceId === 'project-graph') {
     // Compiles the workflow document into an immutable snapshot. Templates are
@@ -760,12 +898,12 @@ const compileInvocationSnapshot = (
   }
 
   if (route.sourceId !== 'generate') {
-    const widgetGraph = project.widgetGraphs[route.sourceId as WidgetId];
+    const widgetGraph = project.widgetGraphs[route.sourceId as WidgetTypeId];
 
     return widgetGraph ? { graph: cloneGraph(widgetGraph), widgetStates } : null;
   }
 
-  const values = normalizeGenerateWidgetValues(project.widgetStates.generate.values);
+  const values = normalizeGenerateWidgetValues(getWidgetValues(project, 'generate'));
 
   if (!values) {
     return null;
@@ -816,7 +954,7 @@ const updateGalleryValues = (
   getValues: (values: Record<string, unknown>) => Record<string, unknown>
 ): WorkbenchState => {
   const activeProject = state.projects.find((project) => project.id === state.activeProjectId);
-  const values = activeProject?.widgetStates.gallery.values;
+  const values = activeProject ? getWidgetValues(activeProject, 'gallery') : null;
 
   if (!activeProject || !values) {
     return state;
@@ -828,33 +966,15 @@ const updateGalleryValues = (
     return state;
   }
 
-  return updateActiveProject(state, (project) => {
-    return {
-      ...project,
-      widgetStates: {
-        ...project.widgetStates,
-        gallery: {
-          ...project.widgetStates.gallery,
-          values: nextValues,
-        },
-      },
-    };
-  });
+  return updateActiveProject(state, (project) => updateProjectWidgetValues(project, 'gallery', () => nextValues));
 };
 
 const refreshProjectBackendData = (project: Project): Project => ({
-  ...project,
-  widgetStates: {
-    ...project.widgetStates,
-    gallery: {
-      ...project.widgetStates.gallery,
-      values: {
-        ...project.widgetStates.gallery.values,
-        galleryImagesRefreshToken: createId('gallery-images-refresh'),
-        galleryRefreshToken: createId('gallery-refresh'),
-      },
-    },
-  },
+  ...updateProjectWidgetValues(project, 'gallery', (values) => ({
+    ...values,
+    galleryImagesRefreshToken: createId('gallery-images-refresh'),
+    galleryRefreshToken: createId('gallery-refresh'),
+  })),
 });
 
 const updateQueueItem = (project: Project, queueItemId: string, getItem: (item: QueueItem) => QueueItem): Project => ({
@@ -911,27 +1031,18 @@ const updateGalleryWithResultImages = (project: Project, images: GeneratedImageC
     return project;
   }
 
-  const galleryValues = project.widgetStates.gallery.values;
+  const galleryValues = getWidgetValues(project, 'gallery');
   const existingImages = getGalleryImages(galleryValues).filter(
     (image) => !images.some((incomingImage) => incomingImage.imageName === image.imageName)
   );
 
-  return {
-    ...project,
-    widgetStates: {
-      ...project.widgetStates,
-      gallery: {
-        ...project.widgetStates.gallery,
-        values: {
-          ...galleryValues,
-          recentImages: [...images, ...existingImages],
-          selectedImage: images[0] ?? galleryValues.selectedImage,
-          selectedImageName: images[0]?.imageName ?? project.widgetStates.gallery.values.selectedImageName,
-          selectedImageNames: images[0] ? [images[0].imageName] : getGallerySelectedImageNames(galleryValues),
-        },
-      },
-    },
-  };
+  return updateProjectWidgetValues(project, 'gallery', () => ({
+    ...galleryValues,
+    recentImages: [...images, ...existingImages],
+    selectedImage: images[0] ?? galleryValues.selectedImage,
+    selectedImageName: images[0]?.imageName ?? galleryValues.selectedImageName,
+    selectedImageNames: images[0] ? [images[0].imageName] : getGallerySelectedImageNames(galleryValues),
+  }));
 };
 
 const routeQueueItemPartialResults = (
@@ -1023,6 +1134,7 @@ const submitInvocationSnapshot = (
       graph,
       sourceId: route.sourceId,
       submittedAt,
+      widgetInstances: cloneWidgetInstances(project.widgetInstances),
       widgetStates,
     },
     status: 'pending',
@@ -1130,7 +1242,7 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
 
       return updateActiveWidgetRegion(state, 'center', (region) => ({
         ...region,
-        activeWidgetId: region.enabledWidgetIds.includes(widgetId) ? widgetId : region.activeWidgetId,
+        activeInstanceId: region.instanceIds.includes(widgetId) ? widgetId : region.activeInstanceId,
         isCollapsed: false,
       }));
     }
@@ -1185,19 +1297,34 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
     case 'openRegionWidget': {
       return updateActiveProject(state, (project) => {
         const region = project.widgetRegions[action.region];
-        const enabledWidgetIds = region.enabledWidgetIds.includes(action.widgetId)
-          ? region.enabledWidgetIds
-          : [...region.enabledWidgetIds, action.widgetId];
+        const existingInstanceInRegion = region.instanceIds
+          .map((instanceId) => project.widgetInstances[instanceId])
+          .find((instance) => instance?.typeId === action.widgetId);
+        const existingInstance =
+          existingInstanceInRegion ??
+          Object.values(project.widgetInstances).find((instance) => instance.typeId === action.widgetId);
+        const instanceId =
+          action.createNew || !existingInstance ? createId(`widget-${action.widgetId}`) : existingInstance.id;
+        const instanceIds = region.instanceIds.includes(instanceId)
+          ? region.instanceIds
+          : [...region.instanceIds, instanceId];
+        const widgetInstances = project.widgetInstances[instanceId]
+          ? project.widgetInstances
+          : {
+              ...project.widgetInstances,
+              [instanceId]: createWidgetInstance(action.widgetId, instanceId, action.initialValues),
+            };
 
         return {
           ...project,
           layout: openPanelForRegion(project.layout, action.region),
+          widgetInstances,
           widgetRegions: {
             ...project.widgetRegions,
             [action.region]: {
               ...region,
-              activeWidgetId: action.widgetId,
-              enabledWidgetIds,
+              activeInstanceId: instanceId,
+              instanceIds,
               isCollapsed: false,
             },
           },
@@ -1213,15 +1340,15 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
             ...project,
             widgetRegions: {
               ...project.widgetRegions,
-              center: { ...region, activeWidgetId: action.widgetId, isCollapsed: false },
+              center: { ...region, activeInstanceId: action.widgetId, isCollapsed: false },
             },
           };
         }
 
         const widgetRegion =
-          region.activeWidgetId === action.widgetId
+          region.activeInstanceId === action.widgetId
             ? { ...region, isCollapsed: !region.isCollapsed }
-            : { ...region, activeWidgetId: action.widgetId, isCollapsed: false };
+            : { ...region, activeInstanceId: action.widgetId, isCollapsed: false };
 
         return {
           ...project,
@@ -1232,24 +1359,63 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
     }
     case 'toggleRegionWidget': {
       return updateActiveWidgetRegion(state, action.region, (region) => {
-        const isEnabled = region.enabledWidgetIds.includes(action.widgetId);
+        const isEnabled = region.instanceIds.includes(action.widgetId);
 
-        if (action.region === 'center' && isEnabled && region.enabledWidgetIds.length === 1) {
+        if (action.region === 'center' && isEnabled && region.instanceIds.length === 1) {
           return region;
         }
 
-        const enabledWidgetIds = isEnabled
-          ? region.enabledWidgetIds.filter((widgetId) => widgetId !== action.widgetId)
-          : [...region.enabledWidgetIds, action.widgetId];
-        const fallbackWidgetId = getNextEnabledWidgetId(region, action.widgetId);
+        const instanceIds = isEnabled
+          ? region.instanceIds.filter((widgetId) => widgetId !== action.widgetId)
+          : [...region.instanceIds, action.widgetId];
+        const fallbackInstanceId = getNextInstanceId(region, action.widgetId);
 
         return {
           ...region,
-          activeWidgetId: isEnabled && fallbackWidgetId ? fallbackWidgetId : action.widgetId,
-          enabledWidgetIds,
-          isCollapsed: action.region === 'center' ? false : enabledWidgetIds.length === 0 ? true : region.isCollapsed,
+          activeInstanceId: isEnabled && fallbackInstanceId ? fallbackInstanceId : action.widgetId,
+          instanceIds,
+          isCollapsed: action.region === 'center' ? false : instanceIds.length === 0 ? true : region.isCollapsed,
         };
       });
+    }
+    case 'moveWidgetInstance': {
+      return updateActiveProject(state, (project) => {
+        const fromRegion = project.widgetRegions[action.fromRegion];
+        const toRegion = project.widgetRegions[action.toRegion];
+        const nextFromInstanceIds = fromRegion.instanceIds.filter((instanceId) => instanceId !== action.instanceId);
+        const nextToInstanceIds = insertAt(toRegion.instanceIds, action.instanceId, action.toIndex);
+
+        return {
+          ...project,
+          layout: openPanelForRegion(project.layout, action.toRegion),
+          widgetRegions: {
+            ...project.widgetRegions,
+            [action.fromRegion]: {
+              ...fromRegion,
+              activeInstanceId:
+                fromRegion.activeInstanceId === action.instanceId
+                  ? (nextFromInstanceIds[0] ?? fromRegion.activeInstanceId)
+                  : fromRegion.activeInstanceId,
+              instanceIds: nextFromInstanceIds,
+              isCollapsed:
+                action.fromRegion === 'center' ? false : nextFromInstanceIds.length === 0 || fromRegion.isCollapsed,
+            },
+            [action.toRegion]: {
+              ...toRegion,
+              activeInstanceId: action.instanceId,
+              instanceIds: nextToInstanceIds,
+              isCollapsed: false,
+            },
+          },
+        };
+      });
+    }
+    case 'reorderWidgetInstances': {
+      return updateActiveWidgetRegion(state, action.region, (region) => ({
+        ...region,
+        activeInstanceId: action.activeInstanceId ?? region.activeInstanceId,
+        instanceIds: action.instanceIds,
+      }));
     }
     case 'setRegionWidgetCollapsed': {
       if (action.region === 'center') {
@@ -1268,43 +1434,62 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       }));
     }
     case 'setGenerateSettings': {
-      return updateActiveProject(state, (project) => ({
-        ...project,
-        widgetStates: {
-          ...project.widgetStates,
-          generate: {
-            ...project.widgetStates.generate,
-            values: cloneGenerateWidgetValues(action.values),
-          },
-        },
-      }));
+      return updateActiveProject(state, (project) =>
+        updateProjectWidgetValues(project, 'generate', () => cloneGenerateWidgetValues(action.values))
+      );
     }
     case 'setGenerateBatchCount': {
       const batchCount = sanitizeBatchCount(action.batchCount);
 
-      return updateActiveProject(state, (project) => ({
-        ...project,
-        widgetStates: {
-          ...project.widgetStates,
-          generate: {
-            ...project.widgetStates.generate,
-            values: { ...project.widgetStates.generate.values, batchCount },
-          },
-        },
-      }));
+      return updateActiveProject(state, (project) =>
+        updateProjectWidgetValues(project, 'generate', (values) => ({ ...values, batchCount }))
+      );
     }
     case 'patchWidgetValues': {
       // Generic widget-owned UI state (panel modes, tabs, sizes). Not undoable.
-      return updateActiveProject(state, (project) => ({
-        ...project,
-        widgetStates: {
-          ...project.widgetStates,
-          [action.widgetId]: {
-            ...project.widgetStates[action.widgetId],
-            values: { ...project.widgetStates[action.widgetId].values, ...action.values },
+      return updateActiveProject(state, (project) =>
+        updateProjectWidgetValues(project, action.widgetId, (values) => ({ ...values, ...action.values }))
+      );
+    }
+    case 'patchWidgetInstanceValues': {
+      return updateActiveProject(state, (project) => {
+        const instance = project.widgetInstances[action.instanceId];
+
+        if (!instance) {
+          return project;
+        }
+
+        return {
+          ...project,
+          widgetInstances: {
+            ...project.widgetInstances,
+            [action.instanceId]: {
+              ...instance,
+              state: { ...instance.state, values: { ...instance.state.values, ...action.values } },
+            },
           },
-        },
-      }));
+        };
+      });
+    }
+    case 'setWidgetInstanceValues': {
+      return updateActiveProject(state, (project) => {
+        const instance = project.widgetInstances[action.instanceId];
+
+        if (!instance) {
+          return project;
+        }
+
+        return {
+          ...project,
+          widgetInstances: {
+            ...project.widgetInstances,
+            [action.instanceId]: {
+              ...instance,
+              state: { ...instance.state, values: action.values },
+            },
+          },
+        };
+      });
     }
     case 'applyProjectGraphAction': {
       return updateActiveProject(state, (project) => {

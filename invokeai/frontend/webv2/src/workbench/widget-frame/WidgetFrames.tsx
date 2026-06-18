@@ -1,4 +1,10 @@
-import type { WidgetManifest, WidgetRegion, WorkbenchRegion } from '@workbench/types';
+import type {
+  WidgetInstanceContract,
+  WidgetManifest,
+  WidgetRegion,
+  WidgetRuntimeApi,
+  WorkbenchRegion,
+} from '@workbench/types';
 
 import { Box, Flex, HStack, Icon, Stack, Text, type RecipeVariantProps, useRecipe } from '@chakra-ui/react';
 import { chipRecipe } from '@theme/recipes';
@@ -152,12 +158,16 @@ export const WidgetPanelFrame = ({
 
 export const WidgetHeader = ({
   actions,
+  instance,
   manifest,
   region,
+  runtime,
 }: {
   actions?: ReactNode;
+  instance: WidgetInstanceContract;
   manifest: WidgetManifest;
   region: WorkbenchRegion;
+  runtime: WidgetRuntimeApi;
 }) => {
   // Manifests may provide a component label (e.g. Workflow's editable
   // `Workflow / [name]`); plain strings render as the standard title.
@@ -188,7 +198,7 @@ export const WidgetHeader = ({
             <Icon as={SettingsIcon} boxSize="3.5" />
           </IconButton>
         ) : null}
-        <WidgetActionsMenu manifest={manifest} region={region} />
+        <WidgetActionsMenu instance={instance} manifest={manifest} region={region} runtime={runtime} />
       </HStack>
     </HStack>
   );

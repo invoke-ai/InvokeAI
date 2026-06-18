@@ -1,6 +1,9 @@
 import type { ComponentProps } from 'react';
 
-import { Icon, Separator, Stack, type StackProps, IconButton } from '@chakra-ui/react';
+import { Icon, Separator, Stack, type StackProps } from '@chakra-ui/react';
+
+import { IconButton } from './Button';
+import { Tooltip } from './Tooltip';
 
 /**
  * The workbench's floating tool strip, shared by canvas-like surfaces (the
@@ -37,16 +40,18 @@ export const ToolbarButton = ({
   isActive?: boolean;
   label: string;
 } & Omit<ComponentProps<typeof IconButton>, 'aria-label'>) => (
-  <IconButton
-    aria-label={label}
-    aria-pressed={isActive}
-    size="sm"
-    title={label}
-    variant={isActive ? 'solid' : 'ghost'}
-    {...buttonProps}
-  >
-    <Icon as={icon} boxSize="3.5" />
-  </IconButton>
+  <Tooltip content={label} positioning={{ placement: 'right-start' }}>
+    <IconButton
+      aria-label={label}
+      aria-pressed={isActive}
+      size="sm"
+      title={label}
+      variant={isActive ? 'solid' : 'ghost'}
+      {...buttonProps}
+    >
+      <Icon as={icon} boxSize="3.5" />
+    </IconButton>
+  </Tooltip>
 );
 
 export const ToolbarSeparator = ({ direction = 'column' }: { direction?: 'column' | 'row' }) => (

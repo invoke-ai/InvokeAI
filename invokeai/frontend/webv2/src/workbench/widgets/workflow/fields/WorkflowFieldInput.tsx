@@ -7,6 +7,7 @@ import { Button } from '@workbench/components/ui';
 import { listGalleryBoards, type GalleryBoard } from '@workbench/gallery/api';
 import { SCHEDULER_OPTIONS } from '@workbench/generation/baseGenerationPolicies';
 import { ModelSelect } from '@workbench/models/components';
+import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useEffect, useState, type ChangeEvent } from 'react';
 
@@ -267,7 +268,7 @@ const BoardInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInp
 
 const ImageInput = ({ invalid, onChange, value }: WorkflowFieldInputProps) => {
   const gallerySelection = useActiveProjectSelector(
-    (project) => project.widgetStates.gallery.values.selectedImage as GeneratedImageContract | null | undefined
+    (project) => getProjectWidgetValues(project, 'gallery').selectedImage as GeneratedImageContract | null | undefined
   );
   const imageName =
     typeof (value as { image_name?: unknown } | null)?.image_name === 'string'

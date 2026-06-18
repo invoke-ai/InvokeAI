@@ -24,7 +24,7 @@ const DiagnosticsPanel = () => {
   const errorLog = useWorkbenchSelector((snapshot) => snapshot.state.errorLog);
 
   return (
-    <Stack gap="3">
+    <Stack gap="3" p="2">
       {errorLog.length === 0 ? (
         <Text color="fg.subtle" fontSize="2xs">
           Shell errors and debugging details will appear here without covering the workbench.

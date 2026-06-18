@@ -2,7 +2,9 @@ import type {
   GraphBearingSurfaceContract,
   GraphContract,
   Project,
+  WidgetInstanceContract,
   WidgetManifest,
+  WidgetRuntimeApi,
   WorkbenchRegion,
 } from '@workbench/types';
 
@@ -81,7 +83,17 @@ const GraphSurfaceMenuItems = ({
   );
 };
 
-export const WidgetActionsMenu = ({ manifest, region }: { manifest: WidgetManifest; region: WorkbenchRegion }) => {
+export const WidgetActionsMenu = ({
+  instance,
+  manifest,
+  region,
+  runtime,
+}: {
+  instance: WidgetInstanceContract;
+  manifest: WidgetManifest;
+  region: WorkbenchRegion;
+  runtime: WidgetRuntimeApi;
+}) => {
   const activeProject = useActiveProject();
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const surface = manifest.graphBearing?.surfaces.includes(region) ? createGraphBearingSurface(manifest, region) : null;
@@ -112,7 +124,9 @@ export const WidgetActionsMenu = ({ manifest, region }: { manifest: WidgetManife
             <Menu.Content minW="13rem">
               {surface ? <GraphSurfaceMenuItems surface={surface} onPreview={() => setIsPreviewOpen(true)} /> : null}
               {surface && HeaderMenu ? <Menu.Separator borderColor="border.subtle" /> : null}
-              {HeaderMenu ? <HeaderMenu manifest={manifest} region={region} /> : null}
+              {HeaderMenu ? (
+                <HeaderMenu instance={instance} manifest={manifest} region={region} runtime={runtime} />
+              ) : null}
             </Menu.Content>
           </Menu.Positioner>
         </Portal>

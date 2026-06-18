@@ -15,6 +15,7 @@ import {
   isSupportedGenerateModel,
 } from './generation/baseGenerationPolicies';
 import { normalizeGenerateWidgetValues } from './generation/settings';
+import { getProjectWidgetValues } from './widgetState';
 import { getProjectGraphReadiness } from './workflows/buildGraph';
 import { getInvocationTemplatesSnapshot } from './workflows/templates';
 
@@ -79,10 +80,12 @@ const sourceWidgetIds: Partial<Record<InvocationSourceId, WidgetId>> = {
 };
 
 const isWidgetMounted = (project: Project, widgetId: WidgetId): boolean =>
-  Object.values(project.widgetRegions).some((region) => region.enabledWidgetIds.includes(widgetId));
+  Object.values(project.widgetRegions).some((region) =>
+    region.instanceIds.some((instanceId) => project.widgetInstances[instanceId]?.typeId === widgetId)
+  );
 
 const getGenerateSnapshotValidationReasons = (project: Project, models?: readonly ModelConfig[]): string[] => {
-  const values = normalizeGenerateWidgetValues(project.widgetStates.generate.values);
+  const values = normalizeGenerateWidgetValues(getProjectWidgetValues(project, 'generate'));
 
   if (!values || !isSupportedGenerateModel(values.model)) {
     return ['Generate needs a supported model before it can be invoked.'];

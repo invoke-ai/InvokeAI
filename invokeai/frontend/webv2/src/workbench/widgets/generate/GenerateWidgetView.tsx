@@ -18,6 +18,7 @@ import {
   syncGenerateWidgetValuesWithModels,
 } from '@workbench/generation/settings';
 import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsStore';
+import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { useEffect, useMemo } from 'react';
 
@@ -38,7 +39,7 @@ const getSettingsWithAutoComponentSource = (
 };
 
 export const GenerateWidgetView = () => {
-  const storedValues = useActiveProjectSelector((project) => project.widgetStates.generate.values);
+  const storedValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'generate'));
   const dispatch = useWorkbenchDispatch();
   const { error, models, status } = useModelsSnapshot();
 

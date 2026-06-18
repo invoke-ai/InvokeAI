@@ -12,6 +12,7 @@ import {
   resultDestinations,
 } from '@workbench/invocation';
 import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsStore';
+import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProject, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
 import { CheckIcon, ChevronDownIcon, LockKeyholeIcon, SparklesIcon } from 'lucide-react';
@@ -52,7 +53,7 @@ const InvokeTooltipContent = ({
   isValid: boolean;
   project: Project;
 }) => {
-  const batchCount = getBatchCount(project.widgetStates.generate.values);
+  const batchCount = getBatchCount(getProjectWidgetValues(project, 'generate'));
   const destination = getDestinationLabel(project.invocation.destination);
   const summary =
     project.invocation.sourceId === 'generate'

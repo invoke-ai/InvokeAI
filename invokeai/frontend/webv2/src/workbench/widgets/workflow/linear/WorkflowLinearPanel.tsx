@@ -1,5 +1,6 @@
 import { Flex, HStack, Icon, SegmentGroup, Splitter } from '@chakra-ui/react';
 import { Scrollable, Tabs } from '@workbench/components/ui';
+import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { ensureInvocationTemplatesLoaded } from '@workbench/workflows/templates';
 import { EyeIcon, PencilIcon } from 'lucide-react';
@@ -80,7 +81,7 @@ const PanelModeToggle = ({ mode, onChange }: { mode: PanelMode; onChange: (mode:
 
 export const WorkflowLinearPanel = () => {
   const projectGraph = useActiveProjectSelector((project) => project.projectGraph);
-  const widgetValues = useActiveProjectSelector((project) => project.widgetStates.workflow.values);
+  const widgetValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'workflow'));
   const dispatch = useWorkbenchDispatch();
   const mode = getPanelMode(widgetValues);
   const editTab = getEditTab(widgetValues);

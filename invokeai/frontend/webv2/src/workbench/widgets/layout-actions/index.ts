@@ -1,16 +1,19 @@
 import type { WidgetManifest } from '@workbench/types';
 
+import { PanelBottomIcon } from 'lucide-react';
+
 import { LayoutActionsWidgetView } from './LayoutActionsWidgetView';
 import { LayoutHeaderActions } from './LayoutHeaderActions';
 
 export const layoutActionsWidgetManifest: WidgetManifest = {
+  allowMultiple: false,
+  allowedRegions: ['bottom'],
   failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
   headerActions: LayoutHeaderActions,
-  icon: 'lucide-react:panel-bottom',
+  icon: PanelBottomIcon,
   id: 'layout-actions',
   label: 'Layout Actions',
   labelText: 'Layout Actions',
-  regions: ['bottom'],
   version: 1,
   view: LayoutActionsWidgetView,
 };

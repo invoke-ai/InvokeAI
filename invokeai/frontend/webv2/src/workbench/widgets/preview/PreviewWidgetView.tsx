@@ -17,6 +17,7 @@ import {
   getGalleryImagesRefreshToken,
   getGalleryRecentImagesKey,
 } from '@workbench/widgets/gallery/galleryStateView';
+import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -96,8 +97,8 @@ const previewGridCss = {
 } as const;
 
 export const PreviewWidgetView = ({ region }: WidgetViewProps) => {
-  const galleryValues = useActiveProjectSelector((project) => project.widgetStates.gallery.values);
-  const generateValues = useActiveProjectSelector((project) => project.widgetStates.generate.values);
+  const galleryValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'gallery'));
+  const generateValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'generate'));
   const { antialiasProgressImages, showProgressImagesInViewer } = useActiveProjectSelector(
     (project) => project.settings
   );

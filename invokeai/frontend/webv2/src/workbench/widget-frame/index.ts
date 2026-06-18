@@ -1,5 +1,10 @@
 export { WidgetActionsMenu } from './WidgetActionsMenu';
 export { WidgetBar, type WidgetBarItem } from './WidgetBar';
+export { WidgetEnableMenu, type WidgetEnableMenuItem } from './WidgetEnableMenu';
 export { WidgetFailureBoundary } from './WidgetFailureBoundary';
 export { FieldPlaceholder, StatusWidgetChip, WidgetHeader, WidgetPanelFrame } from './WidgetFrames';
+export { WidgetInstanceContextMenu, type WidgetInstanceContextMenuTarget } from './WidgetInstanceContextMenu';
+export { WidgetRegionDropOverlay } from './WidgetRegionDropOverlay';
+export { WidgetStrip } from './WidgetStrip';
 export { MissingWidgetFrame, WidgetRenderer } from './WidgetRenderer';
+export { useWidgetSortable } from './useWidgetSortable';

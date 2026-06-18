@@ -163,9 +163,9 @@ const ProjectTabContextMenu = ({
     // to enabling it in the right rail. Both actions operate on the active
     // project, which the switch above just made this one.
     const { left, right } = project.widgetRegions;
-    const region = right.enabledWidgetIds.includes('project')
+    const region = right.instanceIds.some((instanceId) => project.widgetInstances[instanceId]?.typeId === 'project')
       ? 'right'
-      : left.enabledWidgetIds.includes('project')
+      : left.instanceIds.some((instanceId) => project.widgetInstances[instanceId]?.typeId === 'project')
         ? 'left'
         : null;
     const preferredRegions: WidgetRegion[] = [region ?? 'right'];

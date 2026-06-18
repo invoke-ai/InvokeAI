@@ -3,6 +3,7 @@ import type { WidgetViewProps } from '@workbench/types';
 import { getGallerySettings } from '@workbench/gallery/settings';
 import { useImageActions } from '@workbench/image-actions';
 import { StatusWidgetChip } from '@workbench/widget-frame';
+import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProject, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { ImageIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
@@ -27,7 +28,7 @@ import { GALLERY_PAGE_SIZE, useGalleryData } from './useGalleryData';
 export const GalleryWidgetView = ({ presentation, region }: WidgetViewProps) => {
   const activeProject = useActiveProject();
   const dispatch = useWorkbenchDispatch();
-  const galleryValues = activeProject.widgetStates.gallery.values;
+  const galleryValues = getProjectWidgetValues(activeProject, 'gallery');
   const galleryView = getGalleryView(galleryValues);
   const searchTerm = getGallerySearchTerm(galleryValues);
   const recentImagesKey = getGalleryRecentImagesKey(galleryValues);
@@ -104,7 +105,7 @@ export const GalleryWidgetView = ({ presentation, region }: WidgetViewProps) => 
   const imageActions = useImageActions({
     boards: data.boards,
     dispatch,
-    generateValues: activeProject.widgetStates.generate.values,
+    generateValues: getProjectWidgetValues(activeProject, 'generate'),
     onImagesDeleted,
     onStarredChange,
   });

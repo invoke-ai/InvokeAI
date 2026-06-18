@@ -25,8 +25,8 @@ describe('project document serialization', () => {
         layout: project.layout,
         projectGraph: project.projectGraph,
         widgetGraphs: {},
+        widgetInstances: project.widgetInstances,
         widgetRegions: project.widgetRegions,
-        widgetStates: project.widgetStates,
       },
     });
 
@@ -39,7 +39,7 @@ describe('project document serialization', () => {
     expect(roundTripped).not.toBeNull();
     expect(roundTripped?.undoRedo).toEqual({ future: [], past: [] });
     expect(roundTripped?.id).toBe(project.id);
-    expect(roundTripped?.widgetStates).toEqual(project.widgetStates);
+    expect(roundTripped?.widgetInstances).toEqual(project.widgetInstances);
   });
 
   it('rejects documents that do not look like projects', () => {

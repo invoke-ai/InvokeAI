@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import type { ComponentType, ExoticComponent, JSXElementConstructor, SVGProps } from 'react';
 
 import type { ProjectGraphState } from './workflows/types';
 
@@ -8,7 +8,7 @@ export type CenterViewId = 'canvas' | 'gallery' | 'preview' | 'workflow' | 'mode
 
 export type GraphId = string;
 
-export type WidgetId =
+export type FirstPartyWidgetTypeId =
   | 'autosave-status'
   | 'canvas'
   | 'diagnostics'
@@ -26,6 +26,10 @@ export type WidgetId =
   | 'users'
   | 'version-status'
   | 'workflow';
+
+export type WidgetTypeId = FirstPartyWidgetTypeId | (string & {});
+export type WidgetInstanceId = string;
+export type WidgetId = WidgetTypeId;
 
 export type WorkbenchRegion = 'left' | 'right' | 'center' | 'bottom' | 'dialog' | 'popover';
 
@@ -88,11 +92,21 @@ export interface BackendGraphContract {
 }
 
 export interface WidgetStateContract {
-  id: WidgetId;
+  id: WidgetTypeId;
   label: string;
   version: 1;
   values: Record<string, unknown>;
   graphId?: GraphId;
+}
+
+export type WidgetStateMap = Record<string, WidgetStateContract>;
+
+export interface WidgetInstanceContract {
+  id: WidgetInstanceId;
+  typeId: WidgetTypeId;
+  title?: string;
+  state: WidgetStateContract;
+  createdAt: string;
 }
 
 export interface GraphBearingSurfaceContract {
@@ -109,6 +123,8 @@ export interface GraphBearingSurfaceContract {
 export interface WidgetViewProps {
   region: WorkbenchRegion;
   manifest: WidgetManifest;
+  instance: WidgetInstanceContract;
+  runtime: WidgetRuntimeApi;
   presentation?: 'compact' | 'expanded' | 'tooltip';
 }
 
@@ -125,18 +141,129 @@ export interface WidgetLabelProps {
 
 export type WidgetLabel = string | ComponentType<WidgetLabelProps>;
 
-export type WidgetIconId = `lucide-react:${string}`;
+export type WidgetIconComponent =
+  | JSXElementConstructor<SVGProps<SVGSVGElement>>
+  | ExoticComponent<SVGProps<SVGSVGElement>>;
+
+export interface WidgetStateRegistration<State extends Record<string, unknown> = Record<string, unknown>> {
+  version: 1;
+  createInitial: () => State;
+  migrate?: (state: unknown, fromVersion: number) => State;
+  persistence?: 'project' | 'workspace' | 'session' | 'none';
+}
+
+export interface WidgetRuntimeApi<State extends Record<string, unknown> = Record<string, unknown>> {
+  instanceId: WidgetInstanceId;
+  typeId: WidgetTypeId;
+  region: WorkbenchRegion;
+  state: State;
+  patchState: (values: Partial<State>) => void;
+  setState: (values: State) => void;
+  commands: WidgetCommandApi;
+  hotkeys: WidgetHotkeyApi;
+  menus: WidgetMenuApi;
+  palette: WidgetCommandPaletteApi;
+  search: WidgetSearchApi;
+  toolbars: WidgetToolbarApi;
+  workbench: WidgetWorkbenchApi;
+}
+
+export interface WidgetCommandApi {
+  execute: (commandId: string, ...args: unknown[]) => Promise<unknown>;
+  register: (command: WidgetCommandContribution) => () => void;
+}
+
+export interface WidgetCommandContribution {
+  id: string;
+  title: string;
+  handler: (...args: unknown[]) => unknown | Promise<unknown>;
+}
+
+export interface WidgetHotkeyApi {
+  register: (hotkey: WidgetHotkeyContribution) => () => void;
+}
+
+export interface WidgetHotkeyContribution {
+  commandId: string;
+  keybinding: string;
+  when?: string;
+}
+
+export interface WidgetMenuApi {
+  register: (menu: WidgetMenuContribution) => () => void;
+}
+
+export interface WidgetMenuContribution {
+  id: string;
+  items: Array<{ commandId: string; group?: string }>;
+}
+
+export interface WidgetCommandPaletteApi {
+  register: (entry: WidgetCommandPaletteContribution) => () => void;
+}
+
+export interface WidgetCommandPaletteContribution {
+  commandId: string;
+  title: string;
+  keywords?: string[];
+}
+
+export interface WidgetSearchApi {
+  registerProvider: (provider: WidgetSearchProvider) => () => void;
+}
+
+export interface WidgetSearchProvider {
+  id: string;
+  label: string;
+  search: (query: string) => Promise<WidgetSearchResult[]> | WidgetSearchResult[];
+}
+
+export interface WidgetSearchResult {
+  id: string;
+  title: string;
+  subtitle?: string;
+  commandId?: string;
+}
+
+export interface WidgetToolbarApi {
+  register: (toolbar: WidgetToolbarContribution) => () => void;
+}
+
+export interface WidgetToolbarContribution {
+  id: string;
+  location: 'center.tabs.trailing' | 'status.left' | 'status.right';
+  items: Array<{ commandId: string; icon?: WidgetIconComponent; label?: string }>;
+}
+
+export interface OpenWorkbenchWidgetOptions {
+  createNew?: boolean;
+  preferredRegions?: ReadonlyArray<WidgetRegion>;
+  requireCenterView?: boolean;
+}
+
+export type WidgetWorkbenchApiResult =
+  | { ok: true; region?: WidgetRegion }
+  | { ok: false; reason: 'unavailable' | 'unsupported' | 'not-found' };
+
+export interface WidgetWorkbenchApi {
+  openWidget: (typeId: WidgetTypeId, options?: OpenWorkbenchWidgetOptions) => WidgetWorkbenchApiResult;
+  revealWidgetInstance: (instanceId: WidgetInstanceId) => WidgetWorkbenchApiResult;
+  closeWidgetInstance: (instanceId: WidgetInstanceId) => WidgetWorkbenchApiResult;
+}
 
 /** Sections of the workbench settings dialog, addressable via `openWorkbenchSettings`. */
 export type SettingsSectionId = 'appearance' | 'behavior' | 'project' | 'workflow' | 'developer' | 'workspace';
 
 export interface WidgetManifest {
-  id: WidgetId;
+  /** Widget runtime API contract version. Defaults to 1 during registry normalization. */
+  apiVersion?: 1;
+  id: WidgetTypeId;
   label: WidgetLabel;
   labelText: string;
   version: 1;
-  regions: WorkbenchRegion[];
-  icon: WidgetIconId;
+  allowedRegions: WidgetRegion[];
+  allowMultiple: boolean;
+  icon: WidgetIconComponent;
   bottomPanel?: 'expandable' | 'tooltip';
   centerPlacement?: 'toolbar' | 'view';
   /** Only offered while an admin is signed in to a multi-user backend. */
@@ -156,6 +283,7 @@ export interface WidgetManifest {
   /** When set, the frame header shows a gear that opens this settings dialog section. */
   settingsSection?: SettingsSectionId;
   footer?: WidgetFooter;
+  state?: WidgetStateRegistration;
   graphBearing?: {
     sourceId: InvocationSourceId;
     defaultGraphId: GraphId;
@@ -167,14 +295,19 @@ export interface WidgetManifest {
   };
 }
 
+export interface NormalizedWidgetManifest extends Omit<WidgetManifest, 'apiVersion' | 'state'> {
+  apiVersion: 1;
+  state: WidgetStateRegistration;
+}
+
 export interface RegisteredWidget {
-  manifest: WidgetManifest;
+  manifest: NormalizedWidgetManifest;
   status: 'enabled' | 'disabled' | 'hidden';
   failure?: WidgetFailure;
 }
 
 export interface WidgetFailure {
-  widgetId: WidgetId;
+  widgetId: WidgetTypeId;
   message: string;
   details: string;
   occurredAt: string;
@@ -275,8 +408,8 @@ export interface PanelState {
 export type WidgetRegion = 'left' | 'right' | 'bottom' | 'center';
 
 export interface WidgetRegionState {
-  activeWidgetId: WidgetId;
-  enabledWidgetIds: WidgetId[];
+  activeInstanceId: WidgetInstanceId;
+  instanceIds: WidgetInstanceId[];
   isCollapsed: boolean;
   sizePx: number;
 }
@@ -302,9 +435,9 @@ export interface Project {
   invocation: InvocationControllerState;
   /** The one active project graph: an editable workflow document, compiled to a `GraphContract` at invoke time. */
   projectGraph: ProjectGraphState;
-  widgetStates: Record<WidgetId, WidgetStateContract>;
+  widgetInstances: Record<WidgetInstanceId, WidgetInstanceContract>;
   widgetRegions: Record<WidgetRegion, WidgetRegionState>;
-  widgetGraphs: Partial<Record<WidgetId, GraphContract>>;
+  widgetGraphs: Partial<Record<WidgetTypeId, GraphContract>>;
   canvas: CanvasStateContract;
   graphHistory: GraphHistorySnapshot[];
   undoRedo: UndoRedoHistory;
@@ -377,9 +510,9 @@ export interface ProjectUndoSnapshot {
   layout: ProjectLayoutState;
   invocation: InvocationControllerState;
   projectGraph: ProjectGraphState;
-  widgetStates: Record<WidgetId, WidgetStateContract>;
+  widgetInstances: Record<WidgetInstanceId, WidgetInstanceContract>;
   widgetRegions: Record<WidgetRegion, WidgetRegionState>;
-  widgetGraphs: Partial<Record<WidgetId, GraphContract>>;
+  widgetGraphs: Partial<Record<WidgetTypeId, GraphContract>>;
   canvas: CanvasStateContract;
 }
 
@@ -392,7 +525,8 @@ export interface QueueSubmissionSnapshot {
   sourceId: InvocationSourceId;
   destination: ResultDestination;
   graph: GraphContract;
-  widgetStates: Record<WidgetId, WidgetStateContract>;
+  widgetInstances: Record<WidgetInstanceId, WidgetInstanceContract>;
+  widgetStates: WidgetStateMap;
   canvas: CanvasStateContract;
   submittedAt: string;
 }

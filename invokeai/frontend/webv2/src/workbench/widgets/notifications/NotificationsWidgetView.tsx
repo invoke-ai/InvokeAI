@@ -35,7 +35,7 @@ const NotificationsPanel = () => {
   const notifications = useWorkbenchSelector((snapshot) => snapshot.state.notifications);
 
   return (
-    <Stack flex="1" gap="3" minH="0">
+    <Stack flex="1" gap="3" minH="0" p="2">
       {notifications.length === 0 ? (
         <Text color="fg.subtle" fontSize="2xs">
           Successful operations, errors, and system messages appear here.

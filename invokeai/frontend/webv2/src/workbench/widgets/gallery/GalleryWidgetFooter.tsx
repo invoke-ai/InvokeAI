@@ -3,6 +3,7 @@ import type { WidgetViewProps } from '@workbench/types';
 import { ButtonGroup, HStack, Pagination } from '@chakra-ui/react';
 import { IconButton } from '@workbench/components/ui';
 import { getGallerySettings } from '@workbench/gallery/settings';
+import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 
@@ -15,7 +16,7 @@ import { GALLERY_PAGE_SIZE } from './useGalleryData';
  * decoupled from the view's data fetching.
  */
 export const GalleryWidgetFooter = (_props: WidgetViewProps) => {
-  const galleryValues = useActiveProjectSelector((project) => project.widgetStates.gallery.values);
+  const galleryValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'gallery'));
   const dispatch = useWorkbenchDispatch();
   const settings = getGallerySettings(galleryValues);
   const page = getGalleryPage(galleryValues);

@@ -1,5 +1,6 @@
 import { NumberInput } from '@chakra-ui/react';
 import { MIN_BATCH_COUNT, sanitizeBatchCount } from '@workbench/generation/batch';
+import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 
 const getBatchCount = (values: Record<string, unknown>): number => {
@@ -9,7 +10,7 @@ const getBatchCount = (values: Record<string, unknown>): number => {
 };
 
 export const BatchCountField = () => {
-  const generateValues = useActiveProjectSelector((project) => project.widgetStates.generate.values);
+  const generateValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'generate'));
   const dispatch = useWorkbenchDispatch();
   const batchCount = getBatchCount(generateValues);
 

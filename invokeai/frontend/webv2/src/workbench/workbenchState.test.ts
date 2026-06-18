@@ -4,6 +4,7 @@ import type { GenerateWidgetValues, MainModelConfig } from './generation/types';
 import type { GeneratedImageContract, Project, WorkbenchState } from './types';
 
 import { DEFAULT_PROJECT_SETTINGS } from './settings/store';
+import { getProjectWidgetValues } from './widgetState';
 import { createInitialWorkbenchState, workbenchReducer } from './workbenchState';
 
 const model: MainModelConfig = {
@@ -76,7 +77,7 @@ describe('workbench widget region defaults', () => {
   it('enables Diagnostics in the right side panel rail', () => {
     const state = createInitialWorkbenchState();
 
-    expect(getActiveProject(state).widgetRegions.right.enabledWidgetIds).toContain('diagnostics');
+    expect(getActiveProject(state).widgetRegions.right.instanceIds).toContain('diagnostics');
   });
 
   it('hydrates the old default right rail with Diagnostics while preserving customized rails', () => {
@@ -87,7 +88,7 @@ describe('workbench widget region defaults', () => {
         ...project,
         widgetRegions: {
           ...project.widgetRegions,
-          right: { ...project.widgetRegions.right, enabledWidgetIds: ['queue', 'gallery', 'layers'] },
+          right: { ...project.widgetRegions.right, instanceIds: ['queue', 'gallery', 'layers'] },
         },
       })),
     } satisfies WorkbenchState;
@@ -97,7 +98,7 @@ describe('workbench widget region defaults', () => {
         ...project,
         widgetRegions: {
           ...project.widgetRegions,
-          right: { ...project.widgetRegions.right, enabledWidgetIds: ['gallery', 'layers'] },
+          right: { ...project.widgetRegions.right, instanceIds: ['gallery', 'layers'] },
         },
       })),
     } satisfies WorkbenchState;
@@ -105,7 +106,7 @@ describe('workbench widget region defaults', () => {
     const hydratedLegacyDefault = workbenchReducer(initial, { state: legacyDefault, type: 'hydrateWorkbench' });
     const hydratedCustomized = workbenchReducer(initial, { state: customized, type: 'hydrateWorkbench' });
 
-    expect(getActiveProject(hydratedLegacyDefault).widgetRegions.right.enabledWidgetIds).toEqual([
+    expect(getActiveProject(hydratedLegacyDefault).widgetRegions.right.instanceIds).toEqual([
       'queue',
       'gallery',
       'layers',
@@ -113,7 +114,7 @@ describe('workbench widget region defaults', () => {
       'diagnostics',
       'project',
     ]);
-    expect(getActiveProject(hydratedCustomized).widgetRegions.right.enabledWidgetIds).toEqual(['gallery', 'layers']);
+    expect(getActiveProject(hydratedCustomized).widgetRegions.right.instanceIds).toEqual(['gallery', 'layers']);
   });
 });
 
@@ -121,7 +122,7 @@ describe('workbench widget region opening', () => {
   it('enables and selects a center widget without toggling it back off', () => {
     let state = createInitialWorkbenchState();
     const activeProject = getActiveProject(state);
-    const enabledWidgetIds: Project['widgetRegions']['center']['enabledWidgetIds'] = ['canvas'];
+    const instanceIds: Project['widgetRegions']['center']['instanceIds'] = ['canvas'];
 
     state = {
       ...state,
@@ -133,8 +134,8 @@ describe('workbench widget region opening', () => {
                 ...project.widgetRegions,
                 center: {
                   ...project.widgetRegions.center,
-                  activeWidgetId: 'canvas',
-                  enabledWidgetIds,
+                  activeInstanceId: 'canvas',
+                  instanceIds,
                 },
               },
             }
@@ -144,20 +145,20 @@ describe('workbench widget region opening', () => {
 
     state = workbenchReducer(state, { region: 'center', type: 'openRegionWidget', widgetId: 'models' });
 
-    expect(getActiveProject(state).widgetRegions.center.activeWidgetId).toBe('models');
-    expect(getActiveProject(state).widgetRegions.center.enabledWidgetIds).toEqual(['canvas', 'models']);
+    expect(getActiveProject(state).widgetRegions.center.activeInstanceId).toBe('models');
+    expect(getActiveProject(state).widgetRegions.center.instanceIds).toEqual(['canvas', 'models']);
 
     state = workbenchReducer(state, { region: 'center', type: 'openRegionWidget', widgetId: 'models' });
 
-    expect(getActiveProject(state).widgetRegions.center.activeWidgetId).toBe('models');
-    expect(getActiveProject(state).widgetRegions.center.enabledWidgetIds).toEqual(['canvas', 'models']);
+    expect(getActiveProject(state).widgetRegions.center.activeInstanceId).toBe('models');
+    expect(getActiveProject(state).widgetRegions.center.instanceIds).toEqual(['canvas', 'models']);
     expect(getActiveProject(state).widgetRegions.center.isCollapsed).toBe(false);
   });
 
   it('opens and uncollapses the target panel region', () => {
     let state = createInitialWorkbenchState();
     const activeProject = getActiveProject(state);
-    const enabledWidgetIds: Project['widgetRegions']['bottom']['enabledWidgetIds'] = ['diagnostics'];
+    const instanceIds: Project['widgetRegions']['bottom']['instanceIds'] = ['diagnostics'];
 
     state = {
       ...state,
@@ -173,8 +174,8 @@ describe('workbench widget region opening', () => {
                 ...project.widgetRegions,
                 bottom: {
                   ...project.widgetRegions.bottom,
-                  activeWidgetId: 'diagnostics',
-                  enabledWidgetIds,
+                  activeInstanceId: 'diagnostics',
+                  instanceIds,
                   isCollapsed: true,
                 },
               },
@@ -186,8 +187,8 @@ describe('workbench widget region opening', () => {
     state = workbenchReducer(state, { region: 'bottom', type: 'openRegionWidget', widgetId: 'queue' });
 
     expect(getActiveProject(state).layout.panels.isBottomOpen).toBe(true);
-    expect(getActiveProject(state).widgetRegions.bottom.activeWidgetId).toBe('queue');
-    expect(getActiveProject(state).widgetRegions.bottom.enabledWidgetIds).toEqual(['diagnostics', 'queue']);
+    expect(getActiveProject(state).widgetRegions.bottom.activeInstanceId).toBe('queue');
+    expect(getActiveProject(state).widgetRegions.bottom.instanceIds).toEqual(['diagnostics', 'queue']);
     expect(getActiveProject(state).widgetRegions.bottom.isCollapsed).toBe(false);
   });
 });
@@ -805,15 +806,12 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
 
     const updatedProject = getActiveProject(state);
+    const galleryValues = getProjectWidgetValues(updatedProject, 'gallery');
 
     expect(updatedProject.canvas.stagingArea.pendingImages).toEqual([]);
-    expect(updatedProject.widgetStates.gallery.values.recentImages).toEqual([
-      createImage('gallery-image.png', queueItem.id),
-    ]);
-    expect(updatedProject.widgetStates.gallery.values.selectedImage).toEqual(
-      createImage('gallery-image.png', queueItem.id)
-    );
-    expect(updatedProject.widgetStates.gallery.values.selectedImageName).toBe('gallery-image.png');
+    expect(galleryValues.recentImages).toEqual([createImage('gallery-image.png', queueItem.id)]);
+    expect(galleryValues.selectedImage).toEqual(createImage('gallery-image.png', queueItem.id));
+    expect(galleryValues.selectedImageName).toBe('gallery-image.png');
   });
 
   it('appends Gallery destination results for local fallback while backend owns boards', () => {
@@ -841,7 +839,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       type: 'routeQueueItemResults',
     });
 
-    const values = getActiveProject(state).widgetStates.gallery.values;
+    const values = getProjectWidgetValues(getActiveProject(state), 'gallery');
 
     expect((values.recentImages as GeneratedImageContract[]).map((image) => image.imageName)).toEqual([
       'gallery-image-2.png',
@@ -868,7 +866,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
 
     const updatedQueueItem = getActiveProject(state).queue.items[0];
-    const galleryValues = getActiveProject(state).widgetStates.gallery.values;
+    const galleryValues = getProjectWidgetValues(getActiveProject(state), 'gallery');
 
     expect(updatedQueueItem.status).toBe('pending');
     expect(updatedQueueItem.completedBackendItemIds).toEqual([11]);
@@ -897,8 +895,8 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
     state = workbenchReducer(state, { image, type: 'selectGalleryImage' });
 
-    expect(getActiveProject(state).widgetStates.gallery.values.selectedImageName).toBe('backend-selected.png');
-    expect(getActiveProject(state).widgetStates.gallery.values.selectedImage).toEqual(image);
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('backend-selected.png');
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImage).toEqual(image);
   });
 });
 
@@ -972,27 +970,31 @@ describe('workbench backend connection recovery', () => {
 
   it('refreshes every project gallery when backend data may have changed', () => {
     const initial = createInitialWorkbenchState();
-    const previousTokens = initial.projects.map((project) => project.widgetStates.gallery.values.galleryRefreshToken);
+    const previousTokens = initial.projects.map(
+      (project) => getProjectWidgetValues(project, 'gallery').galleryRefreshToken
+    );
     const previousImageTokens = initial.projects.map(
-      (project) => project.widgetStates.gallery.values.galleryImagesRefreshToken
+      (project) => getProjectWidgetValues(project, 'gallery').galleryImagesRefreshToken
     );
     const state = workbenchReducer(initial, { type: 'refreshBackendData' });
 
     expect(state.projects).toHaveLength(initial.projects.length);
 
     for (const [index, project] of state.projects.entries()) {
-      expect(project.widgetStates.gallery.values.galleryRefreshToken).toBeDefined();
-      expect(project.widgetStates.gallery.values.galleryRefreshToken).not.toBe(previousTokens[index]);
-      expect(project.widgetStates.gallery.values.galleryImagesRefreshToken).toBeDefined();
-      expect(project.widgetStates.gallery.values.galleryImagesRefreshToken).not.toBe(previousImageTokens[index]);
+      const galleryValues = getProjectWidgetValues(project, 'gallery');
+
+      expect(galleryValues.galleryRefreshToken).toBeDefined();
+      expect(galleryValues.galleryRefreshToken).not.toBe(previousTokens[index]);
+      expect(galleryValues.galleryImagesRefreshToken).toBeDefined();
+      expect(galleryValues.galleryImagesRefreshToken).not.toBe(previousImageTokens[index]);
     }
   });
 
   it('can refresh gallery images without invalidating board data', () => {
     const initial = createInitialWorkbenchState();
     const state = workbenchReducer(initial, { type: 'touchGalleryImagesRefresh' });
-    const previousValues = getActiveProject(initial).widgetStates.gallery.values;
-    const values = getActiveProject(state).widgetStates.gallery.values;
+    const previousValues = getProjectWidgetValues(getActiveProject(initial), 'gallery');
+    const values = getProjectWidgetValues(getActiveProject(state), 'gallery');
 
     expect(values.galleryRefreshToken).toBe(previousValues.galleryRefreshToken);
     expect(values.galleryImagesRefreshToken).toBeDefined();

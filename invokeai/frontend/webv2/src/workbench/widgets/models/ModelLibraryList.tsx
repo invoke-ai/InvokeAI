@@ -2,7 +2,8 @@ import type { ModelConfig } from '@workbench/models/types';
 
 import { Box, Checkbox, Flex, HStack, Icon, Image, ScrollArea, Spinner, Stack, Text } from '@chakra-ui/react';
 import { defaultRangeExtractor, useVirtualizer, type Range } from '@tanstack/react-virtual';
-import { Row } from '@workbench/components/ui';
+import { Button, Row } from '@workbench/components/ui';
+import { EmptyState } from '@workbench/components/ui/EmptyState';
 import { getModelImageUrl } from '@workbench/models/api';
 import {
   filterModels,
@@ -12,8 +13,8 @@ import {
 } from '@workbench/models/library';
 import { useModelsSnapshot } from '@workbench/models/modelsStore';
 import { formatBytes } from '@workbench/models/taxonomy';
-import { getLibraryScrollOffset, saveLibraryScrollOffset } from '@workbench/models/uiStore';
-import { BoxIcon } from 'lucide-react';
+import { getLibraryScrollOffset, openModelsCenterTab, saveLibraryScrollOffset } from '@workbench/models/uiStore';
+import { ArrowRightIcon, BoxIcon, CircleAlert } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ModelBadgeRow } from './ModelBadges';
@@ -51,6 +52,9 @@ export const ModelLibraryList = ({
   const { coverImageVersions, error, missingModelKeys, models, status } = useModelsSnapshot();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [contextMenuTarget, setContextMenuTarget] = useState<ModelContextMenuTarget | null>(null);
+  const openAddModels = () => {
+    openModelsCenterTab('add');
+  };
 
   const rows = useMemo(
     () => flattenGroupsToRows(groupModelsByType(filterModels(models, filters, missingModelKeys))),
@@ -102,28 +106,23 @@ export const ModelLibraryList = ({
   }
 
   if (status === 'error') {
-    return (
-      <Stack align="center" gap="1" py="8">
-        <Text color="fg.error" fontSize="xs" fontWeight="600">
-          Could not load models
-        </Text>
-        <Text color="fg.subtle" fontSize="2xs" maxW="20rem" textAlign="center">
-          {error}
-        </Text>
-      </Stack>
-    );
+    return <EmptyState title="Could not load models" description={error} icon={<Icon as={CircleAlert} />} danger />;
   }
 
   if (rows.length === 0) {
     return (
-      <Stack align="center" gap="1" py="8">
-        <Text color="fg.muted" fontSize="xs" fontWeight="600">
-          {models.length === 0 ? 'No models installed' : 'No models match your filters'}
-        </Text>
-        <Text color="fg.subtle" fontSize="2xs">
-          {models.length === 0 ? 'Use Add Models to install your first model.' : 'Try clearing the search or filters.'}
-        </Text>
-      </Stack>
+      <EmptyState
+        title={models.length === 0 ? 'No models installed' : 'No models match your filters'}
+        description={
+          models.length === 0 ? 'Use Add Models to install your first model.' : 'Try clearing the search or filters.'
+        }
+        icon={<Icon as={CircleAlert} />}
+      >
+        <Button onClick={openAddModels} size="sm">
+          Add Models
+          <Icon as={ArrowRightIcon} />
+        </Button>
+      </EmptyState>
     );
   }
 

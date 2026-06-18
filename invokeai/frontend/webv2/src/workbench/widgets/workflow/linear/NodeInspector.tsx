@@ -9,6 +9,7 @@ import type { ChangeEvent } from 'react';
 import { Flex, HStack, Stack, Text, Textarea } from '@chakra-ui/react';
 import { JsonPreview, Scrollable, Tabs } from '@workbench/components/ui';
 import { workflowSelectionStore } from '@workbench/widgets/workflow/editor/selectionStore';
+import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
 
@@ -127,7 +128,7 @@ const InspectorBody = ({ node, tab }: { node: WorkflowNode; tab: InspectorTab })
 };
 
 export const NodeInspector = ({ projectGraph }: { projectGraph: ProjectGraphState }) => {
-  const workflowWidgetValues = useActiveProjectSelector((project) => project.widgetStates.workflow.values);
+  const workflowWidgetValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'workflow'));
   const dispatch = useWorkbenchDispatch();
   const { selectedNodeIds } = workflowSelectionStore.useSnapshot();
   const tab = getInspectorTab(workflowWidgetValues);
