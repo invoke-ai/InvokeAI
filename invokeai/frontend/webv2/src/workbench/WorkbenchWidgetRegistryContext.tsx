@@ -1,21 +1,27 @@
 import { createContext, use, useMemo, type ReactNode } from 'react';
 
-import type { RegisteredWidget, WorkbenchRegion } from './types';
+import type { RegisteredWidget, WidgetRegion, WidgetTypeId } from './types';
 
 interface WorkbenchWidgetRegistryContextValue {
-  getWidgetsForRegion: (region: WorkbenchRegion) => RegisteredWidget[];
+  getWidgetById: (widgetId: WidgetTypeId) => RegisteredWidget | undefined;
+  getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
 }
 
 const WorkbenchWidgetRegistryContext = createContext<WorkbenchWidgetRegistryContextValue | null>(null);
 
 export const WorkbenchWidgetRegistryProvider = ({
   children,
+  getWidgetById,
   getWidgetsForRegion,
 }: {
   children: ReactNode;
-  getWidgetsForRegion: (region: WorkbenchRegion) => RegisteredWidget[];
+  getWidgetById: (widgetId: WidgetTypeId) => RegisteredWidget | undefined;
+  getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
 }) => {
-  const value = useMemo<WorkbenchWidgetRegistryContextValue>(() => ({ getWidgetsForRegion }), [getWidgetsForRegion]);
+  const value = useMemo<WorkbenchWidgetRegistryContextValue>(
+    () => ({ getWidgetById, getWidgetsForRegion }),
+    [getWidgetById, getWidgetsForRegion]
+  );
 
   return <WorkbenchWidgetRegistryContext value={value}>{children}</WorkbenchWidgetRegistryContext>;
 };
