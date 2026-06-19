@@ -1,8 +1,8 @@
 """FastAPI routes for custom node management."""
 
+import asyncio
 import json
 import shutil
-import subprocess
 import sys
 import traceback
 from importlib.util import module_from_spec, spec_from_file_location
@@ -28,6 +28,7 @@ logger = InvokeAILogger.get_logger()
 # were imported by that pack. Used on uninstall to delete only pack-imported workflows
 # — deleting by tag alone is unsafe because users can edit tags on their own workflows.
 PACK_MANIFEST_FILENAME = ".invokeai_pack_manifest.json"
+GIT_CLONE_TIMEOUT_SECONDS = 120
 
 
 class NodePackInfo(BaseModel):
@@ -126,6 +127,26 @@ def _get_installed_packs() -> list[NodePackInfo]:
     return packs
 
 
+async def _clone_node_pack(source: str, target_dir: Path) -> tuple[int, str]:
+    process = await asyncio.create_subprocess_exec(
+        "git",
+        "clone",
+        source,
+        str(target_dir),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    try:
+        _stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=GIT_CLONE_TIMEOUT_SECONDS)
+    except asyncio.TimeoutError:
+        process.kill()
+        await process.communicate()
+        raise
+
+    return process.returncode or 0, stderr.decode(errors="replace").strip()
+
+
 @custom_nodes_router.get(
     "/",
     operation_id="list_custom_node_packs",
@@ -172,21 +193,16 @@ async def install_custom_node_pack(
 
     try:
         # Clone the repository
-        result = subprocess.run(
-            ["git", "clone", source, str(target_dir)],
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
+        returncode, stderr = await _clone_node_pack(source, target_dir)
 
-        if result.returncode != 0:
+        if returncode != 0:
             # Clean up on failure
             if target_dir.exists():
                 shutil.rmtree(target_dir)
             return InstallNodePackResponse(
                 name=pack_name,
                 success=False,
-                message=f"Git clone failed: {result.stderr.strip()}",
+                message=f"Git clone failed: {stderr}",
             )
 
         # Detect dependency manifests but do NOT install them automatically.
@@ -232,7 +248,7 @@ async def install_custom_node_pack(
             dependency_file=dependency_file,
         )
 
-    except subprocess.TimeoutExpired:
+    except asyncio.TimeoutError:
         if target_dir.exists():
             shutil.rmtree(target_dir)
         return InstallNodePackResponse(

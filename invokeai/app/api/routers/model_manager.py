@@ -1360,7 +1360,7 @@ class HFTokenHelper:
 
 
 @model_manager_router.get("/hf_login", operation_id="get_hf_login_status", response_model=HFTokenStatus)
-async def get_hf_login_status() -> HFTokenStatus:
+async def get_hf_login_status(_: AdminUserOrDefault) -> HFTokenStatus:
     token_status = HFTokenHelper.get_status()
 
     if token_status is HFTokenStatus.UNKNOWN:
