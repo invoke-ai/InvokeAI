@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Callable, Optional
 
 from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.invocations.fields import ImageField
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import (
     Batch,
@@ -38,6 +39,59 @@ class SessionQueueAndProcessorStatus(BaseModel):
     processor: SessionProcessorStatus
 
 
+def _image_record_exists(image_name: str) -> bool:
+    return ApiDependencies.invoker.services.image_records.exists(image_name)
+
+
+def strip_missing_image_results(
+    queue_item: SessionQueueItem, image_exists: Callable[[str], bool] | None = None
+) -> SessionQueueItem:
+    """Remove result outputs whose image records have been deleted.
+
+    Completed queue history can outlive its output images. API clients hydrate
+    images listed in `session.results`; returning stale names makes them loop on
+    404s. Keep the queue item/history, but do not advertise impossible outputs.
+    """
+    if not queue_item.session.results:
+        return queue_item
+
+    image_exists = image_exists or _image_record_exists
+    filtered_results = {}
+    did_filter = False
+    exists_cache: dict[str, bool] = {}
+
+    def cached_exists(image_name: str) -> bool:
+        if image_name not in exists_cache:
+            exists_cache[image_name] = image_exists(image_name)
+        return exists_cache[image_name]
+
+    for node_id, output in queue_item.session.results.items():
+        image = getattr(output, "image", None)
+        if isinstance(image, ImageField) and not cached_exists(image.image_name):
+            did_filter = True
+            continue
+
+        collection = getattr(output, "collection", None)
+        if isinstance(collection, list) and any(isinstance(item, ImageField) for item in collection):
+            filtered_collection = [
+                item for item in collection if not isinstance(item, ImageField) or cached_exists(item.image_name)
+            ]
+            if len(filtered_collection) != len(collection):
+                did_filter = True
+                if len(filtered_collection) == 0:
+                    continue
+                output = output.model_copy(update={"collection": filtered_collection})
+
+        filtered_results[node_id] = output
+
+    if not did_filter:
+        return queue_item
+
+    sanitized_item = queue_item.model_copy(deep=True)
+    sanitized_item.session.results = filtered_results
+    return sanitized_item
+
+
 def sanitize_queue_item_for_user(
     queue_item: SessionQueueItem, current_user_id: str, is_admin: bool
 ) -> SessionQueueItem:
@@ -57,7 +111,7 @@ def sanitize_queue_item_for_user(
     """
     # Admins and item owners can see everything
     if is_admin or queue_item.user_id == current_user_id:
-        return queue_item
+        return strip_missing_image_results(queue_item)
 
     # For non-admins viewing other users' items, strip everything except
     # item_id, queue_id, status, and timestamps

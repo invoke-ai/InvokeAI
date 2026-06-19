@@ -22,6 +22,8 @@ def assert_image_owner(image_name: str, current_user: CurrentUserOrDefault) -> N
     """
     if current_user.is_admin:
         return
+    if not ApiDependencies.invoker.services.image_records.exists(image_name):
+        raise HTTPException(status_code=404, detail="Image not found")
     owner = ApiDependencies.invoker.services.image_records.get_user_id(image_name)
     if owner is not None and owner == current_user.user_id:
         return
@@ -50,6 +52,8 @@ def assert_image_read_access(image_name: str, current_user: CurrentUserOrDefault
     """
     if current_user.is_admin:
         return
+    if not ApiDependencies.invoker.services.image_records.exists(image_name):
+        raise HTTPException(status_code=404, detail="Image not found")
 
     owner = ApiDependencies.invoker.services.image_records.get_user_id(image_name)
     if owner is not None and owner == current_user.user_id:

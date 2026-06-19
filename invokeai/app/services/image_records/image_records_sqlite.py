@@ -84,6 +84,18 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             metadata_raw = cast(Optional[str], as_dict.get("metadata", None))
             return MetadataFieldValidator.validate_json(metadata_raw) if metadata_raw is not None else None
 
+    def exists(self, image_name: str) -> bool:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT 1 FROM images
+                WHERE image_name = ?
+                LIMIT 1;
+                """,
+                (image_name,),
+            )
+            return cursor.fetchone() is not None
+
     def update(
         self,
         image_name: str,
