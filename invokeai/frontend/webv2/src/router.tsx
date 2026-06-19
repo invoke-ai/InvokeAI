@@ -10,10 +10,12 @@ import {
   redirect,
 } from '@tanstack/react-router';
 
+import { getCapabilities, type Capabilities } from './workbench/auth/capabilities';
 import { LoginScreen } from './workbench/auth/components/LoginScreen';
 import { SetupScreen } from './workbench/auth/components/SetupScreen';
 import { ensureAuthSession } from './workbench/auth/session';
-import { HomeScreen } from './workbench/home/HomeScreen';
+import { SocketHubRuntime } from './workbench/backend/SocketHubRuntime';
+import { Launchpad } from './workbench/launchpad/Launchpad';
 import { peekOpenProjectIds, type WorkbenchSearch } from './workbench/projects/session';
 import { loadWorkbenchSettings } from './workbench/settings/store';
 
@@ -25,16 +27,29 @@ import { loadWorkbenchSettings } from './workbench/settings/store';
  * - setup required → everything funnels to /setup
  * - signed out     → authenticated routes redirect to /login
  *
- * Under it, `/` is the Home surface (project library, profile, resources) and
- * `/app` is the editor. The editor bundle — canvas, workflow, widgets — is
- * code-split behind `lazyRouteComponent`, so Home stays light; `defaultPreload:
- * 'intent'` starts fetching that chunk the moment a project card is hovered.
+ * Under it, `/` is the Launchpad (project library, model manager, profile,
+ * resources) and `/app` is the editor. The editor bundle — canvas, workflow,
+ * widgets — is code-split behind `lazyRouteComponent`, so the Launchpad stays
+ * light; `defaultPreload: 'intent'` starts fetching that chunk the moment a
+ * project card is hovered.
  *
  * Hash history is used because the bundle is served with a relative base
  * (`./`), so the app cannot rely on server-side fallback for deep paths.
  */
 
 const rootRoute = createRootRoute({ component: Outlet });
+
+/**
+ * Wraps every authenticated route with the shared backend socket transport.
+ * Feature runtimes attach their own listeners only where needed, keeping the
+ * light Launchpad bundle free of editor/model-manager code.
+ */
+const AuthenticatedLayout = () => (
+  <>
+    <SocketHubRuntime />
+    <Outlet />
+  </>
+);
 
 const authenticatedRoute = createRoute({
   beforeLoad: async () => {
@@ -52,25 +67,50 @@ const authenticatedRoute = createRoute({
 
     await loadWorkbenchSettings();
   },
-  component: Outlet,
+  component: AuthenticatedLayout,
   getParentRoute: () => rootRoute,
   id: 'authenticated',
 });
 
+const requireLaunchpadCapability = async (capability: keyof Capabilities): Promise<void> => {
+  const session = await ensureAuthSession();
+
+  if (!getCapabilities(session)[capability]) {
+    throw redirect({ to: '/projects' });
+  }
+};
+
+// `/` plus a deep-link alias per Launchpad section. All render the same shell;
+// it reads the path to pick the active page.
 const homeRoute = createRoute({
-  component: HomeScreen,
+  component: Launchpad,
   getParentRoute: () => authenticatedRoute,
   path: '/',
 });
 
 const projectsHomeRoute = createRoute({
-  component: HomeScreen,
+  component: Launchpad,
   getParentRoute: () => authenticatedRoute,
   path: 'projects',
 });
 
+const modelsHomeRoute = createRoute({
+  beforeLoad: () => requireLaunchpadCapability('canManageModels'),
+  component: Launchpad,
+  getParentRoute: () => authenticatedRoute,
+  path: 'models',
+});
+
+const nodesHomeRoute = createRoute({
+  beforeLoad: () => requireLaunchpadCapability('canManageNodes'),
+  component: Launchpad,
+  getParentRoute: () => authenticatedRoute,
+  path: 'nodes',
+});
+
 const usersHomeRoute = createRoute({
-  component: HomeScreen,
+  beforeLoad: () => requireLaunchpadCapability('canManageUsers'),
+  component: Launchpad,
   getParentRoute: () => authenticatedRoute,
   path: 'users',
 });
@@ -147,7 +187,14 @@ export const router = createRouter({
   defaultPreload: 'intent',
   history: createHashHistory(),
   routeTree: rootRoute.addChildren([
-    authenticatedRoute.addChildren([homeRoute, projectsHomeRoute, usersHomeRoute, workbenchRoute]),
+    authenticatedRoute.addChildren([
+      homeRoute,
+      projectsHomeRoute,
+      modelsHomeRoute,
+      nodesHomeRoute,
+      usersHomeRoute,
+      workbenchRoute,
+    ]),
     loginRoute,
     setupRoute,
   ]),

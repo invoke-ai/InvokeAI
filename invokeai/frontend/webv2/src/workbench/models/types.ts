@@ -159,6 +159,12 @@ export interface ModelInstallDownloadPart {
   bytes: number;
   total_bytes: number;
   status?: string;
+  /** Server refused to resume this part; it must be restarted from scratch. */
+  resume_required?: boolean;
+  /** Why a resume was refused, when known. */
+  resume_message?: string | null;
+  /** The part was silently restarted from the beginning after a failed resume. */
+  resume_from_scratch?: boolean;
 }
 
 /** A model install job as returned by `/api/v2/models/install`. */

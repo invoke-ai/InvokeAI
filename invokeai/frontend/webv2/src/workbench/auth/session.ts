@@ -1,4 +1,5 @@
 import { ApiError, clearAuthToken, getAuthToken, setAuthToken, setUnauthorizedHandler } from '@workbench/backend/http';
+import { socketHub } from '@workbench/backend/socketHub';
 import { createExternalStore } from '@workbench/externalStore';
 
 import { getAuthStatus, getCurrentUser, login, logout, setupAdmin, type AuthStatus, type UserDTO } from './api';
@@ -132,6 +133,9 @@ export const logoutSession = async (): Promise<void> => {
   }
 
   clearAuthToken();
+  // Tear down the shared socket so it does not linger authenticated as the
+  // previous user; the next authenticated mount reconnects with a fresh token.
+  socketHub.disconnect();
   store.patchSnapshot({ sessionExpired: false, user: null });
 };
 
@@ -162,5 +166,6 @@ setUnauthorizedHandler(() => {
   }
 
   clearAuthToken();
+  socketHub.disconnect();
   store.patchSnapshot({ sessionExpired: true, user: null });
 });

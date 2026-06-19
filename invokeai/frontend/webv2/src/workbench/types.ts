@@ -2,9 +2,9 @@ import type { ComponentType, ExoticComponent, JSXElementConstructor, SVGProps } 
 
 import type { ProjectGraphState } from './workflows/types';
 
-export type LayoutPresetId = 'canvas-default' | 'gallery' | 'workflow' | 'linear' | 'model-manager';
+export type LayoutPresetId = 'canvas-default' | 'gallery' | 'workflow' | 'linear';
 
-export type CenterViewId = 'canvas' | 'gallery' | 'preview' | 'workflow' | 'models';
+export type CenterViewId = 'canvas' | 'gallery' | 'preview' | 'workflow';
 
 export type GraphId = string;
 
@@ -17,7 +17,6 @@ export type FirstPartyWidgetTypeId =
   | 'history-controls'
   | 'layout-actions'
   | 'layers'
-  | 'models'
   | 'notifications'
   | 'preview'
   | 'project'

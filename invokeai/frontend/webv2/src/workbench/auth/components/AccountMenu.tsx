@@ -2,39 +2,33 @@ import { Avatar, Badge, Box, chakra, HStack, Icon, Menu, Portal, Stack, Text } f
 import { useNavigate } from '@tanstack/react-router';
 import { logoutSession, useAuthSession } from '@workbench/auth/session';
 import { MenuContent } from '@workbench/components/ui';
-import { SettingsButton } from '@workbench/settings/SettingsDialog';
-import { useOptionalOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { useOptionalWorkbenchStore } from '@workbench/WorkbenchContext';
 import { ChevronDownIcon, LogOutIcon, UserRoundCogIcon, UsersIcon } from 'lucide-react';
 import { useState } from 'react';
 
 import { ProfileDialog } from './ProfileDialog';
 
 /**
- * Shared settings/account cluster used by both Home and the workbench shell:
- * the settings gear always renders; the avatar menu joins it when a
- * multi-user session is signed in.
+ * The signed-in user's avatar menu — account settings, user management, and
+ * sign-out — shown on both the Launchpad and the workbench shell. Renders only
+ * in a multi-user session; the settings gear is a separate control that each
+ * surface's top bar places alongside it.
  */
 export const AccountMenu = () => {
   const session = useAuthSession();
-  const hasWorkbench = useOptionalWorkbenchStore() !== null;
-  const openWorkbenchWidget = useOptionalOpenWorkbenchWidget();
   const navigate = useNavigate();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   if (!session.multiuserEnabled || session.user === null) {
-    return <SettingsButton />;
+    return;
   }
 
   const user = session.user;
   const label = user.display_name?.trim() || user.email;
 
+  // User management is a Launchpad page (`/users`), not a workbench widget —
+  // so this navigates there, working the same from Home and the editor.
   const openUserManagement = () => {
-    if (!hasWorkbench) {
-      return;
-    }
-
-    openWorkbenchWidget('users', { preferredRegions: ['center'], requireCenterView: true });
+    void navigate({ to: '/users' });
   };
 
   const signOut = async () => {
@@ -43,8 +37,7 @@ export const AccountMenu = () => {
   };
 
   return (
-    <HStack gap="0.5">
-      <SettingsButton />
+    <>
       <Menu.Root positioning={{ placement: 'bottom-end' }}>
         <Menu.Trigger asChild>
           <chakra.button
@@ -93,7 +86,7 @@ export const AccountMenu = () => {
                 <Icon as={UserRoundCogIcon} boxSize="3.5" />
                 Account settings
               </Menu.Item>
-              {user.is_admin && hasWorkbench ? (
+              {user.is_admin ? (
                 <Menu.Item value="users" onClick={openUserManagement}>
                   <Icon as={UsersIcon} boxSize="3.5" />
                   Manage users
@@ -109,6 +102,6 @@ export const AccountMenu = () => {
         </Portal>
       </Menu.Root>
       <ProfileDialog isOpen={isProfileOpen} user={user} onClose={() => setIsProfileOpen(false)} />
-    </HStack>
+    </>
   );
 };

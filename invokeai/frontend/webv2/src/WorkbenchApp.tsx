@@ -4,15 +4,14 @@ import { WorkbenchShell } from '@workbench/shell';
 import type { WorkbenchSearch } from './workbench/projects/session';
 
 import { SessionExpiryGuard } from './workbench/auth/components/SessionExpiryGuard';
-import { ModelsRuntime } from './workbench/widgets/models/ModelsRuntime';
 import { WorkbenchProvider } from './workbench/WorkbenchContext';
 import { WorkbenchRuntime } from './workbench/WorkbenchRuntime';
 import { WorkbenchSessionController } from './workbench/WorkbenchSessionController';
 
 /**
- * The authenticated editor: providers, runtimes, and the shell. Mounted by
- * the /app route once the auth guard has resolved, so the backend socket
- * always connects with a valid token (or none, in single-user mode).
+ * The authenticated editor: providers, editor-only runtimes, and the shell.
+ * The shared backend socket is mounted above this route; `WorkbenchRuntime`
+ * attaches the generation queue listeners while the editor is open.
  *
  * The route's search params shape the boot: ?project deep-links a library
  * project into the session, ?new starts a fresh draft. Both are consumed by
@@ -26,7 +25,6 @@ export const WorkbenchApp = () => {
     <WorkbenchProvider loadOptions={{ createNew: search.new, openProjectId: search.project }}>
       <SessionExpiryGuard />
       <WorkbenchRuntime />
-      <ModelsRuntime />
       <WorkbenchSessionController search={search} />
       <WorkbenchShell />
     </WorkbenchProvider>

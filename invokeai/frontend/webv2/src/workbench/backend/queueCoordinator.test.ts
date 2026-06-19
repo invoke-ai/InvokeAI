@@ -10,11 +10,11 @@ import { ApiError } from './http';
 import {
   createQueueCoordinator,
   QueueItemCancelledError,
-  type BackendSocket,
   type QueueCoordinator,
   type QueueCoordinatorApi,
   type QueueCoordinatorCallbacks,
 } from './queueCoordinator';
+import { createSocketHub, type BackendSocket } from './socketHub';
 
 class FakeSocket implements BackendSocket {
   readonly emitted: { event: string; payload: unknown }[] = [];
@@ -22,6 +22,13 @@ class FakeSocket implements BackendSocket {
 
   on(event: string, handler: (payload: never) => void): void {
     this.handlers.set(event, [...(this.handlers.get(event) ?? []), handler]);
+  }
+
+  off(event: string, handler: (payload: never) => void): void {
+    this.handlers.set(
+      event,
+      (this.handlers.get(event) ?? []).filter((existing) => existing !== handler)
+    );
   }
 
   emit(event: string, payload: unknown): void {
@@ -96,6 +103,7 @@ interface Harness {
   api: { [Key in keyof QueueCoordinatorApi]: ReturnType<typeof vi.fn> };
   callbacks: { [Key in keyof QueueCoordinatorCallbacks]: ReturnType<typeof vi.fn> };
   coordinator: QueueCoordinator;
+  hub: ReturnType<typeof createSocketHub>;
   nodeExecution: { [Key in keyof NodeExecutionSink]: ReturnType<typeof vi.fn> };
   progressImage: { clear: ReturnType<typeof vi.fn>; set: ReturnType<typeof vi.fn> };
   progressEntries: Map<string, QueueItemProgress>;
@@ -125,7 +133,6 @@ const createHarness = (options: { galleryRefreshCoalesceMs?: number } = {}): Har
     listAllQueueItems: vi.fn((): Promise<QueueItemDTO[]> => Promise.resolve([])),
   };
   const callbacks = {
-    onConnectionChange: vi.fn(),
     onGalleryRefresh: vi.fn(),
   };
   const nodeExecution = {
@@ -137,16 +144,20 @@ const createHarness = (options: { galleryRefreshCoalesceMs?: number } = {}): Har
     started: vi.fn(),
   };
   const progressImage = { clear: vi.fn(), set: vi.fn() };
+  const hub = createSocketHub({ createSocket: () => socket });
+
+  hub.connect();
+
   const coordinator = createQueueCoordinator(callbacks, {
     api,
-    createSocket: () => socket,
     galleryRefreshCoalesceMs: options.galleryRefreshCoalesceMs ?? 1,
+    hub,
     nodeExecution,
     progress,
     progressImage,
   });
 
-  return { api, callbacks, coordinator, nodeExecution, progressImage, progressEntries, socket };
+  return { api, callbacks, coordinator, hub, nodeExecution, progressImage, progressEntries, socket };
 };
 
 describe('queueCoordinator', () => {
@@ -158,15 +169,8 @@ describe('queueCoordinator', () => {
 
   afterEach(() => {
     harness.coordinator.dispose();
+    harness.hub.disconnect();
     vi.useRealTimers();
-  });
-
-  it('reports connection lifecycle and subscribes to the queue', () => {
-    harness.coordinator.connect();
-
-    expect(harness.callbacks.onConnectionChange).toHaveBeenNthCalledWith(1, 'connecting', undefined);
-    expect(harness.callbacks.onConnectionChange).toHaveBeenNthCalledWith(2, 'connected', undefined);
-    expect(harness.socket.emitted).toContainEqual({ event: 'subscribe_queue', payload: { queue_id: 'default' } });
   });
 
   it('settles submitted runs from terminal socket events without polling', async () => {
@@ -515,12 +519,14 @@ describe('queueCoordinator', () => {
     expect(harness.api.cancelQueueItemsByBatchIds).toHaveBeenCalledWith(['batch-2']);
   });
 
-  it('stops notifying after dispose', () => {
+  it('detaches socket listeners after dispose', async () => {
     harness.coordinator.connect();
-    harness.callbacks.onConnectionChange.mockClear();
 
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
     harness.coordinator.dispose();
 
-    expect(harness.callbacks.onConnectionChange).not.toHaveBeenCalled();
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 1 }));
+
+    expect(harness.nodeExecution.settleRunning).not.toHaveBeenCalled();
   });
 });

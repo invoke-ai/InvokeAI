@@ -1,6 +1,6 @@
 import { Dialog, Icon, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { Button, CloseButton, Row, Scrollable } from '@workbench/components/ui';
-import { formatRelativeTime } from '@workbench/home/formatRelativeTime';
+import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
 import { refreshProjectLibrary, useProjectLibrary, type ProjectSummary } from '@workbench/projects/library';
 import { importProjectFile, pickProjectFile } from '@workbench/projects/projectFile';
 import { adoptProjectRecord, hydrateProjectFromServer } from '@workbench/projects/syncedPersistence';

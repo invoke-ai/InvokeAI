@@ -14,7 +14,6 @@ import {
   chakra,
   Checkbox,
   Dialog,
-  Field,
   Flex,
   HStack,
   Icon,
@@ -23,13 +22,13 @@ import {
   SimpleGrid,
   Stack,
   Switch,
-  Tabs,
   Text,
+  Field,
   useSlotRecipe,
 } from '@chakra-ui/react';
 import { themeCardRecipe } from '@theme/recipes';
 import { previewSwatches, THEMES, type ThemeDefinition } from '@theme/system';
-import { Button, CloseButton, IconButton, ConfirmDialog } from '@workbench/components/ui';
+import { Button, CloseButton, IconButton, ConfirmDialog, Tabs, Tooltip } from '@workbench/components/ui';
 import { syncedWorkbenchPersistence } from '@workbench/projects/syncedPersistence';
 import {
   useOptionalWorkbenchDispatch,
@@ -89,16 +88,11 @@ export const SettingsButton = () => {
 
   return (
     <>
-      <IconButton
-        aria-label="Settings"
-        color="fg.muted"
-        size="sm"
-        variant="ghost"
-        _hover={{ color: 'fg' }}
-        onClick={() => openWorkbenchSettings()}
-      >
-        <SettingsIcon />
-      </IconButton>
+      <Tooltip content="Settings">
+        <IconButton aria-label="Settings" size="sm" variant="ghost" onClick={() => openWorkbenchSettings()}>
+          <SettingsIcon />
+        </IconButton>
+      </Tooltip>
       <SettingsDialog isOpen={isOpen} onClose={closeWorkbenchSettings} />
     </>
   );
@@ -131,27 +125,30 @@ const SettingsDialogContent = () => {
       <Dialog.Positioner>
         <Dialog.Content h="min(46rem, calc(100dvh - 4rem))" maxW="4xl">
           <Dialog.Header borderBottomWidth="1px" borderColor="border.subtle">
-            <Stack gap="0.5">
-              <Dialog.Title fontSize="md" fontWeight="700">
-                Settings
-              </Dialog.Title>
-              <Text color="fg.subtle" fontSize="xs">
-                {scope === 'user'
-                  ? 'Preferences for the signed-in user. Project settings apply only to the active project.'
-                  : 'Global preferences for this single-user install. Project settings apply only to the active project.'}
-              </Text>
-              {status === 'error' && error ? (
-                <Text color="fg.error" fontSize="2xs">
-                  {error}
+            <Flex alignItems="start" gap="2">
+              <Icon as={SettingsIcon} boxSize="5" />
+              <Stack gap="1">
+                <Dialog.Title fontSize="md" fontWeight="700" mt="0.5" lineHeight={1}>
+                  Settings
+                </Dialog.Title>
+                <Text color="fg.subtle" fontSize="xs">
+                  {scope === 'user'
+                    ? 'Preferences for the signed-in user. Project settings apply only to the active project.'
+                    : 'Global preferences for this single-user install. Project settings apply only to the active project.'}
                 </Text>
-              ) : null}
-            </Stack>
+                {status === 'error' && error ? (
+                  <Text color="fg.error" fontSize="2xs">
+                    {error}
+                  </Text>
+                ) : null}
+              </Stack>
+            </Flex>
           </Dialog.Header>
           <Dialog.Body minH="0" p="0">
             <SettingsTabs />
           </Dialog.Body>
           <Dialog.CloseTrigger asChild>
-            <CloseButton color="fg.muted" size="sm" />
+            <CloseButton size="sm" />
           </Dialog.CloseTrigger>
         </Dialog.Content>
       </Dialog.Positioner>
@@ -161,7 +158,7 @@ const SettingsDialogContent = () => {
 
 const SettingsTabs = () => {
   const hasWorkbench = useOptionalWorkbenchStore() !== null;
-  const allTabs: SettingsTabDefinition[] = [
+  const SETTINGS_TABS: SettingsTabDefinition[] = [
     {
       children: <AppearanceSection />,
       icon: PaletteIcon,
@@ -200,7 +197,7 @@ const SettingsTabs = () => {
       value: 'workspace',
     },
   ];
-  const tabs = allTabs.filter((tab) => tab.condition !== false);
+  const tabs = SETTINGS_TABS.filter((tab) => tab.condition !== false);
   const { sectionId } = settingsDialogStore.useSnapshot();
   const activeSectionId = tabs.some((tab) => tab.value === sectionId) ? sectionId : 'appearance';
 
@@ -220,7 +217,6 @@ const SettingsTabs = () => {
         borderColor="border.subtle"
         borderRightWidth="1px"
         flexShrink={0}
-        gap="1"
         p="2"
         w={{ base: '40', md: '52' }}
       >
@@ -240,20 +236,7 @@ const SettingsTabs = () => {
 };
 
 const SettingsTabTrigger = ({ icon, label, value }: { icon: LucideIcon; label: string; value: string }) => (
-  <Tabs.Trigger
-    color="fg.muted"
-    fontSize="xs"
-    fontWeight="600"
-    gap="2"
-    justifyContent="flex-start"
-    px="3"
-    py="2"
-    rounded="md"
-    textAlign="start"
-    value={value}
-    w="full"
-    _selected={{ bg: 'bg.muted', color: 'fg' }}
-  >
+  <Tabs.Trigger justifyContent="flex-start" textAlign="start" value={value} w="full">
     <Icon as={icon} boxSize="3.5" flexShrink={0} />
     <Text truncate>{label}</Text>
   </Tabs.Trigger>

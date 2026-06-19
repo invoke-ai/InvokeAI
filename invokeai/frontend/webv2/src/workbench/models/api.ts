@@ -126,6 +126,13 @@ export const resumeModelInstall = (id: number): Promise<ModelInstallJob> =>
 export const restartFailedModelInstall = (id: number): Promise<ModelInstallJob> =>
   apiFetchJson<ModelInstallJob>(`${MODELS_BASE}/install/${id}/restart_failed`, { method: 'POST' });
 
+/** Restart a single download part (by its file URL) of an install job. */
+export const restartModelInstallFile = (id: number, fileSource: string): Promise<ModelInstallJob> =>
+  apiFetchJson<ModelInstallJob>(`${MODELS_BASE}/install/${id}/restart_file`, {
+    body: JSON.stringify(fileSource),
+    method: 'POST',
+  });
+
 export const pruneCompletedModelInstalls = async (): Promise<void> => {
   await apiFetch(`${MODELS_BASE}/install`, { method: 'DELETE' });
 };

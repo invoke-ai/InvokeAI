@@ -7,7 +7,7 @@ import { getModelsDir, listMissingModels, listModels } from './api';
 /**
  * Shared library store for installed model configs. Lives outside the
  * workbench reducer because the list is backend-owned server state shared by
- * every surface of the models widget (panel, center view, pickers); a single
+ * every model surface (manager, detail views, pickers); a single
  * module store keeps them consistent and avoids re-fetch storms. Mutations go
  * through the API layer and then either patch the snapshot in place (fast
  * path) or trigger a refresh.

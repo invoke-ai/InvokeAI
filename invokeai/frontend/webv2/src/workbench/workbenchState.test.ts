@@ -110,7 +110,6 @@ describe('workbench widget region defaults', () => {
       'queue',
       'gallery',
       'layers',
-      'models',
       'diagnostics',
       'project',
     ]);
@@ -143,15 +142,15 @@ describe('workbench widget region opening', () => {
       ),
     };
 
-    state = workbenchReducer(state, { region: 'center', type: 'openRegionWidget', widgetId: 'models' });
+    state = workbenchReducer(state, { region: 'center', type: 'openRegionWidget', widgetId: 'preview' });
 
-    expect(getActiveProject(state).widgetRegions.center.activeInstanceId).toBe('models');
-    expect(getActiveProject(state).widgetRegions.center.instanceIds).toEqual(['canvas', 'models']);
+    expect(getActiveProject(state).widgetRegions.center.activeInstanceId).toBe('preview');
+    expect(getActiveProject(state).widgetRegions.center.instanceIds).toEqual(['canvas', 'preview']);
 
-    state = workbenchReducer(state, { region: 'center', type: 'openRegionWidget', widgetId: 'models' });
+    state = workbenchReducer(state, { region: 'center', type: 'openRegionWidget', widgetId: 'preview' });
 
-    expect(getActiveProject(state).widgetRegions.center.activeInstanceId).toBe('models');
-    expect(getActiveProject(state).widgetRegions.center.instanceIds).toEqual(['canvas', 'models']);
+    expect(getActiveProject(state).widgetRegions.center.activeInstanceId).toBe('preview');
+    expect(getActiveProject(state).widgetRegions.center.instanceIds).toEqual(['canvas', 'preview']);
     expect(getActiveProject(state).widgetRegions.center.isCollapsed).toBe(false);
   });
 

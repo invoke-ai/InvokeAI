@@ -16,8 +16,8 @@ import {
   getQueueItemResultImages,
   listAllQueueItems,
 } from '@workbench/generation/api';
-import { handleModelInstallSocketEvent, MODEL_INSTALL_SOCKET_EVENTS } from '@workbench/models/installsStore';
-import { io } from 'socket.io-client';
+
+import type { SocketHub } from './socketHub';
 
 import {
   isTerminalBackendStatus,
@@ -29,26 +29,15 @@ import {
   type QueueItemStatusChangedEvent,
   type TerminalBackendQueueItemStatus,
 } from './events';
-import { ApiError, getAuthToken, getBackendSocketUrl } from './http';
+import { ApiError } from './http';
 import { modelLoadStore } from './modelLoadStore';
 import { nodeExecutionStore, type NodeExecutionSink } from './nodeExecutionStore';
 import { progressImageStore, type ProgressImageSink, type ProgressImageTarget } from './progressImageStore';
 import { queueItemProgressStore, type QueueItemProgressSink } from './progressStore';
 
-const SOCKET_PATH = '/ws/socket.io';
 const GALLERY_REFRESH_COALESCE_MS = 400;
 const SAFETY_SWEEP_INTERVAL_MS = 30_000;
 const TERMINAL_EVENT_BUFFER_LIMIT = 256;
-
-/**
- * The minimal Socket.IO surface the coordinator uses; tests substitute a fake.
- */
-export interface BackendSocket {
-  on(event: string, handler: (payload: never) => void): unknown;
-  emit(event: string, payload: unknown): unknown;
-  connect(): unknown;
-  disconnect(): unknown;
-}
 
 export interface QueueCoordinatorApi {
   cancelQueueItems: typeof cancelQueueItems;
@@ -61,7 +50,6 @@ export interface QueueCoordinatorApi {
 }
 
 export interface QueueCoordinatorCallbacks {
-  onConnectionChange(status: BackendConnectionStatus, error?: string): void;
   /** Fired when one backend item in a local batch completes, before the whole local batch necessarily settles. */
   onBackendItemComplete?(localQueueItemId: string, backendItemId: number): void;
   /** Fired when one backend item in a local batch is canceled. */
@@ -155,18 +143,6 @@ const defaultApi: QueueCoordinatorApi = {
   listAllQueueItems,
 };
 
-const createDefaultSocket = (): BackendSocket => {
-  const token = getAuthToken();
-
-  return io(getBackendSocketUrl(), {
-    auth: token ? { token } : undefined,
-    autoConnect: false,
-    extraHeaders: token ? { Authorization: `Bearer ${token}` } : undefined,
-    path: SOCKET_PATH,
-    timeout: 60000,
-  });
-};
-
 const toTerminalOutcome = (
   status: TerminalBackendQueueItemStatus,
   error?: string | null,
@@ -186,17 +162,17 @@ const toTerminalOutcome = (
 export const createQueueCoordinator = (
   callbacks: QueueCoordinatorCallbacks,
   options: {
+    hub: Pick<SocketHub, 'on' | 'emit' | 'onConnectionChange'>;
     api?: Partial<QueueCoordinatorApi>;
-    createSocket?: () => BackendSocket;
     galleryRefreshCoalesceMs?: number;
     nodeExecution?: NodeExecutionSink;
     progress?: QueueItemProgressSink;
     progressImage?: ProgressImageSink;
     sweepIntervalMs?: number;
-  } = {}
+  }
 ): QueueCoordinator => {
   const api: QueueCoordinatorApi = { ...defaultApi, ...options.api };
-  const createSocket = options.createSocket ?? createDefaultSocket;
+  const hub = options.hub;
   const progress = options.progress ?? queueItemProgressStore;
   const nodeExecution = options.nodeExecution ?? nodeExecutionStore;
   const progressImage = options.progressImage ?? progressImageStore;
@@ -213,7 +189,8 @@ export const createQueueCoordinator = (
    */
   const recentTerminalOutcomes = new Map<number, TerminalOutcome>();
 
-  let socket: BackendSocket | null = null;
+  const detachers: Array<() => void> = [];
+  let isAttached = false;
   let isDisposed = false;
   let galleryRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   let sweepTimer: ReturnType<typeof setInterval> | null = null;
@@ -426,90 +403,80 @@ export const createQueueCoordinator = (
     }
   };
 
-  /** Dropped after dispose so socket teardown does not dispatch into unmounted React. */
-  const notifyConnection = (status: BackendConnectionStatus, error?: string): void => {
-    if (!isDisposed) {
-      callbacks.onConnectionChange(status, error);
+  /**
+   * React to the shared socket's connection lifecycle. The hub owns the socket,
+   * the connection store, and `modelLoadStore.reset()`; the coordinator only
+   * clears its generation-scoped stores and, on (re)connect, schedules a gallery
+   * refresh and sweeps for events missed while disconnected.
+   */
+  const handleConnectionChange = (status: BackendConnectionStatus): void => {
+    progress.clearAll?.();
+    nodeExecution.clearAll();
+
+    if (status === 'connected') {
+      scheduleGalleryRefresh();
+      void sweep();
     }
   };
 
+  /** Attach generation listeners to the shared socket hub. */
   const connect = (): void => {
-    if (isDisposed || socket) {
+    if (isDisposed || isAttached) {
       return;
     }
 
-    socket = createSocket();
-    notifyConnection('connecting');
+    isAttached = true;
 
-    socket.on('connect', () => {
-      modelLoadStore.reset();
-      progress.clearAll?.();
-      nodeExecution.clearAll();
-      notifyConnection('connected');
-      socket?.emit('subscribe_queue', { queue_id: 'default' });
-      scheduleGalleryRefresh();
-      void sweep();
-    });
-    socket.on('connect_error', (error: { message: string }) => {
-      modelLoadStore.reset();
-      progress.clearAll?.();
-      nodeExecution.clearAll();
-      notifyConnection('disconnected', error.message);
-    });
-    socket.on('disconnect', (reason: string) => {
-      modelLoadStore.reset();
-      progress.clearAll?.();
-      nodeExecution.clearAll();
-      notifyConnection('disconnected', reason);
-    });
-    socket.on('queue_item_status_changed', handleStatusChanged);
-    socket.on('invocation_progress', handleProgress);
-    socket.on('invocation_started', (event: InvocationStartedEvent) => {
-      if (!isTrackedEvent(event)) {
-        return;
-      }
+    detachers.push(
+      hub.on('queue_item_status_changed', handleStatusChanged),
+      hub.on('invocation_progress', handleProgress),
+      hub.on('invocation_started', (event: InvocationStartedEvent) => {
+        if (!isTrackedEvent(event)) {
+          return;
+        }
 
-      nodeExecution.started(event);
-    });
-    socket.on('invocation_complete', (event: InvocationCompleteEvent) => {
-      if (!isTrackedEvent(event)) {
-        return;
-      }
+        nodeExecution.started(event);
+      }),
+      hub.on('invocation_complete', (event: InvocationCompleteEvent) => {
+        if (!isTrackedEvent(event)) {
+          return;
+        }
 
-      nodeExecution.completed(event);
-    });
-    socket.on('invocation_error', (event: InvocationErrorEvent) => {
-      if (!isTrackedEvent(event)) {
-        return;
-      }
+        nodeExecution.completed(event);
+      }),
+      hub.on('invocation_error', (event: InvocationErrorEvent) => {
+        if (!isTrackedEvent(event)) {
+          return;
+        }
 
-      nodeExecution.failed(event);
-    });
-    socket.on('model_load_started', (payload: never) => {
-      modelLoadStore.started(payload);
-    });
-    socket.on('model_load_complete', (payload: never) => {
-      modelLoadStore.completed(payload);
-    });
+        nodeExecution.failed(event);
+      }),
+      hub.on('model_load_started', (payload: never) => {
+        modelLoadStore.started(payload);
+      }),
+      hub.on('model_load_complete', (payload: never) => {
+        modelLoadStore.completed(payload);
+      })
+    );
 
-    // Model install lifecycle events are broadcast to every connected client
-    // (no room subscription needed); forward them to the installs store so the
-    // model manager tracks downloads without a second socket.
-    for (const modelInstallEvent of MODEL_INSTALL_SOCKET_EVENTS) {
-      socket.on(modelInstallEvent, (payload: never) => {
-        handleModelInstallSocketEvent(modelInstallEvent, payload);
-      });
-    }
-
-    socket.connect();
+    // Fires synchronously with the current status, so attaching after the hub
+    // has already connected still triggers the initial clear + sweep.
+    detachers.push(hub.onConnectionChange(handleConnectionChange));
 
     sweepTimer = setInterval(() => {
       void sweep();
     }, sweepIntervalMs);
   };
 
+  /** Detach generation listeners; the hub keeps the socket alive. */
   const dispose = (): void => {
     isDisposed = true;
+
+    for (const detach of detachers) {
+      detach();
+    }
+
+    detachers.length = 0;
 
     if (galleryRefreshTimer !== null) {
       clearTimeout(galleryRefreshTimer);
@@ -520,9 +487,6 @@ export const createQueueCoordinator = (
       clearInterval(sweepTimer);
       sweepTimer = null;
     }
-
-    socket?.disconnect();
-    socket = null;
   };
 
   const reconcile = async (items: ReconcileInput[]): Promise<Map<string, ReconcileOutcome>> => {

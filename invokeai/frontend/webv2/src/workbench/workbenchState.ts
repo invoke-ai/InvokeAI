@@ -520,7 +520,6 @@ const createWidgetStates = (): WidgetStateMap => ({
   generate: { graphId: 'generate-graph', id: 'generate', label: 'Generate', values: {}, version: 1 },
   'layout-actions': { id: 'layout-actions', label: 'Layout Actions', values: {}, version: 1 },
   layers: { id: 'layers', label: 'Layers', values: {}, version: 1 },
-  models: { id: 'models', label: 'Models', values: {}, version: 1 },
   notifications: { id: 'notifications', label: 'Notifications', values: {}, version: 1 },
   preview: { id: 'preview', label: 'Preview', values: {}, version: 1 },
   project: { id: 'project', label: 'Project', values: {}, version: 1 },
@@ -563,8 +562,6 @@ const defaultWidgetInstanceTypes: Record<WidgetInstanceId, WidgetTypeId> = {
   generate: 'generate',
   'layout-actions': 'layout-actions',
   layers: 'layers',
-  models: 'models',
-  'models:center': 'models',
   notifications: 'notifications',
   preview: 'preview',
   project: 'project',
@@ -594,7 +591,7 @@ const createWidgetRegions = (): Record<WidgetRegion, WidgetRegionState> => ({
   },
   right: {
     activeInstanceId: 'layers',
-    instanceIds: ['queue', 'gallery', 'layers', 'models', 'diagnostics', 'project'],
+    instanceIds: ['queue', 'gallery', 'layers', 'diagnostics', 'project'],
     isCollapsed: false,
     sizePx: 240,
   },
@@ -616,7 +613,7 @@ const createWidgetRegions = (): Record<WidgetRegion, WidgetRegionState> => ({
   },
   center: {
     activeInstanceId: 'canvas',
-    instanceIds: ['canvas', 'gallery:center', 'preview', 'workflow:center', 'models:center'],
+    instanceIds: ['canvas', 'gallery:center', 'preview', 'workflow:center'],
     isCollapsed: false,
     sizePx: 0,
   },
@@ -645,10 +642,6 @@ const ensureRightRegion = (rightRegion: WidgetRegionState | undefined): WidgetRe
 const getCenterWidgetIdFromViewId = (centerViewId: CenterViewId): WidgetInstanceId => {
   if (centerViewId === 'gallery') {
     return 'gallery:center';
-  }
-
-  if (centerViewId === 'models') {
-    return 'models:center';
   }
 
   if (centerViewId === 'workflow') {

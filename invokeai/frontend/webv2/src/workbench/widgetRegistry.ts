@@ -15,7 +15,6 @@ import { galleryWidgetManifest } from './widgets/gallery';
 import { generateWidgetManifest } from './widgets/generate';
 import { layersWidgetManifest } from './widgets/layers';
 import { layoutActionsWidgetManifest } from './widgets/layout-actions';
-import { modelsWidgetManifest } from './widgets/models';
 import { notificationsWidgetManifest } from './widgets/notifications';
 import { previewWidgetManifest } from './widgets/preview';
 import { projectWidgetManifest } from './widgets/project';
@@ -33,7 +32,6 @@ export const firstPartyWidgetManifests: WidgetManifest[] = [
   previewWidgetManifest,
   projectWidgetManifest,
   layersWidgetManifest,
-  modelsWidgetManifest,
   queueWidgetManifest,
   notificationsWidgetManifest,
   serverStatusWidgetManifest,

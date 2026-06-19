@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type Dispatch } from 'react';
 import type { Project, QueueItem } from './types';
 import type { WorkbenchAction } from './workbenchState';
 
+import { getConnectionStatus, subscribeConnection } from './backend/connectionStore';
 import { getApiErrorMessage } from './backend/http';
 import {
   createQueueCoordinator,
@@ -10,6 +11,7 @@ import {
   type QueueCoordinator,
   type ReconcileInput,
 } from './backend/queueCoordinator';
+import { socketHub } from './backend/socketHub';
 import { addImagesToGalleryBoard } from './gallery/api';
 import { getQueueItemResultImages } from './generation/api';
 import { sanitizeBatchCount } from './generation/batch';
@@ -197,42 +199,64 @@ export const WorkbenchRuntime = () => {
 
   stateRef.current = state;
 
+  // Mirror the shared socket's connection status (owned by the hub, above the
+  // workbench) into workbench state so the editor's many `backendConnection`
+  // consumers and the reconcile gate keep working unchanged. Seeds on mount so
+  // opening the editor over an already-live socket reconciles immediately.
   useEffect(() => {
-    const coordinator = createQueueCoordinator({
-      onBackendItemComplete: (localQueueItemId, backendItemId) => {
-        const routeTarget = stateRef.current.projects
-          .map((project) => ({ project, queueItem: project.queue.items.find((item) => item.id === localQueueItemId) }))
-          .find((target) => target.queueItem !== undefined);
+    const syncConnection = () => {
+      const { error, status } = getConnectionStatus();
 
-        if (!routeTarget?.queueItem || routeTarget.queueItem.completedBackendItemIds?.includes(backendItemId)) {
-          return;
-        }
+      dispatch({ error, status, type: 'setBackendConnectionStatus' });
+    };
 
-        void routeBackendItemResults(routeTarget.project.id, routeTarget.queueItem, backendItemId, dispatch);
-      },
-      onBackendItemCancelled: (localQueueItemId, backendItemId) => {
-        const routeTarget = stateRef.current.projects
-          .map((project) => ({ project, queueItem: project.queue.items.find((item) => item.id === localQueueItemId) }))
-          .find((target) => target.queueItem !== undefined);
+    syncConnection();
 
-        if (!routeTarget?.queueItem || routeTarget.queueItem.cancelledBackendItemIds?.includes(backendItemId)) {
-          return;
-        }
+    return subscribeConnection(syncConnection);
+  }, [dispatch]);
 
-        dispatch({
-          backendItemId,
-          projectId: routeTarget.project.id,
-          queueItemId: localQueueItemId,
-          type: 'markQueueItemBackendCancelled',
-        });
+  useEffect(() => {
+    const coordinator = createQueueCoordinator(
+      {
+        onBackendItemComplete: (localQueueItemId, backendItemId) => {
+          const routeTarget = stateRef.current.projects
+            .map((project) => ({
+              project,
+              queueItem: project.queue.items.find((item) => item.id === localQueueItemId),
+            }))
+            .find((target) => target.queueItem !== undefined);
+
+          if (!routeTarget?.queueItem || routeTarget.queueItem.completedBackendItemIds?.includes(backendItemId)) {
+            return;
+          }
+
+          void routeBackendItemResults(routeTarget.project.id, routeTarget.queueItem, backendItemId, dispatch);
+        },
+        onBackendItemCancelled: (localQueueItemId, backendItemId) => {
+          const routeTarget = stateRef.current.projects
+            .map((project) => ({
+              project,
+              queueItem: project.queue.items.find((item) => item.id === localQueueItemId),
+            }))
+            .find((target) => target.queueItem !== undefined);
+
+          if (!routeTarget?.queueItem || routeTarget.queueItem.cancelledBackendItemIds?.includes(backendItemId)) {
+            return;
+          }
+
+          dispatch({
+            backendItemId,
+            projectId: routeTarget.project.id,
+            queueItemId: localQueueItemId,
+            type: 'markQueueItemBackendCancelled',
+          });
+        },
+        onGalleryRefresh: () => {
+          dispatch({ type: 'refreshBackendData' });
+        },
       },
-      onConnectionChange: (status, error) => {
-        dispatch({ error, status, type: 'setBackendConnectionStatus' });
-      },
-      onGalleryRefresh: () => {
-        dispatch({ type: 'refreshBackendData' });
-      },
-    });
+      { hub: socketHub }
+    );
 
     coordinatorRef.current = coordinator;
     coordinator.connect();
