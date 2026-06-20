@@ -1,5 +1,4 @@
-import type { GenerateModelConfig, VaeModelConfig } from '@workbench/generation/types';
-import type { ModelConfig } from '@workbench/models/types';
+import type { VaeModelConfig } from '@workbench/generation/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';
 
 import {
@@ -13,18 +12,16 @@ import {
   type GalleryBoard,
   type GalleryImage,
 } from '@workbench/gallery/api';
-import { getDefaultGenerateSettings, isSupportedGenerateModel } from '@workbench/generation/baseGenerationPolicies';
-import { isVaeModelConfig, normalizeGenerateWidgetValues } from '@workbench/generation/settings';
+import { isSupportedGenerateModel } from '@workbench/generation/baseGenerationPolicies';
+import { isVaeModelConfig } from '@workbench/generation/settings';
 import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsStore';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useEffect, useMemo, type Dispatch } from 'react';
 
+import { executeImageRecall, getCurrentGenerateValues } from './executeImageRecall';
 import {
-  buildImageRecallSettings,
   EMPTY_IMAGE_RECALL_CAPABILITIES,
   getImageRecallCapabilities,
-  getImageRecallMessage,
-  getImageRecallTitle,
   type ImageRecallCapabilities,
   type ImageRecallKind,
 } from './imageRecall';
@@ -92,22 +89,10 @@ export const useImageActions = ({
 }): ImageActions => {
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const { models } = useModelsSnapshot();
-  const supportedModels = useMemo<GenerateModelConfig[]>(() => models.filter(isSupportedGenerateModel), [models]);
-  const vaeModels = useMemo<VaeModelConfig[]>(
-    () => models.filter((model: ModelConfig) => isVaeModelConfig(model)).map((model) => model as VaeModelConfig),
-    [models]
-  );
+  const supportedModels = useMemo(() => models.filter(isSupportedGenerateModel), [models]);
+  const vaeModels = useMemo(() => models.filter(isVaeModelConfig).map((model) => model as VaeModelConfig), [models]);
   const currentGenerateValues = useMemo(() => {
-    const normalizedValues = normalizeGenerateWidgetValues(generateValues);
-
-    if (normalizedValues) {
-      return normalizedValues;
-    }
-
-    const fallbackModelKey = typeof generateValues.modelKey === 'string' ? generateValues.modelKey : null;
-    const fallbackModel = supportedModels.find((model) => model.key === fallbackModelKey) ?? supportedModels[0];
-
-    return fallbackModel ? { ...getDefaultGenerateSettings(fallbackModel), model: fallbackModel } : null;
+    return getCurrentGenerateValues({ generateValues, supportedModels });
   }, [generateValues, supportedModels]);
 
   useEffect(() => {
@@ -118,29 +103,9 @@ export const useImageActions = ({
     const recordError = (error: unknown) => dispatch({ message: toErrorMessage(error), type: 'recordError' });
     const recordSuccess = (title: string, message?: string) =>
       dispatch({ kind: 'success', message, title, type: 'recordNotice' });
-    const recordInfo = (title: string, message?: string) =>
-      dispatch({ kind: 'info', message, title, type: 'recordNotice' });
     const refreshGallery = () => dispatch({ type: 'touchGalleryRefresh' });
     const refreshGalleryImages = () => dispatch({ type: 'touchGalleryImagesRefresh' });
     const getBoardName = (boardId: string) => boards.find((board) => board.id === boardId)?.name ?? 'Uncategorized';
-    const imageMetadataRequests = new Map<string, Promise<unknown>>();
-    const loadImageMetadata = (imageName: string): Promise<unknown> => {
-      const cachedRequest = imageMetadataRequests.get(imageName);
-
-      if (cachedRequest) {
-        return cachedRequest;
-      }
-
-      const request = getGalleryImageMetadata(imageName).catch((error: unknown) => {
-        imageMetadataRequests.delete(imageName);
-        throw error;
-      });
-
-      imageMetadataRequests.set(imageName, request);
-
-      return request;
-    };
-
     return {
       copyImage: async (image) => {
         try {
@@ -201,7 +166,7 @@ export const useImageActions = ({
         }
 
         try {
-          const metadata = await loadImageMetadata(image.imageName);
+          const metadata = await getGalleryImageMetadata(image.imageName);
 
           return getImageRecallCapabilities({
             currentValues: currentGenerateValues,
@@ -242,32 +207,10 @@ export const useImageActions = ({
         openWorkbenchWidget('preview', { preferredRegions: ['center'], requireCenterView: true });
       },
       recallImageData: async (image, kind) => {
-        try {
-          if (!currentGenerateValues) {
-            recordInfo('Cannot recall image data', 'Select a supported Generate model first.');
-            return;
-          }
+        const didRecall = await executeImageRecall({ dispatch, generateValues, image, kind, models });
 
-          const metadata = kind === 'dimensions' ? null : await loadImageMetadata(image.imageName);
-          const result = buildImageRecallSettings({
-            currentValues: currentGenerateValues,
-            image,
-            kind,
-            metadata,
-            models,
-            supportedModels,
-            vaeModels,
-          });
-
-          if (!result) {
-            recordInfo('No recallable image data', 'This image does not include supported Generate metadata.');
-            return;
-          }
-
-          dispatch({ type: 'setGenerateSettings', values: result.values });
-          recordSuccess(getImageRecallTitle(kind), getImageRecallMessage(result.fields));
-        } catch (error: unknown) {
-          recordError(error);
+        if (didRecall) {
+          openWorkbenchWidget('generate', { preferredRegions: ['left'] });
         }
       },
       selectForCompare: (image) => {
@@ -289,6 +232,7 @@ export const useImageActions = ({
     boards,
     currentGenerateValues,
     dispatch,
+    generateValues,
     models,
     onImagesDeleted,
     onStarredChange,
