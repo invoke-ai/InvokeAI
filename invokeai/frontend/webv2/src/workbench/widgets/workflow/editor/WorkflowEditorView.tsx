@@ -559,6 +559,14 @@ const WorkflowFlow = () => {
     () => ({
       ...flowThemeCss,
       '& .react-flow__node': { opacity: nodeOpacity },
+      '& .react-flow__edge .react-flow__edge-path': {
+        opacity: 0.38,
+        transition: 'opacity 0.12s ease',
+      },
+      '& .react-flow__edge.selected .react-flow__edge-path, & .react-flow__edge.workflow-selected-node-edge .react-flow__edge-path, & .react-flow__edge:hover .react-flow__edge-path':
+        {
+          opacity: 1,
+        },
       '& .react-flow__edge.workflow-selected-node-edge .react-flow__edge-path': {
         animation: 'dashdraw 0.5s linear infinite',
         strokeDasharray: '5',

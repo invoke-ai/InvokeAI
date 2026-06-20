@@ -7,6 +7,7 @@ import type {
 
 import { Box, Flex, Icon, Stack, Text } from '@chakra-ui/react';
 import { Tooltip } from '@workbench/components/ui';
+import { getWorkflowNodeChromeProps } from '@workbench/widgets/workflow/editor/nodeChrome';
 import { getFieldTypeColor, getFieldTypeLabel, isModelFieldType } from '@workbench/workflows/fields';
 import { InfoIcon } from 'lucide-react';
 
@@ -114,17 +115,7 @@ export const NodePreviewCard = ({ template }: { template: InvocationTemplate }) 
   const hasFields = inputTemplates.length > 0 || outputTemplates.length > 0;
 
   return (
-    <Box
-      bg="bg"
-      borderColor="border.emphasized"
-      borderWidth="1px"
-      fontSize="xs"
-      rounded="lg"
-      shadow="sm"
-      transition="border-color 0.12s ease, box-shadow 0.12s ease"
-      w="full"
-      _hover={{ borderColor: 'brand.solid', shadow: 'md' }}
-    >
+    <Box bg="bg" fontSize="xs" rounded="lg" w="full" {...getWorkflowNodeChromeProps({ selected: false })}>
       <Flex
         align="center"
         bg="bg.subtle"

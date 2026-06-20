@@ -10,6 +10,7 @@ import { memo } from 'react';
 import type { ConnectorFlowNode as ConnectorFlowNodeType } from './flowAdapters';
 
 import { getHandleTypeTooltip } from './handleTooltip';
+import { getWorkflowNodeChromeProps } from './nodeChrome';
 
 const HANDLE_SIZE = 12;
 type HandleSide = 'left' | 'right';
@@ -62,17 +63,7 @@ const ConnectorFlowNodeComponent = ({ data, selected }: NodeProps<ConnectorFlowN
         />
       </Tooltip>
       <Tooltip content={getConnectorTitle(data.inputFieldType, data.outputFieldType)} showArrow>
-        <Box
-          bg="bg"
-          borderColor={selected ? 'accent.solid' : 'border.emphasized'}
-          borderWidth="1px"
-          h="1rem"
-          rounded="full"
-          shadow={selected ? 'md' : 'sm'}
-          transition="border-color 0.12s ease, box-shadow 0.12s ease"
-          w="2.5rem"
-          _hover={selected ? undefined : { borderColor: 'brand.solid', shadow: 'md' }}
-        />
+        <Box bg="bg" h="1rem" rounded="full" w="2.5rem" {...getWorkflowNodeChromeProps({ selected })} />
       </Tooltip>
       <Tooltip content={getHandleTypeTooltip(data.outputFieldType, 'Any output')} showArrow>
         <Handle

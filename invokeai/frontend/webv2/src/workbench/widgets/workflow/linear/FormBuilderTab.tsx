@@ -7,6 +7,7 @@ import type {
 
 import { Box, HStack, Icon, Input, Menu, Portal, Separator, Stack, Text, Textarea } from '@chakra-ui/react';
 import { Button, IconButton } from '@workbench/components/ui';
+import { getWorkflowNodeChromeProps } from '@workbench/widgets/workflow/editor/nodeChrome';
 import { requestNodeSelection, workflowSelectionStore } from '@workbench/widgets/workflow/editor/selectionStore';
 import { FieldDescriptionPopover } from '@workbench/widgets/workflow/fields/FieldDescriptionPopover';
 import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
@@ -146,31 +147,10 @@ const BuilderCard = ({
         />
       ) : null}
       <Box
-        borderColor={isInvalid ? 'red.solid' : isHovered || isSelected ? 'accent.solid' : 'border.subtle'}
-        borderWidth="1px"
         overflow="hidden"
         position="relative"
         rounded="md"
-        shadow={
-          isInvalid
-            ? '0 0 0 1px {colors.red.solid/45}'
-            : isHovered || isSelected
-              ? '0 0 0 1px {colors.accent.solid/45}'
-              : undefined
-        }
-        transition="border-color 0.12s ease, box-shadow 0.12s ease"
-        _before={
-          isHovered
-            ? {
-                bg: 'accent.solid/10',
-                content: '""',
-                inset: '0',
-                pointerEvents: 'none',
-                position: 'absolute',
-                zIndex: '1',
-              }
-            : undefined
-        }
+        {...getWorkflowNodeChromeProps({ invalid: Boolean(isInvalid), selected: Boolean(isHovered || isSelected) })}
       >
         <HStack
           bg="bg.muted"

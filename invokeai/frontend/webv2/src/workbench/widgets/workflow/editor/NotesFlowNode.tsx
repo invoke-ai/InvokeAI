@@ -6,22 +6,14 @@ import { memo, type ChangeEvent } from 'react';
 
 import type { NotesFlowNode as NotesFlowNodeType } from './flowAdapters';
 
+import { getWorkflowNodeChromeProps } from './nodeChrome';
+
 const NotesFlowNodeComponent = ({ data, selected }: NodeProps<NotesFlowNodeType>) => {
   const dispatch = useWorkbenchDispatch();
   const node = data.documentNode;
 
   return (
-    <Box
-      bg="bg.subtle"
-      borderColor={selected ? 'accent.solid' : 'border.emphasized'}
-      borderWidth="1px"
-      p="2"
-      rounded="lg"
-      shadow={selected ? 'md' : 'sm'}
-      transition="border-color 0.12s ease, box-shadow 0.12s ease"
-      w="16rem"
-      _hover={selected ? undefined : { borderColor: 'brand.solid', shadow: 'md' }}
-    >
+    <Box bg="bg.subtle" p="2" rounded="lg" w="16rem" {...getWorkflowNodeChromeProps({ selected })}>
       <Input
         aria-label="Note title"
         className="nodrag"

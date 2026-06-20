@@ -9,6 +9,8 @@ import { memo } from 'react';
 
 import type { CurrentImageFlowNode as CurrentImageFlowNodeType } from './flowAdapters';
 
+import { getWorkflowNodeChromeProps } from './nodeChrome';
+
 /**
  * The legacy `current_image` UI node: a live monitor inside the graph. Shows
  * the in-flight denoising preview while a run executes, and the most recently
@@ -29,18 +31,7 @@ const CurrentImageFlowNodeComponent = ({ data, selected }: NodeProps<CurrentImag
   const src = progressImage?.dataUrl ?? latestImage?.imageUrl ?? null;
 
   return (
-    <Box
-      bg="bg"
-      borderColor={selected ? 'accent.solid' : 'border.emphasized'}
-      borderWidth="1px"
-      fontSize="xs"
-      overflow="hidden"
-      rounded="lg"
-      shadow={selected ? 'md' : 'sm'}
-      transition="border-color 0.12s ease, box-shadow 0.12s ease"
-      w="20rem"
-      _hover={selected ? undefined : { borderColor: 'brand.solid', shadow: 'md' }}
-    >
+    <Box bg="bg" fontSize="xs" overflow="hidden" rounded="lg" w="20rem" {...getWorkflowNodeChromeProps({ selected })}>
       <Flex align="center" bg="bg.subtle" borderBottomWidth="1px" borderColor="border.subtle" px="3" py="1.5">
         <Text fontWeight="700">{node.data.label || 'Current Image'}</Text>
         {progressImage ? (
