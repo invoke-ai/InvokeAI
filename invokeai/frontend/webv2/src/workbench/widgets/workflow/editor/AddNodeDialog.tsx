@@ -4,6 +4,7 @@ import type { InvocationTemplate } from '@workbench/workflows/types';
 import { Badge, Box, Dialog, HStack, Icon, Input, Portal, ScrollArea, Stack, Text } from '@chakra-ui/react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { IconButton, Tooltip } from '@workbench/components/ui';
+import { registerHotkeyModalLayer } from '@workbench/hotkeys';
 import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
 import { getCompatibleInputTemplate, getCompatibleOutputTemplate } from '@workbench/workflows/validation';
 import { ChevronDownIcon, ChevronsDownUpIcon, ChevronsUpDownIcon, HammerIcon } from 'lucide-react';
@@ -186,7 +187,7 @@ const CategoryHeaderRow = ({
           color="fg.subtle"
           flexShrink={0}
           transform={isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)'}
-          transition="transform 100ms ease-out"
+          transition="transform var(--wb-motion-duration-fast) ease-out"
         />
         <Text flex="1" fontSize="xs" fontWeight="700">
           {group.label}
@@ -215,30 +216,40 @@ export const AddNodeDialog = ({
   onAddNode: (template: InvocationTemplate) => void;
   onAddNote: () => void;
   onOpenChange: (isOpen: boolean) => void;
-}) => (
-  <Dialog.Root
-    lazyMount
-    open={isOpen}
-    placement="center"
-    scrollBehavior="inside"
-    size="md"
-    unmountOnExit
-    onOpenChange={(event) => {
-      if (!event.open) {
-        onOpenChange(false);
-      }
-    }}
-  >
-    <AddNodeDialogContent
-      connectionFilter={connectionFilter}
-      onAddCurrentImage={onAddCurrentImage}
-      onAddConnector={onAddConnector}
-      onAddNode={onAddNode}
-      onAddNote={onAddNote}
-      onOpenChange={onOpenChange}
-    />
-  </Dialog.Root>
-);
+}) => {
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    return registerHotkeyModalLayer('workflow-add-node');
+  }, [isOpen]);
+
+  return (
+    <Dialog.Root
+      lazyMount
+      open={isOpen}
+      placement="center"
+      scrollBehavior="inside"
+      size="md"
+      unmountOnExit
+      onOpenChange={(event) => {
+        if (!event.open) {
+          onOpenChange(false);
+        }
+      }}
+    >
+      <AddNodeDialogContent
+        connectionFilter={connectionFilter}
+        onAddCurrentImage={onAddCurrentImage}
+        onAddConnector={onAddConnector}
+        onAddNode={onAddNode}
+        onAddNote={onAddNote}
+        onOpenChange={onOpenChange}
+      />
+    </Dialog.Root>
+  );
+};
 
 const AddNodeDialogContent = ({
   connectionFilter,

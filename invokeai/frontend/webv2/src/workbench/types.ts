@@ -131,6 +131,7 @@ export type WidgetView = ComponentType<WidgetViewProps>;
 export type WidgetHeaderActions = ComponentType<WidgetViewProps>;
 export type WidgetHeaderMenu = ComponentType<WidgetViewProps>;
 export type WidgetFooter = ComponentType<WidgetViewProps>;
+export type WidgetHost = ComponentType;
 
 export interface WidgetLabelProps {
   region: WorkbenchRegion;
@@ -182,9 +183,15 @@ export interface WidgetHotkeyApi {
 }
 
 export interface WidgetHotkeyContribution {
+  id: string;
   commandId: string;
-  keybinding: string;
-  when?: string;
+  defaultKeys: string[];
+  title: string;
+  description?: string;
+  scope?: 'focused-region' | 'global' | 'instance' | 'widget';
+  source?: { instanceId: WidgetInstanceId; region: WorkbenchRegion; typeId: WidgetTypeId };
+  preventDefault?: boolean;
+  allowInEditable?: boolean;
 }
 
 export interface WidgetMenuApi {
@@ -250,7 +257,14 @@ export interface WidgetWorkbenchApi {
 }
 
 /** Sections of the workbench settings dialog, addressable via `openWorkbenchSettings`. */
-export type SettingsSectionId = 'appearance' | 'behavior' | 'project' | 'workflow' | 'developer' | 'workspace';
+export type SettingsSectionId =
+  | 'appearance'
+  | 'behavior'
+  | 'hotkeys'
+  | 'project'
+  | 'workflow'
+  | 'developer'
+  | 'workspace';
 
 export interface WidgetManifest {
   /** Widget runtime API contract version. Defaults to 1 during registry normalization. */
@@ -270,6 +284,12 @@ export interface WidgetManifest {
     header?: 'hidden' | 'visible';
   };
   view?: WidgetView;
+  /**
+   * Stable singleton UI owned by the widget but not by any widget instance.
+   * Use for dialogs, file inputs, and other portals driven by widget-level
+   * stores. Mounted once under WorkbenchProvider, independent of widget chrome.
+   */
+  host?: WidgetHost;
   headerActions?: WidgetHeaderActions;
   /**
    * Extra entries for the widget's shared header actions menu. Rendered inside
@@ -648,6 +668,8 @@ export interface WorkbenchPreferences {
   workflowValidateConnections: boolean;
   /** Connection line rendering in the workflow editor. */
   workflowEdgeStyle: 'curved' | 'square';
+  /** Account-bound overrides keyed by hotkey id (`app.invoke`, `gallery.galleryNavLeft`, etc.). */
+  customHotkeys: Record<string, string[]>;
 }
 
 export interface AccountState {

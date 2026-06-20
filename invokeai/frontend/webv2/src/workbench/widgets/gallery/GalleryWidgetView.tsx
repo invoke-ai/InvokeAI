@@ -25,7 +25,7 @@ import { GalleryWidgetContext, type GalleryWidgetContextValue } from './GalleryW
 import { useGalleryActions } from './useGalleryActions';
 import { GALLERY_PAGE_SIZE, useGalleryData } from './useGalleryData';
 
-export const GalleryWidgetView = ({ presentation, region }: WidgetViewProps) => {
+export const GalleryWidgetView = ({ presentation, region, runtime }: WidgetViewProps) => {
   const activeProject = useActiveProject();
   const dispatch = useWorkbenchDispatch();
   const galleryValues = getProjectWidgetValues(activeProject, 'gallery');
@@ -118,8 +118,8 @@ export const GalleryWidgetView = ({ presentation, region }: WidgetViewProps) => 
     selectedBoardId,
   });
   const contextValue = useMemo<GalleryWidgetContextValue>(
-    () => ({ actions, gallery, imageActions, projectName: activeProject.name }),
-    [actions, activeProject.name, gallery, imageActions]
+    () => ({ actions, gallery, imageActions, projectName: activeProject.name, runtime }),
+    [actions, activeProject.name, gallery, imageActions, runtime]
   );
   const isWidePlacement = region === 'center' || (region === 'bottom' && presentation === 'expanded');
 

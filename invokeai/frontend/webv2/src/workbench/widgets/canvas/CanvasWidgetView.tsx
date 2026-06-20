@@ -1,12 +1,13 @@
-import type { KeyboardEvent } from 'react';
+import type { WidgetViewProps } from '@workbench/types';
 
 import { Box, Flex } from '@chakra-ui/react';
 import { useActiveProject, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { useEffect, useEffectEvent } from 'react';
 
 import { CanvasDocumentFrame, CanvasPlaneImage, EmptyCanvasFrame, ToolScrubber } from './CanvasDocumentFrame';
 import { CanvasStagingControls, EmptyStagingControls } from './CanvasStagingControls';
 
-export const CanvasWidgetView = () => {
+export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const activeProject = useActiveProject();
   const dispatch = useWorkbenchDispatch();
   const { document, stagingArea } = activeProject.canvas;
@@ -17,28 +18,37 @@ export const CanvasWidgetView = () => {
   const hasMultipleCandidates = stagingArea.pendingImages.length > 1;
   const renderedLayers = [...layers].reverse();
   const hasCanvasContent = renderedLayers.length > 0 || Boolean(selectedImage);
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (!hasStagedCandidates) {
-      return;
-    }
-
-    if (event.key === 'ArrowLeft') {
-      event.preventDefault();
+  const executeCanvasHotkey = useEffectEvent((commandId: string) => {
+    if (commandId === 'canvas.prevEntity' && hasStagedCandidates) {
       dispatch({ direction: -1, type: 'cycleStagedImage' });
-      return;
-    }
-
-    if (event.key === 'ArrowRight') {
-      event.preventDefault();
+    } else if (commandId === 'canvas.nextEntity' && hasStagedCandidates) {
       dispatch({ direction: 1, type: 'cycleStagedImage' });
-      return;
-    }
-
-    if (event.key === 'Delete' || event.key === 'Backspace') {
-      event.preventDefault();
+    } else if (commandId === 'canvas.deleteSelected' && hasStagedCandidates) {
       dispatch({ type: 'discardSelectedStagedImage' });
+    } else if (commandId === 'canvas.undo') {
+      dispatch({ type: 'undoProjectChange' });
+    } else if (commandId === 'canvas.redo') {
+      dispatch({ type: 'redoProjectChange' });
     }
-  };
+  });
+
+  useEffect(() => {
+    const hotkeys = [
+      ['canvas.prevEntity', 'Previous canvas entity', ['alt+[', 'arrowleft']],
+      ['canvas.nextEntity', 'Next canvas entity', ['alt+]', 'arrowright']],
+      ['canvas.deleteSelected', 'Delete selected canvas item', ['delete', 'backspace']],
+      ['canvas.undo', 'Undo canvas edit', ['mod+z']],
+      ['canvas.redo', 'Redo canvas edit', ['mod+shift+z', 'mod+y']],
+    ] as const;
+    const disposers = hotkeys.flatMap(([id, title, defaultKeys]) => [
+      runtime.commands.register({ handler: () => executeCanvasHotkey(id), id, title }),
+      runtime.hotkeys.register({ commandId: id, defaultKeys: [...defaultKeys], id, title }),
+    ]);
+
+    return () => {
+      disposers.forEach((dispose) => dispose());
+    };
+  }, [runtime.commands, runtime.hotkeys]);
 
   return (
     <Box
@@ -51,7 +61,6 @@ export const CanvasWidgetView = () => {
       w="full"
       bgImage="radial-gradient({colors.fg.grid} 1.5px, transparent 1.5px)"
       bgSize="28px 28px"
-      onKeyDown={onKeyDown}
     >
       <ToolScrubber />
       <Flex align="center" h="full" justify="center" p="12">

@@ -1,6 +1,7 @@
 import type { GalleryImage, GalleryView } from '@workbench/gallery/api';
 import type { GallerySettings } from '@workbench/gallery/settings';
 import type { ImageActions } from '@workbench/image-actions';
+import type { WidgetRuntimeApi } from '@workbench/types';
 
 import { createContext, use } from 'react';
 
@@ -36,6 +37,7 @@ export interface GalleryWidgetContextValue {
   actions: GalleryActions;
   imageActions: ImageActions;
   projectName: string;
+  runtime: WidgetRuntimeApi;
 }
 
 export const GalleryWidgetContext = createContext<GalleryWidgetContextValue | null>(null);

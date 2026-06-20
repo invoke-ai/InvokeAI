@@ -159,6 +159,26 @@ describe('patchWorkbenchPreferences', () => {
     expect(readBackendPreferences().reduceMotion).toBe(true);
     expect(readBackendPreferences().themeId).toBe('forest');
     expect(store.getWorkbenchPreferences().reduceMotion).toBe(true);
+    expect(store.getWorkbenchReduceMotion()).toBe(true);
+  });
+
+  it('persists account-bound custom hotkeys', async () => {
+    seedBackendPreferences({ themeId: 'forest' });
+    await store.loadWorkbenchSettings();
+
+    await store.patchWorkbenchPreferences({ customHotkeys: { 'app.invoke': ['mod+shift+enter'] } });
+
+    expect(readBackendPreferences().customHotkeys).toEqual({ 'app.invoke': ['mod+shift+enter'] });
+    expect(store.getWorkbenchPreferences().customHotkeys).toEqual({ 'app.invoke': ['mod+shift+enter'] });
+  });
+
+  it('persists empty custom hotkeys as disabled bindings', async () => {
+    await store.loadWorkbenchSettings();
+
+    await store.patchWorkbenchPreferences({ customHotkeys: { 'app.invoke': [] } });
+
+    expect(readBackendPreferences().customHotkeys).toEqual({ 'app.invoke': [] });
+    expect(store.getWorkbenchPreferences().customHotkeys).toEqual({ 'app.invoke': [] });
   });
 
   it('replays an offline edit on the next load instead of reverting to the server copy', async () => {

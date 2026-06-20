@@ -29,6 +29,7 @@ import {
 import { themeCardRecipe } from '@theme/recipes';
 import { previewSwatches, THEMES, type ThemeDefinition } from '@theme/system';
 import { Button, CloseButton, IconButton, ConfirmDialog, Tabs, Tooltip } from '@workbench/components/ui';
+import { registerHotkeyModalLayer } from '@workbench/hotkeys';
 import { syncedWorkbenchPersistence } from '@workbench/projects/syncedPersistence';
 import {
   useOptionalWorkbenchDispatch,
@@ -40,6 +41,7 @@ import {
   Code2Icon,
   DatabaseIcon,
   FolderIcon,
+  KeyboardIcon,
   PaletteIcon,
   RotateCcwIcon,
   SettingsIcon,
@@ -48,7 +50,7 @@ import {
   WorkflowIcon,
   type LucideIcon,
 } from 'lucide-react';
-import { useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 
 import {
   closeWorkbenchSettings,
@@ -98,25 +100,36 @@ export const SettingsButton = () => {
   );
 };
 
-export const SettingsDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => (
-  <Dialog.Root
-    lazyMount
-    open={isOpen}
-    placement="center"
-    scrollBehavior="inside"
-    size="xl"
-    unmountOnExit
-    onOpenChange={(event) => {
-      if (!event.open) {
-        onClose();
-      }
-    }}
-  >
-    <SettingsDialogContent />
-  </Dialog.Root>
-);
+export const SettingsDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
 
-const SettingsDialogContent = () => {
+    return registerHotkeyModalLayer('settings');
+  }, [isOpen]);
+
+  return (
+    <Dialog.Root
+      closeOnInteractOutside={false}
+      lazyMount
+      open={isOpen}
+      placement="center"
+      scrollBehavior="inside"
+      size="xl"
+      unmountOnExit
+      onOpenChange={(event) => {
+        if (!event.open) {
+          onClose();
+        }
+      }}
+    >
+      <SettingsDialogContent onClose={onClose} />
+    </Dialog.Root>
+  );
+};
+
+const SettingsDialogContent = ({ onClose }: { onClose: () => void }) => {
   const { error, scope, status } = useWorkbenchSettings();
 
   return (
@@ -170,6 +183,12 @@ const SettingsTabs = () => {
       icon: SlidersHorizontalIcon,
       label: 'Behavior',
       value: 'behavior',
+    },
+    {
+      children: <HotkeysSettingsSection />,
+      icon: KeyboardIcon,
+      label: 'Hotkeys',
+      value: 'hotkeys',
     },
     {
       children: <ProjectSection />,

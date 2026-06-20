@@ -1,9 +1,9 @@
-import type { GeneratedImageContract } from '@workbench/types';
+import type { GeneratedImageContract, WidgetRuntimeApi } from '@workbench/types';
 
 import { Badge, Box, Flex, HStack, Stack } from '@chakra-ui/react';
 import { Button } from '@workbench/components/ui';
 import { ArrowLeftRightIcon, Columns2Icon, XIcon } from 'lucide-react';
-import { useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useEffectEvent, useRef, useState, type CSSProperties } from 'react';
 
 type CompareMode = 'slider' | 'side-by-side';
 
@@ -34,16 +34,38 @@ export const PreviewCompare = ({
   compareImage,
   onExit,
   onSwap,
+  runtime,
 }: {
   baseImage: GeneratedImageContract;
   compareImage: GeneratedImageContract;
   onExit: () => void;
   onSwap: () => void;
+  runtime: WidgetRuntimeApi;
 }) => {
   const [mode, setMode] = useState<CompareMode>('slider');
   const [dividerPercent, setDividerPercent] = useState(50);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
+  const nextMode = useEffectEvent(() => setMode((current) => (current === 'slider' ? 'side-by-side' : 'slider')));
+
+  useEffect(() => {
+    const command = runtime.commands.register({
+      handler: nextMode,
+      id: 'viewer.nextComparisonMode',
+      title: 'Next comparison mode',
+    });
+    const hotkey = runtime.hotkeys.register({
+      commandId: 'viewer.nextComparisonMode',
+      defaultKeys: ['m'],
+      id: 'viewer.nextComparisonMode',
+      title: 'Next comparison mode',
+    });
+
+    return () => {
+      command();
+      hotkey();
+    };
+  }, [runtime.commands, runtime.hotkeys]);
 
   const updateDivider = (clientX: number) => {
     const rect = containerRef.current?.getBoundingClientRect();

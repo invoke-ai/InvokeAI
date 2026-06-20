@@ -5,6 +5,8 @@ import { Stack, Textarea } from '@chakra-ui/react';
 import { Field } from '@workbench/components/ui';
 import { getPromptPolicy } from '@workbench/generation/baseGenerationPolicies';
 
+import { registerPositivePromptElement } from './promptFocus';
+
 interface GeneratePromptFieldsProps {
   settings: GenerateSettings;
   selectedModel: GenerateModelConfig | undefined;
@@ -21,6 +23,7 @@ const PositivePromptField = ({ onChange, value }: PromptFieldProps) => (
   <Field label="Prompt">
     <Textarea
       aria-label="Positive prompt"
+      ref={registerPositivePromptElement}
       minH="6rem"
       resize="vertical"
       size="xs"

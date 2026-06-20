@@ -20,7 +20,7 @@ import {
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 
 import { PreviewCompare } from './PreviewCompare';
 
@@ -96,7 +96,7 @@ const previewGridCss = {
   backgroundSize: '24px 24px',
 } as const;
 
-export const PreviewWidgetView = ({ region }: WidgetViewProps) => {
+export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const galleryValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'gallery'));
   const generateValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'generate'));
   const { antialiasProgressImages, showProgressImagesInViewer } = useActiveProjectSelector(
@@ -264,6 +264,33 @@ export const PreviewWidgetView = ({ region }: WidgetViewProps) => {
   const isComparing =
     selectedImage !== null && compareImage !== null && compareImage.imageName !== selectedImage.imageName;
   const shouldShowProgressImage = showProgressImagesInViewer && progressImage !== null && !isComparing;
+  const executeViewerHotkey = useEffectEvent((commandId: string) => {
+    if (commandId === 'viewer.toggleViewer') {
+      runtime.workbench.closeWidgetInstance(runtime.instanceId);
+      return;
+    }
+
+    if (commandId === 'viewer.swapImages' && selectedImage && compareImage) {
+      dispatch({ image: compareImage, type: 'selectGalleryImage' });
+      dispatch({ image: selectedImage, type: 'setGalleryCompareImage' });
+      return;
+    }
+  });
+
+  useEffect(() => {
+    const hotkeys = [
+      ['viewer.toggleViewer', 'Toggle preview', ['z']],
+      ['viewer.swapImages', 'Swap comparison images', ['c']],
+    ] as const;
+    const disposers = hotkeys.flatMap(([id, title, defaultKeys]) => [
+      runtime.commands.register({ handler: () => executeViewerHotkey(id), id, title }),
+      runtime.hotkeys.register({ commandId: id, defaultKeys: [...defaultKeys], id, title }),
+    ]);
+
+    return () => {
+      disposers.forEach((dispose) => dispose());
+    };
+  }, [runtime.commands, runtime.hotkeys]);
 
   return (
     <Box p="2" h="full">
@@ -273,6 +300,7 @@ export const PreviewWidgetView = ({ region }: WidgetViewProps) => {
             <PreviewCompare
               baseImage={selectedImage}
               compareImage={compareImage}
+              runtime={runtime}
               onExit={() => dispatch({ image: null, type: 'setGalleryCompareImage' })}
               onSwap={() => {
                 dispatch({ image: compareImage, type: 'selectGalleryImage' });

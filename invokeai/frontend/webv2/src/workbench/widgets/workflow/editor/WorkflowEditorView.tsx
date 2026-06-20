@@ -1,3 +1,4 @@
+import type { WidgetRuntimeApi } from '@workbench/types';
 import type { XYPosition } from '@workbench/workflows/types';
 
 import { Box, Flex, Stack, Text } from '@chakra-ui/react';
@@ -35,11 +36,11 @@ import {
 import {
   useCallback,
   useEffect,
+  useEffectEvent,
   useId,
   useMemo,
   useRef,
   useState,
-  type KeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
 
@@ -99,9 +100,6 @@ const DELETE_KEY_CODES = ['Backspace', 'Delete'];
 
 const DEFAULT_EDGE_OPTIONS = { style: { strokeWidth: 2 } };
 
-const isEditableTarget = (target: EventTarget | null): boolean =>
-  target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"]') !== null;
-
 const getEventClientPosition = (event: MouseEvent | TouchEvent): { x: number; y: number } | null => {
   if (event instanceof MouseEvent) {
     return { x: event.clientX, y: event.clientY };
@@ -115,12 +113,18 @@ const getEventClientPosition = (event: MouseEvent | TouchEvent): { x: number; y:
 const getSelectedNodeIdSet = (nodes: WorkflowFlowNode[]): Set<string> =>
   new Set(nodes.filter((node) => node.selected).map((node) => node.id));
 
-const WorkflowFlow = () => {
+const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
   const projectGraph = useActiveProjectSelector((project) => project.projectGraph);
   const dispatch = useWorkbenchDispatch();
   const notify = useNotify();
-  const { themeId, workflowEdgeStyle, workflowShowMinimap, workflowSnapToGrid, workflowValidateConnections } =
-    useWorkbenchPreferences();
+  const {
+    reduceMotion,
+    themeId,
+    workflowEdgeStyle,
+    workflowShowMinimap,
+    workflowSnapToGrid,
+    workflowValidateConnections,
+  } = useWorkbenchPreferences();
   const templatesSnapshot = useInvocationTemplatesSnapshot();
   const invocationTemplates = templatesSnapshot.status === 'loaded' ? templatesSnapshot.templates : undefined;
   const edgeType: FlowEdgeType = workflowEdgeStyle === 'square' ? 'step' : 'default';
@@ -128,7 +132,7 @@ const WorkflowFlow = () => {
     toFlowNodes(projectGraph, [], invocationTemplates)
   );
   const [flowEdges, setFlowEdges] = useState<WorkflowFlowEdge[]>(() =>
-    toFlowEdges(projectGraph, [], edgeType, new Set<string>(), invocationTemplates)
+    toFlowEdges(projectGraph, [], edgeType, new Set<string>(), invocationTemplates, reduceMotion)
   );
   const [flowInstance, setFlowInstance] = useState<WorkflowFlowInstance | null>(null);
   const [tool, setTool] = useState<EditorTool>('pan');
@@ -146,10 +150,12 @@ const WorkflowFlow = () => {
       const selectedNodeIdSet = new Set(nodeIds);
 
       setFlowNodes((current) => withNodeSelection(current, selectedNodeIdSet));
-      setFlowEdges((current) => toFlowEdges(projectGraph, current, edgeType, selectedNodeIdSet, invocationTemplates));
+      setFlowEdges((current) =>
+        toFlowEdges(projectGraph, current, edgeType, selectedNodeIdSet, invocationTemplates, reduceMotion)
+      );
       reportNodeSelection(nodeIds);
     },
-    [edgeType, invocationTemplates, projectGraph]
+    [edgeType, invocationTemplates, projectGraph, reduceMotion]
   );
 
   const { lassoHandlers, lassoOverlay } = useLasso({
@@ -229,12 +235,12 @@ const WorkflowFlow = () => {
 
     selectNodes(selectionRequest.nodeIds);
     void flowInstance.fitView({
-      duration: 300,
+      duration: reduceMotion ? 0 : 300,
       maxZoom: 1.25,
       nodes: selectionRequest.nodeIds.map((id) => ({ id })),
     });
     clearNodeSelectionRequest();
-  }, [flowInstance, selectNodes, selectionRequest]);
+  }, [flowInstance, reduceMotion, selectNodes, selectionRequest]);
 
   /** The context-menu node acts alone unless it is part of the current selection. */
   const getActionNodeIds = useCallback(
@@ -292,22 +298,82 @@ const WorkflowFlow = () => {
     dispatch({ action: { node: buildConnectorNode(position), type: 'addNode' }, type: 'applyProjectGraphAction' });
   };
 
-  const onEditorKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (isEditableTarget(event.target) || !(event.ctrlKey || event.metaKey)) {
-      return;
+  const selectAll = () => {
+    selectNodes(projectGraph.nodes.map((node) => node.id));
+  };
+
+  const deleteSelection = () => {
+    const nodeIds = flowNodes.filter((node) => node.selected).map((node) => node.id);
+    const edgeIds = flowEdges.filter((edge) => edge.selected).map((edge) => edge.id);
+
+    if (nodeIds.length > 0) {
+      dispatch({ action: { nodeIds, type: 'removeNodes' }, type: 'applyProjectGraphAction' });
     }
 
-    const key = event.key.toLowerCase();
-
-    if (key === 'c') {
-      copyNodes();
-    } else if (key === 'v') {
-      pasteNodes();
-    } else if (key === 'd') {
-      event.preventDefault();
-      duplicateNodes();
+    if (edgeIds.length > 0) {
+      dispatch({ action: { edgeIds, type: 'removeEdges' }, type: 'applyProjectGraphAction' });
     }
   };
+
+  const executeWorkflowHotkey = useEffectEvent((commandId: string) => {
+    switch (commandId) {
+      case 'workflows.addNode': {
+        setAddNodeOpen(true);
+        return;
+      }
+      case 'workflows.copySelection': {
+        copyNodes();
+        return;
+      }
+      case 'workflows.pasteSelection':
+      case 'workflows.pasteSelectionWithEdges': {
+        pasteNodes();
+        return;
+      }
+      case 'workflows.duplicateSelection': {
+        duplicateNodes();
+        return;
+      }
+      case 'workflows.selectAll': {
+        selectAll();
+        return;
+      }
+      case 'workflows.deleteSelection': {
+        deleteSelection();
+        return;
+      }
+      case 'workflows.undo': {
+        dispatch({ type: 'undoProjectChange' });
+        return;
+      }
+      case 'workflows.redo': {
+        dispatch({ type: 'redoProjectChange' });
+        return;
+      }
+    }
+  });
+
+  useEffect(() => {
+    const hotkeys = [
+      ['workflows.addNode', 'Add workflow node', ['shift+a', 'space']],
+      ['workflows.copySelection', 'Copy workflow selection', ['mod+c']],
+      ['workflows.pasteSelection', 'Paste workflow selection', ['mod+v']],
+      ['workflows.pasteSelectionWithEdges', 'Paste workflow selection with edges', ['mod+shift+v']],
+      ['workflows.duplicateSelection', 'Duplicate workflow selection', ['mod+d']],
+      ['workflows.selectAll', 'Select all workflow nodes', ['mod+a']],
+      ['workflows.deleteSelection', 'Delete workflow selection', ['delete', 'backspace']],
+      ['workflows.undo', 'Undo workflow edit', ['mod+z']],
+      ['workflows.redo', 'Redo workflow edit', ['mod+shift+z', 'mod+y']],
+    ] as const;
+    const disposers = hotkeys.flatMap(([id, title, defaultKeys]) => [
+      runtime.commands.register({ handler: () => executeWorkflowHotkey(id), id, title }),
+      runtime.hotkeys.register({ commandId: id, defaultKeys: [...defaultKeys], id, title }),
+    ]);
+
+    return () => {
+      disposers.forEach((dispose) => dispose());
+    };
+  }, [runtime.commands, runtime.hotkeys]);
 
   const onNodesChange = useCallback(
     (changes: NodeChange<WorkflowFlowNode>[]) => {
@@ -561,14 +627,14 @@ const WorkflowFlow = () => {
       '& .react-flow__node': { opacity: nodeOpacity },
       '& .react-flow__edge .react-flow__edge-path': {
         opacity: 0.38,
-        transition: 'opacity 0.12s ease',
+        transition: 'opacity var(--wb-motion-duration-fast) ease',
       },
       '& .react-flow__edge.selected .react-flow__edge-path, & .react-flow__edge.workflow-selected-node-edge .react-flow__edge-path, & .react-flow__edge:hover .react-flow__edge-path':
         {
           opacity: 1,
         },
       '& .react-flow__edge.workflow-selected-node-edge .react-flow__edge-path': {
-        animation: 'dashdraw 0.5s linear infinite',
+        animation: 'dashdraw var(--wb-motion-duration-slow) linear var(--wb-motion-animation-iteration-count)',
         strokeDasharray: '5',
       },
       ...(tool === 'eraser'
@@ -587,7 +653,6 @@ const WorkflowFlow = () => {
       position="relative"
       w="full"
       onContextMenuCapture={onEditorContextMenuCapture}
-      onKeyDown={onEditorKeyDown}
       {...pointerToolHandlers}
     >
       <ReactFlow<WorkflowFlowNode, WorkflowFlowEdge>
@@ -722,7 +787,7 @@ const ReadinessBanner = () => {
   );
 };
 
-export const WorkflowEditorView = () => {
+export const WorkflowEditorView = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
   useEffect(() => {
     ensureInvocationTemplatesLoaded();
   }, []);
@@ -731,7 +796,7 @@ export const WorkflowEditorView = () => {
     <ReactFlowProvider>
       <Flex direction="column" h="full" minH="0" w="full">
         <Box flex="1" minH="0" position="relative">
-          <WorkflowFlow />
+          <WorkflowFlow runtime={runtime} />
           <ReadinessBanner />
         </Box>
       </Flex>

@@ -24,8 +24,10 @@ export const WorkbenchApp = () => {
   return (
     <WorkbenchProvider loadOptions={{ createNew: search.new, openProjectId: search.project }}>
       <SessionExpiryGuard />
+      <WorkbenchHotkeyRuntime />
       <WorkbenchRuntime />
       <WorkbenchSessionController search={search} />
+      <WidgetHosts />
       <WorkbenchShell />
     </WorkbenchProvider>
   );

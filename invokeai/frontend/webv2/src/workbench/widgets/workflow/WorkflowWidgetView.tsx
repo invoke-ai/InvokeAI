@@ -33,14 +33,14 @@ const WorkflowStatusBarItem = () => {
   );
 };
 
-export const WorkflowWidgetView = ({ presentation, region }: WidgetViewProps) => {
+export const WorkflowWidgetView = ({ presentation, region, runtime }: WidgetViewProps) => {
   if (region === 'bottom') {
-    return presentation === 'expanded' ? <WorkflowEditorView /> : <WorkflowStatusBarItem />;
+    return presentation === 'expanded' ? <WorkflowEditorView runtime={runtime} /> : <WorkflowStatusBarItem />;
   }
 
   if (region === 'left') {
     return <WorkflowLinearPanel />;
   }
 
-  return <WorkflowEditorView />;
+  return <WorkflowEditorView runtime={runtime} />;
 };

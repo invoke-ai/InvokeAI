@@ -17,19 +17,36 @@ const noopDispose = (): void => {};
 
 class ContributionStore<Contribution> {
   private readonly contributions = new Map<string, Contribution>();
+  private readonly listeners = new Set<() => void>();
 
   register(contribution: Contribution, fallbackId: string): () => void {
     const id = fallbackId;
 
     this.contributions.set(id, contribution);
+    this.notify();
 
     return () => {
       this.contributions.delete(id);
+      this.notify();
     };
   }
 
   list(): Contribution[] {
     return [...this.contributions.values()];
+  }
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private notify(): void {
+    for (const listener of this.listeners) {
+      listener();
+    }
   }
 }
 
@@ -53,7 +70,7 @@ export const commandApi: WidgetCommandApi = {
 
 export const hotkeyApi: WidgetHotkeyApi = {
   register(hotkey) {
-    return hotkeyStore.register(hotkey, `${hotkey.commandId}:${hotkey.keybinding}`);
+    return hotkeyStore.register(hotkey, hotkey.id);
   },
 };
 

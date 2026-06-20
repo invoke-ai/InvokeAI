@@ -38,7 +38,7 @@ type GridCell =
   | { kind: 'placeholder'; placeholder: GalleryQueuePlaceholder };
 
 export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => {
-  const { actions, gallery, imageActions } = useGalleryWidget();
+  const { actions, gallery, imageActions, runtime } = useGalleryWidget();
   const dispatch = useWorkbenchDispatch();
   const [contextMenuTarget, setContextMenuTarget] = useState<ImageContextMenuTarget | null>(null);
   const [isDropActive, setIsDropActive] = useState(false);
@@ -209,7 +209,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
     return [{ boardId: image.boardId, imageName: image.imageName }];
   };
 
-  const navigate = (direction: 'down' | 'left' | 'right' | 'up') => {
+  const navigate = useEffectEvent((direction: 'down' | 'left' | 'right' | 'up') => {
     const imageCount = gallery.images.length;
 
     if (imageCount === 0) {
@@ -227,7 +227,79 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
       actions.selectImage(nextImage);
       virtualizer.scrollToIndex(Math.floor(getCellIndexForImage(nextIndex) / columnCount));
     }
-  };
+  });
+
+  const executeGalleryHotkey = useEffectEvent((commandId: string) => {
+    if (commandId === 'gallery.selectAllOnPage') {
+      const primaryImage = gallery.images[0];
+
+      if (primaryImage) {
+        actions.selectImageRange(
+          gallery.images.map((image) => image.imageName),
+          primaryImage
+        );
+      }
+      return;
+    }
+
+    if (commandId === 'gallery.clearSelection') {
+      dispatch({
+        type: 'patchWidgetValues',
+        values: { selectedImage: null, selectedImageName: null, selectedImageNames: [] },
+        widgetId: 'gallery',
+      });
+      return;
+    }
+
+    if (commandId === 'gallery.deleteSelection' && gallery.selectedImageNames.length > 0) {
+      void imageActions.deleteImages(gallery.selectedImageNames);
+      return;
+    }
+
+    if (commandId === 'gallery.starImage') {
+      const imageNames = gallery.selectedImageNames.length
+        ? gallery.selectedImageNames
+        : gallery.selectedImageName
+          ? [gallery.selectedImageName]
+          : [];
+      const selectedImages = gallery.images.filter((image) => imageNames.includes(image.imageName));
+
+      if (selectedImages.length > 0) {
+        const shouldStar = selectedImages.some((image) => !image.starred);
+
+        void imageActions.setImagesStarred(imageNames, shouldStar);
+      }
+    }
+  });
+
+  useEffect(() => {
+    const directions = [
+      ['gallery.selectAllOnPage', 'Select all gallery images on page', null, ['mod+a']],
+      ['gallery.clearSelection', 'Clear gallery selection', null, ['esc']],
+      ['gallery.galleryNavUp', 'Gallery navigation up', 'up', ['arrowup']],
+      ['gallery.galleryNavRight', 'Gallery navigation right', 'right', ['arrowright']],
+      ['gallery.galleryNavDown', 'Gallery navigation down', 'down', ['arrowdown']],
+      ['gallery.galleryNavLeft', 'Gallery navigation left', 'left', ['arrowleft']],
+      ['gallery.galleryNavUpAlt', 'Gallery navigation up', 'up', ['alt+arrowup']],
+      ['gallery.galleryNavRightAlt', 'Gallery navigation right', 'right', ['alt+arrowright']],
+      ['gallery.galleryNavDownAlt', 'Gallery navigation down', 'down', ['alt+arrowdown']],
+      ['gallery.galleryNavLeftAlt', 'Gallery navigation left', 'left', ['alt+arrowleft']],
+      ['gallery.deleteSelection', 'Delete gallery selection', null, ['delete', 'backspace']],
+      ['gallery.starImage', 'Toggle gallery image star', null, ['.']],
+    ] as const;
+    const disposers = directions.flatMap(([id, title, direction, defaultKeys]) => [
+      runtime.commands.register({
+        handler: () => (direction ? navigate(direction) : executeGalleryHotkey(id)),
+        id,
+        title,
+      }),
+      runtime.hotkeys.register({ commandId: id, defaultKeys: [...defaultKeys], id, title }),
+    ]);
+
+    return () => {
+      disposers.forEach((dispose) => dispose());
+    };
+  }, [runtime.commands, runtime.hotkeys]);
 
   return (
     <Box
@@ -289,23 +361,6 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
             role="listbox"
             tabIndex={0}
             w="full"
-            onKeyDown={(event) => {
-              const direction =
-                event.key === 'ArrowRight'
-                  ? ('right' as const)
-                  : event.key === 'ArrowLeft'
-                    ? ('left' as const)
-                    : event.key === 'ArrowDown'
-                      ? ('down' as const)
-                      : event.key === 'ArrowUp'
-                        ? ('up' as const)
-                        : null;
-
-              if (direction) {
-                event.preventDefault();
-                navigate(direction);
-              }
-            }}
           >
             <ScrollArea.Content>
               <Box h={`${virtualizer.getTotalSize()}px`} position="relative" w="full">

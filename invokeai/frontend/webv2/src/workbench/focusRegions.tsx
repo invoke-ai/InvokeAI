@@ -6,6 +6,10 @@ import type { WidgetRegion } from './types';
 
 import { useWorkbenchPreferences } from './settings/store';
 
+let focusedRegionSnapshot: WidgetRegion | null = null;
+
+export const getFocusedRegionSnapshot = (): WidgetRegion | null => focusedRegionSnapshot;
+
 interface FocusRegionContextValue {
   focusedRegion: WidgetRegion | null;
   setFocusedRegion: (region: WidgetRegion | null) => void;
@@ -27,15 +31,23 @@ const highlightStyles = {
     opacity: 0,
     pointerEvents: 'none',
     position: 'absolute',
-    transition: 'border-color 0.12s ease, opacity 0.12s ease',
+    transition: 'border-color var(--wb-motion-duration-fast) ease, opacity var(--wb-motion-duration-fast) ease',
     zIndex: 2,
   },
 } as const;
 
 export const FocusRegionProvider = ({ children }: { children: ReactNode }) => {
   const [focusedRegion, setFocusedRegion] = useState<WidgetRegion | null>(null);
+  const setFocusedRegionSnapshot = (region: WidgetRegion | null) => {
+    focusedRegionSnapshot = region;
+    setFocusedRegion(region);
+  };
 
-  return <FocusRegionContext value={{ focusedRegion, setFocusedRegion }}>{children}</FocusRegionContext>;
+  return (
+    <FocusRegionContext value={{ focusedRegion, setFocusedRegion: setFocusedRegionSnapshot }}>
+      {children}
+    </FocusRegionContext>
+  );
 };
 
 const useFocusRegionContext = () => {

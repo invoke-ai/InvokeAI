@@ -11,6 +11,7 @@ import { getUserStorageScope } from '@workbench/auth/session';
 import { createExternalStore } from '@workbench/externalStore';
 import { deleteClientStateValue, getClientStateValue, setClientStateValue } from '@workbench/projects/api';
 import { fetchSessionBlob } from '@workbench/projects/session';
+import { useSyncExternalStore } from 'react';
 
 const SETTINGS_BASE_STORAGE_KEY = 'invokeai:v7:webv2:settings';
 const LEGACY_WORKBENCH_BASE_STORAGE_KEY = 'invokeai:v7:webv2:workbench';
@@ -69,6 +70,7 @@ export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
 
 export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   confirmImageDeletion: true,
+  customHotkeys: {},
   developerLogEnabled: true,
   developerLogLevel: 'debug',
   developerLogNamespaces: [...DEVELOPER_LOG_NAMESPACES],
@@ -126,6 +128,23 @@ const normalizeDeveloperLogNamespaces = (values: unknown): DeveloperLogNamespace
   return DEVELOPER_LOG_NAMESPACES.filter((namespace) => enabled.has(namespace));
 };
 
+const normalizeCustomHotkeys = (values: unknown): Record<string, string[]> => {
+  if (!values || typeof values !== 'object' || Array.isArray(values)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(values)
+      .filter(
+        (entry): entry is [string, string[]] =>
+          typeof entry[0] === 'string' &&
+          Array.isArray(entry[1]) &&
+          entry[1].every((hotkey) => typeof hotkey === 'string')
+      )
+      .map(([id, hotkeys]) => [id, hotkeys])
+  );
+};
+
 export const normalizeProjectSettings = (settings?: Partial<ProjectSettings>): ProjectSettings => ({
   antialiasProgressImages:
     typeof settings?.antialiasProgressImages === 'boolean'
@@ -155,6 +174,7 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.confirmImageDeletion === 'boolean'
       ? preferences.confirmImageDeletion
       : DEFAULT_PREFERENCES.confirmImageDeletion,
+  customHotkeys: normalizeCustomHotkeys(preferences?.customHotkeys),
   developerLogEnabled:
     typeof preferences?.developerLogEnabled === 'boolean'
       ? preferences.developerLogEnabled
@@ -383,6 +403,11 @@ export const useWorkbenchSettings = (): WorkbenchSettingsSnapshot => store.useSn
 export const useWorkbenchPreferences = (): WorkbenchPreferences => store.useSnapshot().preferences;
 
 export const getWorkbenchPreferences = (): WorkbenchPreferences => store.getSnapshot().preferences;
+
+export const getWorkbenchReduceMotion = (): boolean => store.getSnapshot().preferences.reduceMotion;
+
+export const useWorkbenchReduceMotion = (): boolean =>
+  useSyncExternalStore(store.subscribe, getWorkbenchReduceMotion, getWorkbenchReduceMotion);
 
 export const patchWorkbenchPreferences = async (preferences: Partial<WorkbenchPreferences>): Promise<void> => {
   const next = normalizeWorkbenchPreferences({ ...store.getSnapshot().preferences, ...preferences });

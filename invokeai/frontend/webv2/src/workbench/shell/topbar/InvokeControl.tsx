@@ -120,7 +120,6 @@ export const InvokeControl = () => {
   const isValid = isInvocationRouteValid(resolvedRoute) && isConnected;
   const routeLabel = isValid ? formatRoute(resolvedRoute) : (blockingReasons[0] ?? formatRoute(resolvedRoute));
   const resolvedRouteRef = useRef(resolvedRoute);
-  const isValidRef = useRef(isValid);
   const modelsRef = useRef(availabilityModels);
 
   resolvedRouteRef.current = resolvedRoute;
@@ -130,33 +129,6 @@ export const InvokeControl = () => {
   useEffect(() => {
     ensureModelsLoaded();
   }, []);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.key !== 'Enter') {
-        return;
-      }
-
-      event.preventDefault();
-
-      if (!isValidRef.current) {
-        return;
-      }
-
-      dispatch({
-        backendSupportsCancellation: true,
-        models: modelsRef.current,
-        route: resolvedRouteRef.current,
-        type: 'submitResolvedInvocationSnapshot',
-      });
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [dispatch]);
 
   const onInvoke = () => {
     if (!isValid) {
@@ -201,7 +173,7 @@ export const InvokeControl = () => {
                 <Text fontSize="sm" fontWeight="700" lineHeight="1">
                   Invoke
                 </Text>
-                <HStack gap="1" maxW="full">
+                <HStack gap="1" maxW="full" mb="-0.5">
                   <Text fontSize="2xs" fontWeight="600" lineHeight="1.1" opacity="0.85" truncate>
                     {routeLabel}
                   </Text>
