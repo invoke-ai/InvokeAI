@@ -12,7 +12,7 @@ type Props = {
 export const GenerateCollapsibleSection = ({ label, defaultOpen, isOpen, children, badges }: Props) => {
   return (
     <Collapsible.Root defaultOpen={defaultOpen} open={isOpen} bg="bg.muted/50" rounded="md" overflow="hidden">
-      <Collapsible.Trigger display="flex" gap={2} w="full" p={2} alignItems="center">
+      <Collapsible.Trigger display="flex" gap={2} w="full" px={2} h="8" alignItems="center">
         <Collapsible.Indicator
           _open={{ transform: 'rotate(90deg)' }}
           transition="transform var(--wb-motion-duration-slow)"
