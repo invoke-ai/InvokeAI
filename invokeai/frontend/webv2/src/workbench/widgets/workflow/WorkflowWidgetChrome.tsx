@@ -2,7 +2,7 @@ import type { WidgetLabelProps, WidgetViewProps } from '@workbench/types';
 import type { InvocationTemplate, XYPosition } from '@workbench/workflows/types';
 
 import { HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
-import { IconButton, ConfirmDialog } from '@workbench/components/ui';
+import { IconButton, ConfirmDialog, Tooltip } from '@workbench/components/ui';
 import { useNotify } from '@workbench/useNotify';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from '@workbench/workflows/connectors';
@@ -146,6 +146,7 @@ export const WorkflowHeaderActions = ({ region }: WidgetViewProps) => {
   // Both workflow surfaces can be mounted at once; exactly one (the first to
   // mount) hosts the shared dialogs and the import file input.
   const hostId = useId();
+  const historyTriggerId = useId();
   const isDialogHost = dialogHostId === hostId;
   const lastImportRequestRef = useRef(importRequestCount);
 
@@ -321,40 +322,43 @@ export const WorkflowHeaderActions = ({ region }: WidgetViewProps) => {
   return (
     <HStack gap="0.5">
       {region === 'center' ? (
+        <Tooltip content="Add node">
+          <IconButton
+            aria-label="Add node"
+            color="fg.muted"
+            size="2xs"
+            variant="ghost"
+            onClick={() => setAddNodeOpen(true)}
+          >
+            <Icon as={PlusIcon} boxSize="3.5" />
+          </IconButton>
+        </Tooltip>
+      ) : null}
+      <Tooltip content="Workflow library">
         <IconButton
-          aria-label="Add node"
+          aria-label="Workflow library"
           color="fg.muted"
           size="2xs"
-          title="Add node"
           variant="ghost"
-          onClick={() => setAddNodeOpen(true)}
+          onClick={() => setWorkflowLibraryOpen(true)}
         >
-          <Icon as={PlusIcon} boxSize="3.5" />
+          <Icon as={LibraryIcon} boxSize="3.5" />
         </IconButton>
-      ) : null}
-      <IconButton
-        aria-label="Workflow library"
-        color="fg.muted"
-        size="2xs"
-        title="Workflow library"
-        variant="ghost"
-        onClick={() => setWorkflowLibraryOpen(true)}
-      >
-        <Icon as={LibraryIcon} boxSize="3.5" />
-      </IconButton>
-      <Menu.Root positioning={{ placement: 'bottom-end' }}>
-        <Menu.Trigger asChild>
-          <IconButton
-            aria-label="Graph history snapshots"
-            color="fg.muted"
-            disabled={restorableHistory.length === 0}
-            size="2xs"
-            title="Graph history snapshots"
-            variant="ghost"
-          >
-            <Icon as={HistoryIcon} boxSize="3.5" />
-          </IconButton>
-        </Menu.Trigger>
+      </Tooltip>
+      <Menu.Root ids={{ trigger: historyTriggerId }} positioning={{ placement: 'bottom-end' }}>
+        <Tooltip content="Graph history snapshots" ids={{ trigger: historyTriggerId }}>
+          <Menu.Trigger asChild>
+            <IconButton
+              aria-label="Graph history snapshots"
+              color="fg.muted"
+              disabled={restorableHistory.length === 0}
+              size="2xs"
+              variant="ghost"
+            >
+              <Icon as={HistoryIcon} boxSize="3.5" />
+            </IconButton>
+          </Menu.Trigger>
+        </Tooltip>
         <Portal>
           <Menu.Positioner>
             <Menu.Content maxH="18rem" minW="16rem" overflowY="auto">
@@ -383,6 +387,7 @@ export const WorkflowHeaderActions = ({ region }: WidgetViewProps) => {
           </Menu.Positioner>
         </Portal>
       </Menu.Root>
+
       {isDialogHost ? (
         <>
           <input
