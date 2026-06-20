@@ -41,6 +41,25 @@ export const isDirectInputField = (template: FieldInputTemplate): boolean =>
 /** A field can be exposed to the Linear UI when it can be edited directly. */
 export const isExposableField = (template: FieldInputTemplate): boolean => isDirectInputField(template);
 
+export const cloneWorkflowFieldDefault = (template: FieldInputTemplate): unknown =>
+  template.default === undefined ? undefined : structuredClone(template.default);
+
+export const isWorkflowFieldValueDefault = (template: FieldInputTemplate, value: unknown): boolean => {
+  if (value === template.default) {
+    return true;
+  }
+
+  if (value === undefined || template.default === undefined) {
+    return false;
+  }
+
+  try {
+    return JSON.stringify(value) === JSON.stringify(template.default);
+  } catch {
+    return false;
+  }
+};
+
 const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
 
 const hasNonEmptyStringProp = (value: unknown, prop: string): boolean =>

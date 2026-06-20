@@ -1,13 +1,19 @@
 import type { NodeFieldFormElement, ProjectGraphState } from '@workbench/workflows/types';
 
-import { Alert, Field, Input, Stack, Text } from '@chakra-ui/react';
-import { FieldLabel, Tooltip } from '@workbench/components/ui';
+import { Alert, Field, HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
+import { FieldLabel, IconButton, Tooltip } from '@workbench/components/ui';
 import { WorkflowFieldInput } from '@workbench/widgets/workflow/fields/WorkflowFieldInput';
 import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { getResolvedWorkflowEdges } from '@workbench/workflows/connectors';
-import { getWorkflowFieldInvalidReason } from '@workbench/workflows/fields';
+import {
+  cloneWorkflowFieldDefault,
+  getWorkflowFieldInvalidReason,
+  isDirectInputField,
+  isWorkflowFieldValueDefault,
+} from '@workbench/workflows/fields';
 import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
 import { isInvocationNode } from '@workbench/workflows/types';
+import { RotateCcwIcon } from 'lucide-react';
 import { useState, type ChangeEvent } from 'react';
 
 /**
@@ -66,42 +72,70 @@ export const NodeFieldControl = ({
   const description = instance?.description || template.description;
   const invalidReason = getWorkflowFieldInvalidReason({ isConnected, template, value: instance?.value });
   const isInvalid = invalidReason !== null;
+  const canReset =
+    !isConnected && isDirectInputField(template) && !isWorkflowFieldValueDefault(template, instance?.value);
   const labelInputId = `${element.id}-label-input`;
   const valueInputId = `${element.id}-value`;
+  const resetButton = canReset ? (
+    <Tooltip content="Reset to default value">
+      <IconButton
+        aria-label={`Reset ${label} to default value`}
+        color="fg.subtle"
+        flexShrink={0}
+        size="2xs"
+        title="Reset to default value"
+        variant="ghost"
+        onClick={() =>
+          dispatch({
+            action: { fieldName, nodeId, type: 'setFieldValue', value: cloneWorkflowFieldDefault(template) },
+            type: 'applyProjectGraphAction',
+          })
+        }
+      >
+        <Icon as={RotateCcwIcon} boxSize="3" />
+      </IconButton>
+    </Tooltip>
+  ) : null;
 
   return (
     <Field.Root invalid={isInvalid} minW="0" w="full">
       <Stack gap="1" minW="0" w="full">
         {isLabelEditable ? (
-          <Input
-            aria-label="Field label"
-            color={isInvalid ? 'fg.error' : 'fg.muted'}
-            fontSize="2xs"
-            fontWeight="600"
-            h="5"
-            id={labelInputId}
-            placeholder={template.title}
-            size="2xs"
-            textTransform="uppercase"
-            value={draftLabel ?? label}
-            variant="flushed"
-            w="full"
-            onBlur={() => setDraftLabel(null)}
-            onChange={(event: ChangeEvent<HTMLInputElement>) => {
-              setDraftLabel(event.currentTarget.value);
-              dispatch({
-                action: { fieldName, label: event.currentTarget.value, nodeId, type: 'setFieldLabel' },
-                type: 'applyProjectGraphAction',
-              });
-            }}
-            onFocus={() => setDraftLabel(label)}
-          />
+          <HStack gap="1" minW="0" w="full">
+            <Input
+              aria-label="Field label"
+              color={isInvalid ? 'fg.error' : 'fg.muted'}
+              fontSize="2xs"
+              fontWeight="600"
+              h="5"
+              id={labelInputId}
+              placeholder={template.title}
+              size="2xs"
+              textTransform="uppercase"
+              value={draftLabel ?? label}
+              variant="flushed"
+              w="full"
+              onBlur={() => setDraftLabel(null)}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                setDraftLabel(event.currentTarget.value);
+                dispatch({
+                  action: { fieldName, label: event.currentTarget.value, nodeId, type: 'setFieldLabel' },
+                  type: 'applyProjectGraphAction',
+                });
+              }}
+              onFocus={() => setDraftLabel(label)}
+            />
+            {resetButton}
+          </HStack>
         ) : (
-          <Tooltip content={`${nodeContext} → ${template.title}`}>
-            <Stack color={isInvalid ? 'fg.error' : undefined} gap="0" minW="0" w="full">
-              <FieldLabel>{label}</FieldLabel>
-            </Stack>
-          </Tooltip>
+          <HStack gap="1" minW="0" w="full">
+            <Tooltip content={`${nodeContext} → ${template.title}`}>
+              <Stack color={isInvalid ? 'fg.error' : undefined} flex="1" gap="0" minW="0">
+                <FieldLabel>{label}</FieldLabel>
+              </Stack>
+            </Tooltip>
+            {resetButton}
+          </HStack>
         )}
         {element.data.showDescription && description ? (
           <Text color="fg.subtle" fontSize="2xs">

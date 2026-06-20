@@ -15,21 +15,32 @@ import { WorkflowFieldInput } from '@workbench/widgets/workflow/fields/WorkflowF
 import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { isExecutableInvocationType } from '@workbench/workflows/buildGraph';
 import {
+  cloneWorkflowFieldDefault,
   getFieldTypeColor,
   getFieldTypeLabel,
   getWorkflowFieldInvalidReason,
   isDirectInputField,
   isExposableField,
+  isWorkflowFieldValueDefault,
   isModelFieldType,
 } from '@workbench/workflows/fields';
 import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
 import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
-import { ChevronDownIcon, ChevronRightIcon, InfoIcon, PinIcon, PinOffIcon, TriangleAlertIcon } from 'lucide-react';
+import {
+  ChevronDownIcon,
+  ChevronRightIcon,
+  InfoIcon,
+  PinIcon,
+  PinOffIcon,
+  RotateCcwIcon,
+  TriangleAlertIcon,
+} from 'lucide-react';
 import { memo, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 
 import type { InvocationFlowNode as InvocationFlowNodeType } from './flowAdapters';
 
 import { getHandleTypeTooltip } from './handleTooltip';
+import { getWorkflowNodeChromeProps } from './nodeChrome';
 
 const NODE_WIDTH = '18rem';
 const HANDLE_SIZE = 12;
@@ -97,16 +108,10 @@ const NodeShell = ({
   return (
     <Box
       bg="bg"
-      borderColor={
-        isInvalid ? 'red.solid' : selected ? 'accent.solid' : isRunning ? 'brand.solid' : 'border.emphasized'
-      }
-      borderWidth="1px"
       fontSize="xs"
       rounded="lg"
-      shadow={isRunning ? '0 0 10px {colors.brand.solid/50}' : selected ? 'md' : 'sm'}
-      transition="border-color 0.12s ease, box-shadow 0.12s ease"
       w={NODE_WIDTH}
-      _hover={selected || isInvalid ? undefined : { borderColor: 'brand.solid', shadow: 'md' }}
+      {...getWorkflowNodeChromeProps({ invalid: isInvalid, running: isRunning, selected })}
     >
       {children}
     </Box>
@@ -352,6 +357,7 @@ const InputFieldRow = ({
   });
   const isInvalid = invalidReason !== null;
   const handleTooltip = getHandleTypeTooltip(template.type);
+  const canReset = showsControl && !isWorkflowFieldValueDefault(template, instance?.value);
 
   if (isSkeleton) {
     return (
@@ -418,6 +424,31 @@ const InputFieldRow = ({
             </Text>
           </Tooltip>
           <HStack flexShrink={0} gap="0" ml="auto">
+            {canReset ? (
+              <Tooltip content="Reset to default value">
+                <IconButton
+                  aria-label={`Reset ${label} to default value`}
+                  className="nodrag"
+                  color="fg.subtle"
+                  size="2xs"
+                  title="Reset to default value"
+                  variant="ghost"
+                  onClick={() =>
+                    dispatch({
+                      action: {
+                        fieldName: template.name,
+                        nodeId: node.id,
+                        type: 'setFieldValue',
+                        value: cloneWorkflowFieldDefault(template),
+                      },
+                      type: 'applyProjectGraphAction',
+                    })
+                  }
+                >
+                  <Icon as={RotateCcwIcon} boxSize="3" />
+                </IconButton>
+              </Tooltip>
+            ) : null}
             <FieldDescriptionPopover
               description={instance?.description}
               fieldName={template.name}
