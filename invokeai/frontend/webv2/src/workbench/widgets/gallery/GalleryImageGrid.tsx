@@ -2,6 +2,8 @@ import type { GalleryImage } from '@workbench/gallery/api';
 import type { GalleryThumbnailFit } from '@workbench/gallery/settings';
 
 import { Badge, Box, Flex, ProgressCircle, ScrollArea, Skeleton, Spinner, Text } from '@chakra-ui/react';
+import { useDraggable } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useQueueItemProgressImage } from '@workbench/backend/progressImageStore';
 import { useQueueItemProgress } from '@workbench/backend/progressStore';
@@ -11,8 +13,10 @@ import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/Workb
 import { StarIcon, UploadIcon } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 
+import type { GalleryImageDragImage } from './galleryDnd';
 import type { GalleryQueuePlaceholder } from './galleryStateView';
 
+import { getGalleryImageDragData, getGalleryImageDragId } from './galleryDnd';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 const GRID_GAP_PX = 4;
@@ -195,6 +199,16 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
     setContextMenuTarget({ images: [image], x, y });
   };
 
+  const getDragImages = (image: GalleryImage): GalleryImageDragImage[] => {
+    if (selectedNames.has(image.imageName) && selectedNames.size > 1) {
+      return gallery.images
+        .filter((candidate) => selectedNames.has(candidate.imageName))
+        .map((candidate) => ({ boardId: candidate.boardId, imageName: candidate.imageName }));
+    }
+
+    return [{ boardId: image.boardId, imageName: image.imageName }];
+  };
+
   const navigate = (direction: 'down' | 'left' | 'right' | 'up') => {
     const imageCount = gallery.images.length;
 
@@ -333,6 +347,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
                                 : null
                           }
                           fit={thumbnailFit}
+                          dragImages={getDragImages(cell.image)}
                           image={cell.image}
                           isPrimary={cell.image.imageName === gallery.selectedImageName}
                           isSelected={selectedNames.has(cell.image.imageName)}
@@ -475,6 +490,7 @@ const GalleryPlaceholderCircularProgress = ({ percentage }: { percentage: number
 const GalleryThumbnail = ({
   alwaysShowDimensions,
   compareRole,
+  dragImages,
   fit,
   image,
   isPrimary,
@@ -485,6 +501,7 @@ const GalleryThumbnail = ({
 }: {
   alwaysShowDimensions: boolean;
   compareRole: 'Compare' | 'Viewing' | null;
+  dragImages: GalleryImageDragImage[];
   fit: GalleryThumbnailFit;
   image: GalleryImage;
   isPrimary: boolean;
@@ -494,9 +511,15 @@ const GalleryThumbnail = ({
   onToggleStarred: (image: GalleryImage) => void;
 }) => {
   const isCompared = compareRole !== null;
+  const { isDragging, listeners, setNodeRef, transform } = useDraggable({
+    data: getGalleryImageDragData(dragImages),
+    id: getGalleryImageDragId(image.imageName),
+  });
 
   return (
     <Box
+      ref={setNodeRef}
+      {...listeners}
       aspectRatio={1}
       bg="bg"
       borderWidth="2px"
@@ -504,12 +527,16 @@ const GalleryThumbnail = ({
       boxShadow={isCompared ? 'inset 0 0 0 1px {colors.accent.solid}' : undefined}
       css={{ '&:hover .gallery-thumb-overlay': { opacity: 1 } }}
       minW="0"
+      opacity={isDragging ? 0.55 : undefined}
       overflow="hidden"
       role="option"
       aria-selected={isSelected}
       position="relative"
       rounded="md"
+      style={{ transform: CSS.Transform.toString(transform) }}
+      touchAction="none"
       w="full"
+      zIndex={isDragging ? 2 : undefined}
       onContextMenu={(event) => {
         event.preventDefault();
         onContextMenu(image, event.clientX, event.clientY);
@@ -535,6 +562,7 @@ const GalleryThumbnail = ({
       >
         <img
           alt={image.imageName}
+          draggable={false}
           src={image.thumbnailUrl || image.imageUrl}
           style={{
             display: 'block',

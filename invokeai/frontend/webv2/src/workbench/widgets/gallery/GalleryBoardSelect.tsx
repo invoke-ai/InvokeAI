@@ -14,6 +14,7 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
+import { useDndContext, useDndMonitor, useDroppable, type DragEndEvent } from '@dnd-kit/core';
 import { Button, CloseButton, IconButton } from '@workbench/components/ui';
 import {
   ArchiveIcon,
@@ -32,15 +33,25 @@ import {
 import { useRef, useState, type MouseEvent } from 'react';
 
 import { GalleryBoardMenu, type GalleryBoardMenuTarget } from './GalleryBoardMenu';
+import {
+  getGalleryBoardDropData,
+  getGalleryBoardDropId,
+  getGalleryImageNamesOutsideBoard,
+  isGalleryBoardDropData,
+  isGalleryImageDragData,
+} from './galleryDnd';
 import { getBoardCounts } from './galleryStateView';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 export const GalleryBoardSelect = () => {
-  const { actions, gallery, projectName } = useGalleryWidget();
+  const { actions, gallery, imageActions, projectName } = useGalleryWidget();
+  const { active } = useDndContext();
   const [isOpen, setIsOpen] = useState(false);
   const [boardSearchTerm, setBoardSearchTerm] = useState('');
   const [boardMenuTarget, setBoardMenuTarget] = useState<GalleryBoardMenuTarget | null>(null);
   const boardMenuActiveRef = useRef(false);
+  const dragOpenedMenuRef = useRef(false);
+  const isGalleryImageDragActive = isGalleryImageDragData(active?.data.current);
   const trimmedSearchTerm = boardSearchTerm.trim();
   const normalizedSearchTerm = trimmedSearchTerm.toLowerCase();
   const matchesSearch = (name: string) => !normalizedSearchTerm || name.toLowerCase().includes(normalizedSearchTerm);
@@ -67,6 +78,44 @@ export const GalleryBoardSelect = () => {
     setIsOpen(false);
     setBoardSearchTerm('');
   };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const dragData = event.active.data.current;
+    const dropData = event.over?.data.current;
+
+    if (isGalleryImageDragData(dragData) && isGalleryBoardDropData(dropData) && dropData.boardKind === 'board') {
+      const imageNames = getGalleryImageNamesOutsideBoard(dragData, dropData.boardId);
+
+      if (imageNames.length > 0) {
+        void imageActions.moveImagesToBoard(imageNames, dropData.boardId);
+      }
+    }
+
+    if (dragOpenedMenuRef.current) {
+      dragOpenedMenuRef.current = false;
+      closeAndReset();
+    }
+  };
+
+  useDndMonitor({
+    onDragCancel: () => {
+      if (dragOpenedMenuRef.current) {
+        dragOpenedMenuRef.current = false;
+        closeAndReset();
+      }
+    },
+    onDragEnd: handleDragEnd,
+    onDragStart: (event) => {
+      if (!isGalleryImageDragData(event.active.data.current)) {
+        return;
+      }
+
+      dragOpenedMenuRef.current = true;
+      setBoardMenuTarget(null);
+      setBoardSearchTerm('');
+      setIsOpen(true);
+    },
+  });
 
   const createBoardFromSearch = () => {
     if (!canCreateFromSearch) {
@@ -105,7 +154,7 @@ export const GalleryBoardSelect = () => {
           // Interactions with the board actions menu (or its dialogs) land
           // outside this dropdown; swallow the resulting close request so the
           // user returns to the still-open board list.
-          if (boardMenuActiveRef.current) {
+          if (boardMenuActiveRef.current || isGalleryImageDragActive) {
             return;
           }
 
@@ -343,47 +392,65 @@ const BoardRow = ({
   isSelected: boolean;
   onOpenMenu?: (x: number, y: number) => void;
   onSelect: () => void;
-}) => (
-  <Menu.Item
-    css={onOpenMenu ? { '&:hover .board-row-actions': { opacity: 1 } } : undefined}
-    value={board.id}
-    onClick={onSelect}
-    onContextMenu={
-      onOpenMenu
-        ? (event: MouseEvent) => {
+}) => {
+  const { active } = useDndContext();
+  const dragData = active?.data.current;
+  const canDropImages =
+    board.kind === 'board' &&
+    isGalleryImageDragData(dragData) &&
+    getGalleryImageNamesOutsideBoard(dragData, board.id).length > 0;
+  const { isOver, setNodeRef } = useDroppable({
+    data: getGalleryBoardDropData(board.id, board.kind),
+    disabled: !canDropImages,
+    id: getGalleryBoardDropId(board.id),
+  });
+
+  return (
+    <Menu.Item
+      ref={setNodeRef}
+      bg={isOver ? 'accent.subtle' : undefined}
+      css={onOpenMenu ? { '&:hover .board-row-actions': { opacity: 1 } } : undefined}
+      outline={canDropImages ? '1px dashed' : undefined}
+      outlineColor={canDropImages ? 'accent.solid' : undefined}
+      value={board.id}
+      onClick={onSelect}
+      onContextMenu={
+        onOpenMenu
+          ? (event: MouseEvent) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onOpenMenu(event.clientX, event.clientY);
+            }
+          : undefined
+      }
+    >
+      <BoardOptionContent badge={badge} board={board} isSelected={isSelected} showOwner />
+      {onOpenMenu && (
+        <IconButton
+          aria-label={`Board actions for ${board.name}`}
+          className="board-row-actions"
+          flexShrink={0}
+          opacity={0}
+          size="2xs"
+          transition="opacity 0.15s ease"
+          variant="ghost"
+          onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
-            onOpenMenu(event.clientX, event.clientY);
-          }
-        : undefined
-    }
-  >
-    <BoardOptionContent badge={badge} board={board} isSelected={isSelected} showOwner />
-    {onOpenMenu && (
-      <IconButton
-        aria-label={`Board actions for ${board.name}`}
-        className="board-row-actions"
-        flexShrink={0}
-        opacity={0}
-        size="2xs"
-        transition="opacity 0.15s ease"
-        variant="ghost"
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
 
-          const rect = event.currentTarget.getBoundingClientRect();
+            const rect = event.currentTarget.getBoundingClientRect();
 
-          onOpenMenu(rect.left, rect.bottom);
-        }}
-        onPointerDown={(event) => event.stopPropagation()}
-        onPointerUp={(event) => event.stopPropagation()}
-      >
-        <MoreVerticalIcon />
-      </IconButton>
-    )}
-  </Menu.Item>
-);
+            onOpenMenu(rect.left, rect.bottom);
+          }}
+          onPointerDown={(event) => event.stopPropagation()}
+          onPointerUp={(event) => event.stopPropagation()}
+        >
+          <MoreVerticalIcon />
+        </IconButton>
+      )}
+    </Menu.Item>
+  );
+};
 
 const BoardOptionContent = ({
   badge,
