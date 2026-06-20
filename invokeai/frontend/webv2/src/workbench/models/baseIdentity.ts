@@ -1,3 +1,4 @@
+import type { ColorPalette } from '@chakra-ui/react';
 import type { ModelBase, ModelConfig } from './types';
 
 // Model-base identity registry: labels, colors, and scalar display facts only.
@@ -6,7 +7,7 @@ import type { ModelBase, ModelConfig } from './types';
 export interface ModelBaseInfo {
   base: ModelBase;
   label: string;
-  colorPalette: string;
+  colorPalette: ColorPalette;
   description?: string;
   supportsDiffusersConversion?: boolean;
 }
@@ -43,12 +44,12 @@ export const MODEL_BASES = {
   flux: {
     base: 'flux',
     label: 'FLUX',
-    colorPalette: 'yellow',
+    colorPalette: 'teal',
   },
   flux2: {
     base: 'flux2',
     label: 'FLUX.2',
-    colorPalette: 'orange',
+    colorPalette: 'cyan',
   },
   cogview4: {
     base: 'cogview4',
@@ -63,7 +64,7 @@ export const MODEL_BASES = {
   'z-image': {
     base: 'z-image',
     label: 'Z-Image',
-    colorPalette: 'pink',
+    colorPalette: 'orange',
   },
   anima: {
     base: 'anima',

@@ -1,6 +1,6 @@
 import type { ModelConfig, ModelTaxonomyType } from './types';
 
-import { getModelBaseLabel } from './baseIdentity';
+import { getModelBaseLabel, KNOWN_MODEL_BASES } from './baseIdentity';
 import { getModelCategoryRank, getModelTypePluralLabel } from './taxonomy';
 
 /**
@@ -38,6 +38,8 @@ export interface ModelGroup {
 }
 
 export interface ModelPickerOptions {
+  /** Multi-select base filter; empty/undefined = all bases. */
+  baseFilter?: ReadonlySet<string>;
   /** Hide specific models, e.g. the current model or already-linked choices. */
   excludeKeys?: ReadonlySet<string>;
   /** Extra predicate supplied by the owning form, e.g. base compatibility. */
@@ -47,6 +49,8 @@ export interface ModelPickerOptions {
 }
 
 export interface ModelPickerResult {
+  /** Distinct bases among candidates (pre-search, pre-base-filter), for chips. */
+  availableBases: string[];
   /** Models available before text search, used for empty-state copy. */
   candidates: ModelConfig[];
   groups: ModelGroup[];
@@ -139,20 +143,51 @@ export const getModelPickerGroups = (models: ModelConfig[], options: ModelPicker
       !options.excludeKeys?.has(model.key) &&
       (options.filter ? options.filter(model) : true)
   );
+  // Chips are derived from candidates — before text search and the base filter —
+  // so the chip row stays stable while the user types or toggles chips.
+  const availableBases = collectBasesForDisplay(candidates);
+  const { baseFilter } = options;
   const visibleModels = candidates
-    .filter((model) => matchesPickerSearch(model, options.searchTerm))
+    .filter(
+      (model) =>
+        matchesPickerSearch(model, options.searchTerm) &&
+        (!baseFilter || baseFilter.size === 0 || baseFilter.has(String(model.base)))
+    )
     .sort(
       (a, b) =>
         getModelCategoryRank(a.type) - getModelCategoryRank(b.type) ||
         a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
     );
 
-  return { candidates, groups: groupModelsByType(visibleModels) };
+  return { availableBases, candidates, groups: groupModelsByType(visibleModels) };
 };
 
 /** Distinct bases present in a model list, for base filter menus. */
 export const collectBases = (models: Pick<ModelConfig, 'base'>[]): string[] =>
   [...new Set(models.map((model) => String(model.base)))].sort();
+
+/** Bases that exist but carry no architecture meaning, sorted after the rest. */
+const DEPRIORITIZED_BASES: ReadonlySet<string> = new Set(['any', 'external', 'unknown']);
+
+/**
+ * Distinct bases present, ordered for display: known bases follow the
+ * registry order from `baseIdentity`, unknown bases come next, and the
+ * meaningless `any`/`external`/`unknown` bases are pushed to the very end.
+ */
+export const collectBasesForDisplay = (models: Pick<ModelConfig, 'base'>[]): string[] => {
+  const bases = [...new Set(models.map((model) => String(model.base)))];
+  const rank = (base: string): number => {
+    if (DEPRIORITIZED_BASES.has(base)) {
+      return KNOWN_MODEL_BASES.length + 1;
+    }
+
+    const index = KNOWN_MODEL_BASES.indexOf(base as (typeof KNOWN_MODEL_BASES)[number]);
+
+    return index === -1 ? KNOWN_MODEL_BASES.length : index;
+  };
+
+  return bases.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+};
 
 /** Distinct types present in a model list, in canonical order. */
 export const collectTypes = (models: Pick<ModelConfig, 'type'>[]): ModelTaxonomyType[] =>

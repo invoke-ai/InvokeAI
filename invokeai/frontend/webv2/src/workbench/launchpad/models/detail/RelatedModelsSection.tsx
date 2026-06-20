@@ -111,6 +111,7 @@ export const RelatedModelsSection = ({
         filter={(candidate) => candidate.base === model.base || candidate.base === 'any' || model.base === 'any'}
         modelTypes={LINKABLE_TYPES}
         placeholder="Search compatible models to link…"
+        showManagerButton={false}
         size="sm"
         value={null}
         onChange={(target) => {

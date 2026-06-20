@@ -1,14 +1,29 @@
 import type { ModelConfig, ModelTaxonomyType } from '@workbench/models/types';
 
-import { Badge, HStack, Icon, Input, InputGroup, Popover, Portal, ScrollArea, Stack, Text } from '@chakra-ui/react';
-import { Button, CloseButton } from '@workbench/components/ui';
+import {
+  Badge,
+  HStack,
+  Icon,
+  Input,
+  InputGroup,
+  Popover,
+  Portal,
+  ScrollArea,
+  Spacer,
+  Stack,
+  Text,
+} from '@chakra-ui/react';
+import { Link } from '@tanstack/react-router';
+import { Button, CloseButton, IconButton, Tooltip } from '@workbench/components/ui';
 import { getModelBaseColorPalette, getModelBaseLabel } from '@workbench/models/baseIdentity';
 import { getModelPickerGroups } from '@workbench/models/library';
 import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsStore';
 import { formatBytes, getModelTypePluralLabel } from '@workbench/models/taxonomy';
 import { useWorkbenchPreferences } from '@workbench/settings/store';
-import { CheckIcon, ChevronDownIcon, SearchIcon, XIcon } from 'lucide-react';
+import { BoxIcon, CheckIcon, ChevronDownIcon, RotateCcwIcon, SearchIcon, XIcon } from 'lucide-react';
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+
+const EMPTY_BASES: ReadonlySet<string> = new Set();
 
 /**
  * Universal single-model picker: a button-triggered searchable list over the
@@ -26,6 +41,7 @@ export const ModelSelect = ({
   modelTypes,
   onChange,
   placeholder,
+  showManagerButton = true,
   size = 'sm',
   value,
 }: {
@@ -41,6 +57,8 @@ export const ModelSelect = ({
   modelTypes: ModelTaxonomyType[];
   onChange: (model: ModelConfig | null) => void;
   placeholder?: string;
+  /** Show the shortcut to the model manager. Hide it inside the manager itself. */
+  showManagerButton?: boolean;
   size?: 'xs' | 'sm' | 'md';
   /** Selected model key, or null. */
   value: string | null;
@@ -49,6 +67,7 @@ export const ModelSelect = ({
   const { models } = useModelsSnapshot();
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedBases, setSelectedBases] = useState<ReadonlySet<string>>(EMPTY_BASES);
   const deferredSearchTerm = useDeferredValue(searchTerm);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const optionRefs = useRef<HTMLElement[]>([]);
@@ -57,12 +76,18 @@ export const ModelSelect = ({
     ensureModelsLoaded();
   }, []);
 
-  const { candidates, groups } = useMemo(
+  const { availableBases, candidates, groups } = useMemo(
     () =>
       isOpen
-        ? getModelPickerGroups(models, { excludeKeys, filter, modelTypes, searchTerm: deferredSearchTerm })
-        : { candidates: [], groups: [] },
-    [deferredSearchTerm, excludeKeys, filter, isOpen, modelTypes, models]
+        ? getModelPickerGroups(models, {
+            baseFilter: selectedBases,
+            excludeKeys,
+            filter,
+            modelTypes,
+            searchTerm: deferredSearchTerm,
+          })
+        : { availableBases: [], candidates: [], groups: [] },
+    [deferredSearchTerm, excludeKeys, filter, isOpen, modelTypes, models, selectedBases]
   );
 
   const selectedModel = useMemo(() => models.find((model) => model.key === value) ?? null, [models, value]);
@@ -72,6 +97,23 @@ export const ModelSelect = ({
   const closeAndReset = () => {
     setIsOpen(false);
     setSearchTerm('');
+    setSelectedBases(EMPTY_BASES);
+  };
+  const toggleBase = (base: string) => {
+    setSelectedBases((prev) => {
+      const next = new Set(prev);
+
+      if (next.has(base)) {
+        next.delete(base);
+      } else {
+        next.add(base);
+      }
+
+      return next;
+    });
+  };
+  const resetBases = () => {
+    setSelectedBases(EMPTY_BASES);
   };
   const selectModel = (model: ModelConfig) => {
     onChange(model);
@@ -121,6 +163,7 @@ export const ModelSelect = ({
         onOpenChange={(event) => {
           if (event.open) {
             setSearchTerm('');
+            setSelectedBases(EMPTY_BASES);
             setIsOpen(true);
             focusSearchInput();
             return;
@@ -167,30 +210,52 @@ export const ModelSelect = ({
               p="0"
             >
               <Stack gap="2" p="2">
-                <InputGroup startElement={<Icon as={SearchIcon} size="xs" />}>
-                  <Input
-                    ref={searchInputRef}
-                    aria-label={`Search ${scopeLabel}`}
-                    placeholder={`Search ${scopeLabel}...`}
-                    size="xs"
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.currentTarget.value)}
-                    onKeyDown={(event) => {
-                      event.stopPropagation();
+                <HStack gap="1">
+                  <InputGroup flex="1" minW="0" startElement={<Icon as={SearchIcon} size="xs" />}>
+                    <Input
+                      ref={searchInputRef}
+                      aria-label={`Search ${scopeLabel}`}
+                      placeholder={`Search ${scopeLabel}...`}
+                      size="xs"
+                      value={searchTerm}
+                      onChange={(event) => setSearchTerm(event.currentTarget.value)}
+                      onKeyDown={(event) => {
+                        event.stopPropagation();
 
-                      if (event.key === 'Escape') {
-                        event.preventDefault();
-                        closeAndReset();
-                        return;
-                      }
+                        if (event.key === 'Escape') {
+                          event.preventDefault();
+                          closeAndReset();
+                          return;
+                        }
 
-                      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-                        event.preventDefault();
-                        focusOption(event.key === 'ArrowDown' ? 'first' : 'last');
-                      }
-                    }}
-                  />
-                </InputGroup>
+                        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                          event.preventDefault();
+                          focusOption(event.key === 'ArrowDown' ? 'first' : 'last');
+                        }
+                      }}
+                    />
+                  </InputGroup>
+                  {showManagerButton ? <ModelManagerLinkButton /> : null}
+                </HStack>
+                {availableBases.length >= 2 ? (
+                  <HStack alignItems="center" flexWrap="wrap" gap="1">
+                    {availableBases.map((base) => (
+                      <BaseChip key={base} base={base} isSelected={selectedBases.has(base)} onToggle={toggleBase} />
+                    ))}
+                    <Spacer />
+                    <IconButton
+                      aria-label="Reset base filters"
+                      flexShrink={0}
+                      opacity={selectedBases.size === 0 ? 0.5 : undefined}
+                      pointerEvents={selectedBases.size === 0 ? 'none' : undefined}
+                      size="2xs"
+                      variant="ghost"
+                      onClick={resetBases}
+                    >
+                      <Icon as={RotateCcwIcon} boxSize="3" />
+                    </IconButton>
+                  </HStack>
+                ) : null}
               </Stack>
               <HStack borderTopWidth="1px" borderColor="border.subtle" />
               <ScrollArea.Root maxH="14rem" size="xs" variant="hover" w="full">
@@ -200,7 +265,9 @@ export const ModelSelect = ({
                       <Text color="fg.subtle" fontSize="2xs" p="2">
                         {candidates.length === 0
                           ? `No compatible ${scopeLabel} installed.`
-                          : `No ${scopeLabel} match your search.`}
+                          : !deferredSearchTerm.trim() && selectedBases.size > 0
+                            ? `No ${scopeLabel} match the selected bases.`
+                            : `No ${scopeLabel} match your search.`}
                       </Text>
                     ) : null}
                     {groups.map((group) => (
@@ -292,6 +359,52 @@ export const ModelSelect = ({
     </HStack>
   );
 };
+
+const ModelManagerLinkButton = () => (
+  <Tooltip content="Manage models" showArrow>
+    <IconButton aria-label="Manage models" asChild flexShrink={0} size="xs" variant="ghost">
+      <Link to="/models">
+        <BoxIcon />
+      </Link>
+    </IconButton>
+  </Tooltip>
+);
+
+const BaseChip = ({
+  base,
+  isSelected,
+  onToggle,
+}: {
+  base: string;
+  isSelected: boolean;
+  onToggle: (base: string) => void;
+}) => (
+  <Badge
+    aria-pressed={isSelected}
+    colorPalette={getModelBaseColorPalette(base)}
+    cursor="pointer"
+    fontSize="2xs"
+    role="button"
+    size="sm"
+    tabIndex={0}
+    userSelect="none"
+    variant={isSelected ? 'solid' : 'surface'}
+    onClick={(event) => {
+      event.stopPropagation();
+      onToggle(base);
+    }}
+    onKeyDown={(event) => {
+      event.stopPropagation();
+
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        onToggle(base);
+      }
+    }}
+  >
+    {getModelBaseLabel(base)}
+  </Badge>
+);
 
 const ModelButtonContent = ({ model }: { model: ModelConfig }) => (
   <HStack as="span" flex="1" gap="2" minW="0">

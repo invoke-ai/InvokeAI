@@ -42,7 +42,7 @@ describe('MODEL_BASES', () => {
       colorPalette: 'blue',
       supportsDiffusersConversion: true,
     });
-    expect(getModelBaseInfo('flux2')).toMatchObject({ label: 'FLUX.2', colorPalette: 'orange' });
+    expect(getModelBaseInfo('flux2')).toMatchObject({ label: 'FLUX.2', colorPalette: 'cyan' });
     expect(getModelBaseInfo('qwen-image')).toMatchObject({ label: 'Qwen Image', colorPalette: 'cyan' });
     expect(isConvertibleToDiffusers(createModel({ base: 'sdxl', format: 'checkpoint', type: 'main' }))).toBe(true);
     expect(isConvertibleToDiffusers(createModel({ base: 'flux', format: 'checkpoint', type: 'main' }))).toBe(false);

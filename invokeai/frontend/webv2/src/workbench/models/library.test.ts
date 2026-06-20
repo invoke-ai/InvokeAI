@@ -4,6 +4,7 @@ import type { ModelConfig } from './types';
 
 import {
   collectBases,
+  collectBasesForDisplay,
   collectTypes,
   DEFAULT_LIBRARY_FILTERS,
   filterModels,
@@ -119,11 +120,64 @@ describe('getModelPickerGroups', () => {
       ['vae', ['d']],
     ]);
   });
+
+  it('filters visible models by the selected bases, empty set showing all', () => {
+    const onlySdxl = getModelPickerGroups(library, {
+      baseFilter: new Set(['sdxl']),
+      modelTypes: ['main', 'lora', 'vae'],
+      searchTerm: '',
+    });
+
+    expect(onlySdxl.groups.flatMap((group) => group.models.map((m) => m.key))).toEqual(['a']);
+
+    const all = getModelPickerGroups(library, {
+      baseFilter: new Set(),
+      modelTypes: ['main', 'lora', 'vae'],
+      searchTerm: '',
+    });
+
+    expect(all.groups.flatMap((group) => group.models.map((m) => m.key))).toEqual(['b', 'a', 'c', 'd']);
+  });
+
+  it('exposes availableBases that stay stable across search and base filtering', () => {
+    const expected = ['sd-1', 'sdxl', 'flux', 'any'];
+
+    const base = getModelPickerGroups(library, { modelTypes: ['main', 'lora', 'vae'], searchTerm: '' });
+    expect(base.availableBases).toEqual(expected);
+
+    const searched = getModelPickerGroups(library, { modelTypes: ['main', 'lora', 'vae'], searchTerm: 'flux' });
+    expect(searched.availableBases).toEqual(expected);
+
+    const filtered = getModelPickerGroups(library, {
+      baseFilter: new Set(['flux']),
+      modelTypes: ['main', 'lora', 'vae'],
+      searchTerm: '',
+    });
+    expect(filtered.availableBases).toEqual(expected);
+  });
+
+  it('drops bases removed by excludeKeys or the custom predicate from availableBases', () => {
+    const result = getModelPickerGroups(library, {
+      excludeKeys: new Set(['b']),
+      filter: (model) => model.base !== 'any',
+      modelTypes: ['main', 'lora', 'vae'],
+      searchTerm: '',
+    });
+
+    expect(result.availableBases).toEqual(['sd-1', 'sdxl']);
+  });
 });
 
 describe('collect helpers', () => {
   it('collects distinct bases alphabetically and types in category order', () => {
     expect(collectBases(library)).toEqual(['any', 'flux', 'sd-1', 'sdxl']);
     expect(collectTypes(library)).toEqual(['main', 'lora', 'vae']);
+  });
+
+  it('orders bases for display by registry order with any/external/unknown last', () => {
+    expect(collectBasesForDisplay(library)).toEqual(['sd-1', 'sdxl', 'flux', 'any']);
+    expect(
+      collectBasesForDisplay([{ base: 'unknown' }, { base: 'flux' }, { base: 'external' }, { base: 'sd-1' }])
+    ).toEqual(['sd-1', 'flux', 'external', 'unknown']);
   });
 });
