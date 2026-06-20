@@ -217,6 +217,7 @@ const buildSDGraph = (
   const compelType = model.base === 'sdxl' ? 'sdxl_compel_prompt' : 'compel';
   const activeLoras = getActiveCompatibleLoras(settings, model);
   const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
+  const colorCompensation = settings.colorCompensation ? 'SDXL' : 'None';
 
   const positivePrompt = addNode(graph, { id: 'positive_prompt', type: 'string' });
   const negativePrompt = addNode(graph, { id: 'negative_prompt', type: 'string' });
@@ -244,6 +245,7 @@ const buildSDGraph = (
     type: 'denoise_latents',
   });
   const output = addNode(graph, {
+    color_compensation: colorCompensation,
     fp32: settings.vaePrecision === 'fp32',
     id: 'canvas_output',
     is_intermediate: outputIsIntermediate,

@@ -57,6 +57,7 @@ export interface BaseGenerationConfig {
   };
   ui: {
     sdVaeOverride: boolean;
+    colorCompensation: boolean;
     vaePrecision: boolean;
     seamless: boolean;
     cfgRescale: boolean;
@@ -148,7 +149,7 @@ export const BASE_GENERATION = {
     schedulerAppliesToGraph: true,
     guidanceLabel: 'CFG',
     negativePrompt: { visible: true, usage: 'always' },
-    ui: { sdVaeOverride: true, vaePrecision: true, seamless: true, cfgRescale: true, clipSkipMax: 12 },
+    ui: { sdVaeOverride: true, colorCompensation: false, vaePrecision: true, seamless: true, cfgRescale: true, clipSkipMax: 12 },
   },
   'sd-2': {
     dimensions: { grid: 8, optimalSide: 512 },
@@ -157,7 +158,7 @@ export const BASE_GENERATION = {
     schedulerAppliesToGraph: true,
     guidanceLabel: 'CFG',
     negativePrompt: { visible: true, usage: 'always' },
-    ui: { sdVaeOverride: true, vaePrecision: true, seamless: true, cfgRescale: true, clipSkipMax: 24 },
+    ui: { sdVaeOverride: true, colorCompensation: false, vaePrecision: true, seamless: true, cfgRescale: true, clipSkipMax: 24 },
   },
   sdxl: {
     dimensions: { grid: 8, optimalSide: 1024 },
@@ -166,7 +167,7 @@ export const BASE_GENERATION = {
     schedulerAppliesToGraph: true,
     guidanceLabel: 'CFG',
     negativePrompt: { visible: true, usage: 'always' },
-    ui: { sdVaeOverride: true, vaePrecision: true, seamless: true, cfgRescale: false },
+    ui: { sdVaeOverride: true, colorCompensation: true, vaePrecision: true, seamless: true, cfgRescale: false },
   },
   'sd-3': {
     dimensions: { grid: 16, optimalSide: 1024 },
@@ -175,7 +176,7 @@ export const BASE_GENERATION = {
     schedulerAppliesToGraph: false,
     guidanceLabel: 'CFG',
     negativePrompt: { visible: true, usage: 'always' },
-    ui: { sdVaeOverride: false, vaePrecision: false, seamless: false, cfgRescale: false },
+    ui: { sdVaeOverride: false, colorCompensation: false, vaePrecision: false, seamless: false, cfgRescale: false },
   },
   flux: {
     dimensions: { grid: 16, optimalSide: 1024 },
@@ -184,7 +185,7 @@ export const BASE_GENERATION = {
     schedulerAppliesToGraph: true,
     guidanceLabel: 'Guidance',
     negativePrompt: { visible: false, usage: 'never' },
-    ui: { sdVaeOverride: false, vaePrecision: false, seamless: false, cfgRescale: false },
+    ui: { sdVaeOverride: false, colorCompensation: false, vaePrecision: false, seamless: false, cfgRescale: false },
   },
   flux2: {
     dimensions: { grid: 16, optimalSide: 1024 },
@@ -193,7 +194,7 @@ export const BASE_GENERATION = {
     schedulerAppliesToGraph: true,
     guidanceLabel: 'Guidance',
     negativePrompt: { visible: false, usage: 'never' },
-    ui: { sdVaeOverride: false, vaePrecision: false, seamless: false, cfgRescale: false },
+    ui: { sdVaeOverride: false, colorCompensation: false, vaePrecision: false, seamless: false, cfgRescale: false },
   },
   cogview4: {
     dimensions: { grid: 32, optimalSide: 1024 },
@@ -202,7 +203,7 @@ export const BASE_GENERATION = {
     schedulerAppliesToGraph: false,
     guidanceLabel: 'CFG',
     negativePrompt: { visible: true, usage: 'always' },
-    ui: { sdVaeOverride: false, vaePrecision: false, seamless: false, cfgRescale: false },
+    ui: { sdVaeOverride: false, colorCompensation: false, vaePrecision: false, seamless: false, cfgRescale: false },
   },
   'qwen-image': {
     dimensions: { grid: 16, optimalSide: 1024 },
@@ -211,7 +212,7 @@ export const BASE_GENERATION = {
     schedulerAppliesToGraph: false,
     guidanceLabel: 'CFG',
     negativePrompt: { visible: true, usage: 'cfg-gated' },
-    ui: { sdVaeOverride: false, vaePrecision: false, seamless: false, cfgRescale: false },
+    ui: { sdVaeOverride: false, colorCompensation: false, vaePrecision: false, seamless: false, cfgRescale: false },
   },
   'z-image': {
     dimensions: { grid: 16, optimalSide: 1024 },
@@ -220,7 +221,7 @@ export const BASE_GENERATION = {
     schedulerAppliesToGraph: true,
     guidanceLabel: 'CFG',
     negativePrompt: { visible: true, usage: 'cfg-gated' },
-    ui: { sdVaeOverride: false, vaePrecision: false, seamless: false, cfgRescale: false },
+    ui: { sdVaeOverride: false, colorCompensation: false, vaePrecision: false, seamless: false, cfgRescale: false },
   },
   anima: {
     dimensions: { grid: 8, optimalSide: 1024 },
@@ -229,7 +230,7 @@ export const BASE_GENERATION = {
     schedulerAppliesToGraph: true,
     guidanceLabel: 'CFG',
     negativePrompt: { visible: true, usage: 'cfg-gated' },
-    ui: { sdVaeOverride: false, vaePrecision: false, seamless: false, cfgRescale: false },
+    ui: { sdVaeOverride: false, colorCompensation: false, vaePrecision: false, seamless: false, cfgRescale: false },
   },
 } as const satisfies Partial<Record<KnownModelBase, BaseGenerationConfig>>;
 
@@ -268,6 +269,7 @@ export interface GenerationModelPolicy {
     schedulerVisible: boolean;
     clipSkipMax: number | null;
     cfgRescaleVisible: boolean;
+    colorCompensationVisible: boolean;
     seamlessVisible: boolean;
     sdVaeVisible: boolean;
     vaePrecisionVisible: boolean;
@@ -282,7 +284,7 @@ const FALLBACK_GENERATION_CONFIG: BaseGenerationConfig = {
   schedulerAppliesToGraph: false,
   guidanceLabel: 'CFG',
   negativePrompt: { visible: true, usage: 'never' },
-  ui: { sdVaeOverride: false, vaePrecision: false, seamless: false, cfgRescale: false },
+  ui: { sdVaeOverride: false, colorCompensation: false, vaePrecision: false, seamless: false, cfgRescale: false },
 };
 
 // Fallbacks keep UI selectors crash-safe; isSupportedGenerateModel() still blocks invocation.
@@ -421,6 +423,7 @@ export const getGenerationUiPolicy = (
     schedulerVisible: config.schedulerAppliesToGraph,
     clipSkipMax: config.ui.clipSkipMax ?? null,
     cfgRescaleVisible: config.ui.cfgRescale,
+    colorCompensationVisible: config.ui.colorCompensation,
     seamlessVisible: config.ui.seamless,
     sdVaeVisible: config.ui.sdVaeOverride,
     vaePrecisionVisible: config.ui.vaePrecision,
@@ -484,6 +487,7 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     cfgRescaleMultiplier: defaults.cfgRescaleMultiplier,
     cfgScale: defaults.cfgScale,
     clipSkip: 0,
+    colorCompensation: false,
     clipEmbedModel: null,
     clipGEmbedModel: null,
     clipLEmbedModel: null,
@@ -521,6 +525,7 @@ export const getSettingsWithModelDefaults = (
     aspectRatioValue: modelDefaults.aspectRatioValue,
     cfgRescaleMultiplier: modelDefaults.cfgRescaleMultiplier,
     cfgScale: modelDefaults.cfgScale,
+    colorCompensation: modelDefaults.colorCompensation,
     height: modelDefaults.height,
     loras: settings.loras.map((lora) =>
       isLoraCompatibleWithModel(lora.model, model) ? lora : { ...lora, isEnabled: false }
@@ -974,6 +979,11 @@ export const getSettingsWithCompatibleModelSelections = (
   if (!uiPolicy.cfgRescaleVisible && nextSettings.cfgRescaleMultiplier !== 0) {
     nextSettings.cfgRescaleMultiplier = 0;
     addClearedLabel(clearedLabels, 'CFG rescale');
+  }
+
+  if (!uiPolicy.colorCompensationVisible && nextSettings.colorCompensation) {
+    nextSettings.colorCompensation = false;
+    addClearedLabel(clearedLabels, 'Color compensation');
   }
 
   if (!uiPolicy.seamlessVisible && (nextSettings.seamlessXAxis || nextSettings.seamlessYAxis)) {

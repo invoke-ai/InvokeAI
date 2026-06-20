@@ -128,6 +128,13 @@ describe('compileGenerateGraph', () => {
     expect(getEdge(graph, 'denoise_latents', 'unet')?.source.node_id).toBe('model_loader');
     expect(getEdge(graph, 'canvas_output', 'vae')?.source.node_id).toBe('model_loader');
     expect(graph.nodes.canvas_output?.fp32).toBe(true);
+    expect(graph.nodes.canvas_output?.color_compensation).toBe('None');
+  });
+
+  it('passes SDXL color compensation to the VAE decode node when enabled', () => {
+    const graph = compile(sdxlModel, { colorCompensation: true });
+
+    expect(graph.nodes.canvas_output?.color_compensation).toBe('SDXL');
   });
 
   it('coerces invalid SD schedulers before graph submission', () => {

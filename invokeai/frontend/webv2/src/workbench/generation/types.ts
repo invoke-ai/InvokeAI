@@ -103,6 +103,7 @@ export interface GenerateSettings {
   cfgRescaleMultiplier: number;
   scheduler: string;
   clipSkip: number;
+  colorCompensation: boolean;
   seed: number;
   shouldRandomizeSeed: boolean;
   seamlessXAxis: boolean;

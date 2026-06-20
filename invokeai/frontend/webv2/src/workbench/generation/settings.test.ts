@@ -52,6 +52,7 @@ describe('normalizeGenerateSettings', () => {
     expect(normalized?.aspectRatioId).toBe('2:3');
     expect(normalized?.aspectRatioIsLocked).toBe(false);
     expect(normalized?.clipSkip).toBe(0);
+    expect(normalized?.colorCompensation).toBe(false);
     expect(normalized?.loras).toEqual([]);
     expect(normalized?.seamlessXAxis).toBe(false);
     expect(normalized?.vae).toBeNull();

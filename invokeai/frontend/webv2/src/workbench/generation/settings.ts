@@ -350,6 +350,7 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     cfgRescaleMultiplier: values.cfgRescaleMultiplier as number,
     cfgScale: values.cfgScale as number,
     clipSkip: hasFiniteNumber(values, 'clipSkip') ? (values.clipSkip as number) : 0,
+    colorCompensation: typeof values.colorCompensation === 'boolean' ? values.colorCompensation : false,
     height,
     loras: Array.isArray(values.loras) ? values.loras.filter(isGenerateLora) : [],
     modelKey: values.modelKey as string,
@@ -397,6 +398,7 @@ export const isGenerateSettings = (values: unknown): values is GenerateSettings 
     typeof values.aspectRatioIsLocked === 'boolean' &&
     hasFiniteNumber(values, 'aspectRatioValue') &&
     hasFiniteNumber(values, 'clipSkip') &&
+    typeof values.colorCompensation === 'boolean' &&
     Array.isArray(values.loras) &&
     values.loras.every(isGenerateLora) &&
     typeof values.seamlessXAxis === 'boolean' &&

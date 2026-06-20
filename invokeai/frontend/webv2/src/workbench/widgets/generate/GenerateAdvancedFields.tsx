@@ -55,6 +55,7 @@ export const GenerateAdvancedFields = ({ onCommit, selectedModel, settings }: Ge
   if (
     !policy.sdVaeVisible &&
     !policy.vaePrecisionVisible &&
+    !policy.colorCompensationVisible &&
     !policy.seamlessVisible &&
     !policy.clipSkipMax &&
     !policy.cfgRescaleVisible
@@ -66,6 +67,7 @@ export const GenerateAdvancedFields = ({ onCommit, selectedModel, settings }: Ge
     <>
       {settings.seamlessXAxis && <Badge size="xs">Tile X</Badge>}
       {settings.seamlessYAxis && <Badge size="xs">Tile Y</Badge>}
+      {settings.colorCompensation && <Badge size="xs">Color compensation</Badge>}
       {customVae && (
         <Badge maxW="32" size="xs" truncate>
           {settings.vae?.name}
@@ -174,6 +176,21 @@ export const GenerateAdvancedFields = ({ onCommit, selectedModel, settings }: Ge
             </Field>
           ) : null}
         </HStack>
+      ) : null}
+
+      {policy.colorCompensationVisible ? (
+        <Field label="Color compensation" p="2">
+          <Switch.Root
+            checked={settings.colorCompensation}
+            size="sm"
+            onCheckedChange={(event) => onCommit({ colorCompensation: event.checked })}
+          >
+            <Switch.HiddenInput />
+            <Switch.Control _checked={{ bg: 'accent.solid' }}>
+              <Switch.Thumb />
+            </Switch.Control>
+          </Switch.Root>
+        </Field>
       ) : null}
 
       {policy.seamlessVisible ? (

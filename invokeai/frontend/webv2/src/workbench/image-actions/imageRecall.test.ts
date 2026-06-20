@@ -40,6 +40,7 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   clipGEmbedModel: null,
   clipLEmbedModel: null,
   clipSkip: 0,
+  colorCompensation: false,
   componentSourceModel: null,
   height: 1024,
   loras: [],

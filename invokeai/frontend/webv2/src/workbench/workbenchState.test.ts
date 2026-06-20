@@ -25,6 +25,7 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   clipGEmbedModel: null,
   clipLEmbedModel: null,
   clipSkip: 0,
+  colorCompensation: false,
   componentSourceModel: null,
   height: 1024,
   loras: [],
