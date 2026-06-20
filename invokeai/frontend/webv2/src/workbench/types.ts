@@ -295,7 +295,7 @@ export interface WidgetManifest {
    * Extra entries for the widget's shared header actions menu. Rendered inside
    * the same menu as the universal graph actions, so widgets extend the frame
    * menu instead of stacking their own. Render `Menu.Item`/`Menu.ItemGroup`
-   * children only; own any dialogs from `headerActions` (always mounted).
+   * children only; use `host` for stable dialogs or file inputs.
    */
   headerMenu?: WidgetHeaderMenu;
   /** When set, the frame header shows a gear that opens this settings dialog section. */

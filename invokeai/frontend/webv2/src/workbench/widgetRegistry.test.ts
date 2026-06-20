@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { WidgetManifest } from './types';
 
-import { registerFirstPartyWidgets, registerWidgets } from './widgetRegistry';
+import { getWidgetHosts, registerFirstPartyWidgets, registerWidgets } from './widgetRegistry';
 
 const TestIcon = () => null;
 const TestView = () => null;
@@ -36,6 +36,10 @@ describe('widget registry', () => {
     expect(widget.manifest.apiVersion).toBe(1);
     expect(widget.manifest.state).toMatchObject({ persistence: 'project', version: 1 });
     expect(widget.manifest.state.createInitial()).toEqual({});
+  });
+
+  it('exposes enabled widget singleton hosts', () => {
+    expect(getWidgetHosts().map((widget) => widget.manifest.id)).toContain('workflow');
   });
 
   it('disables invalid icon manifests', () => {

@@ -2,7 +2,12 @@ import type { WidgetManifest } from '@workbench/types';
 
 import { WorkflowIcon } from 'lucide-react';
 
-import { WorkflowHeaderActions, WorkflowMenuItems, WorkflowWidgetLabel } from './WorkflowWidgetChrome';
+import {
+  WorkflowDialogHost,
+  WorkflowHeaderActions,
+  WorkflowMenuItems,
+  WorkflowWidgetLabel,
+} from './WorkflowWidgetChrome';
 import { WorkflowWidgetView } from './WorkflowWidgetView';
 
 export const workflowWidgetManifest: WidgetManifest = {
@@ -15,6 +20,7 @@ export const workflowWidgetManifest: WidgetManifest = {
     sourceId: 'project-graph',
     surfaces: ['center', 'left', 'bottom'],
   },
+  host: WorkflowDialogHost,
   headerActions: WorkflowHeaderActions,
   headerMenu: WorkflowMenuItems,
   icon: WorkflowIcon,

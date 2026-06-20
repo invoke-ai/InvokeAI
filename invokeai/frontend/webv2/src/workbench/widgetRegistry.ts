@@ -126,6 +126,11 @@ export const getWidgetsForRegion = (region: WidgetRegion): RegisteredWidget[] =>
       widget.status !== 'hidden' && widget.manifest.allowedRegions.includes(region) && isWidgetAvailable(widget)
   );
 
+export const getWidgetHosts = (): RegisteredWidget[] =>
+  registeredWidgets.filter(
+    (widget) => widget.status === 'enabled' && widget.manifest.host && isWidgetAvailable(widget)
+  );
+
 export const getWidgetById = (widgetId: WidgetTypeId): RegisteredWidget | undefined =>
   registeredWidgets.find((widget) => widget.manifest.id === widgetId);
 

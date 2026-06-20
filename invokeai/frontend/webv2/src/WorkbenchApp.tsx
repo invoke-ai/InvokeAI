@@ -4,6 +4,8 @@ import { WorkbenchShell } from '@workbench/shell';
 import type { WorkbenchSearch } from './workbench/projects/session';
 
 import { SessionExpiryGuard } from './workbench/auth/components/SessionExpiryGuard';
+import { WorkbenchHotkeyRuntime } from './workbench/hotkeys/WorkbenchHotkeyRuntime';
+import { WidgetHosts } from './workbench/widget-frame/WidgetHosts';
 import { WorkbenchProvider } from './workbench/WorkbenchContext';
 import { WorkbenchRuntime } from './workbench/WorkbenchRuntime';
 import { WorkbenchSessionController } from './workbench/WorkbenchSessionController';

@@ -1,4 +1,5 @@
 import type {
+  WidgetHotkeyApi,
   OpenWorkbenchWidgetOptions,
   RegisteredWidget,
   WidgetInstanceContract,
@@ -39,38 +40,49 @@ export const createWidgetRuntime = ({
   instance: WidgetInstanceContract;
   project: WidgetPlacementProject;
   region: WorkbenchRegion;
-}): WidgetRuntimeApi => ({
-  commands: commandApi,
-  hotkeys: hotkeyApi,
-  instanceId: instance.id,
-  menus: menuApi,
-  palette: commandPaletteApi,
-  patchState: (values) => dispatch({ instanceId: instance.id, type: 'patchWidgetInstanceValues', values }),
-  region,
-  search: searchApi,
-  setState: (values) => dispatch({ instanceId: instance.id, type: 'setWidgetInstanceValues', values }),
-  state: instance.state.values,
-  toolbars: toolbarApi,
-  typeId: instance.typeId,
-  workbench: {
-    closeWidgetInstance: (instanceId) => {
-      if (!isWidgetRegion(region)) {
-        return { ok: false, reason: 'unsupported' };
-      }
+}): WidgetRuntimeApi => {
+  const hotkeys: WidgetHotkeyApi = {
+    register: (hotkey) =>
+      hotkeyApi.register({
+        ...hotkey,
+        scope: hotkey.scope ?? 'widget',
+        source: { instanceId: instance.id, region, typeId: instance.typeId },
+      }),
+  };
 
-      return closeWidgetPlacement({ dispatch, getWidgetById, instanceId, project, region });
-    },
-    openWidget: (typeId: WidgetTypeId, options?: OpenWorkbenchWidgetOptions) =>
-      openWidgetPlacement({ dispatch, getWidgetsForRegion, options, typeId }),
-    revealWidgetInstance: (instanceId) => {
-      if (!isWidgetRegion(region)) {
-        return { ok: false, reason: 'unsupported' };
-      }
+  return {
+    commands: commandApi,
+    hotkeys,
+    instanceId: instance.id,
+    menus: menuApi,
+    palette: commandPaletteApi,
+    patchState: (values) => dispatch({ instanceId: instance.id, type: 'patchWidgetInstanceValues', values }),
+    region,
+    search: searchApi,
+    setState: (values) => dispatch({ instanceId: instance.id, type: 'setWidgetInstanceValues', values }),
+    state: instance.state.values,
+    toolbars: toolbarApi,
+    typeId: instance.typeId,
+    workbench: {
+      closeWidgetInstance: (instanceId) => {
+        if (!isWidgetRegion(region)) {
+          return { ok: false, reason: 'unsupported' };
+        }
 
-      return revealWidgetPlacement({ dispatch, instanceId, project, region });
+        return closeWidgetPlacement({ dispatch, getWidgetById, instanceId, project, region });
+      },
+      openWidget: (typeId: WidgetTypeId, options?: OpenWorkbenchWidgetOptions) =>
+        openWidgetPlacement({ dispatch, getWidgetsForRegion, options, typeId }),
+      revealWidgetInstance: (instanceId) => {
+        if (!isWidgetRegion(region)) {
+          return { ok: false, reason: 'unsupported' };
+        }
+
+        return revealWidgetPlacement({ dispatch, instanceId, project, region });
+      },
     },
-  },
-});
+  };
+};
 
 export const useWidgetRuntime = ({
   dispatch,

@@ -24,8 +24,6 @@ import { getWorkflowFlowInstance } from './editor/flowInstanceStore';
 import { WorkflowLibraryDialog } from './library/WorkflowLibraryDialog';
 import { copyWorkflowJson, downloadWorkflowJson } from './workflowTransfer';
 import {
-  claimWorkflowDialogHost,
-  releaseWorkflowDialogHost,
   requestWorkflowImport,
   setAddNodeOpen,
   setNewWorkflowConfirmOpen,
@@ -130,41 +128,102 @@ export const WorkflowMenuItems = (_props: WidgetViewProps) => {
 export const WorkflowHeaderActions = ({ region }: WidgetViewProps) => {
   const graphHistory = useActiveProjectSelector((project) => project.graphHistory);
   const dispatch = useWorkbenchDispatch();
+  const restorableHistory = graphHistory.filter((entry) => entry.document);
+  const historyTriggerId = useId();
+
+  return (
+    <HStack gap="0.5">
+      {region === 'center' ? (
+        <Tooltip content="Add node">
+          <IconButton
+            aria-label="Add node"
+            color="fg.muted"
+            size="2xs"
+            variant="ghost"
+            onClick={() => setAddNodeOpen(true)}
+          >
+            <Icon as={PlusIcon} boxSize="3.5" />
+          </IconButton>
+        </Tooltip>
+      ) : null}
+      <Tooltip content="Workflow library">
+        <IconButton
+          aria-label="Workflow library"
+          color="fg.muted"
+          size="2xs"
+          variant="ghost"
+          onClick={() => setWorkflowLibraryOpen(true)}
+        >
+          <Icon as={LibraryIcon} boxSize="3.5" />
+        </IconButton>
+      </Tooltip>
+      <Menu.Root ids={{ trigger: historyTriggerId }} positioning={{ placement: 'bottom-end' }}>
+        <Tooltip content="Graph history snapshots" ids={{ trigger: historyTriggerId }}>
+          <Menu.Trigger asChild>
+            <IconButton
+              aria-label="Graph history snapshots"
+              color="fg.muted"
+              disabled={restorableHistory.length === 0}
+              size="2xs"
+              variant="ghost"
+            >
+              <Icon as={HistoryIcon} boxSize="3.5" />
+            </IconButton>
+          </Menu.Trigger>
+        </Tooltip>
+        <Portal>
+          <Menu.Positioner>
+            <Menu.Content maxH="18rem" minW="16rem" overflowY="auto">
+              <Menu.ItemGroup>
+                <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                  Graph History Snapshots
+                </Menu.ItemGroupLabel>
+                {restorableHistory.map((entry) => (
+                  <Menu.Item
+                    key={entry.id}
+                    value={entry.id}
+                    onClick={() => dispatch({ snapshotId: entry.id, type: 'restoreProjectGraphSnapshot' })}
+                  >
+                    <Stack gap="0" minW="0">
+                      <Menu.ItemText fontSize="xs" truncate>
+                        {entry.label}
+                      </Menu.ItemText>
+                      <Text color="fg.subtle" fontSize="2xs">
+                        {new Date(entry.createdAt).toLocaleString()}
+                      </Text>
+                    </Stack>
+                  </Menu.Item>
+                ))}
+              </Menu.ItemGroup>
+            </Menu.Content>
+          </Menu.Positioner>
+        </Portal>
+      </Menu.Root>
+    </HStack>
+  );
+};
+
+export const WorkflowDialogHost = () => {
+  const dispatch = useWorkbenchDispatch();
   const notify = useNotify();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const {
     addNodeConnection,
     addNodePosition,
-    dialogHostId,
     importRequestCount,
     isAddNodeOpen,
     isLibraryOpen,
     isNewWorkflowConfirmOpen,
   } = workflowUiStore.useSnapshot();
-  const restorableHistory = graphHistory.filter((entry) => entry.document);
-
-  // Both workflow surfaces can be mounted at once; exactly one (the first to
-  // mount) hosts the shared dialogs and the import file input.
-  const hostId = useId();
-  const historyTriggerId = useId();
-  const isDialogHost = dialogHostId === hostId;
   const lastImportRequestRef = useRef(importRequestCount);
 
   useEffect(() => {
-    claimWorkflowDialogHost(hostId);
-
-    return () => {
-      releaseWorkflowDialogHost(hostId);
-    };
-  }, [hostId]);
-
-  useEffect(() => {
-    if (isDialogHost && importRequestCount > lastImportRequestRef.current) {
+    if (importRequestCount > lastImportRequestRef.current) {
       fileInputRef.current?.click();
     }
 
     lastImportRequestRef.current = importRequestCount;
-  }, [importRequestCount, isDialogHost]);
+  }, [importRequestCount]);
 
   const getInsertPosition = (): XYPosition => {
     if (addNodePosition) {
@@ -320,117 +379,46 @@ export const WorkflowHeaderActions = ({ region }: WidgetViewProps) => {
   };
 
   return (
-    <HStack gap="0.5">
-      {region === 'center' ? (
-        <Tooltip content="Add node">
-          <IconButton
-            aria-label="Add node"
-            color="fg.muted"
-            size="2xs"
-            variant="ghost"
-            onClick={() => setAddNodeOpen(true)}
-          >
-            <Icon as={PlusIcon} boxSize="3.5" />
-          </IconButton>
-        </Tooltip>
-      ) : null}
-      <Tooltip content="Workflow library">
-        <IconButton
-          aria-label="Workflow library"
-          color="fg.muted"
-          size="2xs"
-          variant="ghost"
-          onClick={() => setWorkflowLibraryOpen(true)}
-        >
-          <Icon as={LibraryIcon} boxSize="3.5" />
-        </IconButton>
-      </Tooltip>
-      <Menu.Root ids={{ trigger: historyTriggerId }} positioning={{ placement: 'bottom-end' }}>
-        <Tooltip content="Graph history snapshots" ids={{ trigger: historyTriggerId }}>
-          <Menu.Trigger asChild>
-            <IconButton
-              aria-label="Graph history snapshots"
-              color="fg.muted"
-              disabled={restorableHistory.length === 0}
-              size="2xs"
-              variant="ghost"
-            >
-              <Icon as={HistoryIcon} boxSize="3.5" />
-            </IconButton>
-          </Menu.Trigger>
-        </Tooltip>
-        <Portal>
-          <Menu.Positioner>
-            <Menu.Content maxH="18rem" minW="16rem" overflowY="auto">
-              <Menu.ItemGroup>
-                <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
-                  Graph History Snapshots
-                </Menu.ItemGroupLabel>
-                {restorableHistory.map((entry) => (
-                  <Menu.Item
-                    key={entry.id}
-                    value={entry.id}
-                    onClick={() => dispatch({ snapshotId: entry.id, type: 'restoreProjectGraphSnapshot' })}
-                  >
-                    <Stack gap="0" minW="0">
-                      <Menu.ItemText fontSize="xs" truncate>
-                        {entry.label}
-                      </Menu.ItemText>
-                      <Text color="fg.subtle" fontSize="2xs">
-                        {new Date(entry.createdAt).toLocaleString()}
-                      </Text>
-                    </Stack>
-                  </Menu.Item>
-                ))}
-              </Menu.ItemGroup>
-            </Menu.Content>
-          </Menu.Positioner>
-        </Portal>
-      </Menu.Root>
+    <>
+      <input
+        ref={fileInputRef}
+        accept=".json,application/json"
+        hidden
+        type="file"
+        onChange={(event: ChangeEvent<HTMLInputElement>) => {
+          const file = event.currentTarget.files?.[0];
 
-      {isDialogHost ? (
-        <>
-          <input
-            ref={fileInputRef}
-            accept=".json,application/json"
-            hidden
-            type="file"
-            onChange={(event: ChangeEvent<HTMLInputElement>) => {
-              const file = event.currentTarget.files?.[0];
+          event.currentTarget.value = '';
 
-              event.currentTarget.value = '';
-
-              if (file) {
-                importFile(file);
-              }
-            }}
-          />
-          <AddNodeDialog
-            connectionFilter={addNodeConnection}
-            isOpen={isAddNodeOpen}
-            onAddCurrentImage={addCurrentImage}
-            onAddConnector={addConnector}
-            onAddNode={addNode}
-            onAddNote={addNote}
-            onOpenChange={setAddNodeOpen}
-          />
-          <WorkflowLibraryDialog isOpen={isLibraryOpen} onOpenChange={setWorkflowLibraryOpen} />
-          <ConfirmDialog
-            body="Replace the project graph with an empty workflow? The current graph is saved to graph history first."
-            confirmLabel="New workflow"
-            isOpen={isNewWorkflowConfirmOpen}
-            title="New workflow"
-            onClose={() => setNewWorkflowConfirmOpen(false)}
-            onConfirm={() => {
-              dispatch({
-                document: createProjectGraph(createWorkflowId('project-graph')),
-                label: 'New workflow',
-                type: 'replaceProjectGraph',
-              });
-            }}
-          />
-        </>
-      ) : null}
-    </HStack>
+          if (file) {
+            importFile(file);
+          }
+        }}
+      />
+      <AddNodeDialog
+        connectionFilter={addNodeConnection}
+        isOpen={isAddNodeOpen}
+        onAddCurrentImage={addCurrentImage}
+        onAddConnector={addConnector}
+        onAddNode={addNode}
+        onAddNote={addNote}
+        onOpenChange={setAddNodeOpen}
+      />
+      <WorkflowLibraryDialog isOpen={isLibraryOpen} onOpenChange={setWorkflowLibraryOpen} />
+      <ConfirmDialog
+        body="Replace the project graph with an empty workflow? The current graph is saved to graph history first."
+        confirmLabel="New workflow"
+        isOpen={isNewWorkflowConfirmOpen}
+        title="New workflow"
+        onClose={() => setNewWorkflowConfirmOpen(false)}
+        onConfirm={() => {
+          dispatch({
+            document: createProjectGraph(createWorkflowId('project-graph')),
+            label: 'New workflow',
+            type: 'replaceProjectGraph',
+          });
+        }}
+      />
+    </>
   );
 };
