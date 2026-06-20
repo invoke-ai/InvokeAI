@@ -14,7 +14,6 @@ import { diagnosticsWidgetManifest } from './widgets/diagnostics';
 import { galleryWidgetManifest } from './widgets/gallery';
 import { generateWidgetManifest } from './widgets/generate';
 import { layersWidgetManifest } from './widgets/layers';
-import { layoutActionsWidgetManifest } from './widgets/layout-actions';
 import { notificationsWidgetManifest } from './widgets/notifications';
 import { previewWidgetManifest } from './widgets/preview';
 import { projectWidgetManifest } from './widgets/project';
@@ -36,7 +35,6 @@ export const firstPartyWidgetManifests: WidgetManifest[] = [
   notificationsWidgetManifest,
   serverStatusWidgetManifest,
   autosaveStatusWidgetManifest,
-  layoutActionsWidgetManifest,
   versionStatusWidgetManifest,
 ];
 

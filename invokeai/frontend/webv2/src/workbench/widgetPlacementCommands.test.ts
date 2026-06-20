@@ -137,10 +137,10 @@ describe('widget placement commands', () => {
       openWidgetPlacement({
         dispatch,
         getWidgetsForRegion: createRegistry({
-          center: [createWidget({ centerPlacement: 'toolbar', id: 'layout-actions', labelText: 'Layout Actions' })],
+          center: [createWidget({ centerPlacement: 'toolbar', id: 'toolbar-tools', labelText: 'Toolbar Tools' })],
         }),
         options: { preferredRegions: ['center'] },
-        typeId: 'layout-actions',
+        typeId: 'toolbar-tools',
       })
     ).toEqual({ ok: false, reason: 'unavailable' });
     expect(actions).toEqual([]);

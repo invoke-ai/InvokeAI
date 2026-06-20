@@ -79,19 +79,19 @@ describe('widget region view model', () => {
 
   it('identifies the last enabled center view as required', () => {
     const viewModel = createWidgetRegionViewModel({
-      instanceIds: ['canvas', 'layout-actions'],
+      instanceIds: ['canvas', 'toolbar-tools'],
       region: 'center',
       widgetInstances: {
         canvas: createInstance('canvas', 'canvas'),
-        'layout-actions': createInstance('layout-actions', 'layout-actions'),
+        'toolbar-tools': createInstance('toolbar-tools', 'toolbar-tools'),
       },
       widgets: [
         createWidget({ centerPlacement: 'view', id: 'canvas', labelText: 'Canvas' }),
-        createWidget({ centerPlacement: 'toolbar', id: 'layout-actions', labelText: 'Layout Actions' }),
+        createWidget({ centerPlacement: 'toolbar', id: 'toolbar-tools', labelText: 'Toolbar Tools' }),
       ],
     });
     const canvas = viewModel.placedItems.find((item) => item.id === 'canvas');
-    const toolbar = viewModel.placedItems.find((item) => item.id === 'layout-actions');
+    const toolbar = viewModel.placedItems.find((item) => item.id === 'toolbar-tools');
 
     expect(canvas).toBeDefined();
     expect(toolbar).toBeDefined();
