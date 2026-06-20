@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { GenerateWidgetValues, MainModelConfig } from './generation/types';
 import type { GeneratedImageContract, Project, WorkbenchState } from './types';
 
+import { MAX_PROMPT_HISTORY } from './generation/promptHistory';
 import { DEFAULT_PROJECT_SETTINGS } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
 import { createInitialWorkbenchState, workbenchReducer } from './workbenchState';
@@ -790,6 +791,113 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     state = submitGenerate(state);
 
     expect(getActiveProject(state).queue.items).toEqual([]);
+  });
+
+  it('records submitted Generate prompt pairs in project prompt history', () => {
+    let state = primeGenerate(undefined, { negativePrompt: ' blurry ', positivePrompt: ' a cat ' });
+
+    state = submitGenerate(state);
+
+    expect(getActiveProject(state).promptHistory).toEqual([{ negativePrompt: 'blurry', positivePrompt: 'a cat' }]);
+  });
+
+  it('does not record empty Generate prompt pairs', () => {
+    let state = primeGenerate(undefined, { negativePrompt: ' ', positivePrompt: ' ' });
+
+    state = submitGenerate(state);
+
+    expect(getActiveProject(state).promptHistory).toEqual([]);
+  });
+
+  it('stores disabled negative prompts as null in project prompt history', () => {
+    let state = primeGenerate(undefined, {
+      negativePrompt: 'ignored negative prompt',
+      negativePromptEnabled: false,
+      positivePrompt: 'a cat',
+    });
+
+    state = submitGenerate(state);
+
+    expect(getActiveProject(state).promptHistory).toEqual([{ negativePrompt: null, positivePrompt: 'a cat' }]);
+  });
+
+  it('deduplicates prompt history by prompt pair and moves the newest submission to the top', () => {
+    let state = primeGenerate(undefined, { negativePrompt: 'low quality', positivePrompt: 'a cat' });
+
+    state = submitGenerate(state);
+    state = workbenchReducer(state, {
+      type: 'setGenerateSettings',
+      values: createGenerateValues({ negativePrompt: 'blurry', positivePrompt: 'a dog' }),
+    });
+    state = submitGenerate(state);
+    state = workbenchReducer(state, {
+      type: 'setGenerateSettings',
+      values: createGenerateValues({ negativePrompt: 'low quality', positivePrompt: 'a cat' }),
+    });
+    state = submitGenerate(state);
+
+    expect(getActiveProject(state).promptHistory).toEqual([
+      { negativePrompt: 'low quality', positivePrompt: 'a cat' },
+      { negativePrompt: 'blurry', positivePrompt: 'a dog' },
+    ]);
+  });
+
+  it('caps project prompt history', () => {
+    let state = createInitialWorkbenchState();
+
+    for (let i = 0; i < MAX_PROMPT_HISTORY + 1; i += 1) {
+      state = primeGenerate(state, { positivePrompt: `prompt ${i}` });
+      state = submitGenerate(state);
+    }
+
+    const history = getActiveProject(state).promptHistory;
+
+    expect(history).toHaveLength(MAX_PROMPT_HISTORY);
+    expect(history[0]?.positivePrompt).toBe(`prompt ${MAX_PROMPT_HISTORY}`);
+    expect(history.at(-1)?.positivePrompt).toBe('prompt 1');
+  });
+
+  it('supports explicit prompt history remove and clear actions', () => {
+    let state = primeGenerate(undefined, { negativePrompt: 'low quality', positivePrompt: 'a cat' });
+
+    state = submitGenerate(state);
+    state = workbenchReducer(state, {
+      prompt: { negativePrompt: 'blurry', positivePrompt: 'a dog' },
+      type: 'addPromptToHistory',
+    });
+    state = workbenchReducer(state, {
+      prompt: { negativePrompt: 'low quality', positivePrompt: 'a cat' },
+      type: 'removePromptFromHistory',
+    });
+
+    expect(getActiveProject(state).promptHistory).toEqual([{ negativePrompt: 'blurry', positivePrompt: 'a dog' }]);
+
+    state = workbenchReducer(state, { type: 'clearPromptHistory' });
+
+    expect(getActiveProject(state).promptHistory).toEqual([]);
+  });
+
+  it('does not roll back prompt history during project undo and redo', () => {
+    let state = primeGenerate(undefined, { positivePrompt: 'history prompt' });
+
+    state = submitGenerate(state);
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = workbenchReducer(state, { type: 'undoProjectChange' });
+    state = workbenchReducer(state, { type: 'redoProjectChange' });
+
+    expect(getActiveProject(state).promptHistory).toEqual([{ negativePrompt: null, positivePrompt: 'history prompt' }]);
+  });
+
+  it('hydrates older projects with empty prompt history', () => {
+    const initial = createInitialWorkbenchState();
+    const legacyState = {
+      ...initial,
+      projects: initial.projects.map(({ promptHistory: _promptHistory, ...project }) => project),
+    } as unknown as WorkbenchState;
+
+    const hydrated = workbenchReducer(initial, { state: legacyState, type: 'hydrateWorkbench' });
+
+    expect(getActiveProject(hydrated).promptHistory).toEqual([]);
   });
 
   it('routes Gallery destination results to Gallery without staging them on Canvas', () => {

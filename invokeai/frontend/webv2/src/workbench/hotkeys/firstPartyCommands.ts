@@ -7,6 +7,7 @@ import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsS
 import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { focusPositivePrompt } from '@workbench/widgets/generate/promptFields';
+import { navigatePromptHistory } from '@workbench/widgets/generate/promptFields/promptHistoryNavigation';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProject, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
@@ -31,6 +32,8 @@ export const FIRST_PARTY_APP_COMMAND_IDS = [
   'app.selectWorkflowsTab',
   'app.selectModelsTab',
   'app.selectQueueTab',
+  'app.promptHistoryPrev',
+  'app.promptHistoryNext',
   'app.focusPrompt',
   'app.toggleLeftPanel',
   'app.toggleRightPanel',
@@ -183,6 +186,28 @@ export const useRegisterFirstPartyCommands = () => {
         },
         id: 'app.focusPrompt',
         title: 'Focus prompt',
+      }),
+      commandApi.register({
+        handler: () =>
+          navigatePromptHistory({
+            direction: -1,
+            dispatch,
+            models: modelsRef.current,
+            project: projectRef.current,
+          }),
+        id: 'app.promptHistoryPrev',
+        title: 'Previous prompt history item',
+      }),
+      commandApi.register({
+        handler: () =>
+          navigatePromptHistory({
+            direction: 1,
+            dispatch,
+            models: modelsRef.current,
+            project: projectRef.current,
+          }),
+        id: 'app.promptHistoryNext',
+        title: 'Next prompt history item',
       }),
       commandApi.register({
         handler: () => {

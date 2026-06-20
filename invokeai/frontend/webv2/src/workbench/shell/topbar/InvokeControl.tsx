@@ -173,7 +173,7 @@ export const InvokeControl = () => {
                   Invoke
                 </Text>
                 <HStack gap="1" maxW="full" mb="-0.5">
-                  <Text fontSize="2xs" fontWeight="600" lineHeight="1.1" opacity="0.85" truncate>
+                  <Text fontSize="0.58rem" lineHeight="1.1" opacity="0.85" truncate>
                     {routeLabel}
                   </Text>
                   {isLocked ? <Icon as={LockKeyholeIcon} boxSize="2.5" flexShrink={0} /> : null}

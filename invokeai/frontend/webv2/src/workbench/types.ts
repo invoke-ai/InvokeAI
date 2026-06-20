@@ -458,6 +458,7 @@ export interface Project {
   widgetGraphs: Partial<Record<WidgetTypeId, GraphContract>>;
   canvas: CanvasStateContract;
   graphHistory: GraphHistorySnapshot[];
+  promptHistory: PromptHistoryItem[];
   undoRedo: UndoRedoHistory;
   queue: QueueState;
   events: ProjectEvent[];
@@ -515,6 +516,11 @@ export interface GraphHistorySnapshot {
   label: string;
   graph?: GraphContract;
   document?: ProjectGraphState;
+}
+
+export interface PromptHistoryItem {
+  positivePrompt: string;
+  negativePrompt: string | null;
 }
 
 export interface UndoRedoEntry {

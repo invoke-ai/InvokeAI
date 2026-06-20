@@ -19,6 +19,7 @@ import type {
   ProjectLayoutState,
   ProjectSettings,
   ProjectUndoSnapshot,
+  PromptHistoryItem,
   QueueItem,
   QueueItemStatus,
   ResultDestination,
@@ -41,7 +42,13 @@ import { getGenerationModelAvailabilityReasons } from './generation/baseGenerati
 import { sanitizeBatchCount } from './generation/batch';
 import { compileGenerateGraph, resolveGenerateSeed } from './generation/graph';
 import {
+  addPromptHistoryItem,
+  getPromptHistoryItemFromGenerateSettings,
+  removePromptHistoryItem,
+} from './generation/promptHistory';
+import {
   cloneGenerateWidgetValues,
+  normalizeGenerateSettings,
   normalizeGenerateWidgetValues,
   syncGenerateWidgetValuesWithModels,
 } from './generation/settings';
@@ -105,6 +112,9 @@ type WorkbenchAction =
   | { type: 'setRegionWidgetSize'; region: WidgetRegion; sizePx: number }
   | { type: 'setGenerateSettings'; values: GenerateWidgetValues }
   | { type: 'setGenerateBatchCount'; batchCount: number }
+  | { type: 'addPromptToHistory'; prompt: PromptHistoryItem }
+  | { type: 'removePromptFromHistory'; prompt: PromptHistoryItem }
+  | { type: 'clearPromptHistory' }
   | { type: 'patchWidgetValues'; widgetId: WidgetTypeId; values: Record<string, unknown> }
   | { type: 'patchWidgetInstanceValues'; instanceId: WidgetInstanceId; values: Record<string, unknown> }
   | { type: 'setWidgetInstanceValues'; instanceId: WidgetInstanceId; values: Record<string, unknown> }
@@ -666,6 +676,29 @@ const ensureCenterRegion = (
   };
 };
 
+const normalizePromptHistory = (value: unknown): PromptHistoryItem[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.reduceRight<PromptHistoryItem[]>((history, item) => {
+    if (!item || typeof item !== 'object') {
+      return history;
+    }
+
+    const record = item as Record<string, unknown>;
+
+    if (typeof record.positivePrompt !== 'string') {
+      return history;
+    }
+
+    return addPromptHistoryItem(history, {
+      negativePrompt: typeof record.negativePrompt === 'string' ? record.negativePrompt : null,
+      positivePrompt: record.positivePrompt,
+    });
+  }, []);
+};
+
 const ensureProjectWidgetContracts = (project: Project): Project => {
   const defaultWidgetRegions = createWidgetRegions();
   const legacyWidgetRegions = project.widgetRegions as
@@ -677,6 +710,7 @@ const ensureProjectWidgetContracts = (project: Project): Project => {
     ...project,
     canvas: cloneCanvas(project.canvas ?? createCanvasState()),
     projectGraph: normalizeProjectGraph(project.projectGraph),
+    promptHistory: normalizePromptHistory((project as Partial<Project>).promptHistory),
     settings: normalizeProjectSettings(project.settings),
     widgetRegions: {
       left: legacyWidgetRegions?.left ?? legacyWidgetRegions?.['left-panel'] ?? defaultWidgetRegions.left,
@@ -723,6 +757,7 @@ const createProject = (index: number, id = `project-${index}`): Project => ({
   invocation: { ...defaultInvocationRoute },
   layout: { ...defaultLayoutPreset.initialLayout, panels: { ...defaultLayoutPreset.initialLayout.panels } },
   name: `Project Name #${index}`,
+  promptHistory: [],
   projectGraph: createProjectGraph(`${id}-graph`),
   queue: { items: [] },
   settings: normalizeProjectSettings(),
@@ -1115,6 +1150,8 @@ const submitInvocationSnapshot = (
 
   const { graph, widgetStates } = compiledSnapshot;
   const graphHistorySnapshot = createGraphHistorySnapshot(`Queue snapshot ${queueItemId}`, graph);
+  const generateSettings =
+    route.sourceId === 'generate' ? normalizeGenerateSettings(widgetStates.generate.values) : null;
   const queueItem: QueueItem = {
     cancellable: backendSupportsCancellation,
     id: queueItemId,
@@ -1143,6 +1180,9 @@ const submitInvocationSnapshot = (
       ...project.events,
     ],
     graphHistory: [graphHistorySnapshot, ...project.graphHistory].slice(0, HISTORY_LIMIT),
+    promptHistory: generateSettings
+      ? addPromptHistoryItem(project.promptHistory, getPromptHistoryItemFromGenerateSettings(generateSettings))
+      : project.promptHistory,
     invocation: {
       ...project.invocation,
       destination: route.destination,
@@ -1434,6 +1474,21 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       return updateActiveProject(state, (project) =>
         updateProjectWidgetValues(project, 'generate', (values) => ({ ...values, batchCount }))
       );
+    }
+    case 'addPromptToHistory': {
+      return updateActiveProject(state, (project) => ({
+        ...project,
+        promptHistory: addPromptHistoryItem(project.promptHistory, action.prompt),
+      }));
+    }
+    case 'removePromptFromHistory': {
+      return updateActiveProject(state, (project) => ({
+        ...project,
+        promptHistory: removePromptHistoryItem(project.promptHistory, action.prompt),
+      }));
+    }
+    case 'clearPromptHistory': {
+      return updateActiveProject(state, (project) => ({ ...project, promptHistory: [] }));
     }
     case 'patchWidgetValues': {
       // Generic widget-owned UI state (panel modes, tabs, sizes). Not undoable.
@@ -2142,6 +2197,7 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
           ...restoredProject,
           events: project.events,
           graphHistory: project.graphHistory,
+          promptHistory: project.promptHistory,
           queue: project.queue,
           undoRedo: {
             future: [
@@ -2172,6 +2228,7 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
           ...restoredProject,
           events: project.events,
           graphHistory: project.graphHistory,
+          promptHistory: project.promptHistory,
           queue: project.queue,
           undoRedo: {
             future: project.undoRedo.future.slice(1),

@@ -1,4 +1,5 @@
 import type { GenerateModelConfig, GenerateSettings } from '@workbench/generation/types';
+import type { PromptHistoryItem } from '@workbench/types';
 
 import { Stack } from '@chakra-ui/react';
 import { getPromptPolicy } from '@workbench/generation/baseGenerationPolicies';
@@ -14,14 +15,28 @@ interface GeneratePromptFieldsProps {
 
 export const GeneratePromptFields = ({ onCommit, selectedModel, settings }: GeneratePromptFieldsProps) => {
   const promptPolicy = getPromptPolicy(selectedModel, settings);
+  const usePromptHistoryItem = (prompt: PromptHistoryItem) => {
+    onCommit(
+      promptPolicy.negativeVisible
+        ? {
+            negativePrompt: prompt.negativePrompt ?? '',
+            negativePromptEnabled: prompt.negativePrompt ? true : settings.negativePromptEnabled,
+            positivePrompt: prompt.positivePrompt,
+          }
+        : { positivePrompt: prompt.positivePrompt }
+    );
+  };
 
   return (
     <Stack gap="1" py="2">
       <PositivePromptField
         heightPx={settings.positivePromptHeightPx}
         value={settings.positivePrompt}
+        loras={settings.loras}
+        selectedModel={selectedModel}
         onChange={(positivePrompt) => onCommit({ positivePrompt })}
         onResizeEnd={(positivePromptHeightPx) => onCommit({ positivePromptHeightPx })}
+        onUsePrompt={usePromptHistoryItem}
       />
       {promptPolicy.negativeVisible ? (
         <NegativePromptField
