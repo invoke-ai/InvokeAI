@@ -149,7 +149,14 @@ export const BASE_GENERATION = {
     schedulerAppliesToGraph: true,
     guidanceLabel: 'CFG',
     negativePrompt: { visible: true, usage: 'always' },
-    ui: { sdVaeOverride: true, colorCompensation: false, vaePrecision: true, seamless: true, cfgRescale: true, clipSkipMax: 12 },
+    ui: {
+      sdVaeOverride: true,
+      colorCompensation: false,
+      vaePrecision: true,
+      seamless: true,
+      cfgRescale: true,
+      clipSkipMax: 12,
+    },
   },
   'sd-2': {
     dimensions: { grid: 8, optimalSide: 512 },
@@ -158,7 +165,14 @@ export const BASE_GENERATION = {
     schedulerAppliesToGraph: true,
     guidanceLabel: 'CFG',
     negativePrompt: { visible: true, usage: 'always' },
-    ui: { sdVaeOverride: true, colorCompensation: false, vaePrecision: true, seamless: true, cfgRescale: true, clipSkipMax: 24 },
+    ui: {
+      sdVaeOverride: true,
+      colorCompensation: false,
+      vaePrecision: true,
+      seamless: true,
+      cfgRescale: true,
+      clipSkipMax: 24,
+    },
   },
   sdxl: {
     dimensions: { grid: 8, optimalSide: 1024 },
