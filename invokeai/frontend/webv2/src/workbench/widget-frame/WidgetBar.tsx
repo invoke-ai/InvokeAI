@@ -86,6 +86,7 @@ export const WidgetBar = ({
           onSelect={onSelect}
         />
       ))}
+
       <Box mt="1.5">
         <WidgetEnableMenu
           contextTarget={enableMenuTarget}
@@ -98,6 +99,7 @@ export const WidgetBar = ({
           onToggle={(item) => onToggle(item as WidgetBarItem)}
         />
       </Box>
+
       <WidgetInstanceContextMenu
         target={instanceMenuTarget}
         onClose={() => setInstanceMenuTarget(null)}
@@ -148,10 +150,10 @@ const WidgetSlot = ({
           aria-pressed={isActive}
           as="button"
           data-disabled={isDisabled ? '' : undefined}
-          h="9"
           justifyContent="center"
           rounded="md"
           tabIndex={isDisabled ? -1 : undefined}
+          h="9"
           w="9"
           _disabled={{ opacity: 0.4 }}
           onClick={() => {

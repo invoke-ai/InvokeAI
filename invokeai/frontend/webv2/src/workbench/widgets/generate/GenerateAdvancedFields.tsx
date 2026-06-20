@@ -1,7 +1,7 @@
 import type { GenerateModelConfig, GenerateSettings, VaePrecision } from '@workbench/generation/types';
 import type { ChangeEvent } from 'react';
 
-import { Badge, HStack, Input, InputGroup, NativeSelect, Switch } from '@chakra-ui/react';
+import { Badge, HStack, InputGroup, NativeSelect, NumberInput, Switch } from '@chakra-ui/react';
 import { Field } from '@workbench/components/ui';
 import { getDefaultGenerateSettings, getGenerationUiPolicy } from '@workbench/generation/baseGenerationPolicies';
 import { isVaeModelConfig } from '@workbench/generation/settings';
@@ -41,14 +41,13 @@ export const GenerateAdvancedFields = ({ onCommit, selectedModel, settings }: Ge
   const clipSkipMax = policy.clipSkipMax ?? 0;
 
   const updateNumber =
-    (key: 'cfgRescaleMultiplier' | 'clipSkip', max: number) => (event: ChangeEvent<HTMLInputElement>) => {
-      const value = Number(event.currentTarget.value);
-
-      if (!Number.isFinite(value)) {
+    (key: 'cfgRescaleMultiplier' | 'clipSkip', max: number) =>
+    ({ valueAsNumber }: NumberInput.ValueChangeDetails) => {
+      if (!Number.isFinite(valueAsNumber)) {
         return;
       }
 
-      onCommit({ [key]: Math.min(max, Math.max(0, value)) });
+      onCommit({ [key]: Math.min(max, Math.max(0, valueAsNumber)) });
     };
 
   const customVae = policy.sdVaeVisible && Boolean(settings.vae?.key);
@@ -133,42 +132,45 @@ export const GenerateAdvancedFields = ({ onCommit, selectedModel, settings }: Ge
         <HStack gap="2" p="2">
           {policy.clipSkipMax ? (
             <Field label="CLIP skip">
-              <Input
-                max={String(clipSkipMax)}
-                min="0"
+              <NumberInput.Root
+                max={clipSkipMax}
+                min={0}
                 size="xs"
-                type="number"
-                value={settings.clipSkip}
-                onChange={updateNumber('clipSkip', clipSkipMax)}
-              />
+                value={String(settings.clipSkip)}
+                onValueChange={updateNumber('clipSkip', clipSkipMax)}
+              >
+                <NumberInput.Control />
+                <NumberInput.Input />
+              </NumberInput.Root>
             </Field>
           ) : null}
           {policy.cfgRescaleVisible ? (
             <Field label="CFG rescale">
-              <InputGroup
-                endElement={
-                  <ModelDefaultButton
-                    disabled={!modelDefaults || settings.cfgRescaleMultiplier === modelDefaults.cfgRescaleMultiplier}
-                    label="Use model default CFG rescale"
-                    onClick={() => {
-                      if (modelDefaults) {
-                        onCommit({ cfgRescaleMultiplier: modelDefaults.cfgRescaleMultiplier });
-                      }
-                    }}
-                  />
-                }
-                endElementProps={{ pointerEvents: 'auto' }}
+              <NumberInput.Root
+                max={0.99}
+                min={0}
+                size="xs"
+                step={0.05}
+                value={String(settings.cfgRescaleMultiplier)}
+                onValueChange={updateNumber('cfgRescaleMultiplier', 0.99)}
               >
-                <Input
-                  max="0.99"
-                  min="0"
-                  size="xs"
-                  step="0.05"
-                  type="number"
-                  value={settings.cfgRescaleMultiplier}
-                  onChange={updateNumber('cfgRescaleMultiplier', 0.99)}
-                />
-              </InputGroup>
+                <InputGroup
+                  endElement={
+                    <ModelDefaultButton
+                      disabled={!modelDefaults || settings.cfgRescaleMultiplier === modelDefaults.cfgRescaleMultiplier}
+                      label="Use model default CFG rescale"
+                      onClick={() => {
+                        if (modelDefaults) {
+                          onCommit({ cfgRescaleMultiplier: modelDefaults.cfgRescaleMultiplier });
+                        }
+                      }}
+                    />
+                  }
+                  endElementProps={{ pointerEvents: 'auto' }}
+                >
+                  <NumberInput.Input />
+                </InputGroup>
+              </NumberInput.Root>
             </Field>
           ) : null}
         </HStack>

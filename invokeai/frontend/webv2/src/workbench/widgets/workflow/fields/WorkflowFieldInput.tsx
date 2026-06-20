@@ -72,7 +72,7 @@ const StringInput = ({ id, invalid, onChange, template, value }: WorkflowFieldIn
   );
 };
 
-const NumberInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => {
+const NumericInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => {
   const isInteger = template.type.name === 'IntegerField';
   const numericValue = typeof value === 'number' && Number.isFinite(value) ? value : '';
   const min = template.minimum ?? template.exclusiveMinimum ?? undefined;
@@ -184,6 +184,7 @@ const ModelIdentifierInput = ({ id, invalid, onChange, template, value }: Workfl
       filter={allowedBases ? (model: ModelConfig) => allowedBases.includes(model.base) : undefined}
       id={id ? `${id}-model-combobox` : undefined}
       invalid={invalid}
+      isClearable={false}
       modelTypes={modelTypes}
       size="xs"
       value={selectedKey}
@@ -362,7 +363,7 @@ export const WorkflowFieldInput = (props: WorkflowFieldInputProps) => {
       return <StringInput {...props} />;
     case 'IntegerField':
     case 'FloatField':
-      return <NumberInput {...props} />;
+      return <NumericInput {...props} />;
     case 'BooleanField':
       return <BooleanInput {...props} />;
     case 'EnumField':

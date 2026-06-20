@@ -248,7 +248,7 @@ export const WorkflowLibraryDialog = ({
 
   return (
     <>
-      <Dialog.Root open={isOpen} size="lg" onOpenChange={(event) => onOpenChange(event.open)}>
+      <Dialog.Root placement="center" open={isOpen} size="lg" onOpenChange={(event) => onOpenChange(event.open)}>
         <Portal>
           <Dialog.Backdrop />
           <Dialog.Positioner>

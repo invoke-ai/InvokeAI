@@ -2,8 +2,8 @@ import type { XYPosition } from '@workbench/workflows/types';
 
 import { Icon, Menu, Portal } from '@chakra-ui/react';
 import {
-  ChevronDownIcon,
-  ChevronRightIcon,
+  ChevronsDownUpIcon,
+  ChevronsUpDownIcon,
   ClipboardPasteIcon,
   CopyIcon,
   CopyPlusIcon,
@@ -93,7 +93,7 @@ export const NodeContextMenu = ({
               </Menu.Item>
               {menuState.isNodeOpen !== null ? (
                 <Menu.Item value="toggle-open" onClick={onToggleOpen}>
-                  <Icon as={menuState.isNodeOpen ? ChevronRightIcon : ChevronDownIcon} boxSize="3.5" />
+                  <Icon as={menuState.isNodeOpen ? ChevronsDownUpIcon : ChevronsUpDownIcon} boxSize="3.5" />
                   <Menu.ItemText>{menuState.isNodeOpen ? 'Collapse' : 'Expand'}</Menu.ItemText>
                 </Menu.Item>
               ) : null}

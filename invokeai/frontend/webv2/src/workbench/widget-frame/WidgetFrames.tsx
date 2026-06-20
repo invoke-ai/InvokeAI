@@ -8,7 +8,7 @@ import type {
 
 import { Box, Flex, HStack, Icon, Stack, Text, type RecipeVariantProps, useRecipe } from '@chakra-ui/react';
 import { chipRecipe } from '@theme/recipes';
-import { IconButton } from '@workbench/components/ui';
+import { IconButton, Tooltip } from '@workbench/components/ui';
 import { useFocusRegionProps } from '@workbench/focusRegions';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
@@ -187,16 +187,17 @@ export const WidgetHeader = ({
       <HStack flexShrink={0} gap="1.5">
         {actions}
         {manifest.settingsSection ? (
-          <IconButton
-            aria-label={`${manifest.labelText} settings`}
-            color="fg.muted"
-            size="2xs"
-            title={`${manifest.labelText} settings`}
-            variant="ghost"
-            onClick={() => openWorkbenchSettings(manifest.settingsSection)}
-          >
-            <Icon as={SettingsIcon} boxSize="3.5" />
-          </IconButton>
+          <Tooltip content={`${manifest.labelText} settings`}>
+            <IconButton
+              aria-label={`${manifest.labelText} settings`}
+              color="fg.muted"
+              size="2xs"
+              variant="ghost"
+              onClick={() => openWorkbenchSettings(manifest.settingsSection)}
+            >
+              <Icon as={SettingsIcon} boxSize="3.5" />
+            </IconButton>
+          </Tooltip>
         ) : null}
         <WidgetActionsMenu instance={instance} manifest={manifest} region={region} runtime={runtime} />
       </HStack>
