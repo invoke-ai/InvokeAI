@@ -2,7 +2,7 @@ import type { WidgetInstanceId } from '@workbench/types';
 import type { WidgetRegionDropState } from '@workbench/widgetDnd';
 import type { PlacedWidgetRegionItem } from '@workbench/widgetRegionViewModel';
 
-import { Box, type BoxProps } from '@chakra-ui/react';
+import { Box } from '@chakra-ui/react';
 import { horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { Row, Tooltip } from '@workbench/components/ui';
 import {
@@ -105,7 +105,9 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
           }
         />
       ))}
+
       <Box flex="1" />
+
       <WidgetEnableMenu
         contextTarget={enableMenuTarget}
         groupLabel="Bottom Widgets"
@@ -137,12 +139,14 @@ const CompactBottomWidget = ({
   onSelect: (widgetId: WidgetInstanceId) => void;
 }) => {
   const View = item.widget.manifest.view;
-  const { dragHandleProps, setNodeRef, style } = useWidgetSortable({
+  const { dragHandleProps, isDragging, setNodeRef, style } = useWidgetSortable({
     instanceId: item.id,
     region: 'bottom',
     typeId: item.typeId,
   });
-  const rowDragHandleProps = item.isExpandable ? {} : dragHandleProps;
+  const rowDragHandleProps = item.isExpandable
+    ? Object.fromEntries(Object.entries(dragHandleProps).filter(([key]) => key !== 'onKeyDown'))
+    : dragHandleProps;
   const activationProps = item.isExpandable
     ? {
         role: 'button' as const,
@@ -161,13 +165,13 @@ const CompactBottomWidget = ({
   }
 
   const content = (
-    <Box ref={setNodeRef} h="full" pe="1.5" style={style}>
+    <Box ref={setNodeRef} h="full" style={style}>
       <Row
         {...rowDragHandleProps}
         active={isActive ? 'accent' : 'none'}
         aria-label={item.label}
         aria-pressed={isActive}
-        cursor={item.isExpandable ? 'pointer' : 'grab'}
+        cursor={isDragging ? 'grabbing' : item.isExpandable ? 'pointer' : 'default'}
         h="full"
         w="auto"
         _hover={{ color: isActive ? 'accent.contrast' : 'fg' }}
@@ -179,7 +183,6 @@ const CompactBottomWidget = ({
         }}
         onContextMenu={(event) => onContextMenu(item, event)}
       >
-        {item.isExpandable ? <BottomWidgetDragHandle dragHandleProps={dragHandleProps} label={item.label} /> : null}
         {item.instance ? (
           <WidgetRenderer instance={item.instance} widget={item.widget} presentation="compact" region="bottom" />
         ) : null}
@@ -194,7 +197,6 @@ const CompactBottomWidget = ({
         content={item.failureMessage ? `${item.label}: ${item.failureMessage}` : item.label}
         openDelay={250}
         positioning={{ placement: 'top-start' }}
-        showArrow
       >
         {content}
       </Tooltip>
@@ -211,28 +213,8 @@ const CompactBottomWidget = ({
       }
       openDelay={250}
       positioning={{ placement: 'top-start' }}
-      showArrow
     >
       {content}
     </Tooltip>
   );
 };
-
-const BottomWidgetDragHandle = ({
-  dragHandleProps,
-  label,
-}: {
-  dragHandleProps: Record<string, unknown>;
-  label: string;
-}) => (
-  <Box
-    aria-label={`Drag ${label}`}
-    cursor="grab"
-    h="full"
-    role="button"
-    tabIndex={0}
-    w="1.5"
-    _active={{ cursor: 'grabbing' }}
-    {...(dragHandleProps as BoxProps)}
-  />
-);

@@ -23,7 +23,7 @@ const WorkflowStatusBarItem = () => {
   );
 
   return (
-    <HStack gap="1" maxW="14rem" minW="0">
+    <HStack gap="1" maxW="14rem" minW="0" px="2">
       <Icon as={WorkflowIcon} boxSize="3" color={isRunning ? 'brand.solid' : undefined} flexShrink={0} />
       <Text fontSize="2xs" minW="0" truncate>
         {workflowName || 'Untitled Workflow'}

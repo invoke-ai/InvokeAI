@@ -219,9 +219,7 @@ export const rowRecipe = defineRecipe({
 export const chipRecipe = defineRecipe({
   base: {
     alignItems: 'center',
-    borderColor: 'border.emphasized',
     borderRadius: 'sm',
-    borderWidth: '1px',
     display: 'inline-flex',
     flexShrink: '0',
     fontSize: '2xs',
@@ -234,11 +232,11 @@ export const chipRecipe = defineRecipe({
   variants: {
     tone: {
       neutral: {},
-      brand: { bg: 'brand.subtle', borderColor: 'transparent', color: 'brand.fg' },
-      accent: { borderColor: 'accent.solid', color: 'accent.solid' },
-      error: { borderColor: 'fg.error', color: 'fg.error' },
-      success: { borderColor: 'fg.success', color: 'fg.success' },
-      warning: { borderColor: 'fg.warning', color: 'fg.warning' },
+      brand: { bg: 'brand.subtle', color: 'brand.fg' },
+      accent: { color: 'accent.solid' },
+      error: { color: 'fg.error' },
+      success: { color: 'fg.success' },
+      warning: { color: 'fg.warning' },
     },
   },
   defaultVariants: { tone: 'neutral' },
