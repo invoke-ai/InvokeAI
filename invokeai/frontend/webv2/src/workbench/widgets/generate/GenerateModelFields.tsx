@@ -10,7 +10,12 @@ import {
   getSettingsWithModelDefaults,
   isGenerateModelSelectable,
 } from '@workbench/generation/baseGenerationPolicies';
-import { getModelDefaultVae, isGenerateModelConfig, SEED_MAX } from '@workbench/generation/settings';
+import {
+  getModelDefaultVae,
+  hasModelDefaultVae,
+  isGenerateModelConfig,
+  SEED_MAX,
+} from '@workbench/generation/settings';
 import { ModelSelect } from '@workbench/models/components';
 import { useNotify } from '@workbench/useNotify';
 import { ArrowRightLeft, DicesIcon } from 'lucide-react';
@@ -29,6 +34,26 @@ interface GenerateModelFieldsProps {
   onCommitSettings: (nextSettings: GenerateSettings) => void;
 }
 
+const MODEL_DEFAULT_VALUE_KEYS = [
+  'aspectRatioId',
+  'aspectRatioIsLocked',
+  'aspectRatioValue',
+  'cfgRescaleMultiplier',
+  'cfgScale',
+  'height',
+  'modelKey',
+  'scheduler',
+  'steps',
+  'vaePrecision',
+  'width',
+] as const satisfies readonly (keyof GenerateSettings)[];
+
+const settingsMatchModelDefaults = (settings: GenerateSettings, modelDefaultSettings: GenerateSettings) =>
+  MODEL_DEFAULT_VALUE_KEYS.every((key) => Object.is(settings[key], modelDefaultSettings[key])) &&
+  settings.vae?.key === modelDefaultSettings.vae?.key &&
+  settings.loras.length === modelDefaultSettings.loras.length &&
+  settings.loras.every((lora, index) => lora.isEnabled === modelDefaultSettings.loras[index]?.isEnabled);
+
 export const GenerateModelFields = ({
   onCommit,
   onCommitSettings,
@@ -39,6 +64,17 @@ export const GenerateModelFields = ({
   const notify = useNotify();
   const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
   const policy = getGenerationModelPolicy(selectedModel, settings);
+
+  const getModelDefaultSettings = (model: GenerateModelConfig) => {
+    const nextSettings = getSettingsWithModelDefaults(settings, model);
+
+    return hasModelDefaultVae(model) ? { ...nextSettings, vae: getModelDefaultVae(model, vaeModels) } : nextSettings;
+  };
+
+  const modelDefaultSettings = selectedModel ? getModelDefaultSettings(selectedModel) : null;
+  const modelDefaultsAreApplied = modelDefaultSettings
+    ? settingsMatchModelDefaults(settings, modelDefaultSettings)
+    : false;
 
   const commitNumber = (key: 'cfgScale' | 'seed' | 'steps', value: number) => {
     if (!Number.isFinite(value)) {
@@ -70,9 +106,7 @@ export const GenerateModelFields = ({
   };
 
   const applyModelDefaults = (model: GenerateModelConfig) => {
-    const defaultVae = getModelDefaultVae(model, vaeModels);
-
-    onCommitSettings({ ...getSettingsWithModelDefaults(settings, model), vae: defaultVae });
+    onCommitSettings(getModelDefaultSettings(model));
   };
 
   return (
@@ -94,6 +128,7 @@ export const GenerateModelFields = ({
               }}
             />
             <ModelDefaultButton
+              active={Boolean(modelDefaultSettings && !modelDefaultsAreApplied)}
               disabled={!selectedModel}
               onClick={() => {
                 if (selectedModel) {

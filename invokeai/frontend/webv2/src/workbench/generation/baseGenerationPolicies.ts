@@ -528,7 +528,6 @@ export const getSettingsWithModelDefaults = (
     modelKey: model.key,
     scheduler: modelDefaults.scheduler,
     steps: modelDefaults.steps,
-    vae: null,
     vaePrecision: modelDefaults.vaePrecision,
     width: modelDefaults.width,
   };

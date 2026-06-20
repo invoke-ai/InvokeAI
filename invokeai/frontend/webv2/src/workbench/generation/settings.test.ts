@@ -17,6 +17,7 @@ import {
   deriveAspectRatioId,
   getDefaultLoraWeight,
   getModelDefaultVae,
+  hasModelDefaultVae,
   isLoraCompatibleWithModel,
   isGenerateSettings,
   normalizeGenerateSettings,
@@ -212,6 +213,16 @@ describe('model defaults', () => {
     const fluxVae: VaeModelConfig = { base: 'flux', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' };
 
     expect(getModelDefaultVae(zImageModel, [fluxVae])).toBe(fluxVae);
+  });
+
+  it('distinguishes absent VAE defaults from explicit VAE defaults', () => {
+    expect(hasModelDefaultVae({ base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' })).toBe(false);
+    expect(
+      hasModelDefaultVae({ base: 'sdxl', default_settings: { vae: null }, key: 'sdxl', name: 'SDXL', type: 'main' })
+    ).toBe(false);
+    expect(
+      hasModelDefaultVae({ base: 'sdxl', default_settings: { vae: 'vae' }, key: 'sdxl', name: 'SDXL', type: 'main' })
+    ).toBe(true);
   });
 });
 

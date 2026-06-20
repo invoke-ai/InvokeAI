@@ -21,6 +21,7 @@ import {
   getGenerationValidationReasons,
   getPromptPolicy,
   getSettingsWithCompatibleModelSelections,
+  getSettingsWithModelDefaults,
   isSupportedGenerateModel,
   SUPPORTED_GENERATE_BASES,
 } from './baseGenerationPolicies';
@@ -413,6 +414,15 @@ describe('component policies', () => {
     expect(result.settings.width).toBe(512);
     expect(result.settings.height).toBe(512);
     expect(result.clearedLabels).toContain('Dimensions');
+  });
+
+  it('keeps selected VAE when applying model defaults without a VAE override', () => {
+    const model = createModel('sdxl', { default_settings: { steps: 12 } });
+    const settings = createSettings(model, { vae: sdxlVae });
+    const nextSettings = getSettingsWithModelDefaults(settings, model);
+
+    expect(nextSettings.steps).toBe(12);
+    expect(nextSettings.vae).toBe(sdxlVae);
   });
 
   it('reports selected model records that disappeared from the backend model list', () => {

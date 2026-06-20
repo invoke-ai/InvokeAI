@@ -17,6 +17,7 @@ import { isVaeCompatibleWithGenerateModel } from '@workbench/generation/componen
 import {
   cloneGenerateWidgetValues,
   getModelDefaultVae,
+  hasModelDefaultVae,
   isMainModelConfig,
   isModelIdentifierConfig,
   clampDimension,
@@ -395,7 +396,12 @@ export const buildImageRecallSettings = ({
     const model = getSupportedMetadataModel(metadata, supportedModels);
 
     if (model) {
-      values = { ...getSettingsWithModelDefaults(values, model), model, vae: getModelDefaultVae(model, vaeModels) };
+      const valuesWithModelDefaults = getSettingsWithModelDefaults(values, model);
+      values = {
+        ...valuesWithModelDefaults,
+        model,
+        ...(hasModelDefaultVae(model) ? { vae: getModelDefaultVae(model, vaeModels) } : {}),
+      };
       fields.push('model');
     }
 

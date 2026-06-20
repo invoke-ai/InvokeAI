@@ -220,6 +220,9 @@ export const getModelDefaultVae = (
     : null;
 };
 
+export const hasModelDefaultVae = (model: GenerateModelConfig): boolean =>
+  typeof (model.default_settings as { vae?: unknown } | null | undefined)?.vae === 'string';
+
 export const cloneGenerateWidgetValues = (
   values: GenerateWidgetValues
 ): GenerateWidgetValues & Record<string, unknown> => ({
