@@ -25,28 +25,29 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@emotion/react": "^11.14.0",
     "@fontsource/inter": "^5.2.8",
-    "@tanstack/react-router": "^1.170.15",
-    "@tanstack/react-virtual": "^3.14.2",
+    "@tanstack/react-router": "^1.170.16",
+    "@tanstack/react-virtual": "^3.14.3",
     "@xyflow/react": "^12.11.0",
-    "lucide-react": "^1.17.0",
+    "lucide-react": "^1.21.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-icons": "^5.6.0",
     "socket.io-client": "^4.8.3",
+    "tinykeys": "^4.0.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@rolldown/plugin-babel": "^0.2.3",
-    "@types/node": "^25.9.3",
+    "@types/node": "^26.0.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
     "babel-plugin-react-compiler": "^1.0.0",
-    "oxfmt": "^0.54.0",
-    "oxlint": "^1.69.0",
+    "oxfmt": "^0.55.0",
+    "oxlint": "^1.70.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.9"
   },
   "engines": {
     "pnpm": "10"
