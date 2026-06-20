@@ -123,7 +123,6 @@ export const InvokeControl = () => {
   const modelsRef = useRef(availabilityModels);
 
   resolvedRouteRef.current = resolvedRoute;
-  isValidRef.current = isValid;
   modelsRef.current = availabilityModels;
 
   useEffect(() => {

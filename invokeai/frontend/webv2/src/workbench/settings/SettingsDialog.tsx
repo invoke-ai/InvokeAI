@@ -52,6 +52,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useId, useState, type ReactNode } from 'react';
 
+import { HotkeysSettingsSection } from './HotkeysSettingsSection';
 import {
   closeWorkbenchSettings,
   openWorkbenchSettings,
@@ -134,8 +135,15 @@ const SettingsDialogContent = ({ onClose }: { onClose: () => void }) => {
 
   return (
     <Portal>
-      <Dialog.Backdrop />
-      <Dialog.Positioner>
+      <Dialog.Backdrop pointerEvents="auto" />
+      <Dialog.Positioner
+        pointerEvents="auto"
+        onClick={(event) => {
+          if (event.target === event.currentTarget) {
+            onClose();
+          }
+        }}
+      >
         <Dialog.Content h="min(46rem, calc(100dvh - 4rem))" maxW="4xl">
           <Dialog.Header borderBottomWidth="1px" borderColor="border.subtle">
             <Flex alignItems="start" gap="2">
@@ -615,7 +623,7 @@ const SettingToggle = ({
       gap="4"
       justifyContent="space-between"
       w="full"
-      onCheckedChange={(event) => onChange(event.checked)}
+      onCheckedChange={(event) => onChange(event.checked === true)}
     >
       <Stack gap="0.5">
         <Switch.Label color="fg" fontSize="sm" fontWeight="500" m="0">

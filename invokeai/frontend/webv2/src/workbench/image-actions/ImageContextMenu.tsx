@@ -44,7 +44,6 @@ export interface ImageContextMenuTarget {
 const MENU_CONTENT_PROPS = {
   minW: '13rem',
   overflow: 'hidden',
-  p: '0',
 } as const;
 
 const isUsableGalleryImage = (value: unknown): value is GalleryImage =>
@@ -204,13 +203,7 @@ const ImageContextMenuContent = ({
       >
         <Portal>
           <Menu.Positioner>
-            <MenuContent
-              {...MENU_CONTENT_PROPS}
-              maxH="min(28rem, calc(100vh - 2rem))"
-              minW="16rem"
-              overflowY="auto"
-              py="1"
-            >
+            <MenuContent {...MENU_CONTENT_PROPS} maxH="min(28rem, calc(100vh - 2rem))" minW="16rem" overflowY="auto">
               {isBulk ? (
                 <BulkMenuItems
                   actions={actions}
@@ -302,7 +295,7 @@ const SingleImageMenuItems = ({
   recallCapabilities: ImageRecallCapabilities;
 }) => (
   <>
-    <HStack gap="1" px="1">
+    <HStack gap="1">
       <QuickMenuItem
         icon={ExternalLinkIcon}
         label="Open in new tab"
@@ -514,7 +507,7 @@ const ContextSubMenu = ({
     </Menu.TriggerItem>
     <Portal>
       <Menu.Positioner>
-        <MenuContent {...MENU_CONTENT_PROPS} maxH="18rem" overflowY={scrollArea ? undefined : 'auto'} py="1">
+        <MenuContent {...MENU_CONTENT_PROPS} maxH="18rem" overflowY={scrollArea ? undefined : 'auto'}>
           {scrollArea ? (
             <ScrollArea.Root maxH="inherit" size="xs" variant="hover" w="full">
               <ScrollArea.Viewport maxH="inherit" w="full">

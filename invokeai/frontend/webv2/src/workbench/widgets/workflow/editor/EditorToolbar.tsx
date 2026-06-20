@@ -1,5 +1,6 @@
-import { Box, Popover, Portal, Slider, Stack, Text } from '@chakra-ui/react';
-import { Toolbar, ToolbarButton, ToolbarSeparator } from '@workbench/components/ui';
+import { Box, Icon, Popover, Portal, Slider, Stack, Text } from '@chakra-ui/react';
+import { IconButton, Toolbar, ToolbarButton, ToolbarSeparator, Tooltip } from '@workbench/components/ui';
+import { useWorkbenchReduceMotion } from '@workbench/settings/store';
 import { useReactFlow } from '@xyflow/react';
 import {
   BlendIcon,
@@ -56,12 +57,29 @@ export const EditorToolbar = ({
         <ToolbarSeparator />
         <ToolbarButton icon={ZoomInIcon} label="Zoom in" onClick={() => void zoomIn()} />
         <ToolbarButton icon={ZoomOutIcon} label="Zoom out" onClick={() => void zoomOut()} />
-        <ToolbarButton icon={MaximizeIcon} label="Fit view" onClick={() => void fitView({ duration: 300 })} />
+        <ToolbarButton
+          icon={MaximizeIcon}
+          label="Fit view"
+          onClick={() => void fitView({ duration: fitViewDuration })}
+        />
         <ToolbarSeparator />
-        <Popover.Root positioning={{ placement: 'right' }}>
-          <Popover.Trigger asChild>
-            <ToolbarButton color={nodeOpacity < 1 ? 'accent.solid' : undefined} icon={BlendIcon} label="Node opacity" />
-          </Popover.Trigger>
+        <Popover.Root ids={{ trigger: opacityTriggerId }} positioning={{ placement: 'right' }}>
+          <Tooltip
+            content="Node opacity"
+            ids={{ trigger: opacityTriggerId }}
+            positioning={{ placement: 'right-start' }}
+          >
+            <Popover.Trigger asChild>
+              <IconButton
+                aria-label="Node opacity"
+                color={nodeOpacity < 1 ? 'accent.solid' : undefined}
+                size="sm"
+                variant="ghost"
+              >
+                <Icon as={BlendIcon} boxSize="3.5" />
+              </IconButton>
+            </Popover.Trigger>
+          </Tooltip>
           <Portal>
             <Popover.Positioner>
               <Popover.Content w="12rem">

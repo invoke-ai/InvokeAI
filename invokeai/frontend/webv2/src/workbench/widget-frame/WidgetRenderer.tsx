@@ -74,7 +74,7 @@ const WidgetShellFrame = ({
 
   if (region === 'left' || region === 'right' || region === 'bottom') {
     return (
-      <WidgetPanelFrame region={region}>
+      <WidgetPanelFrame instanceId={instance.id} region={region} typeId={instance.typeId}>
         <HeaderSlot instance={instance} presentation={presentation} region={region} runtime={runtime} widget={widget} />
         <PanelBodySlot>{safeContent}</PanelBodySlot>
         <FooterSlot instance={instance} presentation={presentation} region={region} runtime={runtime} widget={widget} />
@@ -83,7 +83,15 @@ const WidgetShellFrame = ({
   }
 
   return (
-    <Flex bg="bg.inset" direction="column" h="full" minH="0" w="full">
+    <Flex
+      bg="bg.inset"
+      data-hotkey-widget-instance-id={instance.id}
+      data-hotkey-widget-type-id={instance.typeId}
+      direction="column"
+      h="full"
+      minH="0"
+      w="full"
+    >
       <HeaderSlot instance={instance} presentation={presentation} region={region} runtime={runtime} widget={widget} />
       <Box flex="1" minH="0" overflow="hidden" position="relative">
         {safeContent}
