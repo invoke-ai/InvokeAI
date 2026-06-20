@@ -14,6 +14,10 @@ const implemented = new Set([
   'app.focusPrompt',
   'app.invoke',
   'app.invokeFront',
+  'app.promptHistoryNext',
+  'app.promptHistoryPrev',
+  'app.promptWeightDown',
+  'app.promptWeightUp',
   'app.resetPanelLayout',
   'app.selectCanvasTab',
   'app.selectGenerateTab',
@@ -59,6 +63,16 @@ const implemented = new Set([
   'workflows.undo',
 ]);
 
+const editableAppHotkeys = new Set([
+  'app.focusPrompt',
+  'app.invoke',
+  'app.invokeFront',
+  'app.promptHistoryNext',
+  'app.promptHistoryPrev',
+  'app.promptWeightDown',
+  'app.promptWeightUp',
+]);
+
 const formatHotkeyTitle = (id: string): string =>
   id
     .replace(/([a-z])([A-Z])/g, '$1 $2')
@@ -68,17 +82,21 @@ const formatHotkeyTitle = (id: string): string =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
 
-const hotkey = (category: HotkeyCategory, id: string, defaultKeys: string[]): HotkeyDefinition => ({
-  allowInEditable: category === 'app' && (id === 'invoke' || id === 'invokeFront'),
-  category,
-  commandId: `${category}.${id}`,
-  defaultKeys,
-  id: `${category}.${id}`,
-  implemented: implemented.has(`${category}.${id}`),
-  preventDefault: true,
-  scope: categoryScopes[category],
-  title: formatHotkeyTitle(id),
-});
+const hotkey = (category: HotkeyCategory, id: string, defaultKeys: string[]): HotkeyDefinition => {
+  const commandId = `${category}.${id}`;
+
+  return {
+    allowInEditable: editableAppHotkeys.has(commandId),
+    category,
+    commandId,
+    defaultKeys,
+    id: commandId,
+    implemented: implemented.has(commandId),
+    preventDefault: true,
+    scope: categoryScopes[category],
+    title: formatHotkeyTitle(id),
+  };
+};
 
 export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('app', 'invoke', ['mod+enter']),

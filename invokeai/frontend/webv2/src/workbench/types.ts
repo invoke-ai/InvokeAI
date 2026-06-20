@@ -652,6 +652,7 @@ export interface ProjectSettings {
   antialiasProgressImages: boolean;
   showProgressImagesInViewer: boolean;
   preferNumericAttentionStyle: boolean;
+  showPromptSyntaxHighlighting: boolean;
 }
 
 /** User-tunable appearance + behavior preferences surfaced in the Settings modal. */

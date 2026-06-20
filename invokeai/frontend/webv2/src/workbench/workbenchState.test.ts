@@ -1053,6 +1053,7 @@ describe('workbench account and project settings', () => {
       preferNumericAttentionStyle: true,
       showProgressDetails: false,
       showProgressImagesInViewer: true,
+      showPromptSyntaxHighlighting: false,
       useCpuNoise: false,
     });
   });

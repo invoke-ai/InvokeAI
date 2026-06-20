@@ -441,10 +441,15 @@ const ProjectSection = () => {
       />
       <SettingToggle
         checked={settings.preferNumericAttentionStyle}
-        comingSoon
         description="Prefer numeric prompt attention syntax when controls insert attention weights."
         label="Prefer numeric attention style"
         onChange={(checked) => updateProjectSettings({ preferNumericAttentionStyle: checked })}
+      />
+      <SettingToggle
+        checked={settings.showPromptSyntaxHighlighting}
+        description="Experimental. Color prompt syntax in prompt fields without changing the prompt text or validation behavior."
+        label="Highlight prompt syntax (experimental)"
+        onChange={(checked) => updateProjectSettings({ showPromptSyntaxHighlighting: checked })}
       />
     </SettingsSection>
   );

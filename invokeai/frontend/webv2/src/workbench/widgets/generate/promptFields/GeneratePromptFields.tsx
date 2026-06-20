@@ -3,6 +3,7 @@ import type { PromptHistoryItem } from '@workbench/types';
 
 import { Stack } from '@chakra-ui/react';
 import { getPromptPolicy } from '@workbench/generation/baseGenerationPolicies';
+import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 
 import { NegativePromptField } from './NegativePromptField';
 import { PositivePromptField } from './PositivePromptField';
@@ -14,6 +15,7 @@ interface GeneratePromptFieldsProps {
 }
 
 export const GeneratePromptFields = ({ onCommit, selectedModel, settings }: GeneratePromptFieldsProps) => {
+  const showSyntaxHighlighting = useActiveProjectSelector((project) => project.settings.showPromptSyntaxHighlighting);
   const promptPolicy = getPromptPolicy(selectedModel, settings);
   const usePromptHistoryItem = (prompt: PromptHistoryItem) => {
     onCommit(
@@ -34,6 +36,7 @@ export const GeneratePromptFields = ({ onCommit, selectedModel, settings }: Gene
         value={settings.positivePrompt}
         loras={settings.loras}
         selectedModel={selectedModel}
+        showSyntaxHighlighting={showSyntaxHighlighting}
         onChange={(positivePrompt) => onCommit({ positivePrompt })}
         onResizeEnd={(positivePromptHeightPx) => onCommit({ positivePromptHeightPx })}
         onUsePrompt={usePromptHistoryItem}
@@ -43,6 +46,7 @@ export const GeneratePromptFields = ({ onCommit, selectedModel, settings }: Gene
           heightPx={settings.negativePromptHeightPx}
           isEnabled={settings.negativePromptEnabled}
           helpText={promptPolicy.negativeHelpText}
+          showSyntaxHighlighting={showSyntaxHighlighting}
           value={settings.negativePrompt}
           onEnabledChange={(negativePromptEnabled) => onCommit({ negativePromptEnabled })}
           onChange={(negativePrompt) => onCommit({ negativePrompt })}

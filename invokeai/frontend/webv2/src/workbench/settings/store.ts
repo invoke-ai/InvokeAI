@@ -63,6 +63,7 @@ export const DEVELOPER_LOG_NAMESPACES: DeveloperLogNamespace[] = [
 export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
   antialiasProgressImages: false,
   preferNumericAttentionStyle: false,
+  showPromptSyntaxHighlighting: false,
   showProgressDetails: false,
   showProgressImagesInViewer: true,
   useCpuNoise: true,
@@ -154,6 +155,10 @@ export const normalizeProjectSettings = (settings?: Partial<ProjectSettings>): P
     typeof settings?.preferNumericAttentionStyle === 'boolean'
       ? settings.preferNumericAttentionStyle
       : DEFAULT_PROJECT_SETTINGS.preferNumericAttentionStyle,
+  showPromptSyntaxHighlighting:
+    typeof settings?.showPromptSyntaxHighlighting === 'boolean'
+      ? settings.showPromptSyntaxHighlighting
+      : DEFAULT_PROJECT_SETTINGS.showPromptSyntaxHighlighting,
   showProgressDetails:
     typeof settings?.showProgressDetails === 'boolean'
       ? settings.showProgressDetails

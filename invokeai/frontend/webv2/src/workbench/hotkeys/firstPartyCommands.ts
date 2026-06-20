@@ -7,6 +7,7 @@ import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsS
 import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { focusPositivePrompt } from '@workbench/widgets/generate/promptFields';
+import { adjustFocusedPromptAttention } from '@workbench/widgets/generate/promptFields/promptAttentionHotkeys';
 import { navigatePromptHistory } from '@workbench/widgets/generate/promptFields/promptHistoryNavigation';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProject, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
@@ -34,6 +35,8 @@ export const FIRST_PARTY_APP_COMMAND_IDS = [
   'app.selectQueueTab',
   'app.promptHistoryPrev',
   'app.promptHistoryNext',
+  'app.promptWeightUp',
+  'app.promptWeightDown',
   'app.focusPrompt',
   'app.toggleLeftPanel',
   'app.toggleRightPanel',
@@ -208,6 +211,18 @@ export const useRegisterFirstPartyCommands = () => {
           }),
         id: 'app.promptHistoryNext',
         title: 'Next prompt history item',
+      }),
+      commandApi.register({
+        handler: () =>
+          adjustFocusedPromptAttention('increment', projectRef.current.settings.preferNumericAttentionStyle),
+        id: 'app.promptWeightUp',
+        title: 'Increase prompt weight',
+      }),
+      commandApi.register({
+        handler: () =>
+          adjustFocusedPromptAttention('decrement', projectRef.current.settings.preferNumericAttentionStyle),
+        id: 'app.promptWeightDown',
+        title: 'Decrease prompt weight',
       }),
       commandApi.register({
         handler: () => {

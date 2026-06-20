@@ -1,12 +1,16 @@
 import type { ChangeEvent } from 'react';
 
 import { Switch } from '@chakra-ui/react';
-import { Field, ResizableTextarea } from '@workbench/components/ui';
+import { Field } from '@workbench/components/ui';
+
+import { PROMPT_ATTENTION_TARGET_PROPS } from './promptAttentionHotkeys';
+import { PromptTextarea } from './PromptTextarea';
 
 interface NegativePromptFieldProps {
   heightPx: number;
   helpText?: string;
   isEnabled: boolean;
+  showSyntaxHighlighting: boolean;
   value: string;
   onChange: (value: string) => void;
   onEnabledChange: (isEnabled: boolean) => void;
@@ -20,6 +24,7 @@ export const NegativePromptField = ({
   onChange,
   onEnabledChange,
   onResizeEnd,
+  showSyntaxHighlighting,
   value,
 }: NegativePromptFieldProps) => (
   <Field
@@ -36,7 +41,8 @@ export const NegativePromptField = ({
     helpText={isEnabled ? helpText : undefined}
   >
     {isEnabled ? (
-      <ResizableTextarea
+      <PromptTextarea
+        {...PROMPT_ATTENTION_TARGET_PROPS}
         aria-label="Negative prompt"
         defaultHeightPx={heightPx}
         maxHeightPx={240}
@@ -44,6 +50,7 @@ export const NegativePromptField = ({
         resizeHandleAriaLabel="Resize negative prompt"
         size="xs"
         fontFamily="mono"
+        showSyntaxHighlighting={showSyntaxHighlighting}
         value={value}
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange(event.currentTarget.value)}
         onResizeEnd={onResizeEnd}

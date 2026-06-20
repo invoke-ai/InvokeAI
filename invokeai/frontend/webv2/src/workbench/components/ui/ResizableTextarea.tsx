@@ -3,6 +3,7 @@ import type {
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent,
   Ref,
+  ReactNode,
 } from 'react';
 
 import { Box, Textarea } from '@chakra-ui/react';
@@ -26,6 +27,7 @@ export interface ResizableTextareaProps extends Omit<
   largeStepPx?: number;
   stepPx?: number;
   textareaRef?: Ref<HTMLTextAreaElement>;
+  underlay?: ReactNode;
   onResizeEnd?: (heightPx: number) => void;
 }
 
@@ -38,6 +40,7 @@ export const ResizableTextarea = ({
   resizeHandleAriaLabel,
   stepPx = DEFAULT_STEP_PX,
   textareaRef,
+  underlay,
   ...textareaProps
 }: ResizableTextareaProps) => {
   const initialHeightPx = clamp(defaultHeightPx, minHeightPx, maxHeightPx);
@@ -97,7 +100,15 @@ export const ResizableTextarea = ({
 
   return (
     <Box position="relative">
-      <Textarea ref={textareaRef} h={`${displayHeightPx}px`} resize="none" {...textareaProps} />
+      {underlay}
+      <Textarea
+        ref={textareaRef}
+        h={`${displayHeightPx}px`}
+        position={underlay ? 'relative' : textareaProps.position}
+        resize="none"
+        zIndex={underlay ? 1 : textareaProps.zIndex}
+        {...textareaProps}
+      />
       <Box
         aria-label={resizeHandleAriaLabel}
         aria-orientation="horizontal"
@@ -113,6 +124,7 @@ export const ResizableTextarea = ({
         role="separator"
         tabIndex={0}
         transition="background var(--wb-motion-duration-fast) ease, opacity var(--wb-motion-duration-fast) ease"
+        zIndex={2}
         _after={{
           bg: 'border.emphasized',
           borderRadius: 'full',

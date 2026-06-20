@@ -211,3 +211,15 @@ describe('clearWorkbenchSettings', () => {
     expect(api.__clientState.has(SETTINGS_KEY)).toBe(false);
   });
 });
+
+describe('normalizeProjectSettings', () => {
+  it('defaults prompt syntax highlighting off for older project payloads', () => {
+    expect(store.normalizeProjectSettings({}).showPromptSyntaxHighlighting).toBe(false);
+    expect(store.normalizeProjectSettings({ showPromptSyntaxHighlighting: true }).showPromptSyntaxHighlighting).toBe(
+      true
+    );
+    expect(store.normalizeProjectSettings({ showPromptSyntaxHighlighting: false }).showPromptSyntaxHighlighting).toBe(
+      false
+    );
+  });
+});

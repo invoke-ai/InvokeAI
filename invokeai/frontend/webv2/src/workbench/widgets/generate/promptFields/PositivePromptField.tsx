@@ -2,16 +2,19 @@ import type { GenerateLora, GenerateModelConfig } from '@workbench/generation/ty
 import type { PromptHistoryItem } from '@workbench/types';
 import type { ChangeEvent } from 'react';
 
-import { Field, ResizableTextarea } from '@workbench/components/ui';
+import { Field } from '@workbench/components/ui';
 
 import { PositivePromptActions } from './PositivePromptActions';
+import { PROMPT_ATTENTION_TARGET_PROPS } from './promptAttentionHotkeys';
 import { registerPositivePromptElement } from './promptFocus';
 import { resetPromptHistoryNavigation } from './promptHistoryNavigation';
+import { PromptTextarea } from './PromptTextarea';
 
 interface PositivePromptFieldProps {
   heightPx: number;
   loras: GenerateLora[];
   selectedModel: GenerateModelConfig | undefined;
+  showSyntaxHighlighting: boolean;
   value: string;
   onChange: (value: string) => void;
   onResizeEnd: (heightPx: number) => void;
@@ -25,6 +28,7 @@ export const PositivePromptField = ({
   onResizeEnd,
   onUsePrompt,
   selectedModel,
+  showSyntaxHighlighting,
   value,
 }: PositivePromptFieldProps) => (
   <Field
@@ -39,7 +43,8 @@ export const PositivePromptField = ({
       />
     }
   >
-    <ResizableTextarea
+    <PromptTextarea
+      {...PROMPT_ATTENTION_TARGET_PROPS}
       aria-label="Positive prompt"
       defaultHeightPx={heightPx}
       maxHeightPx={360}
@@ -47,6 +52,7 @@ export const PositivePromptField = ({
       resizeHandleAriaLabel="Resize positive prompt"
       size="xs"
       fontFamily="mono"
+      showSyntaxHighlighting={showSyntaxHighlighting}
       textareaRef={registerPositivePromptElement}
       value={value}
       onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
