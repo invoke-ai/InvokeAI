@@ -285,7 +285,8 @@ export const toFlowEdges = (
   previousEdges: WorkflowFlowEdge[] = [],
   edgeType: FlowEdgeType = 'default',
   selectedNodeIds: Set<string> = EMPTY_NODE_IDS,
-  templates?: InvocationTemplates
+  templates?: InvocationTemplates,
+  reduceMotion = false
 ): WorkflowFlowEdge[] => {
   const previousById = new Map(previousEdges.map((edge) => [edge.id, edge]));
 
@@ -293,7 +294,7 @@ export const toFlowEdges = (
     const previous = previousById.get(edge.id);
     const data = getWorkflowEdgeData(document, edge, edgeType, templates);
     const isConnectedToSelectedNode = selectedNodeIds.has(edge.source) || selectedNodeIds.has(edge.target);
-    const animated = isConnectedToSelectedNode || undefined;
+    const animated = isConnectedToSelectedNode && !reduceMotion ? true : undefined;
     const className = isConnectedToSelectedNode ? SELECTED_NODE_EDGE_CLASS : undefined;
     const style = isConnectedToSelectedNode ? SELECTED_NODE_EDGE_STYLE : undefined;
     const zIndex = isConnectedToSelectedNode ? 1000 : undefined;

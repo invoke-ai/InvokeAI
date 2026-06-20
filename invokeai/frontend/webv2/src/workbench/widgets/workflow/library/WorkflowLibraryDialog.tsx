@@ -308,7 +308,7 @@ export const WorkflowLibraryDialog = ({
                             overflow="hidden"
                             px="1"
                             rounded="md"
-                            transition="background 0.12s ease"
+                            transition="background var(--wb-motion-duration-fast) ease"
                             w="full"
                           >
                             <Box

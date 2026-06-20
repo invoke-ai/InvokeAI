@@ -432,7 +432,7 @@ const BoardRow = ({
           flexShrink={0}
           opacity={0}
           size="2xs"
-          transition="opacity 0.15s ease"
+          transition="opacity var(--wb-motion-duration-medium) ease"
           variant="ghost"
           onClick={(event) => {
             event.preventDefault();

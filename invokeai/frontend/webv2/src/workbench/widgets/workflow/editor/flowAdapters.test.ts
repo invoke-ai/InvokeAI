@@ -285,4 +285,14 @@ describe('flowAdapters identity preservation', () => {
     expect(cleared[0]?.zIndex).toBeUndefined();
     expect(cleared[0]?.style).toBeUndefined();
   });
+
+  it('keeps selected-node edge styling but disables edge animation when motion is reduced', () => {
+    const doc = createDoc();
+    const highlighted = toFlowEdges(doc, [], 'default', new Set(['a']), undefined, true);
+
+    expect(highlighted[0]?.animated).toBeUndefined();
+    expect(highlighted[0]?.className).toBe('workflow-selected-node-edge');
+    expect(highlighted[0]?.zIndex).toBe(1000);
+    expect(highlighted[0]?.style).toEqual({ strokeWidth: 2 });
+  });
 });

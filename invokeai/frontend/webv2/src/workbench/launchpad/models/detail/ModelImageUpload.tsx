@@ -183,7 +183,7 @@ export const ModelImageUpload = ({
           position="absolute"
           right="1"
           top="1"
-          transition="opacity 0.12s ease"
+          transition="opacity var(--wb-motion-duration-fast) ease"
           _groupFocusWithin={{ opacity: 1, pointerEvents: 'auto' }}
           _groupHover={{ opacity: 1, pointerEvents: 'auto' }}
         >

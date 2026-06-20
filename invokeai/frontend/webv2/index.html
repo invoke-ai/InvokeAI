@@ -24,13 +24,16 @@
             id = raw && JSON.parse(raw).state.account.preferences.themeId;
           }
           var colorScheme = themeColorSchemes[id];
+          var root = document.documentElement;
           if (colorScheme) {
             var isLight = colorScheme === 'light';
-            var root = document.documentElement;
             root.setAttribute('data-theme', id);
             root.style.colorScheme = colorScheme;
             root.classList.toggle('dark', !isLight);
             root.classList.toggle('light', isLight);
+          }
+          if (localStorage.getItem('invokeai:v7:webv2:reduce-motion') === 'true') {
+            root.setAttribute('data-reduce-motion', 'true');
           }
         } catch (error) {
           /* ignore malformed storage */

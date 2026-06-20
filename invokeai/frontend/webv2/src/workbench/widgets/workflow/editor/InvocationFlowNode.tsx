@@ -129,10 +129,14 @@ const NodeProgressStrip = ({ execution }: { execution: NodeExecutionState | null
       <Box
         bg="brand.solid"
         h="full"
-        transition="width 0.2s ease"
+        transition="width var(--wb-motion-duration-slow) ease"
         w={execution.progress === null ? 'full' : `${Math.round(execution.progress * 100)}%`}
         {...(execution.progress === null
-          ? { animationDuration: '1.2s', animationIterationCount: 'infinite', animationName: 'pulse' }
+          ? {
+              animationDuration: 'var(--wb-motion-duration-slow)',
+              animationIterationCount: 'var(--wb-motion-animation-iteration-count)',
+              animationName: 'pulse',
+            }
           : {})}
       />
     </Box>

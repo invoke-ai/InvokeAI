@@ -206,12 +206,14 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
 
       return pendingSelection ? withNodeSelection(next, nextSelectedNodeIdSet) : next;
     });
-    setFlowEdges((current) => toFlowEdges(projectGraph, current, edgeType, nextSelectedNodeIdSet, invocationTemplates));
+    setFlowEdges((current) =>
+      toFlowEdges(projectGraph, current, edgeType, nextSelectedNodeIdSet, invocationTemplates, reduceMotion)
+    );
 
     if (pendingSelection) {
       reportNodeSelection(pendingSelection);
     }
-  }, [edgeType, invocationTemplates, projectGraph, selectedNodeIds]);
+  }, [edgeType, invocationTemplates, projectGraph, reduceMotion, selectedNodeIds]);
 
   // Expose the instance to the widget header's actions (outside this provider).
   useEffect(() => {

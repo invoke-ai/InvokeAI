@@ -49,7 +49,9 @@ const WorkflowEdgeComponent = ({
         });
   const edgeStyle: CSSProperties = {
     ...style,
-    animation: selected ? 'dashdraw 0.5s linear infinite' : undefined,
+    animation: selected
+      ? 'dashdraw var(--wb-motion-duration-slow) linear var(--wb-motion-animation-iteration-count)'
+      : undefined,
     stroke: edgeData.stroke,
     strokeDasharray: selected ? '5' : edgeData.strokeDasharray,
     strokeLinecap: 'round',

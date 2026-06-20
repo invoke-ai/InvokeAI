@@ -13,7 +13,10 @@ export const GenerateCollapsibleSection = ({ label, defaultOpen, isOpen, childre
   return (
     <Collapsible.Root defaultOpen={defaultOpen} open={isOpen} bg="bg.muted/50" rounded="md" overflow="hidden">
       <Collapsible.Trigger display="flex" gap={2} w="full" p={2} alignItems="center">
-        <Collapsible.Indicator _open={{ transform: 'rotate(90deg)' }} transition="transform 0.2s">
+        <Collapsible.Indicator
+          _open={{ transform: 'rotate(90deg)' }}
+          transition="transform var(--wb-motion-duration-slow)"
+        >
           <ChevronRightIcon size="14" />
         </Collapsible.Indicator>
         <Text

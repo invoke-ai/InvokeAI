@@ -15,7 +15,7 @@ export const NewProjectCard = () => (
     minH="40"
     position="relative"
     rounded="lg"
-    transition="border-color 0.15s ease, background 0.15s ease"
+    transition="border-color var(--wb-motion-duration-medium) ease, background var(--wb-motion-duration-medium) ease"
     _hover={{ bg: 'bg.subtle', borderColor: 'border.emphasized' }}
   >
     <Link aria-label="Create new project" search={{ new: true }} style={{ inset: 0, position: 'absolute' }} to="/app" />

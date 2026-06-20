@@ -1,5 +1,5 @@
 import { DEFAULT_THEME, THEMES_BY_ID } from '@theme/system';
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 
 import { useWorkbenchSettings } from './settings/store';
 
@@ -9,15 +9,16 @@ import { useWorkbenchSettings } from './settings/store';
  * Theme switching is intentionally a DOM-attribute flip rather than a React
  * re-theme: the semantic-token conditions in `theme/system.ts` key off
  * `<html data-theme>`, so changing the attribute restyles the whole shell with
- * no component re-render. `data-reduce-motion` is read by the global CSS that
- * neutralizes transitions. Renders nothing.
+ * no component re-render. `data-reduce-motion` is read by global CSS motion
+ * tokens. Renders nothing.
  */
 /**
- * Read by the pre-paint script in index.html. A dedicated key (rather than the
- * workbench snapshot, which is per-user on multi-user backends) so the first
- * paint can apply the last-used theme without knowing who is signed in.
+ * Read by the pre-paint script in index.html. Dedicated hint keys (rather than
+ * the workbench snapshot, which is per-user on multi-user backends) let first
+ * paint apply last-used appearance without knowing who is signed in.
  */
 const THEME_HINT_STORAGE_KEY = 'invokeai:v7:webv2:theme';
+const REDUCE_MOTION_HINT_STORAGE_KEY = 'invokeai:v7:webv2:reduce-motion';
 
 export const ThemeController = () => {
   const { preferences, status } = useWorkbenchSettings();
@@ -26,7 +27,7 @@ export const ThemeController = () => {
   // theme; applying the store's defaults here would flash and clobber it.
   const hasResolved = status === 'ready' || status === 'error';
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!hasResolved) {
       return;
     }
@@ -48,7 +49,7 @@ export const ThemeController = () => {
     }
   }, [hasResolved, themeId]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!hasResolved) {
       return;
     }
@@ -59,6 +60,16 @@ export const ThemeController = () => {
       root.dataset.reduceMotion = 'true';
     } else {
       delete root.dataset.reduceMotion;
+    }
+
+    try {
+      if (reduceMotion) {
+        window.localStorage.setItem(REDUCE_MOTION_HINT_STORAGE_KEY, 'true');
+      } else {
+        window.localStorage.removeItem(REDUCE_MOTION_HINT_STORAGE_KEY);
+      }
+    } catch {
+      // Storage unavailable — the next load just waits for settings to resolve.
     }
   }, [hasResolved, reduceMotion]);
 

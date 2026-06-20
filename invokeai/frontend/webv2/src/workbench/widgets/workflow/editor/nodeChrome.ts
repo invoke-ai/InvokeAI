@@ -16,6 +16,6 @@ export const getWorkflowNodeChromeProps = ({
   borderColor: invalid ? 'red.solid' : running ? 'brand.solid' : 'border.emphasized',
   borderWidth: '1px',
   shadow: selected ? NODE_SELECTED_RING : running ? NODE_RUNNING_RING : 'sm',
-  transition: 'border-color 0.12s ease, box-shadow 0.12s ease',
+  transition: 'border-color var(--wb-motion-duration-fast) ease, box-shadow var(--wb-motion-duration-fast) ease',
   _hover: selected ? undefined : { shadow: NODE_HOVER_RING },
 });

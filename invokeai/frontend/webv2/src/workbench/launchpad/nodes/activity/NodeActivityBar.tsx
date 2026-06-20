@@ -71,7 +71,10 @@ export const NodeActivityBar = () => {
               {installingCount}
             </Badge>
           ) : null}
-          <Collapsible.Indicator _open={{ transform: 'rotate(180deg)' }} transition="transform 0.2s">
+          <Collapsible.Indicator
+            _open={{ transform: 'rotate(180deg)' }}
+            transition="transform var(--wb-motion-duration-slow)"
+          >
             <Icon as={ChevronUpIcon} boxSize="4" color="fg.subtle" flexShrink={0} />
           </Collapsible.Indicator>
         </Collapsible.Trigger>

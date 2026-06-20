@@ -202,8 +202,11 @@ const themeConditions = Object.fromEntries(
   NON_DEFAULT_THEMES.map((theme) => [conditionName(theme.id), `:root[data-theme=${theme.id}]`])
 );
 
+const motionDurationToken = (base: string): TokenValue => ({ value: { base, _reduceMotion: '1ms' } });
+const motionAnimationToken = (base: string): TokenValue => ({ value: { base, _reduceMotion: 'none' } });
+
 const config = defineConfig({
-  conditions: themeConditions,
+  conditions: { ...themeConditions, reduceMotion: ':root[data-reduce-motion=true]' },
   globalCss: {
     'html, body, #root': {
       height: '100%',
@@ -217,14 +220,24 @@ const config = defineConfig({
       minWidth: '960px',
       overflow: 'hidden',
     },
-    // Respect the "reduce motion" preference by neutralizing transitions/animations.
-    '[data-reduce-motion="true"], [data-reduce-motion="true"] *, [data-reduce-motion="true"] *::before, [data-reduce-motion="true"] *::after':
-      {
-        animationDuration: '0.001ms !important',
-        animationIterationCount: '1 !important',
-        scrollBehavior: 'auto !important',
-        transitionDuration: '0.001ms !important',
-      },
+    ':root': {
+      '--wb-motion-duration-fast': '0.12s',
+      '--wb-motion-duration-medium': '0.15s',
+      '--wb-motion-duration-slow': '0.2s',
+      '--wb-motion-animation-iteration-count': 'infinite',
+    },
+    // Keep durations non-zero: Ark presence waits for animation lifecycle events.
+    // Chakra recipe motion is covered by conditional duration/animation tokens below.
+    ':root[data-reduce-motion="true"]': {
+      '--wb-motion-duration-fast': '1ms',
+      '--wb-motion-duration-medium': '1ms',
+      '--wb-motion-duration-slow': '1ms',
+      '--wb-motion-animation-iteration-count': '1',
+      scrollBehavior: 'auto !important',
+    },
+    ':root[data-reduce-motion="true"] .chakra-skeleton': {
+      animation: 'none !important',
+    },
   },
   theme: {
     tokens: {
@@ -238,7 +251,22 @@ const config = defineConfig({
       },
     },
     semanticTokens: {
+      animations: {
+        bounce: motionAnimationToken('bounce 1s infinite'),
+        ping: motionAnimationToken('ping 1s cubic-bezier(0, 0, 0.2, 1) infinite'),
+        pulse: motionAnimationToken('pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'),
+        spin: motionAnimationToken('spin 1s linear infinite'),
+      },
       colors: semanticColors,
+      durations: {
+        fastest: motionDurationToken('50ms'),
+        faster: motionDurationToken('100ms'),
+        fast: motionDurationToken('150ms'),
+        moderate: motionDurationToken('200ms'),
+        slow: motionDurationToken('300ms'),
+        slower: motionDurationToken('400ms'),
+        slowest: motionDurationToken('500ms'),
+      },
     },
     // Chrome-level overrides for Chakra's built-in components, so popover and
     // dialog surfaces are consistent everywhere without per-instance props.

@@ -11,6 +11,7 @@ import {
   ZoomInIcon,
   ZoomOutIcon,
 } from 'lucide-react';
+import { useId } from 'react';
 
 /**
  * The editor's single tool strip, docked to the left edge: interaction tools
@@ -42,6 +43,9 @@ export const EditorToolbar = ({
   onToolChange: (tool: EditorTool) => void;
 }) => {
   const { fitView, zoomIn, zoomOut } = useReactFlow();
+  const reduceMotion = useWorkbenchReduceMotion();
+  const opacityTriggerId = useId();
+  const fitViewDuration = reduceMotion ? 0 : 300;
 
   return (
     <Box left="3" position="absolute" top="50%" transform="translateY(-50%)" zIndex="5">

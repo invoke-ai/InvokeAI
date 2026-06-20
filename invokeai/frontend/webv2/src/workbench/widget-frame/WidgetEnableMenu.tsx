@@ -61,7 +61,7 @@ const getWidgetEnableMenuTriggerButton = (label: string, trigger: WidgetEnableMe
       h={isBottom ? '5' : '9'}
       justify="center"
       rounded={isBottom ? 'sm' : 'md'}
-      transition="background 0.12s ease, color 0.12s ease"
+      transition="background var(--wb-motion-duration-fast) ease, color var(--wb-motion-duration-fast) ease"
       w={isBottom ? '5' : '9'}
       _hover={{ bg: 'bg.muted' }}
     >

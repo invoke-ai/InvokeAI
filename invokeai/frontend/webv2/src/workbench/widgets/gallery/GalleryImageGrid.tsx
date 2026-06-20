@@ -11,7 +11,16 @@ import { IconButton } from '@workbench/components/ui';
 import { ImageContextMenu, type ImageContextMenuTarget } from '@workbench/image-actions';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { StarIcon, UploadIcon } from 'lucide-react';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react';
+import {
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type MouseEvent,
+} from 'react';
 
 import type { GalleryImageDragImage } from './galleryDnd';
 import type { GalleryQueuePlaceholder } from './galleryStateView';
@@ -652,7 +661,7 @@ const GalleryThumbnail = ({
         position="absolute"
         size="2xs"
         top="1"
-        transition="opacity 0.15s ease"
+        transition="opacity var(--wb-motion-duration-medium) ease"
         variant="solid"
         zIndex="1"
         onClick={(event) => {
@@ -671,7 +680,7 @@ const GalleryThumbnail = ({
           pointerEvents="none"
           position="absolute"
           size="xs"
-          transition="opacity 0.15s ease"
+          transition="opacity var(--wb-motion-duration-medium) ease"
           variant="solid"
           zIndex="1"
         >

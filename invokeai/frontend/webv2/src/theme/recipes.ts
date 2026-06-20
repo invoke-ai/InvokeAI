@@ -134,9 +134,11 @@ export const comboboxSlotRecipe = defineSlotRecipe({
 
 /** Dialog chrome: panel surface with a hairline stroke. */
 export const dialogSlotRecipe = defineSlotRecipe({
-  slots: ['content'],
+  ...chakraSlotRecipes.dialog,
   base: {
+    ...chakraSlotRecipes.dialog.base,
     content: {
+      ...chakraSlotRecipes.dialog.base?.content,
       borderColor: 'border.subtle',
       borderWidth: '1px',
     },
@@ -198,7 +200,7 @@ export const rowRecipe = defineRecipe({
     display: 'flex',
     gap: '2',
     textAlign: 'start',
-    transition: 'background 0.12s ease, color 0.12s ease',
+    transition: 'background var(--wb-motion-duration-fast) ease, color var(--wb-motion-duration-fast) ease',
     w: 'full',
     _hover: { bg: 'bg.muted' },
     _focusVisible: { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '-2px' },
@@ -270,7 +272,8 @@ export const themeCardRecipe = defineSlotRecipe({
       overflow: 'hidden',
       p: '3',
       textAlign: 'left',
-      transition: 'border-color 0.12s ease, background 0.12s ease, transform 0.12s ease',
+      transition:
+        'border-color var(--wb-motion-duration-fast) ease, background var(--wb-motion-duration-fast) ease, transform var(--wb-motion-duration-fast) ease',
       _hover: { borderColor: 'border.emphasized' },
       _focusVisible: { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '2px' },
     },

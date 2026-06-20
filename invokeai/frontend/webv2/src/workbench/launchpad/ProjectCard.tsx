@@ -92,7 +92,7 @@ export const ProjectCard = ({ summary }: { summary: ProjectSummary }) => {
       overflow="hidden"
       position="relative"
       rounded="lg"
-      transition="border-color 0.15s ease, background 0.15s ease"
+      transition="border-color var(--wb-motion-duration-medium) ease, background var(--wb-motion-duration-medium) ease"
       _hover={{ bg: 'bg.muted', borderColor: 'border.emphasized' }}
       onContextMenu={(event) => {
         event.preventDefault();

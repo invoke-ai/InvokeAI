@@ -23,7 +23,7 @@ export const WidgetRegionDropOverlay = ({
     rounded="sm"
     shadow={dropState.isAllowed && isOver ? '0 0 0 1px {colors.accent.solid}' : undefined}
     top="0"
-    transition="background 0.12s ease, border-color 0.12s ease, opacity 0.12s ease, box-shadow 0.12s ease"
+    transition="background var(--wb-motion-duration-fast) ease, border-color var(--wb-motion-duration-fast) ease, opacity var(--wb-motion-duration-fast) ease, box-shadow var(--wb-motion-duration-fast) ease"
     zIndex="2"
   />
 );

@@ -1,8 +1,10 @@
 import type {
+  WidgetInstanceId,
   WidgetInstanceContract,
   WidgetManifest,
   WidgetRegion,
   WidgetRuntimeApi,
+  WidgetTypeId,
   WorkbenchRegion,
 } from '@workbench/types';
 
@@ -44,10 +46,14 @@ const clampSize = (region: WidgetRegion, sizePx: number): number => {
 
 export const WidgetPanelFrame = ({
   children,
+  instanceId,
   region,
+  typeId,
 }: {
   children: ReactNode;
+  instanceId?: WidgetInstanceId;
   region: Exclude<WidgetRegion, 'center'>;
+  typeId?: WidgetTypeId;
 }) => {
   const regionState = useActiveProjectSelector((project) => project.widgetRegions[region]);
   const dispatch = useWorkbenchDispatch();
@@ -127,6 +133,8 @@ export const WidgetPanelFrame = ({
       flexShrink={0}
       overflow="hidden"
       minW="0"
+      data-hotkey-widget-instance-id={instanceId}
+      data-hotkey-widget-type-id={typeId}
       {...focusRegionProps}
       {...(isBottom ? { h: `${displaySizePx}px`, w: 'full' } : { h: 'full', w: `${displaySizePx}px` })}
     >
@@ -143,7 +151,7 @@ export const WidgetPanelFrame = ({
         position="absolute"
         role="separator"
         tabIndex={0}
-        transition="opacity 0.12s ease, background 0.12s ease"
+        transition="opacity var(--wb-motion-duration-fast) ease, background var(--wb-motion-duration-fast) ease"
         zIndex="1"
         {...(isBottom ? { h: '2', left: '0', right: '0', top: '-1' } : { bottom: '0', top: '0', w: '2' })}
         {...(!isBottom ? (isLeft ? { right: '-1' } : { left: '-1' }) : {})}
