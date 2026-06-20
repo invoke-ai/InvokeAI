@@ -6,7 +6,7 @@ import { isInvocationRouteValid, resolveInvocationRoute } from '@workbench/invoc
 import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsStore';
 import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
-import { focusPositivePrompt } from '@workbench/widgets/generate/promptFocus';
+import { focusPositivePrompt } from '@workbench/widgets/generate/promptFields';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProject, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';

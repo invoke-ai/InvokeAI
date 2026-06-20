@@ -5,6 +5,7 @@ export * from './JsonPreview';
 export * from './Menu';
 export * from './Panel';
 export * from './RenameDialog';
+export * from './ResizableTextarea';
 export * from './Row';
 export * from './Scrollable';
 export * from './Tabs';

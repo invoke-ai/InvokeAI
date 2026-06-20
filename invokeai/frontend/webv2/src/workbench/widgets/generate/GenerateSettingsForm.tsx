@@ -12,7 +12,7 @@ import { GenerateComponentsSection } from './GenerateComponentsSection';
 import { GenerateConceptsSection } from './GenerateConceptsSection';
 import { GenerateDimensionFields } from './GenerateDimensionFields';
 import { GenerateModelFields } from './GenerateModelFields';
-import { GeneratePromptFields } from './GeneratePromptFields';
+import { GeneratePromptFields } from './promptFields';
 
 interface GenerateSettingsFormProps {
   isLoadingModels: boolean;
