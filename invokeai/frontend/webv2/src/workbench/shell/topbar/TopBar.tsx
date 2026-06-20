@@ -1,12 +1,13 @@
-import { Box, Flex, HStack, Separator } from '@chakra-ui/react';
+import { Flex, HStack, Separator } from '@chakra-ui/react';
+import { Link } from '@tanstack/react-router';
 import { useCapabilities } from '@workbench/auth/capabilities';
 import { AccountMenu } from '@workbench/auth/components/AccountMenu';
 import { ProjectTabs } from '@workbench/projects/components';
 
+import { InvokeMark } from '@/workbench/components/InvokeMark';
 import { SettingsButton } from '@/workbench/settings';
 
 import { BatchCountField } from './BatchCountField';
-import { BrandMark } from './BrandMark';
 import { InvokeControl } from './InvokeControl';
 import { LayoutPresetMenu } from './LayoutPresetMenu';
 import { ModelManagerButton } from './ModelManagerButton';
@@ -32,9 +33,19 @@ export const TopBar = () => {
       pe="1.5"
       w="full"
     >
-      <Box h="12" w="12">
-        <BrandMark />
-      </Box>
+      <Link
+        to="/"
+        style={{
+          alignItems: 'center',
+          aspectRatio: '1/1',
+          display: 'flex',
+          flexShrink: 0,
+          height: '100%',
+          justifyContent: 'center',
+        }}
+      >
+        <InvokeMark size={20} />
+      </Link>
       <Separator orientation="vertical" h={5} ms="-2" />
       <InvokeControl />
       <BatchCountField />

@@ -2,8 +2,8 @@ import type { BackendConnectionStatus } from '@workbench/types';
 
 import { Box, Flex, HStack, Text } from '@chakra-ui/react';
 import { AccountMenu } from '@workbench/auth/components/AccountMenu';
-import { InvokeMark } from '@workbench/auth/components/AuthScreen';
 import { useConnectionStatus } from '@workbench/backend/connectionStore';
+import { InvokeMark } from '@workbench/components/InvokeMark';
 import { SettingsButton } from '@workbench/settings/SettingsDialog';
 
 const CONNECTION_LABEL: Record<Exclude<BackendConnectionStatus, 'connected'>, string> = {

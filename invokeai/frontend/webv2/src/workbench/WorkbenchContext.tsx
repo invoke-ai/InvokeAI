@@ -1,7 +1,17 @@
-import { createContext, use, useEffect, useRef, useSyncExternalStore, type Dispatch, type ReactNode } from 'react';
+import {
+  createContext,
+  use,
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+  useState,
+  type Dispatch,
+  type ReactNode,
+} from 'react';
 
 import type { Project, WorkbenchState } from './types';
 
+import { WorkbenchSplashScreen } from './components/WorkbenchSplashScreen';
 import {
   syncedWorkbenchPersistence,
   type WorkbenchLoadOptions,
@@ -91,6 +101,7 @@ export const WorkbenchProvider = ({
 
   const store = storeRef.current;
   const dispatch = store.dispatch;
+  const [hasHydrated, setHasHydrated] = useState(store.getSnapshot().hasHydrated);
   const hasLoadedPersistenceRef = useRef(false);
   const lastSavedStateKeyRef = useRef(getPersistedStateKey(store.getState()));
   // Captured once: the options describe how this mount of the editor boots.
@@ -139,6 +150,7 @@ export const WorkbenchProvider = ({
 
         if (!isCancelled) {
           store.setHasHydrated(true);
+          setHasHydrated(true);
         }
       }
     };
@@ -282,7 +294,9 @@ export const WorkbenchProvider = ({
 
   return (
     <WorkbenchStoreContext value={store}>
-      <WorkbenchDispatchContext value={dispatch}>{children}</WorkbenchDispatchContext>
+      <WorkbenchDispatchContext value={dispatch}>
+        {hasHydrated ? children : <WorkbenchSplashScreen message="Opening project" />}
+      </WorkbenchDispatchContext>
     </WorkbenchStoreContext>
   );
 };
