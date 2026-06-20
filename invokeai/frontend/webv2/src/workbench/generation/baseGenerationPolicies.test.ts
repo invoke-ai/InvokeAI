@@ -140,29 +140,36 @@ describe('BASE_GENERATION', () => {
   });
 
   it('matches expected prompt policy per base', () => {
-    expect(getPromptPolicy(createModel('flux'), { cfgScale: 4 })).toMatchObject({
+    expect(getPromptPolicy(createModel('flux'), { cfgScale: 4, negativePromptEnabled: true })).toMatchObject({
       negativeVisible: false,
       negativeUsedInGraph: false,
     });
-    expect(getPromptPolicy(createModel('sdxl'), { cfgScale: 1 })).toMatchObject({
+    expect(getPromptPolicy(createModel('sdxl'), { cfgScale: 1, negativePromptEnabled: true })).toMatchObject({
       negativeVisible: true,
       negativeUsedInGraph: true,
     });
-    expect(getPromptPolicy(createModel('qwen-image'), { cfgScale: 1 })).toMatchObject({
+    expect(getPromptPolicy(createModel('sdxl'), { cfgScale: 1, negativePromptEnabled: false })).toMatchObject({
       negativeVisible: true,
       negativeUsedInGraph: false,
     });
-    expect(getPromptPolicy(createModel('qwen-image'), { cfgScale: 2 })).toMatchObject({
+    expect(getPromptPolicy(createModel('qwen-image'), { cfgScale: 1, negativePromptEnabled: true })).toMatchObject({
+      negativeVisible: true,
+      negativeUsedInGraph: false,
+    });
+    expect(getPromptPolicy(createModel('qwen-image'), { cfgScale: 2, negativePromptEnabled: true })).toMatchObject({
       negativeVisible: true,
       negativeUsedInGraph: true,
       negativeHelpText: 'Used only when CFG is greater than 1.',
     });
-    expect(getPromptPolicy(externalModel, { cfgScale: 7 })).toMatchObject({
+    expect(getPromptPolicy(externalModel, { cfgScale: 7, negativePromptEnabled: true })).toMatchObject({
       negativeVisible: false,
       negativeUsedInGraph: false,
     });
     expect(
-      getPromptPolicy({ ...externalModel, capabilities: { supports_negative_prompt: true } }, { cfgScale: 7 })
+      getPromptPolicy(
+        { ...externalModel, capabilities: { supports_negative_prompt: true } },
+        { cfgScale: 7, negativePromptEnabled: true }
+      )
     ).toMatchObject({ negativeVisible: true, negativeUsedInGraph: true });
   });
 

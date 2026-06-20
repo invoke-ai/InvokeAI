@@ -16,16 +16,22 @@ export const GeneratePromptFields = ({ onCommit, selectedModel, settings }: Gene
   const promptPolicy = getPromptPolicy(selectedModel, settings);
 
   return (
-    <Stack gap="1" pt="2">
+    <Stack gap="1" py="2">
       <PositivePromptField
+        heightPx={settings.positivePromptHeightPx}
         value={settings.positivePrompt}
         onChange={(positivePrompt) => onCommit({ positivePrompt })}
+        onResizeEnd={(positivePromptHeightPx) => onCommit({ positivePromptHeightPx })}
       />
       {promptPolicy.negativeVisible ? (
         <NegativePromptField
+          heightPx={settings.negativePromptHeightPx}
+          isEnabled={settings.negativePromptEnabled}
           helpText={promptPolicy.negativeHelpText}
           value={settings.negativePrompt}
+          onEnabledChange={(negativePromptEnabled) => onCommit({ negativePromptEnabled })}
           onChange={(negativePrompt) => onCommit({ negativePrompt })}
+          onResizeEnd={(negativePromptHeightPx) => onCommit({ negativePromptHeightPx })}
         />
       ) : null}
     </Stack>

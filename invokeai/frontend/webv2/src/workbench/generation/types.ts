@@ -91,7 +91,10 @@ export interface GenerateSettings {
   batchCount: number;
   modelKey: string;
   positivePrompt: string;
+  positivePromptHeightPx: number;
+  negativePromptEnabled: boolean;
   negativePrompt: string;
+  negativePromptHeightPx: number;
   width: number;
   height: number;
   aspectRatioId: AspectRatioId;

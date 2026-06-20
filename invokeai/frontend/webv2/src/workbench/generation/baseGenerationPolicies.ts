@@ -400,21 +400,23 @@ export const coerceSchedulerForGraph = (
 
 export const getPromptPolicy = (
   model: GenerateModelConfig | undefined,
-  settings: Pick<GenerateSettings, 'cfgScale'>
+  settings: Pick<GenerateSettings, 'cfgScale' | 'negativePromptEnabled'>
 ) => {
   if (model?.type === 'external_image_generator') {
     const supportsNegativePrompt = model.capabilities?.supports_negative_prompt === true;
 
     return {
       negativeVisible: supportsNegativePrompt,
-      negativeUsedInGraph: supportsNegativePrompt,
+      negativeUsedInGraph: settings.negativePromptEnabled && supportsNegativePrompt,
     };
   }
 
   const config = getBaseGenerationConfig(model);
   // Visibility controls the textarea; usage controls whether the graph wires negative conditioning.
   const negativeUsedInGraph =
-    config.negativePrompt.usage === 'always' || (config.negativePrompt.usage === 'cfg-gated' && settings.cfgScale > 1);
+    settings.negativePromptEnabled &&
+    (config.negativePrompt.usage === 'always' ||
+      (config.negativePrompt.usage === 'cfg-gated' && settings.cfgScale > 1));
 
   return {
     negativeVisible: config.negativePrompt.visible,
@@ -509,8 +511,11 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     height,
     loras: [],
     modelKey: model?.key ?? '',
+    negativePromptEnabled: true,
     negativePrompt: '',
+    negativePromptHeightPx: 56,
     positivePrompt: '',
+    positivePromptHeightPx: 96,
     qwen3EncoderModel: null,
     qwenVLEncoderModel: null,
     scheduler: defaults.scheduler,

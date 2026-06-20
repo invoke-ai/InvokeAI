@@ -54,6 +54,9 @@ describe('normalizeGenerateSettings', () => {
     expect(normalized?.clipSkip).toBe(0);
     expect(normalized?.colorCompensation).toBe(false);
     expect(normalized?.loras).toEqual([]);
+    expect(normalized?.negativePromptEnabled).toBe(true);
+    expect(normalized?.negativePromptHeightPx).toBe(56);
+    expect(normalized?.positivePromptHeightPx).toBe(96);
     expect(normalized?.seamlessXAxis).toBe(false);
     expect(normalized?.vae).toBeNull();
     expect(normalized?.vaePrecision).toBe('fp32');

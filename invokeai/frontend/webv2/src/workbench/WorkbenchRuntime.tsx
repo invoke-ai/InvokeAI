@@ -141,7 +141,7 @@ const submitQueueItem = (
         batchCount: generateValues.batchCount,
         destination: queueItem.snapshot.destination,
         graph,
-        negativePrompt: generateValues.negativePrompt,
+        negativePrompt: generateValues.negativePromptEnabled ? generateValues.negativePrompt : '',
         negativePromptNodeId: 'negative_prompt',
         positivePrompt: generateValues.positivePrompt,
         positivePromptNodeId: 'positive_prompt',

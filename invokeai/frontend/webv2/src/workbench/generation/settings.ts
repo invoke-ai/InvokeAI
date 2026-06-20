@@ -53,6 +53,12 @@ export const MIN_DIMENSION = 64;
 export const MAX_DIMENSION = 4096;
 
 export const SEED_MAX = 4_294_967_295;
+export const MIN_NEGATIVE_PROMPT_HEIGHT_PX = 56;
+export const MAX_NEGATIVE_PROMPT_HEIGHT_PX = 240;
+export const DEFAULT_NEGATIVE_PROMPT_HEIGHT_PX = 56;
+export const MIN_POSITIVE_PROMPT_HEIGHT_PX = 96;
+export const MAX_POSITIVE_PROMPT_HEIGHT_PX = 360;
+export const DEFAULT_POSITIVE_PROMPT_HEIGHT_PX = 96;
 
 export const DEFAULT_LORA_WEIGHT_CONFIG = {
   coarseStep: 0.05,
@@ -98,6 +104,9 @@ const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(v
 
 const hasFiniteNumber = (record: Record<string, unknown>, key: string): boolean =>
   typeof record[key] === 'number' && Number.isFinite(record[key]);
+
+const getClampedNumber = (record: Record<string, unknown>, key: string, min: number, max: number, fallback: number) =>
+  hasFiniteNumber(record, key) ? Math.min(Math.max(record[key] as number, min), max) : fallback;
 
 export const isMainModelConfig = (value: unknown): value is MainModelConfig =>
   isRecord(value) &&
@@ -354,8 +363,23 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     height,
     loras: Array.isArray(values.loras) ? values.loras.filter(isGenerateLora) : [],
     modelKey: values.modelKey as string,
+    negativePromptEnabled: typeof values.negativePromptEnabled === 'boolean' ? values.negativePromptEnabled : true,
     negativePrompt: values.negativePrompt as string,
+    negativePromptHeightPx: getClampedNumber(
+      values,
+      'negativePromptHeightPx',
+      MIN_NEGATIVE_PROMPT_HEIGHT_PX,
+      MAX_NEGATIVE_PROMPT_HEIGHT_PX,
+      DEFAULT_NEGATIVE_PROMPT_HEIGHT_PX
+    ),
     positivePrompt: values.positivePrompt as string,
+    positivePromptHeightPx: getClampedNumber(
+      values,
+      'positivePromptHeightPx',
+      MIN_POSITIVE_PROMPT_HEIGHT_PX,
+      MAX_POSITIVE_PROMPT_HEIGHT_PX,
+      DEFAULT_POSITIVE_PROMPT_HEIGHT_PX
+    ),
     scheduler: values.scheduler as string,
     seamlessXAxis: typeof values.seamlessXAxis === 'boolean' ? values.seamlessXAxis : false,
     seamlessYAxis: typeof values.seamlessYAxis === 'boolean' ? values.seamlessYAxis : false,
@@ -399,6 +423,9 @@ export const isGenerateSettings = (values: unknown): values is GenerateSettings 
     hasFiniteNumber(values, 'aspectRatioValue') &&
     hasFiniteNumber(values, 'clipSkip') &&
     typeof values.colorCompensation === 'boolean' &&
+    typeof values.negativePromptEnabled === 'boolean' &&
+    hasFiniteNumber(values, 'negativePromptHeightPx') &&
+    hasFiniteNumber(values, 'positivePromptHeightPx') &&
     Array.isArray(values.loras) &&
     values.loras.every(isGenerateLora) &&
     typeof values.seamlessXAxis === 'boolean' &&
