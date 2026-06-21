@@ -16534,14 +16534,14 @@ export type components = {
              * Convert Cache Dir
              * Format: path
              * @description Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).
-             * @default models\.convert_cache
+             * @default models/.convert_cache
              */
             convert_cache_dir?: string;
             /**
              * Download Cache Dir
              * Format: path
              * @description Path to the directory that contains dynamically downloaded models.
-             * @default models\.download_cache
+             * @default models/.download_cache
              */
             download_cache_dir?: string;
             /**
@@ -33612,6 +33612,12 @@ export type components = {
              * @default null
              */
             pid_decoder?: components["schemas"]["PiDDecoderField"] | null;
+            /**
+             * VAE
+             * @description Z-Image VAE used to read scaling_factor / shift_factor. If omitted, the FLUX.1 fallback constants (0.3611 / 0.1159) are used.
+             * @default null
+             */
+            vae?: components["schemas"]["VAEField"] | null;
             /**
              * Num Inference Steps
              * @description Number of PiD distill steps. The released checkpoints are trained for 4.
