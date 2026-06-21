@@ -38,6 +38,47 @@ def _looks_like_pid_decoder(state_dict: dict[str | int, Any]) -> bool:
     return any(isinstance(k, str) and _PID_MARKER_SUBSTRING in k for k in state_dict)
 
 
+# The latent input projection (`lq_proj.latent_proj.0`) is a Conv2d whose
+# in-channel count equals the backbone's latent channel count — the released
+# sr4x checkpoints apply no spatial fold here, so the Conv's dim-1 is exactly
+# `lq_latent_channels` (see `_PER_BACKBONE` in invokeai/backend/pid/decode.py):
+# FLUX.1 / SD3 = 16, FLUX.2 = 128. This is the only architectural dimension
+# that varies between backbones and is therefore a filename-independent
+# discriminator between FLUX.2 and the 16-channel family. (FLUX.1 and SD3 are
+# architecturally identical and cannot be told apart from the weights alone.)
+# We match the key by suffix because the official `.pth` keep the `net.` prefix.
+_LATENT_PROJ_KEY_SUFFIX = "lq_proj.latent_proj.0.weight"
+
+_LATENT_CHANNELS_TO_BASES: dict[int, set[BaseModelType]] = {
+    16: {BaseModelType.Flux, BaseModelType.StableDiffusion3},
+    128: {BaseModelType.Flux2},
+}
+
+
+def _latent_channels_from_state_dict(state_dict: dict[str | int, Any]) -> int | None:
+    """Read the backbone's latent channel count from the `lq_proj` input Conv.
+
+    Returns None if the diagnostic weight is absent or not a 4D conv tensor.
+    """
+    for k, v in state_dict.items():
+        if isinstance(k, str) and k.endswith(_LATENT_PROJ_KEY_SUFFIX):
+            shape = getattr(v, "shape", None)
+            if shape is not None and len(shape) == 4:
+                return int(shape[1])
+    return None
+
+
+def _name_for_matching(mod: ModelOnDisk) -> str:
+    """Searchable name for backbone/variant heuristics.
+
+    NVIDIA distributes PiD checkpoints as
+    ``PiD_res2k_sr4x_official_<backbone>_distill_4step/model_ema_bf16.pth`` — the
+    backbone + variant live in the *directory* name, not the weights filename.
+    We therefore match against both the filename and its parent directory.
+    """
+    return f"{mod.path.parent.name} {mod.path.name}"
+
+
 def _backbone_from_filename(name: str) -> BaseModelType | None:
     """Heuristic backbone match against NVIDIA's checkpoint filename conventions.
 
@@ -68,10 +109,11 @@ def _variant_from_filename(name: str) -> PiDDecoderVariantType:
 class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
     """Shared logic for PiD decoder checkpoint configs.
 
-    Concrete subclasses pin `base` to a specific backbone; backbone matching is
-    performed against the filename (NVIDIA's distribution names backbone +
-    variant unambiguously). `variant` is carried as data without participating
-    in the discriminator tag (one config class per backbone).
+    Concrete subclasses pin `base` to a specific backbone. Backbone matching is
+    driven primarily by the latent channel count read from the weights, with the
+    filename / directory name as a tie-breaker for the architecturally identical
+    FLUX.1 / SD3 pair. `variant` is carried as data without participating in the
+    discriminator tag (one config class per backbone).
     """
 
     type: Literal[ModelType.PiDDecoder] = Field(default=ModelType.PiDDecoder)
@@ -82,21 +124,52 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
         raise_if_not_file(mod)
         raise_for_override_fields(cls, override_fields)
 
-        if not _looks_like_pid_decoder(mod.load_state_dict()):
+        state_dict = mod.load_state_dict()
+        if not _looks_like_pid_decoder(state_dict):
             raise NotAMatchError("state dict does not look like a PiD decoder (no 'lq_proj.*' keys)")
 
-        cls._validate_base(mod)
+        cls._validate_base(mod, state_dict)
 
-        variant = override_fields.pop("variant", None) or _variant_from_filename(mod.path.name)
+        variant = override_fields.pop("variant", None) or _variant_from_filename(_name_for_matching(mod))
         return cls(**override_fields, variant=variant)
 
     @classmethod
-    def _validate_base(cls, mod: ModelOnDisk) -> None:
+    def _validate_base(cls, mod: ModelOnDisk, state_dict: dict[str | int, Any]) -> None:
+        """Confirm this checkpoint belongs to the config's pinned backbone.
+
+        The latent channel count (read from the weights) is authoritative and
+        separates FLUX.2 (128ch) from the 16ch family. FLUX.1 and SD3 share an
+        identical architecture, so within the 16ch family we fall back to the
+        filename / directory name, defaulting to FLUX.1 when it is silent.
+        """
         expected_base = cls.model_fields["base"].default
-        inferred_base = _backbone_from_filename(mod.path.name)
+        channels = _latent_channels_from_state_dict(state_dict)
+
+        if channels is not None:
+            candidate_bases = _LATENT_CHANNELS_TO_BASES.get(channels)
+            if candidate_bases is None:
+                raise NotAMatchError(
+                    f"PiD checkpoint has {channels} latent channels; no supported backbone uses this "
+                    "(supported: 16 for FLUX.1/SD3, 128 for FLUX.2)"
+                )
+            if expected_base not in candidate_bases:
+                raise NotAMatchError(f"latent channels={channels} do not match backbone {expected_base}")
+            if len(candidate_bases) > 1:
+                # Ambiguous 16ch family — disambiguate FLUX.1 vs SD3 by name.
+                named_base = _backbone_from_filename(_name_for_matching(mod))
+                if named_base in candidate_bases:
+                    if named_base is not expected_base:
+                        raise NotAMatchError(f"name indicates {named_base}, not {expected_base}")
+                elif expected_base is not BaseModelType.Flux:
+                    # Name gives no usable hint → default the family to FLUX.1.
+                    raise NotAMatchError("ambiguous 16-channel PiD checkpoint; defaulting to FLUX.1")
+            return
+
+        # No diagnostic weight (unexpected) → fall back to filename-only matching.
+        inferred_base = _backbone_from_filename(_name_for_matching(mod))
         if inferred_base is None:
             raise NotAMatchError(
-                "cannot determine PiD decoder backbone from filename (expected one of: flux, flux2, sd3)"
+                "cannot determine PiD decoder backbone from weights or filename (expected one of: flux, flux2, sd3)"
             )
         if inferred_base is not expected_base:
             raise NotAMatchError(f"backbone is {inferred_base}, not {expected_base}")
@@ -110,7 +183,7 @@ class PiDDecoder_Checkpoint_FLUX_Config(PiDDecoder_Checkpoint_Config_Base, Confi
 
 
 class PiDDecoder_Checkpoint_Flux2_Config(PiDDecoder_Checkpoint_Config_Base, Config_Base):
-    """PiD decoder for the FLUX.2 backbone (32-channel latent)."""
+    """PiD decoder for the FLUX.2 backbone (128-channel latent)."""
 
     base: Literal[BaseModelType.Flux2] = Field(default=BaseModelType.Flux2)
     variant: PiDDecoderVariantType = Field(description="Resolution preset of the PiD decoder checkpoint.")
