@@ -8,6 +8,8 @@ def preprocess_t5_encoder_model_identifier(model_identifier: ModelIdentifierFiel
     """
     if model_identifier.base == BaseModelType.Any:
         return model_identifier.model_copy(update={"submodel_type": SubModelType.TextEncoder2})
+    elif model_identifier.base == BaseModelType.Flux:
+        return model_identifier.model_copy(update={"submodel_type": SubModelType.TextEncoder2})
     elif model_identifier.base == BaseModelType.StableDiffusion3:
         return model_identifier.model_copy(update={"submodel_type": SubModelType.TextEncoder3})
     else:
@@ -19,6 +21,8 @@ def preprocess_t5_tokenizer_model_identifier(model_identifier: ModelIdentifierFi
     or SD3 models can be used interchangeably.
     """
     if model_identifier.base == BaseModelType.Any:
+        return model_identifier.model_copy(update={"submodel_type": SubModelType.Tokenizer2})
+    elif model_identifier.base == BaseModelType.Flux:
         return model_identifier.model_copy(update={"submodel_type": SubModelType.Tokenizer2})
     elif model_identifier.base == BaseModelType.StableDiffusion3:
         return model_identifier.model_copy(update={"submodel_type": SubModelType.Tokenizer3})

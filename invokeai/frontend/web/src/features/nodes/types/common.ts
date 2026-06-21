@@ -190,6 +190,7 @@ export const zModelFormat = z.enum([
   'bnb_quantized_int8b',
   'bnb_quantized_nf4b',
   'gguf_quantized',
+  'sdnq_quantized',
   'external_api',
   'unknown',
 ]);

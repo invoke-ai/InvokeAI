@@ -475,11 +475,41 @@ export const isFluxFillMainModelModelConfig = (config: AnyModelConfig): config i
 };
 
 export const isZImageDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
-  return config.type === 'main' && config.base === 'z-image' && config.format === 'diffusers';
+  if (config.type !== 'main' || config.base !== 'z-image') {
+    return false;
+  }
+  // Read `format` and `submodels` as plain strings/unknown so TS doesn't narrow away the
+  // `sdnq_quantized` branch. The OpenAPI schema is regenerated separately and currently
+  // doesn't list the `sdnq_quantized` Z-Image format variant.
+  const format = (config as { format?: unknown }).format as string | undefined;
+  if (format === 'diffusers') {
+    return true;
+  }
+  // SDNQ-quantized ZImagePipeline folders carry the same submodels layout (transformer, vae,
+  // text_encoder, ...) as a plain diffusers ZImagePipeline. Single-file SDNQ Z-Image
+  // checkpoints have no submodels and must not match here.
+  if (format !== 'sdnq_quantized') {
+    return false;
+  }
+  const submodels = (config as { submodels?: unknown }).submodels;
+  return Boolean(submodels);
 };
 
 export const isFlux2DiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
-  return config.type === 'main' && config.base === 'flux2' && config.format === 'diffusers';
+  if (config.type !== 'main' || config.base !== 'flux2') {
+    return false;
+  }
+  // Same reasoning as isZImageDiffusersMainModelConfig: an SDNQ FLUX.2 pipeline folder ships
+  // the same submodels (transformer/text_encoder/tokenizer/vae) and qualifies as a source model.
+  const format = (config as { format?: unknown }).format as string | undefined;
+  if (format === 'diffusers') {
+    return true;
+  }
+  if (format !== 'sdnq_quantized') {
+    return false;
+  }
+  const submodels = (config as { submodels?: unknown }).submodels;
+  return Boolean(submodels);
 };
 
 export const isQwenImageDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {

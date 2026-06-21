@@ -83,12 +83,20 @@ from invokeai.backend.model_manager.configs.main import (
     Main_GGUF_FLUX_Config,
     Main_GGUF_QwenImage_Config,
     Main_GGUF_ZImage_Config,
+    Main_SDNQ_Diffusers_Flux2_Config,
+    Main_SDNQ_Diffusers_FLUX_Config,
+    Main_SDNQ_Diffusers_ZImage_Config,
+    Main_SDNQ_Flux2_Config,
+    Main_SDNQ_FLUX_Config,
+    Main_SDNQ_ZImage_Config,
     MainModelDefaultSettings,
 )
 from invokeai.backend.model_manager.configs.qwen3_encoder import (
     Qwen3Encoder_Checkpoint_Config,
     Qwen3Encoder_GGUF_Config,
     Qwen3Encoder_Qwen3Encoder_Config,
+    Qwen3Encoder_SDNQ_Config,
+    Qwen3Encoder_SDNQ_Folder_Config,
 )
 from invokeai.backend.model_manager.configs.qwen_vl_encoder import (
     QwenVLEncoder_Checkpoint_Config,
@@ -100,7 +108,11 @@ from invokeai.backend.model_manager.configs.t2i_adapter import (
     T2IAdapter_Diffusers_SD1_Config,
     T2IAdapter_Diffusers_SDXL_Config,
 )
-from invokeai.backend.model_manager.configs.t5_encoder import T5Encoder_BnBLLMint8_Config, T5Encoder_T5Encoder_Config
+from invokeai.backend.model_manager.configs.t5_encoder import (
+    T5Encoder_BnBLLMint8_Config,
+    T5Encoder_SDNQ_Config,
+    T5Encoder_T5Encoder_Config,
+)
 from invokeai.backend.model_manager.configs.text_llm import TextLLM_Diffusers_Config
 from invokeai.backend.model_manager.configs.textual_inversion import (
     TI_File_SD1_Config,
@@ -193,6 +205,12 @@ AnyModelConfig = Annotated[
         Annotated[Main_GGUF_FLUX_Config, Main_GGUF_FLUX_Config.get_tag()],
         Annotated[Main_GGUF_QwenImage_Config, Main_GGUF_QwenImage_Config.get_tag()],
         Annotated[Main_GGUF_ZImage_Config, Main_GGUF_ZImage_Config.get_tag()],
+        Annotated[Main_SDNQ_FLUX_Config, Main_SDNQ_FLUX_Config.get_tag()],
+        Annotated[Main_SDNQ_Diffusers_FLUX_Config, Main_SDNQ_Diffusers_FLUX_Config.get_tag()],
+        Annotated[Main_SDNQ_Flux2_Config, Main_SDNQ_Flux2_Config.get_tag()],
+        Annotated[Main_SDNQ_Diffusers_Flux2_Config, Main_SDNQ_Diffusers_Flux2_Config.get_tag()],
+        Annotated[Main_SDNQ_ZImage_Config, Main_SDNQ_ZImage_Config.get_tag()],
+        Annotated[Main_SDNQ_Diffusers_ZImage_Config, Main_SDNQ_Diffusers_ZImage_Config.get_tag()],
         # VAE - checkpoint format
         Annotated[VAE_Checkpoint_SD1_Config, VAE_Checkpoint_SD1_Config.get_tag()],
         Annotated[VAE_Checkpoint_SD2_Config, VAE_Checkpoint_SD2_Config.get_tag()],
@@ -244,10 +262,13 @@ AnyModelConfig = Annotated[
         # T5 Encoder - all formats
         Annotated[T5Encoder_T5Encoder_Config, T5Encoder_T5Encoder_Config.get_tag()],
         Annotated[T5Encoder_BnBLLMint8_Config, T5Encoder_BnBLLMint8_Config.get_tag()],
+        Annotated[T5Encoder_SDNQ_Config, T5Encoder_SDNQ_Config.get_tag()],
         # Qwen3 Encoder
         Annotated[Qwen3Encoder_Qwen3Encoder_Config, Qwen3Encoder_Qwen3Encoder_Config.get_tag()],
         Annotated[Qwen3Encoder_Checkpoint_Config, Qwen3Encoder_Checkpoint_Config.get_tag()],
         Annotated[Qwen3Encoder_GGUF_Config, Qwen3Encoder_GGUF_Config.get_tag()],
+        Annotated[Qwen3Encoder_SDNQ_Config, Qwen3Encoder_SDNQ_Config.get_tag()],
+        Annotated[Qwen3Encoder_SDNQ_Folder_Config, Qwen3Encoder_SDNQ_Folder_Config.get_tag()],
         # Qwen VL Encoder (Qwen2.5-VL multimodal encoder for Qwen Image)
         Annotated[QwenVLEncoder_Diffusers_Config, QwenVLEncoder_Diffusers_Config.get_tag()],
         Annotated[QwenVLEncoder_Checkpoint_Config, QwenVLEncoder_Checkpoint_Config.get_tag()],

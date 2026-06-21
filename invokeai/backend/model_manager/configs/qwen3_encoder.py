@@ -14,6 +14,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, Qwen3VariantType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
 
 
 def _has_qwen3_keys(state_dict: dict[str | int, Any]) -> bool:
@@ -44,6 +45,22 @@ def _has_qwen3_keys(state_dict: dict[str | int, Any]) -> bool:
 def _has_ggml_tensors(state_dict: dict[str | int, Any]) -> bool:
     """Check if state dict contains GGML tensors (GGUF quantized)."""
     return any(isinstance(v, GGMLTensor) for v in state_dict.values())
+
+
+def _has_sdnq_tensors(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains SDNQTensor instances."""
+    return any(isinstance(v, SDNQTensor) for v in state_dict.values())
+
+
+def _has_sdnq_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict has SDNQ-style keys (weight + scale pairs)."""
+    keys = {k for k in state_dict.keys() if isinstance(k, str)}
+    for key in keys:
+        if key.endswith(".weight"):
+            base = key[:-7]
+            if f"{base}.scale" in keys:
+                return True
+    return False
 
 
 def _get_qwen3_variant_from_state_dict(state_dict: dict[str | int, Any]) -> Optional[Qwen3VariantType]:
@@ -281,3 +298,115 @@ class Qwen3Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
         has_ggml = _has_ggml_tensors(mod.load_state_dict())
         if not has_ggml:
             raise NotAMatchError("state dict does not look like GGUF quantized")
+
+
+class Qwen3Encoder_SDNQ_Config(Checkpoint_Config_Base, Config_Base):
+    """Configuration for SDNQ-quantized Qwen3 Encoder models (single file)."""
+
+    base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
+    type: Literal[ModelType.Qwen3Encoder] = Field(default=ModelType.Qwen3Encoder)
+    format: Literal[ModelFormat.SDNQQuantized] = Field(default=ModelFormat.SDNQQuantized)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
+    variant: Qwen3VariantType = Field(description="Qwen3 model size variant (4B or 8B)")
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_qwen3_model(mod)
+
+        cls._validate_looks_like_sdnq_quantized(mod)
+
+        variant = cls._get_variant_or_default(mod)
+
+        return cls(variant=variant, **override_fields)
+
+    @classmethod
+    def _get_variant_or_default(cls, mod: ModelOnDisk) -> Qwen3VariantType:
+        """Get variant from state dict, defaulting to 4B if unknown."""
+        state_dict = mod.load_state_dict()
+        variant = _get_qwen3_variant_from_state_dict(state_dict)
+        return variant if variant is not None else Qwen3VariantType.Qwen3_4B
+
+    @classmethod
+    def _validate_looks_like_qwen3_model(cls, mod: ModelOnDisk) -> None:
+        has_qwen3 = _has_qwen3_keys(mod.load_state_dict())
+        if not has_qwen3:
+            raise NotAMatchError("state dict does not look like a Qwen3 model")
+
+    @classmethod
+    def _validate_looks_like_sdnq_quantized(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
+        if not _has_sdnq_tensors(state_dict) and not _has_sdnq_keys(state_dict):
+            raise NotAMatchError("state dict does not look like SDNQ quantized")
+
+
+class Qwen3Encoder_SDNQ_Folder_Config(Config_Base):
+    """Configuration for folder-based SDNQ-quantized Qwen3 Encoder models.
+
+    Used for SDNQ bundles where the text_encoder is a folder containing
+    quantization_config.json and safetensors files with SDNQ keys.
+    """
+
+    base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
+    type: Literal[ModelType.Qwen3Encoder] = Field(default=ModelType.Qwen3Encoder)
+    format: Literal[ModelFormat.SDNQQuantized] = Field(default=ModelFormat.SDNQQuantized)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
+    variant: Qwen3VariantType = Field(description="Qwen3 model size variant (4B or 8B)")
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        matched = False
+
+        # Check for quantization_config.json with quant_method="sdnq"
+        quant_config_path = mod.path / "quantization_config.json"
+        if quant_config_path.exists():
+            with open(quant_config_path, "r", encoding="utf-8") as f:
+                quant_config = json.load(f)
+            if quant_config.get("quant_method") == "sdnq":
+                matched = True
+
+        # Fallback: check if safetensors files have SDNQ-style keys
+        if not matched:
+            safetensors_files = list(mod.path.glob("*.safetensors"))
+            if safetensors_files:
+                state_dict = mod.load_state_dict()
+                if _has_sdnq_keys(state_dict):
+                    matched = True
+
+        if not matched:
+            raise NotAMatchError("directory does not look like an SDNQ-quantized Qwen3 encoder")
+
+        variant = cls._get_variant_from_dir(mod)
+        return cls(variant=variant, **override_fields)
+
+    @classmethod
+    def _get_variant_from_dir(cls, mod: ModelOnDisk) -> Qwen3VariantType:
+        """Determine variant from config.json hidden_size, defaulting to 4B."""
+        QWEN3_06B_HIDDEN_SIZE = 1024
+        QWEN3_4B_HIDDEN_SIZE = 2560
+        QWEN3_8B_HIDDEN_SIZE = 4096
+
+        for cfg_path in (mod.path / "config.json", mod.path / "text_encoder" / "config.json"):
+            if not cfg_path.exists():
+                continue
+            try:
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                continue
+            hidden_size = cfg.get("hidden_size")
+            if hidden_size == QWEN3_8B_HIDDEN_SIZE:
+                return Qwen3VariantType.Qwen3_8B
+            if hidden_size == QWEN3_4B_HIDDEN_SIZE:
+                return Qwen3VariantType.Qwen3_4B
+            if hidden_size == QWEN3_06B_HIDDEN_SIZE:
+                return Qwen3VariantType.Qwen3_06B
+            break
+        return Qwen3VariantType.Qwen3_4B

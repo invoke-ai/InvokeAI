@@ -462,6 +462,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 ModelFormat.BnbQuantizedLlmInt8b,
                 ModelFormat.BnbQuantizednf4b,
                 ModelFormat.GGUFQuantized,
+                ModelFormat.SDNQQuantized,
             ]:
                 model_is_quantized = True
             else:
