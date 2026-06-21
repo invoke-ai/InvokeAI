@@ -121,7 +121,6 @@ class SD3PiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
             x0 = decoder.decode(
                 latent=denorm_latent,
                 caption_embs=caption_embs,
-
                 caption_mask=caption_mask,
                 config=PiDDecodeConfig(num_inference_steps=self.num_inference_steps, seed=self.seed),
             )
