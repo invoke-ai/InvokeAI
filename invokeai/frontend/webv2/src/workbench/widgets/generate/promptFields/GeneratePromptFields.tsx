@@ -45,6 +45,8 @@ export const GeneratePromptFields = ({ onCommit, selectedModel, settings }: Gene
         <NegativePromptField
           heightPx={settings.negativePromptHeightPx}
           isEnabled={settings.negativePromptEnabled}
+          loras={settings.loras}
+          selectedModel={selectedModel}
           helpText={promptPolicy.negativeHelpText}
           showSyntaxHighlighting={showSyntaxHighlighting}
           value={settings.negativePrompt}

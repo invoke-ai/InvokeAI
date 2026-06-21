@@ -24,8 +24,6 @@ import {
 } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 
-import { insertPositivePromptText } from './promptFocus';
-
 const DISABLED_PROMPT_ACTIONS = [
   { icon: BookDashedIcon, label: 'Prompt Template' },
   { icon: CurlyBracesIcon, label: 'Show dynamic prompts' },
@@ -33,26 +31,23 @@ const DISABLED_PROMPT_ACTIONS = [
 
 interface PositivePromptActionsProps {
   loras: GenerateLora[];
+  isPromptTriggerPickerOpen: boolean;
   onUsePrompt: (prompt: PromptHistoryItem) => void;
   positivePrompt: string;
   selectedModel: GenerateModelConfig | undefined;
+  onOpenPromptTriggerPicker: (anchorElement: HTMLElement) => void;
   onPositivePromptChange: (prompt: string) => void;
 }
 
 export const PositivePromptActions = ({
-  loras,
+  isPromptTriggerPickerOpen,
+  onOpenPromptTriggerPicker,
   onPositivePromptChange,
   onUsePrompt,
   positivePrompt,
-  selectedModel,
 }: PositivePromptActionsProps) => (
   <HStack gap="0.5">
-    <AddPromptTriggerButton
-      loras={loras}
-      positivePrompt={positivePrompt}
-      selectedModel={selectedModel}
-      onPositivePromptChange={onPositivePromptChange}
-    />
+    <AddPromptTriggerButton isOpen={isPromptTriggerPickerOpen} onOpenPromptTriggerPicker={onOpenPromptTriggerPicker} />
     {DISABLED_PROMPT_ACTIONS.map(({ icon: ActionIcon, label }) => (
       <Tooltip key={label} content={label}>
         <IconButton aria-label={label} disabled size="2xs" variant="ghost">
@@ -131,15 +126,42 @@ const getPromptTriggerOptions = ({
   });
 };
 
-const AddPromptTriggerButton = ({
+export const AddPromptTriggerButton = ({
+  isOpen,
+  onOpenPromptTriggerPicker,
+}: {
+  isOpen: boolean;
+  onOpenPromptTriggerPicker: (anchorElement: HTMLElement) => void;
+}) => {
+  return (
+    <Tooltip content="Add prompt trigger">
+      <IconButton
+        aria-label="Add prompt trigger"
+        disabled={isOpen}
+        size="2xs"
+        variant="ghost"
+        onClick={(event) => onOpenPromptTriggerPicker(event.currentTarget)}
+      >
+        <PlusIcon />
+      </IconButton>
+    </Tooltip>
+  );
+};
+
+export const PromptTriggerPopover = ({
   loras,
-  onPositivePromptChange,
-  positivePrompt,
+  onClose,
+  onSelect,
+  open,
+  positioning,
   selectedModel,
-}: Pick<PositivePromptActionsProps, 'loras' | 'onPositivePromptChange' | 'positivePrompt' | 'selectedModel'>) => {
+}: Pick<PositivePromptActionsProps, 'loras' | 'selectedModel'> & {
+  open: boolean;
+  positioning: { getAnchorRect: () => { height: number; width: number; x: number; y: number } | null };
+  onClose: () => void;
+  onSelect: (trigger: string) => void;
+}) => {
   const { models } = useModelsSnapshot();
-  const triggerId = useId();
-  const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const options = getPromptTriggerOptions({ loras, models, selectedModel });
   const filteredOptions = options.filter((option) => {
@@ -166,31 +188,20 @@ const AddPromptTriggerButton = ({
     ensureModelsLoaded();
   }, []);
 
-  const selectTrigger = (trigger: string) => {
-    insertPositivePromptText({ onChange: onPositivePromptChange, text: trigger, value: positivePrompt });
-    setIsOpen(false);
-  };
-
   return (
     <Popover.Root
-      ids={{ trigger: triggerId }}
       lazyMount
-      open={isOpen}
-      positioning={{ placement: 'bottom-end' }}
+      open={open}
+      positioning={{ ...positioning, placement: 'bottom-start' }}
+      unmountOnExit
       onOpenChange={(event) => {
-        setIsOpen(event.open);
         if (event.open) {
           setSearchTerm('');
+        } else {
+          onClose();
         }
       }}
     >
-      <Tooltip content="Add prompt trigger" ids={{ trigger: triggerId }}>
-        <Popover.Trigger asChild>
-          <IconButton aria-label="Add prompt trigger" size="2xs" variant="ghost">
-            <PlusIcon />
-          </IconButton>
-        </Popover.Trigger>
-      </Tooltip>
       <Portal>
         <Popover.Positioner>
           <Popover.Content bg="bg.muted" borderColor="border.emphasized" borderWidth="1px" w="22rem">
@@ -228,7 +239,7 @@ const AddPromptTriggerButton = ({
                               size="xs"
                               variant="ghost"
                               transitionDuration="faster"
-                              onClick={() => selectTrigger(option.value)}
+                              onClick={() => onSelect(option.value)}
                             >
                               <Text color="fg" fontSize="xs" textAlign="start" wordBreak="break-word">
                                 {option.label}
