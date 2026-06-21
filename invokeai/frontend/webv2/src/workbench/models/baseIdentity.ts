@@ -1,4 +1,5 @@
 import type { ColorPalette } from '@chakra-ui/react';
+
 import type { ModelBase, ModelConfig } from './types';
 
 // Model-base identity registry: labels, colors, and scalar display facts only.

@@ -2,7 +2,8 @@ import type { ComponentType, ExoticComponent, JSXElementConstructor, SVGProps } 
 
 import type { ProjectGraphState } from './workflows/types';
 
-export type LayoutPresetId = 'canvas-default' | 'gallery' | 'workflow' | 'linear';
+export type BuiltInLayoutPresetId = 'canvas-default' | 'gallery' | 'workflow' | 'canvas';
+export type LayoutPresetId = BuiltInLayoutPresetId | (string & {});
 
 export type CenterViewId = 'canvas' | 'gallery' | 'preview' | 'workflow';
 
@@ -438,6 +439,18 @@ export interface ProjectLayoutState {
   panels: PanelState;
 }
 
+export interface LayoutPresetWidgetInstanceSnapshot {
+  id: WidgetInstanceId;
+  typeId: WidgetTypeId;
+  title?: string;
+}
+
+export interface LayoutPresetSnapshot {
+  layout: ProjectLayoutState;
+  widgetInstances: Record<WidgetInstanceId, LayoutPresetWidgetInstanceSnapshot>;
+  widgetRegions: Record<WidgetRegion, WidgetRegionState>;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -467,10 +480,8 @@ export interface Project {
 export interface LayoutPreset {
   id: LayoutPresetId;
   label: string;
-  description: string;
-  initialLayout: ProjectLayoutState;
-  /** Widget to focus in the left rail when the preset is applied (e.g. the Linear UI for workflow presets). */
-  leftRegionWidgetId?: WidgetId;
+  isBuiltIn?: boolean;
+  snapshot: LayoutPresetSnapshot;
 }
 
 export interface WorkbenchState {
@@ -681,6 +692,7 @@ export interface WorkbenchPreferences {
 
 export interface AccountState {
   activeLayoutPresetId: LayoutPresetId;
+  customLayoutPresets?: LayoutPreset[];
 }
 
 export interface WorkbenchPersistenceSnapshot {

@@ -112,8 +112,9 @@ describe('workbench widget region defaults', () => {
     const hydratedCustomized = workbenchReducer(initial, { state: customized, type: 'hydrateWorkbench' });
 
     expect(getActiveProject(hydratedLegacyDefault).widgetRegions.right.instanceIds).toEqual([
-      'queue',
       'gallery',
+      'preview',
+      'queue',
       'layers',
       'diagnostics',
       'project',
@@ -194,6 +195,94 @@ describe('workbench widget region opening', () => {
     expect(getActiveProject(state).widgetRegions.bottom.activeInstanceId).toBe('queue');
     expect(getActiveProject(state).widgetRegions.bottom.instanceIds).toEqual(['diagnostics', 'queue']);
     expect(getActiveProject(state).widgetRegions.bottom.isCollapsed).toBe(false);
+  });
+});
+
+describe('workbench layout presets', () => {
+  it('applies the Default preset as a full widget-region layout', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { presetId: 'canvas-default', type: 'applyPreset' });
+
+    const project = getActiveProject(state);
+
+    expect(project.layout.panels).toEqual({ isBottomOpen: false, isLeftOpen: true, isRightOpen: true });
+    expect(project.widgetRegions.left).toMatchObject({
+      activeInstanceId: 'generate',
+      instanceIds: ['generate', 'workflow'],
+      isCollapsed: false,
+      sizePx: 450,
+    });
+    expect(project.widgetRegions.center).toMatchObject({
+      activeInstanceId: 'preview',
+      instanceIds: ['preview', 'canvas', 'gallery:center', 'workflow:center'],
+      isCollapsed: false,
+      sizePx: 0,
+    });
+    expect(project.widgetRegions.right).toMatchObject({
+      activeInstanceId: 'gallery',
+      instanceIds: ['gallery', 'preview', 'queue', 'layers', 'diagnostics', 'project'],
+      isCollapsed: false,
+      sizePx: 450,
+    });
+    expect(project.widgetRegions.bottom).toMatchObject({
+      activeInstanceId: 'queue:bottom',
+      instanceIds: [
+        'server-status',
+        'diagnostics:bottom',
+        'queue:bottom',
+        'gallery:bottom',
+        'notifications',
+        'autosave-status',
+        'version-status',
+        'workflow:bottom',
+      ],
+      isCollapsed: true,
+      sizePx: 180,
+    });
+  });
+
+  it('adds a custom preset from the active project layout and applies it later', () => {
+    let state = createInitialWorkbenchState();
+    const projectId = state.activeProjectId;
+
+    state = workbenchReducer(state, { region: 'right', sizePx: 336, type: 'setRegionWidgetSize' });
+    state = workbenchReducer(state, { region: 'right', type: 'selectRegionWidget', widgetId: 'queue' });
+    state = workbenchReducer(state, { region: 'center', type: 'selectRegionWidget', widgetId: 'preview' });
+    state = workbenchReducer(state, {
+      label: 'Queue review',
+      presetId: 'custom-layout-1',
+      type: 'addLayoutPreset',
+    });
+
+    state = workbenchReducer(state, { presetId: 'canvas', type: 'applyPreset' });
+    state = workbenchReducer(state, { presetId: 'custom-layout-1', type: 'applyPreset' });
+
+    const project = getProject(state, projectId);
+
+    expect(state.account.customLayoutPresets).toHaveLength(1);
+    expect(state.account.customLayoutPresets?.[0]).toMatchObject({ id: 'custom-layout-1', label: 'Queue review' });
+    expect(project.widgetRegions.right).toMatchObject({ activeInstanceId: 'queue', sizePx: 336 });
+    expect(project.widgetRegions.center.activeInstanceId).toBe('preview');
+  });
+
+  it('renames and deletes only custom layout presets', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, {
+      label: 'Original',
+      presetId: 'custom-layout-1',
+      type: 'addLayoutPreset',
+    });
+    state = workbenchReducer(state, {
+      label: 'Renamed',
+      presetId: 'custom-layout-1',
+      type: 'renameLayoutPreset',
+    });
+    state = workbenchReducer(state, { presetId: 'canvas-default', type: 'renameLayoutPreset', label: 'Nope' });
+    state = workbenchReducer(state, { presetId: 'custom-layout-1', type: 'deleteLayoutPreset' });
+
+    expect(state.account.customLayoutPresets).toEqual([]);
   });
 });
 
@@ -1028,7 +1117,7 @@ describe('workbench account and project settings', () => {
 
     const state = workbenchReducer(initial, { state: legacy, type: 'hydrateWorkbench' });
 
-    expect(state.account).toEqual({ activeLayoutPresetId: 'gallery' });
+    expect(state.account).toEqual({ activeLayoutPresetId: 'gallery', customLayoutPresets: [] });
   });
 
   it('heals hydrated accounts that are missing a layout preset', () => {

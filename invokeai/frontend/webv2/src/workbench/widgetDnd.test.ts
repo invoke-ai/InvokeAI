@@ -112,8 +112,18 @@ describe('widget dnd helpers', () => {
 
   it('moves to another eligible region when dropped on that region bar', () => {
     const project = getActiveProject(createInitialWorkbenchState());
+    const projectWithoutRightPreview = {
+      ...project,
+      widgetRegions: {
+        ...project.widgetRegions,
+        right: {
+          ...project.widgetRegions.right,
+          instanceIds: project.widgetRegions.right.instanceIds.filter((instanceId) => instanceId !== 'preview'),
+        },
+      },
+    };
     const resolution = resolveWidgetDragEnd(
-      project,
+      projectWithoutRightPreview,
       getWidgetInstanceDragData('center', 'preview', 'preview'),
       getWidgetRegionDropData('right'),
       getWidget
@@ -122,7 +132,7 @@ describe('widget dnd helpers', () => {
     expect(resolution).toEqual({
       fromRegion: 'center',
       instanceId: 'preview',
-      toIndex: project.widgetRegions.right.instanceIds.length,
+      toIndex: projectWithoutRightPreview.widgetRegions.right.instanceIds.length,
       toRegion: 'right',
       type: 'move',
     });

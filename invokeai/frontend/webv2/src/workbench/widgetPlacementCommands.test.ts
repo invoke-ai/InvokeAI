@@ -214,6 +214,6 @@ describe('widget placement commands', () => {
     const rightRegion = getActiveProject(nextState).widgetRegions.right;
 
     expect(rightRegion.instanceIds).not.toContain('layers');
-    expect(rightRegion.activeInstanceId).toBe('queue');
+    expect(rightRegion.activeInstanceId).toBe('gallery');
   });
 });

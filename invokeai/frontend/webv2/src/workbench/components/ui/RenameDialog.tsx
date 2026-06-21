@@ -16,6 +16,8 @@ export const RenameDialog = ({
   label = 'Project name',
   onClose,
   onSubmit,
+  submitLabel = 'Rename',
+  submitUnchanged = false,
   title = 'Rename project',
 }: {
   initialName: string;
@@ -23,6 +25,8 @@ export const RenameDialog = ({
   label?: string;
   onClose: () => void;
   onSubmit: (name: string) => Promise<void> | void;
+  submitLabel?: string;
+  submitUnchanged?: boolean;
   title?: string;
 }) => {
   const [isPending, setIsPending] = useState(false);
@@ -30,7 +34,7 @@ export const RenameDialog = ({
   const commit = async (value: string) => {
     const name = value.trim();
 
-    if (!name || name === initialName.trim()) {
+    if (!name || (!submitUnchanged && name === initialName.trim())) {
       onClose();
 
       return;
@@ -89,7 +93,7 @@ export const RenameDialog = ({
                   Cancel
                 </Button>
                 <Button loading={isPending} size="xs" type="submit" variant="solid">
-                  Rename
+                  {submitLabel}
                 </Button>
               </Dialog.Footer>
             </chakra.form>

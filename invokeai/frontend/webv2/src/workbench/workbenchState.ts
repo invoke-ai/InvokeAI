@@ -15,6 +15,7 @@ import type {
   InvocationSourceId,
   LayoutPreset,
   LayoutPresetId,
+  LayoutPresetSnapshot,
   Project,
   ProjectLayoutState,
   ProjectSettings,
@@ -59,6 +60,7 @@ import {
   resolveInvocationRoute,
 } from './invocation';
 import { defaultLayoutPreset, getLayoutPreset } from './layoutPresets';
+import { cloneLayoutPresetWidgetRegions, createLayoutPresetSnapshot } from './layoutPresetSnapshots';
 import { normalizeProjectSettings } from './settings/store';
 import { compileProjectGraph } from './workflows/buildGraph';
 import {
@@ -80,6 +82,9 @@ type WorkbenchAction =
   | { type: 'switchProject'; projectId: string }
   | { type: 'setCenterView'; centerViewId: CenterViewId }
   | { type: 'applyPreset'; presetId: LayoutPresetId }
+  | { type: 'addLayoutPreset'; presetId: LayoutPresetId; label: string }
+  | { type: 'renameLayoutPreset'; presetId: LayoutPresetId; label: string }
+  | { type: 'deleteLayoutPreset'; presetId: LayoutPresetId }
   | { type: 'resetActiveLayout' }
   | { type: 'recoverShellLayout' }
   | { type: 'setInvocationSource'; sourceId: InvocationSourceId }
@@ -591,39 +596,7 @@ const createWidgetInstances = (): Record<WidgetInstanceId, WidgetInstanceContrac
   );
 
 const createWidgetRegions = (): Record<WidgetRegion, WidgetRegionState> => ({
-  left: {
-    activeInstanceId: 'generate',
-    instanceIds: ['generate', 'workflow'],
-    isCollapsed: false,
-    sizePx: 288,
-  },
-  right: {
-    activeInstanceId: 'layers',
-    instanceIds: ['queue', 'gallery', 'layers', 'diagnostics', 'project'],
-    isCollapsed: false,
-    sizePx: 240,
-  },
-  bottom: {
-    activeInstanceId: 'queue',
-    instanceIds: [
-      'server-status',
-      'diagnostics:bottom',
-      'queue:bottom',
-      'gallery:bottom',
-      'notifications',
-      'autosave-status',
-      'version-status',
-      'workflow:bottom',
-    ],
-    isCollapsed: true,
-    sizePx: 180,
-  },
-  center: {
-    activeInstanceId: 'canvas',
-    instanceIds: ['canvas', 'gallery:center', 'preview', 'workflow:center'],
-    isCollapsed: false,
-    sizePx: 0,
-  },
+  ...cloneLayoutPresetWidgetRegions(defaultLayoutPreset.snapshot.widgetRegions),
 });
 
 const LEGACY_RIGHT_REGION_WIDGET_IDS: WidgetId[] = ['queue', 'gallery', 'layers'];
@@ -755,7 +728,7 @@ const createProject = (index: number, id = `project-${index}`): Project => ({
   graphHistory: [],
   id,
   invocation: { ...defaultInvocationRoute },
-  layout: { ...defaultLayoutPreset.initialLayout, panels: { ...defaultLayoutPreset.initialLayout.panels } },
+  layout: { ...defaultLayoutPreset.snapshot.layout, panels: { ...defaultLayoutPreset.snapshot.layout.panels } },
   name: `Project Name #${index}`,
   promptHistory: [],
   projectGraph: createProjectGraph(`${id}-graph`),
@@ -818,27 +791,6 @@ const updateActiveWidgetRegion = (
     },
   }));
 
-/** Focuses the regions a layout preset names: the center view and, when declared, a left-rail widget. */
-const applyPresetRegionFocus = (state: WorkbenchState, preset: LayoutPreset): WorkbenchState => {
-  const centerWidgetId = getCenterWidgetIdFromViewId(preset.initialLayout.centerViewId);
-  const nextState = updateActiveWidgetRegion(state, 'center', (region) => ({
-    ...region,
-    activeInstanceId: region.instanceIds.includes(centerWidgetId) ? centerWidgetId : region.activeInstanceId,
-    isCollapsed: false,
-  }));
-  const leftWidgetId = preset.leftRegionWidgetId;
-
-  if (!leftWidgetId) {
-    return nextState;
-  }
-
-  return updateActiveWidgetRegion(nextState, 'left', (region) => ({
-    ...region,
-    activeInstanceId: region.instanceIds.includes(leftWidgetId) ? leftWidgetId : region.activeInstanceId,
-    isCollapsed: false,
-  }));
-};
-
 const openPanelForRegion = (layout: ProjectLayoutState, region: WidgetRegion): ProjectLayoutState => ({
   ...layout,
   panels: {
@@ -849,12 +801,93 @@ const openPanelForRegion = (layout: ProjectLayoutState, region: WidgetRegion): P
   },
 });
 
+const cloneLayoutPresetSnapshot = (snapshot: LayoutPresetSnapshot): LayoutPresetSnapshot => ({
+  layout: { ...snapshot.layout, panels: { ...snapshot.layout.panels } },
+  widgetInstances: Object.fromEntries(
+    Object.entries(snapshot.widgetInstances).map(([instanceId, instance]) => [instanceId, { ...instance }])
+  ),
+  widgetRegions: cloneLayoutPresetWidgetRegions(snapshot.widgetRegions),
+});
+
+const isWidgetRegionState = (value: unknown): value is WidgetRegionState => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const record = value as Partial<WidgetRegionState>;
+
+  return (
+    typeof record.activeInstanceId === 'string' &&
+    Array.isArray(record.instanceIds) &&
+    record.instanceIds.every((instanceId) => typeof instanceId === 'string') &&
+    typeof record.isCollapsed === 'boolean' &&
+    typeof record.sizePx === 'number'
+  );
+};
+
+const isLayoutPresetSnapshot = (value: unknown): value is LayoutPresetSnapshot => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const snapshot = value as Partial<LayoutPresetSnapshot>;
+  const layout = snapshot.layout as Partial<ProjectLayoutState> | undefined;
+
+  return (
+    !!layout &&
+    typeof layout.presetId === 'string' &&
+    typeof layout.centerViewId === 'string' &&
+    !!layout.panels &&
+    typeof layout.panels.isBottomOpen === 'boolean' &&
+    typeof layout.panels.isLeftOpen === 'boolean' &&
+    typeof layout.panels.isRightOpen === 'boolean' &&
+    !!snapshot.widgetInstances &&
+    typeof snapshot.widgetInstances === 'object' &&
+    !!snapshot.widgetRegions &&
+    isWidgetRegionState(snapshot.widgetRegions.left) &&
+    isWidgetRegionState(snapshot.widgetRegions.right) &&
+    isWidgetRegionState(snapshot.widgetRegions.bottom) &&
+    isWidgetRegionState(snapshot.widgetRegions.center)
+  );
+};
+
+const normalizeCustomLayoutPresets = (presets: unknown): LayoutPreset[] => {
+  if (!Array.isArray(presets)) {
+    return [];
+  }
+
+  return presets.flatMap((preset): LayoutPreset[] => {
+    if (!preset || typeof preset !== 'object') {
+      return [];
+    }
+
+    const record = preset as Partial<LayoutPreset>;
+
+    if (typeof record.id !== 'string' || typeof record.label !== 'string' || !isLayoutPresetSnapshot(record.snapshot)) {
+      return [];
+    }
+
+    return [
+      {
+        id: record.id,
+        label: record.label,
+        snapshot: cloneLayoutPresetSnapshot(record.snapshot),
+      },
+    ];
+  });
+};
+
+const normalizeAccount = (account: Partial<WorkbenchState['account']> | undefined): WorkbenchState['account'] => ({
+  activeLayoutPresetId: account?.activeLayoutPresetId ?? defaultLayoutPreset.id,
+  customLayoutPresets: normalizeCustomLayoutPresets(account?.customLayoutPresets),
+});
+
 const normalizeWorkbenchState = (state: WorkbenchState): WorkbenchState => ({
   ...state,
   backendConnection: { status: 'connecting' },
   // Built explicitly: legacy snapshots carried preferences inside the account
   // (they live in the settings store now) and must not resurface here.
-  account: { activeLayoutPresetId: state.account?.activeLayoutPresetId ?? defaultLayoutPreset.id },
+  account: normalizeAccount(state.account),
   notifications: [],
   projects: state.projects.map(ensureProjectWidgetContracts),
 });
@@ -878,6 +911,49 @@ const updateActiveLayout = (
         ...nextProject.events,
       ],
       layout: getLayout(project.layout),
+    };
+  });
+
+const getAvailableLayoutPreset = (state: WorkbenchState, presetId: LayoutPresetId): LayoutPreset =>
+  state.account.customLayoutPresets?.find((preset) => preset.id === presetId) ?? getLayoutPreset(presetId);
+
+const applyLayoutPresetToProject = (project: Project, preset: LayoutPreset): Project => {
+  const snapshot = preset.snapshot;
+  const widgetInstances = { ...project.widgetInstances };
+
+  for (const instance of Object.values(snapshot.widgetInstances)) {
+    widgetInstances[instance.id] = widgetInstances[instance.id]
+      ? { ...widgetInstances[instance.id], title: instance.title }
+      : createWidgetInstance(instance.typeId, instance.id);
+  }
+
+  return {
+    ...project,
+    layout: {
+      ...snapshot.layout,
+      panels: { ...snapshot.layout.panels },
+      presetId: preset.id,
+    },
+    widgetInstances,
+    widgetRegions: cloneLayoutPresetWidgetRegions(snapshot.widgetRegions),
+  };
+};
+
+const updateActiveProjectLayoutPreset = (state: WorkbenchState, preset: LayoutPreset): WorkbenchState =>
+  updateActiveProject(state, (project) => {
+    const nextProject = pushUndo(project, 'Update layout');
+
+    return {
+      ...applyLayoutPresetToProject(nextProject, preset),
+      events: [
+        {
+          createdAt: now(),
+          id: createId('event'),
+          summary: 'Updated active layout',
+          type: 'layout-updated',
+        },
+        ...nextProject.events,
+      ],
     };
   });
 
@@ -1277,27 +1353,78 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       }));
     }
     case 'applyPreset': {
-      const preset = getLayoutPreset(action.presetId);
-      const nextState = updateActiveLayout(state, () => ({
-        ...preset.initialLayout,
-        panels: { ...preset.initialLayout.panels },
-      }));
+      const preset = getAvailableLayoutPreset(state, action.presetId);
+      const nextState = updateActiveProjectLayoutPreset(state, preset);
 
       return {
-        ...applyPresetRegionFocus(nextState, preset),
-        account: { ...state.account, activeLayoutPresetId: action.presetId },
+        ...nextState,
+        account: { ...state.account, activeLayoutPresetId: preset.id },
+      };
+    }
+    case 'addLayoutPreset': {
+      const activeProject = state.projects.find((project) => project.id === state.activeProjectId);
+
+      if (!activeProject) {
+        return state;
+      }
+
+      const preset: LayoutPreset = {
+        id: action.presetId,
+        label: action.label.trim() || 'Custom layout',
+        snapshot: createLayoutPresetSnapshot(ensureProjectWidgetContracts(activeProject)),
+      };
+      const customLayoutPresets = [
+        ...(state.account.customLayoutPresets ?? []).filter((candidate) => candidate.id !== action.presetId),
+        preset,
+      ];
+
+      return {
+        ...state,
+        account: { ...state.account, activeLayoutPresetId: preset.id, customLayoutPresets },
+      };
+    }
+    case 'renameLayoutPreset': {
+      const label = action.label.trim();
+
+      if (!label) {
+        return state;
+      }
+
+      return {
+        ...state,
+        account: {
+          ...state.account,
+          customLayoutPresets: (state.account.customLayoutPresets ?? []).map((preset) =>
+            preset.id === action.presetId ? { ...preset, label } : preset
+          ),
+        },
+      };
+    }
+    case 'deleteLayoutPreset': {
+      const customLayoutPresets = (state.account.customLayoutPresets ?? []).filter(
+        (preset) => preset.id !== action.presetId
+      );
+
+      return {
+        ...state,
+        account: {
+          ...state.account,
+          activeLayoutPresetId:
+            state.account.activeLayoutPresetId === action.presetId
+              ? defaultLayoutPreset.id
+              : state.account.activeLayoutPresetId,
+          customLayoutPresets,
+        },
       };
     }
     case 'resetActiveLayout': {
-      const preset = getLayoutPreset(
+      const preset = getAvailableLayoutPreset(
+        state,
         state.projects.find((project) => project.id === state.activeProjectId)?.layout.presetId ??
           state.account.activeLayoutPresetId
       );
-      const nextState = updateActiveLayout(state, () => {
-        return { ...preset.initialLayout, panels: { ...preset.initialLayout.panels } };
-      });
 
-      return applyPresetRegionFocus(nextState, preset);
+      return updateActiveProjectLayoutPreset(state, preset);
     }
     case 'recoverShellLayout': {
       return updateActiveLayout(state, (layout) => ({
