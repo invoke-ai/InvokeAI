@@ -28,6 +28,7 @@ from invokeai.backend.model_manager.configs.controlnet import (
 )
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
 from invokeai.backend.model_manager.configs.flux_redux import FLUXRedux_Checkpoint_Config
+from invokeai.backend.model_manager.configs.gemma2_encoder import Gemma2Encoder_Gemma2Encoder_Config
 from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
 from invokeai.backend.model_manager.configs.ip_adapter import (
     IPAdapter_Checkpoint_FLUX_Config,
@@ -84,6 +85,11 @@ from invokeai.backend.model_manager.configs.main import (
     Main_GGUF_QwenImage_Config,
     Main_GGUF_ZImage_Config,
     MainModelDefaultSettings,
+)
+from invokeai.backend.model_manager.configs.pid_decoder import (
+    PiDDecoder_Checkpoint_Flux2_Config,
+    PiDDecoder_Checkpoint_FLUX_Config,
+    PiDDecoder_Checkpoint_SD3_Config,
 )
 from invokeai.backend.model_manager.configs.qwen3_encoder import (
     Qwen3Encoder_Checkpoint_Config,
@@ -205,6 +211,10 @@ AnyModelConfig = Annotated[
         Annotated[VAE_Diffusers_SD1_Config, VAE_Diffusers_SD1_Config.get_tag()],
         Annotated[VAE_Diffusers_SDXL_Config, VAE_Diffusers_SDXL_Config.get_tag()],
         Annotated[VAE_Diffusers_Flux2_Config, VAE_Diffusers_Flux2_Config.get_tag()],
+        # PiD Decoder - checkpoint format
+        Annotated[PiDDecoder_Checkpoint_FLUX_Config, PiDDecoder_Checkpoint_FLUX_Config.get_tag()],
+        Annotated[PiDDecoder_Checkpoint_Flux2_Config, PiDDecoder_Checkpoint_Flux2_Config.get_tag()],
+        Annotated[PiDDecoder_Checkpoint_SD3_Config, PiDDecoder_Checkpoint_SD3_Config.get_tag()],
         # ControlNet - checkpoint format
         Annotated[ControlNet_Checkpoint_SD1_Config, ControlNet_Checkpoint_SD1_Config.get_tag()],
         Annotated[ControlNet_Checkpoint_SD2_Config, ControlNet_Checkpoint_SD2_Config.get_tag()],
@@ -248,6 +258,8 @@ AnyModelConfig = Annotated[
         Annotated[Qwen3Encoder_Qwen3Encoder_Config, Qwen3Encoder_Qwen3Encoder_Config.get_tag()],
         Annotated[Qwen3Encoder_Checkpoint_Config, Qwen3Encoder_Checkpoint_Config.get_tag()],
         Annotated[Qwen3Encoder_GGUF_Config, Qwen3Encoder_GGUF_Config.get_tag()],
+        # Gemma 2 Encoder (used by PiD)
+        Annotated[Gemma2Encoder_Gemma2Encoder_Config, Gemma2Encoder_Gemma2Encoder_Config.get_tag()],
         # Qwen VL Encoder (Qwen2.5-VL multimodal encoder for Qwen Image)
         Annotated[QwenVLEncoder_Diffusers_Config, QwenVLEncoder_Diffusers_Config.get_tag()],
         Annotated[QwenVLEncoder_Checkpoint_Config, QwenVLEncoder_Checkpoint_Config.get_tag()],
