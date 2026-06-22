@@ -38,6 +38,12 @@ class SessionQueueAndProcessorStatus(BaseModel):
     processor: SessionProcessorStatus
 
 
+def _get_workflow_call_root_queue_item(queue_item: SessionQueueItem) -> SessionQueueItem:
+    if queue_item.root_item_id is None:
+        return queue_item
+    return ApiDependencies.invoker.services.session_queue.get_queue_item(queue_item.root_item_id)
+
+
 def sanitize_queue_item_for_user(
     queue_item: SessionQueueItem, current_user_id: str, is_admin: bool
 ) -> SessionQueueItem:
@@ -326,7 +332,12 @@ async def retry_items_by_id(
                     raise HTTPException(
                         status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}"
                     )
-                if not current_user.is_admin and queue_item.user_id != current_user.user_id:
+                root_queue_item = _get_workflow_call_root_queue_item(queue_item)
+                if root_queue_item.queue_id != queue_id:
+                    raise HTTPException(
+                        status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}"
+                    )
+                if not current_user.is_admin and root_queue_item.user_id != current_user.user_id:
                     raise HTTPException(
                         status_code=403, detail=f"You do not have permission to retry queue item {item_id}"
                     )
@@ -522,8 +533,12 @@ async def delete_queue_item(
         if queue_item.queue_id != queue_id:
             raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
 
-        # Check authorization: user must own the item or be an admin
-        if queue_item.user_id != current_user.user_id and not current_user.is_admin:
+        root_queue_item = _get_workflow_call_root_queue_item(queue_item)
+        if root_queue_item.queue_id != queue_id:
+            raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
+
+        # The queue service deletes the entire chain, so authorization must use the root owner.
+        if root_queue_item.user_id != current_user.user_id and not current_user.is_admin:
             raise HTTPException(status_code=403, detail="You do not have permission to delete this queue item")
 
         ApiDependencies.invoker.services.session_queue.delete_queue_item(item_id)

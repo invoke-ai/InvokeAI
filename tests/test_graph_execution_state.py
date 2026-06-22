@@ -314,6 +314,25 @@ def test_graph_record_waiting_workflow_call_child_completion_aggregates_named_va
     assert parent.waiting_workflow_call_execution.completed_child_item_ids == [101, 102]
 
 
+def test_graph_record_waiting_workflow_call_child_completion_preserves_enqueue_order():
+    parent = GraphExecutionState(graph=Graph())
+    parent.execution_graph.add_node(AddInvocation(id="prepared-parent", a=1, b=2))
+    parent.prepared_source_mapping["prepared-parent"] = "source-parent"
+
+    frame = parent.build_workflow_call_frame(exec_node_id="prepared-parent", workflow_id="workflow-a")
+    child_a = parent.create_child_workflow_execution_state(Graph(), frame)
+    child_b = parent.create_child_workflow_execution_state(Graph(), frame)
+    parent.begin_waiting_on_workflow_call(frame)
+    parent.attach_waiting_workflow_call_child_sessions([child_a, child_b])
+    parent.set_waiting_workflow_call_child_item_ids([101, 102])
+
+    parent.record_waiting_workflow_call_child_completion(102, {"sum": 7})
+    is_complete, aggregated_values = parent.record_waiting_workflow_call_child_completion(101, {"sum": 3})
+
+    assert is_complete is True
+    assert aggregated_values == {"sum": [3, 7]}
+
+
 def test_graph_end_waiting_on_workflow_call_records_lifecycle_history():
     parent = GraphExecutionState(graph=Graph())
     parent.execution_graph.add_node(PromptTestInvocation(id="prepared-parent", prompt="a"))

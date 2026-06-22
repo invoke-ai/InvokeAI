@@ -575,15 +575,11 @@ def calc_session_count(batch: Batch) -> int:
     # TODO: Should this be a class method on Batch?
     if not batch.data:
         return batch.runs
-    data = []
+    session_count = batch.runs
     for batch_datum_list in batch.data:
-        to_zip = []
-        for batch_datum in batch_datum_list:
-            batch_data_items = range(len(batch_datum.items))
-            to_zip.append(batch_data_items)
-        data.append(list(zip(*to_zip, strict=True)))
-    data_product = list(product(*data))
-    return len(data_product) * batch.runs
+        group_length = len(batch_datum_list[0].items) if batch_datum_list else 0
+        session_count *= group_length
+    return session_count
 
 
 ValueToInsertTuple: TypeAlias = tuple[

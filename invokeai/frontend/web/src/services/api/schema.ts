@@ -32007,6 +32007,27 @@ export type components = {
              */
             id: string;
         };
+        /**
+         * WorkflowAccessRevokedEvent
+         * @description Event model for workflow_access_revoked.
+         */
+        WorkflowAccessRevokedEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * Workflow Id
+             * @description The ID of the workflow
+             */
+            workflow_id: string;
+            /**
+             * User Id
+             * @description The owner of the workflow
+             */
+            user_id: string;
+        };
         /** WorkflowAndGraphResponse */
         WorkflowAndGraphResponse: {
             /**
@@ -32039,7 +32060,7 @@ export type components = {
          * WorkflowCallCompatibilityReason
          * @enum {string}
          */
-        WorkflowCallCompatibilityReason: "ok" | "missing_workflow_return" | "multiple_workflow_return" | "unsupported_node" | "unsupported_batch_input" | "invalid_graph" | "invalid_inputs" | "unknown";
+        WorkflowCallCompatibilityReason: "ok" | "missing_workflow_return" | "multiple_workflow_return" | "unsupported_node" | "unsupported_batch_input" | "invalid_graph" | "invalid_inputs" | "exceeds_capacity" | "unknown";
         /**
          * WorkflowCallExecution
          * @description Tracks one parent/child workflow-call relationship and its lifecycle.
@@ -32097,6 +32118,11 @@ export type components = {
              */
             child_session_ids?: string[];
             /**
+             * Child Item Ids
+             * @description Child queue item ids in enqueue order.
+             */
+            child_item_ids?: number[];
+            /**
              * Expected Child Count
              * @description The number of child executions for this call.
              * @default 1
@@ -32113,6 +32139,15 @@ export type components = {
              */
             aggregated_values?: {
                 [key: string]: unknown[];
+            };
+            /**
+             * Child Outputs
+             * @description Workflow return values keyed by child queue item id.
+             */
+            child_outputs?: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
             };
         };
         /**

@@ -201,12 +201,15 @@ describe('setEventListeners workflow live updates', () => {
     );
   });
 
-  it('clears selected workflow ids when access is lost via a workflow_deleted event', () => {
+  it('clears selected workflow ids when another user revokes shared access', () => {
     const socket = createMockSocket();
     const dispatch = vi.fn();
     const store = {
       dispatch,
       getState: vi.fn(() => ({
+        auth: {
+          user: { user_id: 'viewer-1', is_admin: false },
+        },
         nodes: {
           present: {
             nodes: [
@@ -235,9 +238,56 @@ describe('setEventListeners workflow live updates', () => {
       setIsConnected: vi.fn(),
     });
 
-    socket.trigger('workflow_deleted', { workflow_id: 'wf-shared' });
+    socket.trigger('workflow_access_revoked', { workflow_id: 'wf-shared', user_id: 'owner-1' });
 
     expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          nodeId: 'call-saved-workflows-node',
+          fieldName: 'workflow_id',
+          value: '',
+        }),
+      })
+    );
+  });
+
+  it.each([
+    { user_id: 'owner-1', is_admin: false },
+    { user_id: 'admin-1', is_admin: true },
+  ])('keeps selected workflow ids when access remains for $user_id', (user) => {
+    const socket = createMockSocket();
+    const dispatch = vi.fn();
+    const store = {
+      dispatch,
+      getState: vi.fn(() => ({
+        auth: { user },
+        nodes: {
+          present: {
+            nodes: [
+              {
+                id: 'call-saved-workflows-node',
+                type: 'invocation',
+                data: {
+                  id: 'call-saved-workflows-node',
+                  type: 'call_saved_workflow',
+                  inputs: { workflow_id: { value: 'wf-shared' } },
+                },
+              },
+            ],
+          },
+        },
+      })),
+    };
+
+    setEventListeners({
+      socket: socket as never,
+      store: store as never,
+      setIsConnected: vi.fn(),
+    });
+
+    socket.trigger('workflow_access_revoked', { workflow_id: 'wf-shared', user_id: 'owner-1' });
+
+    expect(dispatch).not.toHaveBeenCalledWith(
       expect.objectContaining({
         payload: expect.objectContaining({
           nodeId: 'call-saved-workflows-node',

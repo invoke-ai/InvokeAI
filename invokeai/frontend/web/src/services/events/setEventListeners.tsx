@@ -129,6 +129,28 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     );
   };
 
+  const clearSavedWorkflowSelection = (workflowId: string) => {
+    const nodes = selectNodesSlice(getState()).nodes;
+
+    for (const node of nodes) {
+      if (node.type !== 'invocation' || node.data.type !== 'call_saved_workflow') {
+        continue;
+      }
+
+      if (node.data.inputs.workflow_id?.value !== workflowId) {
+        continue;
+      }
+
+      dispatch(
+        fieldValueReset({
+          nodeId: node.id,
+          fieldName: 'workflow_id',
+          value: '',
+        })
+      );
+    }
+  };
+
   socket.on('workflow_created', (data) => {
     log.debug({ data }, 'Workflow created');
     invalidateWorkflowLibrary();
@@ -142,26 +164,17 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   socket.on('workflow_deleted', (data) => {
     log.debug({ data }, 'Workflow deleted');
     invalidateWorkflowLibrary();
+    clearSavedWorkflowSelection(data.workflow_id);
+  });
 
-    const nodes = selectNodesSlice(getState()).nodes;
-
-    for (const node of nodes) {
-      if (node.type !== 'invocation' || node.data.type !== 'call_saved_workflow') {
-        continue;
-      }
-
-      if (node.data.inputs.workflow_id?.value !== data.workflow_id) {
-        continue;
-      }
-
-      dispatch(
-        fieldValueReset({
-          nodeId: node.id,
-          fieldName: 'workflow_id',
-          value: '',
-        })
-      );
+  socket.on('workflow_access_revoked', (data) => {
+    log.debug({ data }, 'Workflow access revoked');
+    invalidateWorkflowLibrary();
+    const currentUser = getState().auth.user;
+    if (currentUser?.is_admin || currentUser?.user_id === data.user_id) {
+      return;
     }
+    clearSavedWorkflowSelection(data.workflow_id);
   });
 
   socket.on('invocation_started', (data) => {

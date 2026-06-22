@@ -297,6 +297,31 @@ def test_retry_items_by_id_rejects_items_from_other_queue(
     assert response.status_code == 404
 
 
+def test_retry_items_by_id_authorizes_workflow_call_root_owner(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+) -> None:
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+    assert user1 is not None and user2 is not None
+
+    root_item_id = _insert_queue_item(mock_invoker.services.session_queue, user_id=user2.user_id, status="failed")
+    child_item_id = _insert_queue_item(
+        mock_invoker.services.session_queue,
+        user_id=user1.user_id,
+        status="failed",
+        workflow_call_id="workflow-call-1",
+        parent_item_id=root_item_id,
+        parent_session_id="parent-session-1",
+        root_item_id=root_item_id,
+        workflow_call_depth=1,
+    )
+
+    response = client.put("/api/v1/queue/default/retry_items_by_id", headers=_auth(user1_token), json=[child_item_id])
+
+    assert response.status_code == 403
+    assert mock_invoker.services.session_queue.get_queue_item(root_item_id).status == "failed"
+
+
 def test_retry_items_by_id_skips_missing_items_and_retries_valid_items(
     client: TestClient, mock_invoker: Invoker, user1_token: str
 ) -> None:
@@ -375,3 +400,29 @@ def test_delete_queue_item_rejects_item_from_other_queue(
     response = client.delete(f"/api/v1/queue/default/i/{item_id}", headers=_auth(user1_token))
 
     assert response.status_code == 404
+
+
+def test_delete_queue_item_authorizes_workflow_call_root_owner(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+) -> None:
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+    assert user1 is not None and user2 is not None
+
+    root_item_id = _insert_queue_item(mock_invoker.services.session_queue, user_id=user2.user_id, status="failed")
+    child_item_id = _insert_queue_item(
+        mock_invoker.services.session_queue,
+        user_id=user1.user_id,
+        status="failed",
+        workflow_call_id="workflow-call-1",
+        parent_item_id=root_item_id,
+        parent_session_id="parent-session-1",
+        root_item_id=root_item_id,
+        workflow_call_depth=1,
+    )
+
+    response = client.delete(f"/api/v1/queue/default/i/{child_item_id}", headers=_auth(user1_token))
+
+    assert response.status_code == 403
+    assert mock_invoker.services.session_queue.get_queue_item(root_item_id).status == "failed"
+    assert mock_invoker.services.session_queue.get_queue_item(child_item_id).status == "failed"

@@ -11,6 +11,7 @@ class WorkflowCallCompatibilityReason(str, Enum):
     UnsupportedBatchInput = "unsupported_batch_input"
     InvalidGraph = "invalid_graph"
     InvalidInputs = "invalid_inputs"
+    ExceedsCapacity = "exceeds_capacity"
     Unknown = "unknown"
 
 

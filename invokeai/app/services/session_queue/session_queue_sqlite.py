@@ -30,6 +30,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueItem,
     SessionQueueItemNotFoundError,
     SessionQueueStatus,
+    TooManySessionsError,
     ValueToInsertTuple,
     calc_session_count,
     prepare_values_to_insert,
@@ -394,9 +395,28 @@ class SqliteSessionQueue(SessionQueueBase):
 
     def _get_current_workflow_call_chain_item_ids(self, queue_id: str) -> set[int]:
         current_queue_item = self.get_current(queue_id)
-        if current_queue_item is None:
+        if current_queue_item is not None:
+            return set(self._get_workflow_call_chain_item_ids(current_queue_item.item_id))
+
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT child.item_id
+                FROM session_queue child
+                JOIN session_queue parent ON parent.item_id = child.parent_item_id
+                WHERE
+                    child.queue_id = ?
+                    AND child.status = 'pending'
+                    AND parent.status = 'waiting'
+                ORDER BY child.priority DESC, child.created_at ASC, child.item_id ASC
+                LIMIT 1
+                """,
+                (queue_id,),
+            )
+            row = cursor.fetchone()
+        if row is None:
             return set()
-        return set(self._get_workflow_call_chain_item_ids(current_queue_item.item_id))
+        return set(self._get_workflow_call_chain_item_ids(cast(int, row[0])))
 
     def is_empty(self, queue_id: str) -> IsEmptyResult:
         with self._db.transaction() as cursor:
@@ -857,6 +877,20 @@ class SqliteSessionQueue(SessionQueueBase):
         root_item_id = parent_queue_item.root_item_id or parent_queue_item.item_id
 
         with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT COUNT(*)
+                FROM session_queue
+                WHERE queue_id = ? AND status = 'pending'
+                """,
+                (parent_queue_item.queue_id,),
+            )
+            pending_count = cast(int, cursor.fetchone()[0])
+            if pending_count >= self.__invoker.services.configuration.max_queue_size:
+                raise TooManySessionsError(
+                    "call_saved_workflow exceeds remaining queue capacity for child workflow executions"
+                )
+
             cursor.execute(
                 """--sql
                 INSERT INTO session_queue (

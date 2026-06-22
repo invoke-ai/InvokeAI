@@ -95,6 +95,7 @@ class WorkflowCallExecution(BaseModel):
     status: WorkflowCallStatus = Field(description="The current workflow-call lifecycle state.")
     error_message: Optional[str] = Field(default=None, description="Failure reason, if the call failed.")
     child_session_ids: list[str] = Field(default_factory=list, description="All child graph execution state ids.")
+    child_item_ids: list[int] = Field(default_factory=list, description="Child queue item ids in enqueue order.")
     expected_child_count: int = Field(default=1, ge=1, description="The number of child executions for this call.")
     completed_child_item_ids: list[int] = Field(
         default_factory=list,
@@ -103,6 +104,10 @@ class WorkflowCallExecution(BaseModel):
     aggregated_values: dict[str, list[Any]] = Field(
         default_factory=dict,
         description="The aggregated workflow_return values accumulated from child executions.",
+    )
+    child_outputs: dict[int, dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Workflow return values keyed by child queue item id.",
     )
 
 
@@ -2148,33 +2153,51 @@ class GraphExecutionState(BaseModel):
                 depth=self.waiting_workflow_call_execution.depth,
             )
 
+    def set_waiting_workflow_call_child_item_ids(self, child_item_ids: list[int]) -> None:
+        if self.waiting_workflow_call_execution is None:
+            raise ValueError("Execution state is not waiting on a workflow call.")
+        if len(child_item_ids) != self.waiting_workflow_call_execution.expected_child_count:
+            raise ValueError("Workflow call child item count does not match expected child count.")
+        if len(set(child_item_ids)) != len(child_item_ids):
+            raise ValueError("Workflow call child item ids must be unique.")
+        self.waiting_workflow_call_execution.child_item_ids = list(child_item_ids)
+
     def record_waiting_workflow_call_child_completion(
         self, child_item_id: int, output_values: dict[str, Any]
     ) -> tuple[bool, dict[str, Any]]:
         if self.waiting_workflow_call_execution is None:
             raise ValueError("Execution state is not waiting on a workflow call.")
-        if child_item_id not in self.waiting_workflow_call_execution.completed_child_item_ids:
+        execution = self.waiting_workflow_call_execution
+        if execution.child_item_ids and child_item_id not in execution.child_item_ids:
+            raise ValueError(f"Child queue item {child_item_id} does not belong to the active workflow call.")
+        if child_item_id not in execution.completed_child_item_ids:
             if (
-                self.waiting_workflow_call_execution.expected_child_count > 1
-                and self.waiting_workflow_call_execution.completed_child_item_ids
-                and set(output_values.keys()) != set(self.waiting_workflow_call_execution.aggregated_values.keys())
+                execution.expected_child_count > 1
+                and execution.child_outputs
+                and set(output_values.keys()) != set(next(iter(execution.child_outputs.values())).keys())
             ):
                 raise ValueError("Batched child workflows returned different workflow return keys.")
-            self.waiting_workflow_call_execution.completed_child_item_ids.append(child_item_id)
-            for key, value in output_values.items():
-                self.waiting_workflow_call_execution.aggregated_values.setdefault(key, []).append(value)
-        is_complete = (
-            len(self.waiting_workflow_call_execution.completed_child_item_ids)
-            >= self.waiting_workflow_call_execution.expected_child_count
-        )
-        if self.waiting_workflow_call_execution.expected_child_count == 1:
+            execution.completed_child_item_ids.append(child_item_id)
+            execution.child_outputs[child_item_id] = dict(output_values)
+
+            ordered_item_ids = execution.child_item_ids or execution.completed_child_item_ids
+            execution.aggregated_values = {
+                key: [
+                    execution.child_outputs[item_id][key]
+                    for item_id in ordered_item_ids
+                    if item_id in execution.child_outputs
+                ]
+                for key in output_values
+            }
+        is_complete = len(execution.completed_child_item_ids) >= execution.expected_child_count
+        if execution.expected_child_count == 1:
             return (
                 is_complete,
-                {key: values[0] for key, values in self.waiting_workflow_call_execution.aggregated_values.items()},
+                {key: values[0] for key, values in execution.aggregated_values.items()},
             )
         return (
             is_complete,
-            {key: list(values) for key, values in self.waiting_workflow_call_execution.aggregated_values.items()},
+            {key: list(values) for key, values in execution.aggregated_values.items()},
         )
 
     def end_waiting_on_workflow_call(

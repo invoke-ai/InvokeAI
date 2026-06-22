@@ -378,7 +378,28 @@ def _resolve_image_generator(value: Mapping[str, Any], services: Any, user_id: s
     return [ImageField(image_name=image_name) for image_name in image_names]
 
 
-def _resolve_generator_items(generator_node: Mapping[str, Any], services: Any, user_id: str | None) -> list[Any]:
+def _get_declared_generator_item_count(value: Mapping[str, Any]) -> int | None:
+    explicit_values = value.get("values")
+    if isinstance(explicit_values, list):
+        return len(explicit_values)
+    if value.get("type") == "string_generator_dynamic_prompts_combinatorial":
+        return int(value.get("maxPrompts", 10))
+    if value.get("type") in {
+        "float_generator_arithmetic_sequence",
+        "float_generator_linear_distribution",
+        "float_generator_random_distribution_uniform",
+        "integer_generator_arithmetic_sequence",
+        "integer_generator_linear_distribution",
+        "integer_generator_random_distribution_uniform",
+        "string_generator_dynamic_prompts_random",
+    }:
+        return int(value.get("count", 10))
+    return None
+
+
+def _resolve_generator_items(
+    generator_node: Mapping[str, Any], services: Any, user_id: str | None, maximum_items: int
+) -> list[Any]:
     generator_node_data = generator_node["data"]
     node_type = generator_node_data.get("type")
     inputs = generator_node_data.get("inputs")
@@ -394,6 +415,9 @@ def _resolve_generator_items(generator_node: Mapping[str, Any], services: Any, u
         raise UnsupportedWorkflowNodeError(
             f"call_saved_workflow generator node '{generator_node_data.get('id')}' has invalid generator value"
         )
+    declared_item_count = _get_declared_generator_item_count(generator_value)
+    if declared_item_count is not None and declared_item_count > maximum_items:
+        raise TooManySessionsError("call_saved_workflow exceeds remaining queue capacity for child workflow executions")
     if node_type == "integer_generator":
         return _resolve_integer_generator(generator_value)
     if node_type == "float_generator":
@@ -566,7 +590,7 @@ def build_batch_child_workflow_session_results(
                     "call_saved_workflow image-generator-backed batch child workflows require runtime services"
                 )
             batch_items = (
-                _resolve_generator_items(generator_node, services, user_id)
+                _resolve_generator_items(generator_node, services, user_id, maximum_children)
                 if resolve_generator_items
                 else _get_generator_placeholder_items(generator_node)
             )

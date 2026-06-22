@@ -6,6 +6,7 @@ from invokeai.app.services.session_processor.workflow_call_batch import (
     build_child_workflow_session_results,
     build_child_workflow_sessions,
 )
+from invokeai.app.services.session_queue.session_queue_common import TooManySessionsError
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState, WorkflowCallFrame
 from invokeai.app.services.shared.workflow_graph_builder import UnsupportedWorkflowNodeError
 
@@ -887,6 +888,75 @@ def test_build_child_workflow_sessions_supports_integer_generator() -> None:
     )
 
     assert [child_session.graph.nodes["target"].value for child_session in child_sessions] == [3, 5, 7]
+
+
+def test_build_child_workflow_sessions_rejects_oversized_generator_before_resolution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workflow = _workflow_dump(
+        nodes=[
+            _invocation_node(
+                "generator",
+                "integer_generator",
+                {
+                    "generator": {
+                        "value": {
+                            "type": "integer_generator_arithmetic_sequence",
+                            "start": 0,
+                            "step": 1,
+                            "count": 1_000_000,
+                        }
+                    }
+                },
+            ),
+            _invocation_node(
+                "batch",
+                "integer_batch",
+                {"integers": {"value": []}, "batch_group_id": {"value": "None"}},
+            ),
+            _invocation_node("target", "integer", {"value": {"value": 0}}),
+            _invocation_node("return", "workflow_return", {"collection": {"value": []}}),
+        ],
+        edges=[
+            {
+                "id": "edge-generator-batch",
+                "type": "default",
+                "source": "generator",
+                "sourceHandle": "integers",
+                "target": "batch",
+                "targetHandle": "integers",
+            },
+            {
+                "id": "edge-batch-target",
+                "type": "default",
+                "source": "batch",
+                "sourceHandle": "integers",
+                "target": "target",
+                "targetHandle": "value",
+            },
+            {
+                "id": "edge-target-return",
+                "type": "default",
+                "source": "target",
+                "sourceHandle": "value",
+                "target": "return",
+                "targetHandle": "collection",
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "invokeai.app.services.session_processor.workflow_call_batch._resolve_integer_generator",
+        lambda value: pytest.fail("oversized generators must be rejected before resolution"),
+    )
+
+    with pytest.raises(TooManySessionsError, match="remaining queue capacity"):
+        build_child_workflow_sessions(
+            parent_session=GraphExecutionState(graph=Graph()),
+            workflow=workflow,
+            workflow_inputs={},
+            call_frame=_call_frame(),
+            maximum_children=10,
+        )
 
 
 def test_build_child_workflow_sessions_supports_float_generator() -> None:

@@ -123,7 +123,8 @@ Implemented runtime scaffolding:
   - deleting any queue row in a workflow-call chain deletes the full chain to avoid leaving orphaned parent or child
     rows behind
   - `cancel_all_except_current` and `delete_all_except_current` preserve the active queue item plus its workflow-call
-    ancestors and descendants; unrelated waiting chains are still canceled or deleted
+    ancestors and descendants; this also covers the handoff window where a parent is `waiting` and its child is still
+    `pending`; unrelated waiting chains are still canceled or deleted
   - retry is root-oriented rather than child-oriented; child queue rows should not be directly retried from the UI
   - the current UI policy is:
     - child queue rows keep `Cancel`
@@ -134,6 +135,7 @@ Implemented runtime scaffolding:
   - child queue-row fan-out is bounded by remaining queue capacity, not just the global queue-size setting:
     - a workflow call that would exceed the remaining pending capacity now fails instead of silently truncating or
       over-enqueuing child rows
+    - child insertion rechecks pending capacity in the same database transaction as the insert
 
 Implemented conversion helper:
 
@@ -156,9 +158,9 @@ Implemented conversion helper:
     image in board-backed generators; workflow detail and runtime execution still resolve real generator values
   - the saved-workflow picker uses that metadata to disable unsupported workflows before execution
   - the picker still allows an already-selected unsupported workflow to render, with an explicit unsupported state and
-    backend-provided reason message
-  - workflow library list items now surface an explicit unsupported badge and backend-provided reason message without
-    blocking normal workflow viewing or editing
+    a localized frontend message selected from the structured backend reason
+  - workflow library list items now surface an explicit unsupported badge and localized reason without blocking normal
+    workflow viewing or editing
 
 What is still not implemented:
 
@@ -300,10 +302,11 @@ The current queue-visible implementation uses the following lifecycle contract:
   - canceling a child cancels waiting ancestors
   - canceling batched siblings after one child fails includes nested descendants of those siblings
   - bulk "all except current" actions preserve the active queue item and its parent/child chain, not just the single
-    `in_progress` row
+    `in_progress` row; a pending child with a waiting parent is treated as the active chain during processor handoff
 - retry operations are root-aware:
   - retrying a root queue item creates a new root execution
   - retrying a child queue item should be normalized to the root by backend code
+  - retry and full-chain delete authorization is checked against the root queue item owner
   - child queue rows should not expose direct retry affordances in the UI
   - retry websocket delivery is owner-scoped; when an admin retries roots owned by multiple users, each non-admin user
     must receive only the retry item ids for their own roots, while admins can still observe the full retried set
@@ -311,6 +314,8 @@ The current queue-visible implementation uses the following lifecycle contract:
   single-user mode; the frontend relies on those events to invalidate workflow library data and clear deleted saved
   workflow selections; in single-user mode, workflow CRUD events emit only to the admin room to avoid duplicate delivery
   to sockets that are also joined to `user:system`
+- a public-to-private transition emits a schema-defined `workflow_access_revoked` event to shared-workflow subscribers;
+  non-owner, non-admin clients clear references to that workflow while owners and admins retain access
 - the saved-workflow node picker queries owned/default workflows and public shared workflows separately, merges them by
   workflow id, and fetches additional pages as the combobox menu reaches the end
 - queue status events must preserve user isolation:
@@ -348,6 +353,8 @@ Current semantics:
 - grouped batch nodes zip by `batch_group_id`
 - the workflow call creates one child queue row per expanded batch session
 - supported generator value shapes are resolved into concrete batch items before queue batch expansion
+- declared generator counts are rejected before resolution when they exceed remaining child capacity
+- cartesian expansion size is computed arithmetically before session generation rather than by materializing the product
 - batch outputs may feed a named `workflow_return_value.value` directly; each expanded child returns one value for that
   key
 - parent resume waits for all child rows tied to that workflow call
@@ -488,9 +495,8 @@ Batch return aggregation:
 
 - when a called workflow expands into multiple child queue rows, each child row produces its own named return map
 - the parent aggregates those child maps as `dict[str, list[Any]]`
-- each key maps to the list of values returned by completed child rows for that key
-- child rows are still aggregated in child-completion order unless a later contract explicitly requires stable input
-  order
+- each key maps to child values in child enqueue order, preserving positional correspondence with batch inputs even when
+  child executions complete out of order
 - duplicate keys within a single child return map are still invalid; repeated keys across batch children are the normal
   aggregation path
 

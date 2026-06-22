@@ -72222,6 +72222,29 @@
         ],
         "title": "Workflow"
       },
+      "WorkflowAccessRevokedEvent": {
+        "description": "Event model for workflow_access_revoked.",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "workflow_id": {
+            "description": "The ID of the workflow",
+            "title": "Workflow Id",
+            "type": "string"
+          },
+          "user_id": {
+            "description": "The owner of the workflow",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": ["timestamp", "workflow_id", "user_id"],
+        "title": "WorkflowAccessRevokedEvent",
+        "type": "object"
+      },
       "WorkflowAndGraphResponse": {
         "properties": {
           "workflow": {
@@ -72291,6 +72314,7 @@
           "unsupported_batch_input",
           "invalid_graph",
           "invalid_inputs",
+          "exceeds_capacity",
           "unknown"
         ],
         "title": "WorkflowCallCompatibilityReason"
@@ -72366,6 +72390,14 @@
             "title": "Child Session Ids",
             "description": "All child graph execution state ids."
           },
+          "child_item_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Child Item Ids",
+            "description": "Child queue item ids in enqueue order."
+          },
           "expected_child_count": {
             "type": "integer",
             "minimum": 1.0,
@@ -72389,6 +72421,15 @@
             "type": "object",
             "title": "Aggregated Values",
             "description": "The aggregated workflow_return values accumulated from child executions."
+          },
+          "child_outputs": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Child Outputs",
+            "description": "Workflow return values keyed by child queue item id."
           }
         },
         "type": "object",

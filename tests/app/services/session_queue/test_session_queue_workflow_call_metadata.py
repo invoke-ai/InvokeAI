@@ -7,7 +7,11 @@ import pytest
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 from invokeai.app.services.events.events_common import QueueItemsRetriedEvent, QueueItemStatusChangedEvent
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.session_queue.session_queue_common import NodeFieldValue, SessionQueueItemNotFoundError
+from invokeai.app.services.session_queue.session_queue_common import (
+    NodeFieldValue,
+    SessionQueueItemNotFoundError,
+    TooManySessionsError,
+)
 from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from tests.test_nodes import TestEventService
@@ -203,6 +207,29 @@ def test_enqueue_workflow_call_child_persists_pending_child_queue_item(session_q
     assert child_queue_item.root_item_id == parent_item_id
     assert child_queue_item.workflow_call_depth == 1
     assert child_queue_item.session_id == child_session.id
+
+
+def test_enqueue_workflow_call_child_rejects_full_pending_queue(session_queue: SqliteSessionQueue) -> None:
+    parent_graph = Graph()
+    parent_graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
+    parent_session = GraphExecutionState(graph=parent_graph)
+    invocation = parent_session.next()
+    assert isinstance(invocation, CallSavedWorkflowInvocation)
+
+    frame = parent_session.build_workflow_call_frame(invocation.id, invocation.workflow_id)
+    child_session = parent_session.create_child_workflow_execution_state(Graph(), frame)
+    parent_session.begin_waiting_on_workflow_call(frame)
+    parent_session.attach_waiting_workflow_call_child_session(child_session)
+
+    parent_item_id = _insert_queue_item(session_queue, session=parent_session, status="waiting")
+    _insert_queue_item(session_queue, session=GraphExecutionState(graph=Graph()), status="pending")
+    parent_queue_item = session_queue.get_queue_item(parent_item_id)
+    session_queue._SqliteSessionQueue__invoker.services.configuration.max_queue_size = 1
+
+    with pytest.raises(TooManySessionsError, match="remaining queue capacity"):
+        session_queue.enqueue_workflow_call_child(parent_queue_item, child_session)
+
+    assert session_queue.get_queue_status("default").pending == 1
 
 
 def test_enqueue_workflow_call_child_persists_batch_field_values(session_queue: SqliteSessionQueue) -> None:
@@ -947,6 +974,63 @@ def test_delete_all_except_current_deletes_waiting_chains_outside_current_chain(
         session_queue.get_queue_item(other_parent_item_id)
     with pytest.raises(SessionQueueItemNotFoundError):
         session_queue.get_queue_item(other_child_item_id)
+
+
+def test_cancel_all_except_current_preserves_waiting_chain_during_pending_child_handoff(
+    session_queue: SqliteSessionQueue,
+) -> None:
+    parent_session = GraphExecutionState(graph=Graph())
+    child_session = GraphExecutionState(graph=Graph())
+    unrelated_session = GraphExecutionState(graph=Graph())
+
+    parent_item_id = _insert_queue_item(session_queue, session=parent_session, status="waiting")
+    child_item_id = _insert_queue_item(
+        session_queue,
+        session=child_session,
+        status="pending",
+        workflow_call_id="workflow-call-current",
+        parent_item_id=parent_item_id,
+        parent_session_id=parent_session.id,
+        root_item_id=parent_item_id,
+        workflow_call_depth=1,
+    )
+    unrelated_item_id = _insert_queue_item(session_queue, session=unrelated_session, status="pending")
+
+    result = session_queue.cancel_all_except_current("default")
+
+    assert result.canceled == 1
+    assert session_queue.get_queue_item(parent_item_id).status == "waiting"
+    assert session_queue.get_queue_item(child_item_id).status == "pending"
+    assert session_queue.get_queue_item(unrelated_item_id).status == "canceled"
+
+
+def test_delete_all_except_current_preserves_waiting_chain_during_pending_child_handoff(
+    session_queue: SqliteSessionQueue,
+) -> None:
+    parent_session = GraphExecutionState(graph=Graph())
+    child_session = GraphExecutionState(graph=Graph())
+    unrelated_session = GraphExecutionState(graph=Graph())
+
+    parent_item_id = _insert_queue_item(session_queue, session=parent_session, status="waiting")
+    child_item_id = _insert_queue_item(
+        session_queue,
+        session=child_session,
+        status="pending",
+        workflow_call_id="workflow-call-current",
+        parent_item_id=parent_item_id,
+        parent_session_id=parent_session.id,
+        root_item_id=parent_item_id,
+        workflow_call_depth=1,
+    )
+    unrelated_item_id = _insert_queue_item(session_queue, session=unrelated_session, status="pending")
+
+    result = session_queue.delete_all_except_current("default")
+
+    assert result.deleted == 1
+    assert session_queue.get_queue_item(parent_item_id).status == "waiting"
+    assert session_queue.get_queue_item(child_item_id).status == "pending"
+    with pytest.raises(SessionQueueItemNotFoundError):
+        session_queue.get_queue_item(unrelated_item_id)
 
 
 def test_cancel_by_queue_id_cancels_current_workflow_call_descendants(session_queue: SqliteSessionQueue) -> None:

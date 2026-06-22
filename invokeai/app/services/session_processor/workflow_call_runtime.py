@@ -100,6 +100,8 @@ class WorkflowCallCoordinator:
                     field_values=child_result.field_values,
                 )
                 enqueued_child_item_ids.append(child_queue_item.item_id)
+            queue_item.session.set_waiting_workflow_call_child_item_ids(enqueued_child_item_ids)
+            self._session_runner._services.session_queue.set_queue_item_session(queue_item.item_id, queue_item.session)
             self._session_runner._services.session_queue.suspend_queue_item(queue_item.item_id)
         except Exception as e:
             if enqueued_child_item_ids:

@@ -134,7 +134,13 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
                 </Badge>
               )}
               {listItemState.showUnsupportedBadge && (
-                <Tooltip label={listItemState.unsupportedMessage ?? t('workflows.savedWorkflowUnsupportedDescription')}>
+                <Tooltip
+                  label={
+                    listItemState.unsupportedMessageKey
+                      ? t(listItemState.unsupportedMessageKey)
+                      : t('workflows.savedWorkflowUnsupportedDescription')
+                  }
+                >
                   <Badge
                     color="warning.300"
                     borderColor="warning.600"
@@ -166,7 +172,9 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
           </Text>
           {listItemState.showUnsupportedBadge && (
             <Text variant="subtext" fontSize="xs" noOfLines={2} color="warning.300">
-              {listItemState.unsupportedMessage ?? t('workflows.savedWorkflowUnsupportedDescription')}
+              {listItemState.unsupportedMessageKey
+                ? t(listItemState.unsupportedMessageKey)
+                : t('workflows.savedWorkflowUnsupportedDescription')}
             </Text>
           )}
           {tags.length > 0 && (

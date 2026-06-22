@@ -38,6 +38,7 @@ from invokeai.app.services.events.events_common import (
     QueueItemsRetriedEvent,
     QueueItemStatusChangedEvent,
     RecallParametersUpdatedEvent,
+    WorkflowAccessRevokedEvent,
     WorkflowCreatedEvent,
     WorkflowDeletedEvent,
     WorkflowEventBase,
@@ -421,6 +422,11 @@ class SocketIO:
             if getattr(event_data, "new_is_public", False):
                 await self._sio.emit(event=event_name, data=payload, room="workflows:shared")
             elif getattr(event_data, "old_is_public", False):
+                access_revoked = WorkflowAccessRevokedEvent.build(
+                    workflow_id=event_data.workflow_id, user_id=event_data.user_id
+                )
                 await self._sio.emit(
-                    event="workflow_deleted", data={"workflow_id": event_data.workflow_id}, room="workflows:shared"
+                    event=access_revoked.__event_name__,
+                    data=access_revoked.model_dump(mode="json"),
+                    room="workflows:shared",
                 )

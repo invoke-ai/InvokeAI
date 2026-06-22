@@ -92,7 +92,7 @@ describe('savedWorkflowFieldUtils', () => {
       selection: 'selected',
       statusLabelKey: null,
       badges: ['unsupported', 'default'],
-      compatibilityMessage: 'The workflow must contain exactly one workflow_return node.',
+      compatibilityMessageKey: 'workflows.savedWorkflowCompatibility.missingWorkflowReturn',
     });
   });
 
@@ -101,14 +101,14 @@ describe('savedWorkflowFieldUtils', () => {
       selection: 'unselected',
       statusLabelKey: 'nodes.savedWorkflowChoose',
       badges: [],
-      compatibilityMessage: null,
+      compatibilityMessageKey: null,
     });
 
     expect(getSavedWorkflowDisplayState({ status: 'missing', workflowId: 'missing-workflow' })).toEqual({
       selection: 'missing',
       statusLabelKey: 'nodes.savedWorkflowMissing',
       badges: [],
-      compatibilityMessage: null,
+      compatibilityMessageKey: null,
     });
   });
 
@@ -154,7 +154,7 @@ describe('savedWorkflowFieldUtils', () => {
       selection: 'selected',
       statusLabelKey: null,
       badges: ['shared'],
-      compatibilityMessage: null,
+      compatibilityMessageKey: null,
     });
   });
 

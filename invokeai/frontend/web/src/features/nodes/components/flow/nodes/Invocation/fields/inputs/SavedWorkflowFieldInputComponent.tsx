@@ -158,9 +158,9 @@ const SavedWorkflowFieldInputComponent = (
       ) : (
         <Badge variant="subtle">{statusLabel ?? t('nodes.savedWorkflowChoose')}</Badge>
       )}
-      {selectionState.status === 'selected' && displayState.compatibilityMessage && (
+      {selectionState.status === 'selected' && displayState.compatibilityMessageKey && (
         <Text variant="subtext" fontSize="xs">
-          {displayState.compatibilityMessage}
+          {t(displayState.compatibilityMessageKey)}
         </Text>
       )}
       {isFetching && (

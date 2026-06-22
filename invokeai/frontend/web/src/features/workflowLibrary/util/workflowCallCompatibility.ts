@@ -1,13 +1,28 @@
-import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
+import type { S, WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
+
+const compatibilityMessageKeys = {
+  ok: 'workflows.savedWorkflowCompatibility.unknown',
+  missing_workflow_return: 'workflows.savedWorkflowCompatibility.missingWorkflowReturn',
+  multiple_workflow_return: 'workflows.savedWorkflowCompatibility.multipleWorkflowReturn',
+  unsupported_node: 'workflows.savedWorkflowCompatibility.unsupportedNode',
+  unsupported_batch_input: 'workflows.savedWorkflowCompatibility.unsupportedBatchInput',
+  invalid_graph: 'workflows.savedWorkflowCompatibility.invalidGraph',
+  invalid_inputs: 'workflows.savedWorkflowCompatibility.invalidInputs',
+  exceeds_capacity: 'workflows.savedWorkflowCompatibility.exceedsCapacity',
+  unknown: 'workflows.savedWorkflowCompatibility.unknown',
+} as const satisfies Record<S['WorkflowCallCompatibilityReason'], string>;
+
+export type WorkflowCallCompatibilityMessageKey =
+  (typeof compatibilityMessageKeys)[keyof typeof compatibilityMessageKeys];
 
 type WorkflowCallCompatibilityState =
   | {
       isUnsupported: false;
-      message: null;
+      messageKey: null;
     }
   | {
       isUnsupported: true;
-      message: string | null;
+      messageKey: WorkflowCallCompatibilityMessageKey;
     };
 
 export const getWorkflowCallCompatibilityState = (
@@ -17,12 +32,12 @@ export const getWorkflowCallCompatibilityState = (
   if (!compatibility || compatibility.is_callable) {
     return {
       isUnsupported: false,
-      message: null,
+      messageKey: null,
     };
   }
 
   return {
     isUnsupported: true,
-    message: compatibility.message ?? null,
+    messageKey: compatibilityMessageKeys[compatibility.reason],
   };
 };

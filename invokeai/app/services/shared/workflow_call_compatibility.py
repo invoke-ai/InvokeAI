@@ -9,6 +9,7 @@ from invokeai.app.invocations.baseinvocation import InvocationRegistry
 from invokeai.app.invocations.call_saved_workflow import parse_call_saved_workflow_dynamic_input
 from invokeai.app.invocations.fields import ImageField
 from invokeai.app.services.session_processor.workflow_call_batch import build_child_workflow_sessions
+from invokeai.app.services.session_queue.session_queue_common import TooManySessionsError
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState, WorkflowCallFrame
 from invokeai.app.services.shared.workflow_call_compatibility_common import (
     WorkflowCallCompatibility,
@@ -202,6 +203,12 @@ def get_workflow_call_compatibility(
             is_callable=False,
             reason=reason,
             message=message,
+        )
+    except TooManySessionsError as e:
+        return WorkflowCallCompatibility(
+            is_callable=False,
+            reason=WorkflowCallCompatibilityReason.ExceedsCapacity,
+            message=str(e),
         )
     except ValueError as e:
         return WorkflowCallCompatibility(

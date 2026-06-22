@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import ANY, AsyncMock
 
 import pytest
 from fastapi import FastAPI
@@ -153,7 +153,7 @@ async def test_shared_workflow_event_is_emitted_to_shared_room() -> None:
 
 
 @pytest.mark.anyio
-async def test_shared_to_private_transition_emits_removal_to_shared_room() -> None:
+async def test_shared_to_private_transition_emits_access_revoked_to_shared_room() -> None:
     socketio = SocketIO(FastAPI())
     socketio._sio.emit = AsyncMock()
 
@@ -174,7 +174,7 @@ async def test_shared_to_private_transition_emits_removal_to_shared_room() -> No
     await socketio._handle_workflow_event(("workflow_updated", event_payload))
 
     socketio._sio.emit.assert_any_call(
-        event="workflow_deleted",
-        data={"workflow_id": "wf-1"},
+        event="workflow_access_revoked",
+        data={"workflow_id": "wf-1", "user_id": "owner-1", "timestamp": ANY},
         room="workflows:shared",
     )

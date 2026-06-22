@@ -5,15 +5,10 @@ type ClientEmitSubscribeQueue = { queue_id: string };
 type ClientEmitUnsubscribeQueue = ClientEmitSubscribeQueue;
 type ClientEmitSubscribeBulkDownload = { bulk_download_id: string };
 type ClientEmitUnsubscribeBulkDownload = ClientEmitSubscribeBulkDownload;
-type WorkflowCreatedEvent = { workflow_id: string; user_id: string; is_public: boolean; timestamp: number };
-type WorkflowUpdatedEvent = {
-  workflow_id: string;
-  user_id: string;
-  old_is_public: boolean;
-  new_is_public: boolean;
-  timestamp: number;
-};
-type WorkflowDeletedEvent = { workflow_id: string; user_id: string; is_public?: boolean; timestamp?: number };
+type WorkflowCreatedEvent = S['WorkflowCreatedEvent'];
+type WorkflowUpdatedEvent = S['WorkflowUpdatedEvent'];
+type WorkflowDeletedEvent = S['WorkflowDeletedEvent'];
+type WorkflowAccessRevokedEvent = S['WorkflowAccessRevokedEvent'];
 
 export type ServerToClientEvents = {
   invocation_progress: (payload: S['InvocationProgressEvent']) => void;
@@ -45,6 +40,7 @@ export type ServerToClientEvents = {
   workflow_created: (payload: WorkflowCreatedEvent) => void;
   workflow_updated: (payload: WorkflowUpdatedEvent) => void;
   workflow_deleted: (payload: WorkflowDeletedEvent) => void;
+  workflow_access_revoked: (payload: WorkflowAccessRevokedEvent) => void;
 };
 
 export type ClientToServerEvents = {

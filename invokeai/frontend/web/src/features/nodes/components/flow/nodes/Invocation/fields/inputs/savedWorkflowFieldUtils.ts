@@ -1,5 +1,8 @@
 import type { ComboboxOption } from '@invoke-ai/ui-library';
-import { getWorkflowCallCompatibilityState } from 'features/workflowLibrary/util/workflowCallCompatibility';
+import {
+  getWorkflowCallCompatibilityState,
+  type WorkflowCallCompatibilityMessageKey,
+} from 'features/workflowLibrary/util/workflowCallCompatibility';
 import type { S, WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
 export const MISSING_WORKFLOW_OPTION_VALUE = '__missing_workflow__';
@@ -125,13 +128,13 @@ type SavedWorkflowDisplayState =
       selection: 'unselected' | 'missing';
       statusLabelKey: 'nodes.savedWorkflowChoose' | 'nodes.savedWorkflowMissing';
       badges: SavedWorkflowBadge[];
-      compatibilityMessage: null;
+      compatibilityMessageKey: null;
     }
   | {
       selection: 'selected';
       statusLabelKey: null;
       badges: SavedWorkflowBadge[];
-      compatibilityMessage: string | null;
+      compatibilityMessageKey: WorkflowCallCompatibilityMessageKey | null;
     };
 
 export const getSavedWorkflowDisplayState = (
@@ -142,7 +145,7 @@ export const getSavedWorkflowDisplayState = (
       selection: 'unselected',
       statusLabelKey: 'nodes.savedWorkflowChoose',
       badges: [],
-      compatibilityMessage: null,
+      compatibilityMessageKey: null,
     };
   }
 
@@ -151,7 +154,7 @@ export const getSavedWorkflowDisplayState = (
       selection: 'missing',
       statusLabelKey: 'nodes.savedWorkflowMissing',
       badges: [],
-      compatibilityMessage: null,
+      compatibilityMessageKey: null,
     };
   }
 
@@ -170,6 +173,6 @@ export const getSavedWorkflowDisplayState = (
     selection: 'selected',
     statusLabelKey: null,
     badges,
-    compatibilityMessage: compatibilityState.message,
+    compatibilityMessageKey: compatibilityState.messageKey,
   };
 };

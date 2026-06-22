@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { getWorkflowLibraryListItemState } from './workflowLibraryListItemState';
 
 describe('workflowLibraryListItemState', () => {
-  it('marks unsupported workflows with their backend reason', () => {
+  it('marks unsupported workflows with their localized reason key', () => {
     expect(
       getWorkflowLibraryListItemState({
         category: 'user',
@@ -16,7 +16,7 @@ describe('workflowLibraryListItemState', () => {
       })
     ).toEqual({
       showUnsupportedBadge: true,
-      unsupportedMessage: 'The workflow must contain exactly one workflow_return node.',
+      unsupportedMessageKey: 'workflows.savedWorkflowCompatibility.missingWorkflowReturn',
       showSharedBadge: false,
       showDefaultIcon: false,
     });
@@ -35,7 +35,7 @@ describe('workflowLibraryListItemState', () => {
       })
     ).toEqual({
       showUnsupportedBadge: false,
-      unsupportedMessage: null,
+      unsupportedMessageKey: null,
       showSharedBadge: true,
       showDefaultIcon: false,
     });
@@ -54,7 +54,7 @@ describe('workflowLibraryListItemState', () => {
       })
     ).toEqual({
       showUnsupportedBadge: false,
-      unsupportedMessage: null,
+      unsupportedMessageKey: null,
       showSharedBadge: false,
       showDefaultIcon: true,
     });

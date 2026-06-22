@@ -10,7 +10,7 @@ describe('workflowCallCompatibility', () => {
       })
     ).toEqual({
       isUnsupported: false,
-      message: null,
+      messageKey: null,
     });
   });
 
@@ -25,11 +25,11 @@ describe('workflowCallCompatibility', () => {
       })
     ).toEqual({
       isUnsupported: false,
-      message: null,
+      messageKey: null,
     });
   });
 
-  it('returns the backend compatibility message for unsupported workflows', () => {
+  it('maps structured compatibility reasons to localized message keys', () => {
     expect(
       getWorkflowCallCompatibilityState({
         call_saved_workflow_compatibility: {
@@ -40,7 +40,37 @@ describe('workflowCallCompatibility', () => {
       })
     ).toEqual({
       isUnsupported: true,
-      message: 'The workflow must contain exactly one workflow_return node.',
+      messageKey: 'workflows.savedWorkflowCompatibility.missingWorkflowReturn',
+    });
+  });
+
+  it('uses a localized fallback for unknown compatibility reasons', () => {
+    expect(
+      getWorkflowCallCompatibilityState({
+        call_saved_workflow_compatibility: {
+          is_callable: false,
+          reason: 'unknown',
+          message: 'Backend-only diagnostic text',
+        },
+      })
+    ).toEqual({
+      isUnsupported: true,
+      messageKey: 'workflows.savedWorkflowCompatibility.unknown',
+    });
+  });
+
+  it('maps queue capacity failures to a localized message key', () => {
+    expect(
+      getWorkflowCallCompatibilityState({
+        call_saved_workflow_compatibility: {
+          is_callable: false,
+          reason: 'exceeds_capacity',
+          message: 'call_saved_workflow exceeds remaining queue capacity for child workflow executions',
+        },
+      })
+    ).toEqual({
+      isUnsupported: true,
+      messageKey: 'workflows.savedWorkflowCompatibility.exceedsCapacity',
     });
   });
 });

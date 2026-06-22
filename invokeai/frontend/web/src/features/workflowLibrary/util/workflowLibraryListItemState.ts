@@ -1,9 +1,12 @@
-import { getWorkflowCallCompatibilityState } from 'features/workflowLibrary/util/workflowCallCompatibility';
+import {
+  getWorkflowCallCompatibilityState,
+  type WorkflowCallCompatibilityMessageKey,
+} from 'features/workflowLibrary/util/workflowCallCompatibility';
 import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
 type WorkflowLibraryListItemState = {
   showUnsupportedBadge: boolean;
-  unsupportedMessage: string | null;
+  unsupportedMessageKey: WorkflowCallCompatibilityMessageKey | null;
   showSharedBadge: boolean;
   showDefaultIcon: boolean;
 };
@@ -15,7 +18,7 @@ export const getWorkflowLibraryListItemState = (
 
   return {
     showUnsupportedBadge: compatibilityState.isUnsupported,
-    unsupportedMessage: compatibilityState.message,
+    unsupportedMessageKey: compatibilityState.messageKey,
     showSharedBadge: workflow.is_public && workflow.category !== 'default',
     showDefaultIcon: workflow.category === 'default',
   };

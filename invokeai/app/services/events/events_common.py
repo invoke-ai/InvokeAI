@@ -388,6 +388,17 @@ class WorkflowDeletedEvent(WorkflowEventBase):
         return cls(workflow_id=workflow_id, user_id=user_id, is_public=is_public)
 
 
+@payload_schema.register
+class WorkflowAccessRevokedEvent(WorkflowEventBase):
+    """Event model for workflow_access_revoked."""
+
+    __event_name__ = "workflow_access_revoked"
+
+    @classmethod
+    def build(cls, workflow_id: str, user_id: str) -> "WorkflowAccessRevokedEvent":
+        return cls(workflow_id=workflow_id, user_id=user_id)
+
+
 class DownloadEventBase(EventBase):
     """Base class for events associated with a download"""
 

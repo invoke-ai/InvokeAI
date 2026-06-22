@@ -220,6 +220,65 @@ def test_get_workflow_call_compatibility_reports_multiple_workflow_return_nodes(
     assert compatibility.message == "The workflow must not contain more than one workflow_return node."
 
 
+def test_get_workflow_call_compatibility_reports_generator_capacity_limit() -> None:
+    workflow = _workflow_dump(
+        nodes=[
+            _invocation_node(
+                "generator",
+                "integer_generator",
+                {
+                    "generator": {
+                        "value": {
+                            "type": "integer_generator_arithmetic_sequence",
+                            "start": 0,
+                            "step": 1,
+                            "count": 1_000_000,
+                        }
+                    }
+                },
+            ),
+            _invocation_node(
+                "batch",
+                "integer_batch",
+                {"integers": {"value": []}, "batch_group_id": {"value": "None"}},
+            ),
+            _invocation_node("target", "integer", {"value": {"value": 0}}),
+            *_return_nodes(),
+        ],
+        edges=[
+            {
+                "id": "edge-generator-batch",
+                "type": "default",
+                "source": "generator",
+                "sourceHandle": "integers",
+                "target": "batch",
+                "targetHandle": "integers",
+            },
+            {
+                "id": "edge-batch-target",
+                "type": "default",
+                "source": "batch",
+                "sourceHandle": "integers",
+                "target": "target",
+                "targetHandle": "value",
+            },
+            *_return_edges("target", "value"),
+        ],
+    )
+
+    compatibility = get_workflow_call_compatibility(
+        workflow=workflow,
+        workflow_id="workflow-a",
+        services=_services(),
+        user_id="user-1",
+        maximum_children=10,
+    )
+
+    assert compatibility.is_callable is False
+    assert compatibility.reason is WorkflowCallCompatibilityReason.ExceedsCapacity
+    assert compatibility.message == "call_saved_workflow exceeds remaining queue capacity for child workflow executions"
+
+
 def test_get_workflow_call_compatibility_does_not_report_present_malformed_workflow_return_as_missing() -> None:
     workflow = _workflow_dump(
         nodes=[
