@@ -35,9 +35,7 @@ def _create_broken_relationships_table(conn: sqlite3.Connection) -> None:
         );
         """
     )
-    conn.execute(
-        "CREATE INDEX keyx_model_relationships_model_key_2 ON model_relationships(model_key_2);"
-    )
+    conn.execute("CREATE INDEX keyx_model_relationships_model_key_2 ON model_relationships(model_key_2);")
 
 
 @pytest.fixture
@@ -55,9 +53,9 @@ class TestMigration32:
         Migration32Callback()(db.cursor())
         db.commit()
 
-        sql = db.execute(
-            "SELECT sql FROM sqlite_master WHERE type='table' AND name='model_relationships'"
-        ).fetchone()[0]
+        sql = db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='model_relationships'").fetchone()[
+            0
+        ]
         assert "models_old" not in sql
         assert "REFERENCES models(id)" in sql
 
@@ -69,9 +67,7 @@ class TestMigration32:
         Migration32Callback()(db.cursor())
         db.commit()
 
-        rows = db.execute(
-            "SELECT model_key_1, model_key_2 FROM model_relationships ORDER BY model_key_1"
-        ).fetchall()
+        rows = db.execute("SELECT model_key_1, model_key_2 FROM model_relationships ORDER BY model_key_1").fetchall()
         assert rows == [("a", "b")]
 
     def test_drops_orphaned_links(self, db: sqlite3.Connection):
@@ -119,9 +115,9 @@ class TestMigration32:
         Migration32Callback()(db.cursor())
         db.commit()
 
-        sql = db.execute(
-            "SELECT sql FROM sqlite_master WHERE type='table' AND name='model_relationships'"
-        ).fetchone()[0]
+        sql = db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='model_relationships'").fetchone()[
+            0
+        ]
         assert "REFERENCES models(id)" in sql
 
     def test_no_relationships_table_is_noop(self):
