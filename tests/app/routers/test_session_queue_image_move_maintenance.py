@@ -14,6 +14,11 @@ class MockApiDependencies(ApiDependencies):
         self.invoker = invoker
 
 
+@pytest.fixture
+def anyio_backend() -> str:
+    return "asyncio"
+
+
 @pytest.mark.anyio
 async def test_enqueue_batch_is_blocked_during_image_move_maintenance(
     monkeypatch: pytest.MonkeyPatch, mock_invoker
