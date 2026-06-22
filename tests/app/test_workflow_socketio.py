@@ -7,6 +7,11 @@ from fastapi import FastAPI
 from invokeai.app.api.sockets import SocketIO
 
 
+@pytest.fixture
+def anyio_backend() -> str:
+    return "asyncio"
+
+
 def _patch_multiuser_context(monkeypatch: pytest.MonkeyPatch, *, user_id: str, is_admin: bool) -> None:
     user = SimpleNamespace(user_id=user_id, is_active=True)
     invoker = SimpleNamespace(
