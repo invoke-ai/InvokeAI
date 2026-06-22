@@ -54,6 +54,7 @@ export type MainModelLoaderNodes =
   | 'sdxl_model_loader'
   | 'flux_model_loader'
   | 'flux2_klein_model_loader'
+  | 'flux2_dev_model_loader'
   | 'sd3_model_loader'
   | 'cogview4_model_loader'
   | 'qwen_image_model_loader'

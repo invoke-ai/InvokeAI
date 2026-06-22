@@ -11,6 +11,7 @@ import {
   isIPAdapterModelConfig,
   isLLaVAModelConfig,
   isLoRAModelConfig,
+  isMistralEncoderModelConfig,
   isNonRefinerMainModelConfig,
   isQwen3EncoderModelConfig,
   isQwenVLEncoderModelConfig,
@@ -84,6 +85,11 @@ const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
     category: 'qwen_vl_encoder',
     i18nKey: 'modelManager.qwenVLEncoder',
     filter: isQwenVLEncoderModelConfig,
+  },
+  mistral_encoder: {
+    category: 'mistral_encoder',
+    i18nKey: 'modelManager.mistralEncoder',
+    filter: isMistralEncoderModelConfig,
   },
   control_lora: {
     category: 'control_lora',
@@ -187,6 +193,7 @@ export const MODEL_TYPE_TO_LONG_NAME: Record<ModelType, string> = {
   t5_encoder: 'T5 Encoder',
   qwen3_encoder: 'Qwen3 Encoder',
   qwen_vl_encoder: 'Qwen2.5-VL Encoder',
+  mistral_encoder: 'Mistral Encoder',
   clip_embed: 'CLIP Embed',
   siglip: 'SigLIP',
   flux_redux: 'FLUX Redux',
@@ -255,6 +262,8 @@ export const MODEL_VARIANT_TO_LONG_NAME: Record<AnyModelVariant, string> = {
   qwen3_4b: 'Qwen3 4B',
   qwen3_8b: 'Qwen3 8B',
   qwen3_06b: 'Qwen3 0.6B',
+  cow_mistral3_small: 'cow-mistral3-small (FLUX.2)',
+  mistral3_24b: 'Mistral Small 3 (24B, FLUX.2)',
 };
 
 export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
@@ -271,6 +280,7 @@ export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
   t5_encoder: 'T5 Encoder',
   qwen3_encoder: 'Qwen3 Encoder',
   qwen_vl_encoder: 'Qwen2.5-VL Encoder',
+  mistral_encoder: 'Mistral Encoder',
   bnb_quantized_int8b: 'BNB Quantized (int8b)',
   bnb_quantized_nf4b: 'BNB Quantized (nf4b)',
   gguf_quantized: 'GGUF Quantized',

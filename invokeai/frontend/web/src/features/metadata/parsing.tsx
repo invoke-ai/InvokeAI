@@ -10,6 +10,8 @@ import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/loras
 import {
   animaQwen3EncoderModelSelected,
   animaVaeModelSelected,
+  flux2DevMistralEncoderModelSelected,
+  flux2DevVaeModelSelected,
   geminiTemperatureChanged,
   geminiThinkingLevelChanged,
   heightChanged,
@@ -1191,9 +1193,16 @@ const KleinVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
     const raw = getProperty(metadata, 'vae');
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
-    // Only recall if the current main model is FLUX.2 Klein
+    // FLUX.2 Klein and FLUX.2 [dev] both have base `flux2` and write the VAE
+    // under `metadata.vae`. They use the presence of `mistral_encoder` (dev
+    // only) vs `qwen3_encoder` (Klein only) as a distinguisher so each VAE
+    // handler dispatches into its own slice.
     const base = selectBase(store.getState());
     assert(base === 'flux2', 'KleinVAEModel handler only works with FLUX.2 Klein models');
+    assert(
+      getProperty(metadata, 'mistral_encoder') === undefined,
+      'KleinVAEModel does not handle FLUX.2 [dev] images (mistral_encoder present)'
+    );
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
@@ -1207,6 +1216,36 @@ const KleinVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
 };
 //#endregion KleinVAEModel
 
+//#region Flux2DevVAEModel
+const Flux2DevVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
+  [SingleMetadataKey]: true,
+  type: 'Flux2DevVAEModel',
+  parse: async (metadata, store) => {
+    const raw = getProperty(metadata, 'vae');
+    const parsed = await parseModelIdentifier(raw, store, 'vae');
+    assert(parsed.type === 'vae');
+    const base = selectBase(store.getState());
+    assert(base === 'flux2', 'Flux2DevVAEModel handler only works with FLUX.2 models');
+    // FLUX.2 [dev] images always carry a `mistral_encoder` field; Klein images
+    // carry `qwen3_encoder` instead. This is the disambiguator that keeps dev's
+    // VAE recall from clobbering Klein's slice (and vice versa).
+    assert(
+      getProperty(metadata, 'mistral_encoder') !== undefined,
+      'Flux2DevVAEModel handler only fires on FLUX.2 [dev] images (mistral_encoder must be present)'
+    );
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(flux2DevVaeModelSelected(value));
+  },
+  i18nKey: 'metadata.vae',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
+    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
+  ),
+};
+//#endregion Flux2DevVAEModel
+
 //#region KleinQwen3EncoderModel
 const KleinQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
@@ -1215,7 +1254,8 @@ const KleinQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
     const raw = getProperty(metadata, 'qwen3_encoder');
     const parsed = await parseModelIdentifier(raw, store, 'qwen3_encoder');
     assert(parsed.type === 'qwen3_encoder');
-    // Only recall if the current main model is FLUX.2 Klein
+    // qwen3_encoder is Klein-only metadata; dev never writes it. Just gate on
+    // base. (parseModelIdentifier already rejects when the field is absent.)
     const base = selectBase(store.getState());
     assert(base === 'flux2', 'KleinQwen3EncoderModel handler only works with FLUX.2 Klein models');
     return Promise.resolve(parsed);
@@ -1230,6 +1270,31 @@ const KleinQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
   ),
 };
 //#endregion KleinQwen3EncoderModel
+
+//#region Flux2DevMistralEncoderModel
+const Flux2DevMistralEncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
+  [SingleMetadataKey]: true,
+  type: 'Flux2DevMistralEncoderModel',
+  parse: async (metadata, store) => {
+    const raw = getProperty(metadata, 'mistral_encoder');
+    const parsed = await parseModelIdentifier(raw, store, 'mistral_encoder');
+    assert(parsed.type === 'mistral_encoder');
+    // mistral_encoder is dev-only metadata; Klein never writes it. Just gate on
+    // base. (parseModelIdentifier already rejects when the field is absent.)
+    const base = selectBase(store.getState());
+    assert(base === 'flux2', 'Flux2DevMistralEncoderModel handler only works with FLUX.2 models');
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(flux2DevMistralEncoderModelSelected(value));
+  },
+  i18nKey: 'metadata.mistralEncoder',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
+    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
+  ),
+};
+//#endregion Flux2DevMistralEncoderModel
 
 //#region LoRAs
 const LoRAs: CollectionMetadataHandler<LoRA[]> = {
@@ -1632,6 +1697,8 @@ export const ImageMetadataHandlers = {
   AnimaQwen3EncoderModel,
   KleinVAEModel,
   KleinQwen3EncoderModel,
+  Flux2DevVAEModel,
+  Flux2DevMistralEncoderModel,
   ZImageSeedVarianceEnabled,
   ZImageSeedVarianceStrength,
   ZImageSeedVarianceRandomizePercent,

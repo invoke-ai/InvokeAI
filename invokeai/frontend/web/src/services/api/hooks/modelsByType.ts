@@ -18,6 +18,7 @@ import {
   isControlNetModelConfig,
   isExternalApiModelConfig,
   isFlux1VAEModelConfig,
+  isFlux2DevDiffusersMainModelConfig,
   isFlux2DiffusersMainModelConfig,
   isFlux2VAEModelConfig,
   isFluxKontextModelConfig,
@@ -27,6 +28,7 @@ import {
   isLLaVAModelConfig,
   isLoRAModelConfig,
   isMainOrExternalModelConfig,
+  isMistralEncoderModelConfig,
   isQwen3EncoderModelConfig,
   isQwenImageDiffusersMainModelConfig,
   isQwenImageVAEModelConfig,
@@ -107,6 +109,8 @@ export const useAnimaVAEModels = () => buildModelsHook(isAnimaVAEModelConfig)();
 export const useAnimaQwen3EncoderModels = () => buildModelsHook(isAnimaQwen3EncoderModelConfig)();
 export const useZImageDiffusersModels = () => buildModelsHook(isZImageDiffusersMainModelConfig)();
 export const useFlux2DiffusersModels = () => buildModelsHook(isFlux2DiffusersMainModelConfig)();
+export const useFlux2DevDiffusersModels = () => buildModelsHook(isFlux2DevDiffusersMainModelConfig)();
+export const useMistralEncoderModels = () => buildModelsHook(isMistralEncoderModelConfig)();
 export const useQwenImageDiffusersModels = () => buildModelsHook(isQwenImageDiffusersMainModelConfig)();
 export const useQwenImageVAEModels = () => buildModelsHook(isQwenImageVAEModelConfig)();
 export const useQwenVLEncoderModels = () => buildModelsHook(isQwenVLEncoderModelConfig)();
@@ -151,6 +155,8 @@ export const selectQwenImageVAEModels = buildModelsSelector(isQwenImageVAEModelC
 export const selectQwenVLEncoderModels = buildModelsSelector(isQwenVLEncoderModelConfig);
 export const selectZImageDiffusersModels = buildModelsSelector(isZImageDiffusersMainModelConfig);
 export const selectFlux2DiffusersModels = buildModelsSelector(isFlux2DiffusersMainModelConfig);
+export const selectFlux2DevDiffusersModels = buildModelsSelector(isFlux2DevDiffusersMainModelConfig);
+export const selectMistralEncoderModels = buildModelsSelector(isMistralEncoderModelConfig);
 export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
 export const selectAnimaVAEModels = buildModelsSelector(isAnimaVAEModelConfig);
 export const useTextLLMModels = () => buildModelsHook(isTextLLMModelConfig)();

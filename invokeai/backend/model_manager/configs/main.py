@@ -85,7 +85,10 @@ class MainModelDefaultSettings(BaseModel):
                 return cls(steps=35, cfg_scale=4.5, width=1024, height=1024)
             case BaseModelType.Flux2:
                 # Different defaults based on variant
-                if variant in (Flux2VariantType.Klein4BBase, Flux2VariantType.Klein9BBase):
+                if variant == Flux2VariantType.Dev:
+                    # FLUX.2 [dev] is guidance-distilled (recommended guidance=3.5, 28 steps, CFG disabled)
+                    return cls(steps=28, cfg_scale=1.0, guidance=3.5, width=1024, height=1024)
+                elif variant in (Flux2VariantType.Klein4BBase, Flux2VariantType.Klein9BBase):
                     # Undistilled base models need more steps
                     return cls(steps=28, cfg_scale=1.0, width=1024, height=1024)
                 else:
@@ -350,9 +353,10 @@ def _filename_suggests_base(name: str) -> bool:
 def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | None:
     """Determine FLUX.2 variant from state dict.
 
-    Distinguishes between Klein 4B and Klein 9B based on context embedding dimension:
+    Distinguishes between variants based on context embedding dimension:
     - Klein 4B: context_in_dim = 7680 (3 × Qwen3-4B hidden_size 2560)
     - Klein 9B: context_in_dim = 12288 (3 × Qwen3-8B hidden_size 4096)
+    - Dev:      context_in_dim = 15360 (3 × Mistral Small 3.1 hidden_size 5120)
 
     Note: Klein 9B (distilled) and Klein 9B Base (undistilled) have identical architectures
     and cannot be distinguished from the state dict alone. This function defaults to Klein9B
@@ -365,6 +369,7 @@ def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | N
     # Context dimensions for each variant
     KLEIN_4B_CONTEXT_DIM = 7680  # 3 × 2560
     KLEIN_9B_CONTEXT_DIM = 12288  # 3 × 4096
+    DEV_CONTEXT_DIM = 15360  # 3 × 5120 (Mistral Small 3.1)
 
     # Check context_embedder to determine variant
     # Support both BFL format (txt_in.weight) and diffusers format (context_embedder.weight)
@@ -389,7 +394,9 @@ def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | N
             if len(shape) >= 2:
                 context_in_dim = shape[1]
                 # Determine variant based on context dimension
-                if context_in_dim == KLEIN_9B_CONTEXT_DIM:
+                if context_in_dim == DEV_CONTEXT_DIM:
+                    return Flux2VariantType.Dev
+                elif context_in_dim == KLEIN_9B_CONTEXT_DIM:
                     # Default to Klein9B - callers use filename heuristics to detect Klein9BBase
                     return Flux2VariantType.Klein9B
                 elif context_in_dim == KLEIN_4B_CONTEXT_DIM:
@@ -831,7 +838,7 @@ class Main_Diffusers_FLUX_Config(Diffusers_Config_Base, Main_Config_Base, Config
 
 
 class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
-    """Model config for FLUX.2 models in diffusers format (e.g. FLUX.2 Klein)."""
+    """Model config for FLUX.2 models in diffusers format (FLUX.2 Klein and FLUX.2 [dev])."""
 
     base: Literal[BaseModelType.Flux2] = Field(BaseModelType.Flux2)
     variant: Flux2VariantType = Field()
@@ -847,6 +854,8 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
             common_config_paths(mod.path),
             {
                 "Flux2KleinPipeline",
+                "Flux2Pipeline",
+                "Flux2Transformer2DModel",
             },
         )
 
@@ -864,21 +873,33 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
     def _get_variant_or_raise(cls, mod: ModelOnDisk) -> Flux2VariantType:
         """Determine the FLUX.2 variant from the transformer config.
 
-        FLUX.2 Klein uses Qwen3 text encoder with larger joint_attention_dim:
-        - Klein 4B/4B Base: joint_attention_dim = 7680 (3×Qwen3-4B hidden size)
-        - Klein 9B/9B Base: joint_attention_dim = 12288 (3×Qwen3-8B hidden size)
+        FLUX.2 variants are distinguished by joint_attention_dim (= 3 × text encoder hidden_size):
+        - Klein 4B/4B Base: 7680 (3 × Qwen3-4B 2560)
+        - Klein 9B/9B Base: 12288 (3 × Qwen3-8B 4096)
+        - Dev:              15360 (3 × Mistral Small 3.1 5120)
 
-        Distilled and Base variants share identical architectures. We use a filename heuristic to detect Base models.
+        Klein distilled and Base variants share identical architectures; the Base variant
+        is detected by a filename heuristic.
         """
         KLEIN_4B_CONTEXT_DIM = 7680  # 3 × 2560
         KLEIN_9B_CONTEXT_DIM = 12288  # 3 × 4096
+        DEV_CONTEXT_DIM = 15360  # 3 × 5120
 
-        transformer_config = get_config_dict_or_raise(mod.path / "transformer" / "config.json")
+        # Try transformer/config.json first (full pipeline), fall back to root config.json
+        # (loose transformer-only checkouts).
+        transformer_config_path = mod.path / "transformer" / "config.json"
+        root_config_path = mod.path / "config.json"
+        if transformer_config_path.exists():
+            transformer_config = get_config_dict_or_raise(transformer_config_path)
+        else:
+            transformer_config = get_config_dict_or_raise(root_config_path)
 
         joint_attention_dim = transformer_config.get("joint_attention_dim", 4096)
 
         # Determine variant based on joint_attention_dim
-        if joint_attention_dim == KLEIN_9B_CONTEXT_DIM:
+        if joint_attention_dim == DEV_CONTEXT_DIM:
+            return Flux2VariantType.Dev
+        elif joint_attention_dim == KLEIN_9B_CONTEXT_DIM:
             if _filename_suggests_base(mod.name):
                 return Flux2VariantType.Klein9BBase
             return Flux2VariantType.Klein9B
