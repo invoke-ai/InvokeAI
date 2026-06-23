@@ -66,6 +66,7 @@ class CustomInvokeLinearNF4(InvokeLinearNF4, CustomModuleMixin):
 
         # Make a shallow copy of the quant_state so that we can undo the in-place modification that occurs when casting
         # to a new device.
+        weight_was_offloaded = self.weight.device.type != x.device.type
         old_quant_state = copy.copy(self.weight.quant_state)
         weight = cast_to_device(self.weight, x.device)
         self.weight.quant_state = old_quant_state
@@ -75,7 +76,7 @@ class CustomInvokeLinearNF4(InvokeLinearNF4, CustomModuleMixin):
         weight.quant_state.code = cast_to_device(weight.quant_state.code, x.device)
 
         bias = cast_to_device(self.bias, x.device)
-        if x.numel() == x.shape[-1]:
+        if weight_was_offloaded and x.numel() == x.shape[-1]:
             # bitsandbytes routes single-vector inputs through gemv_4bit, which can fail with CPU-stored,
             # device-autocasted Params4bit weights on some CUDA/bnb combinations. Use the same dequantized
             # matmul path that bnb.matmul_4bit uses for batched inputs.

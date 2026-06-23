@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 import torch
 
@@ -54,6 +56,20 @@ def test_custom_invoke_linear_nf4_all_weights_on_cuda(linear_nf4_layer: InvokeLi
 
     # Assert that the quantized and custom layers produce the same output.
     assert torch.allclose(y_quantized, y_custom, atol=1e-5)
+
+
+def test_custom_invoke_linear_nf4_all_weights_on_cuda_uses_bnb_single_vector_path(
+    linear_nf4_layer: InvokeLinearNF4,
+):
+    """GPU-resident single-vector inference should keep using bnb's gemv_4bit path."""
+    x = torch.randn(1, 64).to("cuda")
+    custom_linear_nf4_layer = wrap_custom_layer(linear_nf4_layer, CustomInvokeLinearNF4)
+    custom_linear_nf4_layer.set_device_autocasting_enabled(True)
+
+    with patch("bitsandbytes.functional.dequantize_4bit") as mock_dequantize:
+        _ = custom_linear_nf4_layer(x)
+
+    mock_dequantize.assert_not_called()
 
 
 # We run with two different input dimensions, because the NF4 layer follows a different code path depending on the

@@ -579,8 +579,7 @@ def test_quantized_linear_sidecar_patches(
     patches, input = patch_under_test
 
     linear_layer, quantized_linear_layer = quantized_linear_layer_under_test
-    if _is_bnb_quantized_linear(quantized_linear_layer) and _has_dora_patch(patches):
-        pytest.skip("DoRA patches require readable base weights and are not compatible with bnb quantized layers.")
+    expect_dora_incompatible = _is_bnb_quantized_linear(quantized_linear_layer) and _has_dora_patch(patches)
 
     # Move everything to the device.
     layer_to_device_via_state_dict(linear_layer, device)
@@ -599,6 +598,11 @@ def test_quantized_linear_sidecar_patches(
 
     # Run inference with the original layer and the patched layer and assert they are equal.
     output_linear_patched = linear_layer_custom(input)
+    if expect_dora_incompatible:
+        with pytest.raises(RuntimeError, match="not compatible with DoRA patches"):
+            quantized_linear_layer_custom(input)
+        return
+
     output_quantized_patched = quantized_linear_layer_custom(input)
     assert torch.allclose(output_linear_patched, output_quantized_patched, rtol=0.2, atol=0.2)
 
@@ -615,8 +619,7 @@ def test_quantized_linear_sidecar_patches_with_autocast_from_cpu_to_device(
     patches, input = patch_under_test
 
     _, quantized_linear_layer = quantized_linear_layer_under_test
-    if _is_bnb_quantized_linear(quantized_linear_layer) and _has_dora_patch(patches):
-        pytest.skip("DoRA patches require readable base weights and are not compatible with bnb quantized layers.")
+    expect_dora_incompatible = _is_bnb_quantized_linear(quantized_linear_layer) and _has_dora_patch(patches)
 
     # Move everything to the device.
     layer_to_device_via_state_dict(quantized_linear_layer, device)
@@ -629,6 +632,11 @@ def test_quantized_linear_sidecar_patches_with_autocast_from_cpu_to_device(
         quantized_linear_layer_custom.add_patch(patch, weight)
 
     # Run inference with the custom layer on the device.
+    if expect_dora_incompatible:
+        with pytest.raises(RuntimeError, match="not compatible with DoRA patches"):
+            quantized_linear_layer_custom(input)
+        return
+
     expected_output = quantized_linear_layer_custom(input)
 
     # Move the custom layer to the CPU.
