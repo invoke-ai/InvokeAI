@@ -5,7 +5,7 @@ import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 import type { components } from 'services/api/schema';
 
 type Props = {
-  targetRef: RefObject<HTMLDivElement>;
+  targetRef: RefObject<HTMLDivElement | null>;
 };
 
 type SessionQueueStatus = components['schemas']['SessionQueueStatus'];

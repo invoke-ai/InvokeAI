@@ -962,7 +962,6 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       title: t('gallery.bulkDownloadReady'),
       status: 'success',
       description: (
-        // eslint-disable-next-line react/jsx-no-bind -- not a component render; no re-render cost
         <Text as="button" onClick={handleDownload} textDecoration="underline" cursor="pointer">
           {t('gallery.clickToDownload')}
         </Text>
