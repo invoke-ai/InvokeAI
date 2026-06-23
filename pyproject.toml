@@ -35,7 +35,7 @@ dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
   "accelerate",
   "bitsandbytes; sys_platform!='darwin'",
-  "compel==2.1.1",
+  "compel>=2.4.0,<3",
   "diffusers[torch]==0.37.0",
   "gguf",
   "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
@@ -49,7 +49,7 @@ dependencies = [
   "torch~=2.7.0",                         # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
   "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
   "torchvision",
-  "transformers>=4.56.0",
+  "transformers>=5.5,<5.6",
 
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events",
