@@ -101,6 +101,7 @@ dependencies = [
 "onnx" = ["onnxruntime"]
 "onnx-cuda" = ["onnxruntime-gpu"]
 "onnx-directml" = ["onnxruntime-directml"]
+"s3" = ["boto3"]
 "dist" = ["pip-tools", "pipdeptree", "twine"]
 "dev" = ["jurigged", "pudb", "snakeviz", "gprof2dot"]
 "test" = [
@@ -116,6 +117,7 @@ dependencies = [
   "httpx",
   "polyfactory==2.19.0",
   "humanize==4.12.1",
+  "boto3",
 ]
 
 [tool.uv]
@@ -208,6 +210,7 @@ addopts = "--cov-report term --cov-report html --cov-report xml --strict-markers
 markers = [
   "slow: Marks tests as slow. Disabled by default. To run all tests, use -m \"\". To run only slow tests, use -m \"slow\".",
   "timeout: Marks the timeout override.",
+  "s3_integration: Real S3/B2 object-store integration tests. Disabled by default (also marked slow). Run with -m s3_integration and the CI_TEST_S3_* env vars set.",
 ]
 [tool.coverage.run]
 branch = true
