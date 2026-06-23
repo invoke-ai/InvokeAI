@@ -1875,7 +1875,15 @@ export type paths = {
         };
         /**
          * Get Queue Item Ids
-         * @description Gets all queue item ids that match the given parameters. Non-admin users only see their own items.
+         * @description Gets all queue item ids that match the given parameters.
+         *
+         *     IDs for every user's items are returned (item ids carry no sensitive data on their own).
+         *     When the corresponding items are hydrated via get_queue_items_by_item_ids, those belonging
+         *     to other users are redacted by sanitize_queue_item_for_user. This lets a non-admin see
+         *     partially-redacted entries for other users' jobs in the queue list, while still revealing
+         *     only timestamps and status for items they do not own.
+         *
+         *     current_user is required so the endpoint stays behind authentication in multiuser mode.
          */
         get: operations["get_queue_item_ids"];
         put?: never;
@@ -28222,6 +28230,16 @@ export type components = {
              * @description Total number of queue items
              */
             total: number;
+            /**
+             * User Pending
+             * @description Number of the requesting user's queue items with status 'pending' (None for admins/global callers)
+             */
+            user_pending?: number | null;
+            /**
+             * User In Progress
+             * @description Number of the requesting user's queue items with status 'in_progress' (None for admins/global callers)
+             */
+            user_in_progress?: number | null;
         };
         /**
          * SetupRequest
