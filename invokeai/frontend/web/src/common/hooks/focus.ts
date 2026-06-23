@@ -97,7 +97,7 @@ type UseFocusRegionOptions = {
  */
 export const useFocusRegion = (
   region: FocusRegionName,
-  ref: RefObject<HTMLElement>,
+  ref: RefObject<HTMLElement | null>,
   options?: UseFocusRegionOptions
 ) => {
   useEffect(() => {
