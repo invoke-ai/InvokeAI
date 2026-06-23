@@ -1093,7 +1093,24 @@ class SqliteSessionQueue(SessionQueueBase):
         acting_user_id: Optional[str] = None,
     ) -> SessionQueueStatus:
         with self._db.transaction() as cursor:
-            # When user_id is provided (non-admin), only count that user's items
+            # Aggregate counts are always global (across all users). This lets a non-admin's
+            # badge show "own / total" — their share of the whole queue — and lets the queue
+            # list surface (redacted) entries belonging to other users.
+            cursor.execute(
+                """--sql
+                SELECT status, count(*)
+                FROM session_queue
+                WHERE queue_id = ?
+                GROUP BY status
+                """,
+                (queue_id,),
+            )
+            counts_result = cast(list[sqlite3.Row], cursor.fetchall())
+
+            # When user_id is provided, additionally compute that user's own counts so the
+            # caller can render the per-user portion of the badge. These are returned in the
+            # separate user_pending/user_in_progress fields and never replace the global counts.
+            user_counts_result: list[sqlite3.Row] = []
             if user_id is not None:
                 cursor.execute(
                     """--sql
@@ -1104,28 +1121,25 @@ class SqliteSessionQueue(SessionQueueBase):
                     """,
                     (queue_id, user_id),
                 )
-            else:
-                cursor.execute(
-                    """--sql
-                    SELECT status, count(*)
-                    FROM session_queue
-                    WHERE queue_id = ?
-                    GROUP BY status
-                    """,
-                    (queue_id,),
-                )
-            counts_result = cast(list[sqlite3.Row], cursor.fetchall())
+                user_counts_result = cast(list[sqlite3.Row], cursor.fetchall())
 
         current_item = self.get_current(queue_id=queue_id)
         total = sum(row[1] or 0 for row in counts_result)
         counts: dict[str, int] = {row[0]: row[1] for row in counts_result}
 
+        user_pending: Optional[int] = None
+        user_in_progress: Optional[int] = None
+        if user_id is not None:
+            user_counts: dict[str, int] = {row[0]: row[1] for row in user_counts_result}
+            user_pending = user_counts.get("pending", 0)
+            user_in_progress = user_counts.get("in_progress", 0)
+
         # Redaction is decided from the same current_item snapshot used to embed identifiers,
         # so a concurrent transition (e.g. B finishing while A's status changes) cannot leave
-        # stale identifiers in the result. user_id (count filter) and acting_user_id
-        # (redaction) are independent: callers that need global counts but per-user redaction
-        # pass only acting_user_id; non-admin API callers pass user_id and inherit the same
-        # redaction by default.
+        # stale identifiers in the result. The aggregate counts stay global; only the current
+        # item's identifiers are gated. acting_user_id (event path) takes precedence over
+        # user_id (API path) when deciding the redaction owner; either being None means an
+        # admin/global caller who may see the current item.
         owner_user_id = user_id if acting_user_id is None else acting_user_id
         show_current_item = current_item is not None and (
             owner_user_id is None or current_item.user_id == owner_user_id
@@ -1143,6 +1157,8 @@ class SqliteSessionQueue(SessionQueueBase):
             failed=counts.get("failed", 0),
             canceled=counts.get("canceled", 0),
             total=total,
+            user_pending=user_pending,
+            user_in_progress=user_in_progress,
         )
 
     def get_batch_status(self, queue_id: str, batch_id: str, user_id: Optional[str] = None) -> BatchStatus:

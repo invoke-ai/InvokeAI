@@ -1335,14 +1335,37 @@ class TestQueueStatusScoping:
         assert status_obj.session_id is None
         assert status_obj.batch_id is None
 
-    def test_session_queue_status_no_user_fields(self):
-        """SessionQueueStatus should not have user_pending/user_in_progress fields anymore.
-        Non-admin users now get their own counts in the main pending/in_progress fields."""
+    def test_session_queue_status_has_user_fields(self):
+        """SessionQueueStatus carries per-user counts (user_pending/user_in_progress) alongside
+        the global aggregate counts. The frontend badge needs both to render "own / total" for
+        non-admin users in multiuser mode. The per-user fields are optional (None for admins
+        and single-user/global callers)."""
         from invokeai.app.services.session_queue.session_queue_common import SessionQueueStatus
 
         fields = set(SessionQueueStatus.model_fields.keys())
-        assert "user_pending" not in fields
-        assert "user_in_progress" not in fields
+        assert "user_pending" in fields
+        assert "user_in_progress" in fields
+
+        # Per-user fields default to None (global/admin caller) and aggregate counts stay global.
+        status_obj = SessionQueueStatus(
+            queue_id="default",
+            item_id=None,
+            session_id=None,
+            batch_id=None,
+            pending=5,
+            in_progress=1,
+            completed=0,
+            failed=0,
+            canceled=0,
+            total=6,
+        )
+        assert status_obj.user_pending is None
+        assert status_obj.user_in_progress is None
+
+        # A non-admin caller's status carries their own subset of the global counts.
+        scoped = status_obj.model_copy(update={"user_pending": 2, "user_in_progress": 1})
+        assert scoped.pending == 5  # global, unchanged
+        assert scoped.user_pending == 2  # this user's share
 
 
 # ===========================================================================
