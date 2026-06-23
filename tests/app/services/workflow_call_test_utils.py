@@ -1078,14 +1078,25 @@ class _WorkflowCallBoundarySession:
         return GraphExecutionState(graph=graph, workflow_call_stack=[frame])
 
     def attach_waiting_workflow_call_child_session(self, child_session: GraphExecutionState) -> None:
-        self.waiting_workflow_call_execution = SimpleNamespace(id="workflow-call-1", depth=1)
+        self.waiting_workflow_call_execution = SimpleNamespace(
+            id="workflow-call-1", depth=1, expected_child_count=1, child_item_ids=[]
+        )
         self.waiting_workflow_call_child_session = child_session
 
     def attach_waiting_workflow_call_child_sessions(self, child_sessions: list[GraphExecutionState]) -> None:
-        self.waiting_workflow_call_execution = SimpleNamespace(id="workflow-call-1", depth=1)
+        self.waiting_workflow_call_execution = SimpleNamespace(
+            id="workflow-call-1", depth=1, expected_child_count=len(child_sessions), child_item_ids=[]
+        )
         self.waiting_workflow_call_child_session = child_sessions[0] if len(child_sessions) == 1 else None
 
-    def end_waiting_on_workflow_call(self) -> None:
+    def set_waiting_workflow_call_child_item_ids(self, child_item_ids: list[int]) -> None:
+        if self.waiting_workflow_call_execution is None:
+            raise ValueError("Execution state is not waiting on a workflow call.")
+        if len(child_item_ids) != self.waiting_workflow_call_execution.expected_child_count:
+            raise ValueError("Workflow call child item count does not match expected child count.")
+        self.waiting_workflow_call_execution.child_item_ids = list(child_item_ids)
+
+    def end_waiting_on_workflow_call(self, status: str = "completed", error_message: str | None = None) -> None:
         self.waiting = None
         self.waiting_workflow_call_child_session = None
 
