@@ -38,6 +38,7 @@ def _insert_queue_item(
     status: str,
     queue_id: str = "default",
     batch_id: str | None = None,
+    destination: str | None = None,
     user_id: str = "user-1",
     workflow_call_id: str | None = None,
     parent_item_id: int | None = None,
@@ -78,7 +79,7 @@ def _insert_queue_item(
                 0,
                 None,
                 None,
-                None,
+                destination,
                 None,
                 user_id,
                 workflow_call_id,
@@ -1093,6 +1094,37 @@ def test_cancel_by_batch_ids_cancels_waiting_parent_and_in_progress_child(
     )
 
     session_queue.cancel_by_batch_ids("default", [batch_id])
+
+    assert session_queue.get_queue_item(parent_item_id).status == "canceled"
+    assert session_queue.get_queue_item(child_item_id).status == "canceled"
+
+
+def test_cancel_by_destination_cancels_waiting_parent_and_in_progress_child(
+    session_queue: SqliteSessionQueue,
+) -> None:
+    destination = "gallery"
+    parent_session = GraphExecutionState(graph=Graph())
+    child_session = GraphExecutionState(graph=Graph())
+
+    parent_item_id = _insert_queue_item(
+        session_queue,
+        session=parent_session,
+        status="waiting",
+        destination=destination,
+    )
+    child_item_id = _insert_queue_item(
+        session_queue,
+        session=child_session,
+        status="in_progress",
+        destination=destination,
+        workflow_call_id="workflow-call-1",
+        parent_item_id=parent_item_id,
+        parent_session_id=parent_session.id,
+        root_item_id=parent_item_id,
+        workflow_call_depth=1,
+    )
+
+    session_queue.cancel_by_destination("default", destination)
 
     assert session_queue.get_queue_item(parent_item_id).status == "canceled"
     assert session_queue.get_queue_item(child_item_id).status == "canceled"
