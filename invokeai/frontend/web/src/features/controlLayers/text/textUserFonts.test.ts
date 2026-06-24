@@ -53,9 +53,11 @@ describe('textUserFonts', () => {
         arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
       })
     );
-    const fontFaceCtor = vi.fn().mockImplementation(() => ({
-      load: () => Promise.resolve(loadedFace),
-    }));
+    const fontFaceCtor = vi.fn(function () {
+      return {
+        load: () => Promise.resolve(loadedFace),
+      };
+    });
 
     await syncUserFontFaces({
       fonts: [font],
@@ -97,9 +99,11 @@ describe('textUserFonts', () => {
           resolveFetch = resolve;
         })
     );
-    const fontFaceCtor = vi.fn().mockImplementation(() => ({
-      load: () => Promise.resolve(loadedFace),
-    }));
+    const fontFaceCtor = vi.fn(function () {
+      return {
+        load: () => Promise.resolve(loadedFace),
+      };
+    });
 
     const syncPromise = syncUserFontFaces({
       fonts: [font],
@@ -148,9 +152,11 @@ describe('textUserFonts', () => {
         ok: true,
         arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
       });
-    const fontFaceCtor = vi.fn().mockImplementation(() => ({
-      load: () => Promise.resolve(loadedFace),
-    }));
+    const fontFaceCtor = vi.fn(function () {
+      return {
+        load: () => Promise.resolve(loadedFace),
+      };
+    });
 
     await syncUserFontFaces({
       fonts: [font],
