@@ -7,7 +7,7 @@ import { firefoxDndFix } from 'features/dnd/util';
 import type { RefObject } from 'react';
 import { useEffect, useState } from 'react';
 
-export const useRefImageDnd = (ref: RefObject<HTMLElement>, id: string) => {
+export const useRefImageDnd = (ref: RefObject<HTMLElement | null>, id: string) => {
   const [dndListState, setDndListState] = useState<DndListTargetState>(idle);
   const [isDragging, setIsDragging] = useState(false);
 
