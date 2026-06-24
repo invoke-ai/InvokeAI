@@ -124,6 +124,9 @@ dependencies = [
 override-dependencies = ["opencv-python; sys_platform=='never'"]
 conflicts = [[{ extra = "cpu" }, { extra = "cuda" }, { extra = "rocm" }]]
 index-strategy = "unsafe-best-match"
+# We do not publish or support ARM Linux builds; restrict resolution to
+# x86_64 Linux, Windows, and macOS. (ROCm in particular is x86_64-only.)
+environments = ["sys_platform == 'win32' or sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'x86_64')"]
 
 [tool.uv.sources]
 torch = [
