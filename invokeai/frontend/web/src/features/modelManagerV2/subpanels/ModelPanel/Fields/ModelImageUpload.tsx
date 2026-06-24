@@ -3,7 +3,7 @@ import { Box, IconButton, Image } from '@invoke-ai/ui-library';
 import { dropzoneAccept } from 'common/hooks/useImageUploadButton';
 import { typedMemo } from 'common/util/typedMemo';
 import { toast } from 'features/toast/toast';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiUploadBold } from 'react-icons/pi';
@@ -32,6 +32,10 @@ type Props = {
 const ModelImageUpload = ({ model_key, model_image }: Props) => {
   const [image, setImage] = useState<string | null>(model_image || null);
   const { t } = useTranslation();
+
+  useEffect(() => {
+    setImage(model_image || null);
+  }, [model_image]);
 
   const [updateModelImage, request] = useUpdateModelImageMutation();
   const [deleteModelImage] = useDeleteModelImageMutation();
