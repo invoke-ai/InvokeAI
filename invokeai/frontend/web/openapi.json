@@ -14415,7 +14415,8 @@
           }
         },
         "type": "object",
-        "title": "CacheStats"
+        "title": "CacheStats",
+        "description": "Collect statistics on cache performance."
       },
       "CalculateImageTilesEvenSplitInvocation": {
         "category": "tiles",
