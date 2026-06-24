@@ -6935,7 +6935,7 @@
       "get": {
         "tags": ["queue"],
         "summary": "Get Queue Item Ids",
-        "description": "Gets all queue item ids that match the given parameters. Non-admin users only see their own items.",
+        "description": "Gets all queue item ids that match the given parameters.\n\nIDs for every user's items are returned (item ids carry no sensitive data on their own).\nWhen the corresponding items are hydrated via get_queue_items_by_item_ids, those belonging\nto other users are redacted by sanitize_queue_item_for_user. This lets a non-admin see\npartially-redacted entries for other users' jobs in the queue list, while still revealing\nonly timestamps and status for items they do not own.\n\ncurrent_user is required so the endpoint stays behind authentication in multiuser mode.",
         "operationId": "get_queue_item_ids",
         "security": [
           {
@@ -14364,7 +14364,8 @@
           }
         },
         "type": "object",
-        "title": "CacheStats"
+        "title": "CacheStats",
+        "description": "Collect statistics on cache performance."
       },
       "CalculateImageTilesEvenSplitInvocation": {
         "category": "tiles",
@@ -65445,6 +65446,30 @@
             "type": "integer",
             "title": "Total",
             "description": "Total number of queue items"
+          },
+          "user_pending": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Pending",
+            "description": "Number of the requesting user's queue items with status 'pending' (None for admins/global callers)"
+          },
+          "user_in_progress": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User In Progress",
+            "description": "Number of the requesting user's queue items with status 'in_progress' (None for admins/global callers)"
           }
         },
         "type": "object",
