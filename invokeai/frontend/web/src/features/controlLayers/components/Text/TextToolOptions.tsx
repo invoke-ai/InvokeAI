@@ -283,6 +283,11 @@ const FontSizeControl = () => {
   const fontSize = useAppSelector(selectTextFontSize);
 
   const [localFontSize, setLocalFontSize] = useState(String(fontSize));
+  const [lastExternalFontSize, setLastExternalFontSize] = useState(fontSize);
+  if (lastExternalFontSize !== fontSize) {
+    setLastExternalFontSize(fontSize);
+    setLocalFontSize(String(fontSize));
+  }
 
   const marks = useMemo(
     () => [1, 100, 200, 300, 400, 500].filter((value) => value >= TEXT_MIN_FONT_SIZE && value <= TEXT_MAX_FONT_SIZE),
@@ -338,10 +343,6 @@ const FontSizeControl = () => {
     e.currentTarget.focus();
     e.currentTarget.select();
   }, []);
-
-  useEffect(() => {
-    setLocalFontSize(String(fontSize));
-  }, [fontSize]);
 
   return (
     <Flex w="auto" flexShrink={0} alignItems="center" gap={2}>
@@ -442,14 +443,16 @@ const LineHeightSelect = () => {
         {t('controlLayers.text.lineHeight')}
       </Text>
       <Tooltip label={t('controlLayers.text.lineHeight')}>
-        <Combobox
-          size="sm"
-          variant="outline"
-          isSearchable={false}
-          options={lineHeightOptions}
-          value={selectedOption}
-          onChange={handleLineHeightChange}
-        />
+        <Box>
+          <Combobox
+            size="sm"
+            variant="outline"
+            isSearchable={false}
+            options={lineHeightOptions}
+            value={selectedOption}
+            onChange={handleLineHeightChange}
+          />
+        </Box>
       </Tooltip>
     </Flex>
   );
