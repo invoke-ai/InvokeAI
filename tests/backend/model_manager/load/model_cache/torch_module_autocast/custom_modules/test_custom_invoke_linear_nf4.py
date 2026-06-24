@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 import torch
 
@@ -56,6 +58,20 @@ def test_custom_invoke_linear_nf4_all_weights_on_cuda(linear_nf4_layer: InvokeLi
     assert torch.allclose(y_quantized, y_custom, atol=1e-5)
 
 
+def test_custom_invoke_linear_nf4_all_weights_on_cuda_uses_bnb_single_vector_path(
+    linear_nf4_layer: InvokeLinearNF4,
+):
+    """GPU-resident single-vector inference should keep using bnb's gemv_4bit path."""
+    x = torch.randn(1, 64).to("cuda")
+    custom_linear_nf4_layer = wrap_custom_layer(linear_nf4_layer, CustomInvokeLinearNF4)
+    custom_linear_nf4_layer.set_device_autocasting_enabled(True)
+
+    with patch("bitsandbytes.functional.dequantize_4bit") as mock_dequantize:
+        _ = custom_linear_nf4_layer(x)
+
+    mock_dequantize.assert_not_called()
+
+
 # We run with two different input dimensions, because the NF4 layer follows a different code path depending on the
 # input dimension, and this has caused issues in the past.
 @pytest.mark.parametrize("input_dim_0", [1, 2])
@@ -70,9 +86,9 @@ def test_custom_invoke_linear_nf4_all_weights_on_cpu(linear_nf4_layer: InvokeLin
     state_dict = {k: v.to("cpu") for k, v in state_dict.items()}
     linear_nf4_layer.load_state_dict(state_dict)
 
-    # Inference of the original layer should fail.
-    with pytest.raises(RuntimeError):
-        linear_nf4_layer(x)
+    # Do not call the raw bitsandbytes NF4 layer here. With CPU-stored weights and a single-row CUDA input, some
+    # bitsandbytes versions hit an unsafe gemv_4bit path instead of raising a Python exception. The custom layer below
+    # is the behavior under test.
 
     # Wrap the InvokeLinearNF4 layer in a CustomInvokeLinearNF4 layer, and run inference on it.
     custom_linear_nf4_layer = wrap_custom_layer(linear_nf4_layer, CustomInvokeLinearNF4)
