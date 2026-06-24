@@ -216,9 +216,11 @@ def test_get_queue_status_reports_waiting_for_owner(
     assert response.status_code == 200
     payload = response.json()
     assert payload["queue"]["waiting"] == 1
-    assert payload["queue"]["pending"] == 0
+    assert payload["queue"]["pending"] == 1
     assert payload["queue"]["in_progress"] == 0
-    assert payload["queue"]["total"] == 1
+    assert payload["queue"]["total"] == 2
+    assert payload["queue"]["user_pending"] == 0
+    assert payload["queue"]["user_in_progress"] == 0
     assert payload["queue"]["item_id"] is None
 
 

@@ -375,8 +375,8 @@ def test_migration_27_creates_users_table(logger: Logger) -> None:
     db._conn.close()
 
 
-def test_migration_32_adds_workflow_call_columns_to_session_queue(logger: Logger) -> None:
-    from invokeai.app.services.shared.sqlite_migrator.migrations.migration_32 import Migration32Callback
+def test_migration_33_adds_workflow_call_columns_to_session_queue(logger: Logger) -> None:
+    from invokeai.app.services.shared.sqlite_migrator.migrations.migration_33 import Migration33Callback
 
     db = SqliteDatabase(db_path=None, logger=logger, verbose=False)
     cursor = db._conn.cursor()
@@ -384,7 +384,7 @@ def test_migration_32_adds_workflow_call_columns_to_session_queue(logger: Logger
     cursor.execute("CREATE TABLE IF NOT EXISTS session_queue (item_id INTEGER PRIMARY KEY);")
     db._conn.commit()
 
-    migration_callback = Migration32Callback()
+    migration_callback = Migration33Callback()
     migration_callback(cursor)
     db._conn.commit()
 

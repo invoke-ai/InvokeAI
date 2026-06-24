@@ -1354,6 +1354,7 @@ class TestQueueStatusScoping:
             batch_id=None,
             pending=5,
             in_progress=1,
+            waiting=0,
             completed=0,
             failed=0,
             canceled=0,
