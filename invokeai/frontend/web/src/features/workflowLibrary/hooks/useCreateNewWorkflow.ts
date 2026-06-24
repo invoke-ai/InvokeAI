@@ -47,7 +47,7 @@ export const useCreateLibraryWorkflow = (): CreateLibraryWorkflowReturn => {
   const getFormFieldInitialValues = useGetFormFieldInitialValues();
 
   const toast = useToast();
-  const toastRef = useRef<ToastId | undefined>();
+  const toastRef = useRef<ToastId | null>(null);
   const createNewWorkflow = useCallback(
     async ({ workflow, onSuccess, onError }: CreateLibraryWorkflowArg) => {
       toastRef.current = toast({

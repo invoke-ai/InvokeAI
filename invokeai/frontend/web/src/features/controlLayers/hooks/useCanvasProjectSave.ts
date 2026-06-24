@@ -31,6 +31,8 @@ export const useCanvasProjectSave = () => {
   const store = useAppStore();
   const { data: appVersion } = useGetAppVersionQuery();
 
+  const appVersionString = appVersion?.version ?? 'unknown';
+
   const saveCanvasProject = useCallback(
     async (name: string) => {
       try {
@@ -61,7 +63,7 @@ export const useCanvasProjectSave = () => {
         // Add manifest
         const manifest: CanvasProjectManifest = {
           version: CANVAS_PROJECT_VERSION,
-          appVersion: appVersion?.version ?? 'unknown',
+          appVersion: appVersionString ?? 'unknown',
           createdAt: new Date().toISOString(),
           name,
         };
@@ -110,7 +112,7 @@ export const useCanvasProjectSave = () => {
         });
       }
     },
-    [appVersion?.version, store, t]
+    [appVersionString, store, t]
   );
 
   return { saveCanvasProject };
