@@ -9,7 +9,7 @@ from invokeai.backend.image_util.mediapipe_face import detect_faces
     "mediapipe_face_detection",
     title="MediaPipe Face Detection",
     tags=["controlnet", "face"],
-    category="controlnet",
+    category="controlnet_preprocessors",
     version="1.0.0",
 )
 class MediaPipeFaceDetectionInvocation(BaseInvocation, WithMetadata, WithBoard):

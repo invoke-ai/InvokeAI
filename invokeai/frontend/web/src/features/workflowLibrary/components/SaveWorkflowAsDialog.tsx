@@ -5,6 +5,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   Button,
+  Checkbox,
   Flex,
   FormControl,
   FormLabel,
@@ -19,6 +20,8 @@ import { t } from 'i18next';
 import { atom, computed } from 'nanostores';
 import type { ChangeEvent, RefObject } from 'react';
 import { memo, useCallback, useRef, useState } from 'react';
+import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
+import { useUpdateWorkflowIsPublicMutation } from 'services/api/endpoints/workflows';
 import { assert } from 'tsafe';
 
 /**
@@ -80,73 +83,101 @@ export const SaveWorkflowAsDialog = () => {
   );
 };
 
-const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef: RefObject<HTMLButtonElement> }) => {
-  const [name, setName] = useState(() => {
-    if (workflow) {
-      return getInitialName(workflow);
-    }
-    return '';
-  });
-
-  const { createNewWorkflow } = useCreateLibraryWorkflow();
-
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const onChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    setName(e.target.value);
-  }, []);
-
-  const onClose = useCallback(() => {
-    $workflowToSave.set(null);
-  }, []);
-
-  const onSave = useCallback(async () => {
-    workflow.id = undefined;
-    workflow.name = name;
-    workflow.meta.category = 'user';
-
-    // We've just made the workflow a draft, but TS doesn't know that. We need to assert it.
-    assert(isDraftWorkflow(workflow));
-
-    await createNewWorkflow({
-      workflow,
-      onSuccess: onClose,
-      onError: onClose,
+const Content = memo(
+  ({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef: RefObject<HTMLButtonElement | null> }) => {
+    const [name, setName] = useState(() => {
+      if (workflow) {
+        return getInitialName(workflow);
+      }
+      return '';
     });
-  }, [workflow, name, createNewWorkflow, onClose]);
+    const [isPublic, setIsPublic] = useState(false);
+    const { data: setupStatus } = useGetSetupStatusQuery();
+    const multiuserEnabled = setupStatus?.multiuser_enabled ?? false;
 
-  return (
-    <AlertDialogContent>
-      <AlertDialogHeader fontSize="lg" fontWeight="bold">
-        {t('workflows.saveWorkflowAs')}
-      </AlertDialogHeader>
+    const { createNewWorkflow } = useCreateLibraryWorkflow();
+    const [updateIsPublic] = useUpdateWorkflowIsPublicMutation();
 
-      <AlertDialogBody>
-        <FormControl alignItems="flex-start">
-          <FormLabel mt="2">{t('workflows.workflowName')}</FormLabel>
-          <Flex flexDir="column" width="full" gap="2">
-            <Input ref={inputRef} value={name} onChange={onChange} placeholder={t('workflows.workflowName')} />
-          </Flex>
-        </FormControl>
-      </AlertDialogBody>
+    const inputRef = useRef<HTMLInputElement>(null);
 
-      <AlertDialogFooter>
-        <Button ref={cancelRef} onClick={onClose}>
-          {t('common.cancel')}
-        </Button>
-        <Button colorScheme="invokeBlue" onClick={onSave} ml={3} isDisabled={!name || !name.length}>
-          {t('common.saveAs')}
-        </Button>
-      </AlertDialogFooter>
-    </AlertDialogContent>
-  );
-});
+    const onChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+      setName(e.target.value);
+    }, []);
+
+    const onChangeIsPublic = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+      setIsPublic(e.target.checked);
+    }, []);
+
+    const onClose = useCallback(() => {
+      $workflowToSave.set(null);
+    }, []);
+
+    const onSave = useCallback(async () => {
+      const workflowToCreate = {
+        ...workflow,
+        id: undefined,
+        name,
+        meta: { ...workflow.meta, category: 'user' as const },
+      };
+
+      // We've just made the workflow a draft, but TS doesn't know that. We need to assert it.
+      assert(isDraftWorkflow(workflowToCreate));
+
+      await createNewWorkflow({
+        workflow: workflowToCreate,
+        onSuccess: async (workflowId?: string) => {
+          if (isPublic && workflowId) {
+            try {
+              await updateIsPublic({ workflow_id: workflowId, is_public: true }).unwrap();
+            } catch {
+              // Sharing failed silently - workflow was saved, just not shared
+            }
+          }
+          onClose();
+        },
+        onError: onClose,
+      });
+    }, [workflow, name, isPublic, createNewWorkflow, updateIsPublic, onClose]);
+
+    return (
+      <AlertDialogContent>
+        <AlertDialogHeader fontSize="lg" fontWeight="bold">
+          {t('workflows.saveWorkflowAs')}
+        </AlertDialogHeader>
+
+        <AlertDialogBody>
+          <FormControl alignItems="flex-start">
+            <FormLabel mt="2">{t('workflows.workflowName')}</FormLabel>
+            <Flex flexDir="column" width="full" gap="2">
+              <Input ref={inputRef} value={name} onChange={onChange} placeholder={t('workflows.workflowName')} />
+              {multiuserEnabled && (
+                <Flex alignItems="center" gap={2}>
+                  <Checkbox isChecked={isPublic} onChange={onChangeIsPublic} />
+                  <FormLabel mb={0}>{t('workflows.shareWorkflow')}</FormLabel>
+                </Flex>
+              )}
+            </Flex>
+          </FormControl>
+        </AlertDialogBody>
+
+        <AlertDialogFooter>
+          <Button ref={cancelRef} onClick={onClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button colorScheme="invokeBlue" onClick={onSave} ml={3} isDisabled={!name || !name.length}>
+            {t('common.saveAs')}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    );
+  }
+);
 Content.displayName = 'Content';
 
 const NoWorkflowToSaveContent = memo(() => {
   return (
     <AlertDialogContent>
-      <IAINoContentFallback icon={null} label="No workflow to save" />
+      <IAINoContentFallback icon={null} label={t('workflows.noWorkflowToSave')} />
     </AlertDialogContent>
   );
 });

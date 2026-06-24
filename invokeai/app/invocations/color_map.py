@@ -11,7 +11,7 @@ from invokeai.backend.image_util.util import np_to_pil, pil_to_np
     "color_map",
     title="Color Map",
     tags=["controlnet"],
-    category="controlnet",
+    category="controlnet_preprocessors",
     version="1.0.0",
 )
 class ColorMapInvocation(BaseInvocation, WithMetadata, WithBoard):

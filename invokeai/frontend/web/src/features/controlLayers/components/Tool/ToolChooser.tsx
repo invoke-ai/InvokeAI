@@ -2,8 +2,11 @@ import { ButtonGroup } from '@invoke-ai/ui-library';
 import { ToolBboxButton } from 'features/controlLayers/components/Tool/ToolBboxButton';
 import { ToolBrushButton } from 'features/controlLayers/components/Tool/ToolBrushButton';
 import { ToolColorPickerButton } from 'features/controlLayers/components/Tool/ToolColorPickerButton';
+import { ToolGradientButton } from 'features/controlLayers/components/Tool/ToolGradientButton';
+import { ToolLassoButton } from 'features/controlLayers/components/Tool/ToolLassoButton';
 import { ToolMoveButton } from 'features/controlLayers/components/Tool/ToolMoveButton';
-import { ToolRectButton } from 'features/controlLayers/components/Tool/ToolRectButton';
+import { ToolShapesButton } from 'features/controlLayers/components/Tool/ToolShapesButton';
+import { ToolTextButton } from 'features/controlLayers/components/Tool/ToolTextButton';
 import React from 'react';
 
 import { ToolEraserButton } from './ToolEraserButton';
@@ -15,7 +18,10 @@ export const ToolChooser: React.FC = () => {
       <ButtonGroup isAttached orientation="vertical">
         <ToolBrushButton />
         <ToolEraserButton />
-        <ToolRectButton />
+        <ToolShapesButton />
+        <ToolGradientButton />
+        <ToolTextButton />
+        <ToolLassoButton />
         <ToolMoveButton />
         <ToolViewButton />
         <ToolBboxButton />

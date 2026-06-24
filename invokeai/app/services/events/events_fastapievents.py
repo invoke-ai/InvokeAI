@@ -28,6 +28,10 @@ class FastAPIEventService(EventServiceBase):
         self._loop.call_soon_threadsafe(self._queue.put_nowait, None)
 
     def dispatch(self, event: EventBase) -> None:
+        if self._loop.is_closed():
+            # The event loop was closed during shutdown. Events can no longer be dispatched;
+            # silently drop this one so the generation thread can wind down cleanly.
+            return
         self._loop.call_soon_threadsafe(self._queue.put_nowait, event)
 
     async def _dispatch_from_queue(self, stop_event: threading.Event):
@@ -42,3 +46,9 @@ class FastAPIEventService(EventServiceBase):
 
             except asyncio.CancelledError as e:
                 raise e  # Raise a proper error
+            except Exception:
+                import logging
+
+                logging.getLogger("InvokeAI").error(
+                    f"Error dispatching event {getattr(event, '__event_name__', event)}", exc_info=True
+                )

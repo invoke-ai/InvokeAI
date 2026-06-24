@@ -41,6 +41,7 @@ class CLIPEmbed_Diffusers_Config_Base(Diffusers_Config_Base):
     base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
     type: Literal[ModelType.CLIPEmbed] = Field(default=ModelType.CLIPEmbed)
     format: Literal[ModelFormat.Diffusers] = Field(default=ModelFormat.Diffusers)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:

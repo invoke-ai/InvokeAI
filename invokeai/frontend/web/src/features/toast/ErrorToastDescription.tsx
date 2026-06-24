@@ -17,7 +17,7 @@ export default function ErrorToastDescription({ errorType, errorMessage }: Descr
         <Trans
           i18nKey="toast.outOfMemoryErrorDescLocal"
           components={{
-            LinkComponent: <ExternalLink href="https://invoke-ai.github.io/InvokeAI/features/low-vram/" />,
+            LinkComponent: <ExternalLink href="https://invoke.ai/configuration/low-vram-mode/" />,
           }}
         />
       );

@@ -16,6 +16,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import Qwen3EncoderField
 from invokeai.app.invocations.primitives import ZImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.z_image_lora_constants import Z_IMAGE_LORA_QWEN3_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -33,7 +34,7 @@ Z_IMAGE_MAX_SEQ_LEN = 512
     "z_image_text_encoder",
     title="Prompt - Z-Image",
     tags=["prompt", "conditioning", "z-image"],
-    category="conditioning",
+    category="prompt",
     version="1.1.0",
     classification=Classification.Prototype,
 )
@@ -57,6 +58,8 @@ class ZImageTextEncoderInvocation(BaseInvocation):
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ZImageConditioningOutput:
         prompt_embeds = self._encode_prompt(context, max_seq_len=Z_IMAGE_MAX_SEQ_LEN)
+        # Move embeddings to CPU for storage to save VRAM
+        prompt_embeds = prompt_embeds.detach().to("cpu")
         conditioning_data = ConditioningFieldData(conditionings=[ZImageConditioningInfo(prompt_embeds=prompt_embeds)])
         conditioning_name = context.conditioning.save(conditioning_data)
         return ZImageConditioningOutput(
@@ -69,14 +72,22 @@ class ZImageTextEncoderInvocation(BaseInvocation):
         Based on the ZImagePipeline._encode_prompt method from diffusers.
         """
         prompt = self.prompt
-        device = TorchDevice.choose_torch_device()
 
         text_encoder_info = context.models.load(self.qwen3_encoder.text_encoder)
         tokenizer_info = context.models.load(self.qwen3_encoder.tokenizer)
 
         with ExitStack() as exit_stack:
-            (_, text_encoder) = exit_stack.enter_context(text_encoder_info.model_on_device())
+            (cached_weights, text_encoder) = exit_stack.enter_context(text_encoder_info.model_on_device())
             (_, tokenizer) = exit_stack.enter_context(tokenizer_info.model_on_device())
+
+            # Use the device that the text encoder is effectively executing on, and repair any required tensors left on
+            # the CPU by a previous interrupted run.
+            repaired_tensors = text_encoder_info.repair_required_tensors_on_device()
+            device = get_effective_device(text_encoder)
+            if repaired_tensors > 0:
+                context.logger.warning(
+                    f"Recovered {repaired_tensors} required Qwen3 tensor(s) onto {device} after a partial device mismatch."
+                )
 
             # Apply LoRA models to the text encoder
             lora_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
@@ -86,6 +97,7 @@ class ZImageTextEncoderInvocation(BaseInvocation):
                     patches=self._lora_iterator(context),
                     prefix=Z_IMAGE_LORA_QWEN3_PREFIX,
                     dtype=lora_dtype,
+                    cached_weights=cached_weights,
                 )
             )
 

@@ -2,7 +2,11 @@ import { NUMPY_RAND_MAX } from 'app/constants';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { buildZodTypeGuard } from 'common/util/zodUtils';
 import {
+  zAnimaSchedulerField,
+  zExternalModelIdentifierField,
+  zFluxDypeExponentField,
   zFluxDypePresetField,
+  zFluxDypeScaleField,
   zFluxSchedulerField,
   zModelIdentifierField,
   zSchedulerField,
@@ -77,9 +81,24 @@ export const [zParameterZImageScheduler, isParameterZImageScheduler] = buildPara
 export type ParameterZImageScheduler = z.infer<typeof zParameterZImageScheduler>;
 // #endregion
 
+// #region Anima Scheduler
+export const [zParameterAnimaScheduler, isParameterAnimaScheduler] = buildParameter(zAnimaSchedulerField);
+export type ParameterAnimaScheduler = z.infer<typeof zParameterAnimaScheduler>;
+// #endregion
+
 // #region Flux DyPE Preset
 export const [zParameterFluxDypePreset, isParameterFluxDypePreset] = buildParameter(zFluxDypePresetField);
 export type ParameterFluxDypePreset = z.infer<typeof zParameterFluxDypePreset>;
+// #endregion
+
+// #region Flux DyPE Scale (magnitude λs)
+export const [zParameterFluxDypeScale, isParameterFluxDypeScale] = buildParameter(zFluxDypeScaleField);
+export type ParameterFluxDypeScale = z.infer<typeof zParameterFluxDypeScale>;
+// #endregion
+
+// #region Flux DyPE Exponent (decay speed λt)
+export const [zParameterFluxDypeExponent, isParameterFluxDypeExponent] = buildParameter(zFluxDypeExponentField);
+export type ParameterFluxDypeExponent = z.infer<typeof zParameterFluxDypeExponent>;
 // #endregion
 
 // #region seed
@@ -103,7 +122,7 @@ export const isParameterHeight = isParameterImageDimension;
 // #endregion
 
 // #region Model
-export const zParameterModel = zModelIdentifierField;
+export const zParameterModel = z.union([zModelIdentifierField, zExternalModelIdentifierField]);
 export type ParameterModel = z.infer<typeof zParameterModel>;
 // #endregion
 

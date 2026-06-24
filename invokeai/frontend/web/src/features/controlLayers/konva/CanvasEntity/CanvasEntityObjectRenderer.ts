@@ -8,7 +8,11 @@ import { CanvasObjectBrushLine } from 'features/controlLayers/konva/CanvasObject
 import { CanvasObjectBrushLineWithPressure } from 'features/controlLayers/konva/CanvasObject/CanvasObjectBrushLineWithPressure';
 import { CanvasObjectEraserLine } from 'features/controlLayers/konva/CanvasObject/CanvasObjectEraserLine';
 import { CanvasObjectEraserLineWithPressure } from 'features/controlLayers/konva/CanvasObject/CanvasObjectEraserLineWithPressure';
+import { CanvasObjectGradient } from 'features/controlLayers/konva/CanvasObject/CanvasObjectGradient';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
+import { CanvasObjectLasso } from 'features/controlLayers/konva/CanvasObject/CanvasObjectLasso';
+import { CanvasObjectOval } from 'features/controlLayers/konva/CanvasObject/CanvasObjectOval';
+import { CanvasObjectPolygon } from 'features/controlLayers/konva/CanvasObject/CanvasObjectPolygon';
 import { CanvasObjectRect } from 'features/controlLayers/konva/CanvasObject/CanvasObjectRect';
 import type { AnyObjectRenderer, AnyObjectState } from 'features/controlLayers/konva/CanvasObject/types';
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
@@ -319,10 +323,6 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
   };
 
   updateOpacity = throttle(() => {
-    if (!this.parent.konva.layer.visible()) {
-      return;
-    }
-
     this.log.trace('Updating opacity');
 
     const opacity = this.parent.state.opacity;
@@ -401,6 +401,46 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       }
 
       didRender = renderer.update(objectState, force || isFirstRender);
+    } else if (objectState.type === 'oval') {
+      assert(renderer instanceof CanvasObjectOval || !renderer);
+
+      if (!renderer) {
+        renderer = new CanvasObjectOval(objectState, this);
+        this.renderers.set(renderer.id, renderer);
+        this.konva.objectGroup.add(renderer.konva.group);
+      }
+
+      didRender = renderer.update(objectState, force || isFirstRender);
+    } else if (objectState.type === 'polygon') {
+      assert(renderer instanceof CanvasObjectPolygon || !renderer);
+
+      if (!renderer) {
+        renderer = new CanvasObjectPolygon(objectState, this);
+        this.renderers.set(renderer.id, renderer);
+        this.konva.objectGroup.add(renderer.konva.group);
+      }
+
+      didRender = renderer.update(objectState, force || isFirstRender);
+    } else if (objectState.type === 'lasso') {
+      assert(renderer instanceof CanvasObjectLasso || !renderer);
+
+      if (!renderer) {
+        renderer = new CanvasObjectLasso(objectState, this);
+        this.renderers.set(renderer.id, renderer);
+        this.konva.objectGroup.add(renderer.konva.group);
+      }
+
+      didRender = renderer.update(objectState, force || isFirstRender);
+    } else if (objectState.type === 'gradient') {
+      assert(renderer instanceof CanvasObjectGradient || !renderer);
+
+      if (!renderer) {
+        renderer = new CanvasObjectGradient(objectState, this);
+        this.renderers.set(renderer.id, renderer);
+        this.konva.objectGroup.add(renderer.konva.group);
+      }
+
+      didRender = renderer.update(objectState, force || isFirstRender);
     } else if (objectState.type === 'image') {
       assert(renderer instanceof CanvasObjectImage || !renderer);
 
@@ -426,16 +466,35 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
    * these visually transparent shapes in its calculation:
    *
    * - Eraser lines, which are normal lines with a globalCompositeOperation of 'destination-out'.
+   * - Subtracting lasso shapes, which use a globalCompositeOperation of 'destination-out'.
    * - Clipped portions of any shape.
    * - Images, which may have transparent areas.
    */
   needsPixelBbox = (): boolean => {
     let needsPixelBbox = false;
     for (const renderer of this.renderers.values()) {
-      const isEraserLine = renderer instanceof CanvasObjectEraserLine;
+      const isEraserLine =
+        renderer instanceof CanvasObjectEraserLine || renderer instanceof CanvasObjectEraserLineWithPressure;
+      const isSubtractingLasso =
+        renderer instanceof CanvasObjectLasso && renderer.state.compositeOperation === 'destination-out';
+      const isSubtractRect =
+        renderer instanceof CanvasObjectRect && renderer.state.compositeOperation === 'destination-out';
+      const isSubtractOval =
+        renderer instanceof CanvasObjectOval && renderer.state.compositeOperation === 'destination-out';
+      const isSubtractPolygon =
+        renderer instanceof CanvasObjectPolygon && renderer.state.compositeOperation === 'destination-out';
       const isImage = renderer instanceof CanvasObjectImage;
+      const imageIgnoresTransparency = isImage && renderer.state.usePixelBbox === false;
       const hasClip = renderer instanceof CanvasObjectBrushLine && renderer.state.clip;
-      if (isEraserLine || hasClip || isImage) {
+      if (
+        isEraserLine ||
+        isSubtractingLasso ||
+        isSubtractRect ||
+        isSubtractOval ||
+        isSubtractPolygon ||
+        hasClip ||
+        (isImage && !imageIgnoresTransparency)
+      ) {
         needsPixelBbox = true;
         break;
       }

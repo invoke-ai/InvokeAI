@@ -4,7 +4,7 @@ import { typedMemo } from 'common/util/typedMemo';
 import { useCallback, useMemo } from 'react';
 import type { Control } from 'react-hook-form';
 import { useController } from 'react-hook-form';
-import type { UpdateModelArg } from 'services/api/endpoints/models';
+import type { UpdateModelBody } from 'services/api/types';
 
 const options: ComboboxOption[] = [
   { value: 'none', label: '-' },
@@ -14,7 +14,7 @@ const options: ComboboxOption[] = [
 ];
 
 type Props = {
-  control: Control<UpdateModelArg['body']>;
+  control: Control<UpdateModelBody>;
 };
 
 const PredictionTypeSelect = ({ control }: Props) => {

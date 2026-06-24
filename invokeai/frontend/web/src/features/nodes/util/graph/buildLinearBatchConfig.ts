@@ -4,6 +4,7 @@ import { range } from 'es-toolkit/compat';
 import type { SeedBehaviour } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import type { BaseModelType } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { components } from 'services/api/schema';
 import type { Batch, EnqueueBatchArg, Invocation } from 'services/api/types';
 
@@ -26,11 +27,12 @@ export const prepareLinearUIBatch = (arg: {
   prepend: boolean;
   base: BaseModelType;
   positivePromptNode: Invocation<'string'>;
+  negativePromptNode?: Invocation<'string'>;
   seedNode?: Invocation<'integer'>;
   origin: string;
   destination: string;
 }): EnqueueBatchArg => {
-  const { state, g, base, prepend, positivePromptNode, seedNode, origin, destination } = arg;
+  const { state, g, base, prepend, positivePromptNode, negativePromptNode, seedNode, origin, destination } = arg;
   const { iterations, shouldRandomizeSeed, seed } = state.params;
   const { prompts, seedBehaviour } = state.dynamicPrompts;
 
@@ -74,13 +76,26 @@ export const prepareLinearUIBatch = (arg: {
     items: extendedPrompts,
   });
 
+  if (negativePromptNode) {
+    const negativePrompt = selectPresetModifiedPrompts(state).negative;
+    firstBatchDatumList.push({
+      node_path: negativePromptNode.id,
+      field_name: 'value',
+      items: extendedPrompts.map(() => negativePrompt),
+    });
+  }
+
   data.push(firstBatchDatumList);
+
+  // Models without a seed node (e.g. external API models without seed support) can't express
+  // PER_ITERATION via a seed batch dimension, so use batch.runs to repeat the graph instead.
+  const runs = !seedNode && seedBehaviour === 'PER_ITERATION' ? iterations : 1;
 
   const enqueueBatchArg: EnqueueBatchArg = {
     prepend,
     batch: {
       graph: g.getGraph(),
-      runs: 1,
+      runs,
       data,
       origin,
       destination,

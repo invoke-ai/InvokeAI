@@ -1,5 +1,7 @@
+import { useAppSelector } from 'app/store/storeHooks';
 import { adjustPromptAttention } from 'common/util/promptAttention';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
+import { selectSystemPrefersNumericAttentionWeights } from 'features/system/store/systemSlice';
 import type { RefObject } from 'react';
 import { useCallback } from 'react';
 
@@ -18,6 +20,7 @@ export const usePromptAttentionHotkeys = ({
   onPromptChange: _onPromptChange,
 }: UsePromptAttentionHotkeysArgs) => {
   const isPromptFocused = useCallback(() => document.activeElement === textareaRef.current, [textareaRef]);
+  const prefersNumericWeights = useAppSelector(selectSystemPrefersNumericAttentionWeights);
 
   const handleAttentionAdjustment = useCallback(
     (direction: 'increment' | 'decrement') => {
@@ -26,7 +29,13 @@ export const usePromptAttentionHotkeys = ({
         return;
       }
 
-      const result = adjustPromptAttention(textarea.value, textarea.selectionStart, textarea.selectionEnd, direction);
+      const result = adjustPromptAttention(
+        textarea.value,
+        textarea.selectionStart,
+        textarea.selectionEnd,
+        direction,
+        prefersNumericWeights
+      );
 
       // Use execCommand to make the change undo-able by the browser.
       // This triggers the textarea's native onChange, which syncs React state.
@@ -37,7 +46,7 @@ export const usePromptAttentionHotkeys = ({
       // Restore the selection to cover the adjusted portion
       textarea.setSelectionRange(result.selectionStart, result.selectionEnd);
     },
-    [textareaRef]
+    [textareaRef, prefersNumericWeights]
   );
 
   useRegisteredHotkeys({
@@ -50,7 +59,7 @@ export const usePromptAttentionHotkeys = ({
       }
     },
     options: { preventDefault: true, enableOnFormTags: ['TEXTAREA'] },
-    dependencies: [isPromptFocused, handleAttentionAdjustment],
+    dependencies: [isPromptFocused, handleAttentionAdjustment, prefersNumericWeights],
   });
 
   useRegisteredHotkeys({
@@ -63,6 +72,6 @@ export const usePromptAttentionHotkeys = ({
       }
     },
     options: { preventDefault: true, enableOnFormTags: ['TEXTAREA'] },
-    dependencies: [isPromptFocused, handleAttentionAdjustment],
+    dependencies: [isPromptFocused, handleAttentionAdjustment, prefersNumericWeights],
   });
 };

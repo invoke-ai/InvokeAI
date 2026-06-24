@@ -1,6 +1,7 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
+import { useIsUncommittedCanvasTextSessionActive } from 'features/controlLayers/hooks/useIsUncommittedCanvasTextSessionActive';
 import { entitySelected } from 'features/controlLayers/store/canvasSlice';
 import { selectAllEntities, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityState } from 'features/controlLayers/store/types';
@@ -43,6 +44,7 @@ const selectPrevEntityIdentifier = createMemoizedSelector(selectCanvasSlice, (ca
 
 export const useNextPrevEntityHotkeys = () => {
   useAssertSingleton('useNextPrevEntityHotkeys');
+  const isUncommittedCanvasTextSessionActive = useIsUncommittedCanvasTextSessionActive();
   const dispatch = useAppDispatch();
 
   const nextEntityIdentifier = useAppSelector(selectNextEntityIdentifier);
@@ -67,8 +69,13 @@ export const useNextPrevEntityHotkeys = () => {
     // “ === alt+[
     ['“'],
     selectPrevEntity,
-    { preventDefault: true, ignoreModifiers: true },
-    [selectPrevEntity]
+    {
+      preventDefault: true,
+      ignoreModifiers: true,
+      // These raw keycode fallbacks must also honor text-session hotkey suppression.
+      enabled: () => !isUncommittedCanvasTextSessionActive(),
+    },
+    [isUncommittedCanvasTextSessionActive, selectPrevEntity]
   );
   useRegisteredHotkeys({
     category: 'canvas',
@@ -81,8 +88,13 @@ export const useNextPrevEntityHotkeys = () => {
     // ‘ === alt+]
     ['‘'],
     selectNextEntity,
-    { preventDefault: true, ignoreModifiers: true },
-    [selectNextEntity]
+    {
+      preventDefault: true,
+      ignoreModifiers: true,
+      // These raw keycode fallbacks must also honor text-session hotkey suppression.
+      enabled: () => !isUncommittedCanvasTextSessionActive(),
+    },
+    [isUncommittedCanvasTextSessionActive, selectNextEntity]
   );
   useRegisteredHotkeys({
     category: 'canvas',

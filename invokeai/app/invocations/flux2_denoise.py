@@ -21,6 +21,7 @@ from invokeai.app.invocations.fields import (
     InputField,
     LatentsField,
 )
+from invokeai.app.invocations.latent_noise import validate_noise_tensor_shape
 from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -38,6 +39,9 @@ from invokeai.backend.flux2.sampling_utils import (
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.lora_conversions.flux_bfl_peft_lora_conversion_utils import (
+    convert_bfl_lora_patch_to_diffusers,
+)
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
@@ -50,8 +54,8 @@ from invokeai.backend.util.devices import TorchDevice
     "flux2_denoise",
     title="FLUX2 Denoise",
     tags=["image", "flux", "flux2", "klein", "denoise"],
-    category="image",
-    version="1.3.0",
+    category="latents",
+    version="1.5.0",
     classification=Classification.Prototype,
 )
 class Flux2DenoiseInvocation(BaseInvocation):
@@ -64,6 +68,11 @@ class Flux2DenoiseInvocation(BaseInvocation):
     latents: Optional[LatentsField] = InputField(
         default=None,
         description=FieldDescriptions.latents,
+        input=Input.Connection,
+    )
+    noise: Optional[LatentsField] = InputField(
+        default=None,
+        description=FieldDescriptions.noise,
         input=Input.Connection,
     )
     denoise_mask: Optional[DenoiseMaskField] = InputField(
@@ -97,6 +106,14 @@ class Flux2DenoiseInvocation(BaseInvocation):
         default=None,
         description="Negative conditioning tensor. Can be None if cfg_scale is 1.0.",
         input=Input.Connection,
+    )
+    guidance: float = InputField(
+        default=4.0,
+        ge=0,
+        le=20,
+        description="Guidance strength for distilled guidance-embedding models. "
+        "Inert for all current FLUX.2 Klein variants (their guidance_embeds weights are absent/zero); "
+        "kept for node-graph compatibility and future guidance-embedded models.",
     )
     cfg_scale: float = InputField(
         default=1.0,
@@ -236,16 +253,16 @@ class Flux2DenoiseInvocation(BaseInvocation):
         if init_latents is not None:
             init_latents = init_latents.to(device=device, dtype=inference_dtype)
 
-        # Prepare input noise (FLUX.2 uses 32 channels)
-        noise = get_noise_flux2(
-            num_samples=1,
-            height=self.height,
-            width=self.width,
-            device=device,
-            dtype=inference_dtype,
-            seed=self.seed,
-        )
-        b, _c, latent_h, latent_w = noise.shape
+        # Prepare input noise (FLUX.2 uses 32 channels).
+        # If noise will never be consumed, avoid validating/loading it.
+        should_ignore_noise = init_latents is not None and not self.add_noise and self.denoise_mask is None
+        noise: Optional[torch.Tensor]
+        if should_ignore_noise:
+            noise = None
+            b, _c, latent_h, latent_w = init_latents.shape
+        else:
+            noise = self._prepare_noise_tensor(context, inference_dtype, device)
+            b, _c, latent_h, latent_w = noise.shape
         packed_h = latent_h // 2
         packed_w = latent_w // 2
 
@@ -303,6 +320,15 @@ class Flux2DenoiseInvocation(BaseInvocation):
         # Prepare input latent image
         if init_latents is not None:
             if self.add_noise:
+                assert noise is not None
+                # Noise the init latents using the first timestep from the clipped
+                # InvokeAI schedule.
+                #
+                # Known limitation: if a scheduler later uses a different first
+                # effective timestep/sigma than this precomputed schedule, the
+                # img2img preblend below may not match that scheduler exactly.
+                # This is an existing pipeline limitation and applies to both
+                # seed-generated noise and externally supplied noise.
                 t_0 = timesteps[0]
                 x = t_0 * noise + (1.0 - t_0) * init_latents
             else:
@@ -310,6 +336,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         else:
             if self.denoising_start > 1e-5:
                 raise ValueError("denoising_start should be 0 when initial latents are not provided.")
+            assert noise is not None
             x = noise
 
         # If len(timesteps) == 1, then short-circuit
@@ -326,18 +353,33 @@ class Flux2DenoiseInvocation(BaseInvocation):
         # Pack all latent tensors
         init_latents_packed = pack_flux2(init_latents) if init_latents is not None else None
         inpaint_mask_packed = pack_flux2(inpaint_mask) if inpaint_mask is not None else None
-        noise_packed = pack_flux2(noise)
+        noise_packed = pack_flux2(noise) if noise is not None else None
         x = pack_flux2(x)
 
-        # Apply BN normalization BEFORE denoising (as per diffusers Flux2KleinPipeline)
-        # BN normalization: y = (x - mean) / std
-        # This transforms latents to normalized space for the transformer
-        # IMPORTANT: Also normalize init_latents and noise for inpainting to maintain consistency
+        # BN normalization for img2img/inpainting:
+        # - The init_latents from VAE encode are NOT BN-normalized
+        # - The transformer operates in BN-normalized space
+        # - We must normalize x, init_latents, AND noise for InpaintExtension
+        # - Output MUST be denormalized after denoising before VAE decode
+        #
+        # This ensures that:
+        # 1. x starts in the correct normalized space for the transformer
+        # 2. When InpaintExtension merges intermediate_latents with noised_init_latents,
+        #    both are in the same scale/space (noise and init_latents must be in same space
+        #    for the linear interpolation: noised = noise * t + init * (1-t))
         if bn_mean is not None and bn_std is not None:
-            x = self._bn_normalize(x, bn_mean, bn_std)
             if init_latents_packed is not None:
                 init_latents_packed = self._bn_normalize(init_latents_packed, bn_mean, bn_std)
-            noise_packed = self._bn_normalize(noise_packed, bn_mean, bn_std)
+                # Also normalize noise for InpaintExtension - it's used to compute
+                # noised_init_latents = noise * t + init_latents * (1-t)
+                # Both operands must be in the same normalized space
+                if noise_packed is not None:
+                    noise_packed = self._bn_normalize(noise_packed, bn_mean, bn_std)
+            # For img2img/inpainting, x is computed from init_latents and must also be normalized
+            # For txt2img, x is pure noise (already N(0,1)) - normalizing it would be incorrect
+            # We detect img2img by checking if init_latents was provided
+            if init_latents is not None:
+                x = self._bn_normalize(x, bn_mean, bn_std)
 
         # Verify packed dimensions
         assert packed_h * packed_w == x.shape[1]
@@ -346,6 +388,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         inpaint_extension: Optional[RectifiedFlowInpaintExtension] = None
         if inpaint_mask_packed is not None:
             assert init_latents_packed is not None
+            assert noise_packed is not None
             inpaint_extension = RectifiedFlowInpaintExtension(
                 init_latents=init_latents_packed,
                 inpaint_mask=inpaint_mask_packed,
@@ -360,22 +403,35 @@ class Flux2DenoiseInvocation(BaseInvocation):
         is_inpainting = self.denoise_mask is not None or self.denoising_start > 1e-5
 
         # Create scheduler with FLUX.2 Klein configuration
-        # For inpainting/img2img, use manual Euler stepping to preserve the exact timestep schedule
-        # For txt2img, use the scheduler with dynamic shifting for optimal results
+        # For inpainting/img2img, use manual Euler stepping to preserve the exact
+        # clipped timestep schedule used for the initial latent/noise preblend.
+        # For txt2img, use the scheduler with dynamic shifting for optimal results.
+        #
+        # This split is intentional. Reusing a scheduler for img2img here can
+        # change the first effective timestep/sigma and break parity with the
+        # preblend computed above.
         scheduler = None
         if self.scheduler in FLUX_SCHEDULER_MAP and not is_inpainting:
             # Only use scheduler for txt2img - use manual Euler for inpainting to preserve exact timesteps
             scheduler_class = FLUX_SCHEDULER_MAP[self.scheduler]
-            scheduler = scheduler_class(
-                num_train_timesteps=1000,
-                shift=3.0,
-                use_dynamic_shifting=True,
-                base_shift=0.5,
-                max_shift=1.15,
-                base_image_seq_len=256,
-                max_image_seq_len=4096,
-                time_shift_type="exponential",
-            )
+            # FlowMatchHeunDiscreteScheduler only supports num_train_timesteps and shift parameters
+            # FlowMatchEulerDiscreteScheduler and FlowMatchLCMScheduler support dynamic shifting
+            if self.scheduler == "heun":
+                scheduler = scheduler_class(
+                    num_train_timesteps=1000,
+                    shift=3.0,
+                )
+            else:
+                scheduler = scheduler_class(
+                    num_train_timesteps=1000,
+                    shift=3.0,
+                    use_dynamic_shifting=True,
+                    base_shift=0.5,
+                    max_shift=1.15,
+                    base_image_seq_len=256,
+                    max_image_seq_len=4096,
+                    time_shift_type="exponential",
+                )
 
         # Prepare reference image extension for FLUX.2 Klein built-in editing
         ref_image_extension = None
@@ -442,6 +498,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 txt_ids=txt_ids,
                 timesteps=timesteps,
                 step_callback=self._build_step_callback(context),
+                guidance=self.guidance,
                 cfg_scale=cfg_scale_list,
                 neg_txt=neg_txt,
                 neg_txt_ids=neg_txt_ids,
@@ -460,6 +517,23 @@ class Flux2DenoiseInvocation(BaseInvocation):
 
         x = unpack_flux2(x.float(), self.height, self.width)
         return x
+
+    def _prepare_noise_tensor(
+        self, context: InvocationContext, inference_dtype: torch.dtype, device: torch.device
+    ) -> torch.Tensor:
+        if self.noise is not None:
+            noise = context.tensors.load(self.noise.latents_name).to(device=device, dtype=inference_dtype)
+            validate_noise_tensor_shape(noise, "FLUX.2", self.width, self.height)
+            return noise
+
+        return get_noise_flux2(
+            num_samples=1,
+            height=self.height,
+            width=self.width,
+            device=device,
+            dtype=inference_dtype,
+            seed=self.seed,
+        )
 
     def _prep_inpaint_mask(self, context: InvocationContext, latents: torch.Tensor) -> Optional[torch.Tensor]:
         """Prepare the inpaint mask."""
@@ -481,11 +555,17 @@ class Flux2DenoiseInvocation(BaseInvocation):
         return mask.expand_as(latents)
 
     def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
-        """Iterate over LoRA models to apply."""
+        """Iterate over LoRA models to apply.
+
+        Converts BFL-format LoRA keys to diffusers format if needed, since FLUX.2 Klein
+        uses Flux2Transformer2DModel (diffusers naming) but LoRAs may have been loaded
+        with BFL naming (e.g. when a Klein 4B LoRA is misidentified as FLUX.1).
+        """
         for lora in self.transformer.loras:
             lora_info = context.models.load(lora.lora)
             assert isinstance(lora_info.model, ModelPatchRaw)
-            yield (lora_info.model, lora.weight)
+            converted = convert_bfl_lora_patch_to_diffusers(lora_info.model)
+            yield (converted, lora.weight)
             del lora_info
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:

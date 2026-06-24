@@ -6,6 +6,7 @@ import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSe
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
+  getDenoisingStartAndEnd,
   getInfill,
   getOriginalAndScaledSizesForOtherModes,
   isMainModelWithoutUnet,
@@ -45,12 +46,9 @@ export const addOutpaint = async ({
   modelLoader,
   seed,
 }: AddOutpaintArg): Promise<Invocation<'invokeai_img_blend' | 'apply_mask_to_image'>> => {
-  // For outpainting, always use full denoising (from pure noise) because:
-  // - New areas should be fully generated
-  // - Existing areas are preserved by the inpaint mask
-  // The strength setting doesn't make sense for outpainting.
-  denoise.denoising_start = 0;
-  denoise.denoising_end = 1;
+  const { denoising_start, denoising_end } = getDenoisingStartAndEnd(state);
+  denoise.denoising_start = denoising_start;
+  denoise.denoising_end = denoising_end;
 
   const params = selectParamsSlice(state);
   const canvasSettings = selectCanvasSettingsSlice(state);
@@ -59,10 +57,12 @@ export const addOutpaint = async ({
 
   if (
     denoise.type === 'cogview4_denoise' ||
+    denoise.type === 'qwen_image_denoise' ||
     denoise.type === 'flux_denoise' ||
     denoise.type === 'flux2_denoise' ||
     denoise.type === 'sd3_denoise' ||
-    denoise.type === 'z_image_denoise'
+    denoise.type === 'z_image_denoise' ||
+    denoise.type === 'anima_denoise'
   ) {
     denoise.width = scaledSize.width;
     denoise.height = scaledSize.height;

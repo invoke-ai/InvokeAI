@@ -70,6 +70,7 @@ export const add: InvocationTemplate = {
   useCache: true,
   nodePack: 'invokeai',
   classification: 'stable',
+  category: 'math',
 };
 
 export const sub: InvocationTemplate = {
@@ -128,16 +129,33 @@ export const sub: InvocationTemplate = {
   useCache: true,
   nodePack: 'invokeai',
   classification: 'stable',
+  category: 'math',
 };
 
 export const collect: InvocationTemplate = {
   title: 'Collect',
   type: 'collect',
-  version: '1.0.0',
+  version: '1.1.0',
   tags: [],
   description: 'Collects values into a collection',
   outputType: 'collect_output',
   inputs: {
+    collection: {
+      name: 'collection',
+      title: 'Collection',
+      required: false,
+      default: undefined,
+      description: 'An optional collection to append to',
+      fieldKind: 'input',
+      input: 'connection',
+      ui_hidden: false,
+      ui_type: 'CollectionField' as const,
+      type: {
+        name: 'CollectionField' as const,
+        cardinality: 'COLLECTION',
+        batch: false,
+      },
+    },
     item: {
       name: 'item',
       title: 'Collection Item',
@@ -173,6 +191,7 @@ export const collect: InvocationTemplate = {
   useCache: true,
   nodePack: 'invokeai',
   classification: 'stable',
+  category: 'collections',
 };
 
 const scheduler: InvocationTemplate = {
@@ -229,6 +248,7 @@ const scheduler: InvocationTemplate = {
   useCache: true,
   nodePack: 'invokeai',
   classification: 'stable',
+  category: 'other',
 };
 
 export const main_model_loader: InvocationTemplate = {
@@ -297,6 +317,7 @@ export const main_model_loader: InvocationTemplate = {
   useCache: true,
   nodePack: 'invokeai',
   classification: 'stable',
+  category: 'model',
 };
 
 export const img_resize: InvocationTemplate = {
@@ -441,6 +462,7 @@ export const img_resize: InvocationTemplate = {
   useCache: true,
   nodePack: 'invokeai',
   classification: 'stable',
+  category: 'image',
 };
 
 const iterate: InvocationTemplate = {
@@ -510,6 +532,7 @@ const iterate: InvocationTemplate = {
   useCache: true,
   nodePack: 'invokeai',
   classification: 'stable',
+  category: 'collections',
 };
 
 export const templates: Templates = {
@@ -697,7 +720,6 @@ export const schema = {
         required: ['type', 'id'],
         title: 'Scheduler',
         description: 'Selects a scheduler.',
-        category: 'latents',
         classification: 'stable',
         node_pack: 'invokeai',
         tags: ['scheduler'],
@@ -1162,13 +1184,12 @@ export const schema = {
             items: {},
             type: 'array',
             title: 'Collection',
-            description: 'The collection, will be provided on execution',
-            default: [],
+            description: 'An optional collection to append to',
             field_kind: 'input',
-            input: 'any',
-            orig_default: [],
+            input: 'connection',
             orig_required: false,
-            ui_hidden: true,
+            ui_hidden: false,
+            ui_type: 'CollectionField',
           },
           type: {
             type: 'string',
@@ -1184,8 +1205,9 @@ export const schema = {
         title: 'CollectInvocation',
         node_pack: 'invokeai',
         description: 'Collects values into a collection',
+        category: 'collections',
         classification: 'stable',
-        version: '1.0.0',
+        version: '1.1.0',
         output: {
           $ref: '#/components/schemas/CollectInvocationOutput',
         },
@@ -1543,6 +1565,7 @@ export const schema = {
         required: ['type', 'id'],
         title: 'IterateInvocation',
         description: 'Iterates over a list of items',
+        category: 'collections',
         classification: 'stable',
         node_pack: 'invokeai',
         version: '1.1.0',

@@ -22,6 +22,7 @@ import {
   isFlux2ReferenceImageConfig,
   isFLUXReduxConfig,
   isIPAdapterConfig,
+  isQwenImageReferenceImageConfig,
   zRefImagesState,
 } from './types';
 import { getReferenceImageState, initialFluxKontextReferenceImage, initialFLUXRedux, initialIPAdapter } from './util';
@@ -33,6 +34,15 @@ type PayloadActionWithId<T = void> = T extends void
         id: string;
       } & T
     >;
+
+/** Fingerprint used to match the same reference image entry after recall when ids are regenerated. */
+/** Empty configs of the same type may collide; the worst case is selecting an equivalent empty entity. */
+const getRefImageRecallMatchKey = (entity: RefImageState): string => {
+  const { config } = entity;
+  const imageName = config.image?.original.image.image_name ?? '';
+  const modelKey = 'model' in config && config.model ? config.model.key : '';
+  return `${config.type}\0${modelKey}\0${imageName}`;
+};
 
 const slice = createSlice({
   name: 'refImages',
@@ -53,13 +63,41 @@ const slice = createSlice({
     },
     refImagesRecalled: (state, action: PayloadAction<{ entities: RefImageState[]; replace: boolean }>) => {
       const { entities, replace } = action.payload;
-      if (replace) {
-        state.entities = entities;
-        state.isPanelOpen = false;
-        state.selectedEntityId = null;
-      } else {
+      if (!replace) {
         state.entities.push(...entities);
+        return;
       }
+      const wasPanelOpen = state.isPanelOpen;
+      const previousSelectedId = state.selectedEntityId;
+      let previousEntity: RefImageState | null = null;
+      if (previousSelectedId !== null) {
+        previousEntity = state.entities.find((e) => e.id === previousSelectedId) ?? null;
+      }
+      state.entities = entities;
+      if (entities.length === 0) {
+        state.selectedEntityId = null;
+        state.isPanelOpen = false;
+        return;
+      }
+      if (!wasPanelOpen) {
+        state.selectedEntityId = null;
+        return;
+      }
+      const firstEntity = entities[0];
+      assert(firstEntity);
+      if (previousSelectedId === null) {
+        // Open panel must have a selection; otherwise, fall back to the first entity.
+        state.selectedEntityId = firstEntity.id;
+        return;
+      }
+      if (previousSelectedId !== null && entities.some((e) => e.id === previousSelectedId)) {
+        state.selectedEntityId = previousSelectedId;
+        return;
+      }
+      const previousKey = previousEntity ? getRefImageRecallMatchKey(previousEntity) : null;
+      const matched =
+        previousKey !== null ? entities.find((e) => getRefImageRecallMatchKey(e) === previousKey) : undefined;
+      state.selectedEntityId = matched?.id ?? firstEntity.id;
     },
     refImageImageChanged: (state, action: PayloadActionWithId<{ croppableImage: CroppableImageWithDims | null }>) => {
       const { id, croppableImage } = action.payload;
@@ -106,8 +144,8 @@ const slice = createSlice({
         return;
       }
 
-      // FLUX.2 reference images don't have a model field - they use built-in support
-      if (isFlux2ReferenceImageConfig(entity.config)) {
+      // FLUX.2 and Qwen Image Edit reference images don't have a model field - they use built-in support
+      if (isFlux2ReferenceImageConfig(entity.config) || isQwenImageReferenceImageConfig(entity.config)) {
         return;
       }
 
@@ -236,7 +274,35 @@ const slice = createSlice({
       }
       entity.isEnabled = !entity.isEnabled;
     },
+    refImageConfigChanged: (state, action: PayloadActionWithId<{ config: RefImageState['config'] }>) => {
+      const { id, config } = action.payload;
+      const entity = selectRefImageEntity(state, id);
+      if (!entity) {
+        return;
+      }
+      // Preserve the existing image when replacing the config
+      entity.config = { ...config, image: entity.config.image };
+    },
     refImagesReset: () => getInitialRefImagesState(),
+    refImagesReordered: (state, action: PayloadAction<{ ids: string[] }>) => {
+      const { ids } = action.payload;
+      if (ids.length !== state.entities.length) {
+        return;
+      }
+      if (new Set(ids).size !== ids.length) {
+        return;
+      }
+      const byId = new Map(state.entities.map((e) => [e.id, e]));
+      const next: RefImageState[] = [];
+      for (const id of ids) {
+        const entity = byId.get(id);
+        if (!entity) {
+          return;
+        }
+        next.push(entity);
+      }
+      state.entities = next;
+    },
   },
 });
 
@@ -247,12 +313,14 @@ export const {
   refImageImageChanged,
   refImageIPAdapterMethodChanged,
   refImageModelChanged,
+  refImageConfigChanged,
   refImageIPAdapterCLIPVisionModelChanged,
   refImageIPAdapterWeightChanged,
   refImageIPAdapterBeginEndStepPctChanged,
   refImageFLUXReduxImageInfluenceChanged,
   refImageIsEnabledToggled,
   refImagesRecalled,
+  refImagesReordered,
 } = slice.actions;
 
 export const refImagesSliceConfig: SliceConfig<typeof slice> = {

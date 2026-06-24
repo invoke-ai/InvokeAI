@@ -25,10 +25,12 @@ export const useClearQueue = () => {
         title: t('queue.clearSucceeded'),
         status: 'success',
       });
-    } catch {
+    } catch (error) {
+      // Check if this is a 403 access denied error
+      const isAccessDenied = error instanceof Object && 'status' in error && error.status === 403;
       toast({
         id: 'QUEUE_CLEAR_FAILED',
-        title: t('queue.clearFailed'),
+        title: isAccessDenied ? t('queue.clearFailedAccessDenied') : t('queue.clearFailed'),
         status: 'error',
       });
     }

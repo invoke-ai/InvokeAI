@@ -53,8 +53,10 @@ jobs:
           df -h
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo swapoff /mnt/swapfile
-          sudo rm -rf /mnt/swapfile
+          if [ -f /mnt/swapfile ]; then
+            sudo swapoff /mnt/swapfile
+            sudo rm -rf /mnt/swapfile
+          fi
           if [ -d /mnt ]; then
             sudo chmod -R 777 /mnt
             echo '{"data-root": "/mnt/docker-root"}' | sudo tee /etc/docker/daemon.json
@@ -64,11 +66,11 @@ jobs:
           df -h
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           images: |
@@ -85,13 +87,13 @@ jobs:
             suffix=-${{ matrix.gpu-driver }},onlatest=false
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
         with:
           platforms: ${{ env.PLATFORMS }}
 
       - name: Login to GitHub Container Registry
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -100,7 +102,7 @@ jobs:
       - name: Build container
         timeout-minutes: 40
         id: docker_build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/Dockerfile

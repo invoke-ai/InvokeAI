@@ -4,7 +4,7 @@ import { modelConfigsAdapterSelectors, useGetModelConfigsQuery } from 'services/
 import type { StarterModel } from 'services/api/types';
 
 type ModelInstallArg = {
-  config: Pick<StarterModel, 'name' | 'base' | 'type' | 'description' | 'format'>;
+  config: Pick<StarterModel, 'name' | 'base' | 'type' | 'description' | 'format' | 'variant'>;
   source: string;
 };
 
@@ -32,7 +32,7 @@ export const useBuildModelInstallArg = () => {
   );
 
   const buildModelInstallArg = useCallback((starterModel: StarterModel): ModelInstallArg => {
-    const { name, base, type, source, description, format } = starterModel;
+    const { name, base, type, source, description, format, variant } = starterModel;
 
     return {
       config: {
@@ -41,6 +41,7 @@ export const useBuildModelInstallArg = () => {
         type,
         description,
         format,
+        variant,
       },
       source,
     };

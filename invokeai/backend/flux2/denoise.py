@@ -4,6 +4,7 @@ This module provides the denoising function for FLUX.2 Klein models,
 which use Qwen3 as the text encoder instead of CLIP+T5.
 """
 
+import inspect
 import math
 from typing import Any, Callable
 
@@ -25,6 +26,7 @@ def denoise(
     # sampling parameters
     timesteps: list[float],
     step_callback: Callable[[PipelineIntermediateState], None],
+    guidance: float,
     cfg_scale: list[float],
     # Negative conditioning for CFG
     neg_txt: torch.Tensor | None = None,
@@ -44,7 +46,10 @@ def denoise(
     This is a simplified denoise function for FLUX.2 Klein models that uses
     the diffusers Flux2Transformer2DModel interface.
 
-    Note: FLUX.2 Klein has guidance_embeds=False, so no guidance parameter is used.
+    All current FLUX.2 Klein variants (4B, 4B Base, 9B, 9B Base) have guidance_embeds=False
+    in their HF transformer config (or absent/zeroed projection weights), so the guidance
+    value is passed but effectively ignored by the model. The argument is retained for
+    node-graph compatibility and future variants that may ship trained guidance projections.
     CFG is applied externally using negative conditioning when cfg_scale != 1.0.
 
     Args:
@@ -55,6 +60,8 @@ def denoise(
         txt_ids: Text position IDs tensor.
         timesteps: List of timesteps for denoising schedule (linear sigmas from 1.0 to 1/n).
         step_callback: Callback function for progress updates.
+        guidance: Guidance strength. Inert for all current FLUX.2 Klein variants
+            (their guidance_embeds projection weights are absent/zero).
         cfg_scale: List of CFG scale values per step.
         neg_txt: Negative text embeddings for CFG (optional).
         neg_txt_ids: Negative text position IDs (optional).
@@ -75,9 +82,10 @@ def denoise(
         img = torch.cat([img, img_cond_seq], dim=1)
         img_ids = torch.cat([img_ids, img_cond_seq_ids], dim=1)
 
-    # Klein has guidance_embeds=False, but the transformer forward() still requires a guidance tensor
-    # We pass a dummy value (1.0) since it won't affect the output when guidance_embeds=False
-    guidance = torch.full((img.shape[0],), 1.0, device=img.device, dtype=img.dtype)
+    # The transformer forward() requires a guidance tensor even when guidance_embeds=False,
+    # because the Flux2TimestepGuidanceEmbeddings forward signature takes it unconditionally.
+    # All current Klein variants have guidance_embeds=False, so the value is ignored internally.
+    guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
 
     # Use scheduler if provided
     use_scheduler = scheduler is not None
@@ -87,11 +95,25 @@ def denoise(
         # The scheduler will apply dynamic shifting internally using mu (if enabled in scheduler config)
         sigmas = np.array(timesteps[:-1], dtype=np.float32)  # Exclude final 0.0
 
-        # Pass mu if provided - it will only be used if scheduler has use_dynamic_shifting=True
-        if mu is not None:
+        # Check if scheduler supports sigmas parameter using inspect.signature
+        # FlowMatchHeunDiscreteScheduler and FlowMatchLCMScheduler don't support sigmas
+        set_timesteps_sig = inspect.signature(scheduler.set_timesteps)
+        supports_sigmas = "sigmas" in set_timesteps_sig.parameters
+        if supports_sigmas and mu is not None:
+            # Pass mu if provided - it will only be used if scheduler has use_dynamic_shifting=True
             scheduler.set_timesteps(sigmas=sigmas.tolist(), mu=mu, device=img.device)
-        else:
+        elif supports_sigmas:
             scheduler.set_timesteps(sigmas=sigmas.tolist(), device=img.device)
+        else:
+            # Scheduler doesn't support sigmas (e.g., Heun, LCM) - use num_inference_steps
+            #
+            # Important for img2img callers: if the initial latent/noise blend was
+            # computed from a separate pre-scheduler schedule, that preblend may not
+            # match this scheduler's true first step exactly.
+            scheduler_kwargs: dict[str, Any] = {"num_inference_steps": len(sigmas), "device": img.device}
+            if mu is not None and "mu" in set_timesteps_sig.parameters:
+                scheduler_kwargs["mu"] = mu
+            scheduler.set_timesteps(**scheduler_kwargs)
         num_scheduler_steps = len(scheduler.timesteps)
         is_heun = hasattr(scheduler, "state_in_first_order")
         user_step = 0
@@ -113,7 +135,7 @@ def denoise(
                 timestep=t_vec,
                 img_ids=img_ids,
                 txt_ids=txt_ids,
-                guidance=guidance,
+                guidance=guidance_vec,
                 return_dict=False,
             )
 
@@ -133,7 +155,7 @@ def denoise(
                     timestep=t_vec,
                     img_ids=img_ids,
                     txt_ids=neg_txt_ids if neg_txt_ids is not None else txt_ids,
-                    guidance=guidance,
+                    guidance=guidance_vec,
                     return_dict=False,
                 )
 
@@ -152,7 +174,15 @@ def denoise(
 
             # Apply inpainting merge at each step
             if inpaint_extension is not None:
-                img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
+                # Separate the generated latents from the reference conditioning
+                gen_img = img[:, :original_seq_len, :]
+                ref_img = img[:, original_seq_len:, :]
+
+                # Merge only the generated part
+                gen_img = inpaint_extension.merge_intermediate_latents_with_init_latents(gen_img, t_prev)
+
+                # Concatenate back together
+                img = torch.cat([gen_img, ref_img], dim=1)
 
             # For Heun, only increment user step after second-order step completes
             if is_heun:
@@ -206,7 +236,7 @@ def denoise(
                 timestep=t_vec,
                 img_ids=img_ids,
                 txt_ids=txt_ids,
-                guidance=guidance,
+                guidance=guidance_vec,
                 return_dict=False,
             )
 
@@ -226,7 +256,7 @@ def denoise(
                     timestep=t_vec,
                     img_ids=img_ids,
                     txt_ids=neg_txt_ids if neg_txt_ids is not None else txt_ids,
-                    guidance=guidance,
+                    guidance=guidance_vec,
                     return_dict=False,
                 )
 
@@ -239,8 +269,19 @@ def denoise(
 
             # Apply inpainting merge at each step
             if inpaint_extension is not None:
-                img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
-                preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_img, 0.0)
+                # Separate the generated latents from the reference conditioning
+                gen_img = img[:, :original_seq_len, :]
+                ref_img = img[:, original_seq_len:, :]
+
+                # Merge only the generated part
+                gen_img = inpaint_extension.merge_intermediate_latents_with_init_latents(gen_img, t_prev)
+
+                # Concatenate back together
+                img = torch.cat([gen_img, ref_img], dim=1)
+
+                # Handling preview images
+                preview_gen = preview_img[:, :original_seq_len, :]
+                preview_gen = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_gen, 0.0)
 
             # Extract only the generated image portion for preview (exclude reference images)
             callback_latents = preview_img[:, :original_seq_len, :] if img_cond_seq is not None else preview_img

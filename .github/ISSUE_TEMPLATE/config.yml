@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: Project-Documentation
-    url: https://invoke-ai.github.io/InvokeAI/
+    url: https://invoke.ai/
     about: Should be your first place to go when looking for manuals/FAQs regarding our InvokeAI Toolkit
   - name: Discord
     url: https://discord.gg/ZmtBAhwWhy

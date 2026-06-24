@@ -2,6 +2,7 @@ import '@fontsource-variable/inter';
 import 'overlayscrollbars/overlayscrollbars.css';
 import '@xyflow/react/dist/base.css';
 import 'common/components/OverlayScrollbars/overlayscrollbars.css';
+import 'app/components/touchDevice.css';
 
 import { ChakraProvider, DarkMode, extendTheme, theme as baseTheme, TOAST_OPTIONS } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';

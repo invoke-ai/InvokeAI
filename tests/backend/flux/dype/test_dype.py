@@ -4,20 +4,23 @@ import torch
 
 from invokeai.backend.flux.dype.base import (
     DyPEConfig,
-    compute_ntk_freqs,
     compute_vision_yarn_freqs,
-    compute_yarn_freqs,
-    get_mscale,
-    get_timestep_mscale,
+    get_timestep_kappa,
 )
 from invokeai.backend.flux.dype.embed import DyPEEmbedND
 from invokeai.backend.flux.dype.presets import (
+    DYPE_PRESET_4K,
+    DYPE_PRESET_AREA,
+    DYPE_PRESET_AUTO,
+    DYPE_PRESET_MANUAL,
+    DYPE_PRESET_OFF,
     DYPE_PRESETS,
-    DyPEPreset,
+    get_dype_config_for_area,
     get_dype_config_for_resolution,
     get_dype_config_from_preset,
 )
 from invokeai.backend.flux.dype.rope import rope_dype
+from invokeai.backend.flux.extensions.dype_extension import DyPEExtension
 
 
 class TestDyPEConfig:
@@ -27,7 +30,6 @@ class TestDyPEConfig:
         config = DyPEConfig()
         assert config.enable_dype is True
         assert config.base_resolution == 1024
-        assert config.method == "vision_yarn"
         assert config.dype_scale == 2.0
         assert config.dype_exponent == 2.0
         assert config.dype_start_sigma == 1.0
@@ -36,63 +38,74 @@ class TestDyPEConfig:
         config = DyPEConfig(
             enable_dype=False,
             base_resolution=512,
-            method="yarn",
             dype_scale=4.0,
             dype_exponent=3.0,
             dype_start_sigma=0.5,
         )
         assert config.enable_dype is False
         assert config.base_resolution == 512
-        assert config.method == "yarn"
         assert config.dype_scale == 4.0
 
 
-class TestMscale:
-    """Tests for mscale calculation functions."""
+class TestDyPEExtension:
+    """Tests for DyPE extension helpers."""
 
-    def test_get_mscale_no_scaling(self):
-        """When scale <= 1.0, mscale should be 1.0."""
-        assert get_mscale(1.0) == 1.0
-        assert get_mscale(0.5) == 1.0
+    def test_resolve_step_sigma_prefers_scheduler_sigmas_tensor(self):
+        sigma = DyPEExtension.resolve_step_sigma(
+            fallback_sigma=0.42,
+            step_index=1,
+            scheduler_sigmas=torch.tensor([1.0, 0.75, 0.5]),
+        )
+        assert sigma == 0.75
 
-    def test_get_mscale_with_scaling(self):
-        """When scale > 1.0, mscale should increase."""
-        mscale_2x = get_mscale(2.0)
-        mscale_4x = get_mscale(4.0)
+    def test_resolve_step_sigma_falls_back_without_scheduler_sigmas(self):
+        sigma = DyPEExtension.resolve_step_sigma(
+            fallback_sigma=0.42,
+            step_index=1,
+            scheduler_sigmas=None,
+        )
+        assert sigma == 0.42
 
-        assert mscale_2x > 1.0
-        assert mscale_4x > mscale_2x
 
-    def test_get_timestep_mscale_no_scaling(self):
-        """When scale <= 1.0, timestep_mscale should be 1.0."""
-        result = get_timestep_mscale(
-            scale=1.0,
-            current_sigma=0.5,
+class TestKappa:
+    """Tests for the DyPE timestep scheduler."""
+
+    def test_get_timestep_kappa_clamps_to_zero_without_scale(self):
+        assert (
+            get_timestep_kappa(
+                current_sigma=0.5,
+                dype_scale=0.0,
+                dype_exponent=2.0,
+                dype_start_sigma=1.0,
+            )
+            == 0.0
+        )
+
+    def test_get_timestep_kappa_is_stronger_early(self):
+        early_kappa = get_timestep_kappa(
+            current_sigma=1.0,
             dype_scale=2.0,
             dype_exponent=2.0,
             dype_start_sigma=1.0,
         )
-        assert result == 1.0
-
-    def test_get_timestep_mscale_high_sigma(self):
-        """Early steps (high sigma) should have stronger scaling."""
-        early_mscale = get_timestep_mscale(
-            scale=2.0,
-            current_sigma=1.0,  # Early step
-            dype_scale=2.0,
-            dype_exponent=2.0,
-            dype_start_sigma=1.0,
-        )
-        late_mscale = get_timestep_mscale(
-            scale=2.0,
-            current_sigma=0.1,  # Late step
+        late_kappa = get_timestep_kappa(
+            current_sigma=0.1,
             dype_scale=2.0,
             dype_exponent=2.0,
             dype_start_sigma=1.0,
         )
 
-        # Early steps should have larger mscale than late steps
-        assert early_mscale >= late_mscale
+        assert early_kappa == 2.0
+        assert late_kappa < early_kappa
+
+    def test_get_timestep_kappa_clamps_above_start_sigma(self):
+        kappa = get_timestep_kappa(
+            current_sigma=2.0,
+            dype_scale=2.0,
+            dype_exponent=2.0,
+            dype_start_sigma=1.0,
+        )
+        assert kappa == 2.0
 
 
 class TestRopeDype:
@@ -150,6 +163,47 @@ class TestRopeDype:
 
         # Results should be different when scaling is applied
         assert not torch.allclose(result_no_scale, result_with_scale)
+
+    def test_rope_dype_late_stage_moves_toward_base_rope(self):
+        """Late-stage DyPE should be closer to base RoPE than early-stage DyPE."""
+        pos = torch.arange(16).unsqueeze(0).float()
+        dim = 32
+        theta = 10000
+
+        config = DyPEConfig(base_resolution=1024)
+
+        base_result = rope_dype(
+            pos=pos,
+            dim=dim,
+            theta=theta,
+            current_sigma=1.0,
+            target_height=1024,
+            target_width=1024,
+            dype_config=config,
+        )
+        early_result = rope_dype(
+            pos=pos,
+            dim=dim,
+            theta=theta,
+            current_sigma=1.0,
+            target_height=2048,
+            target_width=2048,
+            dype_config=config,
+        )
+        late_result = rope_dype(
+            pos=pos,
+            dim=dim,
+            theta=theta,
+            current_sigma=0.05,
+            target_height=2048,
+            target_width=2048,
+            dype_config=config,
+        )
+
+        early_delta = torch.mean(torch.abs(early_result - base_result))
+        late_delta = torch.mean(torch.abs(late_result - base_result))
+
+        assert late_delta < early_delta
 
 
 class TestDyPEEmbedND:
@@ -213,7 +267,7 @@ class TestDyPEPresets:
 
     def test_preset_4k_exists(self):
         """Test that 4K preset is defined."""
-        assert DyPEPreset.PRESET_4K in DYPE_PRESETS
+        assert DYPE_PRESET_4K in DYPE_PRESETS
 
     def test_get_dype_config_for_resolution_below_threshold(self):
         """When resolution is below threshold, should return None."""
@@ -240,7 +294,6 @@ class TestDyPEPresets:
         )
         assert config is not None
         assert config.enable_dype is True
-        assert config.method == "vision_yarn"
 
     def test_get_dype_config_for_resolution_dynamic_scale(self):
         """Higher resolution should result in higher dype_scale."""
@@ -261,10 +314,89 @@ class TestDyPEPresets:
         assert config_4k is not None
         assert config_4k.dype_scale > config_2k.dype_scale
 
+    def test_get_dype_config_for_area_below_threshold(self):
+        """When area is below threshold area, should return None."""
+        config = get_dype_config_for_area(
+            width=1024,
+            height=1024,
+        )
+        assert config is None
+
+    def test_get_dype_config_for_area_above_threshold(self):
+        """When area is above threshold area, should return config."""
+        config = get_dype_config_for_area(
+            width=2048,
+            height=1536,
+            base_resolution=1024,
+        )
+        assert config is not None
+        assert config.enable_dype is True
+
+    def test_get_dype_config_for_area_penalizes_extreme_aspect_ratios(self):
+        balanced_extreme = get_dype_config_for_area(
+            width=2304,
+            height=1152,
+            base_resolution=1024,
+        )
+        extreme = get_dype_config_for_area(
+            width=2304,
+            height=960,
+            base_resolution=1024,
+        )
+        balanced_same_area = get_dype_config_for_area(
+            width=2048,
+            height=1080,
+            base_resolution=1024,
+        )
+
+        assert balanced_extreme is not None
+        assert extreme is not None
+        assert balanced_same_area is not None
+        assert extreme.dype_scale < balanced_extreme.dype_scale
+        assert extreme.dype_scale < balanced_same_area.dype_scale
+
+    def test_get_dype_config_for_area_is_closer_to_auto_strength(self):
+        area = get_dype_config_for_area(
+            width=1728,
+            height=1152,
+            base_resolution=1024,
+        )
+        auto = get_dype_config_for_resolution(
+            width=1728,
+            height=1152,
+            base_resolution=1024,
+            activation_threshold=1536,
+        )
+
+        assert area is not None
+        assert auto is not None
+        assert area.dype_scale > auto.dype_scale * 0.9
+        assert area.dype_scale < auto.dype_scale * 1.1
+
+    def test_get_dype_config_for_area_uses_higher_exponent_than_old_curve(self):
+        config = get_dype_config_for_area(
+            width=1536,
+            height=1024,
+            base_resolution=1024,
+        )
+
+        assert config is not None
+        assert 1.25 <= config.dype_exponent <= 2.0
+
+    def test_get_dype_config_from_preset_area(self):
+        """Preset AREA should use area-based config."""
+        config = get_dype_config_from_preset(
+            preset=DYPE_PRESET_AREA,
+            width=2048,
+            height=1536,
+        )
+        assert config is not None
+        assert config.enable_dype is True
+
     def test_get_dype_config_from_preset_off(self):
         """Preset OFF should return None."""
         config = get_dype_config_from_preset(
-            preset=DyPEPreset.OFF,
+            preset=DYPE_PRESET_OFF,
             width=2048,
             height=2048,
         )
@@ -273,7 +405,7 @@ class TestDyPEPresets:
     def test_get_dype_config_from_preset_auto(self):
         """Preset AUTO should use resolution-based config."""
         config = get_dype_config_from_preset(
-            preset=DyPEPreset.AUTO,
+            preset=DYPE_PRESET_AUTO,
             width=2048,
             height=2048,
         )
@@ -283,25 +415,39 @@ class TestDyPEPresets:
     def test_get_dype_config_from_preset_4k(self):
         """Preset 4K should use 4K settings."""
         config = get_dype_config_from_preset(
-            preset=DyPEPreset.PRESET_4K,
+            preset=DYPE_PRESET_4K,
             width=3840,
             height=2160,
         )
         assert config is not None
         assert config.enable_dype is True
 
-    def test_get_dype_config_from_preset_custom_overrides(self):
-        """Custom scale/exponent should override preset values."""
+    def test_get_dype_config_from_preset_manual_custom_overrides(self):
+        """Custom scale/exponent should override defaults only with 'manual' preset."""
         config = get_dype_config_from_preset(
-            preset=DyPEPreset.PRESET_4K,
-            width=3840,
-            height=2160,
+            preset=DYPE_PRESET_MANUAL,
+            width=2048,
+            height=2048,
             custom_scale=5.0,
             custom_exponent=10.0,
         )
         assert config is not None
         assert config.dype_scale == 5.0
         assert config.dype_exponent == 10.0
+
+    def test_get_dype_config_from_preset_4k_ignores_custom(self):
+        """4K preset should ignore custom scale/exponent values."""
+        config = get_dype_config_from_preset(
+            preset=DYPE_PRESET_4K,
+            width=3840,
+            height=2160,
+            custom_scale=5.0,
+            custom_exponent=10.0,
+        )
+        assert config is not None
+        # Custom values should be ignored - preset values used instead
+        assert config.dype_scale == 2.0  # 4K preset default
+        assert config.dype_exponent == 2.0  # 4K preset default
 
 
 class TestFrequencyComputation:
@@ -326,33 +472,28 @@ class TestFrequencyComputation:
         assert cos.shape[0] == 1  # batch
         assert cos.shape[1] == 16  # seq_len
 
-    def test_compute_yarn_freqs_shape(self):
-        """Test yarn frequency computation shape."""
+    def test_compute_vision_yarn_freqs_reverts_to_base_rope_at_zero_sigma(self):
         pos = torch.arange(16).unsqueeze(0).float()
         config = DyPEConfig()
 
-        cos, sin = compute_yarn_freqs(
+        dy_cos, dy_sin = compute_vision_yarn_freqs(
             pos=pos,
             dim=32,
             theta=10000,
-            scale=2.0,
-            current_sigma=0.5,
+            scale_h=2.0,
+            scale_w=2.0,
+            current_sigma=0.0,
+            dype_config=config,
+        )
+        base_cos, base_sin = compute_vision_yarn_freqs(
+            pos=pos,
+            dim=32,
+            theta=10000,
+            scale_h=1.0,
+            scale_w=1.0,
+            current_sigma=0.0,
             dype_config=config,
         )
 
-        assert cos.shape == sin.shape
-        assert cos.shape[0] == 1
-
-    def test_compute_ntk_freqs_shape(self):
-        """Test ntk frequency computation shape."""
-        pos = torch.arange(16).unsqueeze(0).float()
-
-        cos, sin = compute_ntk_freqs(
-            pos=pos,
-            dim=32,
-            theta=10000,
-            scale=2.0,
-        )
-
-        assert cos.shape == sin.shape
-        assert cos.shape[0] == 1
+        assert torch.allclose(dy_cos, base_cos)
+        assert torch.allclose(dy_sin, base_sin)

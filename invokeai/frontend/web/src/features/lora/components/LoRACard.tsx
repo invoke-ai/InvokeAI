@@ -20,6 +20,7 @@ import {
 } from 'features/controlLayers/store/lorasSlice';
 import type { LoRA } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
 
@@ -38,6 +39,7 @@ export const LoRACard = memo((props: { id: string }) => {
 LoRACard.displayName = 'LoRACard';
 
 const LoRAContent = memo(({ lora }: { lora: LoRA }) => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { data: loraConfig } = useGetModelConfigQuery(lora.model.key);
 
@@ -66,7 +68,7 @@ const LoRAContent = memo(({ lora }: { lora: LoRA }) => {
           <Flex alignItems="center" gap={2}>
             <Switch size="sm" onChange={handleSetLoraToggle} isChecked={lora.isEnabled} />
             <IconButton
-              aria-label="Remove LoRA"
+              aria-label={t('lora.removeLoRA')}
               variant="ghost"
               size="sm"
               onClick={handleRemoveLora}

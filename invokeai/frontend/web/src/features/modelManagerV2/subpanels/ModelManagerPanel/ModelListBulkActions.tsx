@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Button, Checkbox, Flex, Menu, MenuButton, MenuItem, MenuList, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useIsModelManagerEnabled } from 'features/modelManagerV2/hooks/useIsModelManagerEnabled';
 import type { FilterableModelType } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import {
   modelSelectionChanged,
@@ -10,11 +11,15 @@ import {
 } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { t } from 'i18next';
 import { memo, useCallback, useMemo } from 'react';
-import { PiCaretDownBold, PiTrashSimpleBold } from 'react-icons/pi';
-import { modelConfigsAdapterSelectors, useGetModelConfigsQuery } from 'services/api/endpoints/models';
+import { PiCaretDownBold, PiSparkleFill, PiTrashSimpleBold } from 'react-icons/pi';
+import {
+  modelConfigsAdapterSelectors,
+  useGetMissingModelsQuery,
+  useGetModelConfigsQuery,
+} from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 
-import { useBulkDeleteModal } from './ModelList';
+import { useBulkDeleteModal, useBulkReidentifyModal } from './ModelList';
 
 const ModelListBulkActionsSx: SystemStyleObject = {
   alignItems: 'center',
@@ -28,22 +33,43 @@ type ModelListBulkActionsProps = {
 
 export const ModelListBulkActions = memo(({ sx }: ModelListBulkActionsProps) => {
   const dispatch = useAppDispatch();
+  const canManageModels = useIsModelManagerEnabled();
   const filteredModelType = useAppSelector(selectFilteredModelType);
   const selectedModelKeys = useAppSelector(selectSelectedModelKeys);
   const searchTerm = useAppSelector(selectSearchTerm);
-  const { data } = useGetModelConfigsQuery();
+  const { data: allModelsData } = useGetModelConfigsQuery();
+  const { data: missingModelsData } = useGetMissingModelsQuery();
   const bulkDeleteModal = useBulkDeleteModal();
+  const bulkReidentifyModal = useBulkReidentifyModal();
 
   const handleBulkDelete = useCallback(() => {
     bulkDeleteModal.open();
   }, [bulkDeleteModal]);
 
+  const handleBulkReidentify = useCallback(() => {
+    bulkReidentifyModal.open();
+  }, [bulkReidentifyModal]);
+
   // Calculate displayed (filtered) model keys
   const displayedModelKeys = useMemo(() => {
+    // Use missing models data when the filter is 'missing'
+    const data = filteredModelType === 'missing' ? missingModelsData : allModelsData;
     const modelConfigs = modelConfigsAdapterSelectors.selectAll(data ?? { ids: [], entities: {} });
+
+    // For missing models filter, only apply search term filter
+    if (filteredModelType === 'missing') {
+      const filtered = modelConfigs.filter(
+        (m) =>
+          m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          m.base.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          m.type.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      return filtered.map((m) => m.key);
+    }
+
     const filteredModels = modelsFilter(modelConfigs, searchTerm, filteredModelType);
     return filteredModels.map((m) => m.key);
-  }, [data, searchTerm, filteredModelType]);
+  }, [allModelsData, missingModelsData, searchTerm, filteredModelType]);
 
   const { allSelected, someSelected } = useMemo(() => {
     if (displayedModelKeys.length === 0) {
@@ -91,23 +117,31 @@ export const ModelListBulkActions = memo(({ sx }: ModelListBulkActionsProps) => 
         <Text variant="subtext" color="base.400">
           {selectionCount} {t('common.selected')}
         </Text>
-        <Menu placement="bottom-end">
-          <MenuButton
-            as={Button}
-            disabled={selectionCount === 0}
-            size="sm"
-            rightIcon={<PiCaretDownBold />}
-            flexShrink={0}
-            variant="outline"
-          >
-            {t('modelManager.actions')}
-          </MenuButton>
-          <MenuList>
-            <MenuItem icon={<PiTrashSimpleBold />} onClick={handleBulkDelete} color="error.300">
-              {t('modelManager.deleteModels', { count: selectionCount })}
-            </MenuItem>
-          </MenuList>
-        </Menu>
+        {canManageModels && (
+          <Menu placement="bottom-end">
+            <MenuButton
+              as={Button}
+              disabled={selectionCount === 0}
+              size="sm"
+              rightIcon={<PiCaretDownBold />}
+              flexShrink={0}
+              variant="outline"
+            >
+              {t('modelManager.actions')}
+            </MenuButton>
+            <MenuList>
+              <MenuItem icon={<PiSparkleFill />} onClick={handleBulkReidentify}>
+                {t('modelManager.reidentifyModels', {
+                  count: selectionCount,
+                  defaultValue: 'Reidentify Models',
+                })}
+              </MenuItem>
+              <MenuItem icon={<PiTrashSimpleBold />} onClick={handleBulkDelete} color="error.300">
+                {t('modelManager.deleteModels', { count: selectionCount })}
+              </MenuItem>
+            </MenuList>
+          </Menu>
+        )}
       </Flex>
     </Flex>
   );

@@ -7,7 +7,10 @@ import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase'
 import { getSVGPathDataFromPoints } from 'features/controlLayers/konva/util';
 import type { CanvasBrushLineWithPressureState } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import type { NodeConfig } from 'konva/lib/Node';
 import type { Logger } from 'roarr';
+
+type GlobalCompositeOperation = NonNullable<NodeConfig['globalCompositeOperation']>;
 
 export class CanvasObjectBrushLineWithPressure extends CanvasModuleBase {
   readonly type = 'object_brush_line_with_pressure';
@@ -47,7 +50,7 @@ export class CanvasObjectBrushLineWithPressure extends CanvasModuleBase {
         name: `${this.type}:path`,
         listening: false,
         shadowForStrokeEnabled: false,
-        globalCompositeOperation: 'source-over',
+        globalCompositeOperation: (state.globalCompositeOperation ?? 'source-over') as GlobalCompositeOperation,
         perfectDrawEnabled: false,
       }),
     };
@@ -58,8 +61,9 @@ export class CanvasObjectBrushLineWithPressure extends CanvasModuleBase {
   update(state: CanvasBrushLineWithPressureState, force = false): boolean {
     if (force || this.state !== state) {
       this.log.trace({ state }, 'Updating brush line with pressure');
-      const { points, color, strokeWidth } = state;
+      const { points, color, strokeWidth, globalCompositeOperation } = state;
       this.konva.line.setAttrs({
+        globalCompositeOperation: (globalCompositeOperation ?? 'source-over') as GlobalCompositeOperation,
         data: getSVGPathDataFromPoints(points, {
           size: strokeWidth / 2,
           simulatePressure: false,

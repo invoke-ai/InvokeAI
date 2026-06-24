@@ -13,8 +13,11 @@ import {
 } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import type { MutableRefObject } from 'react';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
+import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import React, { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import type {
   GridComponents,
   GridComputeItemKey,
@@ -80,22 +83,41 @@ const computeItemKey: GridComputeItemKey<string, GridContext> = (index, imageNam
   return `${JSON.stringify(queryArgs)}-${imageName ?? index}`;
 };
 
+const canHandleGridArrowNavigation = (
+  activeTab: ReturnType<typeof selectActiveTab>,
+  focusedRegion: ReturnType<typeof getFocusedRegion>
+) => {
+  if (navigationApi.isViewerArrowNavigationMode(activeTab)) {
+    // When gallery is not effectively available, viewer hotkeys own left/right navigation.
+    return false;
+  }
+
+  if (focusedRegion === 'gallery' || focusedRegion === 'viewer') {
+    return true;
+  }
+
+  // Fallback for tab-switch edge case: allow nav when viewer dock tab is active before first click.
+  return navigationApi.isDockviewPanelActive(activeTab, VIEWER_PANEL_ID);
+};
+
 /**
  * Handles keyboard navigation for the gallery.
  */
 const useKeyboardNavigation = (
-  imageNames: string[],
-  virtuosoRef: React.RefObject<VirtuosoGridHandle>,
-  rootRef: React.RefObject<HTMLDivElement>
+  navigationImageNames: string[],
+  virtuosoRef: React.RefObject<VirtuosoGridHandle | null>,
+  rootRef: React.RefObject<HTMLDivElement | null>
 ) => {
   const { dispatch, getState } = useAppStore();
+  const activeTab = useAppSelector(selectActiveTab);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      if (getFocusedRegion() !== 'gallery') {
-        // Only handle keyboard navigation when the gallery is focused
+      const focusedRegion = getFocusedRegion();
+      if (!canHandleGridArrowNavigation(activeTab, focusedRegion)) {
         return;
       }
+
       // Only handle arrow keys
       if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
         return;
@@ -112,7 +134,7 @@ const useKeyboardNavigation = (
         return;
       }
 
-      if (imageNames.length === 0) {
+      if (navigationImageNames.length === 0) {
         return;
       }
 
@@ -132,7 +154,7 @@ const useKeyboardNavigation = (
           (selectImageToCompare(state) ?? selectLastSelectedItem(state))
         : selectLastSelectedItem(state);
 
-      const currentIndex = getItemIndex(imageName ?? null, imageNames);
+      const currentIndex = getItemIndex(imageName ?? null, navigationImageNames);
 
       let newIndex = currentIndex;
 
@@ -146,7 +168,7 @@ const useKeyboardNavigation = (
           }
           break;
         case 'ArrowRight':
-          if (currentIndex < imageNames.length - 1) {
+          if (currentIndex < navigationImageNames.length - 1) {
             newIndex = currentIndex + 1;
             // } else {
             //   // Wrap to first image
@@ -163,16 +185,16 @@ const useKeyboardNavigation = (
           break;
         case 'ArrowDown':
           // If no images below, stay on current image
-          if (currentIndex >= imageNames.length - imagesPerRow) {
+          if (currentIndex >= navigationImageNames.length - imagesPerRow) {
             newIndex = currentIndex;
           } else {
-            newIndex = Math.min(imageNames.length - 1, currentIndex + imagesPerRow);
+            newIndex = Math.min(navigationImageNames.length - 1, currentIndex + imagesPerRow);
           }
           break;
       }
 
-      if (newIndex !== currentIndex && newIndex >= 0 && newIndex < imageNames.length) {
-        const newImageName = imageNames[newIndex];
+      if (newIndex !== currentIndex && newIndex >= 0 && newIndex < navigationImageNames.length) {
+        const newImageName = navigationImageNames[newIndex];
         if (newImageName) {
           if (event.altKey) {
             dispatch(imageToCompareChanged(newImageName));
@@ -182,7 +204,7 @@ const useKeyboardNavigation = (
         }
       }
     },
-    [rootRef, virtuosoRef, imageNames, getState, dispatch]
+    [activeTab, rootRef, virtuosoRef, navigationImageNames, getState, dispatch]
   );
 
   useRegisteredHotkeys({
@@ -257,9 +279,9 @@ const useKeyboardNavigation = (
  */
 const useKeepSelectedImageInView = (
   imageNames: string[],
-  virtuosoRef: React.RefObject<VirtuosoGridHandle>,
-  rootRef: React.RefObject<HTMLDivElement>,
-  rangeRef: MutableRefObject<ListRange>
+  virtuosoRef: React.RefObject<VirtuosoGridHandle | null>,
+  rootRef: React.RefObject<HTMLDivElement | null>,
+  rangeRef: React.RefObject<ListRange>
 ) => {
   const selection = useAppSelector(selectSelection);
 
@@ -270,6 +292,10 @@ const useKeepSelectedImageInView = (
     const range = rangeRef.current;
 
     if (!virtuosoGridHandle || !rootEl || !targetImageName || !imageNames || imageNames.length === 0) {
+      return;
+    }
+
+    if (!imageNames.includes(targetImageName)) {
       return;
     }
 
@@ -310,75 +336,91 @@ const useStarImageHotkey = () => {
   });
 };
 
+type GalleryImageGridContentProps = {
+  imageNames: string[];
+  navigationImageNames?: string[];
+  isLoading: boolean;
+  queryArgs: ListImageNamesQueryArgs;
+  rootRef?: React.RefObject<HTMLDivElement | null>;
+};
+
+export const GalleryImageGridContent = memo(
+  ({ imageNames, navigationImageNames, isLoading, queryArgs, rootRef: rootRefProp }: GalleryImageGridContentProps) => {
+    const { t } = useTranslation();
+    const virtuosoRef = useRef<VirtuosoGridHandle>(null);
+    const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
+    const internalRootRef = useRef<HTMLDivElement>(null);
+    const rootRef = rootRefProp ?? internalRootRef;
+
+    // Use range-based fetching for bulk loading image DTOs into cache based on the visible range
+    const { onRangeChanged } = useRangeBasedImageFetching({
+      imageNames,
+      enabled: !isLoading,
+    });
+
+    useStarImageHotkey();
+    useKeepSelectedImageInView(imageNames, virtuosoRef, rootRef, rangeRef);
+    useKeyboardNavigation(navigationImageNames ?? imageNames, virtuosoRef, rootRef);
+    const scrollerRef = useScrollableGallery(rootRef);
+
+    /*
+     * We have to keep track of the visible range for keep-selected-image-in-view functionality and push the range to
+     * the range-based image fetching hook.
+     */
+    const handleRangeChanged = useCallback(
+      (range: ListRange) => {
+        rangeRef.current = range;
+        onRangeChanged(range);
+      },
+      [onRangeChanged]
+    );
+
+    const context = useMemo<GridContext>(() => ({ imageNames, queryArgs }), [imageNames, queryArgs]);
+
+    if (isLoading) {
+      return (
+        <Flex w="full" h="full" alignItems="center" justifyContent="center" gap={4}>
+          <Spinner size="lg" opacity={0.3} />
+          <Text color="base.300">{t('gallery.loadingGallery')}</Text>
+        </Flex>
+      );
+    }
+
+    if (imageNames.length === 0) {
+      return (
+        <Flex w="full" h="full" alignItems="center" justifyContent="center">
+          <Text color="base.300">{t('gallery.noImagesFound')}</Text>
+        </Flex>
+      );
+    }
+
+    return (
+      // This wrapper component is necessary to initialize the overlay scrollbars!
+      <Box data-overlayscrollbars-initialize="" ref={rootRef} position="relative" w="full" h="full">
+        <VirtuosoGrid<string, GridContext>
+          ref={virtuosoRef}
+          context={context}
+          data={imageNames}
+          increaseViewportBy={4096}
+          itemContent={itemContent}
+          computeItemKey={computeItemKey}
+          components={components}
+          style={style}
+          scrollerRef={scrollerRef}
+          scrollSeekConfiguration={scrollSeekConfiguration}
+          rangeChanged={handleRangeChanged}
+        />
+        <GallerySelectionCountTag imageNames={imageNames} />
+      </Box>
+    );
+  }
+);
+
+GalleryImageGridContent.displayName = 'GalleryImageGridContent';
+
 export const GalleryImageGrid = memo(() => {
-  const virtuosoRef = useRef<VirtuosoGridHandle>(null);
-  const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  // Get the ordered list of image names - this is our primary data source for virtualization
   const { queryArgs, imageNames, isLoading } = useGalleryImageNames();
-
-  // Use range-based fetching for bulk loading image DTOs into cache based on the visible range
-  const { onRangeChanged } = useRangeBasedImageFetching({
-    imageNames,
-    enabled: !isLoading,
-  });
-
-  useStarImageHotkey();
-  useKeepSelectedImageInView(imageNames, virtuosoRef, rootRef, rangeRef);
-  useKeyboardNavigation(imageNames, virtuosoRef, rootRef);
-  const scrollerRef = useScrollableGallery(rootRef);
-
-  /*
-   * We have to keep track of the visible range for keep-selected-image-in-view functionality and push the range to
-   * the range-based image fetching hook.
-   */
-  const handleRangeChanged = useCallback(
-    (range: ListRange) => {
-      rangeRef.current = range;
-      onRangeChanged(range);
-    },
-    [onRangeChanged]
-  );
-
-  const context = useMemo<GridContext>(() => ({ imageNames, queryArgs }), [imageNames, queryArgs]);
-
-  if (isLoading) {
-    return (
-      <Flex w="full" h="full" alignItems="center" justifyContent="center" gap={4}>
-        <Spinner size="lg" opacity={0.3} />
-        <Text color="base.300">Loading gallery...</Text>
-      </Flex>
-    );
-  }
-
-  if (imageNames.length === 0) {
-    return (
-      <Flex w="full" h="full" alignItems="center" justifyContent="center">
-        <Text color="base.300">No images found</Text>
-      </Flex>
-    );
-  }
-
-  return (
-    // This wrapper component is necessary to initialize the overlay scrollbars!
-    <Box data-overlayscrollbars-initialize="" ref={rootRef} position="relative" w="full" h="full">
-      <VirtuosoGrid<string, GridContext>
-        ref={virtuosoRef}
-        context={context}
-        data={imageNames}
-        increaseViewportBy={4096}
-        itemContent={itemContent}
-        computeItemKey={computeItemKey}
-        components={components}
-        style={style}
-        scrollerRef={scrollerRef}
-        scrollSeekConfiguration={scrollSeekConfiguration}
-        rangeChanged={handleRangeChanged}
-      />
-      <GallerySelectionCountTag />
-    </Box>
-  );
+  return <GalleryImageGridContent imageNames={imageNames} isLoading={isLoading} queryArgs={queryArgs} />;
 });
 
 GalleryImageGrid.displayName = 'GalleryImageGrid';

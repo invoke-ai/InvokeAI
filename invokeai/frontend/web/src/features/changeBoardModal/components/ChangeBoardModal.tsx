@@ -3,6 +3,7 @@ import { Combobox, ConfirmationAlertDialog, Flex, FormControl, Text } from '@inv
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import {
   changeBoardReset,
   isModalOpenChanged,
@@ -13,6 +14,7 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import { useAddImagesToBoardMutation, useRemoveImagesFromBoardMutation } from 'services/api/endpoints/images';
+import type { BoardDTO } from 'services/api/types';
 
 const selectImagesToChange = createSelector(
   selectChangeBoardModalSlice,
@@ -28,6 +30,7 @@ const ChangeBoardModal = () => {
   useAssertSingleton('ChangeBoardModal');
   const dispatch = useAppDispatch();
   const currentBoardId = useAppSelector(selectSelectedBoardId);
+  const currentUser = useAppSelector(selectCurrentUser);
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>();
   const { data: boards, isFetching } = useListAllBoardsQuery({ include_archived: true });
   const isModalOpen = useAppSelector(selectIsModalOpen);
@@ -36,10 +39,20 @@ const ChangeBoardModal = () => {
   const [removeImagesFromBoard] = useRemoveImagesFromBoardMutation();
   const { t } = useTranslation();
 
+  // Returns true if the current user can write images to the given board.
+  const canWriteToBoard = useCallback(
+    (board: BoardDTO): boolean => {
+      const isOwnerOrAdmin = !currentUser || currentUser.is_admin || board.user_id === currentUser.user_id;
+      return isOwnerOrAdmin || board.board_visibility === 'public';
+    },
+    [currentUser]
+  );
+
   const options = useMemo<ComboboxOption[]>(() => {
     return [{ label: t('boards.uncategorized'), value: 'none' }]
       .concat(
         (boards ?? [])
+          .filter(canWriteToBoard)
           .map((board) => ({
             label: board.board_name,
             value: board.board_id,
@@ -47,7 +60,7 @@ const ChangeBoardModal = () => {
           .sort((a, b) => a.label.localeCompare(b.label))
       )
       .filter((board) => board.value !== currentBoardId);
-  }, [boards, currentBoardId, t]);
+  }, [boards, canWriteToBoard, currentBoardId, t]);
 
   const value = useMemo(() => options.find((o) => o.value === selectedBoardId), [options, selectedBoardId]);
 

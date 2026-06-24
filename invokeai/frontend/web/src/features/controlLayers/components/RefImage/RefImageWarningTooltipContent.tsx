@@ -7,7 +7,7 @@ export const RefImageWarningTooltipContent = ({ warnings }: { warnings: string[]
 
   return (
     <Flex flexDir="column">
-      <Text fontWeight="semibold">Invalid Reference Image:</Text>
+      <Text fontWeight="semibold">{t('controlLayers.invalidReferenceImage')}</Text>
       <UnorderedList>
         {warnings.map((tKey) => (
           <ListItem key={tKey}>{upperFirst(t(tKey))}</ListItem>

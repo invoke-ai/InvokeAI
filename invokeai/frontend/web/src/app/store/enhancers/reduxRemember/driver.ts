@@ -68,10 +68,26 @@ const getIdbKey = (key: string) => {
   return `${IDB_STORAGE_PREFIX}${key}`;
 };
 
+// Helper to get auth headers for client_state requests
+const getAuthHeaders = (): Record<string, string> => {
+  const headers: Record<string, string> = {};
+  // Safe access to localStorage (not available in Node.js test environment)
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+  return headers;
+};
+
 const getItem = async (key: string) => {
   try {
     const url = getUrl('get_by_key', key);
-    const res = await fetch(url, { method: 'GET' });
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) {
       throw new Error(`Response status: ${res.status}`);
     }
@@ -130,7 +146,11 @@ const setItem = async (key: string, value: string) => {
     }
     log.trace({ key, last: lastPersistedState.get(key), next: value }, `Persisting state for ${key}`);
     const url = getUrl('set_by_key', key);
-    const res = await fetch(url, { method: 'POST', body: value });
+    const res = await fetch(url, {
+      method: 'POST',
+      body: value,
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) {
       throw new Error(`Response status: ${res.status}`);
     }
@@ -158,7 +178,10 @@ export const clearStorage = async () => {
   try {
     persistRefCount++;
     const url = getUrl('delete');
-    const res = await fetch(url, { method: 'POST' });
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) {
       throw new Error(`Response status: ${res.status}`);
     }

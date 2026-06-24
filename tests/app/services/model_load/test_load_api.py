@@ -4,6 +4,7 @@ import pytest
 import torch
 from diffusers import AutoencoderTiny
 
+from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.model_manager import ModelManagerServiceBase
 from invokeai.app.services.shared.invocation_context import (
@@ -11,6 +12,7 @@ from invokeai.app.services.shared.invocation_context import (
     InvocationContextData,
     build_invocation_context,
 )
+from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig, ExternalModelCapabilities
 from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 
@@ -76,6 +78,27 @@ def test_download_and_load(mock_context: InvocationContext) -> None:
     loaded_model_2 = mock_context.models.load_remote_model("https://www.test.foo/download/test_embedding.safetensors")
     assert isinstance(loaded_model_2, LoadedModelWithoutConfig)
     assert loaded_model_1.model is loaded_model_2.model  # should be cached copy
+
+
+def test_external_model_load_raises(
+    mock_context: InvocationContext, mm2_model_manager: ModelManagerServiceBase
+) -> None:
+    config = ExternalApiModelConfig(
+        key="external_test",
+        name="External Test",
+        provider_id="openai",
+        provider_model_id="gpt-image-1",
+        capabilities=ExternalModelCapabilities(modes=["txt2img"]),
+    )
+    mm2_model_manager.store.add_model(config)
+
+    model_field = ModelIdentifierField.from_config(config)
+
+    with pytest.raises(ValueError, match="External API models"):
+        mock_context.models.load(model_field)
+
+    with pytest.raises(ValueError, match="External API models"):
+        mock_context.models.load_by_attrs(name=config.name, base=config.base, type=config.type)
 
 
 def test_download_diffusers(mock_context: InvocationContext) -> None:

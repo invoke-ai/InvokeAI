@@ -20,11 +20,13 @@ import {
   controlLayerAdded,
   entityBrushLineAdded,
   entityEraserLineAdded,
+  entityGradientAdded,
+  entityLassoAdded,
   entityMovedBy,
   entityMovedTo,
   entityRasterized,
-  entityRectAdded,
   entityReset,
+  entityShapeAdded,
   inpaintMaskAdded,
   rasterLayerAdded,
   rgAdded,
@@ -40,11 +42,13 @@ import type {
   CanvasState,
   EntityBrushLineAddedPayload,
   EntityEraserLineAddedPayload,
+  EntityGradientAddedPayload,
   EntityIdentifierPayload,
+  EntityLassoAddedPayload,
   EntityMovedByPayload,
   EntityMovedToPayload,
   EntityRasterizedPayload,
-  EntityRectAddedPayload,
+  EntityShapeAddedPayload,
   Rect,
   RgbaColor,
 } from 'features/controlLayers/store/types';
@@ -167,10 +171,24 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   };
 
   /**
-   * Adds a rectangle to an entity, pushing state to redux.
+   * Adds a shape to an entity, pushing state to redux.
    */
-  addRect = (arg: EntityRectAddedPayload) => {
-    this.store.dispatch(entityRectAdded(arg));
+  addShape = (arg: EntityShapeAddedPayload) => {
+    this.store.dispatch(entityShapeAdded(arg));
+  };
+
+  /**
+   * Adds a lasso object to an entity, pushing state to redux.
+   */
+  addLasso = (arg: EntityLassoAddedPayload) => {
+    this.store.dispatch(entityLassoAdded(arg));
+  };
+
+  /**
+   * Adds a gradient to an entity, pushing state to redux.
+   */
+  addGradient = (arg: EntityGradientAddedPayload) => {
+    this.store.dispatch(entityGradientAdded(arg));
   };
 
   /**

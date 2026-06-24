@@ -316,8 +316,15 @@ class ModelCache:
 
     @synchronized
     @record_activity
-    def put(self, key: str, model: AnyModel) -> None:
-        """Add a model to the cache."""
+    def put(self, key: str, model: AnyModel, execution_device: Optional[torch.device] = None) -> None:
+        """Add a model to the cache.
+
+        Args:
+            key: Cache key for the model
+            model: The model to cache
+            execution_device: Optional device to use for this specific model. If None, uses the cache's default
+                execution_device. Use torch.device("cpu") to force a model to run on CPU.
+        """
         if key in self._cached_models:
             self._logger.debug(
                 f"Attempted to add model {key} ({model.__class__.__name__}), but it already exists in the cache. No action necessary."
@@ -331,20 +338,23 @@ class ModelCache:
         if isinstance(model, torch.nn.Module):
             apply_custom_layers_to_model(model)
 
+        # Use the provided execution device, or fall back to the cache's default
+        effective_execution_device = execution_device if execution_device is not None else self._execution_device
+
         # Partial loading only makes sense on CUDA.
         # - When running on CPU, there is no 'loading' to do.
         # - When running on MPS, memory is shared with the CPU, so the default OS memory management already handles this
         #   well.
-        running_with_cuda = self._execution_device.type == "cuda"
+        running_with_cuda = effective_execution_device.type == "cuda"
 
         # Wrap model.
         if isinstance(model, torch.nn.Module) and running_with_cuda and self._enable_partial_loading:
             wrapped_model = CachedModelWithPartialLoad(
-                model, self._execution_device, keep_ram_copy=self._keep_ram_copy_of_weights
+                model, effective_execution_device, keep_ram_copy=self._keep_ram_copy_of_weights
             )
         else:
             wrapped_model = CachedModelOnlyFullLoad(
-                model, self._execution_device, size, keep_ram_copy=self._keep_ram_copy_of_weights
+                model, effective_execution_device, size, keep_ram_copy=self._keep_ram_copy_of_weights
             )
 
         cache_record = CacheRecord(key=key, cached_model=wrapped_model)
@@ -428,8 +438,11 @@ class ModelCache:
             f"Locking model {cache_entry.key} (Type: {cache_entry.cached_model.model.__class__.__name__})"
         )
 
-        if self._execution_device.type == "cpu":
-            # Models don't need to be loaded into VRAM if we're running on CPU.
+        # Check if the model's specific compute_device is CPU, not just the cache's default execution_device
+        model_compute_device = cache_entry.cached_model.compute_device
+        if model_compute_device.type == "cpu":
+            # Models configured for CPU execution don't need to be loaded into VRAM
+            self._logger.debug(f"Model {cache_entry.key} is configured for CPU execution, skipping VRAM load")
             return
 
         try:
@@ -463,6 +476,26 @@ class ModelCache:
         self._logger.debug(
             f"Unlocked model {cache_entry.key} (Type: {cache_entry.cached_model.model.__class__.__name__})"
         )
+
+        # If `drop_model()` marked this entry stale (e.g. settings changed while a generation
+        # was using it), evict now so the next load rebuilds with the new settings rather than
+        # silently reusing the pre-change cached module.
+        if cache_entry.is_stale and not cache_entry.is_locked and cache_entry.key in self._cached_models:
+            bytes_freed = cache_entry.cached_model.total_bytes()
+            self._delete_cache_entry(cache_entry)
+            if self.stats:
+                self.stats.cleared = (self.stats.cleared or 0) + 1
+            snapshot = self._get_cache_snapshot()
+            for cb in self._on_cache_models_cleared_callbacks:
+                cb(
+                    models_cleared=1,
+                    bytes_requested=0,
+                    bytes_freed=bytes_freed,
+                    cache_snapshot=snapshot,
+                )
+            gc.collect()
+            TorchDevice.empty_cache()
+            self._logger.debug(f"Evicted stale cache entry {cache_entry.key} after unlock.")
 
     def _load_locked_model(self, cache_entry: CacheRecord, working_mem_bytes: Optional[int] = None) -> None:
         """Helper function for self.lock(). Loads a locked model into VRAM."""
@@ -511,9 +544,11 @@ class ModelCache:
         model_cur_vram_bytes = cache_entry.cached_model.cur_vram_bytes()
         vram_available = self._get_vram_available(working_mem_bytes)
         loaded_percent = model_cur_vram_bytes / model_total_bytes if model_total_bytes > 0 else 0
+        # Use the model's actual compute_device for logging, not the cache's default
+        model_device = cache_entry.cached_model.compute_device
         self._logger.info(
             f"Loaded model '{cache_entry.key}' ({cache_entry.cached_model.model.__class__.__name__}) onto "
-            f"{self._execution_device.type} device in {(time.time() - start_time):.2f}s. "
+            f"{model_device.type} device in {(time.time() - start_time):.2f}s. "
             f"Total model size: {model_total_bytes / MB:.2f}MB, "
             f"VRAM: {model_cur_vram_bytes / MB:.2f}MB ({loaded_percent:.1%})"
         )
@@ -851,3 +886,46 @@ class ModelCache:
         """Delete cache_entry from the cache if it exists. No exception is thrown if it doesn't exist."""
         self._cache_stack = [key for key in self._cache_stack if key != cache_entry.key]
         self._cached_models.pop(cache_entry.key, None)
+
+    @synchronized
+    def drop_model(self, model_key: str) -> int:
+        """Drop all cache entries belonging to a model so the next load rebuilds them.
+
+        Cache keys are `<model_key>` or `<model_key>:<submodel>` (see `get_model_cache_key`),
+        so a single model may have multiple entries. Locked entries are marked `is_stale` and
+        evicted by `unlock()` as soon as the last lock releases — without that, a setting
+        toggled during an in-flight generation would survive on the locked entry and quietly
+        get reused by the next generation.
+
+        Returns the number of entries immediately dropped (locked entries that are only marked
+        stale do not count).
+        """
+        prefix = f"{model_key}:"
+        matching: list[CacheRecord] = [
+            entry for key, entry in self._cached_models.items() if key == model_key or key.startswith(prefix)
+        ]
+
+        dropped: list[CacheRecord] = []
+        bytes_freed = 0
+        for entry in matching:
+            if entry.is_locked:
+                entry.is_stale = True
+                continue
+            bytes_freed += entry.cached_model.total_bytes()
+            self._delete_cache_entry(entry)
+            dropped.append(entry)
+
+        if dropped:
+            if self.stats:
+                self.stats.cleared = len(dropped)
+            snapshot = self._get_cache_snapshot()
+            for cb in self._on_cache_models_cleared_callbacks:
+                cb(
+                    models_cleared=len(dropped),
+                    bytes_requested=0,
+                    bytes_freed=bytes_freed,
+                    cache_snapshot=snapshot,
+                )
+            gc.collect()
+            TorchDevice.empty_cache()
+        return len(dropped)

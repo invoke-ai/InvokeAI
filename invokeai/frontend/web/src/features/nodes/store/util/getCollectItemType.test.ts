@@ -41,4 +41,14 @@ describe(getCollectItemType.name, () => {
     const result = getCollectItemType({ add: addWithoutOutputValue, collect }, [n2, n1], [e1], n1.id);
     expect(result).toBeNull();
   });
+
+  it('should return the upstream collect item type for chained collects', () => {
+    const n1 = buildNode(collect);
+    const n2 = buildNode(collect);
+    const n3 = buildNode(add);
+    const e1 = buildEdge(n3.id, 'value', n1.id, 'item');
+    const e2 = buildEdge(n1.id, 'collection', n2.id, 'collection');
+    const result = getCollectItemType(templates, [n1, n2, n3], [e1, e2], n2.id);
+    expect(result).toEqual<FieldType>({ name: 'IntegerField', cardinality: 'SINGLE', batch: false });
+  });
 });
