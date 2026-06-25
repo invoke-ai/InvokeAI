@@ -29,6 +29,7 @@ from invokeai.app.invocations.fields import (
     SD3ConditioningField,
     TensorField,
     UIComponent,
+    Ideogram4ConditioningField,
     ZImageConditioningField,
 )
 from invokeai.app.services.images.images_common import ImageDTO
@@ -473,6 +474,17 @@ class ZImageConditioningOutput(BaseInvocationOutput):
     @classmethod
     def build(cls, conditioning_name: str) -> "ZImageConditioningOutput":
         return cls(conditioning=ZImageConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("ideogram4_conditioning_output")
+class Ideogram4ConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output an Ideogram 4 text conditioning tensor."""
+
+    conditioning: Ideogram4ConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "Ideogram4ConditioningOutput":
+        return cls(conditioning=Ideogram4ConditioningField(conditioning_name=conditioning_name))
 
 
 @invocation_output("qwen_image_conditioning_output")

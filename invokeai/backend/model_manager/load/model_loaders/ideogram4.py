@@ -128,37 +128,50 @@ class Ideogram4DiffusersModel(ModelLoader):
         return model.to(compute_dtype)
 
     def _load_text_encoder(self, model_path: Path) -> AnyModel:
-        from transformers import Qwen3VLModel
+        import accelerate
+        from transformers import AutoConfig, AutoModel
+
+        from invokeai.backend.quantization.bnb_nf4 import quantize_model_nf4
 
         encoder_path = model_path / "text_encoder"
         target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
-        cfg = json.loads((encoder_path / "config.json").read_text(encoding="utf-8"))
-        if cfg.get("ideogram_fp8_weight_only", False):
-            # The fp8 text encoder uses Ideogram's custom weight-only fp8 layout, which transformers'
-            # from_pretrained cannot read. Supporting it requires the vendored _load_fp8_text_encoder
-            # path; deferred until the fp8 build is targeted (nf4 is the 24 GB path).
+        raw_cfg = json.loads((encoder_path / "config.json").read_text(encoding="utf-8"))
+        if raw_cfg.get("ideogram_fp8_weight_only", False):
+            # The fp8 text encoder uses Ideogram's custom weight-only fp8 layout; supporting it
+            # requires the vendored _load_fp8_text_encoder path. Deferred (nf4 is the 24 GB path).
             raise NotImplementedError(
                 "Ideogram 4 fp8 text encoder loading is not yet implemented; use the nf4 build."
             )
 
-        if "quantization_config" in cfg:
-            # bitsandbytes (nf4): transformers applies the quantization from config.json. bnb 4-bit
-            # requires a CUDA device, so place it there directly via device_map.
-            return Qwen3VLModel.from_pretrained(
-                encoder_path,
-                torch_dtype=model_dtype,
-                device_map={"": target_device},
-                local_files_only=True,
-            )
+        # Build the bare architecture from config, then quantize with InvokeAI's InvokeLinearNF4 and
+        # load the prequantized weights. We must NOT use transformers' native bitsandbytes loading
+        # (from_pretrained with a quantization_config) because the resulting bnb Linear4bit layers are
+        # not compatible with InvokeAI's partial-loading model cache. This mirrors how the FLUX T5 bnb
+        # encoder is loaded.
+        cfg = AutoConfig.from_pretrained(encoder_path, local_files_only=True)
+        # Drop the quantization_config so from_config builds a plain (unquantized) architecture.
+        if hasattr(cfg, "quantization_config"):
+            cfg.quantization_config = None
 
-        return Qwen3VLModel.from_pretrained(
-            encoder_path,
-            torch_dtype=model_dtype,
-            low_cpu_mem_usage=True,
-            local_files_only=True,
+        sd = _load_local_state_dict(encoder_path, "model")
+        self._ram_cache.make_room(sum(t.nelement() * t.element_size() for t in sd.values()))
+
+        is_bnb_nf4 = "quantization_config" in raw_cfg and bool(
+            raw_cfg["quantization_config"].get("load_in_4bit")
         )
+
+        with accelerate.init_empty_weights():
+            model: torch.nn.Module = AutoModel.from_config(cfg)
+            if is_bnb_nf4:
+                model = quantize_model_nf4(model, modules_to_not_convert=set(), compute_dtype=compute_dtype)
+
+        model.load_state_dict(sd, strict=False, assign=True)
+        if not is_bnb_nf4:
+            model = model.to(compute_dtype)
+        model.eval()
+        return model
 
     def _load_vae(self, model_path: Path) -> AnyModel:
         from invokeai.backend.ideogram4.autoencoder import (

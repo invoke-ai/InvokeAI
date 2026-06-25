@@ -343,6 +343,12 @@ class ZImageConditioningField(BaseModel):
     )
 
 
+class Ideogram4ConditioningField(BaseModel):
+    """An Ideogram 4 conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
 class QwenImageConditioningField(BaseModel):
     """A Qwen Image Edit conditioning tensor primitive value"""
 
