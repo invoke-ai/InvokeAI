@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import (
     Batch,
@@ -97,6 +98,8 @@ async def enqueue_batch(
     prepend: bool = Body(default=False, description="Whether or not to prepend this batch in the queue"),
 ) -> EnqueueBatchResult:
     """Processes a batch and enqueues the output graphs for execution for the current user."""
+    assert_image_move_maintenance_inactive()
+
     try:
         return await ApiDependencies.invoker.services.session_queue.enqueue_batch(
             queue_id=queue_id, batch=batch, prepend=prepend, user_id=current_user.user_id
