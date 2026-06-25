@@ -102,6 +102,18 @@ const slice = createSlice({
     setIdeogram4SamplerPreset: (state, action: PayloadAction<ParameterIdeogram4SamplerPreset>) => {
       state.ideogram4SamplerPreset = action.payload;
     },
+    setIdeogram4Steps: (state, action: PayloadAction<number | null>) => {
+      state.ideogram4Steps = action.payload;
+    },
+    setIdeogram4GuidanceScale: (state, action: PayloadAction<number | null>) => {
+      state.ideogram4GuidanceScale = action.payload;
+    },
+    setIdeogram4Mu: (state, action: PayloadAction<number | null>) => {
+      state.ideogram4Mu = action.payload;
+    },
+    setIdeogram4ColorPalette: (state, action: PayloadAction<string[]>) => {
+      state.ideogram4ColorPalette = action.payload;
+    },
     setZImageSeedVarianceEnabled: (state, action: PayloadAction<boolean>) => {
       state.zImageSeedVarianceEnabled = action.payload;
     },
@@ -650,6 +662,10 @@ export const {
   setZImageScheduler,
   setZImageShift,
   setIdeogram4SamplerPreset,
+  setIdeogram4Steps,
+  setIdeogram4GuidanceScale,
+  setIdeogram4Mu,
+  setIdeogram4ColorPalette,
   setZImageSeedVarianceEnabled,
   setZImageSeedVarianceStrength,
   setZImageSeedVarianceRandomizePercent,
@@ -917,6 +933,10 @@ export const selectFluxDypeExponent = createParamsSelector((params) => params.fl
 export const selectZImageScheduler = createParamsSelector((params) => params.zImageScheduler);
 export const selectZImageShift = createParamsSelector((params) => params.zImageShift);
 export const selectIdeogram4SamplerPreset = createParamsSelector((params) => params.ideogram4SamplerPreset);
+export const selectIdeogram4Steps = createParamsSelector((params) => params.ideogram4Steps);
+export const selectIdeogram4GuidanceScale = createParamsSelector((params) => params.ideogram4GuidanceScale);
+export const selectIdeogram4Mu = createParamsSelector((params) => params.ideogram4Mu);
+export const selectIdeogram4ColorPalette = createParamsSelector((params) => params.ideogram4ColorPalette);
 export const selectZImageSeedVarianceEnabled = createParamsSelector((params) => params.zImageSeedVarianceEnabled);
 export const selectZImageSeedVarianceStrength = createParamsSelector((params) => params.zImageSeedVarianceStrength);
 export const selectZImageSeedVarianceRandomizePercent = createParamsSelector(

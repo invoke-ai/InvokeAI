@@ -39,7 +39,11 @@ import {
   setFluxDypeScale,
   setFluxScheduler,
   setGuidance,
+  setIdeogram4ColorPalette,
+  setIdeogram4GuidanceScale,
+  setIdeogram4Mu,
   setIdeogram4SamplerPreset,
+  setIdeogram4Steps,
   setImg2imgStrength,
   setRefinerCFGScale,
   setRefinerNegativeAestheticScore,
@@ -905,6 +909,117 @@ const Ideogram4SamplerPreset: SingleMetadataHandler<ParameterIdeogram4SamplerPre
 };
 //#endregion Ideogram4SamplerPreset
 
+//#region Ideogram4Steps
+// Optional override of the preset step count. The graph writes 'auto' (sentinel) when unset; recall
+// maps that back to null (= use preset). Only recalled onto an Ideogram 4 model.
+const Ideogram4Steps: SingleMetadataHandler<number | null> = {
+  [SingleMetadataKey]: true,
+  type: 'Ideogram4Steps',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'ideogram4_steps');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null || raw === 'auto') {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(z.number().int().min(1).max(100).parse(raw));
+  },
+  recall: (value, store) => {
+    if (selectBase(store.getState()) !== 'ideogram-4') {
+      return;
+    }
+    store.dispatch(setIdeogram4Steps(value));
+  },
+  i18nKey: 'parameters.steps',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => (
+    <MetadataPrimitiveValue value={value ?? 'Auto'} />
+  ),
+};
+//#endregion Ideogram4Steps
+
+//#region Ideogram4GuidanceScale
+const Ideogram4GuidanceScale: SingleMetadataHandler<number | null> = {
+  [SingleMetadataKey]: true,
+  type: 'Ideogram4GuidanceScale',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'ideogram4_guidance_scale');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null || raw === 'auto') {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(z.number().min(1).max(20).parse(raw));
+  },
+  recall: (value, store) => {
+    if (selectBase(store.getState()) !== 'ideogram-4') {
+      return;
+    }
+    store.dispatch(setIdeogram4GuidanceScale(value));
+  },
+  i18nKey: 'parameters.ideogram4GuidanceScale',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => (
+    <MetadataPrimitiveValue value={value ?? 'Auto'} />
+  ),
+};
+//#endregion Ideogram4GuidanceScale
+
+//#region Ideogram4Mu
+const Ideogram4Mu: SingleMetadataHandler<number | null> = {
+  [SingleMetadataKey]: true,
+  type: 'Ideogram4Mu',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'ideogram4_mu');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null || raw === 'auto') {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(z.number().min(-4).max(4).parse(raw));
+  },
+  recall: (value, store) => {
+    if (selectBase(store.getState()) !== 'ideogram-4') {
+      return;
+    }
+    store.dispatch(setIdeogram4Mu(value));
+  },
+  i18nKey: 'parameters.ideogram4ScheduleShift',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => (
+    <MetadataPrimitiveValue value={value ?? 'Auto'} />
+  ),
+};
+//#endregion Ideogram4Mu
+
+//#region Ideogram4ColorPalette
+const Ideogram4ColorPalette: SingleMetadataHandler<string[]> = {
+  [SingleMetadataKey]: true,
+  type: 'Ideogram4ColorPalette',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'ideogram4_color_palette');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    return Promise.resolve(z.array(z.string()).parse(raw));
+  },
+  recall: (value, store) => {
+    if (selectBase(store.getState()) !== 'ideogram-4') {
+      return;
+    }
+    store.dispatch(setIdeogram4ColorPalette(value));
+  },
+  i18nKey: 'parameters.ideogram4ColorPalette',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<string[]>) => (
+    <MetadataPrimitiveValue value={value.join(', ')} />
+  ),
+};
+//#endregion Ideogram4ColorPalette
+
 //#region RefinerModel
 const RefinerModel: SingleMetadataHandler<ParameterSDXLRefinerModel> = {
   [SingleMetadataKey]: true,
@@ -1669,6 +1784,10 @@ export const ImageMetadataHandlers = {
   QwenImageShift,
   ZImageShift,
   Ideogram4SamplerPreset,
+  Ideogram4Steps,
+  Ideogram4GuidanceScale,
+  Ideogram4Mu,
+  Ideogram4ColorPalette,
   LoRAs,
   CanvasLayers,
   RefImages,

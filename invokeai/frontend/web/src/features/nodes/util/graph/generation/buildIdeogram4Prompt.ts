@@ -1,6 +1,6 @@
 import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
+import { selectIdeogram4ColorPalette, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { Rect } from 'features/controlLayers/store/types';
 
@@ -62,16 +62,21 @@ export type Ideogram4PromptResult = {
 };
 
 /**
- * Assembles an Ideogram 4 prompt from a global prompt and a set of regions.
+ * Assembles an Ideogram 4 prompt from a global prompt, a set of regions, and an optional color palette.
  *
  * - Raw-JSON passthrough: if the global prompt is already a JSON object (trimmed, starts with `{`), it
- *   is used verbatim and treated as structured.
- * - With regions: a structured JSON caption is built — the global prompt becomes
- *   `high_level_description`, and each region becomes an `obj` element with its bbox + desc.
- * - Without regions: the plain global prompt is returned (the model accepts plain text). This keeps
- *   dynamic prompts and prompt batching working, since the caller can let the batch inject it directly.
+ *   is used verbatim and treated as structured (the palette is ignored — the user controls the JSON).
+ * - With regions and/or a color palette: a structured JSON caption is built — the global prompt becomes
+ *   `high_level_description`, each region becomes an `obj` element, and the palette (if any) becomes
+ *   `style_description.color_palette`.
+ * - Otherwise: the plain global prompt is returned (the model accepts plain text). This keeps dynamic
+ *   prompts and prompt batching working, since the caller can let the batch inject it directly.
  */
-export const buildIdeogram4Caption = (globalPrompt: string, regions: Ideogram4RegionInput[]): Ideogram4PromptResult => {
+export const buildIdeogram4Caption = (
+  globalPrompt: string,
+  regions: Ideogram4RegionInput[],
+  colorPalette: string[] = []
+): Ideogram4PromptResult => {
   const trimmed = globalPrompt.trim();
 
   // The user pasted a structured caption (or any JSON object) — use it verbatim.
@@ -85,18 +90,22 @@ export const buildIdeogram4Caption = (globalPrompt: string, regions: Ideogram4Re
       region.bbox ? { type: 'obj', bbox: region.bbox, desc: region.prompt } : { type: 'obj', desc: region.prompt }
     );
 
-  // Nothing regional to encode — fall back to the plain prompt (documented to work).
-  if (elements.length === 0) {
+  // Normalize the palette to uppercase #RRGGBB (the schema's required hex form); drop invalid entries.
+  const palette = colorPalette.map((c) => c.toUpperCase()).filter((c) => /^#[0-9A-F]{6}$/.test(c));
+
+  // Nothing structured to encode — fall back to the plain prompt (documented to work).
+  if (elements.length === 0 && palette.length === 0) {
     return { prompt: trimmed, isStructured: false };
   }
 
-  const caption = {
-    high_level_description: trimmed,
-    compositional_deconstruction: {
-      background: '',
-      elements,
-    },
-  };
+  // Strict key order: high_level_description, (style_description), compositional_deconstruction.
+  // style_description here carries only color_palette; the other style fields are left to raw-JSON use.
+  const compositional_deconstruction = { background: '', elements };
+  const caption =
+    palette.length > 0
+      ? { high_level_description: trimmed, style_description: { color_palette: palette }, compositional_deconstruction }
+      : { high_level_description: trimmed, compositional_deconstruction };
+
   return { prompt: JSON.stringify(caption), isStructured: true };
 };
 
@@ -107,10 +116,11 @@ export const buildIdeogram4Caption = (globalPrompt: string, regions: Ideogram4Re
  */
 export const buildIdeogram4Prompt = (state: RootState, manager: CanvasManager | null): Ideogram4PromptResult => {
   const globalPrompt = selectPositivePrompt(state);
+  const colorPalette = selectIdeogram4ColorPalette(state);
 
   // No canvas manager (e.g. the Generate tab) → no regions to read.
   if (manager === null) {
-    return buildIdeogram4Caption(globalPrompt, []);
+    return buildIdeogram4Caption(globalPrompt, [], colorPalette);
   }
 
   const canvas = selectCanvasSlice(state);
@@ -133,5 +143,5 @@ export const buildIdeogram4Prompt = (state: RootState, manager: CanvasManager | 
     regions.push({ prompt, bbox });
   }
 
-  return buildIdeogram4Caption(globalPrompt, regions);
+  return buildIdeogram4Caption(globalPrompt, regions, colorPalette);
 };

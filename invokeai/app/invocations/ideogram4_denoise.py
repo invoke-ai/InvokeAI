@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Optional
 
 import torch
 
@@ -21,6 +21,26 @@ from invokeai.backend.util.devices import TorchDevice
 # Named sampler presets bundle step count, guidance schedule (with polish tail), and the
 # logit-normal schedule mean/std. V4_QUALITY_48 is the reference default.
 IDEOGRAM4_SAMPLER_PRESETS = Literal["V4_QUALITY_48", "V4_DEFAULT_20", "V4_TURBO_12"]
+
+
+def _effective_guidance_schedule(
+    base_schedule: tuple[float, ...], preset_num_steps: int, num_steps: int, guidance_scale: Optional[float]
+) -> tuple[float, ...]:
+    """Build the per-step guidance schedule for the (possibly overridden) step count.
+
+    The preset schedule is ``(polish_gw,)*N_polish + (main_gw,)*N_main`` in loop-index order
+    (index 0 = the final/polish step). A ``guidance_scale`` override replaces the main weight while
+    the preset's polish tail is preserved; a changed step count rescales the polish tail
+    proportionally (always keeping at least one polish and one main step).
+    """
+    polish_gw = base_schedule[0]
+    main_gw = float(guidance_scale) if guidance_scale is not None else float(base_schedule[-1])
+    if num_steps == preset_num_steps and guidance_scale is None:
+        return base_schedule
+    n_polish_base = sum(1 for gw in base_schedule if gw == base_schedule[0])
+    polish_count = min(num_steps, max(1, round(n_polish_base * num_steps / preset_num_steps)))
+    main_count = num_steps - polish_count
+    return (polish_gw,) * polish_count + (main_gw,) * main_count
 
 
 @invocation(
@@ -48,11 +68,39 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
     width: int = InputField(default=1024, multiple_of=16, description="Width of the generated image.")
     height: int = InputField(default=1024, multiple_of=16, description="Height of the generated image.")
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
+    # Optional advanced overrides of the sampler preset. None = use the preset's value.
+    steps: Optional[int] = InputField(
+        default=None,
+        ge=1,
+        le=100,
+        description="Override the preset's step count. Leave empty to use the preset.",
+    )
+    guidance_scale: Optional[float] = InputField(
+        default=None,
+        ge=1.0,
+        le=20.0,
+        description="Override the main guidance weight (the preset's polish tail is preserved). "
+        "Empty = use the preset.",
+    )
+    mu: Optional[float] = InputField(
+        default=None,
+        ge=-4.0,
+        le=4.0,
+        description="Override the logit-normal schedule mean (resolution-adjusted internally). "
+        "Empty = use the preset.",
+    )
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         device = TorchDevice.choose_torch_device()
         preset = PRESETS[self.sampler_preset]
+
+        # Apply optional advanced overrides on top of the preset.
+        num_steps = self.steps if self.steps is not None else preset.num_steps
+        mu = self.mu if self.mu is not None else preset.mu
+        guidance_schedule = _effective_guidance_schedule(
+            preset.guidance_schedule, preset.num_steps, num_steps, self.guidance_scale
+        )
 
         # Load conditioning (the stacked Qwen3-VL features).
         cond_data = context.conditioning.load(self.positive_conditioning.conditioning_name)
@@ -73,10 +121,10 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
                 llm_features=llm_features,
                 height=self.height,
                 width=self.width,
-                num_steps=preset.num_steps,
-                mu=preset.mu,
+                num_steps=num_steps,
+                mu=mu,
                 std=preset.std,
-                guidance_schedule=preset.guidance_schedule,
+                guidance_schedule=guidance_schedule,
                 seed=self.seed,
                 device=device,
                 step_callback=step_callback,

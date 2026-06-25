@@ -805,8 +805,14 @@ export const zParamsState = z.object({
   fluxDypeExponent: zParameterFluxDypeExponent,
   zImageScheduler: zParameterZImageScheduler,
   zImageShift: z.number().min(0).max(3).nullable(),
-  // Default makes this resilient to rehydration of persisted state saved before this field existed.
+  // Defaults make these resilient to rehydration of persisted state saved before the fields existed.
   ideogram4SamplerPreset: zParameterIdeogram4SamplerPreset.default('V4_QUALITY_48'),
+  // Optional advanced overrides of the Ideogram 4 sampler preset (null = use the preset's value).
+  ideogram4Steps: z.number().int().min(1).max(100).nullable().default(null),
+  ideogram4GuidanceScale: z.number().min(1).max(20).nullable().default(null),
+  ideogram4Mu: z.number().min(-4).max(4).nullable().default(null),
+  // Hex colors (#RRGGBB) injected into the JSON caption's style_description.color_palette.
+  ideogram4ColorPalette: z.array(z.string()).default([]),
   upscaleScheduler: zParameterScheduler,
   upscaleCfgScale: zParameterCFGScale,
   seed: zParameterSeed,
@@ -896,6 +902,10 @@ export const getInitialParamsState = (): ParamsState => ({
   zImageScheduler: 'euler',
   zImageShift: null,
   ideogram4SamplerPreset: 'V4_QUALITY_48',
+  ideogram4Steps: null,
+  ideogram4GuidanceScale: null,
+  ideogram4Mu: null,
+  ideogram4ColorPalette: [],
   upscaleScheduler: 'kdpm_2',
   upscaleCfgScale: 2,
   seed: 0,

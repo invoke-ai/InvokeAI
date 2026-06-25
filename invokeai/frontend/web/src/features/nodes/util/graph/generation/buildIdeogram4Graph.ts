@@ -1,7 +1,14 @@
 import { objectEquals } from '@observ33r/object-equals';
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectIdeogram4SamplerPreset, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
+import {
+  selectIdeogram4ColorPalette,
+  selectIdeogram4GuidanceScale,
+  selectIdeogram4Mu,
+  selectIdeogram4SamplerPreset,
+  selectIdeogram4Steps,
+  selectMainModelConfig,
+} from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
@@ -38,9 +45,15 @@ export const buildIdeogram4Graph = async (arg: GraphBuilderArg): Promise<GraphBu
   assert(model.base === 'ideogram-4', 'Selected model is not an Ideogram 4 model');
 
   const samplerPreset = selectIdeogram4SamplerPreset(state);
+  // Optional advanced overrides (null = use the preset). The color palette is consumed by
+  // buildIdeogram4Prompt; it is read here only for metadata.
+  const ideogram4Steps = selectIdeogram4Steps(state);
+  const ideogram4GuidanceScale = selectIdeogram4GuidanceScale(state);
+  const ideogram4Mu = selectIdeogram4Mu(state);
+  const colorPalette = selectIdeogram4ColorPalette(state);
 
   // Assemble the prompt: raw-JSON passthrough, a structured caption built from Regional Guidance
-  // layers, or plain text when there are no regions.
+  // layers (+ optional color palette), or plain text when there is nothing structured to encode.
   const { prompt, isStructured } = buildIdeogram4Prompt(state, manager);
 
   const g = new Graph(getPrefixedId('ideogram4_graph'));
@@ -71,6 +84,9 @@ export const buildIdeogram4Graph = async (arg: GraphBuilderArg): Promise<GraphBu
     type: 'ideogram4_denoise',
     id: getPrefixedId('ideogram4_denoise'),
     sampler_preset: samplerPreset,
+    steps: ideogram4Steps ?? undefined,
+    guidance_scale: ideogram4GuidanceScale ?? undefined,
+    mu: ideogram4Mu ?? undefined,
   });
 
   const l2i = g.addNode({
@@ -105,6 +121,12 @@ export const buildIdeogram4Graph = async (arg: GraphBuilderArg): Promise<GraphBu
   g.upsertMetadata({
     model: Graph.getModelMetadataField(modelConfig),
     ideogram4_sampler_preset: samplerPreset,
+    // 'auto' sentinel survives the backend's exclude_none metadata serialization; the parser maps it
+    // back to null (use preset) on recall.
+    ideogram4_steps: ideogram4Steps ?? 'auto',
+    ideogram4_guidance_scale: ideogram4GuidanceScale ?? 'auto',
+    ideogram4_mu: ideogram4Mu ?? 'auto',
+    ideogram4_color_palette: colorPalette,
     width: originalSize.width,
     height: originalSize.height,
     generation_mode: 'ideogram4_txt2img',

@@ -91,4 +91,37 @@ describe('buildIdeogram4Caption', () => {
     expect(result.prompt).toContain('café ☕');
     expect(result.prompt).not.toContain('\\u');
   });
+
+  it('injects a color palette as style_description.color_palette with correct key order', () => {
+    const result = buildIdeogram4Caption('a sunset', [region('a boat', [0, 0, 500, 500])], ['#FF6B35', '#004E89']);
+    expect(result.isStructured).toBe(true);
+    expect(result.prompt).toBe(
+      '{"high_level_description":"a sunset",' +
+        '"style_description":{"color_palette":["#FF6B35","#004E89"]},' +
+        '"compositional_deconstruction":{"background":"","elements":[{"type":"obj","bbox":[0,0,500,500],"desc":"a boat"}]}}'
+    );
+  });
+
+  it('builds a structured caption from a palette alone (no regions)', () => {
+    const result = buildIdeogram4Caption('a sunset', [], ['#FF6B35']);
+    expect(result.isStructured).toBe(true);
+    const parsed = JSON.parse(result.prompt);
+    expect(parsed.style_description.color_palette).toEqual(['#FF6B35']);
+    expect(parsed.compositional_deconstruction.elements).toEqual([]);
+  });
+
+  it('uppercases palette colors and drops invalid hex (shorthand, names)', () => {
+    const result = buildIdeogram4Caption('x', [], ['#ff6b35', 'red', '#FFF', '#00cc88']);
+    const parsed = JSON.parse(result.prompt);
+    expect(parsed.style_description.color_palette).toEqual(['#FF6B35', '#00CC88']);
+  });
+
+  it('ignores the palette for raw-JSON passthrough', () => {
+    const raw = '{"a":1}';
+    expect(buildIdeogram4Caption(raw, [], ['#FF6B35'])).toEqual({ prompt: raw, isStructured: true });
+  });
+
+  it('stays plain text when there are no regions and no palette', () => {
+    expect(buildIdeogram4Caption('just text', [])).toEqual({ prompt: 'just text', isStructured: false });
+  });
 });

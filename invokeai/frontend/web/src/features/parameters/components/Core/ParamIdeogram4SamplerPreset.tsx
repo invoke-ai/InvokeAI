@@ -14,6 +14,14 @@ const IDEOGRAM4_SAMPLER_PRESET_OPTIONS: ComboboxOption[] = [
   { value: 'V4_TURBO_12', label: 'Turbo (12 steps)' },
 ];
 
+// Per-preset step count and schedule mean (mu), mirroring the backend PRESETS. Used by the advanced
+// override controls to show the active preset's value as the "auto" default.
+export const IDEOGRAM4_PRESET_DEFAULTS: Record<string, { steps: number; mu: number }> = {
+  V4_QUALITY_48: { steps: 48, mu: 0.0 },
+  V4_DEFAULT_20: { steps: 20, mu: 0.0 },
+  V4_TURBO_12: { steps: 12, mu: 0.5 },
+};
+
 const ParamIdeogram4SamplerPreset = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
