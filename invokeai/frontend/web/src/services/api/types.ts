@@ -90,6 +90,16 @@ const _zImageDTO = z.object({
 export type ImageDTO = z.infer<typeof _zImageDTO>;
 assert<Equals<ImageDTO, S['ImageDTO']>>();
 
+const _zFileDTO = z.object({
+  file_id: z.string(),
+  file_name: z.string(),
+  content_type: z.string(),
+  size_bytes: z.number().int().gte(0),
+  created_at: z.string(),
+});
+export type FileDTO = z.infer<typeof _zFileDTO>;
+assert<Equals<FileDTO, S['FileDTO']>>();
+
 export type BoardDTO = S['BoardDTO'];
 export type OffsetPaginatedResults_ImageDTO_ = S['OffsetPaginatedResults_ImageDTO_'];
 
@@ -608,6 +618,13 @@ export type UploadImageArg = {
    * If provided, the uploaded image will resized to the given dimensions.
    */
   resize_to?: Dimensions;
+};
+
+export type UploadFileArg = {
+  /**
+   * The file object to upload
+   */
+  file: File;
 };
 
 export type ImageUploadEntryResponse = S['ImageUploadEntry'];

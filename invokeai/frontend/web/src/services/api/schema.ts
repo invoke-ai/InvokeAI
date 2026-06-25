@@ -1001,6 +1001,50 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/files/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload File
+         * @description Uploads a managed file for node inputs.
+         */
+        post: operations["upload_file"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/i/{file_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get File Dto
+         * @description Gets metadata for a managed file.
+         */
+        get: operations["get_file_dto"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete File
+         * @description Deletes a managed file.
+         */
+        delete: operations["delete_file"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/images/upload": {
         parameters: {
             query?: never;
@@ -4349,6 +4393,14 @@ export type components = {
              * @description Whether the workflow should be shared publicly
              */
             is_public: boolean;
+        };
+        /** Body_upload_file */
+        Body_upload_file: {
+            /**
+             * File
+             * Format: binary
+             */
+            file: Blob;
         };
         /** Body_upload_image */
         Body_upload_image: {
@@ -9812,6 +9864,46 @@ export type components = {
          * @enum {string}
          */
         FieldKind: "input" | "output" | "internal" | "node_attribute";
+        /** FileDTO */
+        FileDTO: {
+            /**
+             * File Id
+             * @description The managed file ID.
+             */
+            file_id: string;
+            /**
+             * File Name
+             * @description The original file name.
+             */
+            file_name: string;
+            /**
+             * Content Type
+             * @description The uploaded file content type.
+             */
+            content_type: string;
+            /**
+             * Size Bytes
+             * @description The size of the file in bytes.
+             */
+            size_bytes: number;
+            /**
+             * Created At
+             * Format: date-time
+             * @description When the file was uploaded.
+             */
+            created_at: string;
+        };
+        /**
+         * FileField
+         * @description A managed file primitive field
+         */
+        FileField: {
+            /**
+             * File Id
+             * @description The id of the managed file
+             */
+            file_id: string;
+        };
         /**
          * Float Batch
          * @description Create a batched generation, where the workflow is executed once for each float in the batch.
@@ -16560,6 +16652,12 @@ export type components = {
              * @description Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.
              */
             max_queue_history?: number | null;
+            /**
+             * Max File Upload Size Bytes
+             * @description Maximum size in bytes for managed file uploads.
+             * @default 52428800
+             */
+            max_file_upload_size_bytes?: number;
             /**
              * Allow Nodes
              * @description List of nodes to allow. Omit to allow all.
@@ -34941,6 +35039,115 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    upload_file: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_file"];
+            };
+        };
+        responses: {
+            /** @description The file was uploaded successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileDTO"];
+                };
+            };
+            /** @description The file is too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The file type is not supported */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_file_dto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The managed file ID. */
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_file: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The managed file ID. */
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

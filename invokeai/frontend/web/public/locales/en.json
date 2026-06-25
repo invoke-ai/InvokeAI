@@ -13,7 +13,8 @@
         "toggleRightPanel": "Toggle Right Panel (G)",
         "toggleLeftPanel": "Toggle Left Panel (T)",
         "uploadImage": "Upload Image",
-        "uploadImages": "Upload Images"
+        "uploadImages": "Upload Images",
+        "uploadFile": "Upload File"
     },
     "auth": {
         "login": {
@@ -1904,6 +1905,7 @@
         "imageSavingFailed": "Image Saving Failed",
         "imageUploaded": "Image Uploaded",
         "imageUploadFailed": "Image Upload Failed",
+        "fileUploadFailed": "File Upload Failed",
         "importFailed": "Import Failed",
         "importSuccessful": "Import Successful",
         "invalidUpload": "Invalid Upload",
@@ -1958,6 +1960,7 @@
         "uploadFailedInvalidUploadDesc_withCount_one": "Must be maximum of 1 PNG, JPEG or WEBP image.",
         "uploadFailedInvalidUploadDesc_withCount_other": "Must be maximum of {{count}} PNG, JPEG or WEBP images.",
         "uploadFailedInvalidUploadDesc": "Must be PNG, JPEG or WEBP images.",
+        "fileUploadFailedInvalidUploadDesc": "Must be PDF, Markdown, text, CSV, JSON or YAML files.",
         "workflowLoaded": "Workflow Loaded",
         "problemRetrievingWorkflow": "Problem Retrieving Workflow",
         "workflowDeleted": "Workflow Deleted",

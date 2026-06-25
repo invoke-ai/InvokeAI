@@ -7,6 +7,7 @@ import type {
   EnumFieldInputTemplate,
   FieldInputTemplate,
   FieldType,
+  FileFieldInputTemplate,
   FloatFieldCollectionInputTemplate,
   FloatFieldInputTemplate,
   FloatGeneratorFieldInputTemplate,
@@ -318,6 +319,20 @@ const buildImageFieldInputTemplate: FieldInputTemplateBuilder<ImageFieldInputTem
   return template;
 };
 
+const buildFileFieldInputTemplate: FieldInputTemplateBuilder<FileFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: FileFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildImageFieldCollectionInputTemplate: FieldInputTemplateBuilder<ImageFieldCollectionInputTemplate> = ({
   schemaObject,
   baseField,
@@ -471,6 +486,7 @@ const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputTemplate
   EnumField: buildEnumFieldInputTemplate,
   FloatField: buildFloatFieldInputTemplate,
   ImageField: buildImageFieldInputTemplate,
+  FileField: buildFileFieldInputTemplate,
   IntegerField: buildIntegerFieldInputTemplate,
   ModelIdentifierField: buildModelIdentifierFieldInputTemplate,
   SchedulerField: buildSchedulerFieldInputTemplate,
