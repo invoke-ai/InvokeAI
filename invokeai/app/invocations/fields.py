@@ -155,6 +155,7 @@ class FieldDescriptions:
     t5_encoder = "T5 tokenizer and text encoder"
     glm_encoder = "GLM (THUDM) tokenizer and text encoder"
     qwen3_encoder = "Qwen3 tokenizer and text encoder"
+    qwen3_vl_encoder = "Qwen3-VL tokenizer and text encoder"
     clip_embed_model = "CLIP Embed loader"
     clip_g_model = "CLIP-G Embed loader"
     unet = "UNet (scheduler, LoRAs)"
@@ -171,6 +172,7 @@ class FieldDescriptions:
     sd3_model = "SD3 model (MMDiTX) to load"
     cogview4_model = "CogView4 model (Transformer) to load"
     z_image_model = "Z-Image model (Transformer) to load"
+    krea2_model = "Krea-2 model (Transformer) to load"
     qwen_image_model = "Qwen Image Edit model (Transformer) to load"
     qwen_vl_encoder = "Qwen2.5-VL tokenizer, processor and text/vision encoder"
     sdxl_main_model = "SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load"
@@ -345,6 +347,12 @@ class ZImageConditioningField(BaseModel):
 
 class QwenImageConditioningField(BaseModel):
     """A Qwen Image Edit conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
+class Krea2ConditioningField(BaseModel):
+    """A Krea-2 conditioning tensor primitive value"""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
 

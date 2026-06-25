@@ -107,6 +107,24 @@ const slice = createSlice({
     setZImageSeedVarianceRandomizePercent: (state, action: PayloadAction<number>) => {
       state.zImageSeedVarianceRandomizePercent = action.payload;
     },
+    setKrea2SeedVarianceEnabled: (state, action: PayloadAction<boolean>) => {
+      state.krea2SeedVarianceEnabled = action.payload;
+    },
+    setKrea2SeedVarianceStrength: (state, action: PayloadAction<number>) => {
+      state.krea2SeedVarianceStrength = action.payload;
+    },
+    setKrea2SeedVarianceRandomizePercent: (state, action: PayloadAction<number>) => {
+      state.krea2SeedVarianceRandomizePercent = action.payload;
+    },
+    setKrea2RebalanceEnabled: (state, action: PayloadAction<boolean>) => {
+      state.krea2RebalanceEnabled = action.payload;
+    },
+    setKrea2RebalanceMultiplier: (state, action: PayloadAction<number>) => {
+      state.krea2RebalanceMultiplier = action.payload;
+    },
+    setKrea2RebalanceWeights: (state, action: PayloadAction<string>) => {
+      state.krea2RebalanceWeights = action.payload;
+    },
     setUpscaleScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
       state.upscaleScheduler = action.payload;
     },
@@ -648,6 +666,12 @@ export const {
   setZImageSeedVarianceEnabled,
   setZImageSeedVarianceStrength,
   setZImageSeedVarianceRandomizePercent,
+  setKrea2SeedVarianceEnabled,
+  setKrea2SeedVarianceStrength,
+  setKrea2SeedVarianceRandomizePercent,
+  setKrea2RebalanceEnabled,
+  setKrea2RebalanceMultiplier,
+  setKrea2RebalanceWeights,
   setUpscaleScheduler,
   setUpscaleCfgScale,
   setSeed,
@@ -762,6 +786,7 @@ export const selectIsAnima = createParamsSelector((params) => params.model?.base
 export const selectIsFlux2 = createParamsSelector((params) => params.model?.base === 'flux2');
 export const selectIsExternal = createParamsSelector((params) => params.model?.base === 'external');
 export const selectIsQwenImage = createParamsSelector((params) => params.model?.base === 'qwen-image');
+export const selectIsKrea2 = createParamsSelector((params) => params.model?.base === 'krea-2');
 export const selectIsFluxKontext = createParamsSelector((params) => {
   if (params.model?.base === 'flux' && params.model?.name.toLowerCase().includes('kontext')) {
     return true;
@@ -911,6 +936,14 @@ export const selectZImageSeedVarianceStrength = createParamsSelector((params) =>
 export const selectZImageSeedVarianceRandomizePercent = createParamsSelector(
   (params) => params.zImageSeedVarianceRandomizePercent
 );
+export const selectKrea2SeedVarianceEnabled = createParamsSelector((params) => params.krea2SeedVarianceEnabled);
+export const selectKrea2SeedVarianceStrength = createParamsSelector((params) => params.krea2SeedVarianceStrength);
+export const selectKrea2SeedVarianceRandomizePercent = createParamsSelector(
+  (params) => params.krea2SeedVarianceRandomizePercent
+);
+export const selectKrea2RebalanceEnabled = createParamsSelector((params) => params.krea2RebalanceEnabled);
+export const selectKrea2RebalanceMultiplier = createParamsSelector((params) => params.krea2RebalanceMultiplier);
+export const selectKrea2RebalanceWeights = createParamsSelector((params) => params.krea2RebalanceWeights);
 export const selectSeamlessXAxis = createParamsSelector((params) => params.seamlessXAxis);
 export const selectSeamlessYAxis = createParamsSelector((params) => params.seamlessYAxis);
 export const selectSeed = createParamsSelector((params) => params.seed);

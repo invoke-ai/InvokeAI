@@ -98,6 +98,7 @@ export const zBaseModelType = z.enum([
   'cogview4',
   'qwen-image',
   'z-image',
+  'krea-2',
   'external',
   'anima',
   'unknown',
@@ -113,6 +114,7 @@ export const zMainModelBase = z.enum([
   'cogview4',
   'qwen-image',
   'z-image',
+  'krea-2',
   'anima',
 ]);
 type MainModelBase = z.infer<typeof zMainModelBase>;
@@ -134,6 +136,7 @@ export const zModelType = z.enum([
   't5_encoder',
   'qwen3_encoder',
   'qwen_vl_encoder',
+  'qwen3_vl_encoder',
   'clip_embed',
   'siglip',
   'flux_redux',
@@ -162,6 +165,7 @@ export const zModelVariantType = z.enum(['normal', 'inpaint', 'depth']);
 export const zFluxVariantType = z.enum(['dev', 'dev_fill', 'schnell']);
 export const zFlux2VariantType = z.enum(['klein_4b', 'klein_4b_base', 'klein_9b', 'klein_9b_base']);
 export const zZImageVariantType = z.enum(['turbo', 'zbase']);
+export const zKrea2VariantType = z.enum(['krea2_turbo']);
 const zQwenImageVariantType = z.enum(['generate', 'edit']);
 export const zQwen3VariantType = z.enum(['qwen3_4b', 'qwen3_8b', 'qwen3_06b']);
 export const zAnyModelVariant = z.union([
@@ -170,6 +174,7 @@ export const zAnyModelVariant = z.union([
   zFluxVariantType,
   zFlux2VariantType,
   zZImageVariantType,
+  zKrea2VariantType,
   zQwenImageVariantType,
   zQwen3VariantType,
 ]);
@@ -187,6 +192,7 @@ export const zModelFormat = z.enum([
   't5_encoder',
   'qwen3_encoder',
   'qwen_vl_encoder',
+  'qwen3_vl_encoder',
   'bnb_quantized_int8b',
   'bnb_quantized_nf4b',
   'gguf_quantized',

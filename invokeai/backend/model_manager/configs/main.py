@@ -27,6 +27,7 @@ from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     Flux2VariantType,
     FluxVariantType,
+    Krea2VariantType,
     ModelFormat,
     ModelType,
     ModelVariantType,
@@ -65,7 +66,12 @@ class MainModelDefaultSettings(BaseModel):
     def from_base(
         cls,
         base: BaseModelType,
-        variant: Flux2VariantType | FluxVariantType | ModelVariantType | ZImageVariantType | None = None,
+        variant: Flux2VariantType
+        | FluxVariantType
+        | ModelVariantType
+        | ZImageVariantType
+        | Krea2VariantType
+        | None = None,
     ) -> Self | None:
         match base:
             case BaseModelType.StableDiffusion1:
@@ -95,6 +101,10 @@ class MainModelDefaultSettings(BaseModel):
                     return cls(steps=4, cfg_scale=1.0, width=1024, height=1024)
             case BaseModelType.QwenImage:
                 return cls(steps=40, cfg_scale=4.0, width=1024, height=1024)
+            case BaseModelType.Krea2:
+                # Krea-2-Turbo is distilled: 8 steps, CFG disabled (guidance_scale=0).
+                # cfg_scale has a floor of 1 (ge=1); 1.0 means "no guidance" for the Krea-2 denoise loop.
+                return cls(steps=8, cfg_scale=1.0, width=1024, height=1024)
             case _:
                 # TODO(psyche): Do we want defaults for other base types?
                 return None
@@ -188,6 +198,49 @@ def _has_z_image_keys(state_dict: dict[str | int, Any]) -> bool:
                 return True
 
     return False
+
+
+def _has_krea2_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains Krea-2 (Krea2Transformer2DModel) transformer keys.
+
+    Krea-2's single-stream MMDiT has a distinctive text-fusion stage; the ``text_fusion.``
+    prefix (with ``layerwise_blocks`` / ``refiner_blocks`` / ``projector``) is unique to it.
+    Returns True only for Krea-2 main models, not LoRAs.
+    """
+    krea2_specific_keys = {
+        "text_fusion",  # text-fusion stage (layerwise_blocks, refiner_blocks, projector) - unique to Krea-2
+        "time_mod_proj",  # timestep modulation projection
+    }
+
+    lora_suffixes = (
+        ".lora_down.weight",
+        ".lora_up.weight",
+        ".lora_A.weight",
+        ".lora_B.weight",
+        ".dora_scale",
+        ".alpha",
+    )
+
+    # If any key has a LoRA suffix, this is a LoRA, not a main model.
+    for key in state_dict.keys():
+        if isinstance(key, int):
+            continue
+        if key.endswith(lora_suffixes):
+            return False
+
+    has_text_fusion = False
+    has_img_in = False
+    for key in state_dict.keys():
+        if isinstance(key, int):
+            continue
+        # Handle both direct keys and ComfyUI-style (model.diffusion_model.*) keys.
+        key_parts = key.split(".")
+        if any(part in krea2_specific_keys for part in key_parts):
+            has_text_fusion = True
+        if "img_in" in key_parts:
+            has_img_in = True
+    # Require the distinctive text-fusion stage; img_in is a corroborating signal.
+    return has_text_fusion and has_img_in
 
 
 class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
@@ -1283,6 +1336,76 @@ class Main_GGUF_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_B
         has_ggml_tensors = _has_ggml_tensors(mod.load_state_dict())
         if not has_ggml_tensors:
             raise NotAMatchError("state dict does not look like GGUF quantized")
+
+
+class Main_Diffusers_Krea2_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Krea-2 diffusers models (Krea-2-Turbo)."""
+
+    base: Literal[BaseModelType.Krea2] = Field(BaseModelType.Krea2)
+    variant: Krea2VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # This check implies the base type - no further validation needed.
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "Krea2Pipeline",
+            },
+        )
+
+        variant = override_fields.pop("variant", None) or cls._get_variant(mod)
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        return cls(
+            **override_fields,
+            variant=variant,
+            repo_variant=repo_variant,
+        )
+
+    @classmethod
+    def _get_variant(cls, mod: ModelOnDisk) -> Krea2VariantType:
+        """Determine the Krea-2 variant. Only the distilled Turbo checkpoint is currently supported."""
+        # The distilled (Turbo) checkpoint sets is_distilled=true in model_index.json. Base (midtrain)
+        # support is not yet implemented, so everything currently maps to Turbo.
+        return Krea2VariantType.Turbo
+
+
+class Main_Checkpoint_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Krea-2 single-file checkpoint models (safetensors, etc)."""
+
+    base: Literal[BaseModelType.Krea2] = Field(default=BaseModelType.Krea2)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    variant: Krea2VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_krea2_model(mod)
+
+        cls._validate_does_not_look_like_gguf_quantized(mod)
+
+        variant = override_fields.pop("variant", None) or Krea2VariantType.Turbo
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _validate_looks_like_krea2_model(cls, mod: ModelOnDisk) -> None:
+        if not _has_krea2_keys(mod.load_state_dict()):
+            raise NotAMatchError("state dict does not look like a Krea-2 model")
+
+    @classmethod
+    def _validate_does_not_look_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
+        if _has_ggml_tensors(mod.load_state_dict()):
+            raise NotAMatchError("state dict looks like GGUF quantized")
 
 
 class Main_Diffusers_QwenImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
