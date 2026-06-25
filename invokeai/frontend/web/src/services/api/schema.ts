@@ -19370,6 +19370,16 @@ export type components = {
              * @description Default weight for this model
              */
             weight?: number | null;
+            /**
+             * Weight Min
+             * @description Minimum weight slider value for this model
+             */
+            weight_min?: number | null;
+            /**
+             * Weight Max
+             * @description Maximum weight slider value for this model
+             */
+            weight_max?: number | null;
         };
         /** MDControlListOutput */
         MDControlListOutput: {
