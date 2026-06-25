@@ -78,6 +78,7 @@ Invoke features an organized gallery system for easily storing, accessing, and r
 - Anima
 - Qwen Image
 - Qwen Image Edit
+- Ideogram 4
 - Nano Banana (API Only)
 - GPT Image (API Only)
 - Wan (API Only)
