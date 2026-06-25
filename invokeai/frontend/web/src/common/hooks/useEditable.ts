@@ -6,12 +6,18 @@ type UseEditableArg = {
   defaultValue: string;
   onChange: (value: string) => void;
   onStartEditing?: () => void;
-  inputRef?: RefObject<HTMLInputElement | HTMLTextAreaElement>;
+  inputRef?: RefObject<HTMLInputElement | HTMLTextAreaElement | null>;
 };
 
 export const useEditable = ({ value, defaultValue, onChange: _onChange, onStartEditing, inputRef }: UseEditableArg) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [prevValue, setPrevValue] = useState(value);
   const [localValue, setLocalValue] = useState(value);
+
+  if (value !== prevValue) {
+    setPrevValue(value);
+    setLocalValue(value);
+  }
 
   const onBlur = useCallback(() => {
     const trimmedValue = localValue.trim();
@@ -45,11 +51,6 @@ export const useEditable = ({ value, defaultValue, onChange: _onChange, onStartE
     setIsEditing(true);
     onStartEditing?.();
   }, [onStartEditing]);
-
-  useEffect(() => {
-    // Another component may change the title; sync local title with global state
-    setLocalValue(value);
-  }, [value]);
 
   useEffect(() => {
     if (isEditing) {

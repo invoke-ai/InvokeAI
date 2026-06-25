@@ -6,42 +6,43 @@ import {
 } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+
+type SelectionHistory = {
+  prev: CanvasEntityIdentifier | null;
+  current: CanvasEntityIdentifier | null;
+};
 
 export const useCanvasEntityQuickSwitchHotkey = () => {
   const dispatch = useAppDispatch();
-  const [prev, setPrev] = useState<CanvasEntityIdentifier | null>(null);
-  const [current, setCurrent] = useState<CanvasEntityIdentifier | null>(null);
+  const selectionHistoryRef = useRef<SelectionHistory>({ prev: null, current: null });
   const selected = useAppSelector(selectSelectedEntityIdentifier);
   const bookmarked = useAppSelector(selectBookmarkedEntityIdentifier);
 
-  // Update prev and current when selected entity changes
   useEffect(() => {
+    const { current } = selectionHistoryRef.current;
+
     if (current?.id !== selected?.id) {
-      setPrev(current);
-      setCurrent(selected);
+      selectionHistoryRef.current = { prev: current, current: selected };
     }
-  }, [current, selected]);
+  }, [selected]);
 
   const onQuickSwitch = useCallback(() => {
+    const { prev, current } = selectionHistoryRef.current;
+
     if (bookmarked) {
       if (current?.id !== bookmarked.id) {
-        // Switch between current (non-bookmarked) and bookmarked
-        setPrev(current);
-        setCurrent(bookmarked);
+        selectionHistoryRef.current = { prev: current, current: bookmarked };
         dispatch(entitySelected({ entityIdentifier: bookmarked }));
       } else if (prev) {
-        // Switch back to the last non-bookmarked entity
-        setCurrent(prev);
+        selectionHistoryRef.current = { prev, current: prev };
         dispatch(entitySelected({ entityIdentifier: prev }));
       }
     } else if (prev !== null && current !== null) {
-      // Switch between prev and current if no bookmarked entity
-      setPrev(current);
-      setCurrent(prev);
+      selectionHistoryRef.current = { prev: current, current: prev };
       dispatch(entitySelected({ entityIdentifier: prev }));
     }
-  }, [bookmarked, current, dispatch, prev]);
+  }, [bookmarked, dispatch]);
 
   useRegisteredHotkeys({
     id: 'quickSwitch',
