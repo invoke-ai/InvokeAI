@@ -141,9 +141,16 @@ async def get_queue_item_ids(
     queue_id: str = Path(description="The queue id to perform this operation on"),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
 ) -> ItemIdsResult:
-    """Gets all queue item ids that match the given parameters. The IDs themselves are not sensitive;
-    per-item field redaction is performed when the items are fetched via list_all_queue_items or
-    get_queue_items_by_item_ids."""
+    """Gets all queue item ids that match the given parameters.
+
+    IDs for every user's items are returned (item ids carry no sensitive data on their own).
+    When the corresponding items are hydrated via get_queue_items_by_item_ids, those belonging
+    to other users are redacted by sanitize_queue_item_for_user. This lets a non-admin see
+    partially-redacted entries for other users' jobs in the queue list, while still revealing
+    only timestamps and status for items they do not own.
+
+    current_user is required so the endpoint stays behind authentication in multiuser mode.
+    """
     try:
         return ApiDependencies.invoker.services.session_queue.get_queue_item_ids(queue_id=queue_id, order_dir=order_dir)
     except Exception as e:

@@ -1360,14 +1360,17 @@ class TestQueueStatusScoping:
         assert status_obj.batch_id is None
 
     def test_session_queue_status_has_user_fields(self):
-        """SessionQueueStatus exposes user_pending/user_in_progress so the queue badge
-        can render an X/Y count (X = caller's jobs, Y = global total)."""
+        """SessionQueueStatus carries per-user counts (user_pending/user_in_progress) alongside
+        the global aggregate counts. The frontend badge needs both to render "own / total" for
+        non-admin users in multiuser mode. The per-user fields are optional (None for admins
+        and single-user/global callers)."""
         from invokeai.app.services.session_queue.session_queue_common import SessionQueueStatus
 
         fields = set(SessionQueueStatus.model_fields.keys())
         assert "user_pending" in fields
         assert "user_in_progress" in fields
 
+        # Per-user fields default to None (global/admin caller) and aggregate counts stay global.
         status_obj = SessionQueueStatus(
             queue_id="default",
             item_id=None,
@@ -1379,11 +1382,14 @@ class TestQueueStatusScoping:
             failed=0,
             canceled=0,
             total=6,
-            user_pending=2,
-            user_in_progress=1,
         )
-        assert status_obj.user_pending == 2
-        assert status_obj.user_in_progress == 1
+        assert status_obj.user_pending is None
+        assert status_obj.user_in_progress is None
+
+        # A non-admin caller's status carries their own subset of the global counts.
+        scoped = status_obj.model_copy(update={"user_pending": 2, "user_in_progress": 1})
+        assert scoped.pending == 5  # global, unchanged
+        assert scoped.user_pending == 2  # this user's share
 
     def _setup_queue_router(self, mock_invoker: Invoker):
         """Wire a real session queue and a stub processor into the invoker the router uses,

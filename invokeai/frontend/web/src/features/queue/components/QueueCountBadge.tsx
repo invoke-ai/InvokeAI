@@ -7,11 +7,15 @@ import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 import type { components } from 'services/api/schema';
 
 type Props = {
-  targetRef: RefObject<HTMLDivElement>;
+  targetRef: RefObject<HTMLDivElement | null>;
 };
 
 type SessionQueueStatus = components['schemas']['SessionQueueStatus'];
 
+/**
+ * Determines if per-user queue counts are available. The backend only populates
+ * user_pending/user_in_progress for non-admin callers in multiuser mode.
+ */
 const hasUserCounts = (queueData: SessionQueueStatus): boolean => {
   return (
     queueData.user_pending !== undefined &&
@@ -25,9 +29,10 @@ const hasUserCounts = (queueData: SessionQueueStatus): boolean => {
  * Calculates the appropriate badge text based on queue status and authentication state.
  * Returns null if badge should be hidden.
  *
- * In multiuser mode, the badge is "X/Y" where X is the calling user's pending+in_progress count
- * and Y is the total across all users. In single-user mode (or when user counts are unavailable)
- * the badge shows the total only.
+ * The backend reports global aggregate counts (pending/in_progress) plus, for non-admin
+ * users, their own counts (user_pending/user_in_progress). In multiuser mode this renders
+ * as "X/Y" where X is the user's own pending jobs and Y is the global total. In single-user
+ * mode (or for admins, where per-user counts are absent) it renders just the total.
  */
 const getBadgeText = (queueData: SessionQueueStatus | undefined, isAuthenticated: boolean): string | null => {
   if (!queueData) {

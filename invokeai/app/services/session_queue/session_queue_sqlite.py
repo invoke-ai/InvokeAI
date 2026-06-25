@@ -898,6 +898,9 @@ class SqliteSessionQueue(SessionQueueBase):
         acting_user_id: Optional[str] = None,
     ) -> SessionQueueStatus:
         with self._db.transaction() as cursor:
+            # Aggregate counts are always global (across all users). This lets a non-admin's
+            # badge show "own / total" — their share of the whole queue — and lets the queue
+            # list surface (redacted) entries belonging to other users.
             cursor.execute(
                 """--sql
                 SELECT status, count(*)
@@ -909,6 +912,9 @@ class SqliteSessionQueue(SessionQueueBase):
             )
             counts_result = cast(list[sqlite3.Row], cursor.fetchall())
 
+            # When user_id is provided, additionally compute that user's own counts so the
+            # caller can render the per-user portion of the badge. These are returned in the
+            # separate user_pending/user_in_progress fields and never replace the global counts.
             user_counts_result: list[sqlite3.Row] = []
             if user_id is not None:
                 cursor.execute(
@@ -935,10 +941,10 @@ class SqliteSessionQueue(SessionQueueBase):
 
         # Redaction is decided from the same current_item snapshot used to embed identifiers,
         # so a concurrent transition (e.g. B finishing while A's status changes) cannot leave
-        # stale identifiers in the result. user_id (count filter) and acting_user_id
-        # (redaction) are independent: callers that need global counts but per-user redaction
-        # pass only acting_user_id; non-admin API callers pass user_id and inherit the same
-        # redaction by default.
+        # stale identifiers in the result. The aggregate counts stay global; only the current
+        # item's identifiers are gated. acting_user_id (event path) takes precedence over
+        # user_id (API path) when deciding the redaction owner; either being None means an
+        # admin/global caller who may see the current item.
         owner_user_id = user_id if acting_user_id is None else acting_user_id
         show_current_item = current_item is not None and (
             owner_user_id is None or current_item.user_id == owner_user_id
