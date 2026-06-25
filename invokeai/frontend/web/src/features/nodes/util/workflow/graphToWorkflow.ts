@@ -84,6 +84,7 @@ export const graphToWorkflow = (graph: NonNullableGraph, autoLayout = true): Wor
         version: template.version,
         label: '',
         notes: '',
+        dynamicInputTemplates: {},
         isOpen: true,
         isIntermediate: node.is_intermediate ?? false,
         useCache: node.use_cache ?? true,

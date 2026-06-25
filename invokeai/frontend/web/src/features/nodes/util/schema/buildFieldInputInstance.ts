@@ -11,6 +11,7 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   IntegerField: 0,
   ModelIdentifierField: undefined,
   SchedulerField: 'dpmpp_3m_k',
+  SavedWorkflowField: '',
   StringField: '',
   StylePresetField: undefined,
   FloatGeneratorField: undefined,
