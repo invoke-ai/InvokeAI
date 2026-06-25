@@ -31,7 +31,7 @@ const ParamIdeogram4GuidanceScale = () => {
   return (
     <FormControl>
       <FormLabel>
-        {t('parameters.ideogram4GuidanceScale')}{' '}
+        {t('parameters.guidance')}{' '}
         {guidanceScale !== null ? (
           <Text as="span" cursor="pointer" onClick={onReset} display="inline-flex" verticalAlign="middle">
             <PiXBold />

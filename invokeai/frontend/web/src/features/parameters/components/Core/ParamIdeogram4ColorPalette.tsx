@@ -34,18 +34,12 @@ const ColorSwatch = memo(({ index, color, onSet, onRemove }: ColorSwatchProps) =
     <Flex alignItems="center" gap={1}>
       <input
         type="color"
-        aria-label={t('parameters.ideogram4ColorPalette')}
+        aria-label={t('parameters.colorPalette')}
         value={HEX_RE.test(color) ? color : DEFAULT_COLOR}
         onChange={handleChange}
         style={SWATCH_STYLE}
       />
-      <IconButton
-        aria-label={t('parameters.ideogram4RemoveColor')}
-        icon={<PiXBold />}
-        size="xs"
-        variant="ghost"
-        onClick={handleRemove}
-      />
+      <IconButton aria-label={t('common.delete')} icon={<PiXBold />} size="xs" variant="ghost" onClick={handleRemove} />
     </Flex>
   );
 });
@@ -81,19 +75,13 @@ const ParamIdeogram4ColorPalette = () => {
 
   return (
     <FormControl flexDir="column" alignItems="stretch" gap={2}>
-      <FormLabel>{t('parameters.ideogram4ColorPalette')}</FormLabel>
+      <FormLabel>{t('parameters.colorPalette')}</FormLabel>
       <Flex gap={2} flexWrap="wrap" alignItems="center">
         {palette.map((color, index) => (
           <ColorSwatch key={index} index={index} color={color} onSet={setColor} onRemove={removeColor} />
         ))}
         {palette.length < MAX_COLORS && (
-          <IconButton
-            aria-label={t('parameters.ideogram4AddColor')}
-            icon={<PiPlusBold />}
-            size="sm"
-            variant="ghost"
-            onClick={addColor}
-          />
+          <IconButton aria-label={t('common.add')} icon={<PiPlusBold />} size="sm" variant="ghost" onClick={addColor} />
         )}
       </Flex>
     </FormControl>

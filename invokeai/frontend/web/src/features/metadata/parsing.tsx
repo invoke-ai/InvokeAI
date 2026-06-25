@@ -901,7 +901,7 @@ const Ideogram4SamplerPreset: SingleMetadataHandler<ParameterIdeogram4SamplerPre
     }
     store.dispatch(setIdeogram4SamplerPreset(value));
   },
-  i18nKey: 'parameters.ideogram4SamplerPreset',
+  i18nKey: 'parameters.samplerPreset',
   LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterIdeogram4SamplerPreset>) => (
     <MetadataPrimitiveValue value={value} />
@@ -959,7 +959,7 @@ const Ideogram4GuidanceScale: SingleMetadataHandler<number | null> = {
     }
     store.dispatch(setIdeogram4GuidanceScale(value));
   },
-  i18nKey: 'parameters.ideogram4GuidanceScale',
+  i18nKey: 'parameters.guidance',
   LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => (
     <MetadataPrimitiveValue value={value ?? 'Auto'} />
@@ -987,7 +987,7 @@ const Ideogram4Mu: SingleMetadataHandler<number | null> = {
     }
     store.dispatch(setIdeogram4Mu(value));
   },
-  i18nKey: 'parameters.ideogram4ScheduleShift',
+  i18nKey: 'parameters.shift',
   LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => (
     <MetadataPrimitiveValue value={value ?? 'Auto'} />
@@ -1012,7 +1012,7 @@ const Ideogram4ColorPalette: SingleMetadataHandler<string[]> = {
     }
     store.dispatch(setIdeogram4ColorPalette(value));
   },
-  i18nKey: 'parameters.ideogram4ColorPalette',
+  i18nKey: 'parameters.colorPalette',
   LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<string[]>) => (
     <MetadataPrimitiveValue value={value.join(', ')} />

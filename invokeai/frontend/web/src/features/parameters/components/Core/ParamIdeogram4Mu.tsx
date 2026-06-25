@@ -36,7 +36,7 @@ const ParamIdeogram4Mu = () => {
   return (
     <FormControl>
       <FormLabel>
-        {t('parameters.ideogram4ScheduleShift')}{' '}
+        {t('parameters.shift')}{' '}
         {mu !== null ? (
           <Text as="span" cursor="pointer" onClick={onReset} display="inline-flex" verticalAlign="middle">
             <PiXBold />

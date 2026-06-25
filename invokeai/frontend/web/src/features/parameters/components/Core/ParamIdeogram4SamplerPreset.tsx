@@ -1,4 +1,4 @@
-import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
+import type { ComboboxOnChange, ComboboxOption, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectIdeogram4SamplerPreset, setIdeogram4SamplerPreset } from 'features/controlLayers/store/paramsSlice';
@@ -22,6 +22,10 @@ export const IDEOGRAM4_PRESET_DEFAULTS: Record<string, { steps: number; mu: numb
   V4_TURBO_12: { steps: 12, mu: 0.5 },
 };
 
+// Cap the width so the dropdown doesn't span the whole row, and push it to the right edge of the row
+// (ms: 'auto') so it lines up with the other controls' right edge. The label keeps its normal position.
+const comboboxSx: SystemStyleObject = { maxW: '13rem', ms: 'auto' };
+
 const ParamIdeogram4SamplerPreset = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -41,8 +45,8 @@ const ParamIdeogram4SamplerPreset = () => {
 
   return (
     <FormControl>
-      <FormLabel>{t('parameters.ideogram4SamplerPreset')}</FormLabel>
-      <Combobox value={value} options={IDEOGRAM4_SAMPLER_PRESET_OPTIONS} onChange={onChange} />
+      <FormLabel>{t('parameters.samplerPreset')}</FormLabel>
+      <Combobox value={value} options={IDEOGRAM4_SAMPLER_PRESET_OPTIONS} onChange={onChange} sx={comboboxSx} />
     </FormControl>
   );
 };
