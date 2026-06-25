@@ -39,6 +39,7 @@ import {
   setFluxDypeScale,
   setFluxScheduler,
   setGuidance,
+  setIdeogram4SamplerPreset,
   setImg2imgStrength,
   setRefinerCFGScale,
   setRefinerNegativeAestheticScore,
@@ -78,6 +79,7 @@ import type {
   ParameterFluxDypeScale,
   ParameterGuidance,
   ParameterHeight,
+  ParameterIdeogram4SamplerPreset,
   ParameterModel,
   ParameterNegativePrompt,
   ParameterPositivePrompt,
@@ -103,6 +105,7 @@ import {
   zParameterFluxDypePreset,
   zParameterFluxDypeScale,
   zParameterGuidance,
+  zParameterIdeogram4SamplerPreset,
   zParameterImageDimension,
   zParameterNegativePrompt,
   zParameterPositivePrompt,
@@ -878,6 +881,30 @@ const ZImageShift: SingleMetadataHandler<number | null> = {
 };
 //#endregion ZImageShift
 
+//#region Ideogram4SamplerPreset
+const Ideogram4SamplerPreset: SingleMetadataHandler<ParameterIdeogram4SamplerPreset> = {
+  [SingleMetadataKey]: true,
+  type: 'Ideogram4SamplerPreset',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'ideogram4_sampler_preset');
+    const parsed = zParameterIdeogram4SamplerPreset.parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    // Only recall onto an Ideogram 4 model so we don't set this (otherwise hidden) field for other bases.
+    if (selectBase(store.getState()) !== 'ideogram-4') {
+      return;
+    }
+    store.dispatch(setIdeogram4SamplerPreset(value));
+  },
+  i18nKey: 'parameters.ideogram4SamplerPreset',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ParameterIdeogram4SamplerPreset>) => (
+    <MetadataPrimitiveValue value={value} />
+  ),
+};
+//#endregion Ideogram4SamplerPreset
+
 //#region RefinerModel
 const RefinerModel: SingleMetadataHandler<ParameterSDXLRefinerModel> = {
   [SingleMetadataKey]: true,
@@ -1641,6 +1668,7 @@ export const ImageMetadataHandlers = {
   QwenImageQuantization,
   QwenImageShift,
   ZImageShift,
+  Ideogram4SamplerPreset,
   LoRAs,
   CanvasLayers,
   RefImages,

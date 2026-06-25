@@ -1043,6 +1043,7 @@
         "qwen3Source": "Qwen3 Source",
         "recallParameters": "Recall Parameters",
         "recallParameter": "Recall {{label}}",
+        "ideogram4SamplerPreset": "Sampler Preset",
         "scheduler": "Scheduler",
         "seamlessXAxis": "Seamless X Axis",
         "seamlessYAxis": "Seamless Y Axis",

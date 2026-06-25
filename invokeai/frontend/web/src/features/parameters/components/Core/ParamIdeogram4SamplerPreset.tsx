@@ -1,0 +1,42 @@
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectIdeogram4SamplerPreset, setIdeogram4SamplerPreset } from 'features/controlLayers/store/paramsSlice';
+import { isParameterIdeogram4SamplerPreset } from 'features/parameters/types/parameterSchemas';
+import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+
+// Each preset bundles a step count, the per-step guidance schedule (with a polish tail), and the
+// logit-normal schedule mean/std. The primary quality/speed control for Ideogram 4.
+const IDEOGRAM4_SAMPLER_PRESET_OPTIONS: ComboboxOption[] = [
+  { value: 'V4_QUALITY_48', label: 'Quality (48 steps)' },
+  { value: 'V4_DEFAULT_20', label: 'Default (20 steps)' },
+  { value: 'V4_TURBO_12', label: 'Turbo (12 steps)' },
+];
+
+const ParamIdeogram4SamplerPreset = () => {
+  const dispatch = useAppDispatch();
+  const { t } = useTranslation();
+  const samplerPreset = useAppSelector(selectIdeogram4SamplerPreset);
+
+  const onChange = useCallback<ComboboxOnChange>(
+    (v) => {
+      if (!isParameterIdeogram4SamplerPreset(v?.value)) {
+        return;
+      }
+      dispatch(setIdeogram4SamplerPreset(v.value));
+    },
+    [dispatch]
+  );
+
+  const value = useMemo(() => IDEOGRAM4_SAMPLER_PRESET_OPTIONS.find((o) => o.value === samplerPreset), [samplerPreset]);
+
+  return (
+    <FormControl>
+      <FormLabel>{t('parameters.ideogram4SamplerPreset')}</FormLabel>
+      <Combobox value={value} options={IDEOGRAM4_SAMPLER_PRESET_OPTIONS} onChange={onChange} />
+    </FormControl>
+  );
+};
+
+export default memo(ParamIdeogram4SamplerPreset);
