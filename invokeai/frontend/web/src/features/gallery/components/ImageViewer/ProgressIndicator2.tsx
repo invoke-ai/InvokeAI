@@ -1,6 +1,6 @@
 import type { CircularProgressProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { CircularProgress, Text, Tooltip } from '@invoke-ai/ui-library';
-import { getCudaDeviceIndex } from 'common/util/getCudaDeviceIndex';
+import { useProgressDeviceLabel } from 'common/hooks/useProgressDeviceLabel';
 import { memo } from 'react';
 import type { S } from 'services/api/types';
 import { formatProgressMessage } from 'services/events/stores';
@@ -31,9 +31,10 @@ const labelStyles: SystemStyleObject = {
 
 export const ProgressIndicator = memo(
   ({ progressEvent, ...rest }: { progressEvent: S['InvocationProgressEvent'] } & CircularProgressProps) => {
-    const gpuIndex = getCudaDeviceIndex(progressEvent?.device);
+    const deviceLabel = useProgressDeviceLabel(progressEvent?.device);
+    const message = formatProgressMessage(progressEvent);
     return (
-      <Tooltip label={formatProgressMessage(progressEvent)}>
+      <Tooltip label={deviceLabel ? `${deviceLabel.name} — ${message}` : message}>
         <CircularProgress
           size="14px"
           color="invokeBlue.500"
@@ -43,7 +44,7 @@ export const ProgressIndicator = memo(
           sx={circleStyles}
           {...rest}
         >
-          {gpuIndex !== null && <Text sx={labelStyles}>{gpuIndex}</Text>}
+          {deviceLabel && <Text sx={labelStyles}>{deviceLabel.index}</Text>}
         </CircularProgress>
       </Tooltip>
     );

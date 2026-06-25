@@ -1,4 +1,5 @@
 import threading
+from collections import Counter, defaultdict
 from typing import Dict, Literal, Optional, Union
 
 import torch
@@ -132,10 +133,43 @@ class TorchDevice:
         return cls._to_dtype("float32")
 
     @classmethod
+    def get_device_name(cls, device: torch.device) -> str:
+        """Return the human-readable name for a torch device (e.g. 'AMD Radeon PRO W7900', 'CPU')."""
+        return torch.cuda.get_device_name(device) if device.type == "cuda" else device.type.upper()
+
+    @classmethod
     def get_torch_device_name(cls) -> str:
         """Return the device name for the current torch device."""
-        device = cls.choose_torch_device()
-        return torch.cuda.get_device_name(device) if device.type == "cuda" else device.type.upper()
+        return cls.get_device_name(cls.choose_torch_device())
+
+    @classmethod
+    def get_generation_devices_summary(cls, generation_devices: Union[str, list[str], None]) -> str:
+        """Build a human-readable summary of the devices that will be used for generation.
+
+        For a single device, returns just its name (e.g. ``'AMD Radeon PRO W7900'`` or ``'CPU'``). For
+        multiple devices, returns a bracketed list annotating each with its GPU number and device id,
+        e.g. ``'[AMD Radeon PRO W7900 #1 (cuda:0), AMD Radeon PRO W7900 #2 (cuda:1)]'``. Identically
+        named GPUs get a 1-based ``#N`` suffix so they can be told apart; a uniquely named device gets
+        no suffix.
+        """
+        devices = cls.get_generation_devices(generation_devices)
+        if not devices:
+            # Empty resolution (e.g. `generation_devices` set to an empty list) falls back to the
+            # single globally-configured device.
+            devices = [cls.choose_torch_device()]
+
+        names = [cls.get_device_name(device) for device in devices]
+        if len(devices) == 1:
+            return names[0]
+
+        name_counts = Counter(names)
+        ordinals: dict[str, int] = defaultdict(int)
+        parts: list[str] = []
+        for device, name in zip(devices, names, strict=True):
+            ordinals[name] += 1
+            label = f"{name} #{ordinals[name]}" if name_counts[name] > 1 else name
+            parts.append(f"{label} ({device})")
+        return "[" + ", ".join(parts) + "]"
 
     @classmethod
     def get_generation_devices(cls, generation_devices: Union[str, list[str], None]) -> list[torch.device]:
