@@ -1,0 +1,157 @@
+---
+title: إنشاء حزم العقد
+lastUpdated: 2026-05-23
+---
+
+import { FileTree } from '@astrojs/starlight/components'
+
+يشرح هذا الدليل كيفية تنظيم مستودع Git الخاص بك بحيث يمكن تثبيته عبر مدير العقد المخصصة في InvokeAI.
+
+## هيكل المستودع
+
+مستودعك **هو** حزمة العقد. عندما يقوم المستخدم بتثبيتها، يتم استنساخ المستودع بأكمله داخل دليل `nodes`.
+
+### الحد الأدنى للهيكل المطلوب
+
+<FileTree>
+  - my-node-pack/
+    - `__init__.py` مطلوب: يستورد جميع فئات العقد
+    - my_node.py تنفيذ (تطبيقات) العقدة الخاصة بك
+    - README.md موصى به: صف كيفية عمل عقدك
+</FileTree>
+
+ملف `__init__.py` في الجذر **إجباري**. بدونه، لن يتم تحميل الحزمة.
+
+### الهيكل الموصى به
+
+<FileTree>
+  - my-node-pack/
+    - `__init__.py` مطلوب: يستورد جميع فئات العقد
+    - requirements.txt تبعيات Python (مثبتة من قبل المستخدم)
+    - README.md الوصف والاستخدام والأمثلة
+    - node_one.py تنفيذ العقدة
+    - node_two.py تنفيذ العقدة
+    - utils.py أدوات مساعدة مشتركة
+    - workflows/ اختياري: ملفات سير العمل المضمنة
+      - example_workflow.json
+      - advanced_workflow.json
+</FileTree>
+
+## ملف `__init__.py`
+
+يجب أن يستورد هذا الملف جميع فئات الاستدعاء التي ترغب في تسجيلها. فقط الفئات المستوردة هنا ستكون متاحة في InvokeAI.
+
+```python title="__init__.py"
+from .node_one import MyFirstInvocation
+from .node_two import MySecondInvocation
+```
+
+إذا كانت لديك عقد في أدلة فرعية:
+
+```python
+from .nodes.image_tools import CropInvocation, ResizeInvocation
+from .nodes.text_tools import ConcatInvocation
+```
+
+## التبعيات (`requirements.txt` أو `pyproject.toml`)
+
+إذا كانت عقدك تتطلب حزم Python إضافية، فقم بإدراجها في ملف `requirements.txt` (أو `pyproject.toml`) في جذر المستودع:
+
+```txt title="requirements.txt"
+numpy>=1.24
+opencv-python>=4.8
+```
+
+**لا يقوم** مدير العقد المخصصة بتثبيت هذه التبعيات تلقائيًا — فالتثبيت التلقائي في بيئة InvokeAI قيد التشغيل يخاطر بجلب إصدارات غير متوافقة وتعطيل التطبيق. بعد التثبيت، تعرض الواجهة للمستخدم إشعارًا يخبره بأن التثبيت اليدوي مطلوب، ويجب أن يوثق README الخاص بك أمر التثبيت الدقيق (مثل `pip install -r requirements.txt` من داخل بيئة InvokeAI مفعلة).
+
+**هام:** تجنب تثبيت الإصدارات بشكل صارم جدًا. InvokeAI لها تبعياتها الخاصة، وتضارب الإصدارات يمكن أن يسبب مشاكل. استخدم قيود الحد الأدنى للإصدار (`>=`) حيثما أمكن.
+
+## تضمين سير العمل
+
+إذا كان مستودعك يحتوي على ملفات سير عمل `.json`، فسيتم **استيرادها تلقائيًا** إلى مكتبة سير عمل المستخدم أثناء التثبيت.
+
+### اكتشاف سير العمل
+
+يقوم برنامج التثبيت بمسح مستودعك بشكل متكرر بحثًا عن ملفات `.json`. يتم التعرف على الملف كسير عمل إذا كان يحتوي على مفتاحي `nodes` و `edges` على المستوى الأعلى.
+
+### الوسم
+
+يتم وسم سير العمل المستوردة تلقائيًا بالعلامة `node-pack:<اسم-مستودعك>` ليتمكن المستخدمون من التصفية بناءً عليها في مكتبة سير العمل. عند إلغاء تثبيت حزمة العقد، تتم إزالة سير العمل هذه أيضًا.
+
+### تنسيق سير العمل
+
+يجب أن يتبع سير العمل تنسيق InvokeAI القياسي لسير العمل:
+
+```json title="example_workflow.json"
+{
+  "name": "مثال سير العمل الخاص بي",
+  "author": "اسمك",
+  "description": "يوضح كيفية استخدام MyFirstInvocation",
+  "version": "1.0.0",
+  "contact": "",
+  "tags": "example, my-node-pack",
+  "notes": "",
+  "meta": {
+    "version": "3.0.0",
+    "category": "user"
+  },
+  "exposedFields": [],
+  "nodes": [...],
+  "edges": [...]
+}
+```
+
+**نصيحة:** أسهل طريقة لإنشاء ملف سير عمل هي بناء سير العمل في محرر سير العمل في InvokeAI، ثم تصديره عبر **حفظ باسم** ونسخ ملف `.json` إلى مستودعك.
+
+## تنفيذ العقدة
+
+كل عقدة هي فئة Python مزينة بالديكور `@invocation()`. إليك مثال بسيط:
+
+```python title="example_node.py"
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.fields import InputField, OutputField
+from invokeai.invocation_api import BaseInvocationOutput, invocation_output
+
+@invocation_output("my_output")
+class MyOutput(BaseInvocationOutput):
+    result: str = OutputField(description="النتيجة")
+
+@invocation(
+    "my_node",
+    title="عقدتي",
+    tags=["example", "custom"],
+    category="custom",
+    version="1.0.0",
+)
+class MyInvocation(BaseInvocation):
+    """يفعل شيئًا مفيدًا."""
+
+    input_text: str = InputField(default="", description="نص الإدخال")
+
+    def invoke(self, context) -> MyOutput:
+        return MyOutput(result=f"تمت المعالجة: {self.input_text}")
+```
+
+للحصول على التفاصيل الكاملة حول واجهة برمجة تطبيقات الاستدعاء، راجع [وثائق واجهة برمجة تطبيقات الاستدعاء](invocation-api.md).
+
+## أفضل الممارسات
+
+- **استخدم اسم مستودع وصفيًا** — يصبح اسم الحزمة المعروض في الواجهة
+- **قم بتضمين README.md** مع الوصف ولقطات الشاشة وتعليمات الاستخدام
+- **قم بإصدار عقدك** باستخدام الإصدار الدلالي في ديكور `@invocation()`
+- **لا تقم بتضمين ملفات ثنائية كبيرة** في مستودعك (نماذج، أوزان، إلخ.)
+- **اختبر عقدك** عن طريق وضع المستودع في دليل `nodes` قبل النشر
+- **قم بتضمين سير عمل أمثلة** حتى يتمكن المستخدمون من البدء بسرعة
+- **وسم مستودع GitHub الخاص بك** بـ `invokeai-node` لسهولة الاكتشاف
+- **تجنب تعارض الأسماء** — اختر سلاسل نوع استدعاء فريدة (مثل `my_pack_resize` بدلاً من `resize` فقط)
+
+## اختبار حزمتك
+
+قبل النشر، تحقق من أن حزمتك تعمل مع مدير العقد المخصصة:
+
+1. أنشئ مستودع Git بحزمة العقد الخاصة بك
+2. ادفعها إلى GitHub (أو أي مستضيف Git)
+3. في InvokeAI، اذهب إلى علامة تبويب العقد وقم بتثبيتها عبر رابط Git
+4. تحقق من ظهور عقدك في محرر سير العمل
+5. تحقق من استيراد أي سير عمل مضمنة
+6. اختبر إلغاء التثبيت — يجب إزالة العقد وسير العمل

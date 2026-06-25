@@ -58,6 +58,11 @@ export default defineConfig({
           label: 'English',
           lang: 'en',
         },
+        ar: {
+          label: 'العربية',
+          lang: 'ar',
+          dir: 'rtl',
+        },
       },
       social: socialConfig,
       tableOfContents: {

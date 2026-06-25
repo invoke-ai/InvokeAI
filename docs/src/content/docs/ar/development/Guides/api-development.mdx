@@ -1,0 +1,50 @@
+---
+title: تطوير واجهة برمجة التطبيقات
+---
+
+import InvocationContextDocs from '@lib/components/InvocationContextDocs.astro'
+
+يتم تزويد كل طريقة `invoke` للاستدعاء بوسيط واحد - سياق الاستدعاء.
+
+يوفر هذا الكائن واجهة برمجة تطبيقات يمكن للاستدعاء استخدامها للتفاعل مع خدمات التطبيق، على سبيل المثال:
+
+- حفظ الصور
+- تسجيل الرسائل
+- تحميل النماذج
+
+```py
+class MyInvocation(BaseInvocation):
+  ...
+  def invoke(self, context: InvocationContext) -> ImageOutput:
+      # تحميل صورة
+      image_pil = context.images.get_pil(self.image.image_name)
+      # القيام بشيء ما للصورة
+      output_image = do_something_cool(image_pil)
+      # حفظ الصورة
+      image_dto = context.images.save(output_image)
+      # تسجيل رسالة
+      context.logger.info(f"تم القيام بشيء رائع، تم حفظ الصورة!")
+      # إرجاع المخرجات
+      return ImageOutput.build(image_dto)
+      ...
+```
+
+مرجع واجهة برمجة التطبيقات الكامل المُنشأ موثق أدناه.
+
+## Mixins
+
+يتم توفير اثنين من Mixins مهمين لتسهيل العمل مع البيانات الوصفية وألواح المعرض.
+
+### `WithMetadata`
+
+ورث من هذه الفئة (بالإضافة إلى `BaseInvocation`) لإضافة مدخل `metadata` إلى عقدتك. عندما تفعل ذلك، يمكنك الوصول إلى قاموس البيانات الوصفية من `self.metadata` في دالة `invoke()`.
+
+سيتم ملء القاموس عبر مدخل العقدة، ويمكنك إضافة أي بيانات وصفية تريدها إليه. عند استدعاء `context.images.save()`، إذا كان قاموس البيانات الوصفية يحتوي على أي بيانات، فسيتم تضمينها تلقائيًا في الصورة.
+
+### `WithBoard`
+
+ورث من هذه الفئة (بالإضافة إلى `BaseInvocation`) لإضافة مدخل `board` إلى عقدتك. يتم عرض هذا كقائمة منسدلة لاختيار لوحة. سيكون اختيار المستخدم متاحًا من `self.board` في دالة `invoke()`.
+
+عند استدعاء `context.images.save()`، إذا تم تحديد لوحة، ستتم إضافة الصورة إلى تلك اللوحة أثناء حفظها.
+
+<InvocationContextDocs />

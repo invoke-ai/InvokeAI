@@ -1,0 +1,102 @@
+---
+title: كتابة الاختبارات
+lastUpdated: 2026-02-20
+---
+
+## اختبارات الواجهة الأمامية
+
+نستخدم `vitest` لتشغيل اختبارات الواجهة الأمامية. (راجع [vite.config.ts](https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/frontend/web/vite.config.mts) لخيارات `vitest` الافتراضية.)
+
+{/* TODO: إنهاء وثائق اختبارات الواجهة الأمامية */}
+
+## اختبارات الواجهة الخلفية
+
+نستخدم `pytest` لتشغيل اختبارات بايثون للواجهة الخلفية. (راجع [pyproject.toml](https://github.com/invoke-ai/InvokeAI/blob/main/pyproject.toml) لخيارات `pytest` الافتراضية.)
+
+### سريع مقابل بطيء
+جميع الاختبارات مصنفة إما كـ 'سريعة' (بدون تعليق توضيحي) أو 'بطيئة' (معلّقة بمزخرف `@pytest.mark.slow`).
+
+يتم تشغيل الاختبارات 'السريعة' للتحقق من كل طلب سحب، وهي سريعة بما يكفي لتشغيلها بشكل روتيني أثناء التطوير.
+
+الاختبارات 'البطيئة' تُشغّل حاليًا يدويًا فقط على أساس مخصص. في المستقبل، قد تتم أتمتتها لتُشغّل ليلاً. معظم المطورين من المتوقع أن يشغلوا فقط الاختبارات 'البطيئة' المرتبطة مباشرة بالميزة (الميزات) التي يعملون عليها.
+
+كقاعدة عامة، يجب وضع علامة 'بطيء' على الاختبارات إذا كان هناك احتمال أن تستغرق >1 ثانية (مثل على جهاز CPU فقط مع اتصال إنترنت بطيء). الأمثلة الشائعة للاختبارات البطيئة هي الاختبارات التي تعتمد على تنزيل نموذج، أو تشغيل استدلال النموذج.
+
+### تشغيل الاختبارات
+
+فيما يلي بعض أوامر الاختبار الشائعة:
+
+```bash
+# تشغيل الاختبارات السريعة. (يستخدم هذا ضمنيًا الخيار الافتراضي المُهيأ: `-m "not slow"`.)
+pytest tests/
+
+# أمر مكافئ لتشغيل الاختبارات السريعة.
+pytest tests/ -m "not slow"
+
+# تشغيل الاختبارات البطيئة.
+pytest tests/ -m "slow"
+
+# تشغيل الاختبارات البطيئة من ملف محدد.
+pytest tests/path/to/slow_test.py -m "slow"
+
+# تشغيل جميع الاختبارات (سريعة وبطيئة).
+pytest tests -m ""
+```
+
+### تنظيم الاختبارات
+
+جميع اختبارات الواجهة الخلفية موجودة في دليل [`tests/`](https://github.com/invoke-ai/InvokeAI/tree/main/tests). يعكس هذا الدليل تنظيم دليل `invokeai/`. على سبيل المثال، سيتم العثور على اختبارات `invokeai/model_management/model_manager.py` في `tests/model_management/test_model_manager.py`.
+
+TODO: البيان أعلاه طموح. إعادة تنظيم الاختبارات القديمة مطلوبة لجعله صحيحًا.
+
+### الاختبارات التي تعتمد على النماذج
+
+هناك بعض الأمور التي يجب مراعاتها عند إضافة اختبارات تعتمد على النماذج.
+
+1. إذا لم يكن النموذج المطلوب موجودًا بالفعل، فيجب تنزيله تلقائيًا كجزء من إعداد الاختبار.
+2. إذا كان النموذج قد تم تنزيله بالفعل، فلا يجب إعادة تنزيله دون داع.
+3. اتخذ عناية معقولة للحفاظ على العدد الإجمالي للنماذج المطلوبة للاختبارات منخفضًا. كلما أمكن، أعد استخدام النماذج المطلوبة بالفعل لاختبارات أخرى. إذا كنت تُضيف نموذجًا جديدًا، ففكر في تضمين تعليق لشرح سبب كونه مطلوبًا/فريدًا.
+
+هناك العديد من الأدوات المساعدة للمساعدة في إعداد النموذج للاختبارات. إليك نموذج اختبار يعتمد على نموذج:
+
+```python
+import pytest
+import torch
+
+from invokeai.backend.model_management.models.base import BaseModelType, ModelType
+from invokeai.backend.util.test_utils import install_and_load_model
+
+@pytest.mark.slow
+def test_model(model_installer, torch_device):
+    model_info = install_and_load_model(
+        model_installer=model_installer,
+        model_path_id_or_url="HF/dummy_model_id",
+        model_name="dummy_model",
+        base_model=BaseModelType.StableDiffusion1,
+        model_type=ModelType.Dummy,
+    )
+
+    dummy_input = build_dummy_input(torch_device)
+
+    with torch.no_grad(), model_info as model:
+        model.to(torch_device, dtype=torch.float32)
+        output = model(dummy_input)
+
+    # التحقق من المخرجات...
+```
+
+### تغطية الاختبارات
+
+لمراجعة تغطية الاختبارات، ألحق `--cov` بأمر pytest الخاص بك:
+
+```bash
+pytest tests/ --cov
+```
+
+سيتم الإبلاغ عن نتائج الاختبار والتغطية في الطرفية. بالإضافة إلى ذلك، يتم إنشاء تقرير أكثر تفصيلاً بتنسيق XML و HTML في مجلد `./coverage`. مخرجات HTML مفيدة بشكل خاص في تحديد العبارات غير المختبرة حيث يجب تحسين التغطية. يمكن عرض تقرير HTML بفتح `./coverage/html/index.html`.
+
+:::note مثال على مخرجات تقرير تغطية HTML
+  ![html-overview](../../assets/html-overview.png)
+
+  ![html-detail](../../assets/html-detail.png)
+:::

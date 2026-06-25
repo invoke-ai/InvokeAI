@@ -1,0 +1,356 @@
+---
+title: الاستدعاءات
+lastUpdated: 2026-02-18
+---
+
+import { FileTree, Code, Steps } from '@astrojs/starlight/components'
+
+# العقد
+
+تُضاف الميزات في InvokeAI في شكل أنظمة عقد معيارية تسمى **الاستدعاءات**.
+
+الاستدعاء هو ببساطة عملية واحدة تأخذ بعض المدخلات وتعطي بعض المخرجات. يمكننا بعد ذلك ربط استدعاءات متعددة معًا لإنشاء وظائف أكثر تعقيدًا.
+
+## دليل الاستدعاءات
+
+يمكن العثور على عقد InvokeAI في دليل `invokeai/app/invocations`. يمكن استخدام هذه كأمثلة لإنشاء العقد الخاصة بك.
+
+يجب إضافة العقد الجديدة إلى مجلد فرعي في دليل `nodes` الموجود على المستوى الجذري لموقع تثبيت InvokeAI. العقد المضافة إلى هذا المجلد ستكون قابلة للاستخدام عند بدء تشغيل التطبيق.
+
+مثال على هيكل المجلد الفرعي `nodes`:
+
+<FileTree>
+  - nodes
+    - `__init__.py` محمل العقد المخصص المُدار من Invoke
+    - cool_node
+      - `__init__.py` انظر المثال أدناه
+      - cool_node.py
+    - my_node_pack
+      - `__init__.py` انظر المثال أدناه
+      - tasty_node.py
+      - bodacious_node.py
+      - utils.py
+      - extra_nodes
+        - fancy_node.py
+</FileTree>
+
+يجب أن يحتوي كل مجلد عقدة على ملف `__init__.py` يقوم باستيراد عقدها. فقط العقد المستوردة في ملف `__init__.py` يتم تحميلها. راجع README في مجلد العقد لمزيد من الأمثلة:
+
+```py title="__init__.py"
+from .cool_node import ResizeInvocation
+```
+
+## إنشاء استدعاء جديد
+
+لفهم عملية إنشاء استدعاء جديد، دعنا في الواقع نقوم بإنشاء واحد.
+
+في مثالنا، دعنا ننشئ استدعاءًا يأخذ صورة، ويغير حجمها ويخرج الصورة بعد تغيير الحجم.
+
+المجموعة الأولى من الأشياء التي نحتاج إلى القيام بها عند إنشاء استدعاء جديد هي:
+
+<Steps>
+  1. إنشاء فئة جديدة مشتقة من فئة أب محددة مسبقًا تسمى `BaseInvocation`.
+  2. يجب أن يحتوي كل استدعاء على `docstring` يصف ما يفعله هذا الاستدعاء.
+  3. على الرغم من أنه ليس مطلوبًا بشكل صارم، نقترح أن ينتهي اسم كل فئة استدعاء بكلمة "Invocation"، مثل "CropImageInvocation".
+  4. يجب أن يستخدم كل استدعاء ديكور `@invocation` لتوفير نوع الاستدعاء الفريد الخاص به. يمكنك توفير عنوانه ووسومه وفئته باستخدام الديكور.
+  5. الاستدعاءات مقيدة بنظام الأنواع بشكل صارم. نستخدم مكتبة [typing](https://docs.python.org/3/library/typing.html) الأصلية ومكتبة [pydantic](https://pydantic-docs.helpmanual.io/) المثبتة للتحقق من الصحة.
+</Steps>
+
+لنقم بذلك.
+
+```py title="resize.py"
+from invokeai.invocation_api import (
+  BaseInvocation,
+  invocation,
+)
+
+@invocation('resize')
+class ResizeInvocation(BaseInvocation):
+    '''يغير حجم صورة'''
+```
+
+هذا رائع.
+
+الآن قمنا بإعداد أساس استدعائنا الجديد. دعنا نفكر في المدخلات التي يأخذها استدعائنا.
+
+- نحتاج إلى `صورة` سنقوم بتغيير حجمها.
+- سنحتاج إلى قيم `عرض` و `ارتفاع` جديدة لتغيير حجم الصورة إليها.
+
+### المدخلات
+
+يجب تعريف كل مدخل استدعاء باستخدام دالة `InputField`. هذه غلاف حول دالة `Field` من pydantic، والتي تتعامل مع بضعة أشياء إضافية وتوفر تلميحات الأنواع. مثل أي شيء آخر، يجب أن يكون هذا مقيدًا بنظام الأنواع بشكل صارم ومُعرفًا.
+
+لنقم بإنشاء هذه المدخلات لاستدعائنا. أولاً، مدخل `image` الذي نحتاجه. بشكل عام، يمكننا استخدام أنواع المتغيرات القياسية في Python ولكن InvokeAI لديها بالفعل نوع `ImageField` مخصص يتعامل مع كل ما هو مطلوب لمدخلات الصور.
+
+ولكن ما هو `ImageField`؟ إنه نوع فئة خاص مكتوب خصيصًا للتعامل مع كيفية معالجة الصور في InvokeAI. سنغطي كيفية إنشاء أنواع الحقول المخصصة الخاصة بك لاحقًا في هذا الدليل. الآن، دعنا نمضي قدمًا ونستخدمه.
+
+```py title="resize.py"
+from invokeai.invocation_api import (
+    BaseInvocation,
+    ImageField,
+    InputField,
+    invocation,
+)
+
+@invocation('resize')
+class ResizeInvocation(BaseInvocation):
+
+    # المدخلات
+    image: ImageField = InputField(description="صورة الإدخال")
+```
+
+دعنا نحلل كود الإدخال الخاص بنا.
+
+```python
+image: ImageField = InputField(description="صورة الإدخال")
+```
+
+| الجزء | القيمة | الوصف |
+| ---- | ----- | ----------- |
+| الاسم | `image` | المتغير الذي سيحتوي على صورتنا. |
+| تلميح النوع | `ImageField` | النوع لحقلنا. يشير إلى أن `image` يجب أن يكون `ImageField`. |
+| الحقل | `InputField(description="صورة الإدخال")` | يعلن عن `image` كحقل إدخال ويوفر وصفه. |
+
+رائع. الآن دعنا ننشئ مدخلاتنا الأخرى لـ `width` و `height`
+
+```py title="resize.py"
+from invokeai.invocation_api import (
+    BaseInvocation,
+    ImageField,
+    InputField,
+    invocation,
+)
+
+@invocation('resize')
+class ResizeInvocation(BaseInvocation):
+
+    # المدخلات
+    image: ImageField = InputField(description="صورة الإدخال")
+    width: int = InputField(default=512, ge=64, le=2048, description="عرض الصورة الجديدة")
+    height: int = InputField(default=512, ge=64, le=2048, description="ارتفاع الصورة الجديدة")
+```
+
+كما قد تكون لاحظت، أضفنا وسيطين جديدين لتعريف `InputField` لـ `width` و `height`، يُسميان `gt` و `le`. يرمزان إلى _أكبر من أو يساوي_ و _أقل من أو يساوي_.
+
+تفرض هذه قيودًا على تلك الحقول، وستثير استثناءً إذا كانت القيم لا تفي بالقيود. يتم توفير قيود الحقل بواسطة **pydantic**، لذا أي شيء تراه في **وثائق pydantic** سيعمل.
+
+**ملاحظة:** _كلما كان من الممكن تعريف قيود لحقلنا، يجب أن نفعل ذلك حتى تتوفر للواجهة الأمامية مزيد من المعلومات حول كيفية تحليل هذا الحقل._
+
+ممتاز. لدينا الآن مدخلاتنا. دعنا نفعل شيئًا بها.
+
+### دالة الاستدعاء
+
+دالة `invoke` هي حيث يحدث كل السحر. توفر هذه الدالة معامل `context` من النوع `InvocationContext` والذي سيمنحك الوصول إلى السياق الحالي للتوليد وجميع الخدمات الأخرى التي يوفرها InvokeAI.
+
+لنقم بإنشاء هذه الدالة أولاً.
+
+```py title="resize.py"
+from invokeai.invocation_api import (
+    BaseInvocation,
+    ImageField,
+    InputField,
+    InvocationContext,
+    invocation,
+)
+
+@invocation('resize')
+class ResizeInvocation(BaseInvocation):
+    '''يغير حجم صورة'''
+
+    image: ImageField = InputField(description="صورة الإدخال")
+    width: int = InputField(default=512, ge=64, le=2048, description="عرض الصورة الجديدة")
+    height: int = InputField(default=512, ge=64, le=2048, description="ارتفاع الصورة الجديدة")
+
+    def invoke(self, context: InvocationContext):
+        pass
+```
+
+### المخرجات
+
+مخرجات استدعائنا ستكون أي شيء يتم إرجاعه بواسطة دالة `invoke` هذه. كما هو الحال مع مدخلاتنا، نحتاج إلى تحديد أنواع مخرجاتنا بقوة وتعريفها أيضًا.
+
+ما هو مخرجاتنا؟ صورة أخرى. عادةً ستحتاج إلى إنشاء نوع لهذا ولكن InvokeAI تقدم لك بالفعل نوع `ImageOutput` الذي يتعامل مع جميع المعلومات الضرورية المتعلقة بمخرجات الصور. لذا دعنا نستخدم ذلك.
+
+سنغطي كيفية إنشاء أنواع المخرجات الخاصة بك لاحقًا في هذا الدليل.
+
+```py title="resize.py"
+from invokeai.invocation_api import (
+    BaseInvocation,
+    ImageField,
+    InputField,
+    InvocationContext,
+    invocation,
+)
+
+from invokeai.app.invocations.image import ImageOutput
+
+@invocation('resize')
+class ResizeInvocation(BaseInvocation):
+    '''يغير حجم صورة'''
+
+    image: ImageField = InputField(description="صورة الإدخال")
+    width: int = InputField(default=512, ge=64, le=2048, description="عرض الصورة الجديدة")
+    height: int = InputField(default=512, ge=64, le=2048, description="ارتفاع الصورة الجديدة")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        pass
+```
+
+ممتاز. الآن بعد أن قمنا بإعداد استدعائنا، دعنا نفعل ما نريد فعله.
+
+- سنقوم أولاً بتحميل الصورة باستخدام إحدى الخدمات التي يوفرها InvokeAI لتحميل الصورة.
+- سنقوم بتغيير حجم الصورة باستخدام `PIL` إلى بيانات الإدخال الخاصة بنا.
+- سنقوم بإخراج هذه الصورة بالتنسيق الذي حددناه أعلاه.
+
+لنقم بذلك.
+
+```py title="resize.py"
+from invokeai.invocation_api import (
+    BaseInvocation,
+    ImageField,
+    InputField,
+    InvocationContext,
+    invocation,
+)
+
+from invokeai.app.invocations.image import ImageOutput
+
+@invocation("resize")
+class ResizeInvocation(BaseInvocation):
+    """يغير حجم صورة"""
+
+    image: ImageField = InputField(description="صورة الإدخال")
+    width: int = InputField(default=512, ge=64, le=2048, description="عرض الصورة الجديدة")
+    height: int = InputField(default=512, ge=64, le=2048, description="ارتفاع الصورة الجديدة")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        # تحميل صورة الإدخال كصورة PIL
+        image = context.images.get_pil(self.image.image_name)
+
+        # تغيير حجم الصورة
+        resized_image = image.resize((self.width, self.height))
+
+        # حفظ الصورة
+        image_dto = context.images.save(image=resized_image)
+
+        # إرجاع ImageOutput
+        return ImageOutput.build(image_dto)
+```
+
+**ملاحظة:** لا تشعر بالإرهاق من عملية `ImageOutput`. لدى InvokeAI طريقة معينة يجب أن تُرسل بها الصور لتخزينها وقراءتها بشكل صحيح. في 99٪ من الحالات عند التعامل مع مخرجات الصور، يمكنك ببساطة نسخ ولصق القالب أعلاه.
+
+### التخصيص
+
+يمكننا استخدام ديكور `@invocation` لتوفير بعض المعلومات الإضافية لواجهة المستخدم، مثل عنوان مخصص ووسوم وفئة.
+
+نشجع أيضًا على توفير إصدار. يجب أن يكون هذا سلسلة إصدار [semver](https://semver.org/) ("`$MAJOR`.`$MINOR`.`$PATCH`"). ستعلم واجهة المستخدم المستخدمين إذا كان سير عملهم يستخدم إصدارًا غير متطابق من العقدة.
+
+```py title="resize.py"
+@invocation("resize", title="أداة تغيير الحجم الخاصة بي", tags=["resize", "image"], category="استدعاءاتي", version="1.0.0")
+class ResizeInvocation(BaseInvocation):
+    """يغير حجم صورة"""
+
+    image: ImageField = InputField(description="صورة الإدخال")
+
+    # باقي الكود
+```
+
+هذا كل شيء. لقد صنعت **استدعاء تغيير الحجم** الخاص بك.
+
+## النتيجة
+
+بمجرد إنشاء استدعائك بشكل صحيح، فإن باقي العملية مؤتمتة بالكامل لك.
+
+عند تشغيل InvokeAI، يمكنك الذهاب إلى `http://localhost:9090/docs` ورؤية استدعائك الجديد يظهر هناك مع جميع المعلومات ذات الصلة.
+
+![استدعاء تغيير الحجم](../../assets/resize_invocation.png)
+
+عند تشغيل واجهة المستخدم الأمامية، يمكنك الذهاب إلى علامة تبويب محرر العقد والعثور على استدعائك الجديد جاهزًا للاستخدام.
+
+![محرر عقدة تغيير الحجم](../../assets/resize_node_editor.png)
+
+## المساهمة بالعقد
+
+بمجرد إنشاء عقدة، الخطوة التالية هي مشاركتها مع المجتمع! أفضل طريقة للقيام بذلك هي تقديم طلب سحب لإضافة العقدة إلى قائمة [العقد المجتمعية](/features/workflows/community-nodes). إذا لم تكن متأكدًا من كيفية القيام بذلك، ألق نظرة على [نظرة عامة حول المساهمة بالعقد](/development/guides/creating-nodes/).
+
+## متقدم
+
+### أنواع المخرجات المخصصة
+
+كما هو الحال مع المدخلات المخصصة، قد تجد أحيانًا أنك بحاجة إلى مخرجات مخصصة لا يوفرها InvokeAI. يمكننا إعداد واحدة بسهولة.
+
+الآن بعد أن أصبحت على دراية بالاستدعاءات والمدخلات، دعنا نستخدم تلك المعرفة لإنشاء مخرجات تحتوي على حقل `image` وحقل `color` وحقل `string`.
+
+- مخرجات الاستدعاء هي فئة مشتقة من الفئة الأب `BaseInvocationOutput`.
+- يجب أن تستخدم جميع مخرجات الاستدعاء ديكور `@invocation_output` لتوفير نوع المخرجات الفريد الخاص بها.
+- يجب أن تستخدم حقول المخرجات دالة `OutputField` الموفرة. هذا مشابه جدًا لدالة `InputField` الموصوفة سابقًا - إنها غلاف حول `Field()` من `pydantic`.
+- ليس إلزاميًا ولكننا نوصي باستخدام أسماء تنتهي بـ `Output` لأنواع المخرجات.
+- ليس إلزاميًا ولكننا نوصي بشدة بإضافة `docstring` لوصف ما هو نوع المخرجات الخاص بك من أجله.
+
+الآن بعد أن عرفنا القواعد الأساسية لإنشاء نوع مخرجات جديد، دعنا نمضي قدمًا وننشئه.
+
+```py title="custom_output.py"
+from .baseinvocation import BaseInvocationOutput, OutputField, invocation_output
+from .primitives import ImageField, ColorField
+
+@invocation_output('image_color_string_output')
+class ImageColorStringOutput(BaseInvocationOutput):
+    '''الفئة الأساسية للعقد التي تخرج صورة واحدة'''
+
+    image: ImageField = OutputField(description="الصورة")
+    color: ColorField = OutputField(description="اللون")
+    text: str = OutputField(description="النص")
+```
+
+هذا كل ما في الأمر.
+
+### حقول الإدخال المخصصة
+
+الآن بعد أن عرفت كيفية إنشاء استدعاءاتك الخاصة، دعنا نتعمق في مواضيع أكثر تقدمًا قليلاً.
+
+أثناء إنشاء استدعاءاتك الخاصة، قد تصادف سيناريو حيث لا تلبي الحقول الموجودة في InvokeAI متطلباتك. في مثل هذه الحالات، يمكنك إنشاء حقولك الخاصة.
+
+دعنا ننشئ واحدًا كمثال. لنقل أننا نريد إنشاء حقل إدخال لون يمثل رمز لون. ولكن قبل أن نبدأ، إليك بعض الممارسات الجيدة العامة التي يجب مراعاتها.
+
+### أفضل الممارسات
+
+- لا توجد اتفاقية تسمية لحقول الإدخال، لكننا نوصي بشدة بتسميتها بشيء مناسب مثل `ColorField`.
+- ليس إلزاميًا ولكن من المستحسن بشدة إضافة `docstring` مناسب لوصف حقل.
+- حافظ على حقل في نفس ملف الاستدعاء الذي صُنع من أجله، أو في ملف آخر حيث يكون مناسبًا.
+
+جميع أنواع الإدخال هي فئة مشتقة من نوع `BaseModel` من `pydantic`. لذا دعنا ننشئ واحدًا.
+
+```py title="color_field.py"
+  from pydantic import BaseModel
+
+  class ColorField(BaseModel):
+      '''حقل يحمل قيم rgba للون'''
+      pass
+```
+
+ممتاز. الآن دعنا ننشئ خصائص حقلنا. هذا مشابه لكيفية إنشاء حقول الإدخال لاستدعائك. تنطبق نفس القواعد. دعنا ننشئ أربعة حقول تمثل قنوات _الأحمر (r)_ و _الأزرق (b)_ و _الأخضر (g)_ و _الشفافية (a)_ للون.
+
+:::note
+من الناحية الفنية، تُسمى الخصائص أيضًا _حقول_ - ولكن في هذه الحالة، يشير ذلك إلى حقل `pydantic`.
+:::
+
+```py title="color_field.py"
+class ColorField(BaseModel):
+    '''حقل يحمل قيم rgba للون'''
+    r: int = Field(ge=0, le=255, description="القناة الحمراء")
+    g: int = Field(ge=0, le=255, description="القناة الخضراء")
+    b: int = Field(ge=0, le=255, description="القناة الزرقاء")
+    a: int = Field(ge=0, le=255, description="قناة الشفافية")
+```
+
+هذا كل شيء. لدينا الآن نوع حقل إدخال جديد يمكننا استخدامه في استدعاءاتنا بهذه الطريقة.
+
+```python
+color: ColorField = InputField(default=ColorField(r=0, g=0, b=0, a=0), description='لون خلفية الصورة')
+```
+
+### استخدام الحقل المخصص
+
+عند تشغيل واجهة المستخدم، سيتم التعرف على حقل المخصص تلقائيًا.
+
+الحقول المخصصة تدعم فقط مدخلات الاتصال في محرر سير العمل.

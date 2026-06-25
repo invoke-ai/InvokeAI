@@ -1,0 +1,41 @@
+---
+title: إدارة الحالة
+lastUpdated: 2026-02-18
+---
+
+يستخدم التطبيق بشكل مكثف Redux Toolkit ومكتبة الاستعلام الخاصة به و `nanostores`.
+
+## Redux
+
+نستخدم RTK بشكل موسع - الشرائح، ومهايئات الكيانات، والاستعلامات، وإعادة التحديد، كل شيء. [وثائقهم](https://redux-toolkit.js.org/) ممتازة.
+
+## `nanostores`
+
+[nanostores] هي مكتبة صغيرة لإدارة الحالة. توفر واجهات برمجة أمرية وتصريحية.
+
+### مثال
+
+```ts
+export const $myStringOption = atom<string | null>(null);
+
+// خارج المكون، أو داخل رد اتصال لمنطق حساس للأداء
+$myStringOption.get();
+$myStringOption.set('قيمة جديدة');
+
+// داخل مكون
+const myStringOption = useStore($myStringOption);
+```
+
+### أين تضع nanostores
+
+- لحالة التطبيق العامة، قم بتصدير مخازنك من `invokeai/frontend/web/src/app/store/nanostores/`.
+- لحالة الميزة، أنشئ ملفًا للمخازن بجوار تعريف شريحة redux (مثل `invokeai/frontend/web/src/features/myFeature/myFeatureNanostores.ts`).
+- للخطافات ذات الحالة العامة، قم بتصدير المخزن من نفس ملف الخطاف، أو ضعه بجواره.
+
+### متى تستخدم nanostores
+
+- للبيانات غير القابلة للتسلسل التي تحتاج إلى أن تكون متاحة في جميع أنحاء التطبيق، استخدم `nanostores` بدلاً من العامة.
+- للحالة العامة المؤقتة (أي حالة لا تحتاج إلى أن تكون مستمرة)، استخدم `nanostores` بدلاً من redux.
+- للكود الحساس للأداء وفي ردود الاتصال، يمكن أن تكون مُحددات redux مشكلة بسبب نظام التفاعل التصريحي. فكر في إعادة الهيكلة لاستخدام `nanostores` إذا كانت هناك مشكلة أداء **قابلة للقياس**.
+
+[nanostores]: https://github.com/nanostores/nanostores/

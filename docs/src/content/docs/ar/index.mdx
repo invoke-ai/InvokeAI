@@ -1,0 +1,127 @@
+---
+title: توليد الصور بالذكاء الاصطناعي للمبدعين
+description: محرك إبداعي رائد مصمم لتمكين المحترفين والهواة على حد سواء.
+template: splash
+hero:
+  title: توليد الصور بالذكاء الاصطناعي<br /> للمبدعين
+  tagline: Invoke هو محرك إبداعي مجاني ومفتوح المصدر لتوليد الصور بالذكاء الاصطناعي. صُمم من قبل مبدعين، وللمبدعين. مستضاف ذاتياً، قابل للتخصيص بالكامل، ومرخص تحت رخصة Apache 2.0.
+  actions:
+    - text: البدء
+      link: start-here/installation
+      icon: right-arrow
+      variant: primary
+    - text: عرض على GitHub
+      link: https://github.com/invoke-ai/InvokeAI
+      icon: github
+      variant: minimal
+---
+
+import { Image } from 'astro:assets'
+import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
+import DownloadOptions from '@components/DownloadOptions.astro';
+
+import splashImage from './assets/invoke-webui-canvas.png';
+
+<div class="splash-img">
+  <Image
+    src={splashImage}
+    alt="واجهة Invoke WebUI"
+    loading="eager"
+  />
+</div>
+
+## المحرك الإبداعي
+
+يوفر Invoke مجموعة أدوات احترافية ومتكاملة لتوليد الصور بالذكاء الاصطناعي، مصممة مع وضع سير العمل الإنتاجية في الاعتبار.
+
+<CardGrid>
+  <Card title="قماش موحد" icon="pencil">
+    اختبر **تحرير القماش القائم على الطبقات** الحقيقي. يتيح لك قماش Invoke القوي الرسم والتلوين والتصميم وتعديل إبداعاتك بدقة لا حدود لها. يمكن معالجة كل طبقة بشكل مستقل—مما يمنحك حرية تكوين مشاهد معقدة بسلاسة دون عناء.
+  </Card>
+  <Card title="سير عمل قائمة على العقد" icon="setting">
+    افتح آفاقاً لا محدودة مع **سير العمل المتقدمة القائمة على العقد**. ابني خطوط أنابيب معقدة وقابلة للتكرار عبر واجهة رسومية بيانية بالكامل. اعرض معلمات واجهة مستخدم مخصصة لمشاركة القيم وتحديثها بسهولة دون الغوص في تفاصيل الرسم البياني.
+  </Card>
+  <Card title="دعم نماذج رائد" icon="rocket">
+    ابق في طليعة التطور مع دعم جاهز لأحدث النماذج التأسيسية، بما في ذلك **Flux و SDXL و SD 1.5** والمزيد. إدارة نقاط التفتيش (checkpoints) و LoRAs و Textual Inversions و ControlNets مع مدير نماذج بديهي.
+  </Card>
+  <Card title="محلي 100% وخاص" icon="laptop">
+    **محلي بالكامل ومستضاف ذاتياً**. يعمل Invoke على أجهزتك الخاصة. بياناتك، ومطالباتك، وإبداعاتك تنتمي إليك بالكامل. ودّع الخدمات السحابية المقيدة ومخاوف الخصوصية—حافظ على تحكم مطلق في فنك.
+  </Card>
+</CardGrid>
+
+---
+
+## مصمم للإنتاج
+
+صُمم Invoke للحفاظ على تدفقك الإبداعي متواصلاً. على عكس الأدوات الأخرى التي تبدو كتجارب هندسية، Invoke تطبيق احترافي مصقول.
+
+<CardGrid>
+  <Card title="واجهة بديهية" icon="magnifier">
+    واجهة جميلة ونظيفة تعطي الأولوية لعملك الفني. لا قوائم مزدحمة—فقط الأدوات التي تحتاجها حيث تتوقع وجودها.
+  </Card>
+  <Card title="إتقان ControlNet" icon="puzzle">
+    تنفيذ واسع لـ ControlNet يتيح لك توجيه التوليد بخرائط العمق، والحواف، والأوضاع، والمزيد للتحكم الدقيق في التكوين.
+  </Card>
+  <Card title="تكرار سلس" icon="random">
+    تكرار سريع للمفاهيم مع التوليد الدفعي، والبدائل في المطالبات (prompt wildcards)، ورفع الدقة عالي الجودة، كل ذلك دون مغادرة التطبيق.
+  </Card>
+  <Card title="مجتمع يقود التطوير" icon="heart">
+    يتم تطويره بنشاط من قبل مجتمع مفتوح المصدر شغوف. انضم للحوار، أبلغ عن الأخطاء، أو اطلب ميزات مباشرة.
+  </Card>
+</CardGrid>
+
+---
+
+## انضم للنظام البيئي
+
+سواء كنت تبحث عن تثبيت التطبيق، أو الحصول على الدعم، أو تدريب نماذجك الخاصة، أو المساهمة في المشروع، فإن مجتمع Invoke يغطي كل ذلك.
+
+<CardGrid>
+  <Card title="التثبيت" icon="download">
+    مستعد للبدء؟ [مشغل Invoke](/start-here/installation/) هو أسرع طريقة للتشغيل على Windows و macOS و Linux. للإعدادات المتقدمة، جرب [Docker](/configuration/docker/) أو [التثبيت اليدوي لـ Python](/start-here/manual/).
+
+    <LinkButton href="download" icon="right-arrow">
+      احصل على Invoke
+    </LinkButton>
+  </Card>
+
+  <Card title="درّب نماذجك" icon="star">
+    تريد تدريب نماذج على أسلوبك الخاص؟ يوفر Invoke Training واجهة مخصصة لـ **Textual Inversion** و **تدريب LoRA**.
+
+    <LinkButton href="https://github.com/invoke-ai/invoke-training" variant="secondary" icon="external">
+      استكشف Invoke Training
+    </LinkButton>
+  </Card>
+
+  <Card title="احصل على الدعم" icon="discord">
+    عالِق؟ اطلع على [الأسئلة الشائعة](/troubleshooting/faq/) الشاملة للحصول على إجابات سريعة. إذا كنت لا تزال بحاجة للمساعدة، فمجتمعنا نشط ومتعاون بشكل لا يصدق.
+
+    <LinkButton href="https://discord.gg/ZmtBAhwWhy" variant="secondary" icon="discord">انضم إلى Discord</LinkButton>
+  </Card>
+
+  <Card title="ساهم" icon="github">
+    Invoke برنامج مفتوح المصدر أصبح ممكناً بفضل [أشخاص من جميع أنحاء العالم](/contributing/contributors/). نرحب بمساهمات الكود، والتوثيق، والتصميم بأي حجم! اقرأ [دليل المساهمة](/contributing/) للبدء.
+
+    <LinkButton href="contributing/new-contributor-guide" variant="secondary" icon="open-book">
+      اقرأ دليل المساهمة
+    </LinkButton>
+  </Card>
+</CardGrid>
+
+---
+
+## تحميل Invoke
+
+مستعد لإطلاق العنان لإبداعك؟ Invoke متاح لـ Windows و macOS و Linux. مستضاف ذاتياً، قابل للتخصيص بالكامل، ومرخص تحت رخصة Apache 2.0.
+
+<DownloadOptions />
+
+---
+
+:::note[حول النسخة المستضافة]
+تم إيقاف منصة Invoke المستضافة حيث انضم الفريق المؤسس إلى Adobe. ومع ذلك، يستمر Invoke كمشروع مفتوح المصدر مزدهر تديره المجتمع.
+
+توفر النسخة مفتوحة المصدر نفس الميزات القوية التي ربما استخدمتها في الخدمة المستضافة، مع فائدة إضافية تتمثل في التحكم الكامل والخصوصية من خلال الاستضافة الذاتية.
+
+تم تسليم إدارة المشروع إلى Lincoln Stein (lstein) و Vic (Blessedcoolant)، اللذين كانا من القائمين الأساسيين على المشروع منذ بدايته ويستمران في دفع التطوير للأمام مع المجتمع.
+:::

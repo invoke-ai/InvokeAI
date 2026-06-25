@@ -1,0 +1,119 @@
+---
+title: الهجرة من ComfyUI
+lastUpdated: 2026-05-23
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+إذا كنت قادماً إلى InvokeAI من ComfyUI، مرحباً بك! ستجد الأمور متشابهة ولكنها مختلفة - الخبر السار هو أنك تعرف بالفعل كيف يجب أن تعمل الأمور، والأمر مجرد مسألة توصيلها!
+
+<Card title="درجة تفصيل العقد" icon="information">
+  تميل عقد InvokeAI إلى أن تكون أكثر تفصيلاً من العقد الافتراضية في Comfy. هذا يعني أن كل عقدة في Invoke ستقوم بمهمة محددة، وقد تحتاج إلى استخدام عقد متعددة لتحقيق نفس النتيجة. التفصيل الإضافي يحسن التحكم الذي لديك على سير العمل الخاصة بك.
+</Card>
+<Card title="اختلافات الخلفية" icon="puzzle">
+  خلفية InvokeAI وخلفية ComfyUI مختلفتان جداً، مما يعني أنه لا يمكن استيراد سير عمل Comfy مباشرة إلى InvokeAI. ومع ذلك، قمنا بإنشاء [قائمة بسير العمل الشائعة](../community-nodes) لتبدأ بها مع العقد في InvokeAI!
+</Card>
+
+## مكافئات العقد
+
+العثور على العقدة الصحيحة هو أصعب جزء في التبديل. استخدم الفئات أدناه للعثور على مكافئات InvokeAI لعقد ComfyUI التي اعتدت عليها.
+
+### Sampling
+
+| عقدة ComfyUI | المكافئ في Invoke |
+| :--- | :--- |
+| KSampler | Denoise Latents |
+| Ksampler Advanced | Denoise Latents |
+
+### Loaders
+
+| عقدة ComfyUI | المكافئ في Invoke |
+| :--- | :--- |
+| Load Checkpoint | Main Model Loader _أو_ SDXL Main Model Loader |
+| Load VAE | VAE Loader |
+| Load Lora | LoRA Loader _أو_ SDXL Lora Loader |
+| Load ControlNet Model | ControlNet |
+| Load ControlNet Model (diff) | ControlNet |
+| Load Style Model | Reference Only ControlNet سيكون متاحاً في إصدار مستقبلي من InvokeAI |
+| unCLIPCheckpointLoader | N/A |
+| GLIGENLoader | N/A |
+| Hypernetwork Loader | N/A |
+| Load Upscale Model | يحدث داخل "Upscale (RealESRGAN)" |
+
+### Conditioning
+
+| عقدة ComfyUI | المكافئ في Invoke |
+| :--- | :--- |
+| CLIP Text Encode (Prompt) | Compel (Prompt) أو SDXL Compel (Prompt) |
+| CLIP Set Last Layer | CLIP Skip |
+| Conditioning (Average) | استخدم ميزة .blend() للموجهات |
+| Conditioning (Combine) | N/A |
+| Conditioning (Concat) | راجع عقدة المجتمع Prompt Tools |
+| Conditioning (Set Area) | N/A |
+| Conditioning (Set Mask) | Mask Edge |
+| CLIP Vision Encode | N/A |
+| unCLIPConditioning | N/A |
+| Apply ControlNet | ControlNet |
+| Apply ControlNet (Advanced) | ControlNet |
+
+### Latent
+
+| عقدة ComfyUI | المكافئ في Invoke |
+| :--- | :--- |
+| VAE Decode | Latents to Image |
+| VAE Encode | Image to Latents |
+| Empty Latent Image | Noise |
+| Upscale Latent | Resize Latents |
+| Upscale Latent By | Scale Latents |
+| Latent Composite | Blend Latents |
+| LatentCompositeMasked | N/A |
+
+### Image
+
+| عقدة ComfyUI | المكافئ في Invoke |
+| :--- | :--- |
+| Save Image | Image |
+| Preview Image | Current |
+| Load Image | Image |
+| Empty Image | Blank Image |
+| Invert Image | Invert Lerp Image |
+| Batch Images | ربط عقد "Image" في عقدة "Image Collection" |
+| Pad Image for Outpainting | يمكن إنجاز Outpainting بسهولة في Unified Canvas |
+| ImageCompositeMasked | Paste Image |
+| Upscale Image | Resize Image |
+| Upscale Image By | Upscale Image |
+| Upscale Image (using Model) | Upscale Image |
+| ImageBlur | Blur Image |
+| ImageQuantize | N/A |
+| ImageSharpen | N/A |
+| Canny | Canny Processor |
+
+### Mask
+
+| عقدة ComfyUI | المكافئ في Invoke |
+| :--- | :--- |
+| Load Image (as Mask) | Image |
+| Convert Mask to Image | Image |
+| Convert Image to Mask | Image |
+| SolidMask | N/A |
+| InvertMask | Invert Lerp Image |
+| CropMask | Crop Image |
+| MaskComposite | Combine Mask |
+| FeatherMask | Blur Image |
+
+### Advanced
+
+| عقدة ComfyUI | المكافئ في Invoke |
+| :--- | :--- |
+| Load CLIP | Main Model Loader _أو_ SDXL Main Model Loader |
+| UNETLoader | Main Model Loader _أو_ SDXL Main Model Loader |
+| DualCLIPLoader | Main Model Loader _أو_ SDXL Main Model Loader |
+| Load Checkpoint | Main Model Loader _أو_ SDXL Main Model Loader |
+| ConditioningZeroOut | N/A |
+| ConditioningSetTimestepRange | N/A |
+| CLIPTextEncodeSDXLRefiner | Compel (Prompt) أو SDXL Compel (Prompt) |
+| CLIPTextEncodeSDXL | Compel (Prompt) أو SDXL Compel (Prompt) |
+| ModelMergeSimple | دمج النماذج متاح في Model Manager |
+| ModelMergeBlocks | دمج النماذج متاح في Model Manager |
+| CheckpointSave | حفظ النماذج متاح في Model Manager |
+| CLIPMergeSimple | N/A |
