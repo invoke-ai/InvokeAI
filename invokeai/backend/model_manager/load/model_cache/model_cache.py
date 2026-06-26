@@ -20,6 +20,11 @@ from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_o
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
     CachedModelWithPartialLoad,
 )
+from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
+from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import (
+    SHARED_CPU_WEIGHTS,
+    SharedCpuWeightsStore,
+)
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
 )
@@ -216,6 +221,8 @@ class ModelCache:
         log_memory_usage: bool = False,
         logger: Optional[Logger] = None,
         keep_alive_minutes: float = 0,
+        shared_cpu_weights: SharedCpuWeightsStore | None = SHARED_CPU_WEIGHTS,
+        ram_budget: RamBudget | None = None,
     ):
         """Initialize the model RAM cache.
 
@@ -236,7 +243,15 @@ class ModelCache:
             behaviour.
         :param logger: InvokeAILogger to use (otherwise creates one)
         :param keep_alive_minutes: How long to keep models in cache after last use (in minutes). 0 means keep indefinitely.
+        :param shared_cpu_weights: Process-global store that lets per-device caches share a single CPU copy of each
+            model's weights (see SharedCpuWeightsStore). Defaults to the global store so that, in multi-GPU mode, a
+            model loaded on multiple GPUs occupies RAM only once. Pass None to disable sharing for this cache.
+        :param ram_budget: Optional shared RamBudget used as the single global RAM authority across all per-device
+            caches. When provided, eviction decisions are made against the deduplicated, system-wide RAM total rather
+            than this cache's local (double-counted) sum. When None, the cache uses its own local RAM accounting.
         """
+        self._shared_cpu_weights = shared_cpu_weights
+        self._ram_budget = ram_budget
         self._enable_partial_loading = enable_partial_loading
         self._keep_ram_copy_of_weights = keep_ram_copy_of_weights
         self._execution_device_working_mem_gb = execution_device_working_mem_gb
@@ -302,6 +317,22 @@ class ModelCache:
         """Return the default execution device this cache loads models onto."""
         return self._execution_device
 
+    def set_ram_budget(self, ram_budget: RamBudget) -> None:
+        """Attach the shared global RamBudget after construction.
+
+        Used by the model manager once all per-device caches exist and the global cap has been
+        computed from their individual sizes (see ModelManagerService.build_model_manager).
+        """
+        self._ram_budget = ram_budget
+
+    @property
+    def local_ram_cache_size_bytes(self) -> int:
+        """The RAM cache size this cache computed for itself (from max_cache_ram_gb or the heuristic).
+
+        Used by the model manager to seed the global RamBudget cap when no explicit limit is set.
+        """
+        return self._ram_cache_size_bytes
+
     @property
     @synchronized
     def stats(self) -> Optional[CacheStats]:
@@ -313,9 +344,12 @@ class ModelCache:
     def stats(self, stats: CacheStats) -> None:
         """Set the CacheStats object for collecting cache statistics."""
         self._stats = stats
-        # Populate the cache size in the stats object when it's set
+        # Populate the cache size in the stats object when it's set. Prefer the global budget cap
+        # (the real system-wide limit) when one is attached.
         if self._stats is not None:
-            self._stats.cache_size = self._ram_cache_size_bytes
+            self._stats.cache_size = (
+                self._ram_budget.max_bytes if self._ram_budget is not None else self._ram_cache_size_bytes
+            )
 
     def _record_activity(self) -> None:
         """Record model activity and reset the timeout timer if configured.
@@ -423,16 +457,30 @@ class ModelCache:
         # Wrap model.
         if isinstance(model, torch.nn.Module) and running_with_cuda and self._enable_partial_loading:
             wrapped_model = CachedModelWithPartialLoad(
-                model, effective_execution_device, keep_ram_copy=self._keep_ram_copy_of_weights
+                model,
+                effective_execution_device,
+                keep_ram_copy=self._keep_ram_copy_of_weights,
+                shared_store=self._shared_cpu_weights,
+                cache_key=key,
             )
         else:
             wrapped_model = CachedModelOnlyFullLoad(
-                model, effective_execution_device, size, keep_ram_copy=self._keep_ram_copy_of_weights
+                model,
+                effective_execution_device,
+                size,
+                keep_ram_copy=self._keep_ram_copy_of_weights,
+                shared_store=self._shared_cpu_weights,
+                cache_key=key,
             )
 
         cache_record = CacheRecord(key=key, cached_model=wrapped_model)
         self._cached_models[key] = cache_record
         self._cache_stack.append(key)
+        # Account this model's RAM in the global budget. Shared weights are tracked once by the
+        # SharedCpuWeightsStore; only non-deduplicated models are added to the budget's non-shared
+        # total (a non-shared model resident on N devices correctly counts N times).
+        if self._ram_budget is not None and not wrapped_model.uses_shared_weights:
+            self._ram_budget.add_non_shared(wrapped_model.total_bytes())
         self._logger.debug(
             f"Added model {key} (Type: {model.__class__.__name__}, Wrap mode: {wrapped_model.__class__.__name__}, Model size: {size / MB:.2f}MB)"
         )
@@ -774,11 +822,20 @@ class ModelCache:
         return ram_available_to_model_cache
 
     def _get_ram_in_use(self) -> int:
-        """Get the amount of RAM currently in use."""
+        """Get the amount of RAM currently in use.
+
+        With a shared RamBudget attached, this returns the deduplicated, system-wide total across all
+        per-device caches (shared model weights counted once). Without one, it returns this cache's
+        local sum.
+        """
+        if self._ram_budget is not None:
+            return self._ram_budget.total_in_use()
         return sum(ce.cached_model.total_bytes() for ce in self._cached_models.values())
 
     def _get_ram_available(self) -> int:
         """Get the amount of RAM available for the cache to use."""
+        if self._ram_budget is not None:
+            return self._ram_budget.available()
         return self._ram_cache_size_bytes - self._get_ram_in_use()
 
     def _capture_memory_snapshot(self) -> Optional[MemorySnapshot]:
@@ -917,7 +974,18 @@ class ModelCache:
         ram_bytes_freed = 0
         pos = 0
         models_cleared = 0
-        while ram_bytes_freed < ram_bytes_to_free and pos < len(self._cache_stack):
+        while pos < len(self._cache_stack):
+            # Stop once there is enough room. With a shared RamBudget, re-check the global,
+            # deduplicated availability each iteration: evicting a model that other devices still
+            # hold frees no RAM (its shared weights stay live until the last reference is released),
+            # so a fixed "bytes freed" tally would be wrong. Without a budget, the local tally is
+            # exact, so the original cheaper check is kept.
+            if self._ram_budget is not None:
+                if bytes_needed <= self._get_ram_available():
+                    break
+            elif ram_bytes_freed >= ram_bytes_to_free:
+                break
+
             model_key = self._cache_stack[pos]
             cache_entry = self._cached_models[model_key]
 
@@ -961,8 +1029,21 @@ class ModelCache:
 
     def _delete_cache_entry(self, cache_entry: CacheRecord) -> None:
         """Delete cache_entry from the cache if it exists. No exception is thrown if it doesn't exist."""
+        was_present = cache_entry.key in self._cached_models
         self._cache_stack = [key for key in self._cache_stack if key != cache_entry.key]
         self._cached_models.pop(cache_entry.key, None)
+        # Drop this device's reference to the shared canonical CPU weights so they can be freed once
+        # the last device releases them. Guard on was_present so a double-delete doesn't
+        # double-release (release_shared_weights is itself idempotent, but a re-added entry under the
+        # same key must not be released by a stale delete).
+        if was_present:
+            uses_shared = cache_entry.cached_model.uses_shared_weights
+            total_bytes = cache_entry.cached_model.total_bytes()
+            cache_entry.cached_model.release_shared_weights()
+            # Drop the matching non-shared contribution from the global budget (shared weights are
+            # released via the store above). Captured before release_shared_weights() flips the flag.
+            if self._ram_budget is not None and not uses_shared:
+                self._ram_budget.remove_non_shared(total_bytes)
 
     @synchronized
     def drop_model(self, model_key: str) -> int:

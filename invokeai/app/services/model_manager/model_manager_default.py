@@ -17,6 +17,8 @@ from invokeai.app.services.model_load.model_load_default import ModelLoadService
 from invokeai.app.services.model_manager.model_manager_base import ModelManagerServiceBase
 from invokeai.app.services.model_records.model_records_base import ModelRecordServiceBase
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
+from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
@@ -86,6 +88,12 @@ class ModelManagerService(ModelManagerServiceBase):
         logger = InvokeAILogger.get_logger(cls.__name__)
         logger.setLevel(app_config.log_level.upper())
 
+        # One store + budget shared by every per-device cache. The store deduplicates each model's CPU
+        # weights to a single copy across GPUs (see SharedCpuWeightsStore); the budget is the single
+        # system-wide RAM authority so per-device caches stop double-counting shared weights when they
+        # decide what to evict (see RamBudget).
+        shared_store = SharedCpuWeightsStore()
+
         def build_cache(device: torch.device) -> ModelCache:
             return ModelCache(
                 execution_device_working_mem_gb=app_config.device_working_mem_gb,
@@ -98,6 +106,7 @@ class ModelManagerService(ModelManagerServiceBase):
                 log_memory_usage=app_config.log_memory_usage,
                 logger=logger,
                 keep_alive_minutes=app_config.model_cache_keep_alive_min,
+                shared_cpu_weights=shared_store,
             )
 
         # The default cache for callers without a pinned device (API threads, single-device installs).
@@ -112,6 +121,23 @@ class ModelManagerService(ModelManagerServiceBase):
             key = str(device)
             if key not in ram_caches:
                 ram_caches[key] = build_cache(device)
+
+        # Attach the single global RAM budget. The cap is the user's max_cache_ram_gb interpreted as a
+        # true system-wide limit; when unset, it is the sum of the caches' individually-calculated
+        # sizes, so each device keeps its effective capacity and weight deduplication becomes headroom.
+        gb = 2**30
+        distinct_caches = list(dict.fromkeys(ram_caches.values()))
+        if app_config.max_cache_ram_gb is not None:
+            global_ram_budget_bytes = int(app_config.max_cache_ram_gb * gb)
+        else:
+            global_ram_budget_bytes = sum(c.local_ram_cache_size_bytes for c in distinct_caches)
+        ram_budget = RamBudget(max_bytes=global_ram_budget_bytes, shared_store=shared_store)
+        for cache in distinct_caches:
+            cache.set_ram_budget(ram_budget)
+        logger.info(
+            f"Model cache global RAM budget: {global_ram_budget_bytes / gb:.2f} GB "
+            f"across {len(distinct_caches)} device cache(s)."
+        )
 
         loader = ModelLoadService(
             app_config=app_config,

@@ -216,7 +216,10 @@ class LayerPatcher:
                         param_name,
                         torch.nn.Parameter(expanded_weight, requires_grad=module_param.requires_grad),
                     )
-                    module_param = expanded_weight
+                    # Point at the module's live (expanded) parameter so the out-of-place weight
+                    # update below lands on the module. `expanded_weight` is a detached raw tensor;
+                    # reassigning its `.data` would not propagate to the newly-set Parameter.
+                    module_param = module_to_patch.get_parameter(param_name)
                 else:
                     # For other LoRAs, shape mismatch indicates architecture incompatibility - skip the layer
                     logger = InvokeAILogger.get_logger(LayerPatcher.__name__)
@@ -227,9 +230,17 @@ class LayerPatcher:
                     )
                     continue
 
-            # Convert param_weight to the correct device and dtype, then apply to model weights
+            # Convert param_weight to the correct device and dtype, then apply to model weights.
             param_weight_converted = param_weight.to(device=device, dtype=dtype)
-            module_param.data.copy_(module_param.data + param_weight_converted)
+            # Apply out-of-place (assign a new tensor) rather than an in-place `copy_`. The weight we
+            # are patching may be the model's canonical CPU copy, which is shared across the
+            # per-device model caches in multi-GPU mode (see SharedCpuWeightsStore) and is also the
+            # cache's keep_ram_copy used to restore the model after unpatching. An in-place mutation
+            # here would corrupt that shared/cached tensor — and every other device's view of it.
+            # Reassigning `.data` leaves the original tensor untouched while giving this module the
+            # patched weights, and is memory-equivalent (the in-place form already allocated the
+            # `module_param.data + param_weight_converted` temporary).
+            module_param.data = module_param.data + param_weight_converted
 
         patch.to(device=TorchDevice.CPU_DEVICE)
 
