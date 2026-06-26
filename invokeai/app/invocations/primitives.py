@@ -23,6 +23,7 @@ from invokeai.app.invocations.fields import (
     ImageField,
     Input,
     InputField,
+    Krea2ConditioningField,
     LatentsField,
     OutputField,
     QwenImageConditioningField,
@@ -484,6 +485,17 @@ class QwenImageConditioningOutput(BaseInvocationOutput):
     @classmethod
     def build(cls, conditioning_name: str) -> "QwenImageConditioningOutput":
         return cls(conditioning=QwenImageConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("krea2_conditioning_output")
+class Krea2ConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a Krea-2 conditioning tensor."""
+
+    conditioning: Krea2ConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "Krea2ConditioningOutput":
+        return cls(conditioning=Krea2ConditioningField(conditioning_name=conditioning_name))
 
 
 @invocation_output("anima_conditioning_output")

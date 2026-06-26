@@ -50,6 +50,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_LyCORIS_Anima_Config,
     LoRA_LyCORIS_Flux2_Config,
     LoRA_LyCORIS_FLUX_Config,
+    LoRA_LyCORIS_Krea2_Config,
     LoRA_LyCORIS_QwenImage_Config,
     LoRA_LyCORIS_SD1_Config,
     LoRA_LyCORIS_SD2_Config,
@@ -64,6 +65,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_Anima_Config,
     Main_Checkpoint_Flux2_Config,
     Main_Checkpoint_FLUX_Config,
+    Main_Checkpoint_Krea2_Config,
     Main_Checkpoint_QwenImage_Config,
     Main_Checkpoint_SD1_Config,
     Main_Checkpoint_SD2_Config,
@@ -73,6 +75,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_CogView4_Config,
     Main_Diffusers_Flux2_Config,
     Main_Diffusers_FLUX_Config,
+    Main_Diffusers_Krea2_Config,
     Main_Diffusers_QwenImage_Config,
     Main_Diffusers_SD1_Config,
     Main_Diffusers_SD2_Config,
@@ -82,6 +85,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_ZImage_Config,
     Main_GGUF_Flux2_Config,
     Main_GGUF_FLUX_Config,
+    Main_GGUF_Krea2_Config,
     Main_GGUF_QwenImage_Config,
     Main_GGUF_ZImage_Config,
     MainModelDefaultSettings,
@@ -90,6 +94,10 @@ from invokeai.backend.model_manager.configs.qwen3_encoder import (
     Qwen3Encoder_Checkpoint_Config,
     Qwen3Encoder_GGUF_Config,
     Qwen3Encoder_Qwen3Encoder_Config,
+)
+from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
+    Qwen3VLEncoder_Checkpoint_Config,
+    Qwen3VLEncoder_Qwen3VLEncoder_Config,
 )
 from invokeai.backend.model_manager.configs.qwen_vl_encoder import (
     QwenVLEncoder_Checkpoint_Config,
@@ -175,6 +183,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Diffusers_CogView4_Config, Main_Diffusers_CogView4_Config.get_tag()],
         Annotated[Main_Diffusers_QwenImage_Config, Main_Diffusers_QwenImage_Config.get_tag()],
         Annotated[Main_Diffusers_ZImage_Config, Main_Diffusers_ZImage_Config.get_tag()],
+        Annotated[Main_Diffusers_Krea2_Config, Main_Diffusers_Krea2_Config.get_tag()],
         # Main (Pipeline) - checkpoint format
         # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
         # that will reject FLUX.1 models, but FLUX.1 validation may incorrectly match FLUX.2 models
@@ -186,6 +195,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Checkpoint_FLUX_Config, Main_Checkpoint_FLUX_Config.get_tag()],
         Annotated[Main_Checkpoint_QwenImage_Config, Main_Checkpoint_QwenImage_Config.get_tag()],
         Annotated[Main_Checkpoint_ZImage_Config, Main_Checkpoint_ZImage_Config.get_tag()],
+        Annotated[Main_Checkpoint_Krea2_Config, Main_Checkpoint_Krea2_Config.get_tag()],
         Annotated[Main_Checkpoint_Anima_Config, Main_Checkpoint_Anima_Config.get_tag()],
         # Main (Pipeline) - quantized formats
         # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
@@ -195,6 +205,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_GGUF_FLUX_Config, Main_GGUF_FLUX_Config.get_tag()],
         Annotated[Main_GGUF_QwenImage_Config, Main_GGUF_QwenImage_Config.get_tag()],
         Annotated[Main_GGUF_ZImage_Config, Main_GGUF_ZImage_Config.get_tag()],
+        Annotated[Main_GGUF_Krea2_Config, Main_GGUF_Krea2_Config.get_tag()],
         # VAE - checkpoint format
         Annotated[VAE_Checkpoint_SD1_Config, VAE_Checkpoint_SD1_Config.get_tag()],
         Annotated[VAE_Checkpoint_SD2_Config, VAE_Checkpoint_SD2_Config.get_tag()],
@@ -227,6 +238,7 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_LyCORIS_Flux2_Config, LoRA_LyCORIS_Flux2_Config.get_tag()],
         Annotated[LoRA_LyCORIS_FLUX_Config, LoRA_LyCORIS_FLUX_Config.get_tag()],
         Annotated[LoRA_LyCORIS_ZImage_Config, LoRA_LyCORIS_ZImage_Config.get_tag()],
+        Annotated[LoRA_LyCORIS_Krea2_Config, LoRA_LyCORIS_Krea2_Config.get_tag()],
         Annotated[LoRA_LyCORIS_QwenImage_Config, LoRA_LyCORIS_QwenImage_Config.get_tag()],
         Annotated[LoRA_LyCORIS_Anima_Config, LoRA_LyCORIS_Anima_Config.get_tag()],
         # LoRA - OMI format
@@ -246,6 +258,11 @@ AnyModelConfig = Annotated[
         # T5 Encoder - all formats
         Annotated[T5Encoder_T5Encoder_Config, T5Encoder_T5Encoder_Config.get_tag()],
         Annotated[T5Encoder_BnBLLMint8_Config, T5Encoder_BnBLLMint8_Config.get_tag()],
+        # Qwen3-VL Encoder (Qwen3-VL multimodal encoder for Krea-2) - checked BEFORE the text-only Qwen3
+        # encoder so single-file VL checkpoints (which also carry generic model.layers.* keys) are not
+        # misclassified as the Z-Image Qwen3 encoder. The VL probe requires the visual tower.
+        Annotated[Qwen3VLEncoder_Checkpoint_Config, Qwen3VLEncoder_Checkpoint_Config.get_tag()],
+        Annotated[Qwen3VLEncoder_Qwen3VLEncoder_Config, Qwen3VLEncoder_Qwen3VLEncoder_Config.get_tag()],
         # Qwen3 Encoder
         Annotated[Qwen3Encoder_Qwen3Encoder_Config, Qwen3Encoder_Qwen3Encoder_Config.get_tag()],
         Annotated[Qwen3Encoder_Checkpoint_Config, Qwen3Encoder_Checkpoint_Config.get_tag()],
@@ -402,6 +419,14 @@ class ModelConfigFactory:
                     f"Expected one of: {', '.join(sorted(_MODEL_EXTENSIONS))}"
                 )
         else:
+            # A config file at the root (model_index.json / config.json) is an unambiguous
+            # diffusers/transformers model marker, so accept the directory regardless of file
+            # count. HF snapshots often bundle extra non-model assets (e.g. a model-card `images/`
+            # folder) that would otherwise trip the general-purpose-directory guard below.
+            has_root_config = any((path / config).exists() for config in _CONFIG_FILES)
+            if has_root_config:
+                return
+
             # For directories, do a quick file count check with early exit
             total_files = 0
             # Ignore hidden files and directories
@@ -419,13 +444,6 @@ class ModelConfigFactory:
                             "This looks like a general-purpose directory rather than a model. "
                             "Please provide a path to a specific model file or model directory."
                         )
-
-            # Check if it has config files at root (diffusers/transformers marker)
-            has_root_config = any((path / config).exists() for config in _CONFIG_FILES)
-
-            if has_root_config:
-                # Has a config file, looks like a valid model directory
-                return
 
             # Otherwise, search for model files within depth limit
             def find_model_files(current_path: Path, depth: int) -> bool:

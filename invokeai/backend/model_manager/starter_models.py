@@ -1085,6 +1085,17 @@ z_image_controlnet_tile = StarterModel(
 )
 # endregion
 
+# region Krea-2
+krea2_turbo = StarterModel(
+    name="Krea-2 Turbo",
+    base=BaseModelType.Krea2,
+    source="krea/Krea-2-Turbo",
+    description="Krea-2 Turbo - distilled 12B parameter text-to-image model (8 steps, CFG disabled). "
+    "Full diffusers pipeline including the Qwen-Image VAE and Qwen3-VL text encoder. ~26GB",
+    type=ModelType.Main,
+)
+# endregion
+
 # region External API
 GEMINI_3_IMAGE_ALLOWED_ASPECT_RATIOS = [
     "1:1",
@@ -1690,6 +1701,7 @@ STARTER_MODELS: list[StarterModel] = [
     z_image_qwen3_encoder_quantized,
     z_image_controlnet_union,
     z_image_controlnet_tile,
+    krea2_turbo,
     gemini_flash_image,
     gemini_pro_image_preview,
     gemini_3_1_flash_image_preview,

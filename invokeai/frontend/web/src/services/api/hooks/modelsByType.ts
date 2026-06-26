@@ -28,6 +28,7 @@ import {
   isLoRAModelConfig,
   isMainOrExternalModelConfig,
   isQwen3EncoderModelConfig,
+  isQwen3VLEncoderModelConfig,
   isQwenImageDiffusersMainModelConfig,
   isQwenImageVAEModelConfig,
   isQwenVLEncoderModelConfig,
@@ -111,6 +112,7 @@ export const useQwenImageDiffusersModels = () => buildModelsHook(isQwenImageDiff
 export const useQwenImageVAEModels = () => buildModelsHook(isQwenImageVAEModelConfig)();
 export const useQwenVLEncoderModels = () => buildModelsHook(isQwenVLEncoderModelConfig)();
 export const useQwen3EncoderModels = () => buildModelsHook(isQwen3EncoderModelConfig)();
+export const useQwen3VLEncoderModels = () => buildModelsHook(isQwen3VLEncoderModelConfig)();
 export const useGlobalReferenceImageModels = buildModelsHook(
   (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config) || isFluxKontextModelConfig(config)
 );

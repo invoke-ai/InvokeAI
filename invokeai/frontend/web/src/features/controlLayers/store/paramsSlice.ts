@@ -107,6 +107,24 @@ const slice = createSlice({
     setZImageSeedVarianceRandomizePercent: (state, action: PayloadAction<number>) => {
       state.zImageSeedVarianceRandomizePercent = action.payload;
     },
+    setKrea2SeedVarianceEnabled: (state, action: PayloadAction<boolean>) => {
+      state.krea2SeedVarianceEnabled = action.payload;
+    },
+    setKrea2SeedVarianceStrength: (state, action: PayloadAction<number>) => {
+      state.krea2SeedVarianceStrength = action.payload;
+    },
+    setKrea2SeedVarianceRandomizePercent: (state, action: PayloadAction<number>) => {
+      state.krea2SeedVarianceRandomizePercent = action.payload;
+    },
+    setKrea2RebalanceEnabled: (state, action: PayloadAction<boolean>) => {
+      state.krea2RebalanceEnabled = action.payload;
+    },
+    setKrea2RebalanceMultiplier: (state, action: PayloadAction<number>) => {
+      state.krea2RebalanceMultiplier = action.payload;
+    },
+    setKrea2RebalanceWeights: (state, action: PayloadAction<string>) => {
+      state.krea2RebalanceWeights = action.payload;
+    },
     setUpscaleScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
       state.upscaleScheduler = action.payload;
     },
@@ -222,6 +240,23 @@ const slice = createSlice({
         return;
       }
       state.zImageQwen3SourceModel = result.data;
+    },
+    krea2VaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      const result = zParamsState.shape.krea2VaeModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.krea2VaeModel = result.data;
+    },
+    krea2Qwen3VlEncoderModelSelected: (
+      state,
+      action: PayloadAction<{ key: string; name: string; base: string } | null>
+    ) => {
+      const result = zParamsState.shape.krea2Qwen3VlEncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.krea2Qwen3VlEncoderModel = result.data;
     },
     animaVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
       const result = zParamsState.shape.animaVaeModel.safeParse(action.payload);
@@ -612,6 +647,8 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.zImageVaeModel = oldState.zImageVaeModel;
   newState.zImageQwen3EncoderModel = oldState.zImageQwen3EncoderModel;
   newState.zImageQwen3SourceModel = oldState.zImageQwen3SourceModel;
+  newState.krea2VaeModel = oldState.krea2VaeModel;
+  newState.krea2Qwen3VlEncoderModel = oldState.krea2Qwen3VlEncoderModel;
   newState.animaVaeModel = oldState.animaVaeModel;
   newState.animaQwen3EncoderModel = oldState.animaQwen3EncoderModel;
   newState.kleinVaeModel = oldState.kleinVaeModel;
@@ -648,6 +685,12 @@ export const {
   setZImageSeedVarianceEnabled,
   setZImageSeedVarianceStrength,
   setZImageSeedVarianceRandomizePercent,
+  setKrea2SeedVarianceEnabled,
+  setKrea2SeedVarianceStrength,
+  setKrea2SeedVarianceRandomizePercent,
+  setKrea2RebalanceEnabled,
+  setKrea2RebalanceMultiplier,
+  setKrea2RebalanceWeights,
   setUpscaleScheduler,
   setUpscaleCfgScale,
   setSeed,
@@ -666,6 +709,8 @@ export const {
   zImageVaeModelSelected,
   zImageQwen3EncoderModelSelected,
   zImageQwen3SourceModelSelected,
+  krea2VaeModelSelected,
+  krea2Qwen3VlEncoderModelSelected,
   kleinVaeModelSelected,
   kleinQwen3EncoderModelSelected,
   qwenImageComponentSourceSelected,
@@ -762,6 +807,7 @@ export const selectIsAnima = createParamsSelector((params) => params.model?.base
 export const selectIsFlux2 = createParamsSelector((params) => params.model?.base === 'flux2');
 export const selectIsExternal = createParamsSelector((params) => params.model?.base === 'external');
 export const selectIsQwenImage = createParamsSelector((params) => params.model?.base === 'qwen-image');
+export const selectIsKrea2 = createParamsSelector((params) => params.model?.base === 'krea-2');
 export const selectIsFluxKontext = createParamsSelector((params) => {
   if (params.model?.base === 'flux' && params.model?.name.toLowerCase().includes('kontext')) {
     return true;
@@ -782,6 +828,8 @@ export const selectCLIPGEmbedModel = createParamsSelector((params) => params.cli
 export const selectZImageVaeModel = createParamsSelector((params) => params.zImageVaeModel);
 export const selectZImageQwen3EncoderModel = createParamsSelector((params) => params.zImageQwen3EncoderModel);
 export const selectZImageQwen3SourceModel = createParamsSelector((params) => params.zImageQwen3SourceModel);
+export const selectKrea2VaeModel = createParamsSelector((params) => params.krea2VaeModel);
+export const selectKrea2Qwen3VlEncoderModel = createParamsSelector((params) => params.krea2Qwen3VlEncoderModel);
 export const selectAnimaVaeModel = createParamsSelector((params) => params.animaVaeModel);
 export const selectAnimaQwen3EncoderModel = createParamsSelector((params) => params.animaQwen3EncoderModel);
 export const selectAnimaScheduler = createParamsSelector((params) => params.animaScheduler);
@@ -911,6 +959,14 @@ export const selectZImageSeedVarianceStrength = createParamsSelector((params) =>
 export const selectZImageSeedVarianceRandomizePercent = createParamsSelector(
   (params) => params.zImageSeedVarianceRandomizePercent
 );
+export const selectKrea2SeedVarianceEnabled = createParamsSelector((params) => params.krea2SeedVarianceEnabled);
+export const selectKrea2SeedVarianceStrength = createParamsSelector((params) => params.krea2SeedVarianceStrength);
+export const selectKrea2SeedVarianceRandomizePercent = createParamsSelector(
+  (params) => params.krea2SeedVarianceRandomizePercent
+);
+export const selectKrea2RebalanceEnabled = createParamsSelector((params) => params.krea2RebalanceEnabled);
+export const selectKrea2RebalanceMultiplier = createParamsSelector((params) => params.krea2RebalanceMultiplier);
+export const selectKrea2RebalanceWeights = createParamsSelector((params) => params.krea2RebalanceWeights);
 export const selectSeamlessXAxis = createParamsSelector((params) => params.seamlessXAxis);
 export const selectSeamlessYAxis = createParamsSelector((params) => params.seamlessYAxis);
 export const selectSeed = createParamsSelector((params) => params.seed);

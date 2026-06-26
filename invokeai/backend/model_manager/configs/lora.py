@@ -829,6 +829,9 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         # (with the "transformer." prefix and "single_" variant) which would falsely match our check.
         # Flux Kohya LoRAs use lora_unet_double_blocks or lora_unet_single_blocks.
         has_z_image_keys = state_dict_has_any_keys_starting_with(state_dict, {"diffusion_model.layers."})
+        # Krea-2 LoRAs also carry transformer.transformer_blocks. keys, but uniquely include the
+        # text-fusion stage. Exclude them here so they route to LoRA_LyCORIS_Krea2_Config.
+        has_krea2_keys = _has_krea2_lora_keys(state_dict)
         has_flux_keys = state_dict_has_any_keys_starting_with(
             state_dict,
             {
@@ -842,7 +845,7 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             },
         )
 
-        if has_qwen_ie_keys and has_lora_suffix and not has_z_image_keys and not has_flux_keys:
+        if has_qwen_ie_keys and has_lora_suffix and not has_z_image_keys and not has_krea2_keys and not has_flux_keys:
             return
 
         raise NotAMatchError("model does not match Qwen Image LoRA heuristics")
@@ -855,6 +858,7 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             {"transformer_blocks.", "transformer.transformer_blocks.", "lora_unet_transformer_blocks_"},
         )
         has_z_image_keys = state_dict_has_any_keys_starting_with(state_dict, {"diffusion_model.layers."})
+        has_krea2_keys = _has_krea2_lora_keys(state_dict)
         has_flux_keys = state_dict_has_any_keys_starting_with(
             state_dict,
             {
@@ -868,9 +872,45 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             },
         )
 
-        if has_qwen_ie_keys and not has_z_image_keys and not has_flux_keys:
+        if has_qwen_ie_keys and not has_z_image_keys and not has_krea2_keys and not has_flux_keys:
             return BaseModelType.QwenImage
         raise NotAMatchError("model does not look like a Qwen Image Edit LoRA")
+
+
+def _has_krea2_lora_keys(state_dict: dict[str | int, Any]) -> bool:
+    """True if the state dict targets Krea-2's distinctive text-fusion / time-mod-proj modules."""
+    return any(isinstance(k, str) and ("text_fusion" in k or "time_mod_proj" in k) for k in state_dict.keys())
+
+
+class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for Krea-2 LoRA models in LyCORIS (single-file diffusers PEFT) format."""
+
+    base: Literal[BaseModelType.Krea2] = Field(default=BaseModelType.Krea2)
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        """Krea-2 LoRAs have keys like transformer.text_fusion.* / transformer.transformer_blocks.* with
+        a lora_A/lora_B (or lora_down/lora_up) suffix. The text-fusion stage is unique to Krea-2."""
+        state_dict = mod.load_state_dict()
+        has_lora_suffix = state_dict_has_any_keys_ending_with(
+            state_dict,
+            {
+                "lora_A.weight",
+                "lora_B.weight",
+                "lora_down.weight",
+                "lora_up.weight",
+                "dora_scale",
+            },
+        )
+        if _has_krea2_lora_keys(state_dict) and has_lora_suffix:
+            return
+        raise NotAMatchError("model does not match Krea-2 LoRA heuristics")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        if _has_krea2_lora_keys(mod.load_state_dict()):
+            return BaseModelType.Krea2
+        raise NotAMatchError("model does not look like a Krea-2 LoRA")
 
 
 class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):

@@ -117,6 +117,7 @@ export type T5EncoderBnbQuantizedLlmInt8bModelConfig = Extract<
 >;
 export type Qwen3EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen3_encoder' }>;
 export type QwenVLEncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen_vl_encoder' }>;
+export type Qwen3VLEncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen3_vl_encoder' }>;
 export type SpandrelImageToImageModelConfig = Extract<InternalAnyModelConfig, { type: 'spandrel_image_to_image' }>;
 export type CheckpointModelConfig = Extract<InternalAnyModelConfig, { type: 'main'; format: 'checkpoint' }>;
 export type CLIPVisionModelConfig = Extract<InternalAnyModelConfig, { type: 'clip_vision' }>;
@@ -377,6 +378,10 @@ export const isAnimaQwen3EncoderModelConfig = (config: AnyModelConfig): config i
 
 export const isQwenVLEncoderModelConfig = (config: AnyModelConfig): config is QwenVLEncoderModelConfig => {
   return config.type === 'qwen_vl_encoder';
+};
+
+export const isQwen3VLEncoderModelConfig = (config: AnyModelConfig): config is Qwen3VLEncoderModelConfig => {
+  return config.type === 'qwen3_vl_encoder';
 };
 
 export const isCLIPEmbedModelConfigOrSubmodel = (
