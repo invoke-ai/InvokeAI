@@ -597,20 +597,19 @@ class SqliteSessionQueue(SessionQueueBase):
     def delete_by_destination(
         self, queue_id: str, destination: str, user_id: Optional[str] = None
     ) -> DeleteByDestinationResult:
+        user_filter = "AND user_id = ?" if user_id is not None else ""
+        match_filter = f"queue_id == ? AND destination == ? {user_filter}"
+        params: list[Any] = [queue_id, destination]
+        if user_id is not None:
+            params.append(user_id)
+
+        # Cancel every in-progress item first so each running worker is signaled to stop before we
+        # delete its row. With multiple workers (multi-GPU) more than one item can be in_progress;
+        # canceling only get_current() would leave the others running (and then failing to update a
+        # deleted row). See _cancel_in_progress_matching.
+        self._cancel_in_progress_matching(match_filter, params)
+
         with self._db.transaction() as cursor:
-            current_queue_item = self.get_current(queue_id)
-
-            # Handle current item separately - check ownership if user_id is provided
-            if current_queue_item is not None and current_queue_item.destination == destination:
-                if user_id is None or current_queue_item.user_id == user_id:
-                    self.cancel_queue_item(current_queue_item.item_id)
-
-            # Build WHERE clause with optional user_id filter
-            user_filter = "AND user_id = ?" if user_id is not None else ""
-            params = [queue_id, destination]
-            if user_id is not None:
-                params.append(user_id)
-
             cursor.execute(
                 f"""--sql
                 SELECT COUNT(*)

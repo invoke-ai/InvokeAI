@@ -51,11 +51,17 @@ class CachedModelOnlyFullLoad:
             # module at the shared tensors and drop our duplicate so the weights live once in RAM.
             if shared_store is not None and cache_key is not None:
                 canonical = shared_store.acquire(cache_key, cpu_state_dict)
-                if canonical is not cpu_state_dict:
-                    model.load_state_dict(canonical, assign=True)
-                cpu_state_dict = canonical
                 self._shared_store = shared_store
                 self._shared_key = cache_key
+                try:
+                    if canonical is not cpu_state_dict:
+                        model.load_state_dict(canonical, assign=True)
+                    cpu_state_dict = canonical
+                except Exception:
+                    # The re-point failed after acquiring a reference; release it so the shared
+                    # entry's refcount isn't leaked (this wrapper will never enter the cache).
+                    self.release_shared_weights()
+                    raise
             self._cpu_state_dict = cpu_state_dict
 
         self._total_bytes = total_bytes

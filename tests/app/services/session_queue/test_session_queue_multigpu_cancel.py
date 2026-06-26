@@ -11,6 +11,7 @@ import pytest
 
 from invokeai.app.services.events.events_common import QueueItemStatusChangedEvent
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.session_queue.session_queue_common import SessionQueueItemNotFoundError
 from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from tests.test_nodes import PromptTestInvocation, TestEventService
@@ -105,6 +106,25 @@ def test_cancel_by_queue_id_cancels_all_in_progress(session_queue: SqliteSession
     assert session_queue.get_queue_item(id_a).status == "canceled"
     assert session_queue.get_queue_item(id_b).status == "canceled"
     assert {id_a, id_b} <= _canceled_event_item_ids(mock_invoker)
+
+
+def test_delete_by_destination_cancels_all_in_progress(session_queue: SqliteSessionQueue, mock_invoker: Invoker):
+    """delete_by_destination must signal every running worker (not just get_current()) before
+    deleting their rows, or the un-canceled workers keep running and then fail to update a deleted
+    row."""
+    _insert(session_queue, batch_id=str(uuid.uuid4()), destination="canvas")
+    _insert(session_queue, batch_id=str(uuid.uuid4()), destination="canvas")
+    id_a, id_b = _dequeue_two_on_separate_devices(session_queue)
+
+    result = session_queue.delete_by_destination("default", "canvas")
+
+    assert result.deleted == 2
+    # Both in-progress workers were signaled to cancel before deletion.
+    assert {id_a, id_b} <= _canceled_event_item_ids(mock_invoker)
+    # Rows are gone.
+    for item_id in (id_a, id_b):
+        with pytest.raises(SessionQueueItemNotFoundError):
+            session_queue.get_queue_item(item_id)
 
 
 def test_cancel_by_batch_ids_respects_user_scope(session_queue: SqliteSessionQueue, mock_invoker: Invoker):

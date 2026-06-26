@@ -194,6 +194,17 @@ class TorchDevice:
         seen: set[str] = set()
         for device_str in device_strs:
             device = cls.normalize(device_str)
+            # Fail fast on a CUDA device that doesn't exist, rather than starting a worker pinned to
+            # it that only errors cryptically at the first tensor allocation. ("auto" only generates
+            # valid indices, so this just validates explicitly-configured devices.)
+            if device.type == "cuda":
+                if not torch.cuda.is_available():
+                    raise ValueError(f"generation_devices requested '{device_str}', but no CUDA device is available.")
+                if device.index is not None and device.index >= torch.cuda.device_count():
+                    raise ValueError(
+                        f"generation_devices requested '{device_str}', but only {torch.cuda.device_count()} "
+                        f"CUDA device(s) are available (valid indices 0-{torch.cuda.device_count() - 1})."
+                    )
             if str(device) not in seen:
                 seen.add(str(device))
                 devices.append(device)

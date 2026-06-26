@@ -5,6 +5,7 @@ would happen on two GPUs) must end up aliasing one set of CPU tensors instead of
 copies. They run on CPU — the wrapper constructors never touch VRAM, so no GPU is required.
 """
 
+import pytest
 import torch
 
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_only_full_load import (
@@ -98,3 +99,24 @@ def test_keep_ram_copy_false_does_not_touch_store():
     assert cached.get_cpu_state_dict() is None
     assert "m" not in store
     assert store.refcount("m") == 0
+
+
+class _RepointFailsModule(DummyModule):
+    """A model whose load_state_dict raises, to simulate a re-point failure during construction."""
+
+    def load_state_dict(self, *args, **kwargs):  # type: ignore[override]
+        raise RuntimeError("simulated re-point failure")
+
+
+def test_acquire_is_released_if_repoint_fails():
+    # First device registers the canonical weights (refcount 1).
+    store = SharedCpuWeightsStore()
+    CachedModelWithPartialLoad(DummyModule(), CPU, keep_ram_copy=True, shared_store=store, cache_key="m")
+    assert store.refcount("m") == 1
+
+    # Second device adopts the canonical copy, but its re-point throws. The just-acquired reference
+    # must be released so the store's refcount is not leaked (the wrapper never enters the cache).
+    with pytest.raises(RuntimeError, match="simulated re-point failure"):
+        CachedModelWithPartialLoad(_RepointFailsModule(), CPU, keep_ram_copy=True, shared_store=store, cache_key="m")
+
+    assert store.refcount("m") == 1  # back to just the first device, not leaked at 2

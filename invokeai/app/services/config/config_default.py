@@ -263,6 +263,15 @@ class InvokeAIAppConfig(BaseSettings):
     def validate_generation_devices(cls, v: Union[str, list[str]]) -> Union[str, list[str]]:
         if v == "auto":
             return v
+        # A non-"auto" string would otherwise be iterated character-by-character below (rejecting
+        # 'c' from "cuda:0"), producing a confusing error. Require an explicit list instead.
+        if isinstance(v, str):
+            raise ValueError(
+                f"Invalid generation_devices value '{v}'. Use 'auto' or a list of devices, "
+                "e.g. ['cuda:0', 'cuda:1']."
+            )
+        if len(v) == 0:
+            raise ValueError("generation_devices cannot be an empty list. Use 'auto' or a list of devices.")
         pattern = re.compile(r"^(cpu|mps|cuda(:\d+)?)$")
         for device in v:
             if not pattern.match(device):

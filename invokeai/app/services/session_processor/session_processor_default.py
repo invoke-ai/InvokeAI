@@ -498,6 +498,19 @@ class DefaultSessionProcessor(SessionProcessorBase):
             is_processing=any(worker.queue_item is not None for worker in self._workers),
         )
 
+    def _is_queue_item_terminal(self, item_id: int) -> bool:
+        """Return True if the queue item is already finished (canceled/failed/completed) or gone.
+
+        Checked right after a worker claims an item to catch a cancellation that raced the claim and
+        so never reached this worker's cancel_event — e.g. the status-changed handler ran before the
+        worker recorded `queue_item` and so couldn't match a worker to signal.
+        """
+        try:
+            status = self._invoker.services.session_queue.get_queue_item(item_id).status
+        except SessionQueueItemNotFoundError:
+            return True
+        return status in ("canceled", "failed", "completed")
+
     def _process(
         self,
         worker: _SessionWorker,
@@ -528,6 +541,13 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     if stop_event.is_set():
                         break
 
+                    # Clear any stale cancel signal from the previous item BEFORE claiming the next
+                    # one. Clearing it after dequeue (as before) could wipe a cancel that arrived for
+                    # the item we just claimed — e.g. during the gc.collect() below — silently losing
+                    # the cancellation. Any cancel that arrives after this point for the claimed item
+                    # stays set and is caught by the runner's _is_canceled() check.
+                    worker.cancel_event.clear()
+
                     # Get the next session to process. dequeue() atomically claims the item, so concurrent
                     # workers never receive the same item. Pass this worker's device so the item is
                     # tagged with the GPU that ran it (None in single-device/legacy mode).
@@ -541,6 +561,16 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         poll_now_event.wait(self._polling_interval)
                         continue
 
+                    # A cancellation can race the claim: it may have marked the row terminal before
+                    # this worker recorded `queue_item`, so _on_queue_item_status_changed couldn't set
+                    # our cancel_event. Re-check (cancel_event + a fresh DB status read) and skip
+                    # running if the item is already finished, so the cancel is never lost.
+                    if worker.cancel_event.is_set() or self._is_queue_item_terminal(worker.queue_item.item_id):
+                        self._invoker.services.logger.debug(
+                            f"Queue item {worker.queue_item.item_id} was canceled before it started; skipping."
+                        )
+                        continue
+
                     # GC-ing here can reduce peak memory usage of the invoke process by freeing allocated memory blocks.
                     # Most queue items take seconds to execute, so the relative cost of a GC is very small.
                     # Python will never cede allocated memory back to the OS, so anything we can do to reduce the peak
@@ -551,7 +581,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         f"Executing queue item {worker.queue_item.item_id}, session {worker.queue_item.session_id} "
                         f"on {worker.label}"
                     )
-                    worker.cancel_event.clear()
 
                     # Run the graph
                     worker.runner.run(queue_item=worker.queue_item)

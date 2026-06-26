@@ -35,36 +35,44 @@ class CachedModelWithPartialLoad:
         # patching. Set to `None` if keep_ram_copy is False.
         cpu_state_dict: dict[str, torch.Tensor] | None = model_state_dict if keep_ram_copy else None
 
+        # A dictionary of the size of each tensor in the state dict.
+        # HACK(ryand): We use this dictionary any time we are doing byte tracking calculations. We do this for
+        # consistency in case the application code has modified the model's size (e.g. by casting to a different
+        # precision). Of course, this means that we are making model cache load/unload decisions based on model size
+        # data that may not be fully accurate.
+        #
+        # Note: these are computed from the model's own state dict *before* the shared-weights re-point
+        # below. The re-point only swaps tensor storage; keys, shapes and dtypes are unchanged, so the
+        # metadata is identical either way. Computing it first keeps the acquire the last (and only
+        # failure-prone) step, so a failure there can release the reference cleanly without leaking it.
+        self._state_dict_bytes = {k: calc_tensor_size(v) for k, v in model_state_dict.items()}
+        self._total_bytes = sum(self._state_dict_bytes.values())
+        self._cur_vram_bytes: int | None = None
+        self._modules_that_support_autocast = self._find_modules_that_support_autocast()
+        self._keys_in_modules_that_do_not_support_autocast = self._find_keys_in_modules_that_do_not_support_autocast(
+            model_state_dict
+        )
+        self._state_dict_keys_by_module_prefix = self._group_state_dict_keys_by_module_prefix(model_state_dict)
+
         # In multi-GPU mode, share a single canonical CPU copy of the weights across the per-device
         # caches instead of keeping one copy per device (see SharedCpuWeightsStore). If another
         # device already registered this key, re-point our module's params at the shared tensors and
         # drop our freshly-built duplicate so the weights live once in RAM.
         if cpu_state_dict is not None and shared_store is not None and cache_key is not None:
             canonical = shared_store.acquire(cache_key, cpu_state_dict)
-            if canonical is not cpu_state_dict:
-                self._model.load_state_dict(canonical, assign=True)
-                model_state_dict = canonical
-            cpu_state_dict = canonical
             self._shared_store = shared_store
             self._shared_key = cache_key
+            try:
+                if canonical is not cpu_state_dict:
+                    self._model.load_state_dict(canonical, assign=True)
+                cpu_state_dict = canonical
+            except Exception:
+                # The re-point failed after acquiring a reference; release it so the shared entry's
+                # refcount isn't leaked (this wrapper will never be inserted into the cache).
+                self.release_shared_weights()
+                raise
 
         self._cpu_state_dict: dict[str, torch.Tensor] | None = cpu_state_dict
-
-        # A dictionary of the size of each tensor in the state dict.
-        # HACK(ryand): We use this dictionary any time we are doing byte tracking calculations. We do this for
-        # consistency in case the application code has modified the model's size (e.g. by casting to a different
-        # precision). Of course, this means that we are making model cache load/unload decisions based on model size
-        # data that may not be fully accurate.
-        self._state_dict_bytes = {k: calc_tensor_size(v) for k, v in model_state_dict.items()}
-
-        self._total_bytes = sum(self._state_dict_bytes.values())
-        self._cur_vram_bytes: int | None = None
-
-        self._modules_that_support_autocast = self._find_modules_that_support_autocast()
-        self._keys_in_modules_that_do_not_support_autocast = self._find_keys_in_modules_that_do_not_support_autocast(
-            model_state_dict
-        )
-        self._state_dict_keys_by_module_prefix = self._group_state_dict_keys_by_module_prefix(model_state_dict)
 
     def _find_modules_that_support_autocast(self) -> dict[str, torch.nn.Module]:
         """Find all modules that support autocasting."""

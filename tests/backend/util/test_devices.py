@@ -255,3 +255,23 @@ def test_choose_anima_inference_dtype_auto_delegates_to_safe_dtype():
         result = TorchDevice.choose_anima_inference_dtype(device)
     assert result is sentinel
     mock_safe.assert_called_once_with(device)
+
+
+@patch("torch.cuda.device_count", return_value=2)
+@patch("torch.cuda.is_available", return_value=True)
+def test_get_generation_devices_rejects_out_of_range_cuda(mock_avail, mock_count):
+    # cuda:2 does not exist on a 2-GPU machine — fail fast instead of deferring to first allocation.
+    with pytest.raises(ValueError, match="only 2 CUDA"):
+        TorchDevice.get_generation_devices(["cuda:2"])
+
+
+@patch("torch.cuda.device_count", return_value=2)
+@patch("torch.cuda.is_available", return_value=True)
+def test_get_generation_devices_accepts_in_range_cuda(mock_avail, mock_count):
+    assert [str(d) for d in TorchDevice.get_generation_devices(["cuda:1"])] == ["cuda:1"]
+
+
+@patch("torch.cuda.is_available", return_value=False)
+def test_get_generation_devices_rejects_cuda_when_unavailable(mock_avail):
+    with pytest.raises(ValueError, match="no CUDA"):
+        TorchDevice.get_generation_devices(["cuda:0"])
