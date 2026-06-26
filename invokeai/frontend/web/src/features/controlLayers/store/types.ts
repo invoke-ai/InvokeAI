@@ -106,7 +106,19 @@ const zIPMethodV2 = z.enum(['full', 'style', 'composition', 'style_strong', 'sty
 export type IPMethodV2 = z.infer<typeof zIPMethodV2>;
 export const isIPMethodV2 = (v: unknown): v is IPMethodV2 => zIPMethodV2.safeParse(v).success;
 
-const _zTool = z.enum(['brush', 'eraser', 'move', 'rect', 'lasso', 'gradient', 'view', 'bbox', 'colorPicker', 'text']);
+const _zTool = z.enum([
+  'brush',
+  'eraser',
+  'move',
+  'rect',
+  'path',
+  'lasso',
+  'gradient',
+  'view',
+  'bbox',
+  'colorPicker',
+  'text',
+]);
 export type Tool = z.infer<typeof _zTool>;
 
 const zPoints = z.array(z.number()).refine((points) => points.length % 2 === 0, {
@@ -142,6 +154,8 @@ const zCoordinate = z.object({
   y: z.number(),
 });
 export type Coordinate = z.infer<typeof zCoordinate>;
+
+const zNullableCoordinate = zCoordinate.nullable();
 const _zCoordinateWithPressure = z.object({
   x: z.number(),
   y: z.number(),
@@ -425,6 +439,24 @@ const zCanvasEntityBase = z.object({
   isLocked: z.boolean(),
 });
 
+const zBezierPointType = z.enum(['smooth', 'corner']);
+
+const zCanvasBezierPointState = z.object({
+  anchor: zCoordinate,
+  inHandle: zNullableCoordinate,
+  outHandle: zNullableCoordinate,
+  type: zBezierPointType,
+});
+export type CanvasBezierPointState = z.infer<typeof zCanvasBezierPointState>;
+
+const zCanvasBezierPathState = z.object({
+  id: zId,
+  name: zName,
+  isClosed: z.boolean(),
+  points: z.array(zCanvasBezierPointState),
+});
+export type CanvasBezierPathState = z.infer<typeof zCanvasBezierPathState>;
+
 export const zRefImageState = z.object({
   id: zId,
   isEnabled: z.boolean().default(true),
@@ -656,6 +688,14 @@ const zCanvasControlLayerState = zCanvasRasterLayerState.extend({
 });
 export type CanvasControlLayerState = z.infer<typeof zCanvasControlLayerState>;
 
+const zCanvasVectorLayerState = zCanvasEntityBase.extend({
+  type: z.literal('vector_layer'),
+  position: zCoordinate,
+  opacity: zOpacity,
+  paths: z.array(zCanvasBezierPathState),
+});
+export type CanvasVectorLayerState = z.infer<typeof zCanvasVectorLayerState>;
+
 const zBoundingBoxScaleMethod = z.enum(['none', 'auto', 'manual']);
 export type BoundingBoxScaleMethod = z.infer<typeof zBoundingBoxScaleMethod>;
 export const isBoundingBoxScaleMethod = (v: unknown): v is BoundingBoxScaleMethod =>
@@ -664,6 +704,7 @@ export const isBoundingBoxScaleMethod = (v: unknown): v is BoundingBoxScaleMetho
 const _zCanvasEntityState = z.discriminatedUnion('type', [
   zCanvasRasterLayerState,
   zCanvasControlLayerState,
+  zCanvasVectorLayerState,
   zCanvasRegionalGuidanceState,
   zCanvasInpaintMaskState,
 ]);
@@ -672,6 +713,7 @@ export type CanvasEntityState = z.infer<typeof _zCanvasEntityState>;
 const zCanvasEntityType = z.union([
   zCanvasRasterLayerState.shape.type,
   zCanvasControlLayerState.shape.type,
+  zCanvasVectorLayerState.shape.type,
   zCanvasRegionalGuidanceState.shape.type,
   zCanvasInpaintMaskState.shape.type,
 ]);
@@ -964,6 +1006,10 @@ const zControlLayers = z.object({
   isHidden: z.boolean(),
   entities: z.array(zCanvasControlLayerState),
 });
+const zVectorLayers = z.object({
+  isHidden: z.boolean(),
+  entities: z.array(zCanvasVectorLayerState),
+});
 const zRegionalGuidance = z.object({
   isHidden: z.boolean(),
   entities: z.array(zCanvasRegionalGuidanceState),
@@ -975,6 +1021,7 @@ export const zCanvasState = z.object({
   inpaintMasks: zInpaintMasks,
   rasterLayers: zRasterLayers,
   controlLayers: zControlLayers,
+  vectorLayers: zVectorLayers.default({ isHidden: false, entities: [] }),
   regionalGuidance: zRegionalGuidance,
   bbox: zBboxState,
 });
@@ -986,6 +1033,7 @@ export const getInitialCanvasState = (): CanvasState => ({
   inpaintMasks: { isHidden: false, entities: [] },
   rasterLayers: { isHidden: false, entities: [] },
   controlLayers: { isHidden: false, entities: [] },
+  vectorLayers: { isHidden: false, entities: [] },
   regionalGuidance: { isHidden: false, entities: [] },
   bbox: {
     rect: { x: 0, y: 0, width: 512, height: 512 },
@@ -1017,6 +1065,7 @@ export const zCanvasMetadata = z.object({
   inpaintMasks: z.array(zCanvasInpaintMaskState),
   rasterLayers: z.array(zCanvasRasterLayerState),
   controlLayers: z.array(zCanvasControlLayerState),
+  vectorLayers: z.array(zCanvasVectorLayerState).default([]),
   regionalGuidance: z.array(zCanvasRegionalGuidanceState),
   // referenceImages: z.array(zRefImageState),
 });
@@ -1084,6 +1133,12 @@ export function isControlLayerEntityIdentifier(
   entityIdentifier: CanvasEntityIdentifier
 ): entityIdentifier is CanvasEntityIdentifier<'control_layer'> {
   return entityIdentifier.type === 'control_layer';
+}
+
+export function isVectorLayerEntityIdentifier(
+  entityIdentifier: CanvasEntityIdentifier
+): entityIdentifier is CanvasEntityIdentifier<'vector_layer'> {
+  return entityIdentifier.type === 'vector_layer';
 }
 
 export function isInpaintMaskEntityIdentifier(
