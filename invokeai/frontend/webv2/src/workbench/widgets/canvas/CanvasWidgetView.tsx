@@ -2,7 +2,7 @@ import type { WidgetViewProps } from '@workbench/types';
 
 import { Box, Flex } from '@chakra-ui/react';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { useEffect, useEffectEvent } from 'react';
+import { useCallback, useEffect, useEffectEvent } from 'react';
 
 import { CanvasDocumentFrame, CanvasPlaneImage, EmptyCanvasFrame, ToolScrubber } from './CanvasDocumentFrame';
 import { CanvasStagingControls, EmptyStagingControls } from './CanvasStagingControls';
@@ -18,6 +18,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const hasMultipleCandidates = stagingArea.pendingImages.length > 1;
   const renderedLayers = [...layers].reverse();
   const hasCanvasContent = renderedLayers.length > 0 || Boolean(selectedImage);
+
   const executeCanvasHotkey = useEffectEvent((commandId: string) => {
     if (commandId === 'canvas.prevEntity' && hasStagedCandidates) {
       dispatch({ direction: -1, type: 'cycleStagedImage' });
@@ -31,6 +32,20 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       dispatch({ type: 'redoProjectChange' });
     }
   });
+
+  const handleAccept = useCallback(() => dispatch({ type: 'acceptStagedImage' }), [dispatch]);
+  const handleCycle = useCallback((direction: -1 | 1) => dispatch({ direction, type: 'cycleStagedImage' }), [dispatch]);
+  const handleDiscardAll = useCallback(() => dispatch({ type: 'discardAllStagedImages' }), [dispatch]);
+  const handleDiscardSelected = useCallback(() => dispatch({ type: 'discardSelectedStagedImage' }), [dispatch]);
+  const handleSelectImage = useCallback(
+    (imageIndex: number) => dispatch({ imageIndex, type: 'setStagedImageIndex' }),
+    [dispatch]
+  );
+  const handleToggleThumbnails = useCallback(
+    () => dispatch({ type: 'toggleCanvasStagingThumbnailsVisibility' }),
+    [dispatch]
+  );
+  const handleToggleVisibility = useCallback(() => dispatch({ type: 'toggleCanvasStagingVisibility' }), [dispatch]);
 
   useEffect(() => {
     const hotkeys = [
@@ -100,13 +115,13 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
           pendingImages={stagingArea.pendingImages}
           selectedCandidate={selectedCandidate}
           selectedImageIndex={stagingArea.selectedImageIndex}
-          onAccept={() => dispatch({ type: 'acceptStagedImage' })}
-          onCycle={(direction) => dispatch({ direction, type: 'cycleStagedImage' })}
-          onDiscardAll={() => dispatch({ type: 'discardAllStagedImages' })}
-          onDiscardSelected={() => dispatch({ type: 'discardSelectedStagedImage' })}
-          onSelectImage={(imageIndex) => dispatch({ imageIndex, type: 'setStagedImageIndex' })}
-          onToggleThumbnails={() => dispatch({ type: 'toggleCanvasStagingThumbnailsVisibility' })}
-          onToggleVisibility={() => dispatch({ type: 'toggleCanvasStagingVisibility' })}
+          onAccept={handleAccept}
+          onCycle={handleCycle}
+          onDiscardAll={handleDiscardAll}
+          onDiscardSelected={handleDiscardSelected}
+          onSelectImage={handleSelectImage}
+          onToggleThumbnails={handleToggleThumbnails}
+          onToggleVisibility={handleToggleVisibility}
         />
       ) : (
         <EmptyStagingControls />

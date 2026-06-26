@@ -51,7 +51,7 @@ import {
   WorkflowIcon,
   type LucideIcon,
 } from 'lucide-react';
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 
 import { HotkeysSettingsSection } from './HotkeysSettingsSection';
 import {
@@ -82,6 +82,16 @@ const updatePreferences = (patch: Partial<WorkbenchPreferences>): void => {
   void patchWorkbenchPreferences(patch);
 };
 
+const SETTINGS_TAB_LIST_WIDTH = { base: '40', md: '52' };
+const SETTINGS_CONTENT_PADDING = { base: '4', md: '5' };
+const THEME_GRID_COLUMNS = { base: 2, md: 3 };
+const DEVELOPER_GRID_COLUMNS = { base: 1, md: 2 };
+const DANGER_BUTTON_HOVER_STYLES = { bg: 'fg.error', color: 'bg.subtle' };
+const SWITCH_CHECKED_STYLES = { bg: 'accent.solid' };
+const FIELD_ALIGN_ITEMS = { base: 'stretch', md: 'center' };
+const FIELD_FLEX_DIRECTION = { base: 'column', md: 'row' };
+const SELECT_MAX_WIDTH = { base: 'full', md: '56' };
+
 /**
  * The top bar's settings entry point. It also hosts the dialog itself, driven
  * by `settingsDialogStore` so any surface can deep-link into a section via
@@ -89,11 +99,12 @@ const updatePreferences = (patch: Partial<WorkbenchPreferences>): void => {
  */
 export const SettingsButton = () => {
   const isOpen = settingsDialogStore.useSelector((snapshot) => snapshot.isOpen);
+  const handleOpen = useCallback(() => openWorkbenchSettings(), []);
 
   return (
     <>
       <Tooltip content="Settings">
-        <IconButton aria-label="Settings" size="sm" variant="ghost" onClick={() => openWorkbenchSettings()}>
+        <IconButton aria-label="Settings" size="sm" variant="ghost" onClick={handleOpen}>
           <SettingsIcon />
         </IconButton>
       </Tooltip>
@@ -111,6 +122,15 @@ export const SettingsDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
     return registerHotkeyModalLayer('settings');
   }, [isOpen]);
 
+  const handleOpenChange = useCallback(
+    (event: { open: boolean }) => {
+      if (!event.open) {
+        onClose();
+      }
+    },
+    [onClose]
+  );
+
   return (
     <Dialog.Root
       closeOnInteractOutside={false}
@@ -120,11 +140,7 @@ export const SettingsDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
       scrollBehavior="inside"
       size="xl"
       unmountOnExit
-      onOpenChange={(event) => {
-        if (!event.open) {
-          onClose();
-        }
-      }}
+      onOpenChange={handleOpenChange}
     >
       <SettingsDialogContent onClose={onClose} />
     </Dialog.Root>
@@ -133,18 +149,19 @@ export const SettingsDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
 
 const SettingsDialogContent = ({ onClose }: { onClose: () => void }) => {
   const { error, scope, status } = useWorkbenchSettings();
+  const handlePositionerClick = useCallback(
+    (event: { target: EventTarget; currentTarget: EventTarget }) => {
+      if (event.target === event.currentTarget) {
+        onClose();
+      }
+    },
+    [onClose]
+  );
 
   return (
     <Portal>
       <Dialog.Backdrop pointerEvents="auto" />
-      <Dialog.Positioner
-        pointerEvents="auto"
-        onClick={(event) => {
-          if (event.target === event.currentTarget) {
-            onClose();
-          }
-        }}
-      >
+      <Dialog.Positioner pointerEvents="auto" onClick={handlePositionerClick}>
         <Dialog.Content h="min(46rem, calc(100dvh - 4rem))" maxW="4xl">
           <Dialog.Header borderBottomWidth="1px" borderColor="border.subtle">
             <Flex alignItems="start" gap="2">
@@ -180,54 +197,60 @@ const SettingsDialogContent = ({ onClose }: { onClose: () => void }) => {
 
 const SettingsTabs = () => {
   const hasWorkbench = useOptionalWorkbenchStore() !== null;
-  const SETTINGS_TABS: SettingsTabDefinition[] = [
-    {
-      children: <AppearanceSection />,
-      icon: PaletteIcon,
-      label: 'Appearance',
-      value: 'appearance',
-    },
-    {
-      children: <BehaviorSection />,
-      icon: SlidersHorizontalIcon,
-      label: 'Behavior',
-      value: 'behavior',
-    },
-    {
-      children: <HotkeysSettingsSection />,
-      icon: KeyboardIcon,
-      label: 'Hotkeys',
-      value: 'hotkeys',
-    },
-    {
-      children: <ProjectSection />,
-      condition: hasWorkbench,
-      icon: FolderIcon,
-      label: 'Project',
-      value: 'project',
-    },
-    {
-      children: <WorkflowSection />,
-      icon: WorkflowIcon,
-      label: 'Workflow',
-      value: 'workflow',
-    },
-    {
-      children: <DeveloperSection />,
-      icon: Code2Icon,
-      label: 'Developer',
-      value: 'developer',
-    },
-    {
-      children: <WorkspaceSection />,
-      icon: DatabaseIcon,
-      label: 'Workspace',
-      value: 'workspace',
-    },
-  ];
-  const tabs = SETTINGS_TABS.filter((tab) => tab.condition !== false);
+  const settingsTabs: SettingsTabDefinition[] = useMemo(
+    () => [
+      {
+        children: <AppearanceSection />,
+        icon: PaletteIcon,
+        label: 'Appearance',
+        value: 'appearance',
+      },
+      {
+        children: <BehaviorSection />,
+        icon: SlidersHorizontalIcon,
+        label: 'Behavior',
+        value: 'behavior',
+      },
+      {
+        children: <HotkeysSettingsSection />,
+        icon: KeyboardIcon,
+        label: 'Hotkeys',
+        value: 'hotkeys',
+      },
+      {
+        children: <ProjectSection />,
+        condition: hasWorkbench,
+        icon: FolderIcon,
+        label: 'Project',
+        value: 'project',
+      },
+      {
+        children: <WorkflowSection />,
+        icon: WorkflowIcon,
+        label: 'Workflow',
+        value: 'workflow',
+      },
+      {
+        children: <DeveloperSection />,
+        icon: Code2Icon,
+        label: 'Developer',
+        value: 'developer',
+      },
+      {
+        children: <WorkspaceSection />,
+        icon: DatabaseIcon,
+        label: 'Workspace',
+        value: 'workspace',
+      },
+    ],
+    [hasWorkbench]
+  );
+  const tabs = settingsTabs.filter((tab) => tab.condition !== false);
   const sectionId = settingsDialogStore.useSelector((snapshot) => snapshot.sectionId);
   const activeSectionId = tabs.some((tab) => tab.value === sectionId) ? sectionId : 'appearance';
+  const handleValueChange = useCallback((event: { value: string }) => {
+    setWorkbenchSettingsSection(event.value as SettingsSectionId);
+  }, []);
 
   return (
     <Tabs.Root
@@ -237,7 +260,7 @@ const SettingsTabs = () => {
       orientation="vertical"
       value={activeSectionId}
       variant="subtle"
-      onValueChange={(event) => setWorkbenchSettingsSection(event.value as SettingsSectionId)}
+      onValueChange={handleValueChange}
     >
       <Tabs.List
         alignItems="stretch"
@@ -246,13 +269,13 @@ const SettingsTabs = () => {
         borderRightWidth="1px"
         flexShrink={0}
         p="2"
-        w={{ base: '40', md: '52' }}
+        w={SETTINGS_TAB_LIST_WIDTH}
       >
         {tabs.map((tab) => (
           <SettingsTabTrigger key={tab.value} icon={tab.icon} label={tab.label} value={tab.value} />
         ))}
       </Tabs.List>
-      <Box flex="1" minW="0" overflowY="auto" p={{ base: '4', md: '5' }}>
+      <Box flex="1" minW="0" overflowY="auto" p={SETTINGS_CONTENT_PADDING}>
         {tabs.map((tab) => (
           <Tabs.Content key={tab.value} m="0" p="0" value={tab.value}>
             {tab.children}
@@ -295,13 +318,22 @@ const SettingsSection = ({
 const AppearanceSection = () => {
   const { language, reduceMotion, showFocusRegionHighlight, themeId } = useWorkbenchPreferences();
 
-  const selectTheme = (nextThemeId: WorkbenchThemeId) => {
+  const selectTheme = useCallback((nextThemeId: WorkbenchThemeId) => {
     updatePreferences({ themeId: nextThemeId });
-  };
+  }, []);
+  const updateLanguage = useCallback((value: string) => {
+    updatePreferences({ language: value as WorkbenchLanguage });
+  }, []);
+  const updateReduceMotion = useCallback((checked: boolean) => {
+    updatePreferences({ reduceMotion: checked });
+  }, []);
+  const updateShowFocusRegionHighlight = useCallback((checked: boolean) => {
+    updatePreferences({ showFocusRegionHighlight: checked });
+  }, []);
 
   return (
     <SettingsSection description="Choose a theme, language, and motion behavior." title="Appearance">
-      <SimpleGrid columns={{ base: 2, md: 3 }} gap="3">
+      <SimpleGrid columns={THEME_GRID_COLUMNS} gap="3">
         {THEMES.map((theme) => (
           <ThemeCard key={theme.id} selected={theme.id === themeId} theme={theme} onSelect={selectTheme} />
         ))}
@@ -311,7 +343,7 @@ const AppearanceSection = () => {
         description="Interface language. More i18n coverage will arrive soon."
         label="Language"
         value={language}
-        onChange={(value) => updatePreferences({ language: value as WorkbenchLanguage })}
+        onChange={updateLanguage}
       >
         {WORKBENCH_LANGUAGES.map((value) => (
           <option key={value} value={value}>
@@ -323,13 +355,13 @@ const AppearanceSection = () => {
         checked={reduceMotion}
         description="Disable transitions and animations across the workbench."
         label="Reduce motion"
-        onChange={(checked) => updatePreferences({ reduceMotion: checked })}
+        onChange={updateReduceMotion}
       />
       <SettingToggle
         checked={showFocusRegionHighlight}
         description="Draw a subtle outline around the active workbench region."
         label="Highlight focused region"
-        onChange={(checked) => updatePreferences({ showFocusRegionHighlight: checked })}
+        onChange={updateShowFocusRegionHighlight}
       />
     </SettingsSection>
   );
@@ -347,9 +379,10 @@ const ThemeCard = ({
   const recipe = useSlotRecipe({ recipe: themeCardRecipe });
   const styles = recipe({ selected });
   const [surface, control, brandColor, accentColor] = previewSwatches(theme);
+  const handleSelect = useCallback(() => onSelect(theme.id), [onSelect, theme.id]);
 
   return (
-    <chakra.button type="button" aria-pressed={selected} css={styles.root} onClick={() => onSelect(theme.id)}>
+    <chakra.button type="button" aria-pressed={selected} css={styles.root} onClick={handleSelect}>
       <Flex css={styles.preview}>
         <Box css={styles.swatch} bg={surface} />
         <Box css={styles.swatch} bg={control} />
@@ -371,6 +404,15 @@ const ThemeCard = ({
 
 const BehaviorSection = () => {
   const { confirmImageDeletion, enableInformationalPopovers, enableModelDescriptions } = useWorkbenchPreferences();
+  const updateConfirmImageDeletion = useCallback((checked: boolean) => {
+    updatePreferences({ confirmImageDeletion: checked });
+  }, []);
+  const updateEnableInformationalPopovers = useCallback((checked: boolean) => {
+    updatePreferences({ enableInformationalPopovers: checked });
+  }, []);
+  const updateEnableModelDescriptions = useCallback((checked: boolean) => {
+    updatePreferences({ enableModelDescriptions: checked });
+  }, []);
 
   return (
     <SettingsSection description="Safety checks and user-assistance behavior." title="Behavior">
@@ -378,20 +420,20 @@ const BehaviorSection = () => {
         checked={confirmImageDeletion}
         description="Ask for confirmation before permanently deleting images."
         label="Confirm image deletion"
-        onChange={(checked) => updatePreferences({ confirmImageDeletion: checked })}
+        onChange={updateConfirmImageDeletion}
       />
       <SettingToggle
         checked={enableInformationalPopovers}
         comingSoon
         description="Show educational popovers on controls that have extra guidance."
         label="Enable informational popovers"
-        onChange={(checked) => updatePreferences({ enableInformationalPopovers: checked })}
+        onChange={updateEnableInformationalPopovers}
       />
       <SettingToggle
         checked={enableModelDescriptions}
         description="Include model descriptions in model dropdowns where available."
         label="Enable model descriptions in dropdowns"
-        onChange={(checked) => updatePreferences({ enableModelDescriptions: checked })}
+        onChange={updateEnableModelDescriptions}
       />
     </SettingsSection>
   );
@@ -404,15 +446,54 @@ const ProjectSection = () => {
     shallowEqual
   );
   const dispatch = useOptionalWorkbenchDispatch();
+  const updateProjectSettings = useCallback(
+    (patch: Partial<ProjectSettings>) => {
+      dispatch?.({ settings: patch, type: 'setActiveProjectSettings' });
+    },
+    [dispatch]
+  );
+  const updateUseCpuNoise = useCallback(
+    (checked: boolean) => {
+      updateProjectSettings({ useCpuNoise: checked });
+    },
+    [updateProjectSettings]
+  );
+  const updateShowProgressDetails = useCallback(
+    (checked: boolean) => {
+      updateProjectSettings({ showProgressDetails: checked });
+    },
+    [updateProjectSettings]
+  );
+  const updateAntialiasProgressImages = useCallback(
+    (checked: boolean) => {
+      updateProjectSettings({ antialiasProgressImages: checked });
+    },
+    [updateProjectSettings]
+  );
+  const updateShowProgressImagesInViewer = useCallback(
+    (checked: boolean) => {
+      updateProjectSettings({ showProgressImagesInViewer: checked });
+    },
+    [updateProjectSettings]
+  );
+  const updatePreferNumericAttentionStyle = useCallback(
+    (checked: boolean) => {
+      updateProjectSettings({ preferNumericAttentionStyle: checked });
+    },
+    [updateProjectSettings]
+  );
+  const updateShowPromptSyntaxHighlighting = useCallback(
+    (checked: boolean) => {
+      updateProjectSettings({ showPromptSyntaxHighlighting: checked });
+    },
+    [updateProjectSettings]
+  );
 
   if (!activeProject || !dispatch) {
     return null;
   }
 
   const settings = activeProject.settings;
-  const updateProjectSettings = (patch: Partial<ProjectSettings>) => {
-    dispatch({ settings: patch, type: 'setActiveProjectSettings' });
-  };
 
   return (
     <SettingsSection
@@ -423,38 +504,38 @@ const ProjectSection = () => {
         checked={settings.useCpuNoise}
         description="Use CPU noise generation for deterministic legacy-compatible outputs."
         label="Use CPU noise"
-        onChange={(checked) => updateProjectSettings({ useCpuNoise: checked })}
+        onChange={updateUseCpuNoise}
       />
       <SettingToggle
         checked={settings.showProgressDetails}
         comingSoon
         description="Show detailed invocation progress when the backend reports it."
         label="Show progress details"
-        onChange={(checked) => updateProjectSettings({ showProgressDetails: checked })}
+        onChange={updateShowProgressDetails}
       />
       <SettingToggle
         checked={settings.antialiasProgressImages}
         description="Smooth progress previews instead of rendering them pixelated."
         label="Antialias progress images"
-        onChange={(checked) => updateProjectSettings({ antialiasProgressImages: checked })}
+        onChange={updateAntialiasProgressImages}
       />
       <SettingToggle
         checked={settings.showProgressImagesInViewer}
         description="Show progress images in the viewer when an image is still generating."
         label="Show progress images in viewer"
-        onChange={(checked) => updateProjectSettings({ showProgressImagesInViewer: checked })}
+        onChange={updateShowProgressImagesInViewer}
       />
       <SettingToggle
         checked={settings.preferNumericAttentionStyle}
         description="Prefer numeric prompt attention syntax when controls insert attention weights."
         label="Prefer numeric attention style"
-        onChange={(checked) => updateProjectSettings({ preferNumericAttentionStyle: checked })}
+        onChange={updatePreferNumericAttentionStyle}
       />
       <SettingToggle
         checked={settings.showPromptSyntaxHighlighting}
         description="Experimental. Color prompt syntax in prompt fields without changing the prompt text or validation behavior."
         label="Highlight prompt syntax (experimental)"
-        onChange={(checked) => updateProjectSettings({ showPromptSyntaxHighlighting: checked })}
+        onChange={updateShowPromptSyntaxHighlighting}
       />
     </SettingsSection>
   );
@@ -463,6 +544,18 @@ const ProjectSection = () => {
 const WorkflowSection = () => {
   const { workflowEdgeStyle, workflowShowMinimap, workflowSnapToGrid, workflowValidateConnections } =
     useWorkbenchPreferences();
+  const updateWorkflowEdgeStyle = useCallback((value: string) => {
+    updatePreferences({ workflowEdgeStyle: value === 'square' ? 'square' : 'curved' });
+  }, []);
+  const updateWorkflowSnapToGrid = useCallback((checked: boolean) => {
+    updatePreferences({ workflowSnapToGrid: checked });
+  }, []);
+  const updateWorkflowShowMinimap = useCallback((checked: boolean) => {
+    updatePreferences({ workflowShowMinimap: checked });
+  }, []);
+  const updateWorkflowValidateConnections = useCallback((checked: boolean) => {
+    updatePreferences({ workflowValidateConnections: checked });
+  }, []);
 
   return (
     <SettingsSection description="Editing behavior for the project graph workflow editor." title="Workflow">
@@ -470,7 +563,7 @@ const WorkflowSection = () => {
         description="How connections between nodes are drawn in the editor."
         label="Connection style"
         value={workflowEdgeStyle}
-        onChange={(value) => updatePreferences({ workflowEdgeStyle: value === 'square' ? 'square' : 'curved' })}
+        onChange={updateWorkflowEdgeStyle}
       >
         <option value="curved">Curved</option>
         <option value="square">Square</option>
@@ -479,19 +572,19 @@ const WorkflowSection = () => {
         checked={workflowSnapToGrid}
         description="Snap nodes to the grid while dragging. When off, hold Ctrl to snap temporarily."
         label="Always snap to grid"
-        onChange={(checked) => updatePreferences({ workflowSnapToGrid: checked })}
+        onChange={updateWorkflowSnapToGrid}
       />
       <SettingToggle
         checked={workflowShowMinimap}
         description="Show the minimap overview in the corner of the workflow editor."
         label="Show minimap"
-        onChange={(checked) => updatePreferences({ workflowShowMinimap: checked })}
+        onChange={updateWorkflowShowMinimap}
       />
       <SettingToggle
         checked={workflowValidateConnections}
         description="Reject connections between incompatible field types while wiring nodes. Turn off to wire anything (runs may fail)."
         label="Validate connections"
-        onChange={(checked) => updatePreferences({ workflowValidateConnections: checked })}
+        onChange={updateWorkflowValidateConnections}
       />
     </SettingsSection>
   );
@@ -499,17 +592,26 @@ const WorkflowSection = () => {
 
 const DeveloperSection = () => {
   const { developerLogEnabled, developerLogLevel, developerLogNamespaces } = useWorkbenchPreferences();
-  const enabledNamespaces = new Set(developerLogNamespaces);
+  const enabledNamespaces = useMemo(() => new Set(developerLogNamespaces), [developerLogNamespaces]);
 
-  const toggleNamespace = (namespace: DeveloperLogNamespace, checked: boolean) => {
-    const next = checked
-      ? [...developerLogNamespaces, namespace]
-      : developerLogNamespaces.filter((candidate) => candidate !== namespace);
+  const toggleNamespace = useCallback(
+    (namespace: DeveloperLogNamespace, checked: boolean) => {
+      const next = checked
+        ? [...developerLogNamespaces, namespace]
+        : developerLogNamespaces.filter((candidate) => candidate !== namespace);
 
-    updatePreferences({
-      developerLogNamespaces: DEVELOPER_LOG_NAMESPACES.filter((candidate) => next.includes(candidate)),
-    });
-  };
+      updatePreferences({
+        developerLogNamespaces: DEVELOPER_LOG_NAMESPACES.filter((candidate) => next.includes(candidate)),
+      });
+    },
+    [developerLogNamespaces]
+  );
+  const updateDeveloperLogEnabled = useCallback((checked: boolean) => {
+    updatePreferences({ developerLogEnabled: checked });
+  }, []);
+  const updateDeveloperLogLevel = useCallback((value: string) => {
+    updatePreferences({ developerLogLevel: value as DeveloperLogLevel });
+  }, []);
 
   return (
     <SettingsSection description="Console logging controls for development builds." title="Developer">
@@ -518,14 +620,14 @@ const DeveloperSection = () => {
         comingSoon
         description="Enable console logging for selected namespaces."
         label="Enable developer logs"
-        onChange={(checked) => updatePreferences({ developerLogEnabled: checked })}
+        onChange={updateDeveloperLogEnabled}
       />
       <SettingSelect
         comingSoon
         description="Minimum log level written to the console."
         label="Log level"
         value={developerLogLevel}
-        onChange={(value) => updatePreferences({ developerLogLevel: value as DeveloperLogLevel })}
+        onChange={updateDeveloperLogLevel}
       >
         {DEVELOPER_LOG_LEVELS.map((value) => (
           <option key={value} value={value}>
@@ -537,25 +639,43 @@ const DeveloperSection = () => {
         <Text color="fg" fontSize="sm" fontWeight="500">
           Log namespaces
         </Text>
-        <SimpleGrid columns={{ base: 1, md: 2 }} gap="2">
+        <SimpleGrid columns={DEVELOPER_GRID_COLUMNS} gap="2">
           {DEVELOPER_LOG_NAMESPACES.map((namespace) => (
-            <Checkbox.Root
+            <DeveloperNamespaceCheckbox
               key={namespace}
               checked={enabledNamespaces.has(namespace)}
-              disabled
-              size="sm"
-              onCheckedChange={(event) => toggleNamespace(namespace, event.checked === true)}
-            >
-              <Checkbox.HiddenInput />
-              <Checkbox.Control />
-              <Checkbox.Label color="fg.muted" fontSize="xs">
-                {formatSettingLabel(namespace)}
-              </Checkbox.Label>
-            </Checkbox.Root>
+              namespace={namespace}
+              toggleNamespace={toggleNamespace}
+            />
           ))}
         </SimpleGrid>
       </Stack>
     </SettingsSection>
+  );
+};
+
+const DeveloperNamespaceCheckbox = ({
+  checked,
+  namespace,
+  toggleNamespace,
+}: {
+  checked: boolean;
+  namespace: DeveloperLogNamespace;
+  toggleNamespace: (namespace: DeveloperLogNamespace, checked: boolean) => void;
+}) => {
+  const handleCheckedChange = useCallback(
+    (event: { checked: boolean | 'indeterminate' }) => toggleNamespace(namespace, event.checked === true),
+    [namespace, toggleNamespace]
+  );
+
+  return (
+    <Checkbox.Root checked={checked} disabled size="sm" onCheckedChange={handleCheckedChange}>
+      <Checkbox.HiddenInput />
+      <Checkbox.Control />
+      <Checkbox.Label color="fg.muted" fontSize="xs">
+        {formatSettingLabel(namespace)}
+      </Checkbox.Label>
+    </Checkbox.Root>
   );
 };
 
@@ -564,10 +684,13 @@ const WorkspaceSection = () => {
   const { scope } = useWorkbenchSettings();
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
 
-  const clearSavedData = async () => {
+  const clearSavedData = useCallback(async () => {
     await Promise.all([syncedWorkbenchPersistence.clearWorkbench(), clearWorkbenchSettings()]);
     window.location.reload();
-  };
+  }, []);
+  const resetLayout = useCallback(() => dispatch?.({ type: 'resetActiveLayout' }), [dispatch]);
+  const openClearConfirm = useCallback(() => setIsClearConfirmOpen(true), []);
+  const closeClearConfirm = useCallback(() => setIsClearConfirmOpen(false), []);
 
   return (
     <SettingsSection
@@ -576,7 +699,7 @@ const WorkspaceSection = () => {
     >
       <HStack gap="2" wrap="wrap">
         {dispatch ? (
-          <Button size="sm" variant="outline" onClick={() => dispatch({ type: 'resetActiveLayout' })}>
+          <Button size="sm" variant="outline" onClick={resetLayout}>
             <RotateCcwIcon />
             Reset layout
           </Button>
@@ -586,8 +709,8 @@ const WorkspaceSection = () => {
           color="fg.error"
           size="sm"
           variant="outline"
-          _hover={{ bg: 'fg.error', color: 'bg.subtle' }}
-          onClick={() => setIsClearConfirmOpen(true)}
+          _hover={DANGER_BUTTON_HOVER_STYLES}
+          onClick={openClearConfirm}
         >
           <Trash2Icon />
           Clear saved data…
@@ -602,7 +725,7 @@ const WorkspaceSection = () => {
         confirmLabel="Delete everything"
         isOpen={isClearConfirmOpen}
         title="Clear saved data?"
-        onClose={() => setIsClearConfirmOpen(false)}
+        onClose={closeClearConfirm}
         onConfirm={clearSavedData}
       />
     </SettingsSection>
@@ -623,6 +746,10 @@ const SettingToggle = ({
   onChange: (checked: boolean) => void;
 }) => {
   const descriptionId = useId();
+  const handleCheckedChange = useCallback(
+    (event: { checked: boolean | 'indeterminate' }) => onChange(event.checked === true),
+    [onChange]
+  );
 
   return (
     <Switch.Root
@@ -633,7 +760,7 @@ const SettingToggle = ({
       gap="4"
       justifyContent="space-between"
       w="full"
-      onCheckedChange={(event) => onChange(event.checked === true)}
+      onCheckedChange={handleCheckedChange}
     >
       <Stack gap="0.5">
         <Switch.Label color="fg" fontSize="sm" fontWeight="500" m="0">
@@ -644,7 +771,7 @@ const SettingToggle = ({
         </Text>
       </Stack>
       <Switch.HiddenInput aria-describedby={descriptionId} />
-      <Switch.Control flexShrink={0} _checked={{ bg: 'accent.solid' }}>
+      <Switch.Control flexShrink={0} _checked={SWITCH_CHECKED_STYLES}>
         <Switch.Thumb />
       </Switch.Control>
     </Switch.Root>
@@ -665,31 +792,38 @@ const SettingSelect = ({
   label: string;
   onChange: (value: string) => void;
   value: string;
-}) => (
-  <Field.Root
-    alignItems={{ base: 'stretch', md: 'center' }}
-    disabled={comingSoon}
-    display="flex"
-    flexDirection={{ base: 'column', md: 'row' }}
-    gap="3"
-    justifyContent="space-between"
-  >
-    <Stack gap="0.5">
-      <Field.Label color="fg" fontSize="sm" fontWeight="500" m="0">
-        {label}
-      </Field.Label>
-      <Field.HelperText color="fg.subtle" fontSize="xs" m="0">
-        {description}
-      </Field.HelperText>
-    </Stack>
-    <NativeSelect.Root flexShrink={0} maxW={{ base: 'full', md: '56' }} size="sm" w="full">
-      <NativeSelect.Field value={value} onChange={(event) => onChange(event.currentTarget.value)}>
-        {children}
-      </NativeSelect.Field>
-      <NativeSelect.Indicator />
-    </NativeSelect.Root>
-  </Field.Root>
-);
+}) => {
+  const handleChange = useCallback(
+    (event: { currentTarget: { value: string } }) => onChange(event.currentTarget.value),
+    [onChange]
+  );
+
+  return (
+    <Field.Root
+      alignItems={FIELD_ALIGN_ITEMS}
+      disabled={comingSoon}
+      display="flex"
+      flexDirection={FIELD_FLEX_DIRECTION}
+      gap="3"
+      justifyContent="space-between"
+    >
+      <Stack gap="0.5">
+        <Field.Label color="fg" fontSize="sm" fontWeight="500" m="0">
+          {label}
+        </Field.Label>
+        <Field.HelperText color="fg.subtle" fontSize="xs" m="0">
+          {description}
+        </Field.HelperText>
+      </Stack>
+      <NativeSelect.Root flexShrink={0} maxW={SELECT_MAX_WIDTH} size="sm" w="full">
+        <NativeSelect.Field value={value} onChange={handleChange}>
+          {children}
+        </NativeSelect.Field>
+        <NativeSelect.Indicator />
+      </NativeSelect.Root>
+    </Field.Root>
+  );
+};
 
 const formatSettingLabel = (value: string): string =>
   value

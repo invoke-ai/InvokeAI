@@ -1,9 +1,9 @@
-import { Box, Flex } from '@chakra-ui/react';
+import { Box, Flex, type SystemStyleObject } from '@chakra-ui/react';
 import { useLocation, useNavigate } from '@tanstack/react-router';
 import { useCapabilities } from '@workbench/auth/capabilities';
 import { Tabs } from '@workbench/components/ui';
 import { BoxIcon, BlocksIcon, FolderIcon, UsersIcon, type LucideIcon } from 'lucide-react';
-import { type ReactNode } from 'react';
+import { useCallback, useMemo, type ReactNode } from 'react';
 
 import { LaunchpadNav } from './LaunchpadNav';
 import { LaunchpadTopBar } from './LaunchpadTopBar';
@@ -50,6 +50,13 @@ const SECTION_PATHS: Record<LaunchpadSectionId, '/projects' | '/models' | '/node
   users: '/users',
 };
 
+const TABS_CSS: SystemStyleObject = {
+  display: 'flex',
+  flex: 1,
+  flexDirection: { base: 'column', md: 'row' },
+  minH: 0,
+};
+
 const getRequestedSectionId = (pathname: string): LaunchpadSectionId | null => normalizeSectionId(pathname);
 
 const getActiveSectionId = (
@@ -63,18 +70,23 @@ const getActiveSectionId = (
 export const Launchpad = () => {
   const { canManageModels, canManageNodes, canManageUsers } = useCapabilities();
 
-  const allSections: LaunchpadSection[] = [
-    { icon: FolderIcon, id: 'projects', label: 'Projects', render: () => <ProjectsPage /> },
-    { condition: canManageModels, icon: BoxIcon, id: 'models', label: 'Models', render: () => <ModelsPage /> },
-    { condition: canManageNodes, icon: BlocksIcon, id: 'nodes', label: 'Nodes', render: () => <NodesPage /> },
-    { condition: canManageUsers, icon: UsersIcon, id: 'users', label: 'Users', render: () => <UsersPage /> },
-  ];
-  const sections = allSections.filter((section) => section.condition ?? true);
+  const filtered = useMemo<LaunchpadSection[]>(
+    () =>
+      (
+        [
+          { icon: FolderIcon, id: 'projects', label: 'Projects', render: () => <ProjectsPage /> },
+          { condition: canManageModels, icon: BoxIcon, id: 'models', label: 'Models', render: () => <ModelsPage /> },
+          { condition: canManageNodes, icon: BlocksIcon, id: 'nodes', label: 'Nodes', render: () => <NodesPage /> },
+          { condition: canManageUsers, icon: UsersIcon, id: 'users', label: 'Users', render: () => <UsersPage /> },
+        ] satisfies (LaunchpadSection & { condition?: boolean })[]
+      ).filter((section) => section.condition ?? true),
+    [canManageModels, canManageNodes, canManageUsers]
+  );
 
   return (
     <Flex bg="bg" color="fg" direction="column" h="100dvh" overflow="hidden">
       <LaunchpadTopBar />
-      <LaunchpadSections sections={sections} />
+      <LaunchpadSections sections={filtered} />
     </Flex>
   );
 };
@@ -84,23 +96,24 @@ const LaunchpadSections = ({ sections }: { sections: LaunchpadSection[] }) => {
   const navigate = useNavigate();
   const requestedSectionId = getRequestedSectionId(location.pathname);
   const activeSectionId = getActiveSectionId(sections, requestedSectionId);
+  const handleValueChange = useCallback(
+    (details: { value: string }) => {
+      if (isSectionId(details.value)) {
+        void navigate({ to: SECTION_PATHS[details.value] });
+      }
+    },
+    [navigate]
+  );
 
   return (
     <Tabs.Root
-      display="flex"
-      flex="1"
-      flexDirection={{ base: 'column', md: 'row' }}
+      css={TABS_CSS}
       lazyMount
-      minH="0"
       size="sm"
       orientation="vertical"
       value={activeSectionId}
       variant="subtle"
-      onValueChange={(details) => {
-        if (isSectionId(details.value)) {
-          void navigate({ to: SECTION_PATHS[details.value] });
-        }
-      }}
+      onValueChange={handleValueChange}
     >
       <LaunchpadNav items={sections} />
       <Box flex="1" minH="0" minW="0" position="relative">

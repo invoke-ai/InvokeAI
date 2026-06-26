@@ -1,3 +1,4 @@
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { ModelFilterSortOption } from '@workbench/launchpad/models/shared/ModelFilterMenu';
 import type { ModelSortField } from '@workbench/models/library';
 import type { ModelTaxonomyType } from '@workbench/models/types';
@@ -56,3 +57,4 @@ export const StarterFilterMenu = ({
     onTypeFilterChange={(typeFilter) => onChange({ ...filters, typeFilter })}
   />
 );
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

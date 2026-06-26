@@ -1,3 +1,4 @@
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { AnyModelDefaultSettings, ModelConfig } from '@workbench/models/types';
 
 import { Grid, HStack, Icon, NativeSelect, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
@@ -379,3 +380,4 @@ export const DefaultSettingsSection = ({
     </Stack>
   );
 };
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

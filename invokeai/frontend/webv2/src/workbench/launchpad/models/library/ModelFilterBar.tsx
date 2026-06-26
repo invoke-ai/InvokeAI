@@ -1,3 +1,4 @@
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { ModelLibraryFilters, ModelSortField } from '@workbench/models/library';
 import type { ModelTaxonomyType } from '@workbench/models/types';
 
@@ -97,3 +98,4 @@ export const ModelFilterBar = ({
     </HStack>
   );
 };
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

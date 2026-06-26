@@ -24,11 +24,17 @@ import {
 } from '@workbench/widgetRegionViewModel';
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { type KeyboardEvent, type MouseEvent, useState } from 'react';
+import { type KeyboardEvent, type MouseEvent, useCallback, useMemo, useState } from 'react';
 
 interface BottomWidgetItem extends PlacedWidgetRegionItem<WidgetPlacementInstanceMeta> {
   isExpandable: boolean;
 }
+
+const BOTTOM_MENU_POSITIONING = { placement: 'top-end' } as const;
+const BOTTOM_MENU_TRIGGER = { kind: 'bottom' } as const;
+const COMPACT_ROW_HOVER_PROPS = { color: 'fg' };
+const COMPACT_ROW_ACTIVE_HOVER_PROPS = { color: 'accent.contrast' };
+const TOOLTIP_POSITIONING = { placement: 'top-start' } as const;
 
 export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) => {
   const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
@@ -50,30 +56,41 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
 
     return [{ ...item, isExpandable: isExpandableBottomItem(item) }];
   });
-  const openEnableMenu = (event: MouseEvent) => {
+  const sortableInstanceIds = useMemo(() => compactItems.map((item) => item.id), [compactItems]);
+  const openEnableMenu = useCallback((event: MouseEvent) => {
     event.preventDefault();
     setEnableMenuTarget({ x: event.clientX, y: event.clientY });
-  };
-  const openInstanceMenu = (item: BottomWidgetItem, event: MouseEvent) => {
+  }, []);
+  const openInstanceMenu = useCallback((item: BottomWidgetItem, event: MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
     setInstanceMenuTarget({ item, x: event.clientX, y: event.clientY });
-  };
-  const toggleBottomWidget = (item: WidgetEnableMenuItem) =>
-    item.isEnabled
-      ? closeWidgetPlacement({
-          dispatch,
-          getWidgetById,
-          instanceId: item.id,
-          project: placementProject,
-          region: 'bottom',
-        })
-      : openWidgetPlacement({
-          dispatch,
-          getWidgetsForRegion,
-          options: { createNew: item.allowMultiple, preferredRegions: ['bottom'] },
-          typeId: item.typeId,
-        });
+  }, []);
+  const toggleBottomWidget = useCallback(
+    (item: WidgetEnableMenuItem) =>
+      item.isEnabled
+        ? closeWidgetPlacement({
+            dispatch,
+            getWidgetById,
+            instanceId: item.id,
+            project: placementProject,
+            region: 'bottom',
+          })
+        : openWidgetPlacement({
+            dispatch,
+            getWidgetsForRegion,
+            options: { createNew: item.allowMultiple, preferredRegions: ['bottom'] },
+            typeId: item.typeId,
+          }),
+    [dispatch, placementProject]
+  );
+  const handleSelect = useCallback(
+    (instanceId: WidgetInstanceId) =>
+      revealWidgetPlacement({ dispatch, instanceId, project: placementProject, region: 'bottom' }),
+    [dispatch, placementProject]
+  );
+  const handleContextClose = useCallback(() => setEnableMenuTarget(null), []);
+  const handleInstanceClose = useCallback(() => setInstanceMenuTarget(null), []);
 
   return (
     <WidgetStrip
@@ -88,7 +105,7 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
       h="6"
       px="2"
       region="bottom"
-      sortableInstanceIds={compactItems.map((item) => item.id)}
+      sortableInstanceIds={sortableInstanceIds}
       strategy={horizontalListSortingStrategy}
       w="full"
       onContextMenu={openEnableMenu}
@@ -99,9 +116,7 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
           item={item}
           isActive={item.isExpandable && item.id === bottomRegion.activeInstanceId && !bottomRegion.isCollapsed}
           onContextMenu={openInstanceMenu}
-          onSelect={(instanceId) =>
-            revealWidgetPlacement({ dispatch, instanceId, project: placementProject, region: 'bottom' })
-          }
+          onSelect={handleSelect}
         />
       ))}
 
@@ -111,15 +126,15 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
         contextTarget={enableMenuTarget}
         groupLabel="Bottom Widgets"
         items={items}
-        positioning={{ placement: 'top-end' }}
-        trigger={{ kind: 'bottom' }}
+        positioning={BOTTOM_MENU_POSITIONING}
+        trigger={BOTTOM_MENU_TRIGGER}
         triggerLabel="Bottom widget visibility"
-        onContextClose={() => setEnableMenuTarget(null)}
+        onContextClose={handleContextClose}
         onToggle={toggleBottomWidget}
       />
       <WidgetInstanceContextMenu
         target={instanceMenuTarget}
-        onClose={() => setInstanceMenuTarget(null)}
+        onClose={handleInstanceClose}
         onRemove={toggleBottomWidget}
       />
     </WidgetStrip>
@@ -146,18 +161,33 @@ const CompactBottomWidget = ({
   const rowDragHandleProps = item.isExpandable
     ? Object.fromEntries(Object.entries(dragHandleProps).filter(([key]) => key !== 'onKeyDown'))
     : dragHandleProps;
-  const activationProps = item.isExpandable
-    ? {
-        role: 'button' as const,
-        tabIndex: 0,
-        onKeyDown: (event: KeyboardEvent) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            onSelect(item.id);
-          }
-        },
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        onSelect(item.id);
       }
-    : {};
+    },
+    [item.id, onSelect]
+  );
+  const activationProps = useMemo(
+    () =>
+      item.isExpandable
+        ? {
+            role: 'button' as const,
+            tabIndex: 0,
+            onKeyDown: handleKeyDown,
+          }
+        : {},
+    [handleKeyDown, item.isExpandable]
+  );
+  const handleClick = useCallback(() => {
+    if (item.isExpandable) {
+      onSelect(item.id);
+    }
+  }, [item.id, item.isExpandable, onSelect]);
+  const handleContextMenu = useCallback((event: MouseEvent) => onContextMenu(item, event), [item, onContextMenu]);
+  const tooltipContent = useMemo(() => (item.instance ? <BottomWidgetTooltipContent item={item} /> : null), [item]);
 
   if (!View) {
     return null;
@@ -173,14 +203,10 @@ const CompactBottomWidget = ({
         cursor={isDragging ? 'grabbing' : item.isExpandable ? 'pointer' : 'default'}
         h="full"
         w="auto"
-        _hover={{ color: isActive ? 'accent.contrast' : 'fg' }}
+        _hover={isActive ? COMPACT_ROW_ACTIVE_HOVER_PROPS : COMPACT_ROW_HOVER_PROPS}
         {...activationProps}
-        onClick={() => {
-          if (item.isExpandable) {
-            onSelect(item.id);
-          }
-        }}
-        onContextMenu={(event) => onContextMenu(item, event)}
+        onClick={handleClick}
+        onContextMenu={handleContextMenu}
       >
         {item.instance ? (
           <WidgetRendererById instanceId={item.id} widget={item.widget} presentation="compact" region="bottom" />
@@ -188,14 +214,13 @@ const CompactBottomWidget = ({
       </Row>
     </Box>
   );
-
   if (item.isExpandable) {
     return (
       <Tooltip
         closeDelay={80}
         content={item.failureMessage ? `${item.label}: ${item.failureMessage}` : item.label}
         openDelay={250}
-        positioning={{ placement: 'top-start' }}
+        positioning={TOOLTIP_POSITIONING}
       >
         {content}
       </Tooltip>
@@ -203,17 +228,12 @@ const CompactBottomWidget = ({
   }
 
   return (
-    <Tooltip
-      closeDelay={80}
-      content={
-        item.instance ? (
-          <WidgetRendererById instanceId={item.id} widget={item.widget} presentation="tooltip" region="bottom" />
-        ) : null
-      }
-      openDelay={250}
-      positioning={{ placement: 'top-start' }}
-    >
+    <Tooltip closeDelay={80} content={tooltipContent} openDelay={250} positioning={TOOLTIP_POSITIONING}>
       {content}
     </Tooltip>
   );
 };
+
+const BottomWidgetTooltipContent = ({ item }: { item: BottomWidgetItem }) => (
+  <WidgetRendererById instanceId={item.id} widget={item.widget} presentation="tooltip" region="bottom" />
+);

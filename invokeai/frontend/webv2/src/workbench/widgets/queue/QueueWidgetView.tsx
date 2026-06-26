@@ -7,6 +7,7 @@ import { getDestinationLabel, getSourceLabel } from '@workbench/invocation';
 import { StatusWidgetChip } from '@workbench/widget-frame';
 import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { ListOrderedIcon } from 'lucide-react';
+import { useCallback } from 'react';
 
 import { areQueueRowsEqual, createQueueRowsSelector, getPendingQueueCount } from './queueViewModel';
 
@@ -56,7 +57,6 @@ const QueueItemLiveProgress = ({ queueItemId }: { queueItemId: string }) => {
 
 const QueueContents = () => {
   const queueRows = useWorkbenchSelector((snapshot) => selectQueueRows(snapshot.state.projects), areQueueRowsEqual);
-  const dispatch = useWorkbenchDispatch();
 
   return (
     <Stack gap="2" p="2">
@@ -105,20 +105,26 @@ const QueueContents = () => {
                   {backendIds} · {resultCount}
                   {item.error ? ` · ${item.error}` : ''}
                 </Text>
-                {canCancel ? (
-                  <Button
-                    size="2xs"
-                    variant="outline"
-                    onClick={() => dispatch({ projectId, queueItemId: item.id, type: 'cancelQueueItem' })}
-                  >
-                    Cancel
-                  </Button>
-                ) : null}
+                {canCancel ? <CancelQueueItemButton projectId={projectId} queueItemId={item.id} /> : null}
               </HStack>
             </Stack>
           );
         })
       )}
     </Stack>
+  );
+};
+
+const CancelQueueItemButton = ({ projectId, queueItemId }: { projectId: string; queueItemId: string }) => {
+  const dispatch = useWorkbenchDispatch();
+  const handleCancel = useCallback(
+    () => dispatch({ projectId, queueItemId, type: 'cancelQueueItem' }),
+    [dispatch, projectId, queueItemId]
+  );
+
+  return (
+    <Button size="2xs" variant="outline" onClick={handleCancel}>
+      Cancel
+    </Button>
   );
 };

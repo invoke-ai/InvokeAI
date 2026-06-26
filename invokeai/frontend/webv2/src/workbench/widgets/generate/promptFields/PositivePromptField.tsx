@@ -5,7 +5,7 @@ import type { ChangeEvent, KeyboardEvent } from 'react';
 import { Field } from '@workbench/components/ui';
 import { useRegisterGenerateDraftFlusher } from '@workbench/widgets/generate/generateDraftRegistry';
 import { useDebouncedDraftValue } from '@workbench/widgets/generate/useDebouncedDraftValue';
-import { useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { PositivePromptActions, PromptTriggerPopover } from './PositivePromptActions';
 import { PROMPT_ATTENTION_TARGET_PROPS } from './promptAttentionHotkeys';
@@ -54,76 +54,117 @@ export const PositivePromptField = ({
 
   useRegisterGenerateDraftFlusher(flushDraftValue);
 
-  const commitPromptChange = (nextValue: string) => {
-    resetPromptHistoryNavigation();
-    setDraftValue(nextValue);
-  };
+  const commitPromptChange = useCallback(
+    (nextValue: string) => {
+      resetPromptHistoryNavigation();
+      setDraftValue(nextValue);
+    },
+    [setDraftValue]
+  );
 
-  const commitPromptChangeImmediately = (nextValue: string) => {
-    resetPromptHistoryNavigation();
-    commitDraftValue(nextValue);
-  };
+  const commitPromptChangeImmediately = useCallback(
+    (nextValue: string) => {
+      resetPromptHistoryNavigation();
+      commitDraftValue(nextValue);
+    },
+    [commitDraftValue]
+  );
 
-  const openPromptTriggerPicker = (anchorElement: HTMLElement, range?: PromptTextRange) => {
+  const openPromptTriggerPicker = useCallback((anchorElement: HTMLElement, range?: PromptTextRange) => {
     const rect = anchorElement.getBoundingClientRect();
 
     setTriggerPickerState({
       anchorRect: { height: rect.height, width: rect.width, x: rect.x, y: rect.y },
       range,
     });
-  };
+  }, []);
 
-  const handlePromptKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key !== '<' || event.altKey || event.ctrlKey || event.metaKey) {
-      return;
-    }
+  const handlePromptKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.key !== '<' || event.altKey || event.ctrlKey || event.metaKey) {
+        return;
+      }
 
-    event.preventDefault();
-    openPromptTriggerPicker(event.currentTarget, {
-      end: event.currentTarget.selectionEnd,
-      start: event.currentTarget.selectionStart,
-    });
-  };
+      event.preventDefault();
+      openPromptTriggerPicker(event.currentTarget, {
+        end: event.currentTarget.selectionEnd,
+        start: event.currentTarget.selectionStart,
+      });
+    },
+    [openPromptTriggerPicker]
+  );
 
-  const closePromptTriggerPicker = () => setTriggerPickerState(null);
+  const closePromptTriggerPicker = useCallback(() => setTriggerPickerState(null), []);
 
-  const selectPromptTrigger = (trigger: string) => {
-    insertPromptText({
-      onChange: commitPromptChange,
-      range: triggerPickerState?.range,
-      textarea: textareaRef.current,
-      text: trigger,
-      value: draftValue,
-    });
-    closePromptTriggerPicker();
-  };
+  const selectPromptTrigger = useCallback(
+    (trigger: string) => {
+      insertPromptText({
+        onChange: commitPromptChange,
+        range: triggerPickerState?.range,
+        textarea: textareaRef.current,
+        text: trigger,
+        value: draftValue,
+      });
+      closePromptTriggerPicker();
+    },
+    [closePromptTriggerPicker, commitPromptChange, draftValue, triggerPickerState?.range]
+  );
 
-  const handleUsePrompt = (prompt: PromptHistoryItem) => {
-    replaceDraftValue(prompt.positivePrompt);
-    onUsePrompt(prompt);
-  };
+  const handleUsePrompt = useCallback(
+    (prompt: PromptHistoryItem) => {
+      replaceDraftValue(prompt.positivePrompt);
+      onUsePrompt(prompt);
+    },
+    [onUsePrompt, replaceDraftValue]
+  );
 
-  const handleTextareaRef = (element: HTMLTextAreaElement | null) => {
+  const handleTextareaRef = useCallback((element: HTMLTextAreaElement | null) => {
     textareaRef.current = element;
     registerPositivePromptElement(element);
-  };
+  }, []);
+
+  const handleOpenPromptTriggerPicker = useCallback(
+    (anchorElement: HTMLElement) => openPromptTriggerPicker(anchorElement),
+    [openPromptTriggerPicker]
+  );
+
+  const labelEnd = useMemo(
+    () => (
+      <PositivePromptActions
+        isPromptTriggerPickerOpen={triggerPickerState !== null}
+        loras={loras}
+        positivePrompt={draftValue}
+        projectId={projectId}
+        selectedModel={selectedModel}
+        onOpenPromptTriggerPicker={handleOpenPromptTriggerPicker}
+        onPositivePromptChangeImmediate={commitPromptChangeImmediately}
+        onUsePrompt={handleUsePrompt}
+      />
+    ),
+    [
+      commitPromptChangeImmediately,
+      draftValue,
+      handleOpenPromptTriggerPicker,
+      handleUsePrompt,
+      loras,
+      projectId,
+      selectedModel,
+      triggerPickerState,
+    ]
+  );
+
+  const handlePromptChange = useCallback(
+    (event: ChangeEvent<HTMLTextAreaElement>) => commitPromptChange(event.currentTarget.value),
+    [commitPromptChange]
+  );
+
+  const triggerPickerPositioning = useMemo(
+    () => ({ getAnchorRect: () => triggerPickerState?.anchorRect ?? null }),
+    [triggerPickerState]
+  );
 
   return (
-    <Field
-      label="Prompt"
-      labelEnd={
-        <PositivePromptActions
-          isPromptTriggerPickerOpen={triggerPickerState !== null}
-          loras={loras}
-          positivePrompt={draftValue}
-          projectId={projectId}
-          selectedModel={selectedModel}
-          onOpenPromptTriggerPicker={(anchorElement) => openPromptTriggerPicker(anchorElement)}
-          onPositivePromptChangeImmediate={commitPromptChangeImmediately}
-          onUsePrompt={handleUsePrompt}
-        />
-      }
-    >
+    <Field label="Prompt" labelEnd={labelEnd}>
       <PromptTextarea
         {...PROMPT_ATTENTION_TARGET_PROPS}
         aria-label="Positive prompt"
@@ -136,7 +177,7 @@ export const PositivePromptField = ({
         showSyntaxHighlighting={showSyntaxHighlighting}
         textareaRef={handleTextareaRef}
         value={draftValue}
-        onChange={(event: ChangeEvent<HTMLTextAreaElement>) => commitPromptChange(event.currentTarget.value)}
+        onChange={handlePromptChange}
         onKeyDown={handlePromptKeyDown}
         onResizeEnd={onResizeEnd}
       />
@@ -144,7 +185,7 @@ export const PositivePromptField = ({
         <PromptTriggerPopover
           loras={loras}
           open
-          positioning={{ getAnchorRect: () => triggerPickerState.anchorRect }}
+          positioning={triggerPickerPositioning}
           selectedModel={selectedModel}
           onClose={closePromptTriggerPicker}
           onSelect={selectPromptTrigger}

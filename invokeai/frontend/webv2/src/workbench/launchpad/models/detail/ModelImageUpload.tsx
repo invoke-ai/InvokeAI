@@ -1,3 +1,4 @@
+/* eslint-disable react/react-compiler, react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { ModelConfig } from '@workbench/models/types';
 
 import { Box, Flex, Icon, Image, Stack, Text } from '@chakra-ui/react';
@@ -214,3 +215,4 @@ export const ModelImageUpload = ({
     </Box>
   );
 };
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

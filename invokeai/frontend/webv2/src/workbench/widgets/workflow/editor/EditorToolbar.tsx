@@ -12,7 +12,7 @@ import {
   ZoomInIcon,
   ZoomOutIcon,
 } from 'lucide-react';
-import { useId } from 'react';
+import { useCallback, useId, useMemo } from 'react';
 
 /**
  * The editor's single tool strip, docked to the left edge: interaction tools
@@ -32,6 +32,9 @@ const TOOLS: { icon: typeof HandIcon; id: EditorTool; label: string }[] = [
   { icon: EraserIcon, id: 'eraser', label: 'Eraser (click nodes or edges to delete)' },
 ];
 
+const POPOVER_POSITIONING = { placement: 'right' } as const;
+const TOOLTIP_POSITIONING = { placement: 'right-start' } as const;
+
 export const EditorToolbar = ({
   nodeOpacity,
   tool,
@@ -47,28 +50,36 @@ export const EditorToolbar = ({
   const reduceMotion = useWorkbenchReduceMotion();
   const opacityTriggerId = useId();
   const fitViewDuration = reduceMotion ? 0 : 300;
+  const opacityIds = useMemo(() => ({ trigger: opacityTriggerId }), [opacityTriggerId]);
+  const opacityValue = useMemo(() => [Math.round(nodeOpacity * 100)], [nodeOpacity]);
+  const onZoomInClick = useCallback(() => void zoomIn(), [zoomIn]);
+  const onZoomOutClick = useCallback(() => void zoomOut(), [zoomOut]);
+  const onFitViewClick = useCallback(() => void fitView({ duration: fitViewDuration }), [fitView, fitViewDuration]);
+  const onSliderValueChange = useCallback(
+    (event: { value: number[] }) => onNodeOpacityChange((event.value[0] ?? 100) / 100),
+    [onNodeOpacityChange]
+  );
 
   return (
     <Box left="3" position="absolute" top="50%" transform="translateY(-50%)" zIndex="5">
       <Toolbar>
         {TOOLS.map(({ icon, id, label }) => (
-          <ToolbarButton key={id} icon={icon} isActive={tool === id} label={label} onClick={() => onToolChange(id)} />
+          <EditorToolButton
+            key={id}
+            icon={icon}
+            id={id}
+            isActive={tool === id}
+            label={label}
+            onToolChange={onToolChange}
+          />
         ))}
         <ToolbarSeparator />
-        <ToolbarButton icon={ZoomInIcon} label="Zoom in" onClick={() => void zoomIn()} />
-        <ToolbarButton icon={ZoomOutIcon} label="Zoom out" onClick={() => void zoomOut()} />
-        <ToolbarButton
-          icon={MaximizeIcon}
-          label="Fit view"
-          onClick={() => void fitView({ duration: fitViewDuration })}
-        />
+        <ToolbarButton icon={ZoomInIcon} label="Zoom in" onClick={onZoomInClick} />
+        <ToolbarButton icon={ZoomOutIcon} label="Zoom out" onClick={onZoomOutClick} />
+        <ToolbarButton icon={MaximizeIcon} label="Fit view" onClick={onFitViewClick} />
         <ToolbarSeparator />
-        <Popover.Root ids={{ trigger: opacityTriggerId }} positioning={{ placement: 'right' }}>
-          <Tooltip
-            content="Node opacity"
-            ids={{ trigger: opacityTriggerId }}
-            positioning={{ placement: 'right-start' }}
-          >
+        <Popover.Root ids={opacityIds} positioning={POPOVER_POSITIONING}>
+          <Tooltip content="Node opacity" ids={opacityIds} positioning={TOOLTIP_POSITIONING}>
             <Popover.Trigger asChild>
               <IconButton
                 aria-label="Node opacity"
@@ -93,8 +104,8 @@ export const EditorToolbar = ({
                       min={20}
                       size="sm"
                       step={5}
-                      value={[Math.round(nodeOpacity * 100)]}
-                      onValueChange={(event) => onNodeOpacityChange((event.value[0] ?? 100) / 100)}
+                      value={opacityValue}
+                      onValueChange={onSliderValueChange}
                     >
                       <Slider.Control>
                         <Slider.Track>
@@ -112,4 +123,22 @@ export const EditorToolbar = ({
       </Toolbar>
     </Box>
   );
+};
+
+const EditorToolButton = ({
+  icon,
+  id,
+  isActive,
+  label,
+  onToolChange,
+}: {
+  icon: typeof HandIcon;
+  id: EditorTool;
+  isActive: boolean;
+  label: string;
+  onToolChange: (tool: EditorTool) => void;
+}) => {
+  const onClick = useCallback(() => onToolChange(id), [id, onToolChange]);
+
+  return <ToolbarButton icon={icon} isActive={isActive} label={label} onClick={onClick} />;
 };

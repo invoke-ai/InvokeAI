@@ -1,3 +1,4 @@
+/* eslint-disable react/react-compiler */
 import type { GalleryBoard, GalleryImage } from '@workbench/gallery/api';
 
 import { Dialog, HStack, Icon, Menu, Portal, ScrollArea, Text } from '@chakra-ui/react';
@@ -27,7 +28,7 @@ import {
   WorkflowIcon,
   type LucideIcon,
 } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import type { ImageActions } from './useImageActions';
 
@@ -45,6 +46,9 @@ const MENU_CONTENT_PROPS = {
   minW: '13rem',
   overflow: 'hidden',
 } as const;
+const MENU_POSITIONING_PROPS = { placement: 'right-start' } as const;
+const QUICK_MENU_TOOLTIP_CONTENT_PROPS = { fontSize: '2xs' } as const;
+const QUICK_MENU_TOOLTIP_POSITIONING_PROPS = { placement: 'top' } as const;
 
 const isUsableGalleryImage = (value: unknown): value is GalleryImage =>
   Boolean(value) &&
@@ -132,7 +136,7 @@ const ImageContextMenuContent = ({
   targetRef.current = target;
 
   const isBulk = images.length > 1;
-  const imageNames = images.map((candidate) => candidate.imageName);
+  const imageNames = useMemo(() => images.map((candidate) => candidate.imageName), [images]);
   const recallRequestKey = getImageContextMenuRecallRequestKey(image, isBulk);
   const getImageRecallCapabilities = actions.getImageRecallCapabilities;
 
@@ -173,34 +177,53 @@ const ImageContextMenuContent = ({
     };
   }, [getImageRecallCapabilities, recallRequestKey]);
 
-  const requestDeletion = (names: string[]) => {
-    if (confirmImageDeletion) {
-      setPendingDeletion(names);
-    } else {
-      void actions.deleteImages(names);
+  const requestDeletion = useCallback(
+    (names: string[]) => {
+      if (confirmImageDeletion) {
+        setPendingDeletion(names);
+      } else {
+        void actions.deleteImages(names);
+      }
+    },
+    [actions, confirmImageDeletion]
+  );
+
+  const positioning = useMemo(
+    () => ({
+      getAnchorRect: () => {
+        const currentTarget = targetRef.current;
+
+        return { height: 1, width: 1, x: currentTarget.x, y: currentTarget.y };
+      },
+      placement: 'bottom-start' as const,
+    }),
+    []
+  );
+  const handleOpenChange = useCallback(
+    (event: { open: boolean }) => {
+      if (!event.open) {
+        onClose();
+      }
+    },
+    [onClose]
+  );
+  const handleDeleteDialogOpenChange = useCallback((event: { open: boolean }) => {
+    if (!event.open) {
+      setPendingDeletion(null);
     }
-  };
+  }, []);
+  const handleCancelDeletion = useCallback(() => setPendingDeletion(null), []);
+  const handleConfirmDeletion = useCallback(() => {
+    if (pendingDeletion) {
+      void actions.deleteImages(pendingDeletion);
+    }
+
+    setPendingDeletion(null);
+  }, [actions, pendingDeletion]);
 
   return (
     <>
-      <Menu.Root
-        lazyMount
-        open
-        positioning={{
-          getAnchorRect: () => {
-            const currentTarget = targetRef.current;
-
-            return { height: 1, width: 1, x: currentTarget.x, y: currentTarget.y };
-          },
-          placement: 'bottom-start',
-        }}
-        unmountOnExit
-        onOpenChange={(event) => {
-          if (!event.open) {
-            onClose();
-          }
-        }}
-      >
+      <Menu.Root lazyMount open positioning={positioning} unmountOnExit onOpenChange={handleOpenChange}>
         <Portal>
           <Menu.Positioner>
             <MenuContent {...MENU_CONTENT_PROPS} maxH="min(28rem, calc(100vh - 2rem))" minW="16rem" overflowY="auto">
@@ -226,15 +249,7 @@ const ImageContextMenuContent = ({
           </Menu.Positioner>
         </Portal>
       </Menu.Root>
-      <Dialog.Root
-        open={pendingDeletion !== null}
-        role="alertdialog"
-        onOpenChange={(event) => {
-          if (!event.open) {
-            setPendingDeletion(null);
-          }
-        }}
-      >
+      <Dialog.Root open={pendingDeletion !== null} role="alertdialog" onOpenChange={handleDeleteDialogOpenChange}>
         <Portal>
           <Dialog.Backdrop />
           <Dialog.Positioner>
@@ -254,20 +269,10 @@ const ImageContextMenuContent = ({
                 </Text>
               </Dialog.Body>
               <Dialog.Footer gap="2">
-                <Button size="xs" variant="outline" onClick={() => setPendingDeletion(null)}>
+                <Button size="xs" variant="outline" onClick={handleCancelDeletion}>
                   Cancel
                 </Button>
-                <Button
-                  colorPalette="red"
-                  size="xs"
-                  onClick={() => {
-                    if (pendingDeletion) {
-                      void actions.deleteImages(pendingDeletion);
-                    }
-
-                    setPendingDeletion(null);
-                  }}
-                >
+                <Button colorPalette="red" size="xs" onClick={handleConfirmDeletion}>
                   Delete
                 </Button>
               </Dialog.Footer>
@@ -293,116 +298,152 @@ const SingleImageMenuItems = ({
   isLoadingRecallCapabilities: boolean;
   onRequestDeletion: (imageNames: string[]) => void;
   recallCapabilities: ImageRecallCapabilities;
-}) => (
-  <>
-    <HStack gap="1">
-      <QuickMenuItem
-        icon={ExternalLinkIcon}
-        label="Open in new tab"
-        value="open-in-new-tab"
-        onClick={() => window.open(image.imageUrl, '_blank', 'noopener')}
-      />
-      <QuickMenuItem
-        icon={CopyIcon}
-        label="Copy to clipboard"
-        value="copy-to-clipboard"
-        onClick={() => void actions.copyImage(image)}
-      />
-      <QuickMenuItem
-        icon={DownloadIcon}
-        label="Download image"
-        value="download-image"
-        onClick={() => void actions.downloadImage(image)}
-      />
-      <QuickMenuItem
-        icon={EyeIcon}
-        label="Open in preview"
-        value="open-in-preview"
-        onClick={() => actions.openImageInPreview(image)}
-      />
-      <QuickMenuItem
-        icon={StarIcon}
-        label={image.starred ? 'Unstar image' : 'Star image'}
-        value="toggle-starred"
-        onClick={() => void actions.setImagesStarred([image.imageName], !image.starred)}
-      />
-    </HStack>
-    <Menu.Separator borderColor="border.subtle" />
-    <ContextMenuItem disabled icon={WorkflowIcon} label="Load Workflow" value="load-workflow" />
-    <ContextSubMenu icon={AsteriskIcon} label="Recall Metadata">
+}) => {
+  const handleMove = useCallback(
+    (boardId: string) => void actions.moveImagesToBoard([image.imageName], boardId),
+    [actions, image.imageName]
+  );
+  const handleDelete = useCallback(() => onRequestDeletion([image.imageName]), [image.imageName, onRequestDeletion]);
+  const handleRecallAll = useRecallImageDataHandler(actions, image, 'all');
+  const handleRecallRemix = useRecallImageDataHandler(actions, image, 'remix');
+  const handleRecallPrompts = useRecallImageDataHandler(actions, image, 'prompts');
+  const handleRecallSeed = useRecallImageDataHandler(actions, image, 'seed');
+  const handleRecallDimensions = useRecallImageDataHandler(actions, image, 'dimensions');
+  const handleRecallClipSkip = useRecallImageDataHandler(actions, image, 'clipSkip');
+  const handleSelectForCompare = useSelectForCompareHandler(actions, image);
+
+  return (
+    <>
+      <HStack gap="1">
+        <OpenInNewTabQuickMenuItem image={image} />
+        <CopyQuickMenuItem actions={actions} image={image} />
+        <DownloadQuickMenuItem actions={actions} image={image} />
+        <OpenPreviewQuickMenuItem actions={actions} image={image} />
+        <ToggleStarQuickMenuItem actions={actions} image={image} />
+      </HStack>
+      <Menu.Separator borderColor="border.subtle" />
+      <ContextMenuItem disabled icon={WorkflowIcon} label="Load Workflow" value="load-workflow" />
+      <ContextSubMenu icon={AsteriskIcon} label="Recall Metadata">
+        <ContextMenuItem
+          disabled={isLoadingRecallCapabilities || !recallCapabilities.all}
+          icon={AsteriskIcon}
+          label="Recall All"
+          value="recall-all"
+          onClick={handleRecallAll}
+        />
+        <ContextMenuItem
+          disabled={isLoadingRecallCapabilities || !recallCapabilities.remix}
+          icon={ShuffleIcon}
+          label="Remix Image"
+          value="remix"
+          onClick={handleRecallRemix}
+        />
+        <ContextMenuItem
+          disabled={isLoadingRecallCapabilities || !recallCapabilities.prompts}
+          icon={QuoteIcon}
+          label="Use Prompt"
+          value="use-prompt"
+          onClick={handleRecallPrompts}
+        />
+        <ContextMenuItem
+          disabled={isLoadingRecallCapabilities || !recallCapabilities.seed}
+          icon={SproutIcon}
+          label="Use Seed"
+          value="use-seed"
+          onClick={handleRecallSeed}
+        />
+        <ContextMenuItem
+          disabled={isLoadingRecallCapabilities || !recallCapabilities.dimensions}
+          icon={RulerIcon}
+          label="Use Size"
+          value="use-size"
+          onClick={handleRecallDimensions}
+        />
+        <ContextMenuItem
+          disabled={isLoadingRecallCapabilities || !recallCapabilities.clipSkip}
+          icon={ScissorsIcon}
+          label="Use CLIP Skip"
+          value="use-clip-skip"
+          onClick={handleRecallClipSkip}
+        />
+      </ContextSubMenu>
+      <Menu.Separator borderColor="border.subtle" />
+      <ContextMenuItem disabled icon={ScanIcon} label="Send to Upscale" value="send-to-upscale" />
+      <ContextMenuItem disabled icon={ImageIcon} label="Use as Reference Image" value="use-as-reference-image" />
+      <ContextMenuItem disabled icon={TypeIcon} label="Use as Prompt Template" value="use-as-prompt-template" />
       <ContextMenuItem
-        disabled={isLoadingRecallCapabilities || !recallCapabilities.all}
-        icon={AsteriskIcon}
-        label="Recall All"
-        value="recall-all"
-        onClick={() => void actions.recallImageData(image, 'all')}
+        icon={ImagesIcon}
+        label="Select for Compare"
+        value="select-for-compare"
+        onClick={handleSelectForCompare}
       />
+      <Menu.Separator borderColor="border.subtle" />
+      <ContextSubMenu icon={FileImageIcon} label="New from Image">
+        <ContextMenuItem disabled icon={FileImageIcon} label="New Canvas from Image" value="new-canvas-from-image" />
+        <ContextMenuItem disabled icon={LayersIcon} label="New Layer from Image" value="new-layer-from-image" />
+      </ContextSubMenu>
+      <ChangeBoardSubMenu boards={boards} currentBoardId={image.boardId} onMove={handleMove} />
+      <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
-        disabled={isLoadingRecallCapabilities || !recallCapabilities.remix}
-        icon={ShuffleIcon}
-        label="Remix Image"
-        value="remix"
-        onClick={() => void actions.recallImageData(image, 'remix')}
+        color="fg.error"
+        icon={Trash2Icon}
+        label="Delete Image"
+        value="delete-image"
+        onClick={handleDelete}
       />
-      <ContextMenuItem
-        disabled={isLoadingRecallCapabilities || !recallCapabilities.prompts}
-        icon={QuoteIcon}
-        label="Use Prompt"
-        value="use-prompt"
-        onClick={() => void actions.recallImageData(image, 'prompts')}
-      />
-      <ContextMenuItem
-        disabled={isLoadingRecallCapabilities || !recallCapabilities.seed}
-        icon={SproutIcon}
-        label="Use Seed"
-        value="use-seed"
-        onClick={() => void actions.recallImageData(image, 'seed')}
-      />
-      <ContextMenuItem
-        disabled={isLoadingRecallCapabilities || !recallCapabilities.dimensions}
-        icon={RulerIcon}
-        label="Use Size"
-        value="use-size"
-        onClick={() => void actions.recallImageData(image, 'dimensions')}
-      />
-      <ContextMenuItem
-        disabled={isLoadingRecallCapabilities || !recallCapabilities.clipSkip}
-        icon={ScissorsIcon}
-        label="Use CLIP Skip"
-        value="use-clip-skip"
-        onClick={() => void actions.recallImageData(image, 'clipSkip')}
-      />
-    </ContextSubMenu>
-    <Menu.Separator borderColor="border.subtle" />
-    <ContextMenuItem disabled icon={ScanIcon} label="Send to Upscale" value="send-to-upscale" />
-    <ContextMenuItem disabled icon={ImageIcon} label="Use as Reference Image" value="use-as-reference-image" />
-    <ContextMenuItem disabled icon={TypeIcon} label="Use as Prompt Template" value="use-as-prompt-template" />
-    <ContextMenuItem
-      icon={ImagesIcon}
-      label="Select for Compare"
-      value="select-for-compare"
-      onClick={() => actions.selectForCompare(image)}
+    </>
+  );
+};
+
+type RecallImageDataKind = Parameters<ImageActions['recallImageData']>[1];
+
+const useRecallImageDataHandler = (actions: ImageActions, image: GalleryImage, kind: RecallImageDataKind) =>
+  useCallback(() => void actions.recallImageData(image, kind), [actions, image, kind]);
+
+const useSelectForCompareHandler = (actions: ImageActions, image: GalleryImage) =>
+  useCallback(() => actions.selectForCompare(image), [actions, image]);
+
+const OpenInNewTabQuickMenuItem = ({ image }: { image: GalleryImage }) => {
+  const handleClick = useCallback(() => window.open(image.imageUrl, '_blank', 'noopener'), [image.imageUrl]);
+
+  return (
+    <QuickMenuItem icon={ExternalLinkIcon} label="Open in new tab" value="open-in-new-tab" onClick={handleClick} />
+  );
+};
+
+const CopyQuickMenuItem = ({ actions, image }: { actions: ImageActions; image: GalleryImage }) => {
+  const handleClick = useCallback(() => void actions.copyImage(image), [actions, image]);
+
+  return <QuickMenuItem icon={CopyIcon} label="Copy to clipboard" value="copy-to-clipboard" onClick={handleClick} />;
+};
+
+const DownloadQuickMenuItem = ({ actions, image }: { actions: ImageActions; image: GalleryImage }) => {
+  const handleClick = useCallback(() => void actions.downloadImage(image), [actions, image]);
+
+  return <QuickMenuItem icon={DownloadIcon} label="Download image" value="download-image" onClick={handleClick} />;
+};
+
+const OpenPreviewQuickMenuItem = ({ actions, image }: { actions: ImageActions; image: GalleryImage }) => {
+  const handleClick = useCallback(() => actions.openImageInPreview(image), [actions, image]);
+
+  return <QuickMenuItem icon={EyeIcon} label="Open in preview" value="open-in-preview" onClick={handleClick} />;
+};
+
+const ToggleStarQuickMenuItem = ({ actions, image }: { actions: ImageActions; image: GalleryImage }) => {
+  const handleClick = useCallback(
+    () => void actions.setImagesStarred([image.imageName], !image.starred),
+    [actions, image.imageName, image.starred]
+  );
+
+  return (
+    <QuickMenuItem
+      icon={StarIcon}
+      label={image.starred ? 'Unstar image' : 'Star image'}
+      value="toggle-starred"
+      onClick={handleClick}
     />
-    <Menu.Separator borderColor="border.subtle" />
-    <ContextSubMenu icon={FileImageIcon} label="New from Image">
-      <ContextMenuItem disabled icon={FileImageIcon} label="New Canvas from Image" value="new-canvas-from-image" />
-      <ContextMenuItem disabled icon={LayersIcon} label="New Layer from Image" value="new-layer-from-image" />
-    </ContextSubMenu>
-    <ChangeBoardSubMenu
-      boards={boards}
-      currentBoardId={image.boardId}
-      onMove={(boardId) => void actions.moveImagesToBoard([image.imageName], boardId)}
-    />
-    <Menu.Separator borderColor="border.subtle" />
-    <ContextMenuItem
-      color="fg.error"
-      icon={Trash2Icon}
-      label="Delete Image"
-      value="delete-image"
-      onClick={() => onRequestDeletion([image.imageName])}
-    />
-  </>
-);
+  );
+};
 
 const BulkMenuItems = ({
   actions,
@@ -418,6 +459,16 @@ const BulkMenuItems = ({
   onRequestDeletion: (imageNames: string[]) => void;
 }) => {
   const allStarred = images.every((image) => image.starred);
+  const handleToggleStarred = useCallback(
+    () => void actions.setImagesStarred(imageNames, !allStarred),
+    [actions, allStarred, imageNames]
+  );
+  const handleDownload = useCallback(() => void actions.downloadImages(imageNames), [actions, imageNames]);
+  const handleMove = useCallback(
+    (boardId: string) => void actions.moveImagesToBoard(imageNames, boardId),
+    [actions, imageNames]
+  );
+  const handleDelete = useCallback(() => onRequestDeletion(imageNames), [imageNames, onRequestDeletion]);
 
   return (
     <>
@@ -429,26 +480,22 @@ const BulkMenuItems = ({
         icon={StarIcon}
         label={allStarred ? 'Unstar All' : 'Star All'}
         value="toggle-starred-all"
-        onClick={() => void actions.setImagesStarred(imageNames, !allStarred)}
+        onClick={handleToggleStarred}
       />
       <ContextMenuItem
         icon={DownloadIcon}
         label="Download Selection"
         value="download-selection"
-        onClick={() => void actions.downloadImages(imageNames)}
+        onClick={handleDownload}
       />
-      <ChangeBoardSubMenu
-        boards={boards}
-        currentBoardId={null}
-        onMove={(boardId) => void actions.moveImagesToBoard(imageNames, boardId)}
-      />
+      <ChangeBoardSubMenu boards={boards} currentBoardId={null} onMove={handleMove} />
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
         color="fg.error"
         icon={Trash2Icon}
         label="Delete Selection"
         value="delete-selection"
-        onClick={() => onRequestDeletion(imageNames)}
+        onClick={handleDelete}
       />
     </>
   );
@@ -462,27 +509,41 @@ const ChangeBoardSubMenu = ({
   boards: GalleryBoard[];
   currentBoardId: string | null;
   onMove: (boardId: string) => void;
-}) => (
-  <ContextSubMenu icon={FolderIcon} label="Change Board" scrollArea>
-    {currentBoardId !== 'none' && (
-      <ContextMenuItem
-        icon={FolderIcon}
-        label="Remove from Board"
-        value="remove-from-board"
-        onClick={() => onMove('none')}
-      />
-    )}
-    {boards
-      .filter((board) => board.kind === 'board' && board.id !== currentBoardId)
-      .map((board) => (
-        <Menu.Item key={board.id} value={`move-to-${board.id}`} onClick={() => onMove(board.id)}>
-          <Text fontSize="xs" minW="0" truncate>
-            {board.name}
-          </Text>
-        </Menu.Item>
+}) => {
+  const handleRemoveFromBoard = useCallback(() => onMove('none'), [onMove]);
+  const visibleBoards = useMemo(
+    () => boards.filter((board) => board.kind === 'board' && board.id !== currentBoardId),
+    [boards, currentBoardId]
+  );
+
+  return (
+    <ContextSubMenu icon={FolderIcon} label="Change Board" scrollArea>
+      {currentBoardId !== 'none' && (
+        <ContextMenuItem
+          icon={FolderIcon}
+          label="Remove from Board"
+          value="remove-from-board"
+          onClick={handleRemoveFromBoard}
+        />
+      )}
+      {visibleBoards.map((board) => (
+        <ChangeBoardMenuItem key={board.id} board={board} onMove={onMove} />
       ))}
-  </ContextSubMenu>
-);
+    </ContextSubMenu>
+  );
+};
+
+const ChangeBoardMenuItem = ({ board, onMove }: { board: GalleryBoard; onMove: (boardId: string) => void }) => {
+  const handleClick = useCallback(() => onMove(board.id), [board.id, onMove]);
+
+  return (
+    <Menu.Item value={`move-to-${board.id}`} onClick={handleClick}>
+      <Text fontSize="xs" minW="0" truncate>
+        {board.name}
+      </Text>
+    </Menu.Item>
+  );
+};
 
 const ContextSubMenu = ({
   children,
@@ -495,7 +556,7 @@ const ContextSubMenu = ({
   label: string;
   scrollArea?: boolean;
 }) => (
-  <Menu.Root positioning={{ placement: 'right-start' }}>
+  <Menu.Root positioning={MENU_POSITIONING_PROPS}>
     <Menu.TriggerItem>
       <HStack gap="2" minW="0" w="full">
         <Icon as={icon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
@@ -540,9 +601,9 @@ const QuickMenuItem = ({
   <Tooltip
     showArrow
     content={label}
-    contentProps={{ fontSize: '2xs' }}
+    contentProps={QUICK_MENU_TOOLTIP_CONTENT_PROPS}
     openDelay={300}
-    positioning={{ placement: 'top' }}
+    positioning={QUICK_MENU_TOOLTIP_POSITIONING_PROPS}
   >
     <Menu.Item aria-label={label} flex="1" justifyContent="center" value={value} onClick={onClick}>
       <Icon as={icon} boxSize="4" color="fg" />

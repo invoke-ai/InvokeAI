@@ -1,5 +1,6 @@
 import { Box, type BoxProps, type RecipeVariantProps, useRecipe } from '@chakra-ui/react';
 import { rowRecipe } from '@theme/recipes';
+import { useMemo } from 'react';
 
 export type RowProps = BoxProps & RecipeVariantProps<typeof rowRecipe>;
 
@@ -15,6 +16,7 @@ export type RowProps = BoxProps & RecipeVariantProps<typeof rowRecipe>;
  */
 export const Row = ({ active, css, ...rest }: RowProps) => {
   const recipe = useRecipe({ recipe: rowRecipe });
+  const rowCss = useMemo(() => [recipe({ active }), css], [active, css, recipe]);
 
-  return <Box css={[recipe({ active }), css]} {...rest} />;
+  return <Box css={rowCss} {...rest} />;
 };

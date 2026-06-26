@@ -17,9 +17,14 @@ import {
   PencilIcon,
   Trash2Icon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useMemo, useState, type MouseEvent } from 'react';
 
 import { formatRelativeTime } from './formatRelativeTime';
+
+const CARD_HOVER = { bg: 'bg.muted', borderColor: 'border.emphasized' } as const;
+const LINK_STYLE = { inset: 0, position: 'absolute' } as const;
+const MENU_ITEM_DELETE_HOVER = { bg: 'bg.error', color: 'fg.error' } as const;
+const MENU_POSITION_BOTTOM_END = { placement: 'bottom-end' } as const;
 
 /**
  * One saved project in the Home grid. The whole card is a deep link into the
@@ -33,20 +38,35 @@ export const ProjectCard = ({ summary }: { summary: ProjectSummary }) => {
   const [isActionsOpen, setIsActionsOpen] = useState(false);
   const [contextMenuTarget, setContextMenuTarget] = useState<{ x: number; y: number } | null>(null);
 
-  const handleRename = async (name: string) => {
-    try {
-      await renameLibraryProject(summary.id, name);
-    } catch (error) {
-      toaster.create({
-        description: error instanceof Error ? error.message : undefined,
-        title: 'Rename failed',
-        type: 'error',
-      });
-      throw error;
-    }
-  };
+  const projectSearch = useMemo(() => ({ project: summary.id }), [summary.id]);
+  const menuPositioning = useMemo(
+    () =>
+      contextMenuTarget
+        ? {
+            getAnchorRect: () => ({ height: 1, width: 1, x: contextMenuTarget.x, y: contextMenuTarget.y }),
+            placement: 'bottom-start' as const,
+          }
+        : MENU_POSITION_BOTTOM_END,
+    [contextMenuTarget]
+  );
 
-  const handleDuplicate = async () => {
+  const handleRename = useCallback(
+    async (name: string) => {
+      try {
+        await renameLibraryProject(summary.id, name);
+      } catch (error) {
+        toaster.create({
+          description: error instanceof Error ? error.message : undefined,
+          title: 'Rename failed',
+          type: 'error',
+        });
+        throw error;
+      }
+    },
+    [summary.id]
+  );
+
+  const handleDuplicate = useCallback(async () => {
     try {
       const copy = await duplicateLibraryProject(summary.id);
 
@@ -58,9 +78,9 @@ export const ProjectCard = ({ summary }: { summary: ProjectSummary }) => {
         type: 'error',
       });
     }
-  };
+  }, [summary.id]);
 
-  const handleExport = async () => {
+  const handleExport = useCallback(async () => {
     try {
       await exportLibraryProject(summary.id);
     } catch (error) {
@@ -70,9 +90,9 @@ export const ProjectCard = ({ summary }: { summary: ProjectSummary }) => {
         type: 'error',
       });
     }
-  };
+  }, [summary.id]);
 
-  const handleDelete = async () => {
+  const handleDelete = useCallback(async () => {
     try {
       await deleteLibraryProject(summary.id);
     } catch (error) {
@@ -82,7 +102,24 @@ export const ProjectCard = ({ summary }: { summary: ProjectSummary }) => {
         type: 'error',
       });
     }
-  };
+  }, [summary.id]);
+  const handleContextMenu = useCallback((event: MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setContextMenuTarget({ x: event.clientX, y: event.clientY });
+    setIsActionsOpen(true);
+  }, []);
+  const handleOpenChange = useCallback((event: { open: boolean }) => {
+    setIsActionsOpen(event.open);
+
+    if (!event.open) {
+      setContextMenuTarget(null);
+    }
+  }, []);
+  const clearContextMenuTarget = useCallback(() => setContextMenuTarget(null), []);
+  const openRenameDialog = useCallback(() => setIsRenameOpen(true), []);
+  const closeRenameDialog = useCallback(() => setIsRenameOpen(false), []);
+  const openDeleteDialog = useCallback(() => setIsDeleteOpen(true), []);
+  const closeDeleteDialog = useCallback(() => setIsDeleteOpen(false), []);
 
   return (
     <Box
@@ -93,19 +130,10 @@ export const ProjectCard = ({ summary }: { summary: ProjectSummary }) => {
       position="relative"
       rounded="lg"
       transition="border-color var(--wb-motion-duration-medium) ease, background var(--wb-motion-duration-medium) ease"
-      _hover={{ bg: 'bg.muted', borderColor: 'border.emphasized' }}
-      onContextMenu={(event) => {
-        event.preventDefault();
-        setContextMenuTarget({ x: event.clientX, y: event.clientY });
-        setIsActionsOpen(true);
-      }}
+      _hover={CARD_HOVER}
+      onContextMenu={handleContextMenu}
     >
-      <Link
-        aria-label={`Open ${summary.name}`}
-        search={{ project: summary.id }}
-        style={{ inset: 0, position: 'absolute' }}
-        to="/app"
-      />
+      <Link aria-label={`Open ${summary.name}`} search={projectSearch} style={LINK_STYLE} to="/app" />
       <Flex align="center" bg="bg.muted" h="24" justify="center" pointerEvents="none">
         <Icon as={FolderIcon} boxSize="8" color="fg.subtle" opacity={0.6} />
       </Flex>
@@ -120,31 +148,14 @@ export const ProjectCard = ({ summary }: { summary: ProjectSummary }) => {
         </Stack>
       </Flex>
       <Box bottom="2" pointerEvents="auto" position="absolute" right="2" zIndex="1">
-        <Menu.Root
-          open={isActionsOpen}
-          positioning={
-            contextMenuTarget
-              ? {
-                  getAnchorRect: () => ({ height: 1, width: 1, x: contextMenuTarget.x, y: contextMenuTarget.y }),
-                  placement: 'bottom-start',
-                }
-              : { placement: 'bottom-end' }
-          }
-          onOpenChange={(event) => {
-            setIsActionsOpen(event.open);
-
-            if (!event.open) {
-              setContextMenuTarget(null);
-            }
-          }}
-        >
+        <Menu.Root open={isActionsOpen} positioning={menuPositioning} onOpenChange={handleOpenChange}>
           <Menu.Trigger asChild>
             <IconButton
               aria-label={`Actions for ${summary.name}`}
               color="fg.muted"
               size="2xs"
               variant="ghost"
-              onClick={() => setContextMenuTarget(null)}
+              onClick={clearContextMenuTarget}
             >
               <EllipsisVerticalIcon />
             </IconButton>
@@ -153,30 +164,25 @@ export const ProjectCard = ({ summary }: { summary: ProjectSummary }) => {
             <Menu.Positioner>
               <MenuContent minW="44">
                 <Menu.Item asChild value="open">
-                  <Link search={{ project: summary.id }} to="/app">
+                  <Link search={projectSearch} to="/app">
                     <Icon as={ArrowRightIcon} boxSize="3.5" />
                     Open
                   </Link>
                 </Menu.Item>
-                <Menu.Item value="rename" onClick={() => setIsRenameOpen(true)}>
+                <Menu.Item value="rename" onClick={openRenameDialog}>
                   <Icon as={PencilIcon} boxSize="3.5" />
                   Rename…
                 </Menu.Item>
-                <Menu.Item value="duplicate" onClick={() => void handleDuplicate()}>
+                <Menu.Item value="duplicate" onClick={handleDuplicate}>
                   <Icon as={CopyIcon} boxSize="3.5" />
                   Duplicate
                 </Menu.Item>
-                <Menu.Item value="export" onClick={() => void handleExport()}>
+                <Menu.Item value="export" onClick={handleExport}>
                   <Icon as={FileDownIcon} boxSize="3.5" />
                   Export
                 </Menu.Item>
                 <Menu.Separator />
-                <Menu.Item
-                  color="fg.error"
-                  value="delete"
-                  _hover={{ bg: 'bg.error', color: 'fg.error' }}
-                  onClick={() => setIsDeleteOpen(true)}
-                >
+                <Menu.Item color="fg.error" value="delete" _hover={MENU_ITEM_DELETE_HOVER} onClick={openDeleteDialog}>
                   <Icon as={Trash2Icon} boxSize="3.5" />
                   Delete…
                 </Menu.Item>
@@ -189,7 +195,7 @@ export const ProjectCard = ({ summary }: { summary: ProjectSummary }) => {
       <RenameDialog
         initialName={summary.name}
         isOpen={isRenameOpen}
-        onClose={() => setIsRenameOpen(false)}
+        onClose={closeRenameDialog}
         onSubmit={handleRename}
       />
 
@@ -198,7 +204,7 @@ export const ProjectCard = ({ summary }: { summary: ProjectSummary }) => {
         confirmLabel="Delete project"
         isOpen={isDeleteOpen}
         title="Delete project?"
-        onClose={() => setIsDeleteOpen(false)}
+        onClose={closeDeleteDialog}
         onConfirm={handleDelete}
       />
     </Box>

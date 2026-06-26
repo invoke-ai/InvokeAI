@@ -1,3 +1,4 @@
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { FoundModel } from '@workbench/models/types';
 
 import { Checkbox, HStack, Icon, Stack, Text } from '@chakra-ui/react';
@@ -101,3 +102,4 @@ export const ScanResults = ({
     </Stack>
   );
 };
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

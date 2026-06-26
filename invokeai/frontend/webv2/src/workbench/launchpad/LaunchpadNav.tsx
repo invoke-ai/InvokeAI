@@ -5,6 +5,10 @@ import { Tabs } from '@workbench/components/ui';
 
 import { ResourceLinks } from './ResourceLinks';
 
+const NAV_BORDER_END_WIDTH = { md: '1px' } as const;
+const NAV_WIDTH = { base: 'full', md: '56' } as const;
+const RESOURCE_LINKS_MARGIN_TOP = { md: 'auto' } as const;
+
 export interface LaunchpadNavItem {
   id: string;
   label: string;
@@ -23,13 +27,13 @@ export const LaunchpadNav = ({ items }: { items: LaunchpadNavItem[] }) => (
     aria-label="Launchpad sections"
     as="nav"
     borderColor="border.subtle"
-    borderEndWidth={{ md: '1px' }}
+    borderEndWidth={NAV_BORDER_END_WIDTH}
     flexShrink={0}
     gap="4"
     h="full"
     minH="0"
     p="2"
-    w={{ base: 'full', md: '56' }}
+    w={NAV_WIDTH}
   >
     {items.length > 1 ? (
       <Tabs.List flexShrink={0}>
@@ -42,7 +46,7 @@ export const LaunchpadNav = ({ items }: { items: LaunchpadNavItem[] }) => (
       </Tabs.List>
     ) : null}
 
-    <Box mt={{ md: 'auto' }}>
+    <Box mt={RESOURCE_LINKS_MARGIN_TOP}>
       <ResourceLinks />
     </Box>
   </Stack>

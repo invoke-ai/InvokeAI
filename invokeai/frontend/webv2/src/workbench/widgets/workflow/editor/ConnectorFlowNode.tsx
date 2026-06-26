@@ -5,7 +5,7 @@ import { Tooltip } from '@workbench/components/ui';
 import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from '@workbench/workflows/connectors';
 import { getFieldTypeColor, getFieldTypeLabel, isModelFieldType } from '@workbench/workflows/fields';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 
 import type { ConnectorFlowNode as ConnectorFlowNodeType } from './flowAdapters';
 
@@ -51,27 +51,25 @@ const getConnectorTitle = (inputType: FieldType | null, outputType: FieldType | 
 
 const ConnectorFlowNodeComponent = ({ data, selected }: NodeProps<ConnectorFlowNodeType>) => {
   const node = data.documentNode;
+  const inputHandleStyle = useMemo(
+    () => ({ ...getConnectorHandleStyle(data.inputFieldType, 'left'), left: -HANDLE_SIZE / 2 }),
+    [data.inputFieldType]
+  );
+  const outputHandleStyle = useMemo(
+    () => ({ ...getConnectorHandleStyle(data.outputFieldType, 'right'), right: -HANDLE_SIZE / 2 }),
+    [data.outputFieldType]
+  );
 
   return (
     <Flex align="center" data-connector-node-id={node.id} justify="center" position="relative">
       <Tooltip content={getHandleTypeTooltip(data.inputFieldType, 'Any input')} showArrow>
-        <Handle
-          id={CONNECTOR_INPUT_HANDLE}
-          position={Position.Left}
-          style={{ ...getConnectorHandleStyle(data.inputFieldType, 'left'), left: -HANDLE_SIZE / 2 }}
-          type="target"
-        />
+        <Handle id={CONNECTOR_INPUT_HANDLE} position={Position.Left} style={inputHandleStyle} type="target" />
       </Tooltip>
       <Tooltip content={getConnectorTitle(data.inputFieldType, data.outputFieldType)} showArrow>
         <Box bg="bg" h="1rem" rounded="full" w="2.5rem" {...getWorkflowNodeChromeProps({ selected })} />
       </Tooltip>
       <Tooltip content={getHandleTypeTooltip(data.outputFieldType, 'Any output')} showArrow>
-        <Handle
-          id={CONNECTOR_OUTPUT_HANDLE}
-          position={Position.Right}
-          style={{ ...getConnectorHandleStyle(data.outputFieldType, 'right'), right: -HANDLE_SIZE / 2 }}
-          type="source"
-        />
+        <Handle id={CONNECTOR_OUTPUT_HANDLE} position={Position.Right} style={outputHandleStyle} type="source" />
       </Tooltip>
     </Flex>
   );

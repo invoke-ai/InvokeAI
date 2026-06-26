@@ -7,49 +7,56 @@ import { Button, CloseButton, Field, FieldLabel } from '@workbench/components/ui
 import { useZodForm } from '@workbench/models/useZodForm';
 import { useNotify } from '@workbench/useNotify';
 import { WandSparklesIcon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
 import { AuthFormAlert } from './AuthScreen';
 import { PasswordInput, PasswordStrengthMeter } from './PasswordInput';
 
 /** Account settings: display name and password change for the signed-in user. */
-export const ProfileDialog = ({ isOpen, onClose, user }: { isOpen: boolean; onClose: () => void; user: UserDTO }) => (
-  <Dialog.Root
-    lazyMount
-    open={isOpen}
-    placement="center"
-    scrollBehavior="inside"
-    size="sm"
-    unmountOnExit
-    onOpenChange={(event) => {
+export const ProfileDialog = ({ isOpen, onClose, user }: { isOpen: boolean; onClose: () => void; user: UserDTO }) => {
+  const handleOpenChange = useCallback(
+    (event: Dialog.OpenChangeDetails) => {
       if (!event.open) {
         onClose();
       }
-    }}
-  >
-    <Portal>
-      <Dialog.Backdrop />
-      <Dialog.Positioner>
-        <Dialog.Content>
-          <Dialog.Header borderBottomWidth="1px" borderColor="border.subtle">
-            <Stack gap="0.5">
-              <Dialog.Title fontSize="md" fontWeight="700">
-                Account
-              </Dialog.Title>
-              <Text color="fg.subtle" fontSize="xs">
-                Signed in as {user.email}
-              </Text>
-            </Stack>
-          </Dialog.Header>
-          <ProfileForm user={user} onClose={onClose} />
-          <Dialog.CloseTrigger asChild>
-            <CloseButton color="fg.muted" size="sm" />
-          </Dialog.CloseTrigger>
-        </Dialog.Content>
-      </Dialog.Positioner>
-    </Portal>
-  </Dialog.Root>
-);
+    },
+    [onClose]
+  );
+
+  return (
+    <Dialog.Root
+      lazyMount
+      open={isOpen}
+      placement="center"
+      scrollBehavior="inside"
+      size="sm"
+      unmountOnExit
+      onOpenChange={handleOpenChange}
+    >
+      <Portal>
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content>
+            <Dialog.Header borderBottomWidth="1px" borderColor="border.subtle">
+              <Stack gap="0.5">
+                <Dialog.Title fontSize="md" fontWeight="700">
+                  Account
+                </Dialog.Title>
+                <Text color="fg.subtle" fontSize="xs">
+                  Signed in as {user.email}
+                </Text>
+              </Stack>
+            </Dialog.Header>
+            <ProfileForm user={user} onClose={onClose} />
+            <Dialog.CloseTrigger asChild>
+              <CloseButton color="fg.muted" size="sm" />
+            </Dialog.CloseTrigger>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Portal>
+    </Dialog.Root>
+  );
+};
 
 const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) => {
   const session = useAuthSession();
@@ -62,7 +69,7 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
   );
   const form = useZodForm(schema, initialValues);
 
-  const fillGeneratedPassword = async () => {
+  const fillGeneratedPassword = useCallback(async () => {
     setIsGenerating(true);
 
     try {
@@ -76,38 +83,59 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, [form, notify]);
 
-  const submit = () =>
-    form.handleSubmit(async (values) => {
-      const changes: ProfileUpdateRequest = {};
-      const displayName = values.displayName.trim();
+  const submit = useCallback(
+    () =>
+      form.handleSubmit(async (values) => {
+        const changes: ProfileUpdateRequest = {};
+        const displayName = values.displayName.trim();
 
-      if (displayName !== (user.display_name ?? '')) {
-        changes.display_name = displayName;
-      }
+        if (displayName !== (user.display_name ?? '')) {
+          changes.display_name = displayName;
+        }
 
-      if (values.newPassword !== '') {
-        changes.current_password = values.currentPassword;
-        changes.new_password = values.newPassword;
-      }
+        if (values.newPassword !== '') {
+          changes.current_password = values.currentPassword;
+          changes.new_password = values.newPassword;
+        }
 
-      if (Object.keys(changes).length === 0) {
+        if (Object.keys(changes).length === 0) {
+          onClose();
+          return;
+        }
+
+        try {
+          const updated = await updateCurrentUser(changes);
+
+          setSessionUser(updated);
+        } catch (error) {
+          throw new Error(getApiErrorMessage(error, 'Could not update your account.'));
+        }
+
+        notify.success('Account updated');
         onClose();
-        return;
-      }
-
-      try {
-        const updated = await updateCurrentUser(changes);
-
-        setSessionUser(updated);
-      } catch (error) {
-        throw new Error(getApiErrorMessage(error, 'Could not update your account.'));
-      }
-
-      notify.success('Account updated');
-      onClose();
-    });
+      }),
+    [form, notify, onClose, user.display_name]
+  );
+  const handleDisplayNameChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => form.setValue('displayName', event.target.value),
+    [form]
+  );
+  const handleCurrentPasswordChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => form.setValue('currentPassword', event.target.value),
+    [form]
+  );
+  const handleNewPasswordChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => form.setValue('newPassword', event.target.value),
+    [form]
+  );
+  const handleConfirmPasswordChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => form.setValue('confirmPassword', event.target.value),
+    [form]
+  );
+  const handleGeneratePassword = useCallback(() => void fillGeneratedPassword(), [fillGeneratedPassword]);
+  const handleSave = useCallback(() => void submit(), [submit]);
 
   return (
     <>
@@ -119,13 +147,13 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
               autoComplete="name"
               placeholder={user.email}
               value={form.values.displayName}
-              onChange={(event) => form.setValue('displayName', event.target.value)}
+              onChange={handleDisplayNameChange}
             />
           </Field>
           <Stack gap="3">
             <HStack justify="space-between">
               <FieldLabel>Change password</FieldLabel>
-              <Button loading={isGenerating} size="2xs" variant="outline" onClick={() => void fillGeneratedPassword()}>
+              <Button loading={isGenerating} size="2xs" variant="outline" onClick={handleGeneratePassword}>
                 <WandSparklesIcon />
                 Generate
               </Button>
@@ -135,7 +163,7 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
                 aria-invalid={form.errors.currentPassword ? true : undefined}
                 autoComplete="current-password"
                 value={form.values.currentPassword}
-                onChange={(event) => form.setValue('currentPassword', event.target.value)}
+                onChange={handleCurrentPasswordChange}
               />
             </Field>
             <Field
@@ -148,7 +176,7 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
                   aria-invalid={form.errors.newPassword ? true : undefined}
                   autoComplete="new-password"
                   value={form.values.newPassword}
-                  onChange={(event) => form.setValue('newPassword', event.target.value)}
+                  onChange={handleNewPasswordChange}
                 />
                 <PasswordStrengthMeter password={form.values.newPassword} />
               </Stack>
@@ -158,7 +186,7 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
                 aria-invalid={form.errors.confirmPassword ? true : undefined}
                 autoComplete="new-password"
                 value={form.values.confirmPassword}
-                onChange={(event) => form.setValue('confirmPassword', event.target.value)}
+                onChange={handleConfirmPasswordChange}
               />
             </Field>
           </Stack>
@@ -168,7 +196,7 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
         <Button size="xs" variant="ghost" onClick={onClose}>
           Cancel
         </Button>
-        <Button loading={form.isSubmitting} size="xs" variant="solid" onClick={() => void submit()}>
+        <Button loading={form.isSubmitting} size="xs" variant="solid" onClick={handleSave}>
           Save changes
         </Button>
       </Dialog.Footer>

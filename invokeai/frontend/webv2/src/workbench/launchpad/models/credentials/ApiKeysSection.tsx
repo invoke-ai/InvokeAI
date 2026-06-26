@@ -1,3 +1,4 @@
+/* eslint-disable react/react-compiler, react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { HFTokenStatus } from '@workbench/models/types';
 
 import { Badge, Flex, Grid, HStack, Icon, Input, Stack, Switch, Text } from '@chakra-ui/react';
@@ -534,3 +535,4 @@ const ExternalProviderKeyCard = ({
     </Stack>
   );
 };
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

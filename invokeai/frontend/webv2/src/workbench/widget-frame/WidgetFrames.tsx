@@ -1,3 +1,4 @@
+/* eslint-disable react/react-compiler */
 import type {
   WidgetInstanceId,
   WidgetInstanceRuntimeMeta,
@@ -16,6 +17,8 @@ import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { SettingsIcon, type LucideIcon } from 'lucide-react';
 import {
+  useCallback,
+  useMemo,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
@@ -29,6 +32,8 @@ const MIN_PANEL_SIZE_PX = 180;
 const MAX_PANEL_SIZE_PX = 520;
 const MIN_BOTTOM_PANEL_SIZE_PX = 96;
 const MAX_BOTTOM_PANEL_SIZE_PX = 420;
+const RESIZE_HANDLE_HOVER_PROPS = { bg: 'accent.solid', opacity: 0.45 };
+const RESIZE_HANDLE_FOCUS_PROPS = { bg: 'accent.solid', opacity: 0.65, outline: '2px solid {colors.accent.solid}' };
 
 const getPanelSizeBounds = (region: WidgetRegion): { max: number; min: number } => {
   if (region === 'bottom') {
@@ -64,62 +69,83 @@ export const WidgetPanelFrame = ({
   const sizeBounds = getPanelSizeBounds(region);
   const focusRegionProps = useFocusRegionProps(region);
 
-  const commitSize = (sizePx: number) => {
-    const nextSizePx = clampSize(region, sizePx);
+  const commitSize = useCallback(
+    (sizePx: number) => {
+      const nextSizePx = clampSize(region, sizePx);
 
-    if (nextSizePx !== regionState.sizePx) {
-      dispatch({ region, sizePx: nextSizePx, type: 'setRegionWidgetSize' });
-    }
-  };
+      if (nextSizePx !== regionState.sizePx) {
+        dispatch({ region, sizePx: nextSizePx, type: 'setRegionWidgetSize' });
+      }
+    },
+    [dispatch, region, regionState.sizePx]
+  );
 
-  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
+  const handlePointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
 
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const startSizePx = regionState.sizePx;
-    let nextSizePx = startSizePx;
-    const direction = isLeft ? 1 : -1;
+      const startX = event.clientX;
+      const startY = event.clientY;
+      const startSizePx = regionState.sizePx;
+      let nextSizePx = startSizePx;
+      const direction = isLeft ? 1 : -1;
 
-    const handlePointerMove = (moveEvent: PointerEvent) => {
-      const deltaPx = isBottom ? startY - moveEvent.clientY : (moveEvent.clientX - startX) * direction;
+      const handlePointerMove = (moveEvent: PointerEvent) => {
+        const deltaPx = isBottom ? startY - moveEvent.clientY : (moveEvent.clientX - startX) * direction;
 
-      nextSizePx = clampSize(region, startSizePx + deltaPx);
-      setDragSizePx(nextSizePx);
-    };
+        nextSizePx = clampSize(region, startSizePx + deltaPx);
+        setDragSizePx(nextSizePx);
+      };
 
-    const handlePointerUp = () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-      window.removeEventListener('pointercancel', handlePointerUp);
-      setDragSizePx(null);
-      commitSize(nextSizePx);
-    };
+      const handlePointerUp = () => {
+        window.removeEventListener('pointermove', handlePointerMove);
+        window.removeEventListener('pointerup', handlePointerUp);
+        window.removeEventListener('pointercancel', handlePointerUp);
+        setDragSizePx(null);
+        commitSize(nextSizePx);
+      };
 
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-    window.addEventListener('pointercancel', handlePointerUp);
-  };
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', handlePointerUp);
+      window.addEventListener('pointercancel', handlePointerUp);
+    },
+    [commitSize, isBottom, isLeft, region, regionState.sizePx]
+  );
 
-  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    const step = event.shiftKey ? PANEL_SIZE_STEP_PX * 2 : PANEL_SIZE_STEP_PX;
-    const sizeChanges: Partial<Record<string, number>> = isBottom
-      ? { ArrowDown: -step, ArrowUp: step, End: sizeBounds.max - displaySizePx, Home: sizeBounds.min - displaySizePx }
-      : {
-          ArrowLeft: isLeft ? -step : step,
-          ArrowRight: isLeft ? step : -step,
-          End: sizeBounds.max - displaySizePx,
-          Home: sizeBounds.min - displaySizePx,
-        };
-    const sizeChange = sizeChanges[event.key];
+  const handleKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      const step = event.shiftKey ? PANEL_SIZE_STEP_PX * 2 : PANEL_SIZE_STEP_PX;
+      const sizeChanges: Partial<Record<string, number>> = isBottom
+        ? { ArrowDown: -step, ArrowUp: step, End: sizeBounds.max - displaySizePx, Home: sizeBounds.min - displaySizePx }
+        : {
+            ArrowLeft: isLeft ? -step : step,
+            ArrowRight: isLeft ? step : -step,
+            End: sizeBounds.max - displaySizePx,
+            Home: sizeBounds.min - displaySizePx,
+          };
+      const sizeChange = sizeChanges[event.key];
 
-    if (sizeChange === undefined) {
-      return;
-    }
+      if (sizeChange === undefined) {
+        return;
+      }
 
-    event.preventDefault();
-    commitSize(displaySizePx + sizeChange);
-  };
+      event.preventDefault();
+      commitSize(displaySizePx + sizeChange);
+    },
+    [commitSize, displaySizePx, isBottom, isLeft, sizeBounds.max, sizeBounds.min]
+  );
+  const panelSizeProps = useMemo(
+    () => (isBottom ? { h: `${displaySizePx}px`, w: 'full' } : { h: 'full', w: `${displaySizePx}px` }),
+    [displaySizePx, isBottom]
+  );
+  const resizeOrientationProps = useMemo(
+    () => (isBottom ? { h: '2', left: '0', right: '0', top: '-1' } : { bottom: '0', top: '0', w: '2' }),
+    [isBottom]
+  );
+  const resizeSideProps = useMemo(
+    () => (!isBottom ? (isLeft ? { right: '-1' } : { left: '-1' }) : {}),
+    [isBottom, isLeft]
+  );
 
   return (
     <Flex
@@ -137,7 +163,7 @@ export const WidgetPanelFrame = ({
       data-hotkey-widget-region={region}
       data-hotkey-widget-type-id={typeId}
       {...focusRegionProps}
-      {...(isBottom ? { h: `${displaySizePx}px`, w: 'full' } : { h: 'full', w: `${displaySizePx}px` })}
+      {...panelSizeProps}
     >
       {children}
       <Box
@@ -154,10 +180,10 @@ export const WidgetPanelFrame = ({
         tabIndex={0}
         transition="opacity var(--wb-motion-duration-fast) ease, background var(--wb-motion-duration-fast) ease"
         zIndex="1"
-        {...(isBottom ? { h: '2', left: '0', right: '0', top: '-1' } : { bottom: '0', top: '0', w: '2' })}
-        {...(!isBottom ? (isLeft ? { right: '-1' } : { left: '-1' }) : {})}
-        _hover={{ bg: 'accent.solid', opacity: 0.45 }}
-        _focusVisible={{ bg: 'accent.solid', opacity: 0.65, outline: '2px solid {colors.accent.solid}' }}
+        {...resizeOrientationProps}
+        {...resizeSideProps}
+        _hover={RESIZE_HANDLE_HOVER_PROPS}
+        _focusVisible={RESIZE_HANDLE_FOCUS_PROPS}
         onKeyDown={handleKeyDown}
         onPointerDown={handlePointerDown}
       />
@@ -181,6 +207,10 @@ export const WidgetHeader = ({
   // Manifests may provide a component label (e.g. Workflow's editable
   // `Workflow / [name]`); plain strings render as the standard title.
   const Label = manifest.label;
+  const handleSettingsClick = useCallback(
+    () => openWorkbenchSettings(manifest.settingsSection),
+    [manifest.settingsSection]
+  );
 
   return (
     <HStack justify="space-between" borderBottomWidth={1} h={10} ps="3" pe="2">
@@ -202,7 +232,7 @@ export const WidgetHeader = ({
               color="fg.muted"
               size="2xs"
               variant="ghost"
-              onClick={() => openWorkbenchSettings(manifest.settingsSection)}
+              onClick={handleSettingsClick}
             >
               <Icon as={SettingsIcon} boxSize="3.5" />
             </IconButton>

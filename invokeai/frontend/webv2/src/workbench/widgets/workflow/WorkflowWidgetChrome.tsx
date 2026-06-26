@@ -1,3 +1,4 @@
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { WidgetLabelProps, WidgetViewProps } from '@workbench/types';
 import type { InvocationTemplate, XYPosition } from '@workbench/workflows/types';
 

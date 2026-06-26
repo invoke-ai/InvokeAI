@@ -7,7 +7,7 @@ import { layoutPresets } from '@workbench/layoutPresets';
 import { areLayoutPresetSnapshotsEqual, createLayoutPresetSnapshot } from '@workbench/layoutPresetSnapshots';
 import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { CheckIcon, ChevronDownIcon, EllipsisVerticalIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 interface PresetActionTarget {
   preset: LayoutPreset;
@@ -20,6 +20,10 @@ const getDefaultCustomPresetName = (presets: LayoutPreset[]): string => `Custom 
 const createCustomPresetId = (): string =>
   `custom-layout-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
+const MENU_POSITIONING = { placement: 'bottom-end' } as const;
+const TRIGGER_HOVER_PROPS = { bg: 'bg.muted' };
+const DISABLED_PROPS = { opacity: 0.45 };
+
 /** Global layout preset registry surfaced as a menu. */
 export const LayoutPresetMenu = () => {
   const activeLayoutSnapshot = useActiveProjectSelector(createLayoutPresetSnapshot, areLayoutPresetSnapshotsEqual);
@@ -29,28 +33,70 @@ export const LayoutPresetMenu = () => {
   const [renameTarget, setRenameTarget] = useState<LayoutPreset | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<LayoutPreset | null>(null);
   const [actionTarget, setActionTarget] = useState<PresetActionTarget | null>(null);
-  const allPresets = [...layoutPresets, ...customPresets];
+  const allPresets = useMemo(() => [...layoutPresets, ...customPresets], [customPresets]);
   const matchingPreset = allPresets.find((preset) =>
     areLayoutPresetSnapshotsEqual(activeLayoutSnapshot, preset.snapshot)
   );
   const canAddCurrentLayout = !matchingPreset;
   const triggerLabel = matchingPreset?.label ?? 'Custom';
 
-  const addPreset = (label: string) => {
-    dispatch({ label, presetId: createCustomPresetId(), type: 'addLayoutPreset' });
-  };
+  const addPreset = useCallback(
+    (label: string) => {
+      dispatch({ label, presetId: createCustomPresetId(), type: 'addLayoutPreset' });
+    },
+    [dispatch]
+  );
 
-  const renamePreset = (preset: LayoutPreset, label: string) => {
-    dispatch({ label, presetId: preset.id, type: 'renameLayoutPreset' });
-  };
+  const renamePreset = useCallback(
+    (preset: LayoutPreset, label: string) => {
+      dispatch({ label, presetId: preset.id, type: 'renameLayoutPreset' });
+    },
+    [dispatch]
+  );
 
-  const deletePreset = (preset: LayoutPreset) => {
-    dispatch({ presetId: preset.id, type: 'deleteLayoutPreset' });
-  };
+  const deletePreset = useCallback(
+    (preset: LayoutPreset) => {
+      dispatch({ presetId: preset.id, type: 'deleteLayoutPreset' });
+    },
+    [dispatch]
+  );
+  const applyPreset = useCallback(
+    (preset: LayoutPreset) => dispatch({ presetId: preset.id, type: 'applyPreset' }),
+    [dispatch]
+  );
+  const openActionMenu = useCallback((preset: LayoutPreset, event: MouseEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setActionTarget({ preset, x: event.clientX, y: event.clientY });
+  }, []);
+  const handleAddCurrentLayout = useCallback(() => {
+    if (canAddCurrentLayout) {
+      setIsAddOpen(true);
+    }
+  }, [canAddCurrentLayout]);
+  const closeActionMenu = useCallback(() => setActionTarget(null), []);
+  const openDeleteDialog = useCallback((preset: LayoutPreset) => setDeleteTarget(preset), []);
+  const openRenameDialog = useCallback((preset: LayoutPreset) => setRenameTarget(preset), []);
+  const closeAddDialog = useCallback(() => setIsAddOpen(false), []);
+  const closeRenameDialog = useCallback(() => setRenameTarget(null), []);
+  const submitRename = useCallback(
+    (label: string) => {
+      if (renameTarget) {
+        renamePreset(renameTarget, label);
+      }
+    },
+    [renamePreset, renameTarget]
+  );
+  const closeDeleteDialog = useCallback(() => setDeleteTarget(null), []);
+  const confirmDelete = useCallback(() => {
+    if (deleteTarget) {
+      deletePreset(deleteTarget);
+    }
+  }, [deletePreset, deleteTarget]);
 
   return (
     <>
-      <Menu.Root positioning={{ placement: 'bottom-end' }}>
+      <Menu.Root positioning={MENU_POSITIONING}>
         <Menu.Trigger asChild>
           <Button
             bg="bg.subtle"
@@ -63,7 +109,7 @@ export const LayoutPresetMenu = () => {
             size="xs"
             variant="outline"
             w="9rem"
-            _hover={{ bg: 'bg.muted' }}
+            _hover={TRIGGER_HOVER_PROPS}
           >
             {triggerLabel}
             <Icon as={ChevronDownIcon} boxSize="3" />
@@ -76,7 +122,7 @@ export const LayoutPresetMenu = () => {
                 label="Built-in presets"
                 matchingPreset={matchingPreset}
                 presets={layoutPresets}
-                onApply={(preset) => dispatch({ presetId: preset.id, type: 'applyPreset' })}
+                onApply={applyPreset}
               />
               {customPresets.length ? (
                 <>
@@ -86,16 +132,9 @@ export const LayoutPresetMenu = () => {
                     label="Custom presets"
                     matchingPreset={matchingPreset}
                     presets={customPresets}
-                    onAction={(preset, event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setActionTarget({ preset, x: event.clientX, y: event.clientY });
-                    }}
-                    onApply={(preset) => dispatch({ presetId: preset.id, type: 'applyPreset' })}
-                    onContextMenu={(preset, event) => {
-                      event.preventDefault();
-                      setActionTarget({ preset, x: event.clientX, y: event.clientY });
-                    }}
+                    onAction={openActionMenu}
+                    onApply={applyPreset}
+                    onContextMenu={openActionMenu}
                   />
                 </>
               ) : null}
@@ -103,12 +142,8 @@ export const LayoutPresetMenu = () => {
               <Menu.Item
                 value="add-current-layout"
                 disabled={!canAddCurrentLayout}
-                _disabled={{ opacity: 0.45 }}
-                onClick={() => {
-                  if (canAddCurrentLayout) {
-                    setIsAddOpen(true);
-                  }
-                }}
+                _disabled={DISABLED_PROPS}
+                onClick={handleAddCurrentLayout}
               >
                 <Icon as={PlusIcon} boxSize="3.5" />
                 <Menu.ItemText>Add current layout...</Menu.ItemText>
@@ -124,9 +159,9 @@ export const LayoutPresetMenu = () => {
       </Menu.Root>
       <PresetActionMenu
         target={actionTarget}
-        onClose={() => setActionTarget(null)}
-        onDelete={(preset) => setDeleteTarget(preset)}
-        onRename={(preset) => setRenameTarget(preset)}
+        onClose={closeActionMenu}
+        onDelete={openDeleteDialog}
+        onRename={openRenameDialog}
       />
       <RenameDialog
         initialName={getDefaultCustomPresetName(customPresets)}
@@ -135,7 +170,7 @@ export const LayoutPresetMenu = () => {
         submitLabel="Add preset"
         submitUnchanged
         title="Add layout preset"
-        onClose={() => setIsAddOpen(false)}
+        onClose={closeAddDialog}
         onSubmit={addPreset}
       />
       {renameTarget ? (
@@ -144,8 +179,8 @@ export const LayoutPresetMenu = () => {
           isOpen={renameTarget !== null}
           label="Preset name"
           title="Rename layout preset"
-          onClose={() => setRenameTarget(null)}
-          onSubmit={(label) => renamePreset(renameTarget, label)}
+          onClose={closeRenameDialog}
+          onSubmit={submitRename}
         />
       ) : null}
       <ConfirmDialog
@@ -153,12 +188,8 @@ export const LayoutPresetMenu = () => {
         confirmLabel="Delete preset"
         isOpen={deleteTarget !== null}
         title="Delete layout preset?"
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={() => {
-          if (deleteTarget) {
-            deletePreset(deleteTarget);
-          }
-        }}
+        onClose={closeDeleteDialog}
+        onConfirm={confirmDelete}
       />
     </>
   );
@@ -176,9 +207,9 @@ const PresetGroup = ({
   isCustom?: boolean;
   label: string;
   matchingPreset?: LayoutPreset;
-  onAction?: (preset: LayoutPreset, event: MouseEvent<HTMLButtonElement>) => void;
+  onAction?: (preset: LayoutPreset, event: MouseEvent<HTMLElement>) => void;
   onApply: (preset: LayoutPreset) => void;
-  onContextMenu?: (preset: LayoutPreset, event: MouseEvent<HTMLDivElement>) => void;
+  onContextMenu?: (preset: LayoutPreset, event: MouseEvent<HTMLElement>) => void;
   presets: LayoutPreset[];
 }) => (
   <Menu.ItemGroup>
@@ -186,35 +217,65 @@ const PresetGroup = ({
       {label}
     </Menu.ItemGroupLabel>
     {presets.map((preset) => (
-      <Menu.Item
+      <PresetMenuItem
         key={preset.id}
-        value={preset.id}
-        onClick={() => onApply(preset)}
-        onContextMenu={(event) => onContextMenu?.(preset, event)}
-      >
-        <Stack gap="0" flex="1" minW="0">
-          <Text fontSize="xs" fontWeight="600">
-            {preset.label}
-          </Text>
-        </Stack>
-        <HStack flexShrink={0} gap="1">
-          {preset.id === matchingPreset?.id ? <Icon as={CheckIcon} boxSize="3" color="accent.solid" /> : null}
-          {isCustom ? (
-            <IconButton
-              aria-label={`Actions for ${preset.label}`}
-              color="fg.muted"
-              size="2xs"
-              variant="ghost"
-              onClick={(event) => onAction?.(preset, event)}
-            >
-              <EllipsisVerticalIcon />
-            </IconButton>
-          ) : null}
-        </HStack>
-      </Menu.Item>
+        isCustom={isCustom}
+        isSelected={preset.id === matchingPreset?.id}
+        preset={preset}
+        onAction={onAction}
+        onApply={onApply}
+        onContextMenu={onContextMenu}
+      />
     ))}
   </Menu.ItemGroup>
 );
+
+const PresetMenuItem = ({
+  isCustom,
+  isSelected,
+  onAction,
+  onApply,
+  onContextMenu,
+  preset,
+}: {
+  isCustom: boolean;
+  isSelected: boolean;
+  preset: LayoutPreset;
+  onAction?: (preset: LayoutPreset, event: MouseEvent<HTMLElement>) => void;
+  onApply: (preset: LayoutPreset) => void;
+  onContextMenu?: (preset: LayoutPreset, event: MouseEvent<HTMLElement>) => void;
+}) => {
+  const handleApply = useCallback(() => onApply(preset), [onApply, preset]);
+  const handleContextMenu = useCallback(
+    (event: MouseEvent<HTMLElement>) => onContextMenu?.(preset, event),
+    [onContextMenu, preset]
+  );
+  const handleAction = useCallback((event: MouseEvent<HTMLElement>) => onAction?.(preset, event), [onAction, preset]);
+
+  return (
+    <Menu.Item value={preset.id} onClick={handleApply} onContextMenu={handleContextMenu}>
+      <Stack gap="0" flex="1" minW="0">
+        <Text fontSize="xs" fontWeight="600">
+          {preset.label}
+        </Text>
+      </Stack>
+      <HStack flexShrink={0} gap="1">
+        {isSelected ? <Icon as={CheckIcon} boxSize="3" color="accent.solid" /> : null}
+        {isCustom ? (
+          <IconButton
+            aria-label={`Actions for ${preset.label}`}
+            color="fg.muted"
+            size="2xs"
+            variant="ghost"
+            onClick={handleAction}
+          >
+            <EllipsisVerticalIcon />
+          </IconButton>
+        ) : null}
+      </HStack>
+    </Menu.Item>
+  );
+};
 
 const PresetActionMenu = ({
   onClose,
@@ -226,41 +287,81 @@ const PresetActionMenu = ({
   onClose: () => void;
   onDelete: (preset: LayoutPreset) => void;
   onRename: (preset: LayoutPreset) => void;
-}) => (
-  <Menu.Root
-    key={target?.preset.id ?? 'closed'}
-    lazyMount
-    open={target !== null}
-    positioning={
+}) => {
+  const positioning = useMemo(
+    () =>
       target?.x !== undefined && target.y !== undefined
         ? {
             getAnchorRect: () => ({ height: 1, width: 1, x: target.x as number, y: target.y as number }),
-            placement: 'bottom-start',
+            placement: 'bottom-start' as const,
           }
-        : { placement: 'bottom-end' }
-    }
-    unmountOnExit
-    onOpenChange={(event) => {
+        : MENU_POSITIONING,
+    [target]
+  );
+  const handleOpenChange = useCallback(
+    (event: { open: boolean }) => {
       if (!event.open) {
         onClose();
       }
-    }}
-  >
-    <Portal>
-      <Menu.Positioner>
-        {target ? (
-          <MenuContent minW="12rem">
-            <Menu.Item value="rename-preset" onClick={() => onRename(target.preset)}>
-              <Icon as={PencilIcon} boxSize="3.5" />
-              <Menu.ItemText>Rename...</Menu.ItemText>
-            </Menu.Item>
-            <Menu.Item color="fg.error" value="delete-preset" onClick={() => onDelete(target.preset)}>
-              <Icon as={Trash2Icon} boxSize="3.5" />
-              <Menu.ItemText>Delete...</Menu.ItemText>
-            </Menu.Item>
-          </MenuContent>
-        ) : null}
-      </Menu.Positioner>
-    </Portal>
-  </Menu.Root>
-);
+    },
+    [onClose]
+  );
+
+  return (
+    <Menu.Root
+      key={target?.preset.id ?? 'closed'}
+      lazyMount
+      open={target !== null}
+      positioning={positioning}
+      unmountOnExit
+      onOpenChange={handleOpenChange}
+    >
+      <Portal>
+        <Menu.Positioner>
+          {target ? (
+            <MenuContent minW="12rem">
+              <PresetActionMenuItem action="rename" preset={target.preset} onDelete={onDelete} onRename={onRename} />
+              <PresetActionMenuItem action="delete" preset={target.preset} onDelete={onDelete} onRename={onRename} />
+            </MenuContent>
+          ) : null}
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
+  );
+};
+
+const PresetActionMenuItem = ({
+  action,
+  onDelete,
+  onRename,
+  preset,
+}: {
+  action: 'delete' | 'rename';
+  preset: LayoutPreset;
+  onDelete: (preset: LayoutPreset) => void;
+  onRename: (preset: LayoutPreset) => void;
+}) => {
+  const handleClick = useCallback(() => {
+    if (action === 'rename') {
+      onRename(preset);
+    } else {
+      onDelete(preset);
+    }
+  }, [action, onDelete, onRename, preset]);
+
+  if (action === 'rename') {
+    return (
+      <Menu.Item value="rename-preset" onClick={handleClick}>
+        <Icon as={PencilIcon} boxSize="3.5" />
+        <Menu.ItemText>Rename...</Menu.ItemText>
+      </Menu.Item>
+    );
+  }
+
+  return (
+    <Menu.Item color="fg.error" value="delete-preset" onClick={handleClick}>
+      <Icon as={Trash2Icon} boxSize="3.5" />
+      <Menu.ItemText>Delete...</Menu.ItemText>
+    </Menu.Item>
+  );
+};

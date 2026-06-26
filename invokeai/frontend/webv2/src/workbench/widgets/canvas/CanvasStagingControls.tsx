@@ -1,3 +1,4 @@
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop */
 import type { CanvasStagingCandidateContract, GeneratedImageContract } from '@workbench/types';
 
 import { Box, HStack, ScrollArea, Stack, Text } from '@chakra-ui/react';
@@ -66,6 +67,7 @@ export const CanvasStagingControls = ({
         <ScrollArea.Thumb />
       </ScrollArea.Scrollbar>
     </ScrollArea.Root>
+
     <Stack
       bg="bg.muted"
       borderWidth="1px"

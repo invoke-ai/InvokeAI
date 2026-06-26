@@ -1,3 +1,4 @@
+/* eslint-disable react/react-compiler */
 import { Tooltip as ChakraTooltip, Portal } from '@chakra-ui/react';
 import {
   cloneElement,

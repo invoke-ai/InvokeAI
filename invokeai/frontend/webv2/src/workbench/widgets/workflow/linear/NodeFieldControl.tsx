@@ -14,7 +14,7 @@ import {
 import { useInvocationTemplatesSelector } from '@workbench/workflows/templates';
 import { isInvocationNode } from '@workbench/workflows/types';
 import { RotateCcwIcon } from 'lucide-react';
-import { useState, type ChangeEvent } from 'react';
+import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
 /**
  * One exposed node field, shared by the Linear UI's view mode and the form
@@ -56,6 +56,57 @@ export const NodeFieldControl = ({
   // instead of an empty box.
   const [draftLabel, setDraftLabel] = useState<string | null>(null);
 
+  const isConnected = getResolvedWorkflowEdges(projectGraph.nodes, projectGraph.edges).some(
+    (edge) => edge.target === nodeId && edge.targetHandle === fieldName
+  );
+  const label = instance?.label || template?.title || '';
+  const description = instance?.description || template?.description;
+  const invalidReason = template
+    ? getWorkflowFieldInvalidReason({ isConnected, template, value: instance?.value })
+    : null;
+  const isInvalid = invalidReason !== null;
+  const canReset =
+    !!template &&
+    !isConnected &&
+    isDirectInputField(template) &&
+    !isWorkflowFieldValueDefault(template, instance?.value);
+  const labelInputId = `${element.id}-label-input`;
+  const valueInputId = `${element.id}-value`;
+  const onResetClick = useCallback(
+    () =>
+      dispatch({
+        action: {
+          fieldName,
+          nodeId,
+          type: 'setFieldValue',
+          value: template ? cloneWorkflowFieldDefault(template) : undefined,
+        },
+        type: 'applyProjectGraphAction',
+      }),
+    [dispatch, fieldName, nodeId, template]
+  );
+  const onLabelBlur = useCallback(() => setDraftLabel(null), []);
+  const onLabelChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      setDraftLabel(event.currentTarget.value);
+      dispatch({
+        action: { fieldName, label: event.currentTarget.value, nodeId, type: 'setFieldLabel' },
+        type: 'applyProjectGraphAction',
+      });
+    },
+    [dispatch, fieldName, nodeId]
+  );
+  const onLabelFocus = useCallback(() => setDraftLabel(label), [label]);
+  const onValueChange = useCallback(
+    (value: unknown) =>
+      dispatch({
+        action: { fieldName, nodeId, type: 'setFieldValue', value },
+        type: 'applyProjectGraphAction',
+      }),
+    [dispatch, fieldName, nodeId]
+  );
+  const resetAriaLabel = useMemo(() => `Reset ${label} to default value`, [label]);
+
   if (!invocationNode || !template) {
     return (
       <Alert.Root status="error" size="sm" variant="surface">
@@ -64,33 +115,16 @@ export const NodeFieldControl = ({
       </Alert.Root>
     );
   }
-
-  const isConnected = getResolvedWorkflowEdges(projectGraph.nodes, projectGraph.edges).some(
-    (edge) => edge.target === nodeId && edge.targetHandle === fieldName
-  );
-  const label = instance?.label || template.title;
-  const description = instance?.description || template.description;
-  const invalidReason = getWorkflowFieldInvalidReason({ isConnected, template, value: instance?.value });
-  const isInvalid = invalidReason !== null;
-  const canReset =
-    !isConnected && isDirectInputField(template) && !isWorkflowFieldValueDefault(template, instance?.value);
-  const labelInputId = `${element.id}-label-input`;
-  const valueInputId = `${element.id}-value`;
   const resetButton = canReset ? (
     <Tooltip content="Reset to default value">
       <IconButton
-        aria-label={`Reset ${label} to default value`}
+        aria-label={resetAriaLabel}
         color="fg.subtle"
         flexShrink={0}
         size="2xs"
         title="Reset to default value"
         variant="ghost"
-        onClick={() =>
-          dispatch({
-            action: { fieldName, nodeId, type: 'setFieldValue', value: cloneWorkflowFieldDefault(template) },
-            type: 'applyProjectGraphAction',
-          })
-        }
+        onClick={onResetClick}
       >
         <Icon as={RotateCcwIcon} boxSize="3" />
       </IconButton>
@@ -115,15 +149,9 @@ export const NodeFieldControl = ({
               value={draftLabel ?? label}
               variant="flushed"
               w="full"
-              onBlur={() => setDraftLabel(null)}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                setDraftLabel(event.currentTarget.value);
-                dispatch({
-                  action: { fieldName, label: event.currentTarget.value, nodeId, type: 'setFieldLabel' },
-                  type: 'applyProjectGraphAction',
-                });
-              }}
-              onFocus={() => setDraftLabel(label)}
+              onBlur={onLabelBlur}
+              onChange={onLabelChange}
+              onFocus={onLabelFocus}
             />
             {resetButton}
           </HStack>
@@ -152,12 +180,7 @@ export const NodeFieldControl = ({
             invalid={isInvalid}
             template={template}
             value={instance?.value}
-            onChange={(value) =>
-              dispatch({
-                action: { fieldName, nodeId, type: 'setFieldValue', value },
-                type: 'applyProjectGraphAction',
-              })
-            }
+            onChange={onValueChange}
           />
         )}
         {invalidReason ? <Field.ErrorText fontSize="2xs">{invalidReason}</Field.ErrorText> : null}

@@ -17,7 +17,7 @@ import {
 import { Button, CloseButton, IconButton, Tabs } from '@workbench/components/ui';
 import { isDateBoardId } from '@workbench/gallery/api';
 import { SearchIcon, SettingsIcon, UploadIcon } from 'lucide-react';
-import { useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 
 import { GalleryBoardSelect } from './GalleryBoardSelect';
 import { useGalleryWidget } from './GalleryWidgetContext';
@@ -28,45 +28,73 @@ const galleryViewTabs = [
   { label: 'Assets', value: 'assets' },
 ] satisfies { label: string; value: GalleryView }[];
 
+const UPLOAD_INPUT_STYLE = { display: 'none' } as const;
+const GALLERY_SETTINGS_POSITIONING = { placement: 'bottom-end' } as const;
+const SLIDER_ARIA_LABEL = ['Gallery image density'];
+const SEARCH_START_ELEMENT = <Icon as={SearchIcon} size="sm" />;
+
 export const GalleryToolbar = ({ layout }: { layout: 'stacked' | 'wide' }) => {
   const { actions, gallery } = useGalleryWidget();
   const isWide = layout === 'wide';
-  const viewTabs = (
-    <Tabs.Root
-      size="sm"
-      variant="subtle"
-      value={gallery.galleryView}
-      onValueChange={(event) => actions.setView(event.value as GalleryView)}
-    >
-      <Tabs.List>
-        {galleryViewTabs.map((item) => (
-          <Tabs.Trigger key={item.value} value={item.value} fontSize="xs">
-            {item.label}
-          </Tabs.Trigger>
-        ))}
-      </Tabs.List>
-    </Tabs.Root>
+
+  const handleViewChange = useCallback(
+    (event: { value: string }) => actions.setView(event.value as GalleryView),
+    [actions]
   );
 
-  const toolbarActions = (
-    <HStack gap="2">
-      <GalleryUploadButton />
-      <GallerySettingsMenu />
-    </HStack>
+  const handleClearSearch = useCallback(() => actions.setSearchTerm(''), [actions]);
+
+  const handleSearchChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => actions.setSearchTerm(event.currentTarget.value),
+    [actions]
   );
-  const searchClearButton = gallery.searchTerm ? (
-    <CloseButton size="2xs" aria-label="Clear search" onClick={() => actions.setSearchTerm('')} me="-2" />
-  ) : null;
-  const searchInput = (
-    <InputGroup startElement={<Icon as={SearchIcon} size="sm" />} endElement={searchClearButton}>
-      <Input
-        aria-label="Search gallery images"
-        placeholder="Search images"
-        size="xs"
-        value={gallery.searchTerm}
-        onChange={(event) => actions.setSearchTerm(event.currentTarget.value)}
-      />
-    </InputGroup>
+
+  const searchClearButton = useMemo(
+    () =>
+      gallery.searchTerm ? (
+        <CloseButton size="2xs" aria-label="Clear search" onClick={handleClearSearch} me="-2" />
+      ) : null,
+    [gallery.searchTerm, handleClearSearch]
+  );
+
+  const viewTabs = useMemo(
+    () => (
+      <Tabs.Root size="sm" variant="subtle" value={gallery.galleryView} onValueChange={handleViewChange}>
+        <Tabs.List>
+          {galleryViewTabs.map((item) => (
+            <Tabs.Trigger key={item.value} value={item.value} fontSize="xs">
+              {item.label}
+            </Tabs.Trigger>
+          ))}
+        </Tabs.List>
+      </Tabs.Root>
+    ),
+    [gallery.galleryView, handleViewChange]
+  );
+
+  const toolbarActions = useMemo(
+    () => (
+      <HStack gap="2">
+        <GalleryUploadButton />
+        <GallerySettingsMenu />
+      </HStack>
+    ),
+    []
+  );
+
+  const searchInput = useMemo(
+    () => (
+      <InputGroup startElement={SEARCH_START_ELEMENT} endElement={searchClearButton}>
+        <Input
+          aria-label="Search gallery images"
+          placeholder="Search images"
+          size="xs"
+          value={gallery.searchTerm}
+          onChange={handleSearchChange}
+        />
+      </InputGroup>
+    ),
+    [gallery.searchTerm, handleSearchChange, searchClearButton]
   );
 
   return (
@@ -103,23 +131,30 @@ const GalleryUploadButton = () => {
   const selectedBoard = gallery.boards.find((board) => board.id === gallery.selectedBoardId);
   const isVirtualTarget = isDateBoardId(gallery.selectedBoardId);
 
+  const handleFileChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(event.currentTarget.files ?? []);
+
+      event.currentTarget.value = '';
+
+      if (files.length > 0) {
+        void actions.uploadFiles(files);
+      }
+    },
+    [actions]
+  );
+
+  const handleUploadClick = useCallback(() => fileInputRef.current?.click(), []);
+
   return (
     <>
       <input
         accept={ACCEPTED_UPLOAD_EXTENSIONS}
         multiple
         ref={fileInputRef}
-        style={{ display: 'none' }}
+        style={UPLOAD_INPUT_STYLE}
         type="file"
-        onChange={(event) => {
-          const files = Array.from(event.currentTarget.files ?? []);
-
-          event.currentTarget.value = '';
-
-          if (files.length > 0) {
-            void actions.uploadFiles(files);
-          }
-        }}
+        onChange={handleFileChange}
       />
       <IconButton
         aria-label={
@@ -130,7 +165,7 @@ const GalleryUploadButton = () => {
         disabled={isVirtualTarget}
         size="xs"
         variant="outline"
-        onClick={() => fileInputRef.current?.click()}
+        onClick={handleUploadClick}
       >
         <UploadIcon />
       </IconButton>
@@ -142,9 +177,33 @@ const GallerySettingsMenu = () => {
   const { actions, gallery } = useGalleryWidget();
   const { imageDensityPercent, imageOrderDir, paginationMode, showImageDimensions, starredFirst, thumbnailFit } =
     gallery.settings;
+  const handleDensityKeyDown = useCallback((event: React.KeyboardEvent) => event.stopPropagation(), []);
+  const handleDensityChange = useCallback(
+    (event: { value: number[] }) =>
+      actions.updateSettings({ imageDensityPercent: event.value[0] ?? imageDensityPercent }),
+    [actions, imageDensityPercent]
+  );
+  const handleSquareFit = useCallback(() => actions.updateSettings({ thumbnailFit: 'square' }), [actions]);
+  const handleAspectFit = useCallback(() => actions.updateSettings({ thumbnailFit: 'aspect' }), [actions]);
+  const handleShowDimensionsChange = useCallback(
+    (showImageDimensions: boolean) => actions.updateSettings({ showImageDimensions }),
+    [actions]
+  );
+  const handleNewestFirst = useCallback(() => actions.updateSettings({ imageOrderDir: 'DESC' }), [actions]);
+  const handleOldestFirst = useCallback(() => actions.updateSettings({ imageOrderDir: 'ASC' }), [actions]);
+  const handleStarredFirstChange = useCallback(
+    (starredFirst: boolean) => actions.updateSettings({ starredFirst }),
+    [actions]
+  );
+  const handleInfinitePagination = useCallback(() => actions.updateSettings({ paginationMode: 'infinite' }), [actions]);
+  const handlePaginatedPagination = useCallback(
+    () => actions.updateSettings({ paginationMode: 'paginated' }),
+    [actions]
+  );
+  const densityValue = useMemo(() => [imageDensityPercent], [imageDensityPercent]);
 
   return (
-    <Menu.Root positioning={{ placement: 'bottom-end' }}>
+    <Menu.Root positioning={GALLERY_SETTINGS_POSITIONING}>
       <Menu.Trigger asChild>
         <IconButton aria-label="Gallery settings" size="xs" variant="outline">
           <SettingsIcon />
@@ -162,15 +221,13 @@ const GallerySettingsMenu = () => {
                   </Text>
                 </HStack>
                 <Slider.Root
-                  aria-label={['Gallery image density']}
+                  aria-label={SLIDER_ARIA_LABEL}
                   max={100}
                   min={0}
                   step={1}
-                  value={[imageDensityPercent]}
-                  onKeyDown={(event) => event.stopPropagation()}
-                  onValueChange={(event) =>
-                    actions.updateSettings({ imageDensityPercent: event.value[0] ?? imageDensityPercent })
-                  }
+                  value={densityValue}
+                  onKeyDown={handleDensityKeyDown}
+                  onValueChange={handleDensityChange}
                 >
                   <Slider.Control>
                     <Slider.Track>
@@ -187,7 +244,7 @@ const GallerySettingsMenu = () => {
                     flex="1"
                     size="2xs"
                     variant={thumbnailFit === 'square' ? 'solid' : 'outline'}
-                    onClick={() => actions.updateSettings({ thumbnailFit: 'square' })}
+                    onClick={handleSquareFit}
                   >
                     Square
                   </Button>
@@ -195,7 +252,7 @@ const GallerySettingsMenu = () => {
                     flex="1"
                     size="2xs"
                     variant={thumbnailFit === 'aspect' ? 'solid' : 'outline'}
-                    onClick={() => actions.updateSettings({ thumbnailFit: 'aspect' })}
+                    onClick={handleAspectFit}
                   >
                     Aspect
                   </Button>
@@ -203,7 +260,7 @@ const GallerySettingsMenu = () => {
                 <SettingSwitch
                   checked={showImageDimensions}
                   label="Always show dimensions"
-                  onChange={(checked) => actions.updateSettings({ showImageDimensions: checked })}
+                  onChange={handleShowDimensionsChange}
                 />
               </Stack>
               <Stack gap="2">
@@ -213,7 +270,7 @@ const GallerySettingsMenu = () => {
                     flex="1"
                     size="2xs"
                     variant={imageOrderDir === 'DESC' ? 'solid' : 'outline'}
-                    onClick={() => actions.updateSettings({ imageOrderDir: 'DESC' })}
+                    onClick={handleNewestFirst}
                   >
                     Newest
                   </Button>
@@ -221,7 +278,7 @@ const GallerySettingsMenu = () => {
                     flex="1"
                     size="2xs"
                     variant={imageOrderDir === 'ASC' ? 'solid' : 'outline'}
-                    onClick={() => actions.updateSettings({ imageOrderDir: 'ASC' })}
+                    onClick={handleOldestFirst}
                   >
                     Oldest
                   </Button>
@@ -229,7 +286,7 @@ const GallerySettingsMenu = () => {
                 <SettingSwitch
                   checked={starredFirst}
                   label="Show starred images first"
-                  onChange={(checked) => actions.updateSettings({ starredFirst: checked })}
+                  onChange={handleStarredFirstChange}
                 />
               </Stack>
               <Stack gap="2">
@@ -239,7 +296,7 @@ const GallerySettingsMenu = () => {
                     flex="1"
                     size="2xs"
                     variant={paginationMode === 'infinite' ? 'solid' : 'outline'}
-                    onClick={() => actions.updateSettings({ paginationMode: 'infinite' })}
+                    onClick={handleInfinitePagination}
                   >
                     Infinite
                   </Button>
@@ -247,7 +304,7 @@ const GallerySettingsMenu = () => {
                     flex="1"
                     size="2xs"
                     variant={paginationMode === 'paginated' ? 'solid' : 'outline'}
-                    onClick={() => actions.updateSettings({ paginationMode: 'paginated' })}
+                    onClick={handlePaginatedPagination}
                   >
                     Pages
                   </Button>
@@ -269,15 +326,19 @@ const SettingSwitch = ({
   checked: boolean;
   label: string;
   onChange: (checked: boolean) => void;
-}) => (
-  <Switch.Root checked={checked} size="sm" onCheckedChange={(event) => onChange(event.checked)}>
-    <Switch.HiddenInput />
-    <Switch.Control>
-      <Switch.Thumb />
-    </Switch.Control>
-    <Switch.Label fontSize="2xs">{label}</Switch.Label>
-  </Switch.Root>
-);
+}) => {
+  const handleCheckedChange = useCallback((event: { checked: boolean }) => onChange(event.checked), [onChange]);
+
+  return (
+    <Switch.Root checked={checked} size="sm" onCheckedChange={handleCheckedChange}>
+      <Switch.HiddenInput />
+      <Switch.Control>
+        <Switch.Thumb />
+      </Switch.Control>
+      <Switch.Label fontSize="2xs">{label}</Switch.Label>
+    </Switch.Root>
+  );
+};
 
 const SettingLabel = ({ children }: { children: string }) => (
   <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">

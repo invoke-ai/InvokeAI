@@ -31,8 +31,14 @@
 
     "prefer-template": "error",
     "radix": "error",
+    "no-restricted-exports": "error",
 
-    // "eslint/complexity": "error",
+    // "eslint/complexity": [
+    //   "error",
+    //   {
+    //     "max": 3
+    //   }
+    // ],
 
     "react/jsx-curly-brace-presence": [
       "error",
@@ -46,9 +52,35 @@
     "react/no-unknown-property": "error",
     "react/jsx-no-useless-fragment": "error",
     "react/exhaustive-deps": "error",
+    "react/react-compiler": "error",
 
     "react-hooks/exhaustive-deps": "error",
     "react-hooks/rules-of-hooks": "error",
+
+    "react-perf/jsx-no-new-object-as-prop": [
+      "error",
+      {
+        "nativeAllowList": "all"
+      }
+    ],
+    "react-perf/jsx-no-new-function-as-prop": [
+      "error",
+      {
+        "nativeAllowList": "all"
+      }
+    ],
+    "react-perf/jsx-no-new-array-as-prop": [
+      "error",
+      {
+        "nativeAllowList": "all"
+      }
+    ],
+    "react-perf/jsx-no-jsx-as-prop": [
+      "error",
+      {
+        "nativeAllowList": "all"
+      }
+    ],
 
     "require-await": "error",
 
@@ -65,6 +97,14 @@
         "allowSingleExtends": true
       }
     ],
+    "typescript/consistent-type-assertions": [
+      "error",
+      {
+        "assertionStyle": "as"
+      }
+    ],
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-import-type-side-effects": "error",
 
     "unicorn/no-abusive-eslint-disable": "error",
     "unicorn/error-message": "error",

@@ -60,7 +60,9 @@ export const useRegisterFirstPartyCommands = () => {
 
   useInvocationTemplatesSelector((snapshot) => snapshot.status);
 
-  modelsRef.current = availabilityModels;
+  useEffect(() => {
+    modelsRef.current = availabilityModels;
+  }, [availabilityModels]);
 
   useEffect(
     () =>

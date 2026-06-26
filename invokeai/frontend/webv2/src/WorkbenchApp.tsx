@@ -1,5 +1,6 @@
 import { useSearch } from '@tanstack/react-router';
 import { WorkbenchShell } from '@workbench/shell';
+import { useMemo } from 'react';
 
 import type { WorkbenchSearch } from './workbench/projects/session';
 
@@ -22,9 +23,13 @@ import { WorkbenchSessionController } from './workbench/WorkbenchSessionControll
  */
 export const WorkbenchApp = () => {
   const search = useSearch({ strict: false }) as WorkbenchSearch;
+  const loadOptions = useMemo(
+    () => ({ createNew: search.new, openProjectId: search.project }),
+    [search.new, search.project]
+  );
 
   return (
-    <WorkbenchProvider loadOptions={{ createNew: search.new, openProjectId: search.project }}>
+    <WorkbenchProvider loadOptions={loadOptions}>
       <SessionExpiryGuard />
       <WorkbenchHotkeyRuntime />
       <WorkbenchRuntime />

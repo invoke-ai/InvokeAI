@@ -1,3 +1,4 @@
+/* eslint-disable react/react-compiler */
 import type { InvocationRoute, InvocationSourceId, ResultDestination } from '@workbench/types';
 
 import { Flex, Group, HStack, Icon, Menu, Portal, Separator, Stack, Text, VStack } from '@chakra-ui/react';
@@ -23,10 +24,13 @@ import {
 } from '@workbench/WorkbenchContext';
 import { useInvocationTemplatesSelector } from '@workbench/workflows/templates';
 import { CheckIcon, ChevronDownIcon, LockKeyholeIcon, SparklesIcon } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 const CONTROL_WIDTH = '10rem';
 const selectInvocationRouteInput = createInvocationRouteInputSelector();
+const MENU_POSITIONING = { placement: 'bottom-end' } as const;
+const TOOLTIP_CONTENT_PROPS = { p: '0' };
+const DISABLED_PROPS = { opacity: 0.4 };
 
 const getBatchCount = (values: Record<string, unknown>): number => {
   const batchCount = values.batchCount;
@@ -114,10 +118,10 @@ export const InvokeControl = () => {
   const isLocked = invocation.sourceLocked || invocation.destinationLocked;
   const isConnected = backendConnectionStatus === 'connected';
 
-  const blockingReasons = [
-    ...(isConnected ? [] : ['The backend is disconnected.']),
-    ...resolvedRoute.validationReasons,
-  ];
+  const blockingReasons = useMemo(
+    () => [...(isConnected ? [] : ['The backend is disconnected.']), ...resolvedRoute.validationReasons],
+    [isConnected, resolvedRoute.validationReasons]
+  );
   const isValid = isInvocationRouteValid(resolvedRoute) && isConnected;
   const routeLabel = isValid ? formatRoute(resolvedRoute) : (blockingReasons[0] ?? formatRoute(resolvedRoute));
   const modelsRef = useRef(availabilityModels);
@@ -128,7 +132,7 @@ export const InvokeControl = () => {
     ensureModelsLoaded();
   }, []);
 
-  const onInvoke = () => {
+  const onInvoke = useCallback(() => {
     flushGenerateDrafts();
     const snapshot = store.getSnapshot();
     const postFlushRoute = resolveInvocationRoute(
@@ -148,25 +152,36 @@ export const InvokeControl = () => {
       route: postFlushRoute,
       type: 'submitResolvedInvocationSnapshot',
     });
-  };
+  }, [dispatch, store]);
+  const tooltipContent = useMemo(
+    () => (
+      <InvokeTooltipContent
+        blockingReasons={blockingReasons}
+        generateValues={routeInput.generateValues}
+        invocation={invocation}
+        isValid={isValid}
+      />
+    ),
+    [blockingReasons, invocation, isValid, routeInput.generateValues]
+  );
+  const handleSourceChange = useCallback(
+    (event: { value: string }) =>
+      dispatch({ sourceId: event.value as InvocationSourceId, type: 'setInvocationSource' }),
+    [dispatch]
+  );
+  const handleDestinationChange = useCallback(
+    (event: { value: string }) =>
+      dispatch({ destination: event.value as ResultDestination, type: 'setInvocationDestination' }),
+    [dispatch]
+  );
+  const handleToggleSourceLock = useCallback(() => dispatch({ type: 'toggleSourceLock' }), [dispatch]);
+  const handleToggleDestinationLock = useCallback(() => dispatch({ type: 'toggleDestinationLock' }), [dispatch]);
 
   return (
     <Flex>
-      <Menu.Root positioning={{ placement: 'bottom-end' }}>
+      <Menu.Root positioning={MENU_POSITIONING}>
         <Group attached>
-          <Tooltip
-            content={
-              <InvokeTooltipContent
-                blockingReasons={blockingReasons}
-                generateValues={routeInput.generateValues}
-                invocation={invocation}
-                isValid={isValid}
-              />
-            }
-            contentProps={{ p: '0' }}
-            openDelay={200}
-            showArrow
-          >
+          <Tooltip content={tooltipContent} contentProps={TOOLTIP_CONTENT_PROPS} openDelay={200} showArrow>
             <Button
               aria-disabled={!isValid}
               colorPalette="brand"
@@ -202,12 +217,7 @@ export const InvokeControl = () => {
         <Portal>
           <Menu.Positioner>
             <Menu.Content minW="14rem">
-              <Menu.RadioItemGroup
-                value={invocation.sourceId}
-                onValueChange={(event) =>
-                  dispatch({ sourceId: event.value as InvocationSourceId, type: 'setInvocationSource' })
-                }
-              >
+              <Menu.RadioItemGroup value={invocation.sourceId} onValueChange={handleSourceChange}>
                 <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
                   Source
                 </Menu.ItemGroupLabel>
@@ -216,7 +226,7 @@ export const InvokeControl = () => {
                     key={source.id}
                     value={source.id}
                     disabled={!source.available}
-                    _disabled={{ opacity: 0.4 }}
+                    _disabled={DISABLED_PROPS}
                   >
                     <Menu.ItemText>{source.label}</Menu.ItemText>
                     {source.available ? null : (
@@ -233,12 +243,7 @@ export const InvokeControl = () => {
 
               <Menu.Separator borderColor="border.subtle" />
 
-              <Menu.RadioItemGroup
-                value={invocation.destination}
-                onValueChange={(event) =>
-                  dispatch({ destination: event.value as ResultDestination, type: 'setInvocationDestination' })
-                }
-              >
+              <Menu.RadioItemGroup value={invocation.destination} onValueChange={handleDestinationChange}>
                 <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
                   Destination
                 </Menu.ItemGroupLabel>
@@ -254,19 +259,11 @@ export const InvokeControl = () => {
 
               <Menu.Separator borderColor="border.subtle" />
 
-              <Menu.Item
-                value="lock-source"
-                closeOnSelect={false}
-                onClick={() => dispatch({ type: 'toggleSourceLock' })}
-              >
+              <Menu.Item value="lock-source" closeOnSelect={false} onClick={handleToggleSourceLock}>
                 <Icon as={LockKeyholeIcon} boxSize="3" opacity={invocation.sourceLocked ? 1 : 0.35} />
                 <Menu.ItemText>{invocation.sourceLocked ? 'Unlock source' : 'Lock source'}</Menu.ItemText>
               </Menu.Item>
-              <Menu.Item
-                value="lock-destination"
-                closeOnSelect={false}
-                onClick={() => dispatch({ type: 'toggleDestinationLock' })}
-              >
+              <Menu.Item value="lock-destination" closeOnSelect={false} onClick={handleToggleDestinationLock}>
                 <Icon as={LockKeyholeIcon} boxSize="3" opacity={invocation.destinationLocked ? 1 : 0.35} />
                 <Menu.ItemText>
                   {invocation.destinationLocked ? 'Unlock destination' : 'Lock destination'}

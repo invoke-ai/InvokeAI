@@ -75,25 +75,26 @@ export const WidgetRenderer = ({ instance, presentation, region, widget }: Widge
 
   return (
     <WidgetShellFrame
-      content={content}
       instance={instanceMeta}
       presentation={presentation}
       region={region}
       runtime={runtime}
       widget={widget}
-    />
+    >
+      {content}
+    </WidgetShellFrame>
   );
 };
 
 const WidgetShellFrame = ({
-  content,
+  children,
   instance,
   presentation,
   region,
   runtime,
   widget,
 }: {
-  content: React.ReactNode;
+  children: React.ReactNode;
   instance: WidgetInstanceRuntimeMeta;
   presentation: WidgetViewProps['presentation'];
   region: WidgetViewProps['region'];
@@ -102,7 +103,7 @@ const WidgetShellFrame = ({
 }) => {
   const safeContent = (
     <RenderFailureSlot instance={instance} widget={widget}>
-      {content}
+      {children}
     </RenderFailureSlot>
   );
 
@@ -198,20 +199,24 @@ const HeaderSlot = memo(function HeaderSlot({
   runtime: WidgetRuntimeApi;
   widget: RegisteredWidget;
 }) {
+  const HeaderActions = widget.manifest.headerActions;
+  const actions = useMemo(
+    () =>
+      HeaderActions ? (
+        <HeaderActions
+          instance={instance}
+          manifest={widget.manifest}
+          presentation={presentation}
+          region={region}
+          runtime={runtime}
+        />
+      ) : null,
+    [HeaderActions, instance, presentation, region, runtime, widget.manifest]
+  );
+
   if (widget.manifest.chrome?.header === 'hidden') {
     return null;
   }
-
-  const HeaderActions = widget.manifest.headerActions;
-  const actions = HeaderActions ? (
-    <HeaderActions
-      instance={instance}
-      manifest={widget.manifest}
-      presentation={presentation}
-      region={region}
-      runtime={runtime}
-    />
-  ) : null;
   const bg = region === 'center' ? 'bg' : 'bg.subtle';
 
   return (

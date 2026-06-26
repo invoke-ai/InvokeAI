@@ -3,6 +3,9 @@ import type { ChangeEvent } from 'react';
 import { Icon, Popover, Portal, Stack, Text, Textarea, IconButton } from '@chakra-ui/react';
 import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { FileTextIcon } from 'lucide-react';
+import { useCallback } from 'react';
+
+const POPOVER_POSITIONING = { placement: 'bottom-end' } as const;
 
 /**
  * Small textarea popover overriding a field's template description ("field
@@ -21,9 +24,22 @@ export const FieldDescriptionPopover = ({
   templateDescription: string;
 }) => {
   const dispatch = useWorkbenchDispatch();
+  const onDescriptionChange = useCallback(
+    (event: ChangeEvent<HTMLTextAreaElement>) =>
+      dispatch({
+        action: {
+          description: event.currentTarget.value,
+          fieldName,
+          nodeId,
+          type: 'setFieldDescription',
+        },
+        type: 'applyProjectGraphAction',
+      }),
+    [dispatch, fieldName, nodeId]
+  );
 
   return (
-    <Popover.Root lazyMount positioning={{ placement: 'bottom-end' }}>
+    <Popover.Root lazyMount positioning={POPOVER_POSITIONING}>
       <Popover.Trigger asChild>
         <IconButton
           aria-label="Edit field description"
@@ -53,17 +69,7 @@ export const FieldDescriptionPopover = ({
                   resize="vertical"
                   size="xs"
                   value={description ?? ''}
-                  onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
-                    dispatch({
-                      action: {
-                        description: event.currentTarget.value,
-                        fieldName,
-                        nodeId,
-                        type: 'setFieldDescription',
-                      },
-                      type: 'applyProjectGraphAction',
-                    })
-                  }
+                  onChange={onDescriptionChange}
                 />
               </Stack>
             </Popover.Body>

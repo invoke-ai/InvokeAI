@@ -5,6 +5,7 @@ import { Button, Panel } from '@workbench/components/ui';
 import { StatusWidgetChip } from '@workbench/widget-frame';
 import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { BugIcon, ClipboardListIcon } from 'lucide-react';
+import { useCallback } from 'react';
 
 export const DiagnosticsWidgetView = ({ presentation, region }: WidgetViewProps) => {
   const errorCount = useWorkbenchSelector((snapshot) => snapshot.state.errorLog.length);
@@ -31,19 +32,27 @@ const DiagnosticsPanel = () => {
       ) : (
         <Stack gap="2">
           {errorLog.map((message, index) => (
-            <Panel key={`${message}-${index}`} gap="2" p="2">
-              <Text color="fg.muted" fontFamily="mono" fontSize="2xs" whiteSpace="pre-wrap">
-                {message}
-              </Text>
-              <HStack justify="end">
-                <Button size="2xs" variant="outline" onClick={() => void navigator.clipboard?.writeText(message)}>
-                  Copy
-                </Button>
-              </HStack>
-            </Panel>
+            <DiagnosticsErrorRow key={`${message}-${index}`} message={message} />
           ))}
         </Stack>
       )}
     </Stack>
+  );
+};
+
+const DiagnosticsErrorRow = ({ message }: { message: string }) => {
+  const copyMessage = useCallback(() => void navigator.clipboard?.writeText(message), [message]);
+
+  return (
+    <Panel gap="2" p="2">
+      <Text color="fg.muted" fontFamily="mono" fontSize="2xs" whiteSpace="pre-wrap">
+        {message}
+      </Text>
+      <HStack justify="end">
+        <Button size="2xs" variant="outline" onClick={copyMessage}>
+          Copy
+        </Button>
+      </HStack>
+    </Panel>
   );
 };

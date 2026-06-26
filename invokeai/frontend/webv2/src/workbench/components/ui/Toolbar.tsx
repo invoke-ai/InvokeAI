@@ -5,6 +5,8 @@ import { Icon, Separator, Stack, type StackProps } from '@chakra-ui/react';
 import { IconButton } from './Button';
 import { Tooltip } from './Tooltip';
 
+const toolbarButtonTooltipPositioning = { placement: 'right-start' } as const;
+
 /**
  * The workbench's floating tool strip, shared by canvas-like surfaces (the
  * workflow editor today, the canvas later). Vertical by default — designed to
@@ -40,7 +42,7 @@ export const ToolbarButton = ({
   isActive?: boolean;
   label: string;
 } & Omit<ComponentProps<typeof IconButton>, 'aria-label'>) => (
-  <Tooltip content={label} positioning={{ placement: 'right-start' }}>
+  <Tooltip content={label} positioning={toolbarButtonTooltipPositioning}>
     <IconButton
       aria-label={label}
       aria-pressed={isActive}

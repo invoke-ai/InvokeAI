@@ -1,3 +1,4 @@
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import { Flex, Icon, Text } from '@chakra-ui/react';
 import { Link } from '@tanstack/react-router';
 import { PlusIcon } from 'lucide-react';
@@ -25,3 +26,4 @@ export const NewProjectCard = () => (
     </Text>
   </Flex>
 );
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

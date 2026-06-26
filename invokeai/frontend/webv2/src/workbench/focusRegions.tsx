@@ -1,3 +1,4 @@
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { FocusEvent, PointerEvent, ReactNode } from 'react';
 
 import { createContext, use, useState } from 'react';

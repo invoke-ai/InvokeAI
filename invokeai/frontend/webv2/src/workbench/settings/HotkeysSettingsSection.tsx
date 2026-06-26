@@ -1,7 +1,6 @@
 import type { HotkeyCategory, HotkeyDefinition } from '@workbench/hotkeys';
 
 import { Badge, Box, Flex, HStack, Icon, Input, InputGroup, Kbd, ScrollArea, Stack, Text } from '@chakra-ui/react';
-import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button, IconButton } from '@workbench/components/ui';
 import {
   firstPartyHotkeyCatalog,
@@ -12,7 +11,8 @@ import {
 } from '@workbench/hotkeys';
 import { patchWorkbenchPreferences, useWorkbenchPreferences } from '@workbench/settings/store';
 import { CheckIcon, PlusIcon, RotateCcwIcon, SearchIcon, Trash2Icon, XIcon } from 'lucide-react';
-import { Fragment, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useVirtualizer } from 'react-hook-tanstack-virtual';
 
 type HotkeyConflict = { hotkey: HotkeyDefinition; title: string };
 
@@ -29,6 +29,8 @@ const CATEGORY_LABELS: Record<HotkeyCategory, string> = {
 };
 
 const CATEGORY_ORDER: HotkeyCategory[] = ['app', 'canvas', 'workflows', 'viewer', 'gallery'];
+
+const SEARCH_START_ELEMENT = <Icon as={SearchIcon} boxSize="3.5" />;
 
 const normalizeKeys = (keys: string[]): string[] => keys.map(normalizeHotkeyString).filter(Boolean);
 
@@ -179,22 +181,31 @@ export const HotkeysSettingsSection = () => {
     overscan: 8,
   });
 
-  const saveHotkey = (hotkeyId: string, keys: string[]) => {
-    void patchWorkbenchPreferences({ customHotkeys: { ...customHotkeys, [hotkeyId]: normalizeKeys(keys) } });
-  };
+  const saveHotkey = useCallback(
+    (hotkeyId: string, keys: string[]) => {
+      void patchWorkbenchPreferences({ customHotkeys: { ...customHotkeys, [hotkeyId]: normalizeKeys(keys) } });
+    },
+    [customHotkeys]
+  );
 
-  const resetHotkey = (hotkeyId: string) => {
-    const next = { ...customHotkeys };
+  const resetHotkey = useCallback(
+    (hotkeyId: string) => {
+      const next = { ...customHotkeys };
 
-    delete next[hotkeyId];
-    void patchWorkbenchPreferences({ customHotkeys: next });
-  };
+      delete next[hotkeyId];
+      void patchWorkbenchPreferences({ customHotkeys: next });
+    },
+    [customHotkeys]
+  );
 
-  const resetAll = () => {
+  const resetAll = useCallback(() => {
     void patchWorkbenchPreferences({ customHotkeys: {} });
-  };
+  }, []);
+  const handleSearchChange = useCallback((event: { currentTarget: { value: string } }) => {
+    setSearchTerm(event.currentTarget.value);
+  }, []);
 
-  const virtualRows = virtualizer.getVirtualItems();
+  const virtualRows = virtualizer.virtualItems;
 
   return (
     <Stack h="full" minH="0">
@@ -213,19 +224,14 @@ export const HotkeysSettingsSection = () => {
         </Button>
       </HStack>
 
-      <InputGroup startElement={<Icon as={SearchIcon} boxSize="3.5" />}>
-        <Input
-          placeholder="Search hotkeys"
-          size="xs"
-          value={searchTerm}
-          onChange={(event) => setSearchTerm(event.currentTarget.value)}
-        />
+      <InputGroup startElement={SEARCH_START_ELEMENT}>
+        <Input placeholder="Search hotkeys" size="xs" value={searchTerm} onChange={handleSearchChange} />
       </InputGroup>
 
       <ScrollArea.Root flex="1" minH="0" rounded="md" size="xs" variant="hover" w="full">
         <ScrollArea.Viewport ref={scrollRef} aria-label="Hotkey bindings" h="full" w="full">
           <ScrollArea.Content w="full">
-            <Box h={`${virtualizer.getTotalSize()}px`} position="relative" w="full">
+            <Box h={`${virtualizer.totalSize}px`} position="relative" w="full">
               {virtualRows.map((row) => {
                 const item = rows[row.index];
 
@@ -243,18 +249,12 @@ export const HotkeysSettingsSection = () => {
                     transform={`translateY(${row.start}px)`}
                     w="full"
                   >
-                    {item.kind === 'category' ? (
-                      <CategoryRow title={item.title} />
-                    ) : (
-                      <HotkeyListRow
-                        conflictMap={conflictMap}
-                        effectiveKeys={item.effectiveKeys}
-                        hotkey={item.hotkey}
-                        isCustomized={item.isCustomized}
-                        onReset={() => resetHotkey(item.hotkey.id)}
-                        onSave={(keys) => saveHotkey(item.hotkey.id, keys)}
-                      />
-                    )}
+                    <VirtualHotkeyRow
+                      conflictMap={conflictMap}
+                      item={item}
+                      resetHotkey={resetHotkey}
+                      saveHotkey={saveHotkey}
+                    />
                   </Box>
                 );
               })}
@@ -276,6 +276,48 @@ const CategoryRow = ({ title }: { title: string }) => (
     </Text>
   </Flex>
 );
+
+const VirtualHotkeyRow = ({
+  conflictMap,
+  item,
+  resetHotkey,
+  saveHotkey,
+}: {
+  conflictMap: Map<string, HotkeyConflict[]>;
+  item: HotkeyRow;
+  resetHotkey: (hotkeyId: string) => void;
+  saveHotkey: (hotkeyId: string, keys: string[]) => void;
+}) => {
+  const handleReset = useCallback(() => {
+    if (item.kind === 'hotkey') {
+      resetHotkey(item.hotkey.id);
+    }
+  }, [item, resetHotkey]);
+  const handleSave = useCallback(
+    (keys: string[]) => {
+      if (item.kind === 'hotkey') {
+        saveHotkey(item.hotkey.id, keys);
+      }
+    },
+    [item, saveHotkey]
+  );
+
+  if (item.kind === 'category') {
+    return <CategoryRow title={item.title} />;
+  }
+
+  return (
+    <HotkeyListRow
+      key={item.effectiveKeys.join('\n')}
+      conflictMap={conflictMap}
+      effectiveKeys={item.effectiveKeys}
+      hotkey={item.hotkey}
+      isCustomized={item.isCustomized}
+      onReset={handleReset}
+      onSave={handleSave}
+    />
+  );
+};
 
 const HotkeyListRow = ({
   conflictMap,
@@ -305,44 +347,40 @@ const HotkeyListRow = ({
           .find((entry) => entry.hotkey.id !== hotkey.id && canScopesOverlap(hotkey, entry.hotkey));
   const canSave = !hasDuplicate && !conflict && (isDirty || isEditing);
 
-  useEffect(() => {
-    if (!isEditing) {
-      setDraftKeys(effectiveKeys);
-    }
-  }, [effectiveKeys, isEditing]);
-
-  const updateDraftKey = (index: number, key: string) => {
+  const updateDraftKey = useCallback((index: number, key: string) => {
     setDraftKeys((current) => current.map((candidate, candidateIndex) => (candidateIndex === index ? key : candidate)));
-  };
+  }, []);
 
-  const deleteDraftKey = (index: number) => {
+  const deleteDraftKey = useCallback((index: number) => {
     setDraftKeys((current) => current.filter((_key, candidateIndex) => candidateIndex !== index));
     setEditingIndex(null);
-  };
+  }, []);
 
-  const addDraftKey = () => {
+  const addDraftKey = useCallback(() => {
     setDraftKeys((current) => [...current, '']);
     setEditingIndex(draftKeys.length);
-  };
+  }, [draftKeys.length]);
 
-  const cancelEdit = () => {
+  const cancelEdit = useCallback(() => {
     setDraftKeys(effectiveKeys);
     setEditingIndex(null);
-  };
+  }, [effectiveKeys]);
 
-  const saveEdit = () => {
+  const saveEdit = useCallback(() => {
     if (!canSave) {
       return;
     }
 
     onSave(draftKeys);
     setEditingIndex(null);
-  };
+  }, [canSave, draftKeys, onSave]);
 
-  const disableHotkey = () => {
+  const disableHotkey = useCallback(() => {
     onSave([]);
     setEditingIndex(null);
-  };
+  }, [onSave]);
+
+  const cancelChipEdit = useCallback(() => setEditingIndex(null), []);
 
   return (
     <Flex borderBottomWidth="1px" gap="3" py="2.5">
@@ -379,14 +417,15 @@ const HotkeyListRow = ({
         <HStack gap="1.5" justify="end" wrap="wrap">
           {draftKeys.length > 0 ? (
             draftKeys.map((key, index) => (
-              <HotkeyChip
+              <HotkeyChipItem
                 key={`${index}:${key}`}
-                editing={editingIndex === index}
+                cancelChipEdit={cancelChipEdit}
+                deleteDraftKey={deleteDraftKey}
+                editingIndex={editingIndex}
                 hotkey={key}
-                onCancel={() => setEditingIndex(null)}
-                onDelete={() => deleteDraftKey(index)}
-                onEdit={() => setEditingIndex(index)}
-                onRecord={(nextKey) => updateDraftKey(index, nextKey)}
+                index={index}
+                setEditingIndex={setEditingIndex}
+                updateDraftKey={updateDraftKey}
               />
             ))
           ) : (
@@ -509,5 +548,38 @@ const HotkeyChip = ({
         </Fragment>
       ))}
     </Button>
+  );
+};
+
+const HotkeyChipItem = ({
+  cancelChipEdit,
+  deleteDraftKey,
+  editingIndex,
+  hotkey,
+  index,
+  setEditingIndex,
+  updateDraftKey,
+}: {
+  cancelChipEdit: () => void;
+  deleteDraftKey: (index: number) => void;
+  editingIndex: number | null;
+  hotkey: string;
+  index: number;
+  setEditingIndex: (index: number) => void;
+  updateDraftKey: (index: number, key: string) => void;
+}) => {
+  const handleDelete = useCallback(() => deleteDraftKey(index), [deleteDraftKey, index]);
+  const handleEdit = useCallback(() => setEditingIndex(index), [index, setEditingIndex]);
+  const handleRecord = useCallback((nextKey: string) => updateDraftKey(index, nextKey), [index, updateDraftKey]);
+
+  return (
+    <HotkeyChip
+      editing={editingIndex === index}
+      hotkey={hotkey}
+      onCancel={cancelChipEdit}
+      onDelete={handleDelete}
+      onEdit={handleEdit}
+      onRecord={handleRecord}
+    />
   );
 };

@@ -2,28 +2,31 @@ import { Box, HStack, Input, InputGroup, Text } from '@chakra-ui/react';
 import { getPasswordStrength, type PasswordStrength } from '@workbench/auth/schemas';
 import { IconButton } from '@workbench/components/ui';
 import { EyeIcon, EyeOffIcon } from 'lucide-react';
-import { useState, type ComponentProps } from 'react';
+import { useCallback, useMemo, useState, type ComponentProps } from 'react';
 
 type InputProps = ComponentProps<typeof Input>;
 
 /** Password input with an inline visibility toggle. */
 export const PasswordInput = (props: InputProps) => {
   const [isVisible, setIsVisible] = useState(false);
+  const handleToggleVisibility = useCallback(() => setIsVisible((current) => !current), []);
+  const endElement = useMemo(
+    () => (
+      <IconButton
+        aria-label={isVisible ? 'Hide password' : 'Show password'}
+        color="fg.muted"
+        size="2xs"
+        variant="ghost"
+        onClick={handleToggleVisibility}
+      >
+        {isVisible ? <EyeOffIcon /> : <EyeIcon />}
+      </IconButton>
+    ),
+    [handleToggleVisibility, isVisible]
+  );
 
   return (
-    <InputGroup
-      endElement={
-        <IconButton
-          aria-label={isVisible ? 'Hide password' : 'Show password'}
-          color="fg.muted"
-          size="2xs"
-          variant="ghost"
-          onClick={() => setIsVisible((current) => !current)}
-        >
-          {isVisible ? <EyeOffIcon /> : <EyeIcon />}
-        </IconButton>
-      }
-    >
+    <InputGroup endElement={endElement}>
       <Input type={isVisible ? 'text' : 'password'} {...props} />
     </InputGroup>
   );

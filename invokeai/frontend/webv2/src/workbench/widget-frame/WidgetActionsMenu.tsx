@@ -16,7 +16,7 @@ import { shallowEqual, useActiveProjectSelector, useWorkbenchDispatch } from '@w
 import { compileProjectGraph } from '@workbench/workflows/buildGraph';
 import { getInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
 import { GitBranchIcon, MoreHorizontalIcon, TargetIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 /**
  * The widget frame's shared header actions menu. It hosts the universal
@@ -45,6 +45,9 @@ const getPreviewGraph = (project: Project, surface: GraphBearingSurfaceContract)
   return project.widgetGraphs[surface.widgetId] ?? null;
 };
 
+const MENU_POSITIONING = { placement: 'bottom-end' } as const;
+const DISABLED_PROPS = { opacity: 0.4 };
+
 const GraphSurfaceMenuItems = ({
   surface,
   onPreview,
@@ -55,6 +58,10 @@ const GraphSurfaceMenuItems = ({
   const activeSourceId = useActiveProjectSelector((project) => project.invocation.sourceId);
   const dispatch = useWorkbenchDispatch();
   const isActiveSource = activeSourceId === surface.sourceId;
+  const handleSetSource = useCallback(
+    () => dispatch({ sourceId: surface.sourceId, type: 'setInvocationSource' }),
+    [dispatch, surface.sourceId]
+  );
 
   return (
     <Menu.ItemGroup>
@@ -64,8 +71,8 @@ const GraphSurfaceMenuItems = ({
       <Menu.Item
         value="set-source"
         disabled={isActiveSource || !surface.canSetSource}
-        _disabled={{ opacity: 0.4 }}
-        onClick={() => dispatch({ sourceId: surface.sourceId, type: 'setInvocationSource' })}
+        _disabled={DISABLED_PROPS}
+        onClick={handleSetSource}
       >
         <Icon as={TargetIcon} boxSize="3.5" />
         <Menu.ItemText>Set Source</Menu.ItemText>
@@ -101,6 +108,14 @@ export const WidgetActionsMenu = ({
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const surface = manifest.graphBearing?.surfaces.includes(region) ? createGraphBearingSurface(manifest, region) : null;
   const HeaderMenu = manifest.headerMenu;
+  const handlePreview = useCallback(() => setIsPreviewOpen(true), []);
+  const positionHints = useMemo(
+    () =>
+      isPreviewOpen && surface?.sourceId === 'project-graph'
+        ? Object.fromEntries(activeProject.projectGraph.nodes.map((node) => [node.id, node.position]))
+        : undefined,
+    [activeProject.projectGraph.nodes, isPreviewOpen, surface?.sourceId]
+  );
 
   if (!surface && !HeaderMenu) {
     return null;
@@ -109,14 +124,9 @@ export const WidgetActionsMenu = ({
   const previewGraph = surface && isPreviewOpen ? getPreviewGraph(activeProject, surface) : null;
   // The project graph mirrors the editable document, so the preview can reuse
   // the editor's node positions instead of auto-layouting.
-  const positionHints =
-    isPreviewOpen && surface?.sourceId === 'project-graph'
-      ? Object.fromEntries(activeProject.projectGraph.nodes.map((node) => [node.id, node.position]))
-      : undefined;
-
   return (
     <>
-      <Menu.Root positioning={{ placement: 'bottom-end' }}>
+      <Menu.Root positioning={MENU_POSITIONING}>
         <Menu.Trigger asChild>
           <IconButton aria-label={`${manifest.labelText} actions`} color="fg.muted" size="2xs" variant="ghost">
             <MoreHorizontalIcon />
@@ -125,7 +135,7 @@ export const WidgetActionsMenu = ({
         <Portal>
           <Menu.Positioner>
             <Menu.Content minW="13rem">
-              {surface ? <GraphSurfaceMenuItems surface={surface} onPreview={() => setIsPreviewOpen(true)} /> : null}
+              {surface ? <GraphSurfaceMenuItems surface={surface} onPreview={handlePreview} /> : null}
               {surface && HeaderMenu ? <Menu.Separator borderColor="border.subtle" /> : null}
               {HeaderMenu ? (
                 <HeaderMenu instance={instance} manifest={manifest} region={region} runtime={runtime} />

@@ -2,7 +2,6 @@ import type { AddNodeConnectionFilter } from '@workbench/widgets/workflow/workfl
 import type { InvocationTemplate } from '@workbench/workflows/types';
 
 import { Badge, Box, Dialog, HStack, Icon, Input, Portal, ScrollArea, Stack, Text } from '@chakra-ui/react';
-import { useVirtualizer } from '@tanstack/react-virtual';
 import { IconButton, Tooltip } from '@workbench/components/ui';
 import { registerHotkeyModalLayer } from '@workbench/hotkeys';
 import { useInvocationTemplatesSelector } from '@workbench/workflows/templates';
@@ -12,12 +11,14 @@ import {
   startTransition,
   useCallback,
   useEffect,
+  useEffectEvent,
   useMemo,
   useState,
   type ChangeEvent,
   type KeyboardEvent,
   type ReactNode,
 } from 'react';
+import { useVirtualizer } from 'react-hook-tanstack-virtual';
 
 /**
  * Command-palette-style node picker: a centered search dialog whose results
@@ -31,6 +32,8 @@ const UTILITY_CATEGORY = 'Utility';
 const CATEGORY_ROW_HEIGHT_PX = 28;
 const NODE_ROW_HEIGHT_PX = 44;
 const RESULT_LIST_ID = 'add-node-dialog-results';
+const ROW_HOVER_PROPS = { bg: 'bg.emphasized' };
+const VIRTUALIZER_INITIAL_RECT = { height: 384, width: 0 };
 
 const toCategoryLabel = (value: string): string =>
   value
@@ -106,7 +109,7 @@ const NodeResultRow = ({
     bg={isActive ? 'bg.emphasized' : undefined}
     role="treeitem"
     tabIndex={-1}
-    _hover={{ bg: 'bg.emphasized' }}
+    _hover={ROW_HOVER_PROPS}
     ps="5"
     pe="1.5"
     py="1.5"
@@ -169,7 +172,7 @@ const CategoryHeaderRow = ({
       bg={isActive ? 'bg.emphasized' : undefined}
       role="treeitem"
       tabIndex={-1}
-      _hover={{ bg: 'bg.emphasized' }}
+      _hover={ROW_HOVER_PROPS}
       cursor="pointer"
       ps="1"
       pe="2"
@@ -217,6 +220,15 @@ export const AddNodeDialog = ({
   onAddNote: () => void;
   onOpenChange: (isOpen: boolean) => void;
 }) => {
+  const onDialogOpenChange = useCallback(
+    (event: { open: boolean }) => {
+      if (!event.open) {
+        onOpenChange(false);
+      }
+    },
+    [onOpenChange]
+  );
+
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -233,11 +245,7 @@ export const AddNodeDialog = ({
       scrollBehavior="inside"
       size="md"
       unmountOnExit
-      onOpenChange={(event) => {
-        if (!event.open) {
-          onOpenChange(false);
-        }
-      }}
+      onOpenChange={onDialogOpenChange}
     >
       <AddNodeDialogContent
         connectionFilter={connectionFilter}
@@ -388,14 +396,25 @@ const AddNodeDialogContent = ({
 
     return rows;
   }, [expandedCategories, groups, isSearching]);
+  const effectiveActiveIndex =
+    resultRows.length === 0 ? null : activeIndex === null ? 0 : Math.min(activeIndex, resultRows.length - 1);
+  const estimateVirtualRowSize = useCallback(
+    (index: number) => (resultRows[index]?.kind === 'category' ? CATEGORY_ROW_HEIGHT_PX : NODE_ROW_HEIGHT_PX),
+    [resultRows]
+  );
+  const getVirtualItemKey = useCallback((index: number) => resultRows[index]?.id ?? index, [resultRows]);
+  const getVirtualScrollElement = useCallback(() => scrollElement, [scrollElement]);
 
   const virtualizer = useVirtualizer({
     count: resultRows.length,
-    estimateSize: (index) => (resultRows[index]?.kind === 'category' ? CATEGORY_ROW_HEIGHT_PX : NODE_ROW_HEIGHT_PX),
-    getItemKey: (index) => resultRows[index]?.id ?? index,
-    getScrollElement: () => scrollElement,
-    initialRect: { height: 384, width: 0 },
+    estimateSize: estimateVirtualRowSize,
+    getItemKey: getVirtualItemKey,
+    getScrollElement: getVirtualScrollElement,
+    initialRect: VIRTUALIZER_INITIAL_RECT,
     overscan: 8,
+  });
+  const measureVirtualizer = useEffectEvent(() => {
+    virtualizer.measure();
   });
 
   const toggleCategory = useCallback((label: string) => {
@@ -423,28 +442,14 @@ const AddNodeDialogContent = ({
   }, [groups]);
 
   useEffect(() => {
-    setActiveIndex((prev) => {
-      if (resultRows.length === 0) {
-        return null;
-      }
-
-      if (prev === null) {
-        return 0;
-      }
-
-      return Math.min(prev, resultRows.length - 1);
-    });
+    measureVirtualizer();
   }, [resultRows.length]);
 
   useEffect(() => {
-    virtualizer.measure();
-  }, [resultRows.length, virtualizer]);
-
-  useEffect(() => {
-    if (activeIndex !== null) {
-      virtualizer.scrollToIndex(activeIndex, { align: 'auto' });
+    if (effectiveActiveIndex !== null) {
+      virtualizer.scrollToIndex(effectiveActiveIndex, { align: 'auto' });
     }
-  }, [activeIndex, virtualizer]);
+  }, [effectiveActiveIndex, virtualizer]);
 
   const moveActiveIndex = useCallback(
     (direction: 1 | -1) => {
@@ -495,10 +500,14 @@ const AddNodeDialogContent = ({
 
       if (event.key === 'Enter') {
         event.preventDefault();
-        activateResultRow(activeIndex === null ? undefined : resultRows[activeIndex]);
+        activateResultRow(effectiveActiveIndex === null ? undefined : resultRows[effectiveActiveIndex]);
       }
     },
-    [activateResultRow, activeIndex, moveActiveIndex, resultRows]
+    [activateResultRow, effectiveActiveIndex, moveActiveIndex, resultRows]
+  );
+  const onSearchChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => setSearchTerm(event.currentTarget.value),
+    []
   );
 
   let body: ReactNode;
@@ -519,44 +528,19 @@ const AddNodeDialogContent = ({
     );
   } else {
     body = (
-      <Box h={`${virtualizer.getTotalSize()}px`} position="relative" w="full">
-        {virtualizer.getVirtualItems().map((virtualRow) => {
-          const row = resultRows[virtualRow.index];
-
-          if (!row) {
-            return null;
-          }
-
-          const isActive = virtualRow.index === activeIndex;
-          const id = getResultRowId(virtualRow.index);
-          const onActive = () => setActiveIndex(virtualRow.index);
-
-          return (
-            <Box
-              key={virtualRow.key}
-              ref={virtualizer.measureElement}
-              data-index={virtualRow.index}
-              left="0"
-              position="absolute"
-              top="0"
-              transform={`translateY(${virtualRow.start}px)`}
-              w="full"
-            >
-              {row.kind === 'category' ? (
-                <CategoryHeaderRow
-                  id={id}
-                  group={row.group}
-                  isActive={isActive}
-                  isExpanded={row.isExpanded}
-                  onActive={onActive}
-                  onToggle={toggleCategory}
-                />
-              ) : (
-                <NodeResultRow id={id} isActive={isActive} onActive={onActive} row={row.row} />
-              )}
-            </Box>
-          );
-        })}
+      <Box h={`${virtualizer.totalSize}px`} position="relative" w="full">
+        {virtualizer.virtualItems.map((virtualRow) => (
+          <VirtualResultRow
+            key={virtualRow.key}
+            activeIndex={effectiveActiveIndex}
+            measureElement={virtualizer.measureElement}
+            resultRows={resultRows}
+            virtualIndex={virtualRow.index}
+            virtualStart={virtualRow.start}
+            onActiveIndexChange={setActiveIndex}
+            onToggleCategory={toggleCategory}
+          />
+        ))}
       </Box>
     );
   }
@@ -571,7 +555,9 @@ const AddNodeDialogContent = ({
               <HStack gap="2" flexShrink={0}>
                 <Input
                   autoFocus
-                  aria-activedescendant={activeIndex === null ? undefined : getResultRowId(activeIndex)}
+                  aria-activedescendant={
+                    effectiveActiveIndex === null ? undefined : getResultRowId(effectiveActiveIndex)
+                  }
                   aria-controls={RESULT_LIST_ID}
                   aria-expanded="true"
                   aria-label="Search for nodes"
@@ -584,7 +570,7 @@ const AddNodeDialogContent = ({
                   role="combobox"
                   size="sm"
                   value={searchTerm}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) => setSearchTerm(event.currentTarget.value)}
+                  onChange={onSearchChange}
                   onKeyDown={onSearchKeyDown}
                 />
                 <Tooltip content={isAllExpanded ? 'Collapse All' : 'Expand All'}>
@@ -613,5 +599,58 @@ const AddNodeDialogContent = ({
         </Dialog.Content>
       </Dialog.Positioner>
     </Portal>
+  );
+};
+
+const VirtualResultRow = ({
+  activeIndex,
+  measureElement,
+  resultRows,
+  virtualIndex,
+  virtualStart,
+  onActiveIndexChange,
+  onToggleCategory,
+}: {
+  activeIndex: number | null;
+  measureElement: (node: Element | null) => void;
+  resultRows: ResultRow[];
+  virtualIndex: number;
+  virtualStart: number;
+  onActiveIndexChange: (index: number) => void;
+  onToggleCategory: (label: string) => void;
+}) => {
+  const row = resultRows[virtualIndex];
+  const onActive = useCallback(() => onActiveIndexChange(virtualIndex), [onActiveIndexChange, virtualIndex]);
+
+  if (!row) {
+    return null;
+  }
+
+  const isActive = virtualIndex === activeIndex;
+  const id = getResultRowId(virtualIndex);
+
+  return (
+    <Box
+      ref={measureElement}
+      data-index={virtualIndex}
+      left="0"
+      position="absolute"
+      top="0"
+      transform={`translateY(${virtualStart}px)`}
+      w="full"
+    >
+      {row.kind === 'category' ? (
+        <CategoryHeaderRow
+          id={id}
+          group={row.group}
+          isActive={isActive}
+          isExpanded={row.isExpanded}
+          onActive={onActive}
+          onToggle={onToggleCategory}
+        />
+      ) : (
+        <NodeResultRow id={id} isActive={isActive} onActive={onActive} row={row.row} />
+      )}
+    </Box>
   );
 };

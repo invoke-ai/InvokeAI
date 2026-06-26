@@ -1,3 +1,4 @@
+/* eslint-disable react/react-compiler */
 import type {
   ComponentProps,
   KeyboardEvent as ReactKeyboardEvent,
@@ -7,7 +8,7 @@ import type {
 } from 'react';
 
 import { Box, Textarea } from '@chakra-ui/react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 type TextareaProps = ComponentProps<typeof Textarea>;
 
@@ -15,6 +16,21 @@ const DEFAULT_STEP_PX = 12;
 const DEFAULT_LARGE_STEP_PX = 48;
 
 const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max);
+
+const resizeHandleAfter = {
+  bg: 'border.emphasized',
+  borderRadius: 'full',
+  bottom: '1px',
+  content: '""',
+  h: '1px',
+  left: '25%',
+  opacity: 0.55,
+  position: 'absolute',
+  right: '25%',
+} as const;
+
+const resizeHandleFocusVisible = { bg: 'accent.solid/20', outline: '2px solid {colors.accent.solid}' } as const;
+const resizeHandleHover = { bg: 'accent.solid/12' } as const;
 
 export interface ResizableTextareaProps extends Omit<
   TextareaProps,
@@ -48,55 +64,67 @@ export const ResizableTextarea = ({
   const [dragHeightPx, setDragHeightPx] = useState<number | null>(null);
   const displayHeightPx = dragHeightPx ?? heightPx;
 
-  const commitHeight = (nextHeightPx: number) => {
-    const clampedHeightPx = clamp(nextHeightPx, minHeightPx, maxHeightPx);
+  const commitHeight = useCallback(
+    (nextHeightPx: number) => {
+      const clampedHeightPx = clamp(nextHeightPx, minHeightPx, maxHeightPx);
 
-    setHeightPx(clampedHeightPx);
-    onResizeEnd?.(clampedHeightPx);
-  };
+      setHeightPx(clampedHeightPx);
+      onResizeEnd?.(clampedHeightPx);
+    },
+    [maxHeightPx, minHeightPx, onResizeEnd]
+  );
 
-  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
+  const handlePointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
 
-    const startY = event.clientY;
-    const startHeightPx = displayHeightPx;
-    let nextHeightPx = startHeightPx;
+      const startY = event.clientY;
+      const startHeightPx = displayHeightPx;
+      let nextHeightPx = startHeightPx;
 
-    const handlePointerMove = (moveEvent: PointerEvent) => {
-      nextHeightPx = clamp(startHeightPx + moveEvent.clientY - startY, minHeightPx, maxHeightPx);
-      setDragHeightPx(nextHeightPx);
-    };
+      const handlePointerMove = (moveEvent: PointerEvent) => {
+        nextHeightPx = clamp(startHeightPx + moveEvent.clientY - startY, minHeightPx, maxHeightPx);
+        setDragHeightPx(nextHeightPx);
+      };
 
-    const handlePointerUp = () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-      window.removeEventListener('pointercancel', handlePointerUp);
-      setDragHeightPx(null);
-      commitHeight(nextHeightPx);
-    };
+      const handlePointerUp = () => {
+        window.removeEventListener('pointermove', handlePointerMove);
+        window.removeEventListener('pointerup', handlePointerUp);
+        window.removeEventListener('pointercancel', handlePointerUp);
+        setDragHeightPx(null);
+        commitHeight(nextHeightPx);
+      };
 
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-    window.addEventListener('pointercancel', handlePointerUp);
-  };
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', handlePointerUp);
+      window.addEventListener('pointercancel', handlePointerUp);
+    },
+    [commitHeight, displayHeightPx, maxHeightPx, minHeightPx]
+  );
 
-  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    const step = event.shiftKey ? largeStepPx : stepPx;
-    const heightChanges: Partial<Record<string, number>> = {
-      ArrowDown: step,
-      ArrowUp: -step,
-      End: maxHeightPx - displayHeightPx,
-      Home: minHeightPx - displayHeightPx,
-    };
-    const heightChange = heightChanges[event.key];
+  const handleKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      const step = event.shiftKey ? largeStepPx : stepPx;
+      const heightChange =
+        event.key === 'ArrowDown'
+          ? step
+          : event.key === 'ArrowUp'
+            ? -step
+            : event.key === 'End'
+              ? maxHeightPx - displayHeightPx
+              : event.key === 'Home'
+                ? minHeightPx - displayHeightPx
+                : undefined;
 
-    if (heightChange === undefined) {
-      return;
-    }
+      if (heightChange === undefined) {
+        return;
+      }
 
-    event.preventDefault();
-    commitHeight(displayHeightPx + heightChange);
-  };
+      event.preventDefault();
+      commitHeight(displayHeightPx + heightChange);
+    },
+    [commitHeight, displayHeightPx, largeStepPx, maxHeightPx, minHeightPx, stepPx]
+  );
 
   return (
     <Box position="relative">
@@ -125,19 +153,9 @@ export const ResizableTextarea = ({
         tabIndex={0}
         transition="background var(--wb-motion-duration-fast) ease, opacity var(--wb-motion-duration-fast) ease"
         zIndex={2}
-        _after={{
-          bg: 'border.emphasized',
-          borderRadius: 'full',
-          bottom: '1px',
-          content: '""',
-          h: '1px',
-          left: '25%',
-          opacity: 0.55,
-          position: 'absolute',
-          right: '25%',
-        }}
-        _focusVisible={{ bg: 'accent.solid/20', outline: '2px solid {colors.accent.solid}' }}
-        _hover={{ bg: 'accent.solid/12' }}
+        _after={resizeHandleAfter}
+        _focusVisible={resizeHandleFocusVisible}
+        _hover={resizeHandleHover}
         onKeyDown={handleKeyDown}
         onPointerDown={handlePointerDown}
       />

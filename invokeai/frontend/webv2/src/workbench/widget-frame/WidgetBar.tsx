@@ -6,14 +6,16 @@ import { Box } from '@chakra-ui/react';
 import { verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Row, Tooltip } from '@workbench/components/ui';
 import { WidgetIcon } from '@workbench/iconResolver';
-import { type MouseEvent, useState } from 'react';
+import { type MouseEvent, useCallback, useMemo, useState } from 'react';
 
 import { useWidgetSortable } from './useWidgetSortable';
-import { WidgetEnableMenu } from './WidgetEnableMenu';
+import { WidgetEnableMenu, type WidgetEnableMenuItem } from './WidgetEnableMenu';
 import { WidgetInstanceContextMenu, type WidgetInstanceContextMenuTarget } from './WidgetInstanceContextMenu';
 import { WidgetStrip } from './WidgetStrip';
 
 export type WidgetBarItem = WidgetRegionItem<WidgetPlacementInstanceMeta>;
+
+const WIDGET_SLOT_DISABLED_PROPS = { opacity: 0.4 };
 
 interface WidgetBarProps {
   side: 'left' | 'right';
@@ -46,16 +48,25 @@ export const WidgetBar = ({
   const [enableMenuTarget, setEnableMenuTarget] = useState<{ x: number; y: number } | null>(null);
   const [instanceMenuTarget, setInstanceMenuTarget] = useState<WidgetInstanceContextMenuTarget | null>(null);
 
-  const openEnableMenu = (event: MouseEvent) => {
+  const openEnableMenu = useCallback((event: MouseEvent) => {
     event.preventDefault();
     setEnableMenuTarget({ x: event.clientX, y: event.clientY });
-  };
+  }, []);
 
-  const openInstanceMenu = (item: WidgetBarItem, event: MouseEvent) => {
+  const openInstanceMenu = useCallback((item: WidgetBarItem, event: MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
     setInstanceMenuTarget({ item, x: event.clientX, y: event.clientY });
-  };
+  }, []);
+  const sortableInstanceIds = useMemo(() => railItems.map((item) => item.id), [railItems]);
+  const positioning = useMemo(
+    () => ({ placement: region === 'left' ? 'right-start' : 'left-start' }) as const,
+    [region]
+  );
+  const trigger = useMemo(() => ({ kind: 'rail', region }) as const, [region]);
+  const handleContextClose = useCallback(() => setEnableMenuTarget(null), []);
+  const handleMenuToggle = useCallback((item: WidgetEnableMenuItem) => onToggle(item as WidgetBarItem), [onToggle]);
+  const handleInstanceClose = useCallback(() => setInstanceMenuTarget(null), []);
 
   return (
     <WidgetStrip
@@ -70,7 +81,7 @@ export const WidgetBar = ({
       flexShrink={0}
       pt="1.5"
       region={region}
-      sortableInstanceIds={railItems.map((item) => item.id)}
+      sortableInstanceIds={sortableInstanceIds}
       strategy={verticalListSortingStrategy}
       w="12"
       onContextMenu={openEnableMenu}
@@ -92,18 +103,18 @@ export const WidgetBar = ({
           contextTarget={enableMenuTarget}
           groupLabel="Widgets"
           items={menuItems}
-          positioning={{ placement: region === 'left' ? 'right-start' : 'left-start' }}
-          trigger={{ kind: 'rail', region }}
+          positioning={positioning}
+          trigger={trigger}
           triggerLabel={`${region === 'left' ? 'Left' : 'Right'} widget visibility`}
-          onContextClose={() => setEnableMenuTarget(null)}
-          onToggle={(item) => onToggle(item as WidgetBarItem)}
+          onContextClose={handleContextClose}
+          onToggle={handleMenuToggle}
         />
       </Box>
 
       <WidgetInstanceContextMenu
         target={instanceMenuTarget}
-        onClose={() => setInstanceMenuTarget(null)}
-        onRemove={(item) => onToggle(item as WidgetBarItem)}
+        onClose={handleInstanceClose}
+        onRemove={handleMenuToggle}
       />
     </WidgetStrip>
   );
@@ -126,6 +137,13 @@ const WidgetSlot = ({
 }) => {
   const tooltipLabel = item.failureMessage ? `${item.label}: ${item.failureMessage}` : item.label;
   const isDisabled = item.status === 'disabled';
+  const positioning = useMemo(() => ({ placement: tooltipPlacement }) as const, [tooltipPlacement]);
+  const handleClick = useCallback(() => {
+    if (!isDisabled) {
+      onSelect(item.id);
+    }
+  }, [isDisabled, item.id, onSelect]);
+  const handleContextMenu = useCallback((event: MouseEvent) => onContextMenu(item, event), [item, onContextMenu]);
   const { dragHandleProps, setNodeRef, style } = useWidgetSortable({
     disabled: isDisabled,
     instanceId: item.id,
@@ -134,13 +152,7 @@ const WidgetSlot = ({
   });
 
   return (
-    <Tooltip
-      showArrow
-      closeDelay={80}
-      content={tooltipLabel}
-      openDelay={250}
-      positioning={{ placement: tooltipPlacement }}
-    >
+    <Tooltip showArrow closeDelay={80} content={tooltipLabel} openDelay={250} positioning={positioning}>
       <Box ref={setNodeRef} pb="1.5" style={style}>
         <Row
           {...dragHandleProps}
@@ -155,13 +167,9 @@ const WidgetSlot = ({
           tabIndex={isDisabled ? -1 : undefined}
           h="9"
           w="9"
-          _disabled={{ opacity: 0.4 }}
-          onClick={() => {
-            if (!isDisabled) {
-              onSelect(item.id);
-            }
-          }}
-          onContextMenu={(event) => onContextMenu(item, event)}
+          _disabled={WIDGET_SLOT_DISABLED_PROPS}
+          onClick={handleClick}
+          onContextMenu={handleContextMenu}
         >
           <WidgetIcon icon={item.icon} boxSize="5" />
         </Row>

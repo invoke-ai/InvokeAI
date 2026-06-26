@@ -17,10 +17,13 @@ import {
 import { setQueueExpanded, useModelsUiSelector } from '@workbench/models/uiStore';
 import { useNotify } from '@workbench/useNotify';
 import { ChevronUpIcon, ListOrderedIcon, PauseIcon, PlayIcon, RefreshCcwIcon, Trash2Icon, XIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { InstallQueueList } from './InstallQueueList';
 import { getInstallJobDisplayName } from './queueUtils';
+
+const TRIGGER_HOVER = { color: 'fg' } as const;
+const INDICATOR_OPEN = { transform: 'rotate(180deg)' } as const;
 
 /** Persistent, collapsible install queue footer for the model manager detail pane. */
 export const InstallQueueBar = () => {
@@ -34,31 +37,38 @@ export const InstallQueueBar = () => {
     ensureInstallsLoaded();
   }, []);
 
-  const activeJobs = jobs.filter((job) => isActiveInstallStatus(job.status));
-  const pausedJobs = jobs.filter((job) => job.status === 'paused');
-  const pausableJobs = jobs.filter((job) => job.status === 'downloading');
-  const cancellableJobs = jobs.filter((job) => isActiveInstallStatus(job.status) || job.status === 'paused');
+  const activeJobs = useMemo(() => jobs.filter((job) => isActiveInstallStatus(job.status)), [jobs]);
+  const pausedJobs = useMemo(() => jobs.filter((job) => job.status === 'paused'), [jobs]);
+  const pausableJobs = useMemo(() => jobs.filter((job) => job.status === 'downloading'), [jobs]);
+  const cancellableJobs = useMemo(
+    () => jobs.filter((job) => isActiveInstallStatus(job.status) || job.status === 'paused'),
+    [jobs]
+  );
   const settledCount = jobs.filter((job) => !isActiveInstallStatus(job.status) && job.status !== 'paused').length;
 
   const [busyAction, setBusyAction] = useState<'pause' | 'resume' | 'cancel' | 'prune' | 'refresh' | null>(null);
 
-  const runBulk = async (action: 'pause' | 'resume' | 'cancel', targets: ModelInstallJob[]) => {
-    const call = action === 'pause' ? pauseModelInstall : action === 'resume' ? resumeModelInstall : cancelModelInstall;
+  const runBulk = useCallback(
+    async (action: 'pause' | 'resume' | 'cancel', targets: ModelInstallJob[]) => {
+      const call =
+        action === 'pause' ? pauseModelInstall : action === 'resume' ? resumeModelInstall : cancelModelInstall;
 
-    setBusyAction(action);
+      setBusyAction(action);
 
-    try {
-      await Promise.all(targets.map((job) => call(job.id)));
-      await refreshInstalls();
-    } catch (bulkError) {
-      notify.error('Queue action failed', bulkError instanceof Error ? bulkError.message : String(bulkError));
-      void refreshInstalls();
-    } finally {
-      setBusyAction(null);
-    }
-  };
+      try {
+        await Promise.all(targets.map((job) => call(job.id)));
+        await refreshInstalls();
+      } catch (bulkError) {
+        notify.error('Queue action failed', bulkError instanceof Error ? bulkError.message : String(bulkError));
+        void refreshInstalls();
+      } finally {
+        setBusyAction(null);
+      }
+    },
+    [notify]
+  );
 
-  const handlePrune = async () => {
+  const handlePrune = useCallback(async () => {
     setBusyAction('prune');
 
     try {
@@ -69,9 +79,9 @@ export const InstallQueueBar = () => {
     } finally {
       setBusyAction(null);
     }
-  };
+  }, [notify]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setBusyAction('refresh');
 
     try {
@@ -79,7 +89,11 @@ export const InstallQueueBar = () => {
     } finally {
       setBusyAction(null);
     }
-  };
+  }, []);
+  const handleOpenChange = useCallback((event: { open: boolean }) => setQueueExpanded(event.open), []);
+  const handlePauseAll = useCallback(() => void runBulk('pause', pausableJobs), [pausableJobs, runBulk]);
+  const handleResumeAll = useCallback(() => void runBulk('resume', pausedJobs), [pausedJobs, runBulk]);
+  const handleCancelAll = useCallback(() => void runBulk('cancel', cancellableJobs), [cancellableJobs, runBulk]);
 
   const summary =
     activeJobs.length > 0
@@ -95,7 +109,7 @@ export const InstallQueueBar = () => {
       flexShrink={0}
       open={queueExpanded}
       overflow="hidden"
-      onOpenChange={(event) => setQueueExpanded(event.open)}
+      onOpenChange={handleOpenChange}
     >
       <Collapsible.Content>
         <Flex direction="column" h="min(22rem, 45dvh)" minH="0" overflow="hidden">
@@ -104,12 +118,7 @@ export const InstallQueueBar = () => {
               Install Queue
             </Text>
             <HStack gap="1">
-              <Button
-                loading={busyAction === 'refresh'}
-                size="2xs"
-                variant="ghost"
-                onClick={() => void handleRefresh()}
-              >
+              <Button loading={busyAction === 'refresh'} size="2xs" variant="ghost" onClick={handleRefresh}>
                 <Icon as={RefreshCcwIcon} boxSize="3" />
                 Refresh
               </Button>
@@ -118,7 +127,7 @@ export const InstallQueueBar = () => {
                 loading={busyAction === 'prune'}
                 size="2xs"
                 variant="ghost"
-                onClick={() => void handlePrune()}
+                onClick={handlePrune}
               >
                 <Icon as={Trash2Icon} boxSize="3" />
                 Clear finished
@@ -141,7 +150,7 @@ export const InstallQueueBar = () => {
           gap="2"
           minW="0"
           textAlign="start"
-          _hover={{ color: 'fg' }}
+          _hover={TRIGGER_HOVER}
         >
           {activeJobs.length > 0 ? (
             <Spinner borderWidth="1.5px" boxSize="3.5" color="accent.solid" flexShrink={0} />
@@ -157,10 +166,7 @@ export const InstallQueueBar = () => {
               {activeJobs.length}
             </Badge>
           ) : null}
-          <Collapsible.Indicator
-            _open={{ transform: 'rotate(180deg)' }}
-            transition="transform var(--wb-motion-duration-slow)"
-          >
+          <Collapsible.Indicator _open={INDICATOR_OPEN} transition="transform var(--wb-motion-duration-slow)">
             <Icon as={ChevronUpIcon} boxSize="4" color="fg.subtle" flexShrink={0} />
           </Collapsible.Indicator>
         </Collapsible.Trigger>
@@ -173,7 +179,7 @@ export const InstallQueueBar = () => {
                 loading={busyAction === 'pause'}
                 size="2xs"
                 variant="ghost"
-                onClick={() => void runBulk('pause', pausableJobs)}
+                onClick={handlePauseAll}
               >
                 <Icon as={PauseIcon} boxSize="3.5" />
               </IconButton>
@@ -186,7 +192,7 @@ export const InstallQueueBar = () => {
                 loading={busyAction === 'resume'}
                 size="2xs"
                 variant="ghost"
-                onClick={() => void runBulk('resume', pausedJobs)}
+                onClick={handleResumeAll}
               >
                 <Icon as={PlayIcon} boxSize="3.5" />
               </IconButton>
@@ -199,7 +205,7 @@ export const InstallQueueBar = () => {
                 loading={busyAction === 'cancel'}
                 size="2xs"
                 variant="ghost"
-                onClick={() => void runBulk('cancel', cancellableJobs)}
+                onClick={handleCancelAll}
               >
                 <Icon as={XIcon} boxSize="3.5" />
               </IconButton>

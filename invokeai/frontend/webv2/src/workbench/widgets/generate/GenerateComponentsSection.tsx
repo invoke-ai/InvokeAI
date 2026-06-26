@@ -10,6 +10,7 @@ import {
 } from '@workbench/generation/baseGenerationPolicies';
 import { isMainModelConfig, isModelIdentifierConfig, isVaeModelConfig } from '@workbench/generation/settings';
 import { ModelSelect } from '@workbench/models/components';
+import { useCallback, useMemo } from 'react';
 
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 
@@ -47,14 +48,15 @@ const ComponentPicker = ({
   slot: ComponentSlotPolicy;
 }) => {
   const value = ctx.selectedComponents[slot.key];
-  const filter = slot.filter ? (model: ModelConfig) => slot.filter?.(model, ctx) ?? false : undefined;
+  const filter = useCallback((model: ModelConfig) => slot.filter?.(model, ctx) ?? false, [ctx, slot]);
+  const modelTypes = useMemo(() => [...slot.modelTypes], [slot.modelTypes]);
   const selectedValue = value && (!filter || filter(value as ModelConfig)) ? value.key : null;
 
   return (
     <Field label={slot.label} helpText={slot.helpText}>
       <ModelSelect
-        filter={filter}
-        modelTypes={[...slot.modelTypes]}
+        filter={slot.filter ? filter : undefined}
+        modelTypes={modelTypes}
         placeholder={slot.placeholder ?? 'Model default'}
         size="xs"
         value={selectedValue}
@@ -65,6 +67,28 @@ const ComponentPicker = ({
 };
 
 export const GenerateComponentsSection = ({ onCommit, selectedModel, settings }: GenerateComponentsSectionProps) => {
+  const ctx = useMemo(
+    () => (selectedModel ? getComponentPolicyContext(selectedModel, settings) : null),
+    [selectedModel, settings]
+  );
+
+  const commitSlotValue = useCallback(
+    (slot: ComponentSlotPolicy, model: ModelConfig | null) => {
+      if (slot.valueKind === 'main') {
+        onCommit({ [slot.key]: isMainModelConfig(model) ? model : null });
+        return;
+      }
+
+      if (slot.valueKind === 'vae') {
+        onCommit({ [slot.key]: isVaeModelConfig(model) ? model : null });
+        return;
+      }
+
+      onCommit({ [slot.key]: toComponentModel(model) });
+    },
+    [onCommit]
+  );
+
   if (!selectedModel || selectedModel.type === 'external_image_generator') {
     return null;
   }
@@ -75,28 +99,27 @@ export const GenerateComponentsSection = ({ onCommit, selectedModel, settings }:
     return null;
   }
 
-  const ctx = getComponentPolicyContext(selectedModel, settings);
-  const commitSlotValue = (slot: ComponentSlotPolicy, model: ModelConfig | null) => {
-    if (slot.valueKind === 'main') {
-      onCommit({ [slot.key]: isMainModelConfig(model) ? model : null });
-      return;
-    }
-
-    if (slot.valueKind === 'vae') {
-      onCommit({ [slot.key]: isVaeModelConfig(model) ? model : null });
-      return;
-    }
-
-    onCommit({ [slot.key]: toComponentModel(model) });
-  };
-
   return (
     <GenerateCollapsibleSection label="Components" defaultOpen={policy.defaultOpen}>
       <Stack gap="2" p="2">
         {policy.slots.map((slot) => (
-          <ComponentPicker key={slot.key} ctx={ctx} slot={slot} onChange={(model) => commitSlotValue(slot, model)} />
+          <ComponentPickerRow key={slot.key} commitSlotValue={commitSlotValue} ctx={ctx!} slot={slot} />
         ))}
       </Stack>
     </GenerateCollapsibleSection>
   );
+};
+
+const ComponentPickerRow = ({
+  commitSlotValue,
+  ctx,
+  slot,
+}: {
+  commitSlotValue: (slot: ComponentSlotPolicy, model: ModelConfig | null) => void;
+  ctx: ComponentPolicyContext;
+  slot: ComponentSlotPolicy;
+}) => {
+  const onChange = useCallback((model: ModelConfig | null) => commitSlotValue(slot, model), [commitSlotValue, slot]);
+
+  return <ComponentPicker ctx={ctx} slot={slot} onChange={onChange} />;
 };

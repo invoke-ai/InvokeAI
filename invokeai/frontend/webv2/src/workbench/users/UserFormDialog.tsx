@@ -9,11 +9,13 @@ import { Button, CloseButton, Field } from '@workbench/components/ui';
 import { useZodForm } from '@workbench/models/useZodForm';
 import { useNotify } from '@workbench/useNotify';
 import { WandSparklesIcon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 export type UserFormTarget = { mode: 'create' } | { mode: 'edit'; user: UserDTO };
 
 const getTargetKey = (target: UserFormTarget): string => (target.mode === 'edit' ? target.user.user_id : 'create');
+
+const SWITCH_CHECKED_STYLES = { bg: 'accent.solid' };
 
 /**
  * Create/edit user form for the users widget. The dialog root stays mounted
@@ -28,49 +30,56 @@ export const UserFormDialog = ({
   onClose: () => void;
   onSaved: () => void;
   target: UserFormTarget | null;
-}) => (
-  <Dialog.Root
-    lazyMount
-    open={target !== null}
-    placement="center"
-    scrollBehavior="inside"
-    size="sm"
-    unmountOnExit
-    onOpenChange={(event) => {
+}) => {
+  const handleOpenChange = useCallback(
+    (event: { open: boolean }) => {
       if (!event.open) {
         onClose();
       }
-    }}
-  >
-    <Portal>
-      <Dialog.Backdrop />
-      <Dialog.Positioner>
-        <Dialog.Content>
-          {target ? (
-            <>
-              <Dialog.Header borderBottomWidth="1px" borderColor="border.subtle">
-                <Stack gap="0.5">
-                  <Dialog.Title fontSize="md" fontWeight="700">
-                    {target.mode === 'create' ? 'Add user' : 'Edit user'}
-                  </Dialog.Title>
-                  {target.mode === 'edit' ? (
-                    <Text color="fg.subtle" fontSize="xs">
-                      {target.user.email}
-                    </Text>
-                  ) : null}
-                </Stack>
-              </Dialog.Header>
-              <UserForm key={getTargetKey(target)} target={target} onClose={onClose} onSaved={onSaved} />
-            </>
-          ) : null}
-          <Dialog.CloseTrigger asChild>
-            <CloseButton color="fg.muted" size="sm" />
-          </Dialog.CloseTrigger>
-        </Dialog.Content>
-      </Dialog.Positioner>
-    </Portal>
-  </Dialog.Root>
-);
+    },
+    [onClose]
+  );
+
+  return (
+    <Dialog.Root
+      lazyMount
+      open={target !== null}
+      placement="center"
+      scrollBehavior="inside"
+      size="sm"
+      unmountOnExit
+      onOpenChange={handleOpenChange}
+    >
+      <Portal>
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content>
+            {target ? (
+              <>
+                <Dialog.Header borderBottomWidth="1px" borderColor="border.subtle">
+                  <Stack gap="0.5">
+                    <Dialog.Title fontSize="md" fontWeight="700">
+                      {target.mode === 'create' ? 'Add user' : 'Edit user'}
+                    </Dialog.Title>
+                    {target.mode === 'edit' ? (
+                      <Text color="fg.subtle" fontSize="xs">
+                        {target.user.email}
+                      </Text>
+                    ) : null}
+                  </Stack>
+                </Dialog.Header>
+                <UserForm key={getTargetKey(target)} target={target} onClose={onClose} onSaved={onSaved} />
+              </>
+            ) : null}
+            <Dialog.CloseTrigger asChild>
+              <CloseButton color="fg.muted" size="sm" />
+            </Dialog.CloseTrigger>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Portal>
+    </Dialog.Root>
+  );
+};
 
 const UserForm = ({
   onClose,
@@ -103,7 +112,7 @@ const UserForm = ({
   );
   const form = useZodForm(schema, initialValues);
 
-  const fillGeneratedPassword = async () => {
+  const fillGeneratedPassword = useCallback(async () => {
     setIsGenerating(true);
 
     try {
@@ -114,51 +123,73 @@ const UserForm = ({
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, [form, notify]);
 
-  const submit = () =>
-    form.handleSubmit(async (values) => {
-      try {
-        if (isCreate) {
-          await createUser({
-            display_name: values.displayName.trim() || null,
-            email: values.email,
-            is_admin: values.isAdmin,
-            password: values.password,
-          });
-        } else if (editedUser) {
-          const changes: UserUpdateRequest = {};
-          const displayName = values.displayName.trim();
+  const submit = useCallback(
+    () =>
+      form.handleSubmit(async (values) => {
+        try {
+          if (isCreate) {
+            await createUser({
+              display_name: values.displayName.trim() || null,
+              email: values.email,
+              is_admin: values.isAdmin,
+              password: values.password,
+            });
+          } else if (editedUser) {
+            const changes: UserUpdateRequest = {};
+            const displayName = values.displayName.trim();
 
-          if (displayName !== (editedUser.display_name ?? '')) {
-            changes.display_name = displayName;
+            if (displayName !== (editedUser.display_name ?? '')) {
+              changes.display_name = displayName;
+            }
+
+            if (values.password !== '') {
+              changes.password = values.password;
+            }
+
+            if (values.isAdmin !== editedUser.is_admin) {
+              changes.is_admin = values.isAdmin;
+            }
+
+            if (Object.keys(changes).length === 0) {
+              onClose();
+              return;
+            }
+
+            await updateUser(editedUser.user_id, changes);
           }
-
-          if (values.password !== '') {
-            changes.password = values.password;
-          }
-
-          if (values.isAdmin !== editedUser.is_admin) {
-            changes.is_admin = values.isAdmin;
-          }
-
-          if (Object.keys(changes).length === 0) {
-            onClose();
-            return;
-          }
-
-          await updateUser(editedUser.user_id, changes);
+        } catch (error) {
+          throw new Error(
+            getApiErrorMessage(error, isCreate ? 'Could not create the user.' : 'Could not update the user.')
+          );
         }
-      } catch (error) {
-        throw new Error(
-          getApiErrorMessage(error, isCreate ? 'Could not create the user.' : 'Could not update the user.')
-        );
-      }
 
-      notify.success(isCreate ? 'User created' : 'User updated');
-      onSaved();
-      onClose();
-    });
+        notify.success(isCreate ? 'User created' : 'User updated');
+        onSaved();
+        onClose();
+      }),
+    [editedUser, form, isCreate, notify, onClose, onSaved]
+  );
+
+  const handleEmailChange = useCallback(
+    (event: { target: { value: string } }) => form.setValue('email', event.target.value),
+    [form]
+  );
+  const handleDisplayNameChange = useCallback(
+    (event: { target: { value: string } }) => form.setValue('displayName', event.target.value),
+    [form]
+  );
+  const handlePasswordChange = useCallback(
+    (event: { target: { value: string } }) => form.setValue('password', event.target.value),
+    [form]
+  );
+  const handleGeneratedPasswordClick = useCallback(() => void fillGeneratedPassword(), [fillGeneratedPassword]);
+  const handleAdminCheckedChange = useCallback(
+    (event: { checked: boolean }) => form.setValue('isAdmin', event.checked),
+    [form]
+  );
+  const handleSubmitClick = useCallback(() => void submit(), [submit]);
 
   return (
     <>
@@ -173,16 +204,12 @@ const UserForm = ({
                 autoFocus
                 placeholder="user@example.com"
                 value={form.values.email}
-                onChange={(event) => form.setValue('email', event.target.value)}
+                onChange={handleEmailChange}
               />
             </Field>
           ) : null}
           <Field helpText="Optional — shown instead of the email." label="Display name">
-            <Input
-              autoComplete="off"
-              value={form.values.displayName}
-              onChange={(event) => form.setValue('displayName', event.target.value)}
-            />
+            <Input autoComplete="off" value={form.values.displayName} onChange={handleDisplayNameChange} />
           </Field>
           <Field
             error={form.errors.password}
@@ -202,9 +229,9 @@ const UserForm = ({
                   autoComplete="new-password"
                   flex="1"
                   value={form.values.password}
-                  onChange={(event) => form.setValue('password', event.target.value)}
+                  onChange={handlePasswordChange}
                 />
-                <Button loading={isGenerating} size="xs" variant="outline" onClick={() => void fillGeneratedPassword()}>
+                <Button loading={isGenerating} size="xs" variant="outline" onClick={handleGeneratedPasswordClick}>
                   <WandSparklesIcon />
                   Generate
                 </Button>
@@ -219,7 +246,7 @@ const UserForm = ({
             display="flex"
             justifyContent="space-between"
             w="full"
-            onCheckedChange={(event) => form.setValue('isAdmin', event.checked)}
+            onCheckedChange={handleAdminCheckedChange}
           >
             <Stack gap="0.5">
               <Switch.Label color="fg" fontSize="sm" fontWeight="500" m="0">
@@ -230,7 +257,7 @@ const UserForm = ({
               </Text>
             </Stack>
             <Switch.HiddenInput />
-            <Switch.Control _checked={{ bg: 'accent.solid' }}>
+            <Switch.Control _checked={SWITCH_CHECKED_STYLES}>
               <Switch.Thumb />
             </Switch.Control>
           </Switch.Root>
@@ -240,7 +267,7 @@ const UserForm = ({
         <Button size="xs" variant="ghost" onClick={onClose}>
           Cancel
         </Button>
-        <Button loading={form.isSubmitting} size="xs" variant="solid" onClick={() => void submit()}>
+        <Button loading={form.isSubmitting} size="xs" variant="solid" onClick={handleSubmitClick}>
           {isCreate ? 'Create user' : 'Save changes'}
         </Button>
       </Dialog.Footer>

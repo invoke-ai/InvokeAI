@@ -15,6 +15,15 @@ import { NodesManagerButton } from './NodeManagerButton';
 import { QueueActions } from './QueueActions';
 import { QueueInfo } from './QueueInfo';
 
+const HOME_LINK_STYLE = {
+  alignItems: 'center',
+  aspectRatio: '1/1',
+  display: 'flex',
+  flexShrink: 0,
+  height: '100%',
+  justifyContent: 'center',
+};
+
 /** Workbench top bar: brand, global Invoke command cluster, project tabs, layout + account controls. */
 export const TopBar = () => {
   const { canManageModels, canManageNodes } = useCapabilities();
@@ -33,17 +42,7 @@ export const TopBar = () => {
       pe="1.5"
       w="full"
     >
-      <Link
-        to="/"
-        style={{
-          alignItems: 'center',
-          aspectRatio: '1/1',
-          display: 'flex',
-          flexShrink: 0,
-          height: '100%',
-          justifyContent: 'center',
-        }}
-      >
+      <Link to="/" style={HOME_LINK_STYLE}>
         <InvokeMark size={20} />
       </Link>
       <Separator orientation="vertical" h={5} ms="-2" />

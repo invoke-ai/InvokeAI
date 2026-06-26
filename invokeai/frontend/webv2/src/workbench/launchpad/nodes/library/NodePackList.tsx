@@ -1,3 +1,4 @@
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { NodePackInfo } from '@workbench/customNodes/api';
 
 import { Badge, Flex, Icon, Input, InputGroup, Spinner, Stack, Text } from '@chakra-ui/react';
@@ -158,3 +159,4 @@ const PackRow = ({
     </Badge>
   </Row>
 );
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

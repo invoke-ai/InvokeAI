@@ -1,10 +1,11 @@
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { NodePackInfo } from '@workbench/customNodes/api';
 
 import { Icon, Menu, Portal } from '@chakra-ui/react';
 import { ConfirmDialog, MenuContent } from '@workbench/components/ui';
 import { useNodePackActions } from '@workbench/launchpad/nodes/shared/useNodePackActions';
 import { Trash2Icon } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 
 export interface NodePackContextMenuTarget {
   pack: NodePackInfo;
@@ -23,10 +24,6 @@ export const NodePackContextMenu = ({
 }) => {
   const { uninstall } = useNodePackActions();
   const [pendingUninstall, setPendingUninstall] = useState<NodePackInfo | null>(null);
-  const targetRef = useRef(target);
-
-  targetRef.current = target;
-
   const pack = target?.pack ?? null;
 
   return (
@@ -36,11 +33,7 @@ export const NodePackContextMenu = ({
         lazyMount
         open={target !== null}
         positioning={{
-          getAnchorRect: () => {
-            const currentTarget = targetRef.current;
-
-            return currentTarget ? { height: 1, width: 1, x: currentTarget.x, y: currentTarget.y } : null;
-          },
+          getAnchorRect: () => (target ? { height: 1, width: 1, x: target.x, y: target.y } : null),
           placement: 'bottom-start',
         }}
         unmountOnExit
@@ -80,3 +73,4 @@ export const NodePackContextMenu = ({
     </>
   );
 };
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

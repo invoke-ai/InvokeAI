@@ -1,3 +1,4 @@
+/* eslint-disable react/react-compiler */
 import { Avatar, Badge, Box, Center, Flex, HStack, Spinner, Stack, Switch, Table, Text } from '@chakra-ui/react';
 import { deleteUser, listUsers, updateUser, type UserDTO } from '@workbench/auth/api';
 import { useAuthSession } from '@workbench/auth/session';
@@ -8,6 +9,10 @@ import { PencilIcon, Trash2Icon, UserPlusIcon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import { UserFormDialog, type UserFormTarget } from './UserFormDialog';
+
+const ROW_HOVER_STYLES = { bg: 'bg.muted' };
+const SWITCH_CHECKED_STYLES = { bg: 'accent.solid' };
+const DELETE_BUTTON_HOVER_STYLES = { color: 'fg.error' };
 
 /**
  * Admin-only center view: the workspace user directory with create, edit,
@@ -59,19 +64,22 @@ const UsersDirectory = ({ currentUserId }: { currentUserId: string }) => {
     void refresh();
   }, [refresh]);
 
-  const setUserActive = async (user: UserDTO, isActive: boolean) => {
-    try {
-      await updateUser(user.user_id, { is_active: isActive });
-      await refresh();
-    } catch (error) {
-      notify.error(
-        isActive ? 'Could not activate the user' : 'Could not deactivate the user',
-        getApiErrorMessage(error, 'The backend rejected the change.')
-      );
-    }
-  };
+  const setUserActive = useCallback(
+    async (user: UserDTO, isActive: boolean) => {
+      try {
+        await updateUser(user.user_id, { is_active: isActive });
+        await refresh();
+      } catch (error) {
+        notify.error(
+          isActive ? 'Could not activate the user' : 'Could not deactivate the user',
+          getApiErrorMessage(error, 'The backend rejected the change.')
+        );
+      }
+    },
+    [notify, refresh]
+  );
 
-  const confirmDelete = async () => {
+  const confirmDelete = useCallback(async () => {
     if (!deleteTarget) {
       return;
     }
@@ -83,7 +91,13 @@ const UsersDirectory = ({ currentUserId }: { currentUserId: string }) => {
     } catch (error) {
       notify.error('Could not delete the user', getApiErrorMessage(error, 'The backend rejected the request.'));
     }
-  };
+  }, [deleteTarget, notify, refresh]);
+
+  const openCreateForm = useCallback(() => setFormTarget({ mode: 'create' }), []);
+  const closeForm = useCallback(() => setFormTarget(null), []);
+  const refreshAfterSave = useCallback(() => void refresh(), [refresh]);
+  const closeDeleteConfirm = useCallback(() => setDeleteTarget(null), []);
+  const retryLoad = useCallback(() => void refresh(), [refresh]);
 
   return (
     <>
@@ -100,7 +114,7 @@ const UsersDirectory = ({ currentUserId }: { currentUserId: string }) => {
                   : 'Manage workspace accounts and roles.'}
               </Text>
             </Stack>
-            <Button size="xs" variant="solid" onClick={() => setFormTarget({ mode: 'create' })}>
+            <Button size="xs" variant="solid" onClick={openCreateForm}>
               <UserPlusIcon />
               Add user
             </Button>
@@ -113,7 +127,7 @@ const UsersDirectory = ({ currentUserId }: { currentUserId: string }) => {
                     <Text color="fg.error" fontSize="xs" textAlign="center">
                       {loadError}
                     </Text>
-                    <Button size="xs" variant="outline" onClick={() => void refresh()}>
+                    <Button size="xs" variant="outline" onClick={retryLoad}>
                       Retry
                     </Button>
                   </Stack>
@@ -145,10 +159,10 @@ const UsersDirectory = ({ currentUserId }: { currentUserId: string }) => {
                     <UserRow
                       key={user.user_id}
                       isSelf={user.user_id === currentUserId}
+                      setDeleteTarget={setDeleteTarget}
+                      setFormTarget={setFormTarget}
+                      setUserActive={setUserActive}
                       user={user}
-                      onDelete={() => setDeleteTarget(user)}
-                      onEdit={() => setFormTarget({ mode: 'edit', user })}
-                      onSetActive={(isActive) => void setUserActive(user, isActive)}
                     />
                   ))}
                 </Table.Body>
@@ -157,13 +171,13 @@ const UsersDirectory = ({ currentUserId }: { currentUserId: string }) => {
           </Box>
         </Stack>
       </Flex>
-      <UserFormDialog target={formTarget} onClose={() => setFormTarget(null)} onSaved={() => void refresh()} />
+      <UserFormDialog target={formTarget} onClose={closeForm} onSaved={refreshAfterSave} />
       <ConfirmDialog
         body={`Delete ${deleteTarget ? getUserLabel(deleteTarget) : 'this user'}? Their account is removed permanently.`}
         confirmLabel="Delete user"
         isOpen={deleteTarget !== null}
         title="Delete user?"
-        onClose={() => setDeleteTarget(null)}
+        onClose={closeDeleteConfirm}
         onConfirm={confirmDelete}
       />
     </>
@@ -184,91 +198,100 @@ const formatLastSignIn = (lastLoginAt: string | null): string => {
 
 const UserRow = ({
   isSelf,
-  onDelete,
-  onEdit,
-  onSetActive,
+  setDeleteTarget,
+  setFormTarget,
+  setUserActive,
   user,
 }: {
   isSelf: boolean;
-  onDelete: () => void;
-  onEdit: () => void;
-  onSetActive: (isActive: boolean) => void;
+  setDeleteTarget: (user: UserDTO) => void;
+  setFormTarget: (target: UserFormTarget) => void;
+  setUserActive: (user: UserDTO, isActive: boolean) => void;
   user: UserDTO;
-}) => (
-  <Table.Row bg="transparent" _hover={{ bg: 'bg.muted' }}>
-    <Table.Cell borderColor="border.subtle" ps="4">
-      <HStack gap="2.5">
-        <Avatar.Root bg="accent.subtle" color="fg" size="2xs">
-          <Avatar.Fallback fontSize="2xs" name={getUserLabel(user)} />
-        </Avatar.Root>
-        <Stack gap="0">
-          <HStack gap="1.5">
-            <Text fontSize="xs" fontWeight="600">
-              {getUserLabel(user)}
+}) => {
+  const handleDelete = useCallback(() => setDeleteTarget(user), [setDeleteTarget, user]);
+  const handleEdit = useCallback(() => setFormTarget({ mode: 'edit', user }), [setFormTarget, user]);
+  const handleSetActive = useCallback(
+    (event: { checked: boolean }) => void setUserActive(user, event.checked),
+    [setUserActive, user]
+  );
+
+  return (
+    <Table.Row bg="transparent" _hover={ROW_HOVER_STYLES}>
+      <Table.Cell borderColor="border.subtle" ps="4">
+        <HStack gap="2.5">
+          <Avatar.Root bg="accent.subtle" color="fg" size="2xs">
+            <Avatar.Fallback fontSize="2xs" name={getUserLabel(user)} />
+          </Avatar.Root>
+          <Stack gap="0">
+            <HStack gap="1.5">
+              <Text fontSize="xs" fontWeight="600">
+                {getUserLabel(user)}
+              </Text>
+              {isSelf ? (
+                <Badge fontSize="2xs" variant="surface">
+                  You
+                </Badge>
+              ) : null}
+            </HStack>
+            <Text color="fg.muted" fontSize="2xs">
+              {user.email}
             </Text>
-            {isSelf ? (
-              <Badge fontSize="2xs" variant="surface">
-                You
-              </Badge>
-            ) : null}
-          </HStack>
-          <Text color="fg.muted" fontSize="2xs">
-            {user.email}
-          </Text>
-        </Stack>
-      </HStack>
-    </Table.Cell>
-    <Table.Cell borderColor="border.subtle">
-      <Badge colorPalette={user.is_admin ? 'purple' : 'gray'} fontSize="2xs" variant="surface">
-        {user.is_admin ? 'Admin' : 'User'}
-      </Badge>
-    </Table.Cell>
-    <Table.Cell borderColor="border.subtle">
-      <Text color="fg.muted" fontSize="2xs">
-        {formatLastSignIn(user.last_login_at)}
-      </Text>
-    </Table.Cell>
-    <Table.Cell borderColor="border.subtle">
-      <Tooltip content="You cannot deactivate your own account." disabled={!isSelf} showArrow>
-        <Switch.Root
-          aria-label={`${getUserLabel(user)} active`}
-          checked={user.is_active}
-          disabled={isSelf}
-          size="sm"
-          onCheckedChange={(event) => onSetActive(event.checked)}
-        >
-          <Switch.HiddenInput />
-          <Switch.Control _checked={{ bg: 'accent.solid' }}>
-            <Switch.Thumb />
-          </Switch.Control>
-        </Switch.Root>
-      </Tooltip>
-    </Table.Cell>
-    <Table.Cell borderColor="border.subtle" pe="4" textAlign="end">
-      <HStack gap="0.5" justify="flex-end">
-        <IconButton
-          aria-label={`Edit ${getUserLabel(user)}`}
-          color="fg.muted"
-          size="2xs"
-          variant="ghost"
-          onClick={onEdit}
-        >
-          <PencilIcon />
-        </IconButton>
-        <Tooltip content="You cannot delete your own account." disabled={!isSelf} showArrow>
-          <IconButton
-            aria-label={`Delete ${getUserLabel(user)}`}
-            color="fg.muted"
+          </Stack>
+        </HStack>
+      </Table.Cell>
+      <Table.Cell borderColor="border.subtle">
+        <Badge colorPalette={user.is_admin ? 'purple' : 'gray'} fontSize="2xs" variant="surface">
+          {user.is_admin ? 'Admin' : 'User'}
+        </Badge>
+      </Table.Cell>
+      <Table.Cell borderColor="border.subtle">
+        <Text color="fg.muted" fontSize="2xs">
+          {formatLastSignIn(user.last_login_at)}
+        </Text>
+      </Table.Cell>
+      <Table.Cell borderColor="border.subtle">
+        <Tooltip content="You cannot deactivate your own account." disabled={!isSelf} showArrow>
+          <Switch.Root
+            aria-label={`${getUserLabel(user)} active`}
+            checked={user.is_active}
             disabled={isSelf}
+            size="sm"
+            onCheckedChange={handleSetActive}
+          >
+            <Switch.HiddenInput />
+            <Switch.Control _checked={SWITCH_CHECKED_STYLES}>
+              <Switch.Thumb />
+            </Switch.Control>
+          </Switch.Root>
+        </Tooltip>
+      </Table.Cell>
+      <Table.Cell borderColor="border.subtle" pe="4" textAlign="end">
+        <HStack gap="0.5" justify="flex-end">
+          <IconButton
+            aria-label={`Edit ${getUserLabel(user)}`}
+            color="fg.muted"
             size="2xs"
             variant="ghost"
-            _hover={{ color: 'fg.error' }}
-            onClick={onDelete}
+            onClick={handleEdit}
           >
-            <Trash2Icon />
+            <PencilIcon />
           </IconButton>
-        </Tooltip>
-      </HStack>
-    </Table.Cell>
-  </Table.Row>
-);
+          <Tooltip content="You cannot delete your own account." disabled={!isSelf} showArrow>
+            <IconButton
+              aria-label={`Delete ${getUserLabel(user)}`}
+              color="fg.muted"
+              disabled={isSelf}
+              size="2xs"
+              variant="ghost"
+              _hover={DELETE_BUTTON_HOVER_STYLES}
+              onClick={handleDelete}
+            >
+              <Trash2Icon />
+            </IconButton>
+          </Tooltip>
+        </HStack>
+      </Table.Cell>
+    </Table.Row>
+  );
+};

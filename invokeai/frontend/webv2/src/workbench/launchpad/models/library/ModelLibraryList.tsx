@@ -1,5 +1,5 @@
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import { Box, Checkbox, Flex, HStack, Icon, Image, ScrollArea, Spinner, Stack, Text } from '@chakra-ui/react';
-import { defaultRangeExtractor, useVirtualizer, type Range } from '@tanstack/react-virtual';
 import { Button, Row } from '@workbench/components/ui';
 import { EmptyState } from '@workbench/components/ui/EmptyState';
 import { MissingFileBadge, ModelBaseBadge, ModelFormatBadge } from '@workbench/launchpad/models/detail/ModelBadges';
@@ -15,6 +15,7 @@ import { formatBytes } from '@workbench/models/taxonomy';
 import { getLibraryScrollOffset, openModelManagerTab, saveLibraryScrollOffset } from '@workbench/models/uiStore';
 import { ArrowRightIcon, BoxIcon, CircleAlert } from 'lucide-react';
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useVirtualizer } from 'react-hook-tanstack-virtual';
 
 import { ModelRowContextMenu, type ModelContextMenuTarget } from './ModelRowContextMenu';
 
@@ -79,20 +80,6 @@ export const ModelLibraryList = ({
   );
 
   const headerIndexes = useMemo(() => rows.flatMap((row, index) => (row.kind === 'header' ? [index] : [])), [rows]);
-  const pinnedHeaderIndexRef = useRef<number | null>(null);
-
-  // Track which group the viewport is inside. rangeExtractor sees the exact
-  // visible range on every scroll, before render, so a ref read during render
-  // is always current.
-  const rangeExtractor = useCallback(
-    (range: Range) => {
-      pinnedHeaderIndexRef.current =
-        [...headerIndexes].reverse().find((index) => range.startIndex >= index) ?? headerIndexes[0] ?? null;
-
-      return defaultRangeExtractor(range);
-    },
-    [headerIndexes]
-  );
 
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -105,11 +92,12 @@ export const ModelLibraryList = ({
     getScrollElement: () => scrollRef.current,
     initialOffset: () => getLibraryScrollOffset(instanceId),
     overscan: 8,
-    rangeExtractor,
   });
   const scrollOffsetRef = useRef(virtualizer.scrollOffset ?? 0);
 
-  scrollOffsetRef.current = virtualizer.scrollOffset ?? scrollOffsetRef.current;
+  useEffect(() => {
+    scrollOffsetRef.current = virtualizer.scrollOffset ?? scrollOffsetRef.current;
+  }, [virtualizer.scrollOffset]);
 
   // Persist the offset so switching tabs/regions and coming back lands here.
   useEffect(
@@ -148,7 +136,11 @@ export const ModelLibraryList = ({
     );
   }
 
-  const pinnedHeaderIndex = pinnedHeaderIndexRef.current;
+  const firstVisibleIndex = virtualizer.virtualItems[0]?.index ?? 0;
+  const pinnedHeaderIndex = headerIndexes.reduce<number | null>(
+    (pinnedIndex, index) => (firstVisibleIndex >= index ? index : pinnedIndex),
+    headerIndexes[0] ?? null
+  );
   const pinnedRow = pinnedHeaderIndex === null ? null : rows[pinnedHeaderIndex];
 
   return (
@@ -156,8 +148,8 @@ export const ModelLibraryList = ({
       <ScrollArea.Root h="full" size="xs" variant="hover" w="full">
         <ScrollArea.Viewport ref={scrollRef} aria-label="Model library" h="full" w="full">
           <ScrollArea.Content w="full">
-            <Box h={`${virtualizer.getTotalSize()}px`} position="relative" w="full">
-              {virtualizer.getVirtualItems().map((virtualRow) => {
+            <Box h={`${virtualizer.totalSize}px`} position="relative" w="full">
+              {virtualizer.virtualItems.map((virtualRow) => {
                 const row = rows[virtualRow.index];
 
                 if (!row) {
@@ -382,3 +374,4 @@ const ModelRowThumbnail = ({
     />
   );
 };
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

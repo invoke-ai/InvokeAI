@@ -1,4 +1,4 @@
-import { useRef, useSyncExternalStore } from 'react';
+import { useSyncExternalStoreWithSelector } from 'use-sync-external-store/with-selector';
 
 export type EqualityFn<T> = (left: T, right: T) => boolean;
 
@@ -81,19 +81,7 @@ export const useExternalStoreSelector = <Snapshot, Selected>(
   getSnapshot: () => Snapshot,
   selector: (snapshot: Snapshot) => Selected,
   isEqual: EqualityFn<Selected> = shallowEqual
-): Selected => {
-  const cacheRef = useRef<SelectorCache<Snapshot, Selected> | null>(null);
-
-  if (cacheRef.current === null) {
-    cacheRef.current = createSelectorCache(selector, isEqual);
-  } else {
-    cacheRef.current.setSelector(selector, isEqual);
-  }
-
-  const getSelectedSnapshot = (): Selected => cacheRef.current!.read(getSnapshot());
-
-  return useSyncExternalStore(subscribe, getSelectedSnapshot, getSelectedSnapshot);
-};
+): Selected => useSyncExternalStoreWithSelector(subscribe, getSnapshot, getSnapshot, selector, isEqual);
 
 export const createStableSelector = <Input, Selected>(
   selector: (input: Input) => Selected,

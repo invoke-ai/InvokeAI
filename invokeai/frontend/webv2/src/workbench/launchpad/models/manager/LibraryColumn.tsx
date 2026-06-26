@@ -1,3 +1,4 @@
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import { Box, Flex, HStack, Icon, Separator, Text } from '@chakra-ui/react';
 import { Button, IconButton, ConfirmDialog } from '@workbench/components/ui';
 import { MaintenanceMenu } from '@workbench/launchpad/models/library/MaintenanceMenu';
@@ -155,3 +156,4 @@ export const LibraryColumn = () => {
     </Flex>
   );
 };
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

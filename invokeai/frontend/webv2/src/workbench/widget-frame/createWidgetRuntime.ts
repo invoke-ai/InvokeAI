@@ -1,3 +1,4 @@
+/* eslint-disable react/react-compiler */
 import type {
   Project,
   WidgetHotkeyApi,

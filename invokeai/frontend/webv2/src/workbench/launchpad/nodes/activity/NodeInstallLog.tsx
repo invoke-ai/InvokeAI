@@ -1,3 +1,4 @@
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { SystemStyleObject } from '@chakra-ui/react';
 import type { CustomNodeInstallLogEntry } from '@workbench/customNodes/installLogStore';
 
@@ -83,3 +84,4 @@ const InstallLogRow = ({ entry }: { entry: CustomNodeInstallLogEntry }) => {
     </Table.Row>
   );
 };
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

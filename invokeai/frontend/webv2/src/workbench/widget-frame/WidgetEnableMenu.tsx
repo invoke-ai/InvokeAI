@@ -10,6 +10,7 @@ import { Flex, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { IconButton } from '@workbench/components/ui';
 import { WidgetIcon } from '@workbench/iconResolver';
 import { CheckIcon, MoreHorizontalIcon } from 'lucide-react';
+import { useCallback, useMemo } from 'react';
 
 export interface WidgetEnableMenuItem {
   allowMultiple: boolean;
@@ -41,6 +42,9 @@ interface WidgetEnableMenuProps {
   onToggle: (item: WidgetEnableMenuItem) => void;
 }
 
+const TRIGGER_HOVER_PROPS = { bg: 'bg.muted' };
+const MENU_ITEM_DISABLED_PROPS = { opacity: 0.4 };
+
 const getWidgetEnableMenuTriggerButton = (label: string, trigger: WidgetEnableMenuTrigger) => {
   if (trigger.kind === 'center') {
     return (
@@ -63,7 +67,7 @@ const getWidgetEnableMenuTriggerButton = (label: string, trigger: WidgetEnableMe
       rounded={isBottom ? 'sm' : 'md'}
       transition="background var(--wb-motion-duration-fast) ease, color var(--wb-motion-duration-fast) ease"
       w={isBottom ? '5' : '9'}
-      _hover={{ bg: 'bg.muted' }}
+      _hover={TRIGGER_HOVER_PROPS}
     >
       <Icon as={MoreHorizontalIcon} boxSize={isBottom ? '4' : '5'} />
     </Flex>
@@ -92,30 +96,26 @@ export const WidgetEnableMenu = ({
           const meta = getItemMeta?.(item) ?? (item.failureMessage ? 'Failed' : null);
           const disabled = item.status === 'disabled' || isItemDisabled?.(item) === true;
 
-          return (
-            <Menu.Item
-              key={item.id}
-              role="menuitemcheckbox"
-              aria-checked={item.isEnabled}
-              value={item.id}
-              closeOnSelect={false}
-              disabled={disabled}
-              _disabled={{ opacity: 0.4 }}
-              onClick={() => onToggle(item)}
-            >
-              <Icon as={CheckIcon} boxSize="3" opacity={item.isEnabled ? 1 : 0} />
-              <WidgetIcon icon={item.icon} boxSize="3.5" />
-              <Menu.ItemText>{item.label}</Menu.ItemText>
-              {meta ? (
-                <Text color="fg.subtle" fontSize="2xs" ms="auto">
-                  {meta}
-                </Text>
-              ) : null}
-            </Menu.Item>
-          );
+          return <WidgetEnableMenuRow key={item.id} disabled={disabled} item={item} meta={meta} onToggle={onToggle} />;
         })}
       </Menu.ItemGroup>
     </Menu.Content>
+  );
+
+  const contextPositioning = useMemo(
+    () => ({
+      ...positioning,
+      getAnchorRect: () => (contextTarget ? { height: 1, width: 1, x: contextTarget.x, y: contextTarget.y } : null),
+    }),
+    [contextTarget, positioning]
+  );
+  const handleOpenChange = useCallback(
+    (event: { open: boolean }) => {
+      if (!event.open) {
+        onContextClose?.();
+      }
+    },
+    [onContextClose]
   );
 
   return (
@@ -129,21 +129,49 @@ export const WidgetEnableMenu = ({
       <Menu.Root
         lazyMount
         open={contextTarget !== null && contextTarget !== undefined}
-        positioning={{
-          ...positioning,
-          getAnchorRect: () => (contextTarget ? { height: 1, width: 1, x: contextTarget.x, y: contextTarget.y } : null),
-        }}
+        positioning={contextPositioning}
         unmountOnExit
-        onOpenChange={(event) => {
-          if (!event.open) {
-            onContextClose?.();
-          }
-        }}
+        onOpenChange={handleOpenChange}
       >
         <Portal>
           <Menu.Positioner>{content}</Menu.Positioner>
         </Portal>
       </Menu.Root>
     </>
+  );
+};
+
+const WidgetEnableMenuRow = ({
+  disabled,
+  item,
+  meta,
+  onToggle,
+}: {
+  disabled: boolean;
+  item: WidgetEnableMenuItem;
+  meta: string | null;
+  onToggle: (item: WidgetEnableMenuItem) => void;
+}) => {
+  const handleClick = useCallback(() => onToggle(item), [item, onToggle]);
+
+  return (
+    <Menu.Item
+      role="menuitemcheckbox"
+      aria-checked={item.isEnabled}
+      value={item.id}
+      closeOnSelect={false}
+      disabled={disabled}
+      _disabled={MENU_ITEM_DISABLED_PROPS}
+      onClick={handleClick}
+    >
+      <Icon as={CheckIcon} boxSize="3" opacity={item.isEnabled ? 1 : 0} />
+      <WidgetIcon icon={item.icon} boxSize="3.5" />
+      <Menu.ItemText>{item.label}</Menu.ItemText>
+      {meta ? (
+        <Text color="fg.subtle" fontSize="2xs" ms="auto">
+          {meta}
+        </Text>
+      ) : null}
+    </Menu.Item>
   );
 };

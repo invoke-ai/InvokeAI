@@ -2,6 +2,7 @@ import {
   createContext,
   use,
   useEffect,
+  useEffectEvent,
   useRef,
   useSyncExternalStore,
   useState,
@@ -73,13 +74,7 @@ export const WorkbenchProvider = ({
   /** Boot-time session options (deep-linked project, fresh draft). Read once at mount. */
   loadOptions?: WorkbenchLoadOptions;
 }) => {
-  const storeRef = useRef<WorkbenchStore | null>(null);
-
-  if (storeRef.current === null) {
-    storeRef.current = createWorkbenchStore();
-  }
-
-  const store = storeRef.current;
+  const [store] = useState(() => createWorkbenchStore());
   const dispatch = store.dispatch;
   const [hasHydrated, setHasHydrated] = useState(store.getSnapshot().hasHydrated);
   const hasLoadedPersistenceRef = useRef(false);
@@ -150,7 +145,7 @@ export const WorkbenchProvider = ({
   // recovered fork. The follow-up autosave still persists the reconciled
   // session/cache, while project document pushes are no-ops because the sync
   // layer already acknowledged them.
-  const applySaveResult = (result: WorkbenchSaveResult): void => {
+  const applySaveResult = useEffectEvent((result: WorkbenchSaveResult): void => {
     for (const conflict of result.conflicts) {
       dispatch({
         projectId: conflict.projectId,
@@ -159,11 +154,7 @@ export const WorkbenchProvider = ({
         type: 'reconcileProjectConflict',
       });
     }
-  };
-
-  const applySaveResultRef = useRef(applySaveResult);
-
-  applySaveResultRef.current = applySaveResult;
+  });
 
   useEffect(() => {
     let timeoutId: number | null = null;
@@ -240,7 +231,7 @@ export const WorkbenchProvider = ({
             failedPersistedRevisionRef.current = null;
             scheduledPersistedRevision = null;
             dispatch({ savedAt: result.snapshot.savedAt, type: 'autosaveSucceeded' });
-            applySaveResultRef.current(result);
+            applySaveResult(result);
           })
           .catch((error: unknown) => {
             if (generation !== saveGeneration) {
@@ -313,7 +304,7 @@ export const WorkbenchProvider = ({
           failedStateKeyRef.current = null;
           failedPersistedRevisionRef.current = null;
           dispatch({ savedAt: result.snapshot.savedAt, type: 'autosaveSucceeded' });
-          applySaveResultRef.current(result);
+          applySaveResult(result);
         })
         .catch((error: unknown) => {
           if (
@@ -372,48 +363,22 @@ export const useDebouncedWorkbenchSelector = <Selected,>(
   debounceMs = 300,
   isEqual: EqualityFn<Selected> = Object.is
 ): Selected => {
-  const store = useWorkbenchStore();
-  const [selection, setSelection] = useState(() => selector(store.getSnapshot()));
-  const selectionRef = useRef(selection);
-
-  selectionRef.current = selection;
+  const liveSelection = useWorkbenchSelector(selector, isEqual);
+  const [selection, setSelection] = useState(liveSelection);
 
   useEffect(() => {
-    let currentSelection = selector(store.getSnapshot());
-    let timeoutId: number | null = null;
-
-    if (!isEqual(selectionRef.current, currentSelection)) {
-      selectionRef.current = currentSelection;
-      setSelection(currentSelection);
+    if (isEqual(selection, liveSelection)) {
+      return;
     }
 
-    const unsubscribe = store.subscribe(() => {
-      const nextSelection = selector(store.getSnapshot());
-
-      if (isEqual(currentSelection, nextSelection)) {
-        return;
-      }
-
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
-      }
-
-      timeoutId = window.setTimeout(() => {
-        timeoutId = null;
-        currentSelection = nextSelection;
-        selectionRef.current = nextSelection;
-        setSelection(nextSelection);
-      }, debounceMs);
-    });
+    const timeoutId = window.setTimeout(() => {
+      setSelection(liveSelection);
+    }, debounceMs);
 
     return () => {
-      unsubscribe();
-
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
-      }
+      window.clearTimeout(timeoutId);
     };
-  }, [debounceMs, isEqual, selector, store]);
+  }, [debounceMs, isEqual, liveSelection, selection]);
 
   return selection;
 };

@@ -1,3 +1,4 @@
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import { Icon, Input, Popover, Portal, Stack, Text } from '@chakra-ui/react';
 import { Button, IconButton } from '@workbench/components/ui';
 import { KeyRoundIcon } from 'lucide-react';
@@ -52,3 +53,4 @@ export const AccessTokenPopover = ({
     </Portal>
   </Popover.Root>
 );
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

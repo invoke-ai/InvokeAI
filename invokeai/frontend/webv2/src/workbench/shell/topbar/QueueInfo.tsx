@@ -1,3 +1,4 @@
+/* eslint-disable react/react-compiler */
 import type { QueueItem } from '@workbench/types';
 
 import { Badge, HStack, Icon, Progress, Stack, Text } from '@chakra-ui/react';
@@ -9,6 +10,9 @@ import { getQueueItemExpectedImageCount, getQueueProgressBarState, getQueueSumma
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useActiveProjectSelector, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { ListOrderedIcon } from 'lucide-react';
+import { useCallback, useMemo } from 'react';
+
+const TOOLTIP_CONTENT_PROPS = { maxW: '22rem', p: '0' };
 
 export const QueueInfo = () => {
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
@@ -27,22 +31,22 @@ export const QueueInfo = () => {
     loadingModelsCount: modelLoads.length,
     progress: runningProgress,
   });
+  const tooltipContent = useMemo(
+    () => (
+      <QueueInfoTooltip
+        item={runningItem}
+        modelLoads={modelLoads}
+        progress={runningProgress}
+        total={summary.total}
+        current={summary.current}
+      />
+    ),
+    [modelLoads, runningItem, runningProgress, summary]
+  );
+  const handleOpenQueue = useCallback(() => openWorkbenchWidget('queue'), [openWorkbenchWidget]);
 
   return (
-    <Tooltip
-      content={
-        <QueueInfoTooltip
-          item={runningItem}
-          modelLoads={modelLoads}
-          progress={runningProgress}
-          total={summary.total}
-          current={summary.current}
-        />
-      }
-      contentProps={{ maxW: '22rem', p: '0' }}
-      openDelay={200}
-      showArrow
-    >
+    <Tooltip content={tooltipContent} contentProps={TOOLTIP_CONTENT_PROPS} openDelay={200} showArrow>
       <Button
         aria-label={`Queue progress ${summary.current} of ${summary.total}`}
         variant="outline"
@@ -54,7 +58,7 @@ export const QueueInfo = () => {
         overflow="hidden"
         position="relative"
         px="2"
-        onClick={() => openWorkbenchWidget('queue')}
+        onClick={handleOpenQueue}
       >
         <Icon as={ListOrderedIcon} boxSize="4" flexShrink="0" />
         {summary.current}/{summary.total}

@@ -3,7 +3,16 @@ import type { GeneratedImageContract, WidgetRuntimeApi } from '@workbench/types'
 import { Badge, Box, Flex, HStack, Stack } from '@chakra-ui/react';
 import { Button } from '@workbench/components/ui';
 import { ArrowLeftRightIcon, Columns2Icon, XIcon } from 'lucide-react';
-import { useEffect, useEffectEvent, useRef, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent,
+} from 'react';
 
 type CompareMode = 'slider' | 'side-by-side';
 
@@ -24,6 +33,8 @@ const previewGridCss = {
   backgroundRepeat: 'repeat',
   backgroundSize: '24px 24px',
 } as const;
+
+const sliderTouchStyle = { touchAction: 'none' } as const;
 
 /**
  * Two-image comparison: a draggable slider that reveals the compare image over
@@ -67,7 +78,7 @@ export const PreviewCompare = ({
     };
   }, [runtime.commands, runtime.hotkeys]);
 
-  const updateDivider = (clientX: number) => {
+  const updateDivider = useCallback((clientX: number) => {
     const rect = containerRef.current?.getBoundingClientRect();
 
     if (!rect || rect.width === 0) {
@@ -75,7 +86,38 @@ export const PreviewCompare = ({
     }
 
     setDividerPercent(Math.min(100, Math.max(0, ((clientX - rect.left) / rect.width) * 100)));
-  };
+  }, []);
+  const handlePointerDown = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) {
+        return;
+      }
+
+      event.preventDefault();
+      isDraggingRef.current = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      updateDivider(event.clientX);
+    },
+    [updateDivider]
+  );
+  const handlePointerMove = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (isDraggingRef.current) {
+        event.preventDefault();
+        updateDivider(event.clientX);
+      }
+    },
+    [updateDivider]
+  );
+  const endDrag = useCallback((event?: PointerEvent<HTMLDivElement>) => {
+    if (event?.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    isDraggingRef.current = false;
+  }, []);
+  const toggleMode = useCallback(() => setMode((current) => (current === 'slider' ? 'side-by-side' : 'slider')), []);
+  const clipStyle = useMemo(() => ({ clipPath: `inset(0 ${100 - dividerPercent}% 0 0)` }), [dividerPercent]);
 
   return (
     <Stack gap="3" h="full" minH="0" w="full">
@@ -102,46 +144,16 @@ export const PreviewCompare = ({
             h="full"
             overflow="hidden"
             position="relative"
-            style={{ touchAction: 'none' }}
+            style={sliderTouchStyle}
             w="full"
-            onPointerDown={(event) => {
-              if (event.pointerType === 'mouse' && event.button !== 0) {
-                return;
-              }
-
-              event.preventDefault();
-              isDraggingRef.current = true;
-              event.currentTarget.setPointerCapture(event.pointerId);
-              updateDivider(event.clientX);
-            }}
-            onPointerMove={(event) => {
-              if (isDraggingRef.current) {
-                event.preventDefault();
-                updateDivider(event.clientX);
-              }
-            }}
-            onPointerUp={(event) => {
-              if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-                event.currentTarget.releasePointerCapture(event.pointerId);
-              }
-
-              isDraggingRef.current = false;
-            }}
-            onPointerCancel={() => {
-              isDraggingRef.current = false;
-            }}
-            onLostPointerCapture={() => {
-              isDraggingRef.current = false;
-            }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+            onLostPointerCapture={endDrag}
           >
             <img alt={baseImage.imageName} draggable={false} src={baseImage.imageUrl} style={COMPARE_IMAGE_STYLE} />
-            <Box
-              bg="transparent"
-              inset="0"
-              pointerEvents="none"
-              position="absolute"
-              style={{ clipPath: `inset(0 ${100 - dividerPercent}% 0 0)` }}
-            >
+            <Box bg="transparent" inset="0" pointerEvents="none" position="absolute" style={clipStyle}>
               <img
                 alt={compareImage.imageName}
                 draggable={false}
@@ -174,7 +186,7 @@ export const PreviewCompare = ({
         )}
       </Flex>
       <HStack flexShrink={0} gap="1" justify="center">
-        <Button size="2xs" variant="outline" onClick={() => setMode(mode === 'slider' ? 'side-by-side' : 'slider')}>
+        <Button size="2xs" variant="outline" onClick={toggleMode}>
           <Columns2Icon />
           {mode === 'slider' ? 'Side by Side' : 'Slider'}
         </Button>

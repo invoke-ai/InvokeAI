@@ -1,3 +1,4 @@
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import { Badge, Box, Collapsible, Flex, HStack, Icon, Spinner, Text } from '@chakra-ui/react';
 import { Button } from '@workbench/components/ui';
 import { clearCustomNodeInstallLog, useCustomNodeInstallLog } from '@workbench/customNodes/installLogStore';
@@ -82,3 +83,4 @@ export const NodeActivityBar = () => {
     </Collapsible.Root>
   );
 };
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

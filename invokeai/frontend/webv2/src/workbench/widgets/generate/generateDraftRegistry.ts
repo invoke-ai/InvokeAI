@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useEffectEvent } from 'react';
 
 type DraftFlusher = () => void;
 
@@ -13,12 +13,10 @@ export const flushGenerateDrafts = (): void => {
 };
 
 export const useRegisterGenerateDraftFlusher = (flushDraft: DraftFlusher): void => {
-  const flushDraftRef = useRef(flushDraft);
-
-  flushDraftRef.current = flushDraft;
+  const flushLatestDraft = useEffectEvent(flushDraft);
 
   useEffect(() => {
-    const registeredFlushDraft = () => flushDraftRef.current();
+    const registeredFlushDraft = () => flushLatestDraft();
 
     draftFlushers.add(registeredFlushDraft);
 

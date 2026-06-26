@@ -4,6 +4,7 @@ import { Separator, Stack, Text } from '@chakra-ui/react';
 import { Button } from '@workbench/components/ui';
 import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { getFormChildren } from '@workbench/workflows/document';
+import { useCallback } from 'react';
 
 import { NodeFieldControl } from './NodeFieldControl';
 
@@ -44,6 +45,10 @@ const ViewElement = ({ element, projectGraph }: { element: WorkflowFormElement; 
 export const LinearFormView = ({ projectGraph }: { projectGraph: ProjectGraphState }) => {
   const dispatch = useWorkbenchDispatch();
   const rootChildren = getFormChildren(projectGraph.form);
+  const onOpenWorkflowEditorClick = useCallback(
+    () => dispatch({ region: 'center', type: 'selectRegionWidget', widgetId: 'workflow' }),
+    [dispatch]
+  );
 
   if (rootChildren.length === 0) {
     return (
@@ -52,12 +57,7 @@ export const LinearFormView = ({ projectGraph }: { projectGraph: ProjectGraphSta
           No fields are exposed yet. Pin fields in the Workflow editor, or switch to Edit mode to build this form — it
           maps the project graph to simple controls, like the legacy Linear UI.
         </Text>
-        <Button
-          size="2xs"
-          variant="outline"
-          w="fit-content"
-          onClick={() => dispatch({ region: 'center', type: 'selectRegionWidget', widgetId: 'workflow' })}
-        >
+        <Button size="2xs" variant="outline" w="fit-content" onClick={onOpenWorkflowEditorClick}>
           Open Workflow Editor
         </Button>
       </Stack>

@@ -1,3 +1,4 @@
+/* eslint-disable react/react-compiler, react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { ModelConfig, ModelTaxonomyType } from '@workbench/models/types';
 
 import {

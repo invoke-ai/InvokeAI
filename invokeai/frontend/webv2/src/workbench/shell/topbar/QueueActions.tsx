@@ -11,6 +11,9 @@ import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { getQueueActionState } from '@workbench/widgets/queue/queueViewModel';
 import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { ChevronDownIcon, ListOrderedIcon, PauseIcon, PlayIcon, XIcon } from 'lucide-react';
+import { useCallback, useMemo } from 'react';
+
+const ERROR_ITEM_HOVER_PROPS = { bg: 'bg.error', color: 'fg.error' };
 
 /** Queue cancel cluster and processor actions. */
 export const QueueActions = () => {
@@ -24,7 +27,7 @@ export const QueueActions = () => {
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const isConnected = backendConnectionStatus === 'connected';
 
-  const cancelCurrent = () => {
+  const cancelCurrent = useCallback(() => {
     cancelCurrentQueueItem()
       .then((queueItem) => {
         if (!queueItem) {
@@ -38,9 +41,9 @@ export const QueueActions = () => {
       .catch((error: unknown) =>
         notify.error('Failed to cancel current item', error instanceof Error ? error.message : String(error))
       );
-  };
+  }, [dispatch, notify]);
 
-  const cancelAllExceptCurrent = () => {
+  const cancelAllExceptCurrent = useCallback(() => {
     cancelAllExceptCurrentQueueItems()
       .then(() => {
         dispatch({
@@ -54,62 +57,86 @@ export const QueueActions = () => {
       .catch((error: unknown) =>
         notify.error('Failed to cancel queue items', error instanceof Error ? error.message : String(error))
       );
-  };
+  }, [activeProjectId, currentItemId, dispatch, notify]);
 
-  const runProcessorAction = (label: 'pause' | 'resume') => {
-    const action = label === 'pause' ? pauseQueueProcessor : resumeQueueProcessor;
+  const runProcessorAction = useCallback(
+    (label: 'pause' | 'resume') => {
+      const action = label === 'pause' ? pauseQueueProcessor : resumeQueueProcessor;
 
-    action()
-      .then(() => notify.success(label === 'pause' ? 'Processor paused' : 'Processor resumed'))
-      .catch((error: unknown) =>
-        notify.error(
-          label === 'pause' ? 'Failed to pause processor' : 'Failed to resume processor',
-          error instanceof Error ? error.message : String(error)
-        )
-      );
-  };
+      action()
+        .then(() => notify.success(label === 'pause' ? 'Processor paused' : 'Processor resumed'))
+        .catch((error: unknown) =>
+          notify.error(
+            label === 'pause' ? 'Failed to pause processor' : 'Failed to resume processor',
+            error instanceof Error ? error.message : String(error)
+          )
+        );
+    },
+    [notify]
+  );
+  const cancelAll = useCallback(
+    () => dispatch({ projectId: activeProjectId, type: 'cancelAllQueueItems' }),
+    [activeProjectId, dispatch]
+  );
+  const resumeProcessor = useCallback(() => runProcessorAction('resume'), [runProcessorAction]);
+  const pauseProcessor = useCallback(() => runProcessorAction('pause'), [runProcessorAction]);
+  const openQueue = useCallback(() => openWorkbenchWidget('queue'), [openWorkbenchWidget]);
 
-  const queueEndActions = [
-    {
-      label: 'Cancel Current Item',
-      icon: XIcon,
-      disabled: !isConnected || !hasRunningItem,
-      onClick: cancelCurrent,
-    },
-    {
-      label: 'Cancel All Items',
-      icon: XIcon,
-      disabled: cancellableCount === 0,
-      onClick: () => dispatch({ projectId: activeProjectId, type: 'cancelAllQueueItems' }),
-    },
-    {
-      label: 'Cancel all except current item',
-      icon: XIcon,
-      disabled: !isConnected || !hasPendingQueueWork,
-      onClick: cancelAllExceptCurrent,
-    },
-  ];
+  const queueEndActions = useMemo(
+    () => [
+      {
+        label: 'Cancel Current Item',
+        icon: XIcon,
+        disabled: !isConnected || !hasRunningItem,
+        onClick: cancelCurrent,
+      },
+      {
+        label: 'Cancel All Items',
+        icon: XIcon,
+        disabled: cancellableCount === 0,
+        onClick: cancelAll,
+      },
+      {
+        label: 'Cancel all except current item',
+        icon: XIcon,
+        disabled: !isConnected || !hasPendingQueueWork,
+        onClick: cancelAllExceptCurrent,
+      },
+    ],
+    [
+      cancelAll,
+      cancelAllExceptCurrent,
+      cancelCurrent,
+      cancellableCount,
+      hasPendingQueueWork,
+      hasRunningItem,
+      isConnected,
+    ]
+  );
 
-  const queueProcessorActions = [
-    {
-      label: 'Resume Processor',
-      icon: PlayIcon,
-      disabled: !isConnected,
-      onClick: () => runProcessorAction('resume'),
-    },
-    {
-      label: 'Pause Processor',
-      icon: PauseIcon,
-      disabled: !isConnected,
-      onClick: () => runProcessorAction('pause'),
-    },
-    {
-      label: 'Open Queue',
-      icon: ListOrderedIcon,
-      disabled: false,
-      onClick: () => openWorkbenchWidget('queue'),
-    },
-  ];
+  const queueProcessorActions = useMemo(
+    () => [
+      {
+        label: 'Resume Processor',
+        icon: PlayIcon,
+        disabled: !isConnected,
+        onClick: resumeProcessor,
+      },
+      {
+        label: 'Pause Processor',
+        icon: PauseIcon,
+        disabled: !isConnected,
+        onClick: pauseProcessor,
+      },
+      {
+        label: 'Open Queue',
+        icon: ListOrderedIcon,
+        disabled: false,
+        onClick: openQueue,
+      },
+    ],
+    [isConnected, openQueue, pauseProcessor, resumeProcessor]
+  );
 
   return (
     <Menu.Root>
@@ -154,7 +181,7 @@ export const QueueActions = () => {
                   value={action.label}
                   color="fg.error"
                   disabled={action.disabled}
-                  _hover={{ bg: 'bg.error', color: 'fg.error' }}
+                  _hover={ERROR_ITEM_HOVER_PROPS}
                 >
                   <Icon as={action.icon} boxSize="3" />
                   <span>{action.label}</span>

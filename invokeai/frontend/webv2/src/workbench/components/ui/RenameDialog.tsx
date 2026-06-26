@@ -1,5 +1,5 @@
 import { chakra, Dialog, Input, Portal, Stack } from '@chakra-ui/react';
-import { useState } from 'react';
+import { useCallback, useState, type FormEvent } from 'react';
 
 import { Button, CloseButton } from './Button';
 import { Field } from './Field';
@@ -31,51 +31,55 @@ export const RenameDialog = ({
 }) => {
   const [isPending, setIsPending] = useState(false);
 
-  const commit = async (value: string) => {
-    const name = value.trim();
+  const commit = useCallback(
+    async (value: string) => {
+      const name = value.trim();
 
-    if (!name || (!submitUnchanged && name === initialName.trim())) {
-      onClose();
+      if (!name || (!submitUnchanged && name === initialName.trim())) {
+        onClose();
 
-      return;
-    }
+        return;
+      }
 
-    setIsPending(true);
+      setIsPending(true);
 
-    try {
-      await onSubmit(name);
-      onClose();
-    } catch {
-      // The caller surfaced the failure (toast/notification); stay open so
-      // the name is not lost.
-    } finally {
-      setIsPending(false);
-    }
-  };
+      try {
+        await onSubmit(name);
+        onClose();
+      } catch {
+        // The caller surfaced the failure (toast/notification); stay open so
+        // the name is not lost.
+      } finally {
+        setIsPending(false);
+      }
+    },
+    [initialName, onClose, onSubmit, submitUnchanged]
+  );
+
+  const handleOpenChange = useCallback(
+    (event: { open: boolean }) => {
+      if (!event.open) {
+        onClose();
+      }
+    },
+    [onClose]
+  );
+
+  const handleSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      void commit(new FormData(event.currentTarget).get('renameValue')?.toString() ?? '');
+    },
+    [commit]
+  );
 
   return (
-    <Dialog.Root
-      lazyMount
-      open={isOpen}
-      placement="center"
-      size="xs"
-      unmountOnExit
-      onOpenChange={(event) => {
-        if (!event.open) {
-          onClose();
-        }
-      }}
-    >
+    <Dialog.Root lazyMount open={isOpen} placement="center" size="xs" unmountOnExit onOpenChange={handleOpenChange}>
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
           <Dialog.Content bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" color="fg">
-            <chakra.form
-              onSubmit={(event) => {
-                event.preventDefault();
-                void commit(new FormData(event.currentTarget).get('renameValue')?.toString() ?? '');
-              }}
-            >
+            <chakra.form onSubmit={handleSubmit}>
               <Dialog.Header>
                 <Dialog.Title fontSize="sm" fontWeight="700">
                   {title}

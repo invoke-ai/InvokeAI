@@ -4,6 +4,7 @@ import type { PromptHistoryItem } from '@workbench/types';
 import { Stack } from '@chakra-ui/react';
 import { getPromptPolicy } from '@workbench/generation/baseGenerationPolicies';
 import { useActiveProjectSelector, useWidgetValuesSelector } from '@workbench/WorkbenchContext';
+import { useCallback } from 'react';
 
 import { NegativePromptField } from './NegativePromptField';
 import { PositivePromptField } from './PositivePromptField';
@@ -49,17 +50,40 @@ export const GeneratePromptFields = ({
   const showSyntaxHighlighting = useActiveProjectSelector((project) => project.settings.showPromptSyntaxHighlighting);
   const promptValues = useWidgetValuesSelector('generate', getPromptValues, arePromptValuesEqual);
   const promptPolicy = getPromptPolicy(selectedModel, settings);
-  const usePromptHistoryItem = (prompt: PromptHistoryItem) => {
-    onCommitImmediate(
-      promptPolicy.negativeVisible
-        ? {
-            negativePrompt: prompt.negativePrompt ?? '',
-            negativePromptEnabled: prompt.negativePrompt ? true : promptValues.negativePromptEnabled,
-            positivePrompt: prompt.positivePrompt,
-          }
-        : { positivePrompt: prompt.positivePrompt }
-    );
-  };
+
+  const usePromptHistoryItem = useCallback(
+    (prompt: PromptHistoryItem) => {
+      onCommitImmediate(
+        promptPolicy.negativeVisible
+          ? {
+              negativePrompt: prompt.negativePrompt ?? '',
+              negativePromptEnabled: prompt.negativePrompt ? true : promptValues.negativePromptEnabled,
+              positivePrompt: prompt.positivePrompt,
+            }
+          : { positivePrompt: prompt.positivePrompt }
+      );
+    },
+    [onCommitImmediate, promptPolicy.negativeVisible, promptValues.negativePromptEnabled]
+  );
+
+  const handlePositivePromptChange = useCallback((positivePrompt: string) => onCommit({ positivePrompt }), [onCommit]);
+
+  const handlePositivePromptResizeEnd = useCallback(
+    (positivePromptHeightPx: number) => onCommitImmediate({ positivePromptHeightPx }),
+    [onCommitImmediate]
+  );
+
+  const handleNegativePromptEnabledChange = useCallback(
+    (negativePromptEnabled: boolean) => onCommitImmediate({ negativePromptEnabled }),
+    [onCommitImmediate]
+  );
+
+  const handleNegativePromptChange = useCallback((negativePrompt: string) => onCommit({ negativePrompt }), [onCommit]);
+
+  const handleNegativePromptResizeEnd = useCallback(
+    (negativePromptHeightPx: number) => onCommitImmediate({ negativePromptHeightPx }),
+    [onCommitImmediate]
+  );
 
   return (
     <Stack gap="1" py="2">
@@ -70,8 +94,8 @@ export const GeneratePromptFields = ({
         projectId={projectId}
         selectedModel={selectedModel}
         showSyntaxHighlighting={showSyntaxHighlighting}
-        onChange={(positivePrompt) => onCommit({ positivePrompt })}
-        onResizeEnd={(positivePromptHeightPx) => onCommitImmediate({ positivePromptHeightPx })}
+        onChange={handlePositivePromptChange}
+        onResizeEnd={handlePositivePromptResizeEnd}
         onUsePrompt={usePromptHistoryItem}
       />
       {promptPolicy.negativeVisible ? (
@@ -84,9 +108,9 @@ export const GeneratePromptFields = ({
           helpText={promptPolicy.negativeHelpText}
           showSyntaxHighlighting={showSyntaxHighlighting}
           value={promptValues.negativePrompt}
-          onEnabledChange={(negativePromptEnabled) => onCommitImmediate({ negativePromptEnabled })}
-          onChange={(negativePrompt) => onCommit({ negativePrompt })}
-          onResizeEnd={(negativePromptHeightPx) => onCommitImmediate({ negativePromptHeightPx })}
+          onEnabledChange={handleNegativePromptEnabledChange}
+          onChange={handleNegativePromptChange}
+          onResizeEnd={handleNegativePromptResizeEnd}
         />
       ) : null}
     </Stack>

@@ -33,7 +33,7 @@ import { createWidgetRegionViewModelFromState, getWidgetRegionItems } from '@wor
 import { getWidgetById, getWidgetsForRegion, widgetRegistrationFailures } from '@workbench/widgetRegistry';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { WorkbenchWidgetRegistryProvider } from '@workbench/WorkbenchWidgetRegistryContext';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { BottomPanel } from './BottomPanel';
 import { CenterArea } from './CenterArea';
@@ -41,6 +41,8 @@ import { WorkbenchNotificationToaster } from './notifications';
 import { LeftPanel, RightPanel } from './Panels';
 import { StatusBar } from './StatusBar';
 import { TopBar } from './topbar';
+
+const DND_MODIFIERS = [restrictToWindowEdges];
 
 export const WorkbenchShell = () => {
   const dispatch = useWorkbenchDispatch();
@@ -108,56 +110,107 @@ export const WorkbenchShell = () => {
     }
   }, [dispatch]);
 
-  const handleDragStart = (event: DragStartEvent) => {
-    const activeData = event.active.data.current;
+  const handleDragStart = useCallback(
+    (event: DragStartEvent) => {
+      const activeData = event.active.data.current;
 
-    if (!isWidgetInstanceDragData(activeData)) {
-      return;
-    }
+      if (!isWidgetInstanceDragData(activeData)) {
+        return;
+      }
 
-    const instance = placementProject.widgetInstances[activeData.instanceId];
-    const widget = instance ? getWidgetById(instance.typeId) : undefined;
+      const instance = placementProject.widgetInstances[activeData.instanceId];
+      const widget = instance ? getWidgetById(instance.typeId) : undefined;
 
-    if (!instance || !widget) {
-      return;
-    }
+      if (!instance || !widget) {
+        return;
+      }
 
-    setActiveDrag({
-      fromRegion: activeData.region,
-      icon: widget.manifest.icon,
-      instanceId: activeData.instanceId,
-      label: instance.title ?? widget.manifest.labelText,
-      typeId: instance.typeId,
-    });
-  };
+      setActiveDrag({
+        fromRegion: activeData.region,
+        icon: widget.manifest.icon,
+        instanceId: activeData.instanceId,
+        label: instance.title ?? widget.manifest.labelText,
+        typeId: instance.typeId,
+      });
+    },
+    [placementProject.widgetInstances]
+  );
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const activeData = event.active.data.current;
-    const overData = event.over?.data.current ?? null;
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const activeData = event.active.data.current;
+      const overData = event.over?.data.current ?? null;
 
-    setActiveDrag(null);
+      setActiveDrag(null);
 
-    if (!isWidgetInstanceDragData(activeData) || !isWidgetDndData(overData)) {
-      return;
-    }
+      if (!isWidgetInstanceDragData(activeData) || !isWidgetDndData(overData)) {
+        return;
+      }
 
-    const resolution = resolveWidgetDragEnd(placementProject, activeData, overData, getWidgetById);
+      const resolution = resolveWidgetDragEnd(placementProject, activeData, overData, getWidgetById);
 
-    if (!resolution) {
-      return;
-    }
+      if (!resolution) {
+        return;
+      }
 
-    dispatchWidgetDragEndPlacement({ dispatch, resolution });
-  };
+      dispatchWidgetDragEndPlacement({ dispatch, resolution });
+    },
+    [dispatch, placementProject]
+  );
+  const handleDragCancel = useCallback(() => setActiveDrag(null), []);
+  const handleSelectLeft = useCallback(
+    (instanceId: string) => revealWidgetPlacement({ dispatch, instanceId, project: placementProject, region: 'left' }),
+    [dispatch, placementProject]
+  );
+  const handleSelectRight = useCallback(
+    (instanceId: string) => revealWidgetPlacement({ dispatch, instanceId, project: placementProject, region: 'right' }),
+    [dispatch, placementProject]
+  );
+  const handleToggleLeft = useCallback(
+    (item: (typeof leftMenuItems)[number]) =>
+      item.isEnabled
+        ? closeWidgetPlacement({
+            dispatch,
+            getWidgetById,
+            instanceId: item.id,
+            project: placementProject,
+            region: 'left',
+          })
+        : openWidgetPlacement({
+            dispatch,
+            getWidgetsForRegion,
+            options: { createNew: item.allowMultiple, preferredRegions: ['left'] },
+            typeId: item.typeId,
+          }),
+    [dispatch, placementProject]
+  );
+  const handleToggleRight = useCallback(
+    (item: (typeof rightMenuItems)[number]) =>
+      item.isEnabled
+        ? closeWidgetPlacement({
+            dispatch,
+            getWidgetById,
+            instanceId: item.id,
+            project: placementProject,
+            region: 'right',
+          })
+        : openWidgetPlacement({
+            dispatch,
+            getWidgetsForRegion,
+            options: { createNew: item.allowMultiple, preferredRegions: ['right'] },
+            typeId: item.typeId,
+          }),
+    [dispatch, placementProject]
+  );
 
   return (
     <WorkbenchWidgetRegistryProvider getWidgetById={getWidgetById} getWidgetsForRegion={getWidgetsForRegion}>
       <FocusRegionProvider>
         <DndContext
           collisionDetection={widgetCollisionDetection}
-          modifiers={[restrictToWindowEdges]}
+          modifiers={DND_MODIFIERS}
           sensors={sensors}
-          onDragCancel={() => setActiveDrag(null)}
+          onDragCancel={handleDragCancel}
           onDragEnd={handleDragEnd}
           onDragStart={handleDragStart}
         >
@@ -173,25 +226,8 @@ export const WorkbenchShell = () => {
                 railItems={leftRailItems}
                 region="left"
                 side="left"
-                onSelect={(instanceId) =>
-                  revealWidgetPlacement({ dispatch, instanceId, project: placementProject, region: 'left' })
-                }
-                onToggle={(item) =>
-                  item.isEnabled
-                    ? closeWidgetPlacement({
-                        dispatch,
-                        getWidgetById,
-                        instanceId: item.id,
-                        project: placementProject,
-                        region: 'left',
-                      })
-                    : openWidgetPlacement({
-                        dispatch,
-                        getWidgetsForRegion,
-                        options: { createNew: item.allowMultiple, preferredRegions: ['left'] },
-                        typeId: item.typeId,
-                      })
-                }
+                onSelect={handleSelectLeft}
+                onToggle={handleToggleLeft}
               />
               {panels.isLeftOpen && !leftRegion.isCollapsed && canShowLeftPanel ? (
                 <LeftPanel instanceId={leftRegion.activeInstanceId} />
@@ -207,25 +243,8 @@ export const WorkbenchShell = () => {
                 railItems={rightRailItems}
                 region="right"
                 side="right"
-                onSelect={(instanceId) =>
-                  revealWidgetPlacement({ dispatch, instanceId, project: placementProject, region: 'right' })
-                }
-                onToggle={(item) =>
-                  item.isEnabled
-                    ? closeWidgetPlacement({
-                        dispatch,
-                        getWidgetById,
-                        instanceId: item.id,
-                        project: placementProject,
-                        region: 'right',
-                      })
-                    : openWidgetPlacement({
-                        dispatch,
-                        getWidgetsForRegion,
-                        options: { createNew: item.allowMultiple, preferredRegions: ['right'] },
-                        typeId: item.typeId,
-                      })
-                }
+                onSelect={handleSelectRight}
+                onToggle={handleToggleRight}
               />
             </Flex>
 

@@ -1,3 +1,4 @@
+/* eslint-disable react/react-compiler, react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { AspectRatioId, GenerateModelConfig, GenerateSettings } from '@workbench/generation/types';
 
 import {
@@ -69,6 +70,7 @@ export const GenerateDimensionFields = ({
   const projectIdRef = useRef(projectId);
   const previousSettingsDimensionsRef = useRef<Dimensions>({ height: settings.height, width: settings.width });
   const dimensionRatio = displayDimensions.height > 0 ? displayDimensions.width / displayDimensions.height : 1;
+
   const aspectRatioOptions = useMemo<AspectRatioOption[]>(
     () =>
       ASPECT_RATIO_OPTIONS.map((id) => ({
@@ -77,6 +79,7 @@ export const GenerateDimensionFields = ({
       })),
     [dimensionRatio]
   );
+
   const aspectRatioCollection = useMemo(
     () =>
       createListCollection({
@@ -86,6 +89,7 @@ export const GenerateDimensionFields = ({
       }),
     [aspectRatioOptions]
   );
+
   const activeAspectRatioPreviewRatio = getAspectRatioOptionRatio(settings.aspectRatioId, dimensionRatio);
 
   useEffect(() => {

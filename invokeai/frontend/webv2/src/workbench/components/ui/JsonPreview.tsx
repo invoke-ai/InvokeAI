@@ -1,6 +1,6 @@
 import { Box, Code, Icon, ScrollArea } from '@chakra-ui/react';
 import { CheckIcon, CopyIcon } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { IconButton } from './Button';
 import { toaster } from './toaster';
@@ -40,7 +40,7 @@ export const JsonPreview = ({
     []
   );
 
-  const copy = () => {
+  const copy = useCallback(() => {
     navigator.clipboard
       .writeText(json)
       .then(() => {
@@ -53,7 +53,7 @@ export const JsonPreview = ({
         copyResetTimerRef.current = setTimeout(() => setHasCopied(false), 1500);
       })
       .catch(() => toaster.create({ title: 'Failed to copy JSON', type: 'error' }));
-  };
+  }, [json]);
 
   return (
     <Box

@@ -1,11 +1,14 @@
+/* eslint-disable react/react-compiler */
 import type { GalleryBoard } from '@workbench/gallery/api';
 
 import { Dialog, HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { Button } from '@workbench/components/ui';
 import { ArchiveIcon, DownloadIcon, PencilIcon, Trash2Icon, type LucideIcon } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useGalleryWidget } from './GalleryWidgetContext';
+
+const MENU_CONTENT_PADDING_X = '0';
 
 export interface GalleryBoardMenuTarget {
   board: GalleryBoard;
@@ -46,7 +49,27 @@ export const GalleryBoardMenu = ({
     onActiveChange?.(isActive);
   }, [isActive, onActiveChange]);
 
-  const submitRename = () => {
+  const positioning = useMemo(
+    () => ({
+      getAnchorRect: () => {
+        const currentTarget = targetRef.current;
+
+        return currentTarget ? { height: 1, width: 1, x: currentTarget.x, y: currentTarget.y } : null;
+      },
+      placement: 'bottom-start' as const,
+    }),
+    []
+  );
+  const handleOpenChange = useCallback(
+    (event: { open: boolean }) => {
+      if (!event.open) {
+        onClose();
+      }
+    },
+    [onClose]
+  );
+
+  const submitRename = useCallback(() => {
     const trimmedName = renameValue.trim();
 
     if (renameTarget && trimmedName && trimmedName !== renameTarget.name) {
@@ -54,7 +77,53 @@ export const GalleryBoardMenu = ({
     }
 
     setRenameTarget(null);
-  };
+  }, [actions, renameTarget, renameValue]);
+
+  const handleRenameDialogOpenChange = useCallback((event: { open: boolean }) => {
+    if (!event.open) {
+      setRenameTarget(null);
+    }
+  }, []);
+
+  const handleRenameValueChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setRenameValue(event.currentTarget.value);
+  }, []);
+
+  const handleRenameKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        submitRename();
+      }
+    },
+    [submitRename]
+  );
+
+  const handleCancelRename = useCallback(() => setRenameTarget(null), []);
+
+  const handleDeleteDialogOpenChange = useCallback((event: { open: boolean }) => {
+    if (!event.open) {
+      setDeleteTarget(null);
+    }
+  }, []);
+
+  const handleCancelDelete = useCallback(() => setDeleteTarget(null), []);
+
+  const handleDeleteBoardOnly = useCallback(() => {
+    if (deleteTarget) {
+      void actions.deleteBoard(deleteTarget.id, false);
+    }
+
+    setDeleteTarget(null);
+  }, [actions, deleteTarget]);
+
+  const handleDeleteBoardAndImages = useCallback(() => {
+    if (deleteTarget) {
+      void actions.deleteBoard(deleteTarget.id, true);
+    }
+
+    setDeleteTarget(null);
+  }, [actions, deleteTarget]);
 
   return (
     <>
@@ -62,56 +131,21 @@ export const GalleryBoardMenu = ({
         key={board ? board.id : 'closed'}
         lazyMount
         open={target !== null}
-        positioning={{
-          getAnchorRect: () => {
-            const currentTarget = targetRef.current;
-
-            return currentTarget ? { height: 1, width: 1, x: currentTarget.x, y: currentTarget.y } : null;
-          },
-          placement: 'bottom-start',
-        }}
+        positioning={positioning}
         unmountOnExit
-        onOpenChange={(event) => {
-          if (!event.open) {
-            onClose();
-          }
-        }}
+        onOpenChange={handleOpenChange}
       >
         <Portal>
           <Menu.Positioner>
             {board && (
-              <Menu.Content minW="12rem" py="1" px="0">
-                <BoardMenuItem
-                  icon={DownloadIcon}
-                  label="Download Board"
-                  value="download-board"
-                  onClick={() => void actions.downloadBoard(board.id)}
-                />
+              <Menu.Content minW="12rem" py="1" px={MENU_CONTENT_PADDING_X}>
+                <BoardDownloadMenuItem boardId={board.id} />
                 {isManagedBoard && (
                   <>
-                    <BoardMenuItem
-                      icon={PencilIcon}
-                      label="Rename Board"
-                      value="rename-board"
-                      onClick={() => {
-                        setRenameValue(board.name);
-                        setRenameTarget(board);
-                      }}
-                    />
-                    <BoardMenuItem
-                      icon={ArchiveIcon}
-                      label={board.archived ? 'Unarchive Board' : 'Archive Board'}
-                      value="toggle-archived"
-                      onClick={() => void actions.archiveBoard(board.id, !board.archived)}
-                    />
+                    <BoardRenameMenuItem board={board} onRename={setRenameTarget} onRenameValue={setRenameValue} />
+                    <BoardArchiveMenuItem archived={board.archived} boardId={board.id} />
                     <Menu.Separator borderColor="border.subtle" />
-                    <BoardMenuItem
-                      color="fg.error"
-                      icon={Trash2Icon}
-                      label="Delete Board"
-                      value="delete-board"
-                      onClick={() => setDeleteTarget(board)}
-                    />
+                    <BoardDeleteMenuItem board={board} onDelete={setDeleteTarget} />
                   </>
                 )}
               </Menu.Content>
@@ -122,11 +156,7 @@ export const GalleryBoardMenu = ({
       <Dialog.Root
         initialFocusEl={undefined}
         open={renameTarget !== null}
-        onOpenChange={(event) => {
-          if (!event.open) {
-            setRenameTarget(null);
-          }
-        }}
+        onOpenChange={handleRenameDialogOpenChange}
         size="sm"
       >
         <Portal>
@@ -142,17 +172,12 @@ export const GalleryBoardMenu = ({
                   autoFocus
                   size="sm"
                   value={renameValue}
-                  onChange={(event) => setRenameValue(event.currentTarget.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      submitRename();
-                    }
-                  }}
+                  onChange={handleRenameValueChange}
+                  onKeyDown={handleRenameKeyDown}
                 />
               </Dialog.Body>
               <Dialog.Footer gap="2">
-                <Button size="xs" variant="outline" onClick={() => setRenameTarget(null)}>
+                <Button size="xs" variant="outline" onClick={handleCancelRename}>
                   Cancel
                 </Button>
                 <Button disabled={renameValue.trim().length === 0} size="xs" onClick={submitRename}>
@@ -163,15 +188,7 @@ export const GalleryBoardMenu = ({
           </Dialog.Positioner>
         </Portal>
       </Dialog.Root>
-      <Dialog.Root
-        open={deleteTarget !== null}
-        role="alertdialog"
-        onOpenChange={(event) => {
-          if (!event.open) {
-            setDeleteTarget(null);
-          }
-        }}
-      >
+      <Dialog.Root open={deleteTarget !== null} role="alertdialog" onOpenChange={handleDeleteDialogOpenChange}>
         <Portal>
           <Dialog.Backdrop />
           <Dialog.Positioner>
@@ -191,34 +208,13 @@ export const GalleryBoardMenu = ({
                 </Stack>
               </Dialog.Body>
               <Dialog.Footer gap="2">
-                <Button size="xs" variant="outline" onClick={() => setDeleteTarget(null)}>
+                <Button size="xs" variant="outline" onClick={handleCancelDelete}>
                   Cancel
                 </Button>
-                <Button
-                  colorPalette="red"
-                  size="xs"
-                  variant="outline"
-                  onClick={() => {
-                    if (deleteTarget) {
-                      void actions.deleteBoard(deleteTarget.id, false);
-                    }
-
-                    setDeleteTarget(null);
-                  }}
-                >
+                <Button colorPalette="red" size="xs" variant="outline" onClick={handleDeleteBoardOnly}>
                   Delete Board Only
                 </Button>
-                <Button
-                  colorPalette="red"
-                  size="xs"
-                  onClick={() => {
-                    if (deleteTarget) {
-                      void actions.deleteBoard(deleteTarget.id, true);
-                    }
-
-                    setDeleteTarget(null);
-                  }}
-                >
+                <Button colorPalette="red" size="xs" onClick={handleDeleteBoardAndImages}>
                   Delete Board and Images
                 </Button>
               </Dialog.Footer>
@@ -227,6 +223,58 @@ export const GalleryBoardMenu = ({
         </Portal>
       </Dialog.Root>
     </>
+  );
+};
+
+const BoardDownloadMenuItem = ({ boardId }: { boardId: string }) => {
+  const { actions } = useGalleryWidget();
+  const handleClick = useCallback(() => void actions.downloadBoard(boardId), [actions, boardId]);
+
+  return <BoardMenuItem icon={DownloadIcon} label="Download Board" value="download-board" onClick={handleClick} />;
+};
+
+const BoardRenameMenuItem = ({
+  board,
+  onRename,
+  onRenameValue,
+}: {
+  board: GalleryBoard;
+  onRename: React.Dispatch<React.SetStateAction<GalleryBoard | null>>;
+  onRenameValue: React.Dispatch<React.SetStateAction<string>>;
+}) => {
+  const handleClick = useCallback(() => {
+    onRenameValue(board.name);
+    onRename(board);
+  }, [board, onRename, onRenameValue]);
+
+  return <BoardMenuItem icon={PencilIcon} label="Rename Board" value="rename-board" onClick={handleClick} />;
+};
+
+const BoardArchiveMenuItem = ({ archived, boardId }: { archived: boolean; boardId: string }) => {
+  const { actions } = useGalleryWidget();
+  const handleClick = useCallback(() => void actions.archiveBoard(boardId, !archived), [actions, archived, boardId]);
+
+  return (
+    <BoardMenuItem
+      icon={ArchiveIcon}
+      label={archived ? 'Unarchive Board' : 'Archive Board'}
+      value="toggle-archived"
+      onClick={handleClick}
+    />
+  );
+};
+
+const BoardDeleteMenuItem = ({
+  board,
+  onDelete,
+}: {
+  board: GalleryBoard;
+  onDelete: React.Dispatch<React.SetStateAction<GalleryBoard | null>>;
+}) => {
+  const handleClick = useCallback(() => onDelete(board), [board, onDelete]);
+
+  return (
+    <BoardMenuItem color="fg.error" icon={Trash2Icon} label="Delete Board" value="delete-board" onClick={handleClick} />
   );
 };
 

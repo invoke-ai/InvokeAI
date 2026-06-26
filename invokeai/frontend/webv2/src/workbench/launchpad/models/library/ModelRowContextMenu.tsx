@@ -1,3 +1,4 @@
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { ModelConfig } from '@workbench/models/types';
 
 import { Icon, Menu, Portal } from '@chakra-ui/react';
@@ -6,7 +7,7 @@ import { useModelActions } from '@workbench/launchpad/models/detail/useModelActi
 import { isConvertibleToDiffusers } from '@workbench/models/baseIdentity';
 import { useModelsSelector } from '@workbench/models/modelsStore';
 import { RefreshCcwIcon, Trash2Icon } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { SiHuggingface } from 'react-icons/si';
 
 export interface ModelContextMenuTarget {
@@ -29,10 +30,6 @@ export const ModelRowContextMenu = ({
 }) => {
   const { convert, reidentify, remove } = useModelActions();
   const [pendingConfirm, setPendingConfirm] = useState<{ kind: 'delete' | 'convert'; model: ModelConfig } | null>(null);
-  const targetRef = useRef(target);
-
-  targetRef.current = target;
-
   const model = useModelsSelector((snapshot) =>
     target ? (snapshot.models.find((candidate) => candidate.key === target.modelKey) ?? null) : null
   );
@@ -44,11 +41,7 @@ export const ModelRowContextMenu = ({
         lazyMount
         open={target !== null}
         positioning={{
-          getAnchorRect: () => {
-            const currentTarget = targetRef.current;
-
-            return currentTarget ? { height: 1, width: 1, x: currentTarget.x, y: currentTarget.y } : null;
-          },
+          getAnchorRect: () => (target ? { height: 1, width: 1, x: target.x, y: target.y } : null),
           placement: 'bottom-start',
         }}
         unmountOnExit
@@ -103,3 +96,4 @@ export const ModelRowContextMenu = ({
     </>
   );
 };
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

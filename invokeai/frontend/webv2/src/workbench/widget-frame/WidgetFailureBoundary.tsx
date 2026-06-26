@@ -19,6 +19,18 @@ interface WidgetFailureBoundaryState {
 export class WidgetFailureBoundary extends Component<WidgetFailureBoundaryProps, WidgetFailureBoundaryState> {
   state: WidgetFailureBoundaryState = { resetKey: this.props.resetKey };
 
+  private handleRetry = () => {
+    this.setState({ details: undefined, error: undefined, resetKey: this.props.resetKey });
+  };
+
+  private handleCopyError = () => {
+    const { details, error } = this.state;
+
+    if (error) {
+      void navigator.clipboard?.writeText(details ?? error.message);
+    }
+  };
+
   static getDerivedStateFromProps(
     props: WidgetFailureBoundaryProps,
     state: WidgetFailureBoundaryState
@@ -70,20 +82,10 @@ export class WidgetFailureBoundary extends Component<WidgetFailureBoundaryProps,
           <ScrollArea.Corner />
         </ScrollArea.Root>
         <Stack direction="row" gap="2">
-          <Button
-            alignSelf="start"
-            size="2xs"
-            variant="outline"
-            onClick={() => this.setState({ details: undefined, error: undefined, resetKey: this.props.resetKey })}
-          >
+          <Button alignSelf="start" size="2xs" variant="outline" onClick={this.handleRetry}>
             Retry
           </Button>
-          <Button
-            alignSelf="start"
-            size="2xs"
-            variant="outline"
-            onClick={() => void navigator.clipboard?.writeText(copyableDetails)}
-          >
+          <Button alignSelf="start" size="2xs" variant="outline" onClick={this.handleCopyError}>
             Copy Error
           </Button>
         </Stack>

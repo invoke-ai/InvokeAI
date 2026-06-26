@@ -1,6 +1,7 @@
 import { Icon } from '@chakra-ui/react';
 import { IconButton, Tooltip } from '@workbench/components/ui';
 import { SparklesIcon } from 'lucide-react';
+import { useCallback } from 'react';
 
 export const ModelDefaultButton = ({
   active,
@@ -14,6 +15,14 @@ export const ModelDefaultButton = ({
   onClick: () => void;
 }) => {
   const isActive = active ?? !disabled;
+  const handleClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onClick();
+    },
+    [onClick]
+  );
 
   return (
     <Tooltip content={label}>
@@ -23,11 +32,7 @@ export const ModelDefaultButton = ({
         disabled={disabled}
         size="2xs"
         variant="ghost"
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          onClick();
-        }}
+        onClick={handleClick}
       >
         <Icon as={SparklesIcon} boxSize="2.5" />
       </IconButton>

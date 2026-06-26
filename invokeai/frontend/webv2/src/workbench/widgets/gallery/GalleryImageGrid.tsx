@@ -4,7 +4,6 @@ import type { GalleryThumbnailFit } from '@workbench/gallery/settings';
 import { Badge, Box, Flex, ProgressCircle, ScrollArea, Skeleton, Spinner, Text } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { useVirtualizer } from '@tanstack/react-virtual';
 import { useQueueItemProgressImage } from '@workbench/backend/progressImageStore';
 import { useQueueItemProgress } from '@workbench/backend/progressStore';
 import { IconButton } from '@workbench/components/ui';
@@ -14,6 +13,7 @@ import { StarIcon, UploadIcon } from 'lucide-react';
 import {
   useEffect,
   useEffectEvent,
+  useCallback,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -21,6 +21,7 @@ import {
   type DragEvent,
   type MouseEvent,
 } from 'react';
+import { useVirtualizer } from 'react-hook-tanstack-virtual';
 
 import type { GalleryImageDragImage } from './galleryDnd';
 import type { GalleryQueuePlaceholder } from './galleryStateView';
@@ -29,6 +30,19 @@ import { getGalleryImageDragData, getGalleryImageDragId } from './galleryDnd';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 const GRID_GAP_PX = 4;
+const THUMBNAIL_HOVER_CSS = { '&:hover .gallery-thumb-overlay': { opacity: 1 } } as const;
+const THUMBNAIL_BUTTON_STYLE = {
+  background: 'transparent',
+  border: 0,
+  cursor: 'pointer',
+  display: 'block',
+  height: '100%',
+  inset: 0,
+  minWidth: 0,
+  padding: 0,
+  position: 'absolute',
+  width: '100%',
+} as const;
 
 const viewportWidthCache = new Map<'stacked' | 'wide', number>();
 
@@ -81,6 +95,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
 
     return count;
   }, [gallery.images, imageOrderDir, starredFirst]);
+
   const cells = useMemo<GridCell[]>(() => {
     const imageCells: GridCell[] = gallery.images.map((image, imageIndex) => ({ image, imageIndex, kind: 'image' }));
     const placeholderCells: GridCell[] = gallery.pendingPlaceholders.map((placeholder) => ({
@@ -94,23 +109,28 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
 
     return [...imageCells.slice(0, leadingStarredCount), ...placeholderCells, ...imageCells.slice(leadingStarredCount)];
   }, [gallery.images, gallery.pendingPlaceholders, imageOrderDir, leadingStarredCount]);
+
   const getCellIndexForImage = (imageIndex: number): number =>
     imageOrderDir === 'DESC' && imageIndex >= leadingStarredCount
       ? imageIndex + gallery.pendingPlaceholders.length
       : imageIndex;
+
   const rowCount = Math.ceil(cells.length / columnCount);
+
   const cellSizePx =
     viewportWidth > 0 ? Math.max(1, (viewportWidth - GRID_GAP_PX * (columnCount - 1)) / columnCount) : 96;
-  const rowHeightPx = cellSizePx + GRID_GAP_PX;
-  const rowHeightRef = useRef(rowHeightPx);
 
-  rowHeightRef.current = rowHeightPx;
+  const rowHeightPx = cellSizePx + GRID_GAP_PX;
 
   const virtualizer = useVirtualizer({
     count: rowCount,
-    estimateSize: () => rowHeightRef.current,
+    estimateSize: () => rowHeightPx,
     getScrollElement: () => viewportRef.current,
     overscan: 4,
+  });
+
+  const measureVirtualizer = useEffectEvent(() => {
+    virtualizer.measure();
   });
 
   useLayoutEffect(() => {
@@ -144,10 +164,10 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
   }, [isEmpty, layout]);
 
   useEffect(() => {
-    virtualizer.measure();
-  }, [rowHeightPx, virtualizer]);
+    measureVirtualizer();
+  }, [rowHeightPx]);
 
-  const virtualRows = virtualizer.getVirtualItems();
+  const virtualRows = virtualizer.virtualItems;
   const lastVisibleRowIndex = virtualRows[virtualRows.length - 1]?.index ?? 0;
 
   useEffect(() => {
@@ -156,67 +176,131 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
     }
   }, [actions, lastVisibleRowIndex, paginationMode, rowCount]);
 
-  useEffect(() => {
+  const activeContextMenuTarget = useMemo(() => {
     const primaryTargetImageName = contextMenuTarget?.images[0]?.imageName;
 
     if (!primaryTargetImageName) {
-      return;
+      return contextMenuTarget;
     }
 
-    if (!gallery.images.some((image) => image.imageName === primaryTargetImageName)) {
-      setContextMenuTarget(null);
-    }
+    return gallery.images.some((image) => image.imageName === primaryTargetImageName) ? contextMenuTarget : null;
   }, [contextMenuTarget, gallery.images]);
 
-  const handleThumbnailClick = (image: GalleryImage, event: MouseEvent) => {
-    if (event.shiftKey) {
-      const targetIndex = gallery.images.findIndex((candidate) => candidate.imageName === image.imageName);
-      const anchorIndex = gallery.images.findIndex((candidate) => candidate.imageName === gallery.selectedImageName);
+  const handleThumbnailClick = useCallback(
+    (image: GalleryImage, event: MouseEvent) => {
+      if (event.shiftKey) {
+        const targetIndex = gallery.images.findIndex((candidate) => candidate.imageName === image.imageName);
+        const anchorIndex = gallery.images.findIndex((candidate) => candidate.imageName === gallery.selectedImageName);
 
-      if (targetIndex !== -1 && anchorIndex !== -1 && targetIndex !== anchorIndex) {
-        const start = Math.min(anchorIndex, targetIndex);
-        const end = Math.max(anchorIndex, targetIndex);
+        if (targetIndex !== -1 && anchorIndex !== -1 && targetIndex !== anchorIndex) {
+          const start = Math.min(anchorIndex, targetIndex);
+          const end = Math.max(anchorIndex, targetIndex);
 
-        actions.selectImageRange(
-          gallery.images.slice(start, end + 1).map((candidate) => candidate.imageName),
-          image
-        );
+          actions.selectImageRange(
+            gallery.images.slice(start, end + 1).map((candidate) => candidate.imageName),
+            image
+          );
+          return;
+        }
+      }
+
+      if (event.ctrlKey || event.metaKey) {
+        actions.toggleImageInSelection(image);
+      } else {
+        actions.selectImage(image);
+      }
+    },
+    [actions, gallery.images, gallery.selectedImageName]
+  );
+
+  const handleThumbnailContextMenu = useCallback(
+    (image: GalleryImage, x: number, y: number) => {
+      if (selectedNames.has(image.imageName) && selectedNames.size > 1) {
+        const selectionImages = [
+          image,
+          ...gallery.images.filter(
+            (candidate) => candidate.imageName !== image.imageName && selectedNames.has(candidate.imageName)
+          ),
+        ];
+
+        setContextMenuTarget({ images: selectionImages, x, y });
         return;
       }
-    }
 
-    if (event.ctrlKey || event.metaKey) {
-      actions.toggleImageInSelection(image);
-    } else {
-      actions.selectImage(image);
-    }
-  };
+      setContextMenuTarget({ images: [image], x, y });
+    },
+    [gallery.images, selectedNames]
+  );
 
-  const handleThumbnailContextMenu = (image: GalleryImage, x: number, y: number) => {
-    if (selectedNames.has(image.imageName) && selectedNames.size > 1) {
-      const selectionImages = [
-        image,
-        ...gallery.images.filter(
-          (candidate) => candidate.imageName !== image.imageName && selectedNames.has(candidate.imageName)
-        ),
-      ];
+  const getDragImages = useCallback(
+    (image: GalleryImage): GalleryImageDragImage[] => {
+      if (selectedNames.has(image.imageName) && selectedNames.size > 1) {
+        return gallery.images
+          .filter((candidate) => selectedNames.has(candidate.imageName))
+          .map((candidate) => ({ boardId: candidate.boardId, imageName: candidate.imageName }));
+      }
 
-      setContextMenuTarget({ images: selectionImages, x, y });
+      return [{ boardId: image.boardId, imageName: image.imageName }];
+    },
+    [gallery.images, selectedNames]
+  );
+
+  const handleDragEnter = useCallback((event: DragEvent) => {
+    if (!dragEventContainsFiles(event)) {
       return;
     }
 
-    setContextMenuTarget({ images: [image], x, y });
-  };
+    event.preventDefault();
+    dragDepthRef.current += 1;
+    setIsDropActive(true);
+  }, []);
 
-  const getDragImages = (image: GalleryImage): GalleryImageDragImage[] => {
-    if (selectedNames.has(image.imageName) && selectedNames.size > 1) {
-      return gallery.images
-        .filter((candidate) => selectedNames.has(candidate.imageName))
-        .map((candidate) => ({ boardId: candidate.boardId, imageName: candidate.imageName }));
+  const handleDragLeave = useCallback((event: DragEvent) => {
+    if (!dragEventContainsFiles(event)) {
+      return;
     }
 
-    return [{ boardId: image.boardId, imageName: image.imageName }];
-  };
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+
+    if (dragDepthRef.current === 0) {
+      setIsDropActive(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((event: DragEvent) => {
+    if (dragEventContainsFiles(event)) {
+      event.preventDefault();
+    }
+  }, []);
+
+  const handleDrop = useCallback(
+    (event: DragEvent) => {
+      event.preventDefault();
+      dragDepthRef.current = 0;
+      setIsDropActive(false);
+
+      const files = Array.from(event.dataTransfer.files);
+
+      if (files.length > 0) {
+        void actions.uploadFiles(files);
+      }
+    },
+    [actions]
+  );
+
+  const handleShowProgressImages = useCallback(() => {
+    dispatch({
+      settings: { showProgressImagesInViewer: true },
+      type: 'setActiveProjectSettings',
+    });
+  }, [dispatch]);
+
+  const handleToggleStarred = useCallback(
+    (image: GalleryImage) => void imageActions.setImagesStarred([image.imageName], !image.starred),
+    [imageActions]
+  );
+
+  const handleCloseContextMenu = useCallback(() => setContextMenuTarget(null), []);
 
   const navigate = useEffectEvent((direction: 'down' | 'left' | 'right' | 'up') => {
     const imageCount = gallery.images.length;
@@ -318,42 +402,10 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
       minW="0"
       position="relative"
       w="full"
-      onDragEnter={(event) => {
-        if (!dragEventContainsFiles(event)) {
-          return;
-        }
-
-        event.preventDefault();
-        dragDepthRef.current += 1;
-        setIsDropActive(true);
-      }}
-      onDragLeave={(event) => {
-        if (!dragEventContainsFiles(event)) {
-          return;
-        }
-
-        dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
-
-        if (dragDepthRef.current === 0) {
-          setIsDropActive(false);
-        }
-      }}
-      onDragOver={(event) => {
-        if (dragEventContainsFiles(event)) {
-          event.preventDefault();
-        }
-      }}
-      onDrop={(event) => {
-        event.preventDefault();
-        dragDepthRef.current = 0;
-        setIsDropActive(false);
-
-        const files = Array.from(event.dataTransfer.files);
-
-        if (files.length > 0) {
-          void actions.uploadFiles(files);
-        }
-      }}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
       {isEmpty ? (
         <Flex align="center" color="fg.subtle" h="full" justify="center" minH="8rem">
@@ -372,7 +424,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
             w="full"
           >
             <ScrollArea.Content>
-              <Box h={`${virtualizer.getTotalSize()}px`} position="relative" w="full">
+              <Box h={`${virtualizer.totalSize}px`} position="relative" w="full">
                 {virtualRows.map((virtualRow) => (
                   <Box
                     key={virtualRow.key}
@@ -385,44 +437,39 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
                     transform={`translateY(${virtualRow.start}px)`}
                     w="full"
                   >
-                    {cells.slice(virtualRow.index * columnCount, (virtualRow.index + 1) * columnCount).map((cell) =>
-                      cell.kind === 'placeholder' ? (
-                        <GalleryQueuePlaceholderCell
-                          key={cell.placeholder.id}
-                          antialiasProgressImages={antialiasProgressImages}
-                          fit={thumbnailFit}
-                          placeholder={cell.placeholder}
-                          onClick={() =>
-                            dispatch({
-                              settings: { showProgressImagesInViewer: true },
-                              type: 'setActiveProjectSettings',
-                            })
-                          }
-                        />
-                      ) : (
-                        <GalleryThumbnail
-                          key={cell.image.imageName}
-                          alwaysShowDimensions={showImageDimensions}
-                          compareRole={
-                            isComparisonActive && cell.image.imageName === gallery.selectedImageName
-                              ? 'Viewing'
-                              : isComparisonActive && cell.image.imageName === gallery.compareImageName
-                                ? 'Compare'
-                                : null
-                          }
-                          fit={thumbnailFit}
-                          dragImages={getDragImages(cell.image)}
-                          image={cell.image}
-                          isPrimary={cell.image.imageName === gallery.selectedImageName}
-                          isSelected={selectedNames.has(cell.image.imageName)}
-                          onClick={handleThumbnailClick}
-                          onContextMenu={handleThumbnailContextMenu}
-                          onToggleStarred={(image) =>
-                            void imageActions.setImagesStarred([image.imageName], !image.starred)
-                          }
-                        />
-                      )
-                    )}
+                    {cells
+                      .slice(virtualRow.index * columnCount, (virtualRow.index + 1) * columnCount)
+                      .map((cell) =>
+                        cell.kind === 'placeholder' ? (
+                          <GalleryQueuePlaceholderCell
+                            key={cell.placeholder.id}
+                            antialiasProgressImages={antialiasProgressImages}
+                            fit={thumbnailFit}
+                            placeholder={cell.placeholder}
+                            onClick={handleShowProgressImages}
+                          />
+                        ) : (
+                          <GalleryThumbnailCell
+                            key={cell.image.imageName}
+                            alwaysShowDimensions={showImageDimensions}
+                            compareRole={
+                              isComparisonActive && cell.image.imageName === gallery.selectedImageName
+                                ? 'Viewing'
+                                : isComparisonActive && cell.image.imageName === gallery.compareImageName
+                                  ? 'Compare'
+                                  : null
+                            }
+                            fit={thumbnailFit}
+                            getDragImages={getDragImages}
+                            image={cell.image}
+                            isPrimary={cell.image.imageName === gallery.selectedImageName}
+                            isSelected={selectedNames.has(cell.image.imageName)}
+                            onClick={handleThumbnailClick}
+                            onContextMenu={handleThumbnailContextMenu}
+                            onToggleStarred={handleToggleStarred}
+                          />
+                        )
+                      )}
                   </Box>
                 ))}
               </Box>
@@ -463,8 +510,8 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
       <ImageContextMenu
         actions={imageActions}
         boards={gallery.boards}
-        target={contextMenuTarget}
-        onClose={() => setContextMenuTarget(null)}
+        target={activeContextMenuTarget}
+        onClose={handleCloseContextMenu}
       />
     </Box>
   );
@@ -575,10 +622,45 @@ const GalleryThumbnail = ({
   onToggleStarred: (image: GalleryImage) => void;
 }) => {
   const isCompared = compareRole !== null;
+
   const { isDragging, listeners, setNodeRef, transform } = useDraggable({
     data: getGalleryImageDragData(dragImages),
     id: getGalleryImageDragId(image.imageName),
   });
+
+  const containerStyle = useMemo(() => ({ transform: CSS.Transform.toString(transform) }), [transform]);
+
+  const imageStyle = useMemo(
+    () =>
+      ({
+        display: 'block',
+        height: '100%',
+        inset: 0,
+        maxWidth: 'none',
+        objectFit: fit === 'aspect' ? 'contain' : 'cover',
+        position: 'absolute',
+        width: '100%',
+      }) as const,
+    [fit]
+  );
+
+  const handleContextMenu = useCallback(
+    (event: MouseEvent) => {
+      event.preventDefault();
+      onContextMenu(image, event.clientX, event.clientY);
+    },
+    [image, onContextMenu]
+  );
+
+  const handleClick = useCallback((event: MouseEvent) => onClick(image, event), [image, onClick]);
+
+  const handleToggleStarred = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      onToggleStarred(image);
+    },
+    [image, onToggleStarred]
+  );
 
   return (
     <Box
@@ -589,7 +671,7 @@ const GalleryThumbnail = ({
       borderWidth="2px"
       borderColor={isSelected || isCompared ? 'accent.solid' : 'border.subtle'}
       boxShadow={isCompared ? 'inset 0 0 0 1px {colors.accent.solid}' : undefined}
-      css={{ '&:hover .gallery-thumb-overlay': { opacity: 1 } }}
+      css={THUMBNAIL_HOVER_CSS}
       minW="0"
       opacity={isDragging ? 0.55 : undefined}
       overflow="hidden"
@@ -597,47 +679,20 @@ const GalleryThumbnail = ({
       aria-selected={isSelected}
       position="relative"
       rounded="md"
-      style={{ transform: CSS.Transform.toString(transform) }}
+      style={containerStyle}
       touchAction="none"
       w="full"
       zIndex={isDragging ? 2 : undefined}
-      onContextMenu={(event) => {
-        event.preventDefault();
-        onContextMenu(image, event.clientX, event.clientY);
-      }}
+      onContextMenu={handleContextMenu}
     >
       <button
         aria-label={`Select ${image.imageName} for preview`}
-        style={{
-          background: 'transparent',
-          border: 0,
-          cursor: 'pointer',
-          display: 'block',
-          height: '100%',
-          inset: 0,
-          minWidth: 0,
-          padding: 0,
-          position: 'absolute',
-          width: '100%',
-        }}
+        style={THUMBNAIL_BUTTON_STYLE}
         tabIndex={isPrimary ? 0 : -1}
         type="button"
-        onClick={(event) => onClick(image, event)}
+        onClick={handleClick}
       >
-        <img
-          alt={image.imageName}
-          draggable={false}
-          src={image.thumbnailUrl || image.imageUrl}
-          style={{
-            display: 'block',
-            height: '100%',
-            inset: 0,
-            maxWidth: 'none',
-            objectFit: fit === 'aspect' ? 'contain' : 'cover',
-            position: 'absolute',
-            width: '100%',
-          }}
-        />
+        <img alt={image.imageName} draggable={false} src={image.thumbnailUrl || image.imageUrl} style={imageStyle} />
       </button>
       {compareRole && (
         <Badge
@@ -664,10 +719,7 @@ const GalleryThumbnail = ({
         transition="opacity var(--wb-motion-duration-medium) ease"
         variant="solid"
         zIndex="1"
-        onClick={(event) => {
-          event.stopPropagation();
-          onToggleStarred(image);
-        }}
+        onClick={handleToggleStarred}
       >
         <StarIcon fill={image.starred ? 'currentColor' : 'none'} />
       </IconButton>
@@ -689,4 +741,16 @@ const GalleryThumbnail = ({
       )}
     </Box>
   );
+};
+
+const GalleryThumbnailCell = ({
+  image,
+  getDragImages,
+  ...props
+}: Omit<Parameters<typeof GalleryThumbnail>[0], 'dragImages'> & {
+  getDragImages: (image: GalleryImage) => GalleryImageDragImage[];
+}) => {
+  const dragImages = useMemo(() => getDragImages(image), [getDragImages, image]);
+
+  return <GalleryThumbnail {...props} dragImages={dragImages} image={image} />;
 };

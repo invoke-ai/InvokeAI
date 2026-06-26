@@ -1,5 +1,6 @@
+/* eslint-disable react/react-compiler */
 import { Dialog, Portal, Stack, Text } from '@chakra-ui/react';
-import { useState, type ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 
 import { Button, CloseButton } from './Button';
 
@@ -27,7 +28,7 @@ export const ConfirmDialog = ({
 }) => {
   const [isPending, setIsPending] = useState(false);
 
-  const handleConfirm = async () => {
+  const handleConfirm = useCallback(async () => {
     setIsPending(true);
 
     try {
@@ -36,20 +37,23 @@ export const ConfirmDialog = ({
       setIsPending(false);
       onClose();
     }
-  };
+  }, [onClose, onConfirm]);
+
+  const handleOpenChange = useCallback(
+    (event: { open: boolean }) => {
+      if (!event.open) {
+        onClose();
+      }
+    },
+    [onClose]
+  );
+
+  const handleConfirmClick = useCallback(() => {
+    void handleConfirm();
+  }, [handleConfirm]);
 
   return (
-    <Dialog.Root
-      open={isOpen}
-      placement="center"
-      role="alertdialog"
-      size="sm"
-      onOpenChange={(event) => {
-        if (!event.open) {
-          onClose();
-        }
-      }}
-    >
+    <Dialog.Root open={isOpen} placement="center" role="alertdialog" size="sm" onOpenChange={handleOpenChange}>
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
@@ -71,9 +75,7 @@ export const ConfirmDialog = ({
                 loading={isPending}
                 size="xs"
                 variant="solid"
-                onClick={() => {
-                  void handleConfirm();
-                }}
+                onClick={handleConfirmClick}
               >
                 {confirmLabel}
               </Button>

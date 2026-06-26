@@ -1,3 +1,4 @@
+/* eslint-disable react/react-compiler */
 import type { GeneratedImageContract, WidgetViewProps } from '@workbench/types';
 
 import { Badge, Box, Flex, HStack, Stack, Text } from '@chakra-ui/react';
@@ -27,7 +28,17 @@ import {
   useWorkbenchDispatch,
 } from '@workbench/WorkbenchContext';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type CSSProperties,
+} from 'react';
 
 import { PreviewCompare } from './PreviewCompare';
 
@@ -246,17 +257,20 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     starredFirst,
   ]);
 
-  const selectByOffset = (offset: -1 | 1) => {
-    if (selectedIndex === -1) {
-      return;
-    }
+  const selectByOffset = useCallback(
+    (offset: -1 | 1) => {
+      if (selectedIndex === -1) {
+        return;
+      }
 
-    const nextImage = boardImages[selectedIndex + offset];
+      const nextImage = boardImages[selectedIndex + offset];
 
-    if (nextImage) {
-      dispatch({ image: nextImage, type: 'selectGalleryImage' });
-    }
-  };
+      if (nextImage) {
+        dispatch({ image: nextImage, type: 'selectGalleryImage' });
+      }
+    },
+    [boardImages, dispatch, selectedIndex]
+  );
 
   const [contextMenuTarget, setContextMenuTarget] = useState<ImageContextMenuTarget | null>(null);
   const onImagesDeleted = useCallback(
@@ -312,6 +326,24 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const isComparing =
     selectedImage !== null && compareImage !== null && compareImage.imageName !== selectedImage.imageName;
   const shouldShowProgressImage = showProgressImagesInViewer && progressImage !== null && !isComparing;
+  const exitCompare = useCallback(() => dispatch({ image: null, type: 'setGalleryCompareImage' }), [dispatch]);
+  const swapCompareImages = useCallback(() => {
+    if (selectedImage && compareImage) {
+      dispatch({ image: compareImage, type: 'selectGalleryImage' });
+      dispatch({ image: selectedImage, type: 'setGalleryCompareImage' });
+    }
+  }, [compareImage, dispatch, selectedImage]);
+  const openImageContextMenu = useCallback(
+    (x: number, y: number) => {
+      if (contextMenuImage) {
+        setContextMenuTarget({ images: [contextMenuImage], x, y });
+      }
+    },
+    [contextMenuImage]
+  );
+  const selectNextImage = useCallback(() => selectByOffset(1), [selectByOffset]);
+  const selectPreviousImage = useCallback(() => selectByOffset(-1), [selectByOffset]);
+  const closeContextMenu = useCallback(() => setContextMenuTarget(null), []);
   const executeViewerHotkey = useEffectEvent((commandId: string) => {
     if (commandId === 'viewer.toggleViewer') {
       runtime.workbench.closeWidgetInstance(runtime.instanceId);
@@ -354,11 +386,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
               baseImage={selectedImage}
               compareImage={compareImage}
               runtime={runtime}
-              onExit={() => dispatch({ image: null, type: 'setGalleryCompareImage' })}
-              onSwap={() => {
-                dispatch({ image: compareImage, type: 'selectGalleryImage' });
-                dispatch({ image: selectedImage, type: 'setGalleryCompareImage' });
-              }}
+              onExit={exitCompare}
+              onSwap={swapCompareImages}
             />
           ) : (
             <SelectedImagePreview
@@ -370,20 +399,16 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
               progressImage={shouldShowProgressImage ? progressImage : null}
               selectedIndex={selectedIndex}
               shouldAntialiasProgressImage={antialiasProgressImages}
-              onContextMenu={(x, y) => {
-                if (contextMenuImage) {
-                  setContextMenuTarget({ images: [contextMenuImage], x, y });
-                }
-              }}
-              onNext={() => selectByOffset(1)}
-              onPrevious={() => selectByOffset(-1)}
+              onContextMenu={openImageContextMenu}
+              onNext={selectNextImage}
+              onPrevious={selectPreviousImage}
             />
           )}
           <ImageContextMenu
             actions={imageActions}
             boards={boards}
             target={contextMenuTarget}
-            onClose={() => setContextMenuTarget(null)}
+            onClose={closeContextMenu}
           />
         </>
       ) : (
@@ -421,35 +446,55 @@ const SelectedImagePreview = ({
   onNext: () => void;
   onPrevious: () => void;
 }) => {
-  const previewImage = progressImage
-    ? {
-        alt: 'In-progress diffusion preview',
-        height: progressImage.height,
-        isProgress: true,
-        src: progressImage.dataUrl,
-        width: progressImage.width,
+  const previewImage = useMemo(
+    () =>
+      progressImage
+        ? {
+            alt: 'In-progress diffusion preview',
+            height: progressImage.height,
+            isProgress: true,
+            src: progressImage.dataUrl,
+            width: progressImage.width,
+          }
+        : { alt: image.imageName, height: image.height, isProgress: false, src: image.imageUrl, width: image.width },
+    [image.height, image.imageName, image.imageUrl, image.width, progressImage]
+  );
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        onPrevious();
       }
-    : { alt: image.imageName, height: image.height, isProgress: false, src: image.imageUrl, width: image.width };
+
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        onNext();
+      }
+    },
+    [onNext, onPrevious]
+  );
+  const handleContextMenu = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      onContextMenu(event.clientX, event.clientY);
+    },
+    [onContextMenu]
+  );
+  const imageStyle = useMemo<CSSProperties>(
+    () => ({
+      display: 'block',
+      height: '100%',
+      imageRendering: previewImage.isProgress && !shouldAntialiasProgressImage ? 'pixelated' : 'auto',
+      inset: 0,
+      objectFit: 'contain',
+      position: 'absolute',
+      width: '100%',
+    }),
+    [previewImage.isProgress, shouldAntialiasProgressImage]
+  );
 
   return (
-    <Stack
-      gap="3"
-      h="full"
-      minH="0"
-      tabIndex={0}
-      w="full"
-      onKeyDown={(event) => {
-        if (event.key === 'ArrowLeft') {
-          event.preventDefault();
-          onPrevious();
-        }
-
-        if (event.key === 'ArrowRight') {
-          event.preventDefault();
-          onNext();
-        }
-      }}
-    >
+    <Stack gap="3" h="full" minH="0" tabIndex={0} w="full" onKeyDown={handleKeyDown}>
       <Flex
         align="center"
         borderWidth="1px"
@@ -477,24 +522,9 @@ const SelectedImagePreview = ({
           position="relative"
           rounded="lg"
           w={isCompact ? 'full' : 'auto'}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            onContextMenu(event.clientX, event.clientY);
-          }}
+          onContextMenu={handleContextMenu}
         >
-          <img
-            alt={previewImage.alt}
-            src={previewImage.src}
-            style={{
-              display: 'block',
-              height: '100%',
-              imageRendering: previewImage.isProgress && !shouldAntialiasProgressImage ? 'pixelated' : 'auto',
-              inset: 0,
-              objectFit: 'contain',
-              position: 'absolute',
-              width: '100%',
-            }}
-          />
+          <img alt={previewImage.alt} src={previewImage.src} style={imageStyle} />
           {previewImage.isProgress ? (
             <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
               Generating

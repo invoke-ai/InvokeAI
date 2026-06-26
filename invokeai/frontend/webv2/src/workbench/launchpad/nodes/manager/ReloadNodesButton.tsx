@@ -1,3 +1,4 @@
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import { Icon } from '@chakra-ui/react';
 import { getApiErrorMessage } from '@workbench/backend/http';
 import { Button } from '@workbench/components/ui';
@@ -32,3 +33,4 @@ export const ReloadNodesButton = () => {
     </Button>
   );
 };
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

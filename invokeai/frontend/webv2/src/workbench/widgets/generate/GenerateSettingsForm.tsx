@@ -1,3 +1,4 @@
+/* eslint-disable react/react-compiler */
 import type {
   GenerateModelConfig,
   GenerateSettings,
@@ -6,7 +7,7 @@ import type {
 } from '@workbench/generation/types';
 
 import { Stack, Text } from '@chakra-ui/react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { GenerateAdvancedFields } from './GenerateAdvancedFields';
 import { GenerateComponentsSection } from './GenerateComponentsSection';
@@ -141,7 +142,7 @@ export const GenerateSettingsForm = ({
     }, GENERATE_INPUT_DEBOUNCE_MS);
   };
 
-  const commit = (update: GenerateSettingsUpdate) => {
+  const commit = useCallback((update: GenerateSettingsUpdate) => {
     const nextSettings = applyGenerateSettingsUpdate(
       draftSettingsRef.current,
       mergeGenerateSettingsUpdate(null, update)
@@ -149,9 +150,9 @@ export const GenerateSettingsForm = ({
 
     setDraft(nextSettings);
     scheduleCommitUpdate(update);
-  };
+  }, []);
 
-  const commitDebouncedDraftUpdate = (update: GenerateSettingsUpdate) => {
+  const commitDebouncedDraftUpdate = useCallback((update: GenerateSettingsUpdate) => {
     const pendingUpdate = mergeGenerateSettingsUpdate(pendingUpdateRef.current, update);
     const previousSettings = latestSettingsRef.current;
     const nextSettings = applyGenerateSettingsUpdate(latestSettingsRef.current, pendingUpdate);
@@ -165,9 +166,9 @@ export const GenerateSettingsForm = ({
     latestSettingsRef.current = nextSettings;
     setDraft(nextSettings);
     onPatchSettingsRef.current(getChangedGenerateSettingsPatch(previousSettings, nextSettings));
-  };
+  }, []);
 
-  const commitPromptDraftPatch = (patch: Partial<GenerateSettings>) => {
+  const commitPromptDraftPatch = useCallback((patch: Partial<GenerateSettings>) => {
     const pendingUpdate = mergeGenerateSettingsUpdate(pendingUpdateRef.current, patch);
     const previousSettings = latestSettingsRef.current;
     const nextSettings = applyGenerateSettingsUpdate(latestSettingsRef.current, pendingUpdate);
@@ -180,30 +181,33 @@ export const GenerateSettingsForm = ({
     pendingUpdateRef.current = null;
     latestSettingsRef.current = nextSettings;
     onPatchSettingsRef.current(getChangedGenerateSettingsPatch(previousSettings, nextSettings));
-  };
+  }, []);
 
-  const commitSettingsImmediately = (nextSettings: GenerateSettings) => {
-    const previousSettings = latestSettingsRef.current;
-    const settingsToCommit = getSettingsWithLatestPromptFields(
-      nextSettings,
-      applyGenerateSettingsUpdate(latestSettingsRef.current, pendingUpdateRef.current)
-    );
+  const commitSettingsImmediately = useCallback(
+    (nextSettings: GenerateSettings) => {
+      const previousSettings = latestSettingsRef.current;
+      const settingsToCommit = getSettingsWithLatestPromptFields(
+        nextSettings,
+        applyGenerateSettingsUpdate(latestSettingsRef.current, pendingUpdateRef.current)
+      );
 
-    if (timeoutRef.current !== null) {
-      window.clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
+      if (timeoutRef.current !== null) {
+        window.clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
 
-    pendingUpdateRef.current = null;
-    latestSettingsRef.current = settingsToCommit;
-    setDraft(settingsToCommit);
+      pendingUpdateRef.current = null;
+      latestSettingsRef.current = settingsToCommit;
+      setDraft(settingsToCommit);
 
-    if (!Object.is(previousSettings, settingsToCommit)) {
-      onCommitSettings(settingsToCommit);
-    }
-  };
+      if (!Object.is(previousSettings, settingsToCommit)) {
+        onCommitSettings(settingsToCommit);
+      }
+    },
+    [onCommitSettings]
+  );
 
-  const commitPatchImmediately = (patch: Partial<GenerateSettings>) => {
+  const commitPatchImmediately = useCallback((patch: Partial<GenerateSettings>) => {
     const previousSettings = latestSettingsRef.current;
     const nextSettings = applyGenerateSettingsPatch(
       applyGenerateSettingsUpdate(latestSettingsRef.current, pendingUpdateRef.current),
@@ -219,7 +223,7 @@ export const GenerateSettingsForm = ({
     latestSettingsRef.current = nextSettings;
     setDraft(nextSettings);
     onPatchSettingsRef.current(getChangedGenerateSettingsPatch(previousSettings, nextSettings));
-  };
+  }, []);
 
   return (
     <Stack gap="1" px={1}>

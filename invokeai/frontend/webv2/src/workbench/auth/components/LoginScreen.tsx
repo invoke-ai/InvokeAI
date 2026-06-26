@@ -5,6 +5,7 @@ import { loginWithCredentials, useAuthSession } from '@workbench/auth/session';
 import { getApiErrorMessage } from '@workbench/backend/http';
 import { Button, Field } from '@workbench/components/ui';
 import { useZodForm } from '@workbench/models/useZodForm';
+import { useCallback, type ChangeEvent, type FormEvent } from 'react';
 
 import { AuthFormAlert, AuthScreen } from './AuthScreen';
 import { PasswordInput } from './PasswordInput';
@@ -15,28 +16,46 @@ export const LoginScreen = () => {
   const navigate = useNavigate();
   const form = useZodForm(loginSchema, { email: '', password: '', rememberMe: false });
 
-  const submit = () =>
-    form.handleSubmit(async (values) => {
-      try {
-        await loginWithCredentials(values.email, values.password, values.rememberMe);
-      } catch (error) {
-        throw new Error(getApiErrorMessage(error, 'Sign-in failed. Check your email and password.'));
-      }
+  const submit = useCallback(
+    () =>
+      form.handleSubmit(async (values) => {
+        try {
+          await loginWithCredentials(values.email, values.password, values.rememberMe);
+        } catch (error) {
+          throw new Error(getApiErrorMessage(error, 'Sign-in failed. Check your email and password.'));
+        }
 
-      await navigate({ to: '/' });
-    });
+        await navigate({ to: '/' });
+      }),
+    [form, navigate]
+  );
+
+  const handleSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      void submit();
+    },
+    [submit]
+  );
+
+  const handleEmailChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => form.setValue('email', event.target.value),
+    [form]
+  );
+
+  const handlePasswordChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => form.setValue('password', event.target.value),
+    [form]
+  );
+
+  const handleRememberMeChange = useCallback(
+    (event: Checkbox.CheckedChangeDetails) => form.setValue('rememberMe', event.checked === true),
+    [form]
+  );
 
   return (
     <AuthScreen subtitle="Sign in to your workspace to continue." title="Welcome to Invoke">
-      <chakra.form
-        display="flex"
-        flexDirection="column"
-        gap="4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void submit();
-        }}
-      >
+      <chakra.form display="flex" flexDirection="column" gap="4" onSubmit={handleSubmit}>
         {session.sessionExpired ? (
           <AuthFormAlert message="Your session expired. Sign in again to continue." tone="warning" />
         ) : null}
@@ -48,7 +67,7 @@ export const LoginScreen = () => {
             autoFocus
             placeholder="you@example.com"
             value={form.values.email}
-            onChange={(event) => form.setValue('email', event.target.value)}
+            onChange={handleEmailChange}
           />
         </Field>
         <Field error={form.errors.password} label="Password">
@@ -57,14 +76,10 @@ export const LoginScreen = () => {
             autoComplete="current-password"
             placeholder="Your password"
             value={form.values.password}
-            onChange={(event) => form.setValue('password', event.target.value)}
+            onChange={handlePasswordChange}
           />
         </Field>
-        <Checkbox.Root
-          checked={form.values.rememberMe}
-          size="sm"
-          onCheckedChange={(event) => form.setValue('rememberMe', event.checked === true)}
-        >
+        <Checkbox.Root checked={form.values.rememberMe} size="sm" onCheckedChange={handleRememberMeChange}>
           <Checkbox.HiddenInput />
           <Checkbox.Control />
           <Checkbox.Label color="fg.muted" fontWeight="400">

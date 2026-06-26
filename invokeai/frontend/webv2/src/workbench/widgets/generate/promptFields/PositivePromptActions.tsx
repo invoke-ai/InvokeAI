@@ -1,7 +1,8 @@
+/* eslint-disable react/react-compiler */
 import type { GenerateLora, GenerateModelConfig } from '@workbench/generation/types';
 import type { ModelConfig } from '@workbench/models/types';
 import type { PromptHistoryItem } from '@workbench/types';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, MouseEvent } from 'react';
 
 import { HStack, Icon, Image, Input, Popover, Portal, Separator, Stack, Text } from '@chakra-ui/react';
 import { getApiErrorMessage } from '@workbench/backend/http';
@@ -27,12 +28,15 @@ import {
   TrashIcon,
   Undo2Icon,
 } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 const DISABLED_PROMPT_ACTIONS = [
   { icon: BookDashedIcon, label: 'Prompt Template' },
   { icon: CurlyBracesIcon, label: 'Show dynamic prompts' },
 ];
+const POPOVER_POSITIONING_BOTTOM_END = { placement: 'bottom-end' } as const;
+const TEXT_LLM_MODEL_TYPES = ['text_llm'];
+const LLAVA_MODEL_TYPES = ['llava_onevision'];
 
 interface PositivePromptActionsProps {
   loras: GenerateLora[];
@@ -144,15 +148,14 @@ export const AddPromptTriggerButton = ({
   isOpen: boolean;
   onOpenPromptTriggerPicker: (anchorElement: HTMLElement) => void;
 }) => {
+  const handleClick = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => onOpenPromptTriggerPicker(event.currentTarget),
+    [onOpenPromptTriggerPicker]
+  );
+
   return (
     <Tooltip content="Add prompt trigger">
-      <IconButton
-        aria-label="Add prompt trigger"
-        disabled={isOpen}
-        size="2xs"
-        variant="ghost"
-        onClick={(event) => onOpenPromptTriggerPicker(event.currentTarget)}
-      >
+      <IconButton aria-label="Add prompt trigger" disabled={isOpen} size="2xs" variant="ghost" onClick={handleClick}>
         <PlusIcon />
       </IconButton>
     </Tooltip>
@@ -174,45 +177,61 @@ export const PromptTriggerPopover = ({
 }) => {
   const models = useModelsSelector((snapshot) => snapshot.models);
   const [searchTerm, setSearchTerm] = useState('');
-  const options = getPromptTriggerOptions({ loras, models, selectedModel });
-  const filteredOptions = options.filter((option) => {
-    const query = searchTerm.trim().toLowerCase();
 
-    return !query || option.label.toLowerCase().includes(query) || option.group.toLowerCase().includes(query);
-  });
-  const groupedOptions = filteredOptions.reduce<Array<{ group: string; options: PromptTriggerOption[] }>>(
-    (groups, option) => {
-      const existingGroup = groups.find((group) => group.group === option.group);
-
-      if (existingGroup) {
-        existingGroup.options.push(option);
-      } else {
-        groups.push({ group: option.group, options: [option] });
-      }
-
-      return groups;
-    },
-    []
+  const options = useMemo(
+    () => getPromptTriggerOptions({ loras, models, selectedModel }),
+    [loras, models, selectedModel]
   );
+
+  const filteredOptions = useMemo(
+    () =>
+      options.filter((option) => {
+        const query = searchTerm.trim().toLowerCase();
+
+        return !query || option.label.toLowerCase().includes(query) || option.group.toLowerCase().includes(query);
+      }),
+    [options, searchTerm]
+  );
+
+  const groupedOptions = useMemo(
+    () =>
+      filteredOptions.reduce<Array<{ group: string; options: PromptTriggerOption[] }>>((groups, option) => {
+        const existingGroup = groups.find((group) => group.group === option.group);
+
+        if (existingGroup) {
+          existingGroup.options.push(option);
+        } else {
+          groups.push({ group: option.group, options: [option] });
+        }
+
+        return groups;
+      }, []),
+    [filteredOptions]
+  );
+
+  const popoverPositioning = useMemo(() => ({ ...positioning, placement: 'bottom-start' as const }), [positioning]);
+
+  const handleOpenChange = useCallback(
+    (event: { open: boolean }) => {
+      if (event.open) {
+        setSearchTerm('');
+      } else {
+        onClose();
+      }
+    },
+    [onClose]
+  );
+
+  const handleSearchChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(event.currentTarget.value);
+  }, []);
 
   useEffect(() => {
     ensureModelsLoaded();
   }, []);
 
   return (
-    <Popover.Root
-      lazyMount
-      open={open}
-      positioning={{ ...positioning, placement: 'bottom-start' }}
-      unmountOnExit
-      onOpenChange={(event) => {
-        if (event.open) {
-          setSearchTerm('');
-        } else {
-          onClose();
-        }
-      }}
-    >
+    <Popover.Root lazyMount open={open} positioning={popoverPositioning} unmountOnExit onOpenChange={handleOpenChange}>
       <Portal>
         <Popover.Positioner>
           <Popover.Content bg="bg.muted" borderColor="border.emphasized" borderWidth="1px" w="22rem">
@@ -224,7 +243,7 @@ export const PromptTriggerPopover = ({
                   placeholder="Search prompt triggers"
                   size="xs"
                   value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.currentTarget.value)}
+                  onChange={handleSearchChange}
                 />
                 <Separator />
                 <Scrollable flex="1" label="Prompt trigger options" minH="0">
@@ -240,22 +259,11 @@ export const PromptTriggerPopover = ({
                             {group.group}
                           </Text>
                           {group.options.map((option, index) => (
-                            <Button
+                            <PromptTriggerOptionButton
                               key={`${option.group}-${option.value}-${index}`}
-                              alignItems="start"
-                              h="auto"
-                              justifyContent="start"
-                              px="2"
-                              py="1.5"
-                              size="xs"
-                              variant="ghost"
-                              transitionDuration="faster"
-                              onClick={() => onSelect(option.value)}
-                            >
-                              <Text color="fg" fontSize="xs" textAlign="start" wordBreak="break-word">
-                                {option.label}
-                              </Text>
-                            </Button>
+                              onSelect={onSelect}
+                              option={option}
+                            />
                           ))}
                         </Stack>
                       ))}
@@ -268,6 +276,34 @@ export const PromptTriggerPopover = ({
         </Popover.Positioner>
       </Portal>
     </Popover.Root>
+  );
+};
+
+const PromptTriggerOptionButton = ({
+  onSelect,
+  option,
+}: {
+  onSelect: (trigger: string) => void;
+  option: PromptTriggerOption;
+}) => {
+  const handleClick = useCallback(() => onSelect(option.value), [onSelect, option.value]);
+
+  return (
+    <Button
+      alignItems="start"
+      h="auto"
+      justifyContent="start"
+      px="2"
+      py="1.5"
+      size="xs"
+      transitionDuration="faster"
+      variant="ghost"
+      onClick={handleClick}
+    >
+      <Text color="fg" fontSize="xs" textAlign="start" wordBreak="break-word">
+        {option.label}
+      </Text>
+    </Button>
   );
 };
 
@@ -297,7 +333,7 @@ const ExpandPromptButton = ({
     ensureModelsLoaded();
   }, []);
 
-  const runExpandPrompt = async () => {
+  const runExpandPrompt = useCallback(async () => {
     if (!selectedModel || !positivePrompt.trim()) {
       return;
     }
@@ -317,20 +353,22 @@ const ExpandPromptButton = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [dispatch, onPositivePromptChange, positivePrompt, projectId, selectedModel]);
+
+  const popoverIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
+  const handleOpenChange = useCallback((event: { open: boolean }) => setIsOpen(event.open), []);
+  const handleModelChange = useCallback((model: ModelConfig | null) => setSelectedModelKey(model?.key ?? null), []);
+  const handleRunExpandPrompt = useCallback(() => void runExpandPrompt(), [runExpandPrompt]);
 
   return (
     <Popover.Root
-      ids={{ trigger: triggerId }}
+      ids={popoverIds}
       lazyMount
       open={isOpen}
-      positioning={{ placement: 'bottom-end' }}
-      onOpenChange={(event) => setIsOpen(event.open)}
+      positioning={POPOVER_POSITIONING_BOTTOM_END}
+      onOpenChange={handleOpenChange}
     >
-      <Tooltip
-        content={textLlmModels.length === 0 ? 'No Text LLM installed' : 'Expand prompt'}
-        ids={{ trigger: triggerId }}
-      >
+      <Tooltip content={textLlmModels.length === 0 ? 'No Text LLM installed' : 'Expand prompt'} ids={popoverIds}>
         <Popover.Trigger asChild>
           <IconButton
             aria-label="Expand prompt"
@@ -358,17 +396,17 @@ const ExpandPromptButton = ({
                   <>
                     <ModelSelect
                       isClearable={false}
-                      modelTypes={['text_llm']}
+                      modelTypes={TEXT_LLM_MODEL_TYPES}
                       placeholder="Select Text LLM"
                       size="xs"
                       value={selectedModelKey}
-                      onChange={(model) => setSelectedModelKey(model?.key ?? null)}
+                      onChange={handleModelChange}
                     />
                     <Button
                       disabled={!selectedModel || !positivePrompt.trim()}
                       loading={isLoading}
                       size="xs"
-                      onClick={() => void runExpandPrompt()}
+                      onClick={handleRunExpandPrompt}
                     >
                       Expand
                     </Button>
@@ -408,7 +446,7 @@ const ImageToPromptButton = ({
     ensureModelsLoaded();
   }, []);
 
-  const runImageToPrompt = async () => {
+  const runImageToPrompt = useCallback(async () => {
     if (!selectedImage || !selectedModel) {
       return;
     }
@@ -431,20 +469,22 @@ const ImageToPromptButton = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [dispatch, onPositivePromptChange, projectId, selectedImage, selectedModel]);
+
+  const popoverIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
+  const handleOpenChange = useCallback((event: { open: boolean }) => setIsOpen(event.open), []);
+  const handleModelChange = useCallback((model: ModelConfig | null) => setSelectedModelKey(model?.key ?? null), []);
+  const handleRunImageToPrompt = useCallback(() => void runImageToPrompt(), [runImageToPrompt]);
 
   return (
     <Popover.Root
-      ids={{ trigger: triggerId }}
+      ids={popoverIds}
       lazyMount
       open={isOpen}
-      positioning={{ placement: 'bottom-end' }}
-      onOpenChange={(event) => setIsOpen(event.open)}
+      positioning={POPOVER_POSITIONING_BOTTOM_END}
+      onOpenChange={handleOpenChange}
     >
-      <Tooltip
-        content={llavaModels.length === 0 ? 'No vision model installed' : 'Image to prompt'}
-        ids={{ trigger: triggerId }}
-      >
+      <Tooltip content={llavaModels.length === 0 ? 'No vision model installed' : 'Image to prompt'} ids={popoverIds}>
         <Popover.Trigger asChild>
           <IconButton aria-label="Image to prompt" disabled={isLoading} size="2xs" variant="ghost">
             <ImageUpIcon />
@@ -467,11 +507,11 @@ const ImageToPromptButton = ({
                   <>
                     <ModelSelect
                       isClearable={false}
-                      modelTypes={['llava_onevision']}
+                      modelTypes={LLAVA_MODEL_TYPES}
                       placeholder="Select vision model"
                       size="xs"
                       value={selectedModelKey}
-                      onChange={(model) => setSelectedModelKey(model?.key ?? null)}
+                      onChange={handleModelChange}
                     />
                     {selectedImage ? (
                       <HStack gap="2">
@@ -496,7 +536,7 @@ const ImageToPromptButton = ({
                       disabled={!selectedImage || !selectedModel}
                       loading={isLoading}
                       size="xs"
-                      onClick={() => void runImageToPrompt()}
+                      onClick={handleRunImageToPrompt}
                     >
                       Generate Prompt
                     </Button>
@@ -518,25 +558,32 @@ const PositivePromptHistoryButton = ({ onUsePrompt }: Pick<PositivePromptActions
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const filteredPrompts = filterPromptHistory(promptHistory, searchTerm);
+  const popoverIds = useMemo(() => ({ trigger: historyTriggerId }), [historyTriggerId]);
+  const handleOpenChange = useCallback((event: { open: boolean }) => setIsOpen(event.open), []);
 
-  const onChangeSearchTerm = (event: ChangeEvent<HTMLInputElement>) => {
+  const onChangeSearchTerm = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.currentTarget.value);
-  };
+  }, []);
 
-  const usePrompt = (prompt: PromptHistoryItem) => {
-    onUsePrompt(prompt);
-    setIsOpen(false);
-  };
+  const usePrompt = useCallback(
+    (prompt: PromptHistoryItem) => {
+      onUsePrompt(prompt);
+      setIsOpen(false);
+    },
+    [onUsePrompt]
+  );
+
+  const clearPromptHistory = useCallback(() => dispatch({ type: 'clearPromptHistory' }), [dispatch]);
 
   return (
     <Popover.Root
-      ids={{ trigger: historyTriggerId }}
+      ids={popoverIds}
       lazyMount
       open={isOpen}
-      positioning={{ placement: 'bottom-end' }}
-      onOpenChange={(event) => setIsOpen(event.open)}
+      positioning={POPOVER_POSITIONING_BOTTOM_END}
+      onOpenChange={handleOpenChange}
     >
-      <Tooltip content="Prompt history" ids={{ trigger: historyTriggerId }}>
+      <Tooltip content="Prompt history" ids={popoverIds}>
         <Popover.Trigger asChild>
           <IconButton aria-label="Prompt history" size="2xs" variant="ghost">
             <HistoryIcon />
@@ -557,12 +604,7 @@ const PositivePromptHistoryButton = ({ onUsePrompt }: Pick<PositivePromptActions
                     value={searchTerm}
                     onChange={onChangeSearchTerm}
                   />
-                  <Button
-                    disabled={promptHistory.length === 0}
-                    size="xs"
-                    variant="ghost"
-                    onClick={() => dispatch({ type: 'clearPromptHistory' })}
-                  >
+                  <Button disabled={promptHistory.length === 0} size="xs" variant="ghost" onClick={clearPromptHistory}>
                     <Icon as={TrashIcon} boxSize="3" />
                     Clear
                   </Button>
@@ -576,14 +618,11 @@ const PositivePromptHistoryButton = ({ onUsePrompt }: Pick<PositivePromptActions
                   ) : (
                     <Stack gap="1">
                       {filteredPrompts.map((prompt, index) => (
-                        <>
-                          <PromptHistoryItemRow
-                            key={`${prompt.positivePrompt}-${prompt.negativePrompt ?? ''}-${index}`}
-                            prompt={prompt}
-                            onUsePrompt={usePrompt}
-                          />
-                          <Separator />
-                        </>
+                        <PromptHistoryItemWithSeparator
+                          key={`${prompt.positivePrompt}-${prompt.negativePrompt ?? ''}-${index}`}
+                          prompt={prompt}
+                          onUsePrompt={usePrompt}
+                        />
                       ))}
                     </Stack>
                   )}
@@ -599,6 +638,19 @@ const PositivePromptHistoryButton = ({ onUsePrompt }: Pick<PositivePromptActions
     </Popover.Root>
   );
 };
+
+const PromptHistoryItemWithSeparator = ({
+  onUsePrompt,
+  prompt,
+}: {
+  onUsePrompt: (prompt: PromptHistoryItem) => void;
+  prompt: PromptHistoryItem;
+}) => (
+  <>
+    <PromptHistoryItemRow prompt={prompt} onUsePrompt={onUsePrompt} />
+    <Separator />
+  </>
+);
 
 const PromptHistoryEmptyText = ({ children }: { children: string }) => (
   <HStack h="full" justify="center" minH="9rem">
@@ -616,10 +668,12 @@ const PromptHistoryItemRow = ({
   prompt: PromptHistoryItem;
 }) => {
   const dispatch = useWorkbenchDispatch();
+  const handleUsePrompt = useCallback(() => onUsePrompt(prompt), [onUsePrompt, prompt]);
+  const handleDelete = useCallback(() => dispatch({ prompt, type: 'removePromptFromHistory' }), [dispatch, prompt]);
 
   return (
     <HStack align="start" gap="1.5" pr="1">
-      <IconButton aria-label="Use prompt" size="2xs" variant="ghost" onClick={() => onUsePrompt(prompt)}>
+      <IconButton aria-label="Use prompt" size="2xs" variant="ghost" onClick={handleUsePrompt}>
         <Icon as={Undo2Icon} boxSize="3.5" />
       </IconButton>
       <Stack flex="1" gap="0.5" minW="0">
@@ -646,7 +700,7 @@ const PromptHistoryItemRow = ({
         colorPalette="red"
         size="2xs"
         variant="ghost"
-        onClick={() => dispatch({ prompt, type: 'removePromptFromHistory' })}
+        onClick={handleDelete}
       >
         <Icon as={TrashIcon} boxSize="3.5" />
       </IconButton>

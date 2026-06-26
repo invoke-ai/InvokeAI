@@ -14,7 +14,7 @@ import { ensureModelsLoaded, useModelsSelector } from '@workbench/models/modelsS
 import { flushGenerateDrafts } from '@workbench/widgets/generate/generateDraftRegistry';
 import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchStore } from '@workbench/WorkbenchContext';
 import { useInvocationTemplatesSelector } from '@workbench/workflows/templates';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { GraphPreviewFlow } from './GraphPreviewFlow';
 
@@ -32,6 +32,10 @@ interface GraphPreviewDialogProps {
 type PreviewMode = 'nodes' | 'json';
 
 const selectInvocationRouteInput = createInvocationRouteInputSelector();
+const modeItems = [
+  { label: 'Nodes', value: 'nodes' },
+  { label: 'JSON', value: 'json' },
+];
 
 const PreviewPane = ({ children }: { children: ReactNode }) => (
   <Box flex="1" h="full" minH="0" minW="0" w="full" rounded="md" borderWidth={1} overflow="hidden">
@@ -72,26 +76,49 @@ export const GraphPreviewDialog = ({
     ensureModelsLoaded();
   }, []);
 
+  const handleOpenChange = useCallback((event: { open: boolean }) => onOpenChange(event.open), [onOpenChange]);
+  const handleModeChange = useCallback(
+    (event: { value: string | null }) => setMode(event.value === 'json' ? 'json' : 'nodes'),
+    []
+  );
+  const closeDialog = useCallback(() => onOpenChange(false), [onOpenChange]);
+  const invokeRoute = useCallback(() => {
+    flushGenerateDrafts();
+    const postFlushProject = store.getSnapshot().activeProject;
+    const postFlushRoute = sourceId
+      ? resolveInvocationRoute(
+          postFlushProject,
+          'dialog',
+          { ...postFlushProject.invocation, sourceId, sourceLocked: true },
+          availabilityModels
+        )
+      : null;
+
+    if (!postFlushRoute || !isInvocationRouteValid(postFlushRoute)) {
+      return;
+    }
+
+    dispatch({
+      backendSupportsCancellation: true,
+      models: availabilityModels,
+      route: postFlushRoute,
+      type: 'submitResolvedInvocationSnapshot',
+    });
+    onOpenChange(false);
+  }, [availabilityModels, dispatch, onOpenChange, sourceId, store]);
+  const jsonLabel = useMemo(() => `${title} graph JSON`, [title]);
+
   return (
-    <Dialog.Root open={isOpen} size="xl" onOpenChange={(event) => onOpenChange(event.open)}>
+    <Dialog.Root open={isOpen} size="xl" onOpenChange={handleOpenChange}>
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
           <Dialog.Content h="62vh" maxH="62vh">
             <Dialog.Header alignItems="center" flexDirection="row" justifyContent="space-between">
               <Dialog.Title>{title} Graph Preview</Dialog.Title>
-              <SegmentGroup.Root
-                size="xs"
-                value={mode}
-                onValueChange={(event) => setMode(event.value === 'json' ? 'json' : 'nodes')}
-              >
+              <SegmentGroup.Root size="xs" value={mode} onValueChange={handleModeChange}>
                 <SegmentGroup.Indicator />
-                <SegmentGroup.Items
-                  items={[
-                    { label: 'Nodes', value: 'nodes' },
-                    { label: 'JSON', value: 'json' },
-                  ]}
-                />
+                <SegmentGroup.Items items={modeItems} />
               </SegmentGroup.Root>
             </Dialog.Header>
             <Dialog.Body display="flex" flex="1" flexDirection="column" minH="0">
@@ -105,7 +132,7 @@ export const GraphPreviewDialog = ({
                 </PreviewPane>
               ) : (
                 <PreviewPane>
-                  <JsonPreview h="full" label={`${title} graph JSON`} maxH="100%" value={graph} />
+                  <JsonPreview h="full" label={jsonLabel} maxH="100%" value={graph} />
                 </PreviewPane>
               )}
             </Dialog.Body>
@@ -117,35 +144,12 @@ export const GraphPreviewDialog = ({
                   opacity={canInvoke ? undefined : 0.6}
                   size="sm"
                   title={dialogRoute.validationMessage}
-                  onClick={() => {
-                    flushGenerateDrafts();
-                    const postFlushProject = store.getSnapshot().activeProject;
-                    const postFlushRoute = sourceId
-                      ? resolveInvocationRoute(
-                          postFlushProject,
-                          'dialog',
-                          { ...postFlushProject.invocation, sourceId, sourceLocked: true },
-                          availabilityModels
-                        )
-                      : null;
-
-                    if (!postFlushRoute || !isInvocationRouteValid(postFlushRoute)) {
-                      return;
-                    }
-
-                    dispatch({
-                      backendSupportsCancellation: true,
-                      models: availabilityModels,
-                      route: postFlushRoute,
-                      type: 'submitResolvedInvocationSnapshot',
-                    });
-                    onOpenChange(false);
-                  }}
+                  onClick={invokeRoute}
                 >
                   Invoke {formatRoute(dialogRoute)}
                 </Button>
               ) : null}
-              <Button size="sm" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button size="sm" variant="outline" onClick={closeDialog}>
                 Close
               </Button>
             </Dialog.Footer>

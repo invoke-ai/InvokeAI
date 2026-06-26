@@ -1,3 +1,4 @@
+/* eslint-disable react/react-compiler */
 import type { Project, WidgetRegion } from '@workbench/types';
 
 import { Icon, Menu, Portal, Separator } from '@chakra-ui/react';
@@ -21,7 +22,7 @@ import {
   useWorkbenchStore,
 } from '@workbench/WorkbenchContext';
 import { FileDownIcon, FolderCogIcon, FolderOpenIcon, PencilIcon, PlusIcon, Trash2Icon, XIcon } from 'lucide-react';
-import { useRef, useState, type MouseEvent } from 'react';
+import { useCallback, useMemo, useRef, useState, type MouseEvent } from 'react';
 
 import { OpenProjectDialog } from './OpenProjectDialog';
 
@@ -39,6 +40,8 @@ const areProjectTabSummariesEqual = (
 
 const selectProjectTabSummaries = (projects: readonly Project[]): ProjectTabSummary[] =>
   projects.map(({ id, name }) => ({ id, name }));
+
+const deleteMenuItemHover = { bg: 'bg.error', color: 'fg.error' } as const;
 
 /**
  * Document-style tabs for the open projects (the session), immediately right
@@ -65,49 +68,75 @@ export const ProjectTabs = () => {
   const [deleteTarget, setDeleteTarget] = useState<ProjectTabSummary | null>(null);
   const [isOpenDialogVisible, setIsOpenDialogVisible] = useState(false);
 
-  const getProject = (projectId: string): Project | null =>
-    store.getState().projects.find((project) => project.id === projectId) ?? null;
+  const getProject = useCallback(
+    (projectId: string): Project | null =>
+      store.getState().projects.find((project) => project.id === projectId) ?? null,
+    [store]
+  );
 
-  const onSwitchProject = (projectId: string) => {
-    flushGenerateDrafts();
-    dispatch({ projectId, type: 'switchProject' });
-  };
+  const onSwitchProject = useCallback(
+    (projectId: string) => {
+      flushGenerateDrafts();
+      dispatch({ projectId, type: 'switchProject' });
+    },
+    [dispatch]
+  );
 
-  const openContextMenu = (project: ProjectTabSummary, event: MouseEvent) => {
+  const openContextMenu = useCallback((project: ProjectTabSummary, event: MouseEvent) => {
     event.preventDefault();
     setMenuTarget({ project, x: event.clientX, y: event.clientY });
-  };
+  }, []);
+  const createProject = useCallback(() => {
+    flushGenerateDrafts();
+    dispatch({ type: 'createProject' });
+  }, [dispatch]);
+  const showOpenDialog = useCallback(() => setIsOpenDialogVisible(true), []);
+  const hideOpenDialog = useCallback(() => setIsOpenDialogVisible(false), []);
+  const closeMenu = useCallback(() => setMenuTarget(null), []);
+  const closeRenameDialog = useCallback(() => setRenameTarget(null), []);
+  const closeDeleteDialog = useCallback(() => setDeleteTarget(null), []);
+  const startRename = useCallback((project: ProjectTabSummary) => setRenameTarget(project), []);
+  const startDelete = useCallback((project: ProjectTabSummary) => setDeleteTarget(project), []);
+  const closeProjectBySummary = useCallback(
+    (project: ProjectTabSummary) => {
+      const currentProject = getProject(project.id);
+
+      if (currentProject) {
+        closeProject(currentProject);
+      }
+    },
+    [closeProject, getProject]
+  );
+  const renameProject = useCallback(
+    (name: string) => {
+      if (renameTarget) {
+        dispatch({ name, projectId: renameTarget.id, type: 'renameProject' });
+      }
+    },
+    [dispatch, renameTarget]
+  );
+  const confirmDeleteProject = useCallback(async () => {
+    if (deleteTarget) {
+      const currentProject = getProject(deleteTarget.id);
+
+      if (currentProject) {
+        await deleteProject(currentProject);
+      }
+    }
+  }, [deleteProject, deleteTarget, getProject]);
 
   return (
     <>
       <Tabs.Root minW="max-content" variant="subtle" value={activeProjectId} h="full" w="full">
         <Tabs.List flex="1 1 auto" h="full" py="1">
           {projectTabSummaries.map((project) => (
-            <Tabs.Trigger
+            <ProjectTab
               key={project.id}
-              value={project.id}
-              onClick={() => onSwitchProject(project.id)}
-              onContextMenu={(event) => openContextMenu(project, event)}
-              fontSize="xs"
-              h="full"
-            >
-              {project.name}
-              <CloseButton
-                size="2xs"
-                me="-2"
-                as="span"
-                role="button"
-                aria-label={`Close ${project.name}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  const currentProject = getProject(project.id);
-
-                  if (currentProject) {
-                    closeProject(currentProject);
-                  }
-                }}
-              />
-            </Tabs.Trigger>
+              project={project}
+              onCloseProject={closeProjectBySummary}
+              onContextMenu={openContextMenu}
+              onSwitchProject={onSwitchProject}
+            />
           ))}
           <Separator orientation="vertical" h={5} mx="1" alignSelf="center" />
           <Tooltip content="Create new project" showArrow>
@@ -117,10 +146,7 @@ export const ProjectTabs = () => {
               size="xs"
               variant="ghost"
               alignSelf="center"
-              onClick={() => {
-                flushGenerateDrafts();
-                dispatch({ type: 'createProject' });
-              }}
+              onClick={createProject}
             >
               <PlusIcon />
             </IconButton>
@@ -132,7 +158,7 @@ export const ProjectTabs = () => {
               size="xs"
               variant="ghost"
               alignSelf="center"
-              onClick={() => setIsOpenDialogVisible(true)}
+              onClick={showOpenDialog}
             >
               <FolderOpenIcon />
             </IconButton>
@@ -141,45 +167,63 @@ export const ProjectTabs = () => {
       </Tabs.Root>
       <ProjectTabContextMenu
         target={menuTarget}
-        onClose={() => setMenuTarget(null)}
-        onCloseProject={(project) => {
-          const currentProject = getProject(project.id);
-
-          if (currentProject) {
-            closeProject(currentProject);
-          }
-        }}
-        onDelete={(project) => setDeleteTarget(project)}
-        onRename={(project) => setRenameTarget(project)}
+        onClose={closeMenu}
+        onCloseProject={closeProjectBySummary}
+        onDelete={startDelete}
+        onRename={startRename}
       />
       <RenameDialog
         initialName={renameTarget?.name ?? ''}
         isOpen={renameTarget !== null}
-        onClose={() => setRenameTarget(null)}
-        onSubmit={(name) => {
-          if (renameTarget) {
-            dispatch({ name, projectId: renameTarget.id, type: 'renameProject' });
-          }
-        }}
+        onClose={closeRenameDialog}
+        onSubmit={renameProject}
       />
       <ConfirmDialog
         body={`Delete "${deleteTarget?.name ?? ''}"? The project and its saved copy on the server are removed permanently. To keep it in your library, close the tab instead.`}
         confirmLabel="Delete project"
         isOpen={deleteTarget !== null}
         title="Delete project?"
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={async () => {
-          if (deleteTarget) {
-            const currentProject = getProject(deleteTarget.id);
-
-            if (currentProject) {
-              await deleteProject(currentProject);
-            }
-          }
-        }}
+        onClose={closeDeleteDialog}
+        onConfirm={confirmDeleteProject}
       />
-      {isOpenDialogVisible ? <OpenProjectDialog isOpen onClose={() => setIsOpenDialogVisible(false)} /> : null}
+      {isOpenDialogVisible ? <OpenProjectDialog isOpen onClose={hideOpenDialog} /> : null}
     </>
+  );
+};
+
+const ProjectTab = ({
+  onCloseProject,
+  onContextMenu,
+  onSwitchProject,
+  project,
+}: {
+  onCloseProject: (project: ProjectTabSummary) => void;
+  onContextMenu: (project: ProjectTabSummary, event: MouseEvent) => void;
+  onSwitchProject: (projectId: string) => void;
+  project: ProjectTabSummary;
+}) => {
+  const switchProject = useCallback(() => onSwitchProject(project.id), [onSwitchProject, project.id]);
+  const openContextMenu = useCallback((event: MouseEvent) => onContextMenu(project, event), [onContextMenu, project]);
+  const closeProject = useCallback(
+    (event: MouseEvent) => {
+      event.stopPropagation();
+      onCloseProject(project);
+    },
+    [onCloseProject, project]
+  );
+
+  return (
+    <Tabs.Trigger value={project.id} onClick={switchProject} onContextMenu={openContextMenu} fontSize="xs" h="full">
+      {project.name}
+      <CloseButton
+        size="2xs"
+        me="-2"
+        as="span"
+        role="button"
+        aria-label={`Close ${project.name}`}
+        onClick={closeProject}
+      />
+    </Tabs.Trigger>
   );
 };
 
@@ -203,87 +247,116 @@ const ProjectTabContextMenu = ({
 
   targetRef.current = target;
 
-  const openProjectDetails = (projectSummary: ProjectTabSummary) => {
-    const project = store.getState().projects.find((candidate) => candidate.id === projectSummary.id);
+  const positioning = useMemo(
+    () => ({
+      getAnchorRect: () => {
+        const currentTarget = targetRef.current;
 
-    if (!project) {
-      return;
+        return currentTarget ? { height: 1, width: 1, x: currentTarget.x, y: currentTarget.y } : null;
+      },
+      placement: 'bottom-start' as const,
+    }),
+    []
+  );
+
+  const openProjectDetails = useCallback(
+    (projectSummary: ProjectTabSummary) => {
+      const project = store.getState().projects.find((candidate) => candidate.id === projectSummary.id);
+
+      if (!project) {
+        return;
+      }
+
+      flushGenerateDrafts();
+      dispatch({ projectId: project.id, type: 'switchProject' });
+
+      // Reveal the Project panel wherever the project already shows it; default
+      // to enabling it in the right rail. Both actions operate on the active
+      // project, which the switch above just made this one.
+      const { left, right } = project.widgetRegions;
+      const region = right.instanceIds.some((instanceId) => project.widgetInstances[instanceId]?.typeId === 'project')
+        ? 'right'
+        : left.instanceIds.some((instanceId) => project.widgetInstances[instanceId]?.typeId === 'project')
+          ? 'left'
+          : null;
+      const preferredRegions: WidgetRegion[] = [region ?? 'right'];
+
+      openWorkbenchWidget('project', { preferredRegions });
+    },
+    [dispatch, openWorkbenchWidget, store]
+  );
+
+  const handleOpenChange = useCallback(
+    (event: { open: boolean }) => {
+      if (!event.open) {
+        onClose();
+      }
+    },
+    [onClose]
+  );
+  const renameTarget = useCallback(() => {
+    if (targetRef.current) {
+      onRename(targetRef.current.project);
     }
+  }, [onRename]);
+  const showDetails = useCallback(() => {
+    if (targetRef.current) {
+      openProjectDetails(targetRef.current.project);
+    }
+  }, [openProjectDetails]);
+  const exportProject = useCallback(() => {
+    const currentTarget = targetRef.current;
+    const project = currentTarget
+      ? store.getState().projects.find((candidate) => candidate.id === currentTarget.project.id)
+      : null;
 
-    flushGenerateDrafts();
-    dispatch({ projectId: project.id, type: 'switchProject' });
-
-    // Reveal the Project panel wherever the project already shows it; default
-    // to enabling it in the right rail. Both actions operate on the active
-    // project, which the switch above just made this one.
-    const { left, right } = project.widgetRegions;
-    const region = right.instanceIds.some((instanceId) => project.widgetInstances[instanceId]?.typeId === 'project')
-      ? 'right'
-      : left.instanceIds.some((instanceId) => project.widgetInstances[instanceId]?.typeId === 'project')
-        ? 'left'
-        : null;
-    const preferredRegions: WidgetRegion[] = [region ?? 'right'];
-
-    openWorkbenchWidget('project', { preferredRegions });
-  };
+    if (project) {
+      exportOpenProject(project);
+    }
+  }, [store]);
+  const closeTargetProject = useCallback(() => {
+    if (targetRef.current) {
+      onCloseProject(targetRef.current.project);
+    }
+  }, [onCloseProject]);
+  const deleteTargetProject = useCallback(() => {
+    if (targetRef.current) {
+      onDelete(targetRef.current.project);
+    }
+  }, [onDelete]);
 
   return (
     <Menu.Root
       key={target?.project.id ?? 'closed'}
       lazyMount
       open={target !== null}
-      positioning={{
-        getAnchorRect: () => {
-          const currentTarget = targetRef.current;
-
-          return currentTarget ? { height: 1, width: 1, x: currentTarget.x, y: currentTarget.y } : null;
-        },
-        placement: 'bottom-start',
-      }}
+      positioning={positioning}
       unmountOnExit
-      onOpenChange={(event) => {
-        if (!event.open) {
-          onClose();
-        }
-      }}
+      onOpenChange={handleOpenChange}
     >
       <Portal>
         <Menu.Positioner>
           {target ? (
             <MenuContent minW="44">
-              <Menu.Item value="rename" onClick={() => onRename(target.project)}>
+              <Menu.Item value="rename" onClick={renameTarget}>
                 <Icon as={PencilIcon} boxSize="3.5" />
                 Rename…
               </Menu.Item>
-              <Menu.Item value="details" onClick={() => openProjectDetails(target.project)}>
+              <Menu.Item value="details" onClick={showDetails}>
                 <Icon as={FolderCogIcon} boxSize="3.5" />
                 Project details
               </Menu.Item>
-              <Menu.Item
-                value="export"
-                onClick={() => {
-                  const project = store.getState().projects.find((candidate) => candidate.id === target.project.id);
-
-                  if (project) {
-                    exportOpenProject(project);
-                  }
-                }}
-              >
+              <Menu.Item value="export" onClick={exportProject}>
                 <Icon as={FileDownIcon} boxSize="3.5" />
                 Export
               </Menu.Item>
               <Menu.Separator />
-              <Menu.Item value="close" onClick={() => onCloseProject(target.project)}>
+              <Menu.Item value="close" onClick={closeTargetProject}>
                 <Icon as={XIcon} boxSize="3.5" />
                 Close
               </Menu.Item>
               <Menu.Separator />
-              <Menu.Item
-                color="fg.error"
-                value="delete"
-                _hover={{ bg: 'bg.error', color: 'fg.error' }}
-                onClick={() => onDelete(target.project)}
-              >
+              <Menu.Item color="fg.error" value="delete" _hover={deleteMenuItemHover} onClick={deleteTargetProject}>
                 <Icon as={Trash2Icon} boxSize="3.5" />
                 Delete project…
               </Menu.Item>

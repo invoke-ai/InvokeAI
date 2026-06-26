@@ -36,8 +36,10 @@ export const useDebouncedDraftValue = <Value>({
   const flushOnUnmountRef = useRef(flushOnUnmount);
   const onCommitRef = useRef(onCommit);
 
-  flushOnUnmountRef.current = flushOnUnmount;
-  onCommitRef.current = onCommit;
+  useEffect(() => {
+    flushOnUnmountRef.current = flushOnUnmount;
+    onCommitRef.current = onCommit;
+  });
 
   const setDraft = (nextValue: Value) => {
     draftValueRef.current = nextValue;

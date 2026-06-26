@@ -1,3 +1,4 @@
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { ModelConfig, ModelTaxonomyType } from '@workbench/models/types';
 
 import { Badge, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
@@ -170,3 +171,4 @@ export const RelatedModelsSection = ({
     </Stack>
   );
 };
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

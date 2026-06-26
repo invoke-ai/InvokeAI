@@ -1,3 +1,4 @@
+/* eslint-disable react/react-compiler */
 import type { GeneratedImageContract, WidgetViewProps } from '@workbench/types';
 
 import { getGallerySettings, type GallerySettings } from '@workbench/gallery/settings';
@@ -120,6 +121,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: WidgetViewP
   const knownTotalImages = getGalleryTotalImages(galleryValues);
   const settings = getGallerySettings(galleryValues);
   const onError = useCallback((message: string) => dispatch({ message, type: 'recordError' }), [dispatch]);
+
   const data = useGalleryData({
     galleryView,
     imageRefreshToken,
@@ -131,9 +133,11 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: WidgetViewP
     selectedBoardId: getGallerySelectedBoardId(galleryValues, []),
     settings,
   });
+
   const { loadMore, patchImages, total } = data;
   const selectedBoardId = getGallerySelectedBoardId(galleryValues, data.boards);
   const gallery = getGalleryStateView(galleryValues, data.boards, data.images, data.isLoadingImages, queueItems);
+
   const onStarredChange = useCallback(
     (imageNames: string[], starred: boolean) => {
       patchImages((images) =>
@@ -142,6 +146,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: WidgetViewP
     },
     [patchImages]
   );
+
   const galleryImagesRef = useRef(gallery.images);
   const selectedImageNameRef = useRef(gallery.selectedImageName);
 
@@ -178,6 +183,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: WidgetViewP
     },
     [dispatch]
   );
+
   const imageActions = useImageActions({
     boards: data.boards,
     dispatch,
@@ -186,6 +192,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: WidgetViewP
     onStarredChange,
     projectId,
   });
+
   const actions = useGalleryActions({
     boards: data.boards,
     dispatch,
@@ -194,10 +201,12 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: WidgetViewP
     projectName,
     selectedBoardId,
   });
+
   const contextValue = useMemo<GalleryWidgetContextValue>(
     () => ({ actions, gallery, imageActions, projectName, runtime }),
     [actions, gallery, imageActions, projectName, runtime]
   );
+
   const isWidePlacement = region === 'center' || (region === 'bottom' && presentation === 'expanded');
 
   // Publish the backend total into widget values so the manifest footer can

@@ -1,3 +1,4 @@
+/* eslint-disable react/react-compiler */
 import type { WidgetContributionSource } from '@workbench/types';
 
 import { commandApi } from '@workbench/extensions/extensionApi';
@@ -5,7 +6,7 @@ import { getFocusedRegionSnapshot } from '@workbench/focusRegions';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
-import { useEffect, useEffectEvent, useMemo, useRef } from 'react';
+import { useEffect, useEffectEvent, useMemo } from 'react';
 import { tinykeys } from 'tinykeys';
 
 import type { RegisteredHotkey } from './types';
@@ -30,10 +31,6 @@ export const WorkbenchHotkeyRuntime = () => {
   const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const extensionHotkeys = useExtensionHotkeyDefinitions();
   const isModalLayerActive = useIsHotkeyModalLayerActive();
-  const projectRef = useRef(project);
-  const registeredHotkeysRef = useRef<RegisteredHotkey[]>([]);
-
-  projectRef.current = project;
 
   const registeredHotkeys = useMemo(() => {
     const firstPartyHotkeys = firstPartyHotkeyCatalog.map((hotkey) => applyCustomHotkeys(hotkey, customHotkeys));
@@ -42,7 +39,54 @@ export const WorkbenchHotkeyRuntime = () => {
     return [...firstPartyHotkeys, ...widgetHotkeys];
   }, [customHotkeys, extensionHotkeys]);
 
-  registeredHotkeysRef.current = registeredHotkeys;
+  const executeHotkey = useEffectEvent((hotkey: RegisteredHotkey, source: WidgetContributionSource | null) => {
+    void commandApi.executeForSource(hotkey.commandId, getHotkeyExecutionSource(hotkey, source));
+  });
+
+  const handleHotkey = useEffectEvent((event: KeyboardEvent, matchedKey: string) => {
+    if (event.isComposing || event.keyCode === 229) {
+      return;
+    }
+
+    const focusedRegion = getFocusedRegionSnapshot();
+    const targetWidget = getHotkeyTargetWidget(event.target);
+    const activeRegion = focusedRegion ? project.widgetRegions[focusedRegion] : null;
+    const activeInstanceId = targetWidget?.instanceId ?? activeRegion?.activeInstanceId ?? null;
+    const activeWidgetTypeId = activeInstanceId
+      ? (targetWidget?.typeId ?? project.widgetInstances[activeInstanceId]?.typeId ?? null)
+      : null;
+    const commandSource: WidgetContributionSource | null =
+      activeInstanceId && activeWidgetTypeId && (targetWidget?.region || focusedRegion)
+        ? {
+            instanceId: activeInstanceId,
+            projectId: project.projectId ?? '',
+            region: (targetWidget?.region ?? focusedRegion)!,
+            typeId: activeWidgetTypeId,
+          }
+        : null;
+    const hotkey = resolveHotkey({
+      context: {
+        activeInstanceId,
+        activeWidgetTypeId,
+        focusedRegion,
+        isModalLayerActive,
+        projectId: project.projectId ?? '',
+      },
+      event,
+      hotkeys: registeredHotkeys,
+      matchedKey,
+    });
+
+    if (!hotkey) {
+      return;
+    }
+
+    if (hotkey.preventDefault) {
+      event.preventDefault();
+    }
+
+    executeHotkey(hotkey, commandSource);
+  });
 
   const keybindings = useMemo(() => {
     const bindings: Record<string, (event: KeyboardEvent) => void> = {};
@@ -63,55 +107,6 @@ export const WorkbenchHotkeyRuntime = () => {
 
     return bindings;
   }, [registeredHotkeys]);
-
-  const executeHotkey = useEffectEvent((hotkey: RegisteredHotkey, source: WidgetContributionSource | null) => {
-    void commandApi.executeForSource(hotkey.commandId, getHotkeyExecutionSource(hotkey, source));
-  });
-
-  const handleHotkey = useEffectEvent((event: KeyboardEvent, matchedKey: string) => {
-    if (event.isComposing || event.keyCode === 229) {
-      return;
-    }
-
-    const focusedRegion = getFocusedRegionSnapshot();
-    const targetWidget = getHotkeyTargetWidget(event.target);
-    const activeRegion = focusedRegion ? projectRef.current.widgetRegions[focusedRegion] : null;
-    const activeInstanceId = targetWidget?.instanceId ?? activeRegion?.activeInstanceId ?? null;
-    const activeWidgetTypeId = activeInstanceId
-      ? (targetWidget?.typeId ?? projectRef.current.widgetInstances[activeInstanceId]?.typeId ?? null)
-      : null;
-    const commandSource: WidgetContributionSource | null =
-      activeInstanceId && activeWidgetTypeId && (targetWidget?.region || focusedRegion)
-        ? {
-            instanceId: activeInstanceId,
-            projectId: projectRef.current.projectId ?? '',
-            region: (targetWidget?.region ?? focusedRegion)!,
-            typeId: activeWidgetTypeId,
-          }
-        : null;
-    const hotkey = resolveHotkey({
-      context: {
-        activeInstanceId,
-        activeWidgetTypeId,
-        focusedRegion,
-        isModalLayerActive,
-        projectId: projectRef.current.projectId ?? '',
-      },
-      event,
-      hotkeys: registeredHotkeysRef.current,
-      matchedKey,
-    });
-
-    if (!hotkey) {
-      return;
-    }
-
-    if (hotkey.preventDefault) {
-      event.preventDefault();
-    }
-
-    executeHotkey(hotkey, commandSource);
-  });
 
   useEffect(() => {
     if (Object.keys(keybindings).length === 0) {

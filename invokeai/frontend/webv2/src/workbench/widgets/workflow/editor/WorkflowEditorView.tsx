@@ -1,3 +1,4 @@
+/* eslint-disable react/react-compiler */
 import type { WidgetRuntimeApi } from '@workbench/types';
 import type { XYPosition } from '@workbench/workflows/types';
 
@@ -270,15 +271,18 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
     [flowNodes]
   );
 
-  const copyNodes = (nodeId?: string) => {
-    const copiedCount = copyNodesToClipboard(projectGraph, getActionNodeIds(nodeId));
+  const copyNodes = useCallback(
+    (nodeId?: string) => {
+      const copiedCount = copyNodesToClipboard(projectGraph, getActionNodeIds(nodeId));
 
-    if (copiedCount > 0) {
-      notify.success(`Copied ${copiedCount} node${copiedCount === 1 ? '' : 's'}`);
-    }
-  };
+      if (copiedCount > 0) {
+        notify.success(`Copied ${copiedCount} node${copiedCount === 1 ? '' : 's'}`);
+      }
+    },
+    [getActionNodeIds, notify, projectGraph]
+  );
 
-  const pasteNodes = () => {
+  const pasteNodes = useCallback(() => {
     const { edges, nodes } = buildPasteElements();
 
     if (nodes.length === 0) {
@@ -287,30 +291,39 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
 
     pendingSelectionRef.current = nodes.map((node) => node.id);
     dispatch({ action: { edges, nodes, type: 'addGraphElements' }, type: 'applyProjectGraphAction' });
-  };
+  }, [dispatch]);
 
-  const duplicateNodes = (nodeId?: string) => {
-    const { edges, nodes } = buildDuplicateElements(projectGraph, getActionNodeIds(nodeId));
+  const duplicateNodes = useCallback(
+    (nodeId?: string) => {
+      const { edges, nodes } = buildDuplicateElements(projectGraph, getActionNodeIds(nodeId));
 
-    if (nodes.length === 0) {
-      return;
-    }
+      if (nodes.length === 0) {
+        return;
+      }
 
-    pendingSelectionRef.current = nodes.map((node) => node.id);
-    dispatch({ action: { edges, nodes, type: 'addGraphElements' }, type: 'applyProjectGraphAction' });
-  };
+      pendingSelectionRef.current = nodes.map((node) => node.id);
+      dispatch({ action: { edges, nodes, type: 'addGraphElements' }, type: 'applyProjectGraphAction' });
+    },
+    [dispatch, getActionNodeIds, projectGraph]
+  );
 
-  const deleteNodes = (nodeId?: string) => {
-    const nodeIds = getActionNodeIds(nodeId);
+  const deleteNodes = useCallback(
+    (nodeId?: string) => {
+      const nodeIds = getActionNodeIds(nodeId);
 
-    if (nodeIds.length > 0) {
-      dispatch({ action: { nodeIds, type: 'removeNodes' }, type: 'applyProjectGraphAction' });
-    }
-  };
+      if (nodeIds.length > 0) {
+        dispatch({ action: { nodeIds, type: 'removeNodes' }, type: 'applyProjectGraphAction' });
+      }
+    },
+    [dispatch, getActionNodeIds]
+  );
 
-  const addConnector = (position: XYPosition) => {
-    dispatch({ action: { node: buildConnectorNode(position), type: 'addNode' }, type: 'applyProjectGraphAction' });
-  };
+  const addConnector = useCallback(
+    (position: XYPosition) => {
+      dispatch({ action: { node: buildConnectorNode(position), type: 'addNode' }, type: 'applyProjectGraphAction' });
+    },
+    [dispatch]
+  );
 
   const selectAll = () => {
     selectNodes(projectGraph.nodes.map((node) => node.id));
@@ -658,6 +671,43 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
     }),
     [nodeOpacity, tool]
   );
+  const panOnDrag = useMemo(() => (tool === 'pan' ? true : [1, 2]), [tool]);
+  const proOptions = useMemo(() => ({ hideAttribution: true }), []);
+  const flowStyle = useMemo(() => ({ background: 'transparent' }), []);
+  const onContextMenuAddConnector = useCallback(
+    (position: XYPosition) => {
+      addConnector(position);
+      setContextMenu(null);
+    },
+    [addConnector]
+  );
+  const onContextMenuClose = useCallback(() => setContextMenu(null), []);
+  const onContextMenuCopy = useCallback(() => {
+    copyNodes(contextMenu?.kind === 'node' ? contextMenu.nodeId : undefined);
+    setContextMenu(null);
+  }, [contextMenu, copyNodes]);
+  const onContextMenuDelete = useCallback(() => {
+    deleteNodes(contextMenu?.kind === 'node' ? contextMenu.nodeId : undefined);
+    setContextMenu(null);
+  }, [contextMenu, deleteNodes]);
+  const onContextMenuDuplicate = useCallback(() => {
+    duplicateNodes(contextMenu?.kind === 'node' ? contextMenu.nodeId : undefined);
+    setContextMenu(null);
+  }, [contextMenu, duplicateNodes]);
+  const onContextMenuPaste = useCallback(() => {
+    pasteNodes();
+    setContextMenu(null);
+  }, [pasteNodes]);
+  const onContextMenuToggleOpen = useCallback(() => {
+    if (contextMenu?.kind === 'node' && contextMenu.nodeId && contextMenu.isNodeOpen !== null) {
+      dispatch({
+        action: { isOpen: !contextMenu.isNodeOpen, nodeId: contextMenu.nodeId, type: 'setNodeIsOpen' },
+        type: 'applyProjectGraphAction',
+      });
+    }
+
+    setContextMenu(null);
+  }, [contextMenu, dispatch]);
 
   return (
     <Box
@@ -683,13 +733,13 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
         minZoom={0.1}
         nodes={flowNodes}
         nodeTypes={nodeTypes}
-        panOnDrag={tool === 'pan' ? true : [1, 2]}
-        proOptions={{ hideAttribution: true }}
+        panOnDrag={panOnDrag}
+        proOptions={proOptions}
         selectionMode={SelectionMode.Partial}
         selectionOnDrag={tool === 'box-select'}
         snapGrid={SNAP_GRID}
         snapToGrid={workflowSnapToGrid || isSnapHeld}
-        style={{ background: 'transparent' }}
+        style={flowStyle}
         onConnect={onConnect}
         onConnectEnd={onConnectEnd}
         onEdgeClick={onEdgeClick}
@@ -724,37 +774,13 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
       <NodeContextMenu
         canPaste={hasClipboardNodes}
         menuState={contextMenu}
-        onAddConnector={(position) => {
-          addConnector(position);
-          setContextMenu(null);
-        }}
-        onClose={() => setContextMenu(null)}
-        onCopy={() => {
-          copyNodes(contextMenu?.kind === 'node' ? contextMenu.nodeId : undefined);
-          setContextMenu(null);
-        }}
-        onDelete={() => {
-          deleteNodes(contextMenu?.kind === 'node' ? contextMenu.nodeId : undefined);
-          setContextMenu(null);
-        }}
-        onDuplicate={() => {
-          duplicateNodes(contextMenu?.kind === 'node' ? contextMenu.nodeId : undefined);
-          setContextMenu(null);
-        }}
-        onPaste={() => {
-          pasteNodes();
-          setContextMenu(null);
-        }}
-        onToggleOpen={() => {
-          if (contextMenu?.kind === 'node' && contextMenu.nodeId && contextMenu.isNodeOpen !== null) {
-            dispatch({
-              action: { isOpen: !contextMenu.isNodeOpen, nodeId: contextMenu.nodeId, type: 'setNodeIsOpen' },
-              type: 'applyProjectGraphAction',
-            });
-          }
-
-          setContextMenu(null);
-        }}
+        onAddConnector={onContextMenuAddConnector}
+        onClose={onContextMenuClose}
+        onCopy={onContextMenuCopy}
+        onDelete={onContextMenuDelete}
+        onDuplicate={onContextMenuDuplicate}
+        onPaste={onContextMenuPaste}
+        onToggleOpen={onContextMenuToggleOpen}
       />
     </Box>
   );

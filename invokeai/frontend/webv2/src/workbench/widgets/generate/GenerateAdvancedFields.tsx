@@ -1,3 +1,4 @@
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { GenerateModelConfig, GenerateSettings, VaePrecision } from '@workbench/generation/types';
 import type { ChangeEvent } from 'react';
 

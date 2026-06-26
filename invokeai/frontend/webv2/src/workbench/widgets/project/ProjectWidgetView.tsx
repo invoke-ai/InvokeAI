@@ -13,7 +13,9 @@ import {
   useWorkbenchSelector,
 } from '@workbench/WorkbenchContext';
 import { ArrowRightIcon, CopyIcon, History as HistoryIcon, Trash2Icon } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
+
+const RECOVERY_DELETE_HOVER = { color: 'fg.error' } as const;
 
 /**
  * The Project panel: rename the active project, see its sync/debug details,
@@ -53,13 +55,25 @@ type ProjectPanelViewModel = Pick<
 const NameSection = ({ project }: { project: ProjectPanelViewModel }) => {
   const dispatch = useWorkbenchDispatch();
 
-  const commitName = (value: string) => {
-    const name = value.trim();
+  const commitName = useCallback(
+    (value: string) => {
+      const name = value.trim();
 
-    if (name && name !== project.name) {
-      dispatch({ name, projectId: project.id, type: 'renameProject' });
+      if (name && name !== project.name) {
+        dispatch({ name, projectId: project.id, type: 'renameProject' });
+      }
+    },
+    [dispatch, project.id, project.name]
+  );
+  const handleBlur = useCallback(
+    (event: React.FocusEvent<HTMLInputElement>) => commitName(event.currentTarget.value),
+    [commitName]
+  );
+  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.currentTarget.blur();
     }
-  };
+  }, []);
 
   return (
     <Field helpText="Saved with the project." label="Project name">
@@ -67,12 +81,8 @@ const NameSection = ({ project }: { project: ProjectPanelViewModel }) => {
         defaultValue={project.name}
         key={`${project.id}:${project.name}`}
         size="sm"
-        onBlur={(event) => commitName(event.currentTarget.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            event.currentTarget.blur();
-          }
-        }}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
       />
     </Field>
   );
@@ -101,6 +111,18 @@ const RecoverySection = ({ project }: { project: ProjectPanelViewModel }) => {
   const recoveries = projects.filter(
     (candidate) => candidate.id !== project.id && getRecoveryRootId(candidate) === rootId && candidate.recoveryOf
   );
+  const handleOpenOriginal = useCallback(() => {
+    if (original) {
+      flushGenerateDrafts();
+      dispatch({ projectId: original.id, type: 'switchProject' });
+    }
+  }, [dispatch, original]);
+  const handleCloseDeleteDialog = useCallback(() => setDeleteTarget(null), []);
+  const handleConfirmDelete = useCallback(async () => {
+    if (deleteTarget) {
+      await deleteProject(deleteTarget);
+    }
+  }, [deleteProject, deleteTarget]);
 
   if (!project.recoveryOf && recoveries.length === 0) {
     return null;
@@ -123,16 +145,7 @@ const RecoverySection = ({ project }: { project: ProjectPanelViewModel }) => {
             </Stack>
           </HStack>
           {original ? (
-            <Button
-              mt="2"
-              size="2xs"
-              variant="outline"
-              w="full"
-              onClick={() => {
-                flushGenerateDrafts();
-                dispatch({ projectId: original.id, type: 'switchProject' });
-              }}
-            >
+            <Button mt="2" size="2xs" variant="outline" w="full" onClick={handleOpenOriginal}>
               <ArrowRightIcon />
               Open original "{original.name}"
             </Button>
@@ -140,52 +153,58 @@ const RecoverySection = ({ project }: { project: ProjectPanelViewModel }) => {
         </Panel>
       ) : null}
       {recoveries.map((recovery) => (
-        <Panel key={recovery.id} alignItems="center" flexDirection="row" gap="2" p="2">
-          <Stack flex="1" gap="0" minW="0">
-            <Text fontSize="xs" fontWeight="600" truncate>
-              {recovery.name}
-            </Text>
-            <Text color="fg.muted" fontSize="2xs">
-              {formatTimestamp(recovery.recoveredAt)}
-            </Text>
-          </Stack>
-          <IconButton
-            aria-label={`Open ${recovery.name}`}
-            color="fg.muted"
-            size="2xs"
-            variant="ghost"
-            onClick={() => {
-              flushGenerateDrafts();
-              dispatch({ projectId: recovery.id, type: 'switchProject' });
-            }}
-          >
-            <ArrowRightIcon />
-          </IconButton>
-          <IconButton
-            aria-label={`Delete ${recovery.name}`}
-            color="fg.muted"
-            size="2xs"
-            variant="ghost"
-            _hover={{ color: 'fg.error' }}
-            onClick={() => setDeleteTarget(recovery)}
-          >
-            <Trash2Icon />
-          </IconButton>
-        </Panel>
+        <RecoveryRow key={recovery.id} recovery={recovery} onDelete={setDeleteTarget} />
       ))}
       <ConfirmDialog
         body={`Delete "${deleteTarget?.name ?? ''}"? The recovery copy is removed permanently.`}
         confirmLabel="Delete recovery"
         isOpen={deleteTarget !== null}
         title="Delete recovery?"
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={async () => {
-          if (deleteTarget) {
-            await deleteProject(deleteTarget);
-          }
-        }}
+        onClose={handleCloseDeleteDialog}
+        onConfirm={handleConfirmDelete}
       />
     </Stack>
+  );
+};
+
+const RecoveryRow = ({
+  recovery,
+  onDelete,
+}: {
+  recovery: Project;
+  onDelete: React.Dispatch<React.SetStateAction<Project | null>>;
+}) => {
+  const dispatch = useWorkbenchDispatch();
+  const handleOpen = useCallback(() => {
+    flushGenerateDrafts();
+    dispatch({ projectId: recovery.id, type: 'switchProject' });
+  }, [dispatch, recovery.id]);
+  const handleDelete = useCallback(() => onDelete(recovery), [onDelete, recovery]);
+
+  return (
+    <Panel alignItems="center" flexDirection="row" gap="2" p="2">
+      <Stack flex="1" gap="0" minW="0">
+        <Text fontSize="xs" fontWeight="600" truncate>
+          {recovery.name}
+        </Text>
+        <Text color="fg.muted" fontSize="2xs">
+          {formatTimestamp(recovery.recoveredAt)}
+        </Text>
+      </Stack>
+      <IconButton aria-label={`Open ${recovery.name}`} color="fg.muted" size="2xs" variant="ghost" onClick={handleOpen}>
+        <ArrowRightIcon />
+      </IconButton>
+      <IconButton
+        aria-label={`Delete ${recovery.name}`}
+        color="fg.muted"
+        size="2xs"
+        variant="ghost"
+        _hover={RECOVERY_DELETE_HOVER}
+        onClick={handleDelete}
+      >
+        <Trash2Icon />
+      </IconButton>
+    </Panel>
   );
 };
 
@@ -202,14 +221,15 @@ const DetailsSection = ({ project }: { project: ProjectPanelViewModel }) => {
         ? 'Waiting to sync'
         : `Synced (revision ${projectSync.revision ?? '—'})`;
 
-  const copyId = async () => {
+  const copyId = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(project.id);
       notify.success('Project id copied');
     } catch {
       notify.error('Could not copy', 'Clipboard access was blocked by the browser.');
     }
-  };
+  }, [notify, project.id]);
+  const handleCopyId = useCallback(() => void copyId(), [copyId]);
 
   return (
     <Stack gap="2">
@@ -220,13 +240,7 @@ const DetailsSection = ({ project }: { project: ProjectPanelViewModel }) => {
             <Text fontFamily="mono" fontSize="2xs" truncate>
               {project.id}
             </Text>
-            <IconButton
-              aria-label="Copy project id"
-              color="fg.muted"
-              size="2xs"
-              variant="ghost"
-              onClick={() => void copyId()}
-            >
+            <IconButton aria-label="Copy project id" color="fg.muted" size="2xs" variant="ghost" onClick={handleCopyId}>
               <CopyIcon />
             </IconButton>
           </HStack>

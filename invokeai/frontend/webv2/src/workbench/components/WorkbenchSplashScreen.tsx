@@ -2,6 +2,8 @@ import splashImageUrl from '@assets/SplashImage.webp';
 import { Box, Flex, Heading, HStack, Spinner, Text, VStack } from '@chakra-ui/react';
 import { InvokeMark } from '@workbench/components/InvokeMark';
 
+const splashImageStyle = { backgroundPosition: 'center', backgroundSize: 'cover' } as const;
+
 export const WorkbenchSplashScreen = ({ message = 'Loading workspace' }: { message?: string }) => (
   <Flex align="center" aria-busy="true" bg="bg" color="fg" h="100vh" justify="center" role="status" w="100vw">
     <Box
@@ -14,13 +16,7 @@ export const WorkbenchSplashScreen = ({ message = 'Loading workspace' }: { messa
       shadow="sm"
     >
       <HStack align="stretch" gap="8">
-        <Box
-          aspectRatio="1/1"
-          p="14"
-          bgImage={`url(${splashImageUrl})`}
-          rounded="xl"
-          style={{ backgroundPosition: 'center', backgroundSize: 'cover' }}
-        >
+        <Box aspectRatio="1/1" p="14" bgImage={`url(${splashImageUrl})`} rounded="xl" style={splashImageStyle}>
           <InvokeMark size={164} />
         </Box>
         <VStack align="start" flex="1" minH="full" minW="80" textAlign="start" py="2">

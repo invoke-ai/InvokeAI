@@ -3,7 +3,7 @@ import { Scrollable, Tabs } from '@workbench/components/ui';
 import { useActiveProjectSelector, useWidgetValuesSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { ensureInvocationTemplatesLoaded } from '@workbench/workflows/templates';
 import { EyeIcon, PencilIcon } from 'lucide-react';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 
 import { FormBuilderTab } from './FormBuilderTab';
 import { LinearFormView } from './LinearFormView';
@@ -20,12 +20,21 @@ import { WorkflowJsonTab } from './WorkflowJsonTab';
 
 type PanelMode = 'view' | 'edit';
 type EditTab = 'form' | 'details' | 'json';
+type PanelModeItem = {
+  label: string;
+  icon: typeof EyeIcon;
+  mode: PanelMode;
+};
 
 /** Inspector share of the splitter, as a percentage of the panel height. */
 const DEFAULT_INSPECTOR_SIZE_PCT = 35;
 const SPLITTER_PANELS = [
   { id: 'content', minSize: 25 },
   { id: 'inspector', minSize: 12 },
+];
+const PANEL_MODES: PanelModeItem[] = [
+  { label: 'View', icon: EyeIcon, mode: 'view' },
+  { label: 'Edit', icon: PencilIcon, mode: 'edit' },
 ];
 
 export interface WorkflowPanelState {
@@ -54,30 +63,14 @@ export const areWorkflowPanelStatesEqual = (left: WorkflowPanelState, right: Wor
   left.mode === right.mode && left.editTab === right.editTab && left.inspectorSizePct === right.inspectorSizePct;
 
 const PanelModeToggle = ({ mode, onChange }: { mode: PanelMode; onChange: (mode: PanelMode) => void }) => {
-  type PanelModeItem = {
-    label: string;
-    icon: typeof EyeIcon;
-    mode: PanelMode;
-  };
-
-  const PANEL_MODES: PanelModeItem[] = [
-    {
-      label: 'View',
-      icon: EyeIcon,
-      mode: 'view',
+  const onValueChange = useCallback(
+    (details: { value: string | null }) => {
+      if (details.value === 'view' || details.value === 'edit') {
+        onChange(details.value);
+      }
     },
-    {
-      label: 'Edit',
-      icon: PencilIcon,
-      mode: 'edit',
-    },
-  ];
-
-  const onValueChange = (details: { value: string | null }) => {
-    if (details.value === 'view' || details.value === 'edit') {
-      onChange(details.value);
-    }
-  };
+    [onChange]
+  );
 
   return (
     <SegmentGroup.Root value={mode} onValueChange={onValueChange} size="xs">
@@ -105,21 +98,22 @@ export const WorkflowLinearPanel = () => {
     ensureInvocationTemplatesLoaded();
   }, []);
 
-  const patchValues = (values: Record<string, unknown>) =>
-    dispatch({ type: 'patchWidgetValues', values, widgetId: 'workflow' });
+  const patchValues = useCallback(
+    (values: Record<string, unknown>) => dispatch({ type: 'patchWidgetValues', values, widgetId: 'workflow' }),
+    [dispatch]
+  );
+  const onPanelModeChange = useCallback((panelMode: PanelMode) => patchValues({ panelMode }), [patchValues]);
+  const onEditTabChange = useCallback(
+    (event: { value: string }) => patchValues({ editTab: event.value }),
+    [patchValues]
+  );
 
   return (
     <Flex direction="column" flex="1" h="full" minH="0">
       <HStack flexShrink={0} justify="space-between" px="2" h={10} borderBottomWidth={1}>
-        <PanelModeToggle mode={mode} onChange={(panelMode) => patchValues({ panelMode })} />
+        <PanelModeToggle mode={mode} onChange={onPanelModeChange} />
         {mode === 'edit' ? (
-          <Tabs.Root
-            size="sm"
-            value={editTab}
-            variant="outline"
-            mb="-1"
-            onValueChange={(event) => patchValues({ editTab: event.value })}
-          >
+          <Tabs.Root size="sm" value={editTab} variant="outline" mb="-1" onValueChange={onEditTabChange}>
             <Tabs.List>
               <Tabs.Trigger value="form" fontSize="2xs">
                 Form
@@ -163,22 +157,27 @@ const WorkflowLinearEditContent = ({
   patchValues: (values: Record<string, unknown>) => void;
 }) => {
   const projectGraph = useActiveProjectSelector((project) => project.projectGraph);
+  const defaultSize = useMemo(() => [100 - inspectorSizePct, inspectorSizePct], [inspectorSizePct]);
+  const onResizeEnd = useCallback(
+    (details: { size: number[] }) => {
+      const inspectorSizePct = details.size[1];
+
+      if (typeof inspectorSizePct === 'number') {
+        patchValues({ inspectorSizePct });
+      }
+    },
+    [patchValues]
+  );
 
   return (
     <Splitter.Root
-      defaultSize={[100 - inspectorSizePct, inspectorSizePct]}
+      defaultSize={defaultSize}
       flex="1"
       gap="0"
       minH="0"
       orientation="vertical"
       panels={SPLITTER_PANELS}
-      onResizeEnd={(details) => {
-        const inspectorSizePct = details.size[1];
-
-        if (typeof inspectorSizePct === 'number') {
-          patchValues({ inspectorSizePct });
-        }
-      }}
+      onResizeEnd={onResizeEnd}
     >
       <Splitter.Panel id="content" minH="0" minW="0" overflow="hidden">
         {editTab === 'json' ? (

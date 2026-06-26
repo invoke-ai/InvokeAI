@@ -16,14 +16,14 @@ const ModelManagerView = lazy(() =>
   import('@workbench/launchpad/models/ModelManagerView').then((module) => ({ default: module.ModelManagerView }))
 );
 
+const FALLBACK = (
+  <Center h="full">
+    <Spinner color="fg.muted" size="sm" />
+  </Center>
+);
+
 export const ModelsPage = () => (
-  <Suspense
-    fallback={
-      <Center h="full">
-        <Spinner color="fg.muted" size="sm" />
-      </Center>
-    }
-  >
+  <Suspense fallback={FALLBACK}>
     <ModelManagerView />
   </Suspense>
 );

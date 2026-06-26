@@ -6,7 +6,7 @@ import { addCustomNodeInstallLogEntry } from '@workbench/customNodes/installLogS
 import { refreshCustomNodePacks, useCustomNodesSelector } from '@workbench/customNodes/nodesStore';
 import { updateNodesUi, useNodesUiSelector, type AddNodesTab } from '@workbench/customNodes/nodesUiStore';
 import { FolderOpenIcon, GitBranchIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 
 /**
  * Every way to add custom nodes, one sub-tab per source — Git URL install and
@@ -16,14 +16,14 @@ import { useState } from 'react';
 export const AddNodesView = () => {
   const addTab = useNodesUiSelector((snapshot) => snapshot.addTab);
   const customNodesPath = useCustomNodesSelector((snapshot) => snapshot.customNodesPath);
+  const handleValueChange = useCallback(
+    (event: { value: string }) => updateNodesUi({ addTab: event.value as AddNodesTab }),
+    []
+  );
 
   return (
     <Stack gap="3" h="full" minH="0">
-      <Tabs.Root
-        size="sm"
-        value={addTab}
-        onValueChange={(event) => updateNodesUi({ addTab: event.value as AddNodesTab })}
-      >
+      <Tabs.Root size="sm" value={addTab} onValueChange={handleValueChange}>
         <Tabs.List>
           <Tabs.Trigger fontSize="xs" value="git">
             <Icon as={GitBranchIcon} boxSize="3" />
@@ -47,7 +47,7 @@ const InstallFromGitForm = () => {
   const [isInstalling, setIsInstalling] = useState(false);
   const trimmedSource = source.trim();
 
-  const handleInstall = async () => {
+  const handleInstall = useCallback(async () => {
     if (!trimmedSource) {
       return;
     }
@@ -82,7 +82,21 @@ const InstallFromGitForm = () => {
     } finally {
       setIsInstalling(false);
     }
-  };
+  }, [trimmedSource]);
+  const handleSourceChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => setSource(event.currentTarget.value),
+    []
+  );
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        void handleInstall();
+      }
+    },
+    [handleInstall]
+  );
+  const handleInstallClick = useCallback(() => void handleInstall(), [handleInstall]);
 
   return (
     <Stack gap="4" maxW="44rem">
@@ -101,15 +115,10 @@ const InstallFromGitForm = () => {
             placeholder="https://github.com/owner/invokeai-node-pack.git"
             size="sm"
             value={source}
-            onChange={(event) => setSource(event.currentTarget.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                void handleInstall();
-              }
-            }}
+            onChange={handleSourceChange}
+            onKeyDown={handleKeyDown}
           />
-          <Button disabled={!trimmedSource} loading={isInstalling} size="sm" onClick={() => void handleInstall()}>
+          <Button disabled={!trimmedSource} loading={isInstalling} size="sm" onClick={handleInstallClick}>
             Install
           </Button>
         </HStack>

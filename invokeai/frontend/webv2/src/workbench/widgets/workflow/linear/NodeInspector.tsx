@@ -12,6 +12,7 @@ import { workflowSelectionStore } from '@workbench/widgets/workflow/editor/selec
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { useInvocationTemplatesSelector } from '@workbench/workflows/templates';
+import { useCallback } from 'react';
 
 /**
  * Edit-mode inspector for the editor's selected node, with the legacy tab
@@ -41,6 +42,14 @@ const JsonBlock = ({ label, value }: { label: string; value: unknown }) => <Json
 
 const DetailsTab = ({ node, template }: { node: WorkflowInvocationNode; template: InvocationTemplate | undefined }) => {
   const dispatch = useWorkbenchDispatch();
+  const onNotesChange = useCallback(
+    (event: ChangeEvent<HTMLTextAreaElement>) =>
+      dispatch({
+        action: { nodeId: node.id, notes: event.currentTarget.value, type: 'setNodeNotes' },
+        type: 'applyProjectGraphAction',
+      }),
+    [dispatch, node.id]
+  );
 
   return (
     <Stack gap="2">
@@ -62,12 +71,7 @@ const DetailsTab = ({ node, template }: { node: WorkflowInvocationNode; template
           resize="vertical"
           size="xs"
           value={node.data.notes}
-          onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
-            dispatch({
-              action: { nodeId: node.id, notes: event.currentTarget.value, type: 'setNodeNotes' },
-              type: 'applyProjectGraphAction',
-            })
-          }
+          onChange={onNotesChange}
         />
       </Stack>
     </Stack>
@@ -133,6 +137,11 @@ export const NodeInspector = ({ projectGraph }: { projectGraph: ProjectGraphStat
   const selectedNodeIds = workflowSelectionStore.useSelector((snapshot) => snapshot.selectedNodeIds);
   const tab = getInspectorTab(workflowWidgetValues);
   const selectedNode = projectGraph.nodes.find((node) => node.id === selectedNodeIds[0]);
+  const onTabValueChange = useCallback(
+    (event: { value: string }) =>
+      dispatch({ type: 'patchWidgetValues', values: { inspectorTab: event.value }, widgetId: 'workflow' }),
+    [dispatch]
+  );
 
   return (
     <Flex direction="column" h="full" minH="0">
@@ -140,15 +149,7 @@ export const NodeInspector = ({ projectGraph }: { projectGraph: ProjectGraphStat
         <Text color="fg.muted" fontSize="2xs" fontWeight="600" textTransform="uppercase">
           Node Inspector
         </Text>
-        <Tabs.Root
-          size="sm"
-          value={tab}
-          variant="outline"
-          mb="-1"
-          onValueChange={(event) =>
-            dispatch({ type: 'patchWidgetValues', values: { inspectorTab: event.value }, widgetId: 'workflow' })
-          }
-        >
+        <Tabs.Root size="sm" value={tab} variant="outline" mb="-1" onValueChange={onTabValueChange}>
           <Tabs.List>
             {(['details', 'outputs', 'data', 'template'] as const).map((value) => (
               <Tabs.Trigger key={value} fontSize="2xs" textTransform="capitalize" value={value}>

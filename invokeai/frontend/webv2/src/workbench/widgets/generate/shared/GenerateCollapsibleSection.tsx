@@ -9,12 +9,14 @@ type Props = {
   children: React.ReactNode;
 };
 
+const COLLAPSIBLE_INDICATOR_OPEN_STYLES = { transform: 'rotate(90deg)' };
+
 export const GenerateCollapsibleSection = ({ label, defaultOpen, isOpen, children, badges }: Props) => {
   return (
     <Collapsible.Root defaultOpen={defaultOpen} open={isOpen} bg="bg.muted/50" rounded="md" overflow="hidden">
       <Collapsible.Trigger display="flex" gap={2} w="full" px={2} h="8" alignItems="center">
         <Collapsible.Indicator
-          _open={{ transform: 'rotate(90deg)' }}
+          _open={COLLAPSIBLE_INDICATOR_OPEN_STYLES}
           transition="transform var(--wb-motion-duration-slow)"
         >
           <ChevronRightIcon size="14" />

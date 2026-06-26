@@ -6,9 +6,18 @@ import { getGallerySettings } from '@workbench/gallery/settings';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
+import { useCallback } from 'react';
 
 import { getGalleryPage, getGalleryTotalImages } from './galleryStateView';
 import { GALLERY_PAGE_SIZE } from './useGalleryData';
+
+const PAGINATION_ITEM_VARIANT = { _selected: 'outline', base: 'ghost' } as const;
+
+const renderPaginationItem = (paginationPage: { value: number }) => (
+  <IconButton aria-label={`Page ${paginationPage.value}`} variant={PAGINATION_ITEM_VARIANT}>
+    {paginationPage.value}
+  </IconButton>
+);
 
 /**
  * Widget-chrome footer: page navigation for the gallery's paginated mode.
@@ -21,6 +30,10 @@ export const GalleryWidgetFooter = (_props: WidgetViewProps) => {
   const settings = getGallerySettings(galleryValues);
   const page = getGalleryPage(galleryValues);
   const totalImages = getGalleryTotalImages(galleryValues);
+  const handlePageChange = useCallback(
+    (event: { page: number }) => dispatch({ page: event.page - 1, type: 'setGalleryPage' }),
+    [dispatch]
+  );
 
   if (settings.paginationMode !== 'paginated' || totalImages === null || totalImages <= GALLERY_PAGE_SIZE) {
     return null;
@@ -33,7 +46,7 @@ export const GalleryWidgetFooter = (_props: WidgetViewProps) => {
         page={page + 1}
         pageSize={GALLERY_PAGE_SIZE}
         siblingCount={1}
-        onPageChange={(event) => dispatch({ page: event.page - 1, type: 'setGalleryPage' })}
+        onPageChange={handlePageChange}
       >
         <ButtonGroup gap="1" size="2xs" variant="ghost">
           <Pagination.PrevTrigger asChild>
@@ -41,13 +54,7 @@ export const GalleryWidgetFooter = (_props: WidgetViewProps) => {
               <ChevronLeftIcon />
             </IconButton>
           </Pagination.PrevTrigger>
-          <Pagination.Items
-            render={(paginationPage) => (
-              <IconButton aria-label={`Page ${paginationPage.value}`} variant={{ _selected: 'outline', base: 'ghost' }}>
-                {paginationPage.value}
-              </IconButton>
-            )}
-          />
+          <Pagination.Items render={renderPaginationItem} />
           <Pagination.NextTrigger asChild>
             <IconButton aria-label="Next page">
               <ChevronRightIcon />

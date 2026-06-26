@@ -8,7 +8,7 @@ import { ProjectsGrid } from '@workbench/launchpad/ProjectsGrid';
 import { refreshProjectLibrary } from '@workbench/projects/library';
 import { importProjectFile, pickProjectFile } from '@workbench/projects/projectFile';
 import { FileUpIcon, PlusIcon } from 'lucide-react';
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 
 /**
  * The Launchpad's home section: your project library. It keeps a comfortable
@@ -22,6 +22,8 @@ const PROJECTS_PAGE_MEASURE_SX: SystemStyleObject = {
   w: 'full',
 };
 
+const NEW_PROJECT_SEARCH = { new: true } as const;
+
 export const ProjectsPage = () => {
   const session = useAuthSession();
   const navigate = useNavigate();
@@ -33,7 +35,7 @@ export const ProjectsPage = () => {
   const displayName = session.user?.display_name?.trim();
   const greeting = displayName ? `Welcome back, ${displayName}` : 'Welcome to Invoke';
 
-  const handleImport = async () => {
+  const handleImport = useCallback(async () => {
     const file = await pickProjectFile();
 
     if (!file) {
@@ -51,7 +53,8 @@ export const ProjectsPage = () => {
         type: 'error',
       });
     }
-  };
+  }, [navigate]);
+  const handleImportClick = useCallback(() => void handleImport(), [handleImport]);
 
   return (
     <Scrollable h="full" label="Projects" minH="0">
@@ -66,12 +69,12 @@ export const ProjectsPage = () => {
             </Text>
           </Stack>
           <HStack gap="2" wrap="wrap">
-            <Button size="xs" variant="outline" onClick={() => void handleImport()}>
+            <Button size="xs" variant="outline" onClick={handleImportClick}>
               <FileUpIcon />
               Import…
             </Button>
             <Button asChild size="xs" variant="solid">
-              <Link search={{ new: true }} to="/app">
+              <Link search={NEW_PROJECT_SEARCH} to="/app">
                 <PlusIcon />
                 New project
               </Link>

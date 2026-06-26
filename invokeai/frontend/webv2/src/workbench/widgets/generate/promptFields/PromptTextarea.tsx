@@ -5,7 +5,7 @@ import type { Ref, UIEvent } from 'react';
 import { Box } from '@chakra-ui/react';
 import { ResizableTextarea } from '@workbench/components/ui';
 import { buildPromptHighlightSegments } from '@workbench/generation/prompt/highlight';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 const MAX_HIGHLIGHTED_PROMPT_LENGTH = 20_000;
 const PROMPT_TEXTAREA_LINE_HEIGHT = '1.6';
@@ -26,6 +26,17 @@ const HIGHLIGHT_STYLE_BY_KIND: Record<
   promptFunctionMethod: { color: 'accent.fg' },
   punctuation: { color: 'fg.subtle' },
   text: { color: 'fg' },
+};
+
+const PROMPT_TEXTAREA_FORCED_COLORS_CSS = { '@media (forced-colors: active)': { display: 'none' } };
+const PROMPT_TEXTAREA_HIGHLIGHTED_CSS = {
+  '&::selection': { color: 'transparent', WebkitTextFillColor: 'transparent' },
+  '@media (forced-colors: active)': {
+    WebkitTextFillColor: 'CanvasText',
+    backgroundColor: 'Field',
+    color: 'CanvasText',
+  },
+  WebkitTextFillColor: 'transparent',
 };
 
 interface PromptTextareaProps extends Omit<ResizableTextareaProps, 'underlay'> {
@@ -79,6 +90,7 @@ export const PromptTextarea = ({
   const shouldHighlight = showSyntaxHighlighting && value.length > 0 && value.length <= MAX_HIGHLIGHTED_PROMPT_LENGTH;
   const effectiveFontSize = fontSize ?? 'xs';
   const effectiveLineHeight = lineHeight ?? PROMPT_TEXTAREA_LINE_HEIGHT;
+
   const segments = useMemo(
     () => (shouldHighlight ? buildPromptHighlightSegments(value) : []),
     [shouldHighlight, value]
@@ -107,51 +119,74 @@ export const PromptTextarea = ({
     };
   }, [shouldHighlight, value]);
 
-  const handleTextareaRef = (element: HTMLTextAreaElement | null) => {
-    localTextareaRef.current = element;
-    setRef(textareaRef, element);
-  };
+  const handleTextareaRef = useCallback(
+    (element: HTMLTextAreaElement | null) => {
+      localTextareaRef.current = element;
+      setRef(textareaRef, element);
+    },
+    [textareaRef]
+  );
 
-  const handleScroll = (event: UIEvent<HTMLTextAreaElement>) => {
-    setScroll({ left: event.currentTarget.scrollLeft, top: event.currentTarget.scrollTop });
-    onScroll?.(event);
-  };
+  const handleScroll = useCallback(
+    (event: UIEvent<HTMLTextAreaElement>) => {
+      setScroll({ left: event.currentTarget.scrollLeft, top: event.currentTarget.scrollTop });
+      onScroll?.(event);
+    },
+    [onScroll]
+  );
 
-  const underlay = shouldHighlight ? (
-    <Box
-      aria-hidden="true"
-      borderColor="transparent"
-      borderRadius="md"
-      borderWidth="1px"
-      color="fg"
-      inset="0"
-      overflow="hidden"
-      pointerEvents="none"
-      position="absolute"
-      zIndex={0}
-      css={{ '@media (forced-colors: active)': { display: 'none' } }}
-    >
-      <Box
-        as="pre"
-        fontFamily={fontFamily}
-        fontSize={effectiveFontSize}
-        lineHeight={effectiveLineHeight}
-        m="0"
-        minH="100%"
-        overflowWrap="break-word"
-        px={PROMPT_TEXTAREA_PX}
-        py={PROMPT_TEXTAREA_PY}
-        transform={`translate(${-scroll.left}px, ${-scroll.top}px)`}
-        whiteSpace="pre-wrap"
-        w={textareaClientWidth ? `${textareaClientWidth}px` : '100%'}
-      >
-        {segments.map((segment) => (
-          <PromptHighlightSpan key={`${segment.range.start}:${segment.range.end}:${segment.kind}`} segment={segment} />
-        ))}
-        {value.endsWith('\n') ? '\u200b' : null}
-      </Box>
-    </Box>
-  ) : null;
+  const underlay = useMemo(
+    () =>
+      shouldHighlight ? (
+        <Box
+          aria-hidden="true"
+          borderColor="transparent"
+          borderRadius="md"
+          borderWidth="1px"
+          color="fg"
+          inset="0"
+          overflow="hidden"
+          pointerEvents="none"
+          position="absolute"
+          zIndex={0}
+          css={PROMPT_TEXTAREA_FORCED_COLORS_CSS}
+        >
+          <Box
+            as="pre"
+            fontFamily={fontFamily}
+            fontSize={effectiveFontSize}
+            lineHeight={effectiveLineHeight}
+            m="0"
+            minH="100%"
+            overflowWrap="break-word"
+            px={PROMPT_TEXTAREA_PX}
+            py={PROMPT_TEXTAREA_PY}
+            transform={`translate(${-scroll.left}px, ${-scroll.top}px)`}
+            whiteSpace="pre-wrap"
+            w={textareaClientWidth ? `${textareaClientWidth}px` : '100%'}
+          >
+            {segments.map((segment) => (
+              <PromptHighlightSpan
+                key={`${segment.range.start}:${segment.range.end}:${segment.kind}`}
+                segment={segment}
+              />
+            ))}
+            {value.endsWith('\n') ? '\u200b' : null}
+          </Box>
+        </Box>
+      ) : null,
+    [
+      effectiveFontSize,
+      effectiveLineHeight,
+      fontFamily,
+      scroll.left,
+      scroll.top,
+      segments,
+      shouldHighlight,
+      textareaClientWidth,
+      value,
+    ]
+  );
 
   return (
     <ResizableTextarea
@@ -159,19 +194,7 @@ export const PromptTextarea = ({
       bg={shouldHighlight ? 'transparent' : props.bg}
       caretColor={shouldHighlight ? 'fg' : props.caretColor}
       color={shouldHighlight ? 'transparent' : props.color}
-      css={
-        shouldHighlight
-          ? {
-              '&::selection': { color: 'transparent', WebkitTextFillColor: 'transparent' },
-              '@media (forced-colors: active)': {
-                WebkitTextFillColor: 'CanvasText',
-                backgroundColor: 'Field',
-                color: 'CanvasText',
-              },
-              WebkitTextFillColor: 'transparent',
-            }
-          : props.css
-      }
+      css={shouldHighlight ? PROMPT_TEXTAREA_HIGHLIGHTED_CSS : props.css}
       fontFamily={fontFamily}
       fontSize={effectiveFontSize}
       lineHeight={effectiveLineHeight}

@@ -32,7 +32,9 @@ export const WorkbenchSessionController = ({ search }: { search: WorkbenchSearch
   // The mount-time param was already handled by the boot load options.
   const handledProjectIdRef = useRef<string | null>(search.project ?? null);
 
-  latestProjectIdsRef.current = projectIds;
+  useEffect(() => {
+    latestProjectIdsRef.current = projectIds;
+  }, [projectIds]);
 
   const isNewRequested = search.new === true;
 

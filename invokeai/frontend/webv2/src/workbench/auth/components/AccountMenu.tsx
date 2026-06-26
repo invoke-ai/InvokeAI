@@ -3,9 +3,12 @@ import { useNavigate } from '@tanstack/react-router';
 import { logoutSession, useAuthSession } from '@workbench/auth/session';
 import { MenuContent } from '@workbench/components/ui';
 import { ChevronDownIcon, LogOutIcon, UserRoundCogIcon, UsersIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { ProfileDialog } from './ProfileDialog';
+
+const MENU_POSITIONING = { placement: 'bottom-end' } as const;
+const TRIGGER_HOVER = { bg: 'bg.subtle' } as const;
 
 /**
  * The signed-in user's avatar menu — account settings, user management, and
@@ -18,6 +21,20 @@ export const AccountMenu = () => {
   const navigate = useNavigate();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
+  // User management is a Launchpad page (`/users`), not a workbench widget —
+  // so this navigates there, working the same from Home and the editor.
+  const openUserManagement = useCallback(() => {
+    void navigate({ to: '/users' });
+  }, [navigate]);
+
+  const signOut = useCallback(async () => {
+    await logoutSession();
+    await navigate({ to: '/login' });
+  }, [navigate]);
+
+  const openProfile = useCallback(() => setIsProfileOpen(true), []);
+  const closeProfile = useCallback(() => setIsProfileOpen(false), []);
+
   if (!session.multiuserEnabled || session.user === null) {
     return;
   }
@@ -25,20 +42,9 @@ export const AccountMenu = () => {
   const user = session.user;
   const label = user.display_name?.trim() || user.email;
 
-  // User management is a Launchpad page (`/users`), not a workbench widget —
-  // so this navigates there, working the same from Home and the editor.
-  const openUserManagement = () => {
-    void navigate({ to: '/users' });
-  };
-
-  const signOut = async () => {
-    await logoutSession();
-    await navigate({ to: '/login' });
-  };
-
   return (
     <>
-      <Menu.Root positioning={{ placement: 'bottom-end' }}>
+      <Menu.Root positioning={MENU_POSITIONING}>
         <Menu.Trigger asChild>
           <chakra.button
             alignItems="center"
@@ -50,7 +56,7 @@ export const AccountMenu = () => {
             py="1"
             rounded="md"
             type="button"
-            _hover={{ bg: 'bg.subtle' }}
+            _hover={TRIGGER_HOVER}
           >
             <Avatar.Root bg="accent.subtle" color="fg" size="2xs">
               <Avatar.Fallback fontSize="2xs" name={label} />
@@ -82,7 +88,7 @@ export const AccountMenu = () => {
                 </HStack>
               </Box>
               <Menu.Separator />
-              <Menu.Item value="account" onClick={() => setIsProfileOpen(true)}>
+              <Menu.Item value="account" onClick={openProfile}>
                 <Icon as={UserRoundCogIcon} boxSize="3.5" />
                 Account settings
               </Menu.Item>
@@ -93,7 +99,7 @@ export const AccountMenu = () => {
                 </Menu.Item>
               ) : null}
               <Menu.Separator />
-              <Menu.Item value="sign-out" onClick={() => void signOut()}>
+              <Menu.Item value="sign-out" onClick={signOut}>
                 <Icon as={LogOutIcon} boxSize="3.5" />
                 Sign out
               </Menu.Item>
@@ -101,7 +107,7 @@ export const AccountMenu = () => {
           </Menu.Positioner>
         </Portal>
       </Menu.Root>
-      <ProfileDialog isOpen={isProfileOpen} user={user} onClose={() => setIsProfileOpen(false)} />
+      <ProfileDialog isOpen={isProfileOpen} user={user} onClose={closeProfile} />
     </>
   );
 };

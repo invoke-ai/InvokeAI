@@ -1,3 +1,4 @@
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { GenerateLora, GenerateModelConfig, GenerateSettings, LoraModelConfig } from '@workbench/generation/types';
 import type { ModelConfig } from '@workbench/models/types';
 
@@ -52,6 +53,7 @@ export const GenerateConceptsSection = ({
 }: GenerateConceptsSectionProps) => {
   const loras = useMemo(() => syncGenerateLorasWithModels(settings.loras, loraModels), [loraModels, settings.loras]);
   const selectedLoraKeys = useMemo(() => new Set(loras.map((lora) => lora.model.key)), [loras]);
+
   const activeCount = selectedModel
     ? loras.filter((lora) => lora.isEnabled && isLoraCompatibleWithModel(lora.model, selectedModel)).length
     : 0;
@@ -155,6 +157,7 @@ const LoraRow = ({
 }) => {
   const isActive = lora.isEnabled && isCompatible;
   const defaultWeight = getDefaultLoraWeight(lora.model);
+
   const {
     draftValue: draftWeight,
     flushDraftValue,

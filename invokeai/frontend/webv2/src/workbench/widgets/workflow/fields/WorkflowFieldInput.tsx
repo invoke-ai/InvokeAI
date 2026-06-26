@@ -9,7 +9,7 @@ import { SCHEDULER_OPTIONS } from '@workbench/generation/baseGenerationPolicies'
 import { ModelSelect } from '@workbench/models/components';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
-import { useEffect, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 
 /**
  * Direct-input controls for workflow fields, shared between the node editor
@@ -39,6 +39,14 @@ const toFiniteNumber = (raw: string): number | null => {
 
 const StringInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => {
   const text = typeof value === 'string' ? value : '';
+  const onTextareaChange = useCallback(
+    (event: ChangeEvent<HTMLTextAreaElement>) => onChange(event.currentTarget.value),
+    [onChange]
+  );
+  const onInputChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => onChange(event.currentTarget.value),
+    [onChange]
+  );
 
   if (template.uiComponent === 'textarea') {
     return (
@@ -53,7 +61,7 @@ const StringInput = ({ id, invalid, onChange, template, value }: WorkflowFieldIn
         value={text}
         w="full"
         {...invalidProps(invalid)}
-        onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange(event.currentTarget.value)}
+        onChange={onTextareaChange}
       />
     );
   }
@@ -67,7 +75,7 @@ const StringInput = ({ id, invalid, onChange, template, value }: WorkflowFieldIn
       value={text}
       w="full"
       {...invalidProps(invalid)}
-      onChange={(event: ChangeEvent<HTMLInputElement>) => onChange(event.currentTarget.value)}
+      onChange={onInputChange}
     />
   );
 };
@@ -77,6 +85,16 @@ const NumericInput = ({ id, invalid, onChange, template, value }: WorkflowFieldI
   const numericValue = typeof value === 'number' && Number.isFinite(value) ? value : '';
   const min = template.minimum ?? template.exclusiveMinimum ?? undefined;
   const max = template.maximum ?? template.exclusiveMaximum ?? undefined;
+  const onInputChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const parsed = toFiniteNumber(event.currentTarget.value);
+
+      if (parsed !== null) {
+        onChange(isInteger ? Math.round(parsed) : parsed);
+      }
+    },
+    [isInteger, onChange]
+  );
 
   return (
     <Input
@@ -91,35 +109,35 @@ const NumericInput = ({ id, invalid, onChange, template, value }: WorkflowFieldI
       value={numericValue}
       w="full"
       {...invalidProps(invalid)}
-      onChange={(event: ChangeEvent<HTMLInputElement>) => {
-        const parsed = toFiniteNumber(event.currentTarget.value);
-
-        if (parsed !== null) {
-          onChange(isInteger ? Math.round(parsed) : parsed);
-        }
-      }}
+      onChange={onInputChange}
     />
   );
 };
 
-const BooleanInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => (
-  <Switch.Root
-    checked={value === true}
-    className="nodrag"
-    invalid={invalid}
-    size="sm"
-    onCheckedChange={(event) => onChange(event.checked)}
-  >
-    <Switch.HiddenInput
-      aria-label={template.title}
-      id={id ? `${id}-switch-input` : undefined}
-      {...invalidProps(invalid)}
-    />
-    <Switch.Control _checked={{ bg: 'accent.solid' }}>
-      <Switch.Thumb />
-    </Switch.Control>
-  </Switch.Root>
-);
+const SWITCH_CHECKED_PROPS = { bg: 'accent.solid' };
+
+const BooleanInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => {
+  const onCheckedChange = useCallback((event: { checked: boolean }) => onChange(event.checked), [onChange]);
+
+  return (
+    <Switch.Root
+      checked={value === true}
+      className="nodrag"
+      invalid={invalid}
+      size="sm"
+      onCheckedChange={onCheckedChange}
+    >
+      <Switch.HiddenInput
+        aria-label={template.title}
+        id={id ? `${id}-switch-input` : undefined}
+        {...invalidProps(invalid)}
+      />
+      <Switch.Control _checked={SWITCH_CHECKED_PROPS}>
+        <Switch.Thumb />
+      </Switch.Control>
+    </Switch.Root>
+  );
+};
 
 const SelectInput = ({
   id,
@@ -135,40 +153,49 @@ const SelectInput = ({
   options: { label: string; value: string }[];
   title: string;
   value: unknown;
-}) => (
-  <NativeSelect.Root className="nodrag" invalid={invalid} size="xs" w="full">
-    <NativeSelect.Field
-      aria-label={title}
-      id={id ? `${id}-select` : undefined}
-      value={typeof value === 'string' ? value : ''}
-      onChange={(event: ChangeEvent<HTMLSelectElement>) => onChange(event.currentTarget.value)}
-    >
-      {typeof value !== 'string' || !options.some((option) => option.value === value) ? (
-        <option value="">Select…</option>
-      ) : null}
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </NativeSelect.Field>
-    <NativeSelect.Indicator />
-  </NativeSelect.Root>
-);
+}) => {
+  const selectedValue = typeof value === 'string' ? value : '';
+  const onSelectChange = useCallback(
+    (event: ChangeEvent<HTMLSelectElement>) => onChange(event.currentTarget.value),
+    [onChange]
+  );
 
-const EnumInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => (
-  <SelectInput
-    id={id}
-    invalid={invalid}
-    options={(template.options ?? []).map((option) => ({
-      label: template.uiChoiceLabels?.[option] ?? option,
-      value: option,
-    }))}
-    title={template.title}
-    value={value}
-    onChange={onChange}
-  />
-);
+  return (
+    <NativeSelect.Root className="nodrag" invalid={invalid} size="xs" w="full">
+      <NativeSelect.Field
+        aria-label={title}
+        id={id ? `${id}-select` : undefined}
+        value={selectedValue}
+        onChange={onSelectChange}
+      >
+        {typeof value !== 'string' || !options.some((option) => option.value === value) ? (
+          <option value="">Select…</option>
+        ) : null}
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </NativeSelect.Field>
+      <NativeSelect.Indicator />
+    </NativeSelect.Root>
+  );
+};
+
+const EnumInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => {
+  const options = useMemo(
+    () =>
+      (template.options ?? []).map((option) => ({
+        label: template.uiChoiceLabels?.[option] ?? option,
+        value: option,
+      })),
+    [template.options, template.uiChoiceLabels]
+  );
+
+  return (
+    <SelectInput id={id} invalid={invalid} options={options} title={template.title} value={value} onChange={onChange} />
+  );
+};
 
 const DEFAULT_MODEL_TYPES: ModelTaxonomyType[] = ['main', 'vae', 'lora', 'controlnet', 't2i_adapter', 'ip_adapter'];
 
@@ -177,22 +204,29 @@ const ModelIdentifierInput = ({ id, invalid, onChange, template, value }: Workfl
     typeof (value as { key?: unknown } | null)?.key === 'string' ? (value as { key: string }).key : null;
   const modelTypes = (template.uiModelType as ModelTaxonomyType[] | null) ?? DEFAULT_MODEL_TYPES;
   const allowedBases = template.uiModelBase;
+  const filter = useCallback(
+    (model: ModelConfig) => (allowedBases ? allowedBases.includes(model.base) : true),
+    [allowedBases]
+  );
+  const onModelChange = useCallback(
+    (model: ModelConfig | null) =>
+      onChange(
+        model ? { base: model.base, hash: model.hash, key: model.key, name: model.name, type: model.type } : undefined
+      ),
+    [onChange]
+  );
 
   return (
     <ModelSelect
       className="nodrag nowheel"
-      filter={allowedBases ? (model: ModelConfig) => allowedBases.includes(model.base) : undefined}
+      filter={allowedBases ? filter : undefined}
       id={id ? `${id}-model-combobox` : undefined}
       invalid={invalid}
       isClearable={false}
       modelTypes={modelTypes}
       size="xs"
       value={selectedKey}
-      onChange={(model) =>
-        onChange(
-          model ? { base: model.base, hash: model.hash, key: model.key, name: model.name, type: model.type } : undefined
-        )
-      }
+      onChange={onModelChange}
     />
   );
 };
@@ -250,19 +284,27 @@ const BoardInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInp
       : typeof (value as { board_id?: unknown } | null)?.board_id === 'string'
         ? (value as { board_id: string }).board_id
         : 'auto';
+  const options = useMemo(
+    () => [
+      { label: 'Auto', value: 'auto' },
+      { label: 'None', value: 'none' },
+      ...boards.map((board) => ({ label: board.name, value: board.id })),
+    ],
+    [boards]
+  );
+  const onBoardChange = useCallback(
+    (next: string) => onChange(next === 'auto' || next === 'none' ? next : { board_id: next }),
+    [onChange]
+  );
 
   return (
     <SelectInput
       id={id}
       invalid={invalid}
-      options={[
-        { label: 'Auto', value: 'auto' },
-        { label: 'None', value: 'none' },
-        ...boards.map((board) => ({ label: board.name, value: board.id })),
-      ]}
+      options={options}
       title={template.title}
       value={selected}
-      onChange={(next) => onChange(next === 'auto' || next === 'none' ? next : { board_id: next })}
+      onChange={onBoardChange}
     />
   );
 };
@@ -275,6 +317,14 @@ const ImageInput = ({ invalid, onChange, value }: WorkflowFieldInputProps) => {
     typeof (value as { image_name?: unknown } | null)?.image_name === 'string'
       ? (value as { image_name: string }).image_name
       : null;
+  const invalidAriaProps = useMemo(() => (invalid ? { 'aria-invalid': true } : {}), [invalid]);
+  const onUseGallerySelectionClick = useCallback(() => {
+    if (gallerySelection) {
+      onChange({ image_name: gallerySelection.imageName });
+    }
+  }, [gallerySelection, onChange]);
+  const onClearClick = useCallback(() => onChange(undefined), [onChange]);
+
   return (
     <HStack
       boxShadow={invalid ? '0 0 0 1px {colors.red.solid}' : undefined}
@@ -282,7 +332,7 @@ const ImageInput = ({ invalid, onChange, value }: WorkflowFieldInputProps) => {
       minW="0"
       rounded="sm"
       w="full"
-      {...(invalid ? { 'aria-invalid': true } : {})}
+      {...invalidAriaProps}
     >
       {imageName ? (
         <Text color="fg.muted" flex="1" fontSize="2xs" minW="0" title={imageName} truncate>
@@ -299,16 +349,12 @@ const ImageInput = ({ invalid, onChange, value }: WorkflowFieldInputProps) => {
         size="2xs"
         title={gallerySelection ? `Use ${gallerySelection.imageName}` : 'Select an image in the Gallery first.'}
         variant="outline"
-        onClick={() => {
-          if (gallerySelection) {
-            onChange({ image_name: gallerySelection.imageName });
-          }
-        }}
+        onClick={onUseGallerySelectionClick}
       >
         Use gallery selection
       </Button>
       {imageName ? (
-        <Button className="nodrag" size="2xs" variant="ghost" onClick={() => onChange(undefined)}>
+        <Button className="nodrag" size="2xs" variant="ghost" onClick={onClearClick}>
           Clear
         </Button>
       ) : null}
@@ -319,41 +365,75 @@ const ImageInput = ({ invalid, onChange, value }: WorkflowFieldInputProps) => {
 const COLOR_CHANNELS = ['r', 'g', 'b', 'a'] as const;
 
 const ColorInput = ({ id, invalid, onChange, value }: WorkflowFieldInputProps) => {
-  const color = (typeof value === 'object' && value !== null ? value : {}) as Partial<Record<string, number>>;
+  const color = useMemo(
+    () => (typeof value === 'object' && value !== null ? value : {}) as Partial<Record<string, number>>,
+    [value]
+  );
 
   return (
     <HStack gap="1" w="full">
       {COLOR_CHANNELS.map((channel) => (
-        <Input
+        <ColorChannelInput
           key={channel}
-          aria-label={`Color ${channel.toUpperCase()}`}
-          className="nodrag"
-          id={id ? `${id}-color-${channel}-input` : undefined}
-          max="255"
-          min="0"
-          placeholder={channel.toUpperCase()}
-          size="xs"
-          type="number"
-          value={typeof color[channel] === 'number' ? color[channel] : ''}
-          w="full"
-          {...invalidProps(invalid)}
-          onChange={(event: ChangeEvent<HTMLInputElement>) => {
-            const parsed = toFiniteNumber(event.currentTarget.value);
-
-            if (parsed !== null) {
-              onChange({
-                a: 255,
-                b: 0,
-                g: 0,
-                r: 0,
-                ...color,
-                [channel]: Math.min(255, Math.max(0, Math.round(parsed))),
-              });
-            }
-          }}
+          channel={channel}
+          color={color}
+          id={id}
+          invalid={invalid}
+          onChange={onChange}
         />
       ))}
     </HStack>
+  );
+};
+
+const ColorChannelInput = ({
+  channel,
+  color,
+  id,
+  invalid,
+  onChange,
+}: {
+  channel: (typeof COLOR_CHANNELS)[number];
+  color: Partial<Record<string, number>>;
+  id?: string;
+  invalid?: boolean;
+  onChange: (value: unknown) => void;
+}) => {
+  const ariaLabel = useMemo(() => `Color ${channel.toUpperCase()}`, [channel]);
+  const placeholder = channel.toUpperCase();
+  const onInputChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const parsed = toFiniteNumber(event.currentTarget.value);
+
+      if (parsed !== null) {
+        onChange({
+          a: 255,
+          b: 0,
+          g: 0,
+          r: 0,
+          ...color,
+          [channel]: Math.min(255, Math.max(0, Math.round(parsed))),
+        });
+      }
+    },
+    [channel, color, onChange]
+  );
+
+  return (
+    <Input
+      aria-label={ariaLabel}
+      className="nodrag"
+      id={id ? `${id}-color-${channel}-input` : undefined}
+      max="255"
+      min="0"
+      placeholder={placeholder}
+      size="xs"
+      type="number"
+      value={typeof color[channel] === 'number' ? color[channel] : ''}
+      w="full"
+      {...invalidProps(invalid)}
+      onChange={onInputChange}
+    />
   );
 };
 

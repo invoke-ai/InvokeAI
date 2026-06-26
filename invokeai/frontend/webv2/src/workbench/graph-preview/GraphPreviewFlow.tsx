@@ -67,11 +67,14 @@ export const documentToPreviewGraph = (
 
 const LAYER_WIDTH = 300;
 const ROW_HEIGHT = 100;
+const handleStyle = { background: 'var(--wb-flow-grid)', border: 'none' } as const;
+const reactFlowProOptions = { hideAttribution: true } as const;
+const reactFlowStyle = { background: 'transparent' } as const;
 
 const PreviewNode = ({ data }: NodeProps<PreviewFlowNode>) => (
   <Box bg="bg" borderColor="border.emphasized" borderWidth="1px" fontSize="xs" minW="14rem" rounded="lg" shadow="sm">
-    <Handle position={Position.Left} style={{ background: 'var(--wb-flow-grid)', border: 'none' }} type="target" />
-    <Handle position={Position.Right} style={{ background: 'var(--wb-flow-grid)', border: 'none' }} type="source" />
+    <Handle position={Position.Left} style={handleStyle} type="target" />
+    <Handle position={Position.Right} style={handleStyle} type="source" />
     <Stack gap="0.5" px="3" py="2">
       <Badge fontFamily="mono" size="xs" w="fit-content">
         {data.nodeType}
@@ -187,8 +190,8 @@ export const GraphPreviewFlow = ({
         nodesDraggable={false}
         nodesFocusable={false}
         nodeTypes={nodeTypes}
-        proOptions={{ hideAttribution: true }}
-        style={{ background: 'transparent' }}
+        proOptions={reactFlowProOptions}
+        style={reactFlowStyle}
       >
         <Background
           bgColor="var(--xy-background-color)"
