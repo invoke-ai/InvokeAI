@@ -134,6 +134,8 @@ class InvokeAIAppConfig(BaseSettings):
         external_openai_base_url: Base URL override for OpenAI image generation.
         external_seedream_api_key: API key for Seedream image generation.
         external_seedream_base_url: Base URL override for Seedream image generation.
+        base_url: Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Set only when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`). Leave unset when the proxy strips the sub-path or when serving at the domain root.
+        forwarded_allow_ips: Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.
     """
 
     _root: Optional[Path] = PrivateAttr(default=None)
@@ -155,6 +157,8 @@ class InvokeAIAppConfig(BaseSettings):
     allow_headers:            list[str] = Field(default=["*"],              description="Headers allowed for CORS.")
     ssl_certfile:        Optional[Path] = Field(default=None,               description="SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.")
     ssl_keyfile:         Optional[Path] = Field(default=None,               description="SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.")
+    base_url:             Optional[str] = Field(default=None,               description="Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Required when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`); optional when the proxy strips it (set it anyway so openapi/docs URLs are correct). Leave unset when serving at the domain root. Normalized to a single leading slash with no trailing slash.")
+    forwarded_allow_ips:            str = Field(default="127.0.0.1",        description="Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.")
 
     # MISC FEATURES
     log_tokenization:              bool = Field(default=False,              description="Enable logging of parsed prompt tokens.")
@@ -256,6 +260,20 @@ class InvokeAIAppConfig(BaseSettings):
     # fmt: on
 
     model_config = SettingsConfigDict(env_prefix="INVOKEAI_", env_ignore_empty=True)
+
+    @field_validator("base_url")
+    @classmethod
+    def validate_base_url(cls, v: Optional[str]) -> Optional[str]:
+        """Normalize the reverse-proxy base path: ensure a single leading slash, no trailing slash.
+
+        Empty values and a bare `/` normalize to `None` (feature disabled).
+        """
+        if v is None:
+            return None
+        v = v.strip().strip("/")
+        if not v:
+            return None
+        return f"/{v}"
 
     def update_config(self, config: dict[str, Any] | InvokeAIAppConfig, clobber: bool = True) -> None:
         """Updates the config, overwriting existing values.
