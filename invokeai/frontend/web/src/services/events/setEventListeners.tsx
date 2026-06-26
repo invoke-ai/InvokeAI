@@ -43,7 +43,7 @@ import { createWorkflowExecutionCoordinator } from 'services/events/workflowExec
 import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
 
-import { $lastProgressEvent, $loadingModelsCount } from './stores';
+import { $lastProgressEvent, $loadingModelsCount, setLLMTaskState } from './stores';
 
 const log = logger('events');
 
@@ -972,5 +972,20 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       description: error,
       duration: null,
     });
+  });
+
+  socket.on('llm_task_progress', (data) => {
+    log.trace({ data } as JsonObject, 'LLM task progress');
+    setLLMTaskState(data.task_id, { status: 'progress', payload: data });
+  });
+
+  socket.on('llm_task_complete', (data) => {
+    log.trace({ data } as JsonObject, 'LLM task complete');
+    setLLMTaskState(data.task_id, { status: 'complete' });
+  });
+
+  socket.on('llm_task_error', (data) => {
+    log.warn({ data } as JsonObject, 'LLM task error');
+    setLLMTaskState(data.task_id, { status: 'error', error: data.error });
   });
 };

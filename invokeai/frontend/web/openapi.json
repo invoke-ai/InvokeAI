@@ -22168,6 +22168,18 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id",
+            "description": "Client-supplied task ID used to correlate socket progress events to this request"
           }
         },
         "type": "object",
@@ -34677,6 +34689,18 @@
             "type": "string",
             "title": "Instruction",
             "default": "Describe this image in detail for use as an AI image generation prompt."
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id",
+            "description": "Client-supplied task ID used to correlate socket progress events to this request"
           }
         },
         "type": "object",
@@ -42632,6 +42656,144 @@
         "type": "object"
       },
       "JsonValue": {},
+      "LLMTaskCompleteEvent": {
+        "description": "Event model for llm_task_complete",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "task_id": {
+            "description": "Client-supplied task ID correlating events to a single request",
+            "title": "Task Id",
+            "type": "string"
+          },
+          "user_id": {
+            "default": "system",
+            "description": "ID of the user who initiated the task",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": ["timestamp", "task_id", "user_id"],
+        "title": "LLMTaskCompleteEvent",
+        "type": "object"
+      },
+      "LLMTaskErrorEvent": {
+        "description": "Event model for llm_task_error",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "task_id": {
+            "description": "Client-supplied task ID correlating events to a single request",
+            "title": "Task Id",
+            "type": "string"
+          },
+          "user_id": {
+            "default": "system",
+            "description": "ID of the user who initiated the task",
+            "title": "User Id",
+            "type": "string"
+          },
+          "error": {
+            "description": "The error message",
+            "title": "Error",
+            "type": "string"
+          }
+        },
+        "required": ["timestamp", "task_id", "user_id", "error"],
+        "title": "LLMTaskErrorEvent",
+        "type": "object"
+      },
+      "LLMTaskProgressEvent": {
+        "description": "Event model for llm_task_progress",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "task_id": {
+            "description": "Client-supplied task ID correlating events to a single request",
+            "title": "Task Id",
+            "type": "string"
+          },
+          "user_id": {
+            "default": "system",
+            "description": "ID of the user who initiated the task",
+            "title": "User Id",
+            "type": "string"
+          },
+          "phase": {
+            "description": "Which phase of the task is in progress",
+            "enum": ["loading_model", "generating"],
+            "title": "Phase",
+            "type": "string"
+          },
+          "message": {
+            "description": "A short message describing the current phase",
+            "title": "Message",
+            "type": "string"
+          },
+          "percentage": {
+            "anyOf": [
+              {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Progress fraction in [0, 1]; omit for indeterminate progress",
+            "title": "Percentage"
+          },
+          "current_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Number of tokens generated so far (generating phase)",
+            "title": "Current Tokens"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Max tokens the request will generate (generating phase)",
+            "title": "Total Tokens"
+          }
+        },
+        "required": [
+          "timestamp",
+          "task_id",
+          "user_id",
+          "phase",
+          "message",
+          "percentage",
+          "current_tokens",
+          "total_tokens"
+        ],
+        "title": "LLMTaskProgressEvent",
+        "type": "object"
+      },
       "LaMaInfillInvocation": {
         "category": "inpaint",
         "class": "invocation",
