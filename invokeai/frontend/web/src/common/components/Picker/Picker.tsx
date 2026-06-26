@@ -18,9 +18,8 @@ import { typedMemo } from 'common/util/typedMemo';
 import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import { selectPickerCompactViewStates } from 'features/ui/store/uiSelectors';
 import { pickerCompactViewStateChanged } from 'features/ui/store/uiSlice';
-import type { AnyStore, ReadableAtom, Task, WritableAtom } from 'nanostores';
+import type { AnyStore, ReadableAtom, StoreValue, Task, WritableAtom } from 'nanostores';
 import { atom, computed } from 'nanostores';
-import type { StoreValues } from 'nanostores/computed';
 import type { ChangeEvent, MouseEventHandler, PropsWithChildren, RefObject } from 'react';
 import React, {
   createContext,
@@ -45,6 +44,10 @@ import { useDebounce } from 'use-debounce';
 const NO_WHEEL_NO_DRAG_CLASS = `${NO_WHEEL_CLASS} ${NO_DRAG_CLASS}`;
 
 const uniqueGroupKey = Symbol('uniqueGroupKey');
+
+type StoreValues<Stores extends AnyStore[]> = {
+  [Index in keyof Stores]: StoreValue<Stores[Index]>;
+};
 
 export type Group<T extends object> = {
   /**
@@ -248,8 +251,8 @@ export type PickerContextState<T extends object> = {
   getIsOptionDisabled?: (option: T) => boolean;
   onSelectById: (id: string) => void;
   onClose?: () => void;
-  rootRef: RefObject<HTMLDivElement>;
-  inputRef: RefObject<HTMLInputElement>;
+  rootRef: RefObject<HTMLDivElement | null>;
+  inputRef: RefObject<HTMLInputElement | null>;
   noOptionsFallback?: React.ReactNode;
   noMatchesFallback?: React.ReactNode;
   OptionComponent: React.ComponentType<{ option: T } & BoxProps>;

@@ -5,7 +5,7 @@ import { useTimeoutCallback } from 'common/hooks/useTimeoutCallback';
 import type { RefObject } from 'react';
 import { useEffect } from 'react';
 
-export const useCallbackOnDragEnter = (cb: () => void, ref: RefObject<HTMLElement>, delay = 300) => {
+export const useCallbackOnDragEnter = (cb: () => void, ref: RefObject<HTMLElement | null>, delay = 300) => {
   const [run, cancel] = useTimeoutCallback(cb, delay);
 
   useEffect(() => {
