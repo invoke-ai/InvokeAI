@@ -17,6 +17,11 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   IntegerGeneratorField: undefined,
   StringGeneratorField: undefined,
   ImageGeneratorField: undefined,
+  LoRAMetadataField: undefined,
+  ControlNetMetadataField: undefined,
+  IPAdapterMetadataField: undefined,
+  T2IAdapterMetadataField: undefined,
+  MetadataExtraField: undefined,
 };
 
 export const buildFieldInputInstance = (id: string, template: FieldInputTemplate): FieldInputInstance => {
