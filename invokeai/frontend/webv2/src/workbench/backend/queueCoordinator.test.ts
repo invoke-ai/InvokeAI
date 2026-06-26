@@ -328,6 +328,39 @@ describe('queueCoordinator', () => {
     expect(harness.progressImage.clear).toHaveBeenCalledWith({ itemIndex: 1, queueItemId: 'local-1' });
   });
 
+  it('keeps the completed progress image until backend item result routing finishes', async () => {
+    let finishRouting: () => void = () => undefined;
+    const routingPromise = new Promise<void>((resolve) => {
+      finishRouting = resolve;
+    });
+
+    harness.callbacks.onBackendItemComplete = vi.fn(() => routingPromise);
+    harness.coordinator.connect();
+
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z');
+
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 1 }),
+      image: { dataURL: 'data:image/png;base64,final-denoise', height: 32, width: 64 },
+      invocation_source_id: 'denoise',
+      message: 'Denoising',
+      percentage: 1,
+    });
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 1 }));
+
+    await resultsPromise;
+
+    expect(harness.callbacks.onBackendItemComplete).toHaveBeenCalledWith('local-1', 1);
+    expect(harness.progressImage.clear).not.toHaveBeenCalled();
+
+    finishRouting();
+    await routingPromise;
+    await Promise.resolve();
+
+    expect(harness.progressImage.clear).toHaveBeenCalledWith({ itemIndex: 1, queueItemId: 'local-1' });
+  });
+
   it('notifies when one backend item in a batch completes', async () => {
     harness.callbacks.onBackendItemComplete = vi.fn();
     harness.api.enqueueGenerateGraph.mockResolvedValue({ batchId: 'batch-1', itemIds: [1, 2] });

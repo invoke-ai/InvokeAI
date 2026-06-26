@@ -266,7 +266,7 @@ export const WorkbenchRuntime = () => {
             return;
           }
 
-          void routeBackendItemResults(routeTarget.project.id, routeTarget.queueItem, backendItemId, dispatch);
+          return routeBackendItemResults(routeTarget.project.id, routeTarget.queueItem, backendItemId, dispatch);
         },
         onBackendItemCancelled: (localQueueItemId, backendItemId) => {
           const routeTarget = stateRef.current.projects

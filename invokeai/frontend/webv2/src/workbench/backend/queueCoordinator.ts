@@ -51,7 +51,7 @@ export interface QueueCoordinatorApi {
 
 export interface QueueCoordinatorCallbacks {
   /** Fired when one backend item in a local batch completes, before the whole local batch necessarily settles. */
-  onBackendItemComplete?(localQueueItemId: string, backendItemId: number): void;
+  onBackendItemComplete?(localQueueItemId: string, backendItemId: number): void | Promise<void>;
   /** Fired when one backend item in a local batch is canceled. */
   onBackendItemCancelled?(localQueueItemId: string, backendItemId: number): void;
   /** Coalesced signal that completed generations may have added gallery images. */
@@ -263,7 +263,8 @@ export const createQueueCoordinator = (
     }
 
     waits.delete(backendItemId);
-    progressImage.clear(getProgressImageTarget(wait.localQueueItemId, backendItemId));
+    const progressTarget = getProgressImageTarget(wait.localQueueItemId, backendItemId);
+    const clearProgressImage = (): void => progressImage.clear(progressTarget);
     const state = runProgress.get(wait.localQueueItemId);
 
     if (state) {
@@ -280,11 +281,24 @@ export const createQueueCoordinator = (
     }
 
     if (outcome.status === 'completed') {
-      callbacks.onBackendItemComplete?.(wait.localQueueItemId, backendItemId);
+      const routingPromise = callbacks.onBackendItemComplete?.(wait.localQueueItemId, backendItemId);
+
+      if (routingPromise) {
+        void Promise.resolve(routingPromise)
+          .finally(clearProgressImage)
+          .catch(() => undefined);
+      } else {
+        clearProgressImage();
+      }
     }
 
     if (outcome.status === 'canceled') {
+      clearProgressImage();
       callbacks.onBackendItemCancelled?.(wait.localQueueItemId, backendItemId);
+    }
+
+    if (outcome.status === 'failed') {
+      clearProgressImage();
     }
 
     wait.settle(outcome);
