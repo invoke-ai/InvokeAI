@@ -43,9 +43,9 @@ export interface ResultDestinationMeta {
 
 export const invocationSources: InvocationSourceMeta[] = [
   { id: 'generate', label: 'Generate', available: true },
-  { id: 'project-graph', label: 'Workflow', available: true },
+  { id: 'workflow', label: 'Workflow', available: true },
   { id: 'upscale', label: 'Upscale', available: false },
-  { id: 'canvas-fill', label: 'Canvas Fill', available: false },
+  { id: 'canvas', label: 'Canvas', available: false },
 ];
 
 export const resultDestinations: ResultDestinationMeta[] = [
@@ -76,9 +76,9 @@ export const defaultInvocationRoute: InvocationRoute = {
 const validDestinationIds = new Set(resultDestinations.map((destination) => destination.id));
 
 const sourceWidgetIds: Partial<Record<InvocationSourceId, WidgetId>> = {
-  'canvas-fill': 'canvas',
+  canvas: 'canvas',
   generate: 'generate',
-  'project-graph': 'workflow',
+  workflow: 'workflow',
 };
 
 export interface InvocationRouteInput {
@@ -165,9 +165,7 @@ export const resolveInvocationRouteInput = (
   // read imperatively, and surfaces that render the route subscribe to the
   // templates store so the result stays live.
   const projectGraphReadiness =
-    sourceId === 'project-graph'
-      ? getProjectGraphReadiness(input.projectGraph, getInvocationTemplatesSnapshot())
-      : null;
+    sourceId === 'workflow' ? getProjectGraphReadiness(input.projectGraph, getInvocationTemplatesSnapshot()) : null;
   const validationReasons: string[] = [];
 
   if (!isInvocationSourceAvailable(sourceId)) {

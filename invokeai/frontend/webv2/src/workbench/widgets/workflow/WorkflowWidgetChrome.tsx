@@ -412,7 +412,7 @@ export const WorkflowDialogHost = () => {
         onClose={() => setNewWorkflowConfirmOpen(false)}
         onConfirm={() => {
           dispatch({
-            document: createProjectGraph(createWorkflowId('project-graph')),
+            document: createProjectGraph(createWorkflowId('workflow')),
             label: 'New workflow',
             type: 'replaceProjectGraph',
           });

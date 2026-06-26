@@ -1090,7 +1090,7 @@ const compileInvocationSnapshot = (
 ): { graph: GraphContract; widgetStates: WidgetStateMap } | null => {
   const widgetStates = getWidgetStatesSnapshot(project.widgetInstances);
 
-  if (route.sourceId === 'project-graph') {
+  if (route.sourceId === 'workflow') {
     // Compiles the workflow document into an immutable snapshot. Templates are
     // read imperatively; route validation already guaranteed they are loaded.
     const templatesSnapshot = getInvocationTemplatesSnapshot();
@@ -1796,14 +1796,14 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
         // steer the global Invoke route to the project graph unless locked.
         const shouldAutoSetSource =
           !project.invocation.sourceLocked &&
-          project.invocation.sourceId !== 'project-graph' &&
+          project.invocation.sourceId !== 'workflow' &&
           isHighConfidenceGraphEdit(action.action) &&
-          isInvocationSourceAvailable('project-graph');
+          isInvocationSourceAvailable('workflow');
 
         return {
           ...nextProject,
           invocation: shouldAutoSetSource
-            ? { ...nextProject.invocation, sourceId: 'project-graph' }
+            ? { ...nextProject.invocation, sourceId: 'workflow' }
             : nextProject.invocation,
           projectGraph,
         };

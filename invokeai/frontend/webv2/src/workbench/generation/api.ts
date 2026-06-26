@@ -52,7 +52,7 @@ export const enqueueGenerateGraph = async (request: EnqueueGenerateRequest): Pro
   return { batchId: result.batch?.batch_id, itemIds: result.item_ids ?? [] };
 };
 
-/** Enqueue an arbitrary compiled graph — the workflow / project-graph path. */
+/** Enqueue an arbitrary compiled graph — the workflow path. */
 export const enqueueWorkflowGraph = async (request: EnqueueWorkflowRequest): Promise<EnqueueGenerateResult> => {
   const batchCount = sanitizeBatchCount(request.batchCount);
   const body = {

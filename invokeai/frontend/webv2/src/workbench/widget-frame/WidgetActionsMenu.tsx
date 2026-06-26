@@ -28,7 +28,7 @@ import { useCallback, useMemo, useState } from 'react';
 const getPreviewGraph = (project: Project, surface: GraphBearingSurfaceContract): GraphContract | null => {
   // The project graph compiles fresh for preview so `View Graph` always shows
   // what Invoke would run right now; widget graphs keep their last compile.
-  if (surface.sourceId === 'project-graph') {
+  if (surface.sourceId === 'workflow') {
     const templatesSnapshot = getInvocationTemplatesSnapshot();
 
     if (templatesSnapshot.status !== 'loaded') {
@@ -111,7 +111,7 @@ export const WidgetActionsMenu = ({
   const handlePreview = useCallback(() => setIsPreviewOpen(true), []);
   const positionHints = useMemo(
     () =>
-      isPreviewOpen && surface?.sourceId === 'project-graph'
+      isPreviewOpen && surface?.sourceId === 'workflow'
         ? Object.fromEntries(activeProject.projectGraph.nodes.map((node) => [node.id, node.position]))
         : undefined,
     [activeProject.projectGraph.nodes, isPreviewOpen, surface?.sourceId]

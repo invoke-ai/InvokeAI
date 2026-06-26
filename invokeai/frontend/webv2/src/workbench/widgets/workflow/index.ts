@@ -17,7 +17,7 @@ export const workflowWidgetManifest: WidgetManifest = {
   failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
   graphBearing: {
     defaultGraphId: 'workflow-graph',
-    sourceId: 'project-graph',
+    sourceId: 'workflow',
     surfaces: ['center', 'left', 'bottom'],
   },
   host: WorkflowDialogHost,

@@ -42,7 +42,7 @@ export const getPendingQueueCount = (items: readonly QueueItem[]): number =>
 
 export const hasPendingWorkflowQueueItem = (items: readonly QueueItem[]): boolean =>
   items.some(
-    (item) => item.snapshot.sourceId === 'project-graph' && (item.status === 'running' || item.status === 'pending')
+    (item) => item.snapshot.sourceId === 'workflow' && (item.status === 'running' || item.status === 'pending')
   );
 
 const isCancellableQueueItem = (item: QueueItem): boolean =>

@@ -334,7 +334,7 @@ export const parseWorkflowJson = (raw: unknown): ParsedWorkflow => {
     description: parsed.data.description,
     edges,
     form: parseForm(parsed.data.form, parsed.data.exposedFields, nodeIds, warnings),
-    id: createWorkflowId('project-graph'),
+    id: createWorkflowId('workflow'),
     libraryWorkflowId: parsed.data.id,
     name: parsed.data.name,
     nodes,

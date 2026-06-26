@@ -67,7 +67,7 @@ export const normalizeProjectGraph = (candidate: unknown): ProjectGraphState => 
   const legacyId =
     typeof (candidate as { id?: unknown } | null)?.id === 'string' ? (candidate as { id: string }).id : null;
 
-  return createProjectGraph(legacyId ?? createWorkflowId('project-graph'));
+  return createProjectGraph(legacyId ?? createWorkflowId('workflow'));
 };
 
 export const buildInvocationNode = (template: InvocationTemplate, position: XYPosition): WorkflowInvocationNode => {

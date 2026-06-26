@@ -47,6 +47,52 @@ describe('project document serialization', () => {
     expect(deserializeProjectDocument({ id: 'x' })).toBeNull();
     expect(deserializeProjectDocument({ id: 'x', layout: null, name: 'y' })).toBeNull();
   });
+
+  it('normalizes legacy project-graph invocation sources to workflow', () => {
+    const base = getProject();
+    const project = getProject({
+      invocation: { destination: 'gallery', destinationLocked: false, sourceId: 'workflow', sourceLocked: false },
+      queue: {
+        items: [
+          {
+            cancellable: true,
+            id: 'legacy-queue-item',
+            snapshot: {
+              canvas: base.canvas,
+              destination: 'gallery',
+              graph: { edges: [], id: 'graph', label: 'Graph', nodes: [], updatedAt: 'now', version: 1 },
+              sourceId: 'workflow',
+              submittedAt: 'now',
+              widgetInstances: {},
+              widgetStates: {},
+            },
+            status: 'pending',
+          },
+        ],
+      },
+    });
+    const document = serializeProjectDocument(project);
+
+    document.invocation = {
+      destination: 'gallery',
+      destinationLocked: false,
+      sourceId: 'project-graph',
+      sourceLocked: false,
+    };
+    document.queue = {
+      items: [
+        {
+          ...(project.queue.items[0] as object),
+          snapshot: { ...project.queue.items[0]?.snapshot, sourceId: 'project-graph' },
+        },
+      ],
+    };
+
+    const deserialized = deserializeProjectDocument(document);
+
+    expect(deserialized?.invocation.sourceId).toBe('workflow');
+    expect(deserialized?.queue.items[0]?.snapshot.sourceId).toBe('workflow');
+  });
 });
 
 describe('createRecoveredDocument', () => {

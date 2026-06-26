@@ -77,7 +77,7 @@ const routeRunResults = async (
     // A workflow session reports every image its nodes produced; only the
     // non-intermediate outputs are user-facing results.
     const images =
-      queueItem.snapshot.sourceId === 'project-graph' ? allImages.filter((image) => !image.isIntermediate) : allImages;
+      queueItem.snapshot.sourceId === 'workflow' ? allImages.filter((image) => !image.isIntermediate) : allImages;
 
     if (queueItem.snapshot.destination === 'gallery') {
       const selectedBoardId = getSnapshotGalleryBoardId(queueItem);
@@ -124,7 +124,7 @@ const routeBackendItemResults = async (
   try {
     const allImages = await getQueueItemResultImages(backendItemId, queueItem.id, queueItem.snapshot.submittedAt);
     const images =
-      queueItem.snapshot.sourceId === 'project-graph' ? allImages.filter((image) => !image.isIntermediate) : allImages;
+      queueItem.snapshot.sourceId === 'workflow' ? allImages.filter((image) => !image.isIntermediate) : allImages;
     const selectedBoardId = getSnapshotGalleryBoardId(queueItem);
 
     if (selectedBoardId && selectedBoardId !== 'none') {
@@ -296,7 +296,7 @@ export const WorkbenchRuntime = () => {
 
     coordinatorRef.current = coordinator;
     coordinator.connect();
-    // Node definitions back project-graph route validation, which can be the
+    // Node definitions back workflow route validation, which can be the
     // persisted invocation source before any workflow surface has mounted.
     ensureInvocationTemplatesLoaded();
 
@@ -417,7 +417,7 @@ export const WorkbenchRuntime = () => {
       for (const queueItem of project.queue.items) {
         if (
           queueItem.status === 'pending' &&
-          (queueItem.snapshot.sourceId === 'generate' || queueItem.snapshot.sourceId === 'project-graph') &&
+          (queueItem.snapshot.sourceId === 'generate' || queueItem.snapshot.sourceId === 'workflow') &&
           !startedQueueItemIdsRef.current.has(queueItem.id)
         ) {
           startedQueueItemIdsRef.current.add(queueItem.id);

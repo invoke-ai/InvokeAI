@@ -836,13 +836,13 @@ describe('workbenchReducer Phase 5 generation flow', () => {
   it('accepts the project graph source but does not queue an empty project graph', () => {
     let state = createInitialWorkbenchState();
 
-    state = workbenchReducer(state, { sourceId: 'project-graph', type: 'setInvocationSource' });
+    state = workbenchReducer(state, { sourceId: 'workflow', type: 'setInvocationSource' });
 
-    expect(getActiveProject(state).invocation.sourceId).toBe('project-graph');
+    expect(getActiveProject(state).invocation.sourceId).toBe('workflow');
 
     state = workbenchReducer(state, {
       backendSupportsCancellation: true,
-      route: { destination: 'canvas', destinationLocked: false, sourceId: 'project-graph', sourceLocked: true },
+      route: { destination: 'canvas', destinationLocked: false, sourceId: 'workflow', sourceLocked: true },
       type: 'submitResolvedInvocationSnapshot',
     });
 
@@ -883,7 +883,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     // and steers the unlocked invocation source to the project graph.
     expect(project.projectGraph.nodes).toHaveLength(1);
     expect(project.undoRedo.past.at(-1)?.label).toBe('Add workflow node');
-    expect(project.invocation.sourceId).toBe('project-graph');
+    expect(project.invocation.sourceId).toBe('workflow');
 
     state = workbenchReducer(state, { type: 'undoProjectChange' });
 

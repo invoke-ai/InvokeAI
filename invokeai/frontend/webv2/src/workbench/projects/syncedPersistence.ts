@@ -93,17 +93,68 @@ export const serializeProjectDocument = (project: Project): Record<string, unkno
   return document;
 };
 
+const normalizeInvocationSourceId = (sourceId: unknown): unknown => {
+  if (sourceId === 'project-graph') {
+    return 'workflow';
+  }
+
+  if (sourceId === 'canvas-fill') {
+    return 'canvas';
+  }
+
+  return sourceId;
+};
+
+const normalizeLegacyProjectDocument = (data: Record<string, unknown>): Record<string, unknown> => {
+  const invocation = data.invocation;
+  const queue = data.queue;
+
+  return {
+    ...data,
+    invocation:
+      invocation && typeof invocation === 'object'
+        ? { ...invocation, sourceId: normalizeInvocationSourceId((invocation as { sourceId?: unknown }).sourceId) }
+        : invocation,
+    queue:
+      queue && typeof queue === 'object' && Array.isArray((queue as { items?: unknown }).items)
+        ? {
+            ...queue,
+            items: (queue as { items: unknown[] }).items.map((item) => {
+              if (!item || typeof item !== 'object') {
+                return item;
+              }
+
+              const snapshot = (item as { snapshot?: unknown }).snapshot;
+
+              return {
+                ...item,
+                snapshot:
+                  snapshot && typeof snapshot === 'object'
+                    ? {
+                        ...snapshot,
+                        sourceId: normalizeInvocationSourceId((snapshot as { sourceId?: unknown }).sourceId),
+                      }
+                    : snapshot,
+              };
+            }),
+          }
+        : queue,
+  };
+};
+
 export const deserializeProjectDocument = (data: Record<string, unknown>): Project | null => {
+  const normalizedData = normalizeLegacyProjectDocument(data);
+
   if (
-    typeof data.id !== 'string' ||
-    typeof data.name !== 'string' ||
-    typeof data.layout !== 'object' ||
-    data.layout === null
+    typeof normalizedData.id !== 'string' ||
+    typeof normalizedData.name !== 'string' ||
+    typeof normalizedData.layout !== 'object' ||
+    normalizedData.layout === null
   ) {
     return null;
   }
 
-  return { ...data, undoRedo: { future: [], past: [] } } as unknown as Project;
+  return { ...normalizedData, undoRedo: { future: [], past: [] } } as unknown as Project;
 };
 
 const getSyncMapStorageKey = (): string => `${SYNC_MAP_BASE_KEY}${getUserStorageScope()}`;

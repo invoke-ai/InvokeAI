@@ -268,7 +268,11 @@ export interface WidgetToolbarApi {
 export interface WidgetToolbarContribution {
   id: string;
   location: 'center.tabs.trailing' | 'status.left' | 'status.right';
-  items: Array<{ commandId: string; icon?: WidgetIconComponent; label?: string }>;
+  items: Array<{
+    commandId: string;
+    icon?: WidgetIconComponent;
+    label?: string;
+  }>;
 }
 
 export interface OpenWorkbenchWidgetOptions {
@@ -412,16 +416,7 @@ export interface CanvasStateContract {
   };
 }
 
-/**
- * Invocation sources and destinations.
- *
- * Phase 1 only needs enough of the Invocation Controller to render a stable,
- * fixed-width `Source → Destination` route on the global Invoke control. The
- * full resolver (auto vs. locked, validation, dialog focus) arrives in Phase 4,
- * but the project-owned shape is modelled now so the control is not a dead
- * placeholder.
- */
-export type InvocationSourceId = 'generate' | 'project-graph' | 'upscale' | 'canvas-fill';
+export type InvocationSourceId = 'generate' | 'workflow' | 'upscale' | 'canvas';
 
 export type InvocationMode = 'global' | 'dialog';
 

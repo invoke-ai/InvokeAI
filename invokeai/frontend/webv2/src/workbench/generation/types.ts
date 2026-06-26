@@ -155,7 +155,7 @@ export interface QueueItemDTO {
   };
 }
 
-/** A source-agnostic graph submission (used by the project-graph / workflow source). */
+/** A source-agnostic graph submission (used by the workflow source). */
 export interface EnqueueWorkflowRequest {
   batchCount: number;
   destination: ResultDestination;
