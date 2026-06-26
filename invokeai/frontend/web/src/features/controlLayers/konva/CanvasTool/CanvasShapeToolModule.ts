@@ -175,7 +175,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     const tool = this.parent.$tool.get();
     const isTemporaryToolSwitch = shouldPreserveSuspendableShapesSession(
       tool,
-      this.parent.$toolBuffer.get(),
+      this.parent.$baseTool.get(),
       this.hasSuspendableSession()
     );
     if (tool !== 'rect' && !isTemporaryToolSwitch) {
@@ -191,7 +191,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     const tool = this.parent.$tool.get();
     const isTemporaryToolSwitch = shouldPreserveSuspendableShapesSession(
       tool,
-      this.parent.$toolBuffer.get(),
+      this.parent.$baseTool.get(),
       this.hasSuspendableSession()
     );
     if (tool !== 'rect' && !isTemporaryToolSwitch) {
@@ -392,7 +392,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     const tool = this.parent.$tool.get();
     const isTemporaryToolSwitch = shouldPreserveSuspendableShapesSession(
       tool,
-      this.parent.$toolBuffer.get(),
+      this.parent.$baseTool.get(),
       this.hasSuspendableSession()
     );
     if (tool !== 'rect' && !isTemporaryToolSwitch) {
