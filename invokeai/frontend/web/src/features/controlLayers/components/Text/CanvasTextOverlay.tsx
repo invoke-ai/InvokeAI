@@ -7,7 +7,11 @@ import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSe
 import type { CanvasTextSettingsState } from 'features/controlLayers/store/canvasTextSlice';
 import { selectCanvasTextSlice } from 'features/controlLayers/store/canvasTextSlice';
 import type { Coordinate } from 'features/controlLayers/store/types';
-import { getFontStackById, TEXT_RASTER_PADDING } from 'features/controlLayers/text/textConstants';
+import {
+  $customTextFontStacks,
+  getFontStackById,
+  TEXT_RASTER_PADDING,
+} from 'features/controlLayers/text/textConstants';
 import { isAllowedTextShortcut } from 'features/controlLayers/text/textHotkeys';
 import { measureTextContent, type TextMeasureConfig } from 'features/controlLayers/text/textRenderer';
 import {
@@ -28,6 +32,7 @@ export const CanvasTextOverlay = memo(() => {
   const canvasManager = useCanvasManager();
   const session = useStore(canvasManager.tool.tools.text.$session);
   const stageAttrs = useStore(canvasManager.stage.$stageAttrs);
+  useStore($customTextFontStacks);
 
   if (!session) {
     return null;
@@ -71,12 +76,16 @@ const ROTATE_ANCHOR_LINE_LENGTH = ROTATE_ANCHOR_GAP;
 const ROTATE_ANCHOR_FILL = 'invokeBlue.50';
 const ROTATE_ANCHOR_STROKE = 'invokeBlue.500';
 
-const buildMeasureConfig = (text: string, settings: CanvasTextSettingsState): TextMeasureConfig => {
+const buildMeasureConfig = (
+  text: string,
+  settings: CanvasTextSettingsState,
+  fontFamily: TextMeasureConfig['fontFamily']
+): TextMeasureConfig => {
   const fontStyle: TextMeasureConfig['fontStyle'] = settings.italic ? 'italic' : 'normal';
   return {
     text,
     fontSize: settings.fontSize,
-    fontFamily: getFontStackById(settings.fontId),
+    fontFamily,
     fontWeight: settings.bold ? 700 : 400,
     fontStyle,
     lineHeight: settings.lineHeight,
@@ -99,6 +108,7 @@ const TextEditor = ({
   const canvasManager = useCanvasManager();
   const textSettings = useAppSelector(selectCanvasTextSlice);
   const canvasSettings = useAppSelector(selectCanvasSettingsSlice);
+  useStore($customTextFontStacks);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<HTMLDivElement | null>(null);
   const lastSessionIdRef = useRef<string | null>(null);
@@ -111,9 +121,10 @@ const TextEditor = ({
   const [isDragging, setIsDragging] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
   const [textValue, setTextValue] = useState(initialText);
+  const fontFamily = getFontStackById(textSettings.fontId);
   const contentMetrics = useMemo(
-    () => measureTextContent(buildMeasureConfig(textValue, textSettings)),
-    [textValue, textSettings]
+    () => measureTextContent(buildMeasureConfig(textValue, textSettings, fontFamily)),
+    [fontFamily, textSettings, textValue]
   );
   const textContainerData = useMemo(() => {
     const padding = TEXT_RASTER_PADDING;
@@ -570,7 +581,7 @@ const TextEditor = ({
       decorations.push('line-through');
     }
     return {
-      fontFamily: getFontStackById(textSettings.fontId),
+      fontFamily,
       fontWeight: textSettings.bold ? 700 : 400,
       fontStyle: textSettings.italic ? 'italic' : 'normal',
       textDecorationLine: decorations.length ? decorations.join(' ') : 'none',
@@ -579,7 +590,7 @@ const TextEditor = ({
       color,
       textAlign: textSettings.alignment,
     } as const;
-  }, [canvasSettings, contentMetrics.lineHeightPx, textSettings]);
+  }, [canvasSettings, contentMetrics.lineHeightPx, fontFamily, textSettings]);
 
   const stageScale = stageAttrs.scale || 1;
   const outlineScale = stageScale ? 1 / stageScale : 1;
