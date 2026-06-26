@@ -16414,6 +16414,11 @@ export type components = {
              */
             use_memory_db?: boolean;
             /**
+             * Db Url
+             * @description SQLAlchemy URL for an external database backend (e.g. 'mysql+pymysql://user:pass@host/invokeai'). When unset, the local SQLite database (db_dir/invokeai.db) is used.
+             */
+            db_url?: string | null;
+            /**
              * Dev Reload
              * @description Automatically reload when Python sources are changed. Does not reload node definitions.
              * @default false

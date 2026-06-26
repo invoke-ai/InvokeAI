@@ -41002,6 +41002,18 @@
             "description": "Use in-memory database. Useful for development.",
             "default": false
           },
+          "db_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Db Url",
+            "description": "SQLAlchemy URL for an external database backend (e.g. 'mysql+pymysql://user:pass@host/invokeai'). When unset, the local SQLite database (db_dir/invokeai.db) is used."
+          },
           "dev_reload": {
             "type": "boolean",
             "title": "Dev Reload",
