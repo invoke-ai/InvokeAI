@@ -14,6 +14,7 @@ import {
   zBaseModelType,
   zBoardField,
   zColorField,
+  zFileField,
   zImageField,
   zModelFormat,
   zModelIdentifierField,
@@ -161,6 +162,10 @@ const zImageCollectionFieldType = zFieldTypeBase.extend({
   cardinality: z.literal(COLLECTION),
   originalType: zStatelessFieldType.optional(),
 });
+const zFileFieldType = zFieldTypeBase.extend({
+  name: z.literal('FileField'),
+  originalType: zStatelessFieldType.optional(),
+});
 export const isImageCollectionFieldType = (
   fieldType: FieldType
 ): fieldType is z.infer<typeof zImageCollectionFieldType> =>
@@ -211,6 +216,7 @@ const zStatefulFieldType = z.union([
   zBooleanFieldType,
   zEnumFieldType,
   zImageFieldType,
+  zFileFieldType,
   zBoardFieldType,
   zStylePresetFieldType,
   zModelIdentifierFieldType,
@@ -557,6 +563,26 @@ export const isImageFieldInputTemplate = buildTemplateTypeGuard<ImageFieldInputT
   'SINGLE',
   'SINGLE_OR_COLLECTION',
 ]);
+// #endregion
+
+// #region FileField
+export const zFileFieldValue = zFileField.optional();
+const zFileFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zFileFieldValue,
+});
+const zFileFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zFileFieldType,
+  originalType: zFieldType.optional(),
+  default: zFileFieldValue,
+});
+const zFileFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zFileFieldType,
+});
+export type FileFieldValue = z.infer<typeof zFileFieldValue>;
+export type FileFieldInputInstance = z.infer<typeof zFileFieldInputInstance>;
+export type FileFieldInputTemplate = z.infer<typeof zFileFieldInputTemplate>;
+export const isFileFieldInputInstance = buildInstanceTypeGuard(zFileFieldInputInstance);
+export const isFileFieldInputTemplate = buildTemplateTypeGuard<FileFieldInputTemplate>('FileField', ['SINGLE']);
 // #endregion
 
 // #region ImageField Collection
@@ -1284,6 +1310,7 @@ export const zStatefulFieldValue = z.union([
   zBooleanFieldValue,
   zEnumFieldValue,
   zImageFieldValue,
+  zFileFieldValue,
   zImageFieldCollectionValue,
   zBoardFieldValue,
   zStylePresetFieldValue,
@@ -1312,6 +1339,7 @@ const zStatefulFieldInputInstance = z.union([
   zBooleanFieldInputInstance,
   zEnumFieldInputInstance,
   zImageFieldInputInstance,
+  zFileFieldInputInstance,
   zImageFieldCollectionInputInstance,
   zBoardFieldInputInstance,
   zStylePresetFieldInputInstance,
@@ -1339,6 +1367,7 @@ const zStatefulFieldInputTemplate = z.union([
   zBooleanFieldInputTemplate,
   zEnumFieldInputTemplate,
   zImageFieldInputTemplate,
+  zFileFieldInputTemplate,
   zImageFieldCollectionInputTemplate,
   zBoardFieldInputTemplate,
   zStylePresetFieldInputTemplate,
@@ -1367,6 +1396,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zBooleanFieldOutputTemplate,
   zEnumFieldOutputTemplate,
   zImageFieldOutputTemplate,
+  zFileFieldOutputTemplate,
   zImageFieldCollectionOutputTemplate,
   zBoardFieldOutputTemplate,
   zStylePresetFieldOutputTemplate,

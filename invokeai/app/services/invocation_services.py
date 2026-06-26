@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.download import DownloadQueueServiceBase
     from invokeai.app.services.events.events_base import EventServiceBase
     from invokeai.app.services.external_generation.external_generation_base import ExternalGenerationServiceBase
+    from invokeai.app.services.files.files_base import FileServiceBase
     from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
     from invokeai.app.services.image_records.image_records_base import ImageRecordStorageBase
     from invokeai.app.services.images.images_base import ImageServiceABC
@@ -79,6 +80,7 @@ class InvocationServices:
         workflow_thumbnails: "WorkflowThumbnailServiceBase",
         client_state_persistence: "ClientStatePersistenceABC",
         users: "UserServiceBase",
+        files: "FileServiceBase | None" = None,
     ):
         self.board_images = board_images
         self.board_image_records = board_image_records
@@ -111,3 +113,4 @@ class InvocationServices:
         self.workflow_thumbnails = workflow_thumbnails
         self.client_state_persistence = client_state_persistence
         self.users = users
+        self.files = files

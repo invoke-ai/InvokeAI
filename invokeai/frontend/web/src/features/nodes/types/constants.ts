@@ -44,6 +44,7 @@ export const FIELD_COLORS: { [key: string]: string } = {
   ControlNetModelField: 'teal.500',
   EnumField: 'blue.500',
   FloatField: 'orange.500',
+  FileField: 'cyan.500',
   ImageField: 'purple.500',
   ImageBatchField: 'purple.500',
   IntegerField: 'red.500',

@@ -1,7 +1,7 @@
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Optional, Union
+from typing import IO, TYPE_CHECKING, Any, Callable, Optional, Union
 
 from PIL.Image import Image
 from pydantic.networks import AnyHttpUrl
@@ -12,6 +12,7 @@ from invokeai.app.invocations.fields import MetadataField, WithBoard, WithMetada
 from invokeai.app.services.board_records.board_records_common import BoardRecordOrderBy
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.files.files_common import FileDTO
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
@@ -162,6 +163,47 @@ class LoggerInterface(InvocationContextInterface):
             message: The message to log.
         """
         self._services.logger.error(message)
+
+
+class FilesInterface(InvocationContextInterface):
+    def get_dto(self, file_id: str) -> FileDTO:
+        """Gets metadata for a managed file.
+
+        Args:
+            file_id: The managed file ID.
+
+        Returns:
+            The file DTO.
+        """
+        return self._get_files_service().get_dto(file_id, user_id=self._data.queue_item.user_id)
+
+    def get_path(self, file_id: str) -> Path:
+        """Gets the server-side path to a managed file.
+
+        Args:
+            file_id: The managed file ID.
+
+        Returns:
+            The path to the managed file on the InvokeAI server.
+        """
+        return self._get_files_service().get_path(file_id, user_id=self._data.queue_item.user_id)
+
+    def open(self, file_id: str, mode: str = "rb") -> IO[Any]:
+        """Opens a managed file for reading.
+
+        Args:
+            file_id: The managed file ID.
+            mode: The read mode to use. Supported values are "rb" and "r".
+
+        Returns:
+            A readable file object.
+        """
+        return self._get_files_service().open(file_id, mode=mode, user_id=self._data.queue_item.user_id)
+
+    def _get_files_service(self):
+        if self._services.files is None:
+            raise RuntimeError("The managed files service is not available.")
+        return self._services.files
 
 
 class ImagesInterface(InvocationContextInterface):
@@ -731,6 +773,7 @@ class InvocationContext:
         config (ConfigInterface): The app config.
         util (UtilInterface): Utility methods, including a method to check if an invocation was canceled and step callbacks.
         boards (BoardsInterface): Methods to interact with boards.
+        files (FilesInterface): Methods to read managed files uploaded for node inputs.
     """
 
     def __init__(
@@ -743,6 +786,7 @@ class InvocationContext:
         config: ConfigInterface,
         util: UtilInterface,
         boards: BoardsInterface,
+        files: FilesInterface,
         data: InvocationContextData,
         services: InvocationServices,
     ) -> None:
@@ -762,6 +806,8 @@ class InvocationContext:
         """Utility methods, including a method to check if an invocation was canceled and step callbacks."""
         self.boards = boards
         """Methods to interact with boards."""
+        self.files = files
+        """Methods to read managed files uploaded for node inputs."""
         self._data = data
         """An internal API providing access to data about the current queue item and invocation. You probably shouldn't use this. It may change without warning."""
         self._services = services
@@ -791,6 +837,7 @@ def build_invocation_context(
     models = ModelsInterface(services=services, data=data, util=util)
     images = ImagesInterface(services=services, data=data, util=util)
     boards = BoardsInterface(services=services, data=data)
+    files = FilesInterface(services=services, data=data)
 
     ctx = InvocationContext(
         images=images,
@@ -803,6 +850,7 @@ def build_invocation_context(
         conditioning=conditioning,
         services=services,
         boards=boards,
+        files=files,
     )
 
     return ctx

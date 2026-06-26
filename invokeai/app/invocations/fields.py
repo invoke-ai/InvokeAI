@@ -240,6 +240,12 @@ class ImageField(BaseModel):
     image_name: str = Field(description="The name of the image")
 
 
+class FileField(BaseModel):
+    """A managed file primitive field"""
+
+    file_id: str = Field(description="The id of the managed file")
+
+
 class BoardField(BaseModel):
     """A board primitive field"""
 

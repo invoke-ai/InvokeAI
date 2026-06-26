@@ -8,6 +8,7 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   ColorField: { r: 0, g: 0, b: 0, a: 1 },
   FloatField: 0,
   ImageField: undefined,
+  FileField: undefined,
   IntegerField: 0,
   ModelIdentifierField: undefined,
   SchedulerField: 'dpmpp_3m_k',
