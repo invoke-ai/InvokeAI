@@ -207,10 +207,16 @@ def _has_krea2_keys(state_dict: dict[str | int, Any]) -> bool:
     prefix (with ``layerwise_blocks`` / ``refiner_blocks`` / ``projector``) is unique to it.
     Returns True only for Krea-2 main models, not LoRAs.
     """
+    # The text-fusion stage is unique to Krea-2. Diffusers naming uses `text_fusion`/`time_mod_proj`;
+    # the native/ComfyUI GGUF conversion uses the compact `txtfusion`/`tproj` names instead.
     krea2_specific_keys = {
-        "text_fusion",  # text-fusion stage (layerwise_blocks, refiner_blocks, projector) - unique to Krea-2
-        "time_mod_proj",  # timestep modulation projection
+        "text_fusion",  # text-fusion stage (diffusers naming) - unique to Krea-2
+        "txtfusion",  # text-fusion stage (native/ComfyUI GGUF naming)
+        "time_mod_proj",  # timestep modulation projection (diffusers)
     }
+    # Corroborating image-input signals: `img_in` (diffusers) / `first` (native), or the timestep
+    # modulation projection (`tproj` native).
+    krea2_corroborating_keys = {"img_in", "first", "tproj"}
 
     lora_suffixes = (
         ".lora_down.weight",
@@ -229,7 +235,7 @@ def _has_krea2_keys(state_dict: dict[str | int, Any]) -> bool:
             return False
 
     has_text_fusion = False
-    has_img_in = False
+    has_corroborator = False
     for key in state_dict.keys():
         if isinstance(key, int):
             continue
@@ -237,10 +243,10 @@ def _has_krea2_keys(state_dict: dict[str | int, Any]) -> bool:
         key_parts = key.split(".")
         if any(part in krea2_specific_keys for part in key_parts):
             has_text_fusion = True
-        if "img_in" in key_parts:
-            has_img_in = True
-    # Require the distinctive text-fusion stage; img_in is a corroborating signal.
-    return has_text_fusion and has_img_in
+        if any(part in krea2_corroborating_keys for part in key_parts):
+            has_corroborator = True
+    # Require the distinctive text-fusion stage; the image-input key is a corroborating signal.
+    return has_text_fusion and has_corroborator
 
 
 class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
@@ -1406,6 +1412,38 @@ class Main_Checkpoint_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Con
     def _validate_does_not_look_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
         if _has_ggml_tensors(mod.load_state_dict()):
             raise NotAMatchError("state dict looks like GGUF quantized")
+
+
+class Main_GGUF_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized Krea-2 transformer models (single-file)."""
+
+    base: Literal[BaseModelType.Krea2] = Field(default=BaseModelType.Krea2)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    variant: Krea2VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_krea2_model(mod)
+
+        cls._validate_looks_like_gguf_quantized(mod)
+
+        variant = override_fields.pop("variant", None) or Krea2VariantType.Turbo
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _validate_looks_like_krea2_model(cls, mod: ModelOnDisk) -> None:
+        if not _has_krea2_keys(mod.load_state_dict()):
+            raise NotAMatchError("state dict does not look like a Krea-2 model")
+
+    @classmethod
+    def _validate_looks_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
+        if not _has_ggml_tensors(mod.load_state_dict()):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
 
 
 class Main_Diffusers_QwenImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):

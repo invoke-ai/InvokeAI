@@ -241,6 +241,23 @@ const slice = createSlice({
       }
       state.zImageQwen3SourceModel = result.data;
     },
+    krea2VaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      const result = zParamsState.shape.krea2VaeModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.krea2VaeModel = result.data;
+    },
+    krea2Qwen3VlEncoderModelSelected: (
+      state,
+      action: PayloadAction<{ key: string; name: string; base: string } | null>
+    ) => {
+      const result = zParamsState.shape.krea2Qwen3VlEncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.krea2Qwen3VlEncoderModel = result.data;
+    },
     animaVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
       const result = zParamsState.shape.animaVaeModel.safeParse(action.payload);
       if (!result.success) {
@@ -630,6 +647,8 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.zImageVaeModel = oldState.zImageVaeModel;
   newState.zImageQwen3EncoderModel = oldState.zImageQwen3EncoderModel;
   newState.zImageQwen3SourceModel = oldState.zImageQwen3SourceModel;
+  newState.krea2VaeModel = oldState.krea2VaeModel;
+  newState.krea2Qwen3VlEncoderModel = oldState.krea2Qwen3VlEncoderModel;
   newState.animaVaeModel = oldState.animaVaeModel;
   newState.animaQwen3EncoderModel = oldState.animaQwen3EncoderModel;
   newState.kleinVaeModel = oldState.kleinVaeModel;
@@ -690,6 +709,8 @@ export const {
   zImageVaeModelSelected,
   zImageQwen3EncoderModelSelected,
   zImageQwen3SourceModelSelected,
+  krea2VaeModelSelected,
+  krea2Qwen3VlEncoderModelSelected,
   kleinVaeModelSelected,
   kleinQwen3EncoderModelSelected,
   qwenImageComponentSourceSelected,
@@ -807,6 +828,8 @@ export const selectCLIPGEmbedModel = createParamsSelector((params) => params.cli
 export const selectZImageVaeModel = createParamsSelector((params) => params.zImageVaeModel);
 export const selectZImageQwen3EncoderModel = createParamsSelector((params) => params.zImageQwen3EncoderModel);
 export const selectZImageQwen3SourceModel = createParamsSelector((params) => params.zImageQwen3SourceModel);
+export const selectKrea2VaeModel = createParamsSelector((params) => params.krea2VaeModel);
+export const selectKrea2Qwen3VlEncoderModel = createParamsSelector((params) => params.krea2Qwen3VlEncoderModel);
 export const selectAnimaVaeModel = createParamsSelector((params) => params.animaVaeModel);
 export const selectAnimaQwen3EncoderModel = createParamsSelector((params) => params.animaQwen3EncoderModel);
 export const selectAnimaScheduler = createParamsSelector((params) => params.animaScheduler);

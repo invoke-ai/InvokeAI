@@ -22,6 +22,7 @@ import ParamCLIPGEmbedModelSelect from 'features/parameters/components/Advanced/
 import ParamCLIPLEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPLEmbedModelSelect';
 import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip';
 import ParamFlux2KleinModelSelect from 'features/parameters/components/Advanced/ParamFlux2KleinModelSelect';
+import ParamKrea2ModelSelects from 'features/parameters/components/Advanced/ParamKrea2ModelSelects';
 import ParamQwenImageComponentSourceSelect from 'features/parameters/components/Advanced/ParamQwenImageComponentSourceSelect';
 import ParamQwenImageQuantization from 'features/parameters/components/Advanced/ParamQwenImageQuantization';
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
@@ -169,6 +170,11 @@ export const AdvancedSettingsAccordion = memo(() => {
         {isAnima && (
           <FormControlGroup>
             <ParamAnimaModelSelect />
+          </FormControlGroup>
+        )}
+        {isKrea2 && (
+          <FormControlGroup>
+            <ParamKrea2ModelSelects />
           </FormControlGroup>
         )}
       </Flex>

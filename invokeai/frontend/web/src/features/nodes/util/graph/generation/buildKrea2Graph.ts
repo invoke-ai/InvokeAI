@@ -29,14 +29,14 @@ export const buildKrea2Graph = async (arg: GraphBuilderArg): Promise<GraphBuilde
   const model = selectMainModelConfig(state);
   assert(model, 'No model selected');
   assert(model.base === 'krea-2', 'Selected model is not a Krea-2 model');
-  // The VAE (Qwen-Image VAE) and Qwen3-VL encoder are extracted from the diffusers pipeline.
-  assert(model.format === 'diffusers', 'Krea-2 currently requires a Diffusers-format model');
 
   const params = selectParamsSlice(state);
   // Krea-2-Turbo uses the standard CFG convention; cfg_scale defaults to 1.0 (no CFG) for the distilled model.
   const {
     cfgScale: cfg_scale,
     steps,
+    krea2VaeModel,
+    krea2Qwen3VlEncoderModel,
     krea2RebalanceEnabled,
     krea2RebalanceMultiplier,
     krea2RebalanceWeights,
@@ -44,6 +44,13 @@ export const buildKrea2Graph = async (arg: GraphBuilderArg): Promise<GraphBuilde
     krea2SeedVarianceStrength,
     krea2SeedVarianceRandomizePercent,
   } = params;
+
+  // Krea-2 has no source field: a non-diffusers transformer (single-file checkpoint / GGUF) has no
+  // bundled VAE or encoder, so both standalone submodels must be selected. (Also enforced in readiness.)
+  if (model.format !== 'diffusers') {
+    assert(krea2VaeModel, 'Krea-2 non-diffusers models require a VAE to be selected');
+    assert(krea2Qwen3VlEncoderModel, 'Krea-2 non-diffusers models require a Qwen3-VL encoder to be selected');
+  }
 
   const prompts = selectPresetModifiedPrompts(state);
 
@@ -53,6 +60,10 @@ export const buildKrea2Graph = async (arg: GraphBuilderArg): Promise<GraphBuilde
     type: 'krea2_model_loader',
     id: getPrefixedId('krea2_model_loader'),
     model,
+    // Optional standalone submodels (used when the transformer is a single-file checkpoint/GGUF). When
+    // unset, the loader extracts the VAE / Qwen3-VL encoder from the diffusers model.
+    vae_model: krea2VaeModel ?? undefined,
+    qwen3_vl_encoder_model: krea2Qwen3VlEncoderModel ?? undefined,
   });
 
   const positivePrompt = g.addNode({

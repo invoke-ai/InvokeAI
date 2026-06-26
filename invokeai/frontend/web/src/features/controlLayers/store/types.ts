@@ -854,6 +854,10 @@ export const zParamsState = z.object({
   zImageSeedVarianceEnabled: z.boolean(),
   zImageSeedVarianceStrength: z.number().min(0).max(2),
   zImageSeedVarianceRandomizePercent: z.number().min(1).max(100),
+  // Krea-2 standalone submodels (optional; used when the transformer is a single-file checkpoint/GGUF
+  // that has no bundled VAE / Qwen3-VL encoder. When null, they are extracted from the diffusers model.)
+  krea2VaeModel: zParameterVAEModel.nullable(),
+  krea2Qwen3VlEncoderModel: zModelIdentifierField.nullable(),
   // Krea-2 conditioning enhancers (optional; both default off so stock behaviour is unchanged)
   krea2SeedVarianceEnabled: z.boolean(),
   krea2SeedVarianceStrength: z.number().min(0).max(100),
@@ -944,6 +948,8 @@ export const getInitialParamsState = (): ParamsState => ({
   zImageSeedVarianceEnabled: false,
   zImageSeedVarianceStrength: 0.1,
   zImageSeedVarianceRandomizePercent: 50,
+  krea2VaeModel: null,
+  krea2Qwen3VlEncoderModel: null,
   krea2SeedVarianceEnabled: false,
   krea2SeedVarianceStrength: 20,
   krea2SeedVarianceRandomizePercent: 50,
