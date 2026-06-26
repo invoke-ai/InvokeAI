@@ -11,6 +11,7 @@ import type {
   VaePrecision,
 } from './types';
 
+import { sanitizeBatchCount } from './batch';
 import { isVaeCompatibleWithGenerateModel } from './componentCompatibility';
 
 /** Preset ratios, with the preset to switch to when dimensions are swapped. */
@@ -335,7 +336,7 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     typeof values.negativePrompt === 'string' &&
     typeof values.scheduler === 'string' &&
     typeof values.shouldRandomizeSeed === 'boolean' &&
-    ['batchCount', 'width', 'height', 'steps', 'cfgScale', 'cfgRescaleMultiplier', 'seed'].every((key) =>
+    ['width', 'height', 'steps', 'cfgScale', 'cfgRescaleMultiplier', 'seed'].every((key) =>
       hasFiniteNumber(values, key)
     );
 
@@ -355,7 +356,7 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
         : height > 0
           ? width / height
           : 1,
-    batchCount: values.batchCount as number,
+    batchCount: sanitizeBatchCount(values.batchCount),
     cfgRescaleMultiplier: values.cfgRescaleMultiplier as number,
     cfgScale: values.cfgScale as number,
     clipSkip: hasFiniteNumber(values, 'clipSkip') ? (values.clipSkip as number) : 0,

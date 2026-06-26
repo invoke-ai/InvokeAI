@@ -70,6 +70,13 @@ describe('normalizeGenerateSettings', () => {
     expect(normalizeGenerateSettings(null)).toBeNull();
   });
 
+  it('defaults an omitted batch count to one', () => {
+    const { batchCount, ...storedValues } = legacyStoredValues;
+
+    expect(batchCount).toBe(2);
+    expect(normalizeGenerateSettings(storedValues)?.batchCount).toBe(1);
+  });
+
   it('drops malformed values for the newer fields back to defaults', () => {
     const normalized = normalizeGenerateSettings({
       ...legacyStoredValues,
