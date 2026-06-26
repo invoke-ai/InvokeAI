@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -7,11 +8,13 @@ from fastapi.testclient import TestClient
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
+from invokeai.app.services.model_records import ModelRecordChanges
 from invokeai.backend.model_manager.configs.external_api import (
     ExternalApiModelConfig,
     ExternalModelCapabilities,
     ExternalModelPanelSchema,
 )
+from invokeai.backend.model_manager.metadata import CivitaiMetadata, UnknownMetadataException
 from invokeai.backend.model_manager.taxonomy import ModelType
 
 
@@ -36,6 +39,30 @@ class MockApiDependencies(ApiDependencies):
 
     def __init__(self, invoker: DummyInvoker) -> None:
         self.invoker = invoker
+
+
+def _patch_model_manager_dependencies(monkeypatch: Any, mm2_model_manager: Any, mm2_app_config: Any) -> None:
+    services = type("Services", (), {})()
+    services.model_manager = mm2_model_manager
+    services.model_images = DummyModelImages()
+    services.configuration = mm2_app_config
+
+    invoker = DummyInvoker(services)
+    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
+
+
+def _civitai_metadata(
+    trained_words: list[str], source_url: str | None = "https://civitai.com/models/111?modelVersionId=222"
+) -> CivitaiMetadata:
+    return CivitaiMetadata(
+        name="Test CivitAI LoRA",
+        model_id=111,
+        model_version_id=222,
+        trained_words=trained_words,
+        api_response=json.dumps({"trainedWords": trained_words}),
+        source_url=source_url,
+    )
 
 
 def test_model_manager_external_config_round_trip(
@@ -183,3 +210,219 @@ def test_model_manager_gemini_starter_model_applies_reference_and_resolution_ove
         "16:9",
         "21:9",
     ]
+
+
+def test_refresh_trigger_phrases_restores_deleted_civitai_words_from_source_url(
+    monkeypatch: Any, client: TestClient, mm2_model_manager: Any, mm2_app_config: Any
+) -> None:
+    _patch_model_manager_dependencies(monkeypatch, mm2_model_manager, mm2_app_config)
+    mm2_model_manager.store.update_model(
+        "test_config_4",
+        ModelRecordChanges(
+            source_url="https://civitai.com/models/111/test-lora?modelVersionId=222",
+            trigger_phrases={"custom"},
+        ),
+    )
+
+    class FakeCivitaiMetadataFetch:
+        def from_url(self, url: str) -> CivitaiMetadata:
+            assert url == "https://civitai.com/models/111/test-lora?modelVersionId=222"
+            return _civitai_metadata(["alpha", "custom"])
+
+        def from_hash(self, hash_value: str) -> CivitaiMetadata:
+            raise AssertionError("hash lookup should not be used when source URL resolves")
+
+    monkeypatch.setattr(
+        "invokeai.app.api.routers.model_manager.CivitaiMetadataFetch", lambda: FakeCivitaiMetadataFetch()
+    )
+
+    response = client.post("/api/v2/models/i/test_config_4/refresh_trigger_phrases")
+
+    assert response.status_code == 200
+    assert set(response.json()["trigger_phrases"]) == {"alpha", "custom"}
+    updated_config = mm2_model_manager.store.get_model("test_config_4")
+    assert set(updated_config.trigger_phrases or []) == {"alpha", "custom"}
+    assert updated_config.source_api_response == '{"trainedWords": ["alpha", "custom"]}'
+    assert updated_config.source_url == "https://civitai.com/models/111/test-lora?modelVersionId=222"
+
+
+def test_refresh_trigger_phrases_uses_hash_lookup_when_no_civitai_source(
+    monkeypatch: Any, client: TestClient, mm2_model_manager: Any, mm2_app_config: Any
+) -> None:
+    _patch_model_manager_dependencies(monkeypatch, mm2_model_manager, mm2_app_config)
+
+    class FakeCivitaiMetadataFetch:
+        def from_url(self, url: str) -> CivitaiMetadata:
+            raise AssertionError("source URL lookup should not be used for non-CivitAI sources")
+
+        def from_hash(self, hash_value: str) -> CivitaiMetadata:
+            assert hash_value == "111222333444"
+            return _civitai_metadata(["hash word"])
+
+    monkeypatch.setattr(
+        "invokeai.app.api.routers.model_manager.CivitaiMetadataFetch", lambda: FakeCivitaiMetadataFetch()
+    )
+
+    response = client.post("/api/v2/models/i/test_config_4/refresh_trigger_phrases")
+
+    assert response.status_code == 200
+    assert set(response.json()["trigger_phrases"]) == {"hash word"}
+    updated_config = mm2_model_manager.store.get_model("test_config_4")
+    assert updated_config.source_url == "https://civitai.com/models/111?modelVersionId=222"
+
+
+def test_refresh_trigger_phrases_uses_hash_lookup_for_generic_civitai_source(
+    monkeypatch: Any, client: TestClient, mm2_model_manager: Any, mm2_app_config: Any
+) -> None:
+    _patch_model_manager_dependencies(monkeypatch, mm2_model_manager, mm2_app_config)
+    mm2_model_manager.store.update_model(
+        "test_config_4",
+        ModelRecordChanges(source_url="https://civitai.com/models/111/test-lora"),
+    )
+
+    class FakeCivitaiMetadataFetch:
+        def from_url(self, url: str) -> CivitaiMetadata:
+            raise AssertionError("generic CivitAI model pages should not be used for URL lookup")
+
+        def from_hash(self, hash_value: str) -> CivitaiMetadata:
+            assert hash_value == "111222333444"
+            return _civitai_metadata(["hash word"])
+
+    monkeypatch.setattr(
+        "invokeai.app.api.routers.model_manager.CivitaiMetadataFetch", lambda: FakeCivitaiMetadataFetch()
+    )
+
+    response = client.post("/api/v2/models/i/test_config_4/refresh_trigger_phrases")
+
+    assert response.status_code == 200
+    assert set(response.json()["trigger_phrases"]) == {"hash word"}
+    updated_config = mm2_model_manager.store.get_model("test_config_4")
+    assert updated_config.source_url == "https://civitai.com/models/111/test-lora?modelVersionId=222"
+
+
+def test_refresh_trigger_phrases_rejects_non_lora_model(
+    monkeypatch: Any, client: TestClient, mm2_model_manager: Any, mm2_app_config: Any
+) -> None:
+    _patch_model_manager_dependencies(monkeypatch, mm2_model_manager, mm2_app_config)
+
+    response = client.post("/api/v2/models/i/test_config_2/refresh_trigger_phrases")
+
+    assert response.status_code == 400
+    assert "LoRA" in response.json()["detail"]
+
+
+def test_refresh_trigger_phrases_saves_source_metadata_when_civitai_has_no_words(
+    monkeypatch: Any, client: TestClient, mm2_model_manager: Any, mm2_app_config: Any
+) -> None:
+    _patch_model_manager_dependencies(monkeypatch, mm2_model_manager, mm2_app_config)
+    mm2_model_manager.store.update_model(
+        "test_config_4",
+        ModelRecordChanges(trigger_phrases={"custom"}),
+    )
+
+    class FakeCivitaiMetadataFetch:
+        def from_hash(self, hash_value: str) -> CivitaiMetadata:
+            return _civitai_metadata([])
+
+    monkeypatch.setattr(
+        "invokeai.app.api.routers.model_manager.CivitaiMetadataFetch", lambda: FakeCivitaiMetadataFetch()
+    )
+
+    response = client.post("/api/v2/models/i/test_config_4/refresh_trigger_phrases")
+
+    assert response.status_code == 200
+    assert set(response.json()["trigger_phrases"]) == {"custom"}
+    updated_config = mm2_model_manager.store.get_model("test_config_4")
+    assert set(updated_config.trigger_phrases or []) == {"custom"}
+    assert updated_config.source_api_response == '{"trainedWords": []}'
+    assert updated_config.source_url == "https://civitai.com/models/111?modelVersionId=222"
+
+
+def test_refresh_trigger_phrases_falls_back_to_stored_civitai_response(
+    monkeypatch: Any, client: TestClient, mm2_model_manager: Any, mm2_app_config: Any
+) -> None:
+    _patch_model_manager_dependencies(monkeypatch, mm2_model_manager, mm2_app_config)
+    mm2_model_manager.store.update_model(
+        "test_config_4",
+        ModelRecordChanges(
+            source_url="https://civitai.com/models/111/test-lora",
+            source_api_response='{"trainedWords": ["cached"]}',
+            trigger_phrases={"custom"},
+        ),
+    )
+
+    class FakeCivitaiMetadataFetch:
+        def from_url(self, url: str) -> CivitaiMetadata:
+            raise AssertionError("generic CivitAI model pages should not be used for URL lookup")
+
+        def from_hash(self, hash_value: str) -> CivitaiMetadata:
+            raise UnknownMetadataException("live lookup failed")
+
+        def from_api_response(self, json_str: str) -> CivitaiMetadata:
+            assert json_str == '{"trainedWords": ["cached"]}'
+            return _civitai_metadata(["cached"])
+
+    monkeypatch.setattr(
+        "invokeai.app.api.routers.model_manager.CivitaiMetadataFetch", lambda: FakeCivitaiMetadataFetch()
+    )
+
+    response = client.post("/api/v2/models/i/test_config_4/refresh_trigger_phrases")
+
+    assert response.status_code == 200
+    assert set(response.json()["trigger_phrases"]) == {"cached", "custom"}
+    updated_config = mm2_model_manager.store.get_model("test_config_4")
+    assert updated_config.source_url == "https://civitai.com/models/111/test-lora?modelVersionId=222"
+
+
+def test_refresh_trigger_phrases_preserves_source_url_when_cached_metadata_has_no_source_url(
+    monkeypatch: Any, client: TestClient, mm2_model_manager: Any, mm2_app_config: Any
+) -> None:
+    _patch_model_manager_dependencies(monkeypatch, mm2_model_manager, mm2_app_config)
+    mm2_model_manager.store.update_model(
+        "test_config_4",
+        ModelRecordChanges(
+            source_url="https://civitai.com/models/111/test-lora",
+            source_api_response='{"trainedWords": ["cached"]}',
+            trigger_phrases={"custom"},
+        ),
+    )
+
+    class FakeCivitaiMetadataFetch:
+        def from_hash(self, hash_value: str) -> CivitaiMetadata:
+            raise UnknownMetadataException("live lookup failed")
+
+        def from_api_response(self, json_str: str) -> CivitaiMetadata:
+            assert json_str == '{"trainedWords": ["cached"]}'
+            return _civitai_metadata(["cached"], source_url=None)
+
+    monkeypatch.setattr(
+        "invokeai.app.api.routers.model_manager.CivitaiMetadataFetch", lambda: FakeCivitaiMetadataFetch()
+    )
+
+    response = client.post("/api/v2/models/i/test_config_4/refresh_trigger_phrases")
+
+    assert response.status_code == 200
+    updated_config = mm2_model_manager.store.get_model("test_config_4")
+    assert updated_config.source_url == "https://civitai.com/models/111/test-lora"
+
+
+def test_refresh_trigger_phrases_errors_when_metadata_cannot_be_resolved(
+    monkeypatch: Any, client: TestClient, mm2_model_manager: Any, mm2_app_config: Any
+) -> None:
+    _patch_model_manager_dependencies(monkeypatch, mm2_model_manager, mm2_app_config)
+
+    class FakeCivitaiMetadataFetch:
+        def from_hash(self, hash_value: str) -> CivitaiMetadata:
+            raise UnknownMetadataException("not found")
+
+    monkeypatch.setattr(
+        "invokeai.app.api.routers.model_manager.CivitaiMetadataFetch", lambda: FakeCivitaiMetadataFetch()
+    )
+
+    response = client.post("/api/v2/models/i/test_config_4/refresh_trigger_phrases")
+
+    assert response.status_code == 404
+    assert (
+        "No version-specific CivitAI URL, matching CivitAI hash, or cached CivitAI response"
+        in response.json()["detail"]
+    )
