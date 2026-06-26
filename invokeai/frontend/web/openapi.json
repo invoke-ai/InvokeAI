@@ -10935,7 +10935,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["anima"],
+            "ui_model_type": ["lora"]
           },
           "transformer": {
             "anyOf": [
@@ -10983,7 +10985,7 @@
         "tags": ["lora", "model", "anima"],
         "title": "Apply LoRA Collection - Anima",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/AnimaLoRALoaderOutput"
         }
@@ -22914,7 +22916,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["flux"],
+            "ui_model_type": ["lora"]
           },
           "transformer": {
             "anyOf": [
@@ -22979,7 +22983,7 @@
         "tags": ["lora", "model", "flux"],
         "title": "Apply LoRA Collection - FLUX",
         "type": "object",
-        "version": "1.3.1",
+        "version": "1.3.2",
         "output": {
           "$ref": "#/components/schemas/FluxLoRALoaderOutput"
         }
@@ -24546,7 +24550,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["flux2"],
+            "ui_model_type": ["lora"]
           },
           "transformer": {
             "anyOf": [
@@ -24594,7 +24600,7 @@
         "tags": ["lora", "model", "flux", "klein", "flux2"],
         "title": "Apply LoRA Collection - Flux2 Klein",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/Flux2KleinLoRALoaderOutput"
         }
@@ -43625,7 +43631,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["sd-1", "sd-2"],
+            "ui_model_type": ["lora"]
           },
           "unet": {
             "anyOf": [
@@ -43673,7 +43681,7 @@
         "tags": ["model"],
         "title": "Apply LoRA Collection - SD1.5",
         "type": "object",
-        "version": "1.1.2",
+        "version": "1.1.3",
         "output": {
           "$ref": "#/components/schemas/LoRALoaderOutput"
         }
@@ -60387,7 +60395,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["qwen-image"],
+            "ui_model_type": ["lora"]
           },
           "transformer": {
             "anyOf": [
@@ -60418,7 +60428,7 @@
         "tags": ["lora", "model", "qwen_image"],
         "title": "Apply LoRA Collection - Qwen Image",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/QwenImageLoRALoaderOutput"
         }
@@ -63093,7 +63103,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["sdxl"],
+            "ui_model_type": ["lora"]
           },
           "unet": {
             "anyOf": [
@@ -63158,7 +63170,7 @@
         "tags": ["model"],
         "title": "Apply LoRA Collection - SDXL",
         "type": "object",
-        "version": "1.1.2",
+        "version": "1.1.3",
         "output": {
           "$ref": "#/components/schemas/SDXLLoRALoaderOutput"
         }
@@ -73641,7 +73653,9 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "LoRAs"
+            "title": "LoRAs",
+            "ui_model_base": ["z-image"],
+            "ui_model_type": ["lora"]
           },
           "transformer": {
             "anyOf": [
@@ -73689,7 +73703,7 @@
         "tags": ["lora", "model", "z-image"],
         "title": "Apply LoRA Collection - Z-Image",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/ZImageLoRALoaderOutput"
         }

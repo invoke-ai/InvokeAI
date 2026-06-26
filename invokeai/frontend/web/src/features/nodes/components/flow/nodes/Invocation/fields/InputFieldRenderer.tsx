@@ -7,6 +7,7 @@ import { ImageFieldCollectionInputComponent } from 'features/nodes/components/fl
 import { ImageGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ImageGeneratorFieldComponent';
 import { IntegerFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerFieldCollectionInputComponent';
 import { IntegerGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerGeneratorFieldComponent';
+import { LoRAFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/LoRAFieldCollectionInputComponent';
 import ModelIdentifierFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ModelIdentifierFieldInputComponent';
 import { StringFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringFieldCollectionInputComponent';
 import { StringGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringGeneratorFieldComponent';
@@ -45,6 +46,8 @@ import {
   isIntegerFieldInputTemplate,
   isIntegerGeneratorFieldInputInstance,
   isIntegerGeneratorFieldInputTemplate,
+  isLoRAFieldCollectionInputInstance,
+  isLoRAFieldCollectionInputTemplate,
   isModelIdentifierFieldInputInstance,
   isModelIdentifierFieldInputTemplate,
   isSchedulerFieldInputInstance,
@@ -89,6 +92,13 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
       return null;
     }
     return <StringFieldCollectionInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isLoRAFieldCollectionInputTemplate(template)) {
+    if (!isLoRAFieldCollectionInputInstance(field)) {
+      return null;
+    }
+    return <LoRAFieldCollectionInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
   }
 
   if (isStringFieldInputTemplate(template)) {
