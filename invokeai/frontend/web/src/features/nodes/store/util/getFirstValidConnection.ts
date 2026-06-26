@@ -4,7 +4,7 @@ import type { Templates } from 'features/nodes/store/types';
 import {
   CONNECTOR_INPUT_HANDLE,
   CONNECTOR_OUTPUT_HANDLE,
-  resolveConnectorSourceFieldType,
+  resolveConnectorInferredFieldType,
 } from 'features/nodes/store/util/connectorTopology';
 import { validateConnection } from 'features/nodes/store/util/validateConnection';
 import type { FieldInputTemplate, FieldOutputTemplate } from 'features/nodes/types/field';
@@ -161,7 +161,7 @@ export const getSourceCandidateFields = (
   }
 
   if (isConnectorNode(sourceNode)) {
-    const sourceFieldType = resolveConnectorSourceFieldType(sourceNode.id, nodes, edges, templates);
+    const sourceFieldType = resolveConnectorInferredFieldType(sourceNode.id, nodes, edges, templates);
     const targetTemplate = !isConnectorNode(targetNode) ? templates[targetNode.data.type] : null;
     const targetFieldType = targetTemplate?.inputs[targetHandle]?.type;
     const candidateType = sourceFieldType ?? targetFieldType;

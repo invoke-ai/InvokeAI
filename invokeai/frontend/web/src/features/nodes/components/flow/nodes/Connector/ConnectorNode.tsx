@@ -1,117 +1,170 @@
-import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Icon } from '@invoke-ai/ui-library';
-import type { Node, NodeProps } from '@xyflow/react';
-import { Handle, Position } from '@xyflow/react';
+import { Box, Icon, Tooltip } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
+import { Handle, type HandleType, type Node, type NodeProps, Position } from '@xyflow/react';
+import { useAppSelector } from 'app/store/storeHooks';
+import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
+import {
+  NODE_IO_HANDLE_HITBOX_INPUT,
+  NODE_IO_HANDLE_HITBOX_OUTPUT,
+  NODE_IO_HANDLE_INNER_SX,
+} from 'features/nodes/components/flow/nodes/common/nodeIOHandle';
 import NonInvocationNodeWrapper from 'features/nodes/components/flow/nodes/common/NonInvocationNodeWrapper';
-import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from 'features/nodes/store/util/connectorTopology';
-import { NO_DRAG_CLASS } from 'features/nodes/types/constants';
+import {
+  useConnectionErrorTKey,
+  useIsConnectionInProgress,
+  useIsConnectionStartField,
+} from 'features/nodes/hooks/useFieldConnectionState';
+import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
+import { $templates } from 'features/nodes/store/nodesSlice';
+import { selectEdges, selectNodes } from 'features/nodes/store/selectors';
+import {
+  CONNECTOR_INPUT_HANDLE,
+  CONNECTOR_OUTPUT_HANDLE,
+  resolveConnectorInferredFieldType,
+} from 'features/nodes/store/util/connectorTopology';
+import { HANDLE_TOOLTIP_OPEN_DELAY, NO_DRAG_CLASS } from 'features/nodes/types/constants';
+import type { FieldType } from 'features/nodes/types/field';
+import { isModelFieldType } from 'features/nodes/types/field';
 import type { ConnectorNodeData } from 'features/nodes/types/invocation';
 import type { CSSProperties } from 'react';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiDotOutlineFill } from 'react-icons/pi';
 
 const CONNECTOR_NODE_SIZE = 35;
-const CONNECTOR_HANDLE_SIZE = 12;
-const CONNECTOR_HANDLE_OFFSET = -CONNECTOR_HANDLE_SIZE / 2;
 
-const handleVisualSx = {
-  position: 'absolute',
+/** AnyField-shaped fallback for tooltips when display type is unknown; same shape as connector stubs in `useConnection`. */
+const CONNECTOR_FALLBACK_FIELD_TYPE = {
+  name: 'AnyField',
+  cardinality: 'SINGLE',
+  batch: false,
+} as const satisfies FieldType;
+
+const CONNECTOR_HANDLE_VERTICAL_ALIGN: CSSProperties = {
   top: '50%',
-  w: 4,
-  h: 4,
-  borderRadius: 'full',
-  borderWidth: 2,
-  borderColor: 'base.900',
-  bg: 'base.100',
-  pointerEvents: 'none',
-} satisfies SystemStyleObject;
+  transform: 'translateY(-50%)',
+};
 
-const inputHandleVisualSx = {
-  ...handleVisualSx,
-  left: 0,
-  transform: 'translate(-50%, -50%)',
-} satisfies SystemStyleObject;
-
-const outputHandleVisualSx = {
-  ...handleVisualSx,
-  right: 0,
-  transform: 'translate(50%, -50%)',
-} satisfies SystemStyleObject;
-
-const connectorSx = {
-  '& .connector-border': {
-    pointerEvents: 'none',
-    position: 'absolute',
-    inset: 0,
-    borderRadius: 'inherit',
-    shadow: '0 0 0 1px var(--invoke-colors-base-500)',
-  },
-  _hover: {
-    '& .connector-border': {
-      shadow: '0 0 0 1px var(--invoke-colors-blue-300)',
-    },
-    '&[data-is-selected="true"] .connector-border': {
-      shadow: '0 0 0 2px var(--invoke-colors-blue-300)',
-    },
-  },
-  '&[data-is-selected="true"] .connector-border': {
-    shadow: '0 0 0 2px var(--invoke-colors-blue-300)',
-  },
-} satisfies SystemStyleObject;
-
-const handleStyles = {
-  position: 'absolute',
-  width: `${CONNECTOR_HANDLE_SIZE}px`,
-  height: `${CONNECTOR_HANDLE_SIZE}px`,
-  top: `calc(50% + ${CONNECTOR_HANDLE_OFFSET}px)`,
-  zIndex: 1,
-  background: 'none',
-  border: 'none',
+const CONNECTOR_HANDLE_INPUT_STYLE = {
+  ...NODE_IO_HANDLE_HITBOX_INPUT,
+  ...CONNECTOR_HANDLE_VERTICAL_ALIGN,
 } satisfies CSSProperties;
 
-const inputHandleStyles = {
-  ...handleStyles,
-  left: 0,
-  transform: 'none',
+const CONNECTOR_HANDLE_OUTPUT_STYLE = {
+  ...NODE_IO_HANDLE_HITBOX_OUTPUT,
+  ...CONNECTOR_HANDLE_VERTICAL_ALIGN,
 } satisfies CSSProperties;
 
-const outputHandleStyles = {
-  ...handleStyles,
-  right: 0,
-  transform: 'none',
-} satisfies CSSProperties;
+type PassthroughHandleProps = {
+  nodeId: string;
+  rfHandleType: HandleType;
+  handleId: string;
+  position: Position;
+  hitboxStyle: CSSProperties;
+  inferredFieldType: FieldType | null;
+  fieldColor: string;
+  fieldTypeName: string;
+};
+
+const ConnectorPassthroughHandle = memo(
+  ({
+    nodeId,
+    rfHandleType,
+    handleId,
+    position,
+    hitboxStyle,
+    inferredFieldType,
+    fieldColor,
+    fieldTypeName,
+  }: PassthroughHandleProps) => {
+    const { t } = useTranslation();
+    const isConnectionInProgress = useIsConnectionInProgress();
+    const isConnectionStartField = useIsConnectionStartField(nodeId, handleId, rfHandleType);
+    const connectionError = useConnectionErrorTKey(nodeId, handleId, rfHandleType);
+
+    const tooltipLabel = useMemo(() => {
+      if (isConnectionInProgress && connectionError !== null) {
+        return t(connectionError);
+      }
+      return fieldTypeName;
+    }, [connectionError, fieldTypeName, isConnectionInProgress, t]);
+
+    const innerProps = useMemo(() => {
+      const shape =
+        inferredFieldType !== null
+          ? {
+              'data-cardinality': inferredFieldType.cardinality,
+              'data-is-batch-field': inferredFieldType.batch,
+              'data-is-model-field': isModelFieldType(inferredFieldType),
+            }
+          : {
+              'data-cardinality': 'SINGLE' as const,
+              'data-is-batch-field': false,
+              'data-is-model-field': false,
+            };
+
+      return {
+        sx: NODE_IO_HANDLE_INNER_SX,
+        ...shape,
+        'data-is-connection-in-progress': isConnectionInProgress,
+        'data-is-connection-start-field': isConnectionInProgress ? isConnectionStartField : false,
+        'data-is-connection-valid': isConnectionInProgress ? connectionError === null : false,
+      };
+    }, [connectionError, inferredFieldType, isConnectionInProgress, isConnectionStartField]);
+
+    const innerBackgroundColor =
+      inferredFieldType !== null && inferredFieldType.cardinality !== 'SINGLE' ? 'base.900' : fieldColor;
+
+    return (
+      <Tooltip label={tooltipLabel} placement="start" openDelay={HANDLE_TOOLTIP_OPEN_DELAY}>
+        <Handle className={NO_DRAG_CLASS} type={rfHandleType} id={handleId} position={position} style={hitboxStyle}>
+          <Box {...innerProps} backgroundColor={innerBackgroundColor} borderColor={fieldColor} />
+        </Handle>
+      </Tooltip>
+    );
+  }
+);
+
+ConnectorPassthroughHandle.displayName = 'ConnectorPassthroughHandle';
 
 const ConnectorNode = ({ id, selected }: NodeProps<Node<ConnectorNodeData>>) => {
+  const templates = useStore($templates);
+  const nodes = useAppSelector(selectNodes);
+  const edges = useAppSelector(selectEdges);
+
+  const inferredFieldType = useMemo(
+    () => resolveConnectorInferredFieldType(id, nodes, edges, templates),
+    [id, nodes, edges, templates]
+  );
+
+  const fieldColor = useMemo(() => getFieldColor(inferredFieldType), [inferredFieldType]);
+
+  const fieldTypeName = useFieldTypeName(inferredFieldType ?? CONNECTOR_FALLBACK_FIELD_TYPE);
+
   return (
-    <NonInvocationNodeWrapper
-      nodeId={id}
-      selected={selected}
-      width={CONNECTOR_NODE_SIZE}
-      borderRadius="full"
-      withChrome={false}
-    >
+    <NonInvocationNodeWrapper nodeId={id} selected={selected} width={CONNECTOR_NODE_SIZE} borderRadius="full">
       <Box
         data-connector-node-context-menu="true"
         data-connector-node-id={id}
-        data-is-selected={selected}
         position="relative"
         w={CONNECTOR_NODE_SIZE}
         h={CONNECTOR_NODE_SIZE}
         display="flex"
         alignItems="center"
         justifyContent="center"
-        sx={connectorSx}
       >
-        <Handle
-          className={NO_DRAG_CLASS}
-          type="target"
-          id={CONNECTOR_INPUT_HANDLE}
+        <ConnectorPassthroughHandle
+          nodeId={id}
+          rfHandleType="target"
+          handleId={CONNECTOR_INPUT_HANDLE}
           position={Position.Left}
-          style={inputHandleStyles}
-        >
-          <Box sx={inputHandleVisualSx} />
-        </Handle>
+          hitboxStyle={CONNECTOR_HANDLE_INPUT_STYLE}
+          inferredFieldType={inferredFieldType}
+          fieldColor={fieldColor}
+          fieldTypeName={fieldTypeName}
+        />
         <Box
+          layerStyle="nodeBody"
           position="relative"
           w={CONNECTOR_NODE_SIZE}
           h={CONNECTOR_NODE_SIZE}
@@ -119,20 +172,19 @@ const ConnectorNode = ({ id, selected }: NodeProps<Node<ConnectorNodeData>>) => 
           alignItems="center"
           justifyContent="center"
           borderRadius="full"
-          bg={selected ? 'base.650' : 'base.700'}
         >
-          <Box className="connector-border" />
-          <Icon as={PiDotOutlineFill} boxSize={5} color={selected ? 'base.50' : 'base.100'} />
+          <Icon as={PiDotOutlineFill} boxSize={5} color="base.300" />
         </Box>
-        <Handle
-          className={NO_DRAG_CLASS}
-          type="source"
-          id={CONNECTOR_OUTPUT_HANDLE}
+        <ConnectorPassthroughHandle
+          nodeId={id}
+          rfHandleType="source"
+          handleId={CONNECTOR_OUTPUT_HANDLE}
           position={Position.Right}
-          style={outputHandleStyles}
-        >
-          <Box sx={outputHandleVisualSx} />
-        </Handle>
+          hitboxStyle={CONNECTOR_HANDLE_OUTPUT_STYLE}
+          inferredFieldType={inferredFieldType}
+          fieldColor={fieldColor}
+          fieldTypeName={fieldTypeName}
+        />
       </Box>
     </NonInvocationNodeWrapper>
   );
