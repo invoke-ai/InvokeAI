@@ -9,7 +9,10 @@ from pydantic_core import to_jsonable_python
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_queue.session_queue_sqlite import (
+    ROUND_ROBIN_DEQUEUE_QUERY,
+    SqliteSessionQueue,
+)
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 
 _EMPTY_SESSION_JSON = json.dumps(to_jsonable_python(GraphExecutionState(graph=Graph()).model_dump()))
@@ -190,6 +193,82 @@ def test_round_robin_priority_within_user_respected(session_queue_round_robin: S
     assert items[0] == ("user_a", 10)
     assert items[1] == ("user_b", 0)
     assert items[2] == ("user_a", 0)
+
+
+def _seed_completed_history(
+    session_queue: SqliteSessionQueue,
+    queue_id: str,
+    user_id: str,
+    count: int,
+) -> None:
+    """Insert `count` completed items (with started_at set) for a user, simulating retained history."""
+    with session_queue._db.transaction() as cursor:
+        for i in range(count):
+            session_id = str(uuid.uuid4())
+            batch_id = str(uuid.uuid4())
+            cursor.execute(
+                """--sql
+                INSERT INTO session_queue
+                    (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id, user_id, status, started_at, completed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?)
+                """,
+                (
+                    queue_id,
+                    _EMPTY_SESSION_JSON,
+                    session_id,
+                    batch_id,
+                    None,
+                    0,
+                    None,
+                    None,
+                    None,
+                    None,
+                    user_id,
+                    # Monotonically increasing timestamps so MAX(started_at) is well-defined per user.
+                    f"2026-01-01 {i // 3600 % 24:02d}:{i // 60 % 60:02d}:{i % 60:02d}",
+                    f"2026-01-01 {i // 3600 % 24:02d}:{i // 60 % 60:02d}:{i % 60:02d}",
+                ),
+            )
+
+
+def test_round_robin_dequeue_does_not_scan_full_history(session_queue_round_robin: SqliteSessionQueue) -> None:
+    """Round-robin dequeue cost must scale with active users, not retained queue history.
+
+    Regression guard for the scaling concern: the per-user "last served" lookup must be an
+    indexed seek (MAX(started_at) WHERE user_id = ?) rather than a GROUP BY / scan over every
+    historical started row. `max_queue_history` is unbounded by default, so a plan that scans
+    the full history makes each dequeue O(total history) instead of O(active users).
+
+    We seed a large completed history across several users plus a few pending items, then assert
+    the dequeue query plan never scans the `session_queue` base table and resolves the
+    last-served lookup via a seek on `idx_session_queue_user_started_at`.
+    """
+    queue_id = "default"
+    for u in ("user_a", "user_b", "user_c"):
+        _seed_completed_history(session_queue_round_robin, queue_id, u, count=500)
+        _insert_queue_item(session_queue_round_robin, queue_id, u)
+
+    with session_queue_round_robin._db.transaction() as cursor:
+        plan_rows = cursor.execute("EXPLAIN QUERY PLAN " + ROUND_ROBIN_DEQUEUE_QUERY).fetchall()
+    details = [row["detail"] for row in plan_rows]
+
+    # No step may scan the session_queue base table — that is the full-history scan we are
+    # eliminating. (CTE result scans like "SCAN uni" / "SCAN (subquery-N)" are fine; those are
+    # one row per pending user.)
+    offending = [d for d in details if d.startswith("SCAN session_queue")]
+    assert not offending, f"dequeue plan scans full queue history: {offending}\nfull plan: {details}"
+
+    # The last-served lookup must use the started_at index as a per-user seek.
+    assert any(
+        "idx_session_queue_user_started_at" in d and "user_id=?" in d for d in details
+    ), f"last-served lookup is not an indexed seek; plan: {details}"
+
+    # And the dequeue must still return the least-recently-served user (correctness under history).
+    # user_a's history ends earliest only if seeded first; all three were seeded equal counts with
+    # identical timestamps, so item_id ASC tie-breaks to the first-inserted pending item (user_a).
+    item = session_queue_round_robin.dequeue()
+    assert item is not None
+    assert item.user_id == "user_a"
 
 
 def test_round_robin_ignored_in_single_user_mode(mock_invoker: Invoker) -> None:
