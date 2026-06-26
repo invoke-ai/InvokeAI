@@ -259,9 +259,9 @@ def test_round_robin_dequeue_does_not_scan_full_history(session_queue_round_robi
     assert not offending, f"dequeue plan scans full queue history: {offending}\nfull plan: {details}"
 
     # The last-served lookup must use the started_at index as a per-user seek.
-    assert any(
-        "idx_session_queue_user_started_at" in d and "user_id=?" in d for d in details
-    ), f"last-served lookup is not an indexed seek; plan: {details}"
+    assert any("idx_session_queue_user_started_at" in d and "user_id=?" in d for d in details), (
+        f"last-served lookup is not an indexed seek; plan: {details}"
+    )
 
     # And the dequeue must still return the least-recently-served user (correctness under history).
     # user_a's history ends earliest only if seeded first; all three were seeded equal counts with
