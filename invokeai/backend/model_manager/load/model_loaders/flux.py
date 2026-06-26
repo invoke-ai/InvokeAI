@@ -1080,7 +1080,13 @@ class Flux2CheckpointModel(ModelLoader):
                             if block_size > 1:
                                 scale = scale.repeat_interleave(block_size, dim=dim)
 
-                sd[weight_key] = weight_float * scale
+                # Do the multiply in float32 for precision, but store bf16 (FLUX.2's compute dtype)
+                # immediately so the *whole* model is never materialized in float32. Holding every
+                # dequantized weight as float32 here doubled RAM transiently (~36GB vs ~17GB for a 9B
+                # model) and was the dominant cold-load spike, especially with two GPUs. The result is
+                # identical to the previous code, which cast the same values to bf16 a few steps later.
+                sd[weight_key] = (weight_float * scale).to(torch.bfloat16)
+                del weight_float
 
         # Filter out scale metadata keys and other FP8 metadata
         keys_to_remove = [
@@ -1110,8 +1116,9 @@ class Flux2CheckpointModel(ModelLoader):
             del sd[k]
 
         for key in keys_to_convert:
-            # Convert FP8 tensor to float32
-            sd[key] = sd[key].float()
+            # Convert native FP8 tensors straight to bf16 (FLUX.2's compute dtype) rather than float32,
+            # so a cold load never transiently holds the whole model in float32 (see the scaled path).
+            sd[key] = sd[key].to(torch.bfloat16)
 
         return sd
 

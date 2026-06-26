@@ -125,12 +125,26 @@ class ModelManagerService(ModelManagerServiceBase):
         # Attach the single global RAM budget. The cap is the user's max_cache_ram_gb interpreted as a
         # true system-wide limit; when unset, it is the sum of the caches' individually-calculated
         # sizes, so each device keeps its effective capacity and weight deduplication becomes headroom.
+        # That sum is then clamped to a safe fraction of system RAM: each per-device heuristic already
+        # allows up to ~half of system RAM, so summing across N GPUs would otherwise claim ~N× that and
+        # leave nothing for the OS, causing swap thrashing. The clamp leaves real headroom; shared-weight
+        # dedup means the true footprint usually stays well under the cap regardless.
         gb = 2**30
         distinct_caches = list(dict.fromkeys(ram_caches.values()))
+        # Cross-device weight adoption (and its per-model meta-shell capture) only pays off with more
+        # than one device cache; disable the capture cost otherwise.
+        shared_store.enable_shell_capture = len(distinct_caches) > 1
         if app_config.max_cache_ram_gb is not None:
             global_ram_budget_bytes = int(app_config.max_cache_ram_gb * gb)
         else:
-            global_ram_budget_bytes = sum(c.local_ram_cache_size_bytes for c in distinct_caches)
+            summed_cache_bytes = sum(c.local_ram_cache_size_bytes for c in distinct_caches)
+            system_ram_headroom_bytes = ModelCache.calc_system_ram_headroom_bytes()
+            global_ram_budget_bytes = min(summed_cache_bytes, system_ram_headroom_bytes)
+            if global_ram_budget_bytes < summed_cache_bytes:
+                logger.info(
+                    f"Capping model cache RAM budget at {global_ram_budget_bytes / gb:.2f} GB to leave system "
+                    f"headroom (sum of per-device caches was {summed_cache_bytes / gb:.2f} GB)."
+                )
         ram_budget = RamBudget(max_bytes=global_ram_budget_bytes, shared_store=shared_store)
         for cache in distinct_caches:
             cache.set_ram_budget(ram_budget)

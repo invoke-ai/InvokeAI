@@ -6,11 +6,17 @@ case where a cache cannot free RAM because another device still holds the model.
 """
 
 import logging
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.model_manager.load.model_cache.model_cache import (
+    GB,
+    MIN_RAM_CACHE_BYTES,
+    RAM_CACHE_BASELINE_BYTES,
+    RAM_CACHE_SYSTEM_FRACTION,
+    ModelCache,
+)
 from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
 from invokeai.backend.util.calc_tensor_size import calc_tensor_size
@@ -90,6 +96,45 @@ def test_global_budget_evicts_lru_in_single_cache(mock_logger):
         assert budget.total_in_use() == S
     finally:
         cache.shutdown()
+
+
+def _mock_total_ram(total_bytes: int):
+    """Patch psutil.virtual_memory().total as seen by model_cache."""
+    vm = MagicMock()
+    vm.total = total_bytes
+    return patch(
+        "invokeai.backend.model_manager.load.model_cache.model_cache.psutil.virtual_memory",
+        return_value=vm,
+    )
+
+
+def test_system_ram_headroom_is_fraction_minus_baseline():
+    # On a 96 GB box, the default cap is 50% - 2 GB = 46 GB, leaving real headroom for the OS.
+    with _mock_total_ram(96 * GB):
+        headroom = ModelCache.calc_system_ram_headroom_bytes()
+    assert headroom == int(96 * GB * RAM_CACHE_SYSTEM_FRACTION) - RAM_CACHE_BASELINE_BYTES
+    assert headroom == 46 * GB
+    # And it must leave at least half the system for everything else.
+    assert headroom <= 96 * GB * 0.5
+
+
+def test_system_ram_headroom_respects_floor_on_tiny_systems():
+    # A machine with almost no RAM still gets the absolute minimum, never a negative/zero budget.
+    with _mock_total_ram(2 * GB):
+        headroom = ModelCache.calc_system_ram_headroom_bytes()
+    assert headroom == MIN_RAM_CACHE_BYTES
+
+
+def test_headroom_clamps_summed_multi_gpu_budget():
+    # Reproduces the multi-GPU blowup: two 45 GB per-device caches sum to 90 GB, which would leave
+    # only ~6 GB on a 96 GB machine. The headroom cap must clamp the budget below that sum.
+    per_device_cache_bytes = 45 * GB
+    summed = 2 * per_device_cache_bytes  # 90 GB, as the old code used verbatim
+    with _mock_total_ram(96 * GB):
+        headroom = ModelCache.calc_system_ram_headroom_bytes()
+    clamped = min(summed, headroom)
+    assert clamped == headroom < summed
+    assert clamped == 46 * GB
 
 
 def test_eviction_cannot_free_ram_held_by_another_device(mock_logger):

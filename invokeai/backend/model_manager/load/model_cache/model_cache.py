@@ -40,6 +40,17 @@ GB = 2**30
 # Size of a MB in bytes.
 MB = 2**20
 
+# Default RAM-cache sizing constants. These are used both by the per-device heuristic
+# (_calc_ram_available_to_model_cache) and by the multi-GPU global budget cap
+# (ModelManagerService.build_model_manager), so the two stay consistent.
+#
+# - RAM_CACHE_SYSTEM_FRACTION: fraction of total system RAM the model cache may use by default.
+# - RAM_CACHE_BASELINE_BYTES:  assumed non-model RAM used by InvokeAI itself, reserved before sizing.
+# - MIN_RAM_CACHE_BYTES:       absolute floor so the cache is never sized uselessly small.
+RAM_CACHE_SYSTEM_FRACTION = 0.5
+RAM_CACHE_BASELINE_BYTES = 2 * GB
+MIN_RAM_CACHE_BYTES = 4 * GB
+
 
 class _ModelLoadReadWriteLock:
     """A write-preferring readers-writer lock that serializes model construction against VRAM moves.
@@ -316,6 +327,15 @@ class ModelCache:
     def execution_device(self) -> torch.device:
         """Return the default execution device this cache loads models onto."""
         return self._execution_device
+
+    @property
+    def shared_cpu_weights(self) -> SharedCpuWeightsStore | None:
+        """The process-global store this cache deduplicates CPU weights into, or None if disabled.
+
+        Exposed so the loader can check (via `peek`) whether another device already holds a model's
+        canonical CPU weights and adopt them at construction time instead of re-reading from disk.
+        """
+        return self._shared_cpu_weights
 
     def set_ram_budget(self, ram_budget: RamBudget) -> None:
         """Attach the shared global RamBudget after construction.
@@ -795,8 +815,10 @@ class ModelCache:
         heuristics_applied = [1]
         total_system_ram_bytes = psutil.virtual_memory().total
         # Assumed baseline RAM used by InvokeAI for non-model stuff.
-        baseline_ram_used_by_invokeai = 2 * GB
-        ram_available_to_model_cache = int(total_system_ram_bytes * 0.5 - baseline_ram_used_by_invokeai)
+        baseline_ram_used_by_invokeai = RAM_CACHE_BASELINE_BYTES
+        ram_available_to_model_cache = int(
+            total_system_ram_bytes * RAM_CACHE_SYSTEM_FRACTION - baseline_ram_used_by_invokeai
+        )
 
         # Apply heuristic 2.
         # ------------------
@@ -812,14 +834,33 @@ class ModelCache:
 
         # Apply heuristic 3.
         # ------------------
-        if ram_available_to_model_cache < 4 * GB:
+        if ram_available_to_model_cache < MIN_RAM_CACHE_BYTES:
             heuristics_applied.append(3)
-            ram_available_to_model_cache = 4 * GB
+            ram_available_to_model_cache = MIN_RAM_CACHE_BYTES
 
         self._logger.info(
             f"Calculated model RAM cache size: {ram_available_to_model_cache / MB:.2f} MB. Heuristics applied: {heuristics_applied}."
         )
         return ram_available_to_model_cache
+
+    @staticmethod
+    def calc_system_ram_headroom_bytes() -> int:
+        """The default system-wide cap on TOTAL model-cache RAM, leaving headroom for the OS.
+
+        This is the maximum RAM the model caches should collectively use when the user has not set an
+        explicit `max_cache_ram_gb`. It mirrors heuristic 1 of `_calc_ram_available_to_model_cache`
+        (a fraction of system RAM, less InvokeAI's baseline) with the same minimum floor.
+
+        In multi-GPU mode there is one cache per device, and each device's heuristic independently
+        allows up to this fraction of system RAM; summed across N devices that would claim ~N× as
+        much RAM and cause the system to swap. The model manager uses this value to cap that sum so a
+        safe amount of RAM is always left for the OS and other processes.
+        """
+        total_system_ram_bytes = psutil.virtual_memory().total
+        return max(
+            int(total_system_ram_bytes * RAM_CACHE_SYSTEM_FRACTION) - RAM_CACHE_BASELINE_BYTES,
+            MIN_RAM_CACHE_BYTES,
+        )
 
     def _get_ram_in_use(self) -> int:
         """Get the amount of RAM currently in use.

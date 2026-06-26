@@ -15,6 +15,10 @@ class _SharedWeightsEntry:
     # Number of per-device cached models currently aliasing this entry. The entry is freed
     # (its RAM released) when this drops to zero.
     refcount: int = 0
+    # An empty (meta-weight) structural clone of the first-built module, used so a second device can
+    # adopt the canonical weights without re-reading the model from disk. None until registered (and
+    # for entries whose model isn't an nn.Module). Holds ~no real RAM: its weights are on `meta`.
+    shell: object | None = None
     _key_bytes: dict[str, int] = field(default_factory=dict)
 
 
@@ -47,6 +51,10 @@ class SharedCpuWeightsStore:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._entries: dict[str, _SharedWeightsEntry] = {}
+        # Whether to capture per-model meta-weight shells for cross-device adoption. Only useful with
+        # more than one device cache, so the model manager disables it in single-device setups to
+        # avoid the (small) per-first-load clone cost. See ModelLoader._build_meta_shell.
+        self.enable_shell_capture: bool = True
 
     def acquire(self, key: str, state_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """Adopt the canonical CPU state dict for `key`, registering `state_dict` as canonical if
@@ -71,6 +79,32 @@ class SharedCpuWeightsStore:
                 self._entries[key] = entry
             entry.refcount += 1
             return entry.state_dict
+
+    def peek(self, key: str) -> dict[str, torch.Tensor] | None:
+        """Return the canonical state dict for `key` WITHOUT changing its refcount, or None if absent.
+
+        Used by the loader to adopt already-resident weights at construction time (skipping the disk
+        read) when another device has already loaded this model. The reference is taken later, in the
+        cached-model wrapper's `acquire()`, exactly as for a normal load — so this peek must not
+        itself increment the count.
+        """
+        with self._lock:
+            entry = self._entries.get(key)
+            return entry.state_dict if entry is not None else None
+
+    def set_shell(self, key: str, shell: object) -> None:
+        """Register the empty (meta-weight) structural clone for `key`, if an entry exists and none
+        is set yet. A no-op when the key has no canonical entry (e.g. keep_ram_copy disabled)."""
+        with self._lock:
+            entry = self._entries.get(key)
+            if entry is not None and entry.shell is None:
+                entry.shell = shell
+
+    def get_shell(self, key: str) -> object | None:
+        """Return the registered meta-weight shell for `key`, or None if absent."""
+        with self._lock:
+            entry = self._entries.get(key)
+            return entry.shell if entry is not None else None
 
     def release(self, key: str) -> None:
         """Release one reference to `key`'s canonical state dict, freeing it when the count hits 0.
