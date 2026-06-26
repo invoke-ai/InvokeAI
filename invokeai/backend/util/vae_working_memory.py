@@ -2,6 +2,7 @@ from typing import Literal
 
 import torch
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
+from diffusers.models.autoencoders.autoencoder_kl_qwenimage import AutoencoderKLQwenImage
 from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
 
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
@@ -88,6 +89,35 @@ def estimate_vae_working_memory_flux(
     working_memory = out_h * out_w * element_size * scaling_constant
 
     print(f"estimate_vae_working_memory_flux: {int(working_memory)}")
+
+    return int(working_memory)
+
+
+def estimate_vae_working_memory_qwen_image(
+    operation: Literal["encode", "decode"], image_tensor: torch.Tensor, vae: AutoencoderKLQwenImage
+) -> int:
+    """Estimate the working memory required by the invocation in bytes.
+
+    The Qwen Image VAE is a video-style autoencoder that operates on 5D tensors of shape
+    (B, C, num_frames, H, W). Tiling is not used, so peak working memory scales with the full
+    spatial output. The two trailing dimensions are the spatial H/W in latent space (decode) or
+    pixel space (encode), matching the convention used by the other estimators here.
+    """
+    latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
+
+    h = latent_scale_factor_for_operation * image_tensor.shape[-2]
+    w = latent_scale_factor_for_operation * image_tensor.shape[-1]
+    element_size = next(vae.parameters()).element_size()
+
+    # The Qwen Image VAE is much heavier than the SD/SDXL VAE and needs a correspondingly larger
+    # constant. This was calibrated against a measured decode on an AMD W7900: at 1248x832 the decode
+    # grew CUDA reserved memory by ~10.06 GiB (implied constant ~5082); we round up to 5500 for
+    # headroom. The constant deliberately tracks peak *reserved* (not just allocated) memory so that
+    # whenever the cache declines to free room (i.e. free >= estimate) the decode is still guaranteed
+    # to fit. Encoding uses ~half the working memory of decoding, matching the other estimators here.
+    scaling_constant = 5500 if operation == "decode" else 2750
+
+    working_memory = h * w * element_size * scaling_constant
 
     return int(working_memory)
 
