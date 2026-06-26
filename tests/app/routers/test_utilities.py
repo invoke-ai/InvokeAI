@@ -67,6 +67,23 @@ def test_dynamicprompts_works_for_user(client: TestClient, user1_token: str):
     assert "prompts" in body
 
 
+def test_dynamicprompts_unknown_wildcard_returns_error_without_hanging(client: TestClient, user1_token: str):
+    """An unknown `__wildcard__` would otherwise loop forever in the combinatorial generator.
+
+    The endpoint must instead return promptly with a clear error and the original prompt echoed back.
+    """
+    r = client.post(
+        "/api/v1/utilities/dynamicprompts",
+        json={"prompt": "{__random__8chan|fenster|stuff}"},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert r.status_code == status.HTTP_200_OK
+    body = r.json()
+    assert body["error"] is not None
+    assert "random" in body["error"]
+    assert body["prompts"] == ["{__random__8chan|fenster|stuff}"]
+
+
 # ----------------------------- image_to_prompt: ownership / read-access -----------------------------
 
 
