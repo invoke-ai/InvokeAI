@@ -3,18 +3,24 @@ import type { ChangeEvent, KeyboardEvent } from 'react';
 
 import { HStack, Switch } from '@chakra-ui/react';
 import { Field } from '@workbench/components/ui';
+import { useRegisterGenerateDraftFlusher } from '@workbench/widgets/generate/generateDraftRegistry';
+import { useDebouncedDraftValue } from '@workbench/widgets/generate/useDebouncedDraftValue';
 import { useRef, useState } from 'react';
 
 import { AddPromptTriggerButton, PromptTriggerPopover } from './PositivePromptActions';
 import { PROMPT_ATTENTION_TARGET_PROPS } from './promptAttentionHotkeys';
 import { insertPromptText, type PromptTextRange } from './promptFocus';
+import { resetPromptHistoryNavigation } from './promptHistoryNavigation';
 import { PromptTextarea } from './PromptTextarea';
+
+const PROMPT_INPUT_DEBOUNCE_MS = 250;
 
 interface NegativePromptFieldProps {
   heightPx: number;
   helpText?: string;
   isEnabled: boolean;
   loras: GenerateLora[];
+  projectId: string;
   selectedModel: GenerateModelConfig | undefined;
   showSyntaxHighlighting: boolean;
   value: string;
@@ -36,12 +42,26 @@ export const NegativePromptField = ({
   onChange,
   onEnabledChange,
   onResizeEnd,
+  projectId,
   selectedModel,
   showSyntaxHighlighting,
   value,
 }: NegativePromptFieldProps) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [triggerPickerState, setTriggerPickerState] = useState<PromptTriggerPickerState | null>(null);
+  const { draftValue, flushDraftValue, setDraftValue } = useDebouncedDraftValue({
+    delayMs: PROMPT_INPUT_DEBOUNCE_MS,
+    onCommit: onChange,
+    resetKey: projectId,
+    value,
+  });
+
+  useRegisterGenerateDraftFlusher(flushDraftValue);
+
+  const commitPromptChange = (nextValue: string) => {
+    resetPromptHistoryNavigation();
+    setDraftValue(nextValue);
+  };
 
   const openPromptTriggerPicker = (anchorElement: HTMLElement, range?: PromptTextRange) => {
     const rect = anchorElement.getBoundingClientRect();
@@ -68,11 +88,11 @@ export const NegativePromptField = ({
 
   const selectPromptTrigger = (trigger: string) => {
     insertPromptText({
-      onChange,
+      onChange: commitPromptChange,
       range: triggerPickerState?.range,
       textarea: textareaRef.current,
       text: trigger,
-      value,
+      value: draftValue,
     });
     closePromptTriggerPicker();
   };
@@ -114,19 +134,21 @@ export const NegativePromptField = ({
             textareaRef={(element) => {
               textareaRef.current = element;
             }}
-            value={value}
-            onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange(event.currentTarget.value)}
+            value={draftValue}
+            onChange={(event: ChangeEvent<HTMLTextAreaElement>) => commitPromptChange(event.currentTarget.value)}
             onKeyDown={handlePromptKeyDown}
             onResizeEnd={onResizeEnd}
           />
-          <PromptTriggerPopover
-            loras={loras}
-            open={triggerPickerState !== null}
-            positioning={{ getAnchorRect: () => triggerPickerState?.anchorRect ?? null }}
-            selectedModel={selectedModel}
-            onClose={closePromptTriggerPicker}
-            onSelect={selectPromptTrigger}
-          />
+          {triggerPickerState ? (
+            <PromptTriggerPopover
+              loras={loras}
+              open
+              positioning={{ getAnchorRect: () => triggerPickerState.anchorRect }}
+              selectedModel={selectedModel}
+              onClose={closePromptTriggerPicker}
+              onSelect={selectPromptTrigger}
+            />
+          ) : null}
         </>
       ) : null}
     </Field>

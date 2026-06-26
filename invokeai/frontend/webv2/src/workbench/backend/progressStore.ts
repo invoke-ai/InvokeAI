@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { createKeyedTransientStore } from '@workbench/externalStore';
 
 /**
  * Ephemeral live-progress store for in-flight queue items, keyed by the local
@@ -25,40 +25,19 @@ export interface QueueItemProgressSink {
   clear(queueItemId: string): void;
 }
 
-const progressByQueueItemId = new Map<string, QueueItemProgress>();
-const listeners = new Set<() => void>();
-
-const emit = (): void => {
-  for (const listener of listeners) {
-    listener();
-  }
-};
-
-const subscribe = (listener: () => void): (() => void) => {
-  listeners.add(listener);
-
-  return () => {
-    listeners.delete(listener);
-  };
-};
+const progressByQueueItemId = createKeyedTransientStore<string, QueueItemProgress>();
 
 export const queueItemProgressStore: QueueItemProgressSink = {
   clearAll() {
-    if (progressByQueueItemId.size > 0) {
-      progressByQueueItemId.clear();
-      emit();
-    }
+    progressByQueueItemId.clear();
   },
   clear(queueItemId) {
-    if (progressByQueueItemId.delete(queueItemId)) {
-      emit();
-    }
+    progressByQueueItemId.delete(queueItemId);
   },
   set(queueItemId, progress) {
     progressByQueueItemId.set(queueItemId, progress);
-    emit();
   },
 };
 
 export const useQueueItemProgress = (queueItemId: string): QueueItemProgress | null =>
-  useSyncExternalStore(subscribe, () => progressByQueueItemId.get(queueItemId) ?? null);
+  progressByQueueItemId.useValue(queueItemId) ?? null;

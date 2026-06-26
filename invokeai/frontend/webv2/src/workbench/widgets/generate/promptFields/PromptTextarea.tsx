@@ -120,7 +120,6 @@ export const PromptTextarea = ({
   const underlay = shouldHighlight ? (
     <Box
       aria-hidden="true"
-      bg="bg.emphasized"
       borderColor="transparent"
       borderRadius="md"
       borderWidth="1px"

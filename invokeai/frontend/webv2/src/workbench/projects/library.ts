@@ -69,6 +69,8 @@ const sortSummaries = (summaries: ProjectSummary[]): ProjectSummary[] =>
 
 export const useProjectLibrary = (): ProjectLibrarySnapshot => store.useSnapshot();
 
+export const useProjectLibrarySelector = store.useSelector;
+
 export const getProjectLibrary = (): ProjectLibrarySnapshot => store.getSnapshot();
 
 /** Adopt summaries already fetched elsewhere (the workbench boot pass). */

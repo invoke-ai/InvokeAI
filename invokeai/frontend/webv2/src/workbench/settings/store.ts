@@ -11,7 +11,6 @@ import { getUserStorageScope } from '@workbench/auth/session';
 import { createExternalStore } from '@workbench/externalStore';
 import { deleteClientStateValue, getClientStateValue, setClientStateValue } from '@workbench/projects/api';
 import { fetchSessionBlob } from '@workbench/projects/session';
-import { useSyncExternalStore } from 'react';
 
 const SETTINGS_BASE_STORAGE_KEY = 'invokeai:v7:webv2:settings';
 const LEGACY_WORKBENCH_BASE_STORAGE_KEY = 'invokeai:v7:webv2:workbench';
@@ -405,14 +404,27 @@ export const loadWorkbenchSettings = (): Promise<WorkbenchPreferences> => {
 
 export const useWorkbenchSettings = (): WorkbenchSettingsSnapshot => store.useSnapshot();
 
-export const useWorkbenchPreferences = (): WorkbenchPreferences => store.useSnapshot().preferences;
+export const useWorkbenchPreferences = (): WorkbenchPreferences =>
+  store.useSelector((snapshot) => snapshot.preferences);
+
+type EqualityFn<T> = (left: T, right: T) => boolean;
+
+export const useWorkbenchSettingsSelector = <Selected>(
+  selector: (snapshot: WorkbenchSettingsSnapshot) => Selected,
+  isEqual: EqualityFn<Selected> = Object.is
+): Selected => store.useSelector(selector, isEqual);
+
+export const useWorkbenchPreferenceSelector = <Selected>(
+  selector: (preferences: WorkbenchPreferences) => Selected,
+  isEqual?: EqualityFn<Selected>
+): Selected => useWorkbenchSettingsSelector((snapshot) => selector(snapshot.preferences), isEqual);
 
 export const getWorkbenchPreferences = (): WorkbenchPreferences => store.getSnapshot().preferences;
 
 export const getWorkbenchReduceMotion = (): boolean => store.getSnapshot().preferences.reduceMotion;
 
 export const useWorkbenchReduceMotion = (): boolean =>
-  useSyncExternalStore(store.subscribe, getWorkbenchReduceMotion, getWorkbenchReduceMotion);
+  store.useSelector((snapshot) => snapshot.preferences.reduceMotion);
 
 export const patchWorkbenchPreferences = async (preferences: Partial<WorkbenchPreferences>): Promise<void> => {
   const next = normalizeWorkbenchPreferences({ ...store.getSnapshot().preferences, ...preferences });

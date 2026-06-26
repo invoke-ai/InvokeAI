@@ -6,5 +6,5 @@ export { FieldPlaceholder, StatusWidgetChip, WidgetHeader, WidgetPanelFrame } fr
 export { WidgetInstanceContextMenu, type WidgetInstanceContextMenuTarget } from './WidgetInstanceContextMenu';
 export { WidgetRegionDropOverlay } from './WidgetRegionDropOverlay';
 export { WidgetStrip } from './WidgetStrip';
-export { MissingWidgetFrame, WidgetRenderer } from './WidgetRenderer';
+export { MissingWidgetFrame, WidgetRenderer, WidgetRendererById } from './WidgetRenderer';
 export { useWidgetSortable } from './useWidgetSortable';

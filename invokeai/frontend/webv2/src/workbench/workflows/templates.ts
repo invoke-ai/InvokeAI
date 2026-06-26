@@ -380,5 +380,7 @@ export const ensureInvocationTemplatesLoaded = (): void => {
 
 export const useInvocationTemplatesSnapshot = (): InvocationTemplatesSnapshot => store.useSnapshot();
 
+export const useInvocationTemplatesSelector = store.useSelector;
+
 /** Imperative read for the workbench reducer and route validation. */
 export const getInvocationTemplatesSnapshot = (): InvocationTemplatesSnapshot => store.getSnapshot();

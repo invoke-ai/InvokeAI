@@ -4,7 +4,7 @@ import type { InvocationTemplate, XYPosition } from '@workbench/workflows/types'
 import { HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { IconButton, ConfirmDialog, Tooltip } from '@workbench/components/ui';
 import { useNotify } from '@workbench/useNotify';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchStore } from '@workbench/WorkbenchContext';
 import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from '@workbench/workflows/connectors';
 import {
   buildConnectorNode,
@@ -82,7 +82,7 @@ export const WorkflowWidgetLabel = ({ region }: WidgetLabelProps) => {
 
 /** Entries contributed to the shared widget actions menu. */
 export const WorkflowMenuItems = (_props: WidgetViewProps) => {
-  const projectGraph = useActiveProjectSelector((project) => project.projectGraph);
+  const store = useWorkbenchStore();
   const dispatch = useWorkbenchDispatch();
   const notify = useNotify();
 
@@ -105,13 +105,13 @@ export const WorkflowMenuItems = (_props: WidgetViewProps) => {
       <Menu.Item value="import" onClick={requestWorkflowImport}>
         Import workflow JSON…
       </Menu.Item>
-      <Menu.Item value="export" onClick={() => downloadWorkflowJson(projectGraph)}>
+      <Menu.Item value="export" onClick={() => downloadWorkflowJson(store.getSnapshot().activeProject.projectGraph)}>
         Export workflow JSON
       </Menu.Item>
       <Menu.Item
         value="copy"
         onClick={() => {
-          copyWorkflowJson(projectGraph)
+          copyWorkflowJson(store.getSnapshot().activeProject.projectGraph)
             .then(() => notify.success('Workflow JSON copied'))
             .catch(() => notify.error('Failed to copy workflow JSON'));
         }}
@@ -207,14 +207,12 @@ export const WorkflowDialogHost = () => {
   const dispatch = useWorkbenchDispatch();
   const notify = useNotify();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const {
-    addNodeConnection,
-    addNodePosition,
-    importRequestCount,
-    isAddNodeOpen,
-    isLibraryOpen,
-    isNewWorkflowConfirmOpen,
-  } = workflowUiStore.useSnapshot();
+  const addNodeConnection = workflowUiStore.useSelector((snapshot) => snapshot.addNodeConnection);
+  const addNodePosition = workflowUiStore.useSelector((snapshot) => snapshot.addNodePosition);
+  const importRequestCount = workflowUiStore.useSelector((snapshot) => snapshot.importRequestCount);
+  const isAddNodeOpen = workflowUiStore.useSelector((snapshot) => snapshot.isAddNodeOpen);
+  const isLibraryOpen = workflowUiStore.useSelector((snapshot) => snapshot.isLibraryOpen);
+  const isNewWorkflowConfirmOpen = workflowUiStore.useSelector((snapshot) => snapshot.isNewWorkflowConfirmOpen);
   const lastImportRequestRef = useRef(importRequestCount);
 
   useEffect(() => {

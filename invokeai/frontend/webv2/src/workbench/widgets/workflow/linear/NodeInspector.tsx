@@ -11,7 +11,7 @@ import { JsonPreview, Scrollable, Tabs } from '@workbench/components/ui';
 import { workflowSelectionStore } from '@workbench/widgets/workflow/editor/selectionStore';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
+import { useInvocationTemplatesSelector } from '@workbench/workflows/templates';
 
 /**
  * Edit-mode inspector for the editor's selected node, with the legacy tab
@@ -94,7 +94,7 @@ const OutputsTab = ({ template }: { template: InvocationTemplate | undefined }) 
 );
 
 const InspectorBody = ({ node, tab }: { node: WorkflowNode; tab: InspectorTab }) => {
-  const { templates } = useInvocationTemplatesSnapshot();
+  const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
 
   if (node.type === 'notes' || node.type === 'current_image' || node.type === 'connector') {
     const typeLabel =
@@ -130,7 +130,7 @@ const InspectorBody = ({ node, tab }: { node: WorkflowNode; tab: InspectorTab })
 export const NodeInspector = ({ projectGraph }: { projectGraph: ProjectGraphState }) => {
   const workflowWidgetValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'workflow'));
   const dispatch = useWorkbenchDispatch();
-  const { selectedNodeIds } = workflowSelectionStore.useSnapshot();
+  const selectedNodeIds = workflowSelectionStore.useSelector((snapshot) => snapshot.selectedNodeIds);
   const tab = getInspectorTab(workflowWidgetValues);
   const selectedNode = projectGraph.nodes.find((node) => node.id === selectedNodeIds[0]);
 

@@ -18,10 +18,12 @@ const kindIcon = {
 } satisfies Record<WorkbenchNotificationKind, LucideIcon>;
 
 export const NotificationsWidgetView = ({ presentation, region }: WidgetViewProps) => {
-  const notifications = useWorkbenchSelector((snapshot) => snapshot.state.notifications);
-  const unreadCount = notifications.filter((notification) => !notification.isRead).length;
-  const errorCount = notifications.filter((notification) => notification.kind === 'error').length;
-  const label = unreadCount > 0 ? `${unreadCount} new` : `${notifications.length} total`;
+  const { errorCount, totalCount, unreadCount } = useWorkbenchSelector((snapshot) => ({
+    errorCount: snapshot.state.notifications.filter((notification) => notification.kind === 'error').length,
+    totalCount: snapshot.state.notifications.length,
+    unreadCount: snapshot.state.notifications.filter((notification) => !notification.isRead).length,
+  }));
+  const label = unreadCount > 0 ? `${unreadCount} new` : `${totalCount} total`;
   const icon = errorCount > 0 ? TriangleAlertIcon : BellIcon;
 
   if (region === 'bottom' && presentation !== 'expanded') {

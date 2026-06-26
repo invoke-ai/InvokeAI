@@ -1,15 +1,23 @@
-import type { WidgetViewProps } from '@workbench/types';
+import type { GeneratedImageContract, WidgetViewProps } from '@workbench/types';
 
-import { getGallerySettings } from '@workbench/gallery/settings';
+import { getGallerySettings, type GallerySettings } from '@workbench/gallery/settings';
 import { useImageActions } from '@workbench/image-actions';
 import { StatusWidgetChip } from '@workbench/widget-frame';
-import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProject, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { createGenerateFormValuesSelector } from '@workbench/widgets/generate/generateFormViewModel';
+import {
+  useActiveProjectId,
+  useActiveProjectName,
+  useActiveProjectSelector,
+  useWidgetValuesSelector,
+  useWorkbenchDispatch,
+} from '@workbench/WorkbenchContext';
+import { areArraysEqual, createStableSelector } from '@workbench/workbenchSelectors';
 import { ImageIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { GalleryPanelContent } from './GalleryPanelContent';
 import {
+  getGalleryCompareImage,
   getGalleryPage,
   getGalleryProjectBoardId,
   getGalleryImagesRefreshToken,
@@ -17,6 +25,7 @@ import {
   getGalleryRefreshToken,
   getGallerySearchTerm,
   getGallerySelectedBoardId,
+  getGallerySelectedImageNames,
   getGalleryStateView,
   getGalleryTotalImages,
   getGalleryView,
@@ -25,10 +34,83 @@ import { GalleryWidgetContext, type GalleryWidgetContextValue } from './GalleryW
 import { useGalleryActions } from './useGalleryActions';
 import { GALLERY_PAGE_SIZE, useGalleryData } from './useGalleryData';
 
+interface GalleryWidgetSelectedValues extends Record<string, unknown>, GallerySettings {
+  compareImage: GeneratedImageContract | null;
+  galleryImagesRefreshToken: string;
+  galleryPage: number;
+  galleryRefreshToken: string;
+  galleryTotalImages: number | null;
+  galleryView: ReturnType<typeof getGalleryView>;
+  projectBoardId: string | null;
+  recentImages: GeneratedImageContract[] | undefined;
+  searchTerm: string;
+  selectedBoardId: string;
+  selectedImageName: string | null;
+  selectedImageNames: string[];
+}
+
+const areGallerySettingsEqual = (left: GallerySettings, right: GallerySettings): boolean =>
+  left.boardOrderBy === right.boardOrderBy &&
+  left.boardOrderDir === right.boardOrderDir &&
+  left.imageDensityPercent === right.imageDensityPercent &&
+  left.imageOrderDir === right.imageOrderDir &&
+  left.paginationMode === right.paginationMode &&
+  left.showArchivedBoards === right.showArchivedBoards &&
+  left.showDateBoards === right.showDateBoards &&
+  left.showImageDimensions === right.showImageDimensions &&
+  left.starredFirst === right.starredFirst &&
+  left.thumbnailFit === right.thumbnailFit;
+
+const areGalleryWidgetSelectedValuesEqual = (
+  left: GalleryWidgetSelectedValues,
+  right: GalleryWidgetSelectedValues
+): boolean =>
+  left.compareImage === right.compareImage &&
+  left.galleryImagesRefreshToken === right.galleryImagesRefreshToken &&
+  left.galleryPage === right.galleryPage &&
+  left.galleryRefreshToken === right.galleryRefreshToken &&
+  left.galleryTotalImages === right.galleryTotalImages &&
+  left.galleryView === right.galleryView &&
+  left.projectBoardId === right.projectBoardId &&
+  left.recentImages === right.recentImages &&
+  left.searchTerm === right.searchTerm &&
+  left.selectedBoardId === right.selectedBoardId &&
+  left.selectedImageName === right.selectedImageName &&
+  areArraysEqual(left.selectedImageNames, right.selectedImageNames) &&
+  areGallerySettingsEqual(left, right);
+
+const selectGalleryWidgetValues = createStableSelector(
+  (values: Record<string, unknown>): GalleryWidgetSelectedValues => {
+    const settings = getGallerySettings(values);
+
+    return {
+      ...settings,
+      compareImage: getGalleryCompareImage(values),
+      galleryImagesRefreshToken: getGalleryImagesRefreshToken(values),
+      galleryPage: getGalleryPage(values),
+      galleryRefreshToken: getGalleryRefreshToken(values),
+      galleryTotalImages: getGalleryTotalImages(values),
+      galleryView: getGalleryView(values),
+      projectBoardId: getGalleryProjectBoardId(values),
+      recentImages: Array.isArray(values.recentImages) ? (values.recentImages as GeneratedImageContract[]) : undefined,
+      searchTerm: getGallerySearchTerm(values),
+      selectedBoardId: getGallerySelectedBoardId(values, []),
+      selectedImageName: typeof values.selectedImageName === 'string' ? values.selectedImageName : null,
+      selectedImageNames: getGallerySelectedImageNames(values),
+    };
+  },
+  areGalleryWidgetSelectedValuesEqual
+);
+
+const selectGenerateRecallValues = createGenerateFormValuesSelector();
+
 export const GalleryWidgetView = ({ presentation, region, runtime }: WidgetViewProps) => {
-  const activeProject = useActiveProject();
   const dispatch = useWorkbenchDispatch();
-  const galleryValues = getProjectWidgetValues(activeProject, 'gallery');
+  const projectId = useActiveProjectId();
+  const galleryValues = useWidgetValuesSelector('gallery', selectGalleryWidgetValues);
+  const generateValues = useWidgetValuesSelector('generate', selectGenerateRecallValues);
+  const projectName = useActiveProjectName();
+  const queueItems = useActiveProjectSelector((project) => project.queue.items);
   const galleryView = getGalleryView(galleryValues);
   const searchTerm = getGallerySearchTerm(galleryValues);
   const recentImagesKey = getGalleryRecentImagesKey(galleryValues);
@@ -51,13 +133,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: WidgetViewP
   });
   const { loadMore, patchImages, total } = data;
   const selectedBoardId = getGallerySelectedBoardId(galleryValues, data.boards);
-  const gallery = getGalleryStateView(
-    galleryValues,
-    data.boards,
-    data.images,
-    data.isLoadingImages,
-    activeProject.queue.items
-  );
+  const gallery = getGalleryStateView(galleryValues, data.boards, data.images, data.isLoadingImages, queueItems);
   const onStarredChange = useCallback(
     (imageNames: string[], starred: boolean) => {
       patchImages((images) =>
@@ -105,21 +181,22 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: WidgetViewP
   const imageActions = useImageActions({
     boards: data.boards,
     dispatch,
-    generateValues: getProjectWidgetValues(activeProject, 'generate'),
+    generateValues,
     onImagesDeleted,
     onStarredChange,
+    projectId,
   });
   const actions = useGalleryActions({
     boards: data.boards,
     dispatch,
     loadMore,
     projectBoardId: getGalleryProjectBoardId(galleryValues),
-    projectName: activeProject.name,
+    projectName,
     selectedBoardId,
   });
   const contextValue = useMemo<GalleryWidgetContextValue>(
-    () => ({ actions, gallery, imageActions, projectName: activeProject.name, runtime }),
-    [actions, activeProject.name, gallery, imageActions, runtime]
+    () => ({ actions, gallery, imageActions, projectName, runtime }),
+    [actions, gallery, imageActions, projectName, runtime]
   );
   const isWidePlacement = region === 'center' || (region === 'bottom' && presentation === 'expanded');
 

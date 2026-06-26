@@ -16,9 +16,16 @@ import {
   getGalleryCompareImage,
   getGalleryImagesRefreshToken,
   getGalleryRecentImagesKey,
+  getGalleryRefreshToken,
 } from '@workbench/widgets/gallery/galleryStateView';
+import { createGenerateFormValuesSelector } from '@workbench/widgets/generate/generateFormViewModel';
 import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import {
+  useActiveProjectId,
+  useActiveProjectSelector,
+  useWidgetValuesSelector,
+  useWorkbenchDispatch,
+} from '@workbench/WorkbenchContext';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 
@@ -89,6 +96,15 @@ const getBoardName = (boards: GalleryBoard[], boardId: string): string =>
 
 const shouldLoadBackendBoard = (image: PreviewImage): boolean => image.sourceQueueItemId === 'backend-gallery';
 
+export const getPreviewBoardsRequestKey = ({
+  hasSelectedImage,
+  refreshToken,
+}: {
+  hasSelectedImage: boolean;
+  isBackendImage: boolean;
+  refreshToken: string;
+}): string | null => (hasSelectedImage ? refreshToken : null);
+
 const previewGridCss = {
   backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1.5px)',
   backgroundPosition: 'center',
@@ -96,9 +112,11 @@ const previewGridCss = {
   backgroundSize: '24px 24px',
 } as const;
 
+const selectGenerateRecallValues = createGenerateFormValuesSelector();
+
 export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const galleryValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'gallery'));
-  const generateValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'generate'));
+  const generateValues = useWidgetValuesSelector('generate', selectGenerateRecallValues);
   const { antialiasProgressImages, showProgressImagesInViewer } = useActiveProjectSelector(
     (project) => project.settings
   );
@@ -114,6 +132,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const hasSelectedImage = selectedImage !== null;
   const isBackendImage = selectedImage ? shouldLoadBackendBoard(selectedImage) : false;
   const { imageOrderDir, starredFirst } = getGallerySettings(galleryValues);
+  const boardRefreshToken = getGalleryRefreshToken(galleryValues);
   const imageRefreshToken = getGalleryImagesRefreshToken(galleryValues);
   const recentImagesKey = getGalleryRecentImagesKey(galleryValues);
   const [boards, setBoards] = useState<GalleryBoard[]>(fallbackBoards);
@@ -129,6 +148,37 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
   selectedImageRef.current = selectedImage;
   boardImagesRef.current = boardImages;
+
+  const boardsRequestKey = getPreviewBoardsRequestKey({
+    hasSelectedImage,
+    isBackendImage,
+    refreshToken: boardRefreshToken,
+  });
+
+  useEffect(() => {
+    if (boardsRequestKey === null) {
+      setBoards(fallbackBoards);
+      return;
+    }
+
+    let isStale = false;
+
+    listGalleryBoards()
+      .then((nextBoards) => {
+        if (!isStale) {
+          setBoards(nextBoards);
+        }
+      })
+      .catch(() => {
+        if (!isStale) {
+          setBoards(fallbackBoards);
+        }
+      });
+
+    return () => {
+      isStale = true;
+    };
+  }, [boardsRequestKey]);
 
   // Deliberately NOT keyed on the selected image object or the gallery's
   // board selection/sort: the board context only refetches when the image's
@@ -149,24 +199,20 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     let isStale = false;
 
     setIsLoadingBoard(true);
-    Promise.all([
-      listGalleryBoards().catch(() => fallbackBoards),
-      listGalleryImages({
-        boardId: imageBoardId,
-        galleryView: selectedGalleryView,
-        orderDir: imageOrderDir,
-        searchTerm: '',
-        starredFirst,
-      }).catch(() => ({ images: [] as GalleryImage[], total: 0 })),
-    ])
-      .then(([nextBoards, nextImagesPage]) => {
+    listGalleryImages({
+      boardId: imageBoardId,
+      galleryView: selectedGalleryView,
+      orderDir: imageOrderDir,
+      searchTerm: '',
+      starredFirst,
+    })
+      .then((nextImagesPage) => {
         if (isStale) {
           return;
         }
 
         const fallbackImage = selectedImageRef.current;
 
-        setBoards(nextBoards);
         setBoardImages(nextImagesPage.images.length ? nextImagesPage.images : fallbackImage ? [fallbackImage] : []);
       })
       .catch((error: unknown) => {
@@ -241,11 +287,13 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     },
     [dispatch]
   );
+  const projectId = useActiveProjectId();
   const imageActions = useImageActions({
     boards,
     dispatch,
     generateValues,
     onImagesDeleted,
+    projectId,
   });
   const contextMenuImage = useMemo<GalleryImage | null>(() => {
     if (!selectedImage) {
@@ -275,12 +323,17 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       dispatch({ image: selectedImage, type: 'setGalleryCompareImage' });
       return;
     }
+
+    if (commandId === 'viewer.deleteImage' && selectedImage) {
+      void imageActions.deleteImages([selectedImage.imageName]);
+    }
   });
 
   useEffect(() => {
     const hotkeys = [
       ['viewer.toggleViewer', 'Toggle preview', ['z']],
       ['viewer.swapImages', 'Swap comparison images', ['c']],
+      ['viewer.deleteImage', 'Delete preview image', ['delete', 'backspace']],
     ] as const;
     const disposers = hotkeys.flatMap(([id, title, defaultKeys]) => [
       runtime.commands.register({ handler: () => executeViewerHotkey(id), id, title }),

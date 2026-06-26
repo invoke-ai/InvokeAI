@@ -27,6 +27,8 @@ const store = createExternalStore<ProjectSyncSnapshot>({
 
 export const useProjectSync = (): ProjectSyncSnapshot => store.useSnapshot();
 
+export const useProjectSyncSelector = store.useSelector;
+
 export const reportProjectSync = (update: Omit<ProjectSyncSnapshot, 'lastSyncedAt'>): void => {
   store.setSnapshot({
     ...update,

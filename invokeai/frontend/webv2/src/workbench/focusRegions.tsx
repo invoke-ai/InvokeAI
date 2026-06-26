@@ -4,7 +4,7 @@ import { createContext, use, useState } from 'react';
 
 import type { WidgetRegion } from './types';
 
-import { useWorkbenchPreferences } from './settings/store';
+import { useWorkbenchPreferenceSelector } from './settings/store';
 
 let focusedRegionSnapshot: WidgetRegion | null = null;
 
@@ -62,7 +62,9 @@ const useFocusRegionContext = () => {
 
 export const useFocusRegionProps = (region: WidgetRegion) => {
   const { focusedRegion, setFocusedRegion } = useFocusRegionContext();
-  const { showFocusRegionHighlight } = useWorkbenchPreferences();
+  const showFocusRegionHighlight = useWorkbenchPreferenceSelector(
+    (preferences) => preferences.showFocusRegionHighlight
+  );
   const isHighlighted = showFocusRegionHighlight && focusedRegion === region;
 
   return {

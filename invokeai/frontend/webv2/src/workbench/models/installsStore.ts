@@ -1,5 +1,4 @@
-import { createExternalStore, createListenerChannel } from '@workbench/externalStore';
-import { useSyncExternalStore } from 'react';
+import { createExternalStore, createKeyedTransientStore } from '@workbench/externalStore';
 
 import type { ModelInstallJob, ModelInstallStatus } from './types';
 
@@ -41,14 +40,10 @@ const REFRESH_COALESCE_MS = 250;
 const OUTCOME_LIMIT = 16;
 
 const store = createExternalStore<InstallsSnapshot>({ error: null, jobs: [], status: 'idle' });
-
-let outcomes: InstallOutcome[] = [];
+const outcomesStore = createExternalStore<{ outcomes: InstallOutcome[] }>({ outcomes: [] });
 let nextOutcomeId = 1;
 
-const progressByJobId = new Map<number, InstallDownloadProgress>();
-
-const progressChannel = createListenerChannel();
-const outcomesChannel = createListenerChannel();
+const progressByJobId = createKeyedTransientStore<number, InstallDownloadProgress>();
 
 let inflightRefresh: Promise<void> | null = null;
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -64,14 +59,13 @@ export const refreshInstalls = (): Promise<void> => {
     .then((jobs) => {
       const activeJobIds = new Set(jobs.map((job) => job.id));
 
-      for (const jobId of progressByJobId.keys()) {
+      for (const [jobId] of progressByJobId.entries()) {
         if (!activeJobIds.has(jobId)) {
           progressByJobId.delete(jobId);
         }
       }
 
       store.patchSnapshot({ error: null, jobs, status: 'loaded' });
-      progressChannel.notify();
     })
     .catch((error: unknown) => {
       store.patchSnapshot({
@@ -121,9 +115,10 @@ export const addInstallJob = (job: ModelInstallJob): void => {
 };
 
 const recordOutcome = (outcome: Omit<InstallOutcome, 'id'>): void => {
-  outcomes = [{ ...outcome, id: nextOutcomeId }, ...outcomes].slice(0, OUTCOME_LIMIT);
+  outcomesStore.patchSnapshot({
+    outcomes: [{ ...outcome, id: nextOutcomeId }, ...outcomesStore.getSnapshot().outcomes].slice(0, OUTCOME_LIMIT),
+  });
   nextOutcomeId += 1;
-  outcomesChannel.notify();
 };
 
 interface ModelInstallSocketPayload {
@@ -176,7 +171,6 @@ export const handleModelInstallSocketEvent = (event: ModelInstallSocketEvent, pa
 
   if (event === 'model_install_download_progress') {
     progressByJobId.set(data.id, { bytes: data.bytes ?? 0, totalBytes: data.total_bytes ?? 0 });
-    progressChannel.notify();
 
     const job = store.getSnapshot().jobs.find((candidate) => candidate.id === data.id);
 
@@ -228,36 +222,28 @@ const ACTIVE_STATUSES: ModelInstallStatus[] = ['waiting', 'downloading', 'downlo
 
 export const isActiveInstallStatus = (status: ModelInstallStatus): boolean => ACTIVE_STATUSES.includes(status);
 
+export const useInstallsSelector = store.useSelector;
+
 export const useInstallsSnapshot = (): InstallsSnapshot => store.useSnapshot();
 
 /**
  * Source strings (URL, repo id, or path) of jobs currently in flight, cached
  * per jobs-array so list rows can show an "installing" state by source.
  */
-let activeSourcesCache: { jobs: ModelInstallJob[]; sources: ReadonlySet<string> } | null = null;
+const areSetsEqual = <Value>(left: ReadonlySet<Value>, right: ReadonlySet<Value>): boolean =>
+  left.size === right.size && Array.from(left).every((value) => right.has(value));
 
-const getActiveInstallSources = (): ReadonlySet<string> => {
-  const { jobs } = store.getSnapshot();
-
-  if (activeSourcesCache?.jobs !== jobs) {
-    activeSourcesCache = {
-      jobs,
-      sources: new Set(
-        jobs
-          .filter((job) => isActiveInstallStatus(job.status) || job.status === 'paused')
-          .map((job) => describeSource(job.source))
-      ),
-    };
-  }
-
-  return activeSourcesCache.sources;
-};
+const getActiveInstallSources = (jobs: ModelInstallJob[]): ReadonlySet<string> =>
+  new Set(
+    jobs
+      .filter((job) => isActiveInstallStatus(job.status) || job.status === 'paused')
+      .map((job) => describeSource(job.source))
+  );
 
 export const useActiveInstallSources = (): ReadonlySet<string> =>
-  useSyncExternalStore(store.subscribe, getActiveInstallSources);
+  store.useSelector((snapshot) => getActiveInstallSources(snapshot.jobs), areSetsEqual);
 
 export const useInstallProgress = (jobId: number): InstallDownloadProgress | null =>
-  useSyncExternalStore(progressChannel.subscribe, () => progressByJobId.get(jobId) ?? null);
+  progressByJobId.useValue(jobId) ?? null;
 
-export const useInstallOutcomes = (): InstallOutcome[] =>
-  useSyncExternalStore(outcomesChannel.subscribe, () => outcomes);
+export const useInstallOutcomes = (): InstallOutcome[] => outcomesStore.useSelector((snapshot) => snapshot.outcomes);

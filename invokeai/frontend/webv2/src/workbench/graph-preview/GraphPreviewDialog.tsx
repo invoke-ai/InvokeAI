@@ -3,9 +3,17 @@ import type { XYPosition } from '@workbench/workflows/types';
 
 import { Box, Dialog, Portal, SegmentGroup, Text } from '@chakra-ui/react';
 import { Button, JsonPreview } from '@workbench/components/ui';
-import { formatRoute, isInvocationRouteValid, resolveInvocationRoute } from '@workbench/invocation';
-import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsStore';
-import { useActiveProject, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import {
+  createInvocationRouteInputSelector,
+  formatRoute,
+  isInvocationRouteValid,
+  resolveInvocationRoute,
+  resolveInvocationRouteInput,
+} from '@workbench/invocation';
+import { ensureModelsLoaded, useModelsSelector } from '@workbench/models/modelsStore';
+import { flushGenerateDrafts } from '@workbench/widgets/generate/generateDraftRegistry';
+import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchStore } from '@workbench/WorkbenchContext';
+import { useInvocationTemplatesSelector } from '@workbench/workflows/templates';
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { GraphPreviewFlow } from './GraphPreviewFlow';
@@ -23,6 +31,8 @@ interface GraphPreviewDialogProps {
 
 type PreviewMode = 'nodes' | 'json';
 
+const selectInvocationRouteInput = createInvocationRouteInputSelector();
+
 const PreviewPane = ({ children }: { children: ReactNode }) => (
   <Box flex="1" h="full" minH="0" minW="0" w="full" rounded="md" borderWidth={1} overflow="hidden">
     {children}
@@ -38,16 +48,21 @@ export const GraphPreviewDialog = ({
   title,
   onOpenChange,
 }: GraphPreviewDialogProps) => {
-  const activeProject = useActiveProject();
+  const routeInput = useActiveProjectSelector(selectInvocationRouteInput);
   const dispatch = useWorkbenchDispatch();
-  const { models, status: modelsStatus } = useModelsSnapshot();
+  const store = useWorkbenchStore();
+  const models = useModelsSelector((snapshot) => snapshot.models);
+  const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
   const availabilityModels = modelsStatus === 'loaded' ? models : undefined;
   const [mode, setMode] = useState<PreviewMode>('nodes');
+
+  useInvocationTemplatesSelector((snapshot) => snapshot.status);
+
   const dialogRoute = sourceId
-    ? resolveInvocationRoute(
-        activeProject,
+    ? resolveInvocationRouteInput(
+        routeInput,
         'dialog',
-        { ...activeProject.invocation, sourceId, sourceLocked: true },
+        { ...routeInput.invocation, sourceId, sourceLocked: true },
         availabilityModels
       )
     : null;
@@ -97,18 +112,31 @@ export const GraphPreviewDialog = ({
             <Dialog.Footer>
               {dialogRoute ? (
                 <Button
-                  disabled={!canInvoke}
+                  aria-disabled={!canInvoke}
+                  cursor={canInvoke ? undefined : 'not-allowed'}
+                  opacity={canInvoke ? undefined : 0.6}
                   size="sm"
                   title={dialogRoute.validationMessage}
                   onClick={() => {
-                    if (!canInvoke) {
+                    flushGenerateDrafts();
+                    const postFlushProject = store.getSnapshot().activeProject;
+                    const postFlushRoute = sourceId
+                      ? resolveInvocationRoute(
+                          postFlushProject,
+                          'dialog',
+                          { ...postFlushProject.invocation, sourceId, sourceLocked: true },
+                          availabilityModels
+                        )
+                      : null;
+
+                    if (!postFlushRoute || !isInvocationRouteValid(postFlushRoute)) {
                       return;
                     }
 
                     dispatch({
                       backendSupportsCancellation: true,
                       models: availabilityModels,
-                      route: dialogRoute,
+                      route: postFlushRoute,
                       type: 'submitResolvedInvocationSnapshot',
                     });
                     onOpenChange(false);

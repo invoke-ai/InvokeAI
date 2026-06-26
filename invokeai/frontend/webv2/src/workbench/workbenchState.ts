@@ -97,9 +97,10 @@ type WorkbenchAction =
       widgetId: WidgetTypeId;
       createNew?: boolean;
       initialValues?: Record<string, unknown>;
+      projectId?: string;
     }
-  | { type: 'selectRegionWidget'; region: WidgetRegion; widgetId: WidgetInstanceId }
-  | { type: 'toggleRegionWidget'; region: WidgetRegion; widgetId: WidgetInstanceId }
+  | { type: 'selectRegionWidget'; region: WidgetRegion; widgetId: WidgetInstanceId; projectId?: string }
+  | { type: 'toggleRegionWidget'; region: WidgetRegion; widgetId: WidgetInstanceId; projectId?: string }
   | {
       type: 'moveWidgetInstance';
       instanceId: WidgetInstanceId;
@@ -115,14 +116,25 @@ type WorkbenchAction =
     }
   | { type: 'setRegionWidgetCollapsed'; region: WidgetRegion; isCollapsed: boolean }
   | { type: 'setRegionWidgetSize'; region: WidgetRegion; sizePx: number }
-  | { type: 'setGenerateSettings'; values: GenerateWidgetValues }
-  | { type: 'setGenerateBatchCount'; batchCount: number }
-  | { type: 'addPromptToHistory'; prompt: PromptHistoryItem }
-  | { type: 'removePromptFromHistory'; prompt: PromptHistoryItem }
-  | { type: 'clearPromptHistory' }
-  | { type: 'patchWidgetValues'; widgetId: WidgetTypeId; values: Record<string, unknown> }
-  | { type: 'patchWidgetInstanceValues'; instanceId: WidgetInstanceId; values: Record<string, unknown> }
-  | { type: 'setWidgetInstanceValues'; instanceId: WidgetInstanceId; values: Record<string, unknown> }
+  | { type: 'setGenerateSettings'; values: GenerateWidgetValues; projectId?: string }
+  | { type: 'patchGenerateSettings'; values: Partial<GenerateWidgetValues>; projectId?: string }
+  | { type: 'setGenerateBatchCount'; batchCount: number; projectId?: string }
+  | { type: 'addPromptToHistory'; prompt: PromptHistoryItem; projectId?: string }
+  | { type: 'removePromptFromHistory'; prompt: PromptHistoryItem; projectId?: string }
+  | { type: 'clearPromptHistory'; projectId?: string }
+  | { type: 'patchWidgetValues'; widgetId: WidgetTypeId; values: Record<string, unknown>; projectId?: string }
+  | {
+      type: 'patchWidgetInstanceValues';
+      instanceId: WidgetInstanceId;
+      values: Record<string, unknown>;
+      projectId?: string;
+    }
+  | {
+      type: 'setWidgetInstanceValues';
+      instanceId: WidgetInstanceId;
+      values: Record<string, unknown>;
+      projectId?: string;
+    }
   | { type: 'applyProjectGraphAction'; action: ProjectGraphAction }
   | { type: 'replaceProjectGraph'; document: ProjectGraphState; label: string }
   | { type: 'saveProjectGraphSnapshot' }
@@ -158,20 +170,20 @@ type WorkbenchAction =
   | { type: 'discardAllStagedImages' }
   | { type: 'toggleCanvasStagingVisibility' }
   | { type: 'toggleCanvasStagingThumbnailsVisibility' }
-  | { type: 'selectGalleryImage'; image: GeneratedImageContract }
-  | { type: 'toggleGalleryImageInSelection'; image: GeneratedImageContract }
-  | { type: 'setGalleryMultiSelection'; imageNames: string[]; primaryImage: GeneratedImageContract }
-  | { type: 'setGalleryCompareImage'; image: GeneratedImageContract | null }
-  | { type: 'selectGalleryBoard'; boardId: string }
-  | { type: 'setGalleryView'; galleryView: 'images' | 'assets' }
-  | { type: 'setGallerySearchTerm'; searchTerm: string }
-  | { type: 'updateGallerySettings'; settings: Partial<GallerySettings> }
-  | { type: 'setGalleryPage'; page: number }
-  | { type: 'setGalleryPageInfo'; totalImages: number }
-  | { type: 'touchGalleryRefresh' }
-  | { type: 'touchGalleryImagesRefresh' }
-  | { type: 'removeGalleryImages'; imageNames: string[] }
-  | { type: 'setGalleryProjectBoardId'; boardId: string }
+  | { type: 'selectGalleryImage'; image: GeneratedImageContract; projectId?: string }
+  | { type: 'toggleGalleryImageInSelection'; image: GeneratedImageContract; projectId?: string }
+  | { type: 'setGalleryMultiSelection'; imageNames: string[]; primaryImage: GeneratedImageContract; projectId?: string }
+  | { type: 'setGalleryCompareImage'; image: GeneratedImageContract | null; projectId?: string }
+  | { type: 'selectGalleryBoard'; boardId: string; projectId?: string }
+  | { type: 'setGalleryView'; galleryView: 'images' | 'assets'; projectId?: string }
+  | { type: 'setGallerySearchTerm'; searchTerm: string; projectId?: string }
+  | { type: 'updateGallerySettings'; settings: Partial<GallerySettings>; projectId?: string }
+  | { type: 'setGalleryPage'; page: number; projectId?: string }
+  | { type: 'setGalleryPageInfo'; totalImages: number; projectId?: string }
+  | { type: 'touchGalleryRefresh'; projectId?: string }
+  | { type: 'touchGalleryImagesRefresh'; projectId?: string }
+  | { type: 'removeGalleryImages'; imageNames: string[]; projectId?: string }
+  | { type: 'setGalleryProjectBoardId'; boardId: string; projectId?: string }
   | { type: 'acceptStagedImage' }
   | { type: 'clearCanvasStaging' }
   | { type: 'cancelQueueItem'; queueItemId: string; projectId?: string }
@@ -234,6 +246,39 @@ const addNotification = (state: WorkbenchState, notification: WorkbenchNotificat
   ...state,
   notifications: [notification, ...state.notifications].slice(0, NOTIFICATION_LIMIT),
 });
+
+const areRecordsShallowEqual = (left: Record<string, unknown>, right: Record<string, unknown>): boolean => {
+  if (left === right) {
+    return true;
+  }
+
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every((key) => Object.prototype.hasOwnProperty.call(right, key) && Object.is(left[key], right[key]))
+  );
+};
+
+const patchRecord = <RecordValue extends Record<string, unknown>>(
+  current: RecordValue,
+  patch: Partial<RecordValue>
+): RecordValue => {
+  let didChange = false;
+
+  for (const [key, value] of Object.entries(patch)) {
+    if (!Object.prototype.hasOwnProperty.call(current, key) || !Object.is(current[key], value)) {
+      didChange = true;
+      break;
+    }
+  }
+
+  return didChange ? ({ ...current, ...patch } as RecordValue) : current;
+};
+
+const cloneRecord = <RecordValue extends Record<string, unknown>>(record: RecordValue): RecordValue =>
+  structuredClone(record) as RecordValue;
 
 const cloneGraph = (graph: GraphContract): GraphContract => ({
   ...graph,
@@ -428,6 +473,11 @@ const updateProjectWidgetState = (
     Object.values(project.widgetInstances).find((candidate) => candidate.typeId === widgetId);
   const instanceId = instance?.id ?? widgetId;
   const currentInstance = instance ?? createWidgetInstance(widgetId, instanceId);
+  const nextState = getState(currentInstance.state);
+
+  if (nextState === currentInstance.state) {
+    return project;
+  }
 
   return {
     ...project,
@@ -435,7 +485,7 @@ const updateProjectWidgetState = (
       ...project.widgetInstances,
       [instanceId]: {
         ...currentInstance,
-        state: getState(currentInstance.state),
+        state: nextState,
       },
     },
   };
@@ -446,10 +496,40 @@ const updateProjectWidgetValues = (
   widgetId: WidgetTypeId,
   getValues: (values: Record<string, unknown>) => Record<string, unknown>
 ): Project =>
-  updateProjectWidgetState(project, widgetId, (widgetState) => ({
-    ...widgetState,
-    values: getValues(widgetState.values),
-  }));
+  updateProjectWidgetState(project, widgetId, (widgetState) => {
+    const values = getValues(widgetState.values);
+
+    return values === widgetState.values ? widgetState : { ...widgetState, values };
+  });
+
+const updateProjectWidgetInstanceValues = (
+  project: Project,
+  instanceId: WidgetInstanceId,
+  getValues: (values: Record<string, unknown>) => Record<string, unknown>
+): Project => {
+  const instance = project.widgetInstances[instanceId];
+
+  if (!instance) {
+    return project;
+  }
+
+  const values = getValues(instance.state.values);
+
+  if (values === instance.state.values) {
+    return project;
+  }
+
+  return {
+    ...project,
+    widgetInstances: {
+      ...project.widgetInstances,
+      [instanceId]: {
+        ...instance,
+        state: { ...instance.state, values },
+      },
+    },
+  };
+};
 
 const cloneWidgetRegions = (
   widgetRegions: Record<WidgetRegion, WidgetRegionState>
@@ -754,12 +834,24 @@ const getNextProjectIndex = (projects: Project[]): number => {
 export const createDraftProject = (projects: Project[]): Project =>
   createProject(getNextProjectIndex(projects), createId('project'));
 
-const updateActiveProject = (state: WorkbenchState, getProject: (project: Project) => Project): WorkbenchState => ({
-  ...state,
-  projects: state.projects.map((project) =>
-    project.id === state.activeProjectId ? getProject(ensureProjectWidgetContracts(project)) : project
-  ),
-});
+const updateActiveProject = (state: WorkbenchState, getProject: (project: Project) => Project): WorkbenchState => {
+  let didChange = false;
+  const projects = state.projects.map((project) => {
+    if (project.id !== state.activeProjectId) {
+      return project;
+    }
+
+    const nextProject = getProject(project);
+
+    if (nextProject !== project) {
+      didChange = true;
+    }
+
+    return nextProject;
+  });
+
+  return didChange ? { ...state, projects } : state;
+};
 
 const getNextInstanceId = (region: WidgetRegionState, instanceId: WidgetInstanceId): WidgetInstanceId | null => {
   if (region.activeInstanceId !== instanceId) {
@@ -782,14 +874,26 @@ const updateActiveWidgetRegion = (
   state: WorkbenchState,
   region: WidgetRegion,
   getRegion: (regionState: WidgetRegionState) => WidgetRegionState
-): WorkbenchState =>
-  updateActiveProject(state, (project) => ({
-    ...project,
-    widgetRegions: {
-      ...project.widgetRegions,
-      [region]: getRegion(project.widgetRegions[region]),
-    },
-  }));
+): WorkbenchState => updateActiveProject(state, (project) => updateProjectWidgetRegion(project, region, getRegion));
+
+const updateProjectWidgetRegion = (
+  project: Project,
+  region: WidgetRegion,
+  getRegion: (regionState: WidgetRegionState) => WidgetRegionState
+): Project => {
+  const regionState = project.widgetRegions[region];
+  const nextRegionState = getRegion(regionState);
+
+  return nextRegionState === regionState
+    ? project
+    : {
+        ...project,
+        widgetRegions: {
+          ...project.widgetRegions,
+          [region]: nextRegionState,
+        },
+      };
+};
 
 const openPanelForRegion = (layout: ProjectLayoutState, region: WidgetRegion): ProjectLayoutState => ({
   ...layout,
@@ -1043,21 +1147,34 @@ const updateProjectById = (
   state: WorkbenchState,
   projectId: string,
   getProject: (project: Project) => Project
-): WorkbenchState => ({
-  ...state,
-  projects: state.projects.map((project) =>
-    project.id === projectId ? getProject(ensureProjectWidgetContracts(project)) : project
-  ),
-});
+): WorkbenchState => {
+  let didChange = false;
+  const projects = state.projects.map((project) => {
+    if (project.id !== projectId) {
+      return project;
+    }
+
+    const nextProject = getProject(project);
+
+    if (nextProject !== project) {
+      didChange = true;
+    }
+
+    return nextProject;
+  });
+
+  return didChange ? { ...state, projects } : state;
+};
 
 const updateGalleryValues = (
   state: WorkbenchState,
-  getValues: (values: Record<string, unknown>) => Record<string, unknown>
+  getValues: (values: Record<string, unknown>) => Record<string, unknown>,
+  projectId = state.activeProjectId
 ): WorkbenchState => {
-  const activeProject = state.projects.find((project) => project.id === state.activeProjectId);
-  const values = activeProject ? getWidgetValues(activeProject, 'gallery') : null;
+  const targetProject = state.projects.find((project) => project.id === projectId);
+  const values = targetProject ? getWidgetValues(targetProject, 'gallery') : null;
 
-  if (!activeProject || !values) {
+  if (!targetProject || !values) {
     return state;
   }
 
@@ -1067,7 +1184,9 @@ const updateGalleryValues = (
     return state;
   }
 
-  return updateActiveProject(state, (project) => updateProjectWidgetValues(project, 'gallery', () => nextValues));
+  return updateProjectById(state, projectId, (project) =>
+    updateProjectWidgetValues(project, 'gallery', () => nextValues)
+  );
 };
 
 const refreshProjectBackendData = (project: Project): Project => ({
@@ -1078,12 +1197,24 @@ const refreshProjectBackendData = (project: Project): Project => ({
   })),
 });
 
-const updateQueueItem = (project: Project, queueItemId: string, getItem: (item: QueueItem) => QueueItem): Project => ({
-  ...project,
-  queue: {
-    items: project.queue.items.map((item) => (item.id === queueItemId ? getItem(item) : item)),
-  },
-});
+const updateQueueItem = (project: Project, queueItemId: string, getItem: (item: QueueItem) => QueueItem): Project => {
+  let didChange = false;
+  const items = project.queue.items.map((item) => {
+    if (item.id !== queueItemId) {
+      return item;
+    }
+
+    const nextItem = getItem(item);
+
+    if (nextItem !== item) {
+      didChange = true;
+    }
+
+    return nextItem;
+  });
+
+  return didChange ? { ...project, queue: { items } } : project;
+};
 
 const isCancellableQueueItem = (item: QueueItem): boolean =>
   item.cancellable && (item.status === 'pending' || item.status === 'running');
@@ -1452,7 +1583,7 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       }));
     }
     case 'openRegionWidget': {
-      return updateActiveProject(state, (project) => {
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) => {
         const region = project.widgetRegions[action.region];
         const existingInstanceInRegion = region.instanceIds
           .map((instanceId) => project.widgetInstances[instanceId])
@@ -1489,7 +1620,7 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       });
     }
     case 'selectRegionWidget': {
-      return updateActiveProject(state, (project) => {
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) => {
         const region = project.widgetRegions[action.region];
 
         if (action.region === 'center') {
@@ -1515,25 +1646,27 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       });
     }
     case 'toggleRegionWidget': {
-      return updateActiveWidgetRegion(state, action.region, (region) => {
-        const isEnabled = region.instanceIds.includes(action.widgetId);
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
+        updateProjectWidgetRegion(project, action.region, (region) => {
+          const isEnabled = region.instanceIds.includes(action.widgetId);
 
-        if (action.region === 'center' && isEnabled && region.instanceIds.length === 1) {
-          return region;
-        }
+          if (action.region === 'center' && isEnabled && region.instanceIds.length === 1) {
+            return region;
+          }
 
-        const instanceIds = isEnabled
-          ? region.instanceIds.filter((widgetId) => widgetId !== action.widgetId)
-          : [...region.instanceIds, action.widgetId];
-        const fallbackInstanceId = getNextInstanceId(region, action.widgetId);
+          const instanceIds = isEnabled
+            ? region.instanceIds.filter((widgetId) => widgetId !== action.widgetId)
+            : [...region.instanceIds, action.widgetId];
+          const fallbackInstanceId = getNextInstanceId(region, action.widgetId);
 
-        return {
-          ...region,
-          activeInstanceId: isEnabled && fallbackInstanceId ? fallbackInstanceId : action.widgetId,
-          instanceIds,
-          isCollapsed: action.region === 'center' ? false : instanceIds.length === 0 ? true : region.isCollapsed,
-        };
-      });
+          return {
+            ...region,
+            activeInstanceId: isEnabled && fallbackInstanceId ? fallbackInstanceId : action.widgetId,
+            instanceIds,
+            isCollapsed: action.region === 'center' ? false : instanceIds.length === 0 ? true : region.isCollapsed,
+          };
+        })
+      );
     }
     case 'moveWidgetInstance': {
       return updateActiveProject(state, (project) => {
@@ -1579,89 +1712,75 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
         return state;
       }
 
-      return updateActiveWidgetRegion(state, action.region, (region) => ({
-        ...region,
-        isCollapsed: action.isCollapsed,
-      }));
+      return updateActiveWidgetRegion(state, action.region, (region) =>
+        region.isCollapsed === action.isCollapsed ? region : { ...region, isCollapsed: action.isCollapsed }
+      );
     }
     case 'setRegionWidgetSize': {
-      return updateActiveWidgetRegion(state, action.region, (region) => ({
-        ...region,
-        sizePx: clampPanelSize(action.region, action.sizePx),
-      }));
+      const sizePx = clampPanelSize(action.region, action.sizePx);
+
+      return updateActiveWidgetRegion(state, action.region, (region) =>
+        region.sizePx === sizePx ? region : { ...region, sizePx }
+      );
     }
     case 'setGenerateSettings': {
-      return updateActiveProject(state, (project) =>
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
         updateProjectWidgetValues(project, 'generate', () => cloneGenerateWidgetValues(action.values))
+      );
+    }
+    case 'patchGenerateSettings': {
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
+        updateProjectWidgetValues(project, 'generate', (values) => patchRecord(values, action.values))
       );
     }
     case 'setGenerateBatchCount': {
       const batchCount = sanitizeBatchCount(action.batchCount);
 
-      return updateActiveProject(state, (project) =>
-        updateProjectWidgetValues(project, 'generate', (values) => ({ ...values, batchCount }))
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
+        updateProjectWidgetValues(project, 'generate', (values) =>
+          sanitizeBatchCount(values.batchCount) === batchCount ? values : { ...values, batchCount }
+        )
       );
     }
     case 'addPromptToHistory': {
-      return updateActiveProject(state, (project) => ({
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) => ({
         ...project,
         promptHistory: addPromptHistoryItem(project.promptHistory, action.prompt),
       }));
     }
     case 'removePromptFromHistory': {
-      return updateActiveProject(state, (project) => ({
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) => ({
         ...project,
         promptHistory: removePromptHistoryItem(project.promptHistory, action.prompt),
       }));
     }
     case 'clearPromptHistory': {
-      return updateActiveProject(state, (project) => ({ ...project, promptHistory: [] }));
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) => ({
+        ...project,
+        promptHistory: [],
+      }));
     }
     case 'patchWidgetValues': {
       // Generic widget-owned UI state (panel modes, tabs, sizes). Not undoable.
-      return updateActiveProject(state, (project) =>
-        updateProjectWidgetValues(project, action.widgetId, (values) => ({ ...values, ...action.values }))
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
+        updateProjectWidgetValues(project, action.widgetId, (values) => patchRecord(values, action.values))
       );
     }
     case 'patchWidgetInstanceValues': {
-      return updateActiveProject(state, (project) => {
-        const instance = project.widgetInstances[action.instanceId];
-
-        if (!instance) {
-          return project;
-        }
-
-        return {
-          ...project,
-          widgetInstances: {
-            ...project.widgetInstances,
-            [action.instanceId]: {
-              ...instance,
-              state: { ...instance.state, values: { ...instance.state.values, ...action.values } },
-            },
-          },
-        };
-      });
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
+        updateProjectWidgetInstanceValues(project, action.instanceId, (values) =>
+          patchRecord(values, cloneRecord(action.values))
+        )
+      );
     }
     case 'setWidgetInstanceValues': {
-      return updateActiveProject(state, (project) => {
-        const instance = project.widgetInstances[action.instanceId];
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
+        updateProjectWidgetInstanceValues(project, action.instanceId, (currentValues) => {
+          const values = cloneRecord(action.values);
 
-        if (!instance) {
-          return project;
-        }
-
-        return {
-          ...project,
-          widgetInstances: {
-            ...project.widgetInstances,
-            [action.instanceId]: {
-              ...instance,
-              state: { ...instance.state, values: action.values },
-            },
-          },
-        };
-      });
+          return areRecordsShallowEqual(currentValues, values) ? currentValues : values;
+        })
+      );
     }
     case 'applyProjectGraphAction': {
       return updateActiveProject(state, (project) => {
@@ -1806,12 +1925,16 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
     }
     case 'markQueueItemBackendSubmitted': {
       return updateProjectById(state, action.projectId, (project) =>
-        updateQueueItem(project, action.queueItemId, (item) => ({
-          ...item,
-          backendBatchId: action.backendBatchId,
-          backendItemIds: action.backendItemIds,
-          status: item.status === 'cancelled' ? 'cancelled' : 'running',
-        }))
+        updateQueueItem(project, action.queueItemId, (item) => {
+          const status = item.status === 'cancelled' ? 'cancelled' : 'running';
+          const hasSameBackendItemIds =
+            item.backendItemIds?.length === action.backendItemIds.length &&
+            item.backendItemIds.every((id, index) => id === action.backendItemIds[index]);
+
+          return item.backendBatchId === action.backendBatchId && hasSameBackendItemIds && item.status === status
+            ? item
+            : { ...item, backendBatchId: action.backendBatchId, backendItemIds: action.backendItemIds, status };
+        })
       );
     }
     case 'setQueueItemStatus': {
@@ -1819,6 +1942,10 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       const queueItem = project?.queue.items.find((item) => item.id === action.queueItemId);
 
       if (queueItem?.status === 'cancelled' && action.status !== 'cancelled') {
+        return state;
+      }
+
+      if (queueItem?.status === action.status && queueItem.error === action.error) {
         return state;
       }
 
@@ -1968,73 +2095,97 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       }));
     }
     case 'selectGalleryImage': {
-      return updateGalleryValues(state, (values) => ({
-        ...values,
-        selectedImage: action.image,
-        selectedImageName: action.image.imageName,
-        selectedImageNames: [action.image.imageName],
-      }));
+      return updateGalleryValues(
+        state,
+        (values) => ({
+          ...values,
+          selectedImage: action.image,
+          selectedImageName: action.image.imageName,
+          selectedImageNames: [action.image.imageName],
+        }),
+        action.projectId
+      );
     }
     case 'toggleGalleryImageInSelection': {
-      return updateGalleryValues(state, (values) => {
-        const imageName = action.image.imageName;
-        const selectedImageNames = getGallerySelectedImageNames(values);
+      return updateGalleryValues(
+        state,
+        (values) => {
+          const imageName = action.image.imageName;
+          const selectedImageNames = getGallerySelectedImageNames(values);
 
-        if (!selectedImageNames.includes(imageName)) {
+          if (!selectedImageNames.includes(imageName)) {
+            return {
+              ...values,
+              selectedImage: action.image,
+              selectedImageName: imageName,
+              selectedImageNames: [...selectedImageNames, imageName],
+            };
+          }
+
+          const remainingImageNames = selectedImageNames.filter((name) => name !== imageName);
+          const wasPrimary = values.selectedImageName === imageName;
+
           return {
             ...values,
-            selectedImage: action.image,
-            selectedImageName: imageName,
-            selectedImageNames: [...selectedImageNames, imageName],
+            selectedImage: wasPrimary ? null : values.selectedImage,
+            selectedImageName: wasPrimary
+              ? (remainingImageNames[remainingImageNames.length - 1] ?? null)
+              : values.selectedImageName,
+            selectedImageNames: remainingImageNames,
           };
-        }
-
-        const remainingImageNames = selectedImageNames.filter((name) => name !== imageName);
-        const wasPrimary = values.selectedImageName === imageName;
-
-        return {
-          ...values,
-          selectedImage: wasPrimary ? null : values.selectedImage,
-          selectedImageName: wasPrimary
-            ? (remainingImageNames[remainingImageNames.length - 1] ?? null)
-            : values.selectedImageName,
-          selectedImageNames: remainingImageNames,
-        };
-      });
+        },
+        action.projectId
+      );
     }
     case 'setGalleryMultiSelection': {
-      return updateGalleryValues(state, (values) => ({
-        ...values,
-        selectedImage: action.primaryImage,
-        selectedImageName: action.primaryImage.imageName,
-        selectedImageNames: action.imageNames,
-      }));
+      return updateGalleryValues(
+        state,
+        (values) => ({
+          ...values,
+          selectedImage: action.primaryImage,
+          selectedImageName: action.primaryImage.imageName,
+          selectedImageNames: action.imageNames,
+        }),
+        action.projectId
+      );
     }
     case 'setGalleryCompareImage': {
-      return updateGalleryValues(state, (values) => ({ ...values, compareImage: action.image }));
+      return updateGalleryValues(state, (values) => ({ ...values, compareImage: action.image }), action.projectId);
     }
     case 'selectGalleryBoard': {
-      return updateGalleryValues(state, (values) => ({
-        ...values,
-        galleryPage: 0,
-        selectedBoardId: action.boardId,
-        selectedImageNames: [],
-      }));
+      return updateGalleryValues(
+        state,
+        (values) => ({
+          ...values,
+          galleryPage: 0,
+          selectedBoardId: action.boardId,
+          selectedImageNames: [],
+        }),
+        action.projectId
+      );
     }
     case 'setGalleryView': {
-      return updateGalleryValues(state, (values) => ({
-        ...values,
-        galleryPage: 0,
-        galleryView: action.galleryView,
-        selectedImageNames: [],
-      }));
+      return updateGalleryValues(
+        state,
+        (values) => ({
+          ...values,
+          galleryPage: 0,
+          galleryView: action.galleryView,
+          selectedImageNames: [],
+        }),
+        action.projectId
+      );
     }
     case 'setGallerySearchTerm': {
-      return updateGalleryValues(state, (values) => ({
-        ...values,
-        galleryPage: 0,
-        searchTerm: action.searchTerm,
-      }));
+      return updateGalleryValues(
+        state,
+        (values) => ({
+          ...values,
+          galleryPage: 0,
+          searchTerm: action.searchTerm,
+        }),
+        action.projectId
+      );
     }
     case 'updateGallerySettings': {
       const resetsQuery =
@@ -2042,59 +2193,83 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
         action.settings.starredFirst !== undefined ||
         action.settings.paginationMode !== undefined;
 
-      return updateGalleryValues(state, (values) => ({
-        ...values,
-        ...action.settings,
-        ...(resetsQuery ? { galleryPage: 0 } : {}),
-      }));
+      return updateGalleryValues(
+        state,
+        (values) => ({
+          ...values,
+          ...action.settings,
+          ...(resetsQuery ? { galleryPage: 0 } : {}),
+        }),
+        action.projectId
+      );
     }
     case 'setGalleryPage': {
-      return updateGalleryValues(state, (values) => ({ ...values, galleryPage: Math.max(0, action.page) }));
+      return updateGalleryValues(
+        state,
+        (values) => ({ ...values, galleryPage: Math.max(0, action.page) }),
+        action.projectId
+      );
     }
     case 'setGalleryPageInfo': {
       if (!Number.isFinite(action.totalImages)) {
         return state;
       }
 
-      return updateGalleryValues(state, (values) => {
-        const totalImages = Math.max(0, action.totalImages);
+      return updateGalleryValues(
+        state,
+        (values) => {
+          const totalImages = Math.max(0, action.totalImages);
 
-        return values.galleryTotalImages === totalImages ? values : { ...values, galleryTotalImages: totalImages };
-      });
+          return values.galleryTotalImages === totalImages ? values : { ...values, galleryTotalImages: totalImages };
+        },
+        action.projectId
+      );
     }
     case 'touchGalleryRefresh': {
-      return updateGalleryValues(state, (values) => ({
-        ...values,
-        galleryImagesRefreshToken: createId('gallery-images-refresh'),
-        galleryRefreshToken: createId('gallery-refresh'),
-      }));
+      return updateGalleryValues(
+        state,
+        (values) => ({
+          ...values,
+          galleryImagesRefreshToken: createId('gallery-images-refresh'),
+          galleryRefreshToken: createId('gallery-refresh'),
+        }),
+        action.projectId
+      );
     }
     case 'touchGalleryImagesRefresh': {
-      return updateGalleryValues(state, (values) => ({
-        ...values,
-        galleryImagesRefreshToken: createId('gallery-images-refresh'),
-      }));
+      return updateGalleryValues(
+        state,
+        (values) => ({
+          ...values,
+          galleryImagesRefreshToken: createId('gallery-images-refresh'),
+        }),
+        action.projectId
+      );
     }
     case 'removeGalleryImages': {
       const removedImageNames = new Set(action.imageNames);
 
-      return updateGalleryValues(state, (values) => {
-        const selectedImage = values.selectedImage as GeneratedImageContract | null | undefined;
-        const compareImage = values.compareImage as GeneratedImageContract | null | undefined;
-        const selectedImageName = typeof values.selectedImageName === 'string' ? values.selectedImageName : null;
+      return updateGalleryValues(
+        state,
+        (values) => {
+          const selectedImage = values.selectedImage as GeneratedImageContract | null | undefined;
+          const compareImage = values.compareImage as GeneratedImageContract | null | undefined;
+          const selectedImageName = typeof values.selectedImageName === 'string' ? values.selectedImageName : null;
 
-        return {
-          ...values,
-          compareImage: compareImage && removedImageNames.has(compareImage.imageName) ? null : compareImage,
-          recentImages: getGalleryImages(values).filter((image) => !removedImageNames.has(image.imageName)),
-          selectedImage: selectedImage && removedImageNames.has(selectedImage.imageName) ? null : selectedImage,
-          selectedImageName: selectedImageName && removedImageNames.has(selectedImageName) ? null : selectedImageName,
-          selectedImageNames: getGallerySelectedImageNames(values).filter((name) => !removedImageNames.has(name)),
-        };
-      });
+          return {
+            ...values,
+            compareImage: compareImage && removedImageNames.has(compareImage.imageName) ? null : compareImage,
+            recentImages: getGalleryImages(values).filter((image) => !removedImageNames.has(image.imageName)),
+            selectedImage: selectedImage && removedImageNames.has(selectedImage.imageName) ? null : selectedImage,
+            selectedImageName: selectedImageName && removedImageNames.has(selectedImageName) ? null : selectedImageName,
+            selectedImageNames: getGallerySelectedImageNames(values).filter((name) => !removedImageNames.has(name)),
+          };
+        },
+        action.projectId
+      );
     }
     case 'setGalleryProjectBoardId': {
-      return updateGalleryValues(state, (values) => ({ ...values, projectBoardId: action.boardId }));
+      return updateGalleryValues(state, (values) => ({ ...values, projectBoardId: action.boardId }), action.projectId);
     }
     case 'toggleCanvasStagingVisibility': {
       return updateActiveProject(state, (project) => {
@@ -2455,6 +2630,10 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
     case 'setBackendConnectionStatus': {
       const timestamp = now();
 
+      if (state.backendConnection.status === action.status && state.backendConnection.error === action.error) {
+        return state;
+      }
+
       return {
         ...state,
         backendConnection: {
@@ -2475,10 +2654,15 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       );
     }
     case 'setActiveProjectSettings': {
-      return updateActiveProject(state, (project) => ({
-        ...project,
-        settings: normalizeProjectSettings({ ...project.settings, ...action.settings }),
-      }));
+      return updateActiveProject(state, (project) => {
+        const settings = normalizeProjectSettings({ ...project.settings, ...action.settings });
+
+        return Object.entries(settings).every(([key, value]) =>
+          Object.is(project.settings[key as keyof ProjectSettings], value)
+        )
+          ? project
+          : { ...project, settings };
+      });
     }
   }
 };

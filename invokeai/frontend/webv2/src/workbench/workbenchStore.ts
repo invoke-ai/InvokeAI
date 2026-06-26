@@ -2,6 +2,7 @@ import type { Dispatch } from 'react';
 
 import type { Project, WorkbenchState } from './types';
 
+import { createExternalStore } from './externalStore';
 import { createInitialWorkbenchState, workbenchReducer, type WorkbenchAction } from './workbenchState';
 
 export interface WorkbenchSnapshot {
@@ -12,6 +13,7 @@ export interface WorkbenchSnapshot {
 
 export interface WorkbenchStore {
   dispatch: Dispatch<WorkbenchAction>;
+  getPersistedRevision: () => number;
   getSnapshot: () => WorkbenchSnapshot;
   getState: () => WorkbenchState;
   setHasHydrated: (hasHydrated: boolean) => void;
@@ -27,43 +29,42 @@ const createSnapshot = (state: WorkbenchState, hasHydrated: boolean): WorkbenchS
   state,
 });
 
+const hasPersistedStateChanged = (previous: WorkbenchState, next: WorkbenchState): boolean =>
+  !Object.is(previous.account, next.account) ||
+  previous.activeProjectId !== next.activeProjectId ||
+  !Object.is(previous.errorLog, next.errorLog) ||
+  !Object.is(previous.projects, next.projects) ||
+  !Object.is(previous.widgetFailures, next.widgetFailures);
+
 export const createWorkbenchStore = (initialState = createInitialWorkbenchState()): WorkbenchStore => {
   let state = initialState;
   let hasHydrated = false;
-  let snapshot = createSnapshot(state, hasHydrated);
-  const listeners = new Set<() => void>();
-
-  const emit = (): void => {
-    for (const listener of listeners) {
-      listener();
-    }
-  };
+  let persistedRevision = 0;
+  const snapshotStore = createExternalStore(createSnapshot(state, hasHydrated));
 
   const setSnapshotState = (nextState: WorkbenchState, nextHasHydrated = hasHydrated): void => {
     if (Object.is(nextState, state) && nextHasHydrated === hasHydrated) {
       return;
     }
 
+    if (!Object.is(nextState, state) && hasPersistedStateChanged(state, nextState)) {
+      persistedRevision += 1;
+    }
+
     state = nextState;
     hasHydrated = nextHasHydrated;
-    snapshot = createSnapshot(state, hasHydrated);
-    emit();
+    snapshotStore.setSnapshot(createSnapshot(state, hasHydrated));
   };
 
   return {
     dispatch(action) {
       setSnapshotState(workbenchReducer(state, action));
     },
-    getSnapshot: () => snapshot,
+    getPersistedRevision: () => persistedRevision,
+    getSnapshot: snapshotStore.getSnapshot,
     getState: () => state,
     setHasHydrated: (nextHasHydrated) => setSnapshotState(state, nextHasHydrated),
-    subscribe(listener) {
-      listeners.add(listener);
-
-      return () => {
-        listeners.delete(listener);
-      };
-    },
+    subscribe: snapshotStore.subscribe,
   };
 };
 

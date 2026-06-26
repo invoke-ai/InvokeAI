@@ -4,7 +4,7 @@ import { Badge, Box, Flex, HStack, Icon, Spinner, Stack, Text } from '@chakra-ui
 import { Button, ConfirmDialog } from '@workbench/components/ui';
 import { EmptyState } from '@workbench/components/ui/EmptyState';
 import { useNodePackActions } from '@workbench/launchpad/nodes/shared/useNodePackActions';
-import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
+import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSelector } from '@workbench/workflows/templates';
 import { BlocksIcon, TriangleAlertIcon, Trash2Icon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -18,7 +18,8 @@ import { NodePreviewCard } from './NodePreviewCard';
  * share `template.nodePack === pack.name`.
  */
 export const NodePackDetail = ({ onUninstalled, pack }: { onUninstalled: () => void; pack: NodePackInfo }) => {
-  const { status, templates } = useInvocationTemplatesSnapshot();
+  const status = useInvocationTemplatesSelector((snapshot) => snapshot.status);
+  const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
 
   useEffect(() => {
     ensureInvocationTemplatesLoaded();

@@ -10,8 +10,13 @@ import { filterPromptHistory } from '@workbench/generation/promptHistory';
 import { expandPrompt, imageToPrompt } from '@workbench/generation/promptUtilities';
 import { getSelectedGalleryImage } from '@workbench/image-actions';
 import { ModelSelect } from '@workbench/models/components/ModelSelect';
-import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsStore';
-import { shallowEqual, useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { ensureModelsLoaded, useModelsSelector } from '@workbench/models/modelsStore';
+import {
+  shallowEqual,
+  useActiveProjectId,
+  useActiveProjectSelector,
+  useWorkbenchDispatch,
+} from '@workbench/WorkbenchContext';
 import {
   BookDashedIcon,
   CurlyBracesIcon,
@@ -22,7 +27,7 @@ import {
   TrashIcon,
   Undo2Icon,
 } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 const DISABLED_PROMPT_ACTIONS = [
   { icon: BookDashedIcon, label: 'Prompt Template' },
@@ -35,16 +40,18 @@ interface PositivePromptActionsProps {
   onUsePrompt: (prompt: PromptHistoryItem) => void;
   positivePrompt: string;
   selectedModel: GenerateModelConfig | undefined;
+  projectId: string;
   onOpenPromptTriggerPicker: (anchorElement: HTMLElement) => void;
-  onPositivePromptChange: (prompt: string) => void;
+  onPositivePromptChangeImmediate: (prompt: string) => void;
 }
 
 export const PositivePromptActions = ({
   isPromptTriggerPickerOpen,
   onOpenPromptTriggerPicker,
-  onPositivePromptChange,
+  onPositivePromptChangeImmediate,
   onUsePrompt,
   positivePrompt,
+  projectId,
 }: PositivePromptActionsProps) => (
   <HStack gap="0.5">
     <AddPromptTriggerButton isOpen={isPromptTriggerPickerOpen} onOpenPromptTriggerPicker={onOpenPromptTriggerPicker} />
@@ -55,8 +62,12 @@ export const PositivePromptActions = ({
         </IconButton>
       </Tooltip>
     ))}
-    <ExpandPromptButton onPositivePromptChange={onPositivePromptChange} positivePrompt={positivePrompt} />
-    <ImageToPromptButton onPositivePromptChange={onPositivePromptChange} />
+    <ExpandPromptButton
+      positivePrompt={positivePrompt}
+      projectId={projectId}
+      onPositivePromptChange={onPositivePromptChangeImmediate}
+    />
+    <ImageToPromptButton projectId={projectId} onPositivePromptChange={onPositivePromptChangeImmediate} />
     <PositivePromptHistoryButton onUsePrompt={onUsePrompt} />
   </HStack>
 );
@@ -161,7 +172,7 @@ export const PromptTriggerPopover = ({
   onClose: () => void;
   onSelect: (trigger: string) => void;
 }) => {
-  const { models } = useModelsSnapshot();
+  const models = useModelsSelector((snapshot) => snapshot.models);
   const [searchTerm, setSearchTerm] = useState('');
   const options = getPromptTriggerOptions({ loras, models, selectedModel });
   const filteredOptions = options.filter((option) => {
@@ -263,15 +274,24 @@ export const PromptTriggerPopover = ({
 const ExpandPromptButton = ({
   onPositivePromptChange,
   positivePrompt,
-}: Pick<PositivePromptActionsProps, 'onPositivePromptChange' | 'positivePrompt'>) => {
+  projectId,
+}: {
+  positivePrompt: string;
+  projectId: string;
+  onPositivePromptChange: (prompt: string) => void;
+}) => {
   const dispatch = useWorkbenchDispatch();
-  const { models } = useModelsSnapshot();
+  const models = useModelsSelector((snapshot) => snapshot.models);
+  const activeProjectId = useActiveProjectId();
+  const activeProjectIdRef = useRef(activeProjectId);
   const triggerId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModelKey, setSelectedModelKey] = useState<string | null>(null);
   const textLlmModels = models.filter((model) => model.type === 'text_llm');
   const selectedModel = selectedModelKey ? textLlmModels.find((model) => model.key === selectedModelKey) : null;
+
+  activeProjectIdRef.current = activeProjectId;
 
   useEffect(() => {
     ensureModelsLoaded();
@@ -287,7 +307,7 @@ const ExpandPromptButton = ({
     try {
       const result = await expandPrompt({ model_key: selectedModel.key, prompt: positivePrompt });
 
-      if (result.expanded_prompt) {
+      if (result.expanded_prompt && activeProjectIdRef.current === projectId) {
         onPositivePromptChange(result.expanded_prompt);
       }
 
@@ -365,16 +385,24 @@ const ExpandPromptButton = ({
 
 const ImageToPromptButton = ({
   onPositivePromptChange,
-}: Pick<PositivePromptActionsProps, 'onPositivePromptChange'>) => {
+  projectId,
+}: {
+  projectId: string;
+  onPositivePromptChange: (prompt: string) => void;
+}) => {
   const dispatch = useWorkbenchDispatch();
-  const { models } = useModelsSnapshot();
+  const models = useModelsSelector((snapshot) => snapshot.models);
   const selectedImage = useActiveProjectSelector(getSelectedGalleryImage, shallowEqual);
+  const activeProjectId = useActiveProjectId();
+  const activeProjectIdRef = useRef(activeProjectId);
   const triggerId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModelKey, setSelectedModelKey] = useState<string | null>(null);
   const llavaModels = models.filter((model) => model.type === 'llava_onevision');
   const selectedModel = selectedModelKey ? llavaModels.find((model) => model.key === selectedModelKey) : null;
+
+  activeProjectIdRef.current = activeProjectId;
 
   useEffect(() => {
     ensureModelsLoaded();
@@ -390,7 +418,7 @@ const ImageToPromptButton = ({
     try {
       const result = await imageToPrompt({ image_name: selectedImage.imageName, model_key: selectedModel.key });
 
-      if (result.prompt) {
+      if (result.prompt && activeProjectIdRef.current === projectId) {
         onPositivePromptChange(result.prompt);
       }
 

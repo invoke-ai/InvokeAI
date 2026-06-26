@@ -2,7 +2,7 @@ import type {
   GraphBearingSurfaceContract,
   GraphContract,
   Project,
-  WidgetInstanceContract,
+  WidgetInstanceRuntimeMeta,
   WidgetManifest,
   WidgetRuntimeApi,
   WorkbenchRegion,
@@ -12,7 +12,7 @@ import { Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { IconButton } from '@workbench/components/ui';
 import { GraphPreviewDialog } from '@workbench/graph-preview';
 import { createGraphBearingSurface } from '@workbench/graphSurfaces';
-import { useActiveProject, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { shallowEqual, useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { compileProjectGraph } from '@workbench/workflows/buildGraph';
 import { getInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
 import { GitBranchIcon, MoreHorizontalIcon, TargetIcon } from 'lucide-react';
@@ -52,9 +52,9 @@ const GraphSurfaceMenuItems = ({
   surface: GraphBearingSurfaceContract;
   onPreview: () => void;
 }) => {
-  const activeProject = useActiveProject();
+  const activeSourceId = useActiveProjectSelector((project) => project.invocation.sourceId);
   const dispatch = useWorkbenchDispatch();
-  const isActiveSource = activeProject.invocation.sourceId === surface.sourceId;
+  const isActiveSource = activeSourceId === surface.sourceId;
 
   return (
     <Menu.ItemGroup>
@@ -89,12 +89,15 @@ export const WidgetActionsMenu = ({
   region,
   runtime,
 }: {
-  instance: WidgetInstanceContract;
+  instance: WidgetInstanceRuntimeMeta;
   manifest: WidgetManifest;
   region: WorkbenchRegion;
   runtime: WidgetRuntimeApi;
 }) => {
-  const activeProject = useActiveProject();
+  const activeProject = useActiveProjectSelector(
+    (project) => ({ projectGraph: project.projectGraph, widgetGraphs: project.widgetGraphs }),
+    shallowEqual
+  ) as Project;
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const surface = manifest.graphBearing?.surfaces.includes(region) ? createGraphBearingSurface(manifest, region) : null;
   const HeaderMenu = manifest.headerMenu;
@@ -107,7 +110,7 @@ export const WidgetActionsMenu = ({
   // The project graph mirrors the editable document, so the preview can reuse
   // the editor's node positions instead of auto-layouting.
   const positionHints =
-    surface?.sourceId === 'project-graph'
+    isPreviewOpen && surface?.sourceId === 'project-graph'
       ? Object.fromEntries(activeProject.projectGraph.nodes.map((node) => [node.id, node.position]))
       : undefined;
 
@@ -131,7 +134,7 @@ export const WidgetActionsMenu = ({
           </Menu.Positioner>
         </Portal>
       </Menu.Root>
-      {surface ? (
+      {surface && isPreviewOpen ? (
         <GraphPreviewDialog
           graph={previewGraph}
           graphId={surface.graphId}

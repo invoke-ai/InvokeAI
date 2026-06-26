@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "react", "import", "unicorn", "oxc", "react-perf", "unicorn"],
+  "plugins": ["typescript", "react", "import", "unicorn", "oxc", "react-perf", "eslint"],
   "categories": {
     "correctness": "error"
   },
@@ -28,9 +28,11 @@
     "no-throw-literal": "error",
     "no-unmodified-loop-condition": "error",
     "no-var": "error",
-    "prefer-template": "error",
 
+    "prefer-template": "error",
     "radix": "error",
+
+    // "eslint/complexity": "error",
 
     "react/jsx-curly-brace-presence": [
       "error",

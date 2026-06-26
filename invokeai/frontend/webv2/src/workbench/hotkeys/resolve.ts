@@ -5,6 +5,10 @@ import { isEditableHotkeyTarget, normalizeHotkeyString } from './keys';
 const getScopePriority = (hotkey: RegisteredHotkey, context: HotkeyContext): number => {
   const { scope } = hotkey;
 
+  if (hotkey.source && hotkey.source.projectId !== context.projectId) {
+    return -1;
+  }
+
   if (scope.kind === 'instance') {
     return scope.instanceId === context.activeInstanceId ? 400 : -1;
   }

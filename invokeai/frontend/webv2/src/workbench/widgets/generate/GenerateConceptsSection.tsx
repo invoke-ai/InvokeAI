@@ -15,14 +15,20 @@ import { ModelSelect } from '@workbench/models/components';
 import { Trash2Icon } from 'lucide-react';
 import { useMemo } from 'react';
 
+import type { GenerateSettingsUpdate } from './generateDebounce';
+
+import { useRegisterGenerateDraftFlusher } from './generateDraftRegistry';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { ModelDefaultButton } from './shared/ModelDefaultButton';
+import { useDebouncedDraftValue } from './useDebouncedDraftValue';
 
 interface GenerateConceptsSectionProps {
   settings: GenerateSettings;
   loraModels: LoraModelConfig[];
+  projectId: string;
   selectedModel: GenerateModelConfig | undefined;
-  onCommit: (patch: Partial<GenerateSettings>) => void;
+  onCommit: (update: GenerateSettingsUpdate) => void;
+  onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
 }
 
 const LORA_WEIGHT_MARKS = [
@@ -31,6 +37,7 @@ const LORA_WEIGHT_MARKS = [
   { label: '1', value: 1 },
   { label: '2', value: 2 },
 ];
+const LORA_WEIGHT_DEBOUNCE_MS = 250;
 
 const isCompatibleLora = (lora: GenerateLora, selectedModel: GenerateModelConfig | undefined): boolean =>
   Boolean(selectedModel && isLoraCompatibleWithModel(lora.model, selectedModel));
@@ -38,6 +45,8 @@ const isCompatibleLora = (lora: GenerateLora, selectedModel: GenerateModelConfig
 export const GenerateConceptsSection = ({
   loraModels,
   onCommit,
+  onCommitImmediate,
+  projectId,
   selectedModel,
   settings,
 }: GenerateConceptsSectionProps) => {
@@ -52,19 +61,29 @@ export const GenerateConceptsSection = ({
       return;
     }
 
-    onCommit({
+    onCommitImmediate({
       loras: [...loras, { isEnabled: true, model, weight: getDefaultLoraWeight(model) }],
     });
   };
 
   const updateLora = (modelKey: string, patch: Partial<Pick<GenerateLora, 'isEnabled' | 'weight'>>) => {
-    onCommit({
-      loras: loras.map((lora) => (lora.model.key === modelKey ? { ...lora, ...patch } : lora)),
+    onCommit((settings) => {
+      const latestLoras = syncGenerateLorasWithModels(settings.loras, loraModels);
+      const hasLora = latestLoras.some((lora) => lora.model.key === modelKey);
+
+      if (!hasLora) {
+        return settings;
+      }
+
+      return {
+        ...settings,
+        loras: latestLoras.map((lora) => (lora.model.key === modelKey ? { ...lora, ...patch } : lora)),
+      };
     });
   };
 
   const removeLora = (modelKey: string) => {
-    onCommit({ loras: loras.filter((lora) => lora.model.key !== modelKey) });
+    onCommitImmediate({ loras: loras.filter((lora) => lora.model.key !== modelKey) });
   };
 
   const badges =
@@ -106,6 +125,7 @@ export const GenerateConceptsSection = ({
                 key={lora.model.key}
                 isCompatible={isCompatibleLora(lora, selectedModel)}
                 lora={lora}
+                projectId={projectId}
                 onRemove={() => removeLora(lora.model.key)}
                 onToggle={(isEnabled) => updateLora(lora.model.key, { isEnabled })}
                 onWeightChange={(weight) => updateLora(lora.model.key, { weight })}
@@ -122,17 +142,31 @@ const LoraRow = ({
   isCompatible,
   lora,
   onRemove,
+  projectId,
   onToggle,
   onWeightChange,
 }: {
   isCompatible: boolean;
   lora: GenerateLora;
   onRemove: () => void;
+  projectId: string;
   onToggle: (isEnabled: boolean) => void;
   onWeightChange: (weight: number) => void;
 }) => {
   const isActive = lora.isEnabled && isCompatible;
   const defaultWeight = getDefaultLoraWeight(lora.model);
+  const {
+    draftValue: draftWeight,
+    flushDraftValue,
+    setDraftValue: setWeight,
+  } = useDebouncedDraftValue({
+    delayMs: LORA_WEIGHT_DEBOUNCE_MS,
+    onCommit: onWeightChange,
+    resetKey: projectId,
+    value: lora.weight,
+  });
+
+  useRegisterGenerateDraftFlusher(flushDraftValue);
 
   return (
     <Stack
@@ -204,12 +238,12 @@ const LoraRow = ({
           min={DEFAULT_LORA_WEIGHT_CONFIG.sliderMin}
           minW="0"
           step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
-          value={[lora.weight]}
+          value={[draftWeight]}
           onValueChange={({ value }) => {
             const nextWeight = value[0];
 
             if (Number.isFinite(nextWeight)) {
-              onWeightChange(nextWeight as number);
+              setWeight(nextWeight as number);
             }
           }}
         >
@@ -227,21 +261,21 @@ const LoraRow = ({
           min={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMin}
           size="xs"
           step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
-          value={String(lora.weight)}
+          value={String(draftWeight)}
           w="20"
           disabled={!isActive}
           onValueChange={({ valueAsNumber }) => {
             if (Number.isFinite(valueAsNumber)) {
-              onWeightChange(valueAsNumber);
+              setWeight(valueAsNumber);
             }
           }}
         >
           <InputGroup
             endElement={
               <ModelDefaultButton
-                disabled={!isActive || lora.weight === defaultWeight}
+                disabled={!isActive || draftWeight === defaultWeight}
                 label="Use concept default weight"
-                onClick={() => onWeightChange(defaultWeight)}
+                onClick={() => setWeight(defaultWeight)}
               />
             }
             endElementProps={{ pointerEvents: 'auto' }}

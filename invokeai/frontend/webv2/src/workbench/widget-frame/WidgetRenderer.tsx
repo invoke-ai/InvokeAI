@@ -1,25 +1,63 @@
-import type { RegisteredWidget, WidgetInstanceContract, WidgetRuntimeApi, WidgetViewProps } from '@workbench/types';
+import type {
+  RegisteredWidget,
+  WidgetInstanceContract,
+  WidgetInstanceRuntimeMeta,
+  WidgetRuntimeApi,
+  WidgetViewProps,
+} from '@workbench/types';
 
 import { Box, Flex, Text } from '@chakra-ui/react';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
+import { memo, useMemo } from 'react';
 
 import { useWidgetRuntime } from './createWidgetRuntime';
 import { WidgetFailureBoundary } from './WidgetFailureBoundary';
 import { WidgetHeader, WidgetPanelFrame } from './WidgetFrames';
+import { areProjectWidgetRenderInstancesEqual } from './widgetRenderInstance';
 
 interface WidgetRendererProps extends Omit<WidgetViewProps, 'manifest' | 'runtime'> {
   instance: WidgetInstanceContract;
   widget: RegisteredWidget;
 }
 
+interface WidgetRendererByIdProps extends Omit<WidgetViewProps, 'instance' | 'manifest' | 'runtime'> {
+  instanceId: string;
+  widget: RegisteredWidget;
+}
+
+export const WidgetRendererById = ({ instanceId, widget, ...props }: WidgetRendererByIdProps) => {
+  const selection = useActiveProjectSelector(
+    (project) => ({ instance: project.widgetInstances[instanceId], projectId: project.id }),
+    areProjectWidgetRenderInstancesEqual
+  );
+
+  return selection.instance ? <WidgetRenderer instance={selection.instance} widget={widget} {...props} /> : null;
+};
+
 export const WidgetRenderer = ({ instance, presentation, region, widget }: WidgetRendererProps) => {
   const dispatch = useWorkbenchDispatch();
   const { getWidgetById, getWidgetsForRegion } = useWorkbenchWidgetRegistry();
   const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const View = widget.manifest.view;
-  const runtime = useWidgetRuntime({ dispatch, getWidgetById, getWidgetsForRegion, instance, project, region });
+  const instanceMeta: WidgetInstanceRuntimeMeta = useMemo(
+    () => ({
+      createdAt: instance.createdAt,
+      id: instance.id,
+      title: instance.title,
+      typeId: instance.typeId,
+    }),
+    [instance.createdAt, instance.id, instance.title, instance.typeId]
+  );
+  const runtime = useWidgetRuntime({
+    dispatch,
+    getWidgetById,
+    getWidgetsForRegion,
+    instance: instanceMeta,
+    project,
+    region,
+  });
 
   if (!View) {
     return null;
@@ -27,7 +65,7 @@ export const WidgetRenderer = ({ instance, presentation, region, widget }: Widge
 
   const content = (
     <View
-      instance={instance}
+      instance={instanceMeta}
       manifest={widget.manifest}
       presentation={presentation}
       region={region}
@@ -38,7 +76,7 @@ export const WidgetRenderer = ({ instance, presentation, region, widget }: Widge
   return (
     <WidgetShellFrame
       content={content}
-      instance={instance}
+      instance={instanceMeta}
       presentation={presentation}
       region={region}
       runtime={runtime}
@@ -56,7 +94,7 @@ const WidgetShellFrame = ({
   widget,
 }: {
   content: React.ReactNode;
-  instance: WidgetInstanceContract;
+  instance: WidgetInstanceRuntimeMeta;
   presentation: WidgetViewProps['presentation'];
   region: WidgetViewProps['region'];
   runtime: WidgetRuntimeApi;
@@ -86,6 +124,7 @@ const WidgetShellFrame = ({
     <Flex
       bg="bg.inset"
       data-hotkey-widget-instance-id={instance.id}
+      data-hotkey-widget-region={region}
       data-hotkey-widget-type-id={instance.typeId}
       direction="column"
       h="full"
@@ -107,7 +146,7 @@ const RenderFailureSlot = ({
   widget,
 }: {
   children: React.ReactNode;
-  instance: WidgetInstanceContract;
+  instance: WidgetInstanceRuntimeMeta;
   widget: RegisteredWidget;
 }) => {
   if (!widget.manifest.failurePolicy.isolateRenderFailure) {
@@ -121,19 +160,44 @@ const RenderFailureSlot = ({
   );
 };
 
-const HeaderSlot = ({
+const areWidgetChromeInstancesEqual = (left: WidgetInstanceRuntimeMeta, right: WidgetInstanceRuntimeMeta): boolean =>
+  left.id === right.id && left.typeId === right.typeId && left.title === right.title;
+
+const areSlotPropsEqual = (
+  left: {
+    instance: WidgetInstanceRuntimeMeta;
+    presentation: WidgetViewProps['presentation'];
+    region: WidgetViewProps['region'];
+    runtime: WidgetRuntimeApi;
+    widget: RegisteredWidget;
+  },
+  right: {
+    instance: WidgetInstanceRuntimeMeta;
+    presentation: WidgetViewProps['presentation'];
+    region: WidgetViewProps['region'];
+    runtime: WidgetRuntimeApi;
+    widget: RegisteredWidget;
+  }
+): boolean =>
+  left.presentation === right.presentation &&
+  left.region === right.region &&
+  left.widget === right.widget &&
+  left.runtime === right.runtime &&
+  areWidgetChromeInstancesEqual(left.instance, right.instance);
+
+const HeaderSlot = memo(function HeaderSlot({
   instance,
   presentation,
   region,
   runtime,
   widget,
 }: {
-  instance: WidgetInstanceContract;
+  instance: WidgetInstanceRuntimeMeta;
   presentation: WidgetViewProps['presentation'];
   region: WidgetViewProps['region'];
   runtime: WidgetRuntimeApi;
   widget: RegisteredWidget;
-}) => {
+}) {
   if (widget.manifest.chrome?.header === 'hidden') {
     return null;
   }
@@ -161,7 +225,7 @@ const HeaderSlot = ({
       />
     </Box>
   );
-};
+}, areSlotPropsEqual);
 
 const PanelBodySlot = ({ children }: { children: React.ReactNode }) => (
   <Flex direction="column" flex="1" minH="0" minW="0" overflowX="hidden" overflowY="auto">
@@ -169,19 +233,19 @@ const PanelBodySlot = ({ children }: { children: React.ReactNode }) => (
   </Flex>
 );
 
-const FooterSlot = ({
+const FooterSlot = memo(function FooterSlot({
   instance,
   presentation,
   region,
   runtime,
   widget,
 }: {
-  instance: WidgetInstanceContract;
+  instance: WidgetInstanceRuntimeMeta;
   presentation: WidgetViewProps['presentation'];
   region: WidgetViewProps['region'];
   runtime: WidgetRuntimeApi;
   widget: RegisteredWidget;
-}) => {
+}) {
   const Footer = widget.manifest.footer;
 
   if (!Footer) {
@@ -200,7 +264,7 @@ const FooterSlot = ({
       />
     </Box>
   );
-};
+}, areSlotPropsEqual);
 
 export const MissingWidgetFrame = ({ label, region }: { label: string; region: 'bottom' | 'left' | 'right' }) => (
   <WidgetPanelFrame region={region}>

@@ -13,11 +13,32 @@ import {
 import { exportOpenProject } from '@workbench/projects/projectFile';
 import { useProjectActions } from '@workbench/projects/useProjectActions';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { flushGenerateDrafts } from '@workbench/widgets/generate/generateDraftRegistry';
+import {
+  useActiveProjectSelector,
+  useWorkbenchDispatch,
+  useWorkbenchSelector,
+  useWorkbenchStore,
+} from '@workbench/WorkbenchContext';
 import { FileDownIcon, FolderCogIcon, FolderOpenIcon, PencilIcon, PlusIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useRef, useState, type MouseEvent } from 'react';
 
 import { OpenProjectDialog } from './OpenProjectDialog';
+
+interface ProjectTabSummary {
+  id: string;
+  name: string;
+}
+
+const areProjectTabSummariesEqual = (
+  left: readonly ProjectTabSummary[],
+  right: readonly ProjectTabSummary[]
+): boolean =>
+  left.length === right.length &&
+  left.every((summary, index) => summary.id === right[index]?.id && summary.name === right[index]?.name);
+
+const selectProjectTabSummaries = (projects: readonly Project[]): ProjectTabSummary[] =>
+  projects.map(({ id, name }) => ({ id, name }));
 
 /**
  * Document-style tabs for the open projects (the session), immediately right
@@ -31,20 +52,28 @@ import { OpenProjectDialog } from './OpenProjectDialog';
  * with rename, details, export, close, and delete.
  */
 export const ProjectTabs = () => {
-  const projects = useWorkbenchSelector((snapshot) => snapshot.state.projects);
+  const projectTabSummaries = useWorkbenchSelector(
+    (snapshot) => selectProjectTabSummaries(snapshot.state.projects),
+    areProjectTabSummariesEqual
+  );
   const activeProjectId = useActiveProjectSelector((project) => project.id);
+  const store = useWorkbenchStore();
   const dispatch = useWorkbenchDispatch();
   const { closeProject, deleteProject } = useProjectActions();
-  const [menuTarget, setMenuTarget] = useState<{ project: Project; x: number; y: number } | null>(null);
-  const [renameTarget, setRenameTarget] = useState<Project | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
+  const [menuTarget, setMenuTarget] = useState<{ project: ProjectTabSummary; x: number; y: number } | null>(null);
+  const [renameTarget, setRenameTarget] = useState<ProjectTabSummary | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ProjectTabSummary | null>(null);
   const [isOpenDialogVisible, setIsOpenDialogVisible] = useState(false);
 
+  const getProject = (projectId: string): Project | null =>
+    store.getState().projects.find((project) => project.id === projectId) ?? null;
+
   const onSwitchProject = (projectId: string) => {
+    flushGenerateDrafts();
     dispatch({ projectId, type: 'switchProject' });
   };
 
-  const openContextMenu = (project: Project, event: MouseEvent) => {
+  const openContextMenu = (project: ProjectTabSummary, event: MouseEvent) => {
     event.preventDefault();
     setMenuTarget({ project, x: event.clientX, y: event.clientY });
   };
@@ -53,7 +82,7 @@ export const ProjectTabs = () => {
     <>
       <Tabs.Root minW="max-content" variant="subtle" value={activeProjectId} h="full" w="full">
         <Tabs.List flex="1 1 auto" h="full" py="1">
-          {projects.map((project) => (
+          {projectTabSummaries.map((project) => (
             <Tabs.Trigger
               key={project.id}
               value={project.id}
@@ -71,7 +100,11 @@ export const ProjectTabs = () => {
                 aria-label={`Close ${project.name}`}
                 onClick={(event) => {
                   event.stopPropagation();
-                  closeProject(project);
+                  const currentProject = getProject(project.id);
+
+                  if (currentProject) {
+                    closeProject(currentProject);
+                  }
                 }}
               />
             </Tabs.Trigger>
@@ -84,7 +117,10 @@ export const ProjectTabs = () => {
               size="xs"
               variant="ghost"
               alignSelf="center"
-              onClick={() => dispatch({ type: 'createProject' })}
+              onClick={() => {
+                flushGenerateDrafts();
+                dispatch({ type: 'createProject' });
+              }}
             >
               <PlusIcon />
             </IconButton>
@@ -106,7 +142,13 @@ export const ProjectTabs = () => {
       <ProjectTabContextMenu
         target={menuTarget}
         onClose={() => setMenuTarget(null)}
-        onCloseProject={closeProject}
+        onCloseProject={(project) => {
+          const currentProject = getProject(project.id);
+
+          if (currentProject) {
+            closeProject(currentProject);
+          }
+        }}
         onDelete={(project) => setDeleteTarget(project)}
         onRename={(project) => setRenameTarget(project)}
       />
@@ -128,11 +170,15 @@ export const ProjectTabs = () => {
         onClose={() => setDeleteTarget(null)}
         onConfirm={async () => {
           if (deleteTarget) {
-            await deleteProject(deleteTarget);
+            const currentProject = getProject(deleteTarget.id);
+
+            if (currentProject) {
+              await deleteProject(currentProject);
+            }
           }
         }}
       />
-      <OpenProjectDialog isOpen={isOpenDialogVisible} onClose={() => setIsOpenDialogVisible(false)} />
+      {isOpenDialogVisible ? <OpenProjectDialog isOpen onClose={() => setIsOpenDialogVisible(false)} /> : null}
     </>
   );
 };
@@ -145,18 +191,26 @@ const ProjectTabContextMenu = ({
   target,
 }: {
   onClose: () => void;
-  onCloseProject: (project: Project) => void;
-  onDelete: (project: Project) => void;
-  onRename: (project: Project) => void;
-  target: { project: Project; x: number; y: number } | null;
+  onCloseProject: (project: ProjectTabSummary) => void;
+  onDelete: (project: ProjectTabSummary) => void;
+  onRename: (project: ProjectTabSummary) => void;
+  target: { project: ProjectTabSummary; x: number; y: number } | null;
 }) => {
   const dispatch = useWorkbenchDispatch();
+  const store = useWorkbenchStore();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const targetRef = useRef(target);
 
   targetRef.current = target;
 
-  const openProjectDetails = (project: Project) => {
+  const openProjectDetails = (projectSummary: ProjectTabSummary) => {
+    const project = store.getState().projects.find((candidate) => candidate.id === projectSummary.id);
+
+    if (!project) {
+      return;
+    }
+
+    flushGenerateDrafts();
     dispatch({ projectId: project.id, type: 'switchProject' });
 
     // Reveal the Project panel wherever the project already shows it; default
@@ -205,7 +259,16 @@ const ProjectTabContextMenu = ({
                 <Icon as={FolderCogIcon} boxSize="3.5" />
                 Project details
               </Menu.Item>
-              <Menu.Item value="export" onClick={() => exportOpenProject(target.project)}>
+              <Menu.Item
+                value="export"
+                onClick={() => {
+                  const project = store.getState().projects.find((candidate) => candidate.id === target.project.id);
+
+                  if (project) {
+                    exportOpenProject(project);
+                  }
+                }}
+              >
                 <Icon as={FileDownIcon} boxSize="3.5" />
                 Export
               </Menu.Item>

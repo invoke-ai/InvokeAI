@@ -1,7 +1,7 @@
 import type { WidgetHotkeyContribution, WidgetRegion, WorkbenchRegion } from '@workbench/types';
 
 import { extensionContributionStores } from '@workbench/extensions/extensionApi';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 import type { HotkeyDefinition } from './types';
 
@@ -39,12 +39,7 @@ export const toExtensionHotkeyDefinition = (hotkey: WidgetHotkeyContribution): H
 };
 
 export const useExtensionHotkeyDefinitions = (): HotkeyDefinition[] => {
-  const [hotkeys, setHotkeys] = useState(() => extensionContributionStores.hotkeys.list());
-
-  useEffect(
-    () => extensionContributionStores.hotkeys.subscribe(() => setHotkeys(extensionContributionStores.hotkeys.list())),
-    []
-  );
+  const hotkeys = extensionContributionStores.hotkeys.useList();
 
   return useMemo(
     () => hotkeys.map(toExtensionHotkeyDefinition).filter((hotkey): hotkey is HotkeyDefinition => hotkey !== null),

@@ -26,12 +26,17 @@ const KNOWN_BASES = [
 ];
 
 /** Zod-validated editor for a model's identity fields. */
+type ModelEditTarget = Pick<
+  ModelConfig,
+  'base' | 'description' | 'key' | 'name' | 'prediction_type' | 'source_url' | 'type' | 'variant'
+>;
+
 export const ModelEditForm = ({
   model,
   onCancel,
   onSaved,
 }: {
-  model: ModelConfig;
+  model: ModelEditTarget;
   onCancel: () => void;
   onSaved: () => void;
 }) => {

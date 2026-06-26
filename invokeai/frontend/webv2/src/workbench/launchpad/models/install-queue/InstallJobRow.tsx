@@ -1,7 +1,7 @@
 import type { ModelInstallJob } from '@workbench/models/types';
 
 import { Badge, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { useConnectionStatus } from '@workbench/backend/connectionStore';
+import { useConnectionStatusSelector } from '@workbench/backend/connectionStore';
 import { IconButton, Tooltip } from '@workbench/components/ui';
 import {
   cancelModelInstall,
@@ -29,7 +29,7 @@ export const InstallJobRow = ({
   onError: (title: string, message: string) => void;
 }) => {
   const [isActing, setIsActing] = useState(false);
-  const { status: connectionStatus } = useConnectionStatus();
+  const connectionStatus = useConnectionStatusSelector((snapshot) => snapshot.status);
   const badge = STATUS_BADGES[job.status] ?? { label: job.status, palette: 'gray' };
   const sourceLabel = getInstallSourceLabel(job.source);
   const displayName = getInstallJobDisplayName(job);

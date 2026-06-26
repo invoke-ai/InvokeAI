@@ -1,34 +1,32 @@
-import type { InvocationSourceId, Project, ResultDestination } from '@workbench/types';
+import type { InvocationRoute, InvocationSourceId, ResultDestination } from '@workbench/types';
 
 import { Flex, Group, HStack, Icon, Menu, Portal, Separator, Stack, Text, VStack } from '@chakra-ui/react';
 import { Button, IconButton, Tooltip } from '@workbench/components/ui';
 import { sanitizeBatchCount } from '@workbench/generation/batch';
 import {
   formatRoute,
+  createInvocationRouteInputSelector,
   getDestinationLabel,
   invocationSources,
   isInvocationRouteValid,
   resolveInvocationRoute,
+  resolveInvocationRouteInput,
   resultDestinations,
 } from '@workbench/invocation';
-import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsStore';
-import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProject, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
-import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
+import { ensureModelsLoaded, useModelsSelector } from '@workbench/models/modelsStore';
+import { flushGenerateDrafts } from '@workbench/widgets/generate/generateDraftRegistry';
+import {
+  useActiveProjectSelector,
+  useWorkbenchDispatch,
+  useWorkbenchSelector,
+  useWorkbenchStore,
+} from '@workbench/WorkbenchContext';
+import { useInvocationTemplatesSelector } from '@workbench/workflows/templates';
 import { CheckIcon, ChevronDownIcon, LockKeyholeIcon, SparklesIcon } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
-/**
- * Fixed-width global Invoke control.
- *
- * The defining Phase 1 requirement: the primary label stays `Invoke`, the
- * secondary line shows the resolved `Source → Destination` route with a compact
- * lock indicator, and the control reserves stable horizontal space so project
- * tabs never shift when the route text changes. The caret opens the Invocation
- * Controller menu (source / destination / lock), which is wired to project-owned
- * state even though full invocation lands in Phase 4.
- */
-const CONTROL_WIDTH = '12rem';
+const CONTROL_WIDTH = '10rem';
+const selectInvocationRouteInput = createInvocationRouteInputSelector();
 
 const getBatchCount = (values: Record<string, unknown>): number => {
   const batchCount = values.batchCount;
@@ -46,17 +44,19 @@ const compactBlockingReason = (reason: string): string => {
 
 const InvokeTooltipContent = ({
   blockingReasons,
+  generateValues,
+  invocation,
   isValid,
-  project,
 }: {
   blockingReasons: string[];
+  generateValues: Record<string, unknown>;
+  invocation: InvocationRoute;
   isValid: boolean;
-  project: Project;
 }) => {
-  const batchCount = getBatchCount(getProjectWidgetValues(project, 'generate'));
-  const destination = getDestinationLabel(project.invocation.destination);
+  const batchCount = getBatchCount(generateValues);
+  const destination = getDestinationLabel(invocation.destination);
   const summary =
-    project.invocation.sourceId === 'generate'
+    invocation.sourceId === 'generate'
       ? `1 prompt × ${batchCount} iteration${batchCount === 1 ? '' : 's'} → ${batchCount} generation${batchCount === 1 ? '' : 's'}`
       : `Workflow × ${batchCount} run${batchCount === 1 ? '' : 's'} → ${batchCount} generation${batchCount === 1 ? '' : 's'}`;
 
@@ -97,32 +97,31 @@ const InvokeTooltipContent = ({
 };
 
 export const InvokeControl = () => {
-  const activeProject = useActiveProject();
+  const routeInput = useActiveProjectSelector(selectInvocationRouteInput);
   const dispatch = useWorkbenchDispatch();
+  const store = useWorkbenchStore();
   const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection.status);
-  const { models, status: modelsStatus } = useModelsSnapshot();
+  const models = useModelsSelector((snapshot) => snapshot.models);
+  const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
   const availabilityModels = modelsStatus === 'loaded' ? models : undefined;
-  const { invocation } = activeProject;
+  const { invocation } = routeInput;
 
   // Project-graph route validation reads the invocation templates imperatively;
   // subscribing here keeps the resolved route live while they load.
-  useInvocationTemplatesSnapshot();
+  useInvocationTemplatesSelector((snapshot) => snapshot.status);
 
-  const resolvedRoute = resolveInvocationRoute(activeProject, 'global', activeProject.invocation, availabilityModels);
+  const resolvedRoute = resolveInvocationRouteInput(routeInput, 'global', routeInput.invocation, availabilityModels);
   const isLocked = invocation.sourceLocked || invocation.destinationLocked;
   const isConnected = backendConnectionStatus === 'connected';
-  // Legacy parity: the queue button disables with the full list of reasons,
-  // including a disconnected backend.
+
   const blockingReasons = [
     ...(isConnected ? [] : ['The backend is disconnected.']),
     ...resolvedRoute.validationReasons,
   ];
   const isValid = isInvocationRouteValid(resolvedRoute) && isConnected;
   const routeLabel = isValid ? formatRoute(resolvedRoute) : (blockingReasons[0] ?? formatRoute(resolvedRoute));
-  const resolvedRouteRef = useRef(resolvedRoute);
   const modelsRef = useRef(availabilityModels);
 
-  resolvedRouteRef.current = resolvedRoute;
   modelsRef.current = availabilityModels;
 
   useEffect(() => {
@@ -130,14 +129,23 @@ export const InvokeControl = () => {
   }, []);
 
   const onInvoke = () => {
-    if (!isValid) {
+    flushGenerateDrafts();
+    const snapshot = store.getSnapshot();
+    const postFlushRoute = resolveInvocationRoute(
+      snapshot.activeProject,
+      'global',
+      snapshot.activeProject.invocation,
+      modelsRef.current
+    );
+
+    if (!isInvocationRouteValid(postFlushRoute) || snapshot.state.backendConnection.status !== 'connected') {
       return;
     }
 
     dispatch({
       backendSupportsCancellation: true,
-      models: availabilityModels,
-      route: resolvedRouteRef.current,
+      models: modelsRef.current,
+      route: postFlushRoute,
       type: 'submitResolvedInvocationSnapshot',
     });
   };
@@ -148,13 +156,17 @@ export const InvokeControl = () => {
         <Group attached>
           <Tooltip
             content={
-              <InvokeTooltipContent blockingReasons={blockingReasons} isValid={isValid} project={activeProject} />
+              <InvokeTooltipContent
+                blockingReasons={blockingReasons}
+                generateValues={routeInput.generateValues}
+                invocation={invocation}
+                isValid={isValid}
+              />
             }
             contentProps={{ p: '0' }}
             openDelay={200}
             showArrow
           >
-            {/* aria-disabled (not disabled) keeps hover alive so the reasons tooltip can show. */}
             <Button
               aria-disabled={!isValid}
               colorPalette="brand"

@@ -26,10 +26,11 @@ describe('getHotkeyTargetWidget', () => {
       getHotkeyTargetWidget(
         new FakeElement({
           'data-hotkey-widget-instance-id': 'preview',
+          'data-hotkey-widget-region': 'center',
           'data-hotkey-widget-type-id': 'preview',
         }) as unknown as EventTarget
       )
-    ).toEqual({ instanceId: 'preview', typeId: 'preview' });
+    ).toEqual({ instanceId: 'preview', region: 'center', typeId: 'preview' });
   });
 
   it('ignores targets outside widget shells', () => {

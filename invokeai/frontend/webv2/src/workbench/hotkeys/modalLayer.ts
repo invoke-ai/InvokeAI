@@ -1,18 +1,19 @@
-import { createListenerChannel } from '@workbench/externalStore';
+import { createExternalStore } from '@workbench/externalStore';
 
-const channel = createListenerChannel();
-const activeLayerIds = new Set<string>();
+const store = createExternalStore<{ activeLayerIds: ReadonlySet<string> }>({ activeLayerIds: new Set<string>() });
 
 export const registerHotkeyModalLayer = (id: string): (() => void) => {
-  activeLayerIds.add(id);
-  channel.notify();
+  store.patchSnapshot({ activeLayerIds: new Set([...store.getSnapshot().activeLayerIds, id]) });
 
   return () => {
+    const activeLayerIds = new Set(store.getSnapshot().activeLayerIds);
+
     activeLayerIds.delete(id);
-    channel.notify();
+    store.patchSnapshot({ activeLayerIds });
   };
 };
 
-export const isHotkeyModalLayerActive = (): boolean => activeLayerIds.size > 0;
+export const isHotkeyModalLayerActive = (): boolean => store.getSnapshot().activeLayerIds.size > 0;
 
-export const subscribeHotkeyModalLayers = channel.subscribe;
+export const useIsHotkeyModalLayerActive = (): boolean =>
+  store.useSelector((snapshot) => snapshot.activeLayerIds.size > 0);

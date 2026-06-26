@@ -110,7 +110,7 @@ export const getModelBaseColorPalette = (base: ModelBase): string => getModelBas
 
 export const isKnownModelBase = (base: ModelBase): base is KnownModelBase => base in MODEL_BASES;
 
-export const isConvertibleToDiffusers = (model: ModelConfig): boolean =>
+export const isConvertibleToDiffusers = (model: Pick<ModelConfig, 'base' | 'format' | 'type'>): boolean =>
   model.format === 'checkpoint' &&
   model.type === 'main' &&
   Boolean(getModelBaseInfo(model.base).supportsDiffusersConversion);

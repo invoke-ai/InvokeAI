@@ -4,13 +4,13 @@ import type { XYPosition } from '@workbench/workflows/types';
 import { Box, Flex, Stack, Text } from '@chakra-ui/react';
 import { FlowMiniMap, flowThemeCss, getFlowColorMode } from '@workbench/graph-preview';
 import '@xyflow/react/dist/style.css';
-import { useWorkbenchPreferences } from '@workbench/settings/store';
+import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
 import { setAddNodeOpen } from '@workbench/widgets/workflow/workflowUiStore';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { shallowEqual, useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { getProjectGraphReadiness } from '@workbench/workflows/buildGraph';
 import { buildConnectorNode, createWorkflowId } from '@workbench/workflows/document';
-import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
+import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSelector } from '@workbench/workflows/templates';
 import {
   getWorkflowSourceFieldType,
   getWorkflowTargetFieldType,
@@ -124,9 +124,20 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
     workflowShowMinimap,
     workflowSnapToGrid,
     workflowValidateConnections,
-  } = useWorkbenchPreferences();
-  const templatesSnapshot = useInvocationTemplatesSnapshot();
-  const invocationTemplates = templatesSnapshot.status === 'loaded' ? templatesSnapshot.templates : undefined;
+  } = useWorkbenchPreferenceSelector(
+    (preferences) => ({
+      reduceMotion: preferences.reduceMotion,
+      themeId: preferences.themeId,
+      workflowEdgeStyle: preferences.workflowEdgeStyle,
+      workflowShowMinimap: preferences.workflowShowMinimap,
+      workflowSnapToGrid: preferences.workflowSnapToGrid,
+      workflowValidateConnections: preferences.workflowValidateConnections,
+    }),
+    shallowEqual
+  );
+  const templatesStatus = useInvocationTemplatesSelector((snapshot) => snapshot.status);
+  const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
+  const invocationTemplates = templatesStatus === 'loaded' ? templates : undefined;
   const edgeType: FlowEdgeType = workflowEdgeStyle === 'square' ? 'step' : 'default';
   const [flowNodes, setFlowNodes] = useState<WorkflowFlowNode[]>(() =>
     toFlowNodes(projectGraph, [], invocationTemplates)
@@ -138,7 +149,8 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
   const [tool, setTool] = useState<EditorTool>('pan');
   const [nodeOpacity, setNodeOpacity] = useState(1);
   const [contextMenu, setContextMenu] = useState<WorkflowContextMenuState | null>(null);
-  const { selectedNodeIds, selectionRequest } = workflowSelectionStore.useSnapshot();
+  const selectedNodeIds = workflowSelectionStore.useSelector((snapshot) => snapshot.selectedNodeIds);
+  const selectionRequest = workflowSelectionStore.useSelector((snapshot) => snapshot.selectionRequest);
   const isSnapHeld = useModifierHeld('Control');
   const hasClipboardNodes = useHasClipboardNodes();
   const backgroundId = useId().replace(/:/g, '');
@@ -432,11 +444,11 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
             targetNodeId: connection.target,
           },
           projectGraph,
-          templatesSnapshot.templates
+          templates
         ) === null
       );
     },
-    [projectGraph, templatesSnapshot.templates, workflowValidateConnections]
+    [projectGraph, templates, workflowValidateConnections]
   );
 
   const onConnect = useCallback(
@@ -488,7 +500,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
       }
 
       if (handle.type === 'source') {
-        const sourceType = getWorkflowSourceFieldType(projectGraph, templatesSnapshot.templates, nodeId, handleId);
+        const sourceType = getWorkflowSourceFieldType(projectGraph, templates, nodeId, handleId);
 
         if (sourceType === undefined) {
           return;
@@ -504,7 +516,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
       }
 
       if (handle.type === 'target') {
-        const targetType = getWorkflowTargetFieldType(projectGraph, templatesSnapshot.templates, nodeId, handleId);
+        const targetType = getWorkflowTargetFieldType(projectGraph, templates, nodeId, handleId);
 
         if (targetType === undefined) {
           return;
@@ -518,7 +530,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
         });
       }
     },
-    [flowInstance, projectGraph, templatesSnapshot.templates]
+    [flowInstance, projectGraph, templates]
   );
 
   const onNodeContextMenu = useCallback((event: ReactMouseEvent, node: WorkflowFlowNode) => {
@@ -750,7 +762,12 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
 
 const ReadinessBanner = () => {
   const projectGraph = useActiveProjectSelector((project) => project.projectGraph);
-  const templatesSnapshot = useInvocationTemplatesSnapshot();
+  const templatesStatus = useInvocationTemplatesSelector((snapshot) => snapshot.status);
+  const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
+  const templatesSnapshot = useMemo(
+    () => ({ error: null, status: templatesStatus, templates }),
+    [templatesStatus, templates]
+  );
   const readiness = useMemo(
     () => getProjectGraphReadiness(projectGraph, templatesSnapshot),
     [projectGraph, templatesSnapshot]

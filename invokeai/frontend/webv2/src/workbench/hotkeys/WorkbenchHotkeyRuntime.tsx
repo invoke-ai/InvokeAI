@@ -1,8 +1,11 @@
+import type { WidgetContributionSource } from '@workbench/types';
+
 import { commandApi } from '@workbench/extensions/extensionApi';
 import { getFocusedRegionSnapshot } from '@workbench/focusRegions';
-import { useWorkbenchPreferences } from '@workbench/settings/store';
-import { useActiveProject } from '@workbench/WorkbenchContext';
-import { useEffect, useEffectEvent, useMemo, useRef, useSyncExternalStore } from 'react';
+import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
+import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
+import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { useEffect, useEffectEvent, useMemo, useRef } from 'react';
 import { tinykeys } from 'tinykeys';
 
 import type { RegisteredHotkey } from './types';
@@ -11,33 +14,33 @@ import { firstPartyHotkeyCatalog } from './catalog';
 import { useExtensionHotkeyDefinitions } from './extensionHotkeys';
 import { useRegisterFirstPartyCommands } from './firstPartyCommands';
 import { toTinykeysBinding } from './keys';
-import { isHotkeyModalLayerActive, subscribeHotkeyModalLayers } from './modalLayer';
+import { useIsHotkeyModalLayerActive } from './modalLayer';
 import { applyCustomHotkeys, resolveHotkey } from './resolve';
 import { getHotkeyTargetWidget } from './targetWidget';
+
+export const getHotkeyExecutionSource = (
+  hotkey: Pick<RegisteredHotkey, 'scope' | 'source'>,
+  activeSource: WidgetContributionSource | null
+): WidgetContributionSource | null => (hotkey.scope.kind === 'global' ? (hotkey.source ?? null) : activeSource);
 
 export const WorkbenchHotkeyRuntime = () => {
   useRegisterFirstPartyCommands();
 
-  const preferences = useWorkbenchPreferences();
-  const project = useActiveProject();
+  const customHotkeys = useWorkbenchPreferenceSelector((preferences) => preferences.customHotkeys);
+  const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const extensionHotkeys = useExtensionHotkeyDefinitions();
-  const isModalLayerActive = useSyncExternalStore(
-    subscribeHotkeyModalLayers,
-    isHotkeyModalLayerActive,
-    isHotkeyModalLayerActive
-  );
+  const isModalLayerActive = useIsHotkeyModalLayerActive();
   const projectRef = useRef(project);
   const registeredHotkeysRef = useRef<RegisteredHotkey[]>([]);
 
   projectRef.current = project;
 
   const registeredHotkeys = useMemo(() => {
-    const customHotkeys = preferences.customHotkeys;
     const firstPartyHotkeys = firstPartyHotkeyCatalog.map((hotkey) => applyCustomHotkeys(hotkey, customHotkeys));
     const widgetHotkeys = extensionHotkeys.map((hotkey) => applyCustomHotkeys(hotkey, customHotkeys));
 
     return [...firstPartyHotkeys, ...widgetHotkeys];
-  }, [extensionHotkeys, preferences.customHotkeys]);
+  }, [customHotkeys, extensionHotkeys]);
 
   registeredHotkeysRef.current = registeredHotkeys;
 
@@ -61,8 +64,8 @@ export const WorkbenchHotkeyRuntime = () => {
     return bindings;
   }, [registeredHotkeys]);
 
-  const executeHotkey = useEffectEvent((hotkey: RegisteredHotkey) => {
-    void commandApi.execute(hotkey.commandId);
+  const executeHotkey = useEffectEvent((hotkey: RegisteredHotkey, source: WidgetContributionSource | null) => {
+    void commandApi.executeForSource(hotkey.commandId, getHotkeyExecutionSource(hotkey, source));
   });
 
   const handleHotkey = useEffectEvent((event: KeyboardEvent, matchedKey: string) => {
@@ -77,8 +80,23 @@ export const WorkbenchHotkeyRuntime = () => {
     const activeWidgetTypeId = activeInstanceId
       ? (targetWidget?.typeId ?? projectRef.current.widgetInstances[activeInstanceId]?.typeId ?? null)
       : null;
+    const commandSource: WidgetContributionSource | null =
+      activeInstanceId && activeWidgetTypeId && (targetWidget?.region || focusedRegion)
+        ? {
+            instanceId: activeInstanceId,
+            projectId: projectRef.current.projectId ?? '',
+            region: (targetWidget?.region ?? focusedRegion)!,
+            typeId: activeWidgetTypeId,
+          }
+        : null;
     const hotkey = resolveHotkey({
-      context: { activeInstanceId, activeWidgetTypeId, focusedRegion, isModalLayerActive },
+      context: {
+        activeInstanceId,
+        activeWidgetTypeId,
+        focusedRegion,
+        isModalLayerActive,
+        projectId: projectRef.current.projectId ?? '',
+      },
       event,
       hotkeys: registeredHotkeysRef.current,
       matchedKey,
@@ -92,7 +110,7 @@ export const WorkbenchHotkeyRuntime = () => {
       event.preventDefault();
     }
 
-    executeHotkey(hotkey);
+    executeHotkey(hotkey, commandSource);
   });
 
   useEffect(() => {

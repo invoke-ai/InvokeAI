@@ -14,8 +14,10 @@ import {
 } from '@workbench/gallery/api';
 import { isSupportedGenerateModel } from '@workbench/generation/baseGenerationPolicies';
 import { isVaeModelConfig } from '@workbench/generation/settings';
-import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsStore';
+import { ensureModelsLoaded, useModelsSelector } from '@workbench/models/modelsStore';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { getProjectWidgetValues } from '@workbench/widgetState';
+import { useWorkbenchStore } from '@workbench/WorkbenchContext';
 import { useEffect, useMemo, type Dispatch } from 'react';
 
 import { executeImageRecall, getCurrentGenerateValues } from './executeImageRecall';
@@ -78,17 +80,20 @@ export const useImageActions = ({
   generateValues,
   onImagesDeleted,
   onStarredChange,
+  projectId,
 }: {
   boards: GalleryBoard[];
   dispatch: Dispatch<WorkbenchAction>;
   generateValues: Record<string, unknown>;
+  projectId?: string;
   /** Called after a successful deletion so the host can select a neighboring image. */
   onImagesDeleted?: (imageNames: string[]) => void;
   /** Optional optimistic hook, called before the request and re-called inverted on failure. */
   onStarredChange?: (imageNames: string[], starred: boolean) => void;
 }): ImageActions => {
   const openWorkbenchWidget = useOpenWorkbenchWidget();
-  const { models } = useModelsSnapshot();
+  const store = useWorkbenchStore();
+  const models = useModelsSelector((snapshot) => snapshot.models);
   const supportedModels = useMemo(() => models.filter(isSupportedGenerateModel), [models]);
   const vaeModels = useMemo(() => models.filter(isVaeModelConfig).map((model) => model as VaeModelConfig), [models]);
   const currentGenerateValues = useMemo(() => {
@@ -103,9 +108,18 @@ export const useImageActions = ({
     const recordError = (error: unknown) => dispatch({ message: toErrorMessage(error), type: 'recordError' });
     const recordSuccess = (title: string, message?: string) =>
       dispatch({ kind: 'success', message, title, type: 'recordNotice' });
-    const refreshGallery = () => dispatch({ type: 'touchGalleryRefresh' });
-    const refreshGalleryImages = () => dispatch({ type: 'touchGalleryImagesRefresh' });
+    const refreshGallery = () => dispatch({ projectId, type: 'touchGalleryRefresh' });
+    const refreshGalleryImages = () => dispatch({ projectId, type: 'touchGalleryImagesRefresh' });
     const getBoardName = (boardId: string) => boards.find((board) => board.id === boardId)?.name ?? 'Uncategorized';
+    const getLatestGenerateValues = () => {
+      const snapshot = store.getSnapshot();
+      const project = projectId
+        ? snapshot.state.projects.find((candidate) => candidate.id === projectId)
+        : snapshot.activeProject;
+
+      return project ? getProjectWidgetValues(project, 'generate') : {};
+    };
+
     return {
       copyImage: async (image) => {
         try {
@@ -121,7 +135,7 @@ export const useImageActions = ({
       deleteImages: async (imageNames) => {
         try {
           await deleteGalleryImages(imageNames);
-          dispatch({ imageNames, type: 'removeGalleryImages' });
+          dispatch({ imageNames, projectId, type: 'removeGalleryImages' });
           onImagesDeleted?.(imageNames);
           recordSuccess(imageNames.length === 1 ? 'Deleted image' : `Deleted ${imageNames.length} images`);
           refreshGallery();
@@ -203,18 +217,26 @@ export const useImageActions = ({
         }
       },
       openImageInPreview: (image) => {
-        dispatch({ image, type: 'selectGalleryImage' });
+        dispatch({ image, projectId, type: 'selectGalleryImage' });
         openWorkbenchWidget('preview', { preferredRegions: ['center'], requireCenterView: true });
       },
       recallImageData: async (image, kind) => {
-        const didRecall = await executeImageRecall({ dispatch, generateValues, image, kind, models });
+        const didRecall = await executeImageRecall({
+          dispatch,
+          generateValues,
+          getGenerateValues: getLatestGenerateValues,
+          image,
+          kind,
+          models,
+          projectId,
+        });
 
-        if (didRecall) {
+        if (didRecall && (!projectId || store.getSnapshot().activeProject.id === projectId)) {
           openWorkbenchWidget('generate', { preferredRegions: ['left'] });
         }
       },
       selectForCompare: (image) => {
-        dispatch({ image, type: 'setGalleryCompareImage' });
+        dispatch({ image, projectId, type: 'setGalleryCompareImage' });
       },
       setImagesStarred: async (imageNames, starred) => {
         onStarredChange?.(imageNames, starred);
@@ -237,6 +259,8 @@ export const useImageActions = ({
     onImagesDeleted,
     onStarredChange,
     openWorkbenchWidget,
+    projectId,
+    store,
     supportedModels,
     vaeModels,
   ]);

@@ -1,26 +1,10 @@
-import { useSyncExternalStore } from 'react';
+import { createExternalStore } from '@workbench/externalStore';
 
 export interface ModelLoadInfo {
   label: string;
 }
 
-const listeners = new Set<() => void>();
-
-let activeLoads: ModelLoadInfo[] = [];
-
-const emit = (): void => {
-  for (const listener of listeners) {
-    listener();
-  }
-};
-
-const subscribe = (listener: () => void): (() => void) => {
-  listeners.add(listener);
-
-  return () => {
-    listeners.delete(listener);
-  };
-};
+const store = createExternalStore<{ activeLoads: ModelLoadInfo[] }>({ activeLoads: [] });
 
 const getModelLoadLabel = (payload: unknown): string => {
   const record = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
@@ -35,27 +19,20 @@ const getModelLoadLabel = (payload: unknown): string => {
 
 export const modelLoadStore = {
   started(payload: unknown): void {
-    activeLoads = [...activeLoads, { label: getModelLoadLabel(payload) }];
-    emit();
+    store.patchSnapshot({ activeLoads: [...store.getSnapshot().activeLoads, { label: getModelLoadLabel(payload) }] });
   },
   completed(payload: unknown): void {
     const label = getModelLoadLabel(payload);
+    const { activeLoads } = store.getSnapshot();
     const index = activeLoads.findIndex((load) => load.label === label);
 
-    if (index >= 0) {
-      activeLoads = activeLoads.filter((_, loadIndex) => loadIndex !== index);
-    } else {
-      activeLoads = activeLoads.slice(1);
-    }
-
-    emit();
+    store.patchSnapshot({
+      activeLoads: index >= 0 ? activeLoads.filter((_, loadIndex) => loadIndex !== index) : activeLoads.slice(1),
+    });
   },
   reset(): void {
-    if (activeLoads.length > 0) {
-      activeLoads = [];
-      emit();
-    }
+    store.patchSnapshot({ activeLoads: [] });
   },
 };
 
-export const useModelLoads = (): ModelLoadInfo[] => useSyncExternalStore(subscribe, () => activeLoads);
+export const useModelLoads = (): ModelLoadInfo[] => store.useSelector((snapshot) => snapshot.activeLoads);

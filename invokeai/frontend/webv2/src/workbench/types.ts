@@ -108,6 +108,13 @@ export interface WidgetInstanceContract {
   createdAt: string;
 }
 
+export interface WidgetInstanceRuntimeMeta {
+  id: WidgetInstanceId;
+  typeId: WidgetTypeId;
+  title?: string;
+  createdAt: string;
+}
+
 export interface GraphBearingSurfaceContract {
   surfaceId: string;
   widgetId: WidgetId;
@@ -122,7 +129,8 @@ export interface GraphBearingSurfaceContract {
 export interface WidgetViewProps {
   region: WorkbenchRegion;
   manifest: WidgetManifest;
-  instance: WidgetInstanceContract;
+  /** Chrome metadata only. Read reactive widget values through `runtime.state`. */
+  instance: WidgetInstanceRuntimeMeta;
   runtime: WidgetRuntimeApi;
   presentation?: 'compact' | 'expanded' | 'tooltip';
 }
@@ -156,9 +164,7 @@ export interface WidgetRuntimeApi<State extends Record<string, unknown> = Record
   instanceId: WidgetInstanceId;
   typeId: WidgetTypeId;
   region: WorkbenchRegion;
-  state: State;
-  patchState: (values: Partial<State>) => void;
-  setState: (values: State) => void;
+  state: WidgetRuntimeStateApi<State>;
   commands: WidgetCommandApi;
   hotkeys: WidgetHotkeyApi;
   menus: WidgetMenuApi;
@@ -168,8 +174,30 @@ export interface WidgetRuntimeApi<State extends Record<string, unknown> = Record
   workbench: WidgetWorkbenchApi;
 }
 
+export interface WidgetRuntimeStateApi<State extends Record<string, unknown> = Record<string, unknown>> {
+  getSnapshot: () => Readonly<State>;
+  useSelector: <Selected>(
+    selector: (state: Readonly<State>) => Selected,
+    isEqual?: (left: Selected, right: Selected) => boolean
+  ) => Selected;
+  patch: (values: Partial<State>) => void;
+  set: (values: State) => void;
+}
+
+export interface WidgetContributionSource {
+  instanceId: WidgetInstanceId;
+  projectId: string;
+  region: WorkbenchRegion;
+  typeId: WidgetTypeId;
+}
+
 export interface WidgetCommandApi {
   execute: (commandId: string, ...args: unknown[]) => Promise<unknown>;
+  executeForSource: (
+    commandId: string,
+    source: WidgetContributionSource | null,
+    ...args: unknown[]
+  ) => Promise<unknown>;
   register: (command: WidgetCommandContribution) => () => void;
 }
 
@@ -177,6 +205,7 @@ export interface WidgetCommandContribution {
   id: string;
   title: string;
   handler: (...args: unknown[]) => unknown | Promise<unknown>;
+  source?: WidgetContributionSource;
 }
 
 export interface WidgetHotkeyApi {
@@ -190,7 +219,7 @@ export interface WidgetHotkeyContribution {
   title: string;
   description?: string;
   scope?: 'focused-region' | 'global' | 'instance' | 'widget';
-  source?: { instanceId: WidgetInstanceId; region: WorkbenchRegion; typeId: WidgetTypeId };
+  source?: WidgetContributionSource;
   preventDefault?: boolean;
   allowInEditable?: boolean;
 }
@@ -202,6 +231,7 @@ export interface WidgetMenuApi {
 export interface WidgetMenuContribution {
   id: string;
   items: Array<{ commandId: string; group?: string }>;
+  source?: WidgetContributionSource;
 }
 
 export interface WidgetCommandPaletteApi {

@@ -6,7 +6,7 @@ import { SourceListItem } from '@workbench/launchpad/models/shared/SourceListIte
 import { addModelRelationship, getRelatedModelKeys, removeModelRelationship } from '@workbench/models/api';
 import { getModelBaseColorPalette, getModelBaseLabel } from '@workbench/models/baseIdentity';
 import { ModelSelect } from '@workbench/models/components';
-import { useModelsSnapshot } from '@workbench/models/modelsStore';
+import { useModelsSelector } from '@workbench/models/modelsStore';
 import { getModelTypeLabel } from '@workbench/models/taxonomy';
 import { Link2OffIcon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -32,10 +32,10 @@ export const RelatedModelsSection = ({
   model,
   onError,
 }: {
-  model: ModelConfig;
+  model: Pick<ModelConfig, 'base' | 'key'>;
   onError: (message: string) => void;
 }) => {
-  const { models } = useModelsSnapshot();
+  const models = useModelsSelector((snapshot) => snapshot.models);
   const [relatedKeys, setRelatedKeys] = useState<string[] | null>(null);
   const [isMutating, setIsMutating] = useState(false);
 

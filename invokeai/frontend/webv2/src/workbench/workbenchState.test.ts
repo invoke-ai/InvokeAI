@@ -198,6 +198,61 @@ describe('workbench widget region opening', () => {
   });
 });
 
+describe('workbench widget state updates', () => {
+  it('patches a missing undefined widget value key as a real state change', () => {
+    const initial = createInitialWorkbenchState();
+    const next = workbenchReducer(initial, {
+      type: 'patchWidgetValues',
+      values: { optionalValue: undefined },
+      widgetId: 'diagnostics',
+    });
+    const values = getProjectWidgetValues(getActiveProject(next), 'diagnostics');
+
+    expect(next).not.toBe(initial);
+    expect(Object.prototype.hasOwnProperty.call(values, 'optionalValue')).toBe(true);
+  });
+
+  it('can patch a widget instance in a non-active project', () => {
+    let state = createInitialWorkbenchState();
+    const firstProjectId = state.activeProjectId;
+
+    state = workbenchReducer(state, { type: 'createProject' });
+    const secondProjectId = state.activeProjectId;
+
+    expect(secondProjectId).not.toBe(firstProjectId);
+
+    state = workbenchReducer(state, {
+      instanceId: 'generate',
+      projectId: firstProjectId,
+      type: 'patchWidgetInstanceValues',
+      values: { projectScoped: true },
+    });
+
+    expect(getProject(state, firstProjectId).widgetInstances.generate?.state.values.projectScoped).toBe(true);
+    expect(getProject(state, secondProjectId).widgetInstances.generate?.state.values.projectScoped).toBeUndefined();
+  });
+
+  it('clones replacement widget instance values before storing them', () => {
+    let state = createInitialWorkbenchState();
+    const values: Record<string, unknown> = { mutable: 'before' };
+
+    state = workbenchReducer(state, { instanceId: 'generate', type: 'setWidgetInstanceValues', values });
+    values.mutable = 'after';
+
+    expect(getActiveProject(state).widgetInstances.generate?.state.values.mutable).toBe('before');
+  });
+
+  it('clones patched widget instance values before storing them', () => {
+    let state = createInitialWorkbenchState();
+    const values: Record<string, unknown> = { nested: { mutable: 'before' } };
+
+    state = workbenchReducer(state, { instanceId: 'generate', type: 'patchWidgetInstanceValues', values });
+    (values.nested as { mutable: string }).mutable = 'after';
+
+    expect(getActiveProject(state).widgetInstances.generate?.state.values.nested).toEqual({ mutable: 'before' });
+  });
+});
+
 describe('workbench layout presets', () => {
   it('applies the Default preset as a full widget-region layout', () => {
     let state = createInitialWorkbenchState();
@@ -910,6 +965,27 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(getActiveProject(state).promptHistory).toEqual([{ negativePrompt: null, positivePrompt: 'a cat' }]);
   });
 
+  it('patches Generate settings without replacing unchanged nested values', () => {
+    const loraModel = { base: 'sdxl', key: 'lora-1', name: 'LoRA', type: 'lora' } as const;
+    const state = primeGenerate(undefined, {
+      loras: [{ isEnabled: true, model: loraModel, weight: 0.75 }],
+      positivePrompt: 'before',
+    });
+    const beforeValues = getProjectWidgetValues(getActiveProject(state), 'generate') as unknown as GenerateWidgetValues;
+    const nextState = workbenchReducer(state, {
+      type: 'patchGenerateSettings',
+      values: { positivePrompt: 'after' },
+    });
+    const afterValues = getProjectWidgetValues(
+      getActiveProject(nextState),
+      'generate'
+    ) as unknown as GenerateWidgetValues;
+
+    expect(afterValues.positivePrompt).toBe('after');
+    expect(afterValues.model).toBe(beforeValues.model);
+    expect(afterValues.loras).toBe(beforeValues.loras);
+  });
+
   it('deduplicates prompt history by prompt pair and moves the newest submission to the top', () => {
     let state = primeGenerate(undefined, { negativePrompt: 'low quality', positivePrompt: 'a cat' });
 
@@ -1200,6 +1276,54 @@ describe('workbench backend connection recovery', () => {
     expect(values.galleryRefreshToken).toBe(previousValues.galleryRefreshToken);
     expect(values.galleryImagesRefreshToken).toBeDefined();
     expect(values.galleryImagesRefreshToken).not.toBe(previousValues.galleryImagesRefreshToken);
+  });
+
+  it('can refresh gallery images in a non-active project without touching the active project', () => {
+    let state = createInitialWorkbenchState();
+    const firstProjectId = state.activeProjectId;
+
+    state = workbenchReducer(state, { type: 'createProject' });
+    const secondProjectId = state.activeProjectId;
+    const firstPreviousValues = getProjectWidgetValues(getProject(state, firstProjectId), 'gallery');
+    const secondPreviousValues = getProjectWidgetValues(getProject(state, secondProjectId), 'gallery');
+
+    state = workbenchReducer(state, { projectId: firstProjectId, type: 'touchGalleryImagesRefresh' });
+
+    const firstValues = getProjectWidgetValues(getProject(state, firstProjectId), 'gallery');
+    const secondValues = getProjectWidgetValues(getProject(state, secondProjectId), 'gallery');
+
+    expect(firstValues.galleryImagesRefreshToken).not.toBe(firstPreviousValues.galleryImagesRefreshToken);
+    expect(secondValues.galleryImagesRefreshToken).toBe(secondPreviousValues.galleryImagesRefreshToken);
+  });
+
+  it('can remove gallery images from a non-active project without touching the active project', () => {
+    let state = createInitialWorkbenchState();
+    const firstProjectId = state.activeProjectId;
+    const image = createImage('shared.png', 'backend-gallery');
+
+    state = workbenchReducer(state, { type: 'createProject' });
+    const secondProjectId = state.activeProjectId;
+    state = workbenchReducer(state, {
+      projectId: firstProjectId,
+      type: 'patchWidgetValues',
+      values: { recentImages: [image], selectedImage: image, selectedImageName: image.imageName },
+      widgetId: 'gallery',
+    });
+    state = workbenchReducer(state, {
+      projectId: secondProjectId,
+      type: 'patchWidgetValues',
+      values: { recentImages: [image], selectedImage: image, selectedImageName: image.imageName },
+      widgetId: 'gallery',
+    });
+
+    state = workbenchReducer(state, {
+      imageNames: [image.imageName],
+      projectId: firstProjectId,
+      type: 'removeGalleryImages',
+    });
+
+    expect(getProjectWidgetValues(getProject(state, firstProjectId), 'gallery').recentImages).toEqual([]);
+    expect(getProjectWidgetValues(getProject(state, secondProjectId), 'gallery').recentImages).toEqual([image]);
   });
 
   it('does not hydrate stale persisted backend connection state', () => {

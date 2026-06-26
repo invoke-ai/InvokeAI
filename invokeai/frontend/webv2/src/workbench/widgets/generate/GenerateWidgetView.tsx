@@ -17,11 +17,12 @@ import {
   normalizeGenerateWidgetValues,
   syncGenerateWidgetValuesWithModels,
 } from '@workbench/generation/settings';
-import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsStore';
+import { ensureModelsLoaded, useModelsSelector } from '@workbench/models/modelsStore';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { useEffect, useMemo } from 'react';
 
+import { areProjectGenerateFormValuesEqual, getGenerateFormCommitPatch } from './generateFormViewModel';
 import { GenerateSettingsForm } from './GenerateSettingsForm';
 
 const getSettingsWithAutoComponentSource = (
@@ -39,9 +40,16 @@ const getSettingsWithAutoComponentSource = (
 };
 
 export const GenerateWidgetView = () => {
-  const storedValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'generate'));
+  const storedSelection = useActiveProjectSelector(
+    (project) => ({ projectId: project.id, values: getProjectWidgetValues(project, 'generate') }),
+    areProjectGenerateFormValuesEqual
+  );
+  const projectId = storedSelection.projectId;
+  const storedValues = storedSelection.values;
   const dispatch = useWorkbenchDispatch();
-  const { error, models, status } = useModelsSnapshot();
+  const error = useModelsSelector((snapshot) => snapshot.error);
+  const models = useModelsSelector((snapshot) => snapshot.models);
+  const status = useModelsSelector((snapshot) => snapshot.status);
 
   useEffect(() => {
     ensureModelsLoaded();
@@ -83,8 +91,12 @@ export const GenerateWidgetView = () => {
       return;
     }
 
-    dispatch({ type: 'setGenerateSettings', values: { ...nextSettings, model } });
-  }, [dispatch, models, selectedModel, settings, storedValues, supportedModels]);
+    dispatch({
+      projectId,
+      type: 'patchGenerateSettings',
+      values: getGenerateFormCommitPatch({ ...nextSettings, model }),
+    });
+  }, [dispatch, models, projectId, selectedModel, settings, storedValues, supportedModels]);
 
   const commitSettings = (nextSettings: GenerateSettings) => {
     const model = supportedModels.find((candidate) => candidate.key === nextSettings.modelKey);
@@ -94,9 +106,14 @@ export const GenerateWidgetView = () => {
     }
 
     dispatch({
-      type: 'setGenerateSettings',
-      values: { ...getSettingsWithAutoComponentSource(nextSettings, model, models), model },
+      projectId,
+      type: 'patchGenerateSettings',
+      values: getGenerateFormCommitPatch({ ...getSettingsWithAutoComponentSource(nextSettings, model, models), model }),
     });
+  };
+
+  const patchSettings = (values: Partial<GenerateSettings>) => {
+    dispatch({ projectId, type: 'patchGenerateSettings', values });
   };
 
   return (
@@ -104,11 +121,13 @@ export const GenerateWidgetView = () => {
       isLoadingModels={status === 'idle' || status === 'loading'}
       loadError={error}
       loraModels={loraModels}
+      projectId={projectId}
       selectedModel={selectedModel}
       settings={settings}
       supportedModels={supportedModels}
       vaeModels={vaeModels}
       onCommitSettings={commitSettings}
+      onPatchSettings={patchSettings}
     />
   );
 };

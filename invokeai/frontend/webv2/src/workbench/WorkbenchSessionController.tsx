@@ -4,7 +4,9 @@ import { useEffect, useRef } from 'react';
 import type { WorkbenchSearch } from './projects/session';
 
 import { hydrateProjectFromServer } from './projects/syncedPersistence';
+import { flushGenerateDrafts } from './widgets/generate/generateDraftRegistry';
 import { useWorkbenchDispatch, useWorkbenchHasHydrated, useWorkbenchSelector } from './WorkbenchContext';
+import { areArraysEqual } from './workbenchSelectors';
 
 /**
  * Keeps a mounted editor in line with the /app search params. Renders nothing.
@@ -19,15 +21,18 @@ import { useWorkbenchDispatch, useWorkbenchHasHydrated, useWorkbenchSelector } f
  *   library and opens it if not.
  */
 export const WorkbenchSessionController = ({ search }: { search: WorkbenchSearch }) => {
-  const state = useWorkbenchSelector((snapshot) => snapshot.state);
+  const projectIds = useWorkbenchSelector(
+    (snapshot) => snapshot.state.projects.map((project) => project.id),
+    areArraysEqual
+  );
   const dispatch = useWorkbenchDispatch();
   const hasHydrated = useWorkbenchHasHydrated();
   const navigate = useNavigate();
-  const latestStateRef = useRef(state);
+  const latestProjectIdsRef = useRef(projectIds);
   // The mount-time param was already handled by the boot load options.
   const handledProjectIdRef = useRef<string | null>(search.project ?? null);
 
-  latestStateRef.current = state;
+  latestProjectIdsRef.current = projectIds;
 
   const isNewRequested = search.new === true;
 
@@ -48,7 +53,8 @@ export const WorkbenchSessionController = ({ search }: { search: WorkbenchSearch
 
     handledProjectIdRef.current = requestedProjectId;
 
-    if (latestStateRef.current.projects.some((project) => project.id === requestedProjectId)) {
+    if (latestProjectIdsRef.current.includes(requestedProjectId)) {
+      flushGenerateDrafts();
       dispatch({ projectId: requestedProjectId, type: 'switchProject' });
 
       return undefined;
@@ -62,6 +68,7 @@ export const WorkbenchSessionController = ({ search }: { search: WorkbenchSearch
       }
 
       if (project) {
+        flushGenerateDrafts();
         dispatch({ project, type: 'openProject' });
       } else {
         dispatch({

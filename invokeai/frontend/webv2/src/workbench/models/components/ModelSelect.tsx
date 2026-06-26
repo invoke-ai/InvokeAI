@@ -17,9 +17,9 @@ import { Link } from '@tanstack/react-router';
 import { Button, CloseButton, IconButton, Tooltip } from '@workbench/components/ui';
 import { getModelBaseColorPalette, getModelBaseLabel } from '@workbench/models/baseIdentity';
 import { getModelPickerGroups } from '@workbench/models/library';
-import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsStore';
+import { ensureModelsLoaded, useModelsSelector } from '@workbench/models/modelsStore';
 import { formatBytes, getModelTypePluralLabel } from '@workbench/models/taxonomy';
-import { useWorkbenchPreferences } from '@workbench/settings/store';
+import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { BoxIcon, CheckIcon, ChevronDownIcon, RotateCcwIcon, SearchIcon, XIcon } from 'lucide-react';
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -63,8 +63,8 @@ export const ModelSelect = ({
   /** Selected model key, or null. */
   value: string | null;
 }) => {
-  const { enableModelDescriptions } = useWorkbenchPreferences();
-  const { models } = useModelsSnapshot();
+  const enableModelDescriptions = useWorkbenchPreferenceSelector((preferences) => preferences.enableModelDescriptions);
+  const models = useModelsSelector((snapshot) => snapshot.models);
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBases, setSelectedBases] = useState<ReadonlySet<string>>(EMPTY_BASES);

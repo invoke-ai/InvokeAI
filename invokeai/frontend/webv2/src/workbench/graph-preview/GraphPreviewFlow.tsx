@@ -1,7 +1,7 @@
 import type { GraphContract } from '@workbench/types';
 
 import { Badge, Box, Stack, Text } from '@chakra-ui/react';
-import { useWorkbenchPreferences } from '@workbench/settings/store';
+import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import '@xyflow/react/dist/style.css';
 import { getResolvedWorkflowEdges } from '@workbench/workflows/connectors';
 import { isInvocationNode, type ProjectGraphState, type XYPosition } from '@workbench/workflows/types';
@@ -167,7 +167,7 @@ export const GraphPreviewFlow = ({
   graph: GraphContract;
   positionHints?: Record<string, XYPosition>;
 }) => {
-  const { themeId } = useWorkbenchPreferences();
+  const themeId = useWorkbenchPreferenceSelector((preferences) => preferences.themeId);
   const backgroundId = useId().replace(/:/g, '');
   const nodes = useMemo(() => toPreviewNodes(graph, positionHints), [graph, positionHints]);
   const edges = useMemo(() => toPreviewEdges(graph), [graph]);

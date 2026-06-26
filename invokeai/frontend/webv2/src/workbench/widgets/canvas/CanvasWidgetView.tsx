@@ -1,16 +1,16 @@
 import type { WidgetViewProps } from '@workbench/types';
 
 import { Box, Flex } from '@chakra-ui/react';
-import { useActiveProject, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { useEffect, useEffectEvent } from 'react';
 
 import { CanvasDocumentFrame, CanvasPlaneImage, EmptyCanvasFrame, ToolScrubber } from './CanvasDocumentFrame';
 import { CanvasStagingControls, EmptyStagingControls } from './CanvasStagingControls';
 
 export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
-  const activeProject = useActiveProject();
+  const canvas = useActiveProjectSelector((project) => project.canvas);
   const dispatch = useWorkbenchDispatch();
-  const { document, stagingArea } = activeProject.canvas;
+  const { document, stagingArea } = canvas;
   const { layers } = document;
   const selectedCandidate = stagingArea.pendingImages[stagingArea.selectedImageIndex];
   const selectedImage = stagingArea.isVisible ? selectedCandidate : undefined;

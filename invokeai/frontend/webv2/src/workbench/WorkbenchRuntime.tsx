@@ -16,7 +16,13 @@ import { addImagesToGalleryBoard } from './gallery/api';
 import { getQueueItemResultImages } from './generation/api';
 import { sanitizeBatchCount } from './generation/batch';
 import { normalizeGenerateSettings } from './generation/settings';
-import { useWorkbenchDispatch, useWorkbenchHasHydrated, useWorkbenchSelector } from './WorkbenchContext';
+import {
+  useWorkbenchDispatch,
+  useWorkbenchHasHydrated,
+  useWorkbenchSelector,
+  useWorkbenchStore,
+} from './WorkbenchContext';
+import { createStableSelector } from './workbenchSelectors';
 import { ensureInvocationTemplatesLoaded } from './workflows/templates';
 
 const getSnapshotGalleryBoardId = (queueItem: QueueItem): string | null => {
@@ -33,6 +39,28 @@ const getSnapshotBatchCount = (queueItem: QueueItem): number => {
 
   return sanitizeBatchCount(batchCount);
 };
+
+const selectQueueRevision = createStableSelector((snapshot: { state: { projects: Project[] } }) =>
+  snapshot.state.projects
+    .map((project) =>
+      [
+        project.id,
+        project.queue.items
+          .map((item) =>
+            [
+              item.id,
+              item.status,
+              item.backendBatchId ?? '',
+              item.backendItemIds?.join('.') ?? '',
+              item.cancelledBackendItemIds?.join('.') ?? '',
+              item.completedBackendItemIds?.join('.') ?? '',
+            ].join(':')
+          )
+          .join(','),
+      ].join('=')
+    )
+    .join('|')
+);
 
 /**
  * Await a tracked run's terminal outcome, route its images to the queue item's
@@ -187,17 +215,25 @@ const submitQueueItem = (
  * inside the WorkbenchProvider; renders nothing.
  */
 export const WorkbenchRuntime = () => {
-  const state = useWorkbenchSelector((snapshot) => snapshot.state);
+  const store = useWorkbenchStore();
   const dispatch = useWorkbenchDispatch();
   const hasHydrated = useWorkbenchHasHydrated();
+  const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection.status);
+  const queueRevision = useWorkbenchSelector(selectQueueRevision);
   const coordinatorRef = useRef<QueueCoordinator | null>(null);
-  const stateRef = useRef(state);
+  const stateRef = useRef(store.getState());
   const startedQueueItemIdsRef = useRef(new Set<string>());
   const cancelledQueueItemIdsRef = useRef(new Set<string>());
   const reconcileStateRef = useRef<'idle' | 'running' | 'done'>('idle');
   const [isReconciled, setIsReconciled] = useState(false);
 
-  stateRef.current = state;
+  useEffect(
+    () =>
+      store.subscribe(() => {
+        stateRef.current = store.getState();
+      }),
+    [store]
+  );
 
   // Mirror the shared socket's connection status (owned by the hub, above the
   // workbench) into workbench state so the editor's many `backendConnection`
@@ -279,7 +315,7 @@ export const WorkbenchRuntime = () => {
     if (
       !coordinator ||
       !hasHydrated ||
-      state.backendConnection.status !== 'connected' ||
+      backendConnectionStatus !== 'connected' ||
       reconcileStateRef.current !== 'idle'
     ) {
       return;
@@ -287,7 +323,7 @@ export const WorkbenchRuntime = () => {
 
     reconcileStateRef.current = 'running';
 
-    const openItems = state.projects.flatMap((project) =>
+    const openItems = stateRef.current.projects.flatMap((project) =>
       project.queue.items
         .filter((queueItem) => queueItem.status === 'pending' || queueItem.status === 'running')
         .map((queueItem) => ({ project, queueItem }))
@@ -368,7 +404,7 @@ export const WorkbenchRuntime = () => {
         reconcileStateRef.current = 'done';
         setIsReconciled(true);
       });
-  }, [dispatch, hasHydrated, state.backendConnection.status, state.projects]);
+  }, [backendConnectionStatus, dispatch, hasHydrated, queueRevision]);
 
   useEffect(() => {
     const coordinator = coordinatorRef.current;
@@ -377,7 +413,7 @@ export const WorkbenchRuntime = () => {
       return;
     }
 
-    for (const project of state.projects) {
+    for (const project of stateRef.current.projects) {
       for (const queueItem of project.queue.items) {
         if (
           queueItem.status === 'pending' &&
@@ -402,7 +438,7 @@ export const WorkbenchRuntime = () => {
         }
       }
     }
-  }, [dispatch, isReconciled, state.projects]);
+  }, [dispatch, isReconciled, queueRevision]);
 
   return null;
 };

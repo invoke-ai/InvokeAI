@@ -57,4 +57,6 @@ export const refreshStartersIfLoaded = (): void => {
   }
 };
 
+export const useStartersSelector = store.useSelector;
+
 export const useStartersSnapshot = (): StartersSnapshot => store.useSnapshot();

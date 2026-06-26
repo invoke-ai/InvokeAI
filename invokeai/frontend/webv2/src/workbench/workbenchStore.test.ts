@@ -67,6 +67,7 @@ describe('createWorkbenchStore', () => {
   it('updates hydration metadata without changing durable workbench state', () => {
     const store = createWorkbenchStore();
     const initialState = store.getState();
+    const initialPersistedRevision = store.getPersistedRevision();
     const listener = vi.fn();
 
     store.subscribe(listener);
@@ -76,10 +77,32 @@ describe('createWorkbenchStore', () => {
     expect(listener).toHaveBeenCalledTimes(1);
     expect(store.getSnapshot().hasHydrated).toBe(true);
     expect(store.getState()).toBe(initialState);
+    expect(store.getPersistedRevision()).toBe(initialPersistedRevision);
 
     store.setHasHydrated(true);
 
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('bumps persisted revision only for autosaved state changes', () => {
+    const store = createWorkbenchStore();
+    const initialPersistedRevision = store.getPersistedRevision();
+
+    store.dispatch({ status: 'connected', type: 'setBackendConnectionStatus' });
+
+    expect(store.getPersistedRevision()).toBe(initialPersistedRevision);
+
+    store.dispatch({ kind: 'info', title: 'Global notice', type: 'recordNotice' });
+
+    expect(store.getPersistedRevision()).toBe(initialPersistedRevision);
+
+    store.dispatch({
+      name: 'Persisted rename',
+      projectId: store.getSnapshot().activeProject.id,
+      type: 'renameProject',
+    });
+
+    expect(store.getPersistedRevision()).toBe(initialPersistedRevision + 1);
   });
 
   it('stops notifying unsubscribed listeners', () => {
@@ -172,6 +195,73 @@ describe('createWorkbenchStore', () => {
     store.dispatch({ instanceId: 'generate', type: 'patchWidgetInstanceValues', values: { prompt: 'updated' } });
 
     expect(widgetInstancesWatcher.changeCount).toBe(1);
+    expect(placementWatcher.changeCount).toBe(0);
+  });
+
+  it('treats identical widget placement in a different project as a placement change', () => {
+    const store = createWorkbenchStore();
+    const placementWatcher = watchSelector(
+      store,
+      (snapshot) => getWidgetPlacementProject(snapshot.activeProject),
+      areWidgetPlacementProjectsEqual
+    );
+    const firstProjectId = placementWatcher.current.projectId;
+
+    store.dispatch({ type: 'createProject' });
+
+    expect(placementWatcher.current.projectId).not.toBe(firstProjectId);
+    expect(placementWatcher.changeCount).toBe(1);
+  });
+
+  it('does not notify subscribers for equivalent generate and project settings writes', () => {
+    const store = createWorkbenchStore();
+    const listener = vi.fn();
+
+    store.subscribe(listener);
+
+    store.dispatch({ batchCount: 1, type: 'setGenerateBatchCount' });
+    store.dispatch({ settings: { useCpuNoise: true }, type: 'setActiveProjectSettings' });
+    store.dispatch({ isCollapsed: false, region: 'left', type: 'setRegionWidgetCollapsed' });
+    store.dispatch({
+      region: 'left',
+      sizePx: store.getSnapshot().activeProject.widgetRegions.left.sizePx,
+      type: 'setRegionWidgetSize',
+    });
+    store.dispatch({ type: 'patchWidgetValues', values: {}, widgetId: 'generate' });
+    store.dispatch({ status: 'connecting', type: 'setBackendConnectionStatus' });
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('does not notify subscribers for equivalent queue status writes', () => {
+    const store = createWorkbenchStore();
+    const project = store.getSnapshot().activeProject;
+    const listener = vi.fn();
+
+    store.subscribe(listener);
+
+    store.dispatch({
+      projectId: project.id,
+      queueItemId: 'missing-queue-item',
+      status: 'pending',
+      type: 'setQueueItemStatus',
+    });
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('keeps placement selectors stable across generate, queue, and settings changes', () => {
+    const store = createWorkbenchStore();
+    const placementWatcher = watchSelector(
+      store,
+      (snapshot) => getWidgetPlacementProject(snapshot.activeProject),
+      areWidgetPlacementProjectsEqual
+    );
+
+    store.dispatch({ batchCount: 2, type: 'setGenerateBatchCount' });
+    store.dispatch({ backendSupportsCancellation: true, type: 'submitInvocationSnapshot' });
+    store.dispatch({ settings: { useCpuNoise: false }, type: 'setActiveProjectSettings' });
+
     expect(placementWatcher.changeCount).toBe(0);
   });
 });

@@ -2,7 +2,7 @@ import type { GalleryBoard, GalleryImage } from '@workbench/gallery/api';
 
 import { Dialog, HStack, Icon, Menu, Portal, ScrollArea, Text } from '@chakra-ui/react';
 import { Button, MenuContent, Tooltip } from '@workbench/components/ui';
-import { useWorkbenchPreferences } from '@workbench/settings/store';
+import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import {
   AsteriskIcon,
   ChevronRightIcon,
@@ -120,7 +120,7 @@ const ImageContextMenuContent = ({
   target: ImageContextMenuTarget;
   onClose: () => void;
 }) => {
-  const { confirmImageDeletion } = useWorkbenchPreferences();
+  const confirmImageDeletion = useWorkbenchPreferenceSelector((preferences) => preferences.confirmImageDeletion);
   const [pendingDeletion, setPendingDeletion] = useState<string[] | null>(null);
   const [recallCapabilities, setRecallCapabilities] = useState<ImageRecallCapabilities>(
     EMPTY_IMAGE_RECALL_CAPABILITIES

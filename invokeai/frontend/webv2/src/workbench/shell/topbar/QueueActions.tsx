@@ -1,5 +1,3 @@
-import type { QueueItem } from '@workbench/types';
-
 import { Group, Icon, Menu, Portal } from '@chakra-ui/react';
 import { IconButton, Tooltip } from '@workbench/components/ui';
 import {
@@ -10,58 +8,20 @@ import {
 } from '@workbench/generation/api';
 import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { getQueueActionState } from '@workbench/widgets/queue/queueViewModel';
 import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { ChevronDownIcon, ListOrderedIcon, PauseIcon, PlayIcon, XIcon } from 'lucide-react';
-
-const isCancellableQueueItem = (item: QueueItem): boolean =>
-  item.cancellable && (item.status === 'pending' || item.status === 'running');
-
-const compareQueueSubmittedAt = (left: QueueItem, right: QueueItem): number => {
-  const leftTime = Date.parse(left.snapshot.submittedAt);
-  const rightTime = Date.parse(right.snapshot.submittedAt);
-
-  return (Number.isFinite(leftTime) ? leftTime : 0) - (Number.isFinite(rightTime) ? rightTime : 0);
-};
-
-const getCurrentQueueActionItem = (queueItems: QueueItem[]): QueueItem | null => {
-  const runningItem = queueItems.filter(isCancellableQueueItem).find((item) => item.status === 'running');
-
-  if (runningItem) {
-    return runningItem;
-  }
-
-  return queueItems.filter(isCancellableQueueItem).sort(compareQueueSubmittedAt)[0] ?? null;
-};
-
-const getOpenBackendSlotCount = (item: QueueItem): number => {
-  if (!item.backendItemIds?.length) {
-    return item.status === 'pending' || item.status === 'running' ? 1 : 0;
-  }
-
-  const terminalBackendItemIds = new Set([
-    ...(item.completedBackendItemIds ?? []),
-    ...(item.cancelledBackendItemIds ?? []),
-  ]);
-
-  return item.backendItemIds.filter((backendItemId) => !terminalBackendItemIds.has(backendItemId)).length;
-};
 
 /** Queue cancel cluster and processor actions. */
 export const QueueActions = () => {
   const activeProjectId = useWorkbenchSelector((snapshot) => snapshot.state.activeProjectId);
   const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection.status);
-  const queueItems = useActiveProjectSelector((project) => project.queue.items);
+  const { cancellableCount, currentItemId, hasPendingQueueWork, hasRunningItem } = useActiveProjectSelector((project) =>
+    getQueueActionState(project.queue.items)
+  );
   const dispatch = useWorkbenchDispatch();
   const notify = useNotify();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
-  const currentItem = getCurrentQueueActionItem(queueItems);
-  const hasRunningItem = queueItems.some((item) => isCancellableQueueItem(item) && item.status === 'running');
-  const cancellableCount = queueItems.filter(isCancellableQueueItem).length;
-  const hasPendingQueueWork = queueItems.some((item) =>
-    item.id === currentItem?.id
-      ? item.status === 'running' && getOpenBackendSlotCount(item) > 1
-      : item.status === 'pending'
-  );
   const isConnected = backendConnectionStatus === 'connected';
 
   const cancelCurrent = () => {
@@ -84,7 +44,7 @@ export const QueueActions = () => {
     cancelAllExceptCurrentQueueItems()
       .then(() => {
         dispatch({
-          currentQueueItemId: currentItem?.id ?? null,
+          currentQueueItemId: currentItemId,
           projectId: activeProjectId,
           type: 'cancelAllQueueItemsExceptCurrent',
         });

@@ -1,7 +1,8 @@
 import { DEFAULT_THEME, THEMES_BY_ID } from '@theme/system';
 import { useLayoutEffect } from 'react';
 
-import { useWorkbenchSettings } from './settings/store';
+import { useWorkbenchSettingsSelector } from './settings/store';
+import { shallowEqual } from './WorkbenchContext';
 
 /**
  * Applies the persisted appearance preferences to the document root.
@@ -21,8 +22,14 @@ const THEME_HINT_STORAGE_KEY = 'invokeai:v7:webv2:theme';
 const REDUCE_MOTION_HINT_STORAGE_KEY = 'invokeai:v7:webv2:reduce-motion';
 
 export const ThemeController = () => {
-  const { preferences, status } = useWorkbenchSettings();
-  const { reduceMotion, themeId } = preferences;
+  const { reduceMotion, status, themeId } = useWorkbenchSettingsSelector(
+    (snapshot) => ({
+      reduceMotion: snapshot.preferences.reduceMotion,
+      status: snapshot.status,
+      themeId: snapshot.preferences.themeId,
+    }),
+    shallowEqual
+  );
   // Until the settings store has resolved, the pre-paint hint script owns the
   // theme; applying the store's defaults here would flash and clobber it.
   const hasResolved = status === 'ready' || status === 'error';

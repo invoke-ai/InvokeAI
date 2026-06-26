@@ -11,6 +11,7 @@ import { getProjectWidgetValues } from '@workbench/widgetState';
 import { isPositivePromptFocused } from './promptFocus';
 
 type NavigationState = {
+  projectId: string;
   historyIndex: number;
   stashedPrompts: {
     negativePrompt: string;
@@ -65,7 +66,7 @@ const applyPromptHistoryIndex = ({
     values.negativePromptEnabled = prompt.negativePrompt ? true : settings.negativePromptEnabled;
   }
 
-  dispatch({ type: 'patchWidgetValues', values, widgetId: 'generate' });
+  dispatch({ projectId: project.id, type: 'patchWidgetValues', values, widgetId: 'generate' });
 };
 
 export const navigatePromptHistory = ({
@@ -79,6 +80,10 @@ export const navigatePromptHistory = ({
   models: readonly ModelConfig[] | undefined;
   project: Project;
 }): void => {
+  if (navigationState?.projectId !== project.id) {
+    navigationState = null;
+  }
+
   if (!isPositivePromptFocused() || project.promptHistory.length === 0) {
     return;
   }
@@ -93,6 +98,7 @@ export const navigatePromptHistory = ({
     if (!navigationState) {
       navigationState = {
         historyIndex: 0,
+        projectId: project.id,
         stashedPrompts: {
           negativePrompt: settings.negativePrompt,
           negativePromptEnabled: settings.negativePromptEnabled,
@@ -115,6 +121,7 @@ export const navigatePromptHistory = ({
 
   if (nextHistoryIndex < 0) {
     dispatch({
+      projectId: project.id,
       type: 'patchWidgetValues',
       values: navigationState.stashedPrompts,
       widgetId: 'generate',

@@ -1,7 +1,6 @@
 import { Flex, HStack, Icon, SegmentGroup, Splitter } from '@chakra-ui/react';
 import { Scrollable, Tabs } from '@workbench/components/ui';
-import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWidgetValuesSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { ensureInvocationTemplatesLoaded } from '@workbench/workflows/templates';
 import { EyeIcon, PencilIcon } from 'lucide-react';
 import { useEffect } from 'react';
@@ -29,6 +28,12 @@ const SPLITTER_PANELS = [
   { id: 'inspector', minSize: 12 },
 ];
 
+export interface WorkflowPanelState {
+  editTab: EditTab;
+  inspectorSizePct: number;
+  mode: PanelMode;
+}
+
 const getPanelMode = (values: Record<string, unknown>): PanelMode => (values.panelMode === 'edit' ? 'edit' : 'view');
 
 const getEditTab = (values: Record<string, unknown>): EditTab =>
@@ -38,6 +43,15 @@ const getInspectorSizePct = (values: Record<string, unknown>): number =>
   typeof values.inspectorSizePct === 'number' && Number.isFinite(values.inspectorSizePct)
     ? Math.min(75, Math.max(12, values.inspectorSizePct))
     : DEFAULT_INSPECTOR_SIZE_PCT;
+
+export const getWorkflowPanelState = (values: Record<string, unknown>): WorkflowPanelState => ({
+  editTab: getEditTab(values),
+  inspectorSizePct: getInspectorSizePct(values),
+  mode: getPanelMode(values),
+});
+
+export const areWorkflowPanelStatesEqual = (left: WorkflowPanelState, right: WorkflowPanelState): boolean =>
+  left.mode === right.mode && left.editTab === right.editTab && left.inspectorSizePct === right.inspectorSizePct;
 
 const PanelModeToggle = ({ mode, onChange }: { mode: PanelMode; onChange: (mode: PanelMode) => void }) => {
   type PanelModeItem = {
@@ -80,11 +94,12 @@ const PanelModeToggle = ({ mode, onChange }: { mode: PanelMode; onChange: (mode:
 };
 
 export const WorkflowLinearPanel = () => {
-  const projectGraph = useActiveProjectSelector((project) => project.projectGraph);
-  const widgetValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'workflow'));
+  const { editTab, inspectorSizePct, mode } = useWidgetValuesSelector(
+    'workflow',
+    getWorkflowPanelState,
+    areWorkflowPanelStatesEqual
+  );
   const dispatch = useWorkbenchDispatch();
-  const mode = getPanelMode(widgetValues);
-  const editTab = getEditTab(widgetValues);
 
   useEffect(() => {
     ensureInvocationTemplatesLoaded();
@@ -120,44 +135,68 @@ export const WorkflowLinearPanel = () => {
         ) : null}
       </HStack>
       {mode === 'view' ? (
-        <Scrollable flex="1" label="Workflow panel content" minH="0">
-          <LinearFormView projectGraph={projectGraph} />
-        </Scrollable>
+        <WorkflowLinearViewContent />
       ) : (
-        <Splitter.Root
-          defaultSize={[100 - getInspectorSizePct(widgetValues), getInspectorSizePct(widgetValues)]}
-          flex="1"
-          gap="0"
-          minH="0"
-          orientation="vertical"
-          panels={SPLITTER_PANELS}
-          onResizeEnd={(details) => {
-            const inspectorSizePct = details.size[1];
-
-            if (typeof inspectorSizePct === 'number') {
-              patchValues({ inspectorSizePct });
-            }
-          }}
-        >
-          <Splitter.Panel id="content" minH="0" minW="0" overflow="hidden">
-            {editTab === 'json' ? (
-              <WorkflowJsonTab projectGraph={projectGraph} />
-            ) : (
-              <Scrollable flex="1" h="full" label="Workflow panel content" minH="0" minW="0" w="full">
-                {editTab === 'form' ? (
-                  <FormBuilderTab projectGraph={projectGraph} />
-                ) : (
-                  <WorkflowDetailsTab metadata={projectGraph} />
-                )}
-              </Scrollable>
-            )}
-          </Splitter.Panel>
-          <Splitter.ResizeTrigger aria-label="Resize node inspector" id="content:inspector" />
-          <Splitter.Panel id="inspector" minH="0" overflow="hidden">
-            <NodeInspector projectGraph={projectGraph} />
-          </Splitter.Panel>
-        </Splitter.Root>
+        <WorkflowLinearEditContent editTab={editTab} inspectorSizePct={inspectorSizePct} patchValues={patchValues} />
       )}
     </Flex>
+  );
+};
+
+const WorkflowLinearViewContent = () => {
+  const projectGraph = useActiveProjectSelector((project) => project.projectGraph);
+
+  return (
+    <Scrollable flex="1" label="Workflow panel content" minH="0">
+      <LinearFormView projectGraph={projectGraph} />
+    </Scrollable>
+  );
+};
+
+const WorkflowLinearEditContent = ({
+  editTab,
+  inspectorSizePct,
+  patchValues,
+}: {
+  editTab: EditTab;
+  inspectorSizePct: number;
+  patchValues: (values: Record<string, unknown>) => void;
+}) => {
+  const projectGraph = useActiveProjectSelector((project) => project.projectGraph);
+
+  return (
+    <Splitter.Root
+      defaultSize={[100 - inspectorSizePct, inspectorSizePct]}
+      flex="1"
+      gap="0"
+      minH="0"
+      orientation="vertical"
+      panels={SPLITTER_PANELS}
+      onResizeEnd={(details) => {
+        const inspectorSizePct = details.size[1];
+
+        if (typeof inspectorSizePct === 'number') {
+          patchValues({ inspectorSizePct });
+        }
+      }}
+    >
+      <Splitter.Panel id="content" minH="0" minW="0" overflow="hidden">
+        {editTab === 'json' ? (
+          <WorkflowJsonTab projectGraph={projectGraph} />
+        ) : (
+          <Scrollable flex="1" h="full" label="Workflow panel content" minH="0" minW="0" w="full">
+            {editTab === 'form' ? (
+              <FormBuilderTab projectGraph={projectGraph} />
+            ) : (
+              <WorkflowDetailsTab metadata={projectGraph} />
+            )}
+          </Scrollable>
+        )}
+      </Splitter.Panel>
+      <Splitter.ResizeTrigger aria-label="Resize node inspector" id="content:inspector" />
+      <Splitter.Panel id="inspector" minH="0" overflow="hidden">
+        <NodeInspector projectGraph={projectGraph} />
+      </Splitter.Panel>
+    </Splitter.Root>
   );
 };

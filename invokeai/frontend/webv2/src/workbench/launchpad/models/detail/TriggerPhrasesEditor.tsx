@@ -1,34 +1,52 @@
-import type { ModelConfig } from '@workbench/models/types';
-
 import { HStack, Icon, Input, Tag, Text, Wrap } from '@chakra-ui/react';
 import { Button, Field } from '@workbench/components/ui';
 import { updateModel } from '@workbench/models/api';
 import { replaceModelInStore } from '@workbench/models/modelsStore';
 import { triggerPhraseSchema } from '@workbench/models/schemas';
 import { PlusIcon } from 'lucide-react';
-import { useState } from 'react';
+import { memo, useState } from 'react';
+
+interface TriggerPhrasesEditorState {
+  draft: string;
+  error: string | null;
+  isSaving: boolean;
+  modelKey: string;
+}
 
 /**
  * Tag-style editor for a model's trigger phrases. Each add/remove persists
  * immediately — there is no separate save step for phrases.
  */
 export const TriggerPhrasesEditor = ({
-  model,
+  modelKey,
   onError,
+  phrases,
 }: {
-  model: ModelConfig;
+  modelKey: string;
   onError: (message: string) => void;
+  phrases: readonly string[];
 }) => {
-  const [draft, setDraft] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const phrases = model.trigger_phrases ?? [];
+  const [editor, setEditor] = useState<TriggerPhrasesEditorState>(() => ({
+    draft: '',
+    error: null,
+    isSaving: false,
+    modelKey,
+  }));
+  const isEditorCurrent = editor.modelKey === modelKey;
+  const draft = isEditorCurrent ? editor.draft : '';
+  const error = isEditorCurrent ? editor.error : null;
+  const isSaving = isEditorCurrent ? editor.isSaving : false;
 
   const persist = async (nextPhrases: string[]): Promise<boolean> => {
-    setIsSaving(true);
+    setEditor((current) => ({
+      draft: current.modelKey === modelKey ? current.draft : '',
+      error: current.modelKey === modelKey ? current.error : null,
+      isSaving: true,
+      modelKey,
+    }));
 
     try {
-      replaceModelInStore(await updateModel(model.key, { trigger_phrases: nextPhrases }));
+      replaceModelInStore(await updateModel(modelKey, { trigger_phrases: nextPhrases }));
 
       return true;
     } catch (persistError) {
@@ -36,7 +54,7 @@ export const TriggerPhrasesEditor = ({
 
       return false;
     } finally {
-      setIsSaving(false);
+      setEditor((current) => (current.modelKey === modelKey ? { ...current, isSaving: false } : current));
     }
   };
 
@@ -44,20 +62,20 @@ export const TriggerPhrasesEditor = ({
     const parsed = triggerPhraseSchema.safeParse(draft);
 
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Invalid trigger phrase.');
+      setEditor({ draft, error: parsed.error.issues[0]?.message ?? 'Invalid trigger phrase.', isSaving, modelKey });
       return;
     }
 
     if (phrases.some((phrase) => phrase.toLowerCase() === parsed.data.toLowerCase())) {
-      setError('That trigger phrase is already on this model.');
+      setEditor({ draft, error: 'That trigger phrase is already on this model.', isSaving, modelKey });
       return;
     }
 
-    setError(null);
+    setEditor({ draft, error: null, isSaving, modelKey });
 
     // Clear the draft only once it is saved, so a failure never eats the text.
     if (await persist([...phrases, parsed.data])) {
-      setDraft('');
+      setEditor((current) => (current.modelKey === modelKey ? { ...current, draft: '' } : current));
     }
   };
 
@@ -71,11 +89,10 @@ export const TriggerPhrasesEditor = ({
         <Input
           aria-invalid={error ? true : undefined}
           placeholder="Add a trigger phrase…"
-          size="sm"
+          size="xs"
           value={draft}
           onChange={(event) => {
-            setDraft(event.currentTarget.value);
-            setError(null);
+            setEditor({ draft: event.currentTarget.value, error: null, isSaving, modelKey });
           }}
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
@@ -87,7 +104,7 @@ export const TriggerPhrasesEditor = ({
         <Button
           disabled={draft.trim().length === 0}
           loading={isSaving}
-          size="sm"
+          size="xs"
           variant="outline"
           onClick={() => {
             void addPhrase();
@@ -121,3 +138,5 @@ export const TriggerPhrasesEditor = ({
     </Field>
   );
 };
+
+export const MemoizedTriggerPhrasesEditor = memo(TriggerPhrasesEditor);

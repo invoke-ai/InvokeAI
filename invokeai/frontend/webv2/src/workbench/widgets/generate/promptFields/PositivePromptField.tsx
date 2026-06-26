@@ -3,6 +3,8 @@ import type { PromptHistoryItem } from '@workbench/types';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 
 import { Field } from '@workbench/components/ui';
+import { useRegisterGenerateDraftFlusher } from '@workbench/widgets/generate/generateDraftRegistry';
+import { useDebouncedDraftValue } from '@workbench/widgets/generate/useDebouncedDraftValue';
 import { useRef, useState } from 'react';
 
 import { PositivePromptActions, PromptTriggerPopover } from './PositivePromptActions';
@@ -11,9 +13,12 @@ import { insertPromptText, type PromptTextRange, registerPositivePromptElement }
 import { resetPromptHistoryNavigation } from './promptHistoryNavigation';
 import { PromptTextarea } from './PromptTextarea';
 
+const PROMPT_INPUT_DEBOUNCE_MS = 250;
+
 interface PositivePromptFieldProps {
   heightPx: number;
   loras: GenerateLora[];
+  projectId: string;
   selectedModel: GenerateModelConfig | undefined;
   showSyntaxHighlighting: boolean;
   value: string;
@@ -33,16 +38,30 @@ export const PositivePromptField = ({
   onChange,
   onResizeEnd,
   onUsePrompt,
+  projectId,
   selectedModel,
   showSyntaxHighlighting,
   value,
 }: PositivePromptFieldProps) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [triggerPickerState, setTriggerPickerState] = useState<PromptTriggerPickerState | null>(null);
+  const { commitDraftValue, draftValue, flushDraftValue, replaceDraftValue, setDraftValue } = useDebouncedDraftValue({
+    delayMs: PROMPT_INPUT_DEBOUNCE_MS,
+    onCommit: onChange,
+    resetKey: projectId,
+    value,
+  });
+
+  useRegisterGenerateDraftFlusher(flushDraftValue);
 
   const commitPromptChange = (nextValue: string) => {
     resetPromptHistoryNavigation();
-    onChange(nextValue);
+    setDraftValue(nextValue);
+  };
+
+  const commitPromptChangeImmediately = (nextValue: string) => {
+    resetPromptHistoryNavigation();
+    commitDraftValue(nextValue);
   };
 
   const openPromptTriggerPicker = (anchorElement: HTMLElement, range?: PromptTextRange) => {
@@ -74,9 +93,14 @@ export const PositivePromptField = ({
       range: triggerPickerState?.range,
       textarea: textareaRef.current,
       text: trigger,
-      value,
+      value: draftValue,
     });
     closePromptTriggerPicker();
+  };
+
+  const handleUsePrompt = (prompt: PromptHistoryItem) => {
+    replaceDraftValue(prompt.positivePrompt);
+    onUsePrompt(prompt);
   };
 
   const handleTextareaRef = (element: HTMLTextAreaElement | null) => {
@@ -91,11 +115,12 @@ export const PositivePromptField = ({
         <PositivePromptActions
           isPromptTriggerPickerOpen={triggerPickerState !== null}
           loras={loras}
-          positivePrompt={value}
+          positivePrompt={draftValue}
+          projectId={projectId}
           selectedModel={selectedModel}
           onOpenPromptTriggerPicker={(anchorElement) => openPromptTriggerPicker(anchorElement)}
-          onPositivePromptChange={commitPromptChange}
-          onUsePrompt={onUsePrompt}
+          onPositivePromptChangeImmediate={commitPromptChangeImmediately}
+          onUsePrompt={handleUsePrompt}
         />
       }
     >
@@ -110,19 +135,21 @@ export const PositivePromptField = ({
         fontFamily="mono"
         showSyntaxHighlighting={showSyntaxHighlighting}
         textareaRef={handleTextareaRef}
-        value={value}
+        value={draftValue}
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => commitPromptChange(event.currentTarget.value)}
         onKeyDown={handlePromptKeyDown}
         onResizeEnd={onResizeEnd}
       />
-      <PromptTriggerPopover
-        loras={loras}
-        open={triggerPickerState !== null}
-        positioning={{ getAnchorRect: () => triggerPickerState?.anchorRect ?? null }}
-        selectedModel={selectedModel}
-        onClose={closePromptTriggerPicker}
-        onSelect={selectPromptTrigger}
-      />
+      {triggerPickerState ? (
+        <PromptTriggerPopover
+          loras={loras}
+          open
+          positioning={{ getAnchorRect: () => triggerPickerState.anchorRect }}
+          selectedModel={selectedModel}
+          onClose={closePromptTriggerPicker}
+          onSelect={selectPromptTrigger}
+        />
+      ) : null}
     </Field>
   );
 };

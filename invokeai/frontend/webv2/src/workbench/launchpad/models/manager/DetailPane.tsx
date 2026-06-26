@@ -4,19 +4,22 @@ import { AddModelsView } from '@workbench/launchpad/models/add-models/AddModelsV
 import { ApiKeysSection } from '@workbench/launchpad/models/credentials/ApiKeysSection';
 import { ModelDetail } from '@workbench/launchpad/models/detail/ModelDetail';
 import { InstallQueueBar } from '@workbench/launchpad/models/install-queue/InstallQueueBar';
-import { useModelsSnapshot } from '@workbench/models/modelsStore';
-import { updateModelsUi, useModelsUi, type ModelManagerTab } from '@workbench/models/uiStore';
+import { useModelsSelector } from '@workbench/models/modelsStore';
+import { updateModelsUi, useModelsUiSelector, type ModelManagerTab } from '@workbench/models/uiStore';
 import { BoxIcon, KeyRoundIcon, PlusIcon } from 'lucide-react';
+import { useCallback } from 'react';
 
 import { HEADER_MIN_HEIGHT } from './layoutConstants';
 
 /** The tabbed detail pane: selected model, Add Models, API Keys, and queue footer. */
 export const DetailPane = () => {
-  const { activeModelKey, activeTab } = useModelsUi();
-  const { models } = useModelsSnapshot();
-
-  const activeModel = activeModelKey ? models.find((model) => model.key === activeModelKey) : undefined;
-  const detailLabel = activeModel?.name ?? 'Model Details';
+  const { activeModelKey, activeTab } = useModelsUiSelector(
+    (snapshot) => ({ activeModelKey: snapshot.activeModelKey, activeTab: snapshot.activeTab }),
+    (left, right) => left.activeModelKey === right.activeModelKey && left.activeTab === right.activeTab
+  );
+  const detailLabel = useModelsSelector(
+    (snapshot) => snapshot.models.find((model) => model.key === activeModelKey)?.name ?? 'Model Details'
+  );
 
   return (
     <Flex direction="column" flex="1" minH="0" minW="0">
@@ -62,6 +65,8 @@ export const DetailPane = () => {
 };
 
 const DetailTab = ({ modelKey }: { modelKey: string | null }) => {
+  const handleDeleted = useCallback(() => updateModelsUi({ activeModelKey: null }), []);
+
   if (modelKey === null) {
     return (
       <Flex align="center" direction="column" gap="2" h="full" justify="center" p="6">
@@ -79,12 +84,7 @@ const DetailTab = ({ modelKey }: { modelKey: string | null }) => {
 
   return (
     <Scrollable h="full" label="Model details" minH="0" p="3">
-      <ModelDetail
-        key={modelKey}
-        density="full"
-        modelKey={modelKey}
-        onDeleted={() => updateModelsUi({ activeModelKey: null })}
-      />
+      <ModelDetail key={modelKey} density="full" modelKey={modelKey} onDeleted={handleDeleted} />
     </Scrollable>
   );
 };

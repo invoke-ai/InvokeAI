@@ -3,9 +3,9 @@ import type { ModelConfig } from '@workbench/models/types';
 import { Box, Flex, Icon, Image, Stack, Text } from '@chakra-ui/react';
 import { IconButton, Tooltip } from '@workbench/components/ui';
 import { deleteModelImage, getModelImageUrl, updateModelImage } from '@workbench/models/api';
-import { markCoverImageChanged, useModelsSnapshot } from '@workbench/models/modelsStore';
+import { markCoverImageChanged, useModelsSelector } from '@workbench/models/modelsStore';
 import { ImageIcon, UploadIcon, XIcon } from 'lucide-react';
-import { useRef, useState, type DragEvent } from 'react';
+import { useEffect, useRef, useState, type DragEvent } from 'react';
 
 const ACCEPTED_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 
@@ -21,17 +21,23 @@ export const ModelImageUpload = ({
   onError,
   onUpdated,
 }: {
-  model: ModelConfig;
+  model: Pick<ModelConfig, 'cover_image' | 'key' | 'name'>;
   onError: (message: string) => void;
   onUpdated: () => void;
 }) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const dragDepthRef = useRef(0);
-  const { coverImageVersions } = useModelsSnapshot();
+  const imageVersion = useModelsSelector((snapshot) => snapshot.coverImageVersions[model.key]);
   const [hasImage, setHasImage] = useState(Boolean(model.cover_image));
   const [isBusy, setIsBusy] = useState(false);
   const [isDropActive, setIsDropActive] = useState(false);
-  const imageVersion = coverImageVersions[model.key];
+
+  useEffect(() => {
+    dragDepthRef.current = 0;
+    setHasImage(Boolean(model.cover_image));
+    setIsBusy(false);
+    setIsDropActive(false);
+  }, [model.cover_image, model.key]);
 
   const handleFile = async (file: File | undefined) => {
     if (!file) {
@@ -44,12 +50,13 @@ export const ModelImageUpload = ({
     }
 
     setIsBusy(true);
+    const modelKey = model.key;
 
     try {
-      await updateModelImage(model.key, file);
+      await updateModelImage(modelKey, file);
       setHasImage(true);
       // Bumps the cache-bust version so this tile and list thumbnails reload.
-      markCoverImageChanged(model.key, true);
+      markCoverImageChanged(modelKey, true);
       onUpdated();
     } catch (error) {
       onError(error instanceof Error ? error.message : 'Failed to upload model image.');
@@ -60,11 +67,12 @@ export const ModelImageUpload = ({
 
   const handleDelete = async () => {
     setIsBusy(true);
+    const modelKey = model.key;
 
     try {
-      await deleteModelImage(model.key);
+      await deleteModelImage(modelKey);
       setHasImage(false);
-      markCoverImageChanged(model.key, false);
+      markCoverImageChanged(modelKey, false);
       onUpdated();
     } catch (error) {
       onError(error instanceof Error ? error.message : 'Failed to remove model image.');

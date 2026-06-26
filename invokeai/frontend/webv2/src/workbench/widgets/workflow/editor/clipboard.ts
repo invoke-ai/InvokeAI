@@ -38,7 +38,7 @@ export const copyNodesToClipboard = (document: ProjectGraphState, nodeIds: strin
 
 export const hasClipboardNodes = (): boolean => clipboardStore.getSnapshot().nodes.length > 0;
 
-export const useHasClipboardNodes = (): boolean => clipboardStore.useSnapshot().nodes.length > 0;
+export const useHasClipboardNodes = (): boolean => clipboardStore.useSelector((snapshot) => snapshot.nodes.length > 0);
 
 const materializeElements = (
   payload: WorkflowClipboardSnapshot,

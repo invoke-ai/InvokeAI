@@ -3,15 +3,16 @@ import { commandApi } from '@workbench/extensions/extensionApi';
 import { cancelCurrentQueueItem } from '@workbench/generation/api';
 import { executeImageRecall, getSelectedGalleryImage, type ImageRecallKind } from '@workbench/image-actions';
 import { isInvocationRouteValid, resolveInvocationRoute } from '@workbench/invocation';
-import { ensureModelsLoaded, useModelsSnapshot } from '@workbench/models/modelsStore';
+import { ensureModelsLoaded, useModelsSelector } from '@workbench/models/modelsStore';
 import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
+import { flushGenerateDrafts } from '@workbench/widgets/generate/generateDraftRegistry';
 import { focusPositivePrompt } from '@workbench/widgets/generate/promptFields';
 import { adjustFocusedPromptAttention } from '@workbench/widgets/generate/promptFields/promptAttentionHotkeys';
 import { navigatePromptHistory } from '@workbench/widgets/generate/promptFields/promptHistoryNavigation';
 import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProject, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
+import { useWorkbenchDispatch, useWorkbenchStore } from '@workbench/WorkbenchContext';
+import { useInvocationTemplatesSelector } from '@workbench/workflows/templates';
 import { useEffect, useEffectEvent, useRef } from 'react';
 
 const imageRecallCommands: Record<string, ImageRecallKind> = {
@@ -49,23 +50,33 @@ export const FIRST_PARTY_IMAGE_RECALL_COMMAND_IDS = Object.keys(imageRecallComma
 export const FIRST_PARTY_COMMAND_IDS = [...FIRST_PARTY_APP_COMMAND_IDS, ...Object.keys(imageRecallCommands)] as const;
 
 export const useRegisterFirstPartyCommands = () => {
-  const project = useActiveProject();
+  const store = useWorkbenchStore();
   const dispatch = useWorkbenchDispatch();
-  const { models, status: modelsStatus } = useModelsSnapshot();
+  const models = useModelsSelector((snapshot) => snapshot.models);
+  const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
   const availabilityModels = modelsStatus === 'loaded' ? models : undefined;
-  const projectRef = useRef(project);
+  const projectRef = useRef(store.getSnapshot().activeProject);
   const modelsRef = useRef(availabilityModels);
 
-  useInvocationTemplatesSnapshot();
+  useInvocationTemplatesSelector((snapshot) => snapshot.status);
 
-  projectRef.current = project;
   modelsRef.current = availabilityModels;
+
+  useEffect(
+    () =>
+      store.subscribe(() => {
+        projectRef.current = store.getSnapshot().activeProject;
+      }),
+    [store]
+  );
 
   useEffect(() => {
     ensureModelsLoaded();
   }, []);
 
   const submitInvocation = useEffectEvent(() => {
+    flushGenerateDrafts();
+
     const activeProject = projectRef.current;
     const resolvedRoute = resolveInvocationRoute(activeProject, 'global', activeProject.invocation, modelsRef.current);
     const { status } = getConnectionStatus();
@@ -102,9 +113,10 @@ export const useRegisterFirstPartyCommands = () => {
       image,
       kind,
       models: modelsRef.current ?? [],
+      projectId: activeProject.id,
     });
 
-    if (didRecall) {
+    if (didRecall && store.getSnapshot().activeProject.id === activeProject.id) {
       openWidgetPlacement({
         dispatch,
         getWidgetsForRegion,
@@ -191,24 +203,30 @@ export const useRegisterFirstPartyCommands = () => {
         title: 'Focus prompt',
       }),
       commandApi.register({
-        handler: () =>
+        handler: () => {
+          flushGenerateDrafts();
+
           navigatePromptHistory({
             direction: -1,
             dispatch,
             models: modelsRef.current,
             project: projectRef.current,
-          }),
+          });
+        },
         id: 'app.promptHistoryPrev',
         title: 'Previous prompt history item',
       }),
       commandApi.register({
-        handler: () =>
+        handler: () => {
+          flushGenerateDrafts();
+
           navigatePromptHistory({
             direction: 1,
             dispatch,
             models: modelsRef.current,
             project: projectRef.current,
-          }),
+          });
+        },
         id: 'app.promptHistoryNext',
         title: 'Next prompt history item',
       }),

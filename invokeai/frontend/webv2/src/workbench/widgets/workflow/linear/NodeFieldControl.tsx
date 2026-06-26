@@ -11,7 +11,7 @@ import {
   isDirectInputField,
   isWorkflowFieldValueDefault,
 } from '@workbench/workflows/fields';
-import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
+import { useInvocationTemplatesSelector } from '@workbench/workflows/templates';
 import { isInvocationNode } from '@workbench/workflows/types';
 import { RotateCcwIcon } from 'lucide-react';
 import { useState, type ChangeEvent } from 'react';
@@ -23,7 +23,7 @@ import { useState, type ChangeEvent } from 'react';
  */
 /** Resolves a form element's node, field instance, and input template against the document. */
 export const useNodeFieldBinding = (element: NodeFieldFormElement, projectGraph: ProjectGraphState) => {
-  const { templates } = useInvocationTemplatesSnapshot();
+  const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
   const { fieldName, nodeId } = element.data.fieldIdentifier;
   const node = projectGraph.nodes.find((candidate) => candidate.id === nodeId);
   const invocationNode = node && isInvocationNode(node) ? node : null;

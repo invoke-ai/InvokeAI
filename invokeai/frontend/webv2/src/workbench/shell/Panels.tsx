@@ -1,6 +1,7 @@
 import type { WidgetInstanceId, WorkbenchRegion } from '@workbench/types';
 
-import { MissingWidgetFrame, WidgetRenderer } from '@workbench/widget-frame';
+import { MissingWidgetFrame, WidgetRendererById } from '@workbench/widget-frame';
+import { areWidgetRenderInstancesEqual } from '@workbench/widget-frame/widgetRenderInstance';
 import { getWidgetById } from '@workbench/widgetRegistry';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 
@@ -20,7 +21,10 @@ const panelRegions = {
 } as const satisfies Record<string, WorkbenchRegion>;
 
 const WidgetPanelSlot = ({ instanceId, panel }: { instanceId: WidgetInstanceId; panel: keyof typeof panelRegions }) => {
-  const instance = useActiveProjectSelector((project) => project.widgetInstances[instanceId]);
+  const instance = useActiveProjectSelector(
+    (project) => project.widgetInstances[instanceId],
+    areWidgetRenderInstancesEqual
+  );
   const widget = instance ? getWidgetById(instance.typeId) : undefined;
   const View = widget?.manifest.view;
   const region = panelRegions[panel];
@@ -29,5 +33,5 @@ const WidgetPanelSlot = ({ instanceId, panel }: { instanceId: WidgetInstanceId; 
     return <MissingWidgetFrame label={widget?.manifest.labelText ?? instanceId} region={region} />;
   }
 
-  return <WidgetRenderer instance={instance} widget={widget} region={region} />;
+  return <WidgetRendererById instanceId={instance.id} widget={widget} region={region} />;
 };

@@ -1,6 +1,7 @@
 import type { WidgetViewProps } from '@workbench/types';
 
 import { Box, HStack, Icon, Text } from '@chakra-ui/react';
+import { hasPendingWorkflowQueueItem } from '@workbench/widgets/queue/queueViewModel';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { WorkflowIcon } from 'lucide-react';
 
@@ -16,11 +17,8 @@ import { WorkflowLinearPanel } from './linear/WorkflowLinearPanel';
  */
 
 const WorkflowStatusBarItem = () => {
-  const queueItems = useActiveProjectSelector((project) => project.queue.items);
   const workflowName = useActiveProjectSelector((project) => project.projectGraph.name);
-  const isRunning = queueItems.some(
-    (item) => item.snapshot.sourceId === 'project-graph' && (item.status === 'running' || item.status === 'pending')
-  );
+  const isRunning = useActiveProjectSelector((project) => hasPendingWorkflowQueueItem(project.queue.items));
 
   return (
     <HStack gap="1" maxW="14rem" minW="0" px="2">

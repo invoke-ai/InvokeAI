@@ -65,7 +65,15 @@ const PREPROCESSORS = [
   'tile',
 ];
 
-export const supportsDefaultSettings = (model: ModelConfig): boolean =>
+type DefaultSettingsModel = Pick<ModelConfig, 'default_settings' | 'key' | 'type'>;
+
+interface DefaultSettingsDraft {
+  modelKey: string;
+  settings: AnyModelDefaultSettings;
+  source: AnyModelDefaultSettings | null | undefined;
+}
+
+export const supportsDefaultSettings = (model: Pick<ModelConfig, 'type'>): boolean =>
   model.type === 'main' || model.type === 'lora' || CONTROL_ADAPTER_TYPES.has(model.type);
 
 interface FieldSpec {
@@ -213,7 +221,7 @@ const CONTROL_ADAPTER_FIELDS: FieldSpec[] = [
   },
 ];
 
-const getFieldsForModel = (model: ModelConfig): FieldSpec[] => {
+const getFieldsForModel = (model: Pick<ModelConfig, 'type'>): FieldSpec[] => {
   if (model.type === 'main') {
     return MAIN_FIELDS;
   }
@@ -225,7 +233,7 @@ const getFieldsForModel = (model: ModelConfig): FieldSpec[] => {
   return CONTROL_ADAPTER_FIELDS;
 };
 
-const validateDefaults = (model: ModelConfig, settings: AnyModelDefaultSettings): string | null => {
+const validateDefaults = (model: Pick<ModelConfig, 'type'>, settings: AnyModelDefaultSettings): string | null => {
   if (model.type === 'main') {
     const result = mainDefaultSettingsSchema.safeParse({
       cfgRescaleMultiplier: settings.cfg_rescale_multiplier ?? null,
@@ -255,14 +263,23 @@ export const DefaultSettingsSection = ({
   onError,
   onSaved,
 }: {
-  model: ModelConfig;
+  model: DefaultSettingsModel;
   onError: (message: string) => void;
   onSaved: () => void;
 }) => {
   const fields = useMemo(() => getFieldsForModel(model), [model]);
-  const [settings, setSettings] = useState<AnyModelDefaultSettings>(() => ({ ...model.default_settings }));
+  const [draft, setDraft] = useState<DefaultSettingsDraft>(() => ({
+    modelKey: model.key,
+    settings: { ...model.default_settings },
+    source: model.default_settings,
+  }));
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const isDraftCurrent = draft.modelKey === model.key && draft.source === model.default_settings;
+  const savedSettingsDraft = useMemo(() => ({ ...model.default_settings }), [model.default_settings]);
+  const settings = isDraftCurrent ? draft.settings : savedSettingsDraft;
+  const visibleError = isDraftCurrent ? error : null;
+  const visibleIsSaving = isDraftCurrent ? isSaving : false;
 
   const isDirty = useMemo(() => {
     const saved = model.default_settings ?? {};
@@ -271,7 +288,11 @@ export const DefaultSettingsSection = ({
   }, [fields, model.default_settings, settings]);
 
   const setFieldValue = (key: keyof AnyModelDefaultSettings, value: unknown) => {
-    setSettings((current) => ({ ...current, [key]: value as never }));
+    setDraft({
+      modelKey: model.key,
+      settings: { ...settings, [key]: value as never },
+      source: model.default_settings,
+    });
     setError(null);
   };
 
@@ -304,13 +325,19 @@ export const DefaultSettingsSection = ({
             Applied automatically when this model is selected. Off = use the app default.
           </Text>
         </Stack>
-        <Button disabled={!isDirty} loading={isSaving} size="xs" variant="solid" onClick={() => void handleSave()}>
+        <Button
+          disabled={!isDirty}
+          loading={visibleIsSaving}
+          size="xs"
+          variant="solid"
+          onClick={() => void handleSave()}
+        >
           Save Defaults
         </Button>
       </HStack>
-      {error ? (
+      {visibleError ? (
         <Text color="fg.error" fontSize="2xs" role="alert">
-          {error}
+          {visibleError}
         </Text>
       ) : null}
       <Grid gap="2.5" templateColumns="repeat(auto-fill, minmax(13rem, 1fr))">

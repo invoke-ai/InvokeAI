@@ -7,8 +7,7 @@ import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { BugIcon, ClipboardListIcon } from 'lucide-react';
 
 export const DiagnosticsWidgetView = ({ presentation, region }: WidgetViewProps) => {
-  const errorLog = useWorkbenchSelector((snapshot) => snapshot.state.errorLog);
-  const errorCount = errorLog.length;
+  const errorCount = useWorkbenchSelector((snapshot) => snapshot.state.errorLog.length);
   const label = errorCount === 0 ? 'Clean' : `${errorCount} issue${errorCount === 1 ? '' : 's'}`;
 
   if (region === 'bottom' && presentation !== 'expanded') {

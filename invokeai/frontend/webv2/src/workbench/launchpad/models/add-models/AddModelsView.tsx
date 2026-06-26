@@ -6,8 +6,8 @@ import { Button, Scrollable, Tooltip } from '@workbench/components/ui';
 import { getExternalProviderConfigs, getHuggingFaceModels, scanFolderForModels } from '@workbench/models/api';
 import { getModelBaseLabel } from '@workbench/models/baseIdentity';
 import { collectBases, collectTypes } from '@workbench/models/library';
-import { ensureStartersLoaded, useStartersSnapshot } from '@workbench/models/startersStore';
-import { updateModelsUi, useModelsUi } from '@workbench/models/uiStore';
+import { ensureStartersLoaded, useStartersSelector } from '@workbench/models/startersStore';
+import { updateModelsUi, useModelsUiSelector } from '@workbench/models/uiStore';
 import { useNotify } from '@workbench/useNotify';
 import { DownloadIcon, FileIcon, FolderIcon, FolderSearchIcon, LinkIcon, SearchIcon } from 'lucide-react';
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
@@ -55,8 +55,13 @@ const compareStarterModels = (a: IndexedStarterModel, b: IndexedStarterModel, fi
 export const AddModelsView = () => {
   const notify = useNotify();
   const { install, pendingSources } = useInstallActions();
-  const { error: loadError, response, status } = useStartersSnapshot();
-  const { hfLookup, scan } = useModelsUi();
+  const loadError = useStartersSelector((snapshot) => snapshot.error);
+  const response = useStartersSelector((snapshot) => snapshot.response);
+  const status = useStartersSelector((snapshot) => snapshot.status);
+  const { hfLookup, scan } = useModelsUiSelector(
+    (snapshot) => ({ hfLookup: snapshot.hfLookup, scan: snapshot.scan }),
+    (left, right) => left.hfLookup === right.hfLookup && left.scan === right.scan
+  );
 
   const [query, setQuery] = useState('');
   const [accessToken, setAccessToken] = useState('');

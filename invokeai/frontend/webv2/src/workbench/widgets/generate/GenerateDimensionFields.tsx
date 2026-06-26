@@ -25,7 +25,7 @@ import {
   MIN_DIMENSION,
 } from '@workbench/generation/settings';
 import { ArrowLeftRightIcon, LockIcon, LockOpenIcon, RulerDimensionLineIcon, ScalingIcon } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { AspectRatioPreview } from './shared/AspectRatioPreview';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
@@ -33,6 +33,7 @@ import { ModelDefaultButton } from './shared/ModelDefaultButton';
 
 interface GenerateDimensionFieldsProps {
   settings: GenerateSettings;
+  projectId: string;
   selectedModel: GenerateModelConfig | undefined;
   onCommit: (patch: Partial<GenerateSettings>) => void;
 }
@@ -51,7 +52,12 @@ const getActiveRatio = (settings: GenerateSettings): number =>
 const getAspectRatioOptionRatio = (id: AspectRatioId, fallbackRatio: number): number =>
   id === 'Free' ? fallbackRatio : ASPECT_RATIO_MAP[id].ratio;
 
-export const GenerateDimensionFields = ({ onCommit, selectedModel, settings }: GenerateDimensionFieldsProps) => {
+export const GenerateDimensionFields = ({
+  onCommit,
+  projectId,
+  selectedModel,
+  settings,
+}: GenerateDimensionFieldsProps) => {
   const [draftDimensions, setDraftDimensions] = useState<Dimensions | null>(null);
   const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
   const dimensions = getGenerationDimensions(selectedModel);
@@ -60,6 +66,7 @@ export const GenerateDimensionFields = ({ onCommit, selectedModel, settings }: G
   const displayDimensions = draftDimensions ?? { height: settings.height, width: settings.width };
   const onCommitRef = useRef(onCommit);
   const pendingDimensionsRef = useRef<Dimensions | null>(null);
+  const projectIdRef = useRef(projectId);
   const previousSettingsDimensionsRef = useRef<Dimensions>({ height: settings.height, width: settings.width });
   const dimensionRatio = displayDimensions.height > 0 ? displayDimensions.width / displayDimensions.height : 1;
   const aspectRatioOptions = useMemo<AspectRatioOption[]>(
@@ -89,6 +96,17 @@ export const GenerateDimensionFields = ({ onCommit, selectedModel, settings }: G
     pendingDimensionsRef.current = dimensions;
     onCommitRef.current(dimensions);
   }, []);
+
+  useLayoutEffect(() => {
+    if (projectIdRef.current === projectId) {
+      return;
+    }
+
+    projectIdRef.current = projectId;
+    pendingDimensionsRef.current = null;
+    previousSettingsDimensionsRef.current = { height: settings.height, width: settings.width };
+    setDraftDimensions(null);
+  }, [projectId, settings.height, settings.width]);
 
   useEffect(() => {
     const previousSettingsDimensions = previousSettingsDimensionsRef.current;
@@ -135,9 +153,7 @@ export const GenerateDimensionFields = ({ onCommit, selectedModel, settings }: G
         return;
       }
 
-      const dimensions = getNextDimensions(key, value, false);
-
-      setDraftDimensions(dimensions);
+      setDraftDimensions(getNextDimensions(key, value, false));
     };
 
   const commitDimension =

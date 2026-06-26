@@ -8,6 +8,7 @@ import type {
   ResultDestination,
   WidgetId,
 } from './types';
+import type { ProjectGraphState } from './workflows/types';
 
 import {
   getGenerationModelAvailabilityReasons,
@@ -16,6 +17,7 @@ import {
 } from './generation/baseGenerationPolicies';
 import { normalizeGenerateWidgetValues } from './generation/settings';
 import { getProjectWidgetValues } from './widgetState';
+import { areArraysEqual, createStableSelector } from './workbenchSelectors';
 import { getProjectGraphReadiness } from './workflows/buildGraph';
 import { getInvocationTemplatesSnapshot } from './workflows/templates';
 
@@ -79,13 +81,56 @@ const sourceWidgetIds: Partial<Record<InvocationSourceId, WidgetId>> = {
   'project-graph': 'workflow',
 };
 
-const isWidgetMounted = (project: Project, widgetId: WidgetId): boolean =>
-  Object.values(project.widgetRegions).some((region) =>
-    region.instanceIds.some((instanceId) => project.widgetInstances[instanceId]?.typeId === widgetId)
-  );
+export interface InvocationRouteInput {
+  generateValues: Record<string, unknown>;
+  invocation: InvocationRoute;
+  mountedWidgetIds: readonly WidgetId[];
+  projectGraph: ProjectGraphState;
+  projectId: string;
+}
 
-const getGenerateSnapshotValidationReasons = (project: Project, models?: readonly ModelConfig[]): string[] => {
-  const values = normalizeGenerateWidgetValues(getProjectWidgetValues(project, 'generate'));
+const getMountedWidgetIds = (project: Project): WidgetId[] => {
+  const mountedWidgetIds = new Set<WidgetId>();
+
+  for (const region of Object.values(project.widgetRegions)) {
+    for (const instanceId of region.instanceIds) {
+      const widgetId = project.widgetInstances[instanceId]?.typeId;
+
+      if (widgetId) {
+        mountedWidgetIds.add(widgetId);
+      }
+    }
+  }
+
+  return Array.from(mountedWidgetIds).sort();
+};
+
+export const getInvocationRouteInput = (project: Project): InvocationRouteInput => ({
+  generateValues: getProjectWidgetValues(project, 'generate'),
+  invocation: project.invocation,
+  mountedWidgetIds: getMountedWidgetIds(project),
+  projectGraph: project.projectGraph,
+  projectId: project.id,
+});
+
+export const areInvocationRouteInputsEqual = (left: InvocationRouteInput, right: InvocationRouteInput): boolean =>
+  left.projectId === right.projectId &&
+  left.invocation === right.invocation &&
+  left.projectGraph === right.projectGraph &&
+  left.generateValues === right.generateValues &&
+  areArraysEqual(left.mountedWidgetIds, right.mountedWidgetIds);
+
+export const createInvocationRouteInputSelector = () =>
+  createStableSelector(getInvocationRouteInput, areInvocationRouteInputsEqual);
+
+const isWidgetMounted = (input: InvocationRouteInput, widgetId: WidgetId): boolean =>
+  input.mountedWidgetIds.includes(widgetId);
+
+const getGenerateSnapshotValidationReasons = (
+  generateValues: Record<string, unknown>,
+  models?: readonly ModelConfig[]
+): string[] => {
+  const values = normalizeGenerateWidgetValues(generateValues);
 
   if (!values || !isSupportedGenerateModel(values.model)) {
     return ['Generate needs a supported model before it can be invoked.'];
@@ -105,6 +150,13 @@ export const resolveInvocationRoute = (
   mode: InvocationMode = 'global',
   route: InvocationRoute = project.invocation,
   models?: readonly ModelConfig[]
+): ResolvedInvocationRoute => resolveInvocationRouteInput(getInvocationRouteInput(project), mode, route, models);
+
+export const resolveInvocationRouteInput = (
+  input: InvocationRouteInput,
+  mode: InvocationMode = 'global',
+  route: InvocationRoute = input.invocation,
+  models?: readonly ModelConfig[]
 ): ResolvedInvocationRoute => {
   const sourceId = route.sourceId;
   const destination = route.destination;
@@ -114,18 +166,18 @@ export const resolveInvocationRoute = (
   // templates store so the result stays live.
   const projectGraphReadiness =
     sourceId === 'project-graph'
-      ? getProjectGraphReadiness(project.projectGraph, getInvocationTemplatesSnapshot())
+      ? getProjectGraphReadiness(input.projectGraph, getInvocationTemplatesSnapshot())
       : null;
   const validationReasons: string[] = [];
 
   if (!isInvocationSourceAvailable(sourceId)) {
     validationReasons.push(`${getSourceLabel(sourceId)} is not an available invocation source.`);
-  } else if (sourceWidgetId && !isWidgetMounted(project, sourceWidgetId)) {
+  } else if (sourceWidgetId && !isWidgetMounted(input, sourceWidgetId)) {
     validationReasons.push(`The ${getSourceLabel(sourceId)} widget is not mounted in this project.`);
   }
 
   if (sourceId === 'generate') {
-    validationReasons.push(...getGenerateSnapshotValidationReasons(project, models));
+    validationReasons.push(...getGenerateSnapshotValidationReasons(input.generateValues, models));
   }
 
   if (projectGraphReadiness && !projectGraphReadiness.canInvoke) {

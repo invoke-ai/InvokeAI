@@ -14,6 +14,7 @@ import type { WidgetPlacementMeta } from './widgetRegionViewModel';
 import type { WorkbenchAction } from './workbenchState';
 
 export interface WidgetPlacementProject {
+  projectId?: string;
   widgetInstances: WidgetPlacementMeta;
   widgetRegions: Record<WidgetRegion, Pick<WidgetRegionState, 'activeInstanceId' | 'instanceIds'>>;
 }
@@ -71,10 +72,12 @@ export const openWidgetPlacement = ({
   dispatch,
   getWidgetsForRegion,
   options,
+  projectId,
   typeId,
 }: {
   dispatch: Dispatch<WorkbenchAction>;
   getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
+  projectId?: string;
   typeId: WidgetTypeId;
   options?: OpenWorkbenchWidgetOptions;
 }): WidgetPlacementCommandResult => {
@@ -85,8 +88,9 @@ export const openWidgetPlacement = ({
   }
 
   dispatch({
-    createNew: options?.createNew,
+    createNew: target.widget.manifest.allowMultiple ? options?.createNew : undefined,
     initialValues: target.widget.manifest.state?.createInitial(),
+    projectId,
     region: target.region,
     type: 'openRegionWidget',
     widgetId: typeId,
@@ -137,7 +141,7 @@ export const closeWidgetPlacement = ({
     }
   }
 
-  dispatch({ region, type: 'toggleRegionWidget', widgetId: instanceId });
+  dispatch({ projectId: project.projectId, region, type: 'toggleRegionWidget', widgetId: instanceId });
 
   return { ok: true, region };
 };
@@ -161,7 +165,7 @@ export const revealWidgetPlacement = ({
     return { ok: false, reason: 'unsupported' };
   }
 
-  dispatch({ region, type: 'selectRegionWidget', widgetId: instanceId });
+  dispatch({ projectId: project.projectId, region, type: 'selectRegionWidget', widgetId: instanceId });
 
   return { ok: true, region };
 };

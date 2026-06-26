@@ -24,7 +24,7 @@ import {
   isWorkflowFieldValueDefault,
   isModelFieldType,
 } from '@workbench/workflows/fields';
-import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
+import { useInvocationTemplatesSelector } from '@workbench/workflows/templates';
 import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
 import {
   ChevronDownIcon,
@@ -145,7 +145,7 @@ const NodeProgressStrip = ({ execution }: { execution: NodeExecutionState | null
 
 const NodeTitle = ({ node }: { node: WorkflowInvocationNode }) => {
   const dispatch = useWorkbenchDispatch();
-  const { templates } = useInvocationTemplatesSnapshot();
+  const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
   const [draftLabel, setDraftLabel] = useState<string | null>(null);
   const title = node.data.label || templates[node.data.type]?.title || node.data.type;
 
@@ -576,7 +576,7 @@ const HiddenHandles = ({
 
 const InvocationFlowNodeComponent = ({ data, selected }: NodeProps<InvocationFlowNodeType>) => {
   const dispatch = useWorkbenchDispatch();
-  const { templates } = useInvocationTemplatesSnapshot();
+  const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
   const isZoomedOut = useIsZoomedOut();
   const node = data.documentNode;
   const template = templates[node.data.type];

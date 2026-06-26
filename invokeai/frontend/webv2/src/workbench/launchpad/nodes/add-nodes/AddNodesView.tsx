@@ -3,8 +3,8 @@ import { getApiErrorMessage } from '@workbench/backend/http';
 import { Button, Field, Scrollable, Tabs, toaster } from '@workbench/components/ui';
 import { installCustomNodePack } from '@workbench/customNodes/api';
 import { addCustomNodeInstallLogEntry } from '@workbench/customNodes/installLogStore';
-import { refreshCustomNodePacks, useCustomNodesSnapshot } from '@workbench/customNodes/nodesStore';
-import { updateNodesUi, useNodesUi, type AddNodesTab } from '@workbench/customNodes/nodesUiStore';
+import { refreshCustomNodePacks, useCustomNodesSelector } from '@workbench/customNodes/nodesStore';
+import { updateNodesUi, useNodesUiSelector, type AddNodesTab } from '@workbench/customNodes/nodesUiStore';
 import { FolderOpenIcon, GitBranchIcon } from 'lucide-react';
 import { useState } from 'react';
 
@@ -14,8 +14,8 @@ import { useState } from 'react';
  * active sub-tab lives in the nodes UI store so it survives navigation.
  */
 export const AddNodesView = () => {
-  const { addTab } = useNodesUi();
-  const { customNodesPath } = useCustomNodesSnapshot();
+  const addTab = useNodesUiSelector((snapshot) => snapshot.addTab);
+  const customNodesPath = useCustomNodesSelector((snapshot) => snapshot.customNodesPath);
 
   return (
     <Stack gap="3" h="full" minH="0">

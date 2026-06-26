@@ -4,8 +4,8 @@ import type { MouseEvent } from 'react';
 import { HStack, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { Button, ConfirmDialog, IconButton, MenuContent, RenameDialog } from '@workbench/components/ui';
 import { layoutPresets } from '@workbench/layoutPresets';
-import { doesProjectMatchLayoutPreset } from '@workbench/layoutPresetSnapshots';
-import { useActiveProject, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { areLayoutPresetSnapshotsEqual, createLayoutPresetSnapshot } from '@workbench/layoutPresetSnapshots';
+import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { CheckIcon, ChevronDownIcon, EllipsisVerticalIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react';
 import { useState } from 'react';
 
@@ -22,7 +22,7 @@ const createCustomPresetId = (): string =>
 
 /** Global layout preset registry surfaced as a menu. */
 export const LayoutPresetMenu = () => {
-  const activeProject = useActiveProject();
+  const activeLayoutSnapshot = useActiveProjectSelector(createLayoutPresetSnapshot, areLayoutPresetSnapshotsEqual);
   const customPresets = useWorkbenchSelector((snapshot) => snapshot.state.account.customLayoutPresets ?? []);
   const dispatch = useWorkbenchDispatch();
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -30,7 +30,9 @@ export const LayoutPresetMenu = () => {
   const [deleteTarget, setDeleteTarget] = useState<LayoutPreset | null>(null);
   const [actionTarget, setActionTarget] = useState<PresetActionTarget | null>(null);
   const allPresets = [...layoutPresets, ...customPresets];
-  const matchingPreset = allPresets.find((preset) => doesProjectMatchLayoutPreset(activeProject, preset));
+  const matchingPreset = allPresets.find((preset) =>
+    areLayoutPresetSnapshotsEqual(activeLayoutSnapshot, preset.snapshot)
+  );
   const canAddCurrentLayout = !matchingPreset;
   const triggerLabel = matchingPreset?.label ?? 'Custom';
 

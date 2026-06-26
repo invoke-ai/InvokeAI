@@ -9,7 +9,14 @@ import {
   type ReactNode,
 } from 'react';
 
-import type { Project, WorkbenchState } from './types';
+import type {
+  Project,
+  ProjectLayoutState,
+  ProjectSettings,
+  WidgetInstanceId,
+  WidgetTypeId,
+  WorkbenchState,
+} from './types';
 
 import { WorkbenchSplashScreen } from './components/WorkbenchSplashScreen';
 import {
@@ -17,7 +24,9 @@ import {
   type WorkbenchLoadOptions,
   type WorkbenchSaveResult,
 } from './projects/syncedPersistence';
-import { getAutosaveScheduleDecision } from './workbenchAutosave';
+import { getProjectWidgetValues } from './widgetState';
+import { getAutosaveScheduleDecision, getPersistedStateKey, isAutosaveCompletionCurrent } from './workbenchAutosave';
+import { shallowEqual as selectorShallowEqual, useExternalStoreSelector } from './workbenchSelectors';
 import {
   createWorkbenchStore,
   type WorkbenchAction,
@@ -44,27 +53,7 @@ const WorkbenchStoreContext = createContext<WorkbenchStore | null>(null);
 const subscribeToNothing = (): (() => void) => () => {};
 const getNullSnapshot = (): null => null;
 
-export const shallowEqual = <T,>(left: T, right: T): boolean => {
-  if (Object.is(left, right)) {
-    return true;
-  }
-
-  if (typeof left !== 'object' || left === null || typeof right !== 'object' || right === null) {
-    return false;
-  }
-
-  const leftRecord = left as Record<PropertyKey, unknown>;
-  const rightRecord = right as Record<PropertyKey, unknown>;
-  const leftKeys = Reflect.ownKeys(leftRecord);
-
-  if (leftKeys.length !== Reflect.ownKeys(rightRecord).length) {
-    return false;
-  }
-
-  return leftKeys.every(
-    (key) => Object.prototype.hasOwnProperty.call(rightRecord, key) && Object.is(leftRecord[key], rightRecord[key])
-  );
-};
+export const shallowEqual = selectorShallowEqual;
 
 /**
  * The reducer dispatch alone, on its own context. `dispatch` is stable for the
@@ -75,15 +64,6 @@ export const shallowEqual = <T,>(left: T, right: T): boolean => {
 const WorkbenchDispatchContext = createContext<Dispatch<WorkbenchAction> | null>(null);
 
 const AUTOSAVE_DELAY_MS = 500;
-
-const getPersistedStateKey = (state: WorkbenchState): string =>
-  JSON.stringify({
-    account: state.account,
-    activeProjectId: state.activeProjectId,
-    errorLog: state.errorLog,
-    projects: state.projects,
-    widgetFailures: state.widgetFailures,
-  });
 
 export const WorkbenchProvider = ({
   children,
@@ -103,7 +83,10 @@ export const WorkbenchProvider = ({
   const dispatch = store.dispatch;
   const [hasHydrated, setHasHydrated] = useState(store.getSnapshot().hasHydrated);
   const hasLoadedPersistenceRef = useRef(false);
+  const lastSavedPersistedRevisionRef = useRef(store.getPersistedRevision());
   const lastSavedStateKeyRef = useRef(getPersistedStateKey(store.getState()));
+  const failedPersistedRevisionRef = useRef<number | null>(null);
+  const failedStateKeyRef = useRef<string | null>(null);
   // Captured once: the options describe how this mount of the editor boots.
   // Later search-param changes are handled live by WorkbenchSessionController.
   const bootOptionsRef = useRef(loadOptions);
@@ -185,8 +168,7 @@ export const WorkbenchProvider = ({
   useEffect(() => {
     let timeoutId: number | null = null;
     let saveGeneration = 0;
-    let failedStateKey: string | null = null;
-    let scheduledStateKey: string | null = null;
+    let scheduledPersistedRevision: number | null = null;
 
     const clearScheduledSave = (): void => {
       if (timeoutId !== null) {
@@ -200,31 +182,50 @@ export const WorkbenchProvider = ({
         return;
       }
 
-      const state = store.getState();
-      const persistedStateKey = getPersistedStateKey(state);
+      const persistedRevision = store.getPersistedRevision();
       const decision = getAutosaveScheduleDecision({
-        failedStateKey,
-        lastSavedStateKey: lastSavedStateKeyRef.current,
-        persistedStateKey,
-        scheduledStateKey,
+        failedPersistedRevision: failedPersistedRevisionRef.current,
+        lastSavedPersistedRevision: lastSavedPersistedRevisionRef.current,
+        persistedRevision,
+        scheduledPersistedRevision,
       });
 
-      failedStateKey = decision.failedStateKey;
+      if (failedPersistedRevisionRef.current !== null && decision.failedPersistedRevision === null) {
+        failedStateKeyRef.current = null;
+      }
+
+      failedPersistedRevisionRef.current = decision.failedPersistedRevision;
 
       if (!decision.shouldSchedule) {
         return;
       }
 
-      scheduledStateKey = persistedStateKey;
+      scheduledPersistedRevision = persistedRevision;
       saveGeneration += 1;
       const generation = saveGeneration;
 
-      dispatch({ type: 'autosaveStarted' });
       clearScheduledSave();
 
       timeoutId = window.setTimeout(() => {
         const stateToSave = store.getState();
+        const revisionToSave = store.getPersistedRevision();
         const stateKeyToSave = getPersistedStateKey(stateToSave);
+
+        if (stateKeyToSave === lastSavedStateKeyRef.current) {
+          lastSavedPersistedRevisionRef.current = revisionToSave;
+          failedStateKeyRef.current = null;
+          failedPersistedRevisionRef.current = null;
+          scheduledPersistedRevision = null;
+          return;
+        }
+
+        if (stateKeyToSave === failedStateKeyRef.current) {
+          failedPersistedRevisionRef.current = revisionToSave;
+          scheduledPersistedRevision = null;
+          return;
+        }
+
+        dispatch({ type: 'autosaveStarted' });
 
         syncedWorkbenchPersistence
           .saveWorkbench(stateToSave)
@@ -234,8 +235,10 @@ export const WorkbenchProvider = ({
             }
 
             lastSavedStateKeyRef.current = stateKeyToSave;
-            failedStateKey = null;
-            scheduledStateKey = null;
+            lastSavedPersistedRevisionRef.current = revisionToSave;
+            failedStateKeyRef.current = null;
+            failedPersistedRevisionRef.current = null;
+            scheduledPersistedRevision = null;
             dispatch({ savedAt: result.snapshot.savedAt, type: 'autosaveSucceeded' });
             applySaveResultRef.current(result);
           })
@@ -244,8 +247,9 @@ export const WorkbenchProvider = ({
               return;
             }
 
-            failedStateKey = stateKeyToSave;
-            scheduledStateKey = null;
+            failedStateKeyRef.current = stateKeyToSave;
+            failedPersistedRevisionRef.current = revisionToSave;
+            scheduledPersistedRevision = null;
             dispatch({
               error: error instanceof Error ? error.message : 'Failed to autosave workbench.',
               type: 'autosaveFailed',
@@ -286,11 +290,52 @@ export const WorkbenchProvider = ({
         return;
       }
 
-      void syncedWorkbenchPersistence.saveWorkbench(store.getState()).then((result) => {
-        applySaveResultRef.current(result);
-      });
+      const stateToSave = store.getState();
+      const revisionToSave = store.getPersistedRevision();
+      const stateKeyToSave = getPersistedStateKey(stateToSave);
+
+      void syncedWorkbenchPersistence
+        .saveWorkbench(stateToSave)
+        .then((result) => {
+          if (
+            !isAutosaveCompletionCurrent({
+              completedPersistedRevision: revisionToSave,
+              completedStateKey: stateKeyToSave,
+              currentPersistedRevision: store.getPersistedRevision(),
+              currentStateKey: getPersistedStateKey(store.getState()),
+            })
+          ) {
+            return;
+          }
+
+          lastSavedStateKeyRef.current = stateKeyToSave;
+          lastSavedPersistedRevisionRef.current = revisionToSave;
+          failedStateKeyRef.current = null;
+          failedPersistedRevisionRef.current = null;
+          dispatch({ savedAt: result.snapshot.savedAt, type: 'autosaveSucceeded' });
+          applySaveResultRef.current(result);
+        })
+        .catch((error: unknown) => {
+          if (
+            !isAutosaveCompletionCurrent({
+              completedPersistedRevision: revisionToSave,
+              completedStateKey: stateKeyToSave,
+              currentPersistedRevision: store.getPersistedRevision(),
+              currentStateKey: getPersistedStateKey(store.getState()),
+            })
+          ) {
+            return;
+          }
+
+          failedStateKeyRef.current = stateKeyToSave;
+          failedPersistedRevisionRef.current = revisionToSave;
+          dispatch({
+            error: error instanceof Error ? error.message : 'Failed to autosave workbench.',
+            type: 'autosaveFailed',
+          });
+        });
     });
-  }, [store]);
+  }, [dispatch, store]);
 
   return (
     <WorkbenchStoreContext value={store}>
@@ -315,26 +360,62 @@ export const useOptionalWorkbenchStore = (): WorkbenchStore | null => use(Workbe
 
 export const useWorkbenchSelector = <Selected,>(
   selector: WorkbenchSelector<Selected>,
+  isEqual: EqualityFn<Selected> = shallowEqual
+): Selected => {
+  const store = useWorkbenchStore();
+
+  return useExternalStoreSelector(store.subscribe, store.getSnapshot, selector, isEqual);
+};
+
+export const useDebouncedWorkbenchSelector = <Selected,>(
+  selector: WorkbenchSelector<Selected>,
+  debounceMs = 300,
   isEqual: EqualityFn<Selected> = Object.is
 ): Selected => {
   const store = useWorkbenchStore();
-  const selectionRef = useRef<Selected | undefined>(undefined);
-  const hasSelectionRef = useRef(false);
+  const [selection, setSelection] = useState(() => selector(store.getSnapshot()));
+  const selectionRef = useRef(selection);
 
-  const getSelectedSnapshot = (): Selected => {
-    const next = selector(store.getSnapshot());
+  selectionRef.current = selection;
 
-    if (hasSelectionRef.current && isEqual(selectionRef.current as Selected, next)) {
-      return selectionRef.current as Selected;
+  useEffect(() => {
+    let currentSelection = selector(store.getSnapshot());
+    let timeoutId: number | null = null;
+
+    if (!isEqual(selectionRef.current, currentSelection)) {
+      selectionRef.current = currentSelection;
+      setSelection(currentSelection);
     }
 
-    hasSelectionRef.current = true;
-    selectionRef.current = next;
+    const unsubscribe = store.subscribe(() => {
+      const nextSelection = selector(store.getSnapshot());
 
-    return next;
-  };
+      if (isEqual(currentSelection, nextSelection)) {
+        return;
+      }
 
-  return useSyncExternalStore(store.subscribe, getSelectedSnapshot, getSelectedSnapshot);
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+
+      timeoutId = window.setTimeout(() => {
+        timeoutId = null;
+        currentSelection = nextSelection;
+        selectionRef.current = nextSelection;
+        setSelection(nextSelection);
+      }, debounceMs);
+    });
+
+    return () => {
+      unsubscribe();
+
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [debounceMs, isEqual, selector, store]);
+
+  return selection;
 };
 
 export const useActiveProject = (): Project => useWorkbenchSelector((snapshot) => snapshot.activeProject);
@@ -344,31 +425,60 @@ export const useActiveProjectSelector = <Selected,>(
   isEqual?: EqualityFn<Selected>
 ): Selected => useWorkbenchSelector((snapshot) => selector(snapshot.activeProject), isEqual);
 
+export const useActiveProjectId = (): string => useWorkbenchSelector((snapshot) => snapshot.state.activeProjectId);
+
+export const useActiveProjectName = (): string => useActiveProjectSelector((project) => project.name);
+
+export const useActiveProjectLayoutSelector = <Selected,>(
+  selector: (layout: ProjectLayoutState) => Selected,
+  isEqual?: EqualityFn<Selected>
+): Selected => useActiveProjectSelector((project) => selector(project.layout), isEqual);
+
+export const useActiveProjectSettingsSelector = <Selected,>(
+  selector: (settings: ProjectSettings) => Selected,
+  isEqual?: EqualityFn<Selected>
+): Selected => useActiveProjectSelector((project) => selector(project.settings), isEqual);
+
+export const useWidgetValuesSelector = <Selected,>(
+  widgetId: WidgetTypeId,
+  selector: (values: Record<string, unknown>) => Selected,
+  isEqual?: EqualityFn<Selected>
+): Selected => useActiveProjectSelector((project) => selector(getProjectWidgetValues(project, widgetId)), isEqual);
+
+export const useWidgetInstanceValuesSelector = <Selected,>(
+  instanceId: WidgetInstanceId,
+  selector: (values: Record<string, unknown>) => Selected,
+  isEqual?: EqualityFn<Selected>
+): Selected =>
+  useActiveProjectSelector((project) => selector(project.widgetInstances[instanceId]?.state.values ?? {}), isEqual);
+
+export const useProjectWidgetInstanceValuesSelector = <Selected,>(
+  projectId: string,
+  instanceId: WidgetInstanceId,
+  selector: (values: Record<string, unknown>) => Selected,
+  isEqual?: EqualityFn<Selected>
+): Selected =>
+  useWorkbenchSelector((snapshot) => {
+    const project = snapshot.state.projects.find((candidate) => candidate.id === projectId);
+
+    return selector(project?.widgetInstances[instanceId]?.state.values ?? {});
+  }, isEqual);
+
 export const useWorkbenchHasHydrated = (): boolean => useWorkbenchSelector((snapshot) => snapshot.hasHydrated);
 
 export const useOptionalWorkbenchSelector = <Selected,>(
   selector: WorkbenchSelector<Selected>,
   fallback: Selected,
-  isEqual: EqualityFn<Selected> = Object.is
+  isEqual: EqualityFn<Selected> = shallowEqual
 ): Selected => {
   const store = useOptionalWorkbenchStore();
-  const selectionRef = useRef<Selected | undefined>(undefined);
-  const hasSelectionRef = useRef(false);
 
-  const getSelectedSnapshot = (): Selected => {
-    const next = store ? selector(store.getSnapshot()) : fallback;
-
-    if (hasSelectionRef.current && isEqual(selectionRef.current as Selected, next)) {
-      return selectionRef.current as Selected;
-    }
-
-    hasSelectionRef.current = true;
-    selectionRef.current = next;
-
-    return next;
-  };
-
-  return useSyncExternalStore(store?.subscribe ?? subscribeToNothing, getSelectedSnapshot, getSelectedSnapshot);
+  return useExternalStoreSelector(
+    store?.subscribe ?? subscribeToNothing,
+    store?.getSnapshot ?? getNullSnapshot,
+    (snapshot) => (snapshot ? selector(snapshot) : fallback),
+    isEqual
+  );
 };
 
 export const useOptionalWorkbenchDispatch = (): Dispatch<WorkbenchAction> | null =>

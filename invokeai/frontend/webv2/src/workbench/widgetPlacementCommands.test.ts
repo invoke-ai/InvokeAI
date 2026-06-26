@@ -107,6 +107,22 @@ describe('widget placement commands', () => {
     expect(actions).toMatchObject([{ createNew: true, region: 'right', type: 'openRegionWidget', widgetId: 'queue' }]);
   });
 
+  it('does not create a new instance for singleton widgets even when requested', () => {
+    const actions: WorkbenchAction[] = [];
+    const widget = createWidget({ allowMultiple: false, id: 'queue', labelText: 'Queue' });
+
+    openWidgetPlacement({
+      dispatch: (action) => actions.push(action),
+      getWidgetsForRegion: createRegistry({ right: [widget] }),
+      options: { createNew: true, preferredRegions: ['right'] },
+      typeId: 'queue',
+    });
+
+    expect(actions).toMatchObject([
+      { createNew: undefined, region: 'right', type: 'openRegionWidget', widgetId: 'queue' },
+    ]);
+  });
+
   it('rejects invalid regions and unrenderable placements', () => {
     const actions: WorkbenchAction[] = [];
     const dispatch = (action: WorkbenchAction): void => {

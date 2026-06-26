@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { createExternalStore, createKeyedTransientStore } from '@workbench/externalStore';
 
 /**
  * The most recent denoising preview image from `invocation_progress` events,
@@ -19,67 +19,48 @@ export interface ProgressImageTarget {
 
 type LatestProgressImageSnapshot = ProgressImageSnapshot & { target?: ProgressImageTarget };
 
-let latestSnapshot: LatestProgressImageSnapshot | null = null;
-const snapshotsByTarget = new Map<string, ProgressImageSnapshot>();
-const listeners = new Set<() => void>();
+const latestSnapshotStore = createExternalStore<{ latestSnapshot: LatestProgressImageSnapshot | null }>({
+  latestSnapshot: null,
+});
+const snapshotsByTarget = createKeyedTransientStore<string, ProgressImageSnapshot>();
 
 const getTargetKey = ({ itemIndex, queueItemId }: ProgressImageTarget): string => `${queueItemId}:${itemIndex}`;
 
 const isLatestTarget = (target: ProgressImageTarget): boolean =>
-  latestSnapshot?.target?.queueItemId === target.queueItemId && latestSnapshot.target.itemIndex === target.itemIndex;
-
-const emit = (): void => {
-  for (const listener of listeners) {
-    listener();
-  }
-};
-
-const subscribe = (listener: () => void): (() => void) => {
-  listeners.add(listener);
-
-  return () => {
-    listeners.delete(listener);
-  };
-};
+  latestSnapshotStore.getSnapshot().latestSnapshot?.target?.queueItemId === target.queueItemId &&
+  latestSnapshotStore.getSnapshot().latestSnapshot?.target?.itemIndex === target.itemIndex;
 
 export const progressImageStore = {
   clear(target?: ProgressImageTarget): void {
     if (!target) {
-      if (latestSnapshot !== null || snapshotsByTarget.size > 0) {
-        latestSnapshot = null;
-        snapshotsByTarget.clear();
-        emit();
-      }
+      latestSnapshotStore.patchSnapshot({ latestSnapshot: null });
+      snapshotsByTarget.clear();
 
       return;
     }
 
-    const didDeleteTarget = snapshotsByTarget.delete(getTargetKey(target));
+    const targetKey = getTargetKey(target);
     const didClearLatest = isLatestTarget(target);
 
-    if (didClearLatest) {
-      latestSnapshot = null;
-    }
+    snapshotsByTarget.delete(targetKey);
 
-    if (didDeleteTarget || didClearLatest) {
-      emit();
+    if (didClearLatest) {
+      latestSnapshotStore.patchSnapshot({ latestSnapshot: null });
     }
   },
   set(image: ProgressImageSnapshot, target?: ProgressImageTarget): void {
-    latestSnapshot = target ? { ...image, target } : image;
+    latestSnapshotStore.patchSnapshot({ latestSnapshot: target ? { ...image, target } : image });
 
     if (target) {
       snapshotsByTarget.set(getTargetKey(target), image);
     }
-
-    emit();
   },
 };
 
 export type ProgressImageSink = typeof progressImageStore;
 
 export const useProgressImage = (): ProgressImageSnapshot | null =>
-  useSyncExternalStore(subscribe, () => latestSnapshot);
+  latestSnapshotStore.useSelector((snapshot) => snapshot.latestSnapshot);
 
 export const useQueueItemProgressImage = (queueItemId: string, itemIndex: number): ProgressImageSnapshot | null =>
-  useSyncExternalStore(subscribe, () => snapshotsByTarget.get(getTargetKey({ itemIndex, queueItemId })) ?? null);
+  snapshotsByTarget.useValue(getTargetKey({ itemIndex, queueItemId })) ?? null;

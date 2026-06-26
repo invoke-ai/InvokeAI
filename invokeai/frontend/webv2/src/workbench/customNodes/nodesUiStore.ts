@@ -40,4 +40,6 @@ export const setNodeActivityExpanded = (activityExpanded: boolean): void => {
   updateNodesUi({ activityExpanded });
 };
 
+export const useNodesUiSelector = store.useSelector;
+
 export const useNodesUi = (): NodesUiSnapshot => store.useSnapshot();

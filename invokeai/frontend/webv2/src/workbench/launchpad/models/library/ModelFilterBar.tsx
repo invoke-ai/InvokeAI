@@ -4,6 +4,7 @@ import type { ModelTaxonomyType } from '@workbench/models/types';
 import { HStack, Icon, Input, InputGroup } from '@chakra-ui/react';
 import { FilterMenuItem, ModelFilterMenu } from '@workbench/launchpad/models/shared/ModelFilterMenu';
 import { SearchIcon } from 'lucide-react';
+import { useCallback, useMemo } from 'react';
 
 const SORT_FIELDS: { field: ModelSortField; label: string }[] = [
   { field: 'default', label: 'Default' },
@@ -32,41 +33,67 @@ export const ModelFilterBar = ({
   filters: ModelLibraryFilters;
   missingCount: number;
   onChange: (filters: ModelLibraryFilters) => void;
-}) => (
-  <HStack gap="1.5" w="full" px="3" pt="3">
-    <InputGroup startElement={<Icon as={SearchIcon} boxSize="3.5" color="fg.subtle" />}>
-      <Input
-        aria-label="Search models"
-        placeholder="Search models…"
-        size="xs"
-        value={filters.searchTerm}
-        onChange={(event) => onChange({ ...filters, searchTerm: event.currentTarget.value })}
+}) => {
+  const handleSearchChange = useCallback(
+    (searchTerm: string) => onChange({ ...filters, searchTerm }),
+    [filters, onChange]
+  );
+  const handleMissingFilterToggle = useCallback(
+    () => onChange({ ...filters, missingOnly: !filters.missingOnly, typeFilter: null }),
+    [filters, onChange]
+  );
+  const handleBaseFilterChange = useCallback(
+    (baseFilter: string | null) => onChange({ ...filters, baseFilter }),
+    [filters, onChange]
+  );
+  const handleSortChange = useCallback(
+    (sortField: ModelSortField, sortDirection: 'asc' | 'desc') => onChange({ ...filters, sortDirection, sortField }),
+    [filters, onChange]
+  );
+  const handleTypeFilterChange = useCallback(
+    (typeFilter: ModelTaxonomyType | null) => onChange({ ...filters, missingOnly: false, typeFilter }),
+    [filters, onChange]
+  );
+  const extraTypeItems = useMemo(
+    () =>
+      missingCount > 0 ? (
+        <FilterMenuItem
+          isChecked={filters.missingOnly}
+          label={`Missing files (${missingCount})`}
+          value="type-missing"
+          onSelect={handleMissingFilterToggle}
+        />
+      ) : null,
+    [filters.missingOnly, handleMissingFilterToggle, missingCount]
+  );
+
+  return (
+    <HStack gap="1.5" w="full" px="3" pt="3">
+      <InputGroup startElement={<Icon as={SearchIcon} boxSize="3.5" color="fg.subtle" />}>
+        <Input
+          aria-label="Search models"
+          placeholder="Search models…"
+          size="xs"
+          value={filters.searchTerm}
+          onChange={(event) => handleSearchChange(event.currentTarget.value)}
+        />
+      </InputGroup>
+      <ModelFilterMenu
+        ariaLabel="Filter and sort models"
+        availableBases={availableBases}
+        availableTypes={availableTypes}
+        baseFilter={filters.baseFilter}
+        extraTypeItems={extraTypeItems}
+        isActive={isFiltering(filters)}
+        sortDirection={filters.sortDirection}
+        sortField={filters.sortField}
+        sortFields={SORT_FIELDS}
+        typeAllChecked={filters.typeFilter === null && !filters.missingOnly}
+        typeFilter={filters.typeFilter}
+        onBaseFilterChange={handleBaseFilterChange}
+        onSortChange={handleSortChange}
+        onTypeFilterChange={handleTypeFilterChange}
       />
-    </InputGroup>
-    <ModelFilterMenu
-      ariaLabel="Filter and sort models"
-      availableBases={availableBases}
-      availableTypes={availableTypes}
-      baseFilter={filters.baseFilter}
-      extraTypeItems={
-        missingCount > 0 ? (
-          <FilterMenuItem
-            isChecked={filters.missingOnly}
-            label={`Missing files (${missingCount})`}
-            value="type-missing"
-            onSelect={() => onChange({ ...filters, missingOnly: !filters.missingOnly, typeFilter: null })}
-          />
-        ) : null
-      }
-      isActive={isFiltering(filters)}
-      sortDirection={filters.sortDirection}
-      sortField={filters.sortField}
-      sortFields={SORT_FIELDS}
-      typeAllChecked={filters.typeFilter === null && !filters.missingOnly}
-      typeFilter={filters.typeFilter}
-      onBaseFilterChange={(baseFilter) => onChange({ ...filters, baseFilter })}
-      onSortChange={(sortField, sortDirection) => onChange({ ...filters, sortDirection, sortField })}
-      onTypeFilterChange={(typeFilter) => onChange({ ...filters, missingOnly: false, typeFilter })}
-    />
-  </HStack>
-);
+    </HStack>
+  );
+};

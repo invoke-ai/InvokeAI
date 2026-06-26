@@ -1,11 +1,13 @@
 import { Dialog, Icon, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { Button, CloseButton, Row, Scrollable } from '@workbench/components/ui';
 import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
-import { refreshProjectLibrary, useProjectLibrary, type ProjectSummary } from '@workbench/projects/library';
+import { refreshProjectLibrary, useProjectLibrarySelector, type ProjectSummary } from '@workbench/projects/library';
 import { importProjectFile, pickProjectFile } from '@workbench/projects/projectFile';
 import { adoptProjectRecord, hydrateProjectFromServer } from '@workbench/projects/syncedPersistence';
 import { useNotify } from '@workbench/useNotify';
+import { flushGenerateDrafts } from '@workbench/widgets/generate/generateDraftRegistry';
 import { useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { areArraysEqual } from '@workbench/workbenchSelectors';
 import { ArrowRightIcon, FileUpIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -15,10 +17,13 @@ import { useEffect, useState } from 'react';
  * library and opens it in place — no navigation, the editor stays mounted.
  */
 export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
-  const projects = useWorkbenchSelector((snapshot) => snapshot.state.projects);
+  const projectIds = useWorkbenchSelector(
+    (snapshot) => snapshot.state.projects.map((project) => project.id),
+    areArraysEqual
+  );
   const dispatch = useWorkbenchDispatch();
   const notify = useNotify();
-  const library = useProjectLibrary();
+  const summaries = useProjectLibrarySelector((snapshot) => snapshot.summaries);
   const [busyProjectId, setBusyProjectId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -27,8 +32,8 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
     }
   }, [isOpen]);
 
-  const openProjectIds = new Set(projects.map((project) => project.id));
-  const available = library.summaries.filter((summary) => !openProjectIds.has(summary.id));
+  const openProjectIds = new Set(projectIds);
+  const available = summaries.filter((summary) => !openProjectIds.has(summary.id));
 
   const openProject = async (summary: ProjectSummary) => {
     setBusyProjectId(summary.id);
@@ -44,6 +49,7 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
       return;
     }
 
+    flushGenerateDrafts();
     dispatch({ project, type: 'openProject' });
     onClose();
   };
@@ -60,6 +66,7 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
       const project = adoptProjectRecord(record);
 
       if (project) {
+        flushGenerateDrafts();
         dispatch({ project, type: 'openProject' });
         onClose();
       }
@@ -114,9 +121,7 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
                   ))}
                   {available.length === 0 ? (
                     <Text color="fg.muted" fontSize="xs" px="2.5" py="4" textAlign="center">
-                      {library.summaries.length === 0
-                        ? 'No saved projects yet.'
-                        : 'All saved projects are already open.'}
+                      {summaries.length === 0 ? 'No saved projects yet.' : 'All saved projects are already open.'}
                     </Text>
                   ) : null}
                 </Stack>

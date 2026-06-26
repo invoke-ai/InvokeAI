@@ -2,7 +2,8 @@ import type { Project } from '@workbench/types';
 
 import { useNavigate } from '@tanstack/react-router';
 import { useNotify } from '@workbench/useNotify';
-import { useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { flushGenerateDrafts } from '@workbench/widgets/generate/generateDraftRegistry';
+import { useWorkbenchDispatch, useWorkbenchStore } from '@workbench/WorkbenchContext';
 
 import { deleteLibraryProject } from './library';
 import {
@@ -27,13 +28,15 @@ export const useProjectActions = (): {
   closeProject: (project: Project) => void;
   deleteProject: (project: Project) => Promise<void>;
 } => {
-  const state = useWorkbenchSelector((snapshot) => snapshot.state);
+  const store = useWorkbenchStore();
   const dispatch = useWorkbenchDispatch();
   const navigate = useNavigate();
   const notify = useNotify();
 
   /** When the last tab goes, the session empties and Home takes over. */
   const leaveEditorIfLast = (projectId: string): boolean => {
+    const state = store.getState();
+
     if (state.projects.some((project) => project.id !== projectId)) {
       return false;
     }
@@ -45,7 +48,11 @@ export const useProjectActions = (): {
   };
 
   const closeProject = (project: Project): void => {
-    void flushProjectToServer(project).finally(() => {
+    flushGenerateDrafts();
+
+    const projectToFlush = store.getState().projects.find((candidate) => candidate.id === project.id) ?? project;
+
+    void flushProjectToServer(projectToFlush).finally(() => {
       releaseProjectSync(project.id);
     });
 
@@ -57,6 +64,7 @@ export const useProjectActions = (): {
   };
 
   const deleteProject = async (project: Project): Promise<void> => {
+    flushGenerateDrafts();
     // Marked before the request so an in-flight autosave cannot recreate the
     // project server-side between the DELETE and the tab closing.
     markProjectDeleted(project.id);

@@ -1,14 +1,14 @@
 import { Badge, Box, Collapsible, Flex, HStack, Icon, Spinner, Text } from '@chakra-ui/react';
 import { Button } from '@workbench/components/ui';
 import { clearCustomNodeInstallLog, useCustomNodeInstallLog } from '@workbench/customNodes/installLogStore';
-import { setNodeActivityExpanded, useNodesUi } from '@workbench/customNodes/nodesUiStore';
+import { setNodeActivityExpanded, useNodesUiSelector } from '@workbench/customNodes/nodesUiStore';
 import { ChevronUpIcon, ListOrderedIcon, Trash2Icon } from 'lucide-react';
 
 import { NodeInstallLog } from './NodeInstallLog';
 
 /** Persistent, collapsible install activity footer for the nodes manager detail pane. */
 export const NodeActivityBar = () => {
-  const { activityExpanded } = useNodesUi();
+  const activityExpanded = useNodesUiSelector((snapshot) => snapshot.activityExpanded);
   const log = useCustomNodeInstallLog();
   const installingCount = log.filter((entry) => entry.status === 'installing').length;
   const summary =

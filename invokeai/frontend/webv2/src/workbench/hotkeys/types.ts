@@ -1,4 +1,4 @@
-import type { WidgetInstanceId, WidgetRegion, WidgetTypeId } from '@workbench/types';
+import type { WidgetContributionSource, WidgetInstanceId, WidgetRegion, WidgetTypeId } from '@workbench/types';
 
 export type HotkeyCategory = 'app' | 'canvas' | 'gallery' | 'viewer' | 'workflows';
 
@@ -21,6 +21,7 @@ export interface HotkeyDefinition {
   allowInModal?: boolean;
   unavailableReason?: string;
   implemented?: boolean;
+  source?: WidgetContributionSource;
 }
 
 export interface RegisteredHotkey extends HotkeyDefinition {
@@ -32,6 +33,7 @@ export interface HotkeyContext {
   activeInstanceId: WidgetInstanceId | null;
   activeWidgetTypeId: WidgetTypeId | null;
   isModalLayerActive: boolean;
+  projectId: string;
 }
 
 export type CustomHotkeys = Record<string, string[]>;

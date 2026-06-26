@@ -10,6 +10,7 @@ const context = {
   activeWidgetTypeId: null,
   focusedRegion: null,
   isModalLayerActive: false,
+  projectId: 'project-1',
 } as const;
 
 const base = {
@@ -120,6 +121,26 @@ describe('resolveHotkey', () => {
         matchedKey: 'x',
       })?.commandId
     ).toBe('focused');
+  });
+
+  it('does not resolve hotkeys contributed by another project source', () => {
+    const staleProjectHotkey: RegisteredHotkey = {
+      ...base,
+      commandId: 'stale',
+      id: 'stale',
+      scope: { kind: 'widget', typeId: 'gallery' },
+      source: { instanceId: 'gallery-1', projectId: 'project-2', region: 'left', typeId: 'gallery' },
+      title: 'Stale project',
+    };
+
+    expect(
+      resolveHotkey({
+        context: { ...context, activeInstanceId: 'gallery-1', activeWidgetTypeId: 'gallery', focusedRegion: 'left' },
+        event,
+        hotkeys: [staleProjectHotkey],
+        matchedKey: 'x',
+      })
+    ).toBeNull();
   });
 
   it('suppresses editable targets unless allowed', () => {

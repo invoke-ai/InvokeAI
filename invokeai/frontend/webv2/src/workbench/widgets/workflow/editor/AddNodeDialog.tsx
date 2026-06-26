@@ -5,7 +5,7 @@ import { Badge, Box, Dialog, HStack, Icon, Input, Portal, ScrollArea, Stack, Tex
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { IconButton, Tooltip } from '@workbench/components/ui';
 import { registerHotkeyModalLayer } from '@workbench/hotkeys';
-import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
+import { useInvocationTemplatesSelector } from '@workbench/workflows/templates';
 import { getCompatibleInputTemplate, getCompatibleOutputTemplate } from '@workbench/workflows/validation';
 import { ChevronDownIcon, ChevronsDownUpIcon, ChevronsUpDownIcon, HammerIcon } from 'lucide-react';
 import {
@@ -266,7 +266,9 @@ const AddNodeDialogContent = ({
   onAddNote: () => void;
   onOpenChange: (isOpen: boolean) => void;
 }) => {
-  const { error, status, templates } = useInvocationTemplatesSnapshot();
+  const error = useInvocationTemplatesSelector((snapshot) => snapshot.error);
+  const status = useInvocationTemplatesSelector((snapshot) => snapshot.status);
+  const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(() => new Set());
   const [activeIndex, setActiveIndex] = useState<number | null>(null);

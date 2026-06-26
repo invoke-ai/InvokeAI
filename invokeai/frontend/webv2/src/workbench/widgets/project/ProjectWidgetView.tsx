@@ -2,10 +2,16 @@ import type { Project } from '@workbench/types';
 
 import { HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
 import { Button, IconButton, ConfirmDialog, Field, FieldLabel, Panel } from '@workbench/components/ui';
-import { useProjectSync } from '@workbench/projects/syncStore';
+import { useProjectSyncSelector } from '@workbench/projects/syncStore';
 import { useProjectActions } from '@workbench/projects/useProjectActions';
 import { useNotify } from '@workbench/useNotify';
-import { useActiveProject, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { flushGenerateDrafts } from '@workbench/widgets/generate/generateDraftRegistry';
+import {
+  shallowEqual,
+  useActiveProjectSelector,
+  useWorkbenchDispatch,
+  useWorkbenchSelector,
+} from '@workbench/WorkbenchContext';
 import { ArrowRightIcon, CopyIcon, History as HistoryIcon, Trash2Icon } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
@@ -16,7 +22,19 @@ import { useState, type ReactNode } from 'react';
  * any of its members.
  */
 export const ProjectWidgetView = () => {
-  const activeProject = useActiveProject();
+  const activeProject = useActiveProjectSelector(
+    (project) => ({
+      events: project.events,
+      graphHistory: project.graphHistory,
+      id: project.id,
+      name: project.name,
+      projectGraph: project.projectGraph,
+      queue: project.queue,
+      recoveredAt: project.recoveredAt,
+      recoveryOf: project.recoveryOf,
+    }),
+    shallowEqual
+  );
 
   return (
     <Stack gap="5" p="3">
@@ -27,7 +45,12 @@ export const ProjectWidgetView = () => {
   );
 };
 
-const NameSection = ({ project }: { project: Project }) => {
+type ProjectPanelViewModel = Pick<
+  Project,
+  'events' | 'graphHistory' | 'id' | 'name' | 'projectGraph' | 'queue' | 'recoveredAt' | 'recoveryOf'
+>;
+
+const NameSection = ({ project }: { project: ProjectPanelViewModel }) => {
   const dispatch = useWorkbenchDispatch();
 
   const commitName = (value: string) => {
@@ -56,7 +79,7 @@ const NameSection = ({ project }: { project: Project }) => {
 };
 
 /** The id whose recovery family this project belongs to. */
-const getRecoveryRootId = (project: Project): string => project.recoveryOf ?? project.id;
+const getRecoveryRootId = (project: Pick<Project, 'id' | 'recoveryOf'>): string => project.recoveryOf ?? project.id;
 
 const formatTimestamp = (timestamp: string | undefined): string => {
   if (!timestamp) {
@@ -68,7 +91,7 @@ const formatTimestamp = (timestamp: string | undefined): string => {
   return Number.isNaN(date.getTime()) ? 'Unknown time' : date.toLocaleString();
 };
 
-const RecoverySection = ({ project }: { project: Project }) => {
+const RecoverySection = ({ project }: { project: ProjectPanelViewModel }) => {
   const projects = useWorkbenchSelector((snapshot) => snapshot.state.projects);
   const dispatch = useWorkbenchDispatch();
   const { deleteProject } = useProjectActions();
@@ -105,7 +128,10 @@ const RecoverySection = ({ project }: { project: Project }) => {
               size="2xs"
               variant="outline"
               w="full"
-              onClick={() => dispatch({ projectId: original.id, type: 'switchProject' })}
+              onClick={() => {
+                flushGenerateDrafts();
+                dispatch({ projectId: original.id, type: 'switchProject' });
+              }}
             >
               <ArrowRightIcon />
               Open original "{original.name}"
@@ -128,7 +154,10 @@ const RecoverySection = ({ project }: { project: Project }) => {
             color="fg.muted"
             size="2xs"
             variant="ghost"
-            onClick={() => dispatch({ projectId: recovery.id, type: 'switchProject' })}
+            onClick={() => {
+              flushGenerateDrafts();
+              dispatch({ projectId: recovery.id, type: 'switchProject' });
+            }}
           >
             <ArrowRightIcon />
           </IconButton>
@@ -160,12 +189,11 @@ const RecoverySection = ({ project }: { project: Project }) => {
   );
 };
 
-const DetailsSection = ({ project }: { project: Project }) => {
+const DetailsSection = ({ project }: { project: ProjectPanelViewModel }) => {
   const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection.status);
   const lastSavedAt = useWorkbenchSelector((snapshot) => snapshot.state.autosave.lastSavedAt);
-  const sync = useProjectSync();
+  const projectSync = useProjectSyncSelector((snapshot) => snapshot.projects[project.id]);
   const notify = useNotify();
-  const projectSync = sync.projects[project.id];
 
   const syncLabel =
     backendConnectionStatus !== 'connected'

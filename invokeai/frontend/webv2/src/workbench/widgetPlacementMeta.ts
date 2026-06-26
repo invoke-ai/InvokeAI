@@ -25,8 +25,9 @@ export const getWidgetPlacementMeta = (
 };
 
 export const getWidgetPlacementProject = (
-  project: Pick<Project, 'widgetInstances' | 'widgetRegions'>
+  project: Pick<Project, 'id' | 'widgetInstances' | 'widgetRegions'>
 ): WidgetPlacementProject => ({
+  projectId: project.id,
   widgetInstances: getWidgetPlacementMeta(project),
   widgetRegions: project.widgetRegions,
 });
@@ -52,6 +53,7 @@ export const areWidgetPlacementMetaEqual = (left: WidgetPlacementMeta, right: Wi
 };
 
 export const areWidgetPlacementProjectsEqual = (left: WidgetPlacementProject, right: WidgetPlacementProject): boolean =>
+  left.projectId === right.projectId &&
   areWidgetPlacementMetaEqual(left.widgetInstances, right.widgetInstances) &&
   (Object.keys(left.widgetRegions) as WidgetRegion[]).every((region) => {
     const leftRegion = left.widgetRegions[region];

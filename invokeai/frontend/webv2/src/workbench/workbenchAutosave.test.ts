@@ -1,65 +1,89 @@
 import { describe, expect, it } from 'vitest';
 
-import { getAutosaveScheduleDecision } from './workbenchAutosave';
+import { getAutosaveScheduleDecision, isAutosaveCompletionCurrent } from './workbenchAutosave';
 
 describe('getAutosaveScheduleDecision', () => {
   it('does not schedule already-saved or already-scheduled state', () => {
     expect(
       getAutosaveScheduleDecision({
-        failedStateKey: null,
-        lastSavedStateKey: 'project-a',
-        persistedStateKey: 'project-a',
-        scheduledStateKey: null,
+        failedPersistedRevision: null,
+        lastSavedPersistedRevision: 1,
+        persistedRevision: 1,
+        scheduledPersistedRevision: null,
       })
-    ).toEqual({ failedStateKey: null, shouldSchedule: false });
+    ).toEqual({ failedPersistedRevision: null, shouldSchedule: false });
 
     expect(
       getAutosaveScheduleDecision({
-        failedStateKey: null,
-        lastSavedStateKey: 'project-a',
-        persistedStateKey: 'project-b',
-        scheduledStateKey: 'project-b',
+        failedPersistedRevision: null,
+        lastSavedPersistedRevision: 1,
+        persistedRevision: 2,
+        scheduledPersistedRevision: 2,
       })
-    ).toEqual({ failedStateKey: null, shouldSchedule: false });
+    ).toEqual({ failedPersistedRevision: null, shouldSchedule: false });
   });
 
   it('holds a failed state key until a new durable edit happens', () => {
     expect(
       getAutosaveScheduleDecision({
-        failedStateKey: 'project-b',
-        lastSavedStateKey: 'project-a',
-        persistedStateKey: 'project-b',
-        scheduledStateKey: null,
+        failedPersistedRevision: 2,
+        lastSavedPersistedRevision: 1,
+        persistedRevision: 2,
+        scheduledPersistedRevision: null,
       })
-    ).toEqual({ failedStateKey: 'project-b', shouldSchedule: false });
+    ).toEqual({ failedPersistedRevision: 2, shouldSchedule: false });
 
     expect(
       getAutosaveScheduleDecision({
-        failedStateKey: 'project-b',
-        lastSavedStateKey: 'project-a',
-        persistedStateKey: 'project-c',
-        scheduledStateKey: null,
+        failedPersistedRevision: 2,
+        lastSavedPersistedRevision: 1,
+        persistedRevision: 3,
+        scheduledPersistedRevision: null,
       })
-    ).toEqual({ failedStateKey: null, shouldSchedule: true });
+    ).toEqual({ failedPersistedRevision: null, shouldSchedule: true });
   });
 
   it('clears a failed state key after returning to the last saved state', () => {
     expect(
       getAutosaveScheduleDecision({
-        failedStateKey: 'project-b',
-        lastSavedStateKey: 'project-a',
-        persistedStateKey: 'project-a',
-        scheduledStateKey: null,
+        failedPersistedRevision: 2,
+        lastSavedPersistedRevision: 1,
+        persistedRevision: 1,
+        scheduledPersistedRevision: null,
       })
-    ).toEqual({ failedStateKey: null, shouldSchedule: false });
+    ).toEqual({ failedPersistedRevision: null, shouldSchedule: false });
 
     expect(
       getAutosaveScheduleDecision({
-        failedStateKey: null,
-        lastSavedStateKey: 'project-a',
-        persistedStateKey: 'project-b',
-        scheduledStateKey: null,
+        failedPersistedRevision: null,
+        lastSavedPersistedRevision: 1,
+        persistedRevision: 2,
+        scheduledPersistedRevision: null,
       })
-    ).toEqual({ failedStateKey: null, shouldSchedule: true });
+    ).toEqual({ failedPersistedRevision: null, shouldSchedule: true });
+  });
+});
+
+describe('isAutosaveCompletionCurrent', () => {
+  it('rejects stale save completions after a newer durable revision exists', () => {
+    expect(
+      isAutosaveCompletionCurrent({
+        completedPersistedRevision: 2,
+        completedStateKey: 'state-2',
+        currentPersistedRevision: 3,
+        currentStateKey: 'state-3',
+      })
+    ).toBe(false);
+  });
+
+  it('accepts save completions for the current durable revision and state key', () => {
+    expect(
+      isAutosaveCompletionCurrent({
+        completedPersistedRevision: 2,
+        completedStateKey: 'state-2',
+        currentPersistedRevision: 2,
+        currentStateKey: 'state-2',
+      })
+    ).toBe(true);
   });
 });

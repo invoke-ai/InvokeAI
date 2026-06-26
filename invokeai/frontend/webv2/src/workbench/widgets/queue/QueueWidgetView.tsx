@@ -8,9 +8,12 @@ import { StatusWidgetChip } from '@workbench/widget-frame';
 import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { ListOrderedIcon } from 'lucide-react';
 
+import { areQueueRowsEqual, createQueueRowsSelector, getPendingQueueCount } from './queueViewModel';
+
+const selectQueueRows = createQueueRowsSelector();
+
 export const QueueWidgetView = ({ presentation, region }: WidgetViewProps) => {
-  const queueItems = useActiveProjectSelector((project) => project.queue.items);
-  const pendingQueueCount = queueItems.filter((item) => item.status === 'pending' || item.status === 'running').length;
+  const pendingQueueCount = useActiveProjectSelector((project) => getPendingQueueCount(project.queue.items));
 
   if (region === 'bottom' && presentation !== 'expanded') {
     return <StatusWidgetChip icon={ListOrderedIcon}>{pendingQueueCount} queued</StatusWidgetChip>;
@@ -52,11 +55,8 @@ const QueueItemLiveProgress = ({ queueItemId }: { queueItemId: string }) => {
 };
 
 const QueueContents = () => {
-  const projects = useWorkbenchSelector((snapshot) => snapshot.state.projects);
+  const queueRows = useWorkbenchSelector((snapshot) => selectQueueRows(snapshot.state.projects), areQueueRowsEqual);
   const dispatch = useWorkbenchDispatch();
-  const queueRows = projects.flatMap((project) =>
-    project.queue.items.map((item) => ({ item, projectId: project.id, projectName: project.name }))
-  );
 
   return (
     <Stack gap="2" p="2">

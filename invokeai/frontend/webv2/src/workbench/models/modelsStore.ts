@@ -114,4 +114,10 @@ export const markCoverImageChanged = (key: string, hasImage: boolean): void => {
   });
 };
 
+export const setModelsSnapshotForTests = (next: Partial<ModelsSnapshot>): void => {
+  store.patchSnapshot(next);
+};
+
+export const useModelsSelector = store.useSelector;
+
 export const useModelsSnapshot = (): ModelsSnapshot => store.useSnapshot();

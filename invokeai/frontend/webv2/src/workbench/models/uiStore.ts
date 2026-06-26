@@ -112,4 +112,6 @@ export const saveLibraryScrollOffset = (instanceId: string, offset: number): voi
 export const getLibraryScrollOffset = (instanceId: string): number =>
   store.getSnapshot().libraryScrollOffsets[instanceId] ?? 0;
 
+export const useModelsUiSelector = store.useSelector;
+
 export const useModelsUi = (): ModelsUiSnapshot => store.useSnapshot();

@@ -54,16 +54,40 @@ describe('executeImageRecall', () => {
         image,
         kind: 'remix',
         models: [model],
+        projectId: 'project-1',
       })
     ).resolves.toBe(true);
 
     expect(galleryApi.getGalleryImageMetadata).toHaveBeenCalledWith('selected.png');
     expect(dispatch).toHaveBeenCalledWith({
+      projectId: 'project-1',
       type: 'setGenerateSettings',
       values: expect.objectContaining({ positivePrompt: 'recalled prompt' }),
     });
     expect(dispatch).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'success', title: 'Recalled remix settings', type: 'recordNotice' })
     );
+  });
+
+  it('uses the freshest Generate values when recalling image dimensions', async () => {
+    const dispatch = vi.fn();
+
+    await expect(
+      executeImageRecall({
+        dispatch,
+        generateValues: { modelKey: model.key, positivePrompt: 'stale prompt' },
+        getGenerateValues: () => ({ modelKey: model.key, positivePrompt: 'fresh prompt' }),
+        image,
+        kind: 'dimensions',
+        models: [model],
+        projectId: 'project-1',
+      })
+    ).resolves.toBe(true);
+
+    expect(dispatch).toHaveBeenCalledWith({
+      projectId: 'project-1',
+      type: 'setGenerateSettings',
+      values: expect.objectContaining({ positivePrompt: 'fresh prompt', height: image.height, width: image.width }),
+    });
   });
 });

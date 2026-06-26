@@ -1,32 +1,55 @@
+import type { WorkbenchState } from './types';
+
+export const getPersistedStateKey = (state: WorkbenchState): string =>
+  JSON.stringify({
+    account: state.account,
+    activeProjectId: state.activeProjectId,
+    errorLog: state.errorLog,
+    projects: state.projects,
+    widgetFailures: state.widgetFailures,
+  });
+
 interface AutosaveScheduleDecisionInput {
-  failedStateKey: string | null;
-  lastSavedStateKey: string;
-  persistedStateKey: string;
-  scheduledStateKey: string | null;
+  failedPersistedRevision: number | null;
+  lastSavedPersistedRevision: number;
+  persistedRevision: number;
+  scheduledPersistedRevision: number | null;
 }
 
 interface AutosaveScheduleDecision {
-  failedStateKey: string | null;
+  failedPersistedRevision: number | null;
   shouldSchedule: boolean;
 }
 
 export const getAutosaveScheduleDecision = ({
-  failedStateKey,
-  lastSavedStateKey,
-  persistedStateKey,
-  scheduledStateKey,
+  failedPersistedRevision,
+  lastSavedPersistedRevision,
+  persistedRevision,
+  scheduledPersistedRevision,
 }: AutosaveScheduleDecisionInput): AutosaveScheduleDecision => {
-  if (persistedStateKey === lastSavedStateKey) {
-    return { failedStateKey: null, shouldSchedule: false };
+  if (persistedRevision === lastSavedPersistedRevision) {
+    return { failedPersistedRevision: null, shouldSchedule: false };
   }
 
-  if (persistedStateKey === scheduledStateKey) {
-    return { failedStateKey, shouldSchedule: false };
+  if (persistedRevision === scheduledPersistedRevision) {
+    return { failedPersistedRevision, shouldSchedule: false };
   }
 
-  if (persistedStateKey === failedStateKey) {
-    return { failedStateKey, shouldSchedule: false };
+  if (persistedRevision === failedPersistedRevision) {
+    return { failedPersistedRevision, shouldSchedule: false };
   }
 
-  return { failedStateKey: null, shouldSchedule: true };
+  return { failedPersistedRevision: null, shouldSchedule: true };
 };
+
+export const isAutosaveCompletionCurrent = ({
+  completedPersistedRevision,
+  completedStateKey,
+  currentPersistedRevision,
+  currentStateKey,
+}: {
+  completedPersistedRevision: number;
+  completedStateKey: string;
+  currentPersistedRevision: number;
+  currentStateKey: string;
+}): boolean => completedPersistedRevision === currentPersistedRevision && completedStateKey === currentStateKey;

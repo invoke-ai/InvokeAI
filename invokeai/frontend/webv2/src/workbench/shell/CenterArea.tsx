@@ -1,5 +1,9 @@
 import type { WidgetRegionDropState } from '@workbench/widgetDnd';
-import type { PlacedWidgetRegionItem, WidgetRegionItem } from '@workbench/widgetRegionViewModel';
+import type {
+  PlacedWidgetRegionItem,
+  WidgetPlacementInstanceMeta,
+  WidgetRegionItem,
+} from '@workbench/widgetRegionViewModel';
 
 import { Box, Flex, Text } from '@chakra-ui/react';
 import { horizontalListSortingStrategy } from '@dnd-kit/sortable';
@@ -9,7 +13,7 @@ import { WidgetIcon } from '@workbench/iconResolver';
 import {
   WidgetEnableMenu,
   WidgetInstanceContextMenu,
-  WidgetRenderer,
+  WidgetRendererById,
   WidgetStrip,
   useWidgetSortable,
   type WidgetEnableMenuItem,
@@ -26,13 +30,12 @@ import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { type MouseEvent, useState } from 'react';
 
-type CenterWidgetItem = PlacedWidgetRegionItem;
+type CenterWidgetItem = PlacedWidgetRegionItem<WidgetPlacementInstanceMeta>;
 
 /** Center work area: the view tab strip plus the active registered center view. */
 export const CenterArea = ({ dropState }: { dropState: WidgetRegionDropState }) => {
   const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const centerRegion = useActiveProjectSelector((project) => project.widgetRegions.center);
-  const widgetInstances = useActiveProjectSelector((project) => project.widgetInstances);
   const dispatch = useWorkbenchDispatch();
   const [enableMenuTarget, setEnableMenuTarget] = useState<{ x: number; y: number } | null>(null);
   const [instanceMenuTarget, setInstanceMenuTarget] = useState<WidgetInstanceContextMenuTarget | null>(null);
@@ -40,7 +43,7 @@ export const CenterArea = ({ dropState }: { dropState: WidgetRegionDropState }) 
   const centerRegionViewModel = createWidgetRegionViewModelFromState({
     region: 'center',
     regionState: centerRegion,
-    widgetInstances,
+    widgetInstances: placementProject.widgetInstances,
     widgets: getWidgetsForRegion('center'),
   });
   const centerWidgetMenuItems = getWidgetRegionItems(centerRegionViewModel);
@@ -116,7 +119,7 @@ export const CenterArea = ({ dropState }: { dropState: WidgetRegionDropState }) 
         <Box flex="1" />
         {centerToolbarItems.map((item) => (
           <Flex key={item.id} align="center" h="full">
-            <WidgetRenderer instance={item.instance} widget={item.widget} presentation="compact" region="center" />
+            <WidgetRendererById instanceId={item.id} widget={item.widget} presentation="compact" region="center" />
           </Flex>
         ))}
         <WidgetEnableMenu
@@ -194,7 +197,7 @@ const CenterViewSlot = ({
     return <FallbackCenterView label="Center widget unavailable" />;
   }
 
-  return <WidgetRenderer instance={instance} widget={widget} region="center" />;
+  return <WidgetRendererById instanceId={instance.id} widget={widget} region="center" />;
 };
 
 const FallbackCenterView = ({ label }: { label: string }) => (

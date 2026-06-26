@@ -1,7 +1,7 @@
 import { Box, Flex, Icon, Text } from '@chakra-ui/react';
 import { Scrollable, Tabs } from '@workbench/components/ui';
-import { useCustomNodesSnapshot } from '@workbench/customNodes/nodesStore';
-import { updateNodesUi, useNodesUi, type NodesManagerTab } from '@workbench/customNodes/nodesUiStore';
+import { useCustomNodesSelector } from '@workbench/customNodes/nodesStore';
+import { updateNodesUi, useNodesUiSelector, type NodesManagerTab } from '@workbench/customNodes/nodesUiStore';
 import { NodeActivityBar } from '@workbench/launchpad/nodes/activity/NodeActivityBar';
 import { AddNodesView } from '@workbench/launchpad/nodes/add-nodes/AddNodesView';
 import { NodePackDetail } from '@workbench/launchpad/nodes/detail/NodePackDetail';
@@ -11,8 +11,9 @@ import { HEADER_MIN_HEIGHT } from './layoutConstants';
 
 /** Right side of the nodes manager: selected pack details, Add Nodes, and activity footer. */
 export const DetailPane = () => {
-  const { activePackName, activeTab } = useNodesUi();
-  const { nodePacks } = useCustomNodesSnapshot();
+  const activePackName = useNodesUiSelector((snapshot) => snapshot.activePackName);
+  const activeTab = useNodesUiSelector((snapshot) => snapshot.activeTab);
+  const nodePacks = useCustomNodesSelector((snapshot) => snapshot.nodePacks);
   const activePack = nodePacks.find((pack) => pack.name === activePackName) ?? null;
   const detailLabel = activePack?.name ?? 'Node Pack Details';
 
@@ -51,7 +52,7 @@ export const DetailPane = () => {
 };
 
 const DetailTab = ({ packName }: { packName: string | null }) => {
-  const { nodePacks } = useCustomNodesSnapshot();
+  const nodePacks = useCustomNodesSelector((snapshot) => snapshot.nodePacks);
   const activePack = nodePacks.find((pack) => pack.name === packName) ?? null;
 
   if (!activePack) {

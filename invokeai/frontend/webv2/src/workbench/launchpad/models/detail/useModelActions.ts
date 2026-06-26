@@ -11,11 +11,13 @@ import { useCallback } from 'react';
  * library row context menu so behavior and notifications stay identical.
  * Confirmation UI is the caller's job; these just act and notify.
  */
+type ModelActionTarget = Pick<ModelConfig, 'key' | 'name'>;
+
 export const useModelActions = () => {
   const notify = useNotify();
 
   const remove = useCallback(
-    async (model: ModelConfig) => {
+    async (model: ModelActionTarget) => {
       try {
         await deleteModel(model.key);
         removeModelsFromStore([model.key]);
@@ -29,7 +31,7 @@ export const useModelActions = () => {
   );
 
   const convert = useCallback(
-    async (model: ModelConfig) => {
+    async (model: ModelActionTarget) => {
       try {
         replaceModelInStore(await convertModelToDiffusers(model.key));
         notify.success('Converted to diffusers', model.name);
@@ -41,7 +43,7 @@ export const useModelActions = () => {
   );
 
   const reidentify = useCallback(
-    async (model: ModelConfig) => {
+    async (model: ModelActionTarget) => {
       try {
         replaceModelInStore(await reidentifyModel(model.key));
         notify.success('Model re-identified', model.name);

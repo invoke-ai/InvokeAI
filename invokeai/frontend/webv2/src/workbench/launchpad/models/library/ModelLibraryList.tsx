@@ -1,10 +1,8 @@
-import type { ModelConfig } from '@workbench/models/types';
-
 import { Box, Checkbox, Flex, HStack, Icon, Image, ScrollArea, Spinner, Stack, Text } from '@chakra-ui/react';
 import { defaultRangeExtractor, useVirtualizer, type Range } from '@tanstack/react-virtual';
 import { Button, Row } from '@workbench/components/ui';
 import { EmptyState } from '@workbench/components/ui/EmptyState';
-import { ModelBadgeRow } from '@workbench/launchpad/models/detail/ModelBadges';
+import { MissingFileBadge, ModelBaseBadge, ModelFormatBadge } from '@workbench/launchpad/models/detail/ModelBadges';
 import { getModelImageUrl } from '@workbench/models/api';
 import {
   filterModels,
@@ -12,11 +10,11 @@ import {
   groupModelsByType,
   type ModelLibraryFilters,
 } from '@workbench/models/library';
-import { useModelsSnapshot } from '@workbench/models/modelsStore';
+import { useModelsSelector } from '@workbench/models/modelsStore';
 import { formatBytes } from '@workbench/models/taxonomy';
 import { getLibraryScrollOffset, openModelManagerTab, saveLibraryScrollOffset } from '@workbench/models/uiStore';
 import { ArrowRightIcon, BoxIcon, CircleAlert } from 'lucide-react';
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ModelRowContextMenu, type ModelContextMenuTarget } from './ModelRowContextMenu';
 
@@ -44,18 +42,36 @@ export const ModelLibraryList = ({
   filters: ModelLibraryFilters;
   /** Identifies this list's scroll-offset slot ('panel', 'manager', ...). */
   instanceId: string;
-  onActivate: (model: ModelConfig) => void;
+  onActivate: (modelKey: string) => void;
   /** Present in the manager library: enables bulk-select checkboxes. */
-  onToggleSelected?: (model: ModelConfig) => void;
+  onToggleSelected?: (modelKey: string) => void;
   selectedKeys?: ReadonlySet<string>;
 }) => {
-  const { coverImageVersions, error, missingModelKeys, models, status } = useModelsSnapshot();
+  const { coverImageVersions, error, missingModelKeys, models, status } = useModelsSelector(
+    (snapshot) => ({
+      coverImageVersions: snapshot.coverImageVersions,
+      error: snapshot.error,
+      missingModelKeys: snapshot.missingModelKeys,
+      models: snapshot.models,
+      status: snapshot.status,
+    }),
+    (left, right) =>
+      left.coverImageVersions === right.coverImageVersions &&
+      left.error === right.error &&
+      left.missingModelKeys === right.missingModelKeys &&
+      left.models === right.models &&
+      left.status === right.status
+  );
   const deferredFilters = useDeferredValue(filters);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [contextMenuTarget, setContextMenuTarget] = useState<ModelContextMenuTarget | null>(null);
   const openAddModels = () => {
     openModelManagerTab('add');
   };
+  const handleContextMenu = useCallback(
+    (modelKey: string, x: number, y: number) => setContextMenuTarget({ modelKey, x, y }),
+    []
+  );
 
   const rows = useMemo(
     () => flattenGroupsToRows(groupModelsByType(filterModels(models, deferredFilters, missingModelKeys))),
@@ -81,6 +97,11 @@ export const ModelLibraryList = ({
   const virtualizer = useVirtualizer({
     count: rows.length,
     estimateSize: (index) => (rows[index]?.kind === 'header' ? HEADER_ROW_HEIGHT_PX : MODEL_ROW_HEIGHT_PX),
+    getItemKey: (index) => {
+      const row = rows[index];
+
+      return row?.kind === 'model' ? row.model.key : `header:${row?.group.type ?? index}`;
+    },
     getScrollElement: () => scrollRef.current,
     initialOffset: () => getLibraryScrollOffset(instanceId),
     overscan: 8,
@@ -143,31 +164,31 @@ export const ModelLibraryList = ({
                   return null;
                 }
 
-                return (
-                  <Box
+                return row.kind === 'header' ? (
+                  <VirtualHeaderRow
                     key={virtualRow.key}
-                    left="0"
-                    position="absolute"
-                    top="0"
-                    transform={`translateY(${virtualRow.start}px)`}
-                    w="full"
-                    px="3"
-                  >
-                    {row.kind === 'header' ? (
-                      <GroupHeader count={row.group.models.length} label={row.group.label} />
-                    ) : (
-                      <ModelRow
-                        imageVersion={coverImageVersions[row.model.key]}
-                        isActive={row.model.key === activeModelKey}
-                        isMissing={missingModelKeys.has(row.model.key)}
-                        isSelected={selectedKeys?.has(row.model.key) ?? false}
-                        model={row.model}
-                        onActivate={onActivate}
-                        onContextMenu={(model, x, y) => setContextMenuTarget({ model, x, y })}
-                        onToggleSelected={onToggleSelected}
-                      />
-                    )}
-                  </Box>
+                    count={row.group.models.length}
+                    label={row.group.label}
+                    virtualStart={virtualRow.start}
+                  />
+                ) : (
+                  <VirtualModelRow
+                    key={virtualRow.key}
+                    base={row.model.base}
+                    coverImage={row.model.cover_image}
+                    fileSize={row.model.file_size}
+                    format={row.model.format}
+                    imageVersion={coverImageVersions[row.model.key]}
+                    isActive={row.model.key === activeModelKey}
+                    isMissing={missingModelKeys.has(row.model.key)}
+                    isSelected={selectedKeys?.has(row.model.key) ?? false}
+                    modelKey={row.model.key}
+                    name={row.model.name}
+                    virtualStart={virtualRow.start}
+                    onActivate={onActivate}
+                    onContextMenu={handleContextMenu}
+                    onToggleSelected={onToggleSelected}
+                  />
                 );
               })}
             </Box>
@@ -200,81 +221,137 @@ const GroupHeader = ({ count, label }: { count: number; label: string }) => (
   </HStack>
 );
 
-const ModelRow = ({
-  imageVersion,
-  isActive,
-  isMissing,
-  isSelected,
-  model,
-  onActivate,
-  onContextMenu,
-  onToggleSelected,
-}: {
-  /** Cover-image cache-bust version from the models store. */
+interface VirtualHeaderRowProps {
+  count: number;
+  label: string;
+  virtualStart: number;
+}
+
+const VirtualHeaderRow = memo(function VirtualHeaderRow({ count, label, virtualStart }: VirtualHeaderRowProps) {
+  return (
+    <Box left="0" position="absolute" top="0" transform={`translateY(${virtualStart}px)`} w="full" px="3">
+      <GroupHeader count={count} label={label} />
+    </Box>
+  );
+});
+
+interface ModelRowProps {
+  base: Parameters<typeof ModelBaseBadge>[0]['base'];
+  coverImage?: string | null;
+  fileSize: number;
+  format: Parameters<typeof ModelFormatBadge>[0]['format'];
   imageVersion?: number;
   isActive: boolean;
   isMissing: boolean;
   isSelected: boolean;
-  model: ModelConfig;
-  onActivate: (model: ModelConfig) => void;
-  onContextMenu: (model: ModelConfig, x: number, y: number) => void;
-  onToggleSelected?: (model: ModelConfig) => void;
-}) => (
-  <Row
-    active={isActive ? 'accent' : isSelected ? 'muted' : 'none'}
-    aria-current={isActive || undefined}
-    h={`${MODEL_ROW_HEIGHT_PX - 4}px`}
-    mb="1"
-    minW="0"
-    px="2"
-    role="button"
-    rounded="md"
-    tabIndex={0}
-    _focusVisible={{ boxShadow: 'inset 0 0 0 2px {colors.accent.solid}', outline: 'none' }}
-    onClick={() => onActivate(model)}
-    onContextMenu={(event) => {
-      event.preventDefault();
-      onContextMenu(model, event.clientX, event.clientY);
-    }}
-    onKeyDown={(event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        onActivate(model);
-      }
-    }}
-  >
-    {onToggleSelected ? (
-      <Checkbox.Root
-        aria-label={`Select ${model.name}`}
-        checked={isSelected}
-        colorPalette="accent"
-        size="xs"
-        onCheckedChange={() => onToggleSelected(model)}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <Checkbox.HiddenInput />
-        <Checkbox.Control />
-      </Checkbox.Root>
-    ) : null}
-    {/* Keyed by version so a stale load error clears when the image changes. */}
-    <ModelRowThumbnail key={imageVersion ?? 0} imageVersion={imageVersion} model={model} />
-    <Stack flex="1" gap="0.5" minW="0">
-      <Text fontSize="xs" fontWeight="600" truncate>
-        {model.name}
-      </Text>
-      <ModelBadgeRow isMissing={isMissing} model={model} />
-    </Stack>
-    <Text color={isActive ? 'accent.solid' : 'fg.subtle'} flexShrink={0} fontSize="2xs">
-      {formatBytes(model.file_size)}
-    </Text>
-  </Row>
-);
+  modelKey: string;
+  name: string;
+  onActivate: (modelKey: string) => void;
+  onContextMenu: (modelKey: string, x: number, y: number) => void;
+  onToggleSelected?: (modelKey: string) => void;
+}
 
-const ModelRowThumbnail = ({ imageVersion, model }: { imageVersion?: number; model: ModelConfig }) => {
+interface VirtualModelRowProps extends ModelRowProps {
+  virtualStart: number;
+}
+
+const VirtualModelRow = memo(function VirtualModelRow({ virtualStart, ...rowProps }: VirtualModelRowProps) {
+  return (
+    <Box left="0" position="absolute" top="0" transform={`translateY(${virtualStart}px)`} w="full" px="3">
+      <ModelRow {...rowProps} />
+    </Box>
+  );
+});
+
+const ModelRow = memo(function ModelRow({
+  base,
+  coverImage,
+  fileSize,
+  format,
+  imageVersion,
+  isActive,
+  isMissing,
+  isSelected,
+  modelKey,
+  name,
+  onActivate,
+  onContextMenu,
+  onToggleSelected,
+}: ModelRowProps) {
+  return (
+    <Row
+      active={isActive ? 'accent' : isSelected ? 'muted' : 'none'}
+      aria-current={isActive || undefined}
+      h={`${MODEL_ROW_HEIGHT_PX - 4}px`}
+      mb="1"
+      minW="0"
+      px="2"
+      role="button"
+      rounded="md"
+      tabIndex={0}
+      _focusVisible={{ boxShadow: 'inset 0 0 0 2px {colors.accent.solid}', outline: 'none' }}
+      onClick={() => onActivate(modelKey)}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        onContextMenu(modelKey, event.clientX, event.clientY);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onActivate(modelKey);
+        }
+      }}
+    >
+      {onToggleSelected ? (
+        <Checkbox.Root
+          aria-label={`Select ${name}`}
+          checked={isSelected}
+          colorPalette="accent"
+          size="xs"
+          onCheckedChange={() => onToggleSelected(modelKey)}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <Checkbox.HiddenInput />
+          <Checkbox.Control />
+        </Checkbox.Root>
+      ) : null}
+      {/* Keyed by version so a stale load error clears when the image changes. */}
+      <ModelRowThumbnail
+        key={`${modelKey}:${imageVersion ?? 0}`}
+        coverImage={coverImage}
+        imageVersion={imageVersion}
+        modelKey={modelKey}
+      />
+      <Stack flex="1" gap="0.5" minW="0">
+        <Text fontSize="xs" fontWeight="600" truncate>
+          {name}
+        </Text>
+        <HStack gap="1" minW="0" wrap="wrap">
+          <ModelBaseBadge base={base} />
+          <ModelFormatBadge format={format} />
+          {isMissing ? <MissingFileBadge /> : null}
+        </HStack>
+      </Stack>
+      <Text color={isActive ? 'accent.solid' : 'fg.subtle'} flexShrink={0} fontSize="2xs">
+        {formatBytes(fileSize)}
+      </Text>
+    </Row>
+  );
+});
+
+const ModelRowThumbnail = ({
+  coverImage,
+  imageVersion,
+  modelKey,
+}: {
+  coverImage?: string | null;
+  imageVersion?: number;
+  modelKey: string;
+}) => {
   // The cover_image marker can be stale; fall back to the icon on load error.
   const [hasImageError, setHasImageError] = useState(false);
 
-  if (!model.cover_image || hasImageError) {
+  if (!coverImage || hasImageError) {
     return (
       <Flex
         align="center"
@@ -300,7 +377,7 @@ const ModelRowThumbnail = ({ imageVersion, model }: { imageVersion?: number; mod
       flexShrink={0}
       loading="lazy"
       rounded="md"
-      src={getModelImageUrl(model.key, imageVersion ? String(imageVersion) : undefined)}
+      src={getModelImageUrl(modelKey, imageVersion ? String(imageVersion) : undefined)}
       onError={() => setHasImageError(true)}
     />
   );

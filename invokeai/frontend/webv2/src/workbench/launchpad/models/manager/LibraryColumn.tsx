@@ -5,29 +5,42 @@ import { ModelFilterBar } from '@workbench/launchpad/models/library/ModelFilterB
 import { ModelLibraryList } from '@workbench/launchpad/models/library/ModelLibraryList';
 import { bulkDeleteModels } from '@workbench/models/api';
 import { collectBases, collectTypes } from '@workbench/models/library';
-import { refreshModels, removeModelsFromStore, useModelsSnapshot } from '@workbench/models/modelsStore';
+import { refreshModels, removeModelsFromStore, useModelsSelector } from '@workbench/models/modelsStore';
 import {
   openModelDetail,
   pruneModelsUiKeys,
   toggleModelSelection,
   updateModelsUi,
-  useModelsUi,
+  useModelsUiSelector,
 } from '@workbench/models/uiStore';
 import { useNotify } from '@workbench/useNotify';
 import { Trash2Icon, XIcon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { HEADER_MIN_HEIGHT, LIBRARY_WIDTH } from './layoutConstants';
 
 /** The persistent master list: header, search/filter bar, and bulk actions. */
 export const LibraryColumn = () => {
   const notify = useNotify();
-  const { missingModelKeys, models } = useModelsSnapshot();
-  const { activeModelKey, filters, selectedKeys } = useModelsUi();
+  const models = useModelsSelector((snapshot) => snapshot.models);
+  const missingCount = useModelsSelector((snapshot) => snapshot.missingModelKeys.size);
+  const { activeModelKey, filters, selectedKeys } = useModelsUiSelector(
+    (snapshot) => ({
+      activeModelKey: snapshot.activeModelKey,
+      filters: snapshot.filters,
+      selectedKeys: snapshot.selectedKeys,
+    }),
+    (left, right) =>
+      left.activeModelKey === right.activeModelKey &&
+      left.filters === right.filters &&
+      left.selectedKeys === right.selectedKeys
+  );
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
 
   const availableTypes = useMemo(() => collectTypes(models), [models]);
   const availableBases = useMemo(() => collectBases(models), [models]);
+  const handleActivate = useCallback((modelKey: string) => openModelDetail(modelKey), []);
+  const handleToggleSelected = useCallback((modelKey: string) => toggleModelSelection(modelKey), []);
 
   const handleBulkDelete = async () => {
     const keys = [...selectedKeys];
@@ -74,7 +87,7 @@ export const LibraryColumn = () => {
         availableBases={availableBases}
         availableTypes={availableTypes}
         filters={filters}
-        missingCount={missingModelKeys.size}
+        missingCount={missingCount}
         onChange={(nextFilters) => updateModelsUi({ filters: nextFilters })}
       />
 
@@ -83,8 +96,8 @@ export const LibraryColumn = () => {
         filters={filters}
         instanceId="manager"
         selectedKeys={selectedKeys}
-        onActivate={(model) => openModelDetail(model.key)}
-        onToggleSelected={(model) => toggleModelSelection(model.key)}
+        onActivate={handleActivate}
+        onToggleSelected={handleToggleSelected}
       />
 
       {selectedKeys.size > 0 ? (

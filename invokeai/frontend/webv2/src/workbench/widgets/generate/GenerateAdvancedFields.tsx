@@ -14,6 +14,7 @@ interface GenerateAdvancedFieldsProps {
   settings: GenerateSettings;
   selectedModel: GenerateModelConfig | undefined;
   onCommit: (patch: Partial<GenerateSettings>) => void;
+  onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
 }
 
 const SeamlessSwitch = ({
@@ -34,7 +35,12 @@ const SeamlessSwitch = ({
   </Switch.Root>
 );
 
-export const GenerateAdvancedFields = ({ onCommit, selectedModel, settings }: GenerateAdvancedFieldsProps) => {
+export const GenerateAdvancedFields = ({
+  onCommit,
+  onCommitImmediate,
+  selectedModel,
+  settings,
+}: GenerateAdvancedFieldsProps) => {
   const modelBase = selectedModel?.base;
   const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
   const policy = getGenerationUiPolicy(selectedModel, settings);
@@ -89,12 +95,12 @@ export const GenerateAdvancedFields = ({ onCommit, selectedModel, settings }: Ge
                   size="xs"
                   placeholder="Model default"
                   value={settings.vae?.key ?? null}
-                  onChange={(model) => onCommit({ vae: isVaeModelConfig(model) ? model : null })}
+                  onChange={(model) => onCommitImmediate({ vae: isVaeModelConfig(model) ? model : null })}
                 />
                 <ModelDefaultButton
                   disabled={!settings.vae}
                   label="Use model default VAE"
-                  onClick={() => onCommit({ vae: null })}
+                  onClick={() => onCommitImmediate({ vae: null })}
                 />
               </HStack>
             </Field>

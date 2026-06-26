@@ -22,6 +22,8 @@ export const setConnectionStatus = (status: BackendConnectionStatus, error?: str
 
 export const getConnectionStatus = (): ConnectionSnapshot => store.getSnapshot();
 
+export const useConnectionStatusSelector = store.useSelector;
+
 export const useConnectionStatus = (): ConnectionSnapshot => store.useSnapshot();
 
 export const subscribeConnection = (listener: () => void): (() => void) => store.subscribe(listener);

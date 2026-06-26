@@ -33,4 +33,4 @@ export const clearCustomNodeInstallLog = (): void => {
   store.patchSnapshot({ log: [] });
 };
 
-export const useCustomNodeInstallLog = (): CustomNodeInstallLogEntry[] => store.useSnapshot().log;
+export const useCustomNodeInstallLog = (): CustomNodeInstallLogEntry[] => store.useSelector((snapshot) => snapshot.log);

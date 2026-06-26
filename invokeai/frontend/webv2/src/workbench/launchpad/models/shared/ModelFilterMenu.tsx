@@ -7,6 +7,7 @@ import { IconButton, MenuContent } from '@workbench/components/ui';
 import { getModelBaseLabel } from '@workbench/models/baseIdentity';
 import { getModelTypeLabel } from '@workbench/models/taxonomy';
 import { CheckIcon, SlidersHorizontalIcon } from 'lucide-react';
+import { memo } from 'react';
 
 export interface ModelFilterSortOption {
   field: ModelSortField;
@@ -68,20 +69,18 @@ export const ModelFilterMenu = ({
             <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
               Model Type
             </Menu.ItemGroupLabel>
-            <FilterMenuItem
+            <AllTypesFilterMenuItem
               isChecked={typeAllChecked ?? typeFilter === null}
               label={typeAllLabel}
-              value="type-all"
-              onSelect={() => onTypeFilterChange(null)}
+              onTypeFilterChange={onTypeFilterChange}
             />
             {extraTypeItems}
             {availableTypes.map((type) => (
-              <FilterMenuItem
+              <TypeFilterMenuItem
                 key={type}
-                isChecked={typeFilter === type}
-                label={getModelTypeLabel(type)}
-                value={`type-${type}`}
-                onSelect={() => onTypeFilterChange(typeFilter === type ? null : type)}
+                type={type}
+                typeFilter={typeFilter}
+                onTypeFilterChange={onTypeFilterChange}
               />
             ))}
           </Menu.ItemGroup>
@@ -90,19 +89,13 @@ export const ModelFilterMenu = ({
             <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
               Base Architecture
             </Menu.ItemGroupLabel>
-            <FilterMenuItem
-              isChecked={baseFilter === null}
-              label="All bases"
-              value="base-all"
-              onSelect={() => onBaseFilterChange(null)}
-            />
+            <AllBasesFilterMenuItem isChecked={baseFilter === null} onBaseFilterChange={onBaseFilterChange} />
             {availableBases.map((base) => (
-              <FilterMenuItem
+              <BaseFilterMenuItem
                 key={base}
-                isChecked={baseFilter === base}
-                label={getModelBaseLabel(base)}
-                value={`base-${base}`}
-                onSelect={() => onBaseFilterChange(baseFilter === base ? null : base)}
+                base={base}
+                baseFilter={baseFilter}
+                onBaseFilterChange={onBaseFilterChange}
               />
             ))}
           </Menu.ItemGroup>
@@ -112,15 +105,13 @@ export const ModelFilterMenu = ({
               Sort By
             </Menu.ItemGroupLabel>
             {sortFields.map(({ field, label }) => (
-              <FilterMenuItem
+              <SortFilterMenuItem
                 key={field}
-                isChecked={sortField === field}
+                field={field}
                 label={label}
-                value={`sort-${field}`}
-                onSelect={() =>
-                  onSortChange(field, sortField === field ? (sortDirection === 'asc' ? 'desc' : 'asc') : 'asc')
-                }
-                trailing={sortField === field ? (sortDirection === 'asc' ? 'Asc' : 'Desc') : undefined}
+                sortDirection={sortDirection}
+                sortField={sortField}
+                onSortChange={onSortChange}
               />
             ))}
           </Menu.ItemGroup>
@@ -131,26 +122,123 @@ export const ModelFilterMenu = ({
 );
 
 /** Checkmark-style menu item shared by the model filter menus. */
-export const FilterMenuItem = ({
-  isChecked,
-  label,
-  onSelect,
-  trailing,
-  value,
-}: {
+interface FilterMenuItemProps {
   isChecked: boolean;
   label: string;
   onSelect: () => void;
   trailing?: string;
   value: string;
-}) => (
-  <Menu.Item aria-checked={isChecked} closeOnSelect={false} role="menuitemcheckbox" value={value} onClick={onSelect}>
-    <Icon as={CheckIcon} boxSize="3" opacity={isChecked ? 1 : 0} />
-    <Menu.ItemText fontSize="xs">{label}</Menu.ItemText>
-    {trailing ? (
-      <Text color="fg.subtle" fontSize="2xs" ms="auto">
-        {trailing}
-      </Text>
-    ) : null}
-  </Menu.Item>
-);
+}
+
+export const FilterMenuItem = memo(function FilterMenuItem({
+  isChecked,
+  label,
+  onSelect,
+  trailing,
+  value,
+}: FilterMenuItemProps) {
+  return (
+    <Menu.Item aria-checked={isChecked} closeOnSelect={false} role="menuitemcheckbox" value={value} onClick={onSelect}>
+      <Icon as={CheckIcon} boxSize="3" opacity={isChecked ? 1 : 0} />
+      <Menu.ItemText fontSize="xs">{label}</Menu.ItemText>
+      {trailing ? (
+        <Text color="fg.subtle" fontSize="2xs" ms="auto">
+          {trailing}
+        </Text>
+      ) : null}
+    </Menu.Item>
+  );
+});
+
+const AllTypesFilterMenuItem = memo(function AllTypesFilterMenuItem({
+  isChecked,
+  label,
+  onTypeFilterChange,
+}: {
+  isChecked: boolean;
+  label: string;
+  onTypeFilterChange: (type: ModelTaxonomyType | null) => void;
+}) {
+  return (
+    <FilterMenuItem isChecked={isChecked} label={label} value="type-all" onSelect={() => onTypeFilterChange(null)} />
+  );
+});
+
+const TypeFilterMenuItem = memo(function TypeFilterMenuItem({
+  type,
+  typeFilter,
+  onTypeFilterChange,
+}: {
+  type: ModelTaxonomyType;
+  typeFilter: ModelTaxonomyType | null;
+  onTypeFilterChange: (type: ModelTaxonomyType | null) => void;
+}) {
+  return (
+    <FilterMenuItem
+      isChecked={typeFilter === type}
+      label={getModelTypeLabel(type)}
+      value={`type-${type}`}
+      onSelect={() => onTypeFilterChange(typeFilter === type ? null : type)}
+    />
+  );
+});
+
+const AllBasesFilterMenuItem = memo(function AllBasesFilterMenuItem({
+  isChecked,
+  onBaseFilterChange,
+}: {
+  isChecked: boolean;
+  onBaseFilterChange: (base: string | null) => void;
+}) {
+  return (
+    <FilterMenuItem
+      isChecked={isChecked}
+      label="All bases"
+      value="base-all"
+      onSelect={() => onBaseFilterChange(null)}
+    />
+  );
+});
+
+const BaseFilterMenuItem = memo(function BaseFilterMenuItem({
+  base,
+  baseFilter,
+  onBaseFilterChange,
+}: {
+  base: string;
+  baseFilter: string | null;
+  onBaseFilterChange: (base: string | null) => void;
+}) {
+  return (
+    <FilterMenuItem
+      isChecked={baseFilter === base}
+      label={getModelBaseLabel(base)}
+      value={`base-${base}`}
+      onSelect={() => onBaseFilterChange(baseFilter === base ? null : base)}
+    />
+  );
+});
+
+const SortFilterMenuItem = memo(function SortFilterMenuItem({
+  field,
+  label,
+  sortDirection,
+  sortField,
+  onSortChange,
+}: {
+  field: ModelSortField;
+  label: string;
+  sortDirection: 'asc' | 'desc';
+  sortField: ModelSortField;
+  onSortChange: (field: ModelSortField, direction: 'asc' | 'desc') => void;
+}) {
+  return (
+    <FilterMenuItem
+      isChecked={sortField === field}
+      label={label}
+      value={`sort-${field}`}
+      onSelect={() => onSortChange(field, sortField === field ? (sortDirection === 'asc' ? 'desc' : 'asc') : 'asc')}
+      trailing={sortField === field ? (sortDirection === 'asc' ? 'Asc' : 'Desc') : undefined}
+    />
+  );
+});

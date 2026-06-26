@@ -1,6 +1,6 @@
 import type { WidgetInstanceId } from '@workbench/types';
 import type { WidgetRegionDropState } from '@workbench/widgetDnd';
-import type { PlacedWidgetRegionItem } from '@workbench/widgetRegionViewModel';
+import type { PlacedWidgetRegionItem, WidgetPlacementInstanceMeta } from '@workbench/widgetRegionViewModel';
 
 import { Box } from '@chakra-ui/react';
 import { horizontalListSortingStrategy } from '@dnd-kit/sortable';
@@ -8,7 +8,7 @@ import { Row, Tooltip } from '@workbench/components/ui';
 import {
   WidgetEnableMenu,
   WidgetInstanceContextMenu,
-  WidgetRenderer,
+  WidgetRendererById,
   WidgetStrip,
   useWidgetSortable,
   type WidgetEnableMenuItem,
@@ -26,21 +26,20 @@ import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { type KeyboardEvent, type MouseEvent, useState } from 'react';
 
-interface BottomWidgetItem extends PlacedWidgetRegionItem {
+interface BottomWidgetItem extends PlacedWidgetRegionItem<WidgetPlacementInstanceMeta> {
   isExpandable: boolean;
 }
 
 export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) => {
   const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const bottomRegion = useActiveProjectSelector((project) => project.widgetRegions.bottom);
-  const widgetInstances = useActiveProjectSelector((project) => project.widgetInstances);
   const dispatch = useWorkbenchDispatch();
   const [enableMenuTarget, setEnableMenuTarget] = useState<{ x: number; y: number } | null>(null);
   const [instanceMenuTarget, setInstanceMenuTarget] = useState<WidgetInstanceContextMenuTarget | null>(null);
   const bottomRegionViewModel = createWidgetRegionViewModelFromState({
     region: 'bottom',
     regionState: bottomRegion,
-    widgetInstances,
+    widgetInstances: placementProject.widgetInstances,
     widgets: getWidgetsForRegion('bottom'),
   });
   const items = getWidgetRegionItems(bottomRegionViewModel);
@@ -184,7 +183,7 @@ const CompactBottomWidget = ({
         onContextMenu={(event) => onContextMenu(item, event)}
       >
         {item.instance ? (
-          <WidgetRenderer instance={item.instance} widget={item.widget} presentation="compact" region="bottom" />
+          <WidgetRendererById instanceId={item.id} widget={item.widget} presentation="compact" region="bottom" />
         ) : null}
       </Row>
     </Box>
@@ -208,7 +207,7 @@ const CompactBottomWidget = ({
       closeDelay={80}
       content={
         item.instance ? (
-          <WidgetRenderer instance={item.instance} widget={item.widget} presentation="tooltip" region="bottom" />
+          <WidgetRendererById instanceId={item.id} widget={item.widget} presentation="tooltip" region="bottom" />
         ) : null
       }
       openDelay={250}

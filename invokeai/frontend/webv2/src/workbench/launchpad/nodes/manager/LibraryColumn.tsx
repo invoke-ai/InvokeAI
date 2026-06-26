@@ -1,6 +1,6 @@
 import { Box, Flex, HStack, Text } from '@chakra-ui/react';
-import { useCustomNodesSnapshot } from '@workbench/customNodes/nodesStore';
-import { openNodePackDetail, updateNodesUi, useNodesUi } from '@workbench/customNodes/nodesUiStore';
+import { useCustomNodesSelector } from '@workbench/customNodes/nodesStore';
+import { openNodePackDetail, updateNodesUi, useNodesUiSelector } from '@workbench/customNodes/nodesUiStore';
 import { NodePackList } from '@workbench/launchpad/nodes/library/NodePackList';
 
 import { HEADER_MIN_HEIGHT, PACK_LIBRARY_WIDTH } from './layoutConstants';
@@ -8,8 +8,11 @@ import { ReloadNodesButton } from './ReloadNodesButton';
 
 /** Persistent custom-node pack list, matching the model manager's library column. */
 export const LibraryColumn = () => {
-  const { activePackName, searchTerm } = useNodesUi();
-  const { error, nodePacks, status } = useCustomNodesSnapshot();
+  const activePackName = useNodesUiSelector((snapshot) => snapshot.activePackName);
+  const searchTerm = useNodesUiSelector((snapshot) => snapshot.searchTerm);
+  const error = useCustomNodesSelector((snapshot) => snapshot.error);
+  const nodePacks = useCustomNodesSelector((snapshot) => snapshot.nodePacks);
+  const status = useCustomNodesSelector((snapshot) => snapshot.status);
 
   return (
     <Flex

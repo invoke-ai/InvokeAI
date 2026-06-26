@@ -1,5 +1,6 @@
 import type {
   ContainerFormElement,
+  InvocationTemplates,
   NodeFieldFormElement,
   ProjectGraphState,
   WorkflowFormElement,
@@ -14,7 +15,7 @@ import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { getResolvedWorkflowEdges } from '@workbench/workflows/connectors';
 import { getFormChildren } from '@workbench/workflows/document';
 import { getWorkflowFieldInvalidReason } from '@workbench/workflows/fields';
-import { useInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
+import { useInvocationTemplatesSelector, type InvocationTemplatesSnapshot } from '@workbench/workflows/templates';
 import { isInvocationNode } from '@workbench/workflows/types';
 import {
   Columns2Icon,
@@ -490,11 +491,12 @@ const AddElementMenu = () => {
 
 const getInvalidNodeFieldElementIds = (
   projectGraph: ProjectGraphState,
-  templatesSnapshot: ReturnType<typeof useInvocationTemplatesSnapshot>
+  templatesStatus: InvocationTemplatesSnapshot['status'],
+  templates: InvocationTemplates
 ): Set<string> => {
   const invalidElementIds = new Set<string>();
 
-  if (templatesSnapshot.status !== 'loaded') {
+  if (templatesStatus !== 'loaded') {
     return invalidElementIds;
   }
 
@@ -517,7 +519,7 @@ const getInvalidNodeFieldElementIds = (
       continue;
     }
 
-    const template = templatesSnapshot.templates[node.data.type]?.inputs[fieldName];
+    const template = templates[node.data.type]?.inputs[fieldName];
 
     if (!template) {
       invalidElementIds.add(element.id);
@@ -535,8 +537,10 @@ const getInvalidNodeFieldElementIds = (
 };
 
 export const FormBuilderTab = ({ projectGraph }: { projectGraph: ProjectGraphState }) => {
-  const templatesSnapshot = useInvocationTemplatesSnapshot();
-  const { hoveredNodeId, selectedNodeIds } = workflowSelectionStore.useSnapshot();
+  const templatesStatus = useInvocationTemplatesSelector((snapshot) => snapshot.status);
+  const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
+  const hoveredNodeId = workflowSelectionStore.useSelector((snapshot) => snapshot.hoveredNodeId);
+  const selectedNodeIds = workflowSelectionStore.useSelector((snapshot) => snapshot.selectedNodeIds);
   const [draggingElementId, setDraggingElementId] = useState<string | null>(null);
   const dndContextValue = useMemo<BuilderDndContextValue>(
     () => ({ draggingElementId, setDraggingElementId }),
@@ -544,8 +548,8 @@ export const FormBuilderTab = ({ projectGraph }: { projectGraph: ProjectGraphSta
   );
   const selectedNodeIdSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
   const invalidElementIds = useMemo(
-    () => getInvalidNodeFieldElementIds(projectGraph, templatesSnapshot),
-    [projectGraph, templatesSnapshot]
+    () => getInvalidNodeFieldElementIds(projectGraph, templatesStatus, templates),
+    [projectGraph, templatesStatus, templates]
   );
   const rootChildren = getFormChildren(projectGraph.form);
 

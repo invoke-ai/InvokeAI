@@ -4,12 +4,13 @@ import { Icon, Menu, Portal } from '@chakra-ui/react';
 import { ConfirmDialog, MenuContent } from '@workbench/components/ui';
 import { useModelActions } from '@workbench/launchpad/models/detail/useModelActions';
 import { isConvertibleToDiffusers } from '@workbench/models/baseIdentity';
+import { useModelsSelector } from '@workbench/models/modelsStore';
 import { RefreshCcwIcon, Trash2Icon } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { SiHuggingface } from 'react-icons/si';
 
 export interface ModelContextMenuTarget {
-  model: ModelConfig;
+  modelKey: string;
   x: number;
   y: number;
 }
@@ -32,12 +33,14 @@ export const ModelRowContextMenu = ({
 
   targetRef.current = target;
 
-  const model = target?.model ?? null;
+  const model = useModelsSelector((snapshot) =>
+    target ? (snapshot.models.find((candidate) => candidate.key === target.modelKey) ?? null) : null
+  );
 
   return (
     <>
       <Menu.Root
-        key={target ? target.model.key : 'closed'}
+        key={target ? target.modelKey : 'closed'}
         lazyMount
         open={target !== null}
         positioning={{

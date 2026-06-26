@@ -12,9 +12,9 @@ import {
   ensureInstallsLoaded,
   isActiveInstallStatus,
   refreshInstalls,
-  useInstallsSnapshot,
+  useInstallsSelector,
 } from '@workbench/models/installsStore';
-import { setQueueExpanded, useModelsUi } from '@workbench/models/uiStore';
+import { setQueueExpanded, useModelsUiSelector } from '@workbench/models/uiStore';
 import { useNotify } from '@workbench/useNotify';
 import { ChevronUpIcon, ListOrderedIcon, PauseIcon, PlayIcon, RefreshCcwIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -25,8 +25,10 @@ import { getInstallJobDisplayName } from './queueUtils';
 /** Persistent, collapsible install queue footer for the model manager detail pane. */
 export const InstallQueueBar = () => {
   const notify = useNotify();
-  const { error, jobs, status } = useInstallsSnapshot();
-  const { queueExpanded } = useModelsUi();
+  const error = useInstallsSelector((snapshot) => snapshot.error);
+  const jobs = useInstallsSelector((snapshot) => snapshot.jobs);
+  const status = useInstallsSelector((snapshot) => snapshot.status);
+  const queueExpanded = useModelsUiSelector((snapshot) => snapshot.queueExpanded);
 
   useEffect(() => {
     ensureInstallsLoaded();

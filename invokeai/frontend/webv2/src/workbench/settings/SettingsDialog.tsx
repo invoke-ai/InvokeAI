@@ -32,6 +32,7 @@ import { Button, CloseButton, IconButton, ConfirmDialog, Tabs, Tooltip } from '@
 import { registerHotkeyModalLayer } from '@workbench/hotkeys';
 import { syncedWorkbenchPersistence } from '@workbench/projects/syncedPersistence';
 import {
+  shallowEqual,
   useOptionalWorkbenchDispatch,
   useOptionalWorkbenchSelector,
   useOptionalWorkbenchStore,
@@ -87,7 +88,7 @@ const updatePreferences = (patch: Partial<WorkbenchPreferences>): void => {
  * `openWorkbenchSettings('workflow')`.
  */
 export const SettingsButton = () => {
-  const { isOpen } = settingsDialogStore.useSnapshot();
+  const isOpen = settingsDialogStore.useSelector((snapshot) => snapshot.isOpen);
 
   return (
     <>
@@ -225,7 +226,7 @@ const SettingsTabs = () => {
     },
   ];
   const tabs = SETTINGS_TABS.filter((tab) => tab.condition !== false);
-  const { sectionId } = settingsDialogStore.useSnapshot();
+  const sectionId = settingsDialogStore.useSelector((snapshot) => snapshot.sectionId);
   const activeSectionId = tabs.some((tab) => tab.value === sectionId) ? sectionId : 'appearance';
 
   return (
@@ -397,7 +398,11 @@ const BehaviorSection = () => {
 };
 
 const ProjectSection = () => {
-  const activeProject = useOptionalWorkbenchSelector<Project | null>((snapshot) => snapshot.activeProject, null);
+  const activeProject = useOptionalWorkbenchSelector<Pick<Project, 'name' | 'settings'> | null>(
+    (snapshot) => ({ name: snapshot.activeProject.name, settings: snapshot.activeProject.settings }),
+    null,
+    shallowEqual
+  );
   const dispatch = useOptionalWorkbenchDispatch();
 
   if (!activeProject || !dispatch) {

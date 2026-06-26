@@ -1,6 +1,6 @@
 import type {
   WidgetInstanceId,
-  WidgetInstanceContract,
+  WidgetInstanceRuntimeMeta,
   WidgetManifest,
   WidgetRegion,
   WidgetRuntimeApi,
@@ -134,6 +134,7 @@ export const WidgetPanelFrame = ({
       overflow="hidden"
       minW="0"
       data-hotkey-widget-instance-id={instanceId}
+      data-hotkey-widget-region={region}
       data-hotkey-widget-type-id={typeId}
       {...focusRegionProps}
       {...(isBottom ? { h: `${displaySizePx}px`, w: 'full' } : { h: 'full', w: `${displaySizePx}px` })}
@@ -172,7 +173,7 @@ export const WidgetHeader = ({
   runtime,
 }: {
   actions?: ReactNode;
-  instance: WidgetInstanceContract;
+  instance: WidgetInstanceRuntimeMeta;
   manifest: WidgetManifest;
   region: WorkbenchRegion;
   runtime: WidgetRuntimeApi;

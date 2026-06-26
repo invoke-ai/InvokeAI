@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { createKeyedTransientStore } from '@workbench/externalStore';
 
 import type { InvocationCompleteEvent, InvocationErrorEvent, InvocationStartedEvent } from './events';
 
@@ -24,22 +24,7 @@ export interface NodeExecutionState {
   error: string | null;
 }
 
-const stateByNodeId = new Map<string, NodeExecutionState>();
-const listeners = new Set<() => void>();
-
-const emit = (): void => {
-  for (const listener of listeners) {
-    listener();
-  }
-};
-
-const subscribe = (listener: () => void): (() => void) => {
-  listeners.add(listener);
-
-  return () => {
-    listeners.delete(listener);
-  };
-};
+const stateByNodeId = createKeyedTransientStore<string, NodeExecutionState>();
 
 /** Pull the produced image out of an invocation output, whatever the node type. */
 const getResultImageName = (result: InvocationCompleteEvent['result']): string | null => {
@@ -50,10 +35,7 @@ const getResultImageName = (result: InvocationCompleteEvent['result']): string |
 
 export const nodeExecutionStore = {
   clearAll(): void {
-    if (stateByNodeId.size > 0) {
-      stateByNodeId.clear();
-      emit();
-    }
+    stateByNodeId.clear();
   },
   completed(event: InvocationCompleteEvent): void {
     const imageName = getResultImageName(event.result);
@@ -68,7 +50,6 @@ export const nodeExecutionStore = {
       progressMessage: null,
       status: 'completed',
     });
-    emit();
   },
   failed(event: InvocationErrorEvent): void {
     const previous = stateByNodeId.get(event.invocation_source_id);
@@ -80,7 +61,6 @@ export const nodeExecutionStore = {
       progressMessage: null,
       status: 'failed',
     });
-    emit();
   },
   progress(nodeId: string, percentage: number | null, message: string): void {
     const previous = stateByNodeId.get(nodeId);
@@ -92,21 +72,13 @@ export const nodeExecutionStore = {
       progressMessage: message,
       status: 'running',
     });
-    emit();
   },
   /** A queue item reached a terminal state: nothing can still be running. */
   settleRunning(): void {
-    let changed = false;
-
-    for (const [nodeId, state] of stateByNodeId) {
+    for (const [nodeId, state] of stateByNodeId.entries()) {
       if (state.status === 'running') {
         stateByNodeId.set(nodeId, { ...state, progress: null, progressMessage: null, status: 'completed' });
-        changed = true;
       }
-    }
-
-    if (changed) {
-      emit();
     }
   },
   started(event: InvocationStartedEvent): void {
@@ -119,11 +91,10 @@ export const nodeExecutionStore = {
       progressMessage: null,
       status: 'running',
     });
-    emit();
   },
 };
 
 export type NodeExecutionSink = typeof nodeExecutionStore;
 
 export const useNodeExecutionState = (nodeId: string): NodeExecutionState | null =>
-  useSyncExternalStore(subscribe, () => stateByNodeId.get(nodeId) ?? null);
+  stateByNodeId.useValue(nodeId) ?? null;

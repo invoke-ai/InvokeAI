@@ -1,5 +1,5 @@
 import type { GalleryImage } from '@workbench/gallery/api';
-import type { GenerateModelConfig, VaeModelConfig } from '@workbench/generation/types';
+import type { GenerateModelConfig, GenerateWidgetValues, VaeModelConfig } from '@workbench/generation/types';
 import type { ModelConfig } from '@workbench/models/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';
 import type { Dispatch } from 'react';
@@ -52,25 +52,39 @@ export const getCurrentGenerateValues = ({
   const fallbackModelKey = typeof generateValues.modelKey === 'string' ? generateValues.modelKey : null;
   const fallbackModel = supportedModels.find((model) => model.key === fallbackModelKey) ?? supportedModels[0];
 
-  return fallbackModel ? { ...getDefaultGenerateSettings(fallbackModel), model: fallbackModel } : null;
+  return fallbackModel
+    ? ({
+        ...getDefaultGenerateSettings(fallbackModel),
+        ...generateValues,
+        model: fallbackModel,
+        modelKey: fallbackModel.key,
+      } as GenerateWidgetValues)
+    : null;
 };
 
 export const executeImageRecall = async ({
   dispatch,
   generateValues,
+  getGenerateValues,
   image,
   kind,
   models,
+  projectId,
 }: {
   dispatch: Dispatch<WorkbenchAction>;
   generateValues: Record<string, unknown>;
+  getGenerateValues?: () => Record<string, unknown>;
   image: GalleryImage;
   kind: ImageRecallKind;
   models: ModelConfig[];
+  projectId?: string;
 }): Promise<boolean> => {
   const supportedModels = models.filter(isSupportedGenerateModel);
   const vaeModels = models.filter(isVaeModelConfig).map((model) => model as VaeModelConfig);
-  const currentGenerateValues = getCurrentGenerateValues({ generateValues, supportedModels });
+  const currentGenerateValues = getCurrentGenerateValues({
+    generateValues: getGenerateValues?.() ?? generateValues,
+    supportedModels,
+  });
 
   try {
     if (!currentGenerateValues) {
@@ -104,7 +118,7 @@ export const executeImageRecall = async ({
       return false;
     }
 
-    dispatch({ type: 'setGenerateSettings', values: result.values });
+    dispatch({ projectId, type: 'setGenerateSettings', values: result.values });
     dispatch({
       kind: 'success',
       message: getImageRecallMessage(result.fields),

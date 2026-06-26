@@ -60,4 +60,6 @@ export const removeCustomNodePackFromStore = (packName: string): void => {
   store.patchSnapshot({ nodePacks: store.getSnapshot().nodePacks.filter((pack) => pack.name !== packName) });
 };
 
+export const useCustomNodesSelector = store.useSelector;
+
 export const useCustomNodesSnapshot = (): CustomNodesSnapshot => store.useSnapshot();

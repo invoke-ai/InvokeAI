@@ -1,11 +1,26 @@
 import { Box, Flex, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { Panel } from '@workbench/components/ui';
-import { useActiveProject } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { LayersIcon } from 'lucide-react';
 
 export const LayersWidgetView = () => {
-  const activeProject = useActiveProject();
-  const layers = activeProject.canvas.document.layers;
+  const { eventsCount, graphHistoryCount, layers, redoCount, stagedImageCount, undoCount } = useActiveProjectSelector(
+    (project) => ({
+      eventsCount: project.events.length,
+      graphHistoryCount: project.graphHistory.length,
+      layers: project.canvas.document.layers,
+      redoCount: project.undoRedo.future.length,
+      stagedImageCount: project.canvas.stagingArea.pendingImageIds.length,
+      undoCount: project.undoRedo.past.length,
+    }),
+    (left, right) =>
+      left.eventsCount === right.eventsCount &&
+      left.graphHistoryCount === right.graphHistoryCount &&
+      left.layers === right.layers &&
+      left.redoCount === right.redoCount &&
+      left.stagedImageCount === right.stagedImageCount &&
+      left.undoCount === right.undoCount
+  );
 
   return (
     <>
@@ -24,7 +39,7 @@ export const LayersWidgetView = () => {
       >
         <Icon as={LayersIcon} boxSize="6" />
         <Text fontSize="2xs" textAlign="center">
-          {layers.length} layers, {activeProject.canvas.stagingArea.pendingImageIds.length} staged images.
+          {layers.length} layers, {stagedImageCount} staged images.
         </Text>
       </Flex>
       <Panel gap="2" p="2">
@@ -67,13 +82,13 @@ export const LayersWidgetView = () => {
           Project Contracts
         </Text>
         <Text color="fg.subtle" fontSize="2xs">
-          Graph history: {activeProject.graphHistory.length}
+          Graph history: {graphHistoryCount}
         </Text>
         <Text color="fg.subtle" fontSize="2xs">
-          Events: {activeProject.events.length}
+          Events: {eventsCount}
         </Text>
         <Text color="fg.subtle" fontSize="2xs">
-          Undo: {activeProject.undoRedo.past.length} / Redo: {activeProject.undoRedo.future.length}
+          Undo: {undoCount} / Redo: {redoCount}
         </Text>
       </Panel>
     </>

@@ -1,6 +1,6 @@
 import { Alert, SimpleGrid, Skeleton, Stack } from '@chakra-ui/react';
 import { Button } from '@workbench/components/ui';
-import { refreshProjectLibrary, useProjectLibrary } from '@workbench/projects/library';
+import { refreshProjectLibrary, useProjectLibrarySelector } from '@workbench/projects/library';
 
 import { NewProjectCard } from './NewProjectCard';
 import { ProjectCard } from './ProjectCard';
@@ -11,16 +11,18 @@ import { ProjectCard } from './ProjectCard';
  * leads, so an empty library still presents the next step.
  */
 export const ProjectsGrid = () => {
-  const library = useProjectLibrary();
-  const isFirstLoad = library.summaries.length === 0 && (library.status === 'idle' || library.status === 'loading');
+  const error = useProjectLibrarySelector((snapshot) => snapshot.error);
+  const status = useProjectLibrarySelector((snapshot) => snapshot.status);
+  const summaries = useProjectLibrarySelector((snapshot) => snapshot.summaries);
+  const isFirstLoad = summaries.length === 0 && (status === 'idle' || status === 'loading');
 
   return (
     <Stack gap="3">
-      {library.status === 'error' ? (
+      {status === 'error' ? (
         <Alert.Root borderRadius="md" size="sm" status="error">
           <Alert.Indicator />
           <Alert.Title flex="1" fontSize="xs">
-            {library.error ?? 'Failed to load your projects.'}
+            {error ?? 'Failed to load your projects.'}
           </Alert.Title>
           <Button size="2xs" variant="outline" onClick={() => void refreshProjectLibrary()}>
             Retry
@@ -31,7 +33,7 @@ export const ProjectsGrid = () => {
         <NewProjectCard />
         {isFirstLoad
           ? Array.from({ length: 3 }, (_value, index) => <Skeleton key={index} minH="40" rounded="lg" />)
-          : library.summaries.map((summary) => <ProjectCard key={summary.id} summary={summary} />)}
+          : summaries.map((summary) => <ProjectCard key={summary.id} summary={summary} />)}
       </SimpleGrid>
     </Stack>
   );
