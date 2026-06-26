@@ -17,6 +17,7 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers._access import assert_image_read_access
 from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
+from invokeai.app.util.dynamicprompts import find_missing_wildcards
 from invokeai.backend.llava_onevision_pipeline import LlavaOnevisionPipeline
 from invokeai.backend.model_manager.taxonomy import ModelType
 from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT, TextLLMPipeline
@@ -52,8 +53,16 @@ async def parse_dynamicprompts(
     """Creates a batch process"""
     max_prompts = min(max_prompts, 10000)
     generator: Union[RandomPromptGenerator, CombinatorialPromptGenerator]
+    error: Optional[str] = None
+
+    # An unknown wildcard sends the combinatorial generator into an infinite loop, so bail out early
+    # with a clear message instead of hanging the request (and with it the UI preview).
+    missing_wildcards = find_missing_wildcards(prompt)
+    if missing_wildcards:
+        wildcards = ", ".join(missing_wildcards)
+        return DynamicPromptsResponse(prompts=[prompt], error=f"No values found for wildcard(s): {wildcards}")
+
     try:
-        error: Optional[str] = None
         if combinatorial:
             generator = CombinatorialPromptGenerator()
             prompts = generator.generate(prompt, max_prompts=max_prompts)
