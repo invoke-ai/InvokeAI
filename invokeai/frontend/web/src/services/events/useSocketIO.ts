@@ -1,5 +1,6 @@
 import { useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
+import { getBasePath, getDeploymentBaseUrl } from 'common/util/baseUrl';
 import type { MapStore } from 'nanostores';
 import { useEffect, useMemo } from 'react';
 import { selectQueueStatus } from 'services/api/endpoints/queue';
@@ -25,15 +26,17 @@ export const useSocketIO = () => {
   const store = useAppStore();
 
   const socketUrl = useMemo(() => {
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    return `${wsProtocol}://${window.location.host}`;
+    const base = new URL(getDeploymentBaseUrl());
+    const wsProtocol = base.protocol === 'https:' ? 'wss' : 'ws';
+    // Origin only - the sub-path prefix (if any) is passed via the socket.io `path` option below.
+    return `${wsProtocol}://${base.host}`;
   }, []);
 
   const socketOptions = useMemo(() => {
     const token = localStorage.getItem('auth_token');
     const options: Partial<ManagerOptions & SocketOptions> = {
       timeout: 60000,
-      path: '/ws/socket.io',
+      path: `${getBasePath()}/ws/socket.io`,
       autoConnect: false, // achtung! removing this breaks the dynamic middleware
       forceNew: true,
       auth: token ? { token } : undefined,

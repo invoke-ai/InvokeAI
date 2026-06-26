@@ -16227,6 +16227,8 @@ export type components = {
          *         external_openai_base_url: Base URL override for OpenAI image generation.
          *         external_seedream_api_key: API key for Seedream image generation.
          *         external_seedream_base_url: Base URL override for Seedream image generation.
+         *         base_url: Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Set only when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`). Leave unset when the proxy strips the sub-path or when serving at the domain root.
+         *         forwarded_allow_ips: Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.
          */
         InvokeAIAppConfig: {
             /**
@@ -16290,6 +16292,17 @@ export type components = {
              * @description SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.
              */
             ssl_keyfile?: string | null;
+            /**
+             * Base Url
+             * @description Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Required when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`); optional when the proxy strips it (set it anyway so openapi/docs URLs are correct). Leave unset when serving at the domain root. Normalized to a single leading slash with no trailing slash.
+             */
+            base_url?: string | null;
+            /**
+             * Forwarded Allow Ips
+             * @description Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.
+             * @default 127.0.0.1
+             */
+            forwarded_allow_ips?: string;
             /**
              * Log Tokenization
              * @description Enable logging of parsed prompt tokens.

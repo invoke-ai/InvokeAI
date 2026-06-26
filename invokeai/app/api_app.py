@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 import invokeai.frontend.web as web_dir
 from invokeai.app.api.dependencies import ApiDependencies
@@ -143,6 +144,41 @@ class RedirectRootWithQueryStringMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class SubPathASGIMiddleware:
+    """Make the app work behind a reverse proxy that serves it under a sub-path (e.g. `/invoke`).
+
+    Handles both common proxy styles:
+      - The proxy STRIPS the sub-path: the incoming path is already `/api/...`. We only advertise the
+        public prefix via `root_path` so generated openapi/docs URLs include it.
+      - The proxy PRESERVES the sub-path: the incoming path is `/invoke/api/...`. We strip the prefix
+        so routing matches, and advertise it via `root_path`.
+
+    Note: we deliberately do NOT use uvicorn's `root_path`, because uvicorn PREPENDS it to the request
+    path, which breaks the preserve-style proxy (the prefix would appear twice). Doing the path
+    rewrite here covers both styles.
+    """
+
+    def __init__(self, app: ASGIApp, base_path: str) -> None:
+        self.app = app
+        self.base_path = base_path
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] in ("http", "websocket"):
+            scope = dict(scope)
+            path: str = scope.get("path", "")
+            # Preserve-style proxy: strip the prefix from the path so routing matches.
+            if path == self.base_path or path.startswith(self.base_path + "/"):
+                scope["path"] = path[len(self.base_path) :] or "/"
+                raw_path = scope.get("raw_path")
+                if raw_path is not None:
+                    base_bytes = self.base_path.encode("latin-1")
+                    if raw_path.startswith(base_bytes):
+                        scope["raw_path"] = raw_path[len(base_bytes) :] or b"/"
+            # Advertise the public prefix for both styles (openapi servers, /docs, redirects).
+            scope["root_path"] = self.base_path
+        await self.app(scope, receive, send)
+
+
 # Add the middleware
 app.add_middleware(RedirectRootWithQueryStringMiddleware)
 app.add_middleware(SlidingWindowTokenMiddleware)
@@ -193,18 +229,22 @@ app.openapi = get_openapi_func(app)
 
 
 @app.get("/docs", include_in_schema=False)
-def overridden_swagger() -> HTMLResponse:
+def overridden_swagger(request: Request) -> HTMLResponse:
+    # Prefix with the proxy root_path (if any) so the schema resolves under a sub-path deployment.
+    root_path = request.scope.get("root_path", "")
     return get_swagger_ui_html(
-        openapi_url=app.openapi_url,  # type: ignore [arg-type] # this is always a string
+        openapi_url=f"{root_path}{app.openapi_url}",  # type: ignore [arg-type] # this is always a string
         title=f"{app.title} - Swagger UI",
         swagger_favicon_url="static/docs/invoke-favicon-docs.svg",
     )
 
 
 @app.get("/redoc", include_in_schema=False)
-def overridden_redoc() -> HTMLResponse:
+def overridden_redoc(request: Request) -> HTMLResponse:
+    # Prefix with the proxy root_path (if any) so the schema resolves under a sub-path deployment.
+    root_path = request.scope.get("root_path", "")
     return get_redoc_html(
-        openapi_url=app.openapi_url,  # type: ignore [arg-type] # this is always a string
+        openapi_url=f"{root_path}{app.openapi_url}",  # type: ignore [arg-type] # this is always a string
         title=f"{app.title} - Redoc",
         redoc_favicon_url="static/docs/invoke-favicon-docs.svg",
     )
