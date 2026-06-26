@@ -105,6 +105,17 @@ const selectGalleryWidgetValues = createStableSelector(
 
 const selectGenerateRecallValues = createGenerateFormValuesSelector();
 
+export const shouldPublishGalleryTotal = ({
+  knownTotalImages,
+  lastPublishedTotal,
+  total,
+}: {
+  knownTotalImages: number | null;
+  lastPublishedTotal: number | null;
+  total: number | null;
+}): boolean =>
+  typeof total === 'number' && Number.isFinite(total) && total !== knownTotalImages && total !== lastPublishedTotal;
+
 export const GalleryWidgetView = ({ presentation, region, runtime }: WidgetViewProps) => {
   const dispatch = useWorkbenchDispatch();
   const projectId = useActiveProjectId();
@@ -149,6 +160,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: WidgetViewP
 
   const galleryImagesRef = useRef(gallery.images);
   const selectedImageNameRef = useRef(gallery.selectedImageName);
+  const lastPublishedTotalRef = useRef<number | null>(null);
 
   galleryImagesRef.current = gallery.images;
   selectedImageNameRef.current = gallery.selectedImageName;
@@ -213,7 +225,23 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: WidgetViewP
   // render page navigation without its own fetch, and clamp the page when the
   // query shrinks (e.g. after deletions).
   useEffect(() => {
-    if (typeof total === 'number' && Number.isFinite(total) && total !== knownTotalImages) {
+    if (total === knownTotalImages) {
+      lastPublishedTotalRef.current = null;
+      return;
+    }
+
+    if (typeof total !== 'number' || !Number.isFinite(total)) {
+      return;
+    }
+
+    if (
+      shouldPublishGalleryTotal({
+        knownTotalImages,
+        lastPublishedTotal: lastPublishedTotalRef.current,
+        total,
+      })
+    ) {
+      lastPublishedTotalRef.current = total;
       dispatch({ totalImages: total, type: 'setGalleryPageInfo' });
     }
   }, [dispatch, knownTotalImages, total]);
