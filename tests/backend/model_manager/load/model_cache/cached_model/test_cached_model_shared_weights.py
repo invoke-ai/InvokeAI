@@ -52,8 +52,12 @@ def test_full_load_shares_cpu_weights_across_devices():
     model_b = DummyModule()
     a_ptrs = _data_ptrs(model_a.state_dict())
 
-    cached_a = CachedModelOnlyFullLoad(model_a, CPU, total_bytes=100, keep_ram_copy=True, shared_store=store, cache_key="m")
-    cached_b = CachedModelOnlyFullLoad(model_b, CPU, total_bytes=100, keep_ram_copy=True, shared_store=store, cache_key="m")
+    cached_a = CachedModelOnlyFullLoad(
+        model_a, CPU, total_bytes=100, keep_ram_copy=True, shared_store=store, cache_key="m"
+    )
+    cached_b = CachedModelOnlyFullLoad(
+        model_b, CPU, total_bytes=100, keep_ram_copy=True, shared_store=store, cache_key="m"
+    )
 
     assert cached_a.get_cpu_state_dict() is cached_b.get_cpu_state_dict()
     assert _data_ptrs(model_b.state_dict()) == a_ptrs

@@ -98,10 +98,15 @@ def test_get_generation_devices_auto_without_cuda():
 
 def test_get_generation_devices_explicit_list_is_deduplicated():
     """An explicit list is normalized and deduplicated, preserving order."""
-    assert TorchDevice.get_generation_devices(["cuda:0", "cuda:0", "cuda:1"]) == [
-        torch.device("cuda:0"),
-        torch.device("cuda:1"),
-    ]
+    # Mock CUDA as present so the device-existence validation passes on CPU-only runners.
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=True),
+        patch("invokeai.backend.util.devices.torch.cuda.device_count", return_value=2),
+    ):
+        assert TorchDevice.get_generation_devices(["cuda:0", "cuda:0", "cuda:1"]) == [
+            torch.device("cuda:0"),
+            torch.device("cuda:1"),
+        ]
 
 
 @pytest.mark.parametrize("value", [None, []])

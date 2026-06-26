@@ -29,9 +29,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
 from tests.backend.model_manager.load.model_cache.cached_model.utils import DummyModule
 from tests.backend.quantization.gguf.test_ggml_tensor import quantize_tensor
 
-requires_two_gpus = pytest.mark.skipif(
-    torch.cuda.device_count() < 2, reason="Requires at least 2 CUDA devices."
-)
+requires_two_gpus = pytest.mark.skipif(torch.cuda.device_count() < 2, reason="Requires at least 2 CUDA devices.")
 
 DEVICE_A = "cuda:0"
 DEVICE_B = "cuda:1"

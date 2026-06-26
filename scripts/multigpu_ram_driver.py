@@ -61,9 +61,7 @@ import psutil
 # --------------------------------------------------------------------------------------------------
 def _request(method: str, url: str, body: dict | None = None, timeout: float = 60.0) -> dict:
     data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(
-        url, data=data, headers={"Content-Type": "application/json"}, method=method
-    )
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method=method)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             raw = resp.read()
@@ -128,9 +126,7 @@ def find_server_pid(port: int) -> int:
         cmd = " ".join(proc.info.get("cmdline") or [])
         if any(n in cmd for n in needles):
             return proc.info["pid"]
-    raise SystemExit(
-        f"Could not auto-detect the InvokeAI server PID on port {port}. Pass --pid explicitly."
-    )
+    raise SystemExit(f"Could not auto-detect the InvokeAI server PID on port {port}. Pass --pid explicitly.")
 
 
 def tree_rss(proc: psutil.Process, use_uss: bool) -> int:
@@ -269,7 +265,7 @@ def main() -> None:
         sampler.stop()
 
     # Summary
-    idle_drift = (sampler.current() - (idle_after_first or baseline))
+    idle_drift = sampler.current() - (idle_after_first or baseline)
     print("\n--- Summary ---")
     print(f"Baseline idle:        {gb(baseline):.2f} GB")
     print(f"Overall peak:         {gb(overall_peak):.2f} GB  (Δ {gb(overall_peak - baseline):+.2f} GB over baseline)")

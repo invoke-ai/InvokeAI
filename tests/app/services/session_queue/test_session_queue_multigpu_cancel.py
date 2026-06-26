@@ -53,9 +53,7 @@ def _insert(
 def _canceled_event_item_ids(mock_invoker: Invoker) -> set[int]:
     event_bus: TestEventService = mock_invoker.services.events
     return {
-        e.item_id
-        for e in event_bus.events
-        if isinstance(e, QueueItemStatusChangedEvent) and e.status == "canceled"
+        e.item_id for e in event_bus.events if isinstance(e, QueueItemStatusChangedEvent) and e.status == "canceled"
     }
 
 
