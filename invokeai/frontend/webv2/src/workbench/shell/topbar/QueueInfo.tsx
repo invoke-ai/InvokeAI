@@ -25,12 +25,14 @@ export const QueueInfo = () => {
   const runningItem = summary.runningQueueItemId
     ? queueItems.find((item) => item.id === summary.runningQueueItemId)
     : undefined;
+
   const progressState = getQueueProgressBarState({
     isConnected: backendConnectionStatus === 'connected',
     isRunning: Boolean(runningItem),
     loadingModelsCount: modelLoads.length,
     progress: runningProgress,
   });
+
   const tooltipContent = useMemo(
     () => (
       <QueueInfoTooltip
@@ -43,6 +45,7 @@ export const QueueInfo = () => {
     ),
     [modelLoads, runningItem, runningProgress, summary]
   );
+
   const handleOpenQueue = useCallback(() => openWorkbenchWidget('queue'), [openWorkbenchWidget]);
 
   return (

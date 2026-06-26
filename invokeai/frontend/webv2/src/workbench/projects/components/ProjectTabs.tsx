@@ -1,7 +1,10 @@
 /* eslint-disable react/react-compiler */
-import type { Project, WidgetRegion } from '@workbench/types';
+import type { Project, QueueItem, WidgetRegion } from '@workbench/types';
 
 import { Icon, Menu, Portal, Separator } from '@chakra-ui/react';
+import { useModelLoads } from '@workbench/backend/modelLoadStore';
+import { useQueueItemProgress } from '@workbench/backend/progressStore';
+import { QueueCircularProgress } from '@workbench/components/QueueProgressIndicator';
 import {
   CloseButton,
   IconButton,
@@ -13,6 +16,7 @@ import {
 } from '@workbench/components/ui';
 import { exportOpenProject } from '@workbench/projects/projectFile';
 import { useProjectActions } from '@workbench/projects/useProjectActions';
+import { getProjectQueueIndicatorState } from '@workbench/queueSummary';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { flushGenerateDrafts } from '@workbench/widgets/generate/generateDraftRegistry';
 import {
@@ -21,7 +25,16 @@ import {
   useWorkbenchSelector,
   useWorkbenchStore,
 } from '@workbench/WorkbenchContext';
-import { FileDownIcon, FolderCogIcon, FolderOpenIcon, PencilIcon, PlusIcon, Trash2Icon, XIcon } from 'lucide-react';
+import {
+  FileDownIcon,
+  FolderCogIcon,
+  FolderIcon,
+  FolderOpenIcon,
+  PencilIcon,
+  PlusIcon,
+  Trash2Icon,
+  XIcon,
+} from 'lucide-react';
 import { useCallback, useMemo, useRef, useState, type MouseEvent } from 'react';
 
 import { OpenProjectDialog } from './OpenProjectDialog';
@@ -29,6 +42,7 @@ import { OpenProjectDialog } from './OpenProjectDialog';
 interface ProjectTabSummary {
   id: string;
   name: string;
+  queueItems: QueueItem[];
 }
 
 const areProjectTabSummariesEqual = (
@@ -36,10 +50,15 @@ const areProjectTabSummariesEqual = (
   right: readonly ProjectTabSummary[]
 ): boolean =>
   left.length === right.length &&
-  left.every((summary, index) => summary.id === right[index]?.id && summary.name === right[index]?.name);
+  left.every(
+    (summary, index) =>
+      summary.id === right[index]?.id &&
+      summary.name === right[index]?.name &&
+      summary.queueItems === right[index]?.queueItems
+  );
 
 const selectProjectTabSummaries = (projects: readonly Project[]): ProjectTabSummary[] =>
-  projects.map(({ id, name }) => ({ id, name }));
+  projects.map(({ id, name, queue }) => ({ id, name, queueItems: queue.items }));
 
 const deleteMenuItemHover = { bg: 'bg.error', color: 'fg.error' } as const;
 
@@ -60,6 +79,8 @@ export const ProjectTabs = () => {
     areProjectTabSummariesEqual
   );
   const activeProjectId = useActiveProjectSelector((project) => project.id);
+  const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection.status);
+  const modelLoads = useModelLoads();
   const store = useWorkbenchStore();
   const dispatch = useWorkbenchDispatch();
   const { closeProject, deleteProject } = useProjectActions();
@@ -86,17 +107,22 @@ export const ProjectTabs = () => {
     event.preventDefault();
     setMenuTarget({ project, x: event.clientX, y: event.clientY });
   }, []);
+
   const createProject = useCallback(() => {
     flushGenerateDrafts();
     dispatch({ type: 'createProject' });
   }, [dispatch]);
+
   const showOpenDialog = useCallback(() => setIsOpenDialogVisible(true), []);
   const hideOpenDialog = useCallback(() => setIsOpenDialogVisible(false), []);
+
   const closeMenu = useCallback(() => setMenuTarget(null), []);
   const closeRenameDialog = useCallback(() => setRenameTarget(null), []);
   const closeDeleteDialog = useCallback(() => setDeleteTarget(null), []);
+
   const startRename = useCallback((project: ProjectTabSummary) => setRenameTarget(project), []);
   const startDelete = useCallback((project: ProjectTabSummary) => setDeleteTarget(project), []);
+
   const closeProjectBySummary = useCallback(
     (project: ProjectTabSummary) => {
       const currentProject = getProject(project.id);
@@ -107,6 +133,7 @@ export const ProjectTabs = () => {
     },
     [closeProject, getProject]
   );
+
   const renameProject = useCallback(
     (name: string) => {
       if (renameTarget) {
@@ -115,6 +142,7 @@ export const ProjectTabs = () => {
     },
     [dispatch, renameTarget]
   );
+
   const confirmDeleteProject = useCallback(async () => {
     if (deleteTarget) {
       const currentProject = getProject(deleteTarget.id);
@@ -132,13 +160,18 @@ export const ProjectTabs = () => {
           {projectTabSummaries.map((project) => (
             <ProjectTab
               key={project.id}
+              backendConnectionStatus={backendConnectionStatus}
+              isActive={project.id === activeProjectId}
+              loadingModelsCount={modelLoads.length}
               project={project}
               onCloseProject={closeProjectBySummary}
               onContextMenu={openContextMenu}
               onSwitchProject={onSwitchProject}
             />
           ))}
+
           <Separator orientation="vertical" h={5} mx="1" alignSelf="center" />
+
           <Tooltip content="Create new project" showArrow>
             <IconButton
               aria-label="Create new project"
@@ -151,6 +184,7 @@ export const ProjectTabs = () => {
               <PlusIcon />
             </IconButton>
           </Tooltip>
+
           <Tooltip content="Open project" showArrow>
             <IconButton
               aria-label="Open project"
@@ -165,6 +199,7 @@ export const ProjectTabs = () => {
           </Tooltip>
         </Tabs.List>
       </Tabs.Root>
+
       <ProjectTabContextMenu
         target={menuTarget}
         onClose={closeMenu}
@@ -192,18 +227,38 @@ export const ProjectTabs = () => {
 };
 
 const ProjectTab = ({
+  backendConnectionStatus,
+  isActive,
+  loadingModelsCount,
   onCloseProject,
   onContextMenu,
   onSwitchProject,
   project,
 }: {
+  backendConnectionStatus: string;
+  isActive: boolean;
+  loadingModelsCount: number;
   onCloseProject: (project: ProjectTabSummary) => void;
   onContextMenu: (project: ProjectTabSummary, event: MouseEvent) => void;
   onSwitchProject: (projectId: string) => void;
   project: ProjectTabSummary;
 }) => {
+  const baseIndicatorState = getProjectQueueIndicatorState({
+    isConnected: backendConnectionStatus === 'connected',
+    loadingModelsCount,
+    progress: null,
+    queueItems: project.queueItems,
+  });
+  const progress = useQueueItemProgress(baseIndicatorState.runningQueueItemId ?? '');
+  const { progressState } = getProjectQueueIndicatorState({
+    isConnected: backendConnectionStatus === 'connected',
+    loadingModelsCount,
+    progress,
+    queueItems: project.queueItems,
+  });
   const switchProject = useCallback(() => onSwitchProject(project.id), [onSwitchProject, project.id]);
   const openContextMenu = useCallback((event: MouseEvent) => onContextMenu(project, event), [onContextMenu, project]);
+
   const closeProject = useCallback(
     (event: MouseEvent) => {
       event.stopPropagation();
@@ -214,7 +269,14 @@ const ProjectTab = ({
 
   return (
     <Tabs.Trigger value={project.id} onClick={switchProject} onContextMenu={openContextMenu} fontSize="xs" h="full">
+      {progressState.kind === 'idle' ? (
+        <Icon as={isActive ? FolderOpenIcon : FolderIcon} boxSize="4" />
+      ) : (
+        <QueueCircularProgress size="2xs" state={progressState} />
+      )}
+
       {project.name}
+
       <CloseButton
         size="2xs"
         me="-2"
@@ -294,16 +356,19 @@ const ProjectTabContextMenu = ({
     },
     [onClose]
   );
+
   const renameTarget = useCallback(() => {
     if (targetRef.current) {
       onRename(targetRef.current.project);
     }
   }, [onRename]);
+
   const showDetails = useCallback(() => {
     if (targetRef.current) {
       openProjectDetails(targetRef.current.project);
     }
   }, [openProjectDetails]);
+
   const exportProject = useCallback(() => {
     const currentTarget = targetRef.current;
     const project = currentTarget
@@ -314,11 +379,13 @@ const ProjectTabContextMenu = ({
       exportOpenProject(project);
     }
   }, [store]);
+
   const closeTargetProject = useCallback(() => {
     if (targetRef.current) {
       onCloseProject(targetRef.current.project);
     }
   }, [onCloseProject]);
+
   const deleteTargetProject = useCallback(() => {
     if (targetRef.current) {
       onDelete(targetRef.current.project);

@@ -159,6 +159,26 @@ export const sliderSlotRecipe = defineSlotRecipe({
   },
 });
 
+/** Progress circle: add a compact icon-sized variant for dense chrome like tabs. */
+export const progressCircleSlotRecipe = defineSlotRecipe({
+  ...chakraSlotRecipes.progressCircle,
+  variants: {
+    ...chakraSlotRecipes.progressCircle.variants,
+    size: {
+      ...chakraSlotRecipes.progressCircle.variants?.size,
+      '2xs': {
+        circle: {
+          '--size': '16px',
+          '--thickness': '3px',
+        },
+        valueText: {
+          textStyle: '2xs',
+        },
+      },
+    },
+  },
+});
+
 /* -------------------------------------------------------------------------- *
  * Workbench recipes (consumed through workbench/components/ui wrappers)
  * -------------------------------------------------------------------------- */

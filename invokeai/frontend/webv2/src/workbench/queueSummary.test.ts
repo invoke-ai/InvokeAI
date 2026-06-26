@@ -3,7 +3,12 @@ import { describe, expect, it } from 'vitest';
 import type { QueueItemProgress } from './backend/progressStore';
 import type { QueueItem } from './types';
 
-import { getQueueProgressBarState, getQueueProgressBarValue, getQueueSummary } from './queueSummary';
+import {
+  getProjectQueueIndicatorState,
+  getQueueProgressBarState,
+  getQueueProgressBarValue,
+  getQueueSummary,
+} from './queueSummary';
 
 const createQueueItem = ({
   backendItemIds,
@@ -125,7 +130,7 @@ describe('getQueueSummary', () => {
       createQueueItem({
         batchCount: 2,
         id: 'workflow-batch',
-        sourceId: 'project-graph',
+        sourceId: 'workflow',
         status: 'pending',
         submittedAt: '2026-06-10T00:00:00.000Z',
       }),
@@ -145,6 +150,49 @@ describe('getQueueSummary', () => {
     ]);
 
     expect(summary).toEqual({ current: 0, runningQueueItemId: null, total: 10_000 });
+  });
+});
+
+describe('getProjectQueueIndicatorState', () => {
+  it('returns idle state for projects without open queue work', () => {
+    expect(
+      getProjectQueueIndicatorState({ isConnected: true, loadingModelsCount: 0, progress: null, queueItems: [] })
+    ).toEqual({ hasOpenQueueWork: false, progressState: { kind: 'idle', value: 0 }, runningQueueItemId: null });
+  });
+
+  it('returns indeterminate state for running work without percentage progress', () => {
+    const queueItems = [createQueueItem({ id: 'running', status: 'running', submittedAt: '2026-06-10T00:00:00.000Z' })];
+
+    expect(
+      getProjectQueueIndicatorState({ isConnected: true, loadingModelsCount: 0, progress: null, queueItems })
+    ).toEqual({
+      hasOpenQueueWork: true,
+      progressState: { kind: 'indeterminate', value: null },
+      runningQueueItemId: 'running',
+    });
+  });
+
+  it('returns determinate state for running work with percentage progress', () => {
+    const queueItems = [createQueueItem({ id: 'running', status: 'running', submittedAt: '2026-06-10T00:00:00.000Z' })];
+    const progress: QueueItemProgress = { message: 'Denoising', percentage: 0.42 };
+
+    expect(getProjectQueueIndicatorState({ isConnected: true, loadingModelsCount: 0, progress, queueItems })).toEqual({
+      hasOpenQueueWork: true,
+      progressState: { kind: 'determinate', value: 0.42 },
+      runningQueueItemId: 'running',
+    });
+  });
+
+  it('uses indeterminate state while models load for pending work', () => {
+    const queueItems = [createQueueItem({ id: 'pending', status: 'pending', submittedAt: '2026-06-10T00:00:00.000Z' })];
+
+    expect(
+      getProjectQueueIndicatorState({ isConnected: true, loadingModelsCount: 1, progress: null, queueItems })
+    ).toEqual({
+      hasOpenQueueWork: true,
+      progressState: { kind: 'indeterminate', value: null },
+      runningQueueItemId: null,
+    });
   });
 });
 

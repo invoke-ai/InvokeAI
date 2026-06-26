@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import legacyBaseline from './__fixtures__/legacyTokenBaseline.json';
 import { CONSUMER_TOKENS, resolveToken, THEMES, type TokenSystem } from './__tokenResolve';
+import { progressCircleSlotRecipe } from './recipes';
 import { system } from './system';
 
 const sys = system as unknown as TokenSystem;
@@ -96,6 +97,12 @@ describe('ramp + mapping structure', () => {
 });
 
 describe('native Chakra integration', () => {
+  it('adds an icon-sized progress circle variant', () => {
+    expect(progressCircleSlotRecipe.variants?.size?.['2xs']).toMatchObject({
+      circle: { '--size': '16px', '--thickness': '3px' },
+    });
+  });
+
   it('resolves every gray virtual-palette key under both dark and light', () => {
     const keys = ['contrast', 'fg', 'subtle', 'muted', 'emphasized', 'solid', 'focusRing', 'border'];
     for (const theme of ['classic', 'light']) {

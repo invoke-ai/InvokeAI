@@ -9,6 +9,12 @@ export interface QueueSummary {
   total: number;
 }
 
+export interface ProjectQueueIndicatorState {
+  hasOpenQueueWork: boolean;
+  progressState: QueueProgressBarState;
+  runningQueueItemId: string | null;
+}
+
 export type QueueProgressBarState =
   | { kind: 'determinate'; value: number }
   | { kind: 'idle'; value: 0 }
@@ -100,4 +106,28 @@ export const getQueueSummary = (items: QueueItem[], progress: QueueItemProgress 
   }
 
   return { current: Math.min(current, total), runningQueueItemId: runningItem.id, total };
+};
+
+export const getProjectQueueIndicatorState = ({
+  isConnected,
+  loadingModelsCount,
+  progress,
+  queueItems,
+}: {
+  isConnected: boolean;
+  loadingModelsCount: number;
+  progress: QueueItemProgress | null;
+  queueItems: QueueItem[];
+}): ProjectQueueIndicatorState => {
+  const summary = getQueueSummary(queueItems, progress);
+  const hasOpenQueueWork = summary.total > 0;
+  const isRunning = summary.runningQueueItemId !== null;
+
+  return {
+    hasOpenQueueWork,
+    progressState: hasOpenQueueWork
+      ? getQueueProgressBarState({ isConnected, isRunning, loadingModelsCount, progress })
+      : { kind: 'idle', value: 0 },
+    runningQueueItemId: summary.runningQueueItemId,
+  };
 };
