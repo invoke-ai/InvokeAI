@@ -2,7 +2,7 @@ import type { WidgetInstanceId, WidgetRegion } from '@workbench/types';
 import type { WidgetRegionDropState } from '@workbench/widgetDnd';
 import type { WidgetPlacementInstanceMeta, WidgetRegionItem } from '@workbench/widgetRegionViewModel';
 
-import { Box } from '@chakra-ui/react';
+import { Box, type SystemStyleObject } from '@chakra-ui/react';
 import { verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Row, Tooltip } from '@workbench/components/ui';
 import { WidgetIcon } from '@workbench/iconResolver';
@@ -28,13 +28,6 @@ interface WidgetBarProps {
   onToggle: (item: WidgetBarItem) => void;
 }
 
-/**
- * A widget bar (left / right rail).
- *
- * Phase 1 renders the rail and its slots; the widget registry, manifests, and
- * real views land in Phase 3. Each slot is a labelled button so the placeholders
- * are accessible and ready to bind to registered widgets later.
- */
 export const WidgetBar = ({
   activeId,
   dropState,
@@ -45,7 +38,10 @@ export const WidgetBar = ({
   region,
   side,
 }: WidgetBarProps) => {
-  const [enableMenuTarget, setEnableMenuTarget] = useState<{ x: number; y: number } | null>(null);
+  const [enableMenuTarget, setEnableMenuTarget] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const [instanceMenuTarget, setInstanceMenuTarget] = useState<WidgetInstanceContextMenuTarget | null>(null);
 
   const openEnableMenu = useCallback((event: MouseEvent) => {
@@ -58,11 +54,17 @@ export const WidgetBar = ({
     event.stopPropagation();
     setInstanceMenuTarget({ item, x: event.clientX, y: event.clientY });
   }, []);
+
   const sortableInstanceIds = useMemo(() => railItems.map((item) => item.id), [railItems]);
+
   const positioning = useMemo(
-    () => ({ placement: region === 'left' ? 'right-start' : 'left-start' }) as const,
+    () =>
+      ({
+        placement: region === 'left' ? 'right-start' : 'left-start',
+      }) as const,
     [region]
   );
+
   const trigger = useMemo(() => ({ kind: 'rail', region }) as const, [region]);
   const handleContextClose = useCallback(() => setEnableMenuTarget(null), []);
   const handleMenuToggle = useCallback((item: WidgetEnableMenuItem) => onToggle(item as WidgetBarItem), [onToggle]);
@@ -120,6 +122,19 @@ export const WidgetBar = ({
   );
 };
 
+const WIDGET_ITEM_SX: SystemStyleObject = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  rounded: 'md',
+  h: 9,
+  w: 9,
+  '&[aria-pressed="false"]:hover': {
+    bg: 'bg.emphasized',
+  },
+  _disabled: WIDGET_SLOT_DISABLED_PROPS,
+};
+
 const WidgetSlot = ({
   item,
   isActive,
@@ -138,12 +153,15 @@ const WidgetSlot = ({
   const tooltipLabel = item.failureMessage ? `${item.label}: ${item.failureMessage}` : item.label;
   const isDisabled = item.status === 'disabled';
   const positioning = useMemo(() => ({ placement: tooltipPlacement }) as const, [tooltipPlacement]);
+
   const handleClick = useCallback(() => {
     if (!isDisabled) {
       onSelect(item.id);
     }
   }, [isDisabled, item.id, onSelect]);
+
   const handleContextMenu = useCallback((event: MouseEvent) => onContextMenu(item, event), [item, onContextMenu]);
+
   const { dragHandleProps, setNodeRef, style } = useWidgetSortable({
     disabled: isDisabled,
     instanceId: item.id,
@@ -156,18 +174,14 @@ const WidgetSlot = ({
       <Box ref={setNodeRef} pb="1.5" style={style}>
         <Row
           {...dragHandleProps}
+          css={WIDGET_ITEM_SX}
           active={isActive ? 'accent' : 'none'}
           aria-label={item.label}
           aria-disabled={isDisabled}
           aria-pressed={isActive}
           as="button"
           data-disabled={isDisabled ? '' : undefined}
-          justifyContent="center"
-          rounded="md"
           tabIndex={isDisabled ? -1 : undefined}
-          h="9"
-          w="9"
-          _disabled={WIDGET_SLOT_DISABLED_PROPS}
           onClick={handleClick}
           onContextMenu={handleContextMenu}
         >
