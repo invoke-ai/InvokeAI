@@ -4,7 +4,7 @@ wraps the safety_checker model. It respects the global "nsfw_checker"
 configuration variable, that allows the checker to be supressed.
 """
 
-from pathlib import Path
+import importlib.resources
 
 import numpy as np
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
@@ -80,5 +80,6 @@ class SafetyChecker:
     def _get_caution_img(cls) -> Image.Image:
         import invokeai.app.assets.images as image_assets
 
-        caution = Image.open(Path(image_assets.__path__[0]) / "caution.png")
-        return caution.resize((caution.width // 2, caution.height // 2))
+        with importlib.resources.open_binary(image_assets, "caution.png") as png:
+            caution = Image.open(png)
+            return caution.resize((caution.width // 2, caution.height // 2))
