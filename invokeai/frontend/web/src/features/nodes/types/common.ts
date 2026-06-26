@@ -15,7 +15,6 @@ export const zFileField = z.object({
   file_id: z.string().trim().min(1),
 });
 export type FileField = z.infer<typeof zFileField>;
-export const isFileField = (field: unknown): field is FileField => zFileField.safeParse(field).success;
 
 export const zBoardField = z.object({
   board_id: z.string().trim().min(1),

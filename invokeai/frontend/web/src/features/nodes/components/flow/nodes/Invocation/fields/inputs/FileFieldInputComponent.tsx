@@ -13,7 +13,7 @@ import type { Accept, FileRejection } from 'react-dropzone';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { PiFileTextBold, PiUploadBold, PiXBold } from 'react-icons/pi';
-import { useGetFileDTOQuery, useUploadFileMutation } from 'services/api/endpoints/files';
+import { useDeleteFileMutation, useGetFileDTOQuery, useUploadFileMutation } from 'services/api/endpoints/files';
 import type { FileDTO } from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
 
@@ -60,7 +60,9 @@ const FileFieldInputComponent = (props: FieldComponentProps<FileFieldInputInstan
   const dispatch = useAppDispatch();
   const isConnected = useStore($isConnected);
   const [uploadFile, uploadRequest] = useUploadFileMutation();
-  const { currentData: fileDTO, isError } = useGetFileDTOQuery(field.value?.file_id ?? skipToken);
+  const [deleteFile, deleteRequest] = useDeleteFileMutation();
+  const currentFileId = field.value?.file_id;
+  const { currentData: fileDTO, isError } = useGetFileDTOQuery(currentFileId ?? skipToken);
 
   const setValue = useCallback(
     (value: FileDTO | undefined) => {
@@ -75,9 +77,32 @@ const FileFieldInputComponent = (props: FieldComponentProps<FileFieldInputInstan
     [dispatch, field.name, nodeId]
   );
 
-  const handleReset = useCallback(() => {
+  const clearValue = useCallback(() => {
     setValue(undefined);
   }, [setValue]);
+
+  const deleteManagedFile = useCallback(
+    async (file_id: string) => {
+      try {
+        await deleteFile(file_id).unwrap();
+      } catch {
+        toast({
+          id: 'FILE_DELETE_FAILED',
+          title: t('toast.somethingWentWrong'),
+          status: 'error',
+        });
+      }
+    },
+    [deleteFile, t]
+  );
+
+  const handleReset = useCallback(() => {
+    const file_id = currentFileId;
+    clearValue();
+    if (file_id) {
+      void deleteManagedFile(file_id);
+    }
+  }, [clearValue, currentFileId, deleteManagedFile]);
 
   const handleResetClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
@@ -89,9 +114,9 @@ const FileFieldInputComponent = (props: FieldComponentProps<FileFieldInputInstan
 
   useEffect(() => {
     if (isConnected && isError) {
-      handleReset();
+      clearValue();
     }
-  }, [handleReset, isConnected, isError]);
+  }, [clearValue, isConnected, isError]);
 
   const onDropAccepted = useCallback(
     async (files: File[]) => {
@@ -100,8 +125,12 @@ const FileFieldInputComponent = (props: FieldComponentProps<FileFieldInputInstan
         return;
       }
       try {
+        const previousFileId = currentFileId;
         const uploadedFileDTO = await uploadFile({ file }).unwrap();
         setValue(uploadedFileDTO);
+        if (previousFileId) {
+          void deleteManagedFile(previousFileId);
+        }
       } catch {
         toast({
           id: 'FILE_UPLOAD_FAILED',
@@ -110,7 +139,7 @@ const FileFieldInputComponent = (props: FieldComponentProps<FileFieldInputInstan
         });
       }
     },
-    [setValue, t, uploadFile]
+    [currentFileId, deleteManagedFile, setValue, t, uploadFile]
   );
 
   const onDropRejected = useCallback(
@@ -195,6 +224,7 @@ const FileFieldInputComponent = (props: FieldComponentProps<FileFieldInputInstan
             icon={<PiXBold />}
             variant="ghost"
             size="sm"
+            isDisabled={deleteRequest.isLoading}
             onClick={handleResetClick}
             flexShrink={0}
           />

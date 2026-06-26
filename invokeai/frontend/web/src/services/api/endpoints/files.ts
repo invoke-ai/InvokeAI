@@ -10,7 +10,7 @@ import { api, buildV1Url } from '..';
  */
 const buildFilesUrl = (path: string = '') => buildV1Url(`files/${path}`);
 
-export const filesApi = api.injectEndpoints({
+const filesApi = api.injectEndpoints({
   endpoints: (build) => ({
     getFileDTO: build.query<FileDTO, string>({
       query: (file_id) => ({ url: buildFilesUrl(`i/${file_id}`) }),
