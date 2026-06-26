@@ -63,6 +63,21 @@ export const getRegionalGuidanceWarnings = (
       }
     }
 
+    if (model.base === 'flux2') {
+      // FLUX.2 Klein applies a single attention mask uniformly across all transformer blocks;
+      // regional negatives / auto-negative are not supported. Reference images (IP Adapters)
+      // are handled via FLUX.2's built-in kontext path, not via regional reference images.
+      if (entity.negativePrompt !== null) {
+        warnings.push(WARNINGS.RG_NEGATIVE_PROMPT_NOT_SUPPORTED);
+      }
+      if (entity.autoNegative) {
+        warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
+      }
+      if (entity.referenceImages.length > 0) {
+        warnings.push(WARNINGS.RG_REFERENCE_IMAGES_NOT_SUPPORTED);
+      }
+    }
+
     if (model.base === 'z-image') {
       // Z-Image has similar limitations to FLUX - no negative prompts via CFG by default
       // Reference images (IP Adapters) are not supported for Z-Image
