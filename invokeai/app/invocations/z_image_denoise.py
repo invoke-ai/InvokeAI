@@ -569,7 +569,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 # Use diffusers scheduler for stepping
                 # Use tqdm with total_steps (user-facing steps) not num_scheduler_steps (internal steps)
                 # This ensures progress bar shows 1/8, 2/8, etc. even when scheduler uses more internal steps
-                pbar = tqdm(total=total_steps, desc="Denoising")
+                pbar = tqdm(total=total_steps, desc=f"Denoising{TorchDevice.get_session_device_label()}")
                 for step_index in range(num_scheduler_steps):
                     sched_timestep = scheduler.timesteps[step_index]
                     # Convert scheduler timestep (0-1000) to normalized sigma (0-1)
@@ -686,7 +686,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 pbar.close()
             else:
                 # Original Euler implementation (default, optimized for Z-Image)
-                for step_idx in tqdm(range(total_steps)):
+                for step_idx in tqdm(range(total_steps), desc=f"Denoising{TorchDevice.get_session_device_label()}"):
                     sigma_curr = sigmas[step_idx]
                     sigma_prev = sigmas[step_idx + 1]
 

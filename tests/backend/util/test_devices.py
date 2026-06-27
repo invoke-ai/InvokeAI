@@ -2,6 +2,7 @@
 Test abstract device class.
 """
 
+import threading
 from unittest.mock import patch
 
 import pytest
@@ -22,6 +23,96 @@ def test_device_choice(device_name):
     config.device = device_name
     torch_device = TorchDevice.choose_torch_device()
     assert torch_device == torch.device(device_name)
+
+
+# ===== per-thread session device (multi-GPU worker pinning) ================
+
+
+def test_session_device_overrides_config():
+    """A per-thread session device takes precedence over the global config.device."""
+    config = get_config()
+    config.device = "cpu"
+    try:
+        TorchDevice.set_session_device("cuda:1")
+        assert TorchDevice.choose_torch_device() == torch.device("cuda:1")
+    finally:
+        TorchDevice.clear_session_device()
+    # Once cleared, we fall back to the global config.
+    assert TorchDevice.choose_torch_device() == torch.device("cpu")
+
+
+def test_session_device_is_thread_local():
+    """Each thread sees only its own pinned device; the main thread is unaffected."""
+    config = get_config()
+    config.device = "cpu"
+    results: dict[str, torch.device] = {}
+    barrier = threading.Barrier(2)
+
+    def worker(name: str, device: str):
+        TorchDevice.set_session_device(device)
+        # Wait so both threads have set their device before either reads it, proving isolation.
+        barrier.wait()
+        results[name] = TorchDevice.choose_torch_device()
+        TorchDevice.clear_session_device()
+
+    t0 = threading.Thread(target=worker, args=("a", "cuda:0"))
+    t1 = threading.Thread(target=worker, args=("b", "cuda:1"))
+    t0.start()
+    t1.start()
+    t0.join()
+    t1.join()
+
+    assert results["a"] == torch.device("cuda:0")
+    assert results["b"] == torch.device("cuda:1")
+    # The main thread never set a session device, so it still uses the global config.
+    assert TorchDevice.get_session_device() is None
+    assert TorchDevice.choose_torch_device() == torch.device("cpu")
+
+
+# ===== generation_devices resolution (config -> concrete device list) =======
+
+
+def test_get_generation_devices_auto_expands_to_all_cuda():
+    """`auto` enumerates every visible CUDA device."""
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=True),
+        patch("invokeai.backend.util.devices.torch.cuda.device_count", return_value=3),
+    ):
+        assert TorchDevice.get_generation_devices("auto") == [
+            torch.device("cuda:0"),
+            torch.device("cuda:1"),
+            torch.device("cuda:2"),
+        ]
+
+
+def test_get_generation_devices_auto_without_cuda():
+    """`auto` falls back to the single best device when CUDA is unavailable."""
+    config = get_config()
+    config.device = "cpu"
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=False),
+        patch("invokeai.backend.util.devices.torch.backends.mps.is_available", return_value=False),
+    ):
+        assert TorchDevice.get_generation_devices("auto") == [torch.device("cpu")]
+
+
+def test_get_generation_devices_explicit_list_is_deduplicated():
+    """An explicit list is normalized and deduplicated, preserving order."""
+    # Mock CUDA as present so the device-existence validation passes on CPU-only runners.
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=True),
+        patch("invokeai.backend.util.devices.torch.cuda.device_count", return_value=2),
+    ):
+        assert TorchDevice.get_generation_devices(["cuda:0", "cuda:0", "cuda:1"]) == [
+            torch.device("cuda:0"),
+            torch.device("cuda:1"),
+        ]
+
+
+@pytest.mark.parametrize("value", [None, []])
+def test_get_generation_devices_empty(value):
+    """`None` or an empty list resolves to an empty list (caller handles the single-device fallback)."""
+    assert TorchDevice.get_generation_devices(value) == []
 
 
 @pytest.mark.parametrize("device_dtype_pair", device_types_cpu)
@@ -169,3 +260,23 @@ def test_choose_anima_inference_dtype_auto_delegates_to_safe_dtype():
         result = TorchDevice.choose_anima_inference_dtype(device)
     assert result is sentinel
     mock_safe.assert_called_once_with(device)
+
+
+@patch("torch.cuda.device_count", return_value=2)
+@patch("torch.cuda.is_available", return_value=True)
+def test_get_generation_devices_rejects_out_of_range_cuda(mock_avail, mock_count):
+    # cuda:2 does not exist on a 2-GPU machine — fail fast instead of deferring to first allocation.
+    with pytest.raises(ValueError, match="only 2 CUDA"):
+        TorchDevice.get_generation_devices(["cuda:2"])
+
+
+@patch("torch.cuda.device_count", return_value=2)
+@patch("torch.cuda.is_available", return_value=True)
+def test_get_generation_devices_accepts_in_range_cuda(mock_avail, mock_count):
+    assert [str(d) for d in TorchDevice.get_generation_devices(["cuda:1"])] == ["cuda:1"]
+
+
+@patch("torch.cuda.is_available", return_value=False)
+def test_get_generation_devices_rejects_cuda_when_unavailable(mock_avail):
+    with pytest.raises(ValueError, match="no CUDA"):
+        TorchDevice.get_generation_devices(["cuda:0"])

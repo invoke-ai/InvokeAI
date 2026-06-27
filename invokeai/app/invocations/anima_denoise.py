@@ -608,7 +608,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
             if driver is not None:
                 user_step = 0
-                pbar = tqdm(total=total_steps, desc="Denoising (Anima)")
+                pbar = tqdm(total=total_steps, desc=f"Denoising (Anima){TorchDevice.get_session_device_label()}")
                 for it in driver.iterations():
                     timestep = torch.tensor(
                         [it.sigma_curr * ANIMA_MULTIPLIER], device=device, dtype=inference_dtype
@@ -655,7 +655,9 @@ class AnimaDenoiseInvocation(BaseInvocation):
                 pbar.close()
             else:
                 # Built-in Euler implementation (default for Anima)
-                for step_idx in tqdm(range(total_steps), desc="Denoising (Anima)"):
+                for step_idx in tqdm(
+                    range(total_steps), desc=f"Denoising (Anima){TorchDevice.get_session_device_label()}"
+                ):
                     sigma_curr = sigmas[step_idx]
                     sigma_prev = sigmas[step_idx + 1]
 

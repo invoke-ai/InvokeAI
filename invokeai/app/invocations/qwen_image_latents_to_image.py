@@ -19,6 +19,7 @@ from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_qwen_image
 
 
 @invocation(
@@ -41,15 +42,26 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
 
         vae_info = context.models.load(self.vae.vae)
         assert isinstance(vae_info.model, AutoencoderKLQwenImage)
+        # Reserve working memory for the decode so the cache offloads any large resident model (e.g.
+        # the transformer) first; otherwise the decode's activations OOM. See estimator for details.
+        estimated_working_memory = estimate_vae_working_memory_qwen_image("decode", latents, vae_info.model)
         with (
             SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes),
-            vae_info.model_on_device() as (_, vae),
+            vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae),
         ):
             context.util.signal_progress("Running VAE")
             assert isinstance(vae, AutoencoderKLQwenImage)
             latents = latents.to(device=TorchDevice.choose_torch_device(), dtype=vae.dtype)
 
-            vae.disable_tiling()
+            # Honor the global force_tiled_decode setting, like the SD/SDXL l2i node. Tiling bounds the
+            # VAE's per-tile memory, which is the scalable way to decode very large outputs that would
+            # exceed VRAM even after offloading the transformer/text encoder. For normal sizes, leave
+            # it off (faster, no tile blending) — the reserved working memory offloads other models so
+            # the full-frame decode fits.
+            if context.config.get().force_tiled_decode:
+                vae.enable_tiling()
+            else:
+                vae.disable_tiling()
 
             tiling_context = nullcontext()
 

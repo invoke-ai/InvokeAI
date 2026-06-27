@@ -5,6 +5,8 @@ from threading import BoundedSemaphore, Thread
 from threading import Event as ThreadEvent
 from typing import Optional
 
+import torch
+
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
 from invokeai.app.services.events.events_common import (
     BatchEnqueuedEvent,
@@ -31,6 +33,7 @@ from invokeai.app.services.session_queue.session_queue_common import SessionQueu
 from invokeai.app.services.shared.graph import NodeInputError
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
 from invokeai.app.util.profiler import Profiler
+from invokeai.backend.util.devices import TorchDevice
 
 
 class DefaultSessionRunner(SessionRunnerBase):
@@ -305,6 +308,26 @@ class DefaultSessionRunner(SessionRunnerBase):
             )
 
 
+class _SessionWorker:
+    """A single generation worker: one thread, optionally pinned to one device.
+
+    In single-device (legacy) mode there is exactly one worker with `device=None`. In multi-GPU
+    mode there is one worker per configured device, each with its own session runner and cancel
+    event so concurrent sessions can be canceled independently.
+    """
+
+    def __init__(self, device: Optional[torch.device], runner: SessionRunnerBase) -> None:
+        self.device = device
+        self.runner = runner
+        self.cancel_event = ThreadEvent()
+        self.queue_item: Optional[SessionQueueItem] = None
+        self.thread: Optional[Thread] = None
+
+    @property
+    def label(self) -> str:
+        return str(self.device) if self.device is not None else "default device"
+
+
 class DefaultSessionProcessor(SessionProcessorBase):
     def __init__(
         self,
@@ -319,57 +342,113 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self._on_non_fatal_processor_error_callbacks = on_non_fatal_processor_error_callbacks or []
         self._thread_limit = thread_limit
         self._polling_interval = polling_interval
+        self._workers: list[_SessionWorker] = []
+
+    def _resolve_devices(self) -> list[Optional[torch.device]]:
+        """Determine the per-worker devices from config.
+
+        Resolves `generation_devices` (which defaults to `"auto"` — every available GPU) into one
+        normalized device per worker. Returns a single `None` (legacy single-worker, device chosen by
+        the global config) only if the resolution is empty (e.g. `generation_devices` set to an empty
+        list).
+        """
+        generation_devices = self._invoker.services.configuration.generation_devices
+        devices = TorchDevice.get_generation_devices(generation_devices)
+        if not devices:
+            return [None]
+        return list(devices)
+
+    def _clone_session_runner(self, template: SessionRunnerBase) -> SessionRunnerBase:
+        """Create an independent runner for an additional worker.
+
+        Each worker needs its own runner because the runner stores its session's cancel event.
+        We carry over the template's callbacks so all workers behave identically.
+        """
+        if isinstance(template, DefaultSessionRunner):
+            return DefaultSessionRunner(
+                on_before_run_session_callbacks=list(template._on_before_run_session_callbacks),
+                on_before_run_node_callbacks=list(template._on_before_run_node_callbacks),
+                on_after_run_node_callbacks=list(template._on_after_run_node_callbacks),
+                on_node_error_callbacks=list(template._on_node_error_callbacks),
+                on_after_run_session_callbacks=list(template._on_after_run_session_callbacks),
+            )
+        # Unknown runner implementation — only safe to reuse in single-worker mode.
+        return template
 
     def start(self, invoker: Invoker) -> None:
         self._invoker: Invoker = invoker
-        self._queue_item: Optional[SessionQueueItem] = None
-        self._invocation: Optional[BaseInvocation] = None
 
         self._resume_event = ThreadEvent()
         self._stop_event = ThreadEvent()
         self._poll_now_event = ThreadEvent()
-        self._cancel_event = ThreadEvent()
 
         register_events(QueueClearedEvent, self._on_queue_cleared)
         register_events(BatchEnqueuedEvent, self._on_batch_enqueued)
         register_events(QueueItemStatusChangedEvent, self._on_queue_item_status_changed)
 
-        self._thread_semaphore = BoundedSemaphore(self._thread_limit)
+        devices = self._resolve_devices()
 
         # If profiling is enabled, create a profiler. The same profiler will be used for all sessions. Internally,
-        # the profiler will create a new profile for each session.
+        # the profiler will create a new profile for each session. Profiling uses a process-global cProfile, which
+        # cannot cleanly attribute work when multiple sessions run concurrently, so it is disabled in multi-GPU mode.
+        profiler_enabled = self._invoker.services.configuration.profile_graphs
+        if profiler_enabled and len(devices) > 1:
+            self._invoker.services.logger.warning(
+                "Graph profiling is disabled because multiple generation devices are configured."
+            )
+            profiler_enabled = False
         self._profiler = (
             Profiler(
                 logger=self._invoker.services.logger,
                 output_dir=self._invoker.services.configuration.profiles_path,
                 prefix=self._invoker.services.configuration.profile_prefix,
             )
-            if self._invoker.services.configuration.profile_graphs
+            if profiler_enabled
             else None
         )
 
-        self.session_runner.start(services=invoker.services, cancel_event=self._cancel_event, profiler=self._profiler)
-        self._thread = Thread(
-            name="session_processor",
-            target=self._process,
-            daemon=True,
-            kwargs={
-                "stop_event": self._stop_event,
-                "poll_now_event": self._poll_now_event,
-                "resume_event": self._resume_event,
-                "cancel_event": self._cancel_event,
-            },
-        )
-        self._thread.start()
+        self._thread_semaphore = BoundedSemaphore(len(devices))
+
+        # Start in the running (resumed) state.
+        self._stop_event.clear()
+        self._resume_event.set()
+
+        self._workers = []
+        for index, device in enumerate(devices):
+            runner = self.session_runner if index == 0 else self._clone_session_runner(self.session_runner)
+            worker = _SessionWorker(device=device, runner=runner)
+            runner.start(services=invoker.services, cancel_event=worker.cancel_event, profiler=self._profiler)
+            self._workers.append(worker)
+
+        if len(self._workers) > 1:
+            self._invoker.services.logger.info(
+                f"Starting session processor with {len(self._workers)} parallel workers on devices: "
+                f"{', '.join(w.label for w in self._workers)}"
+            )
+
+        for index, worker in enumerate(self._workers):
+            worker.thread = Thread(
+                name=f"session_processor_{index}",
+                target=self._process,
+                daemon=True,
+                kwargs={
+                    "worker": worker,
+                    "stop_event": self._stop_event,
+                    "poll_now_event": self._poll_now_event,
+                    "resume_event": self._resume_event,
+                },
+            )
+            worker.thread.start()
 
     def stop(self, *args, **kwargs) -> None:
         self._stop_event.set()
         # Cancel any in-progress generation so that long-running nodes (e.g. denoising) stop at
-        # the next step boundary instead of running to completion. Without this, the generation
+        # the next step boundary instead of running to completion. Without this, a generation
         # thread may still be executing CUDA operations when Python teardown begins, which can
         # cause a C++ std::terminate() crash ("terminate called without an active exception").
-        self._cancel_event.set()
-        # Wake the thread if it is sleeping in poll_now_event.wait() or blocked in resume_event.wait() (paused).
+        for worker in self._workers:
+            worker.cancel_event.set()
+        # Wake any worker sleeping in poll_now_event.wait() or blocked in resume_event.wait() (paused).
         self._poll_now_event.set()
         self._resume_event.set()
 
@@ -377,28 +456,31 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self._poll_now_event.set()
 
     async def _on_queue_cleared(self, event: FastAPIEvent[QueueClearedEvent]) -> None:
-        if self._queue_item and self._queue_item.queue_id == event[1].queue_id:
-            self._cancel_event.set()
+        # Cancel every worker currently running an item from the cleared queue.
+        canceled = False
+        for worker in self._workers:
+            if worker.queue_item and worker.queue_item.queue_id == event[1].queue_id:
+                worker.cancel_event.set()
+                canceled = True
+        if canceled:
             self._poll_now()
 
     async def _on_batch_enqueued(self, event: FastAPIEvent[BatchEnqueuedEvent]) -> None:
         self._poll_now()
 
     async def _on_queue_item_status_changed(self, event: FastAPIEvent[QueueItemStatusChangedEvent]) -> None:
-        # Make sure the cancel event is for the currently processing queue item
-        if self._queue_item and self._queue_item.item_id != event[1].item_id:
-            return
-        if self._queue_item and event[1].status in ["completed", "failed", "canceled"]:
-            # When the queue item is canceled via HTTP, the queue item status is set to `"canceled"` and this event is
-            # emitted. We need to respond to this event and stop graph execution. This is done by setting the cancel
-            # event, which the session runner checks between invocations. If set, the session runner loop is broken.
-            #
-            # Long-running nodes that cannot be interrupted easily present a challenge. `denoise_latents` is one such
-            # node, but it gets a step callback, called on each step of denoising. This callback checks if the queue item
-            # is canceled, and if it is, raises a `CanceledException` to stop execution immediately.
-            if event[1].status == "canceled":
-                self._cancel_event.set()
-            self._poll_now()
+        # Find the worker (if any) currently running the item whose status changed.
+        for worker in self._workers:
+            if worker.queue_item and worker.queue_item.item_id == event[1].item_id:
+                if event[1].status in ["completed", "failed", "canceled"]:
+                    # When the queue item is canceled via HTTP, the status is set to "canceled" and this event is
+                    # emitted. We respond by setting that worker's cancel event, which its session runner checks
+                    # between invocations (and which denoise_latents' step callback checks mid-node, raising
+                    # CanceledException to stop immediately).
+                    if event[1].status == "canceled":
+                        worker.cancel_event.set()
+                    self._poll_now()
+                return
 
     def resume(self) -> SessionProcessorStatus:
         if not self._resume_event.is_set():
@@ -413,22 +495,41 @@ class DefaultSessionProcessor(SessionProcessorBase):
     def get_status(self) -> SessionProcessorStatus:
         return SessionProcessorStatus(
             is_started=self._resume_event.is_set(),
-            is_processing=self._queue_item is not None,
+            is_processing=any(worker.queue_item is not None for worker in self._workers),
         )
+
+    def _is_queue_item_terminal(self, item_id: int) -> bool:
+        """Return True if the queue item is already finished (canceled/failed/completed) or gone.
+
+        Checked right after a worker claims an item to catch a cancellation that raced the claim and
+        so never reached this worker's cancel_event — e.g. the status-changed handler ran before the
+        worker recorded `queue_item` and so couldn't match a worker to signal.
+        """
+        try:
+            status = self._invoker.services.session_queue.get_queue_item(item_id).status
+        except SessionQueueItemNotFoundError:
+            return True
+        return status in ("canceled", "failed", "completed")
 
     def _process(
         self,
+        worker: _SessionWorker,
         stop_event: ThreadEvent,
         poll_now_event: ThreadEvent,
         resume_event: ThreadEvent,
-        cancel_event: ThreadEvent,
     ):
         try:
-            # Any unhandled exception in this block is a fatal processor error and will stop the processor.
+            # Any unhandled exception in this block is a fatal processor error and will stop this worker.
             self._thread_semaphore.acquire()
-            stop_event.clear()
-            resume_event.set()
-            cancel_event.clear()
+
+            # Pin this worker thread to its device so all device-selecting code (TorchDevice.choose_torch_device,
+            # which nodes and the model loader consult) resolves to this GPU. CUDA's current device is per-thread.
+            if worker.device is not None:
+                TorchDevice.set_session_device(worker.device)
+                if worker.device.type == "cuda":
+                    torch.cuda.set_device(worker.device)
+
+            worker.cancel_event.clear()
 
             while not stop_event.is_set():
                 poll_now_event.clear()
@@ -437,13 +538,37 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     # If we are paused, wait for resume event
                     resume_event.wait()
 
-                    # Get the next session to process
-                    self._queue_item = self._invoker.services.session_queue.dequeue()
+                    if stop_event.is_set():
+                        break
 
-                    if self._queue_item is None:
+                    # Clear any stale cancel signal from the previous item BEFORE claiming the next
+                    # one. Clearing it after dequeue (as before) could wipe a cancel that arrived for
+                    # the item we just claimed — e.g. during the gc.collect() below — silently losing
+                    # the cancellation. Any cancel that arrives after this point for the claimed item
+                    # stays set and is caught by the runner's _is_canceled() check.
+                    worker.cancel_event.clear()
+
+                    # Get the next session to process. dequeue() atomically claims the item, so concurrent
+                    # workers never receive the same item. Pass this worker's device so the item is
+                    # tagged with the GPU that ran it (None in single-device/legacy mode).
+                    worker.queue_item = self._invoker.services.session_queue.dequeue(
+                        device=str(worker.device) if worker.device is not None else None
+                    )
+
+                    if worker.queue_item is None:
                         # The queue was empty, wait for next polling interval or event to try again
                         self._invoker.services.logger.debug("Waiting for next polling interval or event")
                         poll_now_event.wait(self._polling_interval)
+                        continue
+
+                    # A cancellation can race the claim: it may have marked the row terminal before
+                    # this worker recorded `queue_item`, so _on_queue_item_status_changed couldn't set
+                    # our cancel_event. Re-check (cancel_event + a fresh DB status read) and skip
+                    # running if the item is already finished, so the cancel is never lost.
+                    if worker.cancel_event.is_set() or self._is_queue_item_terminal(worker.queue_item.item_id):
+                        self._invoker.services.logger.debug(
+                            f"Queue item {worker.queue_item.item_id} was canceled before it started; skipping."
+                        )
                         continue
 
                     # GC-ing here can reduce peak memory usage of the invoke process by freeing allocated memory blocks.
@@ -453,19 +578,19 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     gc.collect()
 
                     self._invoker.services.logger.info(
-                        f"Executing queue item {self._queue_item.item_id}, session {self._queue_item.session_id}"
+                        f"Executing queue item {worker.queue_item.item_id}, session {worker.queue_item.session_id} "
+                        f"on {worker.label}"
                     )
-                    cancel_event.clear()
 
                     # Run the graph
-                    self.session_runner.run(queue_item=self._queue_item)
+                    worker.runner.run(queue_item=worker.queue_item)
 
                 except Exception as e:
                     error_type = e.__class__.__name__
                     error_message = str(e)
                     error_traceback = traceback.format_exc()
                     self._on_non_fatal_processor_error(
-                        queue_item=self._queue_item,
+                        queue_item=worker.queue_item,
                         error_type=error_type,
                         error_message=error_message,
                         error_traceback=error_traceback,
@@ -474,7 +599,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     poll_now_event.wait(self._polling_interval)
                     continue
         except Exception as e:
-            # Fatal error in processor, log and pass - we're done here
+            # Fatal error in this worker, log and pass - we're done here
             error_type = e.__class__.__name__
             error_message = str(e)
             error_traceback = traceback.format_exc()
@@ -482,9 +607,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
             self._invoker.services.logger.error(error_traceback)
             pass
         finally:
-            stop_event.clear()
-            poll_now_event.clear()
-            self._queue_item = None
+            worker.queue_item = None
+            if worker.device is not None:
+                TorchDevice.clear_session_device()
             self._thread_semaphore.release()
 
     def _on_non_fatal_processor_error(

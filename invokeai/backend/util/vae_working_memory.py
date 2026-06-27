@@ -2,6 +2,7 @@ from typing import Literal
 
 import torch
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
+from diffusers.models.autoencoders.autoencoder_kl_qwenimage import AutoencoderKLQwenImage
 from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
 
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
@@ -88,6 +89,39 @@ def estimate_vae_working_memory_flux(
     working_memory = out_h * out_w * element_size * scaling_constant
 
     print(f"estimate_vae_working_memory_flux: {int(working_memory)}")
+
+    return int(working_memory)
+
+
+def estimate_vae_working_memory_qwen_image(
+    operation: Literal["encode", "decode"], image_tensor: torch.Tensor, vae: AutoencoderKLQwenImage
+) -> int:
+    """Estimate the working memory required by the invocation in bytes.
+
+    Without this, the Qwen Image VAE encode/decode passes no working-memory estimate to the model
+    cache, so the cache reserves only its small default and never offloads a large resident
+    transformer (the VAE weights themselves are tiny). The decode then OOMs on its activations. This
+    mirrors the other VAE estimators: peak working memory scales ~linearly with the number of output
+    pixels and the element size. The Qwen Image latents are 5D (B, C, frames, H, W); the trailing two
+    dims are spatial, same as the 2D VAEs. See #8414.
+    """
+    latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
+
+    h = latent_scale_factor_for_operation * image_tensor.shape[-2]
+    w = latent_scale_factor_for_operation * image_tensor.shape[-1]
+    element_size = next(vae.parameters()).element_size()
+
+    # Calibrated for the Qwen Image VAE, a 3D-conv (video) VAE whose decode allocates large conv3d
+    # feature maps — a ~1MP decode was measured to peak at ~17 GiB of VRAM, far above the 2D SD/FLUX
+    # VAEs the generic 2200/1100 constants were tuned for. The reservation must cover that peak AND be
+    # large enough to make the cache offload an otherwise-resident transformer + text encoder (which
+    # the decode doesn't need): the offload only frees ~(working_mem - free) bytes, so under-reserving
+    # leaves the big models resident and the decode OOMs. Over-reserving is safe here (it just offloads
+    # models the decode doesn't use). Encoding uses ~half the working memory of decoding.
+    # NOTE: this is linear in output pixels; a sufficiently large output (>~1.5MP) can still exceed
+    # the card even after offloading everything — that case needs tiled decode, handled separately.
+    scaling_constant = 13000 if operation == "decode" else 6500
+    working_memory = h * w * element_size * scaling_constant
 
     return int(working_memory)
 

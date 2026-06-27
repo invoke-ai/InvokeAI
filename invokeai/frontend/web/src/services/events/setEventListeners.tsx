@@ -43,7 +43,13 @@ import { createWorkflowExecutionCoordinator } from 'services/events/workflowExec
 import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
 
-import { $lastProgressEvent, $loadingModelsCount } from './stores';
+import {
+  $lastProgressEvent,
+  $loadingModelsCount,
+  clearAllProgressEvents,
+  clearProgressEvent,
+  setProgressEvent,
+} from './stores';
 
 const log = logger('events');
 
@@ -86,6 +92,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     socket.emit('subscribe_queue', { queue_id: 'default' });
     socket.emit('subscribe_bulk_download', { bulk_download_id: 'default' });
     $lastProgressEvent.set(null);
+    clearAllProgressEvents();
     $loadingModelsCount.set(0);
   });
 
@@ -93,6 +100,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.debug('Connect error');
     setIsConnected(false);
     $lastProgressEvent.set(null);
+    clearAllProgressEvents();
     $loadingModelsCount.set(0);
     if (error && error.message) {
       const data: string | undefined = (error as unknown as { data: string | undefined }).data;
@@ -111,6 +119,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.debug('Disconnected');
     workflowExecutionCoordinator.cancelPendingWorkflowReconciliations();
     $lastProgressEvent.set(null);
+    clearAllProgressEvents();
     $loadingModelsCount.set(0);
     setIsConnected(false);
   });
@@ -140,6 +149,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.trace({ data } as JsonObject, _message);
 
     $lastProgressEvent.set(data);
+    setProgressEvent(data);
   });
 
   socket.on('invocation_error', (data) => {
@@ -448,11 +458,14 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       }
       // If the queue item is completed, failed, or cancelled, we want to clear the last progress event
       $lastProgressEvent.set(null);
+      // Also remove this session's per-item progress so its stacked progress bar disappears.
+      clearProgressEvent(item_id);
     }
   });
 
   socket.on('queue_cleared', (data) => {
     log.debug({ data }, 'Queue cleared');
+    clearAllProgressEvents();
     dispatch(
       queueApi.util.invalidateTags([
         'SessionQueueStatus',

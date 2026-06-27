@@ -1,4 +1,5 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
+import threading
 from pathlib import Path
 from queue import Queue
 from typing import Optional, Union
@@ -23,6 +24,9 @@ class DiskImageFileStorage(ImageFileStorageBase):
         self.__cache: dict[Path, PILImageType] = {}
         self.__cache_ids = Queue[Path]()
         self.__max_cache_size = 10  # TODO: get this from config
+        # Guards the cache structures (__cache / __cache_ids), which are read and mutated from
+        # multiple session-processor worker threads in multi-GPU parallel mode.
+        self.__cache_lock = threading.Lock()
 
         self.__output_folder = output_folder if isinstance(output_folder, Path) else Path(output_folder)
         self.__thumbnails_folder = self.__output_folder / "thumbnails"
@@ -41,6 +45,13 @@ class DiskImageFileStorage(ImageFileStorageBase):
                 return cache_item
 
             image = Image.open(image_path)
+            # Image.open() is lazy: it reads the header but defers pixel decoding (and holds the
+            # file handle open) until the first .load()/.copy()/.convert(). The opened object is
+            # cached and the SAME object is handed to every caller, so in multi-GPU parallel mode
+            # two worker threads can call .copy() on it concurrently and race on the shared file
+            # handle and decoder state, producing "broken data stream" / "self.png is not None"
+            # errors. Forcing the decode here makes the cached object safe for concurrent reads.
+            image.load()
             self.__set_cache(image_path, image)
             return image
         except FileNotFoundError as e:
@@ -105,16 +116,18 @@ class DiskImageFileStorage(ImageFileStorageBase):
 
             if image_path.exists():
                 image_path.unlink()
-            if image_path in self.__cache:
-                del self.__cache[image_path]
 
             thumbnail_name = get_thumbnail_name(image_name)
             thumbnail_path = self.get_path(thumbnail_name, True, image_subfolder=image_subfolder)
 
             if thumbnail_path.exists():
                 thumbnail_path.unlink()
-            if thumbnail_path in self.__cache:
-                del self.__cache[thumbnail_path]
+
+            with self.__cache_lock:
+                if image_path in self.__cache:
+                    del self.__cache[image_path]
+                if thumbnail_path in self.__cache:
+                    del self.__cache[thumbnail_path]
         except Exception as e:
             raise ImageFileDeleteException from e
 
@@ -185,13 +198,15 @@ class DiskImageFileStorage(ImageFileStorageBase):
             folder.mkdir(parents=True, exist_ok=True)
 
     def __get_cache(self, image_name: Path) -> Optional[PILImageType]:
-        return None if image_name not in self.__cache else self.__cache[image_name]
+        with self.__cache_lock:
+            return None if image_name not in self.__cache else self.__cache[image_name]
 
     def __set_cache(self, image_name: Path, image: PILImageType):
-        if image_name not in self.__cache:
-            self.__cache[image_name] = image
-            self.__cache_ids.put(image_name)  # TODO: this should refresh position for LRU cache
-            if len(self.__cache) > self.__max_cache_size:
-                cache_id = self.__cache_ids.get()
-                if cache_id in self.__cache:
-                    del self.__cache[cache_id]
+        with self.__cache_lock:
+            if image_name not in self.__cache:
+                self.__cache[image_name] = image
+                self.__cache_ids.put(image_name)  # TODO: this should refresh position for LRU cache
+                if len(self.__cache) > self.__max_cache_size:
+                    cache_id = self.__cache_ids.get()
+                    if cache_id in self.__cache:
+                        del self.__cache[cache_id]

@@ -1,0 +1,106 @@
+import threading
+
+import torch
+
+from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
+
+
+def _state_dict() -> dict[str, torch.Tensor]:
+    return {
+        "a": torch.ones(10, 10, dtype=torch.float32),  # 400 bytes
+        "b": torch.ones(5, dtype=torch.float32),  # 20 bytes
+    }
+
+
+def test_first_acquire_registers_and_returns_same_object():
+    store = SharedCpuWeightsStore()
+    sd = _state_dict()
+    canonical = store.acquire("k", sd)
+    # The first acquire keeps the caller's own dict as canonical.
+    assert canonical is sd
+    assert store.refcount("k") == 1
+    assert "k" in store
+
+
+def test_second_acquire_returns_canonical_not_the_new_dict():
+    store = SharedCpuWeightsStore()
+    first = _state_dict()
+    second = _state_dict()  # distinct tensors, same shapes
+    canonical_first = store.acquire("k", first)
+    canonical_second = store.acquire("k", second)
+
+    # The second caller gets the originally-registered tensors, not its own.
+    assert canonical_second is canonical_first
+    assert canonical_second["a"].data_ptr() == first["a"].data_ptr()
+    assert canonical_second["a"].data_ptr() != second["a"].data_ptr()
+    assert store.refcount("k") == 2
+
+
+def test_total_bytes_counts_each_key_once():
+    store = SharedCpuWeightsStore()
+    # Two devices acquire the same key -> counted once.
+    store.acquire("k", _state_dict())
+    store.acquire("k", _state_dict())
+    assert store.total_bytes_in_use() == 420
+    # A different key adds its own bytes.
+    store.acquire("k2", {"x": torch.ones(100, dtype=torch.float32)})  # 400 bytes
+    assert store.total_bytes_in_use() == 820
+
+
+def test_release_frees_only_at_zero():
+    store = SharedCpuWeightsStore()
+    store.acquire("k", _state_dict())
+    store.acquire("k", _state_dict())
+    assert store.refcount("k") == 2
+
+    store.release("k")
+    assert store.refcount("k") == 1
+    assert "k" in store
+    assert store.total_bytes_in_use() == 420
+
+    store.release("k")
+    assert store.refcount("k") == 0
+    assert "k" not in store
+    assert store.total_bytes_in_use() == 0
+
+
+def test_release_unknown_key_is_noop():
+    store = SharedCpuWeightsStore()
+    store.release("missing")  # must not raise
+    assert store.total_bytes_in_use() == 0
+
+
+def test_reacquire_after_full_release_registers_fresh():
+    store = SharedCpuWeightsStore()
+    first = _state_dict()
+    store.acquire("k", first)
+    store.release("k")
+    assert "k" not in store
+
+    second = _state_dict()
+    canonical = store.acquire("k", second)
+    # After a full release the next caller becomes the new canonical.
+    assert canonical is second
+    assert store.refcount("k") == 1
+
+
+def test_concurrent_acquire_release_is_consistent():
+    store = SharedCpuWeightsStore()
+    sd = _state_dict()
+    # Pre-register so the key exists for the whole run and the count never hits zero.
+    store.acquire("k", sd)
+
+    def worker():
+        for _ in range(200):
+            store.acquire("k", _state_dict())
+            store.release("k")
+
+    threads = [threading.Thread(target=worker) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    # Every acquire was paired with a release, so only the pre-registration reference remains.
+    assert store.refcount("k") == 1
+    assert store.total_bytes_in_use() == 420

@@ -1,6 +1,7 @@
 import type { ChakraProps, CollapseProps, FlexProps } from '@invoke-ai/ui-library';
 import { ButtonGroup, Collapse, Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { getCudaDeviceIndex } from 'common/util/getCudaDeviceIndex';
 import { selectCurrentUser } from 'features/auth/store/authSlice';
 import QueueStatusBadge from 'features/queue/components/common/QueueStatusBadge';
 import { useDestinationText } from 'features/queue/components/QueueList/useDestinationText';
@@ -95,6 +96,8 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
     return `${seconds}s`;
   }, [item]);
 
+  const gpuIndex = useMemo(() => getCudaDeviceIndex(item.device), [item.device]);
+
   const isCanceled = useMemo(() => ['canceled', 'completed', 'failed'].includes(item.status), [item.status]);
   const isFailed = useMemo(() => ['canceled', 'failed'].includes(item.status), [item.status]);
   const originText = useOriginText(item.origin);
@@ -139,6 +142,9 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
         </Flex>
         <Flex w={COLUMN_WIDTHS.statusBadge} alignItems="center" flexShrink={0}>
           <QueueStatusBadge status={item.status} />
+        </Flex>
+        <Flex w={COLUMN_WIDTHS.gpu} alignItems="center" flexShrink={0}>
+          {gpuIndex !== null ? gpuIndex : '-'}
         </Flex>
 
         <Flex w={COLUMN_WIDTHS.time} alignItems="center" flexShrink={0}>
