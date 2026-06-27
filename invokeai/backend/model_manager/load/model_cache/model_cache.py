@@ -770,7 +770,13 @@ class ModelCache:
     def _get_vram_in_use(self) -> int:
         """Get the amount of VRAM currently in use by the cache."""
         if self._execution_device.type == "cuda":
-            return torch.cuda.memory_allocated()
+            # Must be queried for THIS cache's execution device, not the process-current device. In
+            # multi-GPU mode each worker calls torch.cuda.set_device for its own GPU, so the current
+            # device flips between workers; querying without the device argument can read a different
+            # (e.g. idle) GPU's allocation. That breaks the cancellation in _get_vram_available
+            # (which adds vram_allocated(execution_device)), inflating "available" toward total VRAM
+            # so the cache never offloads — causing VRAM OOMs that ignore device_working_mem_gb.
+            return torch.cuda.memory_allocated(self._execution_device)
         elif self._execution_device.type == "mps":
             return torch.mps.current_allocated_memory()
         else:
@@ -967,7 +973,12 @@ class ModelCache:
             )
 
         if torch.cuda.is_available():
-            log += "  {:<30} {:.1f} MB\n".format("CUDA Memory Allocated:", torch.cuda.memory_allocated() / MB)
+            # Query this cache's execution device (not the process-current one) for correct
+            # per-device numbers in multi-GPU mode. See _get_vram_in_use.
+            allocated = (
+                torch.cuda.memory_allocated(self._execution_device) if self._execution_device.type == "cuda" else 0
+            )
+            log += "  {:<30} {:.1f} MB\n".format("CUDA Memory Allocated:", allocated / MB)
         log += "  {:<30} {}\n".format("Total models:", len(self._cached_models))
 
         if include_entry_details and len(self._cached_models) > 0:

@@ -98,6 +98,36 @@ def test_global_budget_evicts_lru_in_single_cache(mock_logger):
         cache.shutdown()
 
 
+def test_get_vram_in_use_queries_this_caches_execution_device(mock_logger):
+    """Regression: _get_vram_in_use must query its own execution device, not the process-current one.
+
+    In multi-GPU mode each worker calls torch.cuda.set_device for its GPU, so a no-argument
+    memory_allocated() can read a different device. That breaks the cancellation in
+    _get_vram_available and inflates "available" VRAM, so the cache never offloads and OOMs while
+    ignoring device_working_mem_gb.
+    """
+    import torch
+
+    mc = "invokeai.backend.model_manager.load.model_cache.model_cache"
+    with (
+        patch(f"{mc}.torch.cuda.mem_get_info", return_value=(10 * GB, 48 * GB)),
+        patch(f"{mc}.torch.cuda.memory_allocated", return_value=42) as mock_alloc,
+    ):
+        cache = ModelCache(
+            execution_device_working_mem_gb=3.0,
+            enable_partial_loading=True,
+            keep_ram_copy_of_weights=True,
+            execution_device="cuda:1",
+            storage_device="cpu",
+            logger=mock_logger,
+        )
+        try:
+            assert cache._get_vram_in_use() == 42
+            mock_alloc.assert_called_with(torch.device("cuda:1"))
+        finally:
+            cache.shutdown()
+
+
 def _mock_total_ram(total_bytes: int):
     """Patch psutil.virtual_memory().total as seen by model_cache."""
     vm = MagicMock()
