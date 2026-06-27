@@ -1,7 +1,8 @@
 import type { CircularProgressProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { CircularProgress, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useProgressDeviceLabel } from 'common/hooks/useProgressDeviceLabel';
-import { memo } from 'react';
+import type { ComponentRef } from 'react';
+import { forwardRef, memo } from 'react';
 import type { S } from 'services/api/types';
 import { formatProgressMessage } from 'services/events/stores';
 
@@ -29,23 +30,37 @@ const labelStyles: SystemStyleObject = {
   pointerEvents: 'none',
 };
 
+type ProgressDeviceLabel = ReturnType<typeof useProgressDeviceLabel>;
+
+// The circle is split out and memoized so it does NOT re-render when only the tooltip message
+// changes. Every progress event re-renders the parent, and during the indeterminate phases
+// (everything except denoising) those events keep the same `isIndeterminate`/`value` — but
+// re-rendering the CircularProgress restarts its CSS spin animation, which reads as the disk
+// "flashing". Memoizing on the visual props keeps the animation continuous. forwardRef so the
+// wrapping Tooltip can still anchor to it.
+const ProgressCircle = memo(
+  forwardRef<ComponentRef<typeof CircularProgress>, { deviceLabel: ProgressDeviceLabel } & CircularProgressProps>(
+    ({ deviceLabel, ...rest }, ref) => (
+      <CircularProgress ref={ref} size="14px" color="invokeBlue.500" thickness={14} sx={circleStyles} {...rest}>
+        {deviceLabel && <Text sx={labelStyles}>{deviceLabel.index}</Text>}
+      </CircularProgress>
+    )
+  )
+);
+ProgressCircle.displayName = 'ProgressCircle';
+
 export const ProgressIndicator = memo(
   ({ progressEvent, ...rest }: { progressEvent: S['InvocationProgressEvent'] } & CircularProgressProps) => {
     const deviceLabel = useProgressDeviceLabel(progressEvent?.device);
     const message = formatProgressMessage(progressEvent);
     return (
       <Tooltip label={deviceLabel ? `${deviceLabel.name} — ${message}` : message}>
-        <CircularProgress
-          size="14px"
-          color="invokeBlue.500"
-          thickness={14}
+        <ProgressCircle
           isIndeterminate={!progressEvent || progressEvent.percentage === null}
           value={progressEvent?.percentage ? progressEvent.percentage * 100 : undefined}
-          sx={circleStyles}
+          deviceLabel={deviceLabel}
           {...rest}
-        >
-          {deviceLabel && <Text sx={labelStyles}>{deviceLabel.index}</Text>}
-        </CircularProgress>
+        />
       </Tooltip>
     );
   }
