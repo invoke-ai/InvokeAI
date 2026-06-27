@@ -18,6 +18,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_qwen_image
 
 
 @invocation(
@@ -44,7 +45,10 @@ class QwenImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard)
 
     @staticmethod
     def vae_encode(vae_info: LoadedModel, image_tensor: torch.Tensor) -> torch.Tensor:
-        with vae_info.model_on_device() as (_, vae):
+        # Reserve working memory for the encode so the cache offloads any large resident model first;
+        # otherwise the encode's activations OOM (the VAE weights themselves are tiny).
+        estimated_working_memory = estimate_vae_working_memory_qwen_image("encode", image_tensor, vae_info.model)
+        with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             assert isinstance(vae, AutoencoderKLQwenImage)
 
             vae.disable_tiling()

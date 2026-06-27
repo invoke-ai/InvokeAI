@@ -2,6 +2,7 @@ from typing import Literal
 
 import torch
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
+from diffusers.models.autoencoders.autoencoder_kl_qwenimage import AutoencoderKLQwenImage
 from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
 
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
@@ -88,6 +89,32 @@ def estimate_vae_working_memory_flux(
     working_memory = out_h * out_w * element_size * scaling_constant
 
     print(f"estimate_vae_working_memory_flux: {int(working_memory)}")
+
+    return int(working_memory)
+
+
+def estimate_vae_working_memory_qwen_image(
+    operation: Literal["encode", "decode"], image_tensor: torch.Tensor, vae: AutoencoderKLQwenImage
+) -> int:
+    """Estimate the working memory required by the invocation in bytes.
+
+    Without this, the Qwen Image VAE encode/decode passes no working-memory estimate to the model
+    cache, so the cache reserves only its small default and never offloads a large resident
+    transformer (the VAE weights themselves are tiny). The decode then OOMs on its activations. This
+    mirrors the other VAE estimators: peak working memory scales ~linearly with the number of output
+    pixels and the element size. The Qwen Image latents are 5D (B, C, frames, H, W); the trailing two
+    dims are spatial, same as the 2D VAEs. See #8414.
+    """
+    latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
+
+    h = latent_scale_factor_for_operation * image_tensor.shape[-2]
+    w = latent_scale_factor_for_operation * image_tensor.shape[-1]
+    element_size = next(vae.parameters()).element_size()
+
+    # This constant is determined experimentally and takes into consideration both allocated and reserved memory. See #8414
+    # Encoding uses ~45% the working memory as decoding.
+    scaling_constant = 2200 if operation == "decode" else 1100
+    working_memory = h * w * element_size * scaling_constant
 
     return int(working_memory)
 

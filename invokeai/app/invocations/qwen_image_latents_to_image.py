@@ -19,6 +19,7 @@ from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_qwen_image
 
 
 @invocation(
@@ -41,9 +42,12 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
 
         vae_info = context.models.load(self.vae.vae)
         assert isinstance(vae_info.model, AutoencoderKLQwenImage)
+        # Reserve working memory for the decode so the cache offloads any large resident model (e.g.
+        # the transformer) first; otherwise the decode's activations OOM. See estimator for details.
+        estimated_working_memory = estimate_vae_working_memory_qwen_image("decode", latents, vae_info.model)
         with (
             SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes),
-            vae_info.model_on_device() as (_, vae),
+            vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae),
         ):
             context.util.signal_progress("Running VAE")
             assert isinstance(vae, AutoencoderKLQwenImage)
