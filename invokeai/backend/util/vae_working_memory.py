@@ -111,9 +111,16 @@ def estimate_vae_working_memory_qwen_image(
     w = latent_scale_factor_for_operation * image_tensor.shape[-1]
     element_size = next(vae.parameters()).element_size()
 
-    # This constant is determined experimentally and takes into consideration both allocated and reserved memory. See #8414
-    # Encoding uses ~45% the working memory as decoding.
-    scaling_constant = 2200 if operation == "decode" else 1100
+    # Calibrated for the Qwen Image VAE, a 3D-conv (video) VAE whose decode allocates large conv3d
+    # feature maps — a ~1MP decode was measured to peak at ~17 GiB of VRAM, far above the 2D SD/FLUX
+    # VAEs the generic 2200/1100 constants were tuned for. The reservation must cover that peak AND be
+    # large enough to make the cache offload an otherwise-resident transformer + text encoder (which
+    # the decode doesn't need): the offload only frees ~(working_mem - free) bytes, so under-reserving
+    # leaves the big models resident and the decode OOMs. Over-reserving is safe here (it just offloads
+    # models the decode doesn't use). Encoding uses ~half the working memory of decoding.
+    # NOTE: this is linear in output pixels; a sufficiently large output (>~1.5MP) can still exceed
+    # the card even after offloading everything — that case needs tiled decode, handled separately.
+    scaling_constant = 13000 if operation == "decode" else 6500
     working_memory = h * w * element_size * scaling_constant
 
     return int(working_memory)
