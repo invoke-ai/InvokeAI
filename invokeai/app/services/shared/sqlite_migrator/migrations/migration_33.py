@@ -42,7 +42,7 @@ class Migration33Callback:
             """
         )
 
-        # Last-served lookup: WHERE started_at IS NOT NULL, GROUP BY user_id, MAX(started_at).
+        # Last-served lookup: MAX(started_at) WHERE user_id = ?)
         cursor.execute(
             """--sql
             CREATE INDEX IF NOT EXISTS idx_session_queue_user_started_at
