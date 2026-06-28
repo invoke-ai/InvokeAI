@@ -1,3 +1,5 @@
+import type { DenoiseProgressImage } from '@workbench/images/streamingImageSource';
+
 import { createExternalStore, createKeyedTransientStore } from '@workbench/externalStore';
 
 /**
@@ -6,11 +8,7 @@ import { createExternalStore, createKeyedTransientStore } from '@workbench/exter
  * Current Image node, progress surfaces) fall back to the last real output.
  */
 
-export interface ProgressImageSnapshot {
-  dataUrl: string;
-  width: number;
-  height: number;
-}
+export type ProgressImageSnapshot = DenoiseProgressImage;
 
 export interface ProgressImageTarget {
   queueItemId: string;

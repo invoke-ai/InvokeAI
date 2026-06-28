@@ -13,6 +13,8 @@ import {
 } from '@workbench/gallery/api';
 import { getGallerySettings } from '@workbench/gallery/settings';
 import { ImageContextMenu, useImageActions, type ImageContextMenuTarget } from '@workbench/image-actions';
+import { imageUrlToStreamingSource, progressImageToStreamingSource } from '@workbench/images/streamingImageSource';
+import { useStreamingImageSource } from '@workbench/images/useStreamingImageSource';
 import {
   getGalleryCompareImage,
   getGalleryImagesRefreshToken,
@@ -446,19 +448,19 @@ const SelectedImagePreview = ({
   onNext: () => void;
   onPrevious: () => void;
 }) => {
-  const previewImage = useMemo(
-    () =>
-      progressImage
-        ? {
-            alt: 'In-progress diffusion preview',
-            height: progressImage.height,
-            isProgress: true,
-            src: progressImage.dataUrl,
-            width: progressImage.width,
-          }
-        : { alt: image.imageName, height: image.height, isProgress: false, src: image.imageUrl, width: image.width },
-    [image.height, image.imageName, image.imageUrl, image.width, progressImage]
-  );
+  const previewImage = useStreamingImageSource({
+    fallbackImage: imageUrlToStreamingSource({
+      alt: image.imageName,
+      height: image.height,
+      kind: 'fallback',
+      src: image.imageUrl,
+      width: image.width,
+    }),
+    liveImage: progressImageToStreamingSource(progressImage),
+  });
+  const isProgressImage = previewImage?.kind === 'live';
+  const previewWidth = previewImage?.width ?? image.width;
+  const previewHeight = previewImage?.height ?? image.height;
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       if (event.key === 'ArrowLeft') {
@@ -484,13 +486,13 @@ const SelectedImagePreview = ({
     () => ({
       display: 'block',
       height: '100%',
-      imageRendering: previewImage.isProgress && !shouldAntialiasProgressImage ? 'pixelated' : 'auto',
+      imageRendering: isProgressImage && !shouldAntialiasProgressImage ? 'pixelated' : 'auto',
       inset: 0,
       objectFit: 'contain',
       position: 'absolute',
       width: '100%',
     }),
-    [previewImage.isProgress, shouldAntialiasProgressImage]
+    [isProgressImage, shouldAntialiasProgressImage]
   );
 
   return (
@@ -510,10 +512,10 @@ const SelectedImagePreview = ({
         w="full"
       >
         <Box
-          aspectRatio={previewImage.width / previewImage.height}
+          aspectRatio={previewWidth / previewHeight}
           bg="transparent"
           borderWidth="1px"
-          borderColor={previewImage.isProgress ? 'accent.solid' : 'border.emphasized'}
+          borderColor={isProgressImage ? 'accent.solid' : 'border.emphasized'}
           boxShadow="0 24px 80px rgba(0,0,0,0.42)"
           h={isCompact ? 'auto' : 'full'}
           maxH={isCompact ? undefined : 'full'}
@@ -524,8 +526,8 @@ const SelectedImagePreview = ({
           w={isCompact ? 'full' : 'auto'}
           onContextMenu={handleContextMenu}
         >
-          <img alt={previewImage.alt} src={previewImage.src} style={imageStyle} />
-          {previewImage.isProgress ? (
+          {previewImage ? <img alt={previewImage.alt} src={previewImage.src} style={imageStyle} /> : null}
+          {isProgressImage ? (
             <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
               Generating
             </Badge>
@@ -575,7 +577,7 @@ const SelectedImagePreview = ({
             Source run {image.sourceQueueItemId}
           </Text>
           <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
-            {previewImage.isProgress ? 'Generating' : `${image.width} x ${image.height}`}
+            {isProgressImage ? 'Generating' : `${image.width} x ${image.height}`}
           </Text>
         </Stack>
       </Stack>
@@ -589,53 +591,59 @@ const EmptyPreview = ({
 }: {
   progressImage: ProgressImageSnapshot | null;
   shouldAntialiasProgressImage: boolean;
-}) => (
-  <Flex
-    align="center"
-    backgroundColor="bg.inset"
-    color="fg.grid"
-    css={previewGridCss}
-    h="full"
-    justify="center"
-    w="full"
-  >
-    {progressImage ? (
-      <Box
-        aspectRatio={progressImage.width / progressImage.height}
-        borderColor="accent.solid"
-        borderWidth="1px"
-        boxShadow="0 24px 80px rgba(0,0,0,0.42)"
-        maxH="full"
-        maxW="full"
-        overflow="hidden"
-        position="relative"
-        rounded="lg"
-      >
-        <img
-          alt="In-progress diffusion preview"
-          draggable={false}
-          src={progressImage.dataUrl}
-          style={{
-            display: 'block',
-            height: '100%',
-            imageRendering: shouldAntialiasProgressImage ? 'auto' : 'pixelated',
-            objectFit: 'contain',
-            width: '100%',
-          }}
-        />
-        <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
-          Generating
-        </Badge>
-      </Box>
-    ) : (
-      <Stack align="center" color="fg" gap="2" maxW="18rem" textAlign="center">
-        <Text fontSize="sm" fontWeight="800">
-          No gallery selection
-        </Text>
-        <Text color="fg.subtle" fontSize="2xs">
-          Generate to Gallery, then select a thumbnail in the Gallery widget to inspect it here.
-        </Text>
-      </Stack>
-    )}
-  </Flex>
-);
+}) => {
+  const previewImage = useStreamingImageSource({
+    liveImage: progressImageToStreamingSource(progressImage),
+  });
+
+  return (
+    <Flex
+      align="center"
+      backgroundColor="bg.inset"
+      color="fg.grid"
+      css={previewGridCss}
+      h="full"
+      justify="center"
+      w="full"
+    >
+      {previewImage ? (
+        <Box
+          aspectRatio={(previewImage.width ?? 1) / (previewImage.height ?? 1)}
+          borderColor="accent.solid"
+          borderWidth="1px"
+          boxShadow="0 24px 80px rgba(0,0,0,0.42)"
+          maxH="full"
+          maxW="full"
+          overflow="hidden"
+          position="relative"
+          rounded="lg"
+        >
+          <img
+            alt={previewImage.alt}
+            draggable={false}
+            src={previewImage.src}
+            style={{
+              display: 'block',
+              height: '100%',
+              imageRendering: shouldAntialiasProgressImage ? 'auto' : 'pixelated',
+              objectFit: 'contain',
+              width: '100%',
+            }}
+          />
+          <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
+            Generating
+          </Badge>
+        </Box>
+      ) : (
+        <Stack align="center" color="fg" gap="2" maxW="18rem" textAlign="center">
+          <Text fontSize="sm" fontWeight="800">
+            No gallery selection
+          </Text>
+          <Text color="fg.subtle" fontSize="2xs">
+            Generate to Gallery, then select a thumbnail in the Gallery widget to inspect it here.
+          </Text>
+        </Stack>
+      )}
+    </Flex>
+  );
+};

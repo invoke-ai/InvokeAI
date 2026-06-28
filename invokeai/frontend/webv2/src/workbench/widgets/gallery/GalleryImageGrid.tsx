@@ -8,6 +8,8 @@ import { useQueueItemProgressImage } from '@workbench/backend/progressImageStore
 import { useQueueItemProgress } from '@workbench/backend/progressStore';
 import { IconButton } from '@workbench/components/ui';
 import { ImageContextMenu, type ImageContextMenuTarget } from '@workbench/image-actions';
+import { StreamingImageFrame } from '@workbench/images/StreamingImageFrame';
+import { progressImageToStreamingSource } from '@workbench/images/streamingImageSource';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { StarIcon, UploadIcon } from 'lucide-react';
 import {
@@ -543,34 +545,19 @@ const GalleryQueuePlaceholderCell = ({
       borderWidth="1px"
       cursor="pointer"
       minW="0"
-      overflow="hidden"
-      position="relative"
       rounded="md"
       w="full"
       onClick={onClick}
     >
-      {progressImage ? (
-        <img
-          alt="In-progress diffusion preview"
-          draggable={false}
-          src={progressImage.dataUrl}
-          style={{
-            display: 'block',
-            height: '100%',
-            imageRendering: antialiasProgressImages ? 'auto' : 'pixelated',
-            inset: 0,
-            maxWidth: 'none',
-            objectFit: fit === 'aspect' ? 'contain' : 'cover',
-            position: 'absolute',
-            width: '100%',
-          }}
-        />
-      ) : (
+      <StreamingImageFrame
+        fit={fit === 'aspect' ? 'contain' : 'cover'}
+        h="full"
+        liveImage={progressImageToStreamingSource(progressImage)}
+        shouldAntialiasLiveImage={antialiasProgressImages}
+        w="full"
+      >
         <Skeleton h="full" w="full" />
-      )}
-      {/*<Badge left="1" pointerEvents="none" position="absolute" size="xs" top="1" variant="solid" zIndex="1">
-        {isActive ? 'Generating' : 'Queued'}
-      </Badge>*/}
+      </StreamingImageFrame>
       {isActive ? <GalleryPlaceholderCircularProgress percentage={percentage} /> : null}
     </Box>
   );

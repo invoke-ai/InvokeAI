@@ -1,8 +1,10 @@
 import type { GeneratedImageContract } from '@workbench/types';
 import type { NodeProps } from '@xyflow/react';
 
-import { Box, Flex, Image, Text } from '@chakra-ui/react';
+import { Box, Flex, Text } from '@chakra-ui/react';
 import { useProgressImage } from '@workbench/backend/progressImageStore';
+import { StreamingImageFrame } from '@workbench/images/StreamingImageFrame';
+import { imageUrlToStreamingSource, progressImageToStreamingSource } from '@workbench/images/streamingImageSource';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { memo } from 'react';
@@ -28,7 +30,6 @@ const CurrentImageFlowNodeComponent = ({ data, selected }: NodeProps<CurrentImag
   const progressImage = useProgressImage();
   const node = data.documentNode;
   const latestImage = getLatestImage(galleryValues);
-  const src = progressImage?.dataUrl ?? latestImage?.imageUrl ?? null;
 
   return (
     <Box bg="bg" fontSize="xs" overflow="hidden" rounded="lg" w="20rem" {...getWorkflowNodeChromeProps({ selected })}>
@@ -40,13 +41,23 @@ const CurrentImageFlowNodeComponent = ({ data, selected }: NodeProps<CurrentImag
           </Text>
         ) : null}
       </Flex>
-      {src ? (
-        <Image alt="Current image" draggable={false} h="18rem" objectFit="contain" src={src} w="full" />
-      ) : (
-        <Flex align="center" color="fg.subtle" fontSize="2xs" h="18rem" justify="center" px="4" textAlign="center">
+      <StreamingImageFrame
+        fallbackImage={imageUrlToStreamingSource({
+          alt: latestImage?.imageName ?? 'Current image',
+          height: latestImage?.height,
+          kind: 'fallback',
+          src: latestImage?.imageUrl,
+          width: latestImage?.width,
+        })}
+        fit="contain"
+        h="18rem"
+        liveImage={progressImageToStreamingSource(progressImage)}
+        w="full"
+      >
+        <Flex align="center" color="fg.subtle" fontSize="2xs" h="full" justify="center" px="4" textAlign="center">
           No image yet — the latest generation will appear here.
         </Flex>
-      )}
+      </StreamingImageFrame>
     </Box>
   );
 };
