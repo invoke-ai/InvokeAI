@@ -137,6 +137,18 @@ def sanitize_queue_item_for_user(
     return sanitized_item
 
 
+def get_queue_item_for_mutation(queue_id: str, item_id: int, current_user: CurrentUserOrDefault) -> SessionQueueItem:
+    queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
+
+    if queue_item.queue_id != queue_id:
+        raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
+
+    if queue_item.user_id != current_user.user_id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail=f"You do not have permission to mutate queue item {item_id}")
+
+    return queue_item
+
+
 @session_queue_router.post(
     "/{queue_id}/enqueue_batch",
     operation_id="enqueue_batch",
@@ -194,12 +206,13 @@ async def get_queue_item_ids(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
+    origin_prefix: Optional[str] = Query(default=None, description="Only include queue items whose origin starts with this prefix"),
 ) -> ItemIdsResult:
     """Gets all queue item ids that match the given parameters. Non-admin users only see their own items."""
     try:
         user_id = None if current_user.is_admin else current_user.user_id
         return ApiDependencies.invoker.services.session_queue.get_queue_item_ids(
-            queue_id=queue_id, order_dir=order_dir, user_id=user_id
+            queue_id=queue_id, order_dir=order_dir, user_id=user_id, origin_prefix=origin_prefix
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while listing all queue item ids: {e}")
@@ -370,13 +383,19 @@ async def retry_items_by_id(
         if not current_user.is_admin:
             for item_id in item_ids:
                 try:
-                    queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
-                    if queue_item.user_id != current_user.user_id:
-                        raise HTTPException(
-                            status_code=403, detail=f"You do not have permission to retry queue item {item_id}"
-                        )
+                    get_queue_item_for_mutation(queue_id, item_id, current_user)
                 except SessionQueueItemNotFoundError:
                     # Skip items that don't exist - they will be handled by retry_items_by_id
+                    continue
+        else:
+            for item_id in item_ids:
+                try:
+                    queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
+                    if queue_item.queue_id != queue_id:
+                        raise HTTPException(
+                            status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}"
+                        )
+                except SessionQueueItemNotFoundError:
                     continue
 
         return ApiDependencies.invoker.services.session_queue.retry_items_by_id(queue_id=queue_id, item_ids=item_ids)
@@ -447,10 +466,11 @@ async def prune(
 async def get_current_queue_item(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
+    origin_prefix: Optional[str] = Query(default=None, description="Only include queue items whose origin starts with this prefix"),
 ) -> Optional[SessionQueueItem]:
     """Gets the currently execution queue item"""
     try:
-        item = ApiDependencies.invoker.services.session_queue.get_current(queue_id)
+        item = ApiDependencies.invoker.services.session_queue.get_current(queue_id, origin_prefix=origin_prefix)
         if item is not None:
             item = sanitize_queue_item_for_user(item, current_user.user_id, current_user.is_admin)
         return item
@@ -468,10 +488,11 @@ async def get_current_queue_item(
 async def get_next_queue_item(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
+    origin_prefix: Optional[str] = Query(default=None, description="Only include queue items whose origin starts with this prefix"),
 ) -> Optional[SessionQueueItem]:
     """Gets the next queue item, without executing it"""
     try:
-        item = ApiDependencies.invoker.services.session_queue.get_next(queue_id)
+        item = ApiDependencies.invoker.services.session_queue.get_next(queue_id, origin_prefix=origin_prefix)
         if item is not None:
             item = sanitize_queue_item_for_user(item, current_user.user_id, current_user.is_admin)
         return item
@@ -489,11 +510,14 @@ async def get_next_queue_item(
 async def get_queue_status(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
+    origin_prefix: Optional[str] = Query(default=None, description="Only include queue items whose origin starts with this prefix"),
 ) -> SessionQueueAndProcessorStatus:
     """Gets the status of the session queue. Non-admin users see only their own counts and cannot see current item details unless they own it."""
     try:
         user_id = None if current_user.is_admin else current_user.user_id
-        queue = ApiDependencies.invoker.services.session_queue.get_queue_status(queue_id, user_id=user_id)
+        queue = ApiDependencies.invoker.services.session_queue.get_queue_status(
+            queue_id, user_id=user_id, origin_prefix=origin_prefix
+        )
         processor = ApiDependencies.invoker.services.session_processor.get_status()
         return SessionQueueAndProcessorStatus(queue=queue, processor=processor)
     except Exception as e:
@@ -559,12 +583,7 @@ async def delete_queue_item(
 ) -> None:
     """Deletes a queue item. Users can only delete their own items unless they are an admin."""
     try:
-        # Get the queue item to check ownership
-        queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
-
-        # Check authorization: user must own the item or be an admin
-        if queue_item.user_id != current_user.user_id and not current_user.is_admin:
-            raise HTTPException(status_code=403, detail="You do not have permission to delete this queue item")
+        get_queue_item_for_mutation(queue_id, item_id, current_user)
 
         ApiDependencies.invoker.services.session_queue.delete_queue_item(item_id)
     except SessionQueueItemNotFoundError:
@@ -589,12 +608,7 @@ async def cancel_queue_item(
 ) -> SessionQueueItem:
     """Cancels a queue item. Users can only cancel their own items unless they are an admin."""
     try:
-        # Get the queue item to check ownership
-        queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
-
-        # Check authorization: user must own the item or be an admin
-        if queue_item.user_id != current_user.user_id and not current_user.is_admin:
-            raise HTTPException(status_code=403, detail="You do not have permission to cancel this queue item")
+        get_queue_item_for_mutation(queue_id, item_id, current_user)
 
         return ApiDependencies.invoker.services.session_queue.cancel_queue_item(item_id)
     except SessionQueueItemNotFoundError:
