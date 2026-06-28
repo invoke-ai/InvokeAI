@@ -41226,6 +41226,12 @@
             "description": "Devices to use for parallel generation. `auto` (the default) uses every available GPU, running one generation session per GPU concurrently and distributing jobs fairly across users. Provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices, or a single-device list (e.g. `[cuda:0]`) to run serially. On systems without a GPU, `auto` resolves to the single `cpu`/`mps` device.<br>Valid values: `auto`, or a list whose entries are each `cpu`, `cuda`, `mps`, or `cuda:N` (where N is a device number)",
             "default": "auto"
           },
+          "offload_text_encoders_to_idle_gpus": {
+            "type": "boolean",
+            "title": "Offload Text Encoders To Idle Gpus",
+            "description": "When running on multiple GPUs, load text encoders onto a currently-idle GPU instead of the one running the denoise pipeline. This avoids churning the denoise model in and out of VRAM to make room for the encoder, and lets a cached encoder be reused across generations. Has no effect unless at least two `generation_devices` are configured and a GPU is idle; under full load encoders run on the session's own GPU as before.",
+            "default": true
+          },
           "precision": {
             "type": "string",
             "enum": ["auto", "float16", "bfloat16", "float32"],

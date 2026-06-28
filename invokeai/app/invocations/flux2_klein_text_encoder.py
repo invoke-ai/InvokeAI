@@ -48,6 +48,7 @@ KLEIN_MAX_SEQ_LEN = 512
     category="prompt",
     version="1.1.1",
     classification=Classification.Prototype,
+    idle_gpu_offloadable=True,
 )
 class Flux2KleinTextEncoderInvocation(BaseInvocation):
     """Encodes and preps a prompt for Flux2 Klein image generation.

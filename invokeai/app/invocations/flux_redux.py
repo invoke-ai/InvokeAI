@@ -50,6 +50,7 @@ DOWNSAMPLING_FUNCTIONS = Literal["nearest", "bilinear", "bicubic", "area", "near
     category="conditioning",
     version="2.1.0",
     classification=Classification.Beta,
+    idle_gpu_offloadable=True,
 )
 class FluxReduxInvocation(BaseInvocation):
     """Runs a FLUX Redux model to generate a conditioning tensor."""

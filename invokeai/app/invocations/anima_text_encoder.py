@@ -59,6 +59,7 @@ QWEN3_MAX_SEQ_LEN = 8192
     category="conditioning",
     version="1.4.0",
     classification=Classification.Prototype,
+    idle_gpu_offloadable=True,
 )
 class AnimaTextEncoderInvocation(BaseInvocation):
     """Encodes and preps a prompt for an Anima image.
