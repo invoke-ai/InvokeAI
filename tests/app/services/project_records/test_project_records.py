@@ -59,9 +59,7 @@ def test_create_with_client_id_and_duplicate_rejected(project_records: ProjectRe
         project_records.create(SYSTEM_USER_ID, "Imported again", {"x": 2}, project_id="project-abc")
 
 
-def test_same_project_id_allowed_for_different_users(
-    project_records: ProjectRecordsSqlite, other_user_id: str
-) -> None:
+def test_same_project_id_allowed_for_different_users(project_records: ProjectRecordsSqlite, other_user_id: str) -> None:
     project_records.create(SYSTEM_USER_ID, "Mine", {"owner": "system"}, project_id="project-shared-id")
     other = project_records.create(other_user_id, "Theirs", {"owner": "other"}, project_id="project-shared-id")
 
@@ -85,7 +83,9 @@ def test_list_returns_summaries_for_own_projects_only(
 def test_update_increments_revision(project_records: ProjectRecordsSqlite) -> None:
     created = project_records.create(SYSTEM_USER_ID, "Project", {"v": 1})
 
-    updated = project_records.update(SYSTEM_USER_ID, created.project_id, expected_revision=1, name="Renamed", data={"v": 2})
+    updated = project_records.update(
+        SYSTEM_USER_ID, created.project_id, expected_revision=1, name="Renamed", data={"v": 2}
+    )
 
     assert updated.revision == 2
     assert updated.name == "Renamed"
