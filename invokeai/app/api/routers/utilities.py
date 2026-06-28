@@ -55,12 +55,15 @@ async def parse_dynamicprompts(
     generator: Union[RandomPromptGenerator, CombinatorialPromptGenerator]
     error: Optional[str] = None
 
-    # An unknown wildcard sends the combinatorial generator into an infinite loop, so bail out early
-    # with a clear message instead of hanging the request (and with it the UI preview).
-    missing_wildcards = find_missing_wildcards(prompt)
-    if missing_wildcards:
-        wildcards = ", ".join(missing_wildcards)
-        return DynamicPromptsResponse(prompts=[prompt], error=f"No values found for wildcard(s): {wildcards}")
+    # An unknown wildcard used as a variant value sends the combinatorial generator into an infinite
+    # loop, so bail out early with a clear message instead of hanging the request (and with it the UI
+    # preview). The random generator handles unknown wildcards gracefully, so only the combinatorial
+    # path is guarded.
+    if combinatorial:
+        missing_wildcards = find_missing_wildcards(prompt)
+        if missing_wildcards:
+            wildcards = ", ".join(missing_wildcards)
+            return DynamicPromptsResponse(prompts=[prompt], error=f"No values found for wildcard(s): {wildcards}")
 
     try:
         if combinatorial:
