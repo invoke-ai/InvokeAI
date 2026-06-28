@@ -206,7 +206,9 @@ async def get_queue_item_ids(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
-    origin_prefix: Optional[str] = Query(default=None, description="Only include queue items whose origin starts with this prefix"),
+    origin_prefix: Optional[str] = Query(
+        default=None, description="Only include queue items whose origin starts with this prefix"
+    ),
 ) -> ItemIdsResult:
     """Gets all queue item ids that match the given parameters.
 
@@ -474,7 +476,9 @@ async def prune(
 async def get_current_queue_item(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
-    origin_prefix: Optional[str] = Query(default=None, description="Only include queue items whose origin starts with this prefix"),
+    origin_prefix: Optional[str] = Query(
+        default=None, description="Only include queue items whose origin starts with this prefix"
+    ),
 ) -> Optional[SessionQueueItem]:
     """Gets the currently execution queue item"""
     try:
@@ -496,7 +500,9 @@ async def get_current_queue_item(
 async def get_next_queue_item(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
-    origin_prefix: Optional[str] = Query(default=None, description="Only include queue items whose origin starts with this prefix"),
+    origin_prefix: Optional[str] = Query(
+        default=None, description="Only include queue items whose origin starts with this prefix"
+    ),
 ) -> Optional[SessionQueueItem]:
     """Gets the next queue item, without executing it"""
     try:
@@ -518,7 +524,9 @@ async def get_next_queue_item(
 async def get_queue_status(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
-    origin_prefix: Optional[str] = Query(default=None, description="Only include queue items whose origin starts with this prefix"),
+    origin_prefix: Optional[str] = Query(
+        default=None, description="Only include queue items whose origin starts with this prefix"
+    ),
 ) -> SessionQueueAndProcessorStatus:
     """Gets the status of the session queue. Non-admin users see only their own counts and cannot see current item details unless they own it."""
     try:
