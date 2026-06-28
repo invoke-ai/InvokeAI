@@ -2738,6 +2738,10 @@ export type paths = {
          *             to their defaults (cleared on the frontend).  Defaults to false,
          *             which preserves the existing behaviour of only updating the
          *             parameters that are explicitly provided.
+         *         append: When true, recalled reference images (``ip_adapters`` and
+         *             ``reference_images``) are appended to whatever reference images the
+         *             frontend already has, instead of replacing the whole list.  Mutually
+         *             exclusive with ``strict`` (which clears omitted parameters).
          *
          *     Returns:
          *         A dictionary containing the updated parameters and status
@@ -38615,6 +38619,8 @@ export interface operations {
             query?: {
                 /** @description When true, parameters not included in the request are reset to their defaults (cleared). */
                 strict?: boolean;
+                /** @description When true, recalled reference images (ip_adapters and reference_images) are appended to the frontend's existing reference-image list instead of replacing it. Mutually exclusive with strict. */
+                append?: boolean;
             };
             header?: never;
             path: {

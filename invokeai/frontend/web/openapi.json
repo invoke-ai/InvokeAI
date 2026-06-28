@@ -9665,7 +9665,7 @@
       "post": {
         "tags": ["recall"],
         "summary": "Update Recall Parameters",
-        "description": "Update recallable parameters that can be recalled on the frontend.\n\nThis endpoint allows updating parameters such as prompt, model, steps, and other\ngeneration settings. These parameters are stored in client state and can be\naccessed by the frontend to populate UI elements.\n\nArgs:\n    queue_id: The queue ID to associate these parameters with\n    parameters: The RecallParameter object containing the parameters to update\n    strict: When true, parameters not included in the request body are reset\n        to their defaults (cleared on the frontend).  Defaults to false,\n        which preserves the existing behaviour of only updating the\n        parameters that are explicitly provided.\n\nReturns:\n    A dictionary containing the updated parameters and status\n\nExample:\n    POST /api/v1/recall/{queue_id}?strict=true\n    {\n        \"positive_prompt\": \"a beautiful landscape\",\n        \"model\": \"sd-1.5\",\n        \"steps\": 20\n    }\n    # In strict mode, all other parameters (reference_images, loras, etc.)\n    # are cleared.  In non-strict mode (default) they would be left as-is.",
+        "description": "Update recallable parameters that can be recalled on the frontend.\n\nThis endpoint allows updating parameters such as prompt, model, steps, and other\ngeneration settings. These parameters are stored in client state and can be\naccessed by the frontend to populate UI elements.\n\nArgs:\n    queue_id: The queue ID to associate these parameters with\n    parameters: The RecallParameter object containing the parameters to update\n    strict: When true, parameters not included in the request body are reset\n        to their defaults (cleared on the frontend).  Defaults to false,\n        which preserves the existing behaviour of only updating the\n        parameters that are explicitly provided.\n    append: When true, recalled reference images (``ip_adapters`` and\n        ``reference_images``) are appended to whatever reference images the\n        frontend already has, instead of replacing the whole list.  Mutually\n        exclusive with ``strict`` (which clears omitted parameters).\n\nReturns:\n    A dictionary containing the updated parameters and status\n\nExample:\n    POST /api/v1/recall/{queue_id}?strict=true\n    {\n        \"positive_prompt\": \"a beautiful landscape\",\n        \"model\": \"sd-1.5\",\n        \"steps\": 20\n    }\n    # In strict mode, all other parameters (reference_images, loras, etc.)\n    # are cleared.  In non-strict mode (default) they would be left as-is.",
         "operationId": "update_recall_parameters",
         "security": [
           {
@@ -9695,6 +9695,18 @@
               "title": "Strict"
             },
             "description": "When true, parameters not included in the request are reset to their defaults (cleared)."
+          },
+          {
+            "name": "append",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "When true, recalled reference images (ip_adapters and reference_images) are appended to the frontend's existing reference-image list instead of replacing it. Mutually exclusive with strict.",
+              "default": false,
+              "title": "Append"
+            },
+            "description": "When true, recalled reference images (ip_adapters and reference_images) are appended to the frontend's existing reference-image list instead of replacing it. Mutually exclusive with strict."
           }
         ],
         "requestBody": {
