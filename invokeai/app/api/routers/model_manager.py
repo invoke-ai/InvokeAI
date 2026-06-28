@@ -1306,7 +1306,9 @@ async def empty_model_cache(current_admin: AdminUserOrDefault) -> None:
     """Drop all models from the model cache to free RAM/VRAM. 'Locked' models that are in active use will not be dropped."""
     # Request 1000GB of room in order to force the cache to drop all models.
     ApiDependencies.invoker.services.logger.info("Emptying model cache.")
-    ApiDependencies.invoker.services.model_manager.load.ram_cache.make_room(1000 * 2**30)
+    ApiDependencies.invoker.services.model_manager.load.ram_cache.make_room(
+        1000 * 2**30, preserve_auto_evict_protected=False
+    )
 
 
 class HFTokenStatus(str, Enum):

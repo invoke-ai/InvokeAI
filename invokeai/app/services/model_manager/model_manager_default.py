@@ -96,6 +96,7 @@ class ModelManagerService(ModelManagerServiceBase):
             log_memory_usage=app_config.log_memory_usage,
             logger=logger,
             keep_alive_minutes=app_config.model_cache_keep_alive_min,
+            use_multi_cuda_ram_cache=app_config.use_second_gpu_for_text_encoder,
         )
         loader = ModelLoadService(
             app_config=app_config,

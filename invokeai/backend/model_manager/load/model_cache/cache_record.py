@@ -16,6 +16,9 @@ class CacheRecord:
     key: str
     # Model in memory.
     cached_model: CachedModelWithPartialLoad | CachedModelOnlyFullLoad
+    # Protected entries are skipped by automatic RAM/VRAM eviction. Explicit cache clears
+    # and model reloads may still drop them.
+    prevent_auto_evict: bool = False
     _locks: int = 0
     # Set by ModelCache.drop_model() when the entry was locked at invalidation time.
     # ModelCache.unlock() evicts the entry as soon as the last lock releases so a setting

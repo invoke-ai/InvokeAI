@@ -1670,6 +1670,57 @@ export type paths = {
         patch: operations["update_runtime_config"];
         trace?: never;
     };
+    "/api/v1/app/sync_text_encoder_cache": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sync Text Encoder Cache */
+        post: operations["sync_text_encoder_cache"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/text_encoder_cache_status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Get Text Encoder Cache Status */
+        post: operations["get_text_encoder_cache_status"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/system_status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get System Status */
+        get: operations["get_system_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/app/external_providers/status": {
         parameters: {
             query?: never;
@@ -8015,6 +8066,37 @@ export type components = {
              * @constant
              */
             type: "crop_latents";
+        };
+        /**
+         * CudaDeviceStatus
+         * @description CUDA device memory status.
+         */
+        CudaDeviceStatus: {
+            /**
+             * Index
+             * @description CUDA device index.
+             */
+            index: number;
+            /**
+             * Name
+             * @description CUDA device name.
+             */
+            name: string;
+            /**
+             * Used Gb
+             * @description Total device memory used in GB, including non-InvokeAI processes.
+             */
+            used_gb: number;
+            /**
+             * Invoke Cache Gb
+             * @description InvokeAI model cache memory used on this device in GB.
+             */
+            invoke_cache_gb: number;
+            /**
+             * Total Gb
+             * @description Total device memory in GB.
+             */
+            total_gb: number;
         };
         /**
          * OpenCV Inpaint
@@ -16204,6 +16286,7 @@ export type components = {
          *         lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.
          *         pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to "backend:cudaMallocAsync" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.
          *         device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)
+         *         use_second_gpu_for_text_encoder: When at least two CUDA GPUs are available, run text encoder models on the CUDA device that is not the main execution device.
          *         precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`
          *         sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.
          *         attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`
@@ -16508,6 +16591,12 @@ export type components = {
              * @default auto
              */
             device?: string;
+            /**
+             * Use Second Gpu For Text Encoder
+             * @description When at least two CUDA GPUs are available, run text encoder models on the CUDA device that is not the main execution device.
+             * @default false
+             */
+            use_second_gpu_for_text_encoder?: boolean;
             /**
              * Precision
              * @description Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.
@@ -23374,10 +23463,7 @@ export type components = {
             base: components["schemas"]["BaseModelType"];
             /** @description The model's type */
             type: components["schemas"]["ModelType"];
-            /**
-             * @description The submodel to load, if this is a main model
-             * @default null
-             */
+            /** @description The submodel to load, if this is a main model */
             submodel_type?: components["schemas"]["SubModelType"] | null;
         };
         /**
@@ -29360,6 +29446,107 @@ export type components = {
              */
             type: "sub";
         };
+        /**
+         * SyncTextEncoderCacheRequest
+         * @description Request to actively sync selected text encoder cache entries with the second-GPU toggle state.
+         */
+        SyncTextEncoderCacheRequest: {
+            /**
+             * Enabled
+             * @description Whether second-GPU text encoder mode is enabled.
+             */
+            enabled: boolean;
+            /**
+             * Text Encoder Models
+             * @description Selected text encoder models to unload or prewarm.
+             */
+            text_encoder_models?: components["schemas"]["ModelIdentifierField"][];
+        };
+        /**
+         * SyncTextEncoderCacheResponse
+         * @description Text encoder cache sync result.
+         */
+        SyncTextEncoderCacheResponse: {
+            /**
+             * Dropped
+             * @description Number of cache entries immediately dropped.
+             */
+            dropped: number;
+            /**
+             * Loaded
+             * @description Number of selected encoder entries loaded onto their target device.
+             */
+            loaded: number;
+            /** @description Text encoder cache status after sync. */
+            status: components["schemas"]["TextEncoderCacheStatusResponse"];
+        };
+        /**
+         * SystemGpuStatus
+         * @description Basic GPU status.
+         */
+        SystemGpuStatus: {
+            /**
+             * Index
+             * @description GPU device index.
+             */
+            index: number;
+            /**
+             * Name
+             * @description GPU device name.
+             */
+            name: string;
+            /**
+             * Utilization Percent
+             * @description GPU utilization percent.
+             */
+            utilization_percent?: number | null;
+            /**
+             * Loaded Gb
+             * @description GPU memory used in GB.
+             */
+            loaded_gb: number;
+            /**
+             * Total Gb
+             * @description Total GPU memory in GB.
+             */
+            total_gb: number;
+        };
+        /**
+         * SystemStatusResponse
+         * @description Basic system status.
+         */
+        SystemStatusResponse: {
+            /**
+             * Cpu Percent
+             * @description CPU utilization percent.
+             */
+            cpu_percent: number;
+            /**
+             * Cpu Frequency Ghz
+             * @description Current CPU frequency in GHz.
+             */
+            cpu_frequency_ghz?: number | null;
+            /**
+             * Memory Used Gb
+             * @description System memory used in GB.
+             */
+            memory_used_gb: number;
+            /**
+             * Memory Total Gb
+             * @description Total system memory in GB.
+             */
+            memory_total_gb: number;
+            /**
+             * Memory Percent
+             * @description System memory utilization percent.
+             */
+            memory_percent: number;
+            /**
+             * Gpus
+             * @description GPU statuses.
+             */
+            gpus: components["schemas"]["SystemGpuStatus"][];
+        };
         /** T2IAdapterField */
         T2IAdapterField: {
             /** @description The T2I-Adapter image prompt. */
@@ -30296,6 +30483,63 @@ export type components = {
             tensor_name: string;
         };
         /**
+         * TextEncoderCacheModelStatus
+         * @description Status for one selected text encoder cache entry.
+         */
+        TextEncoderCacheModelStatus: {
+            /**
+             * Key
+             * @description Model key.
+             */
+            key: string;
+            /**
+             * Name
+             * @description Model name.
+             */
+            name: string;
+            /**
+             * Cache Key
+             * @description Resolved cache key.
+             */
+            cache_key: string;
+            /**
+             * Loaded
+             * @description Whether the cache entry exists and has weights on its execution device.
+             */
+            loaded: boolean;
+            /**
+             * Device
+             * @description Execution device for the cache entry.
+             */
+            device?: string | null;
+            /**
+             * Vram Gb
+             * @description Estimated model VRAM resident size in GB.
+             */
+            vram_gb: number;
+            /**
+             * Total Gb
+             * @description Estimated model size in GB.
+             */
+            total_gb: number;
+        };
+        /**
+         * TextEncoderCacheStatusResponse
+         * @description Selected text encoder cache and CUDA memory status.
+         */
+        TextEncoderCacheStatusResponse: {
+            /**
+             * Models
+             * @description Selected text encoder cache statuses.
+             */
+            models: components["schemas"]["TextEncoderCacheModelStatus"][];
+            /**
+             * Cuda Devices
+             * @description CUDA memory status.
+             */
+            cuda_devices: components["schemas"]["CudaDeviceStatus"][];
+        };
+        /**
          * Text LLM
          * @description Run a text language model to generate or expand text (e.g. for prompt expansion).
          */
@@ -30995,6 +31239,16 @@ export type components = {
              * @description Keep the last N completed, failed, and canceled queue items on startup. Set to 0 to prune all terminal items.
              */
             max_queue_history?: number | null;
+            /**
+             * Model Cache Keep Alive Min
+             * @description How long to keep unlocked models in cache after last use, in minutes. 0 keeps models indefinitely.
+             */
+            model_cache_keep_alive_min?: number | null;
+            /**
+             * Use Second Gpu For Text Encoder
+             * @description Run text encoder models on the CUDA device that is not the main execution device when at least two CUDA GPUs are available.
+             */
+            use_second_gpu_for_text_encoder?: boolean | null;
         };
         /**
          * UserDTO
@@ -36506,6 +36760,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sync_text_encoder_cache: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SyncTextEncoderCacheRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncTextEncoderCacheResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_text_encoder_cache_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SyncTextEncoderCacheRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TextEncoderCacheStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_system_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemStatusResponse"];
                 };
             };
         };

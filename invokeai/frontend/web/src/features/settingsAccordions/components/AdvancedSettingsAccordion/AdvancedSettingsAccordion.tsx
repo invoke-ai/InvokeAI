@@ -24,7 +24,9 @@ import ParamFlux2KleinModelSelect from 'features/parameters/components/Advanced/
 import ParamQwenImageComponentSourceSelect from 'features/parameters/components/Advanced/ParamQwenImageComponentSourceSelect';
 import ParamQwenImageQuantization from 'features/parameters/components/Advanced/ParamQwenImageQuantization';
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
+import ParamUseSecondGpuForTextEncoder from 'features/parameters/components/Advanced/ParamUseSecondGpuForTextEncoder';
 import ParamZImageQwen3VaeModelSelect from 'features/parameters/components/Advanced/ParamZImageQwen3VaeModelSelect';
+import SystemHardwareStatus from 'features/parameters/components/Advanced/SystemHardwareStatus';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
 import ParamSeamlessYAxis from 'features/parameters/components/Seamless/ParamSeamlessYAxis';
 import ParamColorCompensation from 'features/parameters/components/VAEModel/ParamColorCompensation';
@@ -136,11 +138,13 @@ export const AdvancedSettingsAccordion = memo(() => {
           <FormControlGroup>
             <ParamT5EncoderModelSelect />
             <ParamCLIPEmbedModelSelect />
+            <ParamUseSecondGpuForTextEncoder />
           </FormControlGroup>
         )}
         {isFlux2 && (
           <FormControlGroup>
             <ParamFlux2KleinModelSelect />
+            <ParamUseSecondGpuForTextEncoder />
           </FormControlGroup>
         )}
         {isSD3 && (
@@ -148,24 +152,29 @@ export const AdvancedSettingsAccordion = memo(() => {
             <ParamT5EncoderModelSelect />
             <ParamCLIPLEmbedModelSelect />
             <ParamCLIPGEmbedModelSelect />
+            <ParamUseSecondGpuForTextEncoder />
           </FormControlGroup>
         )}
         {isZImage && (
           <FormControlGroup>
             <ParamZImageQwen3VaeModelSelect />
+            <ParamUseSecondGpuForTextEncoder />
           </FormControlGroup>
         )}
         {isQwenImage && (
           <FormControlGroup>
             <ParamQwenImageComponentSourceSelect />
             <ParamQwenImageQuantization />
+            <ParamUseSecondGpuForTextEncoder />
           </FormControlGroup>
         )}
         {isAnima && (
           <FormControlGroup>
             <ParamAnimaModelSelect />
+            <ParamUseSecondGpuForTextEncoder />
           </FormControlGroup>
         )}
+        <SystemHardwareStatus />
       </Flex>
     </StandaloneAccordion>
   );

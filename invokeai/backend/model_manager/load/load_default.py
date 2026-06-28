@@ -18,6 +18,7 @@ from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
+    ModelType,
     SubModelType,
 )
 from invokeai.backend.util.devices import TorchDevice
@@ -50,6 +51,20 @@ _FP8_DEFAULT_SKIP_PATTERNS: tuple[str, ...] = (
     r"^proj_in$",
     r"^proj_out$",
 )
+
+_TEXT_ENCODER_SUBMODEL_TYPES = {
+    SubModelType.TextEncoder,
+    SubModelType.TextEncoder2,
+    SubModelType.TextEncoder3,
+}
+
+_STANDALONE_TEXT_ENCODER_MODEL_TYPES = {
+    ModelType.CLIPEmbed,
+    ModelType.Qwen3Encoder,
+    ModelType.QwenVLEncoder,
+    ModelType.T5Encoder,
+    ModelType.TextLLM,
+}
 
 
 # TO DO: The loader is not thread safe!
@@ -103,23 +118,47 @@ class ModelLoader(ModelLoaderBase):
     ) -> Optional[torch.device]:
         """Determine the execution device for a model based on its configuration.
 
-        CPU-only execution is only applied to text encoder submodels to save VRAM while keeping
-        the denoiser on GPU for performance. Conditioning tensors are moved to GPU after encoding.
-
         Returns:
-            torch.device("cpu") if the model should run on CPU only, None otherwise (use cache default).
+            A specific execution device if the model should run somewhere other than the cache default.
         """
+        if self._should_use_second_gpu_for_text_encoder(config, submodel_type):
+            second_cuda_device = self._get_second_cuda_device()
+            if second_cuda_device is not None:
+                return second_cuda_device
+
         # Check if this is a text encoder submodel of a main model with cpu_only setting
         if hasattr(config, "default_settings") and config.default_settings is not None:
             if hasattr(config.default_settings, "cpu_only") and config.default_settings.cpu_only is True:
                 # Only apply CPU execution to text encoder submodels
-                if submodel_type in [SubModelType.TextEncoder, SubModelType.TextEncoder2, SubModelType.TextEncoder3]:
+                if submodel_type in _TEXT_ENCODER_SUBMODEL_TYPES:
                     return torch.device("cpu")
 
         # Check if this is a standalone text encoder config with cpu_only field (T5Encoder, Qwen3Encoder, etc.)
         if hasattr(config, "cpu_only") and config.cpu_only is True:
             return torch.device("cpu")
 
+        return None
+
+    def _should_use_second_gpu_for_text_encoder(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None
+    ) -> bool:
+        if not self._app_config.use_second_gpu_for_text_encoder:
+            return False
+        if submodel_type in _TEXT_ENCODER_SUBMODEL_TYPES:
+            return True
+        return getattr(config, "type", None) in _STANDALONE_TEXT_ENCODER_MODEL_TYPES
+
+    def _get_second_cuda_device(self) -> Optional[torch.device]:
+        if self._torch_device.type != "cuda" or not torch.cuda.is_available() or torch.cuda.device_count() < 2:
+            return None
+
+        main_device_index = self._torch_device.index
+        if main_device_index is None:
+            main_device_index = torch.cuda.current_device()
+
+        for device_index in range(torch.cuda.device_count()):
+            if device_index != main_device_index:
+                return torch.device("cuda", device_index)
         return None
 
     def _load_and_cache(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> CacheRecord:
@@ -133,13 +172,17 @@ class ModelLoader(ModelLoaderBase):
         self._ram_cache.make_room(self.get_size_fs(config, Path(config.path), submodel_type))
         loaded_model = self._load_model(config, submodel_type)
 
-        # Determine execution device from model config, considering submodel type
         execution_device = self._get_execution_device(config, submodel_type)
+        effective_execution_device = execution_device or self._torch_device
+        prevent_auto_evict = (
+            self._app_config.use_second_gpu_for_text_encoder and effective_execution_device.type == "cuda"
+        )
 
         self._ram_cache.put(
             get_model_cache_key(config.key, submodel_type),
             model=loaded_model,
             execution_device=execution_device,
+            prevent_auto_evict=prevent_auto_evict,
         )
 
         return self._ram_cache.get(key=get_model_cache_key(config.key, submodel_type), stats_name=stats_name)

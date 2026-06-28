@@ -29,6 +29,7 @@ import { SettingsDeveloperLogIsEnabled } from 'features/system/components/Settin
 import { SettingsDeveloperLogLevel } from 'features/system/components/SettingsModal/SettingsDeveloperLogLevel';
 import { SettingsDeveloperLogNamespaces } from 'features/system/components/SettingsModal/SettingsDeveloperLogNamespaces';
 import { SettingsImageSubfolderStrategySelect } from 'features/system/components/SettingsModal/SettingsImageSubfolderStrategySelect';
+import { SettingsModelCacheSleepTimerSelect } from 'features/system/components/SettingsModal/SettingsModelCacheSleepTimerSelect';
 import { useClearIntermediates } from 'features/system/components/SettingsModal/useClearIntermediates';
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
 import {
@@ -327,6 +328,7 @@ const SettingsModal = (props: { children: ReactElement<{ onClick?: () => void }>
                       </NumberInput>
                     </FormControl>
                     <SettingsImageSubfolderStrategySelect />
+                    <SettingsModelCacheSleepTimerSelect />
                   </StickyScrollable>
 
                   <StickyScrollable title={t('settings.models')}>

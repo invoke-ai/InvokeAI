@@ -1,3 +1,4 @@
+import type { ModelIdentifierField } from 'features/nodes/types/common';
 import type { OpenAPIV3_1 } from 'openapi-types';
 import type { stringify } from 'querystring';
 import type { paths } from 'services/api/schema';
@@ -77,6 +78,27 @@ export const appInfoApi = api.injectEndpoints({
       },
       invalidatesTags: ['AppConfig'],
     }),
+    syncTextEncoderCache: build.mutation<SyncTextEncoderCacheResponse, SyncTextEncoderCacheArg>({
+      query: (body) => ({
+        url: buildAppInfoUrl('sync_text_encoder_cache'),
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['AppConfig'],
+    }),
+    getTextEncoderCacheStatus: build.mutation<TextEncoderCacheStatusResponse, SyncTextEncoderCacheArg>({
+      query: (body) => ({
+        url: buildAppInfoUrl('text_encoder_cache_status'),
+        method: 'POST',
+        body,
+      }),
+    }),
+    getSystemStatus: build.query<SystemStatusResponse, void>({
+      query: () => ({
+        url: buildAppInfoUrl('system_status'),
+        method: 'GET',
+      }),
+    }),
     getExternalProviderStatuses: build.query<ExternalProviderStatus[], void>({
       query: () => ({
         url: buildAppInfoUrl('external_providers/status'),
@@ -154,6 +176,9 @@ export const {
   useSetExternalProviderConfigMutation,
   useResetExternalProviderConfigMutation,
   useUpdateRuntimeConfigMutation,
+  useSyncTextEncoderCacheMutation,
+  useGetTextEncoderCacheStatusMutation,
+  useGetSystemStatusQuery,
   useClearInvocationCacheMutation,
   useDisableInvocationCacheMutation,
   useEnableInvocationCacheMutation,
@@ -164,4 +189,49 @@ export const {
 
 type SetExternalProviderConfigArg = ExternalProviderConfigUpdate & {
   provider_id: string;
+};
+
+type SyncTextEncoderCacheArg = {
+  enabled: boolean;
+  text_encoder_models: ModelIdentifierField[];
+};
+
+type SyncTextEncoderCacheResponse = {
+  dropped: number;
+  loaded: number;
+  status: TextEncoderCacheStatusResponse;
+};
+
+type TextEncoderCacheStatusResponse = {
+  models: {
+    key: string;
+    name: string;
+    cache_key: string;
+    loaded: boolean;
+    device: string | null;
+    vram_gb: number;
+    total_gb: number;
+  }[];
+  cuda_devices: {
+    index: number;
+    name: string;
+    used_gb: number;
+    invoke_cache_gb: number;
+    total_gb: number;
+  }[];
+};
+
+type SystemStatusResponse = {
+  cpu_percent: number;
+  cpu_frequency_ghz: number | null;
+  memory_used_gb: number;
+  memory_total_gb: number;
+  memory_percent: number;
+  gpus: {
+    index: number;
+    name: string;
+    utilization_percent: number | null;
+    loaded_gb: number;
+    total_gb: number;
+  }[];
 };
