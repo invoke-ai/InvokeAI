@@ -406,6 +406,14 @@ async def update_recall_parameters(
         default=False,
         description="When true, parameters not included in the request are reset to their defaults (cleared).",
     ),
+    append: bool = Query(
+        default=False,
+        description=(
+            "When true, recalled reference images (ip_adapters and reference_images) are "
+            "appended to the frontend's existing reference-image list instead of replacing it. "
+            "Mutually exclusive with strict."
+        ),
+    ),
 ) -> dict[str, Any]:
     """
     Update recallable parameters that can be recalled on the frontend.
@@ -421,6 +429,10 @@ async def update_recall_parameters(
             to their defaults (cleared on the frontend).  Defaults to false,
             which preserves the existing behaviour of only updating the
             parameters that are explicitly provided.
+        append: When true, recalled reference images (``ip_adapters`` and
+            ``reference_images``) are appended to whatever reference images the
+            frontend already has, instead of replacing the whole list.  Mutually
+            exclusive with ``strict`` (which clears omitted parameters).
 
     Returns:
         A dictionary containing the updated parameters and status
@@ -436,6 +448,12 @@ async def update_recall_parameters(
         # are cleared.  In non-strict mode (default) they would be left as-is.
     """
     logger = ApiDependencies.invoker.services.logger
+
+    if strict and append:
+        raise HTTPException(
+            status_code=400,
+            detail="The 'strict' and 'append' query parameters are mutually exclusive",
+        )
 
     # Validate image access before processing — prevents information leakage
     # (dimensions) and derived-image minting via ControlNet preprocessors.
@@ -521,6 +539,14 @@ async def update_recall_parameters(
                 resolved_refs = resolve_reference_images(reference_images_param)
                 provided_params["reference_images"] = resolved_refs
                 logger.info(f"Resolved {len(resolved_refs)} reference image(s)")
+
+        # Append mode rides along inside the event's parameters dict rather
+        # than as a new event field so the generated client schema (which
+        # types parameters as a free-form object) doesn't need regenerating.
+        # Added after the persistence loop above, so the flag itself is never
+        # stored as a recall parameter.
+        if append:
+            provided_params["append"] = True
 
         # Emit event to notify frontend of parameter updates
         try:
