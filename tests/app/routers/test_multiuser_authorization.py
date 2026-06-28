@@ -1952,15 +1952,13 @@ class TestCustomNodesAuthorization:
         monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._get_custom_nodes_path", lambda: tmp_path)
 
         # Simulate a successful git clone by creating the target dir with __init__.py
-        def fake_git_clone(cmd: list[str], **kwargs: Any) -> MagicMock:
+        async def fake_clone_node_pack(source: str, target_dir: Any) -> tuple[int, str]:
             target_dir = tmp_path / "test-pack"
             target_dir.mkdir(parents=True, exist_ok=True)
             (target_dir / "__init__.py").touch()
-            result = MagicMock()
-            result.returncode = 0
-            return result
+            return 0, ""
 
-        monkeypatch.setattr("invokeai.app.api.routers.custom_nodes.subprocess.run", fake_git_clone)
+        monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._clone_node_pack", fake_clone_node_pack)
         monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._load_node_pack", lambda *a, **kw: None)
         monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._import_workflows_from_pack", lambda *a, **kw: [])
         monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._write_pack_manifest", lambda *a, **kw: None)
