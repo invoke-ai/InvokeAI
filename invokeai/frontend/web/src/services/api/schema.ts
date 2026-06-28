@@ -388,6 +388,29 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/models/models_dir": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Models Dir
+         * @description Get the absolute path of the directory managed models are stored in.
+         *
+         *     Model config `path` values are relative to this directory unless they are
+         *     absolute (in-place installs from outside it).
+         */
+        get: operations["get_models_dir"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/models/get_by_attrs": {
         parameters: {
             query?: never;
@@ -2648,6 +2671,58 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Projects
+         * @description Lists the current user's projects as lightweight summaries (no documents).
+         */
+        get: operations["list_projects"];
+        put?: never;
+        /**
+         * Create Project
+         * @description Creates a project for the current user.
+         */
+        post: operations["create_project"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Project
+         * @description Gets one of the current user's projects, including its document.
+         */
+        get: operations["get_project"];
+        /**
+         * Update Project
+         * @description Saves a project. Returns 409 with the current revision when the save is based on a stale revision.
+         */
+        put: operations["update_project"];
+        post?: never;
+        /**
+         * Delete Project
+         * @description Deletes one of the current user's projects. Idempotent.
+         */
+        delete: operations["delete_project"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/recall/{queue_id}": {
         parameters: {
             query?: never;
@@ -4364,7 +4439,6 @@ export type components = {
             /**
              * Resize To
              * @description Dimensions to resize the image to, must be stringified tuple of 2 integers. Max total pixel count: 16777216
-             * @example "[1024,1024]"
              */
             resize_to?: string | null;
             /**
@@ -5164,6 +5238,11 @@ export type components = {
              * @default 0
              */
             high_watermark?: number;
+            /**
+             * Cache Used
+             * @default 0
+             */
+            cache_used?: number;
             /**
              * In Cache
              * @default 0
@@ -9005,6 +9084,13 @@ export type components = {
              * @description The field for this connection
              */
             field: string;
+        };
+        /** EmptyModelCacheResponse */
+        EmptyModelCacheResponse: {
+            /** Models Cleared */
+            models_cleared: number;
+            /** Bytes Freed */
+            bytes_freed: number;
         };
         /** EnqueueBatchResult */
         EnqueueBatchResult: {
@@ -23913,18 +23999,6 @@ export type components = {
             /**
              * Model Keys
              * @description List of model keys to fetch related models for
-             * @example [
-             *       "aa3b247f-90c9-4416-bfcd-aeaa57a5339e",
-             *       "ac32b914-10ab-496e-a24a-3068724b9c35"
-             *     ]
-             * @example [
-             *       "b1c2d3e4-f5a6-7890-abcd-ef1234567890",
-             *       "12345678-90ab-cdef-1234-567890abcdef",
-             *       "fedcba98-7654-3210-fedc-ba9876543210"
-             *     ]
-             * @example [
-             *       "3bb7c0eb-b6c8-469c-ad8c-4d69c06075e4"
-             *     ]
              */
             model_keys: string[];
         };
@@ -23933,23 +24007,11 @@ export type components = {
             /**
              * Model Key 1
              * @description The key of the first model in the relationship
-             * @example aa3b247f-90c9-4416-bfcd-aeaa57a5339e
-             * @example ac32b914-10ab-496e-a24a-3068724b9c35
-             * @example d944abfd-c7c3-42e2-a4ff-da640b29b8b4
-             * @example b1c2d3e4-f5a6-7890-abcd-ef1234567890
-             * @example 12345678-90ab-cdef-1234-567890abcdef
-             * @example fedcba98-7654-3210-fedc-ba9876543210
              */
             model_key_1: string;
             /**
              * Model Key 2
              * @description The key of the second model in the relationship
-             * @example 3bb7c0eb-b6c8-469c-ad8c-4d69c06075e4
-             * @example f0c3da4e-d9ff-42b5-a45c-23be75c887c9
-             * @example 38170dd8-f1e5-431e-866c-2c81f1277fcc
-             * @example c57fea2d-7646-424c-b9ad-c0ba60fc68be
-             * @example 10f7807b-ab54-46a9-ab03-600e88c630a1
-             * @example f6c1d267-cf87-4ee0-bee0-37e791eacab7
              */
             model_key_2: string;
         };
@@ -24844,6 +24906,121 @@ export type components = {
              * @description The image data as a b64 data URL
              */
             dataURL: string;
+        };
+        /**
+         * ProjectCreateRequest
+         * @description Request body for creating a project.
+         */
+        ProjectCreateRequest: {
+            /**
+             * Project Id
+             * @description Client-generated project id (e.g. for imports); generated when omitted
+             */
+            project_id?: string | null;
+            /**
+             * Name
+             * @description The project's display name
+             */
+            name: string;
+            /**
+             * Data
+             * @description The opaque client-owned project document
+             */
+            data: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * ProjectRecordDTO
+         * @description Full project record including the client-owned document.
+         */
+        ProjectRecordDTO: {
+            /**
+             * Project Id
+             * @description The project's client-generated identifier
+             */
+            project_id: string;
+            /**
+             * Name
+             * @description The project's display name
+             */
+            name: string;
+            /**
+             * Revision
+             * @description Monotonic revision, incremented on every save
+             */
+            revision: number;
+            /**
+             * Created At
+             * @description When the project was created
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * @description When the project was last saved
+             */
+            updated_at: string;
+            /**
+             * Data
+             * @description The opaque client-owned project document
+             */
+            data: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * ProjectSummaryDTO
+         * @description Lightweight project listing entry; the document payload is omitted.
+         */
+        ProjectSummaryDTO: {
+            /**
+             * Project Id
+             * @description The project's client-generated identifier
+             */
+            project_id: string;
+            /**
+             * Name
+             * @description The project's display name
+             */
+            name: string;
+            /**
+             * Revision
+             * @description Monotonic revision, incremented on every save
+             */
+            revision: number;
+            /**
+             * Created At
+             * @description When the project was created
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * @description When the project was last saved
+             */
+            updated_at: string;
+        };
+        /**
+         * ProjectUpdateRequest
+         * @description Request body for saving a project with optimistic concurrency.
+         */
+        ProjectUpdateRequest: {
+            /**
+             * Name
+             * @description The project's display name
+             */
+            name: string;
+            /**
+             * Data
+             * @description The opaque client-owned project document
+             */
+            data: {
+                [key: string]: unknown;
+            };
+            /**
+             * Expected Revision
+             * @description The revision this save is based on; mismatch returns 409
+             */
+            expected_revision: number;
         };
         /**
          * Prompt Template
@@ -33601,6 +33778,26 @@ export interface operations {
             };
         };
     };
+    get_models_dir: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The absolute path of the models directory */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string;
+                };
+            };
+        };
+    };
     get_model_records_by_attrs: {
         parameters: {
             query: {
@@ -33687,8 +33884,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    /**
-                     * @example {
+                    /** @example {
                      *       "path": "string",
                      *       "name": "string",
                      *       "base": "sd-1",
@@ -33705,8 +33901,7 @@ export interface operations {
                      *       "prediction_type": "epsilon",
                      *       "repo_variant": "fp16",
                      *       "upcast_attention": false
-                     *     }
-                     */
+                     *     } */
                     "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
                 };
             };
@@ -33794,8 +33989,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    /**
-                     * @example {
+                    /** @example {
                      *       "path": "string",
                      *       "name": "string",
                      *       "base": "sd-1",
@@ -33812,8 +34006,7 @@ export interface operations {
                      *       "prediction_type": "epsilon",
                      *       "repo_variant": "fp16",
                      *       "upcast_attention": false
-                     *     }
-                     */
+                     *     } */
                     "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
                 };
             };
@@ -33867,8 +34060,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    /**
-                     * @example {
+                    /** @example {
                      *       "path": "string",
                      *       "name": "string",
                      *       "base": "sd-1",
@@ -33885,8 +34077,7 @@ export interface operations {
                      *       "prediction_type": "epsilon",
                      *       "repo_variant": "fp16",
                      *       "upcast_attention": false
-                     *     }
-                     */
+                     *     } */
                     "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
                 };
             };
@@ -34215,7 +34406,10 @@ export interface operations {
                 /** @description access token for the remote resource */
                 access_token?: string | null;
             };
-            header?: never;
+            header?: {
+                /** @description access token for the remote resource */
+                "X-Model-Source-Access-Token"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -34602,8 +34796,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    /**
-                     * @example {
+                    /** @example {
                      *       "path": "string",
                      *       "name": "string",
                      *       "base": "sd-1",
@@ -34620,8 +34813,7 @@ export interface operations {
                      *       "prediction_type": "epsilon",
                      *       "repo_variant": "fp16",
                      *       "upcast_attention": false
-                     *     }
-                     */
+                     *     } */
                     "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
                 };
             };
@@ -34712,7 +34904,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["EmptyModelCacheResponse"];
                 };
             };
         };
@@ -36220,13 +36412,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    /**
-                     * @example [
+                    /** @example [
                      *       "15e9eb28-8cfe-47c9-b610-37907a79fc3c",
                      *       "71272e82-0e5f-46d5-bca9-9a61f4bd8a82",
                      *       "a5d7cd49-1b98-4534-a475-aeee4ccf5fa2"
-                     *     ]
-                     */
+                     *     ] */
                     "application/json": string[];
                 };
             };
@@ -36365,8 +36555,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    /**
-                     * @example [
+                    /** @example [
                      *       "ca562b14-995e-4a42-90c1-9528f1a5921d",
                      *       "cc0c2b8a-c62e-41d6-878e-cc74dde5ca8f",
                      *       "18ca7649-6a9e-47d5-bc17-41ab1e8cec81",
@@ -36374,8 +36563,7 @@ export interface operations {
                      *       "c382eaa3-0e28-4ab0-9446-408667699aeb",
                      *       "71272e82-0e5f-46d5-bca9-9a61f4bd8a82",
                      *       "a5d7cd49-1b98-4534-a475-aeee4ccf5fa2"
-                     *     ]
-                     */
+                     *     ] */
                     "application/json": string[];
                 };
             };
@@ -36836,6 +37024,8 @@ export interface operations {
             query?: {
                 /** @description The order of sort */
                 order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description Only include queue items whose origin starts with this prefix */
+                origin_prefix?: string | null;
             };
             header?: never;
             path: {
@@ -37203,7 +37393,10 @@ export interface operations {
     };
     get_current_queue_item: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only include queue items whose origin starts with this prefix */
+                origin_prefix?: string | null;
+            };
             header?: never;
             path: {
                 /** @description The queue id to perform this operation on */
@@ -37235,7 +37428,10 @@ export interface operations {
     };
     get_next_queue_item: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only include queue items whose origin starts with this prefix */
+                origin_prefix?: string | null;
+            };
             header?: never;
             path: {
                 /** @description The queue id to perform this operation on */
@@ -37267,7 +37463,10 @@ export interface operations {
     };
     get_queue_status: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only include queue items whose origin starts with this prefix */
+                origin_prefix?: string | null;
+            };
             header?: never;
             path: {
                 /** @description The queue id to perform this operation on */
@@ -38400,6 +38599,157 @@ export interface operations {
                 };
             };
             /** @description Client state deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_projects: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectSummaryDTO"][];
+                };
+            };
+        };
+    };
+    create_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRecordDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the project to get */
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRecordDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the project to save */
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRecordDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the project to delete */
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
             204: {
                 headers: {
                     [name: string]: unknown;
