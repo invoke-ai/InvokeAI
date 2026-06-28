@@ -139,7 +139,9 @@ export interface CompiledGenerateGraph {
 
 export interface EnqueueGenerateResult {
   batchId?: string;
+  enqueued: number;
   itemIds: number[];
+  requested: number;
 }
 
 export interface QueueItemDTO {
@@ -160,6 +162,7 @@ export interface EnqueueWorkflowRequest {
   batchCount: number;
   destination: ResultDestination;
   graph: BackendGraphContract;
+  projectId: string;
   sourceQueueItemId: string;
 }
 
@@ -174,6 +177,7 @@ export interface EnqueueGenerateRequest {
   seed: number;
   seedNodeId: string;
   shouldRandomizeSeed: boolean;
+  projectId: string;
   sourceQueueItemId: string;
 }
 

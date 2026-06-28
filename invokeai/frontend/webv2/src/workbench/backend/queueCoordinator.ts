@@ -581,6 +581,14 @@ export const createQueueCoordinator = (
   ): Promise<EnqueueGenerateResult> => {
     const result = await api.enqueueGenerateGraph(request);
 
+    if (result.enqueued === 0) {
+      throw new Error('The backend queue did not accept this generation. The queue may be full.');
+    }
+
+    if (result.requested !== result.enqueued) {
+      throw new Error(`The backend queue accepted ${result.enqueued} of ${result.requested} requested items.`);
+    }
+
     beginRun(localQueueItemId, result.itemIds, result.batchId);
 
     return result;
@@ -591,6 +599,14 @@ export const createQueueCoordinator = (
     request: EnqueueWorkflowRequest
   ): Promise<EnqueueGenerateResult> => {
     const result = await api.enqueueWorkflowGraph(request);
+
+    if (result.enqueued === 0) {
+      throw new Error('The backend queue did not accept this workflow. The queue may be full.');
+    }
+
+    if (result.requested !== result.enqueued) {
+      throw new Error(`The backend queue accepted ${result.enqueued} of ${result.requested} requested items.`);
+    }
 
     beginRun(localQueueItemId, result.itemIds, result.batchId);
 
@@ -635,13 +651,21 @@ export const createQueueCoordinator = (
   };
 
   const cancelRun = async ({ backendBatchId, backendItemIds }: CancelRunRequest): Promise<void> => {
-    if (backendItemIds?.length) {
-      await api.cancelQueueItems(backendItemIds);
-      return;
-    }
+    try {
+      if (backendItemIds?.length) {
+        await api.cancelQueueItems(backendItemIds);
+        return;
+      }
 
-    if (backendBatchId) {
-      await api.cancelQueueItemsByBatchIds([backendBatchId]);
+      if (backendBatchId) {
+        await api.cancelQueueItemsByBatchIds([backendBatchId]);
+      }
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        return;
+      }
+
+      throw error;
     }
   };
 

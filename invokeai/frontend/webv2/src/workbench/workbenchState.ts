@@ -154,7 +154,14 @@ type WorkbenchAction =
       backendItemIds: number[];
       backendBatchId?: string;
     }
-  | { type: 'setQueueItemStatus'; projectId: string; queueItemId: string; status: QueueItemStatus; error?: string }
+  | {
+      type: 'setQueueItemStatus';
+      projectId: string;
+      queueItemId: string;
+      status: QueueItemStatus;
+      error?: string;
+      notify?: boolean;
+    }
   | {
       type: 'routeQueueItemPartialResults';
       projectId: string;
@@ -659,7 +666,6 @@ const defaultWidgetInstanceTypes: Record<WidgetInstanceId, WidgetTypeId> = {
   preview: 'preview',
   project: 'project',
   queue: 'queue',
-  'queue:bottom': 'queue',
   'server-status': 'server-status',
   'version-status': 'version-status',
   workflow: 'workflow',
@@ -1957,7 +1963,7 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
         }))
       );
 
-      if (action.status !== 'failed' && action.status !== 'cancelled') {
+      if (action.notify === false || (action.status !== 'failed' && action.status !== 'cancelled')) {
         return nextState;
       }
 

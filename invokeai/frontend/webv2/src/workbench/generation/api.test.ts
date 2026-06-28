@@ -27,6 +27,7 @@ const createRequest = (overrides: Partial<EnqueueGenerateRequest> = {}): Enqueue
   negativePromptNodeId: 'negative_prompt',
   positivePrompt: 'a fjord at dawn',
   positivePromptNodeId: 'positive_prompt',
+  projectId: 'project-1',
   seed: 10,
   seedNodeId: 'seed',
   shouldRandomizeSeed: false,
@@ -38,6 +39,7 @@ const createWorkflowRequest = (overrides: Partial<EnqueueWorkflowRequest> = {}):
   batchCount: 2,
   destination: 'gallery',
   graph: { edges: [], id: 'graph-1', nodes: {} },
+  projectId: 'project-1',
   sourceQueueItemId: 'local-1',
   ...overrides,
 });
@@ -50,6 +52,7 @@ const getSubmittedBody = () => {
   return JSON.parse(init?.body as string) as {
     batch: {
       data: { field_name: string; items: unknown[]; node_path: string }[][];
+      origin: string;
       runs: number;
     };
   };
@@ -58,7 +61,12 @@ const getSubmittedBody = () => {
 describe('enqueueGenerateGraph', () => {
   beforeEach(() => {
     mocks.apiFetchJson.mockReset();
-    mocks.apiFetchJson.mockResolvedValue({ batch: { batch_id: 'batch-1' }, item_ids: [1, 2, 3] });
+    mocks.apiFetchJson.mockResolvedValue({
+      batch: { batch_id: 'batch-1' },
+      enqueued: 3,
+      item_ids: [1, 2, 3],
+      requested: 3,
+    });
   });
 
   it('keeps a fixed seed for every run when randomization is disabled', async () => {
@@ -94,12 +102,25 @@ describe('enqueueGenerateGraph', () => {
       { field_name: 'value', items: ['low quality', 'low quality', 'low quality'], node_path: 'negative_prompt' },
     ]);
   });
+
+  it('includes project-aware webv2 origin metadata', async () => {
+    const { enqueueGenerateGraph } = await import('./api');
+
+    await enqueueGenerateGraph(createRequest());
+
+    expect(getSubmittedBody().batch.origin).toBe('webv2:p:project-1:q:local-1');
+  });
 });
 
 describe('enqueueWorkflowGraph', () => {
   beforeEach(() => {
     mocks.apiFetchJson.mockReset();
-    mocks.apiFetchJson.mockResolvedValue({ batch: { batch_id: 'batch-1' }, item_ids: [1, 2] });
+    mocks.apiFetchJson.mockResolvedValue({
+      batch: { batch_id: 'batch-1' },
+      enqueued: 2,
+      item_ids: [1, 2],
+      requested: 2,
+    });
   });
 
   it('submits workflow runs for the requested batch count', async () => {

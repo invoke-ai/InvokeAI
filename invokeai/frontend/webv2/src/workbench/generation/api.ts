@@ -39,17 +39,24 @@ export const enqueueGenerateGraph = async (request: EnqueueGenerateRequest): Pro
       ],
       destination: request.destination,
       graph: request.graph satisfies BackendGraphContract,
-      origin: buildQueueItemOrigin(request.sourceQueueItemId),
+      origin: buildQueueItemOrigin(request.sourceQueueItemId, request.projectId),
       runs: request.shouldRandomizeSeed ? 1 : batchCount,
     },
     prepend: false,
   };
-  const result = await apiFetchJson<{ batch?: { batch_id?: string }; item_ids?: number[] }>(
-    '/api/v1/queue/default/enqueue_batch',
-    { body: JSON.stringify(body), method: 'POST' }
-  );
+  const result = await apiFetchJson<{
+    batch?: { batch_id?: string };
+    enqueued?: number;
+    item_ids?: number[];
+    requested?: number;
+  }>('/api/v1/queue/default/enqueue_batch', { body: JSON.stringify(body), method: 'POST' });
 
-  return { batchId: result.batch?.batch_id, itemIds: result.item_ids ?? [] };
+  return {
+    batchId: result.batch?.batch_id,
+    enqueued: result.enqueued ?? 0,
+    itemIds: result.item_ids ?? [],
+    requested: result.requested ?? 0,
+  };
 };
 
 /** Enqueue an arbitrary compiled graph — the workflow path. */
@@ -59,17 +66,24 @@ export const enqueueWorkflowGraph = async (request: EnqueueWorkflowRequest): Pro
     batch: {
       destination: request.destination,
       graph: request.graph satisfies BackendGraphContract,
-      origin: buildQueueItemOrigin(request.sourceQueueItemId),
+      origin: buildQueueItemOrigin(request.sourceQueueItemId, request.projectId),
       runs: batchCount,
     },
     prepend: false,
   };
-  const result = await apiFetchJson<{ batch?: { batch_id?: string }; item_ids?: number[] }>(
-    '/api/v1/queue/default/enqueue_batch',
-    { body: JSON.stringify(body), method: 'POST' }
-  );
+  const result = await apiFetchJson<{
+    batch?: { batch_id?: string };
+    enqueued?: number;
+    item_ids?: number[];
+    requested?: number;
+  }>('/api/v1/queue/default/enqueue_batch', { body: JSON.stringify(body), method: 'POST' });
 
-  return { batchId: result.batch?.batch_id, itemIds: result.item_ids ?? [] };
+  return {
+    batchId: result.batch?.batch_id,
+    enqueued: result.enqueued ?? 0,
+    itemIds: result.item_ids ?? [],
+    requested: result.requested ?? 0,
+  };
 };
 
 export const getQueueItem = (itemId: number): Promise<QueueItemDTO> =>

@@ -13,7 +13,7 @@ import {
 } from './backend/queueCoordinator';
 import { socketHub } from './backend/socketHub';
 import { addImagesToGalleryBoard } from './gallery/api';
-import { getQueueItemResultImages } from './generation/api';
+import { getQueueItemResultImages, resumeQueueProcessor } from './generation/api';
 import { sanitizeBatchCount } from './generation/batch';
 import { normalizeGenerateSettings } from './generation/settings';
 import {
@@ -173,6 +173,7 @@ const submitQueueItem = (
         negativePromptNodeId: 'negative_prompt',
         positivePrompt: generateValues.positivePrompt,
         positivePromptNodeId: 'positive_prompt',
+        projectId: project.id,
         seed: generateValues.seed,
         seedNodeId: 'seed',
         shouldRandomizeSeed: generateValues.shouldRandomizeSeed,
@@ -182,6 +183,7 @@ const submitQueueItem = (
         batchCount: getSnapshotBatchCount(queueItem),
         destination: queueItem.snapshot.destination,
         graph,
+        projectId: project.id,
         sourceQueueItemId: queueItem.id,
       });
 
@@ -194,6 +196,11 @@ const submitQueueItem = (
         queueItemId: queueItem.id,
         type: 'markQueueItemBackendSubmitted',
       });
+
+      // Enqueuing implies intent to run: a paused processor would otherwise leave
+      // the batch stuck "waiting for progress" forever. Mirrors the legacy app's
+      // `anyEnqueued` listener; `resume` is a no-op when already running.
+      void resumeQueueProcessor().catch(() => undefined);
 
       return routeRunResults(coordinator, project.id, queueItem, dispatch);
     })
@@ -369,6 +376,7 @@ export const WorkbenchRuntime = () => {
             case 'missing': {
               dispatch({
                 error: 'This run is no longer on the backend queue (it may have been cleared).',
+                notify: false,
                 projectId: project.id,
                 queueItemId: queueItem.id,
                 status: 'failed',

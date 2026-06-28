@@ -281,11 +281,10 @@ describe('workbench layout presets', () => {
       sizePx: 450,
     });
     expect(project.widgetRegions.bottom).toMatchObject({
-      activeInstanceId: 'queue:bottom',
+      activeInstanceId: 'gallery:bottom',
       instanceIds: [
         'server-status',
         'diagnostics:bottom',
-        'queue:bottom',
         'gallery:bottom',
         'notifications',
         'autosave-status',
@@ -737,6 +736,26 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     state = workbenchReducer(state, { type: 'clearCompletedQueueItems' });
 
     expect(getActiveProject(state).queue.items.map((item) => item.status)).toEqual(['cancelled']);
+  });
+
+  it('can mark stale reconciled queue items failed without creating notifications', () => {
+    let state = submitGenerate(primeGenerate());
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0];
+    const notificationCount = state.notifications.length;
+
+    state = workbenchReducer(state, {
+      error: 'This run is no longer on the backend queue.',
+      notify: false,
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      status: 'failed',
+      type: 'setQueueItemStatus',
+    });
+
+    expect(getActiveProject(state).queue.items[0]?.status).toBe('failed');
+    expect(getActiveProject(state).queue.items[0]?.error).toBe('This run is no longer on the backend queue.');
+    expect(state.notifications).toHaveLength(notificationCount);
   });
 
   it('keeps cancellation terminal when backend item ids arrive late', () => {

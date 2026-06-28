@@ -93,6 +93,7 @@ const generateRequest: EnqueueGenerateRequest = {
   negativePromptNodeId: 'negative_prompt',
   positivePrompt: 'a fjord at dawn',
   positivePromptNodeId: 'positive_prompt',
+  projectId: 'project-1',
   seed: 1,
   seedNodeId: 'seed',
   shouldRandomizeSeed: false,
@@ -124,8 +125,8 @@ const createHarness = (options: { galleryRefreshCoalesceMs?: number } = {}): Har
   const api = {
     cancelQueueItems: vi.fn(() => Promise.resolve()),
     cancelQueueItemsByBatchIds: vi.fn(() => Promise.resolve()),
-    enqueueGenerateGraph: vi.fn(() => Promise.resolve({ batchId: 'batch-1', itemIds: [1] })),
-    enqueueWorkflowGraph: vi.fn(() => Promise.resolve({ batchId: 'batch-1', itemIds: [1] })),
+    enqueueGenerateGraph: vi.fn(() => Promise.resolve({ batchId: 'batch-1', enqueued: 1, itemIds: [1], requested: 1 })),
+    enqueueWorkflowGraph: vi.fn(() => Promise.resolve({ batchId: 'batch-1', enqueued: 1, itemIds: [1], requested: 1 })),
     getQueueItem: vi.fn((itemId: number) => Promise.resolve(createQueueItemDTO({ item_id: itemId }))),
     getQueueItemResultImages: vi.fn((itemId: number, sourceQueueItemId: string) =>
       Promise.resolve([createImage(`image-${itemId}.png`, sourceQueueItemId)])
@@ -174,7 +175,12 @@ describe('queueCoordinator', () => {
   });
 
   it('settles submitted runs from terminal socket events without polling', async () => {
-    harness.api.enqueueGenerateGraph.mockResolvedValue({ batchId: 'batch-1', itemIds: [1, 2] });
+    harness.api.enqueueGenerateGraph.mockResolvedValue({
+      batchId: 'batch-1',
+      enqueued: 2,
+      itemIds: [1, 2],
+      requested: 2,
+    });
     harness.coordinator.connect();
 
     await harness.coordinator.submitGenerate('local-1', generateRequest);
@@ -216,7 +222,12 @@ describe('queueCoordinator', () => {
 
   it('returns completed batch item results when sibling backend items are canceled', async () => {
     harness.callbacks.onBackendItemCancelled = vi.fn();
-    harness.api.enqueueGenerateGraph.mockResolvedValue({ batchId: 'batch-1', itemIds: [1, 2, 3] });
+    harness.api.enqueueGenerateGraph.mockResolvedValue({
+      batchId: 'batch-1',
+      enqueued: 3,
+      itemIds: [1, 2, 3],
+      requested: 3,
+    });
     harness.coordinator.connect();
 
     await harness.coordinator.submitGenerate('local-1', generateRequest);
@@ -236,7 +247,12 @@ describe('queueCoordinator', () => {
   });
 
   it('rejects with QueueItemCancelledError when every backend item in a batch is canceled', async () => {
-    harness.api.enqueueGenerateGraph.mockResolvedValue({ batchId: 'batch-1', itemIds: [1, 2] });
+    harness.api.enqueueGenerateGraph.mockResolvedValue({
+      batchId: 'batch-1',
+      enqueued: 2,
+      itemIds: [1, 2],
+      requested: 2,
+    });
     harness.coordinator.connect();
 
     await harness.coordinator.submitGenerate('local-1', generateRequest);
@@ -262,12 +278,30 @@ describe('queueCoordinator', () => {
     expect(images.map((image) => image.imageName)).toEqual(['image-1.png']);
   });
 
+  it('rejects runs when the backend queue accepts no items', async () => {
+    harness.api.enqueueGenerateGraph.mockResolvedValue({ batchId: 'batch-1', enqueued: 0, itemIds: [], requested: 1 });
+
+    await expect(harness.coordinator.submitGenerate('local-1', generateRequest)).rejects.toThrow(
+      'The backend queue did not accept this generation.'
+    );
+  });
+
+  it('rejects runs when the backend queue accepts only part of the batch', async () => {
+    harness.api.enqueueGenerateGraph.mockResolvedValue({ batchId: 'batch-1', enqueued: 1, itemIds: [1], requested: 2 });
+
+    await expect(harness.coordinator.submitGenerate('local-1', generateRequest)).rejects.toThrow(
+      'The backend queue accepted 1 of 2 requested items.'
+    );
+  });
+
   it('coalesces gallery refreshes across a burst of completions', async () => {
     vi.useFakeTimers();
     harness = createHarness({ galleryRefreshCoalesceMs: 400 });
     harness.api.enqueueGenerateGraph.mockResolvedValue({
       batchId: 'batch-1',
+      enqueued: 10,
       itemIds: Array.from({ length: 10 }, (_, index) => index + 1),
+      requested: 10,
     });
     harness.coordinator.connect();
     await harness.coordinator.submitGenerate('local-1', generateRequest);
@@ -286,7 +320,12 @@ describe('queueCoordinator', () => {
   it('does not refresh the gallery for failed or canceled items', async () => {
     vi.useFakeTimers();
     harness = createHarness({ galleryRefreshCoalesceMs: 400 });
-    harness.api.enqueueGenerateGraph.mockResolvedValue({ batchId: 'batch-1', itemIds: [1, 2] });
+    harness.api.enqueueGenerateGraph.mockResolvedValue({
+      batchId: 'batch-1',
+      enqueued: 2,
+      itemIds: [1, 2],
+      requested: 2,
+    });
     harness.coordinator.connect();
     await harness.coordinator.submitGenerate('local-1', generateRequest);
     await vi.advanceTimersByTimeAsync(500); // flush the on-connect refresh
@@ -363,7 +402,12 @@ describe('queueCoordinator', () => {
 
   it('notifies when one backend item in a batch completes', async () => {
     harness.callbacks.onBackendItemComplete = vi.fn();
-    harness.api.enqueueGenerateGraph.mockResolvedValue({ batchId: 'batch-1', itemIds: [1, 2] });
+    harness.api.enqueueGenerateGraph.mockResolvedValue({
+      batchId: 'batch-1',
+      enqueued: 2,
+      itemIds: [1, 2],
+      requested: 2,
+    });
     harness.coordinator.connect();
 
     await harness.coordinator.submitGenerate('local-1', generateRequest);
@@ -374,7 +418,12 @@ describe('queueCoordinator', () => {
   });
 
   it('routes progress images to the active image slot inside a submitted batch', async () => {
-    harness.api.enqueueGenerateGraph.mockResolvedValue({ batchId: 'batch-1', itemIds: [1, 2] });
+    harness.api.enqueueGenerateGraph.mockResolvedValue({
+      batchId: 'batch-1',
+      enqueued: 2,
+      itemIds: [1, 2],
+      requested: 2,
+    });
     harness.coordinator.connect();
 
     await harness.coordinator.submitGenerate('local-1', generateRequest);
@@ -433,7 +482,12 @@ describe('queueCoordinator', () => {
   });
 
   it('tracks the active image index inside a submitted batch', async () => {
-    harness.api.enqueueGenerateGraph.mockResolvedValue({ batchId: 'batch-1', itemIds: [1, 2] });
+    harness.api.enqueueGenerateGraph.mockResolvedValue({
+      batchId: 'batch-1',
+      enqueued: 2,
+      itemIds: [1, 2],
+      requested: 2,
+    });
     harness.coordinator.connect();
 
     await harness.coordinator.submitGenerate('local-1', generateRequest);
@@ -550,6 +604,14 @@ describe('queueCoordinator', () => {
     await harness.coordinator.cancelRun({ backendBatchId: 'batch-2' });
 
     expect(harness.api.cancelQueueItemsByBatchIds).toHaveBeenCalledWith(['batch-2']);
+  });
+
+  it('treats stale missing backend items as already cancelled', async () => {
+    harness.api.cancelQueueItems.mockRejectedValue(
+      new ApiError('Queue item with id 42 not found in queue default', 404)
+    );
+
+    await expect(harness.coordinator.cancelRun({ backendItemIds: [42] })).resolves.toBeUndefined();
   });
 
   it('detaches socket listeners after dispose', async () => {

@@ -28,6 +28,25 @@ export interface QueueItemStatusChangedEvent extends QueueItemEventBase {
   session_id: string;
 }
 
+export interface BatchEnqueuedEvent {
+  queue_id: string;
+  batch_id: string;
+  enqueued: number;
+  requested: number;
+  priority: number;
+  origin: string | null;
+  user_id: string;
+}
+
+export interface QueueClearedEvent {
+  queue_id: string;
+}
+
+export interface QueueItemsRetriedEvent {
+  queue_id: string;
+  retried_item_ids: number[];
+}
+
 /** Shared shape of per-invocation lifecycle events (`InvocationEventBase` on the backend). */
 export interface InvocationEventBase extends QueueItemEventBase {
   session_id: string;
@@ -57,6 +76,9 @@ export interface InvocationErrorEvent extends InvocationEventBase {
 
 export interface BackendSocketEvents {
   queue_item_status_changed: QueueItemStatusChangedEvent;
+  batch_enqueued: BatchEnqueuedEvent;
+  queue_cleared: QueueClearedEvent;
+  queue_items_retried: QueueItemsRetriedEvent;
   invocation_started: InvocationStartedEvent;
   invocation_progress: InvocationProgressEvent;
   invocation_complete: InvocationCompleteEvent;
@@ -72,9 +94,30 @@ export const isTerminalBackendStatus = (status: BackendQueueItemStatus): status 
  * and items are re-adopted by decoding their origin.
  */
 const QUEUE_ITEM_ORIGIN_PREFIX = 'webv2:';
+const PROJECT_QUEUE_ITEM_ORIGIN_PREFIX = 'webv2:p:';
 
-export const buildQueueItemOrigin = (localQueueItemId: string): string =>
-  `${QUEUE_ITEM_ORIGIN_PREFIX}${localQueueItemId}`;
+export const buildProjectQueueItemOriginPrefix = (projectId: string): string =>
+  `${PROJECT_QUEUE_ITEM_ORIGIN_PREFIX}${projectId}:q:`;
+
+export const buildQueueItemOrigin = (localQueueItemId: string, projectId?: string): string =>
+  projectId
+    ? `${buildProjectQueueItemOriginPrefix(projectId)}${localQueueItemId}`
+    : `${QUEUE_ITEM_ORIGIN_PREFIX}${localQueueItemId}`;
 
 export const parseQueueItemOrigin = (origin: string | null | undefined): string | null =>
-  origin?.startsWith(QUEUE_ITEM_ORIGIN_PREFIX) ? origin.slice(QUEUE_ITEM_ORIGIN_PREFIX.length) : null;
+  origin?.startsWith(PROJECT_QUEUE_ITEM_ORIGIN_PREFIX)
+    ? origin.slice(origin.lastIndexOf(':q:') + 3)
+    : origin?.startsWith(QUEUE_ITEM_ORIGIN_PREFIX)
+      ? origin.slice(QUEUE_ITEM_ORIGIN_PREFIX.length)
+      : null;
+
+export const parseQueueItemOriginProjectId = (origin: string | null | undefined): string | null => {
+  if (!origin?.startsWith(PROJECT_QUEUE_ITEM_ORIGIN_PREFIX)) {
+    return null;
+  }
+
+  const rest = origin.slice(PROJECT_QUEUE_ITEM_ORIGIN_PREFIX.length);
+  const separatorIndex = rest.indexOf(':q:');
+
+  return separatorIndex === -1 ? null : rest.slice(0, separatorIndex);
+};
