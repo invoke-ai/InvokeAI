@@ -206,7 +206,9 @@ def test_with_no_metadata(mock_logger):
     assert result.invokeai_graph is None
 
 
-def test_empty_string_overrides_do_not_fall_back_to_image_metadata(mock_logger, valid_metadata, valid_workflow, valid_graph):
+def test_empty_string_overrides_do_not_fall_back_to_image_metadata(
+    mock_logger, valid_metadata, valid_workflow, valid_graph
+):
     mock_image = MagicMock(spec=Image.Image)
     mock_image.info = {
         "invokeai_metadata": valid_metadata,

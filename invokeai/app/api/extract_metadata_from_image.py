@@ -49,7 +49,9 @@ def extract_metadata_from_image(
 
     # Use the metadata override if provided, else attempt to extract it from the image file.
     metadata_raw = (
-        invokeai_metadata_override if invokeai_metadata_override is not None else pil_image.info.get("invokeai_metadata", None)
+        invokeai_metadata_override
+        if invokeai_metadata_override is not None
+        else pil_image.info.get("invokeai_metadata", None)
     )
 
     # If the metadata is present in the image file, we will attempt to parse it as JSON. When we create images,
@@ -69,7 +71,9 @@ def extract_metadata_from_image(
     # We expect the workflow, if embedded in the image, to be a JSON-stringified WorkflowWithoutID. We will store it
     # as a string.
     workflow_raw: str | None = (
-        invokeai_workflow_override if invokeai_workflow_override is not None else pil_image.info.get("invokeai_workflow", None)
+        invokeai_workflow_override
+        if invokeai_workflow_override is not None
+        else pil_image.info.get("invokeai_workflow", None)
     )
 
     # The fallback value for workflow is None.
