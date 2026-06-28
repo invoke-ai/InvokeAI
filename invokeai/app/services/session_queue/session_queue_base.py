@@ -80,7 +80,11 @@ class SessionQueueBase(ABC):
         acting_user_id: Optional[str] = None,
         origin_prefix: Optional[str] = None,
     ) -> SessionQueueStatus:
-        """Gets the status of the queue. If user_id is provided, also includes user-specific counts.
+        """Gets the status of the queue.
+
+        Aggregate counts (pending/in_progress/.../total) are always global across all users.
+        If user_id is provided, the requesting user's own counts are additionally returned in
+        the user_pending/user_in_progress fields (left None otherwise).
 
         acting_user_id is independent of user_id and controls only current-item redaction:
         when set, the returned status omits item_id/session_id/batch_id unless the

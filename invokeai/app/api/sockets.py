@@ -325,11 +325,22 @@ class SocketIO:
 
                 logger.debug(f"Emitted private queue item event {event_name} to user room {user_room} and admin room")
 
-            # RecallParametersUpdatedEvent is private - only emit to owner + admins
+            # RecallParametersUpdatedEvent is private - only emit to owner + admins.
+            #
+            # Emit to the union of the owner room and the admin room in a SINGLE
+            # call. python-socketio deduplicates recipients across a room list,
+            # so a socket that belongs to BOTH rooms — e.g. the "system" user in
+            # single-user mode, which is also an admin — receives the event
+            # exactly once. Two separate emits would deliver it twice: harmless
+            # for the idempotent scalar recall fields (the frontend just re-sets
+            # them), but the append-mode reference-image recall *pushes* rather
+            # than replaces, so a double delivery adds the same reference image
+            # twice.
             elif isinstance(event_data, RecallParametersUpdatedEvent):
                 user_room = f"user:{event_data.user_id}"
-                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=user_room)
-                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
+                await self._sio.emit(
+                    event=event_name, data=event_data.model_dump(mode="json"), room=[user_room, "admin"]
+                )
                 logger.debug(f"Emitted private recall_parameters_updated event to user room {user_room} and admin room")
 
             # BatchEnqueuedEvent carries the enqueuing user's batch_id, origin, and
