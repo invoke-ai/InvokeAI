@@ -68,6 +68,11 @@ class ModelsList(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
 
+class EmptyModelCacheResponse(BaseModel):
+    models_cleared: int
+    bytes_freed: int
+
+
 class CacheType(str, Enum):
     """Cache type - one of vram or ram."""
 
@@ -1320,12 +1325,14 @@ async def get_stats() -> Optional[CacheStats]:
     "/empty_model_cache",
     operation_id="empty_model_cache",
     status_code=200,
+    response_model=EmptyModelCacheResponse,
 )
-async def empty_model_cache(current_admin: AdminUserOrDefault) -> None:
+async def empty_model_cache(current_admin: AdminUserOrDefault) -> EmptyModelCacheResponse:
     """Drop all models from the model cache to free RAM/VRAM. 'Locked' models that are in active use will not be dropped."""
     # Request 1000GB of room in order to force the cache to drop all models.
     ApiDependencies.invoker.services.logger.info("Emptying model cache.")
-    ApiDependencies.invoker.services.model_manager.load.ram_cache.make_room(1000 * 2**30)
+    result = ApiDependencies.invoker.services.model_manager.load.ram_cache.make_room(1000 * 2**30)
+    return EmptyModelCacheResponse(models_cleared=result.models_cleared, bytes_freed=result.bytes_freed)
 
 
 class HFTokenStatus(str, Enum):

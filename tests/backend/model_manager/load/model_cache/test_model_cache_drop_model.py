@@ -169,6 +169,34 @@ def test_drop_model_updates_stats_and_fires_callbacks(cache: ModelCache):
     assert kwargs["bytes_freed"] > 0
 
 
+def test_make_room_returns_clear_result_and_updates_current_cache_usage(cache: ModelCache):
+    cache.put("model-a", torch.nn.Linear(4, 4))
+    cache.put("model-b", torch.nn.Linear(4, 4))
+    cache.stats = CacheStats()
+    before_bytes = cache._get_ram_in_use()
+
+    result = cache.make_room(1000 * 2**30)
+
+    assert result.models_cleared == 2
+    assert result.bytes_freed == before_bytes
+    assert cache.stats.in_cache == 0
+    assert cache.stats.cache_used == 0
+
+
+def test_make_room_reports_noop_when_all_models_are_locked(cache: ModelCache):
+    cache.put("model-a", torch.nn.Linear(4, 4))
+    entry = cache._cached_models["model-a"]
+    entry.lock()
+    cache.stats = CacheStats()
+
+    result = cache.make_room(1000 * 2**30)
+
+    assert result.models_cleared == 0
+    assert result.bytes_freed == 0
+    assert cache.stats.in_cache == 1
+    assert cache.stats.cache_used > 0
+
+
 def test_unlock_stale_eviction_updates_stats_and_fires_callbacks(cache: ModelCache):
     """Stale-entry eviction is also a cache change observers care about."""
     model_key = "abc123"

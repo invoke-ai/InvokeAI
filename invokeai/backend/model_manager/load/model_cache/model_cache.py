@@ -77,6 +77,12 @@ class CacheEntrySnapshot:
     current_vram_bytes: int
 
 
+@dataclass(frozen=True)
+class CacheClearResult:
+    models_cleared: int
+    bytes_freed: int
+
+
 class CacheMissCallback(Protocol):
     def __call__(
         self,
@@ -360,6 +366,7 @@ class ModelCache:
         cache_record = CacheRecord(key=key, cached_model=wrapped_model)
         self._cached_models[key] = cache_record
         self._cache_stack.append(key)
+        self._sync_current_stats()
         self._logger.debug(
             f"Added model {key} (Type: {model.__class__.__name__}, Wrap mode: {wrapped_model.__class__.__name__}, Model size: {size / MB:.2f}MB)"
         )
@@ -377,6 +384,11 @@ class ModelCache:
             )
 
         return overview
+
+    def _sync_current_stats(self) -> None:
+        if self.stats:
+            self.stats.cache_used = self._get_ram_in_use()
+            self.stats.in_cache = len(self._cached_models)
 
     @synchronized
     @record_activity
@@ -405,6 +417,7 @@ class ModelCache:
         if self.stats:
             stats_name = stats_name or key
             self.stats.high_watermark = max(self.stats.high_watermark, self._get_ram_in_use())
+            self.stats.cache_used = self._get_ram_in_use()
             self.stats.in_cache = len(self._cached_models)
             self.stats.loaded_model_sizes[stats_name] = max(
                 self.stats.loaded_model_sizes.get(stats_name, 0), cache_entry.cached_model.total_bytes()
@@ -485,6 +498,7 @@ class ModelCache:
             self._delete_cache_entry(cache_entry)
             if self.stats:
                 self.stats.cleared = (self.stats.cleared or 0) + 1
+                self._sync_current_stats()
             snapshot = self._get_cache_snapshot()
             for cb in self._on_cache_models_cleared_callbacks:
                 cb(
@@ -820,16 +834,16 @@ class ModelCache:
         self._logger.debug(log)
 
     @synchronized
-    def make_room(self, bytes_needed: int) -> None:
+    def make_room(self, bytes_needed: int) -> CacheClearResult:
         """Make enough room in the cache to accommodate a new model of indicated size.
 
         Note: This function deletes all of the cache's internal references to a model in order to free it. If there are
         external references to the model, there's nothing that the cache can do about it, and those models will not be
         garbage-collected.
         """
-        self._make_room_internal(bytes_needed)
+        return self._make_room_internal(bytes_needed)
 
-    def _make_room_internal(self, bytes_needed: int) -> None:
+    def _make_room_internal(self, bytes_needed: int) -> CacheClearResult:
         """Internal implementation of make_room(). Assumes the lock is already held."""
         self._logger.debug(f"Making room for {bytes_needed / MB:.2f}MB of RAM.")
         self._log_cache_state(title="Before dropping models:")
@@ -878,9 +892,12 @@ class ModelCache:
                 )
             gc.collect()
 
+        self._sync_current_stats()
+
         TorchDevice.empty_cache()
         self._logger.debug(f"Dropped {models_cleared} models to free {ram_bytes_freed / MB:.2f}MB of RAM.")
         self._log_cache_state(title="After dropping models:")
+        return CacheClearResult(models_cleared=models_cleared, bytes_freed=ram_bytes_freed)
 
     def _delete_cache_entry(self, cache_entry: CacheRecord) -> None:
         """Delete cache_entry from the cache if it exists. No exception is thrown if it doesn't exist."""
@@ -918,6 +935,7 @@ class ModelCache:
         if dropped:
             if self.stats:
                 self.stats.cleared = len(dropped)
+                self._sync_current_stats()
             snapshot = self._get_cache_snapshot()
             for cb in self._on_cache_models_cleared_callbacks:
                 cb(
