@@ -1,130 +1,49 @@
 import type { WidgetViewProps } from '@workbench/types';
 
-import { Badge, HStack, Progress, Stack, Text } from '@chakra-ui/react';
-import { useQueueItemProgress } from '@workbench/backend/progressStore';
-import { Button } from '@workbench/components/ui';
-import { getDestinationLabel, getSourceLabel } from '@workbench/invocation';
+import { Stack } from '@chakra-ui/react';
 import { StatusWidgetChip } from '@workbench/widget-frame';
-import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { ListOrderedIcon } from 'lucide-react';
-import { useCallback } from 'react';
+import { useState } from 'react';
 
-import { areQueueRowsEqual, createQueueRowsSelector, getPendingQueueCount } from './queueViewModel';
+import type { QueueFilterId } from './queueFilters';
 
-const selectQueueRows = createQueueRowsSelector();
+import { CurrentBatchSection } from './NowNextSection';
+import { QueueFilterTabs } from './QueueFilterTabs';
+import { useScopedQueueCounts } from './queueScope';
+import { QueueStats } from './QueueStats';
+import { RecentSection } from './RecentSection';
 
+/**
+ * Queue console: server-wide stats, status filters, a live NOW & NEXT card, and
+ * the RECENT history. Header (title/Pause/menu) and the MODEL CACHE footer are
+ * provided through the manifest's chrome slots; this view is just the scrolling
+ * body. In a collapsed bottom dock it degrades to a single status chip.
+ */
 export const QueueWidgetView = ({ presentation, region }: WidgetViewProps) => {
-  const pendingQueueCount = useActiveProjectSelector((project) => getPendingQueueCount(project.queue.items));
+  const counts = useScopedQueueCounts();
 
   if (region === 'bottom' && presentation !== 'expanded') {
-    return <StatusWidgetChip icon={ListOrderedIcon}>{pendingQueueCount} queued</StatusWidgetChip>;
+    const isGenerating = counts.in_progress > 0;
+
+    return (
+      <StatusWidgetChip icon={ListOrderedIcon} tone={isGenerating ? 'accent' : undefined}>
+        {isGenerating ? `${counts.in_progress} generating` : `${counts.pending} queued`}
+      </StatusWidgetChip>
+    );
   }
 
-  if (region === 'bottom') {
-    return <QueueContents />;
-  }
-
-  return <QueueContents />;
+  return <QueueContent />;
 };
 
-const QueueItemLiveProgress = ({ queueItemId }: { queueItemId: string }) => {
-  const progress = useQueueItemProgress(queueItemId);
-
-  if (!progress || (!progress.message && progress.percentage === null)) {
-    return null;
-  }
+const QueueContent = () => {
+  const [filter, setFilter] = useState<QueueFilterId>('all');
 
   return (
-    <Stack gap="1">
-      <Progress.Root
-        aria-label={progress.message || 'Generation progress'}
-        max={1}
-        size="xs"
-        value={progress.percentage}
-      >
-        <Progress.Track>
-          <Progress.Range />
-        </Progress.Track>
-      </Progress.Root>
-      {progress.message ? (
-        <Text color="fg.subtle" fontSize="2xs">
-          {progress.message}
-        </Text>
-      ) : null}
+    <Stack gap="3" p="3">
+      <QueueStats />
+      <QueueFilterTabs value={filter} onChange={setFilter} />
+      <CurrentBatchSection />
+      <RecentSection filter={filter} />
     </Stack>
-  );
-};
-
-const QueueContents = () => {
-  const queueRows = useWorkbenchSelector((snapshot) => selectQueueRows(snapshot.state.projects), areQueueRowsEqual);
-
-  return (
-    <Stack gap="2" p="2">
-      {queueRows.length === 0 ? (
-        <Text color="fg.subtle" fontSize="2xs">
-          Queue submissions will appear here.
-        </Text>
-      ) : (
-        queueRows.map(({ item, projectId, projectName }) => {
-          const backendIds = item.backendItemIds?.length ? ` backend ${item.backendItemIds.join(', ')}` : '';
-          const resultCount = item.resultImages?.length ? `${item.resultImages.length} image(s)` : 'No results yet';
-          const generateValues = item.snapshot.widgetStates.generate.values as Record<string, unknown>;
-          const prompt = typeof generateValues.positivePrompt === 'string' ? generateValues.positivePrompt.trim() : '';
-          const promptSummary = prompt ? prompt.slice(0, 72) : 'No prompt snapshot';
-          const canCancel = item.cancellable && (item.status === 'pending' || item.status === 'running');
-
-          return (
-            <Stack
-              key={item.id}
-              bg="bg.subtle"
-              borderWidth="1px"
-              borderColor={item.status === 'failed' ? 'fg.error' : 'border.subtle'}
-              gap="1"
-              p="2"
-              rounded="md"
-            >
-              <HStack justify="space-between">
-                <Text fontSize="2xs" fontWeight="700">
-                  {projectName}
-                </Text>
-                <Badge colorPalette={item.status === 'failed' ? 'red' : item.status === 'completed' ? 'green' : 'blue'}>
-                  {item.status}
-                </Badge>
-              </HStack>
-              <Text color="fg.subtle" fontSize="2xs">
-                {getSourceLabel(item.snapshot.sourceId)} to {getDestinationLabel(item.snapshot.destination)} · Graph{' '}
-                {item.snapshot.graph.label || item.snapshot.graph.id}
-              </Text>
-              <Text color="fg.subtle" fontSize="2xs">
-                {promptSummary}
-              </Text>
-              {item.status === 'running' ? <QueueItemLiveProgress queueItemId={item.id} /> : null}
-              <HStack justify="space-between">
-                <Text color={item.status === 'failed' ? 'fg.error' : 'fg.subtle'} fontSize="2xs">
-                  {item.id}
-                  {backendIds} · {resultCount}
-                  {item.error ? ` · ${item.error}` : ''}
-                </Text>
-                {canCancel ? <CancelQueueItemButton projectId={projectId} queueItemId={item.id} /> : null}
-              </HStack>
-            </Stack>
-          );
-        })
-      )}
-    </Stack>
-  );
-};
-
-const CancelQueueItemButton = ({ projectId, queueItemId }: { projectId: string; queueItemId: string }) => {
-  const dispatch = useWorkbenchDispatch();
-  const handleCancel = useCallback(
-    () => dispatch({ projectId, queueItemId, type: 'cancelQueueItem' }),
-    [dispatch, projectId, queueItemId]
-  );
-
-  return (
-    <Button size="2xs" variant="outline" onClick={handleCancel}>
-      Cancel
-    </Button>
   );
 };

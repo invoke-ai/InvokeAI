@@ -14,7 +14,6 @@ import type {
 const defaultBottomInstanceIds: WidgetInstanceId[] = [
   'server-status',
   'diagnostics:bottom',
-  'queue:bottom',
   'gallery:bottom',
   'notifications',
   'autosave-status',
@@ -36,7 +35,6 @@ const defaultInstanceTypes: Record<WidgetInstanceId, WidgetTypeId> = {
   preview: 'preview',
   project: 'project',
   queue: 'queue',
-  'queue:bottom': 'queue',
   'server-status': 'server-status',
   'version-status': 'version-status',
   workflow: 'workflow',
@@ -119,7 +117,7 @@ export const layoutPresets: LayoutPreset[] = [
     panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
     widgetRegions: {
       bottom: createRegion({
-        activeInstanceId: 'queue:bottom',
+        activeInstanceId: 'gallery:bottom',
         instanceIds: defaultBottomInstanceIds,
         isCollapsed: true,
         sizePx: 180,
@@ -169,7 +167,7 @@ export const layoutPresets: LayoutPreset[] = [
     panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
     widgetRegions: {
       bottom: createRegion({
-        activeInstanceId: 'queue:bottom',
+        activeInstanceId: 'gallery:bottom',
         instanceIds: defaultBottomInstanceIds,
         isCollapsed: true,
         sizePx: 180,

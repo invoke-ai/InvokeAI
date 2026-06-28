@@ -43,6 +43,7 @@ import {
   DatabaseIcon,
   FolderIcon,
   KeyboardIcon,
+  ListOrderedIcon,
   PaletteIcon,
   RotateCcwIcon,
   SettingsIcon,
@@ -223,6 +224,12 @@ const SettingsTabs = () => {
         icon: FolderIcon,
         label: 'Project',
         value: 'project',
+      },
+      {
+        children: <QueueSection />,
+        icon: ListOrderedIcon,
+        label: 'Queue',
+        value: 'queue',
       },
       {
         children: <WorkflowSection />,
@@ -586,6 +593,27 @@ const WorkflowSection = () => {
         label="Validate connections"
         onChange={updateWorkflowValidateConnections}
       />
+    </SettingsSection>
+  );
+};
+
+const QueueSection = () => {
+  const { queueJobsScope } = useWorkbenchPreferences();
+  const updateQueueJobsScope = useCallback((value: string) => {
+    updatePreferences({ queueJobsScope: value === 'active-project' ? 'active-project' : 'all' });
+  }, []);
+
+  return (
+    <SettingsSection description="Choose which jobs the Queue widget includes in its counts and lists." title="Queue">
+      <SettingSelect
+        description="Show jobs from only the active project, or all queue jobs visible to you."
+        label="Show jobs from"
+        value={queueJobsScope}
+        onChange={updateQueueJobsScope}
+      >
+        <option value="active-project">Active project</option>
+        <option value="all">All</option>
+      </SettingSelect>
     </SettingsSection>
   );
 };

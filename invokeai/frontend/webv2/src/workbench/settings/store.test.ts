@@ -223,3 +223,18 @@ describe('normalizeProjectSettings', () => {
     );
   });
 });
+
+describe('normalizeWorkbenchPreferences queue scope', () => {
+  it('defaults queue jobs to all jobs for older preferences', () => {
+    expect(store.normalizeWorkbenchPreferences({}).queueJobsScope).toBe('all');
+  });
+
+  it('accepts only supported queue job scopes', () => {
+    expect(store.normalizeWorkbenchPreferences({ queueJobsScope: 'active-project' }).queueJobsScope).toBe(
+      'active-project'
+    );
+    expect(store.normalizeWorkbenchPreferences({ queueJobsScope: 'all' }).queueJobsScope).toBe('all');
+    expect(store.normalizeWorkbenchPreferences({ queueJobsScope: 'all-projects' }).queueJobsScope).toBe('all');
+    expect(store.normalizeWorkbenchPreferences({ queueJobsScope: 'current-project' }).queueJobsScope).toBe('all');
+  });
+});

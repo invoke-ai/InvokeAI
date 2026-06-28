@@ -297,6 +297,7 @@ export type SettingsSectionId =
   | 'behavior'
   | 'hotkeys'
   | 'project'
+  | 'queue'
   | 'workflow'
   | 'developer'
   | 'workspace';
@@ -697,6 +698,7 @@ export interface WorkbenchPreferences {
   reduceMotion: boolean;
   showFocusRegionHighlight: boolean;
   confirmImageDeletion: boolean;
+  queueJobsScope: 'active-project' | 'all';
   language: WorkbenchLanguage;
   enableInformationalPopovers: boolean;
   enableModelDescriptions: boolean;

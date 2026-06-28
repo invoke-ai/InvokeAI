@@ -77,6 +77,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   enableInformationalPopovers: true,
   enableModelDescriptions: true,
   language: 'en',
+  queueJobsScope: 'all',
   reduceMotion: false,
   showFocusRegionHighlight: true,
   themeId: DEFAULT_THEME_ID,
@@ -169,7 +170,8 @@ export const normalizeProjectSettings = (settings?: Partial<ProjectSettings>): P
   useCpuNoise: typeof settings?.useCpuNoise === 'boolean' ? settings.useCpuNoise : DEFAULT_PROJECT_SETTINGS.useCpuNoise,
 });
 
-type WorkbenchPreferencesInput = Omit<Partial<WorkbenchPreferences>, 'workflowEdgeStyle'> & {
+type WorkbenchPreferencesInput = Omit<Partial<WorkbenchPreferences>, 'queueJobsScope' | 'workflowEdgeStyle'> & {
+  queueJobsScope?: unknown;
   workflowEdgeStyle?: unknown;
 };
 
@@ -196,6 +198,12 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
       ? preferences.enableModelDescriptions
       : DEFAULT_PREFERENCES.enableModelDescriptions,
   language: isWorkbenchLanguage(preferences?.language) ? preferences.language : DEFAULT_PREFERENCES.language,
+  queueJobsScope:
+    preferences?.queueJobsScope === 'all-projects'
+      ? 'all'
+      : preferences?.queueJobsScope === 'active-project' || preferences?.queueJobsScope === 'all'
+        ? preferences.queueJobsScope
+        : DEFAULT_PREFERENCES.queueJobsScope,
   reduceMotion:
     typeof preferences?.reduceMotion === 'boolean' ? preferences.reduceMotion : DEFAULT_PREFERENCES.reduceMotion,
   showFocusRegionHighlight:
