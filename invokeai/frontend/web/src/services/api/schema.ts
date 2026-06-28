@@ -16557,6 +16557,12 @@ export type components = {
              */
             generation_devices?: "auto" | string[];
             /**
+             * Offload Text Encoders To Idle Gpus
+             * @description When running on multiple GPUs, load text encoders onto a currently-idle GPU instead of the one running the denoise pipeline. This avoids churning the denoise model in and out of VRAM to make room for the encoder, and lets a cached encoder be reused across generations. Has no effect unless at least two `generation_devices` are configured and a GPU is idle; under full load encoders run on the session's own GPU as before.
+             * @default true
+             */
+            offload_text_encoders_to_idle_gpus?: boolean;
+            /**
              * Precision
              * @description Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.
              * @default auto

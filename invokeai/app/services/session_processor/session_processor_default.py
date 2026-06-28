@@ -1,9 +1,9 @@
 import gc
 import traceback
-from contextlib import suppress
+from contextlib import contextmanager, suppress
 from threading import BoundedSemaphore, Thread
 from threading import Event as ThreadEvent
-from typing import Optional
+from typing import Iterator, Optional
 
 import torch
 
@@ -33,6 +33,7 @@ from invokeai.app.services.session_queue.session_queue_common import SessionQueu
 from invokeai.app.services.shared.graph import NodeInputError
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
 from invokeai.app.util.profiler import Profiler
+from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -129,8 +130,9 @@ class DefaultSessionRunner(SessionRunnerBase):
                     is_canceled=self._is_canceled,
                 )
 
-                # Invoke the node
-                output = invocation.invoke_internal(context=context, services=self._services)
+                # Invoke the node, optionally on a borrowed idle GPU (text encoders only).
+                with self._maybe_offload_to_idle_gpu(invocation):
+                    output = invocation.invoke_internal(context=context, services=self._services)
                 # Save output and history
                 queue_item.session.complete(invocation.id, output)
 
@@ -155,6 +157,45 @@ class DefaultSessionRunner(SessionRunnerBase):
                 error_message=error_message,
                 error_traceback=error_traceback,
             )
+
+    @contextmanager
+    def _maybe_offload_to_idle_gpu(self, invocation: BaseInvocation) -> Iterator[None]:
+        """Temporarily re-pin this worker thread to an idle GPU for a text-encoder node.
+
+        When ``offload_text_encoders_to_idle_gpus`` is enabled and an idle generation GPU can be
+        borrowed, the encoder model loads into that GPU's cache and its forward runs there (all
+        device-selecting code resolves to the pinned device), keeping the busy GPU's denoise model
+        resident. The conditioning output is stored on the CPU, so the denoiser picks it up on the
+        worker's own GPU after the pin is restored.
+
+        The borrow holds the idle device's exclusive-use lock for the whole node, so a native
+        session on that GPU can never run concurrently against the same cached encoder (which would
+        corrupt it). If no idle GPU is free, the node runs on the worker's own GPU unchanged.
+        """
+        native_device = TorchDevice.get_session_device()
+        if (
+            native_device is None
+            or native_device.type != "cuda"
+            or not invocation.idle_gpu_offloadable
+            or not self._services.configuration.offload_text_encoders_to_idle_gpus
+        ):
+            yield
+            return
+
+        borrowed_device = GENERATION_DEVICE_POOL.try_borrow(exclude=native_device)
+        if borrowed_device is None:
+            yield
+            return
+
+        self._services.logger.debug(
+            f"Running {invocation.get_type()} on idle device {borrowed_device} (session device {native_device})."
+        )
+        TorchDevice.set_session_device(borrowed_device)
+        try:
+            yield
+        finally:
+            TorchDevice.set_session_device(native_device)
+            GENERATION_DEVICE_POOL.release_borrow(borrowed_device)
 
     def _on_before_run_session(self, queue_item: SessionQueueItem) -> None:
         """Called before a session is run.
@@ -388,6 +429,10 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
         devices = self._resolve_devices()
 
+        # Register the generation devices so the model loader can discover idle GPUs to host text
+        # encoders on (see offload_text_encoders_to_idle_gpus). None means legacy single-device mode.
+        GENERATION_DEVICE_POOL.set_generation_devices([d for d in devices if d is not None])
+
         # If profiling is enabled, create a profiler. The same profiler will be used for all sessions. Internally,
         # the profiler will create a new profile for each session. Profiling uses a process-global cProfile, which
         # cannot cleanly attribute work when multiple sessions run concurrently, so it is disabled in multi-GPU mode.
@@ -582,8 +627,16 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         f"on {worker.label}"
                     )
 
-                    # Run the graph
-                    worker.runner.run(queue_item=worker.queue_item)
+                    # Run the graph. Hold this GPU's exclusive-use lock for the whole session so no
+                    # other worker can borrow it for text-encoder offload while we're running on it
+                    # (a borrow + concurrent native session on one GPU would corrupt the shared
+                    # cached encoder). Acquired here, after dequeue, so an idle worker doesn't hold
+                    # the lock and block borrows while waiting for work.
+                    GENERATION_DEVICE_POOL.acquire_session(worker.device)
+                    try:
+                        worker.runner.run(queue_item=worker.queue_item)
+                    finally:
+                        GENERATION_DEVICE_POOL.release_session(worker.device)
 
                 except Exception as e:
                     error_type = e.__class__.__name__

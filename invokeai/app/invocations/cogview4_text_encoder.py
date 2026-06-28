@@ -23,6 +23,7 @@ COGVIEW4_GLM_MAX_SEQ_LEN = 1024
     category="prompt",
     version="1.0.0",
     classification=Classification.Prototype,
+    idle_gpu_offloadable=True,
 )
 class CogView4TextEncoderInvocation(BaseInvocation):
     """Encodes and preps a prompt for a cogview4 image."""

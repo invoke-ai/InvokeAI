@@ -37,6 +37,7 @@ Z_IMAGE_MAX_SEQ_LEN = 512
     category="prompt",
     version="1.1.0",
     classification=Classification.Prototype,
+    idle_gpu_offloadable=True,
 )
 class ZImageTextEncoderInvocation(BaseInvocation):
     """Encodes and preps a prompt for a Z-Image image.

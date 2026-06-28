@@ -147,6 +147,27 @@ Notes:
 
 During parallel generation, the progress display shows one progress bar per active session, stacked vertically, each disappearing as its session completes.
 
+#### Text Encoder Offload to Idle GPUs
+
+When more than one GPU is configured for generation but not all of them are busy, InvokeAI can run a session's text/prompt encoder on a currently-idle GPU instead of the GPU running its denoise pipeline. This avoids evicting the denoise model from VRAM just to make room for the encoder, and lets the cached encoder be reused across generations — making repeated generations noticeably smoother.
+
+This is controlled by the `offload_text_encoders_to_idle_gpus` setting:
+
+```yaml
+offload_text_encoders_to_idle_gpus: true # default value
+```
+
+| Value   | Behavior                                                                                                          |
+| ------- | ---------------------------------------------------------------------------------------------------------------- |
+| `true`  | Run text encoders on an idle GPU when one is available. This is the default.                                      |
+| `false` | Always run text encoders on the same GPU as the rest of the pipeline (the behavior before this feature existed).  |
+
+Notes:
+
+- This has no effect unless at least two `generation_devices` are configured. On a single device — or when every GPU is already busy with its own session — encoders run on the session's own GPU, exactly as if the setting were `false`.
+- It is purely a placement optimization and does not change generated images.
+- A borrowed GPU is used exclusively for the encoder while it runs, so it never interferes with a generation session running on that same GPU.
+
 #### Image Subfolder Strategy
 
 By default, generated images are stored in a single flat directory under `outputs/images/`. The `image_subfolder_strategy` setting lets you organize newly-created images into subfolders automatically. You can edit this setting in `invokeai.yaml` or, as an admin user, in the Settings panel.
