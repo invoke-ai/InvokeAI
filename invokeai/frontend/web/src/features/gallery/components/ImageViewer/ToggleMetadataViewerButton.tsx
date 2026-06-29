@@ -1,6 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useIsRegionFocused } from 'common/hooks/focus';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { selectShouldShowItemDetails, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
@@ -23,6 +24,7 @@ export const ToggleMetadataViewerButton = memo(() => {
   const shouldShowItemDetails = useAppSelector(selectShouldShowItemDetails);
   const imageDTO = useAppSelector(selectLastSelectedItem);
   const { t } = useTranslation();
+  const isViewerFocused = useIsRegionFocused('viewer');
 
   const toggleMetadataViewer = useCallback(() => {
     dispatch(setShouldShowItemDetails(!shouldShowItemDetails));
@@ -32,7 +34,8 @@ export const ToggleMetadataViewerButton = memo(() => {
     id: 'toggleMetadata',
     category: 'viewer',
     callback: toggleMetadataViewer,
-    dependencies: [imageDTO, shouldShowItemDetails],
+    options: { enabled: isViewerFocused && !isDisabledOverride, preventDefault: true },
+    dependencies: [imageDTO, shouldShowItemDetails, isViewerFocused, isDisabledOverride],
   });
 
   return (
