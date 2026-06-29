@@ -11,6 +11,7 @@ import type {
   AspectRatioID,
   InfillMethod,
   ParamsState,
+  PidMode,
   PromptHistoryItem,
   RgbaColor,
 } from 'features/controlLayers/store/types';
@@ -259,6 +260,26 @@ const slice = createSlice({
         return;
       }
       state.kleinQwen3EncoderModel = result.data;
+    },
+    pidModeChanged: (state, action: PayloadAction<PidMode>) => {
+      state.pidMode = action.payload;
+    },
+    pidDecoderModelSelected: (state, action: PayloadAction<{ key: string; name: string; base: string } | null>) => {
+      const result = zParamsState.shape.pidDecoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.pidDecoderModel = result.data;
+    },
+    gemma2EncoderModelSelected: (state, action: PayloadAction<{ key: string; name: string; base: string } | null>) => {
+      const result = zParamsState.shape.gemma2EncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.gemma2EncoderModel = result.data;
+    },
+    setPidSteps: (state, action: PayloadAction<number>) => {
+      state.pidSteps = action.payload;
     },
     qwenImageComponentSourceSelected: (state, action: PayloadAction<ParameterModel | null>) => {
       const result = zParamsState.shape.qwenImageComponentSource.safeParse(action.payload);
@@ -616,6 +637,10 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.animaQwen3EncoderModel = oldState.animaQwen3EncoderModel;
   newState.kleinVaeModel = oldState.kleinVaeModel;
   newState.kleinQwen3EncoderModel = oldState.kleinQwen3EncoderModel;
+  newState.pidMode = oldState.pidMode;
+  newState.pidDecoderModel = oldState.pidDecoderModel;
+  newState.gemma2EncoderModel = oldState.gemma2EncoderModel;
+  newState.pidSteps = oldState.pidSteps;
   newState.qwenImageComponentSource = oldState.qwenImageComponentSource;
   newState.qwenImageVaeModel = oldState.qwenImageVaeModel;
   newState.qwenImageQwenVLEncoderModel = oldState.qwenImageQwenVLEncoderModel;
@@ -668,6 +693,10 @@ export const {
   zImageQwen3SourceModelSelected,
   kleinVaeModelSelected,
   kleinQwen3EncoderModelSelected,
+  pidModeChanged,
+  pidDecoderModelSelected,
+  gemma2EncoderModelSelected,
+  setPidSteps,
   qwenImageComponentSourceSelected,
   qwenImageVaeModelSelected,
   qwenImageQwenVLEncoderModelSelected,
@@ -744,6 +773,15 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         state.qwenImageQwenVLEncoderModel = null;
       }
 
+      if (state._version === 3) {
+        // v3 -> v4, add PiD (Pixel Diffusion Decoder) fields
+        state._version = 4;
+        state.pidMode = 'off';
+        state.pidDecoderModel = null;
+        state.gemma2EncoderModel = null;
+        state.pidSteps = 4;
+      }
+
       return zParamsState.parse(state);
     },
   },
@@ -787,6 +825,10 @@ export const selectAnimaQwen3EncoderModel = createParamsSelector((params) => par
 export const selectAnimaScheduler = createParamsSelector((params) => params.animaScheduler);
 export const selectKleinVaeModel = createParamsSelector((params) => params.kleinVaeModel);
 export const selectKleinQwen3EncoderModel = createParamsSelector((params) => params.kleinQwen3EncoderModel);
+export const selectPidMode = createParamsSelector((params) => params.pidMode);
+export const selectPidDecoderModel = createParamsSelector((params) => params.pidDecoderModel);
+export const selectGemma2EncoderModel = createParamsSelector((params) => params.gemma2EncoderModel);
+export const selectPidSteps = createParamsSelector((params) => params.pidSteps);
 export const selectQwenImageComponentSource = createParamsSelector((params) => params.qwenImageComponentSource);
 export const selectQwenImageVaeModel = createParamsSelector((params) => params.qwenImageVaeModel);
 export const selectQwenImageQwenVLEncoderModel = createParamsSelector((params) => params.qwenImageQwenVLEncoderModel);

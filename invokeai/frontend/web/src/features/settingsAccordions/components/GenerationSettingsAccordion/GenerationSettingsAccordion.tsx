@@ -19,6 +19,7 @@ import {
 } from 'features/controlLayers/store/paramsSlice';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
+import PidSettings from 'features/parameters/components/Advanced/PidSettings';
 import ParamAnimaScheduler from 'features/parameters/components/Core/ParamAnimaScheduler';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamFluxDypeExponent from 'features/parameters/components/Core/ParamFluxDypeExponent';
@@ -120,6 +121,7 @@ export const GenerationSettingsAccordion = memo(() => {
                 {!isExternal && isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeScale />}
                 {!isExternal && isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeExponent />}
               </FormControlGroup>
+              {!isExternal && isFLUX && <PidSettings />}
               {!isExternal && isZImage && <ParamZImageSeedVarianceSettings />}
             </Flex>
           </Expander>

@@ -20,6 +20,7 @@ import { addImageToImage } from 'features/nodes/util/graph/generation/addImageTo
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
 import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
+import { addPidDecode } from 'features/nodes/util/graph/generation/addPidDecode';
 import { addRegions } from 'features/nodes/util/graph/generation/addRegions';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
@@ -62,6 +63,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     fluxVAE,
     t5EncoderModel,
     clipEmbedModel,
+    pidMode,
   } = params;
 
   // Flux2 (Klein) uses Qwen3 instead of CLIP+T5
@@ -387,6 +389,12 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     const fluxPosCond = posCond as Invocation<'flux_text_encoder'>;
     const fluxL2i = l2i as Invocation<'flux_vae_decode'>;
 
+    // PiD decode currently only supports Text to Image. Other modes (img2img/inpaint/outpaint/canvas)
+    // need the compositing-aware path, which is not wired yet - fail loudly instead of silently ignoring it.
+    if (pidMode !== 'off' && generationMode !== 'txt2img') {
+      throw new UnsupportedGenerationModeError(t('toast.pidOnlyTxt2ImgForNow'));
+    }
+
     // Only add FLUX LoRAs for non-Klein models
     addFLUXLoRAs(state, g, fluxDenoise, fluxModelLoader, fluxPosCond);
 
@@ -430,12 +438,23 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
         denoise: fluxDenoise,
       });
     } else if (generationMode === 'txt2img') {
-      canvasOutput = addTextToImage({
-        g,
-        state,
-        denoise: fluxDenoise,
-        l2i: fluxL2i,
-      });
+      if (pidMode !== 'off') {
+        // PiD replaces the VAE decode entirely - drop the unused l2i (and its edges).
+        g.deleteNode(fluxL2i.id);
+        if (pidMode === 'fit') {
+          canvasOutput = addPidDecode({ g, state, denoise: fluxDenoise, positivePrompt, seed });
+        } else {
+          // 'native' (4x output) is not wired yet - it needs the bbox-aware dimension logic.
+          throw new UnsupportedGenerationModeError(t('toast.pidNativeModeNotYetAvailable'));
+        }
+      } else {
+        canvasOutput = addTextToImage({
+          g,
+          state,
+          denoise: fluxDenoise,
+          l2i: fluxL2i,
+        });
+      }
       g.upsertMetadata({ generation_mode: 'flux_txt2img' });
     } else if (generationMode === 'img2img') {
       assert(manager !== null);

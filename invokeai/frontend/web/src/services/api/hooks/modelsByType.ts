@@ -23,10 +23,12 @@ import {
   isFluxKontextModelConfig,
   isFluxReduxModelConfig,
   isFluxVAEModelConfig,
+  isGemma2EncoderModelConfig,
   isIPAdapterModelConfig,
   isLLaVAModelConfig,
   isLoRAModelConfig,
   isMainOrExternalModelConfig,
+  isPiDDecoderModelConfig,
   isQwen3EncoderModelConfig,
   isQwenImageDiffusersMainModelConfig,
   isQwenImageVAEModelConfig,
@@ -111,6 +113,8 @@ export const useQwenImageDiffusersModels = () => buildModelsHook(isQwenImageDiff
 export const useQwenImageVAEModels = () => buildModelsHook(isQwenImageVAEModelConfig)();
 export const useQwenVLEncoderModels = () => buildModelsHook(isQwenVLEncoderModelConfig)();
 export const useQwen3EncoderModels = () => buildModelsHook(isQwen3EncoderModelConfig)();
+export const usePiDDecoderModels = buildModelsHook(isPiDDecoderModelConfig);
+export const useGemma2EncoderModels = () => buildModelsHook(isGemma2EncoderModelConfig)();
 export const useGlobalReferenceImageModels = buildModelsHook(
   (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config) || isFluxKontextModelConfig(config)
 );

@@ -287,6 +287,14 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     if (!params.fluxVAE) {
       reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
     }
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+      }
+    }
   }
 
   if (model?.base === 'flux2' && model.format !== 'diffusers') {
