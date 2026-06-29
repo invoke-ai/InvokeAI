@@ -1,99 +1,57 @@
-/* oxlint-disable no-console */
-
-const PERF_STORAGE_KEY = 'invokeai:webv2:perf';
-const MAX_ENTRIES = 200;
-
-interface WorkbenchPerfEntry {
-  duration: number;
-  name: string;
-  timestamp: number;
-}
-
-declare global {
-  interface Window {
-    __invokeaiWorkbenchPerf?: WorkbenchPerfEntry[];
-  }
-}
+import { canRecordDiagnosticTiming, recordDiagnosticTiming, type DiagnosticSource } from './diagnostics/logger';
 
 const hasPerformanceApi = (): boolean => typeof performance !== 'undefined' && typeof performance.mark === 'function';
 
-const isPerfEnabled = (): boolean => {
-  if (!hasPerformanceApi()) {
-    return false;
-  }
+const canMeasurePerf = (source?: DiagnosticSource): source is DiagnosticSource =>
+  hasPerformanceApi() && canRecordDiagnosticTiming(source);
 
-  try {
-    return typeof window !== 'undefined' && window.localStorage.getItem(PERF_STORAGE_KEY) === '1';
-  } catch {
-    return false;
-  }
-};
-
-export const markWorkbenchPerf = (name: string): void => {
-  if (!isPerfEnabled()) {
+export const markWorkbenchPerf = (name: string, source?: DiagnosticSource): void => {
+  if (!canMeasurePerf(source)) {
     return;
   }
 
   performance.mark(name);
 };
 
-const recordWorkbenchPerfEntry = (entry: WorkbenchPerfEntry): void => {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  // TODO: Move benchmark collection out of a global window buffer when a real diagnostics surface exists.
-  const entries = window.__invokeaiWorkbenchPerf ?? [];
-
-  entries.push(entry);
-
-  if (entries.length > MAX_ENTRIES) {
-    entries.splice(0, entries.length - MAX_ENTRIES);
-  }
-
-  window.__invokeaiWorkbenchPerf = entries;
-};
-
-export const measureWorkbenchPerf = (name: string, startMark: string, endMark?: string): void => {
-  if (!isPerfEnabled()) {
+export const measureWorkbenchPerf = (
+  name: string,
+  startMark: string,
+  source?: DiagnosticSource,
+  endMark?: string
+): void => {
+  if (!canMeasurePerf(source)) {
     return;
   }
 
   try {
     const measure = endMark ? performance.measure(name, startMark, endMark) : performance.measure(name, startMark);
-    const entry = { duration: measure.duration, name: measure.name, timestamp: performance.now() };
 
-    recordWorkbenchPerfEntry(entry);
+    recordDiagnosticTiming(source, measure.name, measure.duration);
 
-    // TODO: Replace console logging with a dedicated benchmark sink/export UI before keeping this long-term.
-    console.info(`[workbench perf] ${entry.name}: ${entry.duration.toFixed(1)}ms`);
+    performance.clearMeasures?.(name);
+    performance.clearMarks?.(startMark);
+    if (endMark) {
+      performance.clearMarks?.(endMark);
+    }
   } catch {
     // A missing mark should never affect workflow behavior.
   }
 };
 
-export const getWorkbenchPerfEntries = (): WorkbenchPerfEntry[] => {
-  if (typeof window === 'undefined') {
-    return [];
-  }
-
-  return [...(window.__invokeaiWorkbenchPerf ?? [])];
-};
-
-export const timeWorkbenchPerf = <T>(name: string, callback: () => T): T => {
-  if (!isPerfEnabled()) {
+export const timeWorkbenchPerf = <T>(name: string, source: DiagnosticSource | undefined, callback: () => T): T => {
+  if (!canMeasurePerf(source)) {
     return callback();
   }
 
   const startMark = `${name}:start`;
   const endMark = `${name}:end`;
 
-  markWorkbenchPerf(startMark);
+  markWorkbenchPerf(startMark, source);
 
   try {
     return callback();
   } finally {
-    markWorkbenchPerf(endMark);
-    measureWorkbenchPerf(name, startMark, endMark);
+    markWorkbenchPerf(endMark, source);
+    measureWorkbenchPerf(name, startMark, source, endMark);
   }
 };

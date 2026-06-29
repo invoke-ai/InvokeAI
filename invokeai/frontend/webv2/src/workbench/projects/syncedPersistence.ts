@@ -103,7 +103,11 @@ const getSerializedProjectDocument = (project: Project): { document: Record<stri
   }
 
   const document = serializeProjectDocument(project);
-  const json = timeWorkbenchPerf('workbench:project-document-stringify', () => JSON.stringify(document));
+  const json = timeWorkbenchPerf(
+    'workbench:project-document-stringify',
+    { area: 'project-sync', kind: 'workbench', projectId: project.id },
+    () => JSON.stringify(document)
+  );
   const serialized = { document, json };
 
   projectDocumentJsonCache.set(project, serialized);

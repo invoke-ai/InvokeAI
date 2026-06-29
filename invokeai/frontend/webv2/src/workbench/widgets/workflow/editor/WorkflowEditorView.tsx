@@ -1,3 +1,4 @@
+import type { DiagnosticSource } from '@workbench/diagnostics/logger';
 /* eslint-disable react/react-compiler */
 import type { WidgetRuntimeApi } from '@workbench/types';
 import type { ProjectGraphState, XYPosition } from '@workbench/workflows/types';
@@ -131,26 +132,28 @@ const buildWorkflowFlowModel = ({
   selectedNodeIds = new Set<string>(),
   isCompact = false,
   canUseCache = false,
+  perfSource,
 }: {
   canUseCache?: boolean;
   document: ProjectGraphState;
   edgeType: FlowEdgeType;
   isCompact?: boolean;
   invocationTemplates?: Parameters<typeof toFlowNodes>[2];
+  perfSource?: DiagnosticSource;
   previousEdges?: WorkflowFlowEdge[];
   previousNodes?: WorkflowFlowNode[];
   reduceMotion: boolean;
   selectedNodeIds?: Set<string>;
 }): WorkflowFlowModel => {
-  const index = timeWorkbenchPerf('workflow:create-graph-index', () =>
+  const index = timeWorkbenchPerf('workflow:create-graph-index', perfSource, () =>
     createWorkflowGraphIndex(document.nodes, document.edges)
   );
 
-  return timeWorkbenchPerf('workflow:build-flow-model', () => ({
-    edges: timeWorkbenchPerf('workflow:to-flow-edges', () =>
+  return timeWorkbenchPerf('workflow:build-flow-model', perfSource, () => ({
+    edges: timeWorkbenchPerf('workflow:to-flow-edges', perfSource, () =>
       toFlowEdges(document, previousEdges, edgeType, selectedNodeIds, invocationTemplates, reduceMotion, index)
     ),
-    nodes: timeWorkbenchPerf('workflow:to-flow-nodes', () =>
+    nodes: timeWorkbenchPerf('workflow:to-flow-nodes', perfSource, () =>
       toFlowNodes(document, previousNodes, invocationTemplates, index, isCompact, canUseCache)
     ),
   }));
@@ -250,6 +253,16 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
     () => getWorkflowViewportKey(projectId, runtime.instanceId),
     [projectId, runtime.instanceId]
   );
+  const perfSource = useMemo<DiagnosticSource>(
+    () => ({
+      instanceId: runtime.instanceId,
+      kind: 'widget',
+      projectId,
+      region: runtime.region,
+      typeId: runtime.typeId,
+    }),
+    [projectId, runtime.instanceId, runtime.region, runtime.typeId]
+  );
   const defaultViewport = useMemo(() => getWorkflowViewport(viewportKey) ?? DEFAULT_VIEWPORT, [viewportKey]);
   const [flowModel, setFlowModel] = useState<WorkflowFlowModel | null>(() =>
     isLargeGraph
@@ -260,6 +273,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
           edgeType,
           invocationTemplates,
           isCompact: isLargeGraph,
+          perfSource,
           reduceMotion,
         })
   );
@@ -371,30 +385,36 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
   }, [isLargeGraph, projectId]);
 
   useEffect(() => {
-    markWorkbenchPerf(perfMountMarkRef.current);
-  }, []);
+    markWorkbenchPerf(perfMountMarkRef.current, perfSource);
+  }, [perfSource]);
 
   useEffect(() => {
     if (isPreparing) {
       return;
     }
 
-    markWorkbenchPerf(perfReadyMarkRef.current);
-    measureWorkbenchPerf('workflow:editor-mounted-to-ready', perfMountMarkRef.current, perfReadyMarkRef.current);
-  }, [isPreparing]);
+    markWorkbenchPerf(perfReadyMarkRef.current, perfSource);
+    measureWorkbenchPerf(
+      'workflow:editor-mounted-to-ready',
+      perfMountMarkRef.current,
+      perfSource,
+      perfReadyMarkRef.current
+    );
+  }, [isPreparing, perfSource]);
 
   useEffect(() => {
     if (!isFullGraphMounted || !isLargeGraph) {
       return;
     }
 
-    markWorkbenchPerf('workflow:full-graph-mounted');
+    markWorkbenchPerf('workflow:full-graph-mounted', perfSource);
     measureWorkbenchPerf(
       'workflow:full-graph-expand',
       'workflow:full-graph-expand-start',
+      perfSource,
       'workflow:full-graph-mounted'
     );
-  }, [isFullGraphMounted, isLargeGraph]);
+  }, [isFullGraphMounted, isLargeGraph, perfSource]);
 
   useEffect(() => {
     if (!workflowShowMinimap) {
@@ -414,12 +434,12 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
     }
 
     const timeoutId = window.setTimeout(() => {
-      markWorkbenchPerf('workflow:minimap-ready');
+      markWorkbenchPerf('workflow:minimap-ready', perfSource);
       setIsMinimapReady(true);
     }, WORKFLOW_MINIMAP_DELAY_MS);
 
     return () => window.clearTimeout(timeoutId);
-  }, [isLargeGraph, isPreparing, workflowShowMinimap]);
+  }, [isLargeGraph, isPreparing, perfSource, workflowShowMinimap]);
 
   useEffect(() => {
     const pendingSelection = pendingSelectionRef.current;
@@ -460,6 +480,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
             canUseCache,
             isCompact: isLargeGraph,
             invocationTemplates,
+            perfSource,
             previousEdges: current?.edges,
             previousNodes: current?.nodes,
             reduceMotion,
@@ -491,6 +512,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
     edgeType,
     invocationTemplates,
     isLargeGraph,
+    perfSource,
     projectGraph,
     reduceMotion,
     selectedNodeIds,
@@ -943,21 +965,31 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
     (instance: WorkflowFlowInstance) => {
       const flowInitMark = 'workflow:react-flow-init';
 
-      markWorkbenchPerf(flowInitMark);
-      measureWorkbenchPerf('workflow:editor-ready-to-react-flow-init', perfReadyMarkRef.current, flowInitMark);
-      measureWorkbenchPerf('workflow:editor-mounted-to-react-flow-init', perfMountMarkRef.current, flowInitMark);
+      markWorkbenchPerf(flowInitMark, perfSource);
+      measureWorkbenchPerf(
+        'workflow:editor-ready-to-react-flow-init',
+        perfReadyMarkRef.current,
+        perfSource,
+        flowInitMark
+      );
+      measureWorkbenchPerf(
+        'workflow:editor-mounted-to-react-flow-init',
+        perfMountMarkRef.current,
+        perfSource,
+        flowInitMark
+      );
       setFlowInstance(instance);
 
       if (isLargeGraph && !isFullGraphMounted && !hasScheduledFullGraphMountRef.current) {
         hasScheduledFullGraphMountRef.current = true;
 
         window.setTimeout(() => {
-          markWorkbenchPerf('workflow:full-graph-expand-start');
+          markWorkbenchPerf('workflow:full-graph-expand-start', perfSource);
           setIsFullGraphMounted(true);
         }, 0);
       }
     },
-    [isFullGraphMounted, isLargeGraph]
+    [isFullGraphMounted, isLargeGraph, perfSource]
   );
 
   const editorCss = useMemo(
