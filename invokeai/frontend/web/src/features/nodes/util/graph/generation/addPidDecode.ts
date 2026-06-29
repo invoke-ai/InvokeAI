@@ -1,9 +1,14 @@
 import type { RootState } from 'app/store/store';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { getOriginalAndScaledSizesForTextToImage } from 'features/nodes/util/graph/graphBuilderUtils';
+import {
+  getDenoisingStartAndEnd,
+  getOriginalAndScaledSizesForOtherModes,
+  getOriginalAndScaledSizesForTextToImage,
+} from 'features/nodes/util/graph/graphBuilderUtils';
 import { PID_SCALE } from 'features/parameters/util/optimalDimension';
 import type { Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -152,4 +157,74 @@ export const addPidDecode = ({
   }
 
   return buildPidDecodeChain({ g, state, denoise, positivePrompt, seed, mode, fitSize: originalSize });
+};
+
+type AddPidImageToImageNativeArg = {
+  g: Graph;
+  state: RootState;
+  manager: CanvasManager;
+  /** The FLUX denoise node. Its dimensions are set here to the 4x target / PID_SCALE. */
+  denoise: Invocation<'flux_denoise'>;
+  /** The VAE encode node for the init image. */
+  i2l: Invocation<'flux_vae_encode'>;
+  /** The model loader providing the VAE for encoding the init image. */
+  vaeSource: Invocation<'flux_model_loader'>;
+  positivePrompt: Invocation<'string'>;
+  seed: Invocation<'integer'>;
+};
+
+/**
+ * Native-4x PiD image-to-image (Canvas only). The user-facing bbox IS the 4x target: generation runs at bbox /
+ * PID_SCALE, the init image is downscaled to that resolution before encoding, and PiD decodes the latents straight
+ * back up to the full bbox size - no post-decode downscale, so all of PiD's detail is preserved. Because the result
+ * is exactly the bbox size it composites cleanly back onto the canvas region.
+ *
+ * Requires the bbox to be a multiple of the PiD-scaled grid (enforced by the UI grid snapping / readiness) so that
+ * bbox / PID_SCALE lands on the FLUX grid and PiD's 4x output matches the bbox exactly.
+ *
+ * @returns The terminal `flux_pid_decode` node, to be used as the canvas output.
+ */
+export const addPidImageToImageNative = async ({
+  g,
+  state,
+  manager,
+  denoise,
+  i2l,
+  vaeSource,
+  positivePrompt,
+  seed,
+}: AddPidImageToImageNativeArg): Promise<Invocation<'img_resize' | 'flux_pid_decode'>> => {
+  const { denoising_start, denoising_end } = getDenoisingStartAndEnd(state);
+  denoise.denoising_start = denoising_start;
+  denoise.denoising_end = denoising_end;
+
+  const { originalSize, rect } = getOriginalAndScaledSizesForOtherModes(state);
+
+  // The bbox is the 4x target; generate at target / PID_SCALE (kept on the FLUX grid).
+  const genSize = {
+    width: Math.max(roundDownToMultiple(originalSize.width / PID_SCALE, FLUX_GRID_SIZE), FLUX_GRID_SIZE),
+    height: Math.max(roundDownToMultiple(originalSize.height / PID_SCALE, FLUX_GRID_SIZE), FLUX_GRID_SIZE),
+  };
+  denoise.width = genSize.width;
+  denoise.height = genSize.height;
+
+  const adapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
+  const { image_name } = await manager.compositor.getCompositeImageDTO(adapters, rect, {
+    is_intermediate: true,
+    silent: true,
+  });
+
+  // Downscale the init image to the generation resolution before encoding.
+  const resizeIn = g.addNode({
+    type: 'img_resize',
+    id: getPrefixedId('initial_image_resize_in'),
+    image: { image_name },
+    ...genSize,
+  });
+  g.addEdge(vaeSource, 'vae', i2l, 'vae');
+  g.addEdge(resizeIn, 'image', i2l, 'image');
+  g.addEdge(i2l, 'latents', denoise, 'latents');
+
+  // PiD decodes the genSize latents straight up to 4x = the bbox. fitSize is ignored in native mode.
+  return buildPidDecodeChain({ g, state, denoise, positivePrompt, seed, mode: 'native', fitSize: originalSize });
 };

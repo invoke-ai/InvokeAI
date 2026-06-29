@@ -34,7 +34,7 @@ import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { isFlux2KleinQwen3Compatible } from 'features/parameters/util/flux2Klein';
-import { getGridSize } from 'features/parameters/util/optimalDimension';
+import { getGridSize, getPidScale } from 'features/parameters/util/optimalDimension';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
 import i18n from 'i18next';
@@ -579,7 +579,9 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
 
     const { bbox } = canvas;
-    const gridSize = getGridSize('flux');
+    // In PiD native mode the bbox is the 4x target, so it must snap to a larger grid (16 * 4) for bbox / 4 to land
+    // on the FLUX grid. getPidScale returns 1 for off/fit, leaving the normal 16px grid.
+    const gridSize = getGridSize('flux', getPidScale(params.pidMode));
 
     if (params.pidMode !== 'off') {
       if (!params.pidDecoderModel) {

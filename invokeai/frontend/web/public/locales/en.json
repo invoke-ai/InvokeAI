@@ -1979,7 +1979,6 @@
         "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4o supports Text to Image and Image to Image only. Use other models Inpainting and Outpainting tasks.",
         "fluxKontextIncompatibleGenerationMode": "FLUX Kontext does not support generation from images placed on the canvas. Re-try using the Reference Image section and disable any Raster Layers.",
         "pidUnsupportedMode": "PiD decode currently supports Text to Image and Image to Image only. Disable PiD for Inpaint/Outpaint.",
-        "pidNativeTxt2ImgOnly": "PiD Native (4x) mode only supports Text to Image. Use Fit mode for Image to Image.",
         "pidScaleBeforeProcessingOff": "Turn off Scale Before Processing (set it to None) to use PiD decode.",
         "problemUnpublishingWorkflow": "Problem Unpublishing Workflow",
         "problemUnpublishingWorkflowDescription": "There was a problem unpublishing the workflow. Please try again.",

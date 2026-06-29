@@ -20,7 +20,11 @@ import { addImageToImage } from 'features/nodes/util/graph/generation/addImageTo
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
 import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
-import { addPidDecode, buildPidDecodeChain } from 'features/nodes/util/graph/generation/addPidDecode';
+import {
+  addPidDecode,
+  addPidImageToImageNative,
+  buildPidDecodeChain,
+} from 'features/nodes/util/graph/generation/addPidDecode';
 import { addRegions } from 'features/nodes/util/graph/generation/addRegions';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
@@ -394,11 +398,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     const fluxL2i = l2i as Invocation<'flux_vae_decode'>;
 
     if (pidMode !== 'off') {
-      // Native (4x output) only makes sense for txt2img - a 4x result can't be composited back onto a canvas region.
-      if (pidMode === 'native' && generationMode !== 'txt2img') {
-        throw new UnsupportedGenerationModeError(t('toast.pidNativeTxt2ImgOnly'));
-      }
-      // Inpaint/outpaint are not wired for PiD yet - only txt2img and img2img are supported.
+      // Inpaint/outpaint are not wired for PiD yet - only txt2img and img2img are supported (Fit and Native).
       if (generationMode === 'inpaint' || generationMode === 'outpaint') {
         throw new UnsupportedGenerationModeError(t('toast.pidUnsupportedMode'));
       }
@@ -472,8 +472,22 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
         type: 'flux_vae_encode',
         id: getPrefixedId('flux_vae_encode'),
       });
-      if (pidMode !== 'off') {
-        // PiD replaces the VAE decode. img2img only supports Fit - the result must fit the bbox to composite.
+      if (pidMode === 'native') {
+        // PiD replaces the VAE decode. Native: the bbox is the 4x target - generate at bbox / 4, PiD decodes
+        // straight back up to the bbox (no downscale), so the full result composites onto the canvas region.
+        g.deleteNode(fluxL2i.id);
+        canvasOutput = await addPidImageToImageNative({
+          g,
+          state,
+          manager,
+          denoise: fluxDenoise,
+          i2l,
+          vaeSource: fluxModelLoader,
+          positivePrompt,
+          seed,
+        });
+      } else if (pidMode === 'fit') {
+        // PiD replaces the VAE decode. Fit: generate at the bbox, PiD decodes 4x, then downscale back to the bbox.
         g.deleteNode(fluxL2i.id);
         const { originalSize } = getOriginalAndScaledSizesForOtherModes(state);
         const pidDecode = buildPidDecodeChain({
