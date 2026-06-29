@@ -1,4 +1,3 @@
-import { Center, Spinner } from '@chakra-ui/react';
 import {
   createHashHistory,
   createRootRoute,
@@ -15,6 +14,7 @@ import { LoginScreen } from './workbench/auth/components/LoginScreen';
 import { SetupScreen } from './workbench/auth/components/SetupScreen';
 import { ensureAuthSession } from './workbench/auth/session';
 import { SocketHubRuntime } from './workbench/backend/SocketHubRuntime';
+import { WorkbenchSplashScreen } from './workbench/components/WorkbenchSplashScreen';
 import { Launchpad } from './workbench/launchpad/Launchpad';
 import { peekOpenProjectIds, type WorkbenchSearch } from './workbench/projects/session';
 import { loadWorkbenchSettings } from './workbench/settings/store';
@@ -175,11 +175,7 @@ const setupRoute = createRoute({
   path: '/setup',
 });
 
-const RouterPending = () => (
-  <Center bg="bg" minH="100dvh">
-    <Spinner color="fg.muted" size="sm" />
-  </Center>
-);
+const RouterPending = () => <WorkbenchSplashScreen message="Loading Application" />;
 
 export const router = createRouter({
   defaultNotFoundComponent: () => <Navigate to="/" />,
