@@ -619,7 +619,8 @@ const QueueSection = () => {
 };
 
 const DeveloperSection = () => {
-  const { developerLogEnabled, developerLogLevel, developerLogNamespaces } = useWorkbenchPreferences();
+  const { developerLogEnabled, developerLogLevel, developerLogNamespaces, developerPerformanceTimingsEnabled } =
+    useWorkbenchPreferences();
   const enabledNamespaces = useMemo(() => new Set(developerLogNamespaces), [developerLogNamespaces]);
 
   const toggleNamespace = useCallback(
@@ -640,19 +641,23 @@ const DeveloperSection = () => {
   const updateDeveloperLogLevel = useCallback((value: string) => {
     updatePreferences({ developerLogLevel: value as DeveloperLogLevel });
   }, []);
+  const updateDeveloperPerformanceTimingsEnabled = useCallback((checked: boolean) => {
+    updatePreferences({ developerPerformanceTimingsEnabled: checked });
+  }, []);
 
   return (
-    <SettingsSection description="Console logging controls for development builds." title="Developer">
+    <SettingsSection
+      description="Current-user diagnostics settings. Entries are still grouped by project and kept in memory only."
+      title="Developer"
+    >
       <SettingToggle
         checked={developerLogEnabled}
-        comingSoon
-        description="Enable console logging for selected namespaces."
-        label="Enable developer logs"
+        description="Record selected diagnostic log events in the Diagnostics widget."
+        label="Record diagnostic logs"
         onChange={updateDeveloperLogEnabled}
       />
       <SettingSelect
-        comingSoon
-        description="Minimum log level written to the console."
+        description="Minimum log level recorded in the Diagnostics widget."
         label="Log level"
         value={developerLogLevel}
         onChange={updateDeveloperLogLevel}
@@ -663,6 +668,12 @@ const DeveloperSection = () => {
           </option>
         ))}
       </SettingSelect>
+      <SettingToggle
+        checked={developerPerformanceTimingsEnabled}
+        description="Record performance measurements such as workflow editor timing and project serialization costs."
+        label="Collect performance timings"
+        onChange={updateDeveloperPerformanceTimingsEnabled}
+      />
       <Stack gap="2">
         <Text color="fg" fontSize="sm" fontWeight="500">
           Log namespaces
@@ -697,7 +708,7 @@ const DeveloperNamespaceCheckbox = ({
   );
 
   return (
-    <Checkbox.Root checked={checked} disabled size="sm" onCheckedChange={handleCheckedChange}>
+    <Checkbox.Root checked={checked} size="sm" onCheckedChange={handleCheckedChange}>
       <Checkbox.HiddenInput />
       <Checkbox.Control />
       <Checkbox.Label color="fg.muted" fontSize="xs">

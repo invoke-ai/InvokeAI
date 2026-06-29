@@ -119,7 +119,7 @@ describe('loadWorkbenchSettings', () => {
     const preferences = await store.loadWorkbenchSettings();
 
     expect(preferences.themeId).toBe('classic');
-    expect(preferences.developerLogLevel).toBe('debug');
+    expect(preferences.developerLogLevel).toBe('warn');
   });
 
   it('serves the local copy when the backend is unreachable and retries next time', async () => {
@@ -221,6 +221,24 @@ describe('normalizeProjectSettings', () => {
     expect(store.normalizeProjectSettings({ showPromptSyntaxHighlighting: false }).showPromptSyntaxHighlighting).toBe(
       false
     );
+  });
+});
+
+describe('normalizeWorkbenchPreferences diagnostics', () => {
+  it('heals invalid diagnostics preferences to defaults', () => {
+    expect(
+      store.normalizeWorkbenchPreferences({
+        developerLogEnabled: true,
+        developerLogLevel: 'shout' as never,
+        developerLogNamespaces: ['system', 'missing'] as never,
+        developerPerformanceTimingsEnabled: true,
+      })
+    ).toMatchObject({
+      developerLogEnabled: true,
+      developerLogLevel: 'warn',
+      developerLogNamespaces: ['system'],
+      developerPerformanceTimingsEnabled: true,
+    });
   });
 });
 

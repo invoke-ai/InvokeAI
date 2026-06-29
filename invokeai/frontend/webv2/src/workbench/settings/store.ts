@@ -72,8 +72,9 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   confirmImageDeletion: true,
   customHotkeys: {},
   developerLogEnabled: true,
-  developerLogLevel: 'debug',
-  developerLogNamespaces: [...DEVELOPER_LOG_NAMESPACES],
+  developerLogLevel: 'warn',
+  developerLogNamespaces: ['system', 'queue', 'workflows'],
+  developerPerformanceTimingsEnabled: false,
   enableInformationalPopovers: true,
   enableModelDescriptions: true,
   language: 'en',
@@ -95,7 +96,7 @@ interface WorkbenchSettingsSnapshot {
 }
 
 const store = createExternalStore<WorkbenchSettingsSnapshot>({
-  preferences: { ...DEFAULT_PREFERENCES, developerLogNamespaces: [...DEFAULT_PREFERENCES.developerLogNamespaces] },
+  preferences: DEFAULT_PREFERENCES,
   scope: 'global',
   status: 'idle',
 });
@@ -189,6 +190,10 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     ? preferences.developerLogLevel
     : DEFAULT_PREFERENCES.developerLogLevel,
   developerLogNamespaces: normalizeDeveloperLogNamespaces(preferences?.developerLogNamespaces),
+  developerPerformanceTimingsEnabled:
+    typeof preferences?.developerPerformanceTimingsEnabled === 'boolean'
+      ? preferences.developerPerformanceTimingsEnabled
+      : DEFAULT_PREFERENCES.developerPerformanceTimingsEnabled,
   enableInformationalPopovers:
     typeof preferences?.enableInformationalPopovers === 'boolean'
       ? preferences.enableInformationalPopovers

@@ -12,10 +12,12 @@ import {
   type ReconcileInput,
 } from './backend/queueCoordinator';
 import { socketHub } from './backend/socketHub';
+import { configureDiagnostics } from './diagnostics/logger';
 import { addImagesToGalleryBoard } from './gallery/api';
 import { getQueueItemResultImages, resumeQueueProcessor } from './generation/api';
 import { sanitizeBatchCount } from './generation/batch';
 import { normalizeGenerateSettings } from './generation/settings';
+import { useWorkbenchPreferenceSelector } from './settings/store';
 import {
   useWorkbenchDispatch,
   useWorkbenchHasHydrated,
@@ -137,7 +139,13 @@ const routeBackendItemResults = async (
     dispatch({ backendItemId, images, projectId, queueItemId: queueItem.id, type: 'routeQueueItemPartialResults' });
     dispatch({ type: 'refreshBackendData' });
   } catch (error) {
-    dispatch({ message: toErrorMessage(error), type: 'recordError' });
+    dispatch({
+      area: 'queue-results',
+      message: toErrorMessage(error),
+      namespace: 'queue',
+      projectId,
+      type: 'recordError',
+    });
   }
 };
 
@@ -226,6 +234,12 @@ export const WorkbenchRuntime = () => {
   const dispatch = useWorkbenchDispatch();
   const hasHydrated = useWorkbenchHasHydrated();
   const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection.status);
+  const diagnosticsPreferences = useWorkbenchPreferenceSelector((preferences) => ({
+    enabled: preferences.developerLogEnabled,
+    level: preferences.developerLogLevel,
+    namespaces: preferences.developerLogNamespaces,
+    performanceTimingsEnabled: preferences.developerPerformanceTimingsEnabled,
+  }));
   const queueRevision = useWorkbenchSelector(selectQueueRevision);
   const coordinatorRef = useRef<QueueCoordinator | null>(null);
   const stateRef = useRef(store.getState());
@@ -241,6 +255,10 @@ export const WorkbenchRuntime = () => {
       }),
     [store]
   );
+
+  useEffect(() => {
+    configureDiagnostics(diagnosticsPreferences);
+  }, [diagnosticsPreferences]);
 
   // Mirror the shared socket's connection status (owned by the hub, above the
   // workbench) into workbench state so the editor's many `backendConnection`
@@ -391,7 +409,12 @@ export const WorkbenchRuntime = () => {
         // Release pending items to the normal submission path; running items
         // cannot be re-attached without backend state, so fail them visibly
         // rather than leaving them stuck as running forever.
-        dispatch({ message: `Queue reconciliation failed: ${toErrorMessage(error)}`, type: 'recordError' });
+        dispatch({
+          area: 'queue-reconciliation',
+          message: `Queue reconciliation failed: ${toErrorMessage(error)}`,
+          namespace: 'queue',
+          type: 'recordError',
+        });
 
         for (const { project, queueItem } of openItems) {
           if (queueItem.status === 'pending') {
@@ -441,7 +464,12 @@ export const WorkbenchRuntime = () => {
           coordinator
             .cancelRun({ backendBatchId: queueItem.backendBatchId, backendItemIds: queueItem.backendItemIds })
             .catch((error: unknown) => {
-              dispatch({ message: toErrorMessage(error), type: 'recordError' });
+              dispatch({
+                area: 'queue-cancel',
+                message: toErrorMessage(error),
+                namespace: 'queue',
+                type: 'recordError',
+              });
             });
         }
       }
