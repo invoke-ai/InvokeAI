@@ -54,6 +54,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 
+import { ClearIntermediatesSetting } from './ClearIntermediatesSetting';
 import { HotkeysSettingsSection } from './HotkeysSettingsSection';
 import {
   closeWorkbenchSettings,
@@ -614,6 +615,7 @@ const QueueSection = () => {
         <option value="active-project">Active project</option>
         <option value="all">All</option>
       </SettingSelect>
+      <ClearIntermediatesSetting />
     </SettingsSection>
   );
 };

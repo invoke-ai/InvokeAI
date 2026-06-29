@@ -192,6 +192,7 @@ type WorkbenchAction =
   | { type: 'touchGalleryImagesRefresh'; projectId?: string }
   | { type: 'removeGalleryImages'; imageNames: string[]; projectId?: string }
   | { type: 'setGalleryProjectBoardId'; boardId: string; projectId?: string }
+  | { type: 'clearCanvasImageReferences' }
   | { type: 'acceptStagedImage' }
   | { type: 'clearCanvasStaging' }
   | { type: 'cancelQueueItem'; queueItemId: string; projectId?: string }
@@ -404,6 +405,15 @@ const clearStagingArea = (stagingArea: CanvasStateContract['stagingArea']): Canv
   pendingImages: [],
   selectedImageIndex: 0,
   sourceQueueItemId: undefined,
+});
+
+const clearCanvasImageReferences = (canvas: CanvasStateContract): CanvasStateContract => ({
+  ...canvas,
+  document: {
+    ...canvas.document,
+    layers: [],
+  },
+  stagingArea: clearStagingArea(canvas.stagingArea),
 });
 
 const clampStagedImageIndex = (imageIndex: number, pendingImageCount: number): number => {
@@ -2319,6 +2329,16 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
           },
         };
       });
+    }
+    case 'clearCanvasImageReferences': {
+      return {
+        ...state,
+        projects: state.projects.map((project) => ({
+          ...project,
+          canvas: clearCanvasImageReferences(project.canvas),
+          undoRedo: { future: [], past: [] },
+        })),
+      };
     }
     case 'acceptStagedImage': {
       const activeProject = state.projects.find((project) => project.id === state.activeProjectId);

@@ -471,6 +471,38 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(project.canvas.stagingArea.isVisible).toBe(false);
   });
 
+  it('clears canvas image references when intermediates are cleared', () => {
+    let state = submitGenerate(primeGenerate());
+    const queueItem = getActiveProject(state).queue.items[0];
+
+    state = workbenchReducer(state, {
+      images: [createImage('candidate-1.png', queueItem.id), createImage('candidate-2.png', queueItem.id)],
+      projectId: getActiveProject(state).id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+    state = workbenchReducer(state, { type: 'acceptStagedImage' });
+    state = workbenchReducer(state, {
+      images: [createImage('candidate-3.png', queueItem.id)],
+      projectId: getActiveProject(state).id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+
+    expect(getActiveProject(state).canvas.document.layers).toHaveLength(1);
+    expect(getActiveProject(state).canvas.stagingArea.pendingImageIds).toEqual(['candidate-3.png']);
+    expect(getActiveProject(state).undoRedo.past).toHaveLength(1);
+
+    state = workbenchReducer(state, { type: 'clearCanvasImageReferences' });
+    const project = getActiveProject(state);
+
+    expect(project.canvas.document.layers).toEqual([]);
+    expect(project.canvas.stagingArea.pendingImages).toEqual([]);
+    expect(project.canvas.stagingArea.pendingImageIds).toEqual([]);
+    expect(project.canvas.stagingArea.isVisible).toBe(false);
+    expect(project.undoRedo).toEqual({ future: [], past: [] });
+  });
+
   it('cycles staged canvas candidates and accepts the selected candidate placement into a raster layer', () => {
     let state = submitGenerate(primeGenerate());
     const queueItem = getActiveProject(state).queue.items[0];
