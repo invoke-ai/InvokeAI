@@ -12,10 +12,10 @@ jobs:
     timeout-minutes: 5 # expected run time: <2 min
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: setup python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: pip
@@ -32,7 +32,7 @@ jobs:
         run: ./scripts/build_wheel.sh
 
       - name: upload python distribution artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dist
           path: ${{ steps.build_wheel.outputs.DIST_PATH }}
