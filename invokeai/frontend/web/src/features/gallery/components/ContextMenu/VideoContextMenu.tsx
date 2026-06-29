@@ -45,7 +45,7 @@ const getVideoDTOFromMap = (target: Node): VideoDTO | undefined => {
 /**
  * Register a context menu for a video DTO on a target element. Mirrors useImageContextMenu.
  */
-export const useVideoContextMenu = (videoDTO: VideoDTO, ref: RefObject<HTMLElement> | (HTMLElement | null)) => {
+export const useVideoContextMenu = (videoDTO: VideoDTO, ref: RefObject<HTMLElement | null> | (HTMLElement | null)) => {
   useEffect(() => {
     if (ref === null) {
       return;
