@@ -182,6 +182,7 @@ class InvokeAIAppConfig(BaseSettings):
 
     # Development
     use_memory_db:                 bool = Field(default=False,              description="Use in-memory database. Useful for development.")
+    db_url:               Optional[str] = Field(default=None,               description="SQLAlchemy URL for an external database backend (e.g. 'mysql+pymysql://user:pass@host/invokeai'). When unset, the local SQLite database (db_dir/invokeai.db) is used.")
     dev_reload:                    bool = Field(default=False,              description="Automatically reload when Python sources are changed. Does not reload node definitions.")
     profile_graphs:                bool = Field(default=False,              description="Enable graph profiling using `cProfile`.")
     profile_prefix:       Optional[str] = Field(default=None,               description="An optional prefix for profile output files.")

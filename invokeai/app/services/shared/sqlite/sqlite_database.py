@@ -4,8 +4,17 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from logging import Logger
 from pathlib import Path
+from typing import TYPE_CHECKING
+from uuid import uuid4
+
+from sqlalchemy import event
+from sqlalchemy.pool import StaticPool
+from sqlmodel import Session, create_engine
 
 from invokeai.app.services.shared.sqlite.sqlite_common import sqlite_memory
+
+if TYPE_CHECKING:
+    from invokeai.app.services.shared.sqlite.db_queries import DbQueries
 
 
 class SqliteDatabase:
@@ -25,14 +34,36 @@ class SqliteDatabase:
     - `conn`: A `sqlite3.Connection` object. Note that the connection must never be closed if the database is in-memory.
     - `lock`: A shared re-entrant lock, used to approximate thread safety.
     - `clean()`: Runs the SQL `VACUUM;` command and reports on the freed space.
+    - `get_session()`: Returns a SQLModel Session for ORM-based queries.
     """
 
-    def __init__(self, db_path: Path | None, logger: Logger, verbose: bool = False) -> None:
-        """Initializes the database. This is used internally by the class constructor."""
+    def __init__(self, db_path: Path | None, logger: Logger, verbose: bool = False, db_url: str | None = None) -> None:
+        """Initializes the database. This is used internally by the class constructor.
+
+        :param db_url: SQLAlchemy URL for a non-SQLite backend (e.g. ``mysql+pymysql://...``).
+            When provided, only the SQLAlchemy engine is created — no raw sqlite3 connection,
+            PRAGMAs or migrations — and the schema is created from ``SQLModel.metadata`` by
+            ``init_db``. When ``None`` (the default), the existing SQLite behaviour is used.
+        """
         self._logger = logger
         self._db_path = db_path
         self._verbose = verbose
+        self._db_url = db_url
+        self._is_sqlite = db_url is None
         self._lock = threading.RLock()
+        self._queries: "DbQueries | None" = None
+        # Raw sqlite3 connection — only used on the SQLite path (migrations, VACUUM,
+        # transaction()). Non-SQLite backends use the SQLAlchemy engine exclusively.
+        self._conn: sqlite3.Connection | None = None
+
+        if db_url is not None:
+            from sqlalchemy.engine import make_url
+
+            self._logger.info(f"Initializing database engine: {make_url(db_url).render_as_string(hide_password=True)}")
+            # pool_pre_ping recycles connections dropped by a networked server; the default
+            # QueuePool (unlike SQLite's StaticPool) gives real concurrency on MySQL/Postgres.
+            self._engine = create_engine(db_url, echo=self._verbose, pool_pre_ping=True)
+            return
 
         if not self._db_path:
             logger.info("Initializing in-memory database")
@@ -55,6 +86,54 @@ class SqliteDatabase:
         # Set a busy timeout to prevent database lockups during writes
         self._conn.execute("PRAGMA busy_timeout = 5000;")  # 5 seconds
 
+        # Set up the SQLAlchemy engine for SQLModel-based queries.
+        # For file-based DBs, both connections point to the same file.
+        # For in-memory DBs, we use a named shared cache so both connections
+        # see the same database.
+        if self._db_path:
+            db_uri = f"sqlite:///{self._db_path}"
+            # StaticPool reuses a single connection — ideal for SQLite which
+            # serializes writes anyway. Avoids the overhead of creating a new
+            # connection for every Session.
+            self._engine = create_engine(
+                db_uri,
+                echo=self._verbose,
+                connect_args={"check_same_thread": False},
+                poolclass=StaticPool,
+            )
+        else:
+            # Use a shared in-memory database via URI with shared cache.
+            # The raw sqlite3 connection above already created ":memory:",
+            # so we re-create it with the shared URI instead.
+            shared_uri = f"file:invokeai_memdb_{uuid4().hex}?mode=memory&cache=shared"
+            self._conn.close()
+            self._conn = sqlite3.connect(shared_uri, uri=True, check_same_thread=False)
+            self._conn.row_factory = sqlite3.Row
+            if self._verbose:
+                self._conn.set_trace_callback(self._logger.debug)
+            self._conn.execute("PRAGMA foreign_keys = ON;")
+
+            self._engine = create_engine(
+                "sqlite+pysqlite://",
+                echo=self._verbose,
+                creator=lambda: sqlite3.connect(shared_uri, uri=True, check_same_thread=False),
+                poolclass=StaticPool,
+            )
+
+        # Apply the same PRAGMAs to all SQLAlchemy connections
+        @event.listens_for(self._engine, "connect")
+        def _set_sqlite_pragmas(dbapi_connection, connection_record):  # type: ignore
+            cursor = dbapi_connection.cursor()
+            # Note: We intentionally skip PRAGMA foreign_keys for the SQLAlchemy engine.
+            # Migration 22 renames the `models` table which corrupts FK references in
+            # `model_relationships`. The raw sqlite3 connection already enforces FKs
+            # for the migration phase. The SQLAlchemy engine is used only for queries
+            # after migrations are complete.
+            if self._db_path:
+                cursor.execute("PRAGMA journal_mode = WAL;")
+                cursor.execute("PRAGMA busy_timeout = 5000;")
+            cursor.close()
+
     def clean(self) -> None:
         """
         Cleans the database by running the VACUUM command, reporting on the freed space.
@@ -75,12 +154,71 @@ class SqliteDatabase:
             self._logger.error(f"Error cleaning database: {e}")
             raise
 
+    @property
+    def queries(self) -> "DbQueries":
+        """The central query catalog — every SQL statement in the app lives on this object.
+
+        Lazily constructed: ``db_queries`` imports the table models and domain DTO modules,
+        which must not be pulled in while this module is being imported.
+        """
+        if self._queries is None:
+            from invokeai.app.services.shared.sqlite.db_queries import DbQueries
+
+            self._queries = DbQueries(self, self._logger)
+        return self._queries
+
+    @contextmanager
+    def get_session(self) -> Generator[Session, None, None]:
+        """
+        Context manager that yields a SQLModel Session for write operations.
+        Commits on success, rolls back on exception.
+
+        Uses expire_on_commit=False so that model attributes remain accessible
+        after commit without triggering lazy-loads or DetachedInstanceError.
+        """
+        with Session(self._engine, expire_on_commit=False) as session:
+            try:
+                yield session
+                session.commit()
+            except Exception:
+                session.rollback()
+                raise
+
+    @contextmanager
+    def get_readonly_session(self) -> Generator[Session, None, None]:
+        """
+        Context manager that yields a lightweight read-only SQLModel Session.
+
+        Optimized for SELECT queries:
+        - autoflush=False: skips the automatic flush before every query
+        - no commit/rollback: avoids transaction overhead for reads
+        - expire_on_commit=False: attributes stay accessible after close
+        """
+        with Session(self._engine, expire_on_commit=False, autoflush=False) as session:
+            yield session
+
+    def create_tables(self) -> None:
+        """Creates all tables from ``SQLModel.metadata`` (used to bootstrap non-SQLite backends).
+
+        On SQLite the schema is owned by the raw-SQL migrations, so this is only used by
+        ``init_db`` for MySQL/MariaDB/Postgres, which have no migration history.
+        """
+        # Imported here to register all table models on SQLModel.metadata and avoid an
+        # import cycle at module load.
+        from invokeai.app.services.shared.sqlite.models import SQLModel
+
+        SQLModel.metadata.create_all(self._engine)
+
     @contextmanager
     def transaction(self) -> Generator[sqlite3.Cursor, None, None]:
         """
         Thread-safe context manager for DB work.
         Acquires the RLock, yields a Cursor, then commits or rolls back.
+
+        SQLite-only: raw cursors are not available on other backends — use get_session().
         """
+        if self._conn is None:
+            raise RuntimeError("transaction() is only available on the SQLite backend; use get_session() instead.")
         with self._lock:
             cursor = self._conn.cursor()
             try:

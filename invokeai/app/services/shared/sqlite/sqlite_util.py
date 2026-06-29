@@ -50,7 +50,16 @@ def init_db(config: InvokeAIAppConfig, logger: Logger, image_files: ImageFileSto
     - Instantiates a :class:`SqliteDatabase`
     - Instantiates a :class:`SqliteMigrator` and registers all migrations
     - Runs all migrations
+
+    When ``config.db_url`` is set (an external MySQL/MariaDB/Postgres backend), the raw-SQL
+    migrations — which are SQLite-specific — are skipped, and the schema is created directly
+    from ``SQLModel.metadata`` instead.
     """
+    if config.db_url:
+        db = SqliteDatabase(db_path=None, logger=logger, verbose=config.log_sql, db_url=config.db_url)
+        db.create_tables()
+        return db
+
     db_path = None if config.use_memory_db else config.db_path
     db = SqliteDatabase(db_path=db_path, logger=logger, verbose=config.log_sql)
 
