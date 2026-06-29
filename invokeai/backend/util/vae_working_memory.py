@@ -110,17 +110,25 @@ def estimate_vae_working_memory_qwen_image(
     element_size = next(vae.parameters()).element_size()
 
     # The Qwen Image VAE is much heavier than the SD/SDXL VAE and needs a correspondingly larger
-    # constant. The decode constant was calibrated against a measured decode on an AMD W7900: at
-    # 1248x832 the decode grew CUDA reserved memory by ~10.06 GiB (implied constant ~5082); we round
-    # up to 5500 for headroom. The constant deliberately tracks peak *reserved* (not just allocated)
-    # memory so that whenever the cache declines to free room (i.e. free >= estimate) the decode is
-    # still guaranteed to fit.
+    # constant. Both constants were calibrated by measuring peak *reserved* memory growth (not just
+    # allocated -- reserved is what the cache's `free >= estimate` check compares against) across a
+    # resolution grid in fp16 on an AMD W7900. See scripts/calibrate_qwen_vae_working_memory.py.
     #
-    # The encode constant has NOT been independently measured. It is set to half the decode constant,
-    # matching the ~45-50% encode/decode ratio the sibling estimators in this module use. This should
-    # be recalibrated against a measured encode (the path Qwen Image Edit actually exercises) so an
-    # under-estimate cannot let the cache skip eviction and OOM.
-    scaling_constant = 5500 if operation == "decode" else 2750
+    # Implied constant = reserved_bytes / (h * w * element_size). Per-point maxima (fp16, W7900):
+    #            512^2   768^2   1024^2  1536^2  1792^2  2048^2     -> ship (max observed + headroom)
+    #   decode    5132    4596    4570    3273    3735    4813      -> 5500
+    #   encode    5864    5858    5858    3532    4364    (OOM)     -> 6300
+    #
+    # Two findings from that grid:
+    #  - Encoding is NOT "half of decoding" as the sibling estimators assume; at matched resolution
+    #    encode reserves >= decode. The constant is sized so Qwen Image Edit (which encodes a real
+    #    input image) cannot under-estimate and let the cache skip eviction.
+    #  - Memory becomes super-linear in area above ~1792^2 (an attention term), so a single linear
+    #    constant under-estimates for very large decodes on big-VRAM cards; such resolutions OOM on a
+    #    48GB card regardless. The implied constant is also non-monotonic (likely an SDPA-backend
+    #    crossover on ROCm), so these numbers are the conservative side -- a CUDA re-run may raise them
+    #    and we ship the per-backend max.
+    scaling_constant = 5500 if operation == "decode" else 6300
 
     working_memory = h * w * element_size * scaling_constant
 
