@@ -15,6 +15,7 @@ import type {
 import type { WidgetPlacementProject } from '@workbench/widgetPlacementCommands';
 import type { WorkbenchAction } from '@workbench/workbenchState';
 
+import { createProjectLogger } from '@workbench/diagnostics/logger';
 import {
   commandApi as sharedCommandApi,
   commandPaletteApi,
@@ -110,9 +111,13 @@ export const createWidgetRuntime = ({
   const menus = {
     register: (menu) => menuApi.register({ ...menu, source }),
   } satisfies WidgetRuntimeApi['menus'];
+  const diagnostics = {
+    logger: (namespace) => createProjectLogger(namespace, { ...source, kind: 'widget' }),
+  } satisfies WidgetRuntimeApi['diagnostics'];
 
   return {
     commands,
+    diagnostics,
     hotkeys,
     instanceId: instance.id,
     menus,

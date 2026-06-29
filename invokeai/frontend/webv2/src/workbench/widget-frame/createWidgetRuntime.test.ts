@@ -8,7 +8,8 @@ import type {
 } from '@workbench/types';
 import type { WorkbenchAction } from '@workbench/workbenchState';
 
-import { describe, expect, it, vi } from 'vitest';
+import { clearProjectDiagnostics, configureDiagnostics, getProjectDiagnostics } from '@workbench/diagnostics/logger';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { cloneWidgetRuntimeState, createWidgetRuntime, getProjectWidgetRuntimeState } from './createWidgetRuntime';
 
@@ -82,6 +83,16 @@ const createPlacementProject = (
 });
 
 describe('createWidgetRuntime', () => {
+  beforeEach(() => {
+    clearProjectDiagnostics('project-1');
+    configureDiagnostics({
+      enabled: true,
+      level: 'trace',
+      namespaces: ['workflows'],
+      performanceTimingsEnabled: false,
+    });
+  });
+
   it('deep clones runtime state snapshots', () => {
     const values = { nested: { mutable: 'before' }, tags: ['before'] };
     const snapshot = cloneWidgetRuntimeState(values);
@@ -116,6 +127,36 @@ describe('createWidgetRuntime', () => {
     expect(state.getSnapshot()).toEqual({ current: true });
     expect(state.patch).toHaveBeenCalledWith({ next: true });
     expect(state.set).toHaveBeenCalledWith({ replaced: true });
+  });
+
+  it('binds diagnostics to the current widget source', () => {
+    const { dispatch } = createDispatch();
+    const runtime = createWidgetRuntime({
+      dispatch,
+      getWidgetById: () => undefined,
+      getWidgetsForRegion: createRegistry({}),
+      instance: createInstance('workflow:center', 'workflow'),
+      project: createPlacementProject(),
+      region: 'center',
+      state: createStateApi(),
+    });
+
+    runtime.diagnostics.logger('workflows').info('Widget rendered');
+
+    expect(getProjectDiagnostics('project-1')).toMatchObject([
+      {
+        level: 'info',
+        message: 'Widget rendered',
+        namespace: 'workflows',
+        source: {
+          instanceId: 'workflow:center',
+          kind: 'widget',
+          projectId: 'project-1',
+          region: 'center',
+          typeId: 'workflow',
+        },
+      },
+    ]);
   });
 
   it('opens widgets through canonical validation and seeded initial values', () => {

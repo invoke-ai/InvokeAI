@@ -165,6 +165,7 @@ export interface WidgetRuntimeApi<State extends Record<string, unknown> = Record
   typeId: WidgetTypeId;
   region: WorkbenchRegion;
   state: WidgetRuntimeStateApi<State>;
+  diagnostics: WidgetDiagnosticsApi;
   commands: WidgetCommandApi;
   hotkeys: WidgetHotkeyApi;
   menus: WidgetMenuApi;
@@ -172,6 +173,17 @@ export interface WidgetRuntimeApi<State extends Record<string, unknown> = Record
   search: WidgetSearchApi;
   toolbars: WidgetToolbarApi;
   workbench: WidgetWorkbenchApi;
+}
+
+export interface WidgetDiagnosticsApi {
+  logger: (namespace: DeveloperLogNamespace) => {
+    debug: (messageOrContext: string | Record<string, unknown>, message?: string) => void;
+    error: (messageOrContext: string | Record<string, unknown>, message?: string) => void;
+    fatal: (messageOrContext: string | Record<string, unknown>, message?: string) => void;
+    info: (messageOrContext: string | Record<string, unknown>, message?: string) => void;
+    trace: (messageOrContext: string | Record<string, unknown>, message?: string) => void;
+    warn: (messageOrContext: string | Record<string, unknown>, message?: string) => void;
+  };
 }
 
 export interface WidgetRuntimeStateApi<State extends Record<string, unknown> = Record<string, unknown>> {
@@ -514,7 +526,6 @@ export interface WorkbenchState {
   projects: Project[];
   activeProjectId: string;
   backendConnection: BackendConnectionState;
-  errorLog: string[];
   notifications: WorkbenchNotification[];
   autosave: AutosaveState;
   account: AccountState;
@@ -705,6 +716,7 @@ export interface WorkbenchPreferences {
   developerLogEnabled: boolean;
   developerLogLevel: DeveloperLogLevel;
   developerLogNamespaces: DeveloperLogNamespace[];
+  developerPerformanceTimingsEnabled: boolean;
   /** Always snap workflow nodes to the grid (Ctrl snaps temporarily when off). */
   workflowSnapToGrid: boolean;
   /** Show the minimap in the workflow editor. */
