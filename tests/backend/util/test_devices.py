@@ -115,6 +115,35 @@ def test_get_generation_devices_empty(value):
     assert TorchDevice.get_generation_devices(value) == []
 
 
+def test_generation_devices_summary_suffix_tied_to_full_device_set():
+    """A device's `#N` suffix stays tied to its cuda index even when other devices are disabled.
+
+    Regression test: with 4 identically-named GPUs, disabling cuda:1 must leave cuda:2/cuda:3 as
+    #3/#4 (not renumber them to #2/#3), so the backend log matches the frontend's labeling.
+    """
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=True),
+        patch("invokeai.backend.util.devices.torch.cuda.device_count", return_value=4),
+        patch("invokeai.backend.util.devices.torch.cuda.get_device_name", return_value="NVIDIA GeForce RTX 4090"),
+    ):
+        summary = TorchDevice.get_generation_devices_summary(["cuda:0", "cuda:2", "cuda:3"])
+        assert summary == (
+            "[NVIDIA GeForce RTX 4090 #1 (cuda:0), "
+            "NVIDIA GeForce RTX 4090 #3 (cuda:2), "
+            "NVIDIA GeForce RTX 4090 #4 (cuda:3)]"
+        )
+
+
+def test_generation_devices_summary_single_device_has_no_suffix():
+    """A single resolved device is summarized by bare name, with no bracket or `#N` suffix."""
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=True),
+        patch("invokeai.backend.util.devices.torch.cuda.device_count", return_value=4),
+        patch("invokeai.backend.util.devices.torch.cuda.get_device_name", return_value="NVIDIA GeForce RTX 4090"),
+    ):
+        assert TorchDevice.get_generation_devices_summary(["cuda:2"]) == "NVIDIA GeForce RTX 4090"
+
+
 @pytest.mark.parametrize("device_dtype_pair", device_types_cpu)
 def test_device_dtype_cpu(device_dtype_pair):
     with (

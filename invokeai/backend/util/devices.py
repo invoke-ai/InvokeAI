@@ -151,6 +151,12 @@ class TorchDevice:
         e.g. ``'[AMD Radeon PRO W7900 #1 (cuda:0), AMD Radeon PRO W7900 #2 (cuda:1)]'``. Identically
         named GPUs get a 1-based ``#N`` suffix so they can be told apart; a uniquely named device gets
         no suffix.
+
+        The ``#N`` suffix is tied to each device's position in the full set of available devices, not
+        to its position in the (possibly filtered) `generation_devices` list. This keeps a device's
+        label stable when other devices are disabled — e.g. disabling ``cuda:1`` leaves ``cuda:2`` as
+        ``#3`` rather than renumbering it to ``#2`` — and keeps the backend log consistent with the
+        frontend, which labels devices over the full available set.
         """
         devices = cls.get_generation_devices(generation_devices)
         if not devices:
@@ -158,18 +164,30 @@ class TorchDevice:
             # single globally-configured device.
             devices = [cls.choose_torch_device()]
 
-        names = [cls.get_device_name(device) for device in devices]
         if len(devices) == 1:
-            return names[0]
+            return cls.get_device_name(devices[0])
 
+        labels = cls._get_device_labels()
+        parts = [f"{labels.get(str(device)) or cls.get_device_name(device)} ({device})" for device in devices]
+        return "[" + ", ".join(parts) + "]"
+
+    @classmethod
+    def _get_device_labels(cls) -> dict[str, str]:
+        """Map each available device id (e.g. ``'cuda:0'``) to its disambiguated human-readable name.
+
+        Identically-named devices get a stable 1-based ``#N`` suffix tied to their order in the full
+        available-device enumeration, so the suffix does not shift when devices are filtered out of
+        `generation_devices`. Mirrors the frontend's device labeling.
+        """
+        all_devices = cls.get_generation_devices("auto")
+        names = [cls.get_device_name(device) for device in all_devices]
         name_counts = Counter(names)
         ordinals: dict[str, int] = defaultdict(int)
-        parts: list[str] = []
-        for device, name in zip(devices, names, strict=True):
+        labels: dict[str, str] = {}
+        for device, name in zip(all_devices, names, strict=True):
             ordinals[name] += 1
-            label = f"{name} #{ordinals[name]}" if name_counts[name] > 1 else name
-            parts.append(f"{label} ({device})")
-        return "[" + ", ".join(parts) + "]"
+            labels[str(device)] = f"{name} #{ordinals[name]}" if name_counts[name] > 1 else name
+        return labels
 
     @classmethod
     def get_generation_devices(cls, generation_devices: Union[str, list[str], None]) -> list[torch.device]:
