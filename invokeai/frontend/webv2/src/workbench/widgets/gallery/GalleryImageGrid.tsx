@@ -32,7 +32,9 @@ import { getGalleryImageDragData, getGalleryImageDragId } from './galleryDnd';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 const GRID_GAP_PX = 4;
-const THUMBNAIL_HOVER_CSS = { '&:hover .gallery-thumb-overlay': { opacity: 1 } } as const;
+const THUMBNAIL_HOVER_CSS = {
+  '&:hover .gallery-thumb-overlay': { opacity: 1 },
+} as const;
 const THUMBNAIL_BUTTON_STYLE = {
   background: 'transparent',
   border: 0,
@@ -99,7 +101,11 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
   }, [gallery.images, imageOrderDir, starredFirst]);
 
   const cells = useMemo<GridCell[]>(() => {
-    const imageCells: GridCell[] = gallery.images.map((image, imageIndex) => ({ image, imageIndex, kind: 'image' }));
+    const imageCells: GridCell[] = gallery.images.map((image, imageIndex) => ({
+      image,
+      imageIndex,
+      kind: 'image',
+    }));
     const placeholderCells: GridCell[] = gallery.pendingPlaceholders.map((placeholder) => ({
       kind: 'placeholder',
       placeholder,
@@ -239,7 +245,10 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
       if (selectedNames.has(image.imageName) && selectedNames.size > 1) {
         return gallery.images
           .filter((candidate) => selectedNames.has(candidate.imageName))
-          .map((candidate) => ({ boardId: candidate.boardId, imageName: candidate.imageName }));
+          .map((candidate) => ({
+            boardId: candidate.boardId,
+            imageName: candidate.imageName,
+          }));
       }
 
       return [{ boardId: image.boardId, imageName: image.imageName }];
@@ -340,7 +349,11 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
     if (commandId === 'gallery.clearSelection') {
       dispatch({
         type: 'patchWidgetValues',
-        values: { selectedImage: null, selectedImageName: null, selectedImageNames: [] },
+        values: {
+          selectedImage: null,
+          selectedImageName: null,
+          selectedImageNames: [],
+        },
         widgetId: 'gallery',
       });
       return;
@@ -388,7 +401,12 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
         id,
         title,
       }),
-      runtime.hotkeys.register({ commandId: id, defaultKeys: [...defaultKeys], id, title }),
+      runtime.hotkeys.register({
+        commandId: id,
+        defaultKeys: [...defaultKeys],
+        id,
+        title,
+      }),
     ]);
 
     return () => {
@@ -546,6 +564,8 @@ const GalleryQueuePlaceholderCell = ({
       cursor="pointer"
       minW="0"
       rounded="md"
+      overflow="hidden"
+      position="relative"
       w="full"
       onClick={onClick}
     >
