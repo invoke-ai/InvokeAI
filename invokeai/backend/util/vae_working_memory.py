@@ -110,11 +110,16 @@ def estimate_vae_working_memory_qwen_image(
     element_size = next(vae.parameters()).element_size()
 
     # The Qwen Image VAE is much heavier than the SD/SDXL VAE and needs a correspondingly larger
-    # constant. This was calibrated against a measured decode on an AMD W7900: at 1248x832 the decode
-    # grew CUDA reserved memory by ~10.06 GiB (implied constant ~5082); we round up to 5500 for
-    # headroom. The constant deliberately tracks peak *reserved* (not just allocated) memory so that
-    # whenever the cache declines to free room (i.e. free >= estimate) the decode is still guaranteed
-    # to fit. Encoding uses ~half the working memory of decoding, matching the other estimators here.
+    # constant. The decode constant was calibrated against a measured decode on an AMD W7900: at
+    # 1248x832 the decode grew CUDA reserved memory by ~10.06 GiB (implied constant ~5082); we round
+    # up to 5500 for headroom. The constant deliberately tracks peak *reserved* (not just allocated)
+    # memory so that whenever the cache declines to free room (i.e. free >= estimate) the decode is
+    # still guaranteed to fit.
+    #
+    # The encode constant has NOT been independently measured. It is set to half the decode constant,
+    # matching the ~45-50% encode/decode ratio the sibling estimators in this module use. This should
+    # be recalibrated against a measured encode (the path Qwen Image Edit actually exercises) so an
+    # under-estimate cannot let the cache skip eviction and OOM.
     scaling_constant = 5500 if operation == "decode" else 2750
 
     working_memory = h * w * element_size * scaling_constant
