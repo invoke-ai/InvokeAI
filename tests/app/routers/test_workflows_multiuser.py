@@ -66,11 +66,11 @@ def mock_services() -> InvocationServices:
         ClientStatePersistenceSqlite,
     )
     from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
-    from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
     from invokeai.app.services.images.images_default import ImageService
     from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
     from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
     from invokeai.app.services.users.users_default import UserService
+    from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
     from tests.test_nodes import TestEventService
 
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
