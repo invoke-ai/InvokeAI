@@ -14,6 +14,7 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_manager.configs.base import Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase
+from invokeai.backend.model_manager.load.memory_snapshot import GB, MemorySnapshot
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.model_cache import (
     MODEL_LOAD_LOCK,
@@ -168,9 +169,26 @@ class ModelLoader(ModelLoaderBase):
 
             shell_to_register: Optional[torch.nn.Module] = None
             if loaded_model is None:
+                # Optional RAM instrumentation for the cold disk-load path (the only place that runs
+                # `from_pretrained`, whose construction transient can briefly spike RAM past the
+                # cache's retained budget). Gated on `log_memory_usage`; captures process RAM before
+                # make_room, after make_room (retained baseline), and after construction (transient
+                # peak) so the surge can be attributed without guessing.
+                log_mem = self._app_config.log_memory_usage
+                ram_before = MemorySnapshot.capture().process_ram if log_mem else 0
                 self._ram_cache.make_room(self.get_size_fs(config, Path(config.path), submodel_type))
+                ram_after_room = MemorySnapshot.capture().process_ram if log_mem else 0
                 with skip_torch_weight_init():
                     loaded_model = self._load_model(config, submodel_type)
+                if log_mem:
+                    ram_peak = MemorySnapshot.capture().process_ram
+                    self._logger.info(
+                        f"Cold load RAM for '{cache_key}': "
+                        f"make_room {ram_before / GB:.2f}->{ram_after_room / GB:.2f}GB "
+                        f"({(ram_after_room - ram_before) / GB:+.2f}), "
+                        f"construct {ram_after_room / GB:.2f}->{ram_peak / GB:.2f}GB "
+                        f"({(ram_peak - ram_after_room) / GB:+.2f}) [transient peak]"
+                    )
                 # Snapshot a meta-weight clone now — before put() applies custom layers or any VRAM
                 # move — so the next device to load this model can adopt these weights (see above).
                 # Skipped in single-device setups, where no other cache will ever adopt it.
@@ -414,6 +432,21 @@ class ModelLoader(ModelLoaderBase):
         """
         if not isinstance(model, torch.nn.Module):
             return None
+
+        def _meta_like(t: torch.Tensor) -> torch.Tensor:
+            # A 0-byte stand-in with the same logical shape/dtype as `t`; replaced by the canonical
+            # tensor on adoption (load_state_dict(assign=True)), so only its shape needs to match.
+            # `torch.empty_like` is preferred (preserves layout etc.) but is NOT implemented by some
+            # tensor subclasses — notably the GGUF `GGMLTensor`, whose `__torch_dispatch__` returns
+            # NotImplemented for `aten.empty_like`. That made `_build_meta_shell` throw on the first
+            # parameter of every GGUF model (e.g. a Q8_0 quantized transformer), silently disabling
+            # cross-device adoption for exactly the largest models. For those, fall back to a plain
+            # meta tensor built from the subclass's reported (dequantized) shape and dtype.
+            try:
+                return torch.empty_like(t, device="meta")
+            except TypeError:
+                return torch.empty(t.shape, dtype=t.dtype, device="meta")
+
         try:
             # Persistent buffers come from the canonical state dict on adoption, so they (like params)
             # are replaced by meta placeholders. Non-persistent buffers are NOT in the state dict, so
@@ -424,15 +457,21 @@ class ModelLoader(ModelLoaderBase):
 
             memo: dict[int, object] = {}
             for param in model.parameters(recurse=True):
-                memo[id(param)] = torch.nn.Parameter(
-                    torch.empty_like(param, device="meta"), requires_grad=param.requires_grad
-                )
+                memo[id(param)] = torch.nn.Parameter(_meta_like(param), requires_grad=param.requires_grad)
             for buffer in model.buffers(recurse=True):
                 if id(buffer) in persistent_buffer_ids:
-                    memo[id(buffer)] = torch.empty_like(buffer, device="meta")
+                    memo[id(buffer)] = _meta_like(buffer)
 
             return copy.deepcopy(model, memo)
-        except Exception:
+        except Exception as e:
+            # Best-effort: an un-clonable model simply isn't adoptable (the next device loads it from
+            # disk). Log at debug so a newly-unadoptable model family can be diagnosed rather than
+            # silently double-loading on every device.
+            from invokeai.backend.util.logging import InvokeAILogger
+
+            InvokeAILogger.get_logger().debug(
+                f"Could not build meta-weight shell for {type(model).__name__} ({e!r}); model won't be adopted."
+            )
             return None
 
     # This needs to be implemented in the subclass

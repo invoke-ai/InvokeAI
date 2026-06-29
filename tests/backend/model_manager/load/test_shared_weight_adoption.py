@@ -53,6 +53,54 @@ def test_meta_shell_has_no_real_weight_storage():
     assert torch.equal(shell.scale, model.scale)
 
 
+def test_adopts_gguf_quantized_weights_and_shares_storage():
+    """Regression: GGUF models (GGMLTensor params) must be adoptable.
+
+    `GGMLTensor.__torch_dispatch__` returns NotImplemented for `aten.empty_like`, so the original
+    `_build_meta_shell` threw on the first parameter and silently returned None -> no shell -> the
+    second GPU re-loaded the (largest) quantized model from disk on every run, spiking RAM. The
+    meta-shell builder must fall back to a plain meta placeholder, and adoption must share the
+    quantized storage (the whole point of dedup).
+    """
+    import math
+
+    import gguf
+
+    from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+
+    def _make_q8(logical_shape: tuple[int, int]) -> GGMLTensor:
+        n = math.prod(logical_shape)
+        nbytes = (n // 32) * 34  # Q8_0: 34 bytes per 32-element block
+        return GGMLTensor(
+            torch.zeros(nbytes, dtype=torch.uint8),
+            gguf.GGMLQuantizationType.Q8_0,
+            torch.Size(logical_shape),
+            torch.bfloat16,
+        )
+
+    model = _TinyModel()
+    # Swap the real weight for a GGMLTensor, mirroring the gguf loader's load_state_dict(assign=True).
+    model.lin.weight = torch.nn.Parameter(_make_q8((4, 4)), requires_grad=False)
+    orig_storage = model.lin.weight.quantized_data.untyped_storage().data_ptr()
+
+    # The shell must build despite GGMLTensor not supporting empty_like.
+    shell = ModelLoader._build_meta_shell(model)
+    assert shell is not None
+    assert shell.lin.weight.is_meta
+
+    store = SharedCpuWeightsStore()
+    store.acquire("g", model.state_dict())
+    store.set_shell("g", shell)
+
+    adopted = _loader_with_store(store)._try_adopt_shared_weights("g")
+
+    assert adopted is not None
+    assert not any(t.is_meta for t in adopted.parameters())
+    # The adopted GGMLTensor must share the quantized blob's storage -> one RAM copy across devices.
+    assert isinstance(adopted.lin.weight, GGMLTensor)
+    assert adopted.lin.weight.quantized_data.untyped_storage().data_ptr() == orig_storage
+
+
 def test_build_meta_shell_returns_none_for_non_module():
     assert ModelLoader._build_meta_shell({"not": "a module"}) is None  # type: ignore[arg-type]
 
