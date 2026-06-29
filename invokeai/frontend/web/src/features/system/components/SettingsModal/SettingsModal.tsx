@@ -28,6 +28,7 @@ import { useRefreshAfterResetModal } from 'features/system/components/SettingsMo
 import { SettingsDeveloperLogIsEnabled } from 'features/system/components/SettingsModal/SettingsDeveloperLogIsEnabled';
 import { SettingsDeveloperLogLevel } from 'features/system/components/SettingsModal/SettingsDeveloperLogLevel';
 import { SettingsDeveloperLogNamespaces } from 'features/system/components/SettingsModal/SettingsDeveloperLogNamespaces';
+import { SettingsImageSubfolderStrategySelect } from 'features/system/components/SettingsModal/SettingsImageSubfolderStrategySelect';
 import { useClearIntermediates } from 'features/system/components/SettingsModal/useClearIntermediates';
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
 import {
@@ -73,7 +74,7 @@ const formatOptionalInteger = (value: number | null | undefined) => {
   return String(value);
 };
 
-const SettingsModal = (props: { children: ReactElement }) => {
+const SettingsModal = (props: { children: ReactElement<{ onClick?: () => void }> }) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -107,7 +108,14 @@ const SettingsModal = (props: { children: ReactElement }) => {
   const shouldShowInvocationProgressDetail = useAppSelector(selectSystemShouldShowInvocationProgressDetail);
   const maxQueueHistory = runtimeConfig?.config.max_queue_history ?? null;
   const canEditRuntimeConfig = runtimeConfig ? !runtimeConfig.config.multiuser || currentUser?.is_admin : false;
-  const [maxQueueHistoryInput, setMaxQueueHistoryInput] = useState(formatOptionalInteger(maxQueueHistory));
+  const [maxQueueHistoryInputState, setMaxQueueHistoryInputState] = useState(() => ({
+    source: maxQueueHistory,
+    value: formatOptionalInteger(maxQueueHistory),
+  }));
+  const maxQueueHistoryInput =
+    maxQueueHistoryInputState.source === maxQueueHistory
+      ? maxQueueHistoryInputState.value
+      : formatOptionalInteger(maxQueueHistory);
 
   const onToggleConfirmOnNewSession = useCallback(() => {
     dispatch(shouldConfirmOnNewSessionToggled());
@@ -120,10 +128,6 @@ const SettingsModal = (props: { children: ReactElement }) => {
     }
   }, [refetchIntermediatesCount, settingsModal.isTrue]);
 
-  useEffect(() => {
-    setMaxQueueHistoryInput(formatOptionalInteger(maxQueueHistory));
-  }, [maxQueueHistory]);
-
   const commitMaxQueueHistory = useCallback(async () => {
     if (!runtimeConfig || !canEditRuntimeConfig) {
       return;
@@ -133,7 +137,7 @@ const SettingsModal = (props: { children: ReactElement }) => {
     const parsedValue = trimmedValue === '' ? null : Number.parseInt(trimmedValue, 10);
 
     if (parsedValue !== null && Number.isNaN(parsedValue)) {
-      setMaxQueueHistoryInput(formatOptionalInteger(maxQueueHistory));
+      setMaxQueueHistoryInputState({ source: maxQueueHistory, value: formatOptionalInteger(maxQueueHistory) });
       return;
     }
 
@@ -142,17 +146,17 @@ const SettingsModal = (props: { children: ReactElement }) => {
       pendingMaxQueueHistoryRef.current === undefined ? maxQueueHistory : pendingMaxQueueHistoryRef.current;
 
     if (normalizedValue === currentValue) {
-      setMaxQueueHistoryInput(formatOptionalInteger(currentValue));
+      setMaxQueueHistoryInputState({ source: currentValue, value: formatOptionalInteger(currentValue) });
       return;
     }
 
     pendingMaxQueueHistoryRef.current = normalizedValue;
-    setMaxQueueHistoryInput(formatOptionalInteger(normalizedValue));
+    setMaxQueueHistoryInputState({ source: normalizedValue, value: formatOptionalInteger(normalizedValue) });
 
     try {
       await updateRuntimeConfig({ max_queue_history: normalizedValue }).unwrap();
     } catch {
-      setMaxQueueHistoryInput(formatOptionalInteger(maxQueueHistory));
+      setMaxQueueHistoryInputState({ source: maxQueueHistory, value: formatOptionalInteger(maxQueueHistory) });
       toast({
         id: 'SETTINGS_MAX_QUEUE_HISTORY_SAVE_FAILED',
         title: t('settings.maxQueueHistorySaveFailed'),
@@ -252,9 +256,12 @@ const SettingsModal = (props: { children: ReactElement }) => {
     [dispatch]
   );
 
-  const handleChangeMaxQueueHistory = useCallback((valueAsString: string) => {
-    setMaxQueueHistoryInput(valueAsString);
-  }, []);
+  const handleChangeMaxQueueHistory = useCallback(
+    (valueAsString: string) => {
+      setMaxQueueHistoryInputState({ source: maxQueueHistory, value: valueAsString });
+    },
+    [maxQueueHistory]
+  );
 
   const handleBlurMaxQueueHistory = useCallback(() => {
     void commitMaxQueueHistory();
@@ -319,6 +326,7 @@ const SettingsModal = (props: { children: ReactElement }) => {
                         <NumberInputField onKeyDown={handleKeyDownMaxQueueHistory} />
                       </NumberInput>
                     </FormControl>
+                    <SettingsImageSubfolderStrategySelect />
                   </StickyScrollable>
 
                   <StickyScrollable title={t('settings.models')}>

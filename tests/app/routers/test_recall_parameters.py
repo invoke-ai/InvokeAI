@@ -9,12 +9,15 @@ request-validation, resolver sequencing, and broadcast payload shape.
 
 from collections.abc import Callable
 from typing import Any, Optional
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers import recall_parameters as recall_module
+from invokeai.app.api.routers.recall_parameters import load_image_file
 from invokeai.app.api_app import app
 from invokeai.app.services.invoker import Invoker
 from invokeai.backend.model_manager.taxonomy import ModelType
@@ -691,3 +694,128 @@ class TestStrictMode:
         assert "loras" not in params
         assert "reference_images" not in params
         assert "seed" not in params
+
+
+class TestAppendMode:
+    """Tests for the ``append`` query parameter.
+
+    ``append=true`` asks the frontend to add the recalled reference images to
+    its existing list instead of replacing it.  The flag travels inside the
+    event's ``parameters`` dict (so the generated client schema needs no
+    change) and must never be persisted as a recall parameter.
+    """
+
+    def test_append_flag_rides_in_parameters(
+        self, monkeypatch: Any, patched_dependencies: MockApiDependencies, client: TestClient
+    ) -> None:
+        monkeypatch.setattr(recall_module, "load_image_file", make_load_image_file_stub({"cat.png": (1024, 768)}))
+
+        response = client.post(
+            "/api/v1/recall/default?append=true",
+            json={"reference_images": [{"image_name": "cat.png"}]},
+        )
+        assert response.status_code == 200
+        params = response.json()["parameters"]
+        assert params["append"] is True
+        assert params["reference_images"][0]["image"]["image_name"] == "cat.png"
+
+    def test_append_flag_absent_by_default(
+        self, monkeypatch: Any, patched_dependencies: MockApiDependencies, client: TestClient
+    ) -> None:
+        monkeypatch.setattr(recall_module, "load_image_file", make_load_image_file_stub({"cat.png": (1024, 768)}))
+
+        response = client.post(
+            "/api/v1/recall/default",
+            json={"reference_images": [{"image_name": "cat.png"}]},
+        )
+        assert response.status_code == 200
+        assert "append" not in response.json()["parameters"]
+
+    def test_append_flag_not_persisted(
+        self, monkeypatch: Any, patched_dependencies: MockApiDependencies, mock_invoker: Invoker, client: TestClient
+    ) -> None:
+        """The flag is injected after the persistence loop — only real recall
+        parameters may be written to client state."""
+        monkeypatch.setattr(recall_module, "load_image_file", make_load_image_file_stub({"cat.png": (1024, 768)}))
+        persisted_keys: list[str] = []
+        monkeypatch.setattr(
+            mock_invoker.services.client_state_persistence,
+            "set_by_key",
+            lambda user_id, key, value: persisted_keys.append(key) or value,
+        )
+
+        response = client.post(
+            "/api/v1/recall/default?append=true",
+            json={"reference_images": [{"image_name": "cat.png"}]},
+        )
+        assert response.status_code == 200
+        assert persisted_keys == ["recall_reference_images"]
+
+    def test_append_and_strict_are_mutually_exclusive(
+        self, monkeypatch: Any, patched_dependencies: MockApiDependencies, client: TestClient
+    ) -> None:
+        response = client.post(
+            "/api/v1/recall/default?strict=true&append=true",
+            json={"reference_images": [{"image_name": "cat.png"}]},
+        )
+        assert response.status_code == 400
+        assert "mutually exclusive" in response.json()["detail"]
+
+
+@pytest.fixture
+def mock_api_deps():
+    """Patch ApiDependencies.invoker with a mock that simulates subfolder-aware image service."""
+    with patch("invokeai.app.api.routers.recall_parameters.ApiDependencies") as mock_deps:
+        invoker = MagicMock()
+        mock_deps.invoker = invoker
+
+        images_service = invoker.services.images
+        images_service.get_path.return_value = "/outputs/images/2026/04/05/test.png"
+        images_service.validate_path.return_value = True
+
+        pil_image = Image.new("RGB", (512, 768))
+        images_service.get_pil_image.return_value = pil_image
+
+        yield invoker
+
+
+class TestLoadImageFile:
+    """Unit tests for ``load_image_file`` — verifies it goes through the
+    subfolder-aware images service rather than the flat image_files service.
+    """
+
+    def test_returns_image_info_for_subfolder_image(self, mock_api_deps: MagicMock):
+        """load_image_file should work for images stored in subfolders."""
+        result = load_image_file("test.png")
+
+        assert result is not None
+        assert result["image_name"] == "test.png"
+        assert result["width"] == 512
+        assert result["height"] == 768
+
+        mock_api_deps.services.images.get_path.assert_called_once_with("test.png")
+        mock_api_deps.services.images.get_pil_image.assert_called_once_with("test.png")
+
+    def test_returns_none_when_file_not_found(self, mock_api_deps: MagicMock):
+        """load_image_file should return None if the resolved path doesn't exist."""
+        mock_api_deps.services.images.validate_path.return_value = False
+
+        result = load_image_file("missing.png")
+
+        assert result is None
+
+    def test_returns_none_on_service_exception(self, mock_api_deps: MagicMock):
+        """load_image_file should return None if the images service raises."""
+        mock_api_deps.services.images.get_path.side_effect = Exception("DB error")
+
+        result = load_image_file("broken.png")
+
+        assert result is None
+
+    def test_uses_images_service_not_image_files(self, mock_api_deps: MagicMock):
+        """Regression: load_image_file must go through images service (subfolder-aware),
+        not image_files (flat-only)."""
+        load_image_file("test.png")
+
+        mock_api_deps.services.image_files.get.assert_not_called()
+        mock_api_deps.services.image_files.get_path.assert_not_called()

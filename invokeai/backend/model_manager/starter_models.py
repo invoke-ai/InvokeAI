@@ -666,6 +666,38 @@ cogview4 = StarterModel(
 )
 # endregion
 
+# region Qwen Image components (shared between Edit and txt2img variants)
+qwen_image_vae = StarterModel(
+    name="Qwen Image VAE",
+    base=BaseModelType.QwenImage,
+    source="Qwen/Qwen-Image-Edit-2511::vae/diffusion_pytorch_model.safetensors",
+    description="Qwen Image VAE (AutoencoderKLQwenImage), shared between the Edit and txt2img variants. "
+    "Use with GGUF transformers to avoid downloading the full ~40GB Diffusers pipeline. (~250MB)",
+    type=ModelType.VAE,
+    format=ModelFormat.Checkpoint,
+)
+
+qwen_vl_encoder_fp8 = StarterModel(
+    name="Qwen2.5-VL Encoder (fp8 scaled)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
+    description="ComfyUI's single-file FP8-scaled Qwen2.5-VL 7B encoder. Bundles the language model and "
+    "visual tower; tokenizer/processor are fetched from HuggingFace on first use. (~7GB)",
+    type=ModelType.QwenVLEncoder,
+    format=ModelFormat.Checkpoint,
+)
+
+qwen_vl_encoder_diffusers = StarterModel(
+    name="Qwen2.5-VL Encoder (Diffusers)",
+    base=BaseModelType.Any,
+    source="Qwen/Qwen-Image-Edit-2511::text_encoder+tokenizer+processor",
+    description="Full-precision Qwen2.5-VL 7B encoder in Diffusers folder layout (text_encoder + tokenizer + processor). "
+    "Larger than the fp8 variant but no on-the-fly dequantization. (~16GB)",
+    type=ModelType.QwenVLEncoder,
+    format=ModelFormat.QwenVLEncoder,
+)
+# endregion
+
 # region Qwen Image Edit
 qwen_image_edit = StarterModel(
     name="Qwen Image Edit 2511",
@@ -684,6 +716,7 @@ qwen_image_edit_gguf_q4_k_m = StarterModel(
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
     variant=QwenImageVariantType.Edit,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_edit_gguf_q2_k = StarterModel(
@@ -694,6 +727,7 @@ qwen_image_edit_gguf_q2_k = StarterModel(
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
     variant=QwenImageVariantType.Edit,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_edit_gguf_q6_k = StarterModel(
@@ -704,6 +738,7 @@ qwen_image_edit_gguf_q6_k = StarterModel(
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
     variant=QwenImageVariantType.Edit,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_edit_gguf_q8_0 = StarterModel(
@@ -714,6 +749,7 @@ qwen_image_edit_gguf_q8_0 = StarterModel(
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
     variant=QwenImageVariantType.Edit,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_edit_lightning_4step = StarterModel(
@@ -750,6 +786,7 @@ qwen_image_gguf_q4_k_m = StarterModel(
     description="Qwen Image 2512 - Q4_K_M quantized transformer. Good quality/size balance. (~13GB)",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_gguf_q2_k = StarterModel(
@@ -759,6 +796,7 @@ qwen_image_gguf_q2_k = StarterModel(
     description="Qwen Image 2512 - Q2_K heavily quantized transformer. Smallest size, lower quality. (~7.5GB)",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_gguf_q6_k = StarterModel(
@@ -768,6 +806,7 @@ qwen_image_gguf_q6_k = StarterModel(
     description="Qwen Image 2512 - Q6_K quantized transformer. Near-lossless quality. (~17GB)",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_gguf_q8_0 = StarterModel(
@@ -777,6 +816,7 @@ qwen_image_gguf_q8_0 = StarterModel(
     description="Qwen Image 2512 - Q8_0 quantized transformer. Highest quality quantization. (~22GB)",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_lightning_4step = StarterModel(
@@ -1295,6 +1335,7 @@ alibabacloud_qwen_image_edit_max = StarterModel(
         supports_negative_prompt=False,
         supports_reference_images=True,
         supports_seed=True,
+        max_reference_images=3,
         max_images_per_request=4,
         allowed_aspect_ratios=QWEN_IMAGE_2_ALLOWED_ASPECT_RATIOS,
         aspect_ratio_sizes={
@@ -1318,6 +1359,23 @@ OPENAI_GPT_IMAGE_PANEL_SCHEMA = ExternalModelPanelSchema(
     prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]
 )
 
+openai_gpt_image_2 = StarterModel(
+    name="GPT Image 2",
+    base=BaseModelType.External,
+    source="external://openai/gpt-image-2",
+    description="OpenAI GPT-Image-2 image generation model. State-of-the-art image generation and editing with flexible sizing and high-fidelity image inputs. Does not support transparent backgrounds or configurable input fidelity. Requires a configured OpenAI API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_images_per_request=10,
+        allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
 openai_gpt_image_1_5 = StarterModel(
     name="GPT Image 1.5",
     base=BaseModelType.External,
@@ -1389,6 +1447,102 @@ openai_dall_e_3 = StarterModel(
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
     panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
 )
+SEEDREAM_ASPECT_RATIOS = ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"]
+SEEDREAM_2K_SIZES = {
+    "1:1": ExternalImageSize(width=2048, height=2048),
+    "3:4": ExternalImageSize(width=1728, height=2304),
+    "4:3": ExternalImageSize(width=2304, height=1728),
+    "16:9": ExternalImageSize(width=2848, height=1600),
+    "9:16": ExternalImageSize(width=1600, height=2848),
+    "3:2": ExternalImageSize(width=2496, height=1664),
+    "2:3": ExternalImageSize(width=1664, height=2496),
+    "21:9": ExternalImageSize(width=3136, height=1344),
+}
+SEEDREAM_1K_SIZES = {
+    "1:1": ExternalImageSize(width=1024, height=1024),
+    "3:4": ExternalImageSize(width=864, height=1152),
+    "4:3": ExternalImageSize(width=1152, height=864),
+    "16:9": ExternalImageSize(width=1312, height=736),
+    "9:16": ExternalImageSize(width=736, height=1312),
+    "2:3": ExternalImageSize(width=832, height=1248),
+    "3:2": ExternalImageSize(width=1248, height=832),
+    "21:9": ExternalImageSize(width=1568, height=672),
+}
+SEEDREAM_PANEL_SCHEMA = ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}])
+seedream_5_0 = StarterModel(
+    name="Seedream 5.0",
+    base=BaseModelType.External,
+    source="external://seedream/seedream-5-0-260128",
+    description="BytePlus Seedream 5.0 flagship image generation model (external API). Supports 2K and 4K resolutions, txt2img and img2img with multi-image reference input.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_reference_images=14,
+        max_images_per_request=15,
+        allowed_aspect_ratios=SEEDREAM_ASPECT_RATIOS,
+        aspect_ratio_sizes=SEEDREAM_2K_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=2048, height=2048, num_images=1),
+    panel_schema=SEEDREAM_PANEL_SCHEMA,
+)
+seedream_5_0_lite = StarterModel(
+    name="Seedream 5.0 Lite",
+    base=BaseModelType.External,
+    source="external://seedream/seedream-5-0-lite-260128",
+    description="BytePlus Seedream 5.0 Lite image generation model (external API). Supports 2K and 4K resolutions, txt2img and img2img with multi-image reference input.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_reference_images=14,
+        max_images_per_request=15,
+        allowed_aspect_ratios=SEEDREAM_ASPECT_RATIOS,
+        aspect_ratio_sizes=SEEDREAM_2K_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=2048, height=2048, num_images=1),
+    panel_schema=SEEDREAM_PANEL_SCHEMA,
+)
+seedream_4_5 = StarterModel(
+    name="Seedream 4.5",
+    base=BaseModelType.External,
+    source="external://seedream/seedream-4-5-251128",
+    description="BytePlus Seedream 4.5 image generation model (external API). Supports 2K and 4K resolutions, txt2img, img2img, batch generation, and multi-image reference input.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_reference_images=14,
+        max_images_per_request=15,
+        allowed_aspect_ratios=SEEDREAM_ASPECT_RATIOS,
+        aspect_ratio_sizes=SEEDREAM_2K_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=2048, height=2048, num_images=1),
+    panel_schema=SEEDREAM_PANEL_SCHEMA,
+)
+seedream_4_0 = StarterModel(
+    name="Seedream 4.0",
+    base=BaseModelType.External,
+    source="external://seedream/seedream-4-0-250828",
+    description="BytePlus Seedream 4.0 image generation model (external API). Supports 1K, 2K, and 4K resolutions, txt2img, img2img, batch generation, and multi-image reference input.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_reference_images=14,
+        max_images_per_request=15,
+        allowed_aspect_ratios=SEEDREAM_ASPECT_RATIOS,
+        aspect_ratio_sizes=SEEDREAM_2K_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=2048, height=2048, num_images=1),
+    panel_schema=SEEDREAM_PANEL_SCHEMA,
+)
+# Seedream 3.0 T2I (seedream-3-0-t2i-250415) removed — deprecated by BytePlus, replaced by seedream-4-0-250828.
+
 # DALL-E 2 removed — deprecated by OpenAI, shutdown May 12, 2026.
 # region Anima
 anima_qwen3_encoder = StarterModel(
@@ -1409,14 +1563,14 @@ anima_vae = StarterModel(
     format=ModelFormat.Checkpoint,
 )
 
-anima_preview3 = StarterModel(
-    name="Anima Preview 3",
+anima_base = StarterModel(
+    name="Anima Base 1.0",
     base=BaseModelType.Anima,
-    source="https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/diffusion_models/anima-preview3-base.safetensors",
-    description="Anima Preview 3 - 2B parameter anime-focused text-to-image model built on Cosmos Predict2 DiT. ~4.5GB",
+    source="https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/diffusion_models/anima-base-v1.0.safetensors",
+    description="Anima Base 1.0 - 2B parameter anime-focused text-to-image model built on Cosmos Predict2 DiT. ~4.5GB",
     type=ModelType.Main,
     format=ModelFormat.Checkpoint,
-    dependencies=[anima_qwen3_encoder, anima_vae, t5_base_encoder],
+    dependencies=[anima_qwen3_encoder, anima_vae],
 )
 # endregion
 
@@ -1510,6 +1664,9 @@ STARTER_MODELS: list[StarterModel] = [
     flux2_klein_qwen3_4b_encoder,
     flux2_klein_qwen3_8b_encoder,
     cogview4,
+    qwen_image_vae,
+    qwen_vl_encoder_fp8,
+    qwen_vl_encoder_diffusers,
     qwen_image_edit,
     qwen_image_edit_gguf_q2_k,
     qwen_image_edit_gguf_q4_k_m,
@@ -1536,16 +1693,21 @@ STARTER_MODELS: list[StarterModel] = [
     gemini_flash_image,
     gemini_pro_image_preview,
     gemini_3_1_flash_image_preview,
+    openai_gpt_image_2,
     openai_gpt_image_1_5,
     openai_gpt_image_1,
     openai_gpt_image_1_mini,
     openai_dall_e_3,
+    seedream_5_0,
+    seedream_5_0_lite,
+    seedream_4_5,
+    seedream_4_0,
     alibabacloud_qwen_image_2_pro,
     alibabacloud_qwen_image_2,
     alibabacloud_qwen_image_max,
     alibabacloud_wan26_t2i,
     alibabacloud_qwen_image_edit_max,
-    anima_preview3,
+    anima_base,
     anima_qwen3_encoder,
     anima_vae,
 ]
@@ -1617,6 +1779,8 @@ flux2_klein_bundle: list[StarterModel] = [
 ]
 
 qwen_image_bundle: list[StarterModel] = [
+    qwen_image_vae,
+    qwen_vl_encoder_fp8,
     qwen_image_edit,
     qwen_image_edit_gguf_q4_k_m,
     qwen_image_edit_gguf_q8_0,
@@ -1630,10 +1794,9 @@ qwen_image_bundle: list[StarterModel] = [
 ]
 
 anima_bundle: list[StarterModel] = [
-    anima_preview3,
+    anima_base,
     anima_qwen3_encoder,
     anima_vae,
-    t5_base_encoder,
 ]
 
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {

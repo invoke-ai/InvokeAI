@@ -34,7 +34,7 @@ jobs:
       docs: ${{ steps.manual.outputs.docs || steps.filter.outputs.docs }}
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -70,34 +70,34 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Python (needed for generate-docs-data)
       - name: setup uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v8.1.0
         with:
-          version: '0.6.10'
+          version: '0.11.12'
           enable-cache: true
           python-version: '3.11'
 
       - name: setup python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
       # generate_docs_json.py only needs the invokeai package importable
       # (pydantic + invokeai.app/backend). Skip the [test] extra to keep CI fast.
       - name: install python dependencies
-        run: uv pip install --editable .
+        run: uv sync --frozen
 
       # Node (needed for docs build)
       - name: setup node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '22.12.0'
+          node-version: '22'
 
       - name: setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 10
           run_install: false
@@ -115,12 +115,20 @@ jobs:
         run: pnpm build
         working-directory: docs
         env:
-          DEPLOY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_target || github.ref == 'refs/heads/main' && 'ghpages' || 'custom' }}
+          DEPLOY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_target || 'custom' }}
+          ENABLE_ANALYTICS: ${{ github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.deploy_target == 'custom') }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: verify deploy output
+        run: pnpm run check-deploy-output
+        working-directory: docs
+        env:
+          DEPLOY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_target || 'custom' }}
 
       # Upload artifact for deploy (main branch only)
       - name: upload pages artifact
         if: github.ref == 'refs/heads/main'
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: docs/dist
 
@@ -138,4 +146,4 @@ jobs:
     steps:
       - name: deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

@@ -4,8 +4,10 @@ import { Box, Flex, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { usePersistedTextAreaSize } from 'common/hooks/usePersistedTextareaSize';
 import {
+  negativePromptChanged,
   positivePromptChanged,
   selectModelSupportsNegativePrompt,
+  selectNegativePrompt,
   selectPositivePrompt,
   selectPositivePromptHistory,
 } from 'features/controlLayers/store/paramsSlice';
@@ -16,7 +18,10 @@ import { ShowDynamicPromptsPreviewButton } from 'features/dynamicPrompts/compone
 import { NegativePromptToggleButton } from 'features/parameters/components/Core/NegativePromptToggleButton';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
-import { PromptResizeHandle } from 'features/parameters/components/Prompts/PromptResizeHandle';
+import {
+  PROMPT_RESIZE_HANDLE_HEIGHT_PX,
+  PromptResizeHandle,
+} from 'features/parameters/components/Prompts/PromptResizeHandle';
 import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModePrompt';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { ExpandPromptButton } from 'features/prompt/ExpandPromptButton';
@@ -59,7 +64,10 @@ const usePromptHistory = () => {
    * When we are moving thru history, we will always have a stashedPrompt (the prompt before we started browsing)
    * and a historyIdx which is an index into the history array (0 = most recent, 1 = previous, etc).
    */
-  const stateRef = useRef<{ stashedPrompt: string; historyIdx: number } | null>(null);
+  const stateRef = useRef<{
+    stashedPrompts: { positivePrompt: string; negativePrompt: string | null };
+    historyIdx: number;
+  } | null>(null);
 
   const prev = useCallback(() => {
     if (history.length === 0) {
@@ -69,8 +77,15 @@ const usePromptHistory = () => {
     let state = stateRef.current;
     if (!state) {
       // First time going "back" in history, init state
-      state = { stashedPrompt: selectPositivePrompt(store.getState()), historyIdx: 0 };
-      stateRef.current = state;
+      const currentState = store.getState();
+      stateRef.current = {
+        stashedPrompts: {
+          positivePrompt: selectPositivePrompt(currentState),
+          negativePrompt: selectNegativePrompt(currentState),
+        },
+        historyIdx: 0,
+      };
+      state = stateRef.current;
     } else {
       // Subsequent "back" in history, increment index
       if (state.historyIdx === history.length - 1) {
@@ -80,12 +95,15 @@ const usePromptHistory = () => {
       state.historyIdx = state.historyIdx + 1;
     }
     // We should go "back" in history
-    const newPrompt = history[state.historyIdx];
-    if (newPrompt === undefined) {
+    const newPrompts = history[state.historyIdx];
+    if (newPrompts === undefined) {
       // Shouldn't happen
       return;
     }
-    store.dispatch(positivePromptChanged(newPrompt));
+    store.dispatch(positivePromptChanged(newPrompts.positivePrompt));
+    if (selectModelSupportsNegativePrompt(store.getState())) {
+      store.dispatch(negativePromptChanged(newPrompts.negativePrompt));
+    }
   }, [history, store]);
   const next = useCallback(() => {
     if (history.length === 0) {
@@ -100,18 +118,24 @@ const usePromptHistory = () => {
     state.historyIdx = state.historyIdx - 1;
     if (state.historyIdx < 0) {
       // Overshot to the "current" stashed prompt
-      store.dispatch(positivePromptChanged(state.stashedPrompt));
+      store.dispatch(positivePromptChanged(state.stashedPrompts.positivePrompt));
+      if (selectModelSupportsNegativePrompt(store.getState())) {
+        store.dispatch(negativePromptChanged(state.stashedPrompts.negativePrompt));
+      }
       // Clear state bc we're back to current prompt
       stateRef.current = null;
       return;
     }
     // We should go "forward" in history
-    const newPrompt = history[state.historyIdx];
-    if (newPrompt === undefined) {
+    const newPrompts = history[state.historyIdx];
+    if (newPrompts === undefined) {
       // Shouldn't happen
       return;
     }
-    store.dispatch(positivePromptChanged(newPrompt));
+    store.dispatch(positivePromptChanged(newPrompts.positivePrompt));
+    if (selectModelSupportsNegativePrompt(store.getState())) {
+      store.dispatch(negativePromptChanged(newPrompts.negativePrompt));
+    }
   }, [history, store]);
   const reset = useCallback(() => {
     // Clear stashed state - used when user clicks away or types in the prompt box
@@ -132,6 +156,7 @@ export const ParamPositivePrompt = memo(() => {
   const promptHistoryApi = usePromptHistory();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   usePersistedTextAreaSize('positive_prompt', textareaRef, persistOptions);
 
   const { activeStylePreset } = useListStylePresetsQuery(undefined, {
@@ -248,6 +273,21 @@ export const ParamPositivePrompt = memo(() => {
     setDroppedImage(undefined);
   }, []);
 
+  const [textareaWidth, setTextareaWidth] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    const element = textareaRef.current;
+    if (!element) {
+      return;
+    }
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setTextareaWidth(entry.contentBoxSize[0]?.inlineSize);
+      }
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     const element = dropTargetRef.current;
     if (!element || !hasLlavaModels) {
@@ -277,8 +317,8 @@ export const ParamPositivePrompt = memo(() => {
 
   return (
     <Box pos="relative" ref={dropTargetRef}>
-      <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
-        <Box pos="relative">
+      <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaWidth}>
+        <Box pos="relative" pb={`${PROMPT_RESIZE_HANDLE_HEIGHT_PX}px`}>
           <Textarea
             className="positive-prompt-textarea"
             name="prompt"

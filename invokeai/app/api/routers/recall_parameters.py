@@ -169,17 +169,15 @@ def load_image_file(image_name: str) -> Optional[dict[str, Any]]:
     """
     logger = ApiDependencies.invoker.services.logger
     try:
-        # Prefer using the image_files service to validate & open images
-        image_files = ApiDependencies.invoker.services.image_files
-        # Resolve a safe path inside outputs
-        image_path = image_files.get_path(image_name)
+        images_service = ApiDependencies.invoker.services.images
+        # Use images service which handles subfolder resolution via DB record
+        path = images_service.get_path(image_name)
 
-        if not image_files.validate_path(str(image_path)):
-            logger.warning(f"Image file not found: {image_name} (searched in {image_path.parent})")
+        if not images_service.validate_path(path):
+            logger.warning(f"Image file not found: {image_name}")
             return None
 
-        # Open the image via service to leverage caching
-        pil_image = image_files.get(image_name)
+        pil_image = images_service.get_pil_image(image_name)
         width, height = pil_image.size
         logger.info(f"Found image file: {image_name} ({width}x{height})")
         return {"image_name": image_name, "width": width, "height": height}
@@ -408,6 +406,14 @@ async def update_recall_parameters(
         default=False,
         description="When true, parameters not included in the request are reset to their defaults (cleared).",
     ),
+    append: bool = Query(
+        default=False,
+        description=(
+            "When true, recalled reference images (ip_adapters and reference_images) are "
+            "appended to the frontend's existing reference-image list instead of replacing it. "
+            "Mutually exclusive with strict."
+        ),
+    ),
 ) -> dict[str, Any]:
     """
     Update recallable parameters that can be recalled on the frontend.
@@ -423,6 +429,10 @@ async def update_recall_parameters(
             to their defaults (cleared on the frontend).  Defaults to false,
             which preserves the existing behaviour of only updating the
             parameters that are explicitly provided.
+        append: When true, recalled reference images (``ip_adapters`` and
+            ``reference_images``) are appended to whatever reference images the
+            frontend already has, instead of replacing the whole list.  Mutually
+            exclusive with ``strict`` (which clears omitted parameters).
 
     Returns:
         A dictionary containing the updated parameters and status
@@ -438,6 +448,12 @@ async def update_recall_parameters(
         # are cleared.  In non-strict mode (default) they would be left as-is.
     """
     logger = ApiDependencies.invoker.services.logger
+
+    if strict and append:
+        raise HTTPException(
+            status_code=400,
+            detail="The 'strict' and 'append' query parameters are mutually exclusive",
+        )
 
     # Validate image access before processing — prevents information leakage
     # (dimensions) and derived-image minting via ControlNet preprocessors.
@@ -523,6 +539,14 @@ async def update_recall_parameters(
                 resolved_refs = resolve_reference_images(reference_images_param)
                 provided_params["reference_images"] = resolved_refs
                 logger.info(f"Resolved {len(resolved_refs)} reference image(s)")
+
+        # Append mode rides along inside the event's parameters dict rather
+        # than as a new event field so the generated client schema (which
+        # types parameters as a free-form object) doesn't need regenerating.
+        # Added after the persistence loop above, so the flag itself is never
+        # stored as a recall parameter.
+        if append:
+            provided_params["append"] = True
 
         # Emit event to notify frontend of parameter updates
         try:

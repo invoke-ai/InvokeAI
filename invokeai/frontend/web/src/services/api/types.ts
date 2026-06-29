@@ -85,6 +85,7 @@ const _zImageDTO = z.object({
   starred: z.boolean(),
   has_workflow: z.boolean(),
   board_id: z.string().nullish(),
+  image_subfolder: z.string().optional(),
 });
 export type ImageDTO = z.infer<typeof _zImageDTO>;
 assert<Equals<ImageDTO, S['ImageDTO']>>();
@@ -115,6 +116,7 @@ export type T5EncoderBnbQuantizedLlmInt8bModelConfig = Extract<
   { type: 't5_encoder'; format: 'bnb_quantized_int8b' }
 >;
 export type Qwen3EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen3_encoder' }>;
+export type QwenVLEncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen_vl_encoder' }>;
 export type SpandrelImageToImageModelConfig = Extract<InternalAnyModelConfig, { type: 'spandrel_image_to_image' }>;
 export type CheckpointModelConfig = Extract<InternalAnyModelConfig, { type: 'main'; format: 'checkpoint' }>;
 export type CLIPVisionModelConfig = Extract<InternalAnyModelConfig, { type: 'clip_vision' }>;
@@ -309,6 +311,16 @@ export const isAnimaVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?:
   );
 };
 
+export const isQwenImageVAEModelConfig = (
+  config: AnyModelConfig,
+  excludeSubmodels?: boolean
+): config is VAEModelConfig => {
+  return (
+    (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
+    config.base === 'qwen-image'
+  );
+};
+
 export const isControlNetModelConfig = (config: AnyModelConfig): config is ControlNetModelConfig => {
   return config.type === 'controlnet';
 };
@@ -361,6 +373,10 @@ export const isQwen3EncoderModelConfig = (config: AnyModelConfig): config is Qwe
 
 export const isAnimaQwen3EncoderModelConfig = (config: AnyModelConfig): config is Qwen3EncoderModelConfig => {
   return config.type === 'qwen3_encoder' && config.variant === 'qwen3_06b';
+};
+
+export const isQwenVLEncoderModelConfig = (config: AnyModelConfig): config is QwenVLEncoderModelConfig => {
+  return config.type === 'qwen_vl_encoder';
 };
 
 export const isCLIPEmbedModelConfigOrSubmodel = (

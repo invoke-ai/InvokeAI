@@ -10,11 +10,11 @@ import {
 } from 'react';
 
 type PromptResizeHandleProps = {
-  textareaRef: RefObject<HTMLTextAreaElement>;
+  textareaRef: RefObject<HTMLTextAreaElement | null>;
   minHeight: number;
 };
 
-const PROMPT_RESIZE_HANDLE_HEIGHT_PX = 8;
+export const PROMPT_RESIZE_HANDLE_HEIGHT_PX = 8;
 
 export const PromptResizeHandle = memo(({ textareaRef, minHeight }: PromptResizeHandleProps) => {
   const activePointerIdRef = useRef<number | null>(null);

@@ -10,6 +10,8 @@ import type {
 } from 'features/metadata/parsing';
 import {
   ImageMetadataHandlers,
+  isCollectionMetadataHandler,
+  isUnrecallableMetadataHandler,
   useCollectionMetadataDatum,
   useSingleMetadataDatum,
   useUnrecallableMetadataDatum,
@@ -22,6 +24,50 @@ type Props = {
   metadata?: unknown;
 };
 
+type ImageMetadataActionHandler =
+  | UnrecallableMetadataHandler<any>
+  | SingleMetadataHandler<any>
+  | CollectionMetadataHandler<any[]>;
+
+export const IMAGE_METADATA_ACTION_HANDLERS: ImageMetadataActionHandler[] = [
+  ImageMetadataHandlers.GenerationMode,
+  ImageMetadataHandlers.PositivePrompt,
+  ImageMetadataHandlers.NegativePrompt,
+  ImageMetadataHandlers.MainModel,
+  ImageMetadataHandlers.VAEModel,
+  ImageMetadataHandlers.Width,
+  ImageMetadataHandlers.Height,
+  ImageMetadataHandlers.Seed,
+  ImageMetadataHandlers.Steps,
+  ImageMetadataHandlers.Scheduler,
+  ImageMetadataHandlers.CLIPSkip,
+  ImageMetadataHandlers.CFGScale,
+  ImageMetadataHandlers.CFGRescaleMultiplier,
+  ImageMetadataHandlers.Guidance,
+  ImageMetadataHandlers.FluxDypePreset,
+  ImageMetadataHandlers.FluxDypeScale,
+  ImageMetadataHandlers.FluxDypeExponent,
+  ImageMetadataHandlers.DenoisingStrength,
+  ImageMetadataHandlers.SeamlessX,
+  ImageMetadataHandlers.SeamlessY,
+  ImageMetadataHandlers.RefinerModel,
+  ImageMetadataHandlers.RefinerCFGScale,
+  ImageMetadataHandlers.RefinerPositiveAestheticScore,
+  ImageMetadataHandlers.RefinerNegativeAestheticScore,
+  ImageMetadataHandlers.RefinerScheduler,
+  ImageMetadataHandlers.RefinerDenoisingStart,
+  ImageMetadataHandlers.RefinerSteps,
+  ImageMetadataHandlers.QwenImageComponentSource,
+  ImageMetadataHandlers.QwenImageQuantization,
+  ImageMetadataHandlers.QwenImageShift,
+  ImageMetadataHandlers.ZImageShift,
+  ImageMetadataHandlers.CanvasLayers,
+  ImageMetadataHandlers.RefImages,
+  ImageMetadataHandlers.KleinVAEModel,
+  ImageMetadataHandlers.KleinQwen3EncoderModel,
+  ImageMetadataHandlers.LoRAs,
+];
+
 export const ImageMetadataActions = memo((props: Props) => {
   const { metadata } = props;
 
@@ -31,41 +77,15 @@ export const ImageMetadataActions = memo((props: Props) => {
 
   return (
     <Flex flexDir="column" ps={8}>
-      <UnrecallableMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.GenerationMode} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.PositivePrompt} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.NegativePrompt} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.MainModel} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.VAEModel} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.Width} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.Height} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.Seed} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.Steps} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.Scheduler} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.CLIPSkip} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.CFGScale} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.CFGRescaleMultiplier} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.Guidance} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.FluxDypePreset} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.FluxDypeScale} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.FluxDypeExponent} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.DenoisingStrength} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.SeamlessX} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.SeamlessY} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerModel} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerCFGScale} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerPositiveAestheticScore} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerNegativeAestheticScore} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerScheduler} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerDenoisingStart} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerSteps} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.QwenImageComponentSource} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.QwenImageQuantization} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.QwenImageShift} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.CanvasLayers} />
-      <CollectionMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefImages} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.KleinVAEModel} />
-      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.KleinQwen3EncoderModel} />
-      <CollectionMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.LoRAs} />
+      {IMAGE_METADATA_ACTION_HANDLERS.map((handler) => {
+        if (isUnrecallableMetadataHandler(handler)) {
+          return <UnrecallableMetadataDatum key={handler.type} metadata={metadata} handler={handler} />;
+        }
+        if (isCollectionMetadataHandler(handler)) {
+          return <CollectionMetadataDatum key={handler.type} metadata={metadata} handler={handler} />;
+        }
+        return <SingleMetadataDatum key={handler.type} metadata={metadata} handler={handler} />;
+      })}
     </Flex>
   );
 });
