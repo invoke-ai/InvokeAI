@@ -847,9 +847,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
     expect(state.notifications).toEqual([]);
 
-    state = workbenchReducer(state, { type: 'clearErrorLog' });
-
-    expect(state.errorLog).toEqual([]);
+    expect(state.notifications).toEqual([]);
   });
 
   it('accepts the project graph source but does not queue an empty project graph', () => {

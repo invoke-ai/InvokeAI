@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { WorkbenchSnapshot, WorkbenchStore } from './workbenchStore';
 
+import { clearProjectDiagnostics, configureDiagnostics, getProjectDiagnostics } from './diagnostics/logger';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from './widgetPlacementMeta';
 import { getProjectWidgetValues } from './widgetState';
 import { createWorkbenchStore } from './workbenchStore';
@@ -35,6 +36,15 @@ const watchSelector = <Selected>(
 };
 
 describe('createWorkbenchStore', () => {
+  beforeEach(() => {
+    configureDiagnostics({
+      enabled: true,
+      level: 'trace',
+      namespaces: ['system', 'queue'],
+      performanceTimingsEnabled: false,
+    });
+  });
+
   it('exposes a stable dispatch and initializes snapshot metadata', () => {
     const store = createWorkbenchStore();
     const snapshot = store.getSnapshot();
@@ -103,6 +113,49 @@ describe('createWorkbenchStore', () => {
     });
 
     expect(store.getPersistedRevision()).toBe(initialPersistedRevision + 1);
+  });
+
+  it('records recordError actions into project diagnostics', () => {
+    const store = createWorkbenchStore();
+    const projectId = store.getSnapshot().activeProject.id;
+
+    clearProjectDiagnostics(projectId);
+    store.dispatch({ area: 'queue-runtime', message: 'Queue failed', namespace: 'queue', type: 'recordError' });
+
+    expect(getProjectDiagnostics(projectId)).toMatchObject([
+      {
+        level: 'error',
+        message: 'Queue failed',
+        namespace: 'queue',
+        source: { area: 'queue-runtime', kind: 'workbench', projectId },
+      },
+    ]);
+    expect(store.getSnapshot().state.notifications[0]?.title).toBe('Error');
+  });
+
+  it('records accepted widget failures into diagnostics once', () => {
+    const store = createWorkbenchStore();
+    const projectId = store.getSnapshot().activeProject.id;
+    const failure = {
+      details: 'Widget stack',
+      message: 'Widget failed',
+      occurredAt: '2026-06-29T00:00:00.000Z',
+      widgetId: 'workflow' as const,
+    };
+
+    clearProjectDiagnostics(projectId);
+    store.dispatch({ failure, type: 'recordWidgetFailure' });
+    store.dispatch({ failure, type: 'recordWidgetFailure' });
+
+    expect(getProjectDiagnostics(projectId)).toMatchObject([
+      {
+        context: { widgetId: 'workflow' },
+        level: 'error',
+        message: 'Widget stack',
+        namespace: 'system',
+        source: { area: 'widget-failure', kind: 'workbench', projectId },
+      },
+    ]);
   });
 
   it('stops notifying unsubscribed listeners', () => {

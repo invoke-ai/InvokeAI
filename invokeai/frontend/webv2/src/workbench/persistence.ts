@@ -21,10 +21,14 @@ export interface WorkbenchPersistenceService {
 
 const isBrowser = (): boolean => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 
-export const stripTransientWorkbenchState = (state: WorkbenchState): WorkbenchState => ({
-  ...state,
-  notifications: [],
-});
+export const stripTransientWorkbenchState = (state: WorkbenchState): WorkbenchState => {
+  const { errorLog: _legacyErrorLog, ...nextState } = state as WorkbenchState & { errorLog?: string[] };
+
+  return {
+    ...nextState,
+    notifications: [],
+  };
+};
 
 const createSnapshot = (state: WorkbenchState): WorkbenchPersistenceSnapshot => ({
   savedAt: new Date().toISOString(),
@@ -100,7 +104,11 @@ export const localStorageWorkbenchPersistence: WorkbenchPersistenceService = {
     try {
       window.localStorage.setItem(
         getStorageKey(),
-        timeWorkbenchPerf('workbench:persistence-localstorage-stringify', () => JSON.stringify(snapshot))
+        timeWorkbenchPerf(
+          'workbench:persistence-localstorage-stringify',
+          { area: 'persistence', kind: 'workbench', projectId: state.activeProjectId },
+          () => JSON.stringify(snapshot)
+        )
       );
     } catch {
       // The backend remains the source of truth; localStorage is only an offline cache.

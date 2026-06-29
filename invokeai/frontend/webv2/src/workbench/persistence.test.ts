@@ -41,6 +41,13 @@ describe('workbench persistence migration', () => {
     expect(snapshot?.state.projects).toHaveLength(1);
   });
 
+  it('drops legacy error logs from persisted snapshots', () => {
+    const state = { ...createInitialWorkbenchState(), errorLog: ['old error'] };
+    const snapshot = migrateWorkbenchPersistenceSnapshot({ savedAt: '2026-06-09T00:00:00.000Z', state, version: 1 });
+
+    expect(snapshot?.state).not.toHaveProperty('errorLog');
+  });
+
   it('rejects unsupported persistence snapshots', () => {
     expect(migrateWorkbenchPersistenceSnapshot({ state: createInitialWorkbenchState(), version: 999 })).toBeNull();
     expect(migrateWorkbenchPersistenceSnapshot({ state: { projects: [] }, version: 1 })).toBeNull();

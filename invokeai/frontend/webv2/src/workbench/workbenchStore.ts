@@ -2,6 +2,7 @@ import type { Dispatch } from 'react';
 
 import type { Project, WorkbenchState } from './types';
 
+import { recordDiagnosticEntry } from './diagnostics/logger';
 import { createExternalStore } from './externalStore';
 import { createInitialWorkbenchState, workbenchReducer, type WorkbenchAction } from './workbenchState';
 
@@ -32,9 +33,75 @@ const createSnapshot = (state: WorkbenchState, hasHydrated: boolean): WorkbenchS
 const hasPersistedStateChanged = (previous: WorkbenchState, next: WorkbenchState): boolean =>
   !Object.is(previous.account, next.account) ||
   previous.activeProjectId !== next.activeProjectId ||
-  !Object.is(previous.errorLog, next.errorLog) ||
   !Object.is(previous.projects, next.projects) ||
   !Object.is(previous.widgetFailures, next.widgetFailures);
+
+const getDiagnosticProjectId = (state: WorkbenchState, projectId?: string): string | undefined =>
+  projectId ?? getActiveProject(state)?.id;
+
+const recordDiagnosticForAction = (
+  action: WorkbenchAction,
+  previousState: WorkbenchState,
+  nextState: WorkbenchState
+): void => {
+  switch (action.type) {
+    case 'recordError': {
+      const projectId = getDiagnosticProjectId(nextState, action.projectId);
+
+      if (!projectId) {
+        return;
+      }
+
+      recordDiagnosticEntry({
+        context: action.context,
+        level: 'error',
+        message: action.message,
+        namespace: action.namespace ?? 'system',
+        source: { area: action.area ?? 'runtime', kind: 'workbench', projectId },
+      });
+      break;
+    }
+    case 'recordWidgetFailure': {
+      if (Object.is(previousState, nextState)) {
+        return;
+      }
+
+      const projectId = getDiagnosticProjectId(nextState);
+
+      if (!projectId) {
+        return;
+      }
+
+      recordDiagnosticEntry({
+        context: { widgetId: action.failure.widgetId },
+        level: 'error',
+        message: action.failure.details,
+        namespace: 'system',
+        source: { area: 'widget-failure', kind: 'workbench', projectId },
+      });
+      break;
+    }
+    case 'closeProject': {
+      if (previousState.projects.length !== 1) {
+        return;
+      }
+
+      const projectId = getDiagnosticProjectId(nextState, action.projectId);
+
+      if (!projectId) {
+        return;
+      }
+
+      recordDiagnosticEntry({
+        level: 'error',
+        message: 'At least one project must remain open.',
+        namespace: 'system',
+        source: { area: 'project-lifecycle', kind: 'workbench', projectId },
+      });
+      break;
+    }
+  }
+};
 
 export const createWorkbenchStore = (initialState = createInitialWorkbenchState()): WorkbenchStore => {
   let state = initialState;
@@ -58,7 +125,11 @@ export const createWorkbenchStore = (initialState = createInitialWorkbenchState(
 
   return {
     dispatch(action) {
-      setSnapshotState(workbenchReducer(state, action));
+      const previousState = state;
+      const nextState = workbenchReducer(state, action);
+
+      setSnapshotState(nextState);
+      recordDiagnosticForAction(action, previousState, nextState);
     },
     getPersistedRevision: () => persistedRevision,
     getSnapshot: snapshotStore.getSnapshot,

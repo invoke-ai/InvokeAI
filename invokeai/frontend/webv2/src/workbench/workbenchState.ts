@@ -8,6 +8,7 @@ import type {
   CenterViewId,
   CanvasRasterLayerContract,
   CanvasStagingCandidateContract,
+  DeveloperLogNamespace,
   GeneratedImageContract,
   GraphContract,
   GraphHistorySnapshot,
@@ -206,16 +207,21 @@ type WorkbenchAction =
   | { type: 'autosaveFailed'; error: string }
   | { type: 'markAllNotificationsRead' }
   | { type: 'clearNotifications' }
-  | { type: 'clearErrorLog' }
   | { type: 'recordWidgetFailure'; failure: WidgetFailure }
   | { type: 'setActiveProjectSettings'; settings: Partial<ProjectSettings> }
-  | { type: 'recordError'; message: string }
+  | {
+      type: 'recordError';
+      message: string;
+      area?: string;
+      context?: Record<string, unknown>;
+      namespace?: DeveloperLogNamespace;
+      projectId?: string;
+    }
   | { type: 'setBackendConnectionStatus'; status: WorkbenchState['backendConnection']['status']; error?: string }
   | { type: 'refreshBackendData' }
   | { type: 'recordNotice'; kind: WorkbenchNotificationKind; title: string; message?: string };
 
 const HISTORY_LIMIT = 40;
-const ERROR_LOG_LIMIT = 5;
 const NOTIFICATION_LIMIT = 100;
 const MIN_PANEL_SIZE_PX = 180;
 const MAX_PANEL_SIZE_PX = 520;
@@ -266,6 +272,17 @@ const areRecordsShallowEqual = (left: Record<string, unknown>, right: Record<str
     leftKeys.length === rightKeys.length &&
     leftKeys.every((key) => Object.prototype.hasOwnProperty.call(right, key) && Object.is(left[key], right[key]))
   );
+};
+
+const areProjectSettingValuesEqual = (
+  left: ProjectSettings[keyof ProjectSettings],
+  right: ProjectSettings[keyof ProjectSettings]
+): boolean => {
+  if (Array.isArray(left) && Array.isArray(right)) {
+    return left.length === right.length && left.every((value, index) => value === right[index]);
+  }
+
+  return Object.is(left, right);
 };
 
 const patchRecord = <RecordValue extends Record<string, unknown>>(
@@ -1416,7 +1433,6 @@ export const createInitialWorkbenchState = (): WorkbenchState => {
     activeProjectId: draft.id,
     autosave: { status: 'idle' },
     backendConnection: { status: 'connecting' },
-    errorLog: [],
     notifications: [],
     projects: [draft],
     widgetFailures: [],
@@ -1457,13 +1473,7 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       if (state.projects.length === 1) {
         const message = 'At least one project must remain open.';
 
-        return addNotification(
-          {
-            ...state,
-            errorLog: [message, ...state.errorLog],
-          },
-          createNotification({ kind: 'error', message, title: 'Project close blocked' })
-        );
+        return addNotification(state, createNotification({ kind: 'error', message, title: 'Project close blocked' }));
       }
 
       const projectIndex = state.projects.findIndex((project) => project.id === action.projectId);
@@ -2604,9 +2614,6 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
     case 'clearNotifications': {
       return { ...state, notifications: [] };
     }
-    case 'clearErrorLog': {
-      return { ...state, errorLog: [] };
-    }
     case 'recordWidgetFailure': {
       const hasFailure = state.widgetFailures.some((failure) => failure.widgetId === action.failure.widgetId);
 
@@ -2617,7 +2624,6 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       return addNotification(
         {
           ...state,
-          errorLog: [action.failure.details, ...state.errorLog].slice(0, ERROR_LOG_LIMIT),
           widgetFailures: [action.failure, ...state.widgetFailures],
         },
         createNotification({
@@ -2628,10 +2634,7 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       );
     }
     case 'recordError': {
-      return addNotification(
-        { ...state, errorLog: [action.message, ...state.errorLog].slice(0, ERROR_LOG_LIMIT) },
-        createNotification({ kind: 'error', message: action.message, title: 'Error' })
-      );
+      return addNotification(state, createNotification({ kind: 'error', message: action.message, title: 'Error' }));
     }
     case 'setBackendConnectionStatus': {
       const timestamp = now();
@@ -2663,9 +2666,14 @@ export const workbenchReducer = (state: WorkbenchState, action: WorkbenchAction)
       return updateActiveProject(state, (project) => {
         const settings = normalizeProjectSettings({ ...project.settings, ...action.settings });
 
-        return Object.entries(settings).every(([key, value]) =>
-          Object.is(project.settings[key as keyof ProjectSettings], value)
-        )
+        return Object.entries(settings).every(([key, value]) => {
+          const settingKey = key as keyof ProjectSettings;
+
+          return areProjectSettingValuesEqual(
+            project.settings[settingKey],
+            value as ProjectSettings[typeof settingKey]
+          );
+        })
           ? project
           : { ...project, settings };
       });
