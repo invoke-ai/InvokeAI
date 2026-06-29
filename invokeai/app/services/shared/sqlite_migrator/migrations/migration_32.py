@@ -1,8 +1,17 @@
-"""Migration 32: Add `videos` and `board_videos` tables for minimal video support.
+"""Migration 32: Repair model_relationships foreign keys.
 
-The `videos` table parallels `images` but with extra `duration` and `fps` columns.
-The `board_videos` table parallels `board_images`, providing one-to-many board↔video association.
-Foreign-key cascades from `boards` mirror the image side, so deleting a board also removes its videos' associations.
+Migration 22 rebuilt the `models` table by renaming it to `models_old`, creating a
+fresh `models` table, copying the data over, and dropping `models_old`. Because
+modern SQLite (with `legacy_alter_table` off) rewrites foreign-key references in
+*other* tables when a table is renamed, the foreign keys in `model_relationships`
+were silently repointed at `models_old` -- which was then dropped.
+
+This left the related-models links referencing a table that no longer exists,
+breaking `ON DELETE CASCADE` and foreign-key integrity for related models.
+
+This migration rebuilds `model_relationships` so its foreign keys reference
+`models(id)` again, preserving existing links and dropping any orphaned rows whose
+model keys no longer exist (those would violate the restored foreign keys).
 """
 
 import sqlite3
@@ -11,103 +20,70 @@ from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import 
 
 
 class Migration32Callback:
+    """Migration to repair the broken foreign keys on the model_relationships table."""
+
     def __call__(self, cursor: sqlite3.Cursor) -> None:
-        self._create_videos(cursor)
-        self._create_board_videos(cursor)
+        self._repair_model_relationships_fks(cursor)
 
-    def _create_videos(self, cursor: sqlite3.Cursor) -> None:
-        tables = [
-            """--sql
-            CREATE TABLE IF NOT EXISTS videos (
-                video_name TEXT NOT NULL PRIMARY KEY,
-                video_origin TEXT NOT NULL,
-                video_category TEXT NOT NULL,
-                width INTEGER NOT NULL,
-                height INTEGER NOT NULL,
-                duration REAL NOT NULL DEFAULT 0.0,
-                fps REAL,
-                session_id TEXT,
-                node_id TEXT,
-                metadata TEXT,
-                is_intermediate BOOLEAN DEFAULT FALSE,
-                starred BOOLEAN DEFAULT FALSE,
-                has_workflow BOOLEAN DEFAULT FALSE,
-                user_id TEXT NOT NULL DEFAULT 'system',
-                video_subfolder TEXT NOT NULL DEFAULT '',
-                created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                -- Updated via trigger
-                updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                -- Soft delete, currently unused
-                deleted_at DATETIME
+    def _repair_model_relationships_fks(self, cursor: sqlite3.Cursor) -> None:
+        cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='model_relationships';")
+        row = cursor.fetchone()
+        if row is None:
+            # Table does not exist (fresh db will create it correctly), nothing to repair.
+            return
+
+        existing_sql: str = row[0]
+        if "models_old" not in existing_sql:
+            # Foreign keys already point at the correct table, nothing to repair.
+            return
+
+        # Rebuild the table with the correct foreign keys referencing models(id).
+        cursor.execute("ALTER TABLE model_relationships RENAME TO model_relationships_old;")
+        cursor.execute(
+            """
+            -- many-to-many relationship table for models
+            CREATE TABLE model_relationships (
+                -- model_key_1 and model_key_2 are the same as the key(primary key) in the models table
+                model_key_1 TEXT NOT NULL,
+                model_key_2 TEXT NOT NULL,
+                created_at TEXT DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+                PRIMARY KEY (model_key_1, model_key_2),
+                -- model_key_1 < model_key_2, to ensure uniqueness and prevent duplicates
+                FOREIGN KEY (model_key_1) REFERENCES models(id) ON DELETE CASCADE,
+                FOREIGN KEY (model_key_2) REFERENCES models(id) ON DELETE CASCADE
             );
             """
-        ]
+        )
 
-        indices = [
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_videos_video_name ON videos(video_name);",
-            "CREATE INDEX IF NOT EXISTS idx_videos_video_origin ON videos(video_origin);",
-            "CREATE INDEX IF NOT EXISTS idx_videos_video_category ON videos(video_category);",
-            "CREATE INDEX IF NOT EXISTS idx_videos_created_at ON videos(created_at);",
-            "CREATE INDEX IF NOT EXISTS idx_videos_starred ON videos(starred);",
-            "CREATE INDEX IF NOT EXISTS idx_videos_user_id ON videos(user_id);",
-        ]
-
-        triggers = [
-            """--sql
-            CREATE TRIGGER IF NOT EXISTS tg_videos_updated_at
-            AFTER UPDATE
-            ON videos FOR EACH ROW
-            BEGIN
-                UPDATE videos SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
-                    WHERE video_name = old.video_name;
-            END;
+        # Copy over the existing links, dropping any orphaned rows whose model keys no
+        # longer exist -- these would violate the restored foreign keys.
+        cursor.execute(
             """
-        ]
-
-        for stmt in tables + indices + triggers:
-            cursor.execute(stmt)
-
-    def _create_board_videos(self, cursor: sqlite3.Cursor) -> None:
-        tables = [
-            """--sql
-            CREATE TABLE IF NOT EXISTS board_videos (
-                board_id TEXT NOT NULL,
-                video_name TEXT NOT NULL,
-                created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                -- updated via trigger
-                updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                -- Soft delete, currently unused
-                deleted_at DATETIME,
-                -- enforce one-to-many board↔video using PK on video_name
-                PRIMARY KEY (video_name),
-                FOREIGN KEY (board_id) REFERENCES boards (board_id) ON DELETE CASCADE,
-                FOREIGN KEY (video_name) REFERENCES videos (video_name) ON DELETE CASCADE
-            );
+            INSERT INTO model_relationships (model_key_1, model_key_2, created_at)
+            SELECT model_key_1, model_key_2, created_at
+            FROM model_relationships_old
+            WHERE model_key_1 IN (SELECT id FROM models)
+              AND model_key_2 IN (SELECT id FROM models);
             """
-        ]
+        )
 
-        indices = [
-            "CREATE INDEX IF NOT EXISTS idx_board_videos_board_id ON board_videos (board_id);",
-            "CREATE INDEX IF NOT EXISTS idx_board_videos_board_id_created_at ON board_videos (board_id, created_at);",
-        ]
-
-        triggers = [
-            """--sql
-            CREATE TRIGGER IF NOT EXISTS tg_board_videos_updated_at
-            AFTER UPDATE
-            ON board_videos FOR EACH ROW
-            BEGIN
-                UPDATE board_videos SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
-                    WHERE board_id = old.board_id AND video_name = old.video_name;
-            END;
+        # Drop the old table first so its index name is freed before we recreate it.
+        cursor.execute("DROP TABLE model_relationships_old;")
+        cursor.execute(
             """
-        ]
-
-        for stmt in tables + indices + triggers:
-            cursor.execute(stmt)
+            -- Creates an index to keep performance equal when searching for model_key_1 or model_key_2
+            CREATE INDEX IF NOT EXISTS keyx_model_relationships_model_key_2
+            ON model_relationships(model_key_2);
+            """
+        )
 
 
 def build_migration_32() -> Migration:
+    """Builds the migration object for migrating from version 31 to version 32.
+
+    This migration repairs the foreign keys on the model_relationships table, which were
+    broken by migration 22 rebuilding the models table.
+    """
     return Migration(
         from_version=31,
         to_version=32,

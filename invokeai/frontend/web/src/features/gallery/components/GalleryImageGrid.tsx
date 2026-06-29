@@ -17,7 +17,6 @@ import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/us
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import type { MutableRefObject } from 'react';
 import React, { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type {
@@ -114,8 +113,8 @@ const canHandleGridArrowNavigation = (
  */
 const useKeyboardNavigation = (
   navigationImageNames: string[],
-  virtuosoRef: React.RefObject<VirtuosoGridHandle>,
-  rootRef: React.RefObject<HTMLDivElement>
+  virtuosoRef: React.RefObject<VirtuosoGridHandle | null>,
+  rootRef: React.RefObject<HTMLDivElement | null>
 ) => {
   const { dispatch, getState } = useAppStore();
   const activeTab = useAppSelector(selectActiveTab);
@@ -288,9 +287,9 @@ const useKeyboardNavigation = (
  */
 const useKeepSelectedImageInView = (
   imageNames: string[],
-  virtuosoRef: React.RefObject<VirtuosoGridHandle>,
-  rootRef: React.RefObject<HTMLDivElement>,
-  rangeRef: MutableRefObject<ListRange>
+  virtuosoRef: React.RefObject<VirtuosoGridHandle | null>,
+  rootRef: React.RefObject<HTMLDivElement | null>,
+  rangeRef: React.RefObject<ListRange>
 ) => {
   const selection = useAppSelector(selectSelection);
 
@@ -367,7 +366,7 @@ type GalleryImageGridContentProps = {
   navigationImageNames?: string[];
   isLoading: boolean;
   queryArgs: ListImageNamesQueryArgs;
-  rootRef?: React.RefObject<HTMLDivElement>;
+  rootRef?: React.RefObject<HTMLDivElement | null>;
 };
 
 export const GalleryImageGridContent = memo(

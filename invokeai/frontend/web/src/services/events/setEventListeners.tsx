@@ -2,8 +2,8 @@ import { Flex, Text } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { socketConnected } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
 import type { AppStore } from 'app/store/store';
-import { deepClone } from 'common/util/deepClone';
-import { forEach, isNil, round } from 'es-toolkit/compat';
+import { parseify } from 'common/util/serialize';
+import { isNil, round } from 'es-toolkit/compat';
 import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { allEntitiesDeleted, controlLayerRecalled } from 'features/controlLayers/store/canvasSlice';
 import { canvasWorkflowIntegrationProcessingCompleted } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
@@ -26,30 +26,20 @@ import type {
 } from 'features/controlLayers/store/types';
 import { getControlLayerState, getReferenceImageState } from 'features/controlLayers/store/util';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
-import { zNodeStatus } from 'features/nodes/types/invocation';
 import { modelSelected } from 'features/parameters/store/actions';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
 import { toast, toastApi } from 'features/toast/toast';
 import { t } from 'i18next';
-import { LRUCache } from 'lru-cache';
 import { Trans } from 'react-i18next';
 import type { ApiTagDescription } from 'services/api';
 import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi } from 'services/api/endpoints/queue';
-import {
-  clearCompletedInvocationKeysForQueueItem,
-  shouldIgnoreFinishedQueueItemInvocationEvent,
-} from 'services/events/invocationTracking';
-import {
-  getUpdatedNodeExecutionStateOnInvocationError,
-  getUpdatedNodeExecutionStateOnInvocationProgress,
-  getUpdatedNodeExecutionStateOnInvocationStarted,
-} from 'services/events/nodeExecutionState';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import { buildOnModelInstallError, DiscordLink, GitHubIssuesLink } from 'services/events/onModelInstallError';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
+import { createWorkflowExecutionCoordinator } from 'services/events/workflowExecutionCoordinator';
 import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
 
@@ -72,10 +62,22 @@ const selectModelInstalls = modelsApi.endpoints.listModelInstalls.select();
 export const setEventListeners = ({ socket, store, setIsConnected }: SetEventListenersArg) => {
   const { dispatch, getState } = store;
 
-  // We can have race conditions where we receive a progress event for a queue item that has already finished. Easiest
-  // way to handle this is to keep track of finished queue items in a cache and ignore progress events for those.
-  const finishedQueueItemIds = new LRUCache<number, boolean>({ max: 100 });
   const completedInvocationKeysByItemId = new Map<number, Set<string>>();
+  const onInvocationComplete = buildOnInvocationComplete(getState, dispatch, completedInvocationKeysByItemId);
+  const workflowExecutionCoordinator = createWorkflowExecutionCoordinator({
+    clearCanvasWorkflowIntegrationProcessing: () => dispatch(canvasWorkflowIntegrationProcessingCompleted()),
+    completedInvocationKeysByItemId,
+    getAllNodeExecutionStates: () => $nodeExecutionStates.get(),
+    getNodeExecutionState: (nodeId) => $nodeExecutionStates.get()[nodeId],
+    logReconciliationError: (error, itemId) => {
+      log.debug({ error: parseify(error) }, `Unable to reconcile workflow queue item ${itemId}`);
+    },
+    onInvocationComplete,
+    reconcileQueueItem: (itemId) =>
+      dispatch(queueApi.endpoints.getQueueItem.initiate(itemId, { forceRefetch: true, subscribe: false })),
+    setNodeExecutionState: (nodeId, state) => $nodeExecutionStates.setKey(nodeId, state),
+    upsertNodeExecutionState: upsertExecutionState,
+  });
 
   socket.on('connect', () => {
     log.debug('Connected');
@@ -107,34 +109,24 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
   socket.on('disconnect', () => {
     log.debug('Disconnected');
+    workflowExecutionCoordinator.cancelPendingWorkflowReconciliations();
     $lastProgressEvent.set(null);
     $loadingModelsCount.set(0);
     setIsConnected(false);
   });
 
   socket.on('invocation_started', (data) => {
-    if (shouldIgnoreFinishedQueueItemInvocationEvent('invocation_started', finishedQueueItemIds, data.item_id)) {
-      return;
-    }
     const { invocation_source_id, invocation } = data;
     log.debug({ data } as JsonObject, `Invocation started (${invocation.type}, ${invocation_source_id})`);
-    const nes = $nodeExecutionStates.get()[invocation_source_id];
-    const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationStarted(
-      nes,
-      data,
-      completedInvocationKeysByItemId
-    );
-    if (updatedNodeExecutionState) {
-      upsertExecutionState(updatedNodeExecutionState.nodeId, updatedNodeExecutionState);
-    }
+    workflowExecutionCoordinator.onInvocationStarted(data);
   });
 
   socket.on('invocation_progress', (data) => {
-    if (shouldIgnoreFinishedQueueItemInvocationEvent('invocation_progress', finishedQueueItemIds, data.item_id)) {
+    if (!workflowExecutionCoordinator.onInvocationProgress(data)) {
       log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
       return;
     }
-    const { invocation_source_id, invocation, origin, percentage, message } = data;
+    const { invocation_source_id, invocation, percentage, message } = data;
 
     let _message = 'Invocation progress';
     if (message) {
@@ -148,36 +140,17 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.trace({ data } as JsonObject, _message);
 
     $lastProgressEvent.set(data);
-
-    if (origin === 'workflows') {
-      const nes = $nodeExecutionStates.get()[invocation_source_id];
-      const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationProgress(
-        nes,
-        data,
-        completedInvocationKeysByItemId
-      );
-      if (updatedNodeExecutionState) {
-        upsertExecutionState(updatedNodeExecutionState.nodeId, updatedNodeExecutionState);
-      }
-    }
   });
 
   socket.on('invocation_error', (data) => {
     const { invocation_source_id, invocation } = data;
     log.error({ data } as JsonObject, `Invocation error (${invocation.type}, ${invocation_source_id})`);
-    const nes = $nodeExecutionStates.get()[invocation_source_id];
-    const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationError(nes, data);
-    if (updatedNodeExecutionState) {
-      upsertExecutionState(updatedNodeExecutionState.nodeId, updatedNodeExecutionState);
-    }
-    // Clear canvas workflow integration processing state on error
-    if (data.origin === 'canvas_workflow_integration') {
-      dispatch(canvasWorkflowIntegrationProcessingCompleted());
-    }
+    workflowExecutionCoordinator.onInvocationError(data);
   });
 
-  const onInvocationComplete = buildOnInvocationComplete(getState, dispatch, completedInvocationKeysByItemId);
-  socket.on('invocation_complete', onInvocationComplete);
+  socket.on('invocation_complete', (data) => {
+    workflowExecutionCoordinator.onInvocationComplete(data);
+  });
 
   socket.on('model_load_started', (data) => {
     const { config, submodel_type } = data;
@@ -389,8 +362,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('queue_item_status_changed', (data) => {
-    if (finishedQueueItemIds.has(data.item_id)) {
-      log.trace({ data }, `Received event for already-finished queue item ${data.item_id}`);
+    if (!workflowExecutionCoordinator.onQueueItemStatusChanged(data)) {
       return;
     }
 
@@ -463,22 +435,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     }
     dispatch(queueApi.util.invalidateTags(tagsToInvalidate));
 
-    if (status === 'in_progress') {
-      forEach($nodeExecutionStates.get(), (nes) => {
-        if (!nes) {
-          return;
-        }
-        const clone = deepClone(nes);
-        clone.status = zNodeStatus.enum.PENDING;
-        clone.error = null;
-        clone.progress = null;
-        clone.progressImage = null;
-        clone.outputs = [];
-        $nodeExecutionStates.setKey(clone.nodeId, clone);
-      });
-    } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
-      finishedQueueItemIds.set(item_id, true);
-      clearCompletedInvocationKeysForQueueItem(completedInvocationKeysByItemId, item_id);
+    if (status === 'completed' || status === 'failed' || status === 'canceled') {
       if (status === 'failed' && error_type) {
         toast({
           id: `INVOCATION_ERROR_${error_type}`,
@@ -774,6 +731,10 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
         const hasIpAdapters = data.parameters.ip_adapters !== undefined;
         const hasRefImages = data.parameters.reference_images !== undefined;
+        // Append mode (POST /api/v1/recall/{queue_id}?append=true): add the
+        // recalled reference images to the existing list instead of replacing
+        // it. The backend passes the flag inside the parameters dict.
+        const append = data.parameters.append === true;
 
         if (hasIpAdapters || hasRefImages) {
           const allRefImagePromises: Promise<RefImageState | null>[] = [];
@@ -917,9 +878,21 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
           }
 
           // Single dispatch after all IP adapter + reference image promises settle.
-          // Always replace:true so stale entries from a previous recall are cleared.
+          // replace:true (the default) clears stale entries from a previous
+          // recall; append mode instead pushes onto the existing list and
+          // deliberately dispatches nothing when no valid states resolved, so
+          // a failed append can never wipe the user's current reference images.
           Promise.all(allRefImagePromises).then((results) => {
             const validStates = results.filter((state): state is RefImageState => state !== null);
+            if (append) {
+              if (validStates.length > 0) {
+                dispatch(refImagesRecalled({ entities: validStates, replace: false }));
+                log.info(
+                  `Appended ${validStates.length} reference image(s) (IP adapters + model-free) to existing list`
+                );
+              }
+              return;
+            }
             dispatch(refImagesRecalled({ entities: validStates, replace: true }));
             if (validStates.length > 0) {
               log.info(
@@ -992,7 +965,6 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       title: t('gallery.bulkDownloadReady'),
       status: 'success',
       description: (
-        // eslint-disable-next-line react/jsx-no-bind -- not a component render; no re-render cost
         <Text as="button" onClick={handleDownload} textDecoration="underline" cursor="pointer">
           {t('gallery.clickToDownload')}
         </Text>

@@ -65,6 +65,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_Anima_Config,
     Main_Checkpoint_Flux2_Config,
     Main_Checkpoint_FLUX_Config,
+    Main_Checkpoint_QwenImage_Config,
     Main_Checkpoint_SD1_Config,
     Main_Checkpoint_SD2_Config,
     Main_Checkpoint_SDXL_Config,
@@ -190,6 +191,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Checkpoint_SDXLRefiner_Config, Main_Checkpoint_SDXLRefiner_Config.get_tag()],
         Annotated[Main_Checkpoint_Flux2_Config, Main_Checkpoint_Flux2_Config.get_tag()],
         Annotated[Main_Checkpoint_FLUX_Config, Main_Checkpoint_FLUX_Config.get_tag()],
+        Annotated[Main_Checkpoint_QwenImage_Config, Main_Checkpoint_QwenImage_Config.get_tag()],
         Annotated[Main_Checkpoint_ZImage_Config, Main_Checkpoint_ZImage_Config.get_tag()],
         Annotated[Main_Checkpoint_Anima_Config, Main_Checkpoint_Anima_Config.get_tag()],
         # Main (Pipeline) - quantized formats
