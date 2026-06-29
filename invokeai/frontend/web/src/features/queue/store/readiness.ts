@@ -324,6 +324,17 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
+  if (model?.base === 'krea-2' && model.format !== 'diffusers') {
+    // Non-diffusers Krea-2 (single-file checkpoint / GGUF) ships only the transformer, so a standalone
+    // VAE and Qwen3-VL encoder must be selected. Diffusers models bundle them, so they're optional there.
+    if (!params.krea2VaeModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noKrea2VaeModelSelected') });
+    }
+    if (!params.krea2Qwen3VlEncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noKrea2Qwen3VlEncoderModelSelected') });
+    }
+  }
+
   if (model?.base === 'anima') {
     if (!params.animaVaeModel) {
       reasons.push({ content: i18n.t('parameters.invoke.noAnimaVaeModelSelected') });
@@ -781,6 +792,17 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
     if (!hasQwen3Source) {
       reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+    }
+  }
+
+  if (model?.base === 'krea-2' && model.format !== 'diffusers') {
+    // Non-diffusers Krea-2 (single-file checkpoint / GGUF) ships only the transformer, so a standalone
+    // VAE and Qwen3-VL encoder must be selected. Diffusers models bundle them, so they're optional there.
+    if (!params.krea2VaeModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noKrea2VaeModelSelected') });
+    }
+    if (!params.krea2Qwen3VlEncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noKrea2Qwen3VlEncoderModelSelected') });
     }
   }
 

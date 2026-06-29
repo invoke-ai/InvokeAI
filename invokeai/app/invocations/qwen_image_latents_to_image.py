@@ -1,7 +1,6 @@
 from contextlib import nullcontext
 
 import torch
-from diffusers.models.autoencoders.autoencoder_kl_qwenimage import AutoencoderKLQwenImage
 from einops import rearrange
 from PIL import Image
 
@@ -17,6 +16,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.krea2.vae_compat import as_qwen_image_vae
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.util.devices import TorchDevice
 
@@ -40,13 +40,14 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
         latents = context.tensors.load(self.latents.latents_name)
 
         vae_info = context.models.load(self.vae.vae)
-        assert isinstance(vae_info.model, AutoencoderKLQwenImage)
         with (
             SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes),
             vae_info.model_on_device() as (_, vae),
         ):
             context.util.signal_progress("Running VAE")
-            assert isinstance(vae, AutoencoderKLQwenImage)
+            # A native-layout qwen_image_vae single file is classified with the Anima base and loaded
+            # as AutoencoderKLWan; reinterpret it as AutoencoderKLQwenImage (identical weights).
+            vae = as_qwen_image_vae(vae)
             latents = latents.to(device=TorchDevice.choose_torch_device(), dtype=vae.dtype)
 
             vae.disable_tiling()

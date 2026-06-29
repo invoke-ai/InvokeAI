@@ -87,6 +87,14 @@ class Qwen3EncoderField(BaseModel):
     loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
 
 
+class Qwen3VLEncoderField(BaseModel):
+    """Field for the Qwen3-VL text encoder used by Krea-2 models."""
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+    loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
+
+
 class VAEField(BaseModel):
     vae: ModelIdentifierField = Field(description="Info to load vae submodel")
     seamless_axes: List[str] = Field(default_factory=list, description='Axes("x" and "y") to which apply seamless')

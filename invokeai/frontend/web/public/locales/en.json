@@ -1351,6 +1351,7 @@
         "t5Encoder": "T5 Encoder",
         "qwen3Encoder": "Qwen3 Encoder",
         "qwenVLEncoder": "Qwen2.5-VL Encoder",
+        "qwen3VLEncoder": "Qwen3-VL Encoder",
         "animaVae": "VAE",
         "animaVaePlaceholder": "Select Anima-compatible VAE",
         "animaQwen3Encoder": "Qwen3 0.6B Encoder",
@@ -1361,6 +1362,10 @@
         "zImageQwen3EncoderPlaceholder": "From Qwen3 source model",
         "zImageQwen3Source": "Qwen3 & VAE Source Model",
         "zImageQwen3SourcePlaceholder": "Required if VAE/Encoder empty",
+        "krea2Vae": "VAE (optional)",
+        "krea2VaePlaceholder": "From Krea-2 diffusers model",
+        "krea2Qwen3VlEncoder": "Qwen3-VL Encoder (optional)",
+        "krea2Qwen3VlEncoderPlaceholder": "From Krea-2 diffusers model",
         "flux2KleinVae": "VAE (optional)",
         "flux2KleinVaePlaceholder": "From diffusers model",
         "flux2KleinVaeNoModelPlaceholder": "No diffusers model available",
@@ -1680,6 +1685,8 @@
             "noQwenImageComponentSourceSelected": "GGUF Qwen Image models require a Diffusers Component Source for VAE/encoder",
             "noZImageVaeSourceSelected": "No VAE source: Select VAE (FLUX) or Qwen3 Source model",
             "noZImageQwen3EncoderSourceSelected": "No Qwen3 Encoder source: Select Qwen3 Encoder or Qwen3 Source model",
+            "noKrea2VaeModelSelected": "Non-diffusers Krea-2: select a VAE in Advanced settings",
+            "noKrea2Qwen3VlEncoderModelSelected": "Non-diffusers Krea-2: select a Qwen3-VL Encoder in Advanced settings",
             "noAnimaVaeModelSelected": "No Anima VAE model selected",
             "noAnimaQwen3EncoderModelSelected": "No Anima Qwen3 Encoder model selected",
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), bbox width is {{width}}",
@@ -1726,6 +1733,9 @@
         "seedVarianceEnabled": "Seed Variance Enhancer",
         "seedVarianceStrength": "Variance Strength",
         "seedVarianceRandomizePercent": "Randomize Percent",
+        "krea2RebalanceEnabled": "Conditioning Rebalance",
+        "krea2RebalanceMultiplier": "Rebalance Multiplier",
+        "krea2RebalanceWeights": "Per-Layer Weights (12)",
         "imageActions": "Image Actions",
         "sendToCanvas": "Send To Canvas",
         "sendToUpscale": "Send To Upscale",
@@ -2051,6 +2061,48 @@
             "paragraphs": [
                 "Percentage of embedding values that receive noise (1-100%).",
                 "Lower values create more selective noise patterns, while 100% affects all values equally."
+            ]
+        },
+        "krea2ConditioningRebalance": {
+            "heading": "Conditioning Rebalance",
+            "paragraphs": [
+                "Krea-2 stacks 12 text-encoder layers per token. This reweights those layers and applies an overall multiplier to push the model harder toward your prompt, countering the quality dilution of the distilled Turbo model.",
+                "Enable this to improve prompt adherence when the model ignores parts of your prompt."
+            ]
+        },
+        "krea2RebalanceMultiplier": {
+            "heading": "Rebalance Multiplier",
+            "paragraphs": [
+                "Overall gain applied to the conditioning after per-layer weighting. Higher values push harder toward the prompt.",
+                "Default is 4.0. Very high values may over-saturate or distort the output."
+            ]
+        },
+        "krea2RebalanceWeights": {
+            "heading": "Per-Layer Weights",
+            "paragraphs": [
+                "Comma-separated gains for the 12 tapped encoder layers (exactly 12 values). Later layers carry more semantic detail.",
+                "The default emphasizes specific layers (e.g. 2.5, 5, 4) found to improve prompt adherence."
+            ]
+        },
+        "krea2SeedVarianceEnhancer": {
+            "heading": "Seed Variance Enhancer",
+            "paragraphs": [
+                "Distilled few-step models like Krea-2-Turbo can produce nearly identical images across different seeds. This adds seed-based noise to the text embeddings to increase variation while staying reproducible.",
+                "Enable this to get more diverse results when exploring seeds, at some cost to prompt adherence."
+            ]
+        },
+        "krea2SeedVarianceStrength": {
+            "heading": "Variance Strength",
+            "paragraphs": [
+                "Magnitude of the uniform noise added to the embeddings.",
+                "Higher values give more variety but can drift further from the prompt. Default is 20."
+            ]
+        },
+        "krea2SeedVarianceRandomizePercent": {
+            "heading": "Randomize Percent",
+            "paragraphs": [
+                "Percentage of embedding values that receive noise (1-100%).",
+                "Lower values create more selective perturbations, while 100% affects all values."
             ]
         },
         "compositingMaskBlur": {

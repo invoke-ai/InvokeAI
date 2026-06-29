@@ -11,6 +11,7 @@ import {
   selectIsExternal,
   selectIsFLUX,
   selectIsFlux2,
+  selectIsKrea2,
   selectIsQwenImage,
   selectIsSD3,
   selectIsZImage,
@@ -31,6 +32,7 @@ import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import ParamZImageScheduler from 'features/parameters/components/Core/ParamZImageScheduler';
 import ParamZImageShift from 'features/parameters/components/Core/ParamZImageShift';
+import ParamKrea2EnhancersSettings from 'features/parameters/components/Krea2Enhancers/ParamKrea2EnhancersSettings';
 import ParamZImageSeedVarianceSettings from 'features/parameters/components/SeedVariance/ParamZImageSeedVarianceSettings';
 import { MainModelPicker } from 'features/settingsAccordions/components/GenerationSettingsAccordion/MainModelPicker';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
@@ -54,6 +56,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const isZImage = useAppSelector(selectIsZImage);
   const isExternal = useAppSelector(selectIsExternal);
   const isQwenImage = useAppSelector(selectIsQwenImage);
+  const isKrea2 = useAppSelector(selectIsKrea2);
   const isAnima = useAppSelector(selectIsAnima);
   const fluxDypePreset = useAppSelector(selectFluxDypePreset);
   const modelSupportsGuidance = useAppSelector(selectModelSupportsGuidance);
@@ -121,6 +124,7 @@ export const GenerationSettingsAccordion = memo(() => {
                 {!isExternal && isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeExponent />}
               </FormControlGroup>
               {!isExternal && isZImage && <ParamZImageSeedVarianceSettings />}
+              {!isExternal && isKrea2 && <ParamKrea2EnhancersSettings />}
             </Flex>
           </Expander>
         )}
