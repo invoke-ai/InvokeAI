@@ -451,6 +451,16 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     }
   });
 
+  socket.on('queue_counts_changed', (data) => {
+    // A content-free broadcast that the queue's global counts may have changed — typically
+    // because *another* user enqueued or one of their jobs changed status. We never receive
+    // those users' private queue item events, so this is the only signal that lets a non-admin's
+    // badge keep its global total (the "/Y" in "X/Y") and the in_progress-driven progress bar
+    // current. Only the redacted SessionQueueStatus is refetched; no per-user/batch caches.
+    log.trace({ data }, 'Queue counts changed');
+    dispatch(queueApi.util.invalidateTags(['SessionQueueStatus']));
+  });
+
   socket.on('queue_cleared', (data) => {
     log.debug({ data }, 'Queue cleared');
     dispatch(
