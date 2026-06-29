@@ -113,11 +113,15 @@ PID_MODEL_MAX_LENGTH: int = 300
 
 
 # Working-memory (activation) estimate for the PiD decode, mirroring `estimate_vae_working_memory_*` (see #8414).
-# PiD runs a multi-step pixel-diffusion at the full super-resolved output resolution, so its peak activation
-# memory scales with the OUTPUT pixel count. This constant is an experimentally-tunable starting value: it must
-# stay small enough not to over-reserve VRAM on setups that already run PiD, while still reserving enough that the
-# model cache offloads the (large) main transformer before the decode runs. Calibrate against measured peak VRAM.
-_PID_DECODE_WORKING_MEMORY_SCALING_CONSTANT = 160
+# PiD runs a multi-step pixel-diffusion in float32 at the full super-resolved output resolution, so its peak
+# activation memory scales with the OUTPUT pixel count.
+#
+# This is ONLY the activation headroom reserved for the decode itself - it does NOT do the heavy lifting of
+# evicting the main transformer/encoders (the nodes call context.models.offload_all_from_vram() for that before
+# loading PidNet). It must therefore stay modest: the cache uses max(this_estimate, device_working_mem_gb=3GB),
+# and an over-large value pushes the working set negative and forces PidNet to partial-load onto the CPU (slow).
+# ~4GB at a 2048px output is a small headroom above the 3GB default. Experimentally-tunable; calibrate to peak.
+_PID_DECODE_WORKING_MEMORY_SCALING_CONSTANT = 250
 
 
 def estimate_pid_decode_working_memory(latent: Tensor, backbone: BaseModelType) -> int:

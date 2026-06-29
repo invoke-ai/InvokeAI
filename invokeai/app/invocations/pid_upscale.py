@@ -141,6 +141,10 @@ class PiDUpscaleInvocation(BaseInvocation, WithMetadata, WithBoard):
 
             caption_mask = caption_mask.detach().to("cpu")
         del gemma_encoder, gemma_tokenizer
+        # Gemma is only needed for the one-shot caption encode above. Offload it from VRAM (keeping it in the RAM
+        # cache) so its ~5GB is freed before the PiD decoder loads. The cache offloads anything else it needs to
+        # fit the decode on its own, so we deliberately do NOT evict every other model here.
+        context.models.offload_from_vram(self.gemma2_encoder.text_encoder)
         TorchDevice.empty_cache()
 
         # 3) Run PiD decode (the loader already returns a live PidNet).

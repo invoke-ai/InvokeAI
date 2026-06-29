@@ -581,6 +581,20 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     const { bbox } = canvas;
     const gridSize = getGridSize('flux');
 
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+      }
+      // PiD decodes at 4x the generation resolution; "Scale Before Processing" would inflate the generation
+      // size and blow up the decode. Require it to be off (None) so generation == bbox.
+      if (bbox.scaleMethod !== 'none') {
+        reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
+      }
+    }
+
     if (bbox.scaleMethod === 'none') {
       if (bbox.rect.width % gridSize !== 0) {
         reasons.push({

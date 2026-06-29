@@ -20,12 +20,16 @@ import { addImageToImage } from 'features/nodes/util/graph/generation/addImageTo
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
 import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
-import { addPidDecode } from 'features/nodes/util/graph/generation/addPidDecode';
+import { addPidDecode, buildPidDecodeChain } from 'features/nodes/util/graph/generation/addPidDecode';
 import { addRegions } from 'features/nodes/util/graph/generation/addRegions';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { selectCanvasOutputFields } from 'features/nodes/util/graph/graphBuilderUtils';
+import {
+  getOriginalAndScaledSizesForOtherModes,
+  getOriginalAndScaledSizesForTextToImage,
+  selectCanvasOutputFields,
+} from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { isFlux2KleinQwen3Compatible } from 'features/parameters/util/flux2Klein';
@@ -389,10 +393,21 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     const fluxPosCond = posCond as Invocation<'flux_text_encoder'>;
     const fluxL2i = l2i as Invocation<'flux_vae_decode'>;
 
-    // PiD decode currently only supports Text to Image. Other modes (img2img/inpaint/outpaint/canvas)
-    // need the compositing-aware path, which is not wired yet - fail loudly instead of silently ignoring it.
-    if (pidMode !== 'off' && generationMode !== 'txt2img') {
-      throw new UnsupportedGenerationModeError(t('toast.pidOnlyTxt2ImgForNow'));
+    if (pidMode !== 'off') {
+      // Native (4x output) only makes sense for txt2img - a 4x result can't be composited back onto a canvas region.
+      if (pidMode === 'native' && generationMode !== 'txt2img') {
+        throw new UnsupportedGenerationModeError(t('toast.pidNativeTxt2ImgOnly'));
+      }
+      // Inpaint/outpaint are not wired for PiD yet - only txt2img and img2img are supported.
+      if (generationMode === 'inpaint' || generationMode === 'outpaint') {
+        throw new UnsupportedGenerationModeError(t('toast.pidUnsupportedMode'));
+      }
+      // PiD decodes at 4x the generation resolution. "Scale Before Processing" (Canvas) would silently inflate
+      // the generation size to the model optimal, blowing up the decode - require it off (scaled == original).
+      const { originalSize, scaledSize } = getOriginalAndScaledSizesForTextToImage(state);
+      if (scaledSize.width !== originalSize.width || scaledSize.height !== originalSize.height) {
+        throw new UnsupportedGenerationModeError(t('toast.pidScaleBeforeProcessingOff'));
+      }
     }
 
     // Only add FLUX LoRAs for non-Klein models
@@ -457,15 +472,39 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
         type: 'flux_vae_encode',
         id: getPrefixedId('flux_vae_encode'),
       });
-      canvasOutput = await addImageToImage({
-        g,
-        state,
-        manager,
-        l2i: fluxL2i,
-        i2l,
-        denoise: fluxDenoise,
-        vaeSource: fluxModelLoader,
-      });
+      if (pidMode !== 'off') {
+        // PiD replaces the VAE decode. img2img only supports Fit - the result must fit the bbox to composite.
+        g.deleteNode(fluxL2i.id);
+        const { originalSize } = getOriginalAndScaledSizesForOtherModes(state);
+        const pidDecode = buildPidDecodeChain({
+          g,
+          state,
+          denoise: fluxDenoise,
+          positivePrompt,
+          seed,
+          mode: 'fit',
+          fitSize: originalSize,
+        });
+        canvasOutput = await addImageToImage({
+          g,
+          state,
+          manager,
+          l2i: pidDecode,
+          i2l,
+          denoise: fluxDenoise,
+          vaeSource: fluxModelLoader,
+        });
+      } else {
+        canvasOutput = await addImageToImage({
+          g,
+          state,
+          manager,
+          l2i: fluxL2i,
+          i2l,
+          denoise: fluxDenoise,
+          vaeSource: fluxModelLoader,
+        });
+      }
       g.upsertMetadata({ generation_mode: 'flux_img2img' });
     } else if (generationMode === 'inpaint') {
       assert(manager !== null);

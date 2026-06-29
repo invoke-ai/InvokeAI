@@ -426,6 +426,22 @@ class ModelsInterface(InvocationContextInterface):
         self._util.signal_progress(message)
         return self._services.model_manager.load.load_model(configs[0], submodel_type)
 
+    def offload_from_vram(self, identifier: Union[str, "ModelIdentifierField"]) -> int:
+        """Move a model (and all of its submodels) from VRAM to RAM, freeing its VRAM but keeping it cached.
+
+        Use this when an invocation is done with a model for the rest of the run - e.g. a one-shot text encoder -
+        so the next, larger load does not have to compete with it for VRAM. The model stays in the RAM cache, so
+        a subsequent load only re-streams it back to VRAM rather than rebuilding it from disk.
+
+        Args:
+            identifier: The key or ModelField representing the model to offload.
+
+        Returns:
+            The number of VRAM bytes freed.
+        """
+        key = identifier if isinstance(identifier, str) else identifier.key
+        return self._services.model_manager.load.ram_cache.offload_model_from_vram(key)
+
     @staticmethod
     def _raise_if_external(model: AnyModelConfig) -> None:
         if model.base == BaseModelType.External or model.format == ModelFormat.ExternalApi:
