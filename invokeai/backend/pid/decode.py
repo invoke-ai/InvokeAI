@@ -112,6 +112,31 @@ PID_NEGATIVE_PROMPT: str = (
 PID_MODEL_MAX_LENGTH: int = 300
 
 
+# Working-memory (activation) estimate for the PiD decode, mirroring `estimate_vae_working_memory_*` (see #8414).
+# PiD runs a multi-step pixel-diffusion at the full super-resolved output resolution, so its peak activation
+# memory scales with the OUTPUT pixel count. This constant is an experimentally-tunable starting value: it must
+# stay small enough not to over-reserve VRAM on setups that already run PiD, while still reserving enough that the
+# model cache offloads the (large) main transformer before the decode runs. Calibrate against measured peak VRAM.
+_PID_DECODE_WORKING_MEMORY_SCALING_CONSTANT = 160
+
+
+def estimate_pid_decode_working_memory(latent: Tensor, backbone: BaseModelType) -> int:
+    """Estimate the working (activation) memory in bytes for a PiD decode of *latent*.
+
+    The decoded image is ``latent_spatial * sr_scale * latent_spatial_down_factor`` pixels per side. PidNet runs
+    in float32 (see ``model_loaders/pid_decoder.py``), so the element size is 4 bytes. Returns 0 for unsupported
+    backbones so callers fall back to the cache's default working-memory reservation.
+    """
+    per_backbone = _PER_BACKBONE.get(backbone)
+    if per_backbone is None:
+        return 0
+    total_up = int(_PID_SR4X_BASE["sr_scale"]) * int(per_backbone["latent_spatial_down_factor"])
+    out_h = int(latent.shape[-2]) * total_up
+    out_w = int(latent.shape[-1]) * total_up
+    element_size = 4  # PidNet runs in float32 (see model_loaders/pid_decoder.py)
+    return int(out_h * out_w * element_size * _PID_DECODE_WORKING_MEMORY_SCALING_CONSTANT)
+
+
 def build_pid_net(backbone: BaseModelType) -> PidNet:
     """Build an uninitialised PidNet of the right shape for *backbone*.
 

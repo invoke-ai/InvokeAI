@@ -1,14 +1,24 @@
 import type { RootState } from 'app/store/store';
+import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { getOriginalAndScaledSizesForTextToImage } from 'features/nodes/util/graph/graphBuilderUtils';
+import { PID_SCALE } from 'features/parameters/util/optimalDimension';
 import type { Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
+
+// FLUX works on a 16px grid (VAE /8 x 2x2 patches), so the generation resolution must be a multiple of 16.
+const FLUX_GRID_SIZE = 16;
 
 type AddPidDecodeArg = {
   g: Graph;
   state: RootState;
+  /**
+   * - 'fit':    generate at the requested size, PiD decodes 4x, then downscale back (compositing-safe).
+   * - 'native': the requested dimensions are the 4x target; generate at target / 4 and use PiD's 4x output directly.
+   */
+  mode: 'fit' | 'native';
   /** The FLUX denoise node producing the latents PiD will decode. */
   denoise: Invocation<'flux_denoise'>;
   /** The positive prompt node - PiD conditions its decode on the same caption. */
@@ -18,24 +28,27 @@ type AddPidDecodeArg = {
 };
 
 /**
- * Adds a PiD (Pixel Diffusion Decoder) decode in place of the regular FLUX VAE decode, in "fit" mode.
+ * Adds a PiD (Pixel Diffusion Decoder) decode in place of the regular FLUX VAE decode.
  *
  * PiD is a fixed 4x super-resolution decoder: it consumes the FLUX latent and emits an image at 4x the
- * generation resolution. In "fit" mode we downscale that output back to the requested size so the result
- * composites cleanly (canvas/inpaint) and matches the dimensions the user expects. The 4x detail gain is
- * partly traded away by the downscale - "native" mode (no downscale) is handled separately.
+ * generation resolution.
+ * - In "fit" mode we generate at the requested size and downscale PiD's 4x output back to it, so the result
+ *   composites cleanly and matches the dimensions the user set (the 4x detail gain is partly traded away).
+ * - In "native" mode the user-facing dimensions ARE the 4x target: we generate at target / 4 and emit PiD's
+ *   full 4x output with no downscale.
  *
  * The caller is responsible for having NOT wired a VAE decode for these latents (or for deleting it).
  *
- * @returns The terminal image node (the downscale), to be used as the canvas output.
+ * @returns The terminal image node, to be used as the canvas output.
  */
 export const addPidDecode = ({
   g,
   state,
+  mode,
   denoise,
   positivePrompt,
   seed,
-}: AddPidDecodeArg): Invocation<'img_resize'> => {
+}: AddPidDecodeArg): Invocation<'img_resize' | 'flux_pid_decode'> => {
   const params = selectParamsSlice(state);
   const { pidDecoderModel, gemma2EncoderModel, pidSteps } = params;
   assert(pidDecoderModel, 'No PiD decoder model selected');
@@ -43,11 +56,17 @@ export const addPidDecode = ({
 
   const { originalSize, scaledSize } = getOriginalAndScaledSizesForTextToImage(state);
 
-  // Generate at the normal resolution; PiD will 4x it and we downscale back below.
   denoise.denoising_start = 0;
   denoise.denoising_end = 1;
-  denoise.width = scaledSize.width;
-  denoise.height = scaledSize.height;
+  if (mode === 'native') {
+    // The user-facing dimensions are the 4x target; generate at target / PID_SCALE (kept on the FLUX grid).
+    denoise.width = Math.max(roundDownToMultiple(originalSize.width / PID_SCALE, FLUX_GRID_SIZE), FLUX_GRID_SIZE);
+    denoise.height = Math.max(roundDownToMultiple(originalSize.height / PID_SCALE, FLUX_GRID_SIZE), FLUX_GRID_SIZE);
+  } else {
+    // Generate at the normal resolution; PiD will 4x it and we downscale back below.
+    denoise.width = scaledSize.width;
+    denoise.height = scaledSize.height;
+  }
 
   const gemma2Loader = g.addNode({
     type: 'gemma2_encoder_loader',
@@ -71,6 +90,21 @@ export const addPidDecode = ({
   g.addEdge(pidLoader, 'pid_decoder', pidDecode, 'pid_decoder');
   g.addEdge(seed, 'value', pidDecode, 'seed');
 
+  if (mode === 'native') {
+    // PiD's 4x output IS the requested target (generation was target / 4) - no downscale.
+    const outputWidth = denoise.width * PID_SCALE;
+    const outputHeight = denoise.height * PID_SCALE;
+    g.upsertMetadata({
+      width: outputWidth,
+      height: outputHeight,
+      pid_mode: mode,
+      pid_decoder: pidDecoderModel,
+      gemma2_encoder: gemma2EncoderModel,
+      pid_steps: pidSteps,
+    });
+    return pidDecode;
+  }
+
   // Fit mode: downscale PiD's 4x output back to the requested size.
   const resize = g.addNode({
     id: getPrefixedId('pid_fit_resize'),
@@ -82,7 +116,7 @@ export const addPidDecode = ({
   g.upsertMetadata({
     width: originalSize.width,
     height: originalSize.height,
-    pid_mode: 'fit',
+    pid_mode: mode,
     pid_decoder: pidDecoderModel,
     gemma2_encoder: gemma2EncoderModel,
     pid_steps: pidSteps,

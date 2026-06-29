@@ -441,12 +441,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       if (pidMode !== 'off') {
         // PiD replaces the VAE decode entirely - drop the unused l2i (and its edges).
         g.deleteNode(fluxL2i.id);
-        if (pidMode === 'fit') {
-          canvasOutput = addPidDecode({ g, state, denoise: fluxDenoise, positivePrompt, seed });
-        } else {
-          // 'native' (4x output) is not wired yet - it needs the bbox-aware dimension logic.
-          throw new UnsupportedGenerationModeError(t('toast.pidNativeModeNotYetAvailable'));
-        }
+        canvasOutput = addPidDecode({ g, state, mode: pidMode, denoise: fluxDenoise, positivePrompt, seed });
       } else {
         canvasOutput = addTextToImage({
           g,

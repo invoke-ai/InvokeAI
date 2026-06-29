@@ -11,6 +11,7 @@ export type ImageOutputNodes =
   | 'img_resize'
   | 'invokeai_img_blend'
   | 'apply_mask_to_image'
+  | 'flux_pid_decode'
   | 'flux_vae_decode'
   | 'flux2_vae_decode'
   | 'sd3_l2i'

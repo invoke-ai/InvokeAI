@@ -32,6 +32,7 @@ from invokeai.backend.pid.decode import (
     PiDDecodeConfig,
     PiDDecoder,
     encode_caption_for_pid,
+    estimate_pid_decode_working_memory,
 )
 from invokeai.backend.util.devices import TorchDevice
 
@@ -110,7 +111,8 @@ class FluxPiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         # 2) Run PiD decode (the loader already returns a live PidNet).
         pid_info = context.models.load(self.pid_decoder.decoder)
-        with pid_info.model_on_device() as (_, pid_net):
+        estimated_working_memory = estimate_pid_decode_working_memory(latents, BaseModelType.Flux)
+        with pid_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, pid_net):
             if not isinstance(pid_net, PidNet):
                 raise TypeError(f"Expected PidNet for PiD decoder, got {type(pid_net).__name__}.")
             device = TorchDevice.choose_torch_device()
