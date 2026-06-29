@@ -3,9 +3,10 @@ import type { BackendGraphContract, GraphContract } from '@workbench/types';
 import type { InvocationTemplatesSnapshot } from './templates';
 import type { FieldInputTemplate, InvocationTemplates, ProjectGraphState, WorkflowInvocationNode } from './types';
 
-import { getResolvedWorkflowEdges } from './connectors';
+import { getResolvedWorkflowEdgesIndexed } from './connectors';
 import { createWorkflowId } from './document';
 import { getWorkflowFieldInvalidReason } from './fields';
+import { createWorkflowGraphIndex } from './graphIndex';
 import { isInvocationNode } from './types';
 import { hasAnyCycle } from './validation';
 
@@ -70,6 +71,7 @@ export const getProjectGraphReadiness = (
 
   const templates = templatesSnapshot.templates;
   const executableNodes = getExecutableNodes(document);
+  const index = createWorkflowGraphIndex(document.nodes, document.edges);
 
   if (executableNodes.length === 0) {
     return { canInvoke: false, reasons: ['The project graph has no nodes. Add nodes in the Workflow view.'] };
@@ -77,7 +79,7 @@ export const getProjectGraphReadiness = (
 
   const reasons: string[] = [];
   const connectedInputs = new Set(
-    getResolvedWorkflowEdges(document.nodes, document.edges, templates)
+    getResolvedWorkflowEdgesIndexed(document.edges, index, templates)
       .filter((edge) => executableNodes.some((node) => node.id === edge.target))
       .map((edge) => `${edge.target}:${edge.targetHandle}`)
   );
@@ -143,6 +145,8 @@ export const compileProjectGraph = (document: ProjectGraphState, templates: Invo
   const executableNodes = getExecutableNodes(document).filter((node) => templates[node.data.type] !== undefined);
   const executableNodeIds = new Set(executableNodes.map((node) => node.id));
   const backendGraph: BackendGraphContract = { edges: [], id: createWorkflowId('workflow-graph'), nodes: {} };
+  const index = createWorkflowGraphIndex(document.nodes, document.edges);
+  const resolvedEdges = getResolvedWorkflowEdgesIndexed(document.edges, index, templates);
 
   for (const node of executableNodes) {
     const template = templates[node.data.type] as NonNullable<(typeof templates)[string]>;
@@ -172,7 +176,7 @@ export const compileProjectGraph = (document: ProjectGraphState, templates: Invo
 
   const seenEdgeKeys = new Set<string>();
 
-  for (const edge of getResolvedWorkflowEdges(document.nodes, document.edges, templates)) {
+  for (const edge of resolvedEdges) {
     if (!executableNodeIds.has(edge.source) || !executableNodeIds.has(edge.target)) {
       continue;
     }
@@ -200,7 +204,7 @@ export const compileProjectGraph = (document: ProjectGraphState, templates: Invo
 
   return {
     backendGraph,
-    edges: getResolvedWorkflowEdges(document.nodes, document.edges, templates)
+    edges: resolvedEdges
       .filter((edge) => executableNodeIds.has(edge.source) && executableNodeIds.has(edge.target))
       .map((edge) => ({
         id: edge.id,
