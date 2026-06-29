@@ -3,11 +3,53 @@
 from contextlib import nullcontext
 from unittest.mock import MagicMock, patch
 
+import pytest
 import torch
 from diffusers.models.autoencoders.autoencoder_kl_qwenimage import AutoencoderKLQwenImage
 
 from invokeai.app.invocations.qwen_image_image_to_latents import QwenImageImageToLatentsInvocation
 from invokeai.app.invocations.qwen_image_latents_to_image import QwenImageLatentsToImageInvocation
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_qwen_image
+
+
+class TestQwenImageWorkingMemoryEstimate:
+    """Lock in the per-backend scaling constants calibrated in scripts/calibrate_qwen_vae_working_memory.py.
+
+    These differ by backend because the Qwen VAE is attention-heavy: ROCm falls back to math attention
+    (O(area^2), much higher memory) while CUDA uses Flash/efficient attention. A regression that swaps
+    the constants would reintroduce the ROCm OOM (under-estimate) or needlessly over-budget CUDA.
+    """
+
+    # (operation, latent_h, latent_w) -> the estimator scales pixel area (latent * 8 for decode,
+    # raw for encode) by element_size and the constant.
+    @pytest.mark.parametrize(
+        "operation, is_rocm, expected_constant",
+        [
+            ("decode", True, 5500),
+            ("decode", False, 2900),
+            ("encode", True, 6300),
+            ("encode", False, 1600),
+        ],
+    )
+    def test_constant_selected_per_backend(self, operation, is_rocm, expected_constant):
+        mock_vae = MagicMock(spec=AutoencoderKLQwenImage)
+        mock_vae.parameters.return_value = iter([torch.zeros(1, dtype=torch.float16)])  # element_size == 2
+
+        # decode receives latents (pixel area = latent area * 8^2); encode receives a pixel image.
+        if operation == "decode":
+            image_tensor = torch.zeros(1, 16, 1, 64, 64)
+            h = w = 64 * 8
+        else:
+            image_tensor = torch.zeros(1, 3, 1, 512, 512)
+            h = w = 512
+
+        hip_value = "7.1.0" if is_rocm else None
+        with patch("torch.version.hip", hip_value):
+            result = estimate_vae_working_memory_qwen_image(
+                operation=operation, image_tensor=image_tensor, vae=mock_vae
+            )
+
+        assert result == h * w * 2 * expected_constant
 
 
 class TestQwenImageWorkingMemory:
