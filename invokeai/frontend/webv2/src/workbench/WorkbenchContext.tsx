@@ -26,7 +26,7 @@ import {
   type WorkbenchSaveResult,
 } from './projects/syncedPersistence';
 import { getProjectWidgetValues } from './widgetState';
-import { getAutosaveScheduleDecision, getPersistedStateKey, isAutosaveCompletionCurrent } from './workbenchAutosave';
+import { getAutosaveScheduleDecision, isAutosaveCompletionCurrent } from './workbenchAutosave';
 import { shallowEqual as selectorShallowEqual, useExternalStoreSelector } from './workbenchSelectors';
 import {
   createWorkbenchStore,
@@ -79,9 +79,7 @@ export const WorkbenchProvider = ({
   const [hasHydrated, setHasHydrated] = useState(store.getSnapshot().hasHydrated);
   const hasLoadedPersistenceRef = useRef(false);
   const lastSavedPersistedRevisionRef = useRef(store.getPersistedRevision());
-  const lastSavedStateKeyRef = useRef(getPersistedStateKey(store.getState()));
   const failedPersistedRevisionRef = useRef<number | null>(null);
-  const failedStateKeyRef = useRef<string | null>(null);
   // Captured once: the options describe how this mount of the editor boots.
   // Later search-param changes are handled live by WorkbenchSessionController.
   const bootOptionsRef = useRef(loadOptions);
@@ -100,11 +98,13 @@ export const WorkbenchProvider = ({
         }
 
         if (snapshot) {
-          if (!syncedWorkbenchPersistence.hasPendingChanges()) {
-            lastSavedStateKeyRef.current = getPersistedStateKey(snapshot.state);
-          }
+          const isPendingSnapshot = syncedWorkbenchPersistence.hasPendingChanges();
 
           dispatch({ state: snapshot.state, type: 'hydrateWorkbench' });
+
+          if (!isPendingSnapshot) {
+            lastSavedPersistedRevisionRef.current = store.getPersistedRevision();
+          }
         }
 
         const requestedId = bootOptions?.openProjectId;
@@ -181,10 +181,6 @@ export const WorkbenchProvider = ({
         scheduledPersistedRevision,
       });
 
-      if (failedPersistedRevisionRef.current !== null && decision.failedPersistedRevision === null) {
-        failedStateKeyRef.current = null;
-      }
-
       failedPersistedRevisionRef.current = decision.failedPersistedRevision;
 
       if (!decision.shouldSchedule) {
@@ -200,21 +196,6 @@ export const WorkbenchProvider = ({
       timeoutId = window.setTimeout(() => {
         const stateToSave = store.getState();
         const revisionToSave = store.getPersistedRevision();
-        const stateKeyToSave = getPersistedStateKey(stateToSave);
-
-        if (stateKeyToSave === lastSavedStateKeyRef.current) {
-          lastSavedPersistedRevisionRef.current = revisionToSave;
-          failedStateKeyRef.current = null;
-          failedPersistedRevisionRef.current = null;
-          scheduledPersistedRevision = null;
-          return;
-        }
-
-        if (stateKeyToSave === failedStateKeyRef.current) {
-          failedPersistedRevisionRef.current = revisionToSave;
-          scheduledPersistedRevision = null;
-          return;
-        }
 
         dispatch({ type: 'autosaveStarted' });
 
@@ -225,9 +206,7 @@ export const WorkbenchProvider = ({
               return;
             }
 
-            lastSavedStateKeyRef.current = stateKeyToSave;
             lastSavedPersistedRevisionRef.current = revisionToSave;
-            failedStateKeyRef.current = null;
             failedPersistedRevisionRef.current = null;
             scheduledPersistedRevision = null;
             dispatch({ savedAt: result.snapshot.savedAt, type: 'autosaveSucceeded' });
@@ -238,7 +217,6 @@ export const WorkbenchProvider = ({
               return;
             }
 
-            failedStateKeyRef.current = stateKeyToSave;
             failedPersistedRevisionRef.current = revisionToSave;
             scheduledPersistedRevision = null;
             dispatch({
@@ -283,7 +261,6 @@ export const WorkbenchProvider = ({
 
       const stateToSave = store.getState();
       const revisionToSave = store.getPersistedRevision();
-      const stateKeyToSave = getPersistedStateKey(stateToSave);
 
       void syncedWorkbenchPersistence
         .saveWorkbench(stateToSave)
@@ -291,17 +268,13 @@ export const WorkbenchProvider = ({
           if (
             !isAutosaveCompletionCurrent({
               completedPersistedRevision: revisionToSave,
-              completedStateKey: stateKeyToSave,
               currentPersistedRevision: store.getPersistedRevision(),
-              currentStateKey: getPersistedStateKey(store.getState()),
             })
           ) {
             return;
           }
 
-          lastSavedStateKeyRef.current = stateKeyToSave;
           lastSavedPersistedRevisionRef.current = revisionToSave;
-          failedStateKeyRef.current = null;
           failedPersistedRevisionRef.current = null;
           dispatch({ savedAt: result.snapshot.savedAt, type: 'autosaveSucceeded' });
           applySaveResult(result);
@@ -310,15 +283,12 @@ export const WorkbenchProvider = ({
           if (
             !isAutosaveCompletionCurrent({
               completedPersistedRevision: revisionToSave,
-              completedStateKey: stateKeyToSave,
               currentPersistedRevision: store.getPersistedRevision(),
-              currentStateKey: getPersistedStateKey(store.getState()),
             })
           ) {
             return;
           }
 
-          failedStateKeyRef.current = stateKeyToSave;
           failedPersistedRevisionRef.current = revisionToSave;
           dispatch({
             error: error instanceof Error ? error.message : 'Failed to autosave workbench.',

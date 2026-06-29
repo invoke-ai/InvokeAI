@@ -71,4 +71,52 @@ describe('workbench persistence migration', () => {
 
     expect(persisted.state.notifications).toEqual([]);
   });
+
+  it('treats localStorage quota failures as cache misses, not save failures', async () => {
+    const originalSet = window.localStorage.setItem;
+
+    try {
+      window.localStorage.setItem = (key: string, value: string): void => {
+        if (key === 'invokeai:v7:webv2:workbench') {
+          throw new DOMException('Quota exceeded', 'QuotaExceededError');
+        }
+
+        originalSet.call(window.localStorage, key, value);
+      };
+
+      await expect(
+        localStorageWorkbenchPersistence.saveWorkbench(createInitialWorkbenchState())
+      ).resolves.toMatchObject({
+        version: 1,
+      });
+    } finally {
+      window.localStorage.setItem = originalSet;
+    }
+  });
+
+  it('still attempts localStorage cache writes for large open workflow projects', async () => {
+    const state = createInitialWorkbenchState();
+    const project = state.projects[0]!;
+    const largeState = {
+      ...state,
+      projects: [
+        {
+          ...project,
+          projectGraph: {
+            ...project.projectGraph,
+            nodes: Array.from({ length: 300 }, (_, index) => ({
+              data: { label: '', notes: '' },
+              id: `node-${index}`,
+              position: { x: 0, y: 0 },
+              type: 'notes' as const,
+            })),
+          },
+        },
+      ],
+    };
+
+    await localStorageWorkbenchPersistence.saveWorkbench(largeState);
+
+    expect(storage.has('invokeai:v7:webv2:workbench')).toBe(true);
+  });
 });

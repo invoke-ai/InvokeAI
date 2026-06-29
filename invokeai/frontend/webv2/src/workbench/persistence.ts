@@ -1,6 +1,7 @@
 import type { WorkbenchPersistenceSnapshot, WorkbenchState } from './types';
 
 import { getUserStorageScope } from './auth/session';
+import { timeWorkbenchPerf } from './performanceMarks';
 
 const BASE_STORAGE_KEY = 'invokeai:v7:webv2:workbench';
 const WORKBENCH_SCHEMA_VERSION = 1;
@@ -96,7 +97,14 @@ export const localStorageWorkbenchPersistence: WorkbenchPersistenceService = {
       return Promise.resolve(snapshot);
     }
 
-    window.localStorage.setItem(getStorageKey(), JSON.stringify(snapshot));
+    try {
+      window.localStorage.setItem(
+        getStorageKey(),
+        timeWorkbenchPerf('workbench:persistence-localstorage-stringify', () => JSON.stringify(snapshot))
+      );
+    } catch {
+      // The backend remains the source of truth; localStorage is only an offline cache.
+    }
 
     return Promise.resolve(snapshot);
   },

@@ -1,14 +1,3 @@
-import type { WorkbenchState } from './types';
-
-export const getPersistedStateKey = (state: WorkbenchState): string =>
-  JSON.stringify({
-    account: state.account,
-    activeProjectId: state.activeProjectId,
-    errorLog: state.errorLog,
-    projects: state.projects,
-    widgetFailures: state.widgetFailures,
-  });
-
 interface AutosaveScheduleDecisionInput {
   failedPersistedRevision: number | null;
   lastSavedPersistedRevision: number;
@@ -44,12 +33,8 @@ export const getAutosaveScheduleDecision = ({
 
 export const isAutosaveCompletionCurrent = ({
   completedPersistedRevision,
-  completedStateKey,
   currentPersistedRevision,
-  currentStateKey,
 }: {
   completedPersistedRevision: number;
-  completedStateKey: string;
   currentPersistedRevision: number;
-  currentStateKey: string;
-}): boolean => completedPersistedRevision === currentPersistedRevision && completedStateKey === currentStateKey;
+}): boolean => completedPersistedRevision === currentPersistedRevision;

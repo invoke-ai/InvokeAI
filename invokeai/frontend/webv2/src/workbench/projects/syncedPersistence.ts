@@ -1,6 +1,7 @@
 import type { Project, WorkbenchPersistenceSnapshot, WorkbenchState } from '@workbench/types';
 
 import { getUserStorageScope } from '@workbench/auth/session';
+import { timeWorkbenchPerf } from '@workbench/performanceMarks';
 import { localStorageWorkbenchPersistence, stripTransientWorkbenchState } from '@workbench/persistence';
 import { createDraftProject, createInitialWorkbenchState } from '@workbench/workbenchState';
 
@@ -81,6 +82,7 @@ const syncEntries = new Map<string, SyncEntry>();
 const deletedProjectIds = new Set<string>();
 let lastPushedAccount: string | null = null;
 let hasPending = false;
+const projectDocumentJsonCache = new WeakMap<Project, { document: Record<string, unknown>; json: string }>();
 
 /**
  * Undo/redo stacks are session-only (each entry is a full project snapshot,
@@ -91,6 +93,22 @@ export const serializeProjectDocument = (project: Project): Record<string, unkno
   const { undoRedo: _undoRedo, ...document } = project;
 
   return document;
+};
+
+const getSerializedProjectDocument = (project: Project): { document: Record<string, unknown>; json: string } => {
+  const cached = projectDocumentJsonCache.get(project);
+
+  if (cached) {
+    return cached;
+  }
+
+  const document = serializeProjectDocument(project);
+  const json = timeWorkbenchPerf('workbench:project-document-stringify', () => JSON.stringify(document));
+  const serialized = { document, json };
+
+  projectDocumentJsonCache.set(project, serialized);
+
+  return serialized;
 };
 
 const normalizeInvocationSourceId = (sourceId: unknown): unknown => {
@@ -315,8 +333,7 @@ const recoverConflictingProject = async (
 };
 
 const pushProject = async (project: Project, conflicts: ProjectConflictResolution[]): Promise<string> => {
-  const document = serializeProjectDocument(project);
-  const documentJson = JSON.stringify(document);
+  const { document, json: documentJson } = getSerializedProjectDocument(project);
   const entry = syncEntries.get(project.id);
 
   if (deletedProjectIds.has(project.id) || entry?.pushedDoc === documentJson) {

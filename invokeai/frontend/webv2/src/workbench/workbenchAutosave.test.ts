@@ -69,20 +69,25 @@ describe('isAutosaveCompletionCurrent', () => {
     expect(
       isAutosaveCompletionCurrent({
         completedPersistedRevision: 2,
-        completedStateKey: 'state-2',
         currentPersistedRevision: 3,
-        currentStateKey: 'state-3',
       })
     ).toBe(false);
   });
 
-  it('accepts save completions for the current durable revision and state key', () => {
+  it('accepts save completions for the current durable revision', () => {
     expect(
       isAutosaveCompletionCurrent({
         completedPersistedRevision: 2,
-        completedStateKey: 'state-2',
         currentPersistedRevision: 2,
-        currentStateKey: 'state-2',
+      })
+    ).toBe(true);
+  });
+
+  it('does not require serializing full workbench state to compare completions', () => {
+    expect(
+      isAutosaveCompletionCurrent({
+        completedPersistedRevision: 4,
+        currentPersistedRevision: 4,
       })
     ).toBe(true);
   });
