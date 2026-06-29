@@ -441,8 +441,13 @@ class ModelCache:
         # Check if the model's specific compute_device is CPU, not just the cache's default execution_device
         model_compute_device = cache_entry.cached_model.compute_device
         if model_compute_device.type == "cpu":
-            # Models configured for CPU execution don't need to be loaded into VRAM
-            self._logger.debug(f"Model {cache_entry.key} is configured for CPU execution, skipping VRAM load")
+            # Models configured for CPU execution (cpu_only) don't need to be loaded into VRAM. Log at INFO so it
+            # mirrors the "Loaded model ... onto <device> device" line emitted for GPU loads below — otherwise there
+            # is no visible indication that the model is running on CPU at the default log level.
+            self._logger.info(
+                f"Loaded model '{cache_entry.key}' ({cache_entry.cached_model.model.__class__.__name__}) onto "
+                f"cpu device (cpu_only); skipping VRAM load"
+            )
             return
 
         try:

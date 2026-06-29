@@ -28,6 +28,7 @@ from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder as FluxAutoEncoder
+from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux
 
@@ -72,7 +73,8 @@ class AnimaLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                 raise TypeError(f"Expected AutoencoderKLWan or FluxAutoEncoder, got {type(vae).__name__}.")
 
             vae_dtype = next(iter(vae.parameters())).dtype
-            latents = latents.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)
+            # Use the VAE's actual device (may be CPU if the model is configured cpu_only).
+            latents = latents.to(device=get_effective_device(vae), dtype=vae_dtype)
 
             TorchDevice.empty_cache()
 
