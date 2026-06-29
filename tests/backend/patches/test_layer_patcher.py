@@ -311,3 +311,47 @@ def test_apply_smart_model_patches_force_sidecar_and_direct_patching():
             force_sidecar_patching=True,
         ):
             pass
+
+
+@torch.no_grad()
+def test_apply_smart_model_patches_fp8_weights_force_sidecar():
+    """Regression test: a module whose weights are stored in float8 (e.g. from fp8_storage layerwise
+    casting) must be sidecar-patched, even when direct patching is explicitly requested. Direct patching
+    does an in-place add on the model weight, which has no CUDA add kernel for float8 and raises
+    'ufunc_add_CUDA not implemented for Float8_e4m3fn'.
+    """
+    linear_in_features = 4
+    linear_out_features = 8
+    lora_rank = 2
+    # Build the model, then cast its weights to fp8 to mimic fp8_storage layerwise casting.
+    model = DummyModuleWithOneLayer(linear_in_features, linear_out_features, device="cpu", dtype=torch.bfloat16)
+    model.linear_layer_1.weight.data = model.linear_layer_1.weight.data.to(torch.float8_e4m3fn)
+    model.linear_layer_1.bias.data = model.linear_layer_1.bias.data.to(torch.float8_e4m3fn)
+    apply_custom_layers_to_model(model)
+
+    assert LayerPatcher._is_any_part_of_layer_fp8(model.linear_layer_1)
+
+    lora_layers = {
+        "linear_layer_1": LoRALayer.from_state_dict_values(
+            values={
+                "lora_down.weight": torch.ones((lora_rank, linear_in_features), device="cpu", dtype=torch.bfloat16),
+                "lora_up.weight": torch.ones((linear_out_features, lora_rank), device="cpu", dtype=torch.bfloat16),
+            },
+        )
+    }
+    lora = ModelPatchRaw(lora_layers)
+
+    # force_direct_patching=True would crash on fp8 weights if it were honored; the fp8 guard must
+    # override it and route to sidecar patching instead.
+    with LayerPatcher.apply_smart_model_patches(
+        model=model,
+        patches=[(lora, 0.5)],
+        prefix="",
+        dtype=torch.bfloat16,
+        force_direct_patching=True,
+    ):
+        # A sidecar patch was added to the module rather than the weight being modified in place.
+        assert model.linear_layer_1.get_num_patches() == 1
+
+    # After exiting the context, the sidecar patch is cleared.
+    assert model.linear_layer_1.get_num_patches() == 0
