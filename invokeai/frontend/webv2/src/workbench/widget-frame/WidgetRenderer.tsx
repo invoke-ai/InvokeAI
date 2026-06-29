@@ -10,11 +10,12 @@ import { Box, Flex, Text } from '@chakra-ui/react';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
-import { memo, useMemo } from 'react';
+import { memo, Suspense, useMemo } from 'react';
 
 import { useWidgetRuntime } from './createWidgetRuntime';
 import { WidgetFailureBoundary } from './WidgetFailureBoundary';
 import { WidgetHeader, WidgetPanelFrame } from './WidgetFrames';
+import { WidgetLoadingFallback } from './WidgetLoadingFallback';
 import { areProjectWidgetRenderInstancesEqual } from './widgetRenderInstance';
 
 interface WidgetRendererProps extends Omit<WidgetViewProps, 'manifest' | 'runtime'> {
@@ -58,19 +59,22 @@ export const WidgetRenderer = ({ instance, presentation, region, widget }: Widge
     project,
     region,
   });
+  const loadingFallback = useMemo(() => <WidgetLoadingFallback presentation={presentation} />, [presentation]);
 
   if (!View) {
     return null;
   }
 
   const content = (
-    <View
-      instance={instanceMeta}
-      manifest={widget.manifest}
-      presentation={presentation}
-      region={region}
-      runtime={runtime}
-    />
+    <Suspense fallback={loadingFallback}>
+      <View
+        instance={instanceMeta}
+        manifest={widget.manifest}
+        presentation={presentation}
+        region={region}
+        runtime={runtime}
+      />
+    </Suspense>
   );
 
   return (
