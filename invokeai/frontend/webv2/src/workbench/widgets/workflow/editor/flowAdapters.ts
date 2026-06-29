@@ -1,5 +1,8 @@
 import type {
   FieldType,
+  FieldInputTemplate,
+  FieldOutputTemplate,
+  InvocationTemplate,
   InvocationTemplates,
   ProjectGraphState,
   WorkflowConnectorNode,
@@ -11,12 +14,14 @@ import type {
 import type { Edge as FlowEdge, Node as FlowNode } from '@xyflow/react';
 import type { CSSProperties } from 'react';
 
+import { isExecutableInvocationType } from '@workbench/workflows/buildGraph';
 import {
   CONNECTOR_INPUT_HANDLE,
   CONNECTOR_OUTPUT_HANDLE,
-  getResolvedWorkflowEdges,
+  getResolvedWorkflowEdgesIndexed,
 } from '@workbench/workflows/connectors';
 import { getFieldTypeColor, getFieldTypeLabel } from '@workbench/workflows/fields';
+import { createWorkflowGraphIndex, type WorkflowGraphIndex } from '@workbench/workflows/graphIndex';
 import { getWorkflowSourceFieldType, getWorkflowTargetFieldType } from '@workbench/workflows/validation';
 
 /**
@@ -34,11 +39,17 @@ import { getWorkflowSourceFieldType, getWorkflowTargetFieldType } from '@workben
 
 export type InvocationFlowNode = FlowNode<
   {
+    canUseCache: boolean;
     documentNode: WorkflowInvocationNode;
+    /** Source handle names with an outgoing edge. */
+    connectedSourceHandles: string[];
     /** Target handle names with an incoming edge. */
     connectedTargetHandles: string[];
     /** Field names of this node exposed in the Linear UI form. */
     exposedFieldNames: string[];
+    /** Large workflows render unselected nodes without field controls until selected. */
+    isCompact: boolean;
+    template: InvocationNodeTemplateView | null;
   },
   'invocation'
 >;
@@ -57,11 +68,73 @@ const SELECTED_NODE_EDGE_STYLE: CSSProperties = { strokeWidth: 2 };
 
 const sameNames = (a: string[], b: string[]): boolean => a.length === b.length && a.every((name, i) => name === b[i]);
 
-const getConnectedHandlesByNode = (document: ProjectGraphState): Map<string, string[]> => {
+export interface InvocationNodeTemplateView {
+  hasImageOutput: boolean;
+  inputTemplates: FieldInputTemplate[];
+  isExecutable: boolean;
+  outputTemplates: FieldOutputTemplate[];
+  template: InvocationTemplate;
+}
+
+const sortByUiOrder = <T extends { uiOrder?: number | null }>(templates: T[]): T[] =>
+  [...templates].sort((a, b) => (a.uiOrder ?? Number.MAX_SAFE_INTEGER) - (b.uiOrder ?? Number.MAX_SAFE_INTEGER));
+
+const hasImageOutput = (template: InvocationTemplate): boolean =>
+  template.type !== 'image' && Object.values(template.outputs).some((output) => output.type.name === 'ImageField');
+
+const createInvocationNodeTemplateView = (template: InvocationTemplate): InvocationNodeTemplateView => ({
+  hasImageOutput: hasImageOutput(template),
+  inputTemplates: sortByUiOrder(Object.values(template.inputs).filter((input) => !input.uiHidden)),
+  isExecutable: isExecutableInvocationType(template.type),
+  outputTemplates: Object.values(template.outputs),
+  template,
+});
+
+const templateViewCache = new WeakMap<InvocationTemplates, Map<string, InvocationNodeTemplateView>>();
+
+const getInvocationNodeTemplateViews = (
+  templates: InvocationTemplates | undefined
+): Map<string, InvocationNodeTemplateView> => {
+  if (!templates) {
+    return new Map();
+  }
+
+  const cached = templateViewCache.get(templates);
+
+  if (cached) {
+    return cached;
+  }
+
+  const views = new Map<string, InvocationNodeTemplateView>();
+
+  for (const template of Object.values(templates)) {
+    views.set(template.type, createInvocationNodeTemplateView(template));
+  }
+
+  templateViewCache.set(templates, views);
+
+  return views;
+};
+
+const getConnectedHandlesByNode = (document: ProjectGraphState, index: WorkflowGraphIndex): Map<string, string[]> => {
   const byNode = new Map<string, string[]>();
 
-  for (const edge of getResolvedWorkflowEdges(document.nodes, document.edges)) {
+  for (const edge of getResolvedWorkflowEdgesIndexed(document.edges, index)) {
     byNode.set(edge.target, [...(byNode.get(edge.target) ?? []), edge.targetHandle]);
+  }
+
+  for (const handles of byNode.values()) {
+    handles.sort();
+  }
+
+  return byNode;
+};
+
+const getConnectedSourceHandlesByNode = (document: ProjectGraphState): Map<string, string[]> => {
+  const byNode = new Map<string, string[]>();
+
+  for (const edge of document.edges) {
+    byNode.set(edge.source, [...(byNode.get(edge.source) ?? []), edge.sourceHandle]);
   }
 
   for (const handles of byNode.values()) {
@@ -92,23 +165,34 @@ const getExposedFieldsByNode = (document: ProjectGraphState): Map<string, string
 export const toFlowNodes = (
   document: ProjectGraphState,
   previousNodes: WorkflowFlowNode[] = [],
-  templates?: InvocationTemplates
+  templates?: InvocationTemplates,
+  index: WorkflowGraphIndex = createWorkflowGraphIndex(document.nodes, document.edges),
+  isCompact = false,
+  canUseCache = false
 ): WorkflowFlowNode[] => {
   const previousById = new Map(previousNodes.map((node) => [node.id, node]));
-  const connectedByNode = getConnectedHandlesByNode(document);
+  const connectedByNode = getConnectedHandlesByNode(document, index);
+  const connectedSourcesByNode = getConnectedSourceHandlesByNode(document);
   const exposedByNode = getExposedFieldsByNode(document);
+  const templateViews = getInvocationNodeTemplateViews(templates);
 
   return document.nodes.map((documentNode): WorkflowFlowNode => {
     const previous = previousById.get(documentNode.id);
     const selected = previous?.selected ?? false;
 
     if (documentNode.type === 'invocation') {
+      const connectedSourceHandles = connectedSourcesByNode.get(documentNode.id) ?? EMPTY_NAMES;
       const connectedTargetHandles = connectedByNode.get(documentNode.id) ?? EMPTY_NAMES;
       const exposedFieldNames = exposedByNode.get(documentNode.id) ?? EMPTY_NAMES;
+      const template = templateViews.get(documentNode.data.type) ?? null;
 
       if (
         previous?.type === 'invocation' &&
+        previous.data.canUseCache === canUseCache &&
         previous.data.documentNode === documentNode &&
+        previous.data.isCompact === isCompact &&
+        previous.data.template === template &&
+        sameNames(previous.data.connectedSourceHandles, connectedSourceHandles) &&
         sameNames(previous.data.connectedTargetHandles, connectedTargetHandles) &&
         sameNames(previous.data.exposedFieldNames, exposedFieldNames)
       ) {
@@ -116,7 +200,15 @@ export const toFlowNodes = (
       }
 
       return {
-        data: { connectedTargetHandles, documentNode, exposedFieldNames },
+        data: {
+          canUseCache,
+          connectedSourceHandles,
+          connectedTargetHandles,
+          documentNode,
+          exposedFieldNames,
+          isCompact,
+          template,
+        },
         id: documentNode.id,
         position: documentNode.position,
         selected,
@@ -140,10 +232,10 @@ export const toFlowNodes = (
 
     if (documentNode.type === 'connector') {
       const inputFieldType = templates
-        ? (getWorkflowTargetFieldType(document, templates, documentNode.id, CONNECTOR_INPUT_HANDLE) ?? null)
+        ? (getWorkflowTargetFieldType(document, templates, documentNode.id, CONNECTOR_INPUT_HANDLE, index) ?? null)
         : null;
       const outputFieldType = templates
-        ? (getWorkflowSourceFieldType(document, templates, documentNode.id, CONNECTOR_OUTPUT_HANDLE) ?? null)
+        ? (getWorkflowSourceFieldType(document, templates, documentNode.id, CONNECTOR_OUTPUT_HANDLE, index) ?? null)
         : null;
 
       if (
@@ -228,15 +320,16 @@ const UNKNOWN_EDGE_DATA = (pathType: FlowEdgeType): WorkflowEdgeData => ({
 const getWorkflowEdgeFieldType = (
   document: ProjectGraphState,
   templates: InvocationTemplates | undefined,
-  edge: WorkflowEdge
+  edge: WorkflowEdge,
+  index: WorkflowGraphIndex
 ): FieldType | null => {
   if (!templates) {
     return null;
   }
 
   return (
-    getWorkflowSourceFieldType(document, templates, edge.source, edge.sourceHandle) ??
-    getWorkflowTargetFieldType(document, templates, edge.target, edge.targetHandle) ??
+    getWorkflowSourceFieldType(document, templates, edge.source, edge.sourceHandle, index) ??
+    getWorkflowTargetFieldType(document, templates, edge.target, edge.targetHandle, index) ??
     null
   );
 };
@@ -245,9 +338,10 @@ export const getWorkflowEdgeData = (
   document: ProjectGraphState,
   edge: WorkflowEdge,
   pathType: FlowEdgeType,
-  templates?: InvocationTemplates
+  templates?: InvocationTemplates,
+  index: WorkflowGraphIndex = createWorkflowGraphIndex(document.nodes, document.edges)
 ): WorkflowEdgeData => {
-  const fieldType = getWorkflowEdgeFieldType(document, templates, edge);
+  const fieldType = getWorkflowEdgeFieldType(document, templates, edge, index);
 
   if (!fieldType) {
     return UNKNOWN_EDGE_DATA(pathType);
@@ -286,13 +380,14 @@ export const toFlowEdges = (
   edgeType: FlowEdgeType = 'default',
   selectedNodeIds: Set<string> = EMPTY_NODE_IDS,
   templates?: InvocationTemplates,
-  reduceMotion = false
+  reduceMotion = false,
+  index: WorkflowGraphIndex = createWorkflowGraphIndex(document.nodes, document.edges)
 ): WorkflowFlowEdge[] => {
   const previousById = new Map(previousEdges.map((edge) => [edge.id, edge]));
 
   return document.edges.map((edge) => {
     const previous = previousById.get(edge.id);
-    const data = getWorkflowEdgeData(document, edge, edgeType, templates);
+    const data = getWorkflowEdgeData(document, edge, edgeType, templates, index);
     const isConnectedToSelectedNode = selectedNodeIds.has(edge.source) || selectedNodeIds.has(edge.target);
     const animated = isConnectedToSelectedNode && !reduceMotion ? true : undefined;
     const className = isConnectedToSelectedNode ? SELECTED_NODE_EDGE_CLASS : undefined;

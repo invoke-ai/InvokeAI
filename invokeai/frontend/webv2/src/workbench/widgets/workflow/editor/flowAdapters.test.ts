@@ -133,8 +133,19 @@ describe('flowAdapters identity preservation', () => {
 
     expect(nodeB?.type === 'invocation' && nodeB.data.connectedTargetHandles).toEqual([]);
     expect(second[1]).not.toBe(first[1]);
-    // Node a had no incoming edges either way — still identity-stable.
-    expect(second[0]).toBe(first[0]);
+    // Node a lost its outgoing handle metadata, so it must also update.
+    expect(second[0]).not.toBe(first[0]);
+    expect(second[0]?.type === 'invocation' && second[0].data.connectedSourceHandles).toEqual([]);
+  });
+
+  it('precomputes connected source handles onto invocation node data', () => {
+    const doc = createDoc();
+    const nodes = toFlowNodes(doc);
+    const source = nodes[0];
+    const target = nodes[1];
+
+    expect(source?.type === 'invocation' ? source.data.connectedSourceHandles : []).toEqual(['value']);
+    expect(target?.type === 'invocation' ? target.data.connectedSourceHandles : []).toEqual([]);
   });
 
   it('precomputes exposed field names onto invocation node data', () => {
@@ -160,6 +171,18 @@ describe('flowAdapters identity preservation', () => {
     expect(nodeB?.type === 'invocation' && nodeB.data.exposedFieldNames).toEqual(['a']);
   });
 
+  it('marks invocation nodes compact for large workflow rendering', () => {
+    const doc = createDoc();
+    const normal = toFlowNodes(doc);
+    const compact = toFlowNodes(doc, normal, undefined, undefined, true);
+    const compactAgain = toFlowNodes(doc, compact, undefined, undefined, true);
+
+    expect(normal[0]?.type === 'invocation' && normal[0].data.isCompact).toBe(false);
+    expect(compact[0]?.type === 'invocation' && compact[0].data.isCompact).toBe(true);
+    expect(compact[0]).not.toBe(normal[0]);
+    expect(compactAgain[0]).toBe(compact[0]);
+  });
+
   it('precomputes resolved connector field types onto connector node data', () => {
     const fieldType = single('ImageField');
     const templates = createTemplates(fieldType);
@@ -179,6 +202,20 @@ describe('flowAdapters identity preservation', () => {
     expect(connector?.type === 'connector' && connector.data.outputFieldType).toBe(fieldType);
     expect(connector).not.toBe(untyped[1]);
     expect(toFlowNodes(doc, typed, templates)[1]).toBe(connector);
+  });
+
+  it('precomputes stable invocation template views onto invocation node data', () => {
+    const doc = createDoc();
+    const templates = createTemplates();
+    const first = toFlowNodes(doc, [], templates);
+    const second = toFlowNodes(doc, first, templates);
+    const node = first[0];
+
+    expect(node?.type === 'invocation' ? node.data.template?.template.title : null).toBe('Add');
+    expect(node?.type === 'invocation' ? node.data.template?.inputTemplates.map((input) => input.name) : []).toEqual([
+      'a',
+    ]);
+    expect(second[0]).toBe(first[0]);
   });
 
   it('does not mark a target as connected through an unresolved connector output', () => {

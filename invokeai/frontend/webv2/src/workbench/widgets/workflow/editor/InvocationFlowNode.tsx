@@ -3,18 +3,15 @@ import type {
   FieldInputTemplate,
   FieldOutputTemplate,
   FieldType,
-  InvocationTemplate,
   WorkflowInvocationNode,
 } from '@workbench/workflows/types';
 
 import { Box, Checkbox, Field, Flex, HStack, Icon, IconButton, Image, Input, Stack, Text } from '@chakra-ui/react';
-import { useAuthSession } from '@workbench/auth/session';
 import { useNodeExecutionState, type NodeExecutionState } from '@workbench/backend/nodeExecutionStore';
 import { Tooltip } from '@workbench/components/ui';
 import { FieldDescriptionPopover } from '@workbench/widgets/workflow/fields/FieldDescriptionPopover';
 import { WorkflowFieldInput } from '@workbench/widgets/workflow/fields/WorkflowFieldInput';
 import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
-import { isExecutableInvocationType } from '@workbench/workflows/buildGraph';
 import {
   cloneWorkflowFieldDefault,
   getFieldTypeColor,
@@ -25,7 +22,6 @@ import {
   isWorkflowFieldValueDefault,
   isModelFieldType,
 } from '@workbench/workflows/fields';
-import { useInvocationTemplatesSelector } from '@workbench/workflows/templates';
 import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
 import {
   ChevronDownIcon,
@@ -38,7 +34,7 @@ import {
 } from 'lucide-react';
 import { memo, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 
-import type { InvocationFlowNode as InvocationFlowNodeType } from './flowAdapters';
+import type { InvocationFlowNode as InvocationFlowNodeType, InvocationNodeTemplateView } from './flowAdapters';
 
 import { getHandleTypeTooltip } from './handleTooltip';
 import { getWorkflowNodeChromeProps } from './nodeChrome';
@@ -67,9 +63,6 @@ const handleStyle = (type: FieldType, side: HandleSide): React.CSSProperties => 
     width: HANDLE_SIZE,
   };
 };
-
-const sortByUiOrder = <T extends { uiOrder?: number | null }>(templates: T[]): T[] =>
-  [...templates].sort((a, b) => (a.uiOrder ?? Number.MAX_SAFE_INTEGER) - (b.uiOrder ?? Number.MAX_SAFE_INTEGER));
 
 /** True while the viewport is zoomed out far enough that field content is unreadable noise. */
 const useIsZoomedOut = (): boolean => useStore((state) => state.transform[2] < CONTENT_VISIBILITY_ZOOM);
@@ -144,11 +137,9 @@ const NodeProgressStrip = ({ execution }: { execution: NodeExecutionState | null
   );
 };
 
-const NodeTitle = ({ node }: { node: WorkflowInvocationNode }) => {
+const NodeTitle = ({ node, title }: { node: WorkflowInvocationNode; title: string }) => {
   const dispatch = useWorkbenchDispatch();
-  const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
   const [draftLabel, setDraftLabel] = useState<string | null>(null);
-  const title = node.data.label || templates[node.data.type]?.title || node.data.type;
 
   if (draftLabel !== null) {
     return (
@@ -238,10 +229,13 @@ const OutputFieldTooltip = ({ template }: { template: FieldOutputTemplate }) => 
   </Stack>
 );
 
-const hasImageOutput = (template: InvocationTemplate): boolean =>
-  template.type !== 'image' && Object.values(template.outputs).some((output) => output.type.name === 'ImageField');
-
-const NodeInfoTooltipContent = ({ node, template }: { node: WorkflowInvocationNode; template: InvocationTemplate }) => {
+const NodeInfoTooltipContent = ({
+  node,
+  template,
+}: {
+  node: WorkflowInvocationNode;
+  template: InvocationNodeTemplateView['template'];
+}) => {
   const title = node.data.label ? `${node.data.label} (${template.title})` : template.title;
   const nodePack = node.data.nodePack || template.nodePack;
 
@@ -259,7 +253,13 @@ const NodeInfoTooltipContent = ({ node, template }: { node: WorkflowInvocationNo
   );
 };
 
-const NodeInfoButton = ({ node, template }: { node: WorkflowInvocationNode; template: InvocationTemplate }) => (
+const NodeInfoButton = ({
+  node,
+  template,
+}: {
+  node: WorkflowInvocationNode;
+  template: InvocationNodeTemplateView['template'];
+}) => (
   <Tooltip
     content={<NodeInfoTooltipContent node={node} template={template} />}
     positioning={{ placement: 'top-end' }}
@@ -276,14 +276,8 @@ const NodeInfoButton = ({ node, template }: { node: WorkflowInvocationNode; temp
   </Tooltip>
 );
 
-const NodeFooter = ({ node, template }: { node: WorkflowInvocationNode; template: InvocationTemplate }) => {
+const NodeFooter = ({ canUseCache, node }: { canUseCache: boolean; node: WorkflowInvocationNode }) => {
   const dispatch = useWorkbenchDispatch();
-  const session = useAuthSession();
-  const canUseCache = !session.multiuserEnabled || session.user?.is_admin === true;
-
-  if (!isExecutableInvocationType(template.type) || !hasImageOutput(template)) {
-    return null;
-  }
 
   return (
     <Flex
@@ -575,15 +569,100 @@ const HiddenHandles = ({
   </Box>
 );
 
-const InvocationFlowNodeComponent = ({ data, selected }: NodeProps<InvocationFlowNodeType>) => {
+const CompactHiddenHandles = ({
+  connectedSourceHandles,
+  connectedTargetHandles,
+  inputTemplates,
+  outputTemplates,
+}: {
+  connectedSourceHandles: string[];
+  connectedTargetHandles: string[];
+  inputTemplates: FieldInputTemplate[];
+  outputTemplates: FieldOutputTemplate[];
+}) => {
+  const connectedSources = new Set(connectedSourceHandles);
+  const connectedTargets = new Set(connectedTargetHandles);
+
+  return (
+    <HiddenHandles
+      inputTemplates={inputTemplates.filter((inputTemplate) => connectedTargets.has(inputTemplate.name))}
+      outputTemplates={outputTemplates.filter((outputTemplate) => connectedSources.has(outputTemplate.name))}
+    />
+  );
+};
+
+const CompactNodeBody = ({ inputCount, outputCount }: { inputCount: number; outputCount: number }) => (
+  <Flex
+    align="center"
+    bg="bg.muted"
+    borderBottomRadius="lg"
+    borderTopWidth="1px"
+    borderColor="border.subtle"
+    color="fg.subtle"
+    fontSize="2xs"
+    gap="2"
+    px="3"
+    py="2"
+  >
+    <Text>
+      {inputCount} input{inputCount === 1 ? '' : 's'}
+    </Text>
+    <Text>·</Text>
+    <Text>
+      {outputCount} output{outputCount === 1 ? '' : 's'}
+    </Text>
+    <Text ms="auto">Select for fields</Text>
+  </Flex>
+);
+
+const CompactInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNodeType>) => {
+  const node = data.documentNode;
+  const templateView = data.template;
+  const inputTemplates = templateView?.inputTemplates ?? [];
+  const outputTemplates = templateView?.outputTemplates ?? [];
+  const title = node.data.label || templateView?.template.title || node.data.type;
+
+  return (
+    <NodeShell isMissing={!templateView} selected={selected ?? false}>
+      <Flex
+        align="center"
+        bg="bg.subtle"
+        borderBottomWidth="1px"
+        borderColor="border.subtle"
+        borderTopRadius="lg"
+        gap="1"
+        px="3"
+        py="2"
+      >
+        <Text fontSize="sm" fontWeight="700" minW="0" title={title} truncate>
+          {title}
+        </Text>
+      </Flex>
+      {templateView ? (
+        <CompactNodeBody inputCount={inputTemplates.length} outputCount={outputTemplates.length} />
+      ) : (
+        <Text bg="bg.muted" borderBottomRadius="lg" color="fg.subtle" fontSize="2xs" px="3" py="2">
+          Unknown node type. Select for details.
+        </Text>
+      )}
+      <CompactHiddenHandles
+        connectedSourceHandles={data.connectedSourceHandles}
+        connectedTargetHandles={data.connectedTargetHandles}
+        inputTemplates={inputTemplates}
+        outputTemplates={outputTemplates}
+      />
+    </NodeShell>
+  );
+};
+
+const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNodeType>) => {
   const dispatch = useWorkbenchDispatch();
-  const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
   const isZoomedOut = useIsZoomedOut();
   const node = data.documentNode;
-  const template = templates[node.data.type];
+  const templateView = data.template;
   const execution = useNodeExecutionState(node.id);
 
-  if (!template) {
+  if (!templateView) {
     return (
       <NodeShell isMissing selected={selected ?? false}>
         <HStack gap="1.5" p="3">
@@ -599,14 +678,16 @@ const InvocationFlowNodeComponent = ({ data, selected }: NodeProps<InvocationFlo
     );
   }
 
+  const template = templateView.template;
   const connectedFieldNames = new Set(data.connectedTargetHandles);
   const exposedFieldNames = new Set(data.exposedFieldNames);
-  const inputTemplates = sortByUiOrder(Object.values(template.inputs).filter((input) => !input.uiHidden));
-  const outputTemplates = Object.values(template.outputs);
+  const inputTemplates = templateView.inputTemplates;
+  const outputTemplates = templateView.outputTemplates;
   const isOpen = node.data.isOpen;
   const isRunning = execution?.status === 'running';
   const isMissingRequiredInput = hasMissingRequiredInputs(node, Object.values(template.inputs), connectedFieldNames);
-  const withFooter = !isZoomedOut && isExecutableInvocationType(template.type) && hasImageOutput(template);
+  const isCompact = data.isCompact && !selected;
+  const withFooter = !isZoomedOut && templateView.isExecutable && templateView.hasImageOutput;
   const withOutputPreview = Boolean(execution?.outputImageUrl);
 
   return (
@@ -643,14 +724,19 @@ const InvocationFlowNodeComponent = ({ data, selected }: NodeProps<InvocationFlo
           </Text>
         ) : (
           <>
-            <NodeTitle node={node} />
+            <NodeTitle node={node} title={node.data.label || template.title} />
             <Box flex="1" />
             <NodeInfoButton node={node} template={template} />
           </>
         )}
       </Flex>
       <NodeProgressStrip execution={execution} />
-      {isOpen ? (
+      {isOpen && isCompact ? (
+        <>
+          <CompactNodeBody inputCount={inputTemplates.length} outputCount={outputTemplates.length} />
+          <HiddenHandles inputTemplates={inputTemplates} outputTemplates={outputTemplates} />
+        </>
+      ) : isOpen ? (
         <Box bg="bg.muted" borderBottomRadius={withFooter || withOutputPreview ? 'none' : 'lg'} py="1">
           {outputTemplates.map((outputTemplate) => (
             <OutputFieldRow key={outputTemplate.name} isSkeleton={isZoomedOut} template={outputTemplate} />
@@ -686,9 +772,16 @@ const InvocationFlowNodeComponent = ({ data, selected }: NodeProps<InvocationFlo
           )}
         </Box>
       ) : null}
-      {isOpen && withFooter ? <NodeFooter node={node} template={template} /> : null}
+      {isOpen && withFooter ? <NodeFooter canUseCache={data.canUseCache} node={node} /> : null}
     </NodeShell>
   );
 };
+
+const InvocationFlowNodeComponent = (props: NodeProps<InvocationFlowNodeType>) =>
+  props.data.isCompact && !props.selected ? (
+    <CompactInvocationNode {...props} />
+  ) : (
+    <ExpandedInvocationNode {...props} />
+  );
 
 export const InvocationFlowNode = memo(InvocationFlowNodeComponent);

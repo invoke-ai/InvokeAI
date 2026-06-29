@@ -1,16 +1,19 @@
 /* eslint-disable react/react-compiler */
 import type { WidgetRuntimeApi } from '@workbench/types';
-import type { XYPosition } from '@workbench/workflows/types';
+import type { ProjectGraphState, XYPosition } from '@workbench/workflows/types';
 
-import { Box, Flex, Stack, Text } from '@chakra-ui/react';
+import { Box, Flex, HStack, Spinner, Stack, Text } from '@chakra-ui/react';
+import { useAuthSession } from '@workbench/auth/session';
 import { FlowMiniMap, flowThemeCss, getFlowColorMode } from '@workbench/graph-preview';
 import '@xyflow/react/dist/style.css';
+import { markWorkbenchPerf, measureWorkbenchPerf, timeWorkbenchPerf } from '@workbench/performanceMarks';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
 import { setAddNodeOpen } from '@workbench/widgets/workflow/workflowUiStore';
 import { shallowEqual, useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { getProjectGraphReadiness } from '@workbench/workflows/buildGraph';
 import { buildConnectorNode, createWorkflowId } from '@workbench/workflows/document';
+import { createWorkflowGraphIndex } from '@workbench/workflows/graphIndex';
 import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSelector } from '@workbench/workflows/templates';
 import {
   getWorkflowSourceFieldType,
@@ -33,6 +36,7 @@ import {
   type NodeChange,
   type NodeTypes,
   type OnConnectEnd,
+  type Viewport,
 } from '@xyflow/react';
 import {
   useCallback,
@@ -42,6 +46,7 @@ import {
   useMemo,
   useRef,
   useState,
+  startTransition,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
 
@@ -66,6 +71,11 @@ import { InvocationFlowNode } from './InvocationFlowNode';
 import { NodeContextMenu, type WorkflowContextMenuState } from './NodeContextMenu';
 import { NotesFlowNode } from './NotesFlowNode';
 import {
+  isLargeWorkflowGraph,
+  WORKFLOW_INITIAL_RENDER_NODE_COUNT,
+  WORKFLOW_MINIMAP_DELAY_MS,
+} from './performanceConstants';
+import {
   clearNodeSelectionRequest,
   reportNodeHover,
   reportNodeSelection,
@@ -75,6 +85,7 @@ import { useEraser } from './useEraser';
 import { useLasso } from './useLasso';
 import { useModifierHeld } from './useModifierHeld';
 import { WorkflowEdge } from './WorkflowEdge';
+import { getWorkflowViewport, getWorkflowViewportKey, setWorkflowViewport } from './workflowViewportStore';
 
 const nodeTypes: NodeTypes = {
   connector: ConnectorFlowNode,
@@ -100,6 +111,50 @@ const SNAP_GRID: [number, number] = [24, 24];
 const DELETE_KEY_CODES = ['Backspace', 'Delete'];
 
 const DEFAULT_EDGE_OPTIONS = { style: { strokeWidth: 2 } };
+const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 } as const;
+
+interface WorkflowFlowModel {
+  edges: WorkflowFlowEdge[];
+  nodes: WorkflowFlowNode[];
+}
+
+const EMPTY_FLOW_EDGES: WorkflowFlowEdge[] = [];
+const EMPTY_FLOW_NODES: WorkflowFlowNode[] = [];
+
+const buildWorkflowFlowModel = ({
+  document,
+  edgeType,
+  invocationTemplates,
+  previousEdges = [],
+  previousNodes = [],
+  reduceMotion,
+  selectedNodeIds = new Set<string>(),
+  isCompact = false,
+  canUseCache = false,
+}: {
+  canUseCache?: boolean;
+  document: ProjectGraphState;
+  edgeType: FlowEdgeType;
+  isCompact?: boolean;
+  invocationTemplates?: Parameters<typeof toFlowNodes>[2];
+  previousEdges?: WorkflowFlowEdge[];
+  previousNodes?: WorkflowFlowNode[];
+  reduceMotion: boolean;
+  selectedNodeIds?: Set<string>;
+}): WorkflowFlowModel => {
+  const index = timeWorkbenchPerf('workflow:create-graph-index', () =>
+    createWorkflowGraphIndex(document.nodes, document.edges)
+  );
+
+  return timeWorkbenchPerf('workflow:build-flow-model', () => ({
+    edges: timeWorkbenchPerf('workflow:to-flow-edges', () =>
+      toFlowEdges(document, previousEdges, edgeType, selectedNodeIds, invocationTemplates, reduceMotion, index)
+    ),
+    nodes: timeWorkbenchPerf('workflow:to-flow-nodes', () =>
+      toFlowNodes(document, previousNodes, invocationTemplates, index, isCompact, canUseCache)
+    ),
+  }));
+};
 
 const getEventClientPosition = (event: MouseEvent | TouchEvent): { x: number; y: number } | null => {
   if (event instanceof MouseEvent) {
@@ -111,11 +166,57 @@ const getEventClientPosition = (event: MouseEvent | TouchEvent): { x: number; y:
   return touch ? { x: touch.clientX, y: touch.clientY } : null;
 };
 
+const WorkflowEditorPreparingState = ({ edgeCount, nodeCount }: { edgeCount: number; nodeCount: number }) => (
+  <Flex align="center" bg="bg.inset" h="full" justify="center" p="6" w="full">
+    <Stack align="center" gap="3" textAlign="center">
+      <HStack color="fg.muted" gap="2">
+        <Spinner size="sm" />
+        <Text fontSize="sm" fontWeight="700">
+          Preparing workflow graph
+        </Text>
+      </HStack>
+      <Text color="fg.subtle" fontSize="xs">
+        Loading {nodeCount.toLocaleString()} node{nodeCount === 1 ? '' : 's'} and {edgeCount.toLocaleString()} edge
+        {edgeCount === 1 ? '' : 's'}.
+      </Text>
+    </Stack>
+  </Flex>
+);
+
 const getSelectedNodeIdSet = (nodes: WorkflowFlowNode[]): Set<string> =>
   new Set(nodes.filter((node) => node.selected).map((node) => node.id));
 
+const getNodeDistanceFromViewportOrigin = (node: WorkflowFlowNode, viewport: Viewport): number => {
+  const zoom = viewport.zoom || 1;
+  const originX = -viewport.x / zoom;
+  const originY = -viewport.y / zoom;
+  const dx = node.position.x - originX;
+  const dy = node.position.y - originY;
+
+  return dx * dx + dy * dy;
+};
+
+export const getInitialRenderFlowModel = (model: WorkflowFlowModel, viewport: Viewport): WorkflowFlowModel => {
+  if (model.nodes.length <= WORKFLOW_INITIAL_RENDER_NODE_COUNT) {
+    return model;
+  }
+
+  const nodes = [...model.nodes]
+    .sort(
+      (left, right) =>
+        getNodeDistanceFromViewportOrigin(left, viewport) - getNodeDistanceFromViewportOrigin(right, viewport)
+    )
+    .slice(0, WORKFLOW_INITIAL_RENDER_NODE_COUNT);
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const edges = model.edges.filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target));
+
+  return { edges, nodes };
+};
+
 const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
   const projectGraph = useActiveProjectSelector((project) => project.projectGraph);
+  const projectId = useActiveProjectSelector((project) => project.id);
+  const session = useAuthSession();
   const dispatch = useWorkbenchDispatch();
   const notify = useNotify();
   const {
@@ -139,33 +240,81 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
   const templatesStatus = useInvocationTemplatesSelector((snapshot) => snapshot.status);
   const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
   const invocationTemplates = templatesStatus === 'loaded' ? templates : undefined;
+  const canUseCache = !session.multiuserEnabled || session.user?.is_admin === true;
   const edgeType: FlowEdgeType = workflowEdgeStyle === 'square' ? 'step' : 'default';
-  const [flowNodes, setFlowNodes] = useState<WorkflowFlowNode[]>(() =>
-    toFlowNodes(projectGraph, [], invocationTemplates)
+  const isLargeGraph = isLargeWorkflowGraph({
+    edgeCount: projectGraph.edges.length,
+    nodeCount: projectGraph.nodes.length,
+  });
+  const viewportKey = useMemo(
+    () => getWorkflowViewportKey(projectId, runtime.instanceId),
+    [projectId, runtime.instanceId]
   );
-  const [flowEdges, setFlowEdges] = useState<WorkflowFlowEdge[]>(() =>
-    toFlowEdges(projectGraph, [], edgeType, new Set<string>(), invocationTemplates, reduceMotion)
+  const defaultViewport = useMemo(() => getWorkflowViewport(viewportKey) ?? DEFAULT_VIEWPORT, [viewportKey]);
+  const [flowModel, setFlowModel] = useState<WorkflowFlowModel | null>(() =>
+    isLargeGraph
+      ? null
+      : buildWorkflowFlowModel({
+          canUseCache,
+          document: projectGraph,
+          edgeType,
+          invocationTemplates,
+          isCompact: isLargeGraph,
+          reduceMotion,
+        })
   );
+  const flowNodes = flowModel?.nodes ?? EMPTY_FLOW_NODES;
+  const flowEdges = flowModel?.edges ?? EMPTY_FLOW_EDGES;
+  const isPreparing = flowModel === null;
+  const shouldDeferInitialBuild = isLargeGraph && flowModel === null;
   const [flowInstance, setFlowInstance] = useState<WorkflowFlowInstance | null>(null);
+  const [isFullGraphMounted, setIsFullGraphMounted] = useState(!isLargeGraph);
   const [tool, setTool] = useState<EditorTool>('pan');
   const [nodeOpacity, setNodeOpacity] = useState(1);
+  const [isMinimapReady, setIsMinimapReady] = useState(!isLargeGraph);
   const [contextMenu, setContextMenu] = useState<WorkflowContextMenuState | null>(null);
   const selectedNodeIds = workflowSelectionStore.useSelector((snapshot) => snapshot.selectedNodeIds);
   const selectionRequest = workflowSelectionStore.useSelector((snapshot) => snapshot.selectionRequest);
   const isSnapHeld = useModifierHeld('Control');
   const hasClipboardNodes = useHasClipboardNodes();
   const backgroundId = useId().replace(/:/g, '');
+  const perfMountMarkRef = useRef(`workflow:${runtime.instanceId}:editor-mounted`);
+  const perfReadyMarkRef = useRef(`workflow:${runtime.instanceId}:editor-ready`);
+  const hasScheduledFullGraphMountRef = useRef(false);
   /** Node ids to select once the next document-driven rebuild lands (fresh paste/duplicate results). */
   const pendingSelectionRef = useRef<string[] | null>(null);
+  const lastBuiltModelRef = useRef<{
+    edgeType: FlowEdgeType;
+    invocationTemplates: typeof invocationTemplates;
+    projectGraph: ProjectGraphState;
+    reduceMotion: boolean;
+    selectedNodeIds: string[];
+  } | null>(null);
 
   const selectNodes = useCallback(
     (nodeIds: string[]) => {
       const selectedNodeIdSet = new Set(nodeIds);
 
-      setFlowNodes((current) => withNodeSelection(current, selectedNodeIdSet));
-      setFlowEdges((current) =>
-        toFlowEdges(projectGraph, current, edgeType, selectedNodeIdSet, invocationTemplates, reduceMotion)
-      );
+      setFlowModel((current) => {
+        if (!current) {
+          return current;
+        }
+
+        const index = createWorkflowGraphIndex(projectGraph.nodes, projectGraph.edges);
+
+        return {
+          edges: toFlowEdges(
+            projectGraph,
+            current.edges,
+            edgeType,
+            selectedNodeIdSet,
+            invocationTemplates,
+            reduceMotion,
+            index
+          ),
+          nodes: withNodeSelection(current.nodes, selectedNodeIdSet),
+        };
+      });
       reportNodeSelection(nodeIds);
     },
     [edgeType, invocationTemplates, projectGraph, reduceMotion]
@@ -206,6 +355,71 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
     onErase: eraseElements,
   });
   const pointerToolHandlers = tool === 'lasso' ? lassoHandlers : tool === 'eraser' ? eraserHandlers : {};
+  const renderedFlowModel = useMemo(
+    () =>
+      flowModel && isLargeGraph && !isFullGraphMounted
+        ? getInitialRenderFlowModel(flowModel, defaultViewport)
+        : flowModel,
+    [defaultViewport, flowModel, isFullGraphMounted, isLargeGraph]
+  );
+  const renderedFlowNodes = renderedFlowModel?.nodes ?? EMPTY_FLOW_NODES;
+  const renderedFlowEdges = renderedFlowModel?.edges ?? EMPTY_FLOW_EDGES;
+
+  useEffect(() => {
+    hasScheduledFullGraphMountRef.current = false;
+    setIsFullGraphMounted(!isLargeGraph);
+  }, [isLargeGraph, projectId]);
+
+  useEffect(() => {
+    markWorkbenchPerf(perfMountMarkRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (isPreparing) {
+      return;
+    }
+
+    markWorkbenchPerf(perfReadyMarkRef.current);
+    measureWorkbenchPerf('workflow:editor-mounted-to-ready', perfMountMarkRef.current, perfReadyMarkRef.current);
+  }, [isPreparing]);
+
+  useEffect(() => {
+    if (!isFullGraphMounted || !isLargeGraph) {
+      return;
+    }
+
+    markWorkbenchPerf('workflow:full-graph-mounted');
+    measureWorkbenchPerf(
+      'workflow:full-graph-expand',
+      'workflow:full-graph-expand-start',
+      'workflow:full-graph-mounted'
+    );
+  }, [isFullGraphMounted, isLargeGraph]);
+
+  useEffect(() => {
+    if (!workflowShowMinimap) {
+      setIsMinimapReady(false);
+      return undefined;
+    }
+
+    if (!isLargeGraph) {
+      setIsMinimapReady(true);
+      return undefined;
+    }
+
+    setIsMinimapReady(false);
+
+    if (isPreparing) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      markWorkbenchPerf('workflow:minimap-ready');
+      setIsMinimapReady(true);
+    }, WORKFLOW_MINIMAP_DELAY_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isLargeGraph, isPreparing, workflowShowMinimap]);
 
   useEffect(() => {
     const pendingSelection = pendingSelectionRef.current;
@@ -213,20 +427,75 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
     pendingSelectionRef.current = null;
     const nextSelectedNodeIds = pendingSelection ?? selectedNodeIds;
     const nextSelectedNodeIdSet = new Set(nextSelectedNodeIds);
+    let frameId: number | null = null;
 
-    setFlowNodes((current) => {
-      const next = toFlowNodes(projectGraph, current, invocationTemplates);
+    const lastBuiltModel = lastBuiltModelRef.current;
 
-      return pendingSelection ? withNodeSelection(next, nextSelectedNodeIdSet) : next;
-    });
-    setFlowEdges((current) =>
-      toFlowEdges(projectGraph, current, edgeType, nextSelectedNodeIdSet, invocationTemplates, reduceMotion)
-    );
+    if (
+      pendingSelection === null &&
+      !shouldDeferInitialBuild &&
+      lastBuiltModel?.projectGraph === projectGraph &&
+      lastBuiltModel.edgeType === edgeType &&
+      lastBuiltModel.invocationTemplates === invocationTemplates &&
+      lastBuiltModel.reduceMotion === reduceMotion &&
+      lastBuiltModel.selectedNodeIds === nextSelectedNodeIds
+    ) {
+      return undefined;
+    }
+
+    const updateModel = () => {
+      lastBuiltModelRef.current = {
+        edgeType,
+        invocationTemplates,
+        projectGraph,
+        reduceMotion,
+        selectedNodeIds: nextSelectedNodeIds,
+      };
+
+      startTransition(() => {
+        setFlowModel((current) => {
+          const next = buildWorkflowFlowModel({
+            document: projectGraph,
+            edgeType,
+            canUseCache,
+            isCompact: isLargeGraph,
+            invocationTemplates,
+            previousEdges: current?.edges,
+            previousNodes: current?.nodes,
+            reduceMotion,
+            selectedNodeIds: nextSelectedNodeIdSet,
+          });
+
+          return { ...next, nodes: withNodeSelection(next.nodes, nextSelectedNodeIdSet) };
+        });
+      });
+    };
+
+    if (shouldDeferInitialBuild) {
+      frameId = window.requestAnimationFrame(updateModel);
+    } else {
+      updateModel();
+    }
 
     if (pendingSelection) {
       reportNodeSelection(pendingSelection);
     }
-  }, [edgeType, invocationTemplates, projectGraph, reduceMotion, selectedNodeIds]);
+
+    return () => {
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
+  }, [
+    canUseCache,
+    edgeType,
+    invocationTemplates,
+    isLargeGraph,
+    projectGraph,
+    reduceMotion,
+    selectedNodeIds,
+    shouldDeferInitialBuild,
+  ]);
 
   // Expose the instance to the widget header's actions (outside this provider).
   useEffect(() => {
@@ -419,7 +688,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
         }
       }
 
-      setFlowNodes((current) => applyNodeChanges(changes, current));
+      setFlowModel((current) => (current ? { ...current, nodes: applyNodeChanges(changes, current.nodes) } : current));
     },
     [dispatch]
   );
@@ -432,7 +701,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
         dispatch({ action: { edgeIds: removedEdgeIds, type: 'removeEdges' }, type: 'applyProjectGraphAction' });
       }
 
-      setFlowEdges((current) => applyEdgeChanges(changes, current));
+      setFlowModel((current) => (current ? { ...current, edges: applyEdgeChanges(changes, current.edges) } : current));
     },
     [dispatch]
   );
@@ -630,12 +899,29 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
     ({ nodes }: { nodes: WorkflowFlowNode[] }) => {
       const nodeIds = nodes.map((node) => node.id);
 
-      setFlowEdges((current) =>
-        toFlowEdges(projectGraph, current, edgeType, getSelectedNodeIdSet(nodes), invocationTemplates)
-      );
+      setFlowModel((current) => {
+        if (!current) {
+          return current;
+        }
+
+        const index = createWorkflowGraphIndex(projectGraph.nodes, projectGraph.edges);
+
+        return {
+          ...current,
+          edges: toFlowEdges(
+            projectGraph,
+            current.edges,
+            edgeType,
+            getSelectedNodeIdSet(nodes),
+            invocationTemplates,
+            reduceMotion,
+            index
+          ),
+        };
+      });
       reportNodeSelection(nodeIds);
     },
-    [edgeType, invocationTemplates, projectGraph]
+    [edgeType, invocationTemplates, projectGraph, reduceMotion]
   );
 
   const onNodeMouseEnter = useCallback((_: ReactMouseEvent, node: WorkflowFlowNode) => {
@@ -647,6 +933,32 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
       reportNodeHover(null);
     }
   }, []);
+  const onMoveEnd = useCallback(
+    (_: MouseEvent | TouchEvent | null, viewport: Viewport) => {
+      setWorkflowViewport(viewportKey, viewport);
+    },
+    [viewportKey]
+  );
+  const onFlowInit = useCallback(
+    (instance: WorkflowFlowInstance) => {
+      const flowInitMark = 'workflow:react-flow-init';
+
+      markWorkbenchPerf(flowInitMark);
+      measureWorkbenchPerf('workflow:editor-ready-to-react-flow-init', perfReadyMarkRef.current, flowInitMark);
+      measureWorkbenchPerf('workflow:editor-mounted-to-react-flow-init', perfMountMarkRef.current, flowInitMark);
+      setFlowInstance(instance);
+
+      if (isLargeGraph && !isFullGraphMounted && !hasScheduledFullGraphMountRef.current) {
+        hasScheduledFullGraphMountRef.current = true;
+
+        window.setTimeout(() => {
+          markWorkbenchPerf('workflow:full-graph-expand-start');
+          setIsFullGraphMounted(true);
+        }, 0);
+      }
+    },
+    [isFullGraphMounted, isLargeGraph]
+  );
 
   const editorCss = useMemo(
     () => ({
@@ -709,6 +1021,10 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
     setContextMenu(null);
   }, [contextMenu, dispatch]);
 
+  if (isPreparing) {
+    return <WorkflowEditorPreparingState edgeCount={projectGraph.edges.length} nodeCount={projectGraph.nodes.length} />;
+  }
+
   return (
     <Box
       bg="bg.inset"
@@ -720,19 +1036,21 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
       {...pointerToolHandlers}
     >
       <ReactFlow<WorkflowFlowNode, WorkflowFlowEdge>
+        key={viewportKey}
         colorMode={getFlowColorMode(themeId)}
         connectionLineType={edgeType === 'step' ? ConnectionLineType.Step : ConnectionLineType.Bezier}
         defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
+        defaultViewport={defaultViewport}
         deleteKeyCode={DELETE_KEY_CODES}
         elevateEdgesOnSelect
-        edges={flowEdges}
+        edges={renderedFlowEdges}
         edgeTypes={edgeTypes}
-        fitView
         isValidConnection={isValidConnection}
         maxZoom={2}
         minZoom={0.1}
-        nodes={flowNodes}
+        nodes={renderedFlowNodes}
         nodeTypes={nodeTypes}
+        onlyRenderVisibleElements={isLargeGraph}
         panOnDrag={panOnDrag}
         proOptions={proOptions}
         selectionMode={SelectionMode.Partial}
@@ -744,12 +1062,13 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
         onConnectEnd={onConnectEnd}
         onEdgeClick={onEdgeClick}
         onEdgesChange={onEdgesChange}
-        onInit={setFlowInstance}
+        onInit={onFlowInit}
         onNodeClick={onNodeClick}
         onNodeContextMenu={onNodeContextMenu}
         onNodeMouseEnter={onNodeMouseEnter}
         onNodeMouseLeave={onNodeMouseLeave}
         onNodesChange={onNodesChange}
+        onMoveEnd={onMoveEnd}
         onPaneContextMenu={onPaneContextMenu}
         onSelectionChange={onSelectionChange}
       >
@@ -767,7 +1086,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WidgetRuntimeApi }) => {
           onNodeOpacityChange={setNodeOpacity}
           onToolChange={setTool}
         />
-        {workflowShowMinimap ? <FlowMiniMap /> : null}
+        {workflowShowMinimap && isMinimapReady ? <FlowMiniMap /> : null}
       </ReactFlow>
       {lassoOverlay}
       {eraserOverlay}
@@ -817,8 +1136,8 @@ const ReadinessBanner = () => {
       zIndex="1"
     >
       <Stack gap="0.5">
-        {readiness.reasons.slice(0, 4).map((reason) => (
-          <Text key={reason} color="fg.muted" fontSize="2xs">
+        {readiness.reasons.slice(0, 4).map((reason, index) => (
+          <Text key={`${index}:${reason}`} color="fg.muted" fontSize="2xs">
             {reason}
           </Text>
         ))}
