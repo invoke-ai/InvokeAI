@@ -2,6 +2,7 @@ import {
   Box,
   ButtonGroup,
   Combobox,
+  type ComboboxOption,
   CompositeSlider,
   Flex,
   IconButton,
@@ -17,7 +18,10 @@ import {
   Text,
   Tooltip,
 } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import type { GroupBase } from 'chakra-react-select';
+import { selectAuthToken } from 'features/auth/store/authSlice';
 import {
   selectTextAlignment,
   selectTextFontId,
@@ -33,14 +37,23 @@ import {
   textUnderlineToggled,
 } from 'features/controlLayers/store/canvasTextSlice';
 import {
+  getTextFontStack,
+  isCustomTextFontId,
   resolveAvailableFont,
+  setCustomTextFontStacks,
   TEXT_FONT_STACKS,
   TEXT_MAX_FONT_SIZE,
   TEXT_MIN_FONT_SIZE,
   type TextFontId,
 } from 'features/controlLayers/text/textConstants';
+import {
+  $userFontReadyStates,
+  buildCustomTextFontStacks,
+  primeUserFontReadiness,
+  syncUserFontFaces,
+} from 'features/controlLayers/text/textUserFonts';
 import type { FocusEvent, KeyboardEvent, MouseEvent } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiCaretDownBold,
@@ -52,8 +65,15 @@ import {
   PiTextStrikethroughBold,
   PiTextUnderlineBold,
 } from 'react-icons/pi';
+import { useListUserFontsQuery } from 'services/api/endpoints/utilities';
 
 const formatSliderValue = (value: number) => String(value);
+const truncateLabel = (value: string, maxLength: number = 36): string => {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, maxLength - 3)}...`;
+};
 
 export const TextToolOptions = () => {
   return (
@@ -71,16 +91,150 @@ const FontSelect = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const fontId = useAppSelector(selectTextFontId);
+  const authToken = useAppSelector(selectAuthToken);
+  const { data: userFonts } = useListUserFontsQuery();
+  const loadedUserFontFacesRef = useRef<Map<string, FontFace>>(new Map());
+  const autoRetryAttemptsRef = useRef(0);
+  const userFontReadyStates = useStore($userFontReadyStates);
+  const [fontSyncVersion, setFontSyncVersion] = useState(0);
+  const userFontsLabel = t('controlLayers.text.customFonts');
+  const builtInFontsLabel = t('controlLayers.text.builtInFonts');
+  const missingFontLabel = t('controlLayers.text.missingFont');
+  const customFontStacks = useMemo(() => buildCustomTextFontStacks(userFonts ?? []), [userFonts]);
+  const hasUserFontErrors = useMemo(() => {
+    return (userFonts ?? []).some((font) => userFontReadyStates[font.id] === 'error');
+  }, [userFontReadyStates, userFonts]);
+
+  useEffect(() => {
+    setCustomTextFontStacks(customFontStacks);
+  }, [customFontStacks]);
+
+  useEffect(() => {
+    if (!isCustomTextFontId(fontId) || !userFonts || userFonts.length === 0) {
+      return;
+    }
+    const hasExactUserFont = userFonts.some((font) => font.id === fontId);
+    if (hasExactUserFont) {
+      return;
+    }
+    const resolvedFont = getTextFontStack(fontId);
+    if (resolvedFont && resolvedFont.id !== fontId) {
+      dispatch(textFontChanged(resolvedFont.id));
+    }
+  }, [dispatch, fontId, userFonts]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined' || typeof FontFace === 'undefined') {
+      return;
+    }
+
+    primeUserFontReadiness(userFonts ?? [], loadedUserFontFacesRef.current);
+    let isCancelled = false;
+
+    void (async () => {
+      await syncUserFontFaces({
+        fonts: userFonts ?? [],
+        token: authToken,
+        loadedFontFaces: loadedUserFontFacesRef.current,
+        fontFaceSet: document.fonts,
+        fontFaceCtor: FontFace,
+        fetchFn: fetch,
+      });
+
+      if (!isCancelled) {
+        // Trigger downstream re-measurement once font availability has changed.
+        setCustomTextFontStacks([...customFontStacks]);
+      }
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [authToken, customFontStacks, fontSyncVersion, userFonts]);
+
+  useEffect(() => {
+    if (!hasUserFontErrors) {
+      autoRetryAttemptsRef.current = 0;
+      return;
+    }
+    if (typeof window === 'undefined' || autoRetryAttemptsRef.current >= 2) {
+      return;
+    }
+
+    const delayMs = autoRetryAttemptsRef.current === 0 ? 1000 : 3000;
+    const timeout = window.setTimeout(() => {
+      autoRetryAttemptsRef.current += 1;
+      setFontSyncVersion((version) => version + 1);
+    }, delayMs);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [fontSyncVersion, hasUserFontErrors]);
+
+  useEffect(() => {
+    if (!hasUserFontErrors || typeof window === 'undefined') {
+      return;
+    }
+
+    const retry = () => {
+      setFontSyncVersion((version) => version + 1);
+    };
+
+    window.addEventListener('focus', retry);
+    window.addEventListener('online', retry);
+
+    return () => {
+      window.removeEventListener('focus', retry);
+      window.removeEventListener('online', retry);
+    };
+  }, [hasUserFontErrors]);
+
   const options = useMemo(() => {
-    return TEXT_FONT_STACKS.map(({ id, label, stack }) => {
-      const resolved = resolveAvailableFont(stack);
+    const customOptions: ComboboxOption[] = (userFonts ?? []).map((font) => {
       return {
-        value: id,
-        label: `${label} (${resolved})`,
+        value: font.id,
+        label: truncateLabel(font.label),
+        isDisabled: userFontReadyStates[font.id] !== 'ready',
       };
     });
-  }, []);
-  const selectedOption = options.find((option) => option.value === fontId) ?? null;
+    const builtInOptions: ComboboxOption[] = TEXT_FONT_STACKS.map(({ id, label, stack }) => {
+      const resolved = resolveAvailableFont(stack);
+      const display = truncateLabel(`${label} (${resolved})`);
+      return {
+        value: id,
+        label: display,
+      };
+    });
+    if (customOptions.length === 0) {
+      return builtInOptions;
+    }
+    return [
+      {
+        label: userFontsLabel,
+        options: customOptions,
+      },
+      { label: builtInFontsLabel, options: builtInOptions },
+    ] as GroupBase<ComboboxOption>[];
+  }, [builtInFontsLabel, userFontReadyStates, userFonts, userFontsLabel]);
+  const selectedOption = useMemo(() => {
+    const firstOption = options[0];
+    const flattened =
+      firstOption && 'options' in firstOption
+        ? (options as GroupBase<ComboboxOption>[]).flatMap((group) => group.options)
+        : (options as ComboboxOption[]);
+    const existingOption = flattened.find((option) => option.value === fontId) ?? null;
+    if (existingOption) {
+      return existingOption;
+    }
+    if (isCustomTextFontId(fontId) && !getTextFontStack(fontId)) {
+      return {
+        value: fontId,
+        label: `${missingFontLabel} (${truncateLabel(fontId.slice(5))})`,
+      };
+    }
+    return null;
+  }, [fontId, missingFontLabel, options]);
   const handleFontChange = useCallback(
     (option: { value: string } | null) => {
       if (!option) {
@@ -90,9 +244,23 @@ const FontSelect = () => {
     },
     [dispatch]
   );
+  const formatFontGroupLabel = useCallback(
+    (group: GroupBase<ComboboxOption>) => {
+      const isBuiltInGroup = group.label === builtInFontsLabel;
+      return (
+        <Flex w="full" flexDir="column" gap={1} py={1}>
+          {isBuiltInGroup && <Box borderTopWidth="1px" borderTopColor="base.500" opacity={0.85} />}
+          <Text fontSize="xs" fontWeight="semibold" color="base.400" textTransform="uppercase" letterSpacing="0.04em">
+            {group.label}
+          </Text>
+        </Flex>
+      );
+    },
+    [builtInFontsLabel]
+  );
 
   return (
-    <Flex w="200px" minW="200px" alignItems="center" gap={2}>
+    <Flex w="280px" minW="280px" alignItems="center" gap={2}>
       <Text fontSize="sm" lineHeight="1" whiteSpace="nowrap">
         {t('controlLayers.text.font')}
       </Text>
@@ -103,6 +271,7 @@ const FontSelect = () => {
         options={options}
         value={selectedOption}
         onChange={handleFontChange}
+        formatGroupLabel={formatFontGroupLabel}
       />
     </Flex>
   );
