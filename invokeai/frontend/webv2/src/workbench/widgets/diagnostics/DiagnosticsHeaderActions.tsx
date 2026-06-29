@@ -1,23 +1,24 @@
 import { Badge } from '@chakra-ui/react';
 import { Button } from '@workbench/components/ui';
-import { useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { clearProjectDiagnostics, useProjectDiagnostics } from '@workbench/diagnostics/logger';
+import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { BugIcon } from 'lucide-react';
 import { useCallback } from 'react';
 
 export const DiagnosticsHeaderActions = () => {
-  const errorCount = useWorkbenchSelector((snapshot) => snapshot.state.errorLog.length);
-  const dispatch = useWorkbenchDispatch();
-  const clearErrorLog = useCallback(() => dispatch({ type: 'clearErrorLog' }), [dispatch]);
+  const projectId = useActiveProjectSelector((project) => project.id);
+  const entries = useProjectDiagnostics(projectId);
+  const clearEntries = useCallback(() => clearProjectDiagnostics(projectId), [projectId]);
 
   return (
     <>
-      {errorCount ? (
+      {entries.length ? (
         <Badge colorPalette="red" size="xs">
           <BugIcon />
-          {errorCount}
+          {entries.length}
         </Badge>
       ) : null}
-      <Button disabled={errorCount === 0} size="2xs" variant="outline" onClick={clearErrorLog}>
+      <Button disabled={entries.length === 0} size="2xs" variant="outline" onClick={clearEntries}>
         Clear
       </Button>
     </>
