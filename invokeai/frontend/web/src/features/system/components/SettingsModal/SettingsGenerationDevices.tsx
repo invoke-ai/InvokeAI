@@ -53,6 +53,13 @@ export const SettingsGenerationDevices = memo(() => {
     async (value: GenerationDevicesValue) => {
       try {
         await updateRuntimeConfig({ generation_devices: value }).unwrap();
+        // The change only takes effect after a restart — flash a reminder on every successful change.
+        // A stable id means rapid successive edits refresh the same toast instead of stacking.
+        toast({
+          id: 'SETTINGS_GENERATION_DEVICES_RESTART',
+          title: t('settings.generationDevicesRestart'),
+          status: 'warning',
+        });
       } catch {
         toast({
           id: 'SETTINGS_GENERATION_DEVICES_SAVE_FAILED',

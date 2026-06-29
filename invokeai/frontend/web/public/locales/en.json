@@ -1841,7 +1841,7 @@
         "generationDevices": "Generation Devices",
         "generationDevicesAuto": "Auto (all GPUs)",
         "generationDevicesHelp": "Select which devices to use for parallel generation, one session per device. \"Auto\" uses every available GPU.",
-        "generationDevicesRestart": "Changes take effect after restarting InvokeAI.",
+        "generationDevicesRestart": "Restart InvokeAI for changes to take effect.",
         "generationDevicesSaveFailed": "Failed to save Generation Devices",
         "imageSubfolderStrategy": "Image Subfolder Strategy",
         "imageSubfolderStrategyDate": "Date",
