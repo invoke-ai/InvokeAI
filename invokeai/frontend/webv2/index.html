@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en" class="dark" style="color-scheme: dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Invoke V7 Workbench</title>
+    <script>
+      // Apply the saved theme before first paint so non-default themes don't
+      // flash the default dark surfaces. ThemeController re-applies it on mount.
+      // The theme hint key is user-agnostic (the workbench snapshot is per-user
+      // on multi-user backends); the snapshot read is a legacy fallback.
+      (function () {
+        try {
+          var themeColorSchemes = {
+            classic: 'dark',
+            forest: 'dark',
+            light: 'light',
+            mono: 'dark',
+            ultradark: 'dark',
+          };
+          var id = localStorage.getItem('invokeai:v7:webv2:theme');
+          if (!id) {
+            var raw = localStorage.getItem('invokeai:v7:webv2:workbench');
+            id = raw && JSON.parse(raw).state.account.preferences.themeId;
+          }
+          var colorScheme = themeColorSchemes[id];
+          var root = document.documentElement;
+          if (colorScheme) {
+            var isLight = colorScheme === 'light';
+            root.setAttribute('data-theme', id);
+            root.style.colorScheme = colorScheme;
+            root.classList.toggle('dark', !isLight);
+            root.classList.toggle('light', isLight);
+          }
+          if (localStorage.getItem('invokeai:v7:webv2:reduce-motion') === 'true') {
+            root.setAttribute('data-reduce-motion', 'true');
+          }
+        } catch (error) {
+          /* ignore malformed storage */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

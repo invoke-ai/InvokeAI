@@ -43,12 +43,12 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def get_current(self, queue_id: str) -> Optional[SessionQueueItem]:
+    def get_current(self, queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
         """Gets the currently-executing session queue item"""
         pass
 
     @abstractmethod
-    def get_next(self, queue_id: str) -> Optional[SessionQueueItem]:
+    def get_next(self, queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
         """Gets the next session queue item (does not dequeue it)"""
         pass
 
@@ -78,6 +78,7 @@ class SessionQueueBase(ABC):
         queue_id: str,
         user_id: Optional[str] = None,
         acting_user_id: Optional[str] = None,
+        origin_prefix: Optional[str] = None,
     ) -> SessionQueueStatus:
         """Gets the status of the queue.
 
@@ -191,6 +192,7 @@ class SessionQueueBase(ABC):
         queue_id: str,
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
         user_id: Optional[str] = None,
+        origin_prefix: Optional[str] = None,
     ) -> ItemIdsResult:
         """Gets all queue item ids that match the given parameters. If user_id is provided, only returns items for that user."""
         pass

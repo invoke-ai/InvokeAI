@@ -193,7 +193,7 @@ class SqliteSessionQueue(SessionQueueBase):
                     SELECT item_id
                     FROM session_queue
                     WHERE batch_id = ?
-                    ORDER BY item_id DESC;
+                    ORDER BY item_id ASC;
                     """,
                 (batch.batch_id,),
             )
@@ -233,10 +233,9 @@ class SqliteSessionQueue(SessionQueueBase):
         queue_item = self._set_queue_item_status(item_id=queue_item.item_id, status="in_progress")
         return queue_item
 
-    def get_next(self, queue_id: str) -> Optional[SessionQueueItem]:
+    def get_next(self, queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
+            query = """--sql
                 SELECT
                     sq.*,
                     u.display_name as user_display_name,
@@ -246,22 +245,28 @@ class SqliteSessionQueue(SessionQueueBase):
                 WHERE
                     sq.queue_id = ?
                     AND sq.status = 'pending'
+                """
+            params = [queue_id]
+            if origin_prefix is not None:
+                query += """--sql
+                    AND sq.origin LIKE ?
+                    """
+                params.append(f"{origin_prefix}%")
+            query += """--sql
                 ORDER BY
                     sq.priority DESC,
                     sq.created_at ASC
                 LIMIT 1
-                """,
-                (queue_id,),
-            )
+                """
+            cursor.execute(query, params)
             result = cast(Union[sqlite3.Row, None], cursor.fetchone())
         if result is None:
             return None
         return SessionQueueItem.queue_item_from_dict(dict(result))
 
-    def get_current(self, queue_id: str) -> Optional[SessionQueueItem]:
+    def get_current(self, queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
+            query = """--sql
                 SELECT
                     sq.*,
                     u.display_name as user_display_name,
@@ -271,10 +276,17 @@ class SqliteSessionQueue(SessionQueueBase):
                 WHERE
                     sq.queue_id = ?
                     AND sq.status = 'in_progress'
+                """
+            params = [queue_id]
+            if origin_prefix is not None:
+                query += """--sql
+                    AND sq.origin LIKE ?
+                    """
+                params.append(f"{origin_prefix}%")
+            query += """--sql
                 LIMIT 1
-                """,
-                (queue_id,),
-            )
+                """
+            cursor.execute(query, params)
             result = cast(Union[sqlite3.Row, None], cursor.fetchone())
         if result is None:
             return None
@@ -832,6 +844,7 @@ class SqliteSessionQueue(SessionQueueBase):
         queue_id: str,
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
         user_id: Optional[str] = None,
+        origin_prefix: Optional[str] = None,
     ) -> ItemIdsResult:
         with self._db.transaction() as cursor_:
             query = """--sql
@@ -844,6 +857,10 @@ class SqliteSessionQueue(SessionQueueBase):
             if user_id is not None:
                 query += " AND user_id = ?"
                 query_params.append(user_id)
+
+            if origin_prefix is not None:
+                query += " AND origin LIKE ?"
+                query_params.append(f"{origin_prefix}%")
 
             query += f" ORDER BY created_at {order_dir.value}"
 
@@ -858,20 +875,23 @@ class SqliteSessionQueue(SessionQueueBase):
         queue_id: str,
         user_id: Optional[str] = None,
         acting_user_id: Optional[str] = None,
+        origin_prefix: Optional[str] = None,
     ) -> SessionQueueStatus:
         with self._db.transaction() as cursor:
-            # Aggregate counts are always global (across all users). This lets a non-admin's
-            # badge show "own / total" — their share of the whole queue — and lets the queue
-            # list surface (redacted) entries belonging to other users.
-            cursor.execute(
-                """--sql
+            # Aggregate counts are global across all users within the requested scope.
+            query = """--sql
                 SELECT status, count(*)
                 FROM session_queue
                 WHERE queue_id = ?
-                GROUP BY status
-                """,
-                (queue_id,),
-            )
+                """
+            params: list[str] = [queue_id]
+
+            if origin_prefix is not None:
+                query += " AND origin LIKE ?"
+                params.append(f"{origin_prefix}%")
+
+            query += " GROUP BY status"
+            cursor.execute(query, params)
             counts_result = cast(list[sqlite3.Row], cursor.fetchall())
 
             # When user_id is provided, additionally compute that user's own counts so the
@@ -879,18 +899,24 @@ class SqliteSessionQueue(SessionQueueBase):
             # separate user_pending/user_in_progress fields and never replace the global counts.
             user_counts_result: list[sqlite3.Row] = []
             if user_id is not None:
-                cursor.execute(
-                    """--sql
+                user_query = """--sql
                     SELECT status, count(*)
                     FROM session_queue
                     WHERE queue_id = ? AND user_id = ?
+                    """
+                user_params = [queue_id, user_id]
+
+                if origin_prefix is not None:
+                    user_query += " AND origin LIKE ?"
+                    user_params.append(f"{origin_prefix}%")
+
+                user_query += """--sql
                     GROUP BY status
-                    """,
-                    (queue_id, user_id),
-                )
+                    """
+                cursor.execute(user_query, user_params)
                 user_counts_result = cast(list[sqlite3.Row], cursor.fetchall())
 
-        current_item = self.get_current(queue_id=queue_id)
+        current_item = self.get_current(queue_id=queue_id, origin_prefix=origin_prefix)
         total = sum(row[1] or 0 for row in counts_result)
         counts: dict[str, int] = {row[0]: row[1] for row in counts_result}
 

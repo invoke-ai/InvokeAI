@@ -23,6 +23,7 @@ from invokeai.app.services.config.config_default import (
     load_external_api_keys,
 )
 from invokeai.app.services.external_generation.external_generation_common import ExternalProviderStatus
+from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
 from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.backend.image_util.infill_methods.patchmatch import PatchMatch
@@ -178,7 +179,7 @@ async def update_runtime_config(
     status_code=200,
     response_model=list[ExternalProviderStatusModel],
 )
-async def get_external_provider_statuses() -> list[ExternalProviderStatusModel]:
+async def get_external_provider_statuses(_: AdminUserOrDefault) -> list[ExternalProviderStatusModel]:
     statuses = ApiDependencies.invoker.services.external_generation.get_provider_statuses()
     return [status_to_model(status) for status in statuses.values()]
 
@@ -189,7 +190,7 @@ async def get_external_provider_statuses() -> list[ExternalProviderStatusModel]:
     status_code=200,
     response_model=list[ExternalProviderConfigModel],
 )
-async def get_external_provider_configs() -> list[ExternalProviderConfigModel]:
+async def get_external_provider_configs(_: AdminUserOrDefault) -> list[ExternalProviderConfigModel]:
     config = get_config()
     return [_build_external_provider_config(provider_id, config) for provider_id in EXTERNAL_PROVIDER_FIELDS]
 
@@ -219,9 +220,14 @@ async def set_external_provider_config(
         raise HTTPException(status_code=400, detail="No external provider config fields provided")
 
     api_key_removed = update.api_key is not None and updates.get(api_key_field) is None
+    api_key_set = update.api_key is not None and updates.get(api_key_field) is not None
     _apply_external_provider_update(updates)
     if api_key_removed:
         _remove_external_models_for_provider(provider_id)
+    elif api_key_set:
+        # Configuring a key should make the provider's models usable without a
+        # restart; queue its external starter models the same way startup does.
+        _sync_external_starter_models_for_provider(provider_id)
     return _build_external_provider_config(provider_id, get_config())
 
 
@@ -314,6 +320,19 @@ def _build_external_provider_config(provider_id: str, config: InvokeAIAppConfig)
         api_key_configured=bool(getattr(config, api_key_field)),
         base_url=getattr(config, base_url_field),
     )
+
+
+def _sync_external_starter_models_for_provider(provider_id: str) -> None:
+    invoker = ApiDependencies.invoker
+    try:
+        sync_configured_external_starter_models(
+            configured_provider_ids={provider_id},
+            model_manager=invoker.services.model_manager,
+            logger=invoker.services.logger,
+        )
+    except Exception as error:
+        # Queuing installs must never fail the config save; surface and move on.
+        invoker.services.logger.warning(f"Failed queueing external starter models for '{provider_id}': {error}")
 
 
 def _remove_external_models_for_provider(provider_id: str) -> None:

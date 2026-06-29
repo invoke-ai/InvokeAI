@@ -388,6 +388,29 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/models/models_dir": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Models Dir
+         * @description Get the absolute path of the directory managed models are stored in.
+         *
+         *     Model config `path` values are relative to this directory unless they are
+         *     absolute (in-place installs from outside it).
+         */
+        get: operations["get_models_dir"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/models/get_by_attrs": {
         parameters: {
             query?: never;
@@ -2643,6 +2666,58 @@ export type paths = {
          */
         post: operations["delete_client_state"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Projects
+         * @description Lists the current user's projects as lightweight summaries (no documents).
+         */
+        get: operations["list_projects"];
+        put?: never;
+        /**
+         * Create Project
+         * @description Creates a project for the current user.
+         */
+        post: operations["create_project"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Project
+         * @description Gets one of the current user's projects, including its document.
+         */
+        get: operations["get_project"];
+        /**
+         * Update Project
+         * @description Saves a project. Returns 409 with the current revision when the save is based on a stale revision.
+         */
+        put: operations["update_project"];
+        post?: never;
+        /**
+         * Delete Project
+         * @description Deletes one of the current user's projects. Idempotent.
+         */
+        delete: operations["delete_project"];
         options?: never;
         head?: never;
         patch?: never;
@@ -5164,6 +5239,11 @@ export type components = {
              * @default 0
              */
             high_watermark?: number;
+            /**
+             * Cache Used
+             * @default 0
+             */
+            cache_used?: number;
             /**
              * In Cache
              * @default 0
@@ -9005,6 +9085,13 @@ export type components = {
              * @description The field for this connection
              */
             field: string;
+        };
+        /** EmptyModelCacheResponse */
+        EmptyModelCacheResponse: {
+            /** Models Cleared */
+            models_cleared: number;
+            /** Bytes Freed */
+            bytes_freed: number;
         };
         /** EnqueueBatchResult */
         EnqueueBatchResult: {
@@ -24846,6 +24933,121 @@ export type components = {
             dataURL: string;
         };
         /**
+         * ProjectCreateRequest
+         * @description Request body for creating a project.
+         */
+        ProjectCreateRequest: {
+            /**
+             * Project Id
+             * @description Client-generated project id (e.g. for imports); generated when omitted
+             */
+            project_id?: string | null;
+            /**
+             * Name
+             * @description The project's display name
+             */
+            name: string;
+            /**
+             * Data
+             * @description The opaque client-owned project document
+             */
+            data: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * ProjectRecordDTO
+         * @description Full project record including the client-owned document.
+         */
+        ProjectRecordDTO: {
+            /**
+             * Project Id
+             * @description The project's client-generated identifier
+             */
+            project_id: string;
+            /**
+             * Name
+             * @description The project's display name
+             */
+            name: string;
+            /**
+             * Revision
+             * @description Monotonic revision, incremented on every save
+             */
+            revision: number;
+            /**
+             * Created At
+             * @description When the project was created
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * @description When the project was last saved
+             */
+            updated_at: string;
+            /**
+             * Data
+             * @description The opaque client-owned project document
+             */
+            data: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * ProjectSummaryDTO
+         * @description Lightweight project listing entry; the document payload is omitted.
+         */
+        ProjectSummaryDTO: {
+            /**
+             * Project Id
+             * @description The project's client-generated identifier
+             */
+            project_id: string;
+            /**
+             * Name
+             * @description The project's display name
+             */
+            name: string;
+            /**
+             * Revision
+             * @description Monotonic revision, incremented on every save
+             */
+            revision: number;
+            /**
+             * Created At
+             * @description When the project was created
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * @description When the project was last saved
+             */
+            updated_at: string;
+        };
+        /**
+         * ProjectUpdateRequest
+         * @description Request body for saving a project with optimistic concurrency.
+         */
+        ProjectUpdateRequest: {
+            /**
+             * Name
+             * @description The project's display name
+             */
+            name: string;
+            /**
+             * Data
+             * @description The opaque client-owned project document
+             */
+            data: {
+                [key: string]: unknown;
+            };
+            /**
+             * Expected Revision
+             * @description The revision this save is based on; mismatch returns 409
+             */
+            expected_revision: number;
+        };
+        /**
          * Prompt Template
          * @description Applies a Style Preset template to positive and negative prompts.
          *
@@ -33601,6 +33803,26 @@ export interface operations {
             };
         };
     };
+    get_models_dir: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The absolute path of the models directory */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string;
+                };
+            };
+        };
+    };
     get_model_records_by_attrs: {
         parameters: {
             query: {
@@ -34215,7 +34437,10 @@ export interface operations {
                 /** @description access token for the remote resource */
                 access_token?: string | null;
             };
-            header?: never;
+            header?: {
+                /** @description access token for the remote resource */
+                "X-Model-Source-Access-Token"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -34712,7 +34937,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["EmptyModelCacheResponse"];
                 };
             };
         };
@@ -36836,6 +37061,8 @@ export interface operations {
             query?: {
                 /** @description The order of sort */
                 order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description Only include queue items whose origin starts with this prefix */
+                origin_prefix?: string | null;
             };
             header?: never;
             path: {
@@ -37203,7 +37430,10 @@ export interface operations {
     };
     get_current_queue_item: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only include queue items whose origin starts with this prefix */
+                origin_prefix?: string | null;
+            };
             header?: never;
             path: {
                 /** @description The queue id to perform this operation on */
@@ -37235,7 +37465,10 @@ export interface operations {
     };
     get_next_queue_item: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only include queue items whose origin starts with this prefix */
+                origin_prefix?: string | null;
+            };
             header?: never;
             path: {
                 /** @description The queue id to perform this operation on */
@@ -37267,7 +37500,10 @@ export interface operations {
     };
     get_queue_status: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only include queue items whose origin starts with this prefix */
+                origin_prefix?: string | null;
+            };
             header?: never;
             path: {
                 /** @description The queue id to perform this operation on */
@@ -38400,6 +38636,157 @@ export interface operations {
                 };
             };
             /** @description Client state deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_projects: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectSummaryDTO"][];
+                };
+            };
+        };
+    };
+    create_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRecordDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the project to get */
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRecordDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the project to save */
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRecordDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the project to delete */
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
             204: {
                 headers: {
                     [name: string]: unknown;

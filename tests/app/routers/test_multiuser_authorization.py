@@ -21,6 +21,7 @@ from invokeai.app.api_app import app
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
@@ -114,6 +115,7 @@ def mock_services() -> InvocationServices:
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
         client_state_persistence=ClientStatePersistenceSqlite(db=db),
+        project_records=ProjectRecordsSqlite(db=db),
         users=UserService(db),
         external_generation=None,  # type: ignore
     )
@@ -1950,15 +1952,13 @@ class TestCustomNodesAuthorization:
         monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._get_custom_nodes_path", lambda: tmp_path)
 
         # Simulate a successful git clone by creating the target dir with __init__.py
-        def fake_git_clone(cmd: list[str], **kwargs: Any) -> MagicMock:
+        async def fake_clone_node_pack(source: str, target_dir: Any) -> tuple[int, str]:
             target_dir = tmp_path / "test-pack"
             target_dir.mkdir(parents=True, exist_ok=True)
             (target_dir / "__init__.py").touch()
-            result = MagicMock()
-            result.returncode = 0
-            return result
+            return 0, ""
 
-        monkeypatch.setattr("invokeai.app.api.routers.custom_nodes.subprocess.run", fake_git_clone)
+        monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._clone_node_pack", fake_clone_node_pack)
         monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._load_node_pack", lambda *a, **kw: None)
         monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._import_workflows_from_pack", lambda *a, **kw: [])
         monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._write_pack_manifest", lambda *a, **kw: None)

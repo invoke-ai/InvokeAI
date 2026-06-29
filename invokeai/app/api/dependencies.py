@@ -41,6 +41,7 @@ from invokeai.app.services.model_relationships.model_relationships_default impor
 from invokeai.app.services.names.names_default import SimpleNameService
 from invokeai.app.services.object_serializer.object_serializer_disk import ObjectSerializerDisk
 from invokeai.app.services.object_serializer.object_serializer_forward_cache import ObjectSerializerForwardCache
+from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
 from invokeai.app.services.session_processor.session_processor_default import (
     DefaultSessionProcessor,
     DefaultSessionRunner,
@@ -187,6 +188,7 @@ class ApiDependencies:
         style_preset_image_files = StylePresetImageFileStorageDisk(style_presets_folder / "images")
         workflow_thumbnails = WorkflowThumbnailFileStorageDisk(workflow_thumbnails_folder)
         client_state_persistence = ClientStatePersistenceSqlite(db=db)
+        project_records = ProjectRecordsSqlite(db=db)
         users = UserService(db=db)
 
         services = InvocationServices(
@@ -220,6 +222,7 @@ class ApiDependencies:
             style_preset_image_files=style_preset_image_files,
             workflow_thumbnails=workflow_thumbnails,
             client_state_persistence=client_state_persistence,
+            project_records=project_records,
             users=users,
         )
 

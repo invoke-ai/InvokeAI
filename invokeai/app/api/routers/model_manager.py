@@ -11,7 +11,7 @@ from tempfile import TemporaryDirectory
 from typing import List, Optional, Type
 
 import huggingface_hub
-from fastapi import Body, Path, Query, Response, UploadFile
+from fastapi import Body, Header, Path, Query, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.routing import APIRouter
 from PIL import Image
@@ -66,6 +66,11 @@ class ModelsList(BaseModel):
     models: List[AnyModelConfig]
 
     model_config = ConfigDict(use_enum_values=True)
+
+
+class EmptyModelCacheResponse(BaseModel):
+    models_cleared: int
+    bytes_freed: int
 
 
 class CacheType(str, Enum):
@@ -216,6 +221,20 @@ async def list_missing_models() -> ModelsList:
             missing_models.append(model_config)
 
     return ModelsList(models=missing_models)
+
+
+@model_manager_router.get(
+    "/models_dir",
+    operation_id="get_models_dir",
+    responses={200: {"description": "The absolute path of the models directory"}},
+)
+async def get_models_dir() -> str:
+    """Get the absolute path of the directory managed models are stored in.
+
+    Model config `path` values are relative to this directory unless they are
+    absolute (in-place installs from outside it).
+    """
+    return ApiDependencies.invoker.services.configuration.models_path.resolve().as_posix()
 
 
 @model_manager_router.get(
@@ -747,6 +766,11 @@ async def install_model(
     source: str = Query(description="Model source to install, can be a local path, repo_id, or remote URL"),
     inplace: Optional[bool] = Query(description="Whether or not to install a local model in place", default=False),
     access_token: Optional[str] = Query(description="access token for the remote resource", default=None),
+    source_access_token: Optional[str] = Header(
+        alias="X-Model-Source-Access-Token",
+        description="access token for the remote resource",
+        default=None,
+    ),
     config: ModelRecordChanges = Body(
         description="Object containing fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
         examples=[{"name": "string", "description": "string"}],
@@ -786,7 +810,7 @@ async def install_model(
         result: ModelInstallJob = installer.heuristic_import(
             source=source,
             config=config,
-            access_token=access_token,
+            access_token=source_access_token or access_token,
             inplace=bool(inplace),
         )
         logger.info(f"Started installation of {source}")
@@ -1301,12 +1325,14 @@ async def get_stats() -> Optional[CacheStats]:
     "/empty_model_cache",
     operation_id="empty_model_cache",
     status_code=200,
+    response_model=EmptyModelCacheResponse,
 )
-async def empty_model_cache(current_admin: AdminUserOrDefault) -> None:
+async def empty_model_cache(current_admin: AdminUserOrDefault) -> EmptyModelCacheResponse:
     """Drop all models from the model cache to free RAM/VRAM. 'Locked' models that are in active use will not be dropped."""
     # Request 1000GB of room in order to force the cache to drop all models.
     ApiDependencies.invoker.services.logger.info("Emptying model cache.")
-    ApiDependencies.invoker.services.model_manager.load.ram_cache.make_room(1000 * 2**30)
+    result = ApiDependencies.invoker.services.model_manager.load.ram_cache.make_room(1000 * 2**30)
+    return EmptyModelCacheResponse(models_cleared=result.models_cleared, bytes_freed=result.bytes_freed)
 
 
 class HFTokenStatus(str, Enum):
@@ -1341,7 +1367,7 @@ class HFTokenHelper:
 
 
 @model_manager_router.get("/hf_login", operation_id="get_hf_login_status", response_model=HFTokenStatus)
-async def get_hf_login_status() -> HFTokenStatus:
+async def get_hf_login_status(_: AdminUserOrDefault) -> HFTokenStatus:
     token_status = HFTokenHelper.get_status()
 
     if token_status is HFTokenStatus.UNKNOWN:

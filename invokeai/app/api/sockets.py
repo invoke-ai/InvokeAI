@@ -29,6 +29,7 @@ from invokeai.app.services.events.events_common import (
     ModelInstallCompleteEvent,
     ModelInstallDownloadProgressEvent,
     ModelInstallDownloadsCompleteEvent,
+    ModelInstallDownloadStartedEvent,
     ModelInstallErrorEvent,
     ModelInstallStartedEvent,
     ModelLoadCompleteEvent,
@@ -77,6 +78,7 @@ MODEL_EVENTS = {
     DownloadStartedEvent,
     ModelLoadStartedEvent,
     ModelLoadCompleteEvent,
+    ModelInstallDownloadStartedEvent,
     ModelInstallDownloadProgressEvent,
     ModelInstallDownloadsCompleteEvent,
     ModelInstallStartedEvent,
@@ -86,6 +88,16 @@ MODEL_EVENTS = {
 }
 
 BULK_DOWNLOAD_EVENTS = {BulkDownloadStartedEvent, BulkDownloadCompleteEvent, BulkDownloadErrorEvent}
+
+MODEL_INSTALL_EVENTS = (
+    ModelInstallDownloadStartedEvent,
+    ModelInstallDownloadProgressEvent,
+    ModelInstallDownloadsCompleteEvent,
+    ModelInstallStartedEvent,
+    ModelInstallCompleteEvent,
+    ModelInstallCancelledEvent,
+    ModelInstallErrorEvent,
+)
 
 
 class SocketIO:
@@ -354,7 +366,12 @@ class SocketIO:
             logger.error(f"Error handling queue event {event[0]}: {e}", exc_info=True)
 
     async def _handle_model_event(self, event: FastAPIEvent[ModelEventBase | DownloadEventBase]) -> None:
-        await self._sio.emit(event=event[0], data=event[1].model_dump(mode="json"))
+        event_name, event_data = event
+        if isinstance(event_data, MODEL_INSTALL_EVENTS):
+            await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
+            return
+
+        await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"))
 
     async def _handle_bulk_image_download_event(self, event: FastAPIEvent[BulkDownloadEventBase]) -> None:
         event_name, event_data = event

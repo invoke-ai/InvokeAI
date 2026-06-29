@@ -157,7 +157,7 @@ def test_event_redacts_when_current_item_disappears_between_reads(
     # item; the redaction read returns None as if B finished in between.
     call_count = {"n": 0}
 
-    def racey_get_current(queue_id: str) -> Optional[SessionQueueItem]:
+    def racey_get_current(queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
         call_count["n"] += 1
         if call_count["n"] == 1:
             return b_snapshot

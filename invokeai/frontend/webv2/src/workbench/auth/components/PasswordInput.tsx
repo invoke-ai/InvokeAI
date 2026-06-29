@@ -1,0 +1,67 @@
+import { Box, HStack, Input, InputGroup, Text } from '@chakra-ui/react';
+import { getPasswordStrength, type PasswordStrength } from '@workbench/auth/schemas';
+import { IconButton } from '@workbench/components/ui';
+import { EyeIcon, EyeOffIcon } from 'lucide-react';
+import { useCallback, useMemo, useState, type ComponentProps } from 'react';
+
+type InputProps = ComponentProps<typeof Input>;
+
+/** Password input with an inline visibility toggle. */
+export const PasswordInput = (props: InputProps) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const handleToggleVisibility = useCallback(() => setIsVisible((current) => !current), []);
+  const endElement = useMemo(
+    () => (
+      <IconButton
+        aria-label={isVisible ? 'Hide password' : 'Show password'}
+        color="fg.muted"
+        size="2xs"
+        variant="ghost"
+        onClick={handleToggleVisibility}
+      >
+        {isVisible ? <EyeOffIcon /> : <EyeIcon />}
+      </IconButton>
+    ),
+    [handleToggleVisibility, isVisible]
+  );
+
+  return (
+    <InputGroup endElement={endElement}>
+      <Input type={isVisible ? 'text' : 'password'} {...props} />
+    </InputGroup>
+  );
+};
+
+const STRENGTH_META: Record<PasswordStrength, { filledSegments: number; label: string; tone: string }> = {
+  moderate: { filledSegments: 2, label: 'Moderate', tone: 'fg.warning' },
+  strong: { filledSegments: 3, label: 'Strong', tone: 'fg.success' },
+  weak: { filledSegments: 1, label: 'Weak', tone: 'fg.error' },
+};
+
+/** Three-segment strength readout; renders nothing until the user types. */
+export const PasswordStrengthMeter = ({ password }: { password: string }) => {
+  if (!password) {
+    return null;
+  }
+
+  const meta = STRENGTH_META[getPasswordStrength(password)];
+
+  return (
+    <HStack gap="2">
+      <HStack flex="1" gap="1">
+        {[0, 1, 2].map((segment) => (
+          <Box
+            key={segment}
+            bg={segment < meta.filledSegments ? meta.tone : 'border.subtle'}
+            flex="1"
+            h="1"
+            rounded="full"
+          />
+        ))}
+      </HStack>
+      <Text color={meta.tone} fontSize="2xs" fontWeight="600">
+        {meta.label}
+      </Text>
+    </HStack>
+  );
+};

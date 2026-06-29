@@ -1,0 +1,59 @@
+{
+  "name": "@invoke-ai/invoke-ai-webv2",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm run lint && vite build",
+    "dev": "vite dev",
+    "dev:host": "vite dev --host",
+    "fix": "pnpm run lint:oxc:fix && pnpm run format:write",
+    "format:check": "oxfmt --check .",
+    "format:write": "oxfmt --write .",
+    "lint": "pnpm run format:check && pnpm run lint:oxc && pnpm run lint:tsc",
+    "lint:oxc": "oxlint --react-plugin --import-plugin --deny-warnings .",
+    "lint:oxc:fix": "oxlint --react-plugin --import-plugin --fix .",
+    "lint:tsc": "tsc --noEmit",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/modifiers": "^9.0.0",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@emotion/react": "^11.14.0",
+    "@fontsource/inter": "^5.2.8",
+    "@tanstack/react-router": "^1.170.16",
+    "@tanstack/react-virtual": "^3.14.3",
+    "@xyflow/react": "^12.11.1",
+    "lucide-react": "^1.21.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-hook-tanstack-virtual": "^0.0.4",
+    "react-icons": "^5.6.0",
+    "socket.io-client": "^4.8.3",
+    "tinykeys": "^4.0.0",
+    "use-sync-external-store": "^1.6.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@rolldown/plugin-babel": "^0.2.3",
+    "@types/node": "^26.0.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@types/use-sync-external-store": "^1.5.0",
+    "@vitejs/plugin-react": "^6.0.3",
+    "babel-plugin-react-compiler": "^1.0.0",
+    "oxfmt": "^0.56.0",
+    "oxlint": "^1.71.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.1.0",
+    "vitest": "^4.1.9"
+  },
+  "engines": {
+    "pnpm": "10"
+  },
+  "packageManager": "pnpm@10.12.4"
+}

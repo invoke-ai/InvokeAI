@@ -1,0 +1,137 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "import", "unicorn", "oxc", "react-perf", "eslint"],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "curly": "error",
+    "eqeqeq": "error",
+
+    "import/no-cycle": "error",
+    "import/no-duplicates": "error",
+    "import/no-relative-parent-imports": "error",
+    "import/no-absolute-path": "error",
+    "import/no-amd": "error",
+    "import/no-commonjs": "error",
+    "import/no-mutable-exports": "error",
+
+    "no-console": "warn",
+    "no-eval": "error",
+    "no-extend-native": "error",
+    "no-implied-eval": "error",
+    "no-label-var": "error",
+    "no-promise-executor-return": "error",
+    "no-return-assign": "error",
+    "no-sequences": "error",
+    "no-template-curly-in-string": "error",
+    "no-throw-literal": "error",
+    "no-unmodified-loop-condition": "error",
+    "no-var": "error",
+
+    "prefer-template": "error",
+    "radix": "error",
+    "no-restricted-exports": "error",
+
+    // "eslint/complexity": [
+    //   "error",
+    //   {
+    //     "max": 3
+    //   }
+    // ],
+
+    "react/jsx-curly-brace-presence": [
+      "error",
+      {
+        "props": "never",
+        "children": "never"
+      }
+    ],
+    "react/no-children-prop": "error",
+    "react/no-danger": "error",
+    "react/no-unknown-property": "error",
+    "react/jsx-no-useless-fragment": "error",
+    "react/exhaustive-deps": "error",
+    "react/react-compiler": "error",
+
+    "react-hooks/exhaustive-deps": "error",
+    "react-hooks/rules-of-hooks": "error",
+
+    "react-perf/jsx-no-new-object-as-prop": [
+      "error",
+      {
+        "nativeAllowList": "all"
+      }
+    ],
+    "react-perf/jsx-no-new-function-as-prop": [
+      "error",
+      {
+        "nativeAllowList": "all"
+      }
+    ],
+    "react-perf/jsx-no-new-array-as-prop": [
+      "error",
+      {
+        "nativeAllowList": "all"
+      }
+    ],
+    "react-perf/jsx-no-jsx-as-prop": [
+      "error",
+      {
+        "nativeAllowList": "all"
+      }
+    ],
+
+    "require-await": "error",
+
+    "typescript/consistent-type-imports": [
+      "error",
+      {
+        "fixStyle": "separate-type-imports",
+        "prefer": "type-imports"
+      }
+    ],
+    "typescript/no-empty-interface": [
+      "error",
+      {
+        "allowSingleExtends": true
+      }
+    ],
+    "typescript/consistent-type-assertions": [
+      "error",
+      {
+        "assertionStyle": "as"
+      }
+    ],
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-import-type-side-effects": "error",
+
+    "unicorn/no-abusive-eslint-disable": "error",
+    "unicorn/error-message": "error",
+    "unicorn/throw-new-error": "error",
+    "unicorn/prefer-type-error": "error",
+
+    "vitest/require-mock-type-parameters": "off"
+  },
+  "env": {
+    "browser": true,
+    "builtin": true,
+    "es2022": true,
+    "node": true
+  },
+  "globals": {
+    "GlobalCompositeOperation": "readonly",
+    "RequestInit": "readonly"
+  },
+  "ignorePatterns": [
+    "dist/**",
+    "node_modules/**",
+    "static/**",
+    ".husky/**",
+    "patches/**",
+    "stats.html",
+    "index.html",
+    ".yarn/**",
+    "**/*.scss"
+  ]
+}

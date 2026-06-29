@@ -4,9 +4,10 @@ from datetime import datetime
 
 import pytest
 
-from invokeai.app.api.routers.session_queue import sanitize_queue_item_for_user
+from invokeai.app.api.routers.session_queue import sanitize_queue_item_for_user, strip_missing_image_results
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
-from invokeai.app.invocations.fields import InputField, OutputField
+from invokeai.app.invocations.fields import ImageField, InputField, OutputField
+from invokeai.app.invocations.primitives import ImageCollectionOutput, ImageOutput
 from invokeai.app.services.session_queue.session_queue_common import NodeFieldValue, SessionQueueItem
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -170,3 +171,55 @@ def test_sanitize_system_user_item_for_admin(sample_session_queue_item):
     assert result.field_values is not None
     assert len(result.field_values) == 1
     assert len(result.session.graph.nodes) == 1
+
+
+def test_sanitize_owner_strips_missing_image_results(monkeypatch, sample_session_queue_item):
+    sample_session_queue_item.session.results = {
+        "missing_node": ImageOutput(image=ImageField(image_name="missing.png"), width=64, height=64),
+        "kept_node": ImageOutput(image=ImageField(image_name="kept.png"), width=64, height=64),
+    }
+    monkeypatch.setattr(
+        "invokeai.app.api.routers.session_queue._image_record_exists",
+        lambda name: name == "kept.png",
+    )
+
+    result = sanitize_queue_item_for_user(
+        queue_item=sample_session_queue_item,
+        current_user_id="user_123",
+        is_admin=False,
+    )
+
+    assert "missing_node" not in result.session.results
+    assert "kept_node" in result.session.results
+
+
+def test_strip_missing_image_results_removes_deleted_single_image_output(sample_session_queue_item):
+    sample_session_queue_item.session.results = {
+        "missing_node": ImageOutput(image=ImageField(image_name="missing.png"), width=64, height=64),
+        "kept_node": ImageOutput(image=ImageField(image_name="kept.png"), width=64, height=64),
+    }
+
+    result = strip_missing_image_results(sample_session_queue_item, image_exists=lambda name: name == "kept.png")
+
+    assert "missing_node" not in result.session.results
+    assert "kept_node" in result.session.results
+    # The original queue item is not mutated; only the API response copy is sanitized.
+    assert "missing_node" in sample_session_queue_item.session.results
+
+
+def test_strip_missing_image_results_filters_deleted_collection_items(sample_session_queue_item):
+    sample_session_queue_item.session.results = {
+        "collection_node": ImageCollectionOutput(
+            collection=[ImageField(image_name="missing.png"), ImageField(image_name="kept.png")]
+        )
+    }
+
+    result = strip_missing_image_results(sample_session_queue_item, image_exists=lambda name: name == "kept.png")
+
+    output = result.session.results["collection_node"]
+    assert isinstance(output, ImageCollectionOutput)
+    assert output.collection == [ImageField(image_name="kept.png")]
+    assert sample_session_queue_item.session.results["collection_node"].collection == [
+        ImageField(image_name="missing.png"),
+        ImageField(image_name="kept.png"),
+    ]

@@ -70,6 +70,16 @@ class TestGetManySubfolder:
         assert by_name["hashed.png"] == "ab"
 
 
+class TestImageRecordExists:
+    def test_exists_returns_true_for_saved_image(self, store: SqliteImageRecordStorage) -> None:
+        _save(store, "exists.png")
+
+        assert store.exists("exists.png") is True
+
+    def test_exists_returns_false_for_missing_image(self, store: SqliteImageRecordStorage) -> None:
+        assert store.exists("missing.png") is False
+
+
 class TestDeleteIntermediatesSubfolder:
     """delete_intermediates() returns (name, subfolder) pairs and removes rows."""
 

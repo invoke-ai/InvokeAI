@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     )
     from invokeai.app.services.model_relationships.model_relationships_base import ModelRelationshipsServiceABC
     from invokeai.app.services.names.names_base import NameServiceBase
+    from invokeai.app.services.project_records.project_records_base import ProjectRecordsStorageBase
     from invokeai.app.services.session_processor.session_processor_base import SessionProcessorBase
     from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
     from invokeai.app.services.urls.urls_base import UrlServiceBase
@@ -78,6 +79,7 @@ class InvocationServices:
         style_preset_image_files: "StylePresetImageFileStorageBase",
         workflow_thumbnails: "WorkflowThumbnailServiceBase",
         client_state_persistence: "ClientStatePersistenceABC",
+        project_records: "ProjectRecordsStorageBase",
         users: "UserServiceBase",
     ):
         self.board_images = board_images
@@ -110,4 +112,5 @@ class InvocationServices:
         self.style_preset_image_files = style_preset_image_files
         self.workflow_thumbnails = workflow_thumbnails
         self.client_state_persistence = client_state_persistence
+        self.project_records = project_records
         self.users = users

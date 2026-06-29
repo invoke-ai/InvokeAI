@@ -728,6 +728,27 @@
         }
       }
     },
+    "/api/v2/models/models_dir": {
+      "get": {
+        "tags": ["model_manager"],
+        "summary": "Get Models Dir",
+        "description": "Get the absolute path of the directory managed models are stored in.\n\nModel config `path` values are relative to this directory unless they are\nabsolute (in-place installs from outside it).",
+        "operationId": "get_models_dir",
+        "responses": {
+          "200": {
+            "description": "The absolute path of the models directory",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "title": "Response Get Models Dir"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/models/get_by_attrs": {
       "get": {
         "tags": ["model_manager"],
@@ -2890,6 +2911,24 @@
               "title": "Access Token"
             },
             "description": "access token for the remote resource"
+          },
+          {
+            "name": "X-Model-Source-Access-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "access token for the remote resource",
+              "title": "X-Model-Source-Access-Token"
+            },
+            "description": "access token for the remote resource"
           }
         ],
         "requestBody": {
@@ -3777,7 +3816,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/EmptyModelCacheResponse"
+                }
               }
             }
           }
@@ -3805,7 +3846,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       },
       "post": {
         "tags": ["model_manager"],
@@ -6531,7 +6577,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/external_providers/config": {
@@ -6554,7 +6605,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/app/external_providers/config/{provider_id}": {
@@ -6964,6 +7020,24 @@
               "default": "DESC"
             },
             "description": "The order of sort"
+          },
+          {
+            "name": "origin_prefix",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only include queue items whose origin starts with this prefix",
+              "title": "Origin Prefix"
+            },
+            "description": "Only include queue items whose origin starts with this prefix"
           }
         ],
         "responses": {
@@ -7542,6 +7616,24 @@
               "title": "Queue Id"
             },
             "description": "The queue id to perform this operation on"
+          },
+          {
+            "name": "origin_prefix",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only include queue items whose origin starts with this prefix",
+              "title": "Origin Prefix"
+            },
+            "description": "Only include queue items whose origin starts with this prefix"
           }
         ],
         "responses": {
@@ -7604,6 +7696,24 @@
               "title": "Queue Id"
             },
             "description": "The queue id to perform this operation on"
+          },
+          {
+            "name": "origin_prefix",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only include queue items whose origin starts with this prefix",
+              "title": "Origin Prefix"
+            },
+            "description": "Only include queue items whose origin starts with this prefix"
           }
         ],
         "responses": {
@@ -7666,6 +7776,24 @@
               "title": "Queue Id"
             },
             "description": "The queue id to perform this operation on"
+          },
+          {
+            "name": "origin_prefix",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only include queue items whose origin starts with this prefix",
+              "title": "Origin Prefix"
+            },
+            "description": "Only include queue items whose origin starts with this prefix"
           }
         ],
         "responses": {
@@ -9575,6 +9703,223 @@
           },
           "204": {
             "description": "Client state deleted"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/": {
+      "get": {
+        "tags": ["projects"],
+        "summary": "List Projects",
+        "description": "Lists the current user's projects as lightweight summaries (no documents).",
+        "operationId": "list_projects",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectSummaryDTO"
+                  },
+                  "type": "array",
+                  "title": "Response List Projects"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["projects"],
+        "summary": "Create Project",
+        "description": "Creates a project for the current user.",
+        "operationId": "create_project",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCreateRequest",
+                "description": "The project to create"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRecordDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}": {
+      "get": {
+        "tags": ["projects"],
+        "summary": "Get Project",
+        "description": "Gets one of the current user's projects, including its document.",
+        "operationId": "get_project",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The id of the project to get",
+              "title": "Project Id"
+            },
+            "description": "The id of the project to get"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRecordDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["projects"],
+        "summary": "Update Project",
+        "description": "Saves a project. Returns 409 with the current revision when the save is based on a stale revision.",
+        "operationId": "update_project",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The id of the project to save",
+              "title": "Project Id"
+            },
+            "description": "The id of the project to save"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectUpdateRequest",
+                "description": "The project document and the revision it is based on"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRecordDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["projects"],
+        "summary": "Delete Project",
+        "description": "Deletes one of the current user's projects. Idempotent.",
+        "operationId": "delete_project",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The id of the project to delete",
+              "title": "Project Id"
+            },
+            "description": "The id of the project to delete"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -14350,6 +14695,11 @@
           "high_watermark": {
             "type": "integer",
             "title": "High Watermark",
+            "default": 0
+          },
+          "cache_used": {
+            "type": "integer",
+            "title": "Cache Used",
             "default": 0
           },
           "in_cache": {
@@ -21995,6 +22345,21 @@
         "type": "object",
         "required": ["node_id", "field"],
         "title": "EdgeConnection"
+      },
+      "EmptyModelCacheResponse": {
+        "properties": {
+          "models_cleared": {
+            "type": "integer",
+            "title": "Models Cleared"
+          },
+          "bytes_freed": {
+            "type": "integer",
+            "title": "Bytes Freed"
+          }
+        },
+        "type": "object",
+        "required": ["models_cleared", "bytes_freed"],
+        "title": "EmptyModelCacheResponse"
       },
       "EnqueueBatchResult": {
         "properties": {
@@ -58818,6 +59183,133 @@
         "required": ["width", "height", "dataURL"],
         "title": "ProgressImage",
         "type": "object"
+      },
+      "ProjectCreateRequest": {
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id",
+            "description": "Client-generated project id (e.g. for imports); generated when omitted"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The project's display name"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data",
+            "description": "The opaque client-owned project document"
+          }
+        },
+        "type": "object",
+        "required": ["name", "data"],
+        "title": "ProjectCreateRequest",
+        "description": "Request body for creating a project."
+      },
+      "ProjectRecordDTO": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id",
+            "description": "The project's client-generated identifier"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The project's display name"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "description": "Monotonic revision, incremented on every save"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the project was created"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "When the project was last saved"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data",
+            "description": "The opaque client-owned project document"
+          }
+        },
+        "type": "object",
+        "required": ["project_id", "name", "revision", "created_at", "updated_at", "data"],
+        "title": "ProjectRecordDTO",
+        "description": "Full project record including the client-owned document."
+      },
+      "ProjectSummaryDTO": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id",
+            "description": "The project's client-generated identifier"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The project's display name"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "description": "Monotonic revision, incremented on every save"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the project was created"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "When the project was last saved"
+          }
+        },
+        "type": "object",
+        "required": ["project_id", "name", "revision", "created_at", "updated_at"],
+        "title": "ProjectSummaryDTO",
+        "description": "Lightweight project listing entry; the document payload is omitted."
+      },
+      "ProjectUpdateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The project's display name"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data",
+            "description": "The opaque client-owned project document"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "title": "Expected Revision",
+            "description": "The revision this save is based on; mismatch returns 409"
+          }
+        },
+        "type": "object",
+        "required": ["name", "data", "expected_revision"],
+        "title": "ProjectUpdateRequest",
+        "description": "Request body for saving a project with optimistic concurrency."
       },
       "PromptTemplateInvocation": {
         "category": "prompt",

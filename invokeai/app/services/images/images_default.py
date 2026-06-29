@@ -132,6 +132,9 @@ class ImageService(ImageServiceABC):
         try:
             record = self.__invoker.services.image_records.get(image_name)
             return self.__invoker.services.image_files.get(image_name, image_subfolder=record.image_subfolder)
+        except ImageRecordNotFoundException:
+            self.__invoker.services.logger.debug(f"Image record not found: {image_name}")
+            raise
         except ImageFileNotFoundException:
             self.__invoker.services.logger.error("Failed to get image file")
             raise
@@ -143,7 +146,7 @@ class ImageService(ImageServiceABC):
         try:
             return self.__invoker.services.image_records.get(image_name)
         except ImageRecordNotFoundException:
-            self.__invoker.services.logger.error("Image record not found")
+            self.__invoker.services.logger.debug(f"Image record not found: {image_name}")
             raise
         except Exception as e:
             self.__invoker.services.logger.error("Problem getting image record")
@@ -162,7 +165,7 @@ class ImageService(ImageServiceABC):
 
             return image_dto
         except ImageRecordNotFoundException:
-            self.__invoker.services.logger.error("Image record not found")
+            self.__invoker.services.logger.debug(f"Image record not found: {image_name}")
             raise
         except Exception as e:
             self.__invoker.services.logger.error("Problem getting image DTO")
@@ -172,7 +175,7 @@ class ImageService(ImageServiceABC):
         try:
             return self.__invoker.services.image_records.get_metadata(image_name)
         except ImageRecordNotFoundException:
-            self.__invoker.services.logger.error("Image record not found")
+            self.__invoker.services.logger.debug(f"Image record not found: {image_name}")
             raise
         except Exception as e:
             self.__invoker.services.logger.error("Problem getting image metadata")
@@ -182,6 +185,9 @@ class ImageService(ImageServiceABC):
         try:
             record = self.__invoker.services.image_records.get(image_name)
             return self.__invoker.services.image_files.get_workflow(image_name, image_subfolder=record.image_subfolder)
+        except ImageRecordNotFoundException:
+            self.__invoker.services.logger.debug(f"Image record not found: {image_name}")
+            raise
         except ImageFileNotFoundException:
             self.__invoker.services.logger.error("Image file not found")
             raise
@@ -193,6 +199,9 @@ class ImageService(ImageServiceABC):
         try:
             record = self.__invoker.services.image_records.get(image_name)
             return self.__invoker.services.image_files.get_graph(image_name, image_subfolder=record.image_subfolder)
+        except ImageRecordNotFoundException:
+            self.__invoker.services.logger.debug(f"Image record not found: {image_name}")
+            raise
         except ImageFileNotFoundException:
             self.__invoker.services.logger.error("Image file not found")
             raise
@@ -208,6 +217,9 @@ class ImageService(ImageServiceABC):
                     image_name, thumbnail, image_subfolder=record.image_subfolder
                 )
             )
+        except ImageRecordNotFoundException:
+            self.__invoker.services.logger.debug(f"Image record not found: {image_name}")
+            raise
         except Exception as e:
             self.__invoker.services.logger.error("Problem getting image path")
             raise e
