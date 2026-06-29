@@ -29335,7 +29335,13 @@
                   "$ref": "#/components/schemas/TileToPropertiesInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/TiledFluxDenoiseLatents"
+                },
+                {
                   "$ref": "#/components/schemas/TiledMultiDiffusionDenoiseLatents"
+                },
+                {
+                  "$ref": "#/components/schemas/TiledZImageDenoiseLatents"
                 },
                 {
                   "$ref": "#/components/schemas/UnsharpMaskInvocation"
@@ -36823,7 +36829,13 @@
                 "$ref": "#/components/schemas/TileToPropertiesInvocation"
               },
               {
+                "$ref": "#/components/schemas/TiledFluxDenoiseLatents"
+              },
+              {
                 "$ref": "#/components/schemas/TiledMultiDiffusionDenoiseLatents"
+              },
+              {
+                "$ref": "#/components/schemas/TiledZImageDenoiseLatents"
               },
               {
                 "$ref": "#/components/schemas/UnsharpMaskInvocation"
@@ -37952,7 +37964,13 @@
                 "$ref": "#/components/schemas/TileToPropertiesInvocation"
               },
               {
+                "$ref": "#/components/schemas/TiledFluxDenoiseLatents"
+              },
+              {
                 "$ref": "#/components/schemas/TiledMultiDiffusionDenoiseLatents"
+              },
+              {
+                "$ref": "#/components/schemas/TiledZImageDenoiseLatents"
               },
               {
                 "$ref": "#/components/schemas/UnsharpMaskInvocation"
@@ -38755,7 +38773,13 @@
           "tile_to_properties": {
             "$ref": "#/components/schemas/TileToPropertiesOutput"
           },
+          "tiled_flux_denoise": {
+            "$ref": "#/components/schemas/LatentsOutput"
+          },
           "tiled_multi_diffusion_denoise_latents": {
+            "$ref": "#/components/schemas/LatentsOutput"
+          },
+          "tiled_z_image_denoise": {
             "$ref": "#/components/schemas/LatentsOutput"
           },
           "tomask": {
@@ -39042,7 +39066,9 @@
           "tensor_mask_to_image",
           "text_llm",
           "tile_to_properties",
+          "tiled_flux_denoise",
           "tiled_multi_diffusion_denoise_latents",
+          "tiled_z_image_denoise",
           "tomask",
           "unsharp_mask",
           "unsharp_mask_oklab",
@@ -39849,7 +39875,13 @@
                 "$ref": "#/components/schemas/TileToPropertiesInvocation"
               },
               {
+                "$ref": "#/components/schemas/TiledFluxDenoiseLatents"
+              },
+              {
                 "$ref": "#/components/schemas/TiledMultiDiffusionDenoiseLatents"
+              },
+              {
+                "$ref": "#/components/schemas/TiledZImageDenoiseLatents"
               },
               {
                 "$ref": "#/components/schemas/UnsharpMaskInvocation"
@@ -40736,7 +40768,13 @@
                 "$ref": "#/components/schemas/TileToPropertiesInvocation"
               },
               {
+                "$ref": "#/components/schemas/TiledFluxDenoiseLatents"
+              },
+              {
                 "$ref": "#/components/schemas/TiledMultiDiffusionDenoiseLatents"
+              },
+              {
+                "$ref": "#/components/schemas/TiledZImageDenoiseLatents"
               },
               {
                 "$ref": "#/components/schemas/UnsharpMaskInvocation"
@@ -69470,6 +69508,318 @@
         "title": "TileWithImage",
         "type": "object"
       },
+      "TiledFluxDenoiseLatents": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "stable",
+        "description": "Tiled Multi-Diffusion denoising for FLUX models.\n\nThis node handles automatically tiling the input latents and is primarily intended for\ntiled upscaling workflows with FLUX transformer models. It applies the same multi-diffusion\nblending approach as the SD1.5/SDXL tiled denoise node.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "positive_text_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FluxConditioningField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FluxConditioningField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Positive conditioning tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Positive Text Conditioning"
+          },
+          "negative_text_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FluxConditioningField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FluxConditioningField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Negative conditioning tensor. Can be None if cfg_scale is 1.0.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Negative Text Conditioning"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Flux model (Transformer) to load",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Transformer"
+          },
+          "control": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FluxControlNetField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FluxControlNetField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ControlNet models.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Control"
+          },
+          "controlnet_vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "width": {
+            "default": 1024,
+            "description": "Width of the full image.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 1024,
+            "description": "Height of the full image.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "tile_height": {
+            "default": 1024,
+            "description": "Height of tiles in image space.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Tile Height",
+            "type": "integer"
+          },
+          "tile_width": {
+            "default": 1024,
+            "description": "Width of tiles in image space.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Tile Width",
+            "type": "integer"
+          },
+          "tile_overlap": {
+            "default": 128,
+            "description": "Overlap between adjacent tiles in image space.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 128,
+            "orig_required": false,
+            "title": "Tile Overlap",
+            "type": "integer"
+          },
+          "num_steps": {
+            "default": 8,
+            "description": "Number of diffusion steps.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 8,
+            "orig_required": false,
+            "title": "Num Steps",
+            "type": "integer"
+          },
+          "guidance": {
+            "default": 4.0,
+            "description": "Guidance strength. Higher values adhere more strictly to the prompt.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 4.0,
+            "orig_required": false,
+            "title": "Guidance",
+            "type": "number"
+          },
+          "cfg_scale": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              }
+            ],
+            "default": 1.0,
+            "description": "Classifier-Free Guidance scale",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "CFG Scale"
+          },
+          "denoising_start": {
+            "default": 0.0,
+            "description": "When to start denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 0.0,
+            "orig_required": false,
+            "title": "Denoising Start",
+            "type": "number"
+          },
+          "denoising_end": {
+            "default": 1.0,
+            "description": "When to stop denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Denoising End",
+            "type": "number"
+          },
+          "seed": {
+            "default": 0,
+            "description": "Randomness seed for reproducibility.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "scheduler": {
+            "default": "euler",
+            "description": "Scheduler (sampler) for the denoising process.",
+            "enum": ["euler", "heun", "lcm"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "euler",
+            "orig_required": false,
+            "title": "Scheduler",
+            "type": "string",
+            "ui_choice_labels": {
+              "euler": "Euler",
+              "heun": "Heun (2nd order)",
+              "lcm": "LCM"
+            }
+          },
+          "type": {
+            "const": "tiled_flux_denoise",
+            "default": "tiled_flux_denoise",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["upscale", "denoise", "flux"],
+        "title": "Tiled Multi-Diffusion Denoise - FLUX",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/LatentsOutput"
+        }
+      },
       "TiledMultiDiffusionDenoiseLatents": {
         "category": "latents",
         "class": "invocation",
@@ -69761,6 +70111,292 @@
         "title": "Tiled Multi-Diffusion Denoise - SD1.5, SDXL",
         "type": "object",
         "version": "1.0.1",
+        "output": {
+          "$ref": "#/components/schemas/LatentsOutput"
+        }
+      },
+      "TiledZImageDenoiseLatents": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Tiled Multi-Diffusion denoising for Z-Image models.\n\nThis node handles automatically tiling the input latents and is primarily intended for\ntiled upscaling workflows with Z-Image transformer models.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "positive_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ZImageConditioningField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ZImageConditioningField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Positive conditioning tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Positive Conditioning"
+          },
+          "negative_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ZImageConditioningField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ZImageConditioningField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Negative conditioning tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Negative Conditioning"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Z-Image model (Transformer) to load",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Transformer"
+          },
+          "control": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ZImageControlField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Z-Image control conditioning for spatial control.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE Required for control conditioning.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "width": {
+            "default": 1024,
+            "description": "Width of the full image.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 1024,
+            "description": "Height of the full image.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "tile_height": {
+            "default": 1024,
+            "description": "Height of tiles in image space.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 8,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Tile Height",
+            "type": "integer"
+          },
+          "tile_width": {
+            "default": 1024,
+            "description": "Width of tiles in image space.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 8,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Tile Width",
+            "type": "integer"
+          },
+          "tile_overlap": {
+            "default": 128,
+            "description": "Overlap between adjacent tiles in image space.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 8,
+            "orig_default": 128,
+            "orig_required": false,
+            "title": "Tile Overlap",
+            "type": "integer"
+          },
+          "steps": {
+            "default": 8,
+            "description": "Number of denoising steps.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 8,
+            "orig_required": false,
+            "title": "Steps",
+            "type": "integer"
+          },
+          "guidance_scale": {
+            "default": 1.0,
+            "description": "Guidance scale for classifier-free guidance. 1.0 = no CFG.",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 1.0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Guidance Scale",
+            "type": "number"
+          },
+          "denoising_start": {
+            "default": 0.0,
+            "description": "When to start denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 0.0,
+            "orig_required": false,
+            "title": "Denoising Start",
+            "type": "number"
+          },
+          "denoising_end": {
+            "default": 1.0,
+            "description": "When to stop denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Denoising End",
+            "type": "number"
+          },
+          "seed": {
+            "default": 0,
+            "description": "Randomness seed for reproducibility.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "scheduler": {
+            "default": "euler",
+            "description": "Scheduler (sampler) for the denoising process.",
+            "enum": ["euler", "heun", "lcm"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "euler",
+            "orig_required": false,
+            "title": "Scheduler",
+            "type": "string",
+            "ui_choice_labels": {
+              "euler": "Euler",
+              "heun": "Heun (2nd order)",
+              "lcm": "LCM"
+            }
+          },
+          "type": {
+            "const": "tiled_z_image_denoise",
+            "default": "tiled_z_image_denoise",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["upscale", "denoise", "z-image"],
+        "title": "Tiled Multi-Diffusion Denoise - Z-Image",
+        "type": "object",
+        "version": "1.0.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
