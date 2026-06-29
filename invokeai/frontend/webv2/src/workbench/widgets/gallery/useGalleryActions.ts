@@ -33,7 +33,8 @@ export const useGalleryActions = ({
   selectedBoardId: string;
 }): GalleryActions => {
   return useMemo<GalleryActions>(() => {
-    const recordError = (error: unknown) => dispatch({ message: toErrorMessage(error), type: 'recordError' });
+    const recordError = (error: unknown) =>
+      dispatch({ area: 'gallery-actions', message: toErrorMessage(error), namespace: 'gallery', type: 'recordError' });
     const recordSuccess = (title: string, message?: string) =>
       dispatch({ kind: 'success', message, title, type: 'recordNotice' });
     const refresh = () => dispatch({ type: 'touchGalleryRefresh' });
@@ -145,7 +146,12 @@ export const useGalleryActions = ({
         const accepted = files.filter((file) => ACCEPTED_UPLOAD_TYPES.has(file.type));
 
         if (accepted.length === 0) {
-          dispatch({ message: 'No supported image files to upload (PNG, JPEG, or WebP).', type: 'recordError' });
+          dispatch({
+            area: 'gallery-upload',
+            message: 'No supported image files to upload (PNG, JPEG, or WebP).',
+            namespace: 'gallery',
+            type: 'recordError',
+          });
           return;
         }
 

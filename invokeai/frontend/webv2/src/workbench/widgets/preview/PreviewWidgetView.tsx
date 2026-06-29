@@ -230,7 +230,12 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       })
       .catch((error: unknown) => {
         if (!isStale) {
-          dispatch({ message: error instanceof Error ? error.message : String(error), type: 'recordError' });
+          dispatch({
+            area: 'preview-board-images',
+            message: error instanceof Error ? error.message : String(error),
+            namespace: 'gallery',
+            type: 'recordError',
+          });
 
           const fallbackImage = selectedImageRef.current;
 

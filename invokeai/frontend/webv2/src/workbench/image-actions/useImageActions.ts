@@ -105,7 +105,14 @@ export const useImageActions = ({
   }, []);
 
   return useMemo<ImageActions>(() => {
-    const recordError = (error: unknown) => dispatch({ message: toErrorMessage(error), type: 'recordError' });
+    const recordError = (error: unknown) =>
+      dispatch({
+        area: 'image-actions',
+        message: toErrorMessage(error),
+        namespace: 'gallery',
+        projectId,
+        type: 'recordError',
+      });
     const recordSuccess = (title: string, message?: string) =>
       dispatch({ kind: 'success', message, title, type: 'recordNotice' });
     const refreshGallery = () => dispatch({ projectId, type: 'touchGalleryRefresh' });

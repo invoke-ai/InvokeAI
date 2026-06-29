@@ -120,7 +120,9 @@ export const WorkbenchProvider = ({
         }
       } catch (error) {
         dispatch({
+          area: 'persistence-load',
           message: error instanceof Error ? error.message : 'Failed to load persisted workbench.',
+          namespace: 'system',
           type: 'recordError',
         });
       } finally {

@@ -127,7 +127,13 @@ export const executeImageRecall = async ({
     });
     return true;
   } catch (error: unknown) {
-    dispatch({ message: toErrorMessage(error), type: 'recordError' });
+    dispatch({
+      area: 'image-recall',
+      message: toErrorMessage(error),
+      namespace: 'generation',
+      projectId,
+      type: 'recordError',
+    });
     return false;
   }
 };

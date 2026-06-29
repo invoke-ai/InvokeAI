@@ -349,7 +349,13 @@ const ExpandPromptButton = ({
 
       setIsOpen(false);
     } catch (error) {
-      dispatch({ message: getApiErrorMessage(error, 'Could not expand the prompt.'), type: 'recordError' });
+      dispatch({
+        area: 'expand-prompt',
+        message: getApiErrorMessage(error, 'Could not expand the prompt.'),
+        namespace: 'generation',
+        projectId,
+        type: 'recordError',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -463,7 +469,10 @@ const ImageToPromptButton = ({
       setIsOpen(false);
     } catch (error) {
       dispatch({
+        area: 'image-to-prompt',
         message: getApiErrorMessage(error, 'Could not generate a prompt from the selected image.'),
+        namespace: 'generation',
+        projectId,
         type: 'recordError',
       });
     } finally {

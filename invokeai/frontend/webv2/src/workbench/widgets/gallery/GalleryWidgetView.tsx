@@ -131,7 +131,11 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: WidgetViewP
   const page = getGalleryPage(galleryValues);
   const knownTotalImages = getGalleryTotalImages(galleryValues);
   const settings = getGallerySettings(galleryValues);
-  const onError = useCallback((message: string) => dispatch({ message, type: 'recordError' }), [dispatch]);
+  const onError = useCallback(
+    (message: string) =>
+      dispatch({ area: 'gallery-data', message, namespace: 'gallery', projectId, type: 'recordError' }),
+    [dispatch, projectId]
+  );
 
   const data = useGalleryData({
     galleryView,
