@@ -89,6 +89,19 @@ def make_load_image_file_stub(
     return _load
 
 
+def test_recall_parameters_is_blocked_during_image_move_maintenance(
+    monkeypatch: Any, patched_dependencies: MockApiDependencies, mock_invoker: Invoker, client: TestClient
+) -> None:
+    mock_invoker.services.image_moves = MagicMock()
+    mock_invoker.services.image_moves.is_maintenance_active.return_value = True
+    monkeypatch.setattr("invokeai.app.api.routers.image_move_maintenance.ApiDependencies", patched_dependencies)
+
+    response = client.post("/api/v1/recall/default", json={"positive_prompt": "hello"})
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Image storage maintenance is active"
+
+
 class TestReferenceImagesRecall:
     def test_reference_images_forwarded_when_image_exists(
         self, monkeypatch: Any, patched_dependencies: MockApiDependencies, client: TestClient
