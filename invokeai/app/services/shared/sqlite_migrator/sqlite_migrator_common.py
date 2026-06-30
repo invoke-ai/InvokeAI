@@ -32,9 +32,15 @@ class Migration(BaseModel):
     """
     Represents a migration for a SQLite database.
 
-    :param from_version: The database version on which this migration may be run
-    :param to_version: The database version that results from this migration
+    :param from_version: The legacy database version on which this migration may be run
+    :param to_version: The legacy database version that results from this migration
+    :param id: The stable migration ID. Legacy migrations default to ``migration_{to_version}``.
+    :param depends_on: The stable ID of the migration that must run first.
     :param migrate_callback: The callback to run to perform the migration
+
+    Migrations are executed according to their stable ID dependencies. Existing legacy migrations also keep
+    ``from_version`` and ``to_version`` so older numeric migration state can be mapped to applied migration IDs.
+    New graph-only migrations may omit legacy versions, but must provide an explicit ``id``.
 
     Migration callbacks will be provided an open cursor to the database. They should not commit their
     transaction; this is handled by the migrator.
@@ -88,20 +94,47 @@ class Migration(BaseModel):
     ```
     """
 
-    from_version: int = Field(ge=0, strict=True, description="The database version on which this migration may be run")
-    to_version: int = Field(ge=1, strict=True, description="The database version that results from this migration")
+    from_version: Optional[int] = Field(
+        default=None, ge=0, strict=True, description="The database version on which this migration may be run"
+    )
+    to_version: Optional[int] = Field(
+        default=None, ge=1, strict=True, description="The database version that results from this migration"
+    )
+    id: Optional[str] = Field(default=None, description="Stable migration ID")
+    depends_on: Optional[str] = Field(default=None, description="Stable ID of the migration dependency")
     callback: MigrateCallback = Field(description="The callback to run to perform the migration")
 
     @model_validator(mode="after")
-    def validate_to_version(self) -> "Migration":
-        """Validates that to_version is one greater than from_version."""
-        if self.to_version != self.from_version + 1:
+    def validate_versions_and_ids(self) -> "Migration":
+        """Validates legacy versions and derives stable IDs for legacy migrations."""
+        has_from_version = self.from_version is not None
+        has_to_version = self.to_version is not None
+        if has_from_version != has_to_version:
+            raise MigrationVersionError("from_version and to_version must both be provided for legacy migrations")
+        if self.from_version is not None and self.to_version is not None and self.to_version != self.from_version + 1:
             raise MigrationVersionError("to_version must be one greater than from_version")
+        if self.id is None and self.to_version is not None:
+            self.id = f"migration_{self.to_version}"
+        if self.id is None:
+            raise MigrationVersionError("id is required for graph-only migrations")
+        if self.depends_on is None and self.from_version is not None and self.from_version > 0:
+            self.depends_on = f"migration_{self.from_version}"
+        if self.depends_on == self.id:
+            raise MigrationVersionError("migration cannot depend on itself")
         return self
 
     def __hash__(self) -> int:
         # Callables are not hashable, so we need to implement our own __hash__ function to use this class in a set.
-        return hash((self.from_version, self.to_version))
+        if self.from_version is not None and self.to_version is not None:
+            return hash((self.from_version, self.to_version))
+        return hash(self.id)
+
+    @property
+    def sort_key(self) -> tuple[int, int, str]:
+        """Deterministic sort key for runnable migrations."""
+        if self.to_version is None:
+            return (1, 0, self.id or "")
+        return (0, self.to_version, self.id or "")
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -110,8 +143,9 @@ class MigrationSet:
     """
     A set of Migrations. Performs validation during migration registration and provides utility methods.
 
-    Migrations should be registered with `register()`. Once all are registered, `validate_migration_chain()`
-    should be called to ensure that the migrations form a single chain of migrations from version 0 to the latest version.
+    Migrations should be registered with `register()`. Once all are registered, `validate_dependency_graph()`
+    should be called to ensure that dependencies are complete and acyclic. `validate_migration_chain()` is retained for
+    legacy chain validation tests and compatibility checks.
     """
 
     def __init__(self) -> None:
@@ -119,10 +153,17 @@ class MigrationSet:
 
     def register(self, migration: Migration) -> None:
         """Registers a migration."""
-        migration_from_already_registered = any(m.from_version == migration.from_version for m in self._migrations)
-        migration_to_already_registered = any(m.to_version == migration.to_version for m in self._migrations)
+        migration_from_already_registered = migration.from_version is not None and any(
+            m.from_version == migration.from_version for m in self._migrations if m.from_version is not None
+        )
+        migration_to_already_registered = migration.to_version is not None and any(
+            m.to_version == migration.to_version for m in self._migrations if m.to_version is not None
+        )
         if migration_from_already_registered or migration_to_already_registered:
             raise MigrationVersionError("Migration with from_version or to_version already registered")
+        migration_id_already_registered = any(m.id == migration.id for m in self._migrations)
+        if migration_id_already_registered:
+            raise MigrationVersionError("Migration with id already registered")
         self._migrations.add(migration)
 
     def get(self, from_version: int) -> Optional[Migration]:
@@ -150,6 +191,68 @@ class MigrationSet:
         if touched_count != self.count:
             raise MigrationError("Migration chain is fragmented")
 
+    def validate_dependency_graph(self) -> None:
+        """Validates migration ID dependencies."""
+        migration_ids = {migration.id for migration in self._migrations}
+        for migration in self._migrations:
+            if migration.depends_on is not None and migration.depends_on not in migration_ids:
+                raise MigrationError(
+                    f"Migration '{migration.id}' depends on unknown migration '{migration.depends_on}'"
+                )
+
+        visiting: set[str] = set()
+        visited: set[str] = set()
+        migrations_by_id = self.migrations_by_id
+
+        def visit(migration: Migration) -> None:
+            migration_id = migration.id
+            if migration_id is None:
+                raise MigrationError("Migration is missing id")
+            if migration_id in visited:
+                return
+            if migration_id in visiting:
+                raise MigrationError("Migration dependency graph contains a cycle")
+            visiting.add(migration_id)
+            if migration.depends_on is not None:
+                visit(migrations_by_id[migration.depends_on])
+            visiting.remove(migration_id)
+            visited.add(migration_id)
+
+        for migration in self._migrations:
+            visit(migration)
+
+    def get_migration_plan(self, applied_migration_ids: set[str]) -> list[Migration]:
+        """Gets a deterministic migration plan from the set of applied migration IDs."""
+        self.validate_dependency_graph()
+        known_migration_ids = set(self.migrations_by_id)
+        unknown_applied_ids = applied_migration_ids - known_migration_ids
+        if unknown_applied_ids:
+            unknown_ids = ", ".join(sorted(unknown_applied_ids))
+            raise MigrationError(f"Database contains unknown applied migration IDs: {unknown_ids}")
+
+        plan: list[Migration] = []
+        planned_or_applied_ids = set(applied_migration_ids)
+        remaining = {
+            migration.id: migration for migration in self._migrations if migration.id not in applied_migration_ids
+        }
+
+        while remaining:
+            runnable = sorted(
+                (
+                    migration
+                    for migration in remaining.values()
+                    if migration.depends_on is None or migration.depends_on in planned_or_applied_ids
+                ),
+                key=lambda migration: migration.sort_key,
+            )
+            if not runnable:
+                raise MigrationError("Migration dependency graph cannot be resolved")
+            migration = runnable[0]
+            plan.append(migration)
+            planned_or_applied_ids.add(migration.id or "")
+            del remaining[migration.id]
+        return plan
+
     @property
     def count(self) -> int:
         """The count of registered migrations."""
@@ -160,4 +263,16 @@ class MigrationSet:
         """Gets latest to_version among registered migrations. Returns 0 if there are no migrations registered."""
         if self.count == 0:
             return 0
-        return sorted(self._migrations, key=lambda m: m.to_version)[-1].to_version
+        legacy_migrations = [migration for migration in self._migrations if migration.to_version is not None]
+        if len(legacy_migrations) == 0:
+            return 0
+        latest_version = sorted(legacy_migrations, key=lambda m: m.to_version or 0)[-1].to_version
+        return latest_version or 0
+
+    @property
+    def migrations(self) -> tuple[Migration, ...]:
+        return tuple(sorted(self._migrations, key=lambda migration: migration.sort_key))
+
+    @property
+    def migrations_by_id(self) -> dict[str, Migration]:
+        return {migration.id or "": migration for migration in self._migrations}

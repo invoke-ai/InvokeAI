@@ -1,0 +1,164 @@
+---
+title: SQLite Database Migrations
+lastUpdated: 2026-06-30
+---
+
+InvokeAI uses a custom SQLite migrator for the main application database. Migrations live in `invokeai/app/services/shared/sqlite_migrator/migrations/` and are discovered automatically when the database is initialized.
+
+Use a migration when a change modifies persisted database schema or persisted database data in a way that existing installs must receive on startup.
+
+## Naming
+
+New migration modules should use a date-stamped descriptive name:
+
+```text
+invokeai/app/services/shared/sqlite_migrator/migrations/migration_2026_06_30_add_example_table.py
+```
+
+Date-stamped migration modules must expose a `build_migration()` builder:
+
+```py
+def build_migration() -> Migration:
+    ...
+```
+
+The date prefix should be the date the migration is authored or merged, in `YYYY_MM_DD` format. Add a short snake_case description after the date.
+
+Legacy numeric migration modules are still supported:
+
+```text
+invokeai/app/services/shared/sqlite_migrator/migrations/migration_33.py
+```
+
+Numeric migration modules must expose the matching legacy builder:
+
+```py
+def build_migration_33() -> Migration:
+    ...
+```
+
+The loader discovers both naming styles. Numeric modules are imported in numeric order for legacy compatibility. Date-stamped modules are imported in lexical order, but dependency metadata drives execution order. Non-matching migration module names, missing builders, unknown builder dependencies, and builders that do not return `Migration` fail at startup.
+
+## IDs and Dependencies
+
+Every migration has a stable `id`. For new date-stamped migrations, use the module name without the `migration_` prefix:
+
+```py
+id="2026_06_30_add_example_table"
+```
+
+The loader enforces this match. If `migration_2026_06_30_add_example_table.py` returns a different ID, startup fails instead of persisting a typo that could later cause the migration to run again.
+
+Existing numeric migrations use IDs matching their file number:
+
+```py
+id="migration_33"
+```
+
+For a migration that only needs an older schema point, depend on the migration that introduced the required schema or data:
+
+```py
+depends_on="migration_27"
+```
+
+Dependencies drive execution order. If two migrations both depend on `migration_27`, either may run after `migration_27` unless one explicitly depends on the other. Do not rely on filename or lexical ordering to express a real dependency.
+
+Single-parent dependencies are currently supported. If a migration truly requires two independent branches, add a real dependency between those branches only when that ordering is semantically correct. Otherwise, update the migrator design and tests to support multiple dependencies.
+
+## Template
+
+```py
+import sqlite3
+
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
+
+
+class AddExampleTableCallback:
+    def __call__(self, cursor: sqlite3.Cursor) -> None:
+        cursor.execute("ALTER TABLE images ADD COLUMN example TEXT;")
+
+
+def build_migration() -> Migration:
+    return Migration(
+        id="2026_06_30_add_example_table",
+        depends_on="migration_32",
+        callback=AddExampleTableCallback(),
+    )
+```
+
+Keep the callback self-contained. It receives an open SQLite cursor and must not commit or roll back the transaction. The migrator commits the migration and records it as applied only after the callback succeeds. If the callback raises, the migration transaction is rolled back and the migration is not recorded.
+
+## Builder Dependencies
+
+Migration builders may request known application dependencies by parameter name. The loader inspects the builder signature and passes only the dependencies requested.
+
+Supported dependency names:
+
+- `app_config` or `config`
+- `logger`
+- `image_files`
+
+Example:
+
+```py
+def build_migration(app_config: InvokeAIAppConfig, logger: Logger) -> Migration:
+    return Migration(
+        id="2026_06_30_normalize_model_paths",
+        depends_on="2026_06_30_add_example_table",
+        callback=NormalizeModelPathsCallback(app_config=app_config, logger=logger),
+    )
+```
+
+Do not use `*args`, `**kwargs`, or positional-only parameters in migration builders.
+
+## Registration
+
+Do not manually import or register migrations in `sqlite_util.py`.
+
+Database initialization builds a `MigrationBuildContext`, discovers migration modules, calls their builders, and registers the resulting `Migration` objects with `SqliteMigrator`.
+
+Manual registration is still available for tests:
+
+```py
+migrator.register_migration(Migration(...))
+```
+
+## Applied State and Compatibility
+
+The migrator records stable migration IDs in the `applied_migrations` table. Legacy numeric versions are still written to the existing `migrations` table for migrations that define `to_version`.
+
+New date-stamped migrations should not define `from_version` or `to_version` unless there is a specific legacy compatibility reason. Use `id` and `depends_on` to define execution.
+
+Existing databases are bootstrapped from legacy numeric rows:
+
+- legacy version `1` maps to `migration_1`
+- legacy version `2` maps to `migration_2`
+- and so on
+
+If a database contains an applied migration ID or legacy numeric version unknown to the current code, startup fails before running migrations. This prevents older code from running against a newer schema.
+
+For legacy migrations, the two metadata tables must agree. For example, `applied_migrations` may only record `migration_2` with `legacy_version = 2` if the legacy `migrations` table also contains version `2`. If these records are inconsistent, startup fails before user migration callbacks run.
+
+## Tests
+
+Add focused tests for each migration callback under:
+
+```text
+tests/app/services/shared/sqlite_migrator/migrations/
+```
+
+At minimum, cover:
+
+- the schema or data change performed by the callback
+- idempotent or already-migrated behavior when relevant
+- missing optional source tables or columns when the migration is expected to tolerate them
+- the builder's `id` and `depends_on`
+- legacy `from_version` and `to_version`, if the migration defines them
+
+Also run the migrator tests:
+
+```bash
+pytest tests/app/services/shared/sqlite_migrator tests/test_sqlite_migrator.py
+```
+
+These tests use in-memory databases or pytest temporary directories. They should not touch a real InvokeAI database.

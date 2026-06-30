@@ -111,6 +111,29 @@ def test_migration_hash(no_op_migrate_callback: MigrateCallback) -> None:
     assert hash(migration) == hash((0, 1))
 
 
+def test_legacy_migration_gets_stable_id_and_dependency(no_op_migrate_callback: MigrateCallback) -> None:
+    first_migration = Migration(from_version=0, to_version=1, callback=no_op_migrate_callback)
+    second_migration = Migration(from_version=1, to_version=2, callback=no_op_migrate_callback)
+
+    assert first_migration.id == "migration_1"
+    assert first_migration.depends_on is None
+    assert second_migration.id == "migration_2"
+    assert second_migration.depends_on == "migration_1"
+
+
+def test_explicit_migration_id_and_dependency_are_preserved(no_op_migrate_callback: MigrateCallback) -> None:
+    migration = Migration(
+        id="2026_06_29_add_test_table",
+        depends_on="migration_1",
+        callback=no_op_migrate_callback,
+    )
+
+    assert migration.id == "2026_06_29_add_test_table"
+    assert migration.depends_on == "migration_1"
+    assert migration.from_version is None
+    assert migration.to_version is None
+
+
 def test_migration_set_add_migration(migrator: SqliteMigrator, migration_no_op: Migration) -> None:
     migration = migration_no_op
     migrator._migration_set.register(migration)
@@ -130,6 +153,14 @@ def test_migration_set_may_not_register_dupes(
     migrator._migration_set.register(migrate_1_to_2_a)
     with pytest.raises(MigrationVersionError, match=r"Migration with from_version or to_version already registered"):
         migrator._migration_set.register(migrate_1_to_2_b)
+
+
+def test_migration_set_may_not_register_duplicate_ids(no_op_migrate_callback: MigrateCallback) -> None:
+    migration_set = MigrationSet()
+    migration_set.register(Migration(id="same_id", callback=no_op_migrate_callback))
+
+    with pytest.raises(MigrationVersionError, match="Migration with id already registered"):
+        migration_set.register(Migration(id="same_id", callback=no_op_migrate_callback))
 
 
 def test_migration_set_gets_migration(migration_no_op: Migration) -> None:
@@ -153,6 +184,47 @@ def test_migration_set_validates_migration_chain(no_op_migrate_callback: Migrate
     with pytest.raises(MigrationError, match="Migration chain is fragmented"):
         # no migration from 3 to 4
         migration_set.validate_migration_chain()
+
+
+def test_migration_set_validates_dependency_graph(no_op_migrate_callback: MigrateCallback) -> None:
+    migration_set = MigrationSet()
+    migration_set.register(Migration(id="a", callback=no_op_migrate_callback))
+    migration_set.register(Migration(id="b", depends_on="a", callback=no_op_migrate_callback))
+    migration_set.register(Migration(id="c", depends_on="a", callback=no_op_migrate_callback))
+    migration_set.register(Migration(id="d", depends_on="c", callback=no_op_migrate_callback))
+
+    migration_set.validate_dependency_graph()
+
+
+def test_migration_set_rejects_missing_dependency(no_op_migrate_callback: MigrateCallback) -> None:
+    migration_set = MigrationSet()
+    migration_set.register(Migration(id="a", depends_on="missing", callback=no_op_migrate_callback))
+
+    with pytest.raises(MigrationError, match="depends on unknown migration"):
+        migration_set.validate_dependency_graph()
+
+
+def test_migration_set_rejects_dependency_cycle(no_op_migrate_callback: MigrateCallback) -> None:
+    migration_set = MigrationSet()
+    migration_set.register(Migration(id="a", depends_on="b", callback=no_op_migrate_callback))
+    migration_set.register(Migration(id="b", depends_on="a", callback=no_op_migrate_callback))
+
+    with pytest.raises(MigrationError, match="cycle"):
+        migration_set.validate_dependency_graph()
+
+
+def test_migration_set_plans_branching_migrations(no_op_migrate_callback: MigrateCallback) -> None:
+    migration_set = MigrationSet()
+    migration_a = Migration(id="a", callback=no_op_migrate_callback)
+    migration_b = Migration(id="b", depends_on="a", callback=no_op_migrate_callback)
+    migration_c = Migration(id="c", depends_on="a", callback=no_op_migrate_callback)
+    migration_d = Migration(id="d", depends_on="c", callback=no_op_migrate_callback)
+    migration_set.register(migration_d)
+    migration_set.register(migration_c)
+    migration_set.register(migration_b)
+    migration_set.register(migration_a)
+
+    assert migration_set.get_migration_plan(applied_migration_ids={"a", "b"}) == [migration_c, migration_d]
 
 
 def test_migration_set_counts_migrations(no_op_migrate_callback: MigrateCallback) -> None:
@@ -197,6 +269,13 @@ def test_migrator_creates_migrations_table(migrator: SqliteMigrator) -> None:
     assert cursor.fetchone() is not None
 
 
+def test_migrator_creates_applied_migrations_table(migrator: SqliteMigrator) -> None:
+    cursor = migrator._db._conn.cursor()
+    migrator._create_applied_migrations_table(cursor)
+    cursor.execute("SELECT * FROM sqlite_master WHERE type='table' AND name='applied_migrations';")
+    assert cursor.fetchone() is not None
+
+
 def test_migrator_migration_sets_version(migrator: SqliteMigrator, migration_no_op: Migration) -> None:
     cursor = migrator._db._conn.cursor()
     migrator._create_migrations_table(cursor)
@@ -232,6 +311,164 @@ def test_migrator_runs_all_migrations_in_memory(migrator: SqliteMigrator) -> Non
         migrator.register_migration(migration)
     migrator.run_migrations()
     assert migrator._get_current_version(cursor) == 3
+
+
+def test_migrator_bootstraps_applied_migrations_from_legacy_versions(
+    migrator: SqliteMigrator, no_op_migrate_callback: MigrateCallback
+) -> None:
+    cursor = migrator._db._conn.cursor()
+    migrator._create_migrations_table(cursor)
+    cursor.execute("INSERT INTO migrations (version) VALUES (1);")
+    cursor.execute("INSERT INTO migrations (version) VALUES (2);")
+    cursor.connection.commit()
+    migrator.register_migration(Migration(from_version=0, to_version=1, callback=no_op_migrate_callback))
+    migrator.register_migration(Migration(from_version=1, to_version=2, callback=no_op_migrate_callback))
+    migrator.register_migration(Migration(from_version=2, to_version=3, callback=no_op_migrate_callback))
+
+    migrator.run_migrations()
+
+    cursor.execute("SELECT migration_id FROM applied_migrations ORDER BY migration_id;")
+    assert [row[0] for row in cursor.fetchall()] == ["migration_1", "migration_2", "migration_3"]
+    assert migrator._get_current_version(cursor) == 3
+
+
+def test_migrator_runs_branching_graph_migrations(migrator: SqliteMigrator) -> None:
+    cursor = migrator._db._conn.cursor()
+    executed: list[str] = []
+
+    def create_migration(migration_id: str, depends_on: str | None) -> Migration:
+        def migrate(cursor: sqlite3.Cursor) -> None:
+            executed.append(migration_id)
+            cursor.execute(f"CREATE TABLE {migration_id} (id INTEGER PRIMARY KEY);")
+
+        return Migration(id=migration_id, depends_on=depends_on, callback=migrate)
+
+    for migration in [
+        create_migration("d", "c"),
+        create_migration("c", "a"),
+        create_migration("b", "a"),
+        create_migration("a", None),
+    ]:
+        migrator.register_migration(migration)
+
+    migrator.run_migrations()
+
+    assert executed == ["a", "b", "c", "d"]
+    cursor.execute("SELECT migration_id FROM applied_migrations ORDER BY migration_id;")
+    assert [row[0] for row in cursor.fetchall()] == ["a", "b", "c", "d"]
+
+
+def test_migrator_rejects_unknown_applied_migration(
+    migrator: SqliteMigrator, no_op_migrate_callback: MigrateCallback
+) -> None:
+    cursor = migrator._db._conn.cursor()
+    migrator._create_migrations_table(cursor)
+    migrator._create_applied_migrations_table(cursor)
+    cursor.execute("INSERT INTO applied_migrations (migration_id) VALUES ('future_migration');")
+    cursor.connection.commit()
+    migrator.register_migration(Migration(from_version=0, to_version=1, callback=no_op_migrate_callback))
+
+    with pytest.raises(MigrationError, match="unknown applied migration"):
+        migrator.run_migrations()
+
+
+def test_migrator_rejects_unknown_applied_migration_before_creating_legacy_table(
+    migrator: SqliteMigrator, no_op_migrate_callback: MigrateCallback
+) -> None:
+    cursor = migrator._db._conn.cursor()
+    migrator._create_applied_migrations_table(cursor)
+    cursor.execute("INSERT INTO applied_migrations (migration_id) VALUES ('future_migration');")
+    cursor.connection.commit()
+    migrator.register_migration(Migration(from_version=0, to_version=1, callback=no_op_migrate_callback))
+
+    with pytest.raises(MigrationError, match="unknown applied migration"):
+        migrator.run_migrations()
+
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='migrations';")
+    assert cursor.fetchone() is None
+
+
+def test_migrator_rejects_inconsistent_applied_legacy_version(
+    migrator: SqliteMigrator, no_op_migrate_callback: MigrateCallback
+) -> None:
+    cursor = migrator._db._conn.cursor()
+    migrator._create_migrations_table(cursor)
+    migrator._create_applied_migrations_table(cursor)
+    cursor.execute("INSERT INTO migrations (version) VALUES (1);")
+    cursor.execute("INSERT INTO migrations (version) VALUES (2);")
+    cursor.execute("INSERT INTO applied_migrations (migration_id, legacy_version) VALUES ('migration_1', 2);")
+    cursor.connection.commit()
+    callback_ran = False
+
+    def migration_callback(cursor: sqlite3.Cursor) -> None:
+        nonlocal callback_ran
+        callback_ran = True
+
+    migrator.register_migration(Migration(from_version=0, to_version=1, callback=no_op_migrate_callback))
+    migrator.register_migration(Migration(from_version=1, to_version=2, callback=migration_callback))
+
+    with pytest.raises(MigrationError, match="inconsistent applied migration state"):
+        migrator.run_migrations()
+
+    assert callback_ran is False
+
+
+def test_migrator_rejects_applied_legacy_migration_missing_legacy_row(
+    migrator: SqliteMigrator, no_op_migrate_callback: MigrateCallback
+) -> None:
+    cursor = migrator._db._conn.cursor()
+    migrator._create_migrations_table(cursor)
+    migrator._create_applied_migrations_table(cursor)
+    cursor.execute("INSERT INTO migrations (version) VALUES (1);")
+    cursor.execute("INSERT INTO applied_migrations (migration_id, legacy_version) VALUES ('migration_2', 2);")
+    cursor.connection.commit()
+    callback_ran = False
+
+    def graph_migration_callback(cursor: sqlite3.Cursor) -> None:
+        nonlocal callback_ran
+        callback_ran = True
+
+    migrator.register_migration(Migration(from_version=0, to_version=1, callback=no_op_migrate_callback))
+    migrator.register_migration(Migration(from_version=1, to_version=2, callback=no_op_migrate_callback))
+    migrator.register_migration(
+        Migration(id="2026_06_30_graph_migration", depends_on="migration_2", callback=graph_migration_callback)
+    )
+
+    with pytest.raises(MigrationError, match="inconsistent applied migration state"):
+        migrator.run_migrations()
+
+    assert callback_ran is False
+
+
+def test_migrator_rejects_unknown_legacy_version(
+    migrator: SqliteMigrator, no_op_migrate_callback: MigrateCallback
+) -> None:
+    cursor = migrator._db._conn.cursor()
+    migrator._create_migrations_table(cursor)
+    cursor.execute("INSERT INTO migrations (version) VALUES (1);")
+    cursor.execute("INSERT INTO migrations (version) VALUES (2);")
+    cursor.connection.commit()
+    migrator.register_migration(Migration(from_version=0, to_version=1, callback=no_op_migrate_callback))
+
+    with pytest.raises(MigrationError, match="unknown legacy migration version"):
+        migrator.run_migrations()
+
+
+def test_migrator_rejects_unknown_legacy_version_before_creating_applied_table(
+    migrator: SqliteMigrator, no_op_migrate_callback: MigrateCallback
+) -> None:
+    cursor = migrator._db._conn.cursor()
+    migrator._create_migrations_table(cursor)
+    cursor.execute("INSERT INTO migrations (version) VALUES (1);")
+    cursor.execute("INSERT INTO migrations (version) VALUES (2);")
+    cursor.connection.commit()
+    migrator.register_migration(Migration(from_version=0, to_version=1, callback=no_op_migrate_callback))
+
+    with pytest.raises(MigrationError, match="unknown legacy migration version"):
+        migrator.run_migrations()
+
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='applied_migrations';")
+    assert cursor.fetchone() is None
 
 
 def test_migrator_runs_all_migrations_file(logger: Logger) -> None:
@@ -287,6 +524,8 @@ def test_migrator_makes_no_changes_on_failed_migration(
     with pytest.raises(MigrationError, match="Bad migration"):
         migrator.run_migrations()
     assert migrator._get_current_version(cursor) == 1
+    cursor.execute("SELECT migration_id FROM applied_migrations ORDER BY migration_id;")
+    assert [row[0] for row in cursor.fetchall()] == ["migration_1"]
 
 
 def test_idempotent_migrations(migrator: SqliteMigrator, migration_create_test_table: Migration) -> None:
