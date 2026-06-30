@@ -95,9 +95,7 @@ def _build_input(operation: str, h: int, w: int, z_dim: int, dtype: torch.dtype)
     """
     device = torch.device("cuda")
     if operation == "decode":
-        return torch.randn(
-            1, z_dim, 1, h // LATENT_SCALE_FACTOR, w // LATENT_SCALE_FACTOR, device=device, dtype=dtype
-        )
+        return torch.randn(1, z_dim, 1, h // LATENT_SCALE_FACTOR, w // LATENT_SCALE_FACTOR, device=device, dtype=dtype)
     return torch.randn(1, 3, 1, h, w, device=device, dtype=dtype)
 
 
@@ -157,7 +155,9 @@ def measure_one(vae_path: str, operation: str, h: int, w: int, dtype: torch.dtyp
 def run_grid(vae_path: str, resolutions: list[tuple[int, int]], dtype_name: str, csv_path: Path | None) -> None:
     rows: list[dict] = []
     print(f"VAE: {vae_path}")
-    print(f"torch {torch.__version__} | device {torch.cuda.get_device_name(0)} | hip={torch.version.hip} | dtype={dtype_name}\n")
+    print(
+        f"torch {torch.__version__} | device {torch.cuda.get_device_name(0)} | hip={torch.version.hip} | dtype={dtype_name}\n"
+    )
     print(f"{'op':6} {'HxW':>11} {'area':>10} {'reserved(GiB)':>14} {'alloc(GiB)':>11} {'implied_k':>10}")
     print("-" * 70)
 
@@ -165,8 +165,18 @@ def run_grid(vae_path: str, resolutions: list[tuple[int, int]], dtype_name: str,
         for h, w in resolutions:
             # Fresh subprocess per point for an uncontaminated reserved-memory reading.
             proc = subprocess.run(
-                [sys.executable, __file__, "--single", operation, str(h), str(w),
-                 "--vae", vae_path, "--dtype", dtype_name],
+                [
+                    sys.executable,
+                    __file__,
+                    "--single",
+                    operation,
+                    str(h),
+                    str(w),
+                    "--vae",
+                    vae_path,
+                    "--dtype",
+                    dtype_name,
+                ],
                 capture_output=True,
                 text=True,
             )
@@ -192,15 +202,26 @@ def run_grid(vae_path: str, resolutions: list[tuple[int, int]], dtype_name: str,
     for operation in ("decode", "encode"):
         ks = [r["implied_constant"] for r in rows if r["operation"] == operation and not r.get("oom")]
         if ks:
-            print(f"{operation:6}: n={len(ks)}  min_k={min(ks):.1f}  max_k={max(ks):.1f}  "
-                  f"-> use >= {max(ks):.0f} (+headroom)")
+            print(
+                f"{operation:6}: n={len(ks)}  min_k={min(ks):.1f}  max_k={max(ks):.1f}  "
+                f"-> use >= {max(ks):.0f} (+headroom)"
+            )
 
     if csv_path:
         import csv
 
         fieldnames = [
-            "operation", "h", "w", "area", "element_size", "dtype",
-            "reserved_delta", "allocated_peak", "reserved_baseline", "implied_constant", "oom",
+            "operation",
+            "h",
+            "w",
+            "area",
+            "element_size",
+            "dtype",
+            "reserved_delta",
+            "allocated_peak",
+            "reserved_baseline",
+            "implied_constant",
+            "oom",
         ]
         with csv_path.open("w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
