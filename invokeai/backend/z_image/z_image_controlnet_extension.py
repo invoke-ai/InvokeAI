@@ -7,6 +7,7 @@ transformer, we compute control hints separately and inject them into
 the base transformer's forward pass.
 """
 
+import logging
 from typing import List, Optional, Tuple
 
 import torch
@@ -15,6 +16,8 @@ from torch.nn.utils.rnn import pad_sequence
 
 from invokeai.backend.z_image.z_image_control_adapter import ZImageControlAdapter
 from invokeai.backend.z_image.z_image_patchify_utils import SEQ_MULTI_OF, patchify_control_context
+
+logger = logging.getLogger(__name__)
 
 
 class ZImageControlNetExtension:
@@ -57,17 +60,15 @@ class ZImageControlNetExtension:
         # This matches the default configuration in the original implementation
         self._control_places = [i * 2 for i in range(self._num_control_blocks)]
 
-        # DEBUG: Print control configuration
-        print(f"[DEBUG] Actual num_control_blocks: {self._num_control_blocks}")
-        print(f"[DEBUG] control_places: {self._control_places}")
+        logger.debug("Actual num_control_blocks: %s", self._num_control_blocks)
+        logger.debug("control_places: %s", self._control_places)
 
-        # DEBUG: Check if control_layers have non-zero weights
         first_layer = control_adapter.control_layers[0]
         if hasattr(first_layer, "after_proj"):
             after_proj_norm = first_layer.after_proj.weight.norm().item()
-            print(f"[DEBUG] First control layer after_proj weight norm: {after_proj_norm}")
+            logger.debug("First control layer after_proj weight norm: %s", after_proj_norm)
             if after_proj_norm < 1e-6:
-                print("[WARNING] after_proj weights are near-zero! Weights may not be loaded correctly.")
+                logger.warning("after_proj weights are near-zero! Weights may not be loaded correctly.")
 
     @property
     def weight(self) -> float:
@@ -157,10 +158,9 @@ class ZImageControlNetExtension:
 
         control_unified = pad_sequence(control_unified, batch_first=True, padding_value=0.0)
 
-        # DEBUG (only once)
         if not hasattr(self, "_prepare_printed"):
             self._prepare_printed = True
-            print(f"[DEBUG] Control state prepared: shape {control_unified.shape}")
+            logger.debug("Control state prepared: shape %s", control_unified.shape)
 
         return control_unified
 
@@ -304,26 +304,22 @@ class ZImageControlNetExtension:
         control_unified = pad_sequence(control_unified, batch_first=True, padding_value=0.0)
         c = control_unified
 
-        # Process through control_layers to generate hints
-        # DEBUG: Print shapes before control_layers (only on first call)
         if not hasattr(self, "_debug_printed"):
             self._debug_printed = True
-            print(f"[DEBUG] control_unified shape: {control_unified.shape}")
-            print(f"[DEBUG] unified_hidden_states shape: {unified_hidden_states.shape}")
-            print(f"[DEBUG] ctrl_item_seqlens: {ctrl_item_seqlens}, x_item_seqlens: {x_item_seqlens}")
+            logger.debug("control_unified shape: %s", control_unified.shape)
+            logger.debug("unified_hidden_states shape: %s", unified_hidden_states.shape)
+            logger.debug("ctrl_item_seqlens: %s, x_item_seqlens: %s", ctrl_item_seqlens, x_item_seqlens)
 
-            # Check weight norms of critical layers
             layer0 = self._adapter.control_layers[0]
             if hasattr(layer0, "before_proj"):
-                print(f"[DEBUG] before_proj weight norm: {layer0.before_proj.weight.norm().item():.6f}")
+                logger.debug("before_proj weight norm: %.6f", layer0.before_proj.weight.norm().item())
             if hasattr(layer0, "after_proj"):
-                print(f"[DEBUG] after_proj weight norm: {layer0.after_proj.weight.norm().item():.6f}")
+                logger.debug("after_proj weight norm: %.6f", layer0.after_proj.weight.norm().item())
 
-            # Check control_noise_refiner weights
             if len(self._adapter.control_noise_refiner) > 0:
                 refiner0 = self._adapter.control_noise_refiner[0]
                 if hasattr(refiner0, "attn"):
-                    print(f"[DEBUG] noise_refiner[0] attn.wq norm: {refiner0.attn.wq.weight.norm().item():.6f}")
+                    logger.debug("noise_refiner[0] attn.wq norm: %.6f", refiner0.attn.wq.weight.norm().item())
 
         for layer in self._adapter.control_layers:
             c = layer(
@@ -337,16 +333,19 @@ class ZImageControlNetExtension:
         # Extract hints (all but the last element which is the running state)
         hints = tuple(torch.unbind(c)[:-1])
 
-        # DEBUG: Print hint shapes (only on first call)
         if not hasattr(self, "_hints_printed"):
             self._hints_printed = True
-            print(f"[DEBUG] Number of hints: {len(hints)}")
+            logger.debug("Number of hints: %s", len(hints))
             if hints:
-                print(f"[DEBUG] First hint shape: {hints[0].shape}")
-                # Also check hint statistics for each hint
+                logger.debug("First hint shape: %s", hints[0].shape)
                 for i, h in enumerate(hints[:3]):  # First 3 hints
-                    print(
-                        f"[DEBUG] Hint[{i}] mean: {h.mean().item():.6f}, std: {h.std().item():.6f}, min: {h.min().item():.6f}, max: {h.max().item():.6f}"
+                    logger.debug(
+                        "Hint[%s] mean: %.6f, std: %.6f, min: %.6f, max: %.6f",
+                        i,
+                        h.mean().item(),
+                        h.std().item(),
+                        h.min().item(),
+                        h.max().item(),
                     )
 
         return hints
@@ -476,10 +475,9 @@ def z_image_forward_with_control(
     control_weight: float = 1.0
     hints: Optional[Tuple[torch.Tensor, ...]] = None
 
-    # DEBUG: Print number of transformer layers (only once per session)
     if not hasattr(z_image_forward_with_control, "_layers_printed"):
         z_image_forward_with_control._layers_printed = True
-        print(f"[DEBUG] Base transformer has {len(transformer.layers)} layers")
+        logger.debug("Base transformer has %s layers", len(transformer.layers))
 
     if control_extension is not None:
         # Compute ALL hints at once using the INITIAL unified state (before main layers run)
@@ -511,13 +509,12 @@ def z_image_forward_with_control(
             if control_layer_idx >= skip_layers:
                 hint = hints[control_layer_idx]
 
-                # DEBUG: Print on first injection
                 if not hasattr(z_image_forward_with_control, "_injection_printed"):
                     z_image_forward_with_control._injection_printed = True
-                    print(f"[DEBUG] Injection at layer {layer_idx} (control_layer {control_layer_idx})")
-                    print(f"[DEBUG] Hint mean: {hint.mean().item():.6f}, std: {hint.std().item():.6f}")
-                    print(f"[DEBUG] Unified mean: {unified.mean().item():.6f}, std: {unified.std().item():.6f}")
-                    print(f"[DEBUG] control_weight: {control_weight}, skip_layers: {skip_layers}")
+                    logger.debug("Injection at layer %s (control_layer %s)", layer_idx, control_layer_idx)
+                    logger.debug("Hint mean: %.6f, std: %.6f", hint.mean().item(), hint.std().item())
+                    logger.debug("Unified mean: %.6f, std: %.6f", unified.mean().item(), unified.std().item())
+                    logger.debug("control_weight: %s, skip_layers: %s", control_weight, skip_layers)
 
                 unified = unified + hint * control_weight
 

@@ -116,8 +116,7 @@ jobs:
         working-directory: docs
         env:
           DEPLOY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_target || 'custom' }}
-          ENABLE_ANALYTICS: ${{ github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' ||              
- inputs.deploy_target == 'custom') }}
+          ENABLE_ANALYTICS: ${{ github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.deploy_target == 'custom') }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: verify deploy output

@@ -16,7 +16,7 @@ import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import { selectCanvasOutputFields } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { Invocation } from 'services/api/types';
@@ -54,8 +54,6 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
 
   const fp32 = vaePrecision === 'fp32';
   const compensation = colorCompensation ? 'SDXL' : 'None';
-  const prompts = selectPresetModifiedPrompts(state);
-
   const g = new Graph(getPrefixedId('sdxl_graph'));
 
   const modelLoader = g.addNode({
@@ -66,6 +64,10 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
 
   const positivePrompt = g.addNode({
     id: getPrefixedId('positive_prompt'),
+    type: 'string',
+  });
+  const negativePrompt = g.addNode({
+    id: getPrefixedId('negative_prompt'),
     type: 'string',
   });
   const posCond = g.addNode({
@@ -80,8 +82,6 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   const negCond = g.addNode({
     type: 'sdxl_compel_prompt',
     id: getPrefixedId('neg_cond'),
-    prompt: prompts.negative,
-    style: prompts.negative,
   });
   const negCondCollect = g.addNode({
     type: 'collect',
@@ -127,6 +127,8 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
 
   g.addEdge(positivePrompt, 'value', posCond, 'prompt');
   g.addEdge(positivePrompt, 'value', posCond, 'style');
+  g.addEdge(negativePrompt, 'value', negCond, 'prompt');
+  g.addEdge(negativePrompt, 'value', negCond, 'style');
 
   g.addEdge(posCond, 'conditioning', posCondCollect, 'item');
   g.addEdge(posCondCollect, 'collection', denoise, 'positive_conditioning');
@@ -145,11 +147,11 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     steps,
     rand_device: shouldUseCpuNoise ? 'cpu' : 'cuda',
     scheduler,
-    negative_prompt: prompts.negative,
     vae: vae ?? undefined,
   });
   g.addEdgeToMetadata(seed, 'value', 'seed');
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
+  g.addEdgeToMetadata(negativePrompt, 'value', 'negative_prompt');
 
   const seamless = addSeamless(state, g, denoise, modelLoader, vaeLoader);
 
@@ -344,5 +346,6 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     g,
     seed,
     positivePrompt,
+    negativePrompt,
   };
 };

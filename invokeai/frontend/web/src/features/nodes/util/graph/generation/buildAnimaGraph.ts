@@ -3,7 +3,6 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   selectAnimaQwen3EncoderModel,
   selectAnimaScheduler,
-  selectAnimaT5EncoderModel,
   selectAnimaVaeModel,
   selectMainModelConfig,
   selectParamsSlice,
@@ -42,7 +41,6 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
   // Get Anima component models
   const animaVaeModel = selectAnimaVaeModel(state);
   const animaQwen3EncoderModel = selectAnimaQwen3EncoderModel(state);
-  const animaT5EncoderModel = selectAnimaT5EncoderModel(state);
   const animaScheduler = selectAnimaScheduler(state);
 
   // Validate required component models
@@ -51,7 +49,6 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
     'No VAE model selected for Anima. Set a compatible VAE (Wan 2.1 QwenImage or FLUX VAE).'
   );
   assert(animaQwen3EncoderModel !== null, 'No Qwen3 Encoder model selected for Anima. Set a Qwen3 0.6B encoder model.');
-  assert(animaT5EncoderModel !== null, 'No T5 Encoder model selected for Anima. Set a T5-XXL encoder model.');
 
   const params = selectParamsSlice(state);
   const { cfgScale: guidance_scale, steps } = params;
@@ -66,7 +63,6 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
     model,
     vae_model: animaVaeModel,
     qwen3_encoder_model: animaQwen3EncoderModel,
-    t5_encoder_model: animaT5EncoderModel,
   });
 
   const positivePrompt = g.addNode({
@@ -123,7 +119,6 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
   // Connect model loader outputs
   g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
   g.addEdge(modelLoader, 'qwen3_encoder', posCond, 'qwen3_encoder');
-  g.addEdge(modelLoader, 't5_encoder', posCond, 't5_encoder');
   g.addEdge(modelLoader, 'vae', l2i, 'vae');
 
   // Connect positive prompt through collector for regional support
@@ -134,7 +129,6 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
   // Connect negative conditioning if guidance_scale > 1
   if (negCond !== null && negCondCollect !== null) {
     g.addEdge(modelLoader, 'qwen3_encoder', negCond, 'qwen3_encoder');
-    g.addEdge(modelLoader, 't5_encoder', negCond, 't5_encoder');
     g.addEdge(negCond, 'conditioning', negCondCollect, 'item');
     g.addEdge(negCondCollect, 'collection', denoise, 'negative_conditioning');
   }
@@ -154,7 +148,6 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
     scheduler: animaScheduler,
     vae: animaVaeModel ?? undefined,
     qwen3_encoder: animaQwen3EncoderModel ?? undefined,
-    t5_encoder: animaT5EncoderModel ?? undefined,
   });
   g.addEdgeToMetadata(seed, 'value', 'seed');
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
