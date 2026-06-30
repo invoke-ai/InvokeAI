@@ -61,6 +61,8 @@ For a migration that only needs an older schema point, depend on the migration t
 depends_on="migration_27"
 ```
 
+New production migrations should always set `depends_on`. Only a true root migration should use `depends_on=None`. A migration with no dependency is considered independently runnable, so omitting `depends_on` for a normal schema or data change can allow it to run before the schema it expects exists.
+
 Dependencies drive execution order. If two migrations both depend on `migration_27`, either may run after `migration_27` unless one explicitly depends on the other. Do not rely on filename or lexical ordering to express a real dependency.
 
 Single-parent dependencies are currently supported. If a migration truly requires two independent branches, add a real dependency between those branches only when that ordering is semantically correct. Otherwise, update the migrator design and tests to support multiple dependencies.
