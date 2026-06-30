@@ -2047,6 +2047,15 @@
                 "0.5: Gentler schedule for resolutions just above native (1024px)."
             ]
         },
+        "pidMode": {
+            "heading": "PiD Decode (Super-Resolution Decoder)",
+            "paragraphs": [
+                "PiD replaces the standard VAE decode with NVIDIA's Pixel Diffusion Decoder, a diffusion-based 4x super-resolution decoder. It requires a PiD decoder model and a Gemma-2 caption encoder.",
+                "Fit: generate at your chosen resolution, PiD decodes it 4x, then downscales back to that size - extra detail at the same output size, and it composites onto the canvas (works for Image to Image too).",
+                "Native (4x): your dimensions are the 4x target. Generation runs at a quarter of them (e.g. 512 -> 2048) and PiD's full 4x output is used directly. The PiD decoders are trained for 2K output (512px sources), with 2K-to-4K variants for 4K.",
+                "Because PiD's diffusion decode reconstructs detail, you can usually lower the generation Steps to save time. 'Scale Before Processing' must be set to None while PiD is enabled."
+            ]
+        },
         "seedVarianceEnhancer": {
             "heading": "Seed Variance Enhancer",
             "paragraphs": [

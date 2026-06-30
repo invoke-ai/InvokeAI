@@ -1,6 +1,7 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
 import {
   gemma2EncoderModelSelected,
@@ -109,7 +110,9 @@ const PidSettings = () => {
   return (
     <Flex gap={4} w="full" flexDir="column">
       <FormControl gap={2}>
-        <FormLabel m={0}>{t('modelManager.pidMode')}</FormLabel>
+        <InformationalPopover feature="pidMode">
+          <FormLabel m={0}>{t('modelManager.pidMode')}</FormLabel>
+        </InformationalPopover>
         <Combobox value={value} options={options} onChange={onChange} />
       </FormControl>
       {pidMode !== 'off' && (
