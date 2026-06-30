@@ -4,7 +4,7 @@ type GetMasonryRenderStateArg = {
   isLoading: boolean;
 };
 
-export type MasonryRenderState = 'empty' | 'loading' | 'measuring' | 'ready';
+type MasonryRenderState = 'empty' | 'loading' | 'measuring' | 'ready';
 
 export const getMasonryRenderState = ({
   hasMeasuredColumnCount,

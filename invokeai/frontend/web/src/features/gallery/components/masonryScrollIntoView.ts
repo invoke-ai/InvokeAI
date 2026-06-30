@@ -11,7 +11,7 @@ type GetMasonryScrollDirectionArg = {
   targetIndex: number;
 };
 
-export type MasonrySelectedImageScrollState = {
+type MasonrySelectedImageScrollState = {
   hasSelectionChangedSinceMount: boolean;
   initialSelectedImageName: string | null;
 };

@@ -44,6 +44,8 @@ import { getMasonrySelectedImageScrollDecision, scrollMasonryImageIntoView } fro
 
 type ListImageNamesQueryArgs = ReturnType<typeof selectGetImageNamesQueryArgs>;
 
+type MasonryRootRef = RefObject<HTMLDivElement | null>;
+
 type MasonryContext = {
   queryArgs: ListImageNamesQueryArgs;
   registerMissingImageName: (imageName: string) => void;
@@ -81,7 +83,7 @@ const canHandleMasonryArrowNavigation = (
   return navigationApi.isDockviewPanelActive(activeTab, VIEWER_PANEL_ID);
 };
 
-const useMasonryColumnCount = (rootRef: RefObject<HTMLDivElement>) => {
+const useMasonryColumnCount = (rootRef: MasonryRootRef) => {
   const galleryImageMinimumWidth = useAppSelector(selectGalleryImageMinimumWidth);
   const [columnCount, setColumnCount] = useState(1);
   const [hasMeasuredColumnCount, setHasMeasuredColumnCount] = useState(false);
@@ -257,7 +259,7 @@ const getMasonryScroller = (rootEl: HTMLDivElement): HTMLElement | null => {
 const useMasonryImagePrefetching = (
   imageNames: string[],
   columnCount: number,
-  rootRef: RefObject<HTMLDivElement>,
+  rootRef: MasonryRootRef,
   enabled: boolean,
   preloadThumbnails: (imageDTOs: ImageDTO[]) => void,
   visibleInFlightImageNamesRef: MutableRefObject<Set<string>>,
@@ -646,11 +648,7 @@ const StaticMasonryImageGrid = memo(({ columnCount, context, imageNames }: Stati
 
 StaticMasonryImageGrid.displayName = 'StaticMasonryImageGrid';
 
-const useMasonryKeyboardNavigation = (
-  imageNames: string[],
-  columnCount: number,
-  rootRef: RefObject<HTMLDivElement>
-) => {
+const useMasonryKeyboardNavigation = (imageNames: string[], columnCount: number, rootRef: MasonryRootRef) => {
   const { dispatch, getState } = useAppStore();
   const activeTab = useAppSelector(selectActiveTab);
 
@@ -793,7 +791,7 @@ const useMasonryKeyboardNavigation = (
   });
 };
 
-const useKeepMasonrySelectedImageInView = (imageNames: string[], rootRef: RefObject<HTMLDivElement>) => {
+const useKeepMasonrySelectedImageInView = (imageNames: string[], rootRef: MasonryRootRef) => {
   const selection = useAppSelector(selectSelection);
   const selectedImageScrollStateRef = useRef({
     hasSelectionChangedSinceMount: false,
