@@ -134,7 +134,9 @@ class TestSaveDeleteRoundTrip:
 
         # Thumbnail file exists in mirrored subfolder
         thumbnail_name = get_thumbnail_name(image_name)
-        thumb_path = disk_storage.get_path(thumbnail_name, thumbnail=True, image_subfolder=subfolder)
+        thumb_path = disk_storage.get_path(image_name, thumbnail=True, image_subfolder=subfolder)
+        assert thumb_path.name == thumbnail_name
+        assert not thumb_path.name.startswith("thumbnail_thumbnail_")
         assert thumb_path.exists()
 
         # Round-trip read
