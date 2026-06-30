@@ -86,6 +86,46 @@ def discover_vae() -> Path:
 DTYPES = {"float16": torch.float16, "bfloat16": torch.bfloat16, "float32": torch.float32}
 
 
+def _load_vae(vae_path: str, dtype: torch.dtype) -> AutoencoderKLQwenImage:
+    """Load an AutoencoderKLQwenImage from either a diffusers directory or a single .safetensors file.
+
+    Directory: standard ``from_pretrained``.
+    Single file: ``AutoencoderKLQwenImage`` has no single-file converter registered in diffusers,
+    so we instantiate with the default config and load the state dict directly. Two on-disk layouts
+    exist: the diffusers layout (``encoder.conv_in`` / ``down_blocks`` / ``mid_block`` keys, e.g. the
+    weights InvokeAI's VAELoader consumes) and the original Qwen-Image/Wan release layout
+    (``encoder.conv1`` / ``downsamples`` / ``middle`` / ``time_conv`` keys). We try a direct strict
+    load first, and on a key mismatch fall back to diffusers' Wan VAE converter -- the Qwen-Image VAE
+    shares the Wan VAE key structure -- before retrying.
+    """
+    path = Path(vae_path)
+    if not path.is_file():
+        return AutoencoderKLQwenImage.from_pretrained(vae_path, local_files_only=True, torch_dtype=dtype)
+
+    from safetensors.torch import load_file
+
+    sd = load_file(str(path))
+    for k in list(sd.keys()):
+        if sd[k].is_floating_point():
+            sd[k] = sd[k].to(dtype)
+
+    vae = AutoencoderKLQwenImage()
+    try:
+        # diffusers-layout checkpoint: keys already match the model. State dict was converted to
+        # `dtype` above and is assigned in place, so params carry the correct dtype.
+        vae.load_state_dict(sd, strict=True, assign=True)
+    except RuntimeError:
+        # Original Qwen-Image/Wan release layout: convert keys to the diffusers layout, then retry.
+        from diffusers.loaders.single_file_utils import convert_wan_vae_to_diffusers
+
+        converted = convert_wan_vae_to_diffusers(sd)
+        for k in list(converted.keys()):
+            if converted[k].is_floating_point():
+                converted[k] = converted[k].to(dtype)
+        vae.load_state_dict(converted, strict=True, assign=True)
+    return vae
+
+
 def _build_input(operation: str, h: int, w: int, z_dim: int, dtype: torch.dtype) -> torch.Tensor:
     """Construct the 5D (B, C, num_frames, H, W) input the invocation feeds the VAE.
 
@@ -102,7 +142,7 @@ def _build_input(operation: str, h: int, w: int, z_dim: int, dtype: torch.dtype)
 @torch.inference_mode()
 def measure_one(vae_path: str, operation: str, h: int, w: int, dtype: torch.dtype) -> dict:
     """Measure peak reserved-memory growth for a single decode/encode. Runs in a child process."""
-    vae = AutoencoderKLQwenImage.from_pretrained(vae_path, local_files_only=True, torch_dtype=dtype)
+    vae = _load_vae(vae_path, dtype)
     vae.to("cuda")
     vae.disable_tiling()  # Qwen invocations never tile; match that.
 
@@ -233,7 +273,12 @@ def run_grid(vae_path: str, resolutions: list[tuple[int, int]], dtype_name: str,
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--vae", type=str, default=None, help="Path to an AutoencoderKLQwenImage diffusers dir.")
+    parser.add_argument(
+        "--vae",
+        type=str,
+        default=None,
+        help="Path to an AutoencoderKLQwenImage diffusers dir OR a single .safetensors checkpoint.",
+    )
     parser.add_argument("--csv", type=str, default=None, help="Optional path to write the raw results as CSV.")
     parser.add_argument(
         "--dtype",
