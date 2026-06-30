@@ -55,6 +55,8 @@ Existing numeric migrations use IDs matching their file number:
 id="migration_33"
 ```
 
+Legacy numeric migrations that define `from_version` and `to_version` may only depend on other legacy numeric migrations. New migrations should usually be date-stamped graph-only migrations, and should not define legacy versions unless a specific legacy compatibility requirement exists.
+
 For a migration that only needs an older schema point, depend on the migration that introduced the required schema or data:
 
 ```py
@@ -137,9 +139,11 @@ Existing databases are bootstrapped from legacy numeric rows:
 - legacy version `2` maps to `migration_2`
 - and so on
 
-If a database contains an applied migration ID or legacy numeric version unknown to the current code, startup fails before running migrations. This prevents older code from running against a newer schema.
+If a database contains an applied migration ID or legacy numeric version unknown to the current code, startup fails before running migrations. This prevents older code from running against a newer schema. Downgrading to an InvokeAI version that does not know about migrations already applied by a newer version is not supported.
 
 For legacy migrations, the two metadata tables must agree. For example, `applied_migrations` may only record `migration_2` with `legacy_version = 2` if the legacy `migrations` table also contains version `2`. If these records are inconsistent, startup fails before user migration callbacks run.
+
+When opening a file-backed legacy database for the first time after this migration system change, the migrator may need to create and populate `applied_migrations` even if no user migration callbacks need to run. This metadata bootstrap is backed up before the new metadata table is written.
 
 ## Tests
 

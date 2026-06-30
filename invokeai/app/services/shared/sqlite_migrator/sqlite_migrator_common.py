@@ -194,15 +194,21 @@ class MigrationSet:
     def validate_dependency_graph(self) -> None:
         """Validates migration ID dependencies."""
         migration_ids = {migration.id for migration in self._migrations}
+        migrations_by_id = self.migrations_by_id
         for migration in self._migrations:
             if migration.depends_on is not None and migration.depends_on not in migration_ids:
                 raise MigrationError(
                     f"Migration '{migration.id}' depends on unknown migration '{migration.depends_on}'"
                 )
+            if migration.to_version is not None and migration.depends_on is not None:
+                dependency = migrations_by_id[migration.depends_on]
+                if dependency.to_version is None:
+                    raise MigrationError(
+                        f"Legacy migration '{migration.id}' cannot depend on graph-only migration '{dependency.id}'"
+                    )
 
         visiting: set[str] = set()
         visited: set[str] = set()
-        migrations_by_id = self.migrations_by_id
 
         def visit(migration: Migration) -> None:
             migration_id = migration.id

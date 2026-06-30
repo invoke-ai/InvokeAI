@@ -51,6 +51,8 @@ class SqliteMigrator:
         self._validate_existing_applied_migrations(cursor=cursor)
         self._create_migrations_table(cursor=cursor)
         self._validate_existing_legacy_migrations(cursor=cursor)
+        if self._needs_applied_migrations_bootstrap(cursor=cursor):
+            self._backup_db()
         self._create_applied_migrations_table(cursor=cursor)
         self._validate_existing_applied_legacy_migrations(cursor=cursor)
         self._bootstrap_applied_migrations_from_legacy_versions(cursor=cursor)
@@ -67,21 +69,25 @@ class SqliteMigrator:
 
         self._logger.info("Database update needed")
 
-        # Make a backup of the db if it needs to be updated and is a file db
-        if self._db._db_path is not None:
-            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-            self._backup_path = self._db._db_path.parent / f"{self._db._db_path.stem}_backup_{timestamp}.db"
-            self._logger.info(f"Backing up database to {str(self._backup_path)}")
-            # Use SQLite to do the backup
-            with closing(sqlite3.connect(self._backup_path)) as backup_conn:
-                self._db._conn.backup(backup_conn)
-        else:
-            self._logger.info("Using in-memory database, no backup needed")
+        self._backup_db()
 
         for migration in migration_plan:
             self._run_migration(migration)
         self._logger.info("Database updated successfully")
         return True
+
+    def _backup_db(self) -> None:
+        """Makes a backup of the db if it is a file db and a backup has not already been made."""
+        if self._backup_path is not None:
+            return
+        if self._db._db_path is not None:
+            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+            self._backup_path = self._db._db_path.parent / f"{self._db._db_path.stem}_backup_{timestamp}.db"
+            self._logger.info(f"Backing up database to {str(self._backup_path)}")
+            with closing(sqlite3.connect(self._backup_path)) as backup_conn:
+                self._db._conn.backup(backup_conn)
+        else:
+            self._logger.info("Using in-memory database, no backup needed")
 
     def _run_migration(self, migration: Migration) -> None:
         """Runs a single migration."""
@@ -254,6 +260,21 @@ class SqliteMigrator:
                     "Database contains inconsistent applied migration state: "
                     f"{migration_id} is applied, but legacy version {legacy_version} is missing"
                 )
+
+    def _needs_applied_migrations_bootstrap(self, cursor: sqlite3.Cursor) -> bool:
+        """Checks whether legacy numeric rows need to be written to applied_migrations."""
+        cursor.execute("SELECT version FROM migrations WHERE version > 0;")
+        legacy_versions = {row[0] for row in cursor.fetchall()}
+        if len(legacy_versions) == 0:
+            return False
+
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='applied_migrations';")
+        if cursor.fetchone() is None:
+            return True
+
+        cursor.execute("SELECT legacy_version FROM applied_migrations WHERE legacy_version IS NOT NULL;")
+        applied_legacy_versions = {row[0] for row in cursor.fetchall()}
+        return not legacy_versions.issubset(applied_legacy_versions)
 
     @classmethod
     def _get_applied_migration_ids(cls, cursor: sqlite3.Cursor) -> set[str]:

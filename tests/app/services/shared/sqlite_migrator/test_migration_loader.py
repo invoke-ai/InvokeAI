@@ -241,6 +241,12 @@ def test_build_migrations_discovers_production_migrations(tmp_path: Path) -> Non
     migrations = build_migrations(
         MigrationBuildContext(app_config=FakeConfig(), logger=Logger("test"), image_files=object())
     )
+    legacy_migrations = [migration for migration in migrations if migration.to_version is not None]
+    latest_legacy_version = max(migration.to_version or 0 for migration in legacy_migrations)
 
-    assert [migration.id for migration in migrations] == [f"migration_{i}" for i in range(1, 33)]
-    assert [migration.depends_on for migration in migrations] == [None] + [f"migration_{i}" for i in range(1, 32)]
+    assert [migration.id for migration in legacy_migrations] == [
+        f"migration_{i}" for i in range(1, latest_legacy_version + 1)
+    ]
+    assert [migration.depends_on for migration in legacy_migrations] == [None] + [
+        f"migration_{i}" for i in range(1, latest_legacy_version)
+    ]

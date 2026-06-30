@@ -213,6 +213,25 @@ def test_migration_set_rejects_dependency_cycle(no_op_migrate_callback: MigrateC
         migration_set.validate_dependency_graph()
 
 
+def test_migration_set_rejects_legacy_migration_depending_on_graph_only_migration(
+    no_op_migrate_callback: MigrateCallback,
+) -> None:
+    migration_set = MigrationSet()
+    migration_set.register(Migration(id="2026_06_30_graph_only", callback=no_op_migrate_callback))
+    migration_set.register(
+        Migration(
+            id="migration_2",
+            depends_on="2026_06_30_graph_only",
+            from_version=1,
+            to_version=2,
+            callback=no_op_migrate_callback,
+        )
+    )
+
+    with pytest.raises(MigrationError, match="cannot depend on graph-only migration"):
+        migration_set.validate_dependency_graph()
+
+
 def test_migration_set_plans_branching_migrations(no_op_migrate_callback: MigrateCallback) -> None:
     migration_set = MigrationSet()
     migration_a = Migration(id="a", callback=no_op_migrate_callback)
@@ -330,6 +349,41 @@ def test_migrator_bootstraps_applied_migrations_from_legacy_versions(
     cursor.execute("SELECT migration_id FROM applied_migrations ORDER BY migration_id;")
     assert [row[0] for row in cursor.fetchall()] == ["migration_1", "migration_2", "migration_3"]
     assert migrator._get_current_version(cursor) == 3
+
+
+def test_migrator_backs_up_file_db_before_metadata_only_bootstrap(
+    logger: Logger, no_op_migrate_callback: MigrateCallback
+) -> None:
+    with TemporaryDirectory() as tempdir:
+        original_db_path = Path(tempdir) / "invokeai.db"
+        db = SqliteDatabase(db_path=original_db_path, logger=logger, verbose=False)
+        cursor = db._conn.cursor()
+        cursor.execute("CREATE TABLE test (id INTEGER PRIMARY KEY);")
+        cursor.execute(
+            """--sql
+            CREATE TABLE migrations (
+                version INTEGER PRIMARY KEY,
+                migrated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW'))
+            );
+            """
+        )
+        cursor.execute("INSERT INTO migrations (version) VALUES (0);")
+        cursor.execute("INSERT INTO migrations (version) VALUES (1);")
+        db._conn.commit()
+
+        migrator = SqliteMigrator(db=db)
+        migrator.register_migration(Migration(from_version=0, to_version=1, callback=no_op_migrate_callback))
+
+        assert migrator.run_migrations() is False
+
+        db._conn.close()
+        assert migrator._backup_path is not None
+        with closing(sqlite3.connect(migrator._backup_path)) as backup_db_conn:
+            backup_db_cursor = backup_db_conn.cursor()
+            backup_db_cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='test';")
+            assert backup_db_cursor.fetchone() is not None
+            backup_db_cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='applied_migrations';")
+            assert backup_db_cursor.fetchone() is None
 
 
 def test_migrator_runs_branching_graph_migrations(migrator: SqliteMigrator) -> None:
