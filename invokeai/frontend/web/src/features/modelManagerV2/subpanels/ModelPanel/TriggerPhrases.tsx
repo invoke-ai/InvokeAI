@@ -8,12 +8,14 @@ import {
   Tag,
   TagCloseButton,
   TagLabel,
+  Tooltip,
 } from '@invoke-ai/ui-library';
+import { toast } from 'features/toast/toast';
 import type { ChangeEvent } from 'react';
 import React, { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiPlusBold } from 'react-icons/pi';
-import { useUpdateModelMutation } from 'services/api/endpoints/models';
+import { PiArrowClockwiseBold, PiPlusBold } from 'react-icons/pi';
+import { useRefreshModelTriggerPhrasesMutation, useUpdateModelMutation } from 'services/api/endpoints/models';
 import type { LoRAModelConfig, MainModelConfig } from 'services/api/types';
 
 type Props = {
@@ -25,6 +27,7 @@ export const TriggerPhrases = memo(({ modelConfig }: Props) => {
   const [phrase, setPhrase] = useState('');
 
   const [updateModel, { isLoading }] = useUpdateModelMutation();
+  const [refreshModelTriggerPhrases, { isLoading: isRefreshing }] = useRefreshModelTriggerPhrasesMutation();
 
   const handlePhraseChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setPhrase(e.target.value);
@@ -74,7 +77,27 @@ export const TriggerPhrases = memo(({ modelConfig }: Props) => {
     [addTriggerPhrase]
   );
 
+  const refreshTriggerPhrases = useCallback(() => {
+    refreshModelTriggerPhrases({ key: modelConfig.key })
+      .unwrap()
+      .then(() => {
+        toast({
+          id: 'TRIGGER_PHRASES_REFRESHED',
+          title: t('modelManager.triggerPhrasesRefreshed'),
+          status: 'success',
+        });
+      })
+      .catch(() => {
+        toast({
+          id: 'TRIGGER_PHRASES_REFRESH_FAILED',
+          title: t('modelManager.triggerPhrasesRefreshFailed'),
+          status: 'error',
+        });
+      });
+  }, [modelConfig.key, refreshModelTriggerPhrases, t]);
+
   const hasTriggerPhrases = triggerPhrases.length > 0;
+  const canRefreshTriggerPhrases = modelConfig.type === 'lora';
 
   return (
     <Flex flexDir="column" w="full" gap="5">
@@ -83,16 +106,36 @@ export const TriggerPhrases = memo(({ modelConfig }: Props) => {
           <FormLabel>{t('modelManager.triggerPhrases')}</FormLabel>
           <Flex flexDir="column" w="full">
             <Flex gap="3" alignItems="center" w="full">
-              <Input value={phrase} onChange={handlePhraseChange} placeholder={t('modelManager.typePhraseHere')} />
+              <Input
+                value={phrase}
+                onChange={handlePhraseChange}
+                placeholder={t('modelManager.typePhraseHere')}
+                minW={0}
+              />
               <Button
                 leftIcon={<PiPlusBold />}
                 size="sm"
                 onClick={addTriggerPhrase}
                 isDisabled={!phrase || Boolean(errors.length)}
                 isLoading={isLoading}
+                flexShrink={0}
               >
                 {t('common.add')}
               </Button>
+              {canRefreshTriggerPhrases && (
+                <Tooltip label={t('modelManager.refreshTriggerPhrasesTooltip')}>
+                  <Button
+                    leftIcon={<PiArrowClockwiseBold />}
+                    size="sm"
+                    onClick={refreshTriggerPhrases}
+                    isLoading={isRefreshing}
+                    isDisabled={isLoading}
+                    flexShrink={0}
+                  >
+                    {t('modelManager.refreshTriggerPhrases')}
+                  </Button>
+                </Tooltip>
+              )}
             </Flex>
             {errors.map((error) => (
               <FormErrorMessage key={error}>{error}</FormErrorMessage>
@@ -106,7 +149,7 @@ export const TriggerPhrases = memo(({ modelConfig }: Props) => {
           {triggerPhrases.map((phrase, index) => (
             <Tag size="md" key={index} py={2} px={4} bg="base.700">
               <TagLabel>{phrase}</TagLabel>
-              <TagCloseButton onClick={removeTriggerPhrase.bind(null, phrase)} isDisabled={isLoading} />
+              <TagCloseButton onClick={removeTriggerPhrase.bind(null, phrase)} isDisabled={isLoading || isRefreshing} />
             </Tag>
           ))}
         </Flex>
