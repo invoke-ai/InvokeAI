@@ -51,7 +51,7 @@ _LATENT_PROJ_KEY_SUFFIX = "lq_proj.latent_proj.0.weight"
 
 _LATENT_CHANNELS_TO_BASES: dict[int, set[BaseModelType]] = {
     4: {BaseModelType.StableDiffusionXL},
-    16: {BaseModelType.Flux, BaseModelType.StableDiffusion3},
+    16: {BaseModelType.Flux, BaseModelType.StableDiffusion3, BaseModelType.QwenImage},
     128: {BaseModelType.Flux2},
 }
 
@@ -93,6 +93,8 @@ def _backbone_from_filename(name: str) -> BaseModelType | None:
         return BaseModelType.Flux
     if re.search(r"\bsdxl\b|sdxl", n):
         return BaseModelType.StableDiffusionXL
+    if re.search(r"qwen[_-]?image|qwenimage", n):
+        return BaseModelType.QwenImage
     if re.search(r"\bsd[_-]?3\b|sd3", n):
         return BaseModelType.StableDiffusion3
     return None
@@ -217,4 +219,16 @@ class PiDDecoder_Checkpoint_SDXL_Config(PiDDecoder_Checkpoint_Config_Base, Confi
     """PiD decoder for the SDXL backbone (4-channel latent)."""
 
     base: Literal[BaseModelType.StableDiffusionXL] = Field(default=BaseModelType.StableDiffusionXL)
+    variant: PiDDecoderVariantType = Field(description="Resolution preset of the PiD decoder checkpoint.")
+
+
+class PiDDecoder_Checkpoint_QwenImage_Config(PiDDecoder_Checkpoint_Config_Base, Config_Base):
+    """PiD decoder for the Qwen-Image backbone (16-channel latent).
+
+    Shares the 16-channel latent shape with FLUX.1 and SD3, so it relies on the same
+    filename / directory-name disambiguation (or a trusted explicit ``base`` override)
+    as SD3 - see ``_validate_base``.
+    """
+
+    base: Literal[BaseModelType.QwenImage] = Field(default=BaseModelType.QwenImage)
     variant: PiDDecoderVariantType = Field(description="Resolution preset of the PiD decoder checkpoint.")

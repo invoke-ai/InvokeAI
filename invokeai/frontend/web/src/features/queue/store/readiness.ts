@@ -352,6 +352,16 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
+  if (model?.base === 'qwen-image' && params.pidMode !== 'off') {
+    // PiD decode (any Qwen-Image format) needs both a PiD decoder and the Gemma-2 caption encoder.
+    if (!params.pidDecoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+    }
+    if (!params.gemma2EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+    }
+  }
+
   if (model?.base === 'z-image') {
     // Check if VAE source is available (either separate VAE or Qwen3 Source)
     const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
@@ -831,7 +841,21 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
 
   if (model?.base === 'qwen-image') {
     const { bbox } = canvas;
-    const gridSize = getGridSize('qwen-image');
+    // In PiD native mode the bbox is the 4x target, so it must snap to a larger grid (16 * 4) for bbox / 4 to land
+    // on the Qwen grid. getPidScale returns 1 for off/fit, leaving the normal 16px grid.
+    const gridSize = getGridSize('qwen-image', getPidScale(params.pidMode));
+
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+      }
+      if (bbox.scaleMethod !== 'none') {
+        reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
+      }
+    }
 
     if (bbox.scaleMethod === 'none') {
       if (bbox.rect.width % gridSize !== 0) {

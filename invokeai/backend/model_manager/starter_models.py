@@ -222,6 +222,20 @@ pid_decoder_sdxl_2kto4k = StarterModel(
     variant=PiDDecoderVariantType.Res2kTo4k_Sr4x,
     dependencies=[gemma2_2b_encoder],
 )
+# Qwen-Image uses a 16-channel latent (ambiguous with FLUX/SD3). The config probe disambiguates via the checkpoint's
+# directory name (`…official_qwenimage_distill…`); if the HF single-file download drops it, the explicit
+# base=QwenImage override the installer sends is trusted instead (see pid_decoder.py::_validate_base). Only the
+# 2K-to-4K preset exists.
+pid_decoder_qwenimage_2kto4k = StarterModel(
+    name="PiD Decoder Qwen-Image (2K to 4K)",
+    base=BaseModelType.QwenImage,
+    source="nvidia/PiD::checkpoints/PiD_res2kto4k_sr4x_official_qwenimage_distill_4step/model_ema_bf16.pth",
+    description="NVIDIA PiD 4x super-resolution decoder for Qwen-Image latents, 2K-to-4K preset. ~5GB",
+    type=ModelType.PiDDecoder,
+    format=ModelFormat.Checkpoint,
+    variant=PiDDecoderVariantType.Res2kTo4k_Sr4x,
+    dependencies=[gemma2_2b_encoder],
+)
 # endregion
 
 
@@ -1815,6 +1829,7 @@ STARTER_MODELS: list[StarterModel] = [
     pid_decoder_sd3_2k,
     pid_decoder_sd3_2kto4k,
     pid_decoder_sdxl_2kto4k,
+    pid_decoder_qwenimage_2kto4k,
 ]
 
 sd1_bundle: list[StarterModel] = [

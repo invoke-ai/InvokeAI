@@ -89,6 +89,7 @@ from invokeai.backend.model_manager.configs.main import (
 from invokeai.backend.model_manager.configs.pid_decoder import (
     PiDDecoder_Checkpoint_Flux2_Config,
     PiDDecoder_Checkpoint_FLUX_Config,
+    PiDDecoder_Checkpoint_QwenImage_Config,
     PiDDecoder_Checkpoint_SD3_Config,
     PiDDecoder_Checkpoint_SDXL_Config,
 )
@@ -217,6 +218,7 @@ AnyModelConfig = Annotated[
         Annotated[PiDDecoder_Checkpoint_Flux2_Config, PiDDecoder_Checkpoint_Flux2_Config.get_tag()],
         Annotated[PiDDecoder_Checkpoint_SD3_Config, PiDDecoder_Checkpoint_SD3_Config.get_tag()],
         Annotated[PiDDecoder_Checkpoint_SDXL_Config, PiDDecoder_Checkpoint_SDXL_Config.get_tag()],
+        Annotated[PiDDecoder_Checkpoint_QwenImage_Config, PiDDecoder_Checkpoint_QwenImage_Config.get_tag()],
         # ControlNet - checkpoint format
         Annotated[ControlNet_Checkpoint_SD1_Config, ControlNet_Checkpoint_SD1_Config.get_tag()],
         Annotated[ControlNet_Checkpoint_SD2_Config, ControlNet_Checkpoint_SD2_Config.get_tag()],

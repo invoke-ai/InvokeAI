@@ -17,6 +17,7 @@ export const getPidDecoderBaseForMainBase = (base?: BaseModelType | null): BaseM
     case 'flux2':
     case 'sd-3':
     case 'sdxl':
+    case 'qwen-image':
       return base;
     default:
       return null;
