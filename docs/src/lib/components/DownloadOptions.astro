@@ -49,6 +49,24 @@ const manualDownloadOptions = {
     href: withBase('/configuration/docker/', import.meta.env.BASE_URL),
   },
 };
+
+const hostedOptions = {
+  aibadgr: {
+     headline: 'Run on AI Badgr',
+     description: 'Run on the AI Badgr hosted GPU service',
+     href: 'https://aibadgr.com/gpu/launch?template=invokeai',
+   },
+  runpod: {
+     headline: 'Run on RunPod',
+     description: 'Run on the RunPod hosted GPU service',
+     href: 'https://www.runpod.io/blog/invoke-ai-stable-diffusion-runpod-nfz18',
+   },
+  railway: {
+     headline: 'Run on Railway',
+     description: 'Run on the Railway hosted GPU service',
+     href: 'https://railway.com/deploy/invokeai',
+   },
+};
 ---
 
 <div class="download-options">
@@ -92,6 +110,27 @@ const manualDownloadOptions = {
       ))
     }
   </div>
+
+  <!-- Hosted -->
+  <div class="download-options__separator download-options__separator--text">
+    <span align="center">Commercial Hosted Service Options</span>
+  </div>
+
+  <!-- Hosted Options -->
+  <div class="download-options__grid download-options--launcher">
+    {
+      Object.entries(hostedOptions).map(
+        ([key, { headline, description, href }]) => (
+          <div class="download-option" data-platform={key}>
+            <h3>{headline}</h3>
+	    <a href={href}>{description}</a>
+            </div>
+          </div>
+        ),
+      )
+    }
+  </div>
+  
 </div>
 
 <style is:global>
@@ -132,6 +171,15 @@ const manualDownloadOptions = {
       background: var(--sl-color-hairline);
       z-index: 0;
     }
+  }
+
+  .download-options__separator--text > span {
+    border-radius: 0;
+    border: none;
+    width: auto;
+    aspect-ratio: auto;
+    padding: 0 0.75rem;
+    white-space: nowrap;
   }
 
   .download-options--launcher {
