@@ -122,9 +122,7 @@ class QwenImagePiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
                 )
             latents = latents[:, :, 0]
         if latents.ndim != 4 or latents.shape[-3] != 16:
-            raise ValueError(
-                f"Qwen-Image PiD decode expected a 16-channel latent, got shape {tuple(latents.shape)}."
-            )
+            raise ValueError(f"Qwen-Image PiD decode expected a 16-channel latent, got shape {tuple(latents.shape)}.")
 
         # 2) Resolve the per-channel latents_mean / latents_std used to denormalise the stored latent.
         latents_mean = list(_QWEN_VAE_LATENTS_MEAN_FALLBACK)
