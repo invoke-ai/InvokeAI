@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.events.events_base import EventServiceBase
     from invokeai.app.services.external_generation.external_generation_base import ExternalGenerationServiceBase
     from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
+    from invokeai.app.services.image_moves.image_moves_default import ImageMoveService
     from invokeai.app.services.image_records.image_records_base import ImageRecordStorageBase
     from invokeai.app.services.images.images_base import ImageServiceABC
     from invokeai.app.services.invocation_cache.invocation_cache_base import InvocationCacheBase
@@ -81,6 +82,7 @@ class InvocationServices:
         client_state_persistence: "ClientStatePersistenceABC",
         project_records: "ProjectRecordsStorageBase",
         users: "UserServiceBase",
+        image_moves: "ImageMoveService | None" = None,
     ):
         self.board_images = board_images
         self.board_image_records = board_image_records
@@ -101,6 +103,7 @@ class InvocationServices:
         self.external_generation = external_generation
         self.performance_statistics = performance_statistics
         self.session_queue = session_queue
+        self.image_moves = image_moves
         self.session_processor = session_processor
         self.invocation_cache = invocation_cache
         self.names = names
