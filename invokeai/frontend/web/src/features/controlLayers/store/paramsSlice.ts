@@ -11,6 +11,7 @@ import type {
   AspectRatioID,
   InfillMethod,
   ParamsState,
+  PidMode,
   PromptHistoryItem,
   RgbaColor,
 } from 'features/controlLayers/store/types';
@@ -49,7 +50,12 @@ import type {
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
 import { getExternalPanelControl, hasExternalPanelControl } from 'features/parameters/util/externalPanelSchema';
-import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
+import {
+  getGridSize,
+  getIsSizeOptimal,
+  getOptimalDimension,
+  getPidScale,
+} from 'features/parameters/util/optimalDimension';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import type { AnyModelConfigWithExternal } from 'services/api/types';
 import { isExternalApiModelConfig, isNonRefinerMainModelConfig } from 'services/api/types';
@@ -260,6 +266,39 @@ const slice = createSlice({
       }
       state.kleinQwen3EncoderModel = result.data;
     },
+    pidModeChanged: (state, action: PayloadAction<PidMode>) => {
+      const prevPidScale = getPidScale(state.pidMode);
+      const nextPidScale = getPidScale(action.payload);
+      state.pidMode = action.payload;
+      // Entering/leaving native mode reinterprets the dimensions (4x target <-> generation resolution), so
+      // re-fit them to the new mode's optimal target on the new grid, preserving aspect ratio.
+      if (prevPidScale !== nextPidScale) {
+        const base = state.model?.base as BaseModelType | undefined;
+        const optimalDimension = getOptimalDimension(base, nextPidScale);
+        const { width, height } = calculateNewSize(
+          state.dimensions.aspectRatio.value,
+          optimalDimension * optimalDimension,
+          base,
+          nextPidScale
+        );
+        state.dimensions.width = width;
+        state.dimensions.height = height;
+      }
+    },
+    pidDecoderModelSelected: (state, action: PayloadAction<{ key: string; name: string; base: string } | null>) => {
+      const result = zParamsState.shape.pidDecoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.pidDecoderModel = result.data;
+    },
+    gemma2EncoderModelSelected: (state, action: PayloadAction<{ key: string; name: string; base: string } | null>) => {
+      const result = zParamsState.shape.gemma2EncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.gemma2EncoderModel = result.data;
+    },
     qwenImageComponentSourceSelected: (state, action: PayloadAction<ParameterModel | null>) => {
       const result = zParamsState.shape.qwenImageComponentSource.safeParse(action.payload);
       if (!result.success) {
@@ -392,7 +431,7 @@ const slice = createSlice({
     //#region Dimensions
     sizeRecalled: (state, action: PayloadAction<{ width: number; height: number }>) => {
       const { width, height } = action.payload;
-      const gridSize = getGridSize(state.model?.base as BaseModelType | undefined);
+      const gridSize = getGridSize(state.model?.base as BaseModelType | undefined, getPidScale(state.pidMode));
       state.dimensions.width = Math.max(roundDownToMultiple(width, gridSize), 64);
       state.dimensions.height = Math.max(roundDownToMultiple(height, gridSize), 64);
       state.dimensions.aspectRatio.value = state.dimensions.width / state.dimensions.height;
@@ -401,7 +440,7 @@ const slice = createSlice({
     },
     widthChanged: (state, action: PayloadAction<{ width: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
       const { width, updateAspectRatio, clamp } = action.payload;
-      const gridSize = getGridSize(state.model?.base as BaseModelType | undefined);
+      const gridSize = getGridSize(state.model?.base as BaseModelType | undefined, getPidScale(state.pidMode));
       state.dimensions.width = clamp ? Math.max(roundDownToMultiple(width, gridSize), 64) : width;
 
       if (state.dimensions.aspectRatio.isLocked) {
@@ -419,7 +458,7 @@ const slice = createSlice({
     },
     heightChanged: (state, action: PayloadAction<{ height: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
       const { height, updateAspectRatio, clamp } = action.payload;
-      const gridSize = getGridSize(state.model?.base as BaseModelType | undefined);
+      const gridSize = getGridSize(state.model?.base as BaseModelType | undefined, getPidScale(state.pidMode));
       state.dimensions.height = clamp ? Math.max(roundDownToMultiple(height, gridSize), 64) : height;
 
       if (state.dimensions.aspectRatio.isLocked) {
@@ -457,7 +496,8 @@ const slice = createSlice({
           const { width, height } = calculateNewSize(
             state.dimensions.aspectRatio.value,
             state.dimensions.width * state.dimensions.height,
-            state.model?.base as BaseModelType | undefined
+            state.model?.base as BaseModelType | undefined,
+            getPidScale(state.pidMode)
           );
           state.dimensions.width = width;
           state.dimensions.height = height;
@@ -475,7 +515,8 @@ const slice = createSlice({
         const { width, height } = calculateNewSize(
           state.dimensions.aspectRatio.value,
           state.dimensions.width * state.dimensions.height,
-          state.model?.base as BaseModelType | undefined
+          state.model?.base as BaseModelType | undefined,
+          getPidScale(state.pidMode)
         );
         state.dimensions.width = width;
         state.dimensions.height = height;
@@ -483,12 +524,14 @@ const slice = createSlice({
       }
     },
     sizeOptimized: (state) => {
-      const optimalDimension = getOptimalDimension(state.model?.base as BaseModelType | undefined);
+      const pidScale = getPidScale(state.pidMode);
+      const optimalDimension = getOptimalDimension(state.model?.base as BaseModelType | undefined, pidScale);
       if (state.dimensions.aspectRatio.isLocked) {
         const { width, height } = calculateNewSize(
           state.dimensions.aspectRatio.value,
           optimalDimension * optimalDimension,
-          state.model?.base as BaseModelType | undefined
+          state.model?.base as BaseModelType | undefined,
+          pidScale
         );
         state.dimensions.width = width;
         state.dimensions.height = height;
@@ -499,19 +542,22 @@ const slice = createSlice({
       }
     },
     syncedToOptimalDimension: (state) => {
-      const optimalDimension = getOptimalDimension(state.model?.base as BaseModelType | undefined);
+      const pidScale = getPidScale(state.pidMode);
+      const optimalDimension = getOptimalDimension(state.model?.base as BaseModelType | undefined, pidScale);
 
       if (
         !getIsSizeOptimal(
           state.dimensions.width,
           state.dimensions.height,
-          state.model?.base as BaseModelType | undefined
+          state.model?.base as BaseModelType | undefined,
+          pidScale
         )
       ) {
         const bboxDims = calculateNewSize(
           state.dimensions.aspectRatio.value,
           optimalDimension * optimalDimension,
-          state.model?.base as BaseModelType | undefined
+          state.model?.base as BaseModelType | undefined,
+          pidScale
         );
         state.dimensions.width = bboxDims.width;
         state.dimensions.height = bboxDims.height;
@@ -616,6 +662,10 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.animaQwen3EncoderModel = oldState.animaQwen3EncoderModel;
   newState.kleinVaeModel = oldState.kleinVaeModel;
   newState.kleinQwen3EncoderModel = oldState.kleinQwen3EncoderModel;
+  newState.pidMode = oldState.pidMode;
+  newState.pidDecoderModel = oldState.pidDecoderModel;
+  newState.gemma2EncoderModel = oldState.gemma2EncoderModel;
+  newState.pidSteps = oldState.pidSteps;
   newState.qwenImageComponentSource = oldState.qwenImageComponentSource;
   newState.qwenImageVaeModel = oldState.qwenImageVaeModel;
   newState.qwenImageQwenVLEncoderModel = oldState.qwenImageQwenVLEncoderModel;
@@ -668,6 +718,9 @@ export const {
   zImageQwen3SourceModelSelected,
   kleinVaeModelSelected,
   kleinQwen3EncoderModelSelected,
+  pidModeChanged,
+  pidDecoderModelSelected,
+  gemma2EncoderModelSelected,
   qwenImageComponentSourceSelected,
   qwenImageVaeModelSelected,
   qwenImageQwenVLEncoderModelSelected,
@@ -744,6 +797,15 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         state.qwenImageQwenVLEncoderModel = null;
       }
 
+      if (state._version === 3) {
+        // v3 -> v4, add PiD (Pixel Diffusion Decoder) fields
+        state._version = 4;
+        state.pidMode = 'off';
+        state.pidDecoderModel = null;
+        state.gemma2EncoderModel = null;
+        state.pidSteps = 4;
+      }
+
       return zParamsState.parse(state);
     },
   },
@@ -787,6 +849,9 @@ export const selectAnimaQwen3EncoderModel = createParamsSelector((params) => par
 export const selectAnimaScheduler = createParamsSelector((params) => params.animaScheduler);
 export const selectKleinVaeModel = createParamsSelector((params) => params.kleinVaeModel);
 export const selectKleinQwen3EncoderModel = createParamsSelector((params) => params.kleinQwen3EncoderModel);
+export const selectPidMode = createParamsSelector((params) => params.pidMode);
+export const selectPidDecoderModel = createParamsSelector((params) => params.pidDecoderModel);
+export const selectGemma2EncoderModel = createParamsSelector((params) => params.gemma2EncoderModel);
 export const selectQwenImageComponentSource = createParamsSelector((params) => params.qwenImageComponentSource);
 export const selectQwenImageVaeModel = createParamsSelector((params) => params.qwenImageVaeModel);
 export const selectQwenImageQwenVLEncoderModel = createParamsSelector((params) => params.qwenImageQwenVLEncoderModel);

@@ -134,10 +134,12 @@ export const zModelType = z.enum([
   't5_encoder',
   'qwen3_encoder',
   'qwen_vl_encoder',
+  'gemma2_encoder',
   'clip_embed',
   'siglip',
   'flux_redux',
   'external_image_generator',
+  'pid_decoder',
   'unknown',
 ]);
 export type ModelType = z.infer<typeof zModelType>;
@@ -164,6 +166,7 @@ export const zFlux2VariantType = z.enum(['klein_4b', 'klein_4b_base', 'klein_9b'
 export const zZImageVariantType = z.enum(['turbo', 'zbase']);
 const zQwenImageVariantType = z.enum(['generate', 'edit']);
 export const zQwen3VariantType = z.enum(['qwen3_4b', 'qwen3_8b', 'qwen3_06b']);
+const zPiDDecoderVariantType = z.enum(['res2k_sr4x', 'res2kto4k_sr4x']);
 export const zAnyModelVariant = z.union([
   zModelVariantType,
   zClipVariantType,
@@ -172,6 +175,7 @@ export const zAnyModelVariant = z.union([
   zZImageVariantType,
   zQwenImageVariantType,
   zQwen3VariantType,
+  zPiDDecoderVariantType,
 ]);
 export type AnyModelVariant = z.infer<typeof zAnyModelVariant>;
 export const zModelFormat = z.enum([
@@ -187,6 +191,7 @@ export const zModelFormat = z.enum([
   't5_encoder',
   'qwen3_encoder',
   'qwen_vl_encoder',
+  'gemma2_encoder',
   'bnb_quantized_int8b',
   'bnb_quantized_nf4b',
   'gguf_quantized',

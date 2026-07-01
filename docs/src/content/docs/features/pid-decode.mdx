@@ -1,0 +1,76 @@
+---
+title: PiD Super-Resolution Decode
+lastUpdated: 2026-07-01
+sidebar:
+  order: 5
+---
+
+import { Steps, Aside, Tabs, TabItem } from '@astrojs/starlight/components'
+
+**PiD** (Pixel Diffusion Decoder) is an alternative way to turn a model's latents into an image. Instead of the usual VAE decode, it runs a short pixel-space diffusion that produces a **4× super-resolved** result in a single, few-step pass — so a 512×512 generation comes out as a detailed 2048×2048 image.
+
+Because it decodes in pixel space and is conditioned on your prompt, PiD often recovers finer texture and edge detail than a plain VAE decode followed by an upscaler.
+
+<Aside type="note">
+PiD replaces the VAE decode step of a single generation. It is not a separate "upscale" pass you run on an existing image — you enable it before generating.
+</Aside>
+
+## Supported models
+
+PiD works with these base models:
+
+| Base model | PiD decoder to install |
+|---|---|
+| FLUX.1 | PiD Decoder FLUX |
+| FLUX.2 Klein (4B / 9B) | PiD Decoder FLUX.2 |
+| Stable Diffusion 3 | PiD Decoder SD3 |
+| SDXL | PiD Decoder SDXL |
+| Z-Image / Z-Image Turbo | **PiD Decoder FLUX** (Z-Image shares FLUX.1's VAE) |
+| Qwen-Image | PiD Decoder Qwen-Image |
+
+<Aside type="tip">
+Z-Image has no PiD decoder of its own — when a Z-Image model is active, the decoder picker lists the **FLUX** decoders. That's expected.
+</Aside>
+
+## What you need to install
+
+PiD needs two extra models, both available in **Model Manager → Starter Models**:
+
+<Steps>
+1. A **PiD Decoder** for your base model (e.g. *PiD Decoder FLUX (2K)*). Some bases offer a *2K* and a *2K-to-4K* preset; SDXL and Qwen-Image ship only the *2K-to-4K* preset.
+2. The **Gemma 2 2B (PiD caption encoder)** — PiD uses it to condition the decode on your prompt. It installs automatically as a dependency of any PiD decoder, and is shared across all of them.
+</Steps>
+
+Each PiD decoder is roughly 5 GB and the shared Gemma-2 encoder is roughly 5 GB.
+
+## Enabling PiD
+
+Open the **Generation** settings for a supported model and expand the advanced options. You'll find a **PiD** control with three modes:
+
+<Tabs>
+  <TabItem label="Off">
+    Standard VAE decode. No PiD models required.
+  </TabItem>
+  <TabItem label="Fit">
+    Generate at the requested size, decode 4× with PiD, then downscale the result back to the requested size. This is the safe default and works everywhere — the output matches your bounding box exactly, so it composites cleanly on the Canvas.
+  </TabItem>
+  <TabItem label="Native">
+    Treat the requested dimensions as the **4× target**: the image is generated at target ÷ 4 and PiD's full 4× output is used directly (no downscale), preserving all of the added detail. Great when you want a large, highly-detailed result.
+  </TabItem>
+</Tabs>
+
+When PiD mode is not *Off*, pick your **PiD Decoder** and **Gemma-2 Encoder** below the mode selector. The **PiD Steps** control (default 4) sets how many decode steps run — the released checkpoints are trained for 4.
+
+PiD is available in both the **Generate** tab (text-to-image) and on the **Canvas** (image-to-image), in both Fit and Native modes.
+
+## Tips & limitations
+
+- **Turn off "Scale Before Processing"** on the Canvas when using PiD — PiD already decodes at 4×, so pre-scaling would inflate the work and is blocked.
+- **Inpaint / Outpaint** are not supported with PiD yet; use text-to-image or image-to-image.
+- **SDXL Refiner** cannot be combined with PiD — disable one of them.
+- PiD's memory use scales with the *output* resolution. A 2048px output needs only a little more headroom than a normal decode, but Native mode at large target sizes (e.g. a 4096px result) is significantly heavier.
+- Turbo variants (e.g. Z-Image Turbo) work as usual — the low step count / no-CFG only affects generation; PiD's own step count is separate.
+
+<Aside type="caution">
+The PiD decoder *code* is Apache-2.0, but NVIDIA releases the pretrained *weights* under a non-commercial / research license. Keep that in mind if you redistribute the checkpoints.
+</Aside>

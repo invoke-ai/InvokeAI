@@ -1354,6 +1354,12 @@
         "selectModelToView": "Select a model to view its details",
         "typePhraseHere": "Type phrase here",
         "t5Encoder": "T5 Encoder",
+        "gemma2Encoder": "Gemma-2 Encoder",
+        "pidDecoder": "PiD Decoder",
+        "pidMode": "PiD Decode",
+        "pidModeOff": "Off",
+        "pidModeFit": "On (Fit to size)",
+        "pidModeNative": "On (Native 4×)",
         "qwen3Encoder": "Qwen3 Encoder",
         "qwenVLEncoder": "Qwen2.5-VL Encoder",
         "animaVae": "VAE",
@@ -1678,6 +1684,10 @@
             "noStartingFrameImage": "No starting frame image",
             "noT5EncoderModelSelected": "No T5 Encoder model selected for FLUX generation",
             "noFLUXVAEModelSelected": "No VAE model selected for FLUX generation",
+            "noPidDecoderModelSelected": "No PiD decoder model selected",
+            "noGemma2EncoderModelSelected": "No Gemma-2 encoder model selected (required by PiD)",
+            "pidScaleBeforeProcessingMustBeOff": "Turn off Scale Before Processing (set it to None) to use PiD decode",
+            "pidIncompatibleWithRefiner": "PiD decode is not compatible with the SDXL Refiner. Disable one of them.",
             "noCLIPEmbedModelSelected": "No CLIP Embed model selected for FLUX generation",
             "noQwen3EncoderModelSelected": "No Qwen3 Encoder model selected for FLUX2 Klein generation",
             "noFlux2KleinVaeModelSelected": "No VAE selected. Non-diffusers FLUX.2 Klein models require a standalone VAE",
@@ -1990,6 +2000,8 @@
         "imagenIncompatibleGenerationMode": "Google {{model}} supports Text to Image only. Use other models for Image to Image, Inpainting and Outpainting tasks.",
         "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4o supports Text to Image and Image to Image only. Use other models Inpainting and Outpainting tasks.",
         "fluxKontextIncompatibleGenerationMode": "FLUX Kontext does not support generation from images placed on the canvas. Re-try using the Reference Image section and disable any Raster Layers.",
+        "pidUnsupportedMode": "PiD decode currently supports Text to Image and Image to Image only. Disable PiD for Inpaint/Outpaint.",
+        "pidScaleBeforeProcessingOff": "Turn off Scale Before Processing (set it to None) to use PiD decode.",
         "problemUnpublishingWorkflow": "Problem Unpublishing Workflow",
         "problemUnpublishingWorkflowDescription": "There was a problem unpublishing the workflow. Please try again.",
         "workflowUnpublished": "Workflow Unpublished",
@@ -2055,6 +2067,15 @@
                 "2.0: Recommended for 4K+ resolutions. Aggressive schedule that transitions quickly to clean up artifacts.",
                 "1.0: Good starting point for ~2K-3K resolutions.",
                 "0.5: Gentler schedule for resolutions just above native (1024px)."
+            ]
+        },
+        "pidMode": {
+            "heading": "PiD Decode (Super-Resolution Decoder)",
+            "paragraphs": [
+                "PiD replaces the standard VAE decode with NVIDIA's Pixel Diffusion Decoder, a diffusion-based 4x super-resolution decoder. It requires a PiD decoder model and a Gemma-2 caption encoder.",
+                "Fit: generate at your chosen resolution, PiD decodes it 4x, then downscales back to that size - extra detail at the same output size, and it composites onto the canvas (works for Image to Image too).",
+                "Native (4x): your dimensions are the 4x target. Generation runs at a quarter of them (e.g. 512 -> 2048) and PiD's full 4x output is used directly. The PiD decoders are trained for 2K output (512px sources), with 2K-to-4K variants for 4K.",
+                "Because PiD's diffusion decode reconstructs detail, you can usually lower the generation Steps to save time. 'Scale Before Processing' must be set to None while PiD is enabled."
             ]
         },
         "seedVarianceEnhancer": {

@@ -14,6 +14,7 @@ from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
     ModelType,
+    PiDDecoderVariantType,
     QwenImageVariantType,
 )
 
@@ -124,6 +125,116 @@ flux_vae = StarterModel(
     source="black-forest-labs/FLUX.1-schnell::ae.safetensors",
     description="FLUX VAE compatible with both schnell and dev variants.",
     type=ModelType.VAE,
+)
+# endregion
+
+
+# region PiD (Pixel Diffusion Decoder)
+# PiD's pretrained decoders condition on Gemma-2-2b-it caption embeddings (2304-dim). NVIDIA references the ungated
+# mirror Efficient-Large-Model/gemma-2-2b-it. It is shared across all PiD backbones, so it is a dependency of each
+# decoder below (and offered standalone here so it can be installed once).
+gemma2_2b_encoder = StarterModel(
+    name="Gemma 2 2B (PiD caption encoder)",
+    base=BaseModelType.Any,
+    source="Efficient-Large-Model/gemma-2-2b-it",
+    description="Gemma-2-2b-it text encoder that PiD uses to condition its diffusion decode on a caption. ~5GB",
+    type=ModelType.Gemma2Encoder,
+    format=ModelFormat.Gemma2Encoder,
+)
+
+# NVIDIA PiD decoders (https://huggingface.co/nvidia/PiD). Code is Apache-2.0; weights are NSCLv1 (non-commercial /
+# research). Each is a 4x super-resolution decoder that replaces the regular VAE decode and needs the Gemma-2 encoder.
+pid_decoder_flux_2k = StarterModel(
+    name="PiD Decoder FLUX (2K)",
+    base=BaseModelType.Flux,
+    source="nvidia/PiD::checkpoints/PiD_res2k_sr4x_official_flux_distill_4step/model_ema_bf16.pth",
+    description="NVIDIA PiD 4x super-resolution decoder for FLUX latents, 2K target preset (e.g. 512 -> 2048). ~5GB",
+    type=ModelType.PiDDecoder,
+    format=ModelFormat.Checkpoint,
+    variant=PiDDecoderVariantType.Res2k_Sr4x,
+    dependencies=[gemma2_2b_encoder],
+)
+pid_decoder_flux_2kto4k = StarterModel(
+    name="PiD Decoder FLUX (2K to 4K)",
+    base=BaseModelType.Flux,
+    source="nvidia/PiD::checkpoints/PiD_res2kto4k_sr4x_official_flux_distill_4step/model_ema_bf16.pth",
+    description="NVIDIA PiD 4x super-resolution decoder for FLUX latents, 2K-to-4K preset for higher-resolution output. ~5GB",
+    type=ModelType.PiDDecoder,
+    format=ModelFormat.Checkpoint,
+    variant=PiDDecoderVariantType.Res2kTo4k_Sr4x,
+    dependencies=[gemma2_2b_encoder],
+)
+# FLUX.2 Klein shares one 32-channel VAE across the 4B and 9B variants, so a single decoder per preset covers both.
+# The 128-channel packed latent is unambiguous (unlike the 16ch FLUX/SD3 case), so no directory-name disambiguation
+# is needed for the config probe.
+pid_decoder_flux2_2k = StarterModel(
+    name="PiD Decoder FLUX.2 (2K)",
+    base=BaseModelType.Flux2,
+    source="nvidia/PiD::checkpoints/PiD_res2k_sr4x_official_flux2_distill_4step/model_ema_bf16.pth",
+    description="NVIDIA PiD 4x super-resolution decoder for FLUX.2 Klein latents, 2K target preset (e.g. 512 -> 2048). ~5GB",
+    type=ModelType.PiDDecoder,
+    format=ModelFormat.Checkpoint,
+    variant=PiDDecoderVariantType.Res2k_Sr4x,
+    dependencies=[gemma2_2b_encoder],
+)
+pid_decoder_flux2_2kto4k = StarterModel(
+    name="PiD Decoder FLUX.2 (2K to 4K)",
+    base=BaseModelType.Flux2,
+    source="nvidia/PiD::checkpoints/PiD_res2kto4k_sr4x_official_flux2_distill_4step/model_ema_bf16.pth",
+    description="NVIDIA PiD 4x super-resolution decoder for FLUX.2 Klein latents, 2K-to-4K preset for higher-resolution output. ~5GB",
+    type=ModelType.PiDDecoder,
+    format=ModelFormat.Checkpoint,
+    variant=PiDDecoderVariantType.Res2kTo4k_Sr4x,
+    dependencies=[gemma2_2b_encoder],
+)
+# SD3 uses a 16-channel latent, architecturally identical to FLUX.1. The config probe disambiguates via the
+# checkpoint's directory name (`…official_sd3_distill…`); if the HF single-file download drops that name, the
+# explicit base=StableDiffusion3 override the installer sends is trusted instead (see pid_decoder.py::_validate_base).
+pid_decoder_sd3_2k = StarterModel(
+    name="PiD Decoder SD3 (2K)",
+    base=BaseModelType.StableDiffusion3,
+    source="nvidia/PiD::checkpoints/PiD_res2k_sr4x_official_sd3_distill_4step/model_ema_bf16.pth",
+    description="NVIDIA PiD 4x super-resolution decoder for SD3 latents, 2K target preset (e.g. 512 -> 2048). ~5GB",
+    type=ModelType.PiDDecoder,
+    format=ModelFormat.Checkpoint,
+    variant=PiDDecoderVariantType.Res2k_Sr4x,
+    dependencies=[gemma2_2b_encoder],
+)
+pid_decoder_sd3_2kto4k = StarterModel(
+    name="PiD Decoder SD3 (2K to 4K)",
+    base=BaseModelType.StableDiffusion3,
+    source="nvidia/PiD::checkpoints/PiD_res2kto4k_sr4x_official_sd3_distill_4step/model_ema_bf16.pth",
+    description="NVIDIA PiD 4x super-resolution decoder for SD3 latents, 2K-to-4K preset for higher-resolution output. ~5GB",
+    type=ModelType.PiDDecoder,
+    format=ModelFormat.Checkpoint,
+    variant=PiDDecoderVariantType.Res2kTo4k_Sr4x,
+    dependencies=[gemma2_2b_encoder],
+)
+# SDXL uses a 4-channel latent, which is unambiguous (no FLUX/SD3-style directory-name disambiguation needed).
+# NVIDIA ships only the 2K-to-4K preset for SDXL (no plain 2K checkpoint).
+pid_decoder_sdxl_2kto4k = StarterModel(
+    name="PiD Decoder SDXL (2K to 4K)",
+    base=BaseModelType.StableDiffusionXL,
+    source="nvidia/PiD::checkpoints/PiD_res2kto4k_sr4x_official_sdxl_distill_4step/model_ema_bf16.pth",
+    description="NVIDIA PiD 4x super-resolution decoder for SDXL latents, 2K-to-4K preset. ~5GB",
+    type=ModelType.PiDDecoder,
+    format=ModelFormat.Checkpoint,
+    variant=PiDDecoderVariantType.Res2kTo4k_Sr4x,
+    dependencies=[gemma2_2b_encoder],
+)
+# Qwen-Image uses a 16-channel latent (ambiguous with FLUX/SD3). The config probe disambiguates via the checkpoint's
+# directory name (`…official_qwenimage_distill…`); if the HF single-file download drops it, the explicit
+# base=QwenImage override the installer sends is trusted instead (see pid_decoder.py::_validate_base). Only the
+# 2K-to-4K preset exists.
+pid_decoder_qwenimage_2kto4k = StarterModel(
+    name="PiD Decoder Qwen-Image (2K to 4K)",
+    base=BaseModelType.QwenImage,
+    source="nvidia/PiD::checkpoints/PiD_res2kto4k_sr4x_official_qwenimage_distill_4step/model_ema_bf16.pth",
+    description="NVIDIA PiD 4x super-resolution decoder for Qwen-Image latents, 2K-to-4K preset. ~5GB",
+    type=ModelType.PiDDecoder,
+    format=ModelFormat.Checkpoint,
+    variant=PiDDecoderVariantType.Res2kTo4k_Sr4x,
+    dependencies=[gemma2_2b_encoder],
 )
 # endregion
 
@@ -1710,6 +1821,15 @@ STARTER_MODELS: list[StarterModel] = [
     anima_base,
     anima_qwen3_encoder,
     anima_vae,
+    gemma2_2b_encoder,
+    pid_decoder_flux_2k,
+    pid_decoder_flux_2kto4k,
+    pid_decoder_flux2_2k,
+    pid_decoder_flux2_2kto4k,
+    pid_decoder_sd3_2k,
+    pid_decoder_sd3_2kto4k,
+    pid_decoder_sdxl_2kto4k,
+    pid_decoder_qwenimage_2kto4k,
 ]
 
 sd1_bundle: list[StarterModel] = [

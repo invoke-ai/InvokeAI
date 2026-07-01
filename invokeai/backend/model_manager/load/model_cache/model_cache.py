@@ -929,3 +929,23 @@ class ModelCache:
             gc.collect()
             TorchDevice.empty_cache()
         return len(dropped)
+
+    def offload_model_from_vram(self, model_key: str) -> int:
+        """Move a model (and its submodels) from VRAM to RAM without dropping it from the cache.
+
+        Unlike `drop_model`, the cache entry is kept, so the model stays resident in RAM and the next load does
+        not have to rebuild it from disk - only re-stream its weights back to VRAM. This is useful for freeing
+        VRAM after a one-shot use (e.g. a text encoder that has already produced its embeddings) before a much
+        larger model loads. Locked (in-use) entries are skipped.
+
+        Returns the number of VRAM bytes freed.
+        """
+        prefix = f"{model_key}:"
+        bytes_freed = 0
+        for key, entry in list(self._cached_models.items()):
+            if (key == model_key or key.startswith(prefix)) and not entry.is_locked:
+                bytes_freed += self._move_model_to_ram(entry, entry.cached_model.total_bytes())
+        if bytes_freed > 0:
+            gc.collect()
+            TorchDevice.empty_cache()
+        return bytes_freed
