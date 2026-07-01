@@ -16,6 +16,7 @@ import type {
   IntegerFieldCollectionInputTemplate,
   IntegerFieldInputTemplate,
   IntegerGeneratorFieldInputTemplate,
+  LoRAFieldCollectionInputTemplate,
   ModelIdentifierFieldInputTemplate,
   SchedulerFieldInputTemplate,
   StatefulFieldType,
@@ -33,6 +34,7 @@ import {
   isFloatCollectionFieldType,
   isImageCollectionFieldType,
   isIntegerCollectionFieldType,
+  isLoRAFieldCollectionFieldType,
   isStatefulFieldType,
   isStringCollectionFieldType,
 } from 'features/nodes/types/field';
@@ -340,6 +342,30 @@ const buildImageFieldCollectionInputTemplate: FieldInputTemplateBuilder<ImageFie
   return template;
 };
 
+const buildLoRAFieldCollectionInputTemplate: FieldInputTemplateBuilder<LoRAFieldCollectionInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: LoRAFieldCollectionInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    // An empty collection is always valid, so we default to an empty list rather than leaving the
+    // field unsatisfied. This is what lets a node with no LoRAs selected still fire.
+    default: schemaObject.default ?? [],
+  };
+
+  if (schemaObject.minItems !== undefined) {
+    template.minItems = schemaObject.minItems;
+  }
+
+  if (schemaObject.maxItems !== undefined) {
+    template.maxItems = schemaObject.maxItems;
+  }
+
+  return template;
+};
+
 const buildEnumFieldInputTemplate: FieldInputTemplateBuilder<EnumFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -472,6 +498,9 @@ const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputTemplate
   FloatField: buildFloatFieldInputTemplate,
   ImageField: buildImageFieldInputTemplate,
   IntegerField: buildIntegerFieldInputTemplate,
+  // LoRAField is always handled by the collection branch above (COLLECTION / SINGLE_OR_COLLECTION);
+  // this entry is a defensive fallback to satisfy the exhaustive builder map.
+  LoRAField: buildLoRAFieldCollectionInputTemplate,
   ModelIdentifierField: buildModelIdentifierFieldInputTemplate,
   SchedulerField: buildSchedulerFieldInputTemplate,
   StringField: buildStringFieldInputTemplate,
@@ -544,6 +573,12 @@ export const buildFieldInputTemplate = (
       });
     } else if (isFloatCollectionFieldType(fieldType)) {
       return buildFloatFieldCollectionInputTemplate({
+        schemaObject: fieldSchema,
+        baseField,
+        fieldType,
+      });
+    } else if (isLoRAFieldCollectionFieldType(fieldType)) {
+      return buildLoRAFieldCollectionInputTemplate({
         schemaObject: fieldSchema,
         baseField,
         fieldType,
