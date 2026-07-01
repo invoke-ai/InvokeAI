@@ -35,6 +35,12 @@
           if (localStorage.getItem('invokeai:v7:webv2:reduce-motion') === 'true') {
             root.setAttribute('data-reduce-motion', 'true');
           }
+          var language = localStorage.getItem('invokeai:v7:webv2:language');
+          if (language) {
+            root.setAttribute('lang', language);
+            var direction = language === 'ar' || language === 'he' ? 'rtl' : 'ltr';
+            root.setAttribute('dir', direction);
+          }
         } catch (error) {
           /* ignore malformed storage */
         }

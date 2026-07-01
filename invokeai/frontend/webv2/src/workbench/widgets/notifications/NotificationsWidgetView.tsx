@@ -4,6 +4,7 @@ import { Badge, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { StatusWidgetChip } from '@workbench/widget-frame';
 import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { BellIcon, CircleCheckIcon, CircleXIcon, InfoIcon, TriangleAlertIcon, type LucideIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const kindColorPalette: Record<WorkbenchNotificationKind, string> = {
   error: 'red',
@@ -18,29 +19,34 @@ const kindIcon = {
 } satisfies Record<WorkbenchNotificationKind, LucideIcon>;
 
 export const NotificationsWidgetView = ({ presentation, region }: WidgetViewProps) => {
+  const { t } = useTranslation();
   const { errorCount, totalCount, unreadCount } = useWorkbenchSelector((snapshot) => ({
     errorCount: snapshot.state.notifications.filter((notification) => notification.kind === 'error').length,
     totalCount: snapshot.state.notifications.length,
     unreadCount: snapshot.state.notifications.filter((notification) => !notification.isRead).length,
   }));
-  const label = unreadCount > 0 ? `${unreadCount} new` : `${totalCount} total`;
+  const label =
+    unreadCount > 0
+      ? t('notifications.newCount', { count: unreadCount })
+      : t('notifications.totalCount', { count: totalCount });
   const icon = errorCount > 0 ? TriangleAlertIcon : BellIcon;
 
   if (region === 'bottom' && presentation !== 'expanded') {
-    return <StatusWidgetChip icon={icon}>Notifications: {label}</StatusWidgetChip>;
+    return <StatusWidgetChip icon={icon}>{t('notifications.labelWithCount', { label })}</StatusWidgetChip>;
   }
 
   return <NotificationsPanel />;
 };
 
 const NotificationsPanel = () => {
+  const { t } = useTranslation();
   const notifications = useWorkbenchSelector((snapshot) => snapshot.state.notifications);
 
   return (
     <Stack flex="1" gap="3" minH="0" p="2">
       {notifications.length === 0 ? (
         <Text color="fg.subtle" fontSize="2xs">
-          Successful operations, errors, and system messages appear here.
+          {t('notifications.empty')}
         </Text>
       ) : (
         <Stack gap="2">
@@ -65,7 +71,7 @@ const NotificationsPanel = () => {
                     </Text>
                   </HStack>
                   <Badge colorPalette={kindColorPalette[notification.kind]} size="xs">
-                    {notification.kind}
+                    {t(`notifications.kind.${notification.kind}`)}
                   </Badge>
                 </HStack>
                 {notification.message ? (

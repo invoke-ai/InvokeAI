@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { Badge, Box, HStack, Icon } from '@chakra-ui/react';
 import { Button } from '@workbench/components/ui';
 import { CheckIcon, FolderIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 /** Horizontal row of bundle filters. */
 export const BundleChips = ({
@@ -20,6 +21,8 @@ export const BundleChips = ({
   starterCount: number;
   trailing?: ReactNode;
 }) => {
+  const { t } = useTranslation();
+
   if (bundles.length === 0 && !trailing) {
     return null;
   }
@@ -36,7 +39,7 @@ export const BundleChips = ({
         >
           <BundleChip
             isSelected={selectedName === null}
-            label="All"
+            label={t('common.all')}
             subLabel={`${starterCount}`}
             onSelect={() => onSelect(null)}
           />

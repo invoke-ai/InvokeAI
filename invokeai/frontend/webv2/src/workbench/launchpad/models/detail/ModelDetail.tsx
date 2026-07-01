@@ -10,6 +10,7 @@ import { useNotify } from '@workbench/useNotify';
 import { areArraysEqual } from '@workbench/workbenchSelectors';
 import { ArrowLeftIcon, MoreHorizontalIcon, PencilIcon, RefreshCcwIcon, Trash2Icon } from 'lucide-react';
 import { memo, useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SiHuggingface } from 'react-icons/si';
 
 import { DefaultSettingsSection, supportsDefaultSettings } from './DefaultSettingsSection';
@@ -185,6 +186,7 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
   onDeleted,
 }: ModelIdentitySectionProps) {
   const notify = useNotify();
+  const { t } = useTranslation();
   const [editingModelKey, setEditingModelKey] = useState<string | null>(null);
   const isEditing = editingModelKey === model.key;
 
@@ -194,8 +196,8 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
         <ModelImageUpload
           key={model.key}
           model={model}
-          onError={(message) => notify.error('Model image', message)}
-          onUpdated={() => notify.success('Model image updated')}
+          onError={(message) => notify.error(t('models.modelImage'), message)}
+          onUpdated={() => notify.success(t('models.modelImageUpdated'))}
         />
         <Stack flex="1" gap="1" minW="0">
           <Text fontSize="sm" fontWeight="700" lineClamp={2}>
@@ -209,7 +211,7 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
             <HStack gap="1.5">
               <MissingFileBadge />
               <Text color="fg.subtle" fontSize="2xs">
-                The file for this model was not found on disk.
+                {t('models.fileNotFoundOnDisk')}
               </Text>
             </HStack>
           ) : null}
@@ -233,7 +235,7 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
           onCancel={() => setEditingModelKey(null)}
           onSaved={() => {
             setEditingModelKey(null);
-            notify.success('Model updated', model.name);
+            notify.success(t('models.modelUpdated'), model.name);
           }}
         />
       ) : (
@@ -254,6 +256,7 @@ const ModelDetailActions = ({
   onDeleted: () => void;
   onToggleEditing: () => void;
 }) => {
+  const { t } = useTranslation();
   const { convert, reidentify, remove } = useModelActions();
   const [pendingAction, setPendingAction] = useState<'delete' | 'convert' | null>(null);
   const [isActionBusy, setIsActionBusy] = useState(false);
@@ -273,16 +276,16 @@ const ModelDetailActions = ({
       {isConvertibleToDiffusers(model) ? (
         <Button size="xs" variant="outline" onClick={() => setPendingAction('convert')}>
           <Icon as={SiHuggingface} boxSize="3" />
-          Convert to Diffusers
+          {t('models.convertToDiffusers')}
         </Button>
       ) : null}
       <Button size="xs" variant={isEditing ? 'solid' : 'outline'} onClick={onToggleEditing}>
         <Icon as={PencilIcon} boxSize="3" />
-        {isEditing ? 'Editing' : 'Edit'}
+        {isEditing ? t('models.editing') : t('common.edit')}
       </Button>
       <Menu.Root positioning={{ placement: 'bottom-end' }}>
         <Menu.Trigger asChild>
-          <IconButton aria-label="Model actions" loading={isActionBusy} size="xs" variant="ghost">
+          <IconButton aria-label={t('models.actions')} loading={isActionBusy} size="xs" variant="ghost">
             <Icon as={MoreHorizontalIcon} boxSize="4" />
           </IconButton>
         </Menu.Trigger>
@@ -291,22 +294,22 @@ const ModelDetailActions = ({
             <MenuContent minW="12rem">
               <Menu.Item value="reidentify" onClick={() => void handleReidentify()}>
                 <Icon as={RefreshCcwIcon} boxSize="3.5" />
-                <Menu.ItemText fontSize="xs">Re-identify model</Menu.ItemText>
+                <Menu.ItemText fontSize="xs">{t('models.reidentify')}</Menu.ItemText>
               </Menu.Item>
               <Menu.Separator />
               <Menu.Item color="fg.error" value="delete" onClick={() => setPendingAction('delete')}>
                 <Icon as={Trash2Icon} boxSize="3.5" />
-                <Menu.ItemText fontSize="xs">Delete model</Menu.ItemText>
+                <Menu.ItemText fontSize="xs">{t('models.deleteModel')}</Menu.ItemText>
               </Menu.Item>
             </MenuContent>
           </Menu.Positioner>
         </Portal>
       </Menu.Root>
       <ConfirmDialog
-        body={`Delete “${model.name}”? The database record is removed, and the model files are deleted if they live inside the InvokeAI models directory.`}
-        confirmLabel="Delete Model"
+        body={t('models.deleteBody', { name: model.name })}
+        confirmLabel={t('models.deleteModel')}
         isOpen={pendingAction === 'delete'}
-        title="Delete model"
+        title={t('models.deleteModel')}
         onClose={() => setPendingAction(null)}
         onConfirm={async () => {
           await remove(model);
@@ -315,10 +318,10 @@ const ModelDetailActions = ({
       />
       {/* Destructive styling: the original checkpoint file is replaced. */}
       <ConfirmDialog
-        body={`Convert “${model.name}” to the diffusers format in place? The original checkpoint file is replaced by a diffusers folder.`}
-        confirmLabel="Convert"
+        body={t('models.convertBody', { name: model.name })}
+        confirmLabel={t('models.convert')}
         isOpen={pendingAction === 'convert'}
-        title="Convert to diffusers"
+        title={t('models.convertToDiffusers')}
         onClose={() => setPendingAction(null)}
         onConfirm={() => convert(model)}
       />
@@ -332,6 +335,7 @@ const DefaultSettingsSectionContainer = memo(function DefaultSettingsSectionCont
   modelKey: string;
 }) {
   const notify = useNotify();
+  const { t } = useTranslation();
   const model = useModelsSelector((snapshot) => selectDefaultSettingsModel(snapshot.models, modelKey));
 
   if (!model || !supportsDefaultSettings(model)) {
@@ -341,15 +345,16 @@ const DefaultSettingsSectionContainer = memo(function DefaultSettingsSectionCont
   return (
     <DefaultSettingsSection
       model={model}
-      onError={(message) => notify.error('Default settings', message)}
-      onSaved={() => notify.success('Default settings saved')}
+      onError={(message) => notify.error(t('models.defaultSettings'), message)}
+      onSaved={() => notify.success(t('models.defaultSettingsSaved'))}
     />
   );
 });
 
 const TriggerPhrasesEditorContainer = memo(function TriggerPhrasesEditorContainer({ modelKey }: { modelKey: string }) {
   const notify = useNotify();
-  const handleError = useCallback((message: string) => notify.error('Trigger phrases', message), [notify]);
+  const { t } = useTranslation();
+  const handleError = useCallback((message: string) => notify.error(t('models.triggerPhrases'), message), [notify, t]);
   const model = useModelsSelector(
     (snapshot) => selectTriggerPhrasesModel(snapshot.models, modelKey),
     areTriggerPhrasesModelsEqual
@@ -370,6 +375,7 @@ const TriggerPhrasesEditorContainer = memo(function TriggerPhrasesEditorContaine
 
 const RelatedModelsSectionContainer = memo(function RelatedModelsSectionContainer({ modelKey }: { modelKey: string }) {
   const notify = useNotify();
+  const { t } = useTranslation();
   const model = useModelsSelector(
     (snapshot) => {
       const candidate = snapshot.models.find((model) => model.key === modelKey);
@@ -378,7 +384,10 @@ const RelatedModelsSectionContainer = memo(function RelatedModelsSectionContaine
     },
     (left, right) => left?.key === right?.key && left?.base === right?.base
   );
-  const handleSectionError = useCallback((message: string) => notify.error('Model manager', message), [notify]);
+  const handleSectionError = useCallback(
+    (message: string) => notify.error(t('models.modelManager'), message),
+    [notify, t]
+  );
 
   if (!model) {
     return null;
@@ -387,16 +396,21 @@ const RelatedModelsSectionContainer = memo(function RelatedModelsSectionContaine
   return <RelatedModelsSection model={model} onError={handleSectionError} />;
 });
 
-const BackButton = ({ onBack }: { onBack: () => void }) => (
-  <Button alignSelf="start" size="2xs" variant="ghost" onClick={onBack}>
-    <Icon as={ArrowLeftIcon} boxSize="3" />
-    All models
-  </Button>
-);
+const BackButton = ({ onBack }: { onBack: () => void }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Button alignSelf="start" size="2xs" variant="ghost" onClick={onBack}>
+      <Icon as={ArrowLeftIcon} boxSize="3" />
+      {t('models.allModels')}
+    </Button>
+  );
+};
 
 const isAbsolutePath = (path: string): boolean => path.startsWith('/') || /^[A-Za-z]:[\\/]/.test(path);
 
 const ModelAttributes = ({ density, model }: { density: 'panel' | 'full'; model: ModelIdentityModel }) => {
+  const { t } = useTranslation();
   const modelsDir = useModelsSelector((snapshot) => snapshot.modelsDir);
   // Managed models store paths relative to the models directory; show the
   // resolved absolute path so it can be found on disk.
@@ -404,12 +418,12 @@ const ModelAttributes = ({ density, model }: { density: 'panel' | 'full'; model:
     isAbsolutePath(model.path) || !modelsDir ? model.path : `${modelsDir.replace(/\/+$/, '')}/${model.path}`;
 
   const attributes: { label: string; value: string }[] = [
-    { label: 'File Size', value: formatBytes(model.file_size) },
-    { label: 'Variant', value: model.variant ?? '—' },
-    { label: 'Prediction Type', value: model.prediction_type ?? '—' },
-    { label: 'Hash', value: model.hash },
-    { label: 'Path', value: fullPath },
-    { label: 'Source', value: model.source },
+    { label: t('models.fileSize'), value: formatBytes(model.file_size) },
+    { label: t('models.variant'), value: model.variant ?? '—' },
+    { label: t('models.predictionType'), value: model.prediction_type ?? '—' },
+    { label: t('models.hash'), value: model.hash },
+    { label: t('models.path'), value: fullPath },
+    { label: t('models.source'), value: model.source },
   ];
 
   return (

@@ -256,3 +256,18 @@ describe('normalizeWorkbenchPreferences queue scope', () => {
     expect(store.normalizeWorkbenchPreferences({ queueJobsScope: 'current-project' }).queueJobsScope).toBe('all');
   });
 });
+
+describe('normalizeWorkbenchPreferences language', () => {
+  it('accepts locale files that were migrated from the legacy web app', () => {
+    expect(store.normalizeWorkbenchPreferences({ language: 'uk' }).language).toBe('uk');
+    expect(store.normalizeWorkbenchPreferences({ language: 'en-GB' }).language).toBe('en-GB');
+  });
+
+  it('migrates legacy ua preferences to the uk locale file', () => {
+    expect(store.normalizeWorkbenchPreferences({ language: 'ua' as never }).language).toBe('uk');
+  });
+
+  it('heals unsupported languages to the default', () => {
+    expect(store.normalizeWorkbenchPreferences({ language: 'missing' as never }).language).toBe('en');
+  });
+});

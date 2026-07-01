@@ -2,11 +2,12 @@ import { Icon } from '@chakra-ui/react';
 import { IconButton, Tooltip } from '@workbench/components/ui';
 import { SparklesIcon } from 'lucide-react';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export const ModelDefaultButton = ({
   active,
   disabled,
-  label = 'Use model default',
+  label,
   onClick,
 }: {
   active?: boolean;
@@ -14,6 +15,8 @@ export const ModelDefaultButton = ({
   label?: string;
   onClick: () => void;
 }) => {
+  const { t } = useTranslation();
+  const resolvedLabel = label ?? t('widgets.generate.useModelDefault');
   const isActive = active ?? !disabled;
   const handleClick = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -25,9 +28,9 @@ export const ModelDefaultButton = ({
   );
 
   return (
-    <Tooltip content={label}>
+    <Tooltip content={resolvedLabel}>
       <IconButton
-        aria-label={label}
+        aria-label={resolvedLabel}
         colorPalette={isActive ? 'brand' : undefined}
         disabled={disabled}
         size="2xs"

@@ -175,7 +175,7 @@ const setupRoute = createRoute({
   path: '/setup',
 });
 
-const RouterPending = () => <WorkbenchSplashScreen message="Loading Application" />;
+const RouterPending = () => <WorkbenchSplashScreen messageKey="splash.loadingApplication" />;
 
 export const router = createRouter({
   defaultNotFoundComponent: () => <Navigate to="/" />,

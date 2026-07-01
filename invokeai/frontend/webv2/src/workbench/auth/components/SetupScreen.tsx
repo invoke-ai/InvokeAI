@@ -6,6 +6,7 @@ import { getApiErrorMessage } from '@workbench/backend/http';
 import { Button, Field } from '@workbench/components/ui';
 import { useZodForm } from '@workbench/models/useZodForm';
 import { useCallback, useMemo, type ChangeEvent, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { AuthFormAlert, AuthScreen } from './AuthScreen';
 import { PasswordInput, PasswordStrengthMeter } from './PasswordInput';
@@ -17,6 +18,7 @@ const INITIAL_VALUES: SetupFormValues = { confirmPassword: '', displayName: '', 
  * signs straight into it.
  */
 export const SetupScreen = () => {
+  const { t } = useTranslation();
   const session = useAuthSession();
   const navigate = useNavigate();
   const schema = useMemo(() => createSetupSchema(session.strictPasswordChecking), [session.strictPasswordChecking]);
@@ -28,12 +30,12 @@ export const SetupScreen = () => {
         try {
           await completeAdminSetup(values.email, values.displayName.trim() || null, values.password);
         } catch (error) {
-          throw new Error(getApiErrorMessage(error, 'Could not create the administrator account.'));
+          throw new Error(getApiErrorMessage(error, t('auth.couldNotCreateAdmin')));
         }
 
         await navigate({ to: '/' });
       }),
-    [form, navigate]
+    [form, navigate, t]
   );
   const handleSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
@@ -60,14 +62,10 @@ export const SetupScreen = () => {
   );
 
   return (
-    <AuthScreen
-      footer="You can add more users later from the user menu."
-      subtitle="Create the administrator account to get started."
-      title="Set up Invoke"
-    >
+    <AuthScreen footer={t('auth.setupFooter')} subtitle={t('auth.setupSubtitle')} title={t('auth.setupTitle')}>
       <chakra.form display="flex" flexDirection="column" gap="4" onSubmit={handleSubmit}>
         {form.formError ? <AuthFormAlert message={form.formError} tone="error" /> : null}
-        <Field error={form.errors.email} label="Email">
+        <Field error={form.errors.email} label={t('users.email')}>
           <Input
             aria-invalid={form.errors.email ? true : undefined}
             autoComplete="email"
@@ -77,10 +75,10 @@ export const SetupScreen = () => {
             onChange={handleEmailChange}
           />
         </Field>
-        <Field helpText="Optional — shown instead of your email." label="Display name">
+        <Field helpText={t('auth.displayNameHelp')} label={t('users.displayName')}>
           <Input
             autoComplete="name"
-            placeholder="Administrator"
+            placeholder={t('auth.administrator')}
             value={form.values.displayName}
             onChange={handleDisplayNameChange}
           />
@@ -88,7 +86,7 @@ export const SetupScreen = () => {
         <Field
           error={form.errors.password}
           helpText={session.strictPasswordChecking ? PASSWORD_RULES_HINT : undefined}
-          label="Password"
+          label={t('auth.password')}
         >
           <Stack gap="1.5">
             <PasswordInput
@@ -100,7 +98,7 @@ export const SetupScreen = () => {
             <PasswordStrengthMeter password={form.values.password} />
           </Stack>
         </Field>
-        <Field error={form.errors.confirmPassword} label="Confirm password">
+        <Field error={form.errors.confirmPassword} label={t('auth.confirmPassword')}>
           <PasswordInput
             aria-invalid={form.errors.confirmPassword ? true : undefined}
             autoComplete="new-password"
@@ -109,7 +107,7 @@ export const SetupScreen = () => {
           />
         </Field>
         <Button loading={form.isSubmitting} size="sm" type="submit" variant="solid">
-          Create administrator account
+          {t('auth.createAdminAccount')}
         </Button>
       </chakra.form>
     </AuthScreen>

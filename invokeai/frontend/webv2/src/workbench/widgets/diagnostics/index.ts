@@ -13,8 +13,7 @@ export const diagnosticsWidgetManifest: WidgetManifest = {
   headerActions: DiagnosticsHeaderActions,
   icon: BugIcon,
   id: 'diagnostics',
-  label: 'Diagnostics',
-  labelText: 'Diagnostics',
+  label: (t) => t('widgets.labels.diagnostics'),
   version: 1,
   view: DiagnosticsWidgetView,
 };

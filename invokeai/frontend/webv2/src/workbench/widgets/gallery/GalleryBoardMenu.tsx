@@ -5,6 +5,7 @@ import { Dialog, HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-
 import { Button } from '@workbench/components/ui';
 import { ArchiveIcon, DownloadIcon, PencilIcon, Trash2Icon, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useGalleryWidget } from './GalleryWidgetContext';
 
@@ -32,6 +33,7 @@ export const GalleryBoardMenu = ({
   onActiveChange?: (isActive: boolean) => void;
   onClose: () => void;
 }) => {
+  const { t } = useTranslation();
   const { actions, gallery } = useGalleryWidget();
   const [renameTarget, setRenameTarget] = useState<GalleryBoard | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<GalleryBoard | null>(null);
@@ -164,11 +166,11 @@ export const GalleryBoardMenu = ({
           <Dialog.Positioner>
             <Dialog.Content>
               <Dialog.Header>
-                <Dialog.Title fontSize="sm">Rename board</Dialog.Title>
+                <Dialog.Title fontSize="sm">{t('widgets.gallery.renameBoard')}</Dialog.Title>
               </Dialog.Header>
               <Dialog.Body>
                 <Input
-                  aria-label="Board name"
+                  aria-label={t('widgets.gallery.boardName')}
                   autoFocus
                   size="sm"
                   value={renameValue}
@@ -178,10 +180,10 @@ export const GalleryBoardMenu = ({
               </Dialog.Body>
               <Dialog.Footer gap="2">
                 <Button size="xs" variant="outline" onClick={handleCancelRename}>
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button disabled={renameValue.trim().length === 0} size="xs" onClick={submitRename}>
-                  Rename
+                  {t('common.rename')}
                 </Button>
               </Dialog.Footer>
             </Dialog.Content>
@@ -194,28 +196,32 @@ export const GalleryBoardMenu = ({
           <Dialog.Positioner>
             <Dialog.Content>
               <Dialog.Header>
-                <Dialog.Title fontSize="sm">Delete board &ldquo;{deleteTarget?.name}&rdquo;?</Dialog.Title>
+                <Dialog.Title fontSize="sm">
+                  {t('widgets.gallery.deleteBoardQuestion', { name: deleteTarget?.name ?? '' })}
+                </Dialog.Title>
               </Dialog.Header>
               <Dialog.Body>
                 <Stack gap="2">
                   <Text color="fg.subtle" fontSize="xs">
-                    Deleted boards cannot be restored. Choose whether the board&rsquo;s images move to Uncategorized or
-                    are permanently deleted with it.
+                    {t('widgets.gallery.deleteBoardDescription')}
                   </Text>
                   <Text color="fg.subtle" fontSize="2xs">
-                    {deleteTarget?.imageCount ?? 0} images | {deleteTarget?.assetCount ?? 0} assets
+                    {t('widgets.gallery.boardItemCounts', {
+                      assets: deleteTarget?.assetCount ?? 0,
+                      images: deleteTarget?.imageCount ?? 0,
+                    })}
                   </Text>
                 </Stack>
               </Dialog.Body>
               <Dialog.Footer gap="2">
                 <Button size="xs" variant="outline" onClick={handleCancelDelete}>
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button colorPalette="red" size="xs" variant="outline" onClick={handleDeleteBoardOnly}>
-                  Delete Board Only
+                  {t('widgets.gallery.deleteBoardOnly')}
                 </Button>
                 <Button colorPalette="red" size="xs" onClick={handleDeleteBoardAndImages}>
-                  Delete Board and Images
+                  {t('widgets.gallery.deleteBoardAndImages')}
                 </Button>
               </Dialog.Footer>
             </Dialog.Content>
@@ -227,10 +233,18 @@ export const GalleryBoardMenu = ({
 };
 
 const BoardDownloadMenuItem = ({ boardId }: { boardId: string }) => {
+  const { t } = useTranslation();
   const { actions } = useGalleryWidget();
   const handleClick = useCallback(() => void actions.downloadBoard(boardId), [actions, boardId]);
 
-  return <BoardMenuItem icon={DownloadIcon} label="Download Board" value="download-board" onClick={handleClick} />;
+  return (
+    <BoardMenuItem
+      icon={DownloadIcon}
+      label={t('widgets.gallery.downloadBoard')}
+      value="download-board"
+      onClick={handleClick}
+    />
+  );
 };
 
 const BoardRenameMenuItem = ({
@@ -242,22 +256,31 @@ const BoardRenameMenuItem = ({
   onRename: React.Dispatch<React.SetStateAction<GalleryBoard | null>>;
   onRenameValue: React.Dispatch<React.SetStateAction<string>>;
 }) => {
+  const { t } = useTranslation();
   const handleClick = useCallback(() => {
     onRenameValue(board.name);
     onRename(board);
   }, [board, onRename, onRenameValue]);
 
-  return <BoardMenuItem icon={PencilIcon} label="Rename Board" value="rename-board" onClick={handleClick} />;
+  return (
+    <BoardMenuItem
+      icon={PencilIcon}
+      label={t('widgets.gallery.renameBoard')}
+      value="rename-board"
+      onClick={handleClick}
+    />
+  );
 };
 
 const BoardArchiveMenuItem = ({ archived, boardId }: { archived: boolean; boardId: string }) => {
+  const { t } = useTranslation();
   const { actions } = useGalleryWidget();
   const handleClick = useCallback(() => void actions.archiveBoard(boardId, !archived), [actions, archived, boardId]);
 
   return (
     <BoardMenuItem
       icon={ArchiveIcon}
-      label={archived ? 'Unarchive Board' : 'Archive Board'}
+      label={archived ? t('widgets.gallery.unarchiveBoard') : t('widgets.gallery.archiveBoard')}
       value="toggle-archived"
       onClick={handleClick}
     />
@@ -271,10 +294,17 @@ const BoardDeleteMenuItem = ({
   board: GalleryBoard;
   onDelete: React.Dispatch<React.SetStateAction<GalleryBoard | null>>;
 }) => {
+  const { t } = useTranslation();
   const handleClick = useCallback(() => onDelete(board), [board, onDelete]);
 
   return (
-    <BoardMenuItem color="fg.error" icon={Trash2Icon} label="Delete Board" value="delete-board" onClick={handleClick} />
+    <BoardMenuItem
+      color="fg.error"
+      icon={Trash2Icon}
+      label={t('widgets.gallery.deleteBoard')}
+      value="delete-board"
+      onClick={handleClick}
+    />
   );
 };
 

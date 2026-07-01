@@ -12,8 +12,7 @@ export const previewWidgetManifest: WidgetManifest = {
   headerActions: PreviewHeaderActions,
   icon: EyeIcon,
   id: 'preview',
-  label: 'Preview',
-  labelText: 'Preview',
+  label: (t) => t('widgets.labels.preview'),
   version: 1,
   view: PreviewWidgetView,
 };

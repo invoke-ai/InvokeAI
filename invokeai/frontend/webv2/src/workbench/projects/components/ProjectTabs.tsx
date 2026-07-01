@@ -36,6 +36,7 @@ import {
   XIcon,
 } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { OpenProjectDialog } from './OpenProjectDialog';
 
@@ -74,6 +75,7 @@ const deleteMenuItemHover = { bg: 'bg.error', color: 'fg.error' } as const;
  * with rename, details, export, close, and delete.
  */
 export const ProjectTabs = () => {
+  const { t } = useTranslation();
   const projectTabSummaries = useWorkbenchSelector(
     (snapshot) => selectProjectTabSummaries(snapshot.state.projects),
     areProjectTabSummariesEqual
@@ -172,9 +174,9 @@ export const ProjectTabs = () => {
 
           <Separator orientation="vertical" h={5} mx="1" alignSelf="center" />
 
-          <Tooltip content="Create new project" showArrow>
+          <Tooltip content={t('projects.createNewProject')} showArrow>
             <IconButton
-              aria-label="Create new project"
+              aria-label={t('projects.createNewProject')}
               flexShrink={0}
               size="xs"
               variant="ghost"
@@ -185,9 +187,9 @@ export const ProjectTabs = () => {
             </IconButton>
           </Tooltip>
 
-          <Tooltip content="Open project" showArrow>
+          <Tooltip content={t('projects.openProject')} showArrow>
             <IconButton
-              aria-label="Open project"
+              aria-label={t('projects.openProject')}
               flexShrink={0}
               size="xs"
               variant="ghost"
@@ -214,10 +216,10 @@ export const ProjectTabs = () => {
         onSubmit={renameProject}
       />
       <ConfirmDialog
-        body={`Delete "${deleteTarget?.name ?? ''}"? The project and its saved copy on the server are removed permanently. To keep it in your library, close the tab instead.`}
-        confirmLabel="Delete project"
+        body={t('projects.deleteProjectTabBody', { name: deleteTarget?.name ?? '' })}
+        confirmLabel={t('projects.deleteProject')}
         isOpen={deleteTarget !== null}
-        title="Delete project?"
+        title={t('projects.deleteProjectQuestion')}
         onClose={closeDeleteDialog}
         onConfirm={confirmDeleteProject}
       />
@@ -257,6 +259,7 @@ const ProjectTab = ({
     queueItems: project.queueItems,
   });
   const switchProject = useCallback(() => onSwitchProject(project.id), [onSwitchProject, project.id]);
+  const { t } = useTranslation();
   const openContextMenu = useCallback((event: MouseEvent) => onContextMenu(project, event), [onContextMenu, project]);
 
   const closeProject = useCallback(
@@ -282,7 +285,7 @@ const ProjectTab = ({
         me="-2"
         as="span"
         role="button"
-        aria-label={`Close ${project.name}`}
+        aria-label={t('projects.closeProjectLabel', { name: project.name })}
         onClick={closeProject}
       />
     </Tabs.Trigger>
@@ -306,6 +309,7 @@ const ProjectTabContextMenu = ({
   const store = useWorkbenchStore();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const targetRef = useRef(target);
+  const { t } = useTranslation();
 
   targetRef.current = target;
 
@@ -407,25 +411,25 @@ const ProjectTabContextMenu = ({
             <MenuContent minW="44">
               <Menu.Item value="rename" onClick={renameTarget}>
                 <Icon as={PencilIcon} boxSize="3.5" />
-                Rename…
+                {t('projects.renameWithEllipsis')}
               </Menu.Item>
               <Menu.Item value="details" onClick={showDetails}>
                 <Icon as={FolderCogIcon} boxSize="3.5" />
-                Project details
+                {t('projects.projectDetails')}
               </Menu.Item>
               <Menu.Item value="export" onClick={exportProject}>
                 <Icon as={FileDownIcon} boxSize="3.5" />
-                Export
+                {t('common.export')}
               </Menu.Item>
               <Menu.Separator />
               <Menu.Item value="close" onClick={closeTargetProject}>
                 <Icon as={XIcon} boxSize="3.5" />
-                Close
+                {t('common.close')}
               </Menu.Item>
               <Menu.Separator />
               <Menu.Item color="fg.error" value="delete" _hover={deleteMenuItemHover} onClick={deleteTargetProject}>
                 <Icon as={Trash2Icon} boxSize="3.5" />
-                Delete project…
+                {t('projects.deleteProjectWithEllipsis')}
               </Menu.Item>
             </MenuContent>
           ) : null}

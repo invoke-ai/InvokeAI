@@ -4,6 +4,7 @@ import { logoutSession, useAuthSession } from '@workbench/auth/session';
 import { MenuContent } from '@workbench/components/ui';
 import { ChevronDownIcon, LogOutIcon, UserRoundCogIcon, UsersIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { ProfileDialog } from './ProfileDialog';
 
@@ -17,6 +18,7 @@ const TRIGGER_HOVER = { bg: 'bg.subtle' } as const;
  * surface's top bar places alongside it.
  */
 export const AccountMenu = () => {
+  const { t } = useTranslation();
   const session = useAuthSession();
   const navigate = useNavigate();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -82,7 +84,7 @@ export const AccountMenu = () => {
                   </Stack>
                   {user.is_admin ? (
                     <Badge colorPalette="purple" fontSize="2xs" variant="surface">
-                      Admin
+                      {t('users.admin')}
                     </Badge>
                   ) : null}
                 </HStack>
@@ -90,18 +92,18 @@ export const AccountMenu = () => {
               <Menu.Separator />
               <Menu.Item value="account" onClick={openProfile}>
                 <Icon as={UserRoundCogIcon} boxSize="3.5" />
-                Account settings
+                {t('auth.accountSettings')}
               </Menu.Item>
               {user.is_admin ? (
                 <Menu.Item value="users" onClick={openUserManagement}>
                   <Icon as={UsersIcon} boxSize="3.5" />
-                  Manage users
+                  {t('users.manageUsers')}
                 </Menu.Item>
               ) : null}
               <Menu.Separator />
               <Menu.Item value="sign-out" onClick={signOut}>
                 <Icon as={LogOutIcon} boxSize="3.5" />
-                Sign out
+                {t('auth.signOut')}
               </Menu.Item>
             </MenuContent>
           </Menu.Positioner>

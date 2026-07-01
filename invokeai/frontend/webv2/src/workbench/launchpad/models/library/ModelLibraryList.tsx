@@ -16,6 +16,7 @@ import { getLibraryScrollOffset, openModelManagerTab, saveLibraryScrollOffset } 
 import { ArrowRightIcon, BoxIcon, CircleAlert } from 'lucide-react';
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from 'react-hook-tanstack-virtual';
+import { useTranslation } from 'react-i18next';
 
 import { ModelRowContextMenu, type ModelContextMenuTarget } from './ModelRowContextMenu';
 
@@ -48,6 +49,7 @@ export const ModelLibraryList = ({
   onToggleSelected?: (modelKey: string) => void;
   selectedKeys?: ReadonlySet<string>;
 }) => {
+  const { t } = useTranslation();
   const { coverImageVersions, error, missingModelKeys, models, status } = useModelsSelector(
     (snapshot) => ({
       coverImageVersions: snapshot.coverImageVersions,
@@ -116,20 +118,20 @@ export const ModelLibraryList = ({
   }
 
   if (status === 'error') {
-    return <EmptyState title="Could not load models" description={error} icon={<Icon as={CircleAlert} />} danger />;
+    return <EmptyState title={t('models.couldNotLoad')} description={error} icon={<Icon as={CircleAlert} />} danger />;
   }
 
   if (rows.length === 0) {
     return (
       <EmptyState
-        title={models.length === 0 ? 'No models installed' : 'No models match your filters'}
+        title={models.length === 0 ? t('models.noneInstalled') : t('models.noneMatchFilters')}
         description={
-          models.length === 0 ? 'Use Add Models to install your first model.' : 'Try clearing the search or filters.'
+          models.length === 0 ? t('models.noneInstalledDescription') : t('models.noneMatchFiltersDescription')
         }
         icon={<Icon as={CircleAlert} />}
       >
         <Button onClick={openAddModels} size="sm">
-          Add Models
+          {t('models.addModels')}
           <Icon as={ArrowRightIcon} />
         </Button>
       </EmptyState>
@@ -146,7 +148,7 @@ export const ModelLibraryList = ({
   return (
     <Box flex="1" minH="0" position="relative" w="full">
       <ScrollArea.Root h="full" size="xs" variant="hover" w="full">
-        <ScrollArea.Viewport ref={scrollRef} aria-label="Model library" h="full" w="full">
+        <ScrollArea.Viewport ref={scrollRef} aria-label={t('models.library')} h="full" w="full">
           <ScrollArea.Content w="full">
             <Box h={`${virtualizer.totalSize}px`} position="relative" w="full">
               {virtualizer.virtualItems.map((virtualRow) => {

@@ -5,6 +5,7 @@ import { Flex, Spinner, Stack, Text } from '@chakra-ui/react';
 import { Button, Scrollable } from '@workbench/components/ui';
 import { refreshInstalls } from '@workbench/models/installsStore';
 import { useNotify } from '@workbench/useNotify';
+import { useTranslation } from 'react-i18next';
 
 import { InstallJobRow } from './InstallJobRow';
 
@@ -17,6 +18,7 @@ export const InstallQueueList = ({
   jobs: ModelInstallJob[];
   status: 'idle' | 'loading' | 'loaded' | 'error';
 }) => {
+  const { t } = useTranslation();
   const notify = useNotify();
 
   if (status === 'loading' || status === 'idle') {
@@ -31,13 +33,13 @@ export const InstallQueueList = ({
     return (
       <Stack align="center" gap="1" py="6">
         <Text color="fg.error" fontSize="xs" fontWeight="600">
-          Could not load the install queue
+          {t('models.couldNotLoadInstallQueue')}
         </Text>
         <Text color="fg.subtle" fontSize="2xs">
           {error}
         </Text>
         <Button mt="1" size="xs" variant="outline" onClick={() => void refreshInstalls()}>
-          Retry
+          {t('common.retry')}
         </Button>
       </Stack>
     );
@@ -47,17 +49,17 @@ export const InstallQueueList = ({
     return (
       <Stack align="center" gap="1" py="6">
         <Text color="fg.muted" fontSize="xs" fontWeight="600">
-          No installs yet
+          {t('models.noInstallsYet')}
         </Text>
         <Text color="fg.subtle" fontSize="2xs">
-          Models you install will download here.
+          {t('models.noInstallsDescription')}
         </Text>
       </Stack>
     );
   }
 
   return (
-    <Scrollable h="full" label="Install jobs" minH="0">
+    <Scrollable h="full" label={t('models.installJobs')} minH="0">
       <Stack gap="1.5">
         {jobs.map((job) => (
           <InstallJobRow key={job.id} job={job} onError={notify.error} />

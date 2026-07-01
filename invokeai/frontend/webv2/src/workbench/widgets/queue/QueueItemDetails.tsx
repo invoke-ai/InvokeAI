@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { DataList, Separator, Text } from '@chakra-ui/react';
+import { useTranslation } from 'react-i18next';
 
 import type { QueueServerItem } from './queueServerApi';
 
@@ -20,33 +21,34 @@ const DetailRow = ({ label, children }: { label: string; children: ReactNode }) 
 
 /** Expanded detail grid + actions for a RECENT queue item row. */
 export const QueueItemDetails = ({ item }: { item: QueueServerItem }) => {
+  const { t } = useTranslation();
   const meta = extractGenerationMeta(item);
   const localGenerateValues = useLocalGenerateValues(item.origin);
   const duration = formatDuration(item.started_at, item.completed_at);
 
   return (
     <DataList.Root gap="1.5" orientation="horizontal" size="sm">
-      <DetailRow label="Prompt">{meta.positivePrompt ?? '—'}</DetailRow>
-      <DetailRow label="Negative">{meta.negativePrompt ?? '—'}</DetailRow>
-      <DetailRow label="Seed">
+      <DetailRow label={t('common.prompt')}>{meta.positivePrompt ?? '—'}</DetailRow>
+      <DetailRow label={t('common.negative')}>{meta.negativePrompt ?? '—'}</DetailRow>
+      <DetailRow label={t('common.seed')}>
         <Text as="span" fontVariantNumeric="tabular-nums">
           {meta.seed ?? '—'}
         </Text>
       </DetailRow>
-      <DetailRow label="Created">{new Date(item.created_at).toLocaleString()}</DetailRow>
-      <DetailRow label="Took">{duration ?? '—'}</DetailRow>
-      <DetailRow label="Batch">
+      <DetailRow label={t('common.created')}>{new Date(item.created_at).toLocaleString()}</DetailRow>
+      <DetailRow label={t('widgets.queue.took')}>{duration ?? '—'}</DetailRow>
+      <DetailRow label={t('widgets.queue.batch')}>
         <Text as="span" truncate>
           {item.batch_id}
         </Text>
       </DetailRow>
-      <DetailRow label="Item">
+      <DetailRow label={t('common.item')}>
         <Text as="span" fontVariantNumeric="tabular-nums">
           #{item.item_id}
         </Text>
       </DetailRow>
       {item.error_message ? (
-        <DetailRow label="Error">
+        <DetailRow label={t('common.error')}>
           <Text as="span" color="fg.error">
             {item.error_message}
           </Text>

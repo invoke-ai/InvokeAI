@@ -13,6 +13,7 @@ import { patchWorkbenchPreferences, useWorkbenchPreferences } from '@workbench/s
 import { CheckIcon, PlusIcon, RotateCcwIcon, SearchIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { Fragment, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from 'react-hook-tanstack-virtual';
+import { useTranslation } from 'react-i18next';
 
 type HotkeyConflict = { hotkey: HotkeyDefinition; title: string };
 
@@ -20,12 +21,12 @@ type HotkeyRow =
   | { kind: 'category'; category: HotkeyCategory; title: string }
   | { kind: 'hotkey'; hotkey: HotkeyDefinition; effectiveKeys: string[]; isCustomized: boolean };
 
-const CATEGORY_LABELS: Record<HotkeyCategory, string> = {
-  app: 'App',
-  canvas: 'Canvas',
-  gallery: 'Gallery',
-  viewer: 'Viewer',
-  workflows: 'Workflows',
+const CATEGORY_LABEL_KEYS: Record<HotkeyCategory, string> = {
+  app: 'hotkeys.categories.app',
+  canvas: 'hotkeys.categories.canvas',
+  gallery: 'hotkeys.categories.gallery',
+  viewer: 'hotkeys.categories.viewer',
+  workflows: 'hotkeys.categories.workflows',
 };
 
 const CATEGORY_ORDER: HotkeyCategory[] = ['app', 'canvas', 'workflows', 'viewer', 'gallery'];
@@ -145,7 +146,7 @@ const buildRows = ({
       continue;
     }
 
-    rows.push({ category, kind: 'category', title: CATEGORY_LABELS[category] });
+    rows.push({ category, kind: 'category', title: CATEGORY_LABEL_KEYS[category] });
 
     for (const hotkey of hotkeys) {
       rows.push({
@@ -161,6 +162,7 @@ const buildRows = ({
 };
 
 export const HotkeysSettingsSection = () => {
+  const { t } = useTranslation();
   const { customHotkeys } = useWorkbenchPreferences();
   const extensionHotkeys = useExtensionHotkeyDefinitions();
   const [searchTerm, setSearchTerm] = useState('');
@@ -212,24 +214,29 @@ export const HotkeysSettingsSection = () => {
       <HStack justify="space-between" gap="3">
         <Stack gap="0.5">
           <Text color="fg" fontSize="sm" fontWeight="600">
-            Hotkeys
+            {t('hotkeys.title')}
           </Text>
           <Text color="fg.subtle" fontSize="xs">
-            Account-bound keybinds. Project-level overrides can layer on later without changing hotkey ids.
+            {t('hotkeys.description')}
           </Text>
         </Stack>
         <Button disabled={modifiedCount === 0} size="xs" variant="outline" onClick={resetAll}>
           <RotateCcwIcon />
-          Reset all
+          {t('hotkeys.resetAll')}
         </Button>
       </HStack>
 
       <InputGroup startElement={SEARCH_START_ELEMENT}>
-        <Input placeholder="Search hotkeys" size="xs" value={searchTerm} onChange={handleSearchChange} />
+        <Input
+          placeholder={t('hotkeys.searchPlaceholder')}
+          size="xs"
+          value={searchTerm}
+          onChange={handleSearchChange}
+        />
       </InputGroup>
 
       <ScrollArea.Root flex="1" minH="0" rounded="md" size="xs" variant="hover" w="full">
-        <ScrollArea.Viewport ref={scrollRef} aria-label="Hotkey bindings" h="full" w="full">
+        <ScrollArea.Viewport ref={scrollRef} aria-label={t('hotkeys.bindings')} h="full" w="full">
           <ScrollArea.Content w="full">
             <Box h={`${virtualizer.totalSize}px`} position="relative" w="full">
               {virtualRows.map((row) => {
@@ -269,13 +276,17 @@ export const HotkeysSettingsSection = () => {
   );
 };
 
-const CategoryRow = ({ title }: { title: string }) => (
-  <Flex align="center" borderBottomWidth="1px" pb="2" pt="4">
-    <Text color="fg.muted" fontSize="2xs" fontWeight="800" letterSpacing="0.08em" textTransform="uppercase">
-      {title}
-    </Text>
-  </Flex>
-);
+const CategoryRow = ({ title }: { title: string }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Flex align="center" borderBottomWidth="1px" pb="2" pt="4">
+      <Text color="fg.muted" fontSize="2xs" fontWeight="800" letterSpacing="0.08em" textTransform="uppercase">
+        {t(title)}
+      </Text>
+    </Flex>
+  );
+};
 
 const VirtualHotkeyRow = ({
   conflictMap,
@@ -334,6 +345,7 @@ const HotkeyListRow = ({
   onReset: () => void;
   onSave: (keys: string[]) => void;
 }) => {
+  const { t } = useTranslation();
   const [draftKeys, setDraftKeys] = useState(effectiveKeys);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const isEditing = editingIndex !== null;
@@ -391,12 +403,12 @@ const HotkeyListRow = ({
           </Text>
           {hotkey.implemented === false ? (
             <Badge colorPalette="gray" size="xs" variant="surface">
-              Pending
+              {t('hotkeys.pending')}
             </Badge>
           ) : null}
           {isCustomized ? (
             <Badge colorPalette="blue" size="xs" variant="surface">
-              Custom
+              {t('hotkeys.custom')}
             </Badge>
           ) : null}
         </HStack>
@@ -405,11 +417,11 @@ const HotkeyListRow = ({
         </Text>
         {conflict ? (
           <Text color="fg.error" fontSize="2xs">
-            Conflicts with {conflict.title}
+            {t('hotkeys.conflictsWith', { title: conflict.title })}
           </Text>
         ) : hasDuplicate ? (
           <Text color="fg.error" fontSize="2xs">
-            Duplicate binding in this hotkey
+            {t('hotkeys.duplicateBinding')}
           </Text>
         ) : null}
       </Stack>
@@ -430,21 +442,21 @@ const HotkeyListRow = ({
             ))
           ) : (
             <Text color="fg.subtle" fontSize="2xs">
-              Disabled
+              {t('hotkeys.disabled')}
             </Text>
           )}
-          <IconButton aria-label="Add hotkey" size="xs" variant="ghost" onClick={addDraftKey}>
+          <IconButton aria-label={t('hotkeys.addHotkey')} size="xs" variant="ghost" onClick={addDraftKey}>
             <PlusIcon />
           </IconButton>
         </HStack>
         <HStack gap="1">
           {isEditing || isDirty ? (
             <>
-              <IconButton aria-label="Cancel hotkey edit" size="xs" variant="ghost" onClick={cancelEdit}>
+              <IconButton aria-label={t('hotkeys.cancelEdit')} size="xs" variant="ghost" onClick={cancelEdit}>
                 <XIcon />
               </IconButton>
               <IconButton
-                aria-label="Save hotkey edit"
+                aria-label={t('hotkeys.saveEdit')}
                 disabled={!canSave}
                 size="xs"
                 variant="ghost"
@@ -456,11 +468,11 @@ const HotkeyListRow = ({
           ) : null}
           {effectiveKeys.length > 0 ? (
             <Button size="xs" variant="ghost" onClick={disableHotkey}>
-              Disable
+              {t('hotkeys.disable')}
             </Button>
           ) : null}
           {isCustomized ? (
-            <IconButton aria-label="Reset hotkey" size="xs" variant="ghost" onClick={onReset}>
+            <IconButton aria-label={t('hotkeys.resetHotkey')} size="xs" variant="ghost" onClick={onReset}>
               <RotateCcwIcon />
             </IconButton>
           ) : null}
@@ -485,6 +497,7 @@ const HotkeyChip = ({
   onEdit: () => void;
   onRecord: (hotkey: string) => void;
 }) => {
+  const { t } = useTranslation();
   useEffect(() => {
     if (!editing) {
       return;
@@ -524,9 +537,15 @@ const HotkeyChip = ({
     return (
       <HStack borderColor="accent.solid" borderWidth="1px" gap="1" px="2" py="1" rounded="md">
         <Text color="accent.solid" fontSize="2xs" fontStyle="italic">
-          Press keys
+          {t('hotkeys.pressKeys')}
         </Text>
-        <IconButton aria-label="Delete hotkey" colorPalette="red" size="2xs" variant="ghost" onClick={onDelete}>
+        <IconButton
+          aria-label={t('hotkeys.deleteHotkey')}
+          colorPalette="red"
+          size="2xs"
+          variant="ghost"
+          onClick={onDelete}
+        >
           <Trash2Icon />
         </IconButton>
       </HStack>

@@ -2,6 +2,18 @@ import { describe, expect, it } from 'vitest';
 
 import { getModelCacheClearToast, getModelCacheUsage, normalizeModelCacheClearResult } from './modelCacheStore';
 
+const t = ((key: string, values?: Record<string, unknown>) => {
+  const translations: Record<string, string> = {
+    'widgets.queue.modelCache.cleared': 'Model cache cleared',
+    'widgets.queue.modelCache.clearedDescription': `Cleared ${values?.count} cached models and freed ${values?.bytes}.`,
+    'widgets.queue.modelCache.noModelsCleared': 'No cached models cleared',
+    'widgets.queue.modelCache.noModelsClearedDescription':
+      'No unlocked cached models were available to clear. Active models stay loaded until they are no longer in use.',
+  };
+
+  return translations[key] ?? key;
+}) as never;
+
 describe('model cache stats helpers', () => {
   it('uses current cache usage instead of the historical high watermark', () => {
     expect(
@@ -18,13 +30,13 @@ describe('model cache stats helpers', () => {
   });
 
   it('reports whether clear cache actually cleared models', () => {
-    expect(getModelCacheClearToast({ bytes_freed: 1024, models_cleared: 2 })).toEqual({
+    expect(getModelCacheClearToast({ bytes_freed: 1024, models_cleared: 2 }, t)).toEqual({
       description: 'Cleared 2 cached models and freed 1.0 KB.',
       status: 'success',
       title: 'Model cache cleared',
     });
 
-    expect(getModelCacheClearToast({ bytes_freed: 0, models_cleared: 0 })).toEqual({
+    expect(getModelCacheClearToast({ bytes_freed: 0, models_cleared: 0 }, t)).toEqual({
       description:
         'No unlocked cached models were available to clear. Active models stay loaded until they are no longer in use.',
       status: 'info',

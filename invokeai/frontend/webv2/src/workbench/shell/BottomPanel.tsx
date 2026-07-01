@@ -1,9 +1,12 @@
 import { MissingWidgetFrame, WidgetRendererById } from '@workbench/widget-frame';
 import { areWidgetRenderInstancesEqual } from '@workbench/widget-frame/widgetRenderInstance';
+import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import { getWidgetById } from '@workbench/widgetRegistry';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { useTranslation } from 'react-i18next';
 
 export const BottomPanel = () => {
+  const { t } = useTranslation();
   const panels = useActiveProjectSelector((project) => project.layout.panels);
   const bottomRegion = useActiveProjectSelector((project) => project.widgetRegions.bottom);
   const instance = useActiveProjectSelector(
@@ -24,7 +27,12 @@ export const BottomPanel = () => {
   }
 
   if (!instance || !widget || !View) {
-    return <MissingWidgetFrame label={widget?.manifest.labelText ?? bottomRegion.activeInstanceId} region="bottom" />;
+    return (
+      <MissingWidgetFrame
+        label={widget ? resolveWidgetLabel(widget.manifest, t) : bottomRegion.activeInstanceId}
+        region="bottom"
+      />
+    );
   }
 
   return <WidgetRendererById instanceId={instance.id} widget={widget} presentation="expanded" region="bottom" />;

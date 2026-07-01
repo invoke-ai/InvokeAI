@@ -7,6 +7,7 @@ import { Field } from '@workbench/components/ui';
 import { getDefaultGenerateSettings, getGenerationUiPolicy } from '@workbench/generation/baseGenerationPolicies';
 import { isVaeModelConfig } from '@workbench/generation/settings';
 import { ModelSelect } from '@workbench/models/components';
+import { useTranslation } from 'react-i18next';
 
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { ModelDefaultButton } from './shared/ModelDefaultButton';
@@ -42,6 +43,7 @@ export const GenerateAdvancedFields = ({
   selectedModel,
   settings,
 }: GenerateAdvancedFieldsProps) => {
+  const { t } = useTranslation();
   const modelBase = selectedModel?.base;
   const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
   const policy = getGenerationUiPolicy(selectedModel, settings);
@@ -72,9 +74,9 @@ export const GenerateAdvancedFields = ({
 
   const badges = (
     <>
-      {settings.seamlessXAxis && <Badge size="xs">Tile X</Badge>}
-      {settings.seamlessYAxis && <Badge size="xs">Tile Y</Badge>}
-      {settings.colorCompensation && <Badge size="xs">Color compensation</Badge>}
+      {settings.seamlessXAxis && <Badge size="xs">{t('widgets.generate.tileX')}</Badge>}
+      {settings.seamlessYAxis && <Badge size="xs">{t('widgets.generate.tileY')}</Badge>}
+      {settings.colorCompensation && <Badge size="xs">{t('widgets.generate.colorCompensation')}</Badge>}
       {customVae && (
         <Badge maxW="32" size="xs" truncate>
           {settings.vae?.name}
@@ -84,34 +86,38 @@ export const GenerateAdvancedFields = ({
   );
 
   return (
-    <GenerateCollapsibleSection label="Advanced" defaultOpen={false} badges={badges}>
+    <GenerateCollapsibleSection label={t('widgets.generate.advanced')} defaultOpen={false} badges={badges}>
       {policy.sdVaeVisible || policy.vaePrecisionVisible ? (
         <HStack alignItems="flex-start" gap="2" p="2">
           {policy.sdVaeVisible ? (
-            <Field flex="2" label="VAE" helpText={settings.vae ? undefined : 'Using the VAE bundled with the model.'}>
+            <Field
+              flex="2"
+              label={t('widgets.generate.vae')}
+              helpText={settings.vae ? undefined : t('widgets.generate.usingBundledVae')}
+            >
               <HStack gap="1">
                 <ModelSelect
                   filter={(model) => model.base === modelBase}
                   modelTypes={['vae']}
                   size="xs"
-                  placeholder="Model default"
+                  placeholder={t('widgets.generate.modelDefault')}
                   value={settings.vae?.key ?? null}
                   onChange={(model) => onCommitImmediate({ vae: isVaeModelConfig(model) ? model : null })}
                 />
                 <ModelDefaultButton
                   disabled={!settings.vae}
-                  label="Use model default VAE"
+                  label={t('widgets.generate.useModelDefaultVae')}
                   onClick={() => onCommitImmediate({ vae: null })}
                 />
               </HStack>
             </Field>
           ) : null}
           {policy.vaePrecisionVisible ? (
-            <Field flex="1" label="VAE precision">
+            <Field flex="1" label={t('widgets.generate.vaePrecision')}>
               <HStack gap="1">
                 <NativeSelect.Root flex="1" size="xs">
                   <NativeSelect.Field
-                    aria-label="VAE precision"
+                    aria-label={t('widgets.generate.vaePrecision')}
                     value={settings.vaePrecision}
                     onChange={(event: ChangeEvent<HTMLSelectElement>) =>
                       onCommit({ vaePrecision: event.currentTarget.value as VaePrecision })
@@ -124,7 +130,7 @@ export const GenerateAdvancedFields = ({
                 </NativeSelect.Root>
                 <ModelDefaultButton
                   disabled={!modelDefaults || settings.vaePrecision === modelDefaults.vaePrecision}
-                  label="Use model default VAE precision"
+                  label={t('widgets.generate.useModelDefaultVaePrecision')}
                   onClick={() => {
                     if (modelDefaults) {
                       onCommit({ vaePrecision: modelDefaults.vaePrecision });
@@ -140,7 +146,7 @@ export const GenerateAdvancedFields = ({
       {policy.clipSkipMax || policy.cfgRescaleVisible ? (
         <HStack gap="2" p="2">
           {policy.clipSkipMax ? (
-            <Field label="CLIP skip">
+            <Field label={t('widgets.generate.clipSkip')}>
               <NumberInput.Root
                 max={clipSkipMax}
                 min={0}
@@ -154,7 +160,7 @@ export const GenerateAdvancedFields = ({
             </Field>
           ) : null}
           {policy.cfgRescaleVisible ? (
-            <Field label="CFG rescale">
+            <Field label={t('widgets.generate.cfgRescale')}>
               <NumberInput.Root
                 max={0.99}
                 min={0}
@@ -167,7 +173,7 @@ export const GenerateAdvancedFields = ({
                   endElement={
                     <ModelDefaultButton
                       disabled={!modelDefaults || settings.cfgRescaleMultiplier === modelDefaults.cfgRescaleMultiplier}
-                      label="Use model default CFG rescale"
+                      label={t('widgets.generate.useModelDefaultCfgRescale')}
                       onClick={() => {
                         if (modelDefaults) {
                           onCommit({ cfgRescaleMultiplier: modelDefaults.cfgRescaleMultiplier });
@@ -186,7 +192,7 @@ export const GenerateAdvancedFields = ({
       ) : null}
 
       {policy.colorCompensationVisible ? (
-        <Field label="Color compensation" p="2">
+        <Field label={t('widgets.generate.colorCompensation')} p="2">
           <Switch.Root
             checked={settings.colorCompensation}
             size="sm"
@@ -201,16 +207,16 @@ export const GenerateAdvancedFields = ({
       ) : null}
 
       {policy.seamlessVisible ? (
-        <Field label="Seamless tiling" p="2">
+        <Field label={t('widgets.generate.seamlessTiling')} p="2">
           <HStack gap="4">
             <SeamlessSwitch
               checked={settings.seamlessXAxis}
-              label="X axis"
+              label={t('widgets.generate.xAxis')}
               onCheckedChange={(checked) => onCommit({ seamlessXAxis: checked })}
             />
             <SeamlessSwitch
               checked={settings.seamlessYAxis}
-              label="Y axis"
+              label={t('widgets.generate.yAxis')}
               onCheckedChange={(checked) => onCommit({ seamlessYAxis: checked })}
             />
           </HStack>

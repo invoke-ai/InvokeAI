@@ -13,8 +13,7 @@ export const notificationsWidgetManifest: WidgetManifest = {
   headerActions: NotificationsHeaderActions,
   icon: BellIcon,
   id: 'notifications',
-  label: 'Notifications',
-  labelText: 'Notifications',
+  label: (t) => t('widgets.labels.notifications'),
   version: 1,
   view: NotificationsWidgetView,
 };

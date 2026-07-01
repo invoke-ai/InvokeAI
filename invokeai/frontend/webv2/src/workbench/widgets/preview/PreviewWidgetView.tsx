@@ -41,6 +41,7 @@ import {
   type MouseEvent,
   type CSSProperties,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { PreviewCompare } from './PreviewCompare';
 
@@ -104,8 +105,13 @@ const getImageGalleryView = (image: PreviewImage): GalleryView => {
   return 'images';
 };
 
-const getBoardName = (boards: GalleryBoard[], boardId: string): string =>
-  boards.find((board) => board.id === boardId)?.name ?? (boardId === 'none' ? 'Uncategorized' : 'Unknown board');
+const getBoardName = (
+  boards: GalleryBoard[],
+  boardId: string,
+  uncategorizedLabel: string,
+  unknownBoardLabel: string
+): string =>
+  boardId === 'none' ? uncategorizedLabel : (boards.find((board) => board.id === boardId)?.name ?? unknownBoardLabel);
 
 const shouldLoadBackendBoard = (image: PreviewImage): boolean => image.sourceQueueItemId === 'backend-gallery';
 
@@ -128,6 +134,7 @@ const previewGridCss = {
 const selectGenerateRecallValues = createGenerateFormValuesSelector();
 
 export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
+  const { t } = useTranslation();
   const galleryValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'gallery'));
   const generateValues = useWidgetValuesSelector('generate', selectGenerateRecallValues);
   const { antialiasProgressImages, showProgressImagesInViewer } = useActiveProjectSelector(
@@ -155,7 +162,12 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const selectedIndex = selectedImage
     ? boardImages.findIndex((image) => image.imageName === selectedImage.imageName)
     : -1;
-  const boardName = getBoardName(boards, displayBoardId);
+  const boardName = getBoardName(
+    boards,
+    displayBoardId,
+    t('widgets.gallery.uncategorized'),
+    t('widgets.gallery.unknownBoard')
+  );
   const selectedImageRef = useRef(selectedImage);
   const boardImagesRef = useRef(boardImages);
 
@@ -370,9 +382,9 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
   useEffect(() => {
     const hotkeys = [
-      ['viewer.toggleViewer', 'Toggle preview', ['z']],
-      ['viewer.swapImages', 'Swap comparison images', ['c']],
-      ['viewer.deleteImage', 'Delete preview image', ['delete', 'backspace']],
+      ['viewer.toggleViewer', t('widgets.preview.commands.togglePreview'), ['z']],
+      ['viewer.swapImages', t('widgets.preview.commands.swapComparisonImages'), ['c']],
+      ['viewer.deleteImage', t('widgets.preview.commands.deletePreviewImage'), ['delete', 'backspace']],
     ] as const;
     const disposers = hotkeys.flatMap(([id, title, defaultKeys]) => [
       runtime.commands.register({ handler: () => executeViewerHotkey(id), id, title }),
@@ -382,7 +394,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     return () => {
       disposers.forEach((dispose) => dispose());
     };
-  }, [runtime.commands, runtime.hotkeys]);
+  }, [runtime.commands, runtime.hotkeys, t]);
 
   return (
     <Box p="2" h="full">
@@ -453,6 +465,7 @@ const SelectedImagePreview = ({
   onNext: () => void;
   onPrevious: () => void;
 }) => {
+  const { t } = useTranslation();
   const previewImage = useStreamingImageSource({
     fallbackImage: imageUrlToStreamingSource({
       alt: image.imageName,
@@ -534,7 +547,7 @@ const SelectedImagePreview = ({
           {previewImage ? <img alt={previewImage.alt} src={previewImage.src} style={imageStyle} /> : null}
           {isProgressImage ? (
             <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
-              Generating
+              {t('common.generating')}
             </Badge>
           ) : null}
         </Box>
@@ -547,15 +560,15 @@ const SelectedImagePreview = ({
             </Badge>
             <Text color="fg.subtle" fontSize="2xs" truncate>
               {isLoadingBoard
-                ? 'Loading board'
+                ? t('widgets.preview.loadingBoard')
                 : selectedIndex === -1
-                  ? `${boardImageCount} image${boardImageCount === 1 ? '' : 's'}`
-                  : `${selectedIndex + 1} of ${boardImageCount}`}
+                  ? t('widgets.preview.imageCount', { count: boardImageCount })
+                  : t('common.countOfTotal', { count: selectedIndex + 1, total: boardImageCount })}
             </Text>
           </HStack>
           <HStack flexShrink={0} gap="1">
             <Button
-              aria-label="Previous image in board"
+              aria-label={t('widgets.preview.previousImageInBoard')}
               disabled={selectedIndex <= 0}
               size="2xs"
               variant="outline"
@@ -564,7 +577,7 @@ const SelectedImagePreview = ({
               <ChevronLeftIcon />
             </Button>
             <Button
-              aria-label="Next image in board"
+              aria-label={t('widgets.preview.nextImageInBoard')}
               disabled={selectedIndex === -1 || selectedIndex >= boardImageCount - 1}
               size="2xs"
               variant="outline"
@@ -579,10 +592,10 @@ const SelectedImagePreview = ({
             {image.imageName}
           </Text>
           <Text color="fg.subtle" fontSize="2xs">
-            Source run {image.sourceQueueItemId}
+            {t('widgets.preview.sourceRun', { id: image.sourceQueueItemId })}
           </Text>
           <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
-            {isProgressImage ? 'Generating' : `${image.width} x ${image.height}`}
+            {isProgressImage ? t('common.generating') : `${image.width} x ${image.height}`}
           </Text>
         </Stack>
       </Stack>
@@ -597,6 +610,7 @@ const EmptyPreview = ({
   progressImage: ProgressImageSnapshot | null;
   shouldAntialiasProgressImage: boolean;
 }) => {
+  const { t } = useTranslation();
   const previewImage = useStreamingImageSource({
     liveImage: progressImageToStreamingSource(progressImage),
   });
@@ -636,16 +650,16 @@ const EmptyPreview = ({
             }}
           />
           <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
-            Generating
+            {t('common.generating')}
           </Badge>
         </Box>
       ) : (
         <Stack align="center" color="fg" gap="2" maxW="18rem" textAlign="center">
           <Text fontSize="sm" fontWeight="800">
-            No gallery selection
+            {t('widgets.preview.noGallerySelection')}
           </Text>
           <Text color="fg.subtle" fontSize="2xs">
-            Generate to Gallery, then select a thumbnail in the Gallery widget to inspect it here.
+            {t('widgets.preview.emptyDescription')}
           </Text>
         </Stack>
       )}

@@ -1,5 +1,6 @@
 import { Stack, Text } from '@chakra-ui/react';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { QueueFilterId } from './queueFilters';
 
@@ -14,6 +15,7 @@ import { SectionHeader } from './SectionHeader';
  * and next items are excluded here since NOW & NEXT already shows them.
  */
 export const RecentSection = ({ filter }: { filter: QueueFilterId }) => {
+  const { t } = useTranslation();
   const currentBatchItems = useScopedCurrentBatchItems();
   const items = useScopedRecentItems();
   const { error, loadState } = useQueueLoadState();
@@ -26,10 +28,14 @@ export const RecentSection = ({ filter }: { filter: QueueFilterId }) => {
 
   return (
     <Stack gap="2">
-      <SectionHeader count={filtered.length} title="Recent" />
+      <SectionHeader count={filtered.length} title={t('common.recent')} />
       {filtered.length === 0 ? (
         <Text color={loadState === 'error' ? 'fg.error' : 'fg.subtle'} fontSize="2xs" px="1">
-          {loadState === 'loading' ? 'Loading queue…' : loadState === 'error' ? error : 'Nothing here yet.'}
+          {loadState === 'loading'
+            ? t('widgets.queue.loading')
+            : loadState === 'error'
+              ? error
+              : t('common.nothingHereYet')}
         </Text>
       ) : (
         <Stack gap="1">

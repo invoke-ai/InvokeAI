@@ -27,6 +27,7 @@ import {
 } from '@workbench/generation/settings';
 import { ArrowLeftRightIcon, LockIcon, LockOpenIcon, RulerDimensionLineIcon, ScalingIcon } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { AspectRatioPreview } from './shared/AspectRatioPreview';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
@@ -59,6 +60,7 @@ export const GenerateDimensionFields = ({
   selectedModel,
   settings,
 }: GenerateDimensionFieldsProps) => {
+  const { t } = useTranslation();
   const [draftDimensions, setDraftDimensions] = useState<Dimensions | null>(null);
   const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
   const dimensions = getGenerationDimensions(selectedModel);
@@ -279,8 +281,8 @@ export const GenerateDimensionFields = ({
   );
 
   return (
-    <GenerateCollapsibleSection label="Dimensions" badges={badges} defaultOpen>
-      <Field label="Aspect ratio" p="2">
+    <GenerateCollapsibleSection label={t('widgets.generate.dimensions')} badges={badges} defaultOpen>
+      <Field label={t('widgets.generate.aspectRatio')} p="2">
         <HStack gap="1">
           <Select.Root
             collection={aspectRatioCollection}
@@ -325,9 +327,19 @@ export const GenerateDimensionFields = ({
               </Select.Positioner>
             </Portal>
           </Select.Root>
-          <Tooltip content={settings.aspectRatioIsLocked ? 'Unlock aspect ratio' : 'Lock aspect ratio'}>
+          <Tooltip
+            content={
+              settings.aspectRatioIsLocked
+                ? t('widgets.generate.unlockAspectRatio')
+                : t('widgets.generate.lockAspectRatio')
+            }
+          >
             <IconButton
-              aria-label={settings.aspectRatioIsLocked ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
+              aria-label={
+                settings.aspectRatioIsLocked
+                  ? t('widgets.generate.unlockAspectRatio')
+                  : t('widgets.generate.lockAspectRatio')
+              }
               size="xs"
               variant={settings.aspectRatioIsLocked ? 'solid' : 'outline'}
               onClick={toggleLock}
@@ -335,13 +347,23 @@ export const GenerateDimensionFields = ({
               {settings.aspectRatioIsLocked ? <LockIcon /> : <LockOpenIcon />}
             </IconButton>
           </Tooltip>
-          <Tooltip content="Swap width and height">
-            <IconButton aria-label="Swap width and height" size="xs" variant="outline" onClick={swapDimensions}>
+          <Tooltip content={t('widgets.generate.swapWidthAndHeight')}>
+            <IconButton
+              aria-label={t('widgets.generate.swapWidthAndHeight')}
+              size="xs"
+              variant="outline"
+              onClick={swapDimensions}
+            >
               <ArrowLeftRightIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip content="Set size to the model's optimal pixel count">
-            <IconButton aria-label="Set optimal size" size="xs" variant="outline" onClick={optimizeSize}>
+          <Tooltip content={t('widgets.generate.setOptimalSizeDescription')}>
+            <IconButton
+              aria-label={t('widgets.generate.setOptimalSize')}
+              size="xs"
+              variant="outline"
+              onClick={optimizeSize}
+            >
               <ScalingIcon />
             </IconButton>
           </Tooltip>
@@ -349,7 +371,10 @@ export const GenerateDimensionFields = ({
       </Field>
       <HStack alignItems="flex-start" gap="2" p="2">
         <Stack w="full">
-          <Field label="Width" helpText={`Multiple of ${dimensionGrid}`}>
+          <Field
+            label={t('widgets.generate.width')}
+            helpText={t('widgets.generate.multipleOf', { value: dimensionGrid })}
+          >
             <NumberInput.Root
               size="xs"
               allowMouseWheel
@@ -365,7 +390,7 @@ export const GenerateDimensionFields = ({
                 endElement={
                   <ModelDefaultButton
                     disabled={!modelDefaults || displayDimensions.width === modelDefaults.width}
-                    label="Use model default width"
+                    label={t('widgets.generate.useModelDefaultWidth')}
                     onClick={() => setDimensionToModelDefault('width')}
                   />
                 }
@@ -381,7 +406,10 @@ export const GenerateDimensionFields = ({
               </InputGroup>
             </NumberInput.Root>
           </Field>
-          <Field label="Height" helpText={`Multiple of ${dimensionGrid}`}>
+          <Field
+            label={t('widgets.generate.height')}
+            helpText={t('widgets.generate.multipleOf', { value: dimensionGrid })}
+          >
             <NumberInput.Root
               size="xs"
               allowMouseWheel
@@ -397,7 +425,7 @@ export const GenerateDimensionFields = ({
                 endElement={
                   <ModelDefaultButton
                     disabled={!modelDefaults || displayDimensions.height === modelDefaults.height}
-                    label="Use model default height"
+                    label={t('widgets.generate.useModelDefaultHeight')}
                     onClick={() => setDimensionToModelDefault('height')}
                   />
                 }

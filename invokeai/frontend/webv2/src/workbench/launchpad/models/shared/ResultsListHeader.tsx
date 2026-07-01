@@ -2,6 +2,7 @@ import { HStack, Icon, Input, InputGroup, Stack, Text } from '@chakra-ui/react';
 import { Button, IconButton } from '@workbench/components/ui';
 import { DownloadIcon, SearchIcon, XIcon } from 'lucide-react';
 import { useCallback, type ChangeEvent, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const SEARCH_ICON = <Icon as={SearchIcon} boxSize="3" color="fg.subtle" />;
 
@@ -14,11 +15,11 @@ const SEARCH_ICON = <Icon as={SearchIcon} boxSize="3" color="fg.subtle" />;
 export const ResultsListHeader = ({
   extra,
   installAllDisabled,
-  installAllLabel = 'Install all',
+  installAllLabel,
   onClear,
   onInstallAll,
   onSearchChange,
-  searchPlaceholder = 'Filter results',
+  searchPlaceholder,
   searchValue,
   summary,
 }: {
@@ -32,6 +33,9 @@ export const ResultsListHeader = ({
   searchValue: string;
   summary: ReactNode;
 }) => {
+  const { t } = useTranslation();
+  const resolvedInstallAllLabel = installAllLabel ?? t('models.installAll');
+  const resolvedSearchPlaceholder = searchPlaceholder ?? t('models.filterResults');
   const handleSearchChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => onSearchChange(event.currentTarget.value),
     [onSearchChange]
@@ -45,7 +49,7 @@ export const ResultsListHeader = ({
         </Text>
         <HStack gap="3">
           {extra}
-          <IconButton aria-label="Dismiss results" size="2xs" variant="ghost" onClick={onClear}>
+          <IconButton aria-label={t('models.dismissResults')} size="2xs" variant="ghost" onClick={onClear}>
             <Icon as={XIcon} boxSize="3" />
           </IconButton>
         </HStack>
@@ -53,8 +57,8 @@ export const ResultsListHeader = ({
       <HStack gap="2">
         <InputGroup flex="1" startElement={SEARCH_ICON}>
           <Input
-            aria-label={searchPlaceholder}
-            placeholder={searchPlaceholder}
+            aria-label={resolvedSearchPlaceholder}
+            placeholder={resolvedSearchPlaceholder}
             size="xs"
             value={searchValue}
             onChange={handleSearchChange}
@@ -62,7 +66,7 @@ export const ResultsListHeader = ({
         </InputGroup>
         <Button disabled={installAllDisabled} flexShrink={0} size="xs" variant="outline" onClick={onInstallAll}>
           <Icon as={DownloadIcon} boxSize="3" />
-          {installAllLabel}
+          {resolvedInstallAllLabel}
         </Button>
       </HStack>
     </Stack>

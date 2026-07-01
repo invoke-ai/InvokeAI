@@ -18,6 +18,7 @@ import { refreshStartersIfLoaded } from '@workbench/models/startersStore';
 import { useNotify } from '@workbench/useNotify';
 import { HexagonIcon } from 'lucide-react';
 import { useEffect, useState, type ElementType } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SiAlibabacloud, SiBytedance, SiGooglegemini, SiHuggingface, SiOpenai } from 'react-icons/si';
 
 /**
@@ -28,15 +29,16 @@ import { SiAlibabacloud, SiBytedance, SiGooglegemini, SiHuggingface, SiOpenai } 
  */
 export const ApiKeysSection = () => {
   const notify = useNotify();
+  const { t } = useTranslation();
 
   return (
     <Stack gap="3">
       <Text color="fg.subtle" fontSize="2xs">
-        Keys are used when installing protected models and when generating with external API models.
+        {t('models.apiKeysDescription')}
       </Text>
       <Grid gap="2.5" templateColumns="repeat(auto-fill, minmax(19rem, 1fr))">
         <HuggingFaceKeyCard onError={notify.error} />
-        <CivitaiKeyCard onError={(message) => notify.error('Civitai key', message)} />
+        <CivitaiKeyCard onError={(message) => notify.error(t('models.civitaiKey'), message)} />
         <ExternalProviderKeyCards onError={notify.error} />
       </Grid>
     </Stack>
@@ -73,6 +75,7 @@ const ApiKeyCard = ({
   status: KeyStatusBadge | null;
   title: string;
 }) => {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState('');
   const [isBusy, setIsBusy] = useState(false);
 
@@ -84,7 +87,7 @@ const ApiKeyCard = ({
 
       return true;
     } catch (error) {
-      onError(error instanceof Error ? error.message : 'Something went wrong.');
+      onError(error instanceof Error ? error.message : t('common.somethingWentWrong'));
 
       return false;
     } finally {
@@ -139,7 +142,7 @@ const ApiKeyCard = ({
       </HStack>
       <HStack gap="1.5">
         <Input
-          aria-label={`${title} API key`}
+          aria-label={t('models.apiKeyFor', { title })}
           disabled={isLoading}
           placeholder={placeholder}
           size="xs"
@@ -160,11 +163,11 @@ const ApiKeyCard = ({
           variant="solid"
           onClick={() => void handleSave()}
         >
-          Save
+          {t('common.save')}
         </Button>
         {onClear ? (
           <Button disabled={isBusy || isLoading} size="sm" variant="ghost" onClick={() => void runAction(onClear)}>
-            Clear
+            {t('common.clear')}
           </Button>
         ) : null}
       </HStack>
@@ -172,14 +175,16 @@ const ApiKeyCard = ({
   );
 };
 
-const HF_STATUS_BADGES: Record<HFTokenStatus, KeyStatusBadge> = {
-  invalid: { label: 'Invalid', palette: 'red' },
-  unknown: { label: 'Not set', palette: 'gray' },
-  valid: { label: 'Valid', palette: 'green' },
+const HF_STATUS_PALETTES: Record<HFTokenStatus, string> = {
+  invalid: 'red',
+  unknown: 'gray',
+  valid: 'green',
 };
 
 const HuggingFaceKeyCard = ({ onError }: { onError: (title: string, message: string) => void }) => {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<HFTokenStatus | null>(null);
+  const statusBadge = status ? { label: t(`models.keyStatus.${status}`), palette: HF_STATUS_PALETTES[status] } : null;
 
   useEffect(() => {
     let isStale = false;
@@ -199,17 +204,17 @@ const HuggingFaceKeyCard = ({ onError }: { onError: (title: string, message: str
     return () => {
       isStale = true;
     };
-  }, []);
+  }, [t]);
 
   return (
     <ApiKeyCard
-      description="For gated repos like FLUX. Stored on the InvokeAI server and verified with HuggingFace."
+      description={t('models.huggingFaceKeyDescription')}
       icon={SiHuggingface}
       isLoading={status === null}
       placeholder="hf_…"
-      status={status ? HF_STATUS_BADGES[status] : null}
+      status={statusBadge}
       title="HuggingFace"
-      onError={(message) => onError('HuggingFace token', message)}
+      onError={(message) => onError(t('models.huggingFaceToken'), message)}
       onClear={
         status === 'valid' || status === 'invalid'
           ? async () => {
@@ -223,7 +228,7 @@ const HuggingFaceKeyCard = ({ onError }: { onError: (title: string, message: str
         setStatus(nextStatus);
 
         if (nextStatus === 'invalid') {
-          onError('HuggingFace token', 'HuggingFace rejected this token. Check that it has read access.');
+          onError(t('models.huggingFaceToken'), t('models.huggingFaceRejectedToken'));
         }
       }}
     />
@@ -231,14 +236,19 @@ const HuggingFaceKeyCard = ({ onError }: { onError: (title: string, message: str
 };
 
 const CivitaiKeyCard = ({ onError }: { onError: (message: string) => void }) => {
+  const { t } = useTranslation();
   const [hasKey, setHasKey] = useState(() => getCivitaiApiKey() !== null);
 
   return (
     <ApiKeyCard
-      description="Attached automatically when installing civitai.com models that require login. Stored in this browser only."
+      description={t('models.civitaiKeyDescription')}
       icon={HexagonIcon}
-      placeholder="32-character key from civitai.com/user/account"
-      status={hasKey ? { label: 'Saved', palette: 'green' } : { label: 'Not set', palette: 'gray' }}
+      placeholder={t('models.civitaiKeyPlaceholder')}
+      status={
+        hasKey
+          ? { label: t('models.keyStatus.saved'), palette: 'green' }
+          : { label: t('models.keyStatus.unknown'), palette: 'gray' }
+      }
       title="Civitai"
       onError={onError}
       onClear={
@@ -261,10 +271,11 @@ const EXTERNAL_PROVIDER_PRESENTATION: Record<string, { title: string; icon: Elem
   alibabacloud: { icon: SiAlibabacloud, placeholder: 'sk-…', title: 'Alibaba Cloud (Qwen)' },
   gemini: { icon: SiGooglegemini, placeholder: 'AIza…', title: 'Google Gemini' },
   openai: { icon: SiOpenai, placeholder: 'sk-…', title: 'OpenAI' },
-  seedream: { icon: SiBytedance, placeholder: 'API key from BytePlus console', title: 'Seedream' },
+  seedream: { icon: SiBytedance, placeholder: 'byteplus', title: 'Seedream' },
 };
 
 const ExternalProviderKeyCards = ({ onError }: { onError: (title: string, message: string) => void }) => {
+  const { t } = useTranslation();
   const [configs, setConfigs] = useState<ExternalProviderConfig[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -280,14 +291,14 @@ const ExternalProviderKeyCards = ({ onError }: { onError: (title: string, messag
       .catch((error: unknown) => {
         if (!isStale) {
           setConfigs([]);
-          setLoadError(error instanceof Error ? error.message : 'Failed to load external providers.');
+          setLoadError(error instanceof Error ? error.message : t('models.failedToLoadExternalProviders'));
         }
       });
 
     return () => {
       isStale = true;
     };
-  }, []);
+  }, [t]);
 
   const replaceConfig = (next: ExternalProviderConfig) => {
     setConfigs((current) => (current ?? []).map((config) => (config.provider_id === next.provider_id ? next : config)));
@@ -296,7 +307,7 @@ const ExternalProviderKeyCards = ({ onError }: { onError: (title: string, messag
   if (loadError) {
     return (
       <Text color="fg.error" fontSize="2xs">
-        External providers unavailable: {loadError}
+        {t('models.externalProvidersUnavailable', { error: loadError })}
       </Text>
     );
   }
@@ -306,17 +317,23 @@ const ExternalProviderKeyCards = ({ onError }: { onError: (title: string, messag
       {(configs ?? []).map((config) => {
         const presentation = EXTERNAL_PROVIDER_PRESENTATION[config.provider_id] ?? {
           icon: HexagonIcon,
-          placeholder: 'API key',
+          placeholder: 'generic',
           title: config.provider_id,
         };
+        const placeholder =
+          presentation.placeholder === 'byteplus'
+            ? t('models.bytePlusApiKeyPlaceholder')
+            : presentation.placeholder === 'generic'
+              ? t('models.apiKey')
+              : presentation.placeholder;
 
         return (
           <ExternalProviderKeyCard
             config={config}
             key={config.provider_id}
-            description="External image generator. The key is stored in the InvokeAI server config and used by external API models."
+            description={t('models.externalProviderKeyDescription')}
             icon={presentation.icon}
-            placeholder={presentation.placeholder}
+            placeholder={placeholder}
             title={presentation.title}
             onError={(message) => onError(presentation.title, message)}
             onUpdated={replaceConfig}
@@ -344,6 +361,7 @@ const ExternalProviderKeyCard = ({
   placeholder: string;
   title: string;
 }) => {
+  const { t } = useTranslation();
   const [apiKeyDraft, setApiKeyDraft] = useState('');
   const [baseUrlDraft, setBaseUrlDraft] = useState(config.base_url ?? '');
   const [overrideBaseUrl, setOverrideBaseUrl] = useState(config.base_url !== null);
@@ -373,7 +391,7 @@ const ExternalProviderKeyCard = ({
       setOverrideBaseUrl(nextConfig.base_url !== null);
       onSuccess?.(nextConfig);
     } catch (error) {
-      onError(error instanceof Error ? error.message : 'Something went wrong.');
+      onError(error instanceof Error ? error.message : t('common.somethingWentWrong'));
     } finally {
       setIsBusy(false);
     }
@@ -444,7 +462,7 @@ const ExternalProviderKeyCard = ({
               size="sm"
               variant="surface"
             >
-              {config.api_key_configured ? 'Configured' : 'Not set'}
+              {config.api_key_configured ? t('models.keyStatus.configured') : t('models.keyStatus.unknown')}
             </Badge>
           </HStack>
           <Text color="fg.subtle" fontSize="2xs" lineClamp={2}>
@@ -456,9 +474,9 @@ const ExternalProviderKeyCard = ({
       <Stack gap="2">
         <HStack gap="1.5">
           <Input
-            aria-label={`${title} API key`}
+            aria-label={t('models.apiKeyFor', { title })}
             disabled={isBusy}
-            placeholder={config.api_key_configured ? 'API key configured' : placeholder}
+            placeholder={config.api_key_configured ? t('models.apiKeyConfigured') : placeholder}
             size="xs"
             type="password"
             value={apiKeyDraft}
@@ -490,12 +508,12 @@ const ExternalProviderKeyCard = ({
             <Switch.Thumb />
           </Switch.Control>
           <Switch.Label color="fg.muted" fontSize="2xs">
-            Override base URL
+            {t('models.overrideBaseUrl')}
           </Switch.Label>
         </Switch.Root>
         {overrideBaseUrl ? (
           <Input
-            aria-label={`${title} base URL`}
+            aria-label={t('models.baseUrlFor', { title })}
             disabled={isBusy}
             placeholder="https://api.example.com"
             size="xs"
@@ -519,7 +537,7 @@ const ExternalProviderKeyCard = ({
           variant="solid"
           onClick={() => void handleSave()}
         >
-          Save
+          {t('common.save')}
         </Button>
         {canClear ? (
           <Button
@@ -528,7 +546,7 @@ const ExternalProviderKeyCard = ({
             variant="ghost"
             onClick={() => void runAction(() => resetExternalProviderConfig(config.provider_id))}
           >
-            Clear
+            {t('common.clear')}
           </Button>
         ) : null}
       </HStack>

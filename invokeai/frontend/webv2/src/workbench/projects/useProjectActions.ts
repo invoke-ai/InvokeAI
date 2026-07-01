@@ -4,6 +4,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { useNotify } from '@workbench/useNotify';
 import { flushGenerateDrafts } from '@workbench/widgets/generate/generateDraftRegistry';
 import { useWorkbenchDispatch, useWorkbenchStore } from '@workbench/WorkbenchContext';
+import { useTranslation } from 'react-i18next';
 
 import { deleteLibraryProject } from './library';
 import {
@@ -32,6 +33,7 @@ export const useProjectActions = (): {
   const dispatch = useWorkbenchDispatch();
   const navigate = useNavigate();
   const notify = useNotify();
+  const { t } = useTranslation();
 
   /** When the last tab goes, the session empties and Home takes over. */
   const leaveEditorIfLast = (projectId: string): boolean => {
@@ -73,7 +75,7 @@ export const useProjectActions = (): {
       await deleteLibraryProject(project.id);
     } catch (error) {
       unmarkProjectDeleted(project.id);
-      notify.error('Delete failed', error instanceof Error ? error.message : undefined);
+      notify.error(t('projects.deleteFailed'), error instanceof Error ? error.message : undefined);
 
       return;
     }

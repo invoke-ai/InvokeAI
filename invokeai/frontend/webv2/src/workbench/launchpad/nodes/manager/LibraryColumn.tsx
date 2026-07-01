@@ -3,12 +3,14 @@ import { Box, Flex, HStack, Text } from '@chakra-ui/react';
 import { useCustomNodesSelector } from '@workbench/customNodes/nodesStore';
 import { openNodePackDetail, updateNodesUi, useNodesUiSelector } from '@workbench/customNodes/nodesUiStore';
 import { NodePackList } from '@workbench/launchpad/nodes/library/NodePackList';
+import { useTranslation } from 'react-i18next';
 
 import { HEADER_MIN_HEIGHT, PACK_LIBRARY_WIDTH } from './layoutConstants';
 import { ReloadNodesButton } from './ReloadNodesButton';
 
 /** Persistent custom-node pack list, matching the model manager's library column. */
 export const LibraryColumn = () => {
+  const { t } = useTranslation();
   const activePackName = useNodesUiSelector((snapshot) => snapshot.activePackName);
   const searchTerm = useNodesUiSelector((snapshot) => snapshot.searchTerm);
   const error = useCustomNodesSelector((snapshot) => snapshot.error);
@@ -27,7 +29,7 @@ export const LibraryColumn = () => {
     >
       <HStack align="center" borderBottomWidth={1} flexShrink={0} gap="2" minH={HEADER_MIN_HEIGHT} px="3">
         <Text fontSize="sm" fontWeight="700">
-          Node Packs
+          {t('nodes.nodePacks')}
         </Text>
         <Text color="fg.subtle" fontSize="xs">
           {nodePacks.length}

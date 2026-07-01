@@ -4,12 +4,16 @@ import { IconButton } from '@workbench/components/ui';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { HourglassIcon } from 'lucide-react';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export const PreviewHeaderActions = () => {
+  const { t } = useTranslation();
   const showProgressImagesInViewer = useActiveProjectSelector((project) => project.settings.showProgressImagesInViewer);
   const hasProgressImage = useProgressImage() !== null;
   const dispatch = useWorkbenchDispatch();
-  const label = showProgressImagesInViewer ? 'Hide in-progress diffusion' : 'Show in-progress diffusion';
+  const label = showProgressImagesInViewer
+    ? t('widgets.preview.hideInProgressDiffusion')
+    : t('widgets.preview.showInProgressDiffusion');
   const toggleProgressImages = useCallback(
     () =>
       dispatch({

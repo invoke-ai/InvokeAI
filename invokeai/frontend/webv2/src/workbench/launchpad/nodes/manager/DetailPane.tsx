@@ -7,16 +7,18 @@ import { NodeActivityBar } from '@workbench/launchpad/nodes/activity/NodeActivit
 import { AddNodesView } from '@workbench/launchpad/nodes/add-nodes/AddNodesView';
 import { NodePackDetail } from '@workbench/launchpad/nodes/detail/NodePackDetail';
 import { BlocksIcon, PlusIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { HEADER_MIN_HEIGHT } from './layoutConstants';
 
 /** Right side of the nodes manager: selected pack details, Add Nodes, and activity footer. */
 export const DetailPane = () => {
+  const { t } = useTranslation();
   const activePackName = useNodesUiSelector((snapshot) => snapshot.activePackName);
   const activeTab = useNodesUiSelector((snapshot) => snapshot.activeTab);
   const nodePacks = useCustomNodesSelector((snapshot) => snapshot.nodePacks);
   const activePack = nodePacks.find((pack) => pack.name === activePackName) ?? null;
-  const detailLabel = activePack?.name ?? 'Node Pack Details';
+  const detailLabel = activePack?.name ?? t('nodes.details');
 
   return (
     <Flex direction="column" flex="1" minH="0" minW="0">
@@ -36,7 +38,7 @@ export const DetailPane = () => {
             </Tabs.Trigger>
             <Tabs.Trigger fontSize="xs" value="add">
               <Icon as={PlusIcon} boxSize="3" />
-              Add Nodes
+              {t('nodes.addNodes')}
             </Tabs.Trigger>
           </Tabs.List>
         </Tabs.Root>
@@ -53,6 +55,7 @@ export const DetailPane = () => {
 };
 
 const DetailTab = ({ packName }: { packName: string | null }) => {
+  const { t } = useTranslation();
   const nodePacks = useCustomNodesSelector((snapshot) => snapshot.nodePacks);
   const activePack = nodePacks.find((pack) => pack.name === packName) ?? null;
 
@@ -61,17 +64,17 @@ const DetailTab = ({ packName }: { packName: string | null }) => {
       <Flex align="center" direction="column" gap="2" h="full" justify="center" p="6">
         <Icon as={BlocksIcon} boxSize="8" color="fg.subtle" />
         <Text color="fg.muted" fontSize="sm" fontWeight="600">
-          Select a node pack
+          {t('nodes.selectPack')}
         </Text>
         <Text color="fg.subtle" fontSize="xs" maxW="22rem" textAlign="center">
-          Choose a pack from the library to see its path, manage it, and preview every node it adds.
+          {t('nodes.selectPackDescription')}
         </Text>
       </Flex>
     );
   }
 
   return (
-    <Scrollable h="full" label="Node pack details" minH="0" p="3">
+    <Scrollable h="full" label={t('nodes.details')} minH="0" p="3">
       <NodePackDetail pack={activePack} onUninstalled={() => updateNodesUi({ activePackName: null })} />
     </Scrollable>
   );

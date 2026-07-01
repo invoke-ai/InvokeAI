@@ -2,6 +2,7 @@ import { Alert, SimpleGrid, Skeleton, Stack } from '@chakra-ui/react';
 import { Button } from '@workbench/components/ui';
 import { refreshProjectLibrary, useProjectLibrarySelector } from '@workbench/projects/library';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { NewProjectCard } from './NewProjectCard';
 import { ProjectCard } from './ProjectCard';
@@ -14,6 +15,7 @@ const GRID_COLUMNS = { base: 1, lg: 3, sm: 2 } as const;
  * leads, so an empty library still presents the next step.
  */
 export const ProjectsGrid = () => {
+  const { t } = useTranslation();
   const error = useProjectLibrarySelector((snapshot) => snapshot.error);
   const status = useProjectLibrarySelector((snapshot) => snapshot.status);
   const summaries = useProjectLibrarySelector((snapshot) => snapshot.summaries);
@@ -26,10 +28,10 @@ export const ProjectsGrid = () => {
         <Alert.Root borderRadius="md" size="sm" status="error">
           <Alert.Indicator />
           <Alert.Title flex="1" fontSize="xs">
-            {error ?? 'Failed to load your projects.'}
+            {error ?? t('projects.failedToLoad')}
           </Alert.Title>
           <Button size="2xs" variant="outline" onClick={handleRetry}>
-            Retry
+            {t('common.retry')}
           </Button>
         </Alert.Root>
       ) : null}

@@ -7,6 +7,7 @@ import { Field } from '@workbench/components/ui';
 import { useRegisterGenerateDraftFlusher } from '@workbench/widgets/generate/generateDraftRegistry';
 import { useDebouncedDraftValue } from '@workbench/widgets/generate/useDebouncedDraftValue';
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { AddPromptTriggerButton, PromptTriggerPopover } from './PositivePromptActions';
 import { PROMPT_ATTENTION_TARGET_PROPS } from './promptAttentionHotkeys';
@@ -48,6 +49,7 @@ export const NegativePromptField = ({
   showSyntaxHighlighting,
   value,
 }: NegativePromptFieldProps) => {
+  const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [triggerPickerState, setTriggerPickerState] = useState<PromptTriggerPickerState | null>(null);
   const { draftValue, flushDraftValue, setDraftValue } = useDebouncedDraftValue({
@@ -140,11 +142,11 @@ export const NegativePromptField = ({
           <Switch.Control _checked={{ bg: 'accent.solid' }}>
             <Switch.Thumb />
           </Switch.Control>
-          <Switch.Label srOnly>Enable negative prompt</Switch.Label>
+          <Switch.Label srOnly>{t('widgets.generate.enableNegativePrompt')}</Switch.Label>
         </Switch.Root>
       </HStack>
     ),
-    [handleEnabledChange, handleOpenPromptTriggerPicker, isEnabled, triggerPickerState]
+    [handleEnabledChange, handleOpenPromptTriggerPicker, isEnabled, t, triggerPickerState]
   );
 
   const triggerPickerPositioning = useMemo(
@@ -153,16 +155,16 @@ export const NegativePromptField = ({
   );
 
   return (
-    <Field label="Negative prompt" labelEnd={labelEnd} helpText={isEnabled ? helpText : undefined}>
+    <Field label={t('widgets.generate.negativePrompt')} labelEnd={labelEnd} helpText={isEnabled ? helpText : undefined}>
       {isEnabled ? (
         <>
           <PromptTextarea
             {...PROMPT_ATTENTION_TARGET_PROPS}
-            aria-label="Negative prompt"
+            aria-label={t('widgets.generate.negativePrompt')}
             defaultHeightPx={heightPx}
             maxHeightPx={240}
             minHeightPx={56}
-            resizeHandleAriaLabel="Resize negative prompt"
+            resizeHandleAriaLabel={t('widgets.generate.resizeNegativePrompt')}
             size="xs"
             fontFamily="mono"
             showSyntaxHighlighting={showSyntaxHighlighting}

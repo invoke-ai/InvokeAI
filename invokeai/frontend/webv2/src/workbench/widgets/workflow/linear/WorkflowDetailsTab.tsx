@@ -5,9 +5,11 @@ import { HStack, Input, Stack, Textarea } from '@chakra-ui/react';
 import { Field } from '@workbench/components/ui';
 import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 /** Workflow metadata editing — the legacy "Details" tab. */
 export const WorkflowDetailsTab = ({ metadata }: { metadata: WorkflowMetadata }) => {
+  const { t } = useTranslation();
   const dispatch = useWorkbenchDispatch();
   const commit = useCallback(
     (patch: Partial<WorkflowMetadata>) =>
@@ -56,8 +58,8 @@ export const WorkflowDetailsTab = ({ metadata }: { metadata: WorkflowMetadata })
 
   return (
     <Stack gap="3" p="3">
-      {textField('Name', 'name', onNameChange)}
-      <Field label="Description">
+      {textField(t('common.name'), 'name', onNameChange)}
+      <Field label={t('widgets.workflow.description')}>
         <Textarea
           minH="3.5rem"
           resize="vertical"
@@ -67,14 +69,14 @@ export const WorkflowDetailsTab = ({ metadata }: { metadata: WorkflowMetadata })
         />
       </Field>
       <HStack align="start" gap="2">
-        {textField('Author', 'author', onAuthorChange)}
-        {textField('Version', 'workflowVersion', onWorkflowVersionChange)}
+        {textField(t('widgets.workflow.author'), 'author', onAuthorChange)}
+        {textField(t('widgets.workflow.version'), 'workflowVersion', onWorkflowVersionChange)}
       </HStack>
       <HStack align="start" gap="2">
-        {textField('Tags', 'tags', onTagsChange)}
-        {textField('Contact', 'contact', onContactChange)}
+        {textField(t('widgets.workflow.tags'), 'tags', onTagsChange)}
+        {textField(t('widgets.workflow.contact'), 'contact', onContactChange)}
       </HStack>
-      <Field label="Notes">
+      <Field label={t('widgets.workflow.notes')}>
         <Textarea minH="3.5rem" resize="vertical" size="xs" value={metadata.notes} onChange={onNotesChange} />
       </Field>
     </Stack>

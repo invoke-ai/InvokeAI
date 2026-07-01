@@ -23,6 +23,7 @@ import {
   type WidgetEnableMenuItem,
   type WidgetInstanceContextMenuTarget,
 } from '@workbench/widget-frame';
+import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import { closeWidgetPlacement, openWidgetPlacement, revealWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import {
@@ -33,6 +34,7 @@ import {
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { type MouseEvent, useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 type CenterWidgetItem = PlacedWidgetRegionItem<WidgetPlacementInstanceMeta>;
 
@@ -42,6 +44,7 @@ const CENTER_PREFERRED_REGIONS = ['center'] as const;
 
 /** Center work area: the view tab strip plus the active registered center view. */
 export const CenterArea = ({ dropState }: { dropState: WidgetRegionDropState }) => {
+  const { t } = useTranslation();
   const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const centerRegion = useActiveProjectSelector((project) => project.widgetRegions.center);
   const invocation = useActiveProjectSelector((project) => project.invocation);
@@ -55,8 +58,13 @@ export const CenterArea = ({ dropState }: { dropState: WidgetRegionDropState }) 
   } | null>(null);
   const [instanceMenuTarget, setInstanceMenuTarget] = useState<WidgetInstanceContextMenuTarget | null>(null);
   const focusRegionProps = useFocusRegionProps('center');
+  const getWidgetLabel = useCallback(
+    (manifest: Parameters<typeof resolveWidgetLabel>[0]) => resolveWidgetLabel(manifest, t),
+    [t]
+  );
 
   const centerRegionViewModel = createWidgetRegionViewModelFromState({
+    getWidgetLabel,
     region: 'center',
     regionState: centerRegion,
     widgetInstances: placementProject.widgetInstances,

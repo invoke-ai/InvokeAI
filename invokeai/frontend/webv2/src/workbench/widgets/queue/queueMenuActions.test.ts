@@ -5,6 +5,14 @@ import { getQueueMenuActions } from './queueMenuActions';
 describe('getQueueMenuActions', () => {
   it('uses the same cancellation and processor actions for topbar and widget menus', () => {
     const actions = getQueueMenuActions({
+      labels: {
+        cancelAll: 'Cancel All Items',
+        cancelAllExceptCurrent: 'Cancel all except current item',
+        cancelCurrent: 'Cancel Current Item',
+        openQueue: 'Open Queue',
+        pauseProcessor: 'Pause Processor',
+        resumeProcessor: 'Resume Processor',
+      },
       cancellableCount: 2,
       canManageProcessor: true,
       hasPendingQueueWork: true,

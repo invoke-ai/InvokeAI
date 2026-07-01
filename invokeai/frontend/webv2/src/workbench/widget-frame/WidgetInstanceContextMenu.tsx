@@ -1,6 +1,7 @@
 import { Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { XIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { WidgetEnableMenuItem } from './WidgetEnableMenu';
 
@@ -27,6 +28,7 @@ export const WidgetInstanceContextMenu = ({
   removeDisabledLabel = 'Required',
   target,
 }: WidgetInstanceContextMenuProps) => {
+  const { t } = useTranslation();
   const positioning = useMemo(
     () => ({
       getAnchorRect: () => (target ? { height: 1, width: 1, x: target.x, y: target.y } : null),
@@ -69,7 +71,7 @@ export const WidgetInstanceContextMenu = ({
                 onClick={handleRemove}
               >
                 <Icon as={XIcon} boxSize="3.5" />
-                <Menu.ItemText>Remove {target.item.label}</Menu.ItemText>
+                <Menu.ItemText>{t('widgets.removeWidget', { label: target.item.label })}</Menu.ItemText>
                 {isDisabled ? (
                   <Text color="fg.subtle" fontSize="2xs" ms="auto">
                     {removeDisabledLabel}

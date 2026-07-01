@@ -5,12 +5,12 @@ import type { QueueStatusCounts } from './queueServerApi';
 /** Status filters for the RECENT list, matching the screenshot's tab row. */
 export type QueueFilterId = 'all' | 'active' | 'completed' | 'failed' | 'canceled';
 
-export const QUEUE_FILTERS: { id: QueueFilterId; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'active', label: 'Active' },
-  { id: 'completed', label: 'Done' },
-  { id: 'failed', label: 'Failed' },
-  { id: 'canceled', label: 'Canceled' },
+export const QUEUE_FILTERS: { id: QueueFilterId; labelKey: string }[] = [
+  { id: 'all', labelKey: 'common.all' },
+  { id: 'active', labelKey: 'common.active' },
+  { id: 'completed', labelKey: 'common.done' },
+  { id: 'failed', labelKey: 'common.failed' },
+  { id: 'canceled', labelKey: 'common.canceled' },
 ];
 
 export const matchesFilter = (status: BackendQueueItemStatus, filter: QueueFilterId): boolean => {

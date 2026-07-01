@@ -6,12 +6,14 @@ import { getApiErrorMessage } from '@workbench/backend/http';
 import { Button, Field } from '@workbench/components/ui';
 import { useZodForm } from '@workbench/models/useZodForm';
 import { useCallback, type ChangeEvent, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { AuthFormAlert, AuthScreen } from './AuthScreen';
 import { PasswordInput } from './PasswordInput';
 
 /** Sign-in screen, shown only when the backend runs in multi-user mode. */
 export const LoginScreen = () => {
+  const { t } = useTranslation();
   const session = useAuthSession();
   const navigate = useNavigate();
   const form = useZodForm(loginSchema, { email: '', password: '', rememberMe: false });
@@ -22,12 +24,12 @@ export const LoginScreen = () => {
         try {
           await loginWithCredentials(values.email, values.password, values.rememberMe);
         } catch (error) {
-          throw new Error(getApiErrorMessage(error, 'Sign-in failed. Check your email and password.'));
+          throw new Error(getApiErrorMessage(error, t('auth.signInFailed')));
         }
 
         await navigate({ to: '/' });
       }),
-    [form, navigate]
+    [form, navigate, t]
   );
 
   const handleSubmit = useCallback(
@@ -54,13 +56,11 @@ export const LoginScreen = () => {
   );
 
   return (
-    <AuthScreen subtitle="Sign in to your workspace to continue." title="Welcome to Invoke">
+    <AuthScreen subtitle={t('auth.signInSubtitle')} title={t('auth.welcomeTitle')}>
       <chakra.form display="flex" flexDirection="column" gap="4" onSubmit={handleSubmit}>
-        {session.sessionExpired ? (
-          <AuthFormAlert message="Your session expired. Sign in again to continue." tone="warning" />
-        ) : null}
+        {session.sessionExpired ? <AuthFormAlert message={t('auth.sessionExpired')} tone="warning" /> : null}
         {form.formError ? <AuthFormAlert message={form.formError} tone="error" /> : null}
-        <Field error={form.errors.email} label="Email">
+        <Field error={form.errors.email} label={t('users.email')}>
           <Input
             aria-invalid={form.errors.email ? true : undefined}
             autoComplete="email"
@@ -70,11 +70,11 @@ export const LoginScreen = () => {
             onChange={handleEmailChange}
           />
         </Field>
-        <Field error={form.errors.password} label="Password">
+        <Field error={form.errors.password} label={t('auth.password')}>
           <PasswordInput
             aria-invalid={form.errors.password ? true : undefined}
             autoComplete="current-password"
-            placeholder="Your password"
+            placeholder={t('auth.yourPassword')}
             value={form.values.password}
             onChange={handlePasswordChange}
           />
@@ -83,11 +83,11 @@ export const LoginScreen = () => {
           <Checkbox.HiddenInput />
           <Checkbox.Control />
           <Checkbox.Label color="fg.muted" fontWeight="400">
-            Keep me signed in for a week
+            {t('auth.keepSignedIn')}
           </Checkbox.Label>
         </Checkbox.Root>
         <Button loading={form.isSubmitting} size="sm" type="submit" variant="solid">
-          Sign in
+          {t('auth.signIn')}
         </Button>
       </chakra.form>
     </AuthScreen>

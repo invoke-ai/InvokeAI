@@ -6,13 +6,14 @@ import { HStack, Icon, Input, InputGroup } from '@chakra-ui/react';
 import { FilterMenuItem, ModelFilterMenu } from '@workbench/launchpad/models/shared/ModelFilterMenu';
 import { SearchIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
-const SORT_FIELDS: { field: ModelSortField; label: string }[] = [
-  { field: 'default', label: 'Default' },
-  { field: 'name', label: 'Name' },
-  { field: 'base', label: 'Base' },
-  { field: 'size', label: 'Size' },
-  { field: 'format', label: 'Format' },
+const SORT_FIELDS: { field: ModelSortField; labelKey: string }[] = [
+  { field: 'default', labelKey: 'models.sort.default' },
+  { field: 'name', labelKey: 'models.sort.name' },
+  { field: 'base', labelKey: 'models.sort.base' },
+  { field: 'size', labelKey: 'models.sort.size' },
+  { field: 'format', labelKey: 'models.sort.format' },
 ];
 
 const isFiltering = (filters: ModelLibraryFilters): boolean =>
@@ -35,6 +36,7 @@ export const ModelFilterBar = ({
   missingCount: number;
   onChange: (filters: ModelLibraryFilters) => void;
 }) => {
+  const { t } = useTranslation();
   const handleSearchChange = useCallback(
     (searchTerm: string) => onChange({ ...filters, searchTerm }),
     [filters, onChange]
@@ -60,27 +62,26 @@ export const ModelFilterBar = ({
       missingCount > 0 ? (
         <FilterMenuItem
           isChecked={filters.missingOnly}
-          label={`Missing files (${missingCount})`}
+          label={t('models.missingFilesCount', { count: missingCount })}
           value="type-missing"
           onSelect={handleMissingFilterToggle}
         />
       ) : null,
-    [filters.missingOnly, handleMissingFilterToggle, missingCount]
+    [filters.missingOnly, handleMissingFilterToggle, missingCount, t]
   );
-
   return (
     <HStack gap="1.5" w="full" px="3" pt="3">
       <InputGroup startElement={<Icon as={SearchIcon} boxSize="3.5" color="fg.subtle" />}>
         <Input
-          aria-label="Search models"
-          placeholder="Search models…"
+          aria-label={t('models.searchModels')}
+          placeholder={t('models.searchModelsPlaceholder')}
           size="xs"
           value={filters.searchTerm}
           onChange={(event) => handleSearchChange(event.currentTarget.value)}
         />
       </InputGroup>
       <ModelFilterMenu
-        ariaLabel="Filter and sort models"
+        ariaLabel={t('models.filterAndSort')}
         availableBases={availableBases}
         availableTypes={availableTypes}
         baseFilter={filters.baseFilter}

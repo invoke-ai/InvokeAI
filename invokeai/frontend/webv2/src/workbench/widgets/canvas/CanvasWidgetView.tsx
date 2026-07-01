@@ -3,11 +3,13 @@ import type { WidgetViewProps } from '@workbench/types';
 import { Box, Flex } from '@chakra-ui/react';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { useCallback, useEffect, useEffectEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { CanvasDocumentFrame, CanvasPlaneImage, EmptyCanvasFrame, ToolScrubber } from './CanvasDocumentFrame';
 import { CanvasStagingControls, EmptyStagingControls } from './CanvasStagingControls';
 
 export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
+  const { t } = useTranslation();
   const canvas = useActiveProjectSelector((project) => project.canvas);
   const dispatch = useWorkbenchDispatch();
   const { document, stagingArea } = canvas;
@@ -49,11 +51,11 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
 
   useEffect(() => {
     const hotkeys = [
-      ['canvas.prevEntity', 'Previous canvas entity', ['alt+[', 'arrowleft']],
-      ['canvas.nextEntity', 'Next canvas entity', ['alt+]', 'arrowright']],
-      ['canvas.deleteSelected', 'Delete selected canvas item', ['delete', 'backspace']],
-      ['canvas.undo', 'Undo canvas edit', ['mod+z']],
-      ['canvas.redo', 'Redo canvas edit', ['mod+shift+z', 'mod+y']],
+      ['canvas.prevEntity', t('widgets.canvas.commands.previousEntity'), ['alt+[', 'arrowleft']],
+      ['canvas.nextEntity', t('widgets.canvas.commands.nextEntity'), ['alt+]', 'arrowright']],
+      ['canvas.deleteSelected', t('widgets.canvas.commands.deleteSelected'), ['delete', 'backspace']],
+      ['canvas.undo', t('widgets.canvas.commands.undo'), ['mod+z']],
+      ['canvas.redo', t('widgets.canvas.commands.redo'), ['mod+shift+z', 'mod+y']],
     ] as const;
     const disposers = hotkeys.flatMap(([id, title, defaultKeys]) => [
       runtime.commands.register({ handler: () => executeCanvasHotkey(id), id, title }),
@@ -63,11 +65,11 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     return () => {
       disposers.forEach((dispose) => dispose());
     };
-  }, [runtime.commands, runtime.hotkeys]);
+  }, [runtime.commands, runtime.hotkeys, t]);
 
   return (
     <Box
-      aria-label="Canvas surface"
+      aria-label={t('widgets.canvas.surface')}
       bg="bg.inset"
       h="full"
       overflow="hidden"

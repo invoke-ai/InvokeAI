@@ -10,6 +10,7 @@ import { useZodForm } from '@workbench/models/useZodForm';
 import { useNotify } from '@workbench/useNotify';
 import { WandSparklesIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export type UserFormTarget = { mode: 'create' } | { mode: 'edit'; user: UserDTO };
 
@@ -31,6 +32,7 @@ export const UserFormDialog = ({
   onSaved: () => void;
   target: UserFormTarget | null;
 }) => {
+  const { t } = useTranslation();
   const handleOpenChange = useCallback(
     (event: { open: boolean }) => {
       if (!event.open) {
@@ -59,7 +61,7 @@ export const UserFormDialog = ({
                 <Dialog.Header borderBottomWidth="1px" borderColor="border.subtle">
                   <Stack gap="0.5">
                     <Dialog.Title fontSize="md" fontWeight="700">
-                      {target.mode === 'create' ? 'Add user' : 'Edit user'}
+                      {target.mode === 'create' ? t('users.addUser') : t('users.editUser')}
                     </Dialog.Title>
                     {target.mode === 'edit' ? (
                       <Text color="fg.subtle" fontSize="xs">
@@ -90,6 +92,7 @@ const UserForm = ({
   onSaved: () => void;
   target: UserFormTarget;
 }) => {
+  const { t } = useTranslation();
   const session = useAuthSession();
   const notify = useNotify();
   const [isGenerating, setIsGenerating] = useState(false);
@@ -117,13 +120,13 @@ const UserForm = ({
 
     try {
       form.setValue('password', await generatePassword());
-      notify.info('Password generated', 'Reveal it with the eye icon and share it with the user securely.');
+      notify.info(t('users.passwordGenerated'), t('users.passwordGeneratedDescription'));
     } catch (error) {
-      notify.error('Could not generate a password', getApiErrorMessage(error, 'The backend rejected the request.'));
+      notify.error(t('users.couldNotGeneratePassword'), getApiErrorMessage(error, t('users.backendRejectedRequest')));
     } finally {
       setIsGenerating(false);
     }
-  }, [form, notify]);
+  }, [form, notify, t]);
 
   const submit = useCallback(
     () =>
@@ -160,16 +163,14 @@ const UserForm = ({
             await updateUser(editedUser.user_id, changes);
           }
         } catch (error) {
-          throw new Error(
-            getApiErrorMessage(error, isCreate ? 'Could not create the user.' : 'Could not update the user.')
-          );
+          throw new Error(getApiErrorMessage(error, isCreate ? t('users.couldNotCreate') : t('users.couldNotUpdate')));
         }
 
-        notify.success(isCreate ? 'User created' : 'User updated');
+        notify.success(isCreate ? t('users.created') : t('users.updated'));
         onSaved();
         onClose();
       }),
-    [editedUser, form, isCreate, notify, onClose, onSaved]
+    [editedUser, form, isCreate, notify, onClose, onSaved, t]
   );
 
   const handleEmailChange = useCallback(
@@ -197,7 +198,7 @@ const UserForm = ({
         <Stack gap="4" py="2">
           {form.formError ? <AuthFormAlert message={form.formError} tone="error" /> : null}
           {isCreate ? (
-            <Field error={form.errors.email} label="Email">
+            <Field error={form.errors.email} label={t('users.email')}>
               <Input
                 aria-invalid={form.errors.email ? true : undefined}
                 autoComplete="off"
@@ -208,7 +209,7 @@ const UserForm = ({
               />
             </Field>
           ) : null}
-          <Field helpText="Optional — shown instead of the email." label="Display name">
+          <Field helpText={t('users.displayNameHelp')} label={t('users.displayName')}>
             <Input autoComplete="off" value={form.values.displayName} onChange={handleDisplayNameChange} />
           </Field>
           <Field
@@ -218,9 +219,9 @@ const UserForm = ({
                 ? session.strictPasswordChecking
                   ? PASSWORD_RULES_HINT
                   : undefined
-                : 'Leave blank to keep the current password.'
+                : t('users.leaveBlankPassword')
             }
-            label={isCreate ? 'Password' : 'New password'}
+            label={isCreate ? t('users.password') : t('users.newPassword')}
           >
             <Stack gap="1.5">
               <HStack gap="2">
@@ -233,7 +234,7 @@ const UserForm = ({
                 />
                 <Button loading={isGenerating} size="xs" variant="outline" onClick={handleGeneratedPasswordClick}>
                   <WandSparklesIcon />
-                  Generate
+                  {t('users.generate')}
                 </Button>
               </HStack>
               <PasswordStrengthMeter password={form.values.password} />
@@ -250,10 +251,10 @@ const UserForm = ({
           >
             <Stack gap="0.5">
               <Switch.Label color="fg" fontSize="sm" fontWeight="500" m="0">
-                Administrator
+                {t('users.administrator')}
               </Switch.Label>
               <Text color="fg.subtle" fontSize="xs">
-                {isSelf ? 'You cannot change your own role.' : 'Can manage users and all workspace settings.'}
+                {isSelf ? t('users.cannotChangeSelfRole') : t('users.administratorHelp')}
               </Text>
             </Stack>
             <Switch.HiddenInput />
@@ -265,10 +266,10 @@ const UserForm = ({
       </Dialog.Body>
       <Dialog.Footer gap="2">
         <Button size="xs" variant="ghost" onClick={onClose}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button loading={form.isSubmitting} size="xs" variant="solid" onClick={handleSubmitClick}>
-          {isCreate ? 'Create user' : 'Save changes'}
+          {isCreate ? t('users.createUser') : t('users.saveChanges')}
         </Button>
       </Dialog.Footer>
     </>

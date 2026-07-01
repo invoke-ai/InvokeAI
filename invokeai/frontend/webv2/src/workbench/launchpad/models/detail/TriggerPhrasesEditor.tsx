@@ -6,6 +6,7 @@ import { replaceModelInStore } from '@workbench/models/modelsStore';
 import { triggerPhraseSchema } from '@workbench/models/schemas';
 import { PlusIcon } from 'lucide-react';
 import { memo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface TriggerPhrasesEditorState {
   draft: string;
@@ -27,6 +28,7 @@ export const TriggerPhrasesEditor = ({
   onError: (message: string) => void;
   phrases: readonly string[];
 }) => {
+  const { t } = useTranslation();
   const [editor, setEditor] = useState<TriggerPhrasesEditorState>(() => ({
     draft: '',
     error: null,
@@ -51,7 +53,7 @@ export const TriggerPhrasesEditor = ({
 
       return true;
     } catch (persistError) {
-      onError(persistError instanceof Error ? persistError.message : 'Failed to update trigger phrases.');
+      onError(persistError instanceof Error ? persistError.message : t('models.failedToUpdateTriggerPhrases'));
 
       return false;
     } finally {
@@ -63,12 +65,17 @@ export const TriggerPhrasesEditor = ({
     const parsed = triggerPhraseSchema.safeParse(draft);
 
     if (!parsed.success) {
-      setEditor({ draft, error: parsed.error.issues[0]?.message ?? 'Invalid trigger phrase.', isSaving, modelKey });
+      setEditor({
+        draft,
+        error: parsed.error.issues[0]?.message ?? t('models.invalidTriggerPhrase'),
+        isSaving,
+        modelKey,
+      });
       return;
     }
 
     if (phrases.some((phrase) => phrase.toLowerCase() === parsed.data.toLowerCase())) {
-      setEditor({ draft, error: 'That trigger phrase is already on this model.', isSaving, modelKey });
+      setEditor({ draft, error: t('models.triggerPhraseDuplicate'), isSaving, modelKey });
       return;
     }
 
@@ -81,15 +88,11 @@ export const TriggerPhrasesEditor = ({
   };
 
   return (
-    <Field
-      error={error}
-      helpText="Phrases that activate this model, surfaced in the prompt editor."
-      label="Trigger Phrases"
-    >
+    <Field error={error} helpText={t('models.triggerPhrasesHelp')} label={t('models.triggerPhrases')}>
       <HStack gap="1.5">
         <Input
           aria-invalid={error ? true : undefined}
-          placeholder="Add a trigger phrase…"
+          placeholder={t('models.addTriggerPhrase')}
           size="xs"
           value={draft}
           onChange={(event) => {
@@ -112,7 +115,7 @@ export const TriggerPhrasesEditor = ({
           }}
         >
           <Icon as={PlusIcon} boxSize="3.5" />
-          Add
+          {t('common.add')}
         </Button>
       </HStack>
       {phrases.length > 0 ? (
@@ -122,7 +125,7 @@ export const TriggerPhrasesEditor = ({
               <Tag.Label>{phrase}</Tag.Label>
               <Tag.EndElement>
                 <Tag.CloseTrigger
-                  aria-label={`Remove trigger phrase ${phrase}`}
+                  aria-label={t('models.removeTriggerPhrase', { phrase })}
                   onClick={() => {
                     void persist(phrases.filter((existing) => existing !== phrase));
                   }}

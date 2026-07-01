@@ -18,22 +18,23 @@ import { Button, CloseButton, IconButton, Tabs } from '@workbench/components/ui'
 import { isDateBoardId } from '@workbench/gallery/api';
 import { SearchIcon, SettingsIcon, UploadIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { GalleryBoardSelect } from './GalleryBoardSelect';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 const ACCEPTED_UPLOAD_EXTENSIONS = 'image/png,image/jpeg,image/webp';
 const galleryViewTabs = [
-  { label: 'Images', value: 'images' },
-  { label: 'Assets', value: 'assets' },
-] satisfies { label: string; value: GalleryView }[];
+  { labelKey: 'common.images', value: 'images' },
+  { labelKey: 'common.assets', value: 'assets' },
+] satisfies { labelKey: string; value: GalleryView }[];
 
 const UPLOAD_INPUT_STYLE = { display: 'none' } as const;
 const GALLERY_SETTINGS_POSITIONING = { placement: 'bottom-end' } as const;
-const SLIDER_ARIA_LABEL = ['Gallery image density'];
 const SEARCH_START_ELEMENT = <Icon as={SearchIcon} size="sm" />;
 
 export const GalleryToolbar = ({ layout }: { layout: 'stacked' | 'wide' }) => {
+  const { t } = useTranslation();
   const { actions, gallery } = useGalleryWidget();
   const isWide = layout === 'wide';
 
@@ -52,9 +53,9 @@ export const GalleryToolbar = ({ layout }: { layout: 'stacked' | 'wide' }) => {
   const searchClearButton = useMemo(
     () =>
       gallery.searchTerm ? (
-        <CloseButton size="2xs" aria-label="Clear search" onClick={handleClearSearch} me="-2" />
+        <CloseButton size="2xs" aria-label={t('common.clearSearch')} onClick={handleClearSearch} me="-2" />
       ) : null,
-    [gallery.searchTerm, handleClearSearch]
+    [gallery.searchTerm, handleClearSearch, t]
   );
 
   const viewTabs = useMemo(
@@ -63,13 +64,13 @@ export const GalleryToolbar = ({ layout }: { layout: 'stacked' | 'wide' }) => {
         <Tabs.List>
           {galleryViewTabs.map((item) => (
             <Tabs.Trigger key={item.value} value={item.value} fontSize="xs">
-              {item.label}
+              {t(item.labelKey)}
             </Tabs.Trigger>
           ))}
         </Tabs.List>
       </Tabs.Root>
     ),
-    [gallery.galleryView, handleViewChange]
+    [gallery.galleryView, handleViewChange, t]
   );
 
   const toolbarActions = useMemo(
@@ -86,15 +87,15 @@ export const GalleryToolbar = ({ layout }: { layout: 'stacked' | 'wide' }) => {
     () => (
       <InputGroup startElement={SEARCH_START_ELEMENT} endElement={searchClearButton}>
         <Input
-          aria-label="Search gallery images"
-          placeholder="Search images"
+          aria-label={t('widgets.gallery.searchImagesAriaLabel')}
+          placeholder={t('widgets.gallery.searchImagesPlaceholder')}
           size="xs"
           value={gallery.searchTerm}
           onChange={handleSearchChange}
         />
       </InputGroup>
     ),
-    [gallery.searchTerm, handleSearchChange, searchClearButton]
+    [gallery.searchTerm, handleSearchChange, searchClearButton, t]
   );
 
   return (
@@ -126,6 +127,7 @@ export const GalleryToolbar = ({ layout }: { layout: 'stacked' | 'wide' }) => {
 };
 
 const GalleryUploadButton = () => {
+  const { t } = useTranslation();
   const { actions, gallery } = useGalleryWidget();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedBoard = gallery.boards.find((board) => board.id === gallery.selectedBoardId);
@@ -159,8 +161,10 @@ const GalleryUploadButton = () => {
       <IconButton
         aria-label={
           isVirtualTarget
-            ? 'Uploads are unavailable for date boards'
-            : `Upload images to ${selectedBoard?.name ?? 'the selected board'}`
+            ? t('widgets.gallery.uploadsUnavailableForDateBoards')
+            : t('widgets.gallery.uploadImagesToBoard', {
+                name: selectedBoard?.name ?? t('widgets.gallery.selectedBoardFallback'),
+              })
         }
         disabled={isVirtualTarget}
         size="xs"
@@ -174,6 +178,7 @@ const GalleryUploadButton = () => {
 };
 
 const GallerySettingsMenu = () => {
+  const { t } = useTranslation();
   const { actions, gallery } = useGalleryWidget();
   const { imageDensityPercent, imageOrderDir, paginationMode, showImageDimensions, starredFirst, thumbnailFit } =
     gallery.settings;
@@ -200,12 +205,13 @@ const GallerySettingsMenu = () => {
     () => actions.updateSettings({ paginationMode: 'paginated' }),
     [actions]
   );
+  const densityAriaLabel = useMemo(() => [t('widgets.gallery.imageDensity')], [t]);
   const densityValue = useMemo(() => [imageDensityPercent], [imageDensityPercent]);
 
   return (
     <Menu.Root positioning={GALLERY_SETTINGS_POSITIONING}>
       <Menu.Trigger asChild>
-        <IconButton aria-label="Gallery settings" size="xs" variant="outline">
+        <IconButton aria-label={t('widgets.gallery.settings')} size="xs" variant="outline">
           <SettingsIcon />
         </IconButton>
       </Menu.Trigger>
@@ -215,13 +221,13 @@ const GallerySettingsMenu = () => {
             <Stack gap="3">
               <Stack gap="2">
                 <HStack justify="space-between">
-                  <SettingLabel>Grid Density</SettingLabel>
+                  <SettingLabel>{t('widgets.gallery.settingsGridDensity')}</SettingLabel>
                   <Text color="fg.subtle" fontSize="2xs">
                     {imageDensityPercent}%
                   </Text>
                 </HStack>
                 <Slider.Root
-                  aria-label={SLIDER_ARIA_LABEL}
+                  aria-label={densityAriaLabel}
                   max={100}
                   min={0}
                   step={1}
@@ -238,7 +244,7 @@ const GallerySettingsMenu = () => {
                 </Slider.Root>
               </Stack>
               <Stack gap="2">
-                <SettingLabel>Thumbnails</SettingLabel>
+                <SettingLabel>{t('widgets.gallery.settingsThumbnails')}</SettingLabel>
                 <HStack gap="1">
                   <Button
                     flex="1"
@@ -246,7 +252,7 @@ const GallerySettingsMenu = () => {
                     variant={thumbnailFit === 'square' ? 'solid' : 'outline'}
                     onClick={handleSquareFit}
                   >
-                    Square
+                    {t('widgets.gallery.thumbnailFitSquare')}
                   </Button>
                   <Button
                     flex="1"
@@ -254,17 +260,17 @@ const GallerySettingsMenu = () => {
                     variant={thumbnailFit === 'aspect' ? 'solid' : 'outline'}
                     onClick={handleAspectFit}
                   >
-                    Aspect
+                    {t('widgets.gallery.thumbnailFitAspect')}
                   </Button>
                 </HStack>
                 <SettingSwitch
                   checked={showImageDimensions}
-                  label="Always show dimensions"
+                  label={t('widgets.gallery.alwaysShowDimensions')}
                   onChange={handleShowDimensionsChange}
                 />
               </Stack>
               <Stack gap="2">
-                <SettingLabel>Image Sort</SettingLabel>
+                <SettingLabel>{t('widgets.gallery.imageSort')}</SettingLabel>
                 <HStack gap="1">
                   <Button
                     flex="1"
@@ -272,7 +278,7 @@ const GallerySettingsMenu = () => {
                     variant={imageOrderDir === 'DESC' ? 'solid' : 'outline'}
                     onClick={handleNewestFirst}
                   >
-                    Newest
+                    {t('widgets.gallery.newest')}
                   </Button>
                   <Button
                     flex="1"
@@ -280,17 +286,17 @@ const GallerySettingsMenu = () => {
                     variant={imageOrderDir === 'ASC' ? 'solid' : 'outline'}
                     onClick={handleOldestFirst}
                   >
-                    Oldest
+                    {t('widgets.gallery.oldest')}
                   </Button>
                 </HStack>
                 <SettingSwitch
                   checked={starredFirst}
-                  label="Show starred images first"
+                  label={t('widgets.gallery.showStarredImagesFirst')}
                   onChange={handleStarredFirstChange}
                 />
               </Stack>
               <Stack gap="2">
-                <SettingLabel>Pagination</SettingLabel>
+                <SettingLabel>{t('widgets.gallery.pagination')}</SettingLabel>
                 <HStack gap="1">
                   <Button
                     flex="1"
@@ -298,7 +304,7 @@ const GallerySettingsMenu = () => {
                     variant={paginationMode === 'infinite' ? 'solid' : 'outline'}
                     onClick={handleInfinitePagination}
                   >
-                    Infinite
+                    {t('widgets.gallery.infinite')}
                   </Button>
                   <Button
                     flex="1"
@@ -306,7 +312,7 @@ const GallerySettingsMenu = () => {
                     variant={paginationMode === 'paginated' ? 'solid' : 'outline'}
                     onClick={handlePaginatedPagination}
                   >
-                    Pages
+                    {t('common.pages')}
                   </Button>
                 </HStack>
               </Stack>

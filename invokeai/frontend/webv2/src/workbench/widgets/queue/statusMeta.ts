@@ -6,17 +6,17 @@ import type { BackendQueueItemStatus } from '@workbench/backend/events';
  * NOW & NEXT card. One table so status styling stays consistent everywhere.
  */
 export interface QueueStatusMeta {
-  label: string;
+  labelKey: string;
   colorPalette: string;
   dotColor: string;
 }
 
 const STATUS_META: Record<BackendQueueItemStatus, QueueStatusMeta> = {
-  canceled: { colorPalette: 'orange', dotColor: 'orange.solid', label: 'Canceled' },
-  completed: { colorPalette: 'green', dotColor: 'green.solid', label: 'Completed' },
-  failed: { colorPalette: 'red', dotColor: 'red.solid', label: 'Failed' },
-  in_progress: { colorPalette: 'accent', dotColor: 'accent.solid', label: 'Generating' },
-  pending: { colorPalette: 'gray', dotColor: 'fg.muted', label: 'Pending' },
+  canceled: { colorPalette: 'orange', dotColor: 'orange.solid', labelKey: 'common.status.canceled' },
+  completed: { colorPalette: 'green', dotColor: 'green.solid', labelKey: 'common.status.completed' },
+  failed: { colorPalette: 'red', dotColor: 'red.solid', labelKey: 'common.status.failed' },
+  in_progress: { colorPalette: 'accent', dotColor: 'accent.solid', labelKey: 'common.generating' },
+  pending: { colorPalette: 'gray', dotColor: 'fg.muted', labelKey: 'common.status.pending' },
 };
 
 export const getStatusMeta = (status: BackendQueueItemStatus): QueueStatusMeta => STATUS_META[status];

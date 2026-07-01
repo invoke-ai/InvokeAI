@@ -1,5 +1,6 @@
 import { SegmentGroup } from '@chakra-ui/react';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { QueueFilterId } from './queueFilters';
 
@@ -13,6 +14,7 @@ export const QueueFilterTabs = ({
   value: QueueFilterId;
   onChange: (filter: QueueFilterId) => void;
 }) => {
+  const { t } = useTranslation();
   const onValueChange = useCallback(
     (details: { value: string | null }) => {
       if (details.value) {
@@ -24,7 +26,7 @@ export const QueueFilterTabs = ({
 
   return (
     <SegmentGroup.Root
-      aria-label="Filter recent queue items by status"
+      aria-label={t('widgets.queue.filterRecentByStatus')}
       colorPalette="accent"
       size="xs"
       value={value}
@@ -34,7 +36,7 @@ export const QueueFilterTabs = ({
       {QUEUE_FILTERS.map((filter) => (
         <SegmentGroup.Item key={filter.id} value={filter.id}>
           <SegmentGroup.ItemHiddenInput />
-          <SegmentGroup.ItemText>{filter.label}</SegmentGroup.ItemText>
+          <SegmentGroup.ItemText>{t(filter.labelKey)}</SegmentGroup.ItemText>
         </SegmentGroup.Item>
       ))}
     </SegmentGroup.Root>

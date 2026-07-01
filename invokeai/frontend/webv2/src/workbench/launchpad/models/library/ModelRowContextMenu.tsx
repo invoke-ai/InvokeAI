@@ -8,6 +8,7 @@ import { isConvertibleToDiffusers } from '@workbench/models/baseIdentity';
 import { useModelsSelector } from '@workbench/models/modelsStore';
 import { RefreshCcwIcon, Trash2Icon } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SiHuggingface } from 'react-icons/si';
 
 export interface ModelContextMenuTarget {
@@ -28,6 +29,7 @@ export const ModelRowContextMenu = ({
   onClose: () => void;
   target: ModelContextMenuTarget | null;
 }) => {
+  const { t } = useTranslation();
   const { convert, reidentify, remove } = useModelActions();
   const [pendingConfirm, setPendingConfirm] = useState<{ kind: 'delete' | 'convert'; model: ModelConfig } | null>(null);
   const model = useModelsSelector((snapshot) =>
@@ -57,18 +59,18 @@ export const ModelRowContextMenu = ({
               <MenuContent minW="13rem">
                 <Menu.Item value="reidentify" onClick={() => void reidentify(model)}>
                   <Icon as={RefreshCcwIcon} boxSize="3.5" />
-                  <Menu.ItemText fontSize="xs">Re-identify model</Menu.ItemText>
+                  <Menu.ItemText fontSize="xs">{t('models.reidentify')}</Menu.ItemText>
                 </Menu.Item>
                 {isConvertibleToDiffusers(model) ? (
                   <Menu.Item value="convert" onClick={() => setPendingConfirm({ kind: 'convert', model })}>
                     <Icon as={SiHuggingface} boxSize="3.5" />
-                    <Menu.ItemText fontSize="xs">Convert to diffusers</Menu.ItemText>
+                    <Menu.ItemText fontSize="xs">{t('models.convertToDiffusers')}</Menu.ItemText>
                   </Menu.Item>
                 ) : null}
                 <Menu.Separator />
                 <Menu.Item color="fg.error" value="delete" onClick={() => setPendingConfirm({ kind: 'delete', model })}>
                   <Icon as={Trash2Icon} boxSize="3.5" />
-                  <Menu.ItemText fontSize="xs">Delete model</Menu.ItemText>
+                  <Menu.ItemText fontSize="xs">{t('models.deleteModel')}</Menu.ItemText>
                 </Menu.Item>
               </MenuContent>
             ) : null}
@@ -78,12 +80,12 @@ export const ModelRowContextMenu = ({
       <ConfirmDialog
         body={
           pendingConfirm?.kind === 'convert'
-            ? `Convert “${pendingConfirm.model.name}” to the diffusers format in place? The original checkpoint file is replaced by a diffusers folder.`
-            : `Delete “${pendingConfirm?.model.name}”? The database record is removed, and the model files are deleted if they live inside the InvokeAI models directory.`
+            ? t('models.convertBody', { name: pendingConfirm.model.name })
+            : t('models.deleteBody', { name: pendingConfirm?.model.name ?? '' })
         }
-        confirmLabel={pendingConfirm?.kind === 'convert' ? 'Convert' : 'Delete Model'}
+        confirmLabel={pendingConfirm?.kind === 'convert' ? t('models.convert') : t('models.deleteModel')}
         isOpen={pendingConfirm !== null}
-        title={pendingConfirm?.kind === 'convert' ? 'Convert to diffusers' : 'Delete model'}
+        title={pendingConfirm?.kind === 'convert' ? t('models.convertToDiffusers') : t('models.deleteModel')}
         onClose={() => setPendingConfirm(null)}
         onConfirm={async () => {
           if (!pendingConfirm) {

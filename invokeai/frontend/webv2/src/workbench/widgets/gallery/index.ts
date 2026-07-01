@@ -14,8 +14,7 @@ export const galleryWidgetManifest: WidgetManifest = {
   footer: GalleryWidgetFooter,
   icon: ImageIcon,
   id: 'gallery',
-  label: 'Gallery',
-  labelText: 'Gallery',
+  label: (t) => t('widgets.labels.gallery'),
   version: 1,
   view: GalleryWidgetView,
 };

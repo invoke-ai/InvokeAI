@@ -18,7 +18,7 @@ const getActiveProject = (state: WorkbenchState): Project => {
 };
 
 const createWidget = (
-  overrides: Partial<NormalizedWidgetManifest> & Pick<NormalizedWidgetManifest, 'id' | 'labelText'>
+  overrides: Partial<NormalizedWidgetManifest> & Pick<NormalizedWidgetManifest, 'id' | 'label'>
 ): RegisteredWidget => ({
   manifest: {
     apiVersion: 1,
@@ -28,7 +28,6 @@ const createWidget = (
     centerPlacement: 'view',
     failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
     icon: TestIcon,
-    label: overrides.labelText,
     state: { createInitial: () => ({}), persistence: 'project', version: 1 },
     version: 1,
     view: TestView,
@@ -59,7 +58,7 @@ const applyCommand = (
 describe('widget placement commands', () => {
   it('opens a singleton already in the target region without duplicating it', () => {
     const state = createInitialWorkbenchState();
-    const widget = createWidget({ id: 'queue', labelText: 'Queue' });
+    const widget = createWidget({ id: 'queue', label: 'Queue' });
     const nextState = applyCommand(state, (dispatch) => {
       expect(
         openWidgetPlacement({
@@ -78,7 +77,7 @@ describe('widget placement commands', () => {
 
   it('opens an existing singleton instance from another region', () => {
     const state = createInitialWorkbenchState();
-    const widget = createWidget({ id: 'preview', labelText: 'Preview' });
+    const widget = createWidget({ id: 'preview', label: 'Preview' });
     const nextState = applyCommand(state, (dispatch) => {
       openWidgetPlacement({
         dispatch,
@@ -95,7 +94,7 @@ describe('widget placement commands', () => {
 
   it('passes allowMultiple through as createNew', () => {
     const actions: WorkbenchAction[] = [];
-    const widget = createWidget({ allowMultiple: true, id: 'queue', labelText: 'Queue' });
+    const widget = createWidget({ allowMultiple: true, id: 'queue', label: 'Queue' });
 
     openWidgetPlacement({
       dispatch: (action) => actions.push(action),
@@ -109,7 +108,7 @@ describe('widget placement commands', () => {
 
   it('does not create a new instance for singleton widgets even when requested', () => {
     const actions: WorkbenchAction[] = [];
-    const widget = createWidget({ allowMultiple: false, id: 'queue', labelText: 'Queue' });
+    const widget = createWidget({ allowMultiple: false, id: 'queue', label: 'Queue' });
 
     openWidgetPlacement({
       dispatch: (action) => actions.push(action),
@@ -133,7 +132,7 @@ describe('widget placement commands', () => {
       openWidgetPlacement({
         dispatch,
         getWidgetsForRegion: createRegistry({
-          left: [createWidget({ allowedRegions: ['center'], id: 'models', labelText: 'Models' })],
+          left: [createWidget({ allowedRegions: ['center'], id: 'models', label: 'Models' })],
         }),
         options: { preferredRegions: ['left'] },
         typeId: 'models',
@@ -143,7 +142,7 @@ describe('widget placement commands', () => {
       openWidgetPlacement({
         dispatch,
         getWidgetsForRegion: createRegistry({
-          bottom: [createWidget({ bottomPanel: 'tooltip', id: 'diagnostics', labelText: 'Diagnostics' })],
+          bottom: [createWidget({ bottomPanel: 'tooltip', id: 'diagnostics', label: 'Diagnostics' })],
         }),
         options: { preferredRegions: ['bottom'] },
         typeId: 'diagnostics',
@@ -153,7 +152,7 @@ describe('widget placement commands', () => {
       openWidgetPlacement({
         dispatch,
         getWidgetsForRegion: createRegistry({
-          center: [createWidget({ centerPlacement: 'toolbar', id: 'toolbar-tools', labelText: 'Toolbar Tools' })],
+          center: [createWidget({ centerPlacement: 'toolbar', id: 'toolbar-tools', label: 'Toolbar Tools' })],
         }),
         options: { preferredRegions: ['center'] },
         typeId: 'toolbar-tools',
@@ -169,7 +168,7 @@ describe('widget placement commands', () => {
     expect(
       closeWidgetPlacement({
         dispatch: (action) => actions.push(action),
-        getWidgetById: (typeId) => createWidget({ id: typeId, labelText: typeId }),
+        getWidgetById: (typeId) => createWidget({ id: typeId, label: typeId }),
         instanceId: 'canvas',
         project: {
           ...project,
@@ -221,7 +220,7 @@ describe('widget placement commands', () => {
     const nextState = applyCommand(state, (dispatch) => {
       closeWidgetPlacement({
         dispatch,
-        getWidgetById: (typeId) => createWidget({ id: typeId, labelText: typeId }),
+        getWidgetById: (typeId) => createWidget({ id: typeId, label: typeId }),
         instanceId: 'layers',
         project: getActiveProject(state),
         region: 'right',

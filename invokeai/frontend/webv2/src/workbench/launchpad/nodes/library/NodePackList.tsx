@@ -7,6 +7,7 @@ import { EmptyState } from '@workbench/components/ui/EmptyState';
 import { refreshCustomNodePacks } from '@workbench/customNodes/nodesStore';
 import { BlocksIcon, PackageOpenIcon, SearchIcon, TriangleAlertIcon } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { NodePackContextMenu, type NodePackContextMenuTarget } from './NodePackContextMenu';
 
@@ -35,6 +36,7 @@ export const NodePackList = ({
   searchTerm: string;
   status: 'idle' | 'loading' | 'loaded' | 'error';
 }) => {
+  const { t } = useTranslation();
   const [contextMenuTarget, setContextMenuTarget] = useState<NodePackContextMenuTarget | null>(null);
   const deferredSearchTerm = useDeferredValue(searchTerm);
   const filtered = useMemo(() => {
@@ -54,10 +56,10 @@ export const NodePackList = ({
           danger
           description={error}
           icon={<Icon as={TriangleAlertIcon} />}
-          title="Could not load custom node packs"
+          title={t('nodes.couldNotLoadPacks')}
         >
           <Button size="sm" variant="outline" onClick={() => void refreshCustomNodePacks()}>
-            Retry
+            {t('common.retry')}
           </Button>
         </EmptyState>
       </Flex>
@@ -68,26 +70,30 @@ export const NodePackList = ({
     <Stack flex="1" gap="2" minH="0" pt="3">
       <InputGroup px="3" startElement={<Icon as={SearchIcon} boxSize="3.5" color="fg.subtle" />}>
         <Input
-          aria-label="Search node packs"
-          placeholder="Search packs…"
+          aria-label={t('nodes.searchPacks')}
+          placeholder={t('nodes.searchPacksPlaceholder')}
           size="xs"
           value={searchTerm}
           onChange={(event) => onSearchChange(event.currentTarget.value)}
         />
       </InputGroup>
-      <Scrollable h="full" label="Installed custom node packs" minH="0">
+      <Scrollable h="full" label={t('nodes.installedPacks')} minH="0">
         {status === 'idle' || status === 'loading' ? (
           <Flex align="center" justify="center" py="10">
             <Spinner color="fg.subtle" size="sm" />
           </Flex>
         ) : packs.length === 0 ? (
           <EmptyState
-            description="Install from a Git URL or place packs in your custom nodes directory, then reload."
+            description={t('nodes.noPacksDescription')}
             icon={<Icon as={PackageOpenIcon} />}
-            title="No custom node packs"
+            title={t('nodes.noPacks')}
           />
         ) : filtered.length === 0 ? (
-          <EmptyState description="Try a different search." icon={<Icon as={SearchIcon} />} title="No packs match" />
+          <EmptyState
+            description={t('nodes.tryDifferentSearch')}
+            icon={<Icon as={SearchIcon} />}
+            title={t('nodes.noPacksMatch')}
+          />
         ) : (
           <Stack gap="1" minW="0" p="1" px="3" w="full">
             {filtered.map((pack) => (

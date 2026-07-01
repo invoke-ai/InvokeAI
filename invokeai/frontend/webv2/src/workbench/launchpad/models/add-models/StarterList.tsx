@@ -8,6 +8,7 @@ import { InstallSourceButton, SourceListItem } from '@workbench/launchpad/models
 import { getModelBaseColorPalette, getModelBaseLabel } from '@workbench/models/baseIdentity';
 import { getModelTypeLabel } from '@workbench/models/taxonomy';
 import { KeyRoundIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const getExternalProviderId = (source: string): string | null => {
   if (!source.startsWith('external://')) {
@@ -40,11 +41,13 @@ export const StarterList = ({
   selectedBundleSources: ReadonlySet<string> | undefined;
   status: ReturnType<typeof useStartersSnapshot>['status'];
 }) => {
+  const { t } = useTranslation();
+
   if (status === 'error' && loadError) {
     return (
       <Stack align="center" gap="1" py="8">
         <Text color="fg.error" fontSize="xs" fontWeight="600">
-          Could not load starter models
+          {t('models.couldNotLoadStarterModels')}
         </Text>
         <Text color="fg.subtle" fontSize="2xs">
           {loadError}
@@ -64,9 +67,7 @@ export const StarterList = ({
   if (models.length === 0) {
     return (
       <Text color="fg.subtle" fontSize="2xs" py="6" textAlign="center">
-        {isInstallable
-          ? 'No starter models match - press Pull to install the source you entered.'
-          : 'No starter models match your search.'}
+        {isInstallable ? t('models.noStarterModelsPull') : t('models.noStarterModelsSearch')}
       </Text>
     );
   }
@@ -81,7 +82,7 @@ export const StarterList = ({
         const trailing = externalProviderId ? (
           configuredExternalProviders.has(externalProviderId) ? (
             <Badge colorPalette="green" flexShrink={0} fontSize="2xs" size="sm" variant="surface">
-              Installed
+              {t('models.installed')}
             </Badge>
           ) : (
             <Button
@@ -94,7 +95,7 @@ export const StarterList = ({
               }}
             >
               <Icon as={KeyRoundIcon} boxSize="3" />
-              Configure
+              {t('common.configure')}
             </Button>
           )
         ) : (
@@ -126,9 +127,7 @@ export const StarterList = ({
               </>
             }
             description={`${model.description}${
-              dependencyCount > 0
-                ? ` (installs ${dependencyCount} dependenc${dependencyCount === 1 ? 'y' : 'ies'})`
-                : ''
+              dependencyCount > 0 ? t('models.installsDependencies', { count: dependencyCount }) : ''
             }`}
             title={model.name}
             trailing={trailing}

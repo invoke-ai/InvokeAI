@@ -6,6 +6,7 @@ import { IconButton, Tooltip } from '@workbench/components/ui';
 import { useNotify } from '@workbench/useNotify';
 import { XIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { refreshQueue } from './queueDataStore';
 import { cancelQueueItem } from './queueServerApi';
@@ -17,6 +18,7 @@ import { cancelQueueItem } from './queueServerApi';
  * click from also toggling the row it sits in.
  */
 export const CancelQueueItemButton = ({ itemId }: { itemId: number }) => {
+  const { t } = useTranslation();
   const notify = useNotify();
   const [busy, setBusy] = useState(false);
 
@@ -29,18 +31,18 @@ export const CancelQueueItemButton = ({ itemId }: { itemId: number }) => {
         await cancelQueueItem(itemId);
         await refreshQueue();
       } catch (error) {
-        notify.error('Cancel failed', getApiErrorMessage(error, 'Could not cancel this item.'));
+        notify.error(t('common.cancelFailed'), getApiErrorMessage(error, t('widgets.queue.couldNotCancelItem')));
       } finally {
         setBusy(false);
       }
     },
-    [itemId, notify]
+    [itemId, notify, t]
   );
 
   return (
-    <Tooltip content={`Cancel queue item #${itemId}`}>
+    <Tooltip content={t('widgets.queue.cancelItem', { id: itemId })}>
       <IconButton
-        aria-label={`Cancel queue item #${itemId}`}
+        aria-label={t('widgets.queue.cancelItem', { id: itemId })}
         color="fg.muted"
         loading={busy}
         size="2xs"

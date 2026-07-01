@@ -5,6 +5,7 @@ import { formatBytes } from '@workbench/models/taxonomy';
 import { useNotify } from '@workbench/useNotify';
 import { ChevronUpIcon, DatabaseIcon, Trash2Icon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
   clearModelCache,
@@ -33,6 +34,7 @@ const CacheStat = ({ label, value }: { label: string; value: number }) => (
  * "Disable" toggle. Mirrors the model manager's `InstallQueueBar` collapse shape.
  */
 export const ModelCacheFooter = () => {
+  const { t } = useTranslation();
   const { stats } = useModelCacheStats();
   const notify = useNotify();
   const [expanded, setExpanded] = useState(false);
@@ -51,14 +53,17 @@ export const ModelCacheFooter = () => {
 
     try {
       const clearResult = await clearModelCache();
-      const toast = getModelCacheClearToast(clearResult);
+      const toast = getModelCacheClearToast(clearResult, t);
       notify[toast.status](toast.title, toast.description);
     } catch (error) {
-      notify.error('Clear cache failed', getApiErrorMessage(error, 'Could not clear the model cache.'));
+      notify.error(
+        t('widgets.queue.modelCache.clearFailed'),
+        getApiErrorMessage(error, t('widgets.queue.modelCache.couldNotClear'))
+      );
     } finally {
       setBusy(false);
     }
-  }, [notify]);
+  }, [notify, t]);
 
   return (
     <Collapsible.Root
@@ -71,14 +76,14 @@ export const ModelCacheFooter = () => {
       <Collapsible.Content>
         <Stack borderBottomWidth={1} gap="2" px="3" py="2.5">
           <HStack gap="3">
-            <CacheStat label="Hits" value={stats?.hits ?? 0} />
-            <CacheStat label="Misses" value={stats?.misses ?? 0} />
-            <CacheStat label="Loaded" value={stats?.in_cache ?? 0} />
+            <CacheStat label={t('widgets.queue.modelCache.hits')} value={stats?.hits ?? 0} />
+            <CacheStat label={t('widgets.queue.modelCache.misses')} value={stats?.misses ?? 0} />
+            <CacheStat label={t('widgets.queue.modelCache.loaded')} value={stats?.in_cache ?? 0} />
           </HStack>
           <HStack>
             <Button loading={busy} size="2xs" variant="surface" onClick={handleClear}>
               <Icon as={Trash2Icon} boxSize="3" />
-              Clear cache
+              {t('widgets.queue.modelCache.clear')}
             </Button>
           </HStack>
         </Stack>
@@ -86,8 +91,11 @@ export const ModelCacheFooter = () => {
 
       <Stack gap="0">
         <Progress.Root
-          aria-label="Model cache usage"
-          aria-valuetext={`${formatBytes(used)} of ${formatBytes(total)} used`}
+          aria-label={t('widgets.queue.modelCache.usage')}
+          aria-valuetext={t('widgets.queue.modelCache.usedOfTotal', {
+            total: formatBytes(total),
+            used: formatBytes(used),
+          })}
           colorPalette="accent"
           max={1}
           size="xs"
@@ -118,7 +126,7 @@ export const ModelCacheFooter = () => {
             letterSpacing="0.06em"
             textTransform="uppercase"
           >
-            Model Cache
+            {t('widgets.queue.modelCache.label')}
           </Text>
           <Text color="fg.subtle" fontSize="2xs" fontVariantNumeric="tabular-nums">
             {formatBytes(used)} / {formatBytes(total)}

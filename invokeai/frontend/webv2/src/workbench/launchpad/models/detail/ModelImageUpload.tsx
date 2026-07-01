@@ -7,6 +7,7 @@ import { deleteModelImage, getModelImageUrl, updateModelImage } from '@workbench
 import { markCoverImageChanged, useModelsSelector } from '@workbench/models/modelsStore';
 import { ImageIcon, UploadIcon, XIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const ACCEPTED_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 
@@ -26,6 +27,7 @@ export const ModelImageUpload = ({
   onError: (message: string) => void;
   onUpdated: () => void;
 }) => {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const dragDepthRef = useRef(0);
   const imageVersion = useModelsSelector((snapshot) => snapshot.coverImageVersions[model.key]);
@@ -46,7 +48,7 @@ export const ModelImageUpload = ({
     }
 
     if (!ACCEPTED_TYPES.has(file.type)) {
-      onError('Use a PNG, JPEG, or WebP image.');
+      onError(t('models.useSupportedImage'));
       return;
     }
 
@@ -60,7 +62,7 @@ export const ModelImageUpload = ({
       markCoverImageChanged(modelKey, true);
       onUpdated();
     } catch (error) {
-      onError(error instanceof Error ? error.message : 'Failed to upload model image.');
+      onError(error instanceof Error ? error.message : t('models.failedToUploadModelImage'));
     } finally {
       setIsBusy(false);
     }
@@ -76,7 +78,7 @@ export const ModelImageUpload = ({
       markCoverImageChanged(modelKey, false);
       onUpdated();
     } catch (error) {
-      onError(error instanceof Error ? error.message : 'Failed to remove model image.');
+      onError(error instanceof Error ? error.message : t('models.failedToRemoveModelImage'));
     } finally {
       setIsBusy(false);
     }
@@ -85,7 +87,7 @@ export const ModelImageUpload = ({
   return (
     <Box
       aria-busy={isBusy || undefined}
-      aria-label={`Upload cover image for ${model.name}`}
+      aria-label={t('models.uploadCoverImageFor', { name: model.name })}
       bg="bg.emphasized"
       borderColor={isDropActive ? 'accent.solid' : 'border.subtle'}
       borderStyle={hasImage ? 'solid' : 'dashed'}
@@ -160,7 +162,7 @@ export const ModelImageUpload = ({
       />
       {hasImage ? (
         <Image
-          alt={`${model.name} cover`}
+          alt={t('models.modelCoverAlt', { name: model.name })}
           boxSize="full"
           fit="cover"
           src={getModelImageUrl(model.key, imageVersion ? String(imageVersion) : undefined)}
@@ -169,7 +171,7 @@ export const ModelImageUpload = ({
       ) : (
         <Stack align="center" boxSize="full" color="fg.subtle" gap="1" justify="center">
           <Icon as={ImageIcon} boxSize="5" />
-          <Text fontSize="2xs">Add image</Text>
+          <Text fontSize="2xs">{t('models.addImage')}</Text>
         </Stack>
       )}
       {isDropActive ? (
@@ -196,9 +198,9 @@ export const ModelImageUpload = ({
           _groupFocusWithin={{ opacity: 1, pointerEvents: 'auto' }}
           _groupHover={{ opacity: 1, pointerEvents: 'auto' }}
         >
-          <Tooltip content="Remove image">
+          <Tooltip content={t('models.removeImage')}>
             <IconButton
-              aria-label="Remove model image"
+              aria-label={t('models.removeModelImage')}
               colorPalette="red"
               size="2xs"
               variant="solid"

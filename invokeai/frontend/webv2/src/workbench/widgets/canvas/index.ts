@@ -11,8 +11,7 @@ export const canvasWidgetManifest: WidgetManifest = {
   graphBearing: { defaultGraphId: 'canvas-graph', sourceId: 'canvas', surfaces: ['center'] },
   icon: WandSparklesIcon,
   id: 'canvas',
-  label: 'Canvas',
-  labelText: 'Canvas',
+  label: (t) => t('widgets.labels.canvas'),
   version: 1,
   view: CanvasWidgetView,
 };

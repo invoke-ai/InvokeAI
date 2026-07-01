@@ -22,6 +22,7 @@ import {
   type ActiveWidgetDrag,
   widgetCollisionDetection,
 } from '@workbench/widgetDnd';
+import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import {
   closeWidgetPlacement,
   dispatchWidgetDragEndPlacement,
@@ -34,6 +35,7 @@ import { getWidgetById, getWidgetsForRegion, widgetRegistrationFailures } from '
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { WorkbenchWidgetRegistryProvider } from '@workbench/WorkbenchWidgetRegistryContext';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { BottomPanel } from './BottomPanel';
 import { CenterArea } from './CenterArea';
@@ -46,6 +48,7 @@ const DND_MODIFIERS = [restrictToWindowEdges];
 
 export const WorkbenchShell = () => {
   const dispatch = useWorkbenchDispatch();
+  const { t } = useTranslation();
   const panels = useActiveProjectSelector((project) => project.layout.panels);
   const leftRegion = useActiveProjectSelector((project) => project.widgetRegions.left);
   const rightRegion = useActiveProjectSelector((project) => project.widgetRegions.right);
@@ -55,6 +58,10 @@ export const WorkbenchShell = () => {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
   const [activeDrag, setActiveDrag] = useState<ActiveWidgetDrag | null>(null);
+  const getWidgetLabel = useCallback(
+    (manifest: Parameters<typeof resolveWidgetLabel>[0]) => resolveWidgetLabel(manifest, t),
+    [t]
+  );
   const leftRegionViewModel = useMemo(
     () =>
       createWidgetRegionViewModelFromState({
@@ -62,8 +69,9 @@ export const WorkbenchShell = () => {
         regionState: leftRegion,
         widgetInstances: placementProject.widgetInstances,
         widgets: getWidgetsForRegion('left'),
+        getWidgetLabel,
       }),
-    [leftRegion, placementProject.widgetInstances]
+    [getWidgetLabel, leftRegion, placementProject.widgetInstances]
   );
   const rightRegionViewModel = useMemo(
     () =>
@@ -72,8 +80,9 @@ export const WorkbenchShell = () => {
         regionState: rightRegion,
         widgetInstances: placementProject.widgetInstances,
         widgets: getWidgetsForRegion('right'),
+        getWidgetLabel,
       }),
-    [rightRegion, placementProject.widgetInstances]
+    [getWidgetLabel, placementProject.widgetInstances, rightRegion]
   );
   const leftMenuItems = useMemo(() => getWidgetRegionItems(leftRegionViewModel), [leftRegionViewModel]);
   const rightMenuItems = useMemo(() => getWidgetRegionItems(rightRegionViewModel), [rightRegionViewModel]);
@@ -129,11 +138,11 @@ export const WorkbenchShell = () => {
         fromRegion: activeData.region,
         icon: widget.manifest.icon,
         instanceId: activeData.instanceId,
-        label: instance.title ?? widget.manifest.labelText,
+        label: instance.title ?? getWidgetLabel(widget.manifest),
         typeId: instance.typeId,
       });
     },
-    [placementProject.widgetInstances]
+    [getWidgetLabel, placementProject.widgetInstances]
   );
 
   const handleDragEnd = useCallback(

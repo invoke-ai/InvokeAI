@@ -1,3 +1,5 @@
+import type { TFunction } from 'i18next';
+
 import { apiFetchJson, getApiErrorMessage } from '@workbench/backend/http';
 import { createExternalStore } from '@workbench/externalStore';
 import { formatBytes } from '@workbench/models/taxonomy';
@@ -38,23 +40,25 @@ export const getModelCacheUsage = (stats: ModelCacheStats | null): { used: numbe
   used: stats?.cache_used ?? stats?.high_watermark ?? 0,
 });
 
-export const getModelCacheClearToast = ({
-  bytes_freed,
-  models_cleared,
-}: ModelCacheClearResult): { title: string; description: string; status: 'info' | 'success' } => {
+export const getModelCacheClearToast = (
+  { bytes_freed, models_cleared }: ModelCacheClearResult,
+  t: TFunction
+): { title: string; description: string; status: 'info' | 'success' } => {
   if (models_cleared === 0) {
     return {
-      description:
-        'No unlocked cached models were available to clear. Active models stay loaded until they are no longer in use.',
+      description: t('widgets.queue.modelCache.noModelsClearedDescription'),
       status: 'info',
-      title: 'No cached models cleared',
+      title: t('widgets.queue.modelCache.noModelsCleared'),
     };
   }
 
   return {
-    description: `Cleared ${models_cleared} cached model${models_cleared === 1 ? '' : 's'} and freed ${formatBytes(bytes_freed)}.`,
+    description: t('widgets.queue.modelCache.clearedDescription', {
+      bytes: formatBytes(bytes_freed),
+      count: models_cleared,
+    }),
     status: 'success',
-    title: 'Model cache cleared',
+    title: t('widgets.queue.modelCache.cleared'),
   };
 };
 
@@ -82,7 +86,7 @@ export const refreshModelCacheStats = (): Promise<void> => {
       store.patchSnapshot({ error: null, loadState: 'loaded', stats });
     })
     .catch((error: unknown) => {
-      store.patchSnapshot({ error: getApiErrorMessage(error, 'Failed to load cache stats'), loadState: 'error' });
+      store.patchSnapshot({ error: getApiErrorMessage(error, 'Failed to load model cache stats'), loadState: 'error' });
     })
     .finally(() => {
       inflight = null;

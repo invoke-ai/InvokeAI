@@ -13,7 +13,7 @@ const TestIcon = () => null;
 const TestView = () => null;
 
 const createWidget = (
-  overrides: Partial<NormalizedWidgetManifest> & Pick<NormalizedWidgetManifest, 'id' | 'labelText'>
+  overrides: Partial<NormalizedWidgetManifest> & Pick<NormalizedWidgetManifest, 'id' | 'label'>
 ): RegisteredWidget => ({
   manifest: {
     apiVersion: 1,
@@ -21,7 +21,6 @@ const createWidget = (
     allowedRegions: ['left', 'center', 'bottom'],
     failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
     icon: TestIcon,
-    label: overrides.labelText,
     state: { createInitial: () => ({}), persistence: 'project', version: 1 },
     version: 1,
     view: TestView,
@@ -44,7 +43,7 @@ describe('widget region view model', () => {
       instanceIds: ['alpha'],
       region: 'left',
       widgetInstances: { alpha: createInstance('alpha', 'alpha') },
-      widgets: [createWidget({ id: 'alpha', labelText: 'Alpha' }), createWidget({ id: 'beta', labelText: 'Beta' })],
+      widgets: [createWidget({ id: 'alpha', label: 'Alpha' }), createWidget({ id: 'beta', label: 'Beta' })],
     });
 
     expect(viewModel.placedItems.map((item) => item.id)).toEqual(['alpha']);
@@ -59,7 +58,7 @@ describe('widget region view model', () => {
       instanceIds: ['alpha'],
       region: 'left',
       widgetInstances: { alpha: createInstance('alpha', 'alpha') },
-      widgets: [createWidget({ id: 'alpha', labelText: 'Alpha' })],
+      widgets: [createWidget({ id: 'alpha', label: 'Alpha' })],
     });
 
     expect(viewModel.availableItems).toEqual([]);
@@ -70,7 +69,7 @@ describe('widget region view model', () => {
       instanceIds: ['alpha'],
       region: 'left',
       widgetInstances: { alpha: createInstance('alpha', 'alpha') },
-      widgets: [createWidget({ allowMultiple: true, id: 'alpha', labelText: 'Alpha' })],
+      widgets: [createWidget({ allowMultiple: true, id: 'alpha', label: 'Alpha' })],
     });
 
     expect(viewModel.availableItems).toHaveLength(1);
@@ -86,8 +85,8 @@ describe('widget region view model', () => {
         'toolbar-tools': createInstance('toolbar-tools', 'toolbar-tools'),
       },
       widgets: [
-        createWidget({ centerPlacement: 'view', id: 'canvas', labelText: 'Canvas' }),
-        createWidget({ centerPlacement: 'toolbar', id: 'toolbar-tools', labelText: 'Toolbar Tools' }),
+        createWidget({ centerPlacement: 'view', id: 'canvas', label: 'Canvas' }),
+        createWidget({ centerPlacement: 'toolbar', id: 'toolbar-tools', label: 'Toolbar Tools' }),
       ],
     });
     const canvas = viewModel.placedItems.find((item) => item.id === 'canvas');
@@ -109,7 +108,7 @@ describe('widget region view model', () => {
       widgets: [
         createWidget({
           id: 'alpha',
-          labelText: 'Alpha',
+          label: 'Alpha',
           state: { createInitial, persistence: 'project', version: 1 },
         }),
       ],
