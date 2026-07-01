@@ -1,30 +1,24 @@
-import { Box, Button, ButtonGroup, Collapse, Divider, Flex, IconButton, Spacer } from '@invoke-ai/ui-library';
+import { Button, ButtonGroup, Divider, Flex, Spacer } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useDisclosure } from 'common/hooks/useBoolean';
-import { useGallerySearchTerm } from 'features/gallery/components/ImageGrid/useGallerySearchTerm';
 import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { galleryViewChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
 import { useGalleryPanel } from 'features/ui/layouts/use-gallery-panel';
 import { selectShouldUsePagedGalleryView } from 'features/ui/store/uiSelectors';
-import type { CSSProperties } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCaretDownBold, PiCaretUpBold, PiMagnifyingGlassBold } from 'react-icons/pi';
+import { PiCaretDownBold, PiCaretUpBold } from 'react-icons/pi';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 import { GalleryImageGrid } from './GalleryImageGrid';
 import { GalleryImageGridPaged } from './GalleryImageGridPaged';
 import { GallerySettingsPopover } from './GallerySettingsPopover/GallerySettingsPopover';
 import { GalleryUploadButton } from './GalleryUploadButton';
-import { GallerySearch } from './ImageGrid/GallerySearch';
-
-const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0, width: '100%' };
+import { ImageSearchModal } from './ImageSearchModal';
 
 const selectGalleryView = createSelector(selectGallerySlice, (gallery) => gallery.galleryView);
-const selectSearchTerm = createSelector(selectGallerySlice, (gallery) => gallery.searchTerm);
 
 export const GalleryPanel = memo(() => {
   const { t } = useTranslation();
@@ -33,10 +27,7 @@ export const GalleryPanel = memo(() => {
   const galleryPanel = useGalleryPanel(tab);
   const isCollapsed = useStore(galleryPanel.$isCollapsed);
   const galleryView = useAppSelector(selectGalleryView);
-  const initialSearchTerm = useAppSelector(selectSearchTerm);
   const shouldUsePagedGalleryView = useAppSelector(selectShouldUsePagedGalleryView);
-  const searchDisclosure = useDisclosure(!!initialSearchTerm);
-  const [searchTerm, onChangeSearchTerm, onResetSearchTerm] = useGallerySearchTerm();
   const handleClickImages = useCallback(() => {
     dispatch(galleryViewChanged('images'));
   }, [dispatch]);
@@ -44,14 +35,6 @@ export const GalleryPanel = memo(() => {
   const handleClickAssets = useCallback(() => {
     dispatch(galleryViewChanged('assets'));
   }, [dispatch]);
-
-  const handleClickSearch = useCallback(() => {
-    onResetSearchTerm();
-    if (!searchDisclosure.isOpen && galleryPanel.$isCollapsed.get()) {
-      galleryPanel.expand();
-    }
-    searchDisclosure.toggle();
-  }, [galleryPanel, onResetSearchTerm, searchDisclosure]);
 
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
   const boardName = useBoardName(selectedBoardId);
@@ -91,26 +74,9 @@ export const GalleryPanel = memo(() => {
         <Flex flexGrow={1} flexBasis={0} justifyContent="flex-end">
           <GalleryUploadButton />
           <GallerySettingsPopover />
-          <IconButton
-            size="sm"
-            variant="link"
-            alignSelf="stretch"
-            onClick={handleClickSearch}
-            tooltip={searchDisclosure.isOpen ? `${t('gallery.exitSearch')}` : `${t('gallery.displaySearch')}`}
-            aria-label={t('gallery.displaySearch')}
-            icon={<PiMagnifyingGlassBold />}
-          />
+          <ImageSearchModal />
         </Flex>
       </Flex>
-      <Collapse in={searchDisclosure.isOpen} style={COLLAPSE_STYLES}>
-        <Box w="full" pt={2}>
-          <GallerySearch
-            searchTerm={searchTerm}
-            onChangeSearchTerm={onChangeSearchTerm}
-            onResetSearchTerm={onResetSearchTerm}
-          />
-        </Box>
-      </Collapse>
       <Divider pt={2} />
       <Flex w="full" h="full" pt={2}>
         {shouldUsePagedGalleryView ? <GalleryImageGridPaged /> : <GalleryImageGrid />}

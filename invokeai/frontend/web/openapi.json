@@ -4559,6 +4559,184 @@
               "title": "Search Term"
             },
             "description": "The term to search for"
+          },
+          {
+            "name": "file_name_term",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "File name search term",
+              "title": "File Name Term"
+            },
+            "description": "File name search term"
+          },
+          {
+            "name": "metadata_term",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Metadata search term",
+              "title": "Metadata Term"
+            },
+            "description": "Metadata search term"
+          },
+          {
+            "name": "width_min",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Minimum image width",
+              "title": "Width Min"
+            },
+            "description": "Minimum image width"
+          },
+          {
+            "name": "width_max",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Maximum image width",
+              "title": "Width Max"
+            },
+            "description": "Maximum image width"
+          },
+          {
+            "name": "width_exact",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exact image width",
+              "title": "Width Exact"
+            },
+            "description": "Exact image width"
+          },
+          {
+            "name": "height_min",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Minimum image height",
+              "title": "Height Min"
+            },
+            "description": "Minimum image height"
+          },
+          {
+            "name": "height_max",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Maximum image height",
+              "title": "Height Max"
+            },
+            "description": "Maximum image height"
+          },
+          {
+            "name": "height_exact",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exact image height",
+              "title": "Height Exact"
+            },
+            "description": "Exact image height"
+          },
+          {
+            "name": "board_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Boards to include, supports 'none'",
+              "title": "Board Ids"
+            },
+            "description": "Boards to include, supports 'none'"
+          },
+          {
+            "name": "starred_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": ["include", "exclude", "only"],
+              "type": "string",
+              "description": "How to handle starred images",
+              "default": "include",
+              "title": "Starred Mode"
+            },
+            "description": "How to handle starred images"
           }
         ],
         "responses": {
@@ -5435,8 +5613,428 @@
               "title": "Search Term"
             },
             "description": "The term to search for"
+          },
+          {
+            "name": "file_name_term",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "File name search term",
+              "title": "File Name Term"
+            },
+            "description": "File name search term"
+          },
+          {
+            "name": "metadata_term",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Metadata search term",
+              "title": "Metadata Term"
+            },
+            "description": "Metadata search term"
+          },
+          {
+            "name": "width_min",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Minimum image width",
+              "title": "Width Min"
+            },
+            "description": "Minimum image width"
+          },
+          {
+            "name": "width_max",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Maximum image width",
+              "title": "Width Max"
+            },
+            "description": "Maximum image width"
+          },
+          {
+            "name": "width_exact",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exact image width",
+              "title": "Width Exact"
+            },
+            "description": "Exact image width"
+          },
+          {
+            "name": "height_min",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Minimum image height",
+              "title": "Height Min"
+            },
+            "description": "Minimum image height"
+          },
+          {
+            "name": "height_max",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Maximum image height",
+              "title": "Height Max"
+            },
+            "description": "Maximum image height"
+          },
+          {
+            "name": "height_exact",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exact image height",
+              "title": "Height Exact"
+            },
+            "description": "Exact image height"
+          },
+          {
+            "name": "board_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Boards to include, supports 'none'",
+              "title": "Board Ids"
+            },
+            "description": "Boards to include, supports 'none'"
+          },
+          {
+            "name": "starred_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": ["include", "exclude", "only"],
+              "type": "string",
+              "description": "How to handle starred images",
+              "default": "include",
+              "title": "Starred Mode"
+            },
+            "description": "How to handle starred images"
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageNamesResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/images/search": {
+      "post": {
+        "tags": ["images"],
+        "summary": "Search Images",
+        "operationId": "search_images",
+        "parameters": [
+          {
+            "name": "image_origin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ResourceOrigin"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Image Origin"
+            }
+          },
+          {
+            "name": "categories",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ImageCategory"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Categories"
+            }
+          },
+          {
+            "name": "is_intermediate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Intermediate"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "order_dir",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SQLiteDirection",
+              "default": "DESC"
+            }
+          },
+          {
+            "name": "starred_first",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Starred First"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageSearchBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OffsetPaginatedResults_ImageDTO_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/images/search/names": {
+      "post": {
+        "tags": ["images"],
+        "summary": "Search Image Names",
+        "operationId": "search_image_names",
+        "parameters": [
+          {
+            "name": "image_origin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ResourceOrigin"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Image Origin"
+            }
+          },
+          {
+            "name": "categories",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ImageCategory"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Categories"
+            }
+          },
+          {
+            "name": "is_intermediate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Intermediate"
+            }
+          },
+          {
+            "name": "order_dir",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SQLiteDirection",
+              "default": "DESC"
+            }
+          },
+          {
+            "name": "starred_first",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Starred First"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageSearchBody"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -34721,6 +35319,120 @@
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
+      },
+      "ImageSearchBody": {
+        "properties": {
+          "file_name_term": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Name Term"
+          },
+          "metadata_term": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Term"
+          },
+          "width_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width Min"
+          },
+          "width_max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width Max"
+          },
+          "width_exact": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width Exact"
+          },
+          "height_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height Min"
+          },
+          "height_max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height Max"
+          },
+          "height_exact": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height Exact"
+          },
+          "board_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board Ids"
+          },
+          "starred_mode": {
+            "type": "string",
+            "enum": ["include", "exclude", "only"],
+            "title": "Starred Mode",
+            "default": "include"
+          }
+        },
+        "type": "object",
+        "title": "ImageSearchBody"
       },
       "ImageToLatentsInvocation": {
         "category": "latents",
