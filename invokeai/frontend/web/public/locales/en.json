@@ -1053,6 +1053,7 @@
         "seed": "Seed",
         "steps": "Steps",
         "strength": "Image to image strength",
+        "t5Encoder": "T5 Encoder",
         "Threshold": "Noise Threshold",
         "vae": "VAE",
         "width": "Width",

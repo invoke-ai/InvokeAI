@@ -22,7 +22,7 @@ vi.mock('features/controlLayers/store/paramsSlice', async (importOriginal) => {
   return { ...mod, selectBase: () => currentBase };
 });
 
-const fakeModel = (type: 'vae' | 'qwen3_encoder', base: string) => ({
+const fakeModel = (type: 'vae' | 'qwen3_encoder' | 't5_encoder', base: string) => ({
   key: `${type}-key`,
   hash: 'hash',
   name: `Some ${type}`,
@@ -123,6 +123,25 @@ describe('ImageMetadataHandlers — Klein recall gating', () => {
 
       const parsed = await ImageMetadataHandlers.VAEModel.parse({ vae: nextResolved }, store);
       expect(parsed.key).toBe('vae-key');
+    });
+  });
+
+  describe('T5EncoderModel', () => {
+    it('parses metadata.t5_encoder into a t5_encoder model identifier', async () => {
+      nextResolved = fakeModel('t5_encoder', 'any');
+      const store = makeStore();
+
+      const parsed = await ImageMetadataHandlers.T5EncoderModel.parse({ t5_encoder: nextResolved }, store);
+
+      expect(parsed.key).toBe('t5_encoder-key');
+      expect(parsed.type).toBe('t5_encoder');
+    });
+
+    it('rejects parsing when the resolved model is not a t5_encoder', async () => {
+      nextResolved = fakeModel('vae', 'flux');
+      const store = makeStore();
+
+      await expect(ImageMetadataHandlers.T5EncoderModel.parse({ t5_encoder: nextResolved }, store)).rejects.toThrow();
     });
   });
 
