@@ -20,7 +20,7 @@ const config: KnipConfig = {
     'src/services/api/endpoints/auth.ts',
   ],
   ignoreBinaries: ['only-allow'],
-  ignoreDependencies: ['magic-string', '@babel/preset-typescript', 'babel-plugin-react-compiler'],
+  ignoreDependencies: ['magic-string', '@babel/preset-typescript', 'babel-plugin-react-compiler', 'openapi-typescript'],
   paths: {
     'public/*': ['public/*'],
   },
