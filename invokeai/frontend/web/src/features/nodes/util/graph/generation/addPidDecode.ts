@@ -20,16 +20,25 @@ type Size = { width: number; height: number };
  * The base-specific PiD decode node types. Each replaces its base's VAE decode with the PiD super-res decode.
  * Only bases whose graph builder actually wires PiD are listed; more are added as their builders gain support.
  */
-type PidDecodeNodeType = 'flux_pid_decode' | 'flux2_pid_decode' | 'sd3_pid_decode' | 'sdxl_pid_decode';
+type PidDecodeNodeType =
+  | 'flux_pid_decode'
+  | 'flux2_pid_decode'
+  | 'sd3_pid_decode'
+  | 'sdxl_pid_decode'
+  | 'z_image_pid_decode';
 
 /**
  * Denoise nodes whose latents PiD can decode. The FLUX-family nodes carry their own width/height; `denoise_latents`
  * (SD1.5/SD2/SDXL) does not - it is sized via a separate `noise` node, so callers using it must pass `noise`.
  */
-type PidDenoiseNodeType = 'flux_denoise' | 'flux2_denoise' | 'sd3_denoise' | 'denoise_latents';
+type PidDenoiseNodeType = 'flux_denoise' | 'flux2_denoise' | 'sd3_denoise' | 'z_image_denoise' | 'denoise_latents';
 
 /** PiD decode node types that expose a `vae` input (used to read the VAE's scaling constants at runtime). */
-const PID_DECODE_NODES_WITH_VAE_INPUT = new Set<PidDecodeNodeType>(['flux2_pid_decode', 'sdxl_pid_decode']);
+const PID_DECODE_NODES_WITH_VAE_INPUT = new Set<PidDecodeNodeType>([
+  'flux2_pid_decode',
+  'sdxl_pid_decode',
+  'z_image_pid_decode',
+]);
 
 /**
  * Sets the generation dimensions for a PiD graph. The FLUX-family denoise nodes carry width/height directly;
