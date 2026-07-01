@@ -1,0 +1,23 @@
+---
+type Props = {
+  href: string;
+  label?: string;
+  [key: string]: any;
+};
+
+const { href, label, ...rest } = Astro.props as Props;
+
+const useSlot = !!Astro.slots.has('default');
+const isExternal = /^https?:\/\//.test(href);
+---
+
+<a
+  href={href}
+  target={isExternal ? '_blank' : undefined}
+  rel={isExternal ? 'noopener noreferrer' : undefined}
+  aria-label={label ?? undefined}
+  title={label ?? undefined}
+  {...rest}
+>
+  {useSlot ? <slot /> : label}
+</a>

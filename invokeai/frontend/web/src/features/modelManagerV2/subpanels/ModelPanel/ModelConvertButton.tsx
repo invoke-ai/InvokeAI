@@ -8,56 +8,51 @@ import {
   UnorderedList,
   useDisclosure,
 } from '@invoke-ai/ui-library';
-import { skipToken } from '@reduxjs/toolkit/query';
 import { toast } from 'features/toast/toast';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useConvertModelMutation, useGetModelConfigQuery } from 'services/api/endpoints/models';
+import { useConvertModelMutation } from 'services/api/endpoints/models';
+import type { CheckpointModelConfig } from 'services/api/types';
 
 interface ModelConvertProps {
-  modelKey: string | null;
+  modelConfig: CheckpointModelConfig;
 }
 
-export const ModelConvertButton = (props: ModelConvertProps) => {
-  const { modelKey } = props;
+export const ModelConvertButton = memo(({ modelConfig }: ModelConvertProps) => {
   const { t } = useTranslation();
-  const { data } = useGetModelConfigQuery(modelKey ?? skipToken);
   const [convertModel, { isLoading }] = useConvertModelMutation();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   const modelConvertHandler = useCallback(() => {
-    if (!data || isLoading) {
+    if (!modelConfig || isLoading) {
       return;
     }
 
-    const toastId = `CONVERTING_MODEL_${data.key}`;
+    const toastId = `CONVERTING_MODEL_${modelConfig.key}`;
     toast({
       id: toastId,
-      title: `${t('modelManager.convertingModelBegin')}: ${data?.name}`,
+      title: `${t('modelManager.convertingModelBegin')}: ${modelConfig.name}`,
       status: 'info',
     });
 
-    convertModel(data?.key)
+    convertModel(modelConfig.key)
       .unwrap()
       .then(() => {
-        toast({ id: toastId, title: `${t('modelManager.modelConverted')}: ${data?.name}`, status: 'success' });
+        toast({ id: toastId, title: `${t('modelManager.modelConverted')}: ${modelConfig.name}`, status: 'success' });
       })
       .catch(() => {
         toast({
           id: toastId,
-          title: `${t('modelManager.modelConversionFailed')}: ${data?.name}`,
+          title: `${t('modelManager.modelConversionFailed')}: ${modelConfig.name}`,
           status: 'error',
         });
       });
-  }, [data, isLoading, t, convertModel]);
-
-  if (data?.format !== 'checkpoint') {
-    return;
-  }
+  }, [modelConfig, isLoading, t, convertModel]);
 
   return (
     <>
       <Button
+        variant="outline"
         onClick={onOpen}
         size="sm"
         aria-label={t('modelManager.convertToDiffusers')}
@@ -68,11 +63,12 @@ export const ModelConvertButton = (props: ModelConvertProps) => {
         🧨 {t('modelManager.convert')}
       </Button>
       <ConfirmationAlertDialog
-        title={`${t('modelManager.convert')} ${data?.name}`}
+        title={`${t('modelManager.convert')} ${modelConfig.name}`}
         acceptCallback={modelConvertHandler}
         acceptButtonText={`${t('modelManager.convert')}`}
         isOpen={isOpen}
         onClose={onClose}
+        useInert={false}
       >
         <Flex flexDirection="column" rowGap={4}>
           <Text fontSize="md">{t('modelManager.convertToDiffusersHelpText1')}</Text>
@@ -96,4 +92,6 @@ export const ModelConvertButton = (props: ModelConvertProps) => {
       </ConfirmationAlertDialog>
     </>
   );
-};
+});
+
+ModelConvertButton.displayName = 'ModelConvertButton';

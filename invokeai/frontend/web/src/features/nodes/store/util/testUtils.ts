@@ -1,10 +1,9 @@
 import type { Templates } from 'features/nodes/store/types';
-import type { InvocationTemplate } from 'features/nodes/types/invocation';
+import type { AnyEdge, InvocationTemplate } from 'features/nodes/types/invocation';
 import { buildInvocationNode } from 'features/nodes/util/node/buildInvocationNode';
 import type { OpenAPIV3_1 } from 'openapi-types';
-import type { Edge } from 'reactflow';
 
-export const buildEdge = (source: string, sourceHandle: string, target: string, targetHandle: string): Edge => ({
+export const buildEdge = (source: string, sourceHandle: string, target: string, targetHandle: string): AnyEdge => ({
   source,
   sourceHandle,
   target,
@@ -34,6 +33,7 @@ export const add: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       default: 0,
     },
@@ -48,6 +48,7 @@ export const add: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       default: 0,
     },
@@ -61,6 +62,7 @@ export const add: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
     },
@@ -68,6 +70,7 @@ export const add: InvocationTemplate = {
   useCache: true,
   nodePack: 'invokeai',
   classification: 'stable',
+  category: 'math',
 };
 
 export const sub: InvocationTemplate = {
@@ -89,6 +92,7 @@ export const sub: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       default: 0,
     },
@@ -103,6 +107,7 @@ export const sub: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       default: 0,
     },
@@ -116,6 +121,7 @@ export const sub: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
     },
@@ -123,20 +129,38 @@ export const sub: InvocationTemplate = {
   useCache: true,
   nodePack: 'invokeai',
   classification: 'stable',
+  category: 'math',
 };
 
 export const collect: InvocationTemplate = {
   title: 'Collect',
   type: 'collect',
-  version: '1.0.0',
+  version: '1.1.0',
   tags: [],
   description: 'Collects values into a collection',
   outputType: 'collect_output',
   inputs: {
+    collection: {
+      name: 'collection',
+      title: 'Collection',
+      required: false,
+      default: undefined,
+      description: 'An optional collection to append to',
+      fieldKind: 'input',
+      input: 'connection',
+      ui_hidden: false,
+      ui_type: 'CollectionField' as const,
+      type: {
+        name: 'CollectionField' as const,
+        cardinality: 'COLLECTION',
+        batch: false,
+      },
+    },
     item: {
       name: 'item',
       title: 'Collection Item',
       required: false,
+      default: undefined,
       description: 'The item to collect (all inputs must be of the same type)',
       fieldKind: 'input',
       input: 'connection',
@@ -145,6 +169,7 @@ export const collect: InvocationTemplate = {
       type: {
         name: 'CollectionItemField',
         cardinality: 'SINGLE',
+        batch: false,
       },
     },
   },
@@ -157,13 +182,16 @@ export const collect: InvocationTemplate = {
       type: {
         name: 'CollectionField',
         cardinality: 'COLLECTION',
+        batch: false,
       },
       ui_hidden: false,
       ui_type: 'CollectionField',
     },
   },
   useCache: true,
+  nodePack: 'invokeai',
   classification: 'stable',
+  category: 'collections',
 };
 
 const scheduler: InvocationTemplate = {
@@ -186,10 +214,11 @@ const scheduler: InvocationTemplate = {
       type: {
         name: 'SchedulerField',
         cardinality: 'SINGLE',
-
+        batch: false,
         originalType: {
           name: 'EnumField',
           cardinality: 'SINGLE',
+          batch: false,
         },
       },
       default: 'euler',
@@ -204,10 +233,12 @@ const scheduler: InvocationTemplate = {
       type: {
         name: 'SchedulerField',
         cardinality: 'SINGLE',
+        batch: false,
 
         originalType: {
           name: 'EnumField',
           cardinality: 'SINGLE',
+          batch: false,
         },
       },
       ui_hidden: false,
@@ -217,6 +248,7 @@ const scheduler: InvocationTemplate = {
   useCache: true,
   nodePack: 'invokeai',
   classification: 'stable',
+  category: 'other',
 };
 
 export const main_model_loader: InvocationTemplate = {
@@ -235,15 +267,12 @@ export const main_model_loader: InvocationTemplate = {
       fieldKind: 'input',
       input: 'direct',
       ui_hidden: false,
-      ui_type: 'MainModelField',
+      ui_model_base: ['sd-1'],
+      ui_model_type: ['main'],
       type: {
-        name: 'MainModelField',
+        name: 'ModelIdentifierField',
         cardinality: 'SINGLE',
-
-        originalType: {
-          name: 'ModelIdentifierField',
-          cardinality: 'SINGLE',
-        },
+        batch: false,
       },
     },
   },
@@ -256,6 +285,7 @@ export const main_model_loader: InvocationTemplate = {
       type: {
         name: 'VAEField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
     },
@@ -267,6 +297,7 @@ export const main_model_loader: InvocationTemplate = {
       type: {
         name: 'CLIPField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
     },
@@ -278,6 +309,7 @@ export const main_model_loader: InvocationTemplate = {
       type: {
         name: 'UNetField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
     },
@@ -285,6 +317,7 @@ export const main_model_loader: InvocationTemplate = {
   useCache: true,
   nodePack: 'invokeai',
   classification: 'stable',
+  category: 'model',
 };
 
 export const img_resize: InvocationTemplate = {
@@ -303,15 +336,18 @@ export const img_resize: InvocationTemplate = {
       fieldKind: 'input',
       input: 'direct',
       ui_hidden: false,
+      default: 'auto',
       type: {
         name: 'BoardField',
         cardinality: 'SINGLE',
+        batch: false,
       },
     },
     metadata: {
       name: 'metadata',
       title: 'Metadata',
       required: false,
+      default: undefined,
       description: 'Optional metadata to be saved with the image',
       fieldKind: 'input',
       input: 'connection',
@@ -319,6 +355,7 @@ export const img_resize: InvocationTemplate = {
       type: {
         name: 'MetadataField',
         cardinality: 'SINGLE',
+        batch: false,
       },
     },
     image: {
@@ -332,6 +369,7 @@ export const img_resize: InvocationTemplate = {
       type: {
         name: 'ImageField',
         cardinality: 'SINGLE',
+        batch: false,
       },
     },
     width: {
@@ -345,6 +383,7 @@ export const img_resize: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       default: 512,
       exclusiveMinimum: 0,
@@ -360,6 +399,7 @@ export const img_resize: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       default: 512,
       exclusiveMinimum: 0,
@@ -375,6 +415,7 @@ export const img_resize: InvocationTemplate = {
       type: {
         name: 'EnumField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       options: ['nearest', 'box', 'bilinear', 'hamming', 'bicubic', 'lanczos'],
       default: 'bicubic',
@@ -389,6 +430,7 @@ export const img_resize: InvocationTemplate = {
       type: {
         name: 'ImageField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
     },
@@ -400,6 +442,7 @@ export const img_resize: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
     },
@@ -411,6 +454,7 @@ export const img_resize: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
     },
@@ -418,6 +462,7 @@ export const img_resize: InvocationTemplate = {
   useCache: true,
   nodePack: 'invokeai',
   classification: 'stable',
+  category: 'image',
 };
 
 const iterate: InvocationTemplate = {
@@ -432,6 +477,7 @@ const iterate: InvocationTemplate = {
       name: 'collection',
       title: 'Collection',
       required: false,
+      default: undefined,
       description: 'The list of items to iterate over',
       fieldKind: 'input',
       input: 'connection',
@@ -440,6 +486,7 @@ const iterate: InvocationTemplate = {
       type: {
         name: 'CollectionField',
         cardinality: 'COLLECTION',
+        batch: false,
       },
     },
   },
@@ -452,6 +499,7 @@ const iterate: InvocationTemplate = {
       type: {
         name: 'CollectionItemField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
       ui_type: 'CollectionItemField',
@@ -464,6 +512,7 @@ const iterate: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
     },
@@ -475,12 +524,15 @@ const iterate: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
     },
   },
   useCache: true,
+  nodePack: 'invokeai',
   classification: 'stable',
+  category: 'collections',
 };
 
 export const templates: Templates = {
@@ -668,7 +720,6 @@ export const schema = {
         required: ['type', 'id'],
         title: 'Scheduler',
         description: 'Selects a scheduler.',
-        category: 'latents',
         classification: 'stable',
         node_pack: 'invokeai',
         tags: ['scheduler'],
@@ -762,7 +813,8 @@ export const schema = {
             input: 'direct',
             orig_required: true,
             ui_hidden: false,
-            ui_type: 'MainModelField',
+            ui_model_base: ['sd-1'],
+            ui_model_type: ['main'],
           },
           type: {
             type: 'string',
@@ -1132,13 +1184,12 @@ export const schema = {
             items: {},
             type: 'array',
             title: 'Collection',
-            description: 'The collection, will be provided on execution',
-            default: [],
+            description: 'An optional collection to append to',
             field_kind: 'input',
-            input: 'any',
-            orig_default: [],
+            input: 'connection',
             orig_required: false,
-            ui_hidden: true,
+            ui_hidden: false,
+            ui_type: 'CollectionField',
           },
           type: {
             type: 'string',
@@ -1152,9 +1203,11 @@ export const schema = {
         type: 'object',
         required: ['type', 'id'],
         title: 'CollectInvocation',
+        node_pack: 'invokeai',
         description: 'Collects values into a collection',
+        category: 'collections',
         classification: 'stable',
-        version: '1.0.0',
+        version: '1.1.0',
         output: {
           $ref: '#/components/schemas/CollectInvocationOutput',
         },
@@ -1512,7 +1565,9 @@ export const schema = {
         required: ['type', 'id'],
         title: 'IterateInvocation',
         description: 'Iterates over a list of items',
+        category: 'collections',
         classification: 'stable',
+        node_pack: 'invokeai',
         version: '1.1.0',
         output: {
           $ref: '#/components/schemas/IterateInvocationOutput',

@@ -1,15 +1,36 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
-import { Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-library';
+import { Box, Flex, FormControlGroup, SimpleGrid, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import {
+  selectIsAnima,
+  selectIsExternal,
+  selectIsFLUX,
+  selectIsFlux2,
+  selectIsQwenImage,
+  selectIsSD3,
+  selectIsZImage,
+  selectParamsSlice,
+  selectVAEKey,
+} from 'features/controlLayers/store/paramsSlice';
+import ParamAnimaModelSelect from 'features/parameters/components/Advanced/ParamAnimaModelSelect';
 import ParamCFGRescaleMultiplier from 'features/parameters/components/Advanced/ParamCFGRescaleMultiplier';
+import ParamCLIPEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPEmbedModelSelect';
+import ParamCLIPGEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPGEmbedModelSelect';
+import ParamCLIPLEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPLEmbedModelSelect';
 import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip';
+import ParamFlux2KleinModelSelect from 'features/parameters/components/Advanced/ParamFlux2KleinModelSelect';
+import ParamQwenImageComponentSourceSelect from 'features/parameters/components/Advanced/ParamQwenImageComponentSourceSelect';
+import ParamQwenImageQuantization from 'features/parameters/components/Advanced/ParamQwenImageQuantization';
+import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
+import ParamZImageQwen3VaeModelSelect from 'features/parameters/components/Advanced/ParamZImageQwen3VaeModelSelect';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
 import ParamSeamlessYAxis from 'features/parameters/components/Seamless/ParamSeamlessYAxis';
+import ParamColorCompensation from 'features/parameters/components/VAEModel/ParamColorCompensation';
+import ParamFLUXVAEModelSelect from 'features/parameters/components/VAEModel/ParamFLUXVAEModelSelect';
 import ParamVAEModelSelect from 'features/parameters/components/VAEModel/ParamVAEModelSelect';
 import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEPrecision';
-import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,30 +45,50 @@ const formLabelProps2: FormLabelProps = {
 };
 
 export const AdvancedSettingsAccordion = memo(() => {
-  const vaeKey = useAppSelector((state) => state.generation.vae?.key);
+  const vaeKey = useAppSelector(selectVAEKey);
   const { currentData: vaeConfig } = useGetModelConfigQuery(vaeKey ?? skipToken);
+  const isFLUX = useAppSelector(selectIsFLUX);
+  const isFlux2 = useAppSelector(selectIsFlux2);
+  const isSD3 = useAppSelector(selectIsSD3);
+  const isZImage = useAppSelector(selectIsZImage);
+  const isExternal = useAppSelector(selectIsExternal);
+  const isQwenImage = useAppSelector(selectIsQwenImage);
+  const isAnima = useAppSelector(selectIsAnima);
+
   const selectBadges = useMemo(
     () =>
-      createMemoizedSelector(selectGenerationSlice, (generation) => {
+      createMemoizedSelector([selectParamsSlice, selectIsFLUX, selectIsFlux2], (params, isFLUX, isFlux2) => {
         const badges: (string | number)[] = [];
-        if (vaeConfig) {
-          let vaeBadge = vaeConfig.name;
-          if (generation.vaePrecision === 'fp16') {
-            vaeBadge += ` ${generation.vaePrecision}`;
+        // FLUX.2 has VAE built into main model - no badge needed
+        if (isFLUX && !isFlux2) {
+          if (vaeConfig) {
+            let vaeBadge = vaeConfig.name;
+            if (params.vaePrecision === 'fp16') {
+              vaeBadge += ` ${params.vaePrecision}`;
+            }
+            badges.push(vaeBadge);
           }
-          badges.push(vaeBadge);
-        } else if (generation.vaePrecision === 'fp16') {
-          badges.push(`VAE ${generation.vaePrecision}`);
+        } else if (!isFlux2) {
+          if (vaeConfig) {
+            let vaeBadge = vaeConfig.name;
+            if (params.vaePrecision === 'fp16') {
+              vaeBadge += ` ${params.vaePrecision}`;
+            }
+            badges.push(vaeBadge);
+          } else if (params.vaePrecision === 'fp16') {
+            badges.push(`VAE ${params.vaePrecision}`);
+          }
+          if (params.clipSkip) {
+            badges.push(`Skip ${params.clipSkip}`);
+          }
+          if (params.cfgRescaleMultiplier) {
+            badges.push(`Rescale ${params.cfgRescaleMultiplier}`);
+          }
+          if (params.seamlessXAxis || params.seamlessYAxis) {
+            badges.push('seamless');
+          }
         }
-        if (generation.clipSkip) {
-          badges.push(`Skip ${generation.clipSkip}`);
-        }
-        if (generation.cfgRescaleMultiplier) {
-          badges.push(`Rescale ${generation.cfgRescaleMultiplier}`);
-        }
-        if (generation.seamlessXAxis || generation.seamlessYAxis) {
-          badges.push('seamless');
-        }
+
         return badges;
       }),
     [vaeConfig]
@@ -55,27 +96,76 @@ export const AdvancedSettingsAccordion = memo(() => {
   const badges = useAppSelector(selectBadges);
   const { t } = useTranslation();
   const { isOpen, onToggle } = useStandaloneAccordionToggle({
-    id: 'advanced-settings',
+    id: `'advanced-settings-generate`,
     defaultIsOpen: false,
   });
+
+  if (isExternal) {
+    return null;
+  }
 
   return (
     <StandaloneAccordion label={t('accordions.advanced.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
       <Flex gap={4} alignItems="center" p={4} flexDir="column" data-testid="advanced-settings-accordion">
-        <Flex gap={4} w="full">
-          <ParamVAEModelSelect />
-          <ParamVAEPrecision />
-        </Flex>
-        <FormControlGroup formLabelProps={formLabelProps}>
-          <ParamClipSkip />
-          <ParamCFGRescaleMultiplier />
-        </FormControlGroup>
-        <Flex gap={4} w="full">
-          <FormControlGroup formLabelProps={formLabelProps2}>
-            <ParamSeamlessXAxis />
-            <ParamSeamlessYAxis />
+        {!isZImage && !isAnima && !isFlux2 && !isQwenImage && (
+          <Flex gap={4} w="full">
+            {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
+            {!isFLUX && !isSD3 && <ParamVAEPrecision />}
+          </Flex>
+        )}
+        {!isFLUX && !isFlux2 && !isSD3 && !isZImage && !isQwenImage && !isAnima && (
+          <>
+            <FormControlGroup formLabelProps={formLabelProps}>
+              <ParamClipSkip />
+              <ParamCFGRescaleMultiplier />
+            </FormControlGroup>
+            <Flex gap={4} w="full">
+              <FormControlGroup formLabelProps={formLabelProps2}>
+                <SimpleGrid columns={2} spacing={4} w="full">
+                  <ParamSeamlessXAxis />
+                  <ParamSeamlessYAxis />
+                  <ParamColorCompensation />
+                  {/* Empty box for visual alignment. Replace with new option when needed. */}
+                  <Box />
+                </SimpleGrid>
+              </FormControlGroup>
+            </Flex>
+          </>
+        )}
+        {isFLUX && !isFlux2 && (
+          <FormControlGroup>
+            <ParamT5EncoderModelSelect />
+            <ParamCLIPEmbedModelSelect />
           </FormControlGroup>
-        </Flex>
+        )}
+        {isFlux2 && (
+          <FormControlGroup>
+            <ParamFlux2KleinModelSelect />
+          </FormControlGroup>
+        )}
+        {isSD3 && (
+          <FormControlGroup>
+            <ParamT5EncoderModelSelect />
+            <ParamCLIPLEmbedModelSelect />
+            <ParamCLIPGEmbedModelSelect />
+          </FormControlGroup>
+        )}
+        {isZImage && (
+          <FormControlGroup>
+            <ParamZImageQwen3VaeModelSelect />
+          </FormControlGroup>
+        )}
+        {isQwenImage && (
+          <FormControlGroup>
+            <ParamQwenImageComponentSourceSelect />
+            <ParamQwenImageQuantization />
+          </FormControlGroup>
+        )}
+        {isAnima && (
+          <FormControlGroup>
+            <ParamAnimaModelSelect />
+          </FormControlGroup>
+        )}
       </Flex>
     </StandaloneAccordion>
   );

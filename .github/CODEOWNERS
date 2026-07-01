@@ -1,32 +1,30 @@
 # continuous integration
-/.github/workflows/  @lstein @blessedcoolant @hipsterusername @ebr
+/.github/workflows/  @lstein @blessedcoolant
 
-# documentation
-/docs/ @lstein @blessedcoolant @hipsterusername @Millu
-/mkdocs.yml @lstein  @blessedcoolant @hipsterusername @Millu
+# documentation - anyone with write privileges can review
+/docs/
 
 # nodes
-/invokeai/app/ @Kyle0654 @blessedcoolant @psychedelicious @brandonrising @hipsterusername
+/invokeai/app/ @blessedcoolant @lstein @dunkeroni @JPPhoto
 
 # installation and configuration
-/pyproject.toml  @lstein @blessedcoolant @hipsterusername
-/docker/  @lstein @blessedcoolant @hipsterusername @ebr
-/scripts/ @ebr @lstein @hipsterusername
-/installer/ @lstein @ebr @hipsterusername
-/invokeai/assets @lstein @ebr @hipsterusername
-/invokeai/configs @lstein @hipsterusername
-/invokeai/version @lstein @blessedcoolant @hipsterusername
+/pyproject.toml  @lstein @blessedcoolant
+/docker/  @lstein @blessedcoolant
+/scripts/  @lstein  @blessedcoolant
+/installer/ @lstein   @blessedcoolant
+/invokeai/assets @lstein   @blessedcoolant
+/invokeai/configs @lstein  @blessedcoolant
+/invokeai/version @lstein @blessedcoolant
 
 # web ui
-/invokeai/frontend @blessedcoolant @psychedelicious @lstein @maryhipp @hipsterusername
-/invokeai/backend @blessedcoolant @psychedelicious @lstein @maryhipp @hipsterusername
+/invokeai/frontend @blessedcoolant  @lstein  @dunkeroni
 
 # generation, model management, postprocessing
-/invokeai/backend  @damian0815 @lstein @blessedcoolant @gregghelt2 @StAlKeR7779 @brandonrising @ryanjdick @hipsterusername
+/invokeai/backend  @lstein @blessedcoolant @dunkeroni @JPPhoto  @Pfannkuchensack
 
 # front ends
-/invokeai/frontend/CLI @lstein @hipsterusername
-/invokeai/frontend/install @lstein @ebr @hipsterusername
-/invokeai/frontend/merge @lstein @blessedcoolant @hipsterusername
-/invokeai/frontend/training @lstein @blessedcoolant @hipsterusername
-/invokeai/frontend/web @psychedelicious @blessedcoolant @maryhipp @hipsterusername
+/invokeai/frontend/CLI @lstein
+/invokeai/frontend/install @lstein
+/invokeai/frontend/merge @lstein @blessedcoolant
+/invokeai/frontend/training @lstein @blessedcoolant
+/invokeai/frontend/web  @blessedcoolant  @lstein @dunkeroni @Pfannkuchensack

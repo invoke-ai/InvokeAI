@@ -14,7 +14,9 @@ class SqliteMigrator:
 
     :param db: The instance of :class:`SqliteDatabase` to migrate.
 
-    Migrations should be registered with :meth:`register_migration`.
+    Migrations should be registered with :meth:`register_migration`, either directly or via the migration loader.
+    They are planned by stable migration ID dependencies and recorded in the ``applied_migrations`` table.
+    Legacy numeric versions are still written for migrations that define ``to_version``.
 
     Each migration is run in a transaction. If a migration fails, the transaction is rolled back.
 
@@ -32,7 +34,7 @@ class SqliteMigrator:
 
     def __init__(self, db: SqliteDatabase) -> None:
         self._db = db
-        self._logger = db.logger
+        self._logger = db._logger
         self._migration_set = MigrationSet()
         self._backup_path: Optional[Path] = None
 
@@ -43,92 +45,247 @@ class SqliteMigrator:
 
     def run_migrations(self) -> bool:
         """Migrates the database to the latest version."""
-        with self._db.lock:
-            # This throws if there is a problem.
-            self._migration_set.validate_migration_chain()
-            cursor = self._db.conn.cursor()
-            self._create_migrations_table(cursor=cursor)
+        # This throws if there is a problem.
+        self._migration_set.validate_dependency_graph()
+        cursor = self._db._conn.cursor()
+        self._validate_existing_applied_migrations(cursor=cursor)
+        self._create_migrations_table(cursor=cursor)
+        self._validate_existing_legacy_migrations(cursor=cursor)
+        if self._needs_applied_migrations_bootstrap(cursor=cursor):
+            self._backup_db()
+        self._create_applied_migrations_table(cursor=cursor)
+        self._validate_existing_applied_legacy_migrations(cursor=cursor)
+        self._bootstrap_applied_migrations_from_legacy_versions(cursor=cursor)
 
-            if self._migration_set.count == 0:
-                self._logger.debug("No migrations registered")
-                return False
+        if self._migration_set.count == 0:
+            self._logger.debug("No migrations registered")
+            return False
 
-            if self._get_current_version(cursor=cursor) == self._migration_set.latest_version:
-                self._logger.debug("Database is up to date, no migrations to run")
-                return False
+        applied_migration_ids = self._get_applied_migration_ids(cursor=cursor)
+        migration_plan = self._migration_set.get_migration_plan(applied_migration_ids=applied_migration_ids)
+        if len(migration_plan) == 0:
+            self._logger.debug("Database is up to date, no migrations to run")
+            return False
 
-            self._logger.info("Database update needed")
+        self._logger.info("Database update needed")
 
-            # Make a backup of the db if it needs to be updated and is a file db
-            if self._db.db_path is not None:
-                timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-                self._backup_path = self._db.db_path.parent / f"{self._db.db_path.stem}_backup_{timestamp}.db"
-                self._logger.info(f"Backing up database to {str(self._backup_path)}")
-                # Use SQLite to do the backup
-                with closing(sqlite3.connect(self._backup_path)) as backup_conn:
-                    self._db.conn.backup(backup_conn)
-            else:
-                self._logger.info("Using in-memory database, no backup needed")
+        self._backup_db()
 
-            next_migration = self._migration_set.get(from_version=self._get_current_version(cursor))
-            while next_migration is not None:
-                self._run_migration(next_migration)
-                next_migration = self._migration_set.get(self._get_current_version(cursor))
-            self._logger.info("Database updated successfully")
-            return True
+        for migration in migration_plan:
+            self._run_migration(migration)
+        self._logger.info("Database updated successfully")
+        return True
+
+    def _backup_db(self) -> None:
+        """Makes a backup of the db if it is a file db and a backup has not already been made."""
+        if self._backup_path is not None:
+            return
+        if self._db._db_path is not None:
+            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+            self._backup_path = self._db._db_path.parent / f"{self._db._db_path.stem}_backup_{timestamp}.db"
+            self._logger.info(f"Backing up database to {str(self._backup_path)}")
+            with closing(sqlite3.connect(self._backup_path)) as backup_conn:
+                self._db._conn.backup(backup_conn)
+        else:
+            self._logger.info("Using in-memory database, no backup needed")
 
     def _run_migration(self, migration: Migration) -> None:
         """Runs a single migration."""
         try:
             # Using sqlite3.Connection as a context manager commits a the transaction on exit, or rolls it back if an
             # exception is raised.
-            with self._db.lock, self._db.conn as conn:
+            with self._db._conn as conn:
                 cursor = conn.cursor()
-                if self._get_current_version(cursor) != migration.from_version:
+                self._create_applied_migrations_table(cursor)
+                if migration.from_version is not None and self._get_current_version(cursor) != migration.from_version:
                     raise MigrationError(
                         f"Database is at version {self._get_current_version(cursor)}, expected {migration.from_version}"
                     )
-                self._logger.debug(f"Running migration from {migration.from_version} to {migration.to_version}")
+                self._logger.debug(f"Running migration '{migration.id}'")
 
                 # Run the actual migration
                 migration.callback(cursor)
 
-                # Update the version
-                cursor.execute("INSERT INTO migrations (version) VALUES (?);", (migration.to_version,))
-
-                self._logger.debug(
-                    f"Successfully migrated database from {migration.from_version} to {migration.to_version}"
+                if migration.to_version is not None:
+                    cursor.execute("INSERT INTO migrations (version) VALUES (?);", (migration.to_version,))
+                cursor.execute(
+                    "INSERT INTO applied_migrations (migration_id, legacy_version) VALUES (?, ?);",
+                    (migration.id, migration.to_version),
                 )
+
+                self._logger.debug(f"Successfully ran migration '{migration.id}'")
         # We want to catch *any* error, mirroring the behaviour of the sqlite3 module.
         except Exception as e:
             # The connection context manager has already rolled back the migration, so we don't need to do anything.
-            msg = f"Error migrating database from {migration.from_version} to {migration.to_version}: {e}"
+            msg = f"Error running migration '{migration.id}': {e}"
             self._logger.error(msg)
             raise MigrationError(msg) from e
 
     def _create_migrations_table(self, cursor: sqlite3.Cursor) -> None:
         """Creates the migrations table for the database, if one does not already exist."""
-        with self._db.lock:
-            try:
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='migrations';")
-                if cursor.fetchone() is not None:
-                    return
+        try:
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='migrations';")
+            if cursor.fetchone() is not None:
+                return
+            cursor.execute(
+                """--sql
+                CREATE TABLE migrations (
+                    version INTEGER PRIMARY KEY,
+                    migrated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW'))
+                );
+                """
+            )
+            cursor.execute("INSERT INTO migrations (version) VALUES (0);")
+            cursor.connection.commit()
+            self._logger.debug("Created migrations table")
+        except sqlite3.Error as e:
+            msg = f"Problem creating migrations table: {e}"
+            self._logger.error(msg)
+            cursor.connection.rollback()
+            raise MigrationError(msg) from e
+
+    def _create_applied_migrations_table(self, cursor: sqlite3.Cursor) -> None:
+        """Creates the applied migrations table for stable migration IDs."""
+        try:
+            cursor.execute(
+                """--sql
+                CREATE TABLE IF NOT EXISTS applied_migrations (
+                    migration_id TEXT PRIMARY KEY,
+                    legacy_version INTEGER UNIQUE,
+                    migrated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW'))
+                );
+                """
+            )
+        except sqlite3.Error as e:
+            msg = f"Problem creating applied_migrations table: {e}"
+            self._logger.error(msg)
+            cursor.connection.rollback()
+            raise MigrationError(msg) from e
+
+    def _bootstrap_applied_migrations_from_legacy_versions(self, cursor: sqlite3.Cursor) -> None:
+        """Backfills applied migration IDs from legacy numeric migration rows."""
+        try:
+            cursor.execute("SELECT version FROM migrations WHERE version > 0 ORDER BY version;")
+            legacy_versions = [row[0] for row in cursor.fetchall()]
+            registered_migration_ids = self._migration_set.migrations_by_id
+            for legacy_version in legacy_versions:
+                migration_id = f"migration_{legacy_version}"
+                if migration_id not in registered_migration_ids:
+                    cursor.connection.rollback()
+                    raise MigrationError(f"Database contains unknown legacy migration version: {legacy_version}")
                 cursor.execute(
-                    """--sql
-                    CREATE TABLE migrations (
-                        version INTEGER PRIMARY KEY,
-                        migrated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW'))
-                    );
-                    """
+                    "SELECT legacy_version FROM applied_migrations WHERE migration_id = ?;",
+                    (migration_id,),
                 )
-                cursor.execute("INSERT INTO migrations (version) VALUES (0);")
-                cursor.connection.commit()
-                self._logger.debug("Created migrations table")
-            except sqlite3.Error as e:
-                msg = f"Problem creating migrations table: {e}"
-                self._logger.error(msg)
-                cursor.connection.rollback()
-                raise MigrationError(msg) from e
+                migration_row = cursor.fetchone()
+                if migration_row is not None and migration_row[0] != legacy_version:
+                    cursor.connection.rollback()
+                    raise MigrationError(
+                        "Database contains inconsistent applied migration state: "
+                        f"{migration_id} is recorded with legacy version {migration_row[0]}, "
+                        f"expected {legacy_version}"
+                    )
+                cursor.execute(
+                    "SELECT migration_id FROM applied_migrations WHERE legacy_version = ?;",
+                    (legacy_version,),
+                )
+                legacy_row = cursor.fetchone()
+                if legacy_row is not None and legacy_row[0] != migration_id:
+                    cursor.connection.rollback()
+                    raise MigrationError(
+                        "Database contains inconsistent applied migration state: "
+                        f"legacy version {legacy_version} is recorded for {legacy_row[0]}, expected {migration_id}"
+                    )
+                cursor.execute(
+                    "INSERT OR IGNORE INTO applied_migrations (migration_id, legacy_version) VALUES (?, ?);",
+                    (migration_id, legacy_version),
+                )
+            cursor.connection.commit()
+        except sqlite3.Error as e:
+            msg = f"Problem bootstrapping applied migrations: {e}"
+            self._logger.error(msg)
+            cursor.connection.rollback()
+            raise MigrationError(msg) from e
+
+    def _validate_existing_applied_migrations(self, cursor: sqlite3.Cursor) -> None:
+        """Validates existing applied migration IDs before creating or mutating migrator metadata."""
+        applied_migration_ids = self._get_applied_migration_ids(cursor=cursor)
+        if len(applied_migration_ids) == 0:
+            return
+        known_migration_ids = set(self._migration_set.migrations_by_id)
+        unknown_applied_ids = applied_migration_ids - known_migration_ids
+        if unknown_applied_ids:
+            unknown_ids = ", ".join(sorted(unknown_applied_ids))
+            raise MigrationError(f"Database contains unknown applied migration IDs: {unknown_ids}")
+
+    def _validate_existing_legacy_migrations(self, cursor: sqlite3.Cursor) -> None:
+        """Validates existing legacy migration versions before creating applied migration metadata."""
+        try:
+            cursor.execute("SELECT version FROM migrations WHERE version > 0 ORDER BY version;")
+        except sqlite3.OperationalError as e:
+            if "no such table" in str(e):
+                return
+            raise
+
+        registered_migration_ids = self._migration_set.migrations_by_id
+        for row in cursor.fetchall():
+            legacy_version = row[0]
+            migration_id = f"migration_{legacy_version}"
+            if migration_id not in registered_migration_ids:
+                raise MigrationError(f"Database contains unknown legacy migration version: {legacy_version}")
+
+    def _validate_existing_applied_legacy_migrations(self, cursor: sqlite3.Cursor) -> None:
+        """Validates applied IDs for legacy migrations against legacy numeric rows."""
+        registered_migrations = self._migration_set.migrations_by_id
+        cursor.execute("SELECT migration_id, legacy_version FROM applied_migrations;")
+        applied_rows = cursor.fetchall()
+
+        cursor.execute("SELECT version FROM migrations WHERE version > 0;")
+        legacy_versions = {row[0] for row in cursor.fetchall()}
+
+        for row in applied_rows:
+            migration_id = row[0]
+            legacy_version = row[1]
+            migration = registered_migrations[migration_id]
+            if migration.to_version is None:
+                continue
+            if legacy_version != migration.to_version:
+                raise MigrationError(
+                    "Database contains inconsistent applied migration state: "
+                    f"{migration_id} is recorded with legacy version {legacy_version}, "
+                    f"expected {migration.to_version}"
+                )
+            if legacy_version not in legacy_versions:
+                raise MigrationError(
+                    "Database contains inconsistent applied migration state: "
+                    f"{migration_id} is applied, but legacy version {legacy_version} is missing"
+                )
+
+    def _needs_applied_migrations_bootstrap(self, cursor: sqlite3.Cursor) -> bool:
+        """Checks whether legacy numeric rows need to be written to applied_migrations."""
+        cursor.execute("SELECT version FROM migrations WHERE version > 0;")
+        legacy_versions = {row[0] for row in cursor.fetchall()}
+        if len(legacy_versions) == 0:
+            return False
+
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='applied_migrations';")
+        if cursor.fetchone() is None:
+            return True
+
+        cursor.execute("SELECT legacy_version FROM applied_migrations WHERE legacy_version IS NOT NULL;")
+        applied_legacy_versions = {row[0] for row in cursor.fetchall()}
+        return not legacy_versions.issubset(applied_legacy_versions)
+
+    @classmethod
+    def _get_applied_migration_ids(cls, cursor: sqlite3.Cursor) -> set[str]:
+        """Gets applied stable migration IDs."""
+        try:
+            cursor.execute("SELECT migration_id FROM applied_migrations;")
+            return {row[0] for row in cursor.fetchall()}
+        except sqlite3.OperationalError as e:
+            if "no such table" in str(e):
+                return set()
+            raise
 
     @classmethod
     def _get_current_version(cls, cursor: sqlite3.Cursor) -> int:

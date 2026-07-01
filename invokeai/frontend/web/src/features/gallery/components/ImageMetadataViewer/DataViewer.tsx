@@ -1,14 +1,28 @@
-import { Box, Flex, IconButton, Tooltip, useShiftModifier } from '@invoke-ai/ui-library';
+import type { FlexProps } from '@invoke-ai/ui-library';
+import {
+  Box,
+  chakra,
+  Flex,
+  IconButton,
+  Input,
+  InputGroup,
+  InputRightElement,
+  Tooltip,
+  useShiftModifier,
+} from '@invoke-ai/ui-library';
 import { getOverlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import { Formatter } from 'fracturedjsonjs';
-import { isString } from 'lodash-es';
+import { useClipboard } from 'common/hooks/useClipboard';
+import { isString } from 'es-toolkit/compat';
+import { Formatter, TableCommaPlacement } from 'fracturedjsonjs';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
-import type { CSSProperties } from 'react';
-import { memo, useCallback, useMemo } from 'react';
+import type { ChangeEvent, CSSProperties } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCopyBold, PiDownloadSimpleBold } from 'react-icons/pi';
+import { PiCopyBold, PiDownloadSimpleBold, PiXBold } from 'react-icons/pi';
 
 const formatter = new Formatter();
+formatter.Options.TableCommaPlacement = TableCommaPlacement.BeforePadding;
+formatter.Options.OmitTrailingWhitespace = true;
 
 type Props = {
   label: string;
@@ -17,17 +31,44 @@ type Props = {
   withDownload?: boolean;
   withCopy?: boolean;
   extraCopyActions?: { label: string; getData: (data: unknown) => unknown }[];
-};
+  wrapData?: boolean;
+  withSearch?: boolean;
+  searchTerm?: string;
+  onSearchTermChange?: (value: string) => void;
+  showSearchInput?: boolean;
+} & FlexProps;
 
-const overlayscrollbarsOptions = getOverlayScrollbarsParams('scroll', 'scroll').options;
+const overlayscrollbarsOptions = getOverlayScrollbarsParams({
+  overflowX: 'scroll',
+  overflowY: 'scroll',
+}).options;
+
+const ChakraPre = chakra('pre');
 
 const DataViewer = (props: Props) => {
-  const { label, data, fileName, withDownload = true, withCopy = true, extraCopyActions } = props;
+  const {
+    label,
+    data,
+    fileName,
+    withDownload = true,
+    withCopy = true,
+    extraCopyActions,
+    wrapData = true,
+    withSearch = false,
+    searchTerm: searchTermProp,
+    onSearchTermChange,
+    showSearchInput = true,
+    ...rest
+  } = props;
   const dataString = useMemo(() => (isString(data) ? data : formatter.Serialize(data)) ?? '', [data]);
   const shift = useShiftModifier();
+  const clipboard = useClipboard();
+  const [internalSearchTerm, setInternalSearchTerm] = useState('');
+  const isControlledSearch = searchTermProp !== undefined;
+  const searchTerm = isControlledSearch ? searchTermProp : internalSearchTerm;
   const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(dataString);
-  }, [dataString]);
+    clipboard.writeText(dataString);
+  }, [clipboard, dataString]);
 
   const handleDownload = useCallback(() => {
     const blob = new Blob([dataString]);
@@ -41,14 +82,75 @@ const DataViewer = (props: Props) => {
 
   const { t } = useTranslation();
 
+  const highlightedDataString = useMemo(() => {
+    const trimmedSearchTerm = searchTerm.trim();
+    if (!trimmedSearchTerm) {
+      return dataString;
+    }
+
+    const regex = new RegExp(`(${escapeRegExp(trimmedSearchTerm)})`, 'gi');
+    const parts = dataString.split(regex);
+
+    return parts.map((part, index) => {
+      const isMatch = index % 2 === 1;
+      if (!isMatch) {
+        return <span key={index}>{part}</span>;
+      }
+      return (
+        <chakra.mark key={index} bg="accent.700" color="accent.50" px={1} borderRadius="sm">
+          {part}
+        </chakra.mark>
+      );
+    });
+  }, [dataString, searchTerm]);
+
+  const setSearchTerm = useCallback(
+    (value: string) => {
+      if (isControlledSearch) {
+        onSearchTermChange?.(value);
+        return;
+      }
+      setInternalSearchTerm(value);
+    },
+    [isControlledSearch, onSearchTermChange]
+  );
+
+  const handleChangeSearch = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      setSearchTerm(e.target.value);
+    },
+    [setSearchTerm]
+  );
+
+  const handleClearSearch = useCallback(() => {
+    setSearchTerm('');
+  }, [setSearchTerm]);
+
   return (
-    <Flex layerStyle="second" borderRadius="base" flexGrow={1} w="full" h="full" position="relative">
-      <Box position="absolute" top={0} left={0} right={0} bottom={0} overflow="auto" p={4} fontSize="sm">
+    <Flex bg="base.800" borderRadius="base" flexGrow={1} w="full" h="full" position="relative" {...rest}>
+      <Box position="absolute" top={0} left={0} right={0} bottom={0} overflow="auto" p={2} fontSize="sm">
         <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayscrollbarsOptions}>
-          <pre>{dataString}</pre>
+          <ChakraPre whiteSpace={wrapData ? 'pre-wrap' : undefined}>{highlightedDataString}</ChakraPre>
         </OverlayScrollbarsComponent>
       </Box>
-      <Flex position="absolute" top={0} insetInlineEnd={0} p={2}>
+      <Flex position="absolute" top={0} insetInlineEnd={0} p={2} gap={2} alignItems="center">
+        {withSearch && showSearchInput && (
+          <InputGroup size="sm" w={48}>
+            <Input placeholder={t('common.search')} value={searchTerm} onChange={handleChangeSearch} />
+            {searchTerm && (
+              <InputRightElement h="full" pe={2}>
+                <IconButton
+                  aria-label={t('boards.clearSearch')}
+                  icon={<PiXBold size={16} />}
+                  variant="link"
+                  opacity={0.7}
+                  onClick={handleClearSearch}
+                  size="sm"
+                />
+              </InputRightElement>
+            )}
+          </InputGroup>
+        )}
         {withDownload && (
           <Tooltip label={`${t('gallery.download')} ${label} JSON`}>
             <IconButton
@@ -94,9 +196,10 @@ type ExtraCopyActionProps = {
 };
 const ExtraCopyAction = ({ label, data, getData }: ExtraCopyActionProps) => {
   const { t } = useTranslation();
+  const clipboard = useClipboard();
   const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(JSON.stringify(getData(data), null, 2));
-  }, [data, getData]);
+    clipboard.writeText(JSON.stringify(getData(data), null, 2));
+  }, [clipboard, data, getData]);
 
   return (
     <Tooltip label={`${t('gallery.copy')} ${label} JSON`}>
@@ -110,3 +213,5 @@ const ExtraCopyAction = ({ label, data, getData }: ExtraCopyActionProps) => {
     </Tooltip>
   );
 };
+
+const escapeRegExp = (value: string) => value.replace(/[-/\\^$*+?.()|[\]{}]/g, '$&');

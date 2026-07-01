@@ -3,7 +3,15 @@ import { createEntityAdapter } from '@reduxjs/toolkit';
 import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
 import queryString from 'query-string';
 import type { operations, paths } from 'services/api/schema';
-import type { AnyModelConfig } from 'services/api/types';
+import type {
+  AnyModelConfig,
+  GetHFTokenStatusResponse,
+  ModelInstallJob,
+  ResetHFTokenResponse,
+  SetHFTokenArg,
+  SetHFTokenResponse,
+} from 'services/api/types';
+import type { Param0 } from 'tsafe';
 
 import type { ApiTagDescription } from '..';
 import { api, buildV2Url, LIST_TAG } from '..';
@@ -36,12 +44,29 @@ type DeleteModelArg = {
 type DeleteModelResponse = void;
 type DeleteModelImageResponse = void;
 
+type BulkDeleteModelsArg = {
+  keys: string[];
+};
+type BulkDeleteModelsResponse = {
+  deleted: string[];
+  failed: string[];
+};
+
+type BulkReidentifyModelsArg = {
+  keys: string[];
+};
+type BulkReidentifyModelsResponse = {
+  succeeded: string[];
+  failed: string[];
+};
+
 type ConvertMainModelResponse =
   paths['/api/v2/models/convert/{key}']['put']['responses']['200']['content']['application/json'];
 
-type InstallModelArg = {
+export type InstallModelArg = {
   source: paths['/api/v2/models/install']['post']['parameters']['query']['source'];
   inplace?: paths['/api/v2/models/install']['post']['parameters']['query']['inplace'];
+  config?: paths['/api/v2/models/install']['post']['requestBody']['content']['application/json'];
 };
 type InstallModelResponse = paths['/api/v2/models/install']['post']['responses']['201']['content']['application/json'];
 
@@ -50,6 +75,10 @@ type ListModelInstallsResponse =
 
 type CancelModelInstallResponse =
   paths['/api/v2/models/install/{id}']['delete']['responses']['201']['content']['application/json'];
+type PauseModelInstallResponse = ModelInstallJob;
+type ResumeModelInstallResponse = ModelInstallJob;
+type RestartFailedModelInstallResponse = ModelInstallJob;
+type RestartModelInstallFileResponse = ModelInstallJob;
 
 type PruneCompletedModelInstallsResponse =
   paths['/api/v2/models/install']['delete']['responses']['200']['content']['application/json'];
@@ -63,9 +92,32 @@ type GetHuggingFaceModelsResponse =
 
 type GetByAttrsArg = operations['get_model_records_by_attrs']['parameters']['query'];
 
+// Orphaned models types - manually defined since the schema hasn't been regenerated yet
+type OrphanedModelInfo = {
+  path: string;
+  absolute_path: string;
+  files: string[];
+  size_bytes: number;
+};
+
+type GetOrphanedModelsResponse = OrphanedModelInfo[];
+
+type DeleteOrphanedModelsArg = {
+  paths: string[];
+};
+
+type DeleteOrphanedModelsResponse = {
+  deleted: string[];
+  errors: Record<string, string>;
+};
+
+type GetModelConfigsArg = {
+  order_by?: string;
+  direction?: string;
+} | void;
+
 const modelConfigsAdapter = createEntityAdapter<AnyModelConfig, string>({
   selectId: (entity) => entity.key,
-  sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
 export const modelConfigsAdapterSelectors = modelConfigsAdapter.getSelectors(undefined, getSelectorsOptions);
 
@@ -124,11 +176,12 @@ export const modelsApi = api.injectEndpoints({
       invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
     }),
     installModel: build.mutation<InstallModelResponse, InstallModelArg>({
-      query: ({ source, inplace = true }) => {
+      query: ({ source, inplace = true, config }) => {
         return {
           url: buildModelsUrl('install'),
           params: { source, inplace },
           method: 'POST',
+          body: config,
         };
       },
       invalidatesTags: ['ModelInstalls'],
@@ -138,6 +191,16 @@ export const modelsApi = api.injectEndpoints({
         return {
           url: buildModelsUrl(`i/${key}`),
           method: 'DELETE',
+        };
+      },
+      invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
+    }),
+    bulkDeleteModels: build.mutation<BulkDeleteModelsResponse, BulkDeleteModelsArg>({
+      query: ({ keys }) => {
+        return {
+          url: buildModelsUrl(`i/bulk_delete`),
+          method: 'POST',
+          body: { keys },
         };
       },
       invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
@@ -188,6 +251,18 @@ export const modelsApi = api.injectEndpoints({
       },
       serializeQueryArgs: ({ queryArgs }) => `${queryArgs.name}.${queryArgs.base}.${queryArgs.type}`,
     }),
+    getModelConfigByHash: build.query<AnyModelConfig, string>({
+      query: (hash) => buildModelsUrl(`get_by_hash?${queryString.stringify({ hash })}`),
+      providesTags: (result) => {
+        const tags: ApiTagDescription[] = [];
+
+        if (result) {
+          tags.push({ type: 'ModelConfig', id: result.key });
+        }
+
+        return tags;
+      },
+    }),
     scanFolder: build.query<ScanFolderResponse, ScanFolderArg>({
       query: (arg) => {
         const folderQueryStr = arg ? queryString.stringify(arg, {}) : '';
@@ -221,6 +296,43 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['ModelInstalls'],
     }),
+    pauseModelInstall: build.mutation<PauseModelInstallResponse, number>({
+      query: (id) => {
+        return {
+          url: buildModelsUrl(`install/${id}/pause`),
+          method: 'POST',
+        };
+      },
+      invalidatesTags: ['ModelInstalls'],
+    }),
+    resumeModelInstall: build.mutation<ResumeModelInstallResponse, number>({
+      query: (id) => {
+        return {
+          url: buildModelsUrl(`install/${id}/resume`),
+          method: 'POST',
+        };
+      },
+      invalidatesTags: ['ModelInstalls'],
+    }),
+    restartFailedModelInstall: build.mutation<RestartFailedModelInstallResponse, number>({
+      query: (id) => {
+        return {
+          url: buildModelsUrl(`install/${id}/restart_failed`),
+          method: 'POST',
+        };
+      },
+      invalidatesTags: ['ModelInstalls'],
+    }),
+    restartModelInstallFile: build.mutation<RestartModelInstallFileResponse, { id: number; file_source: string }>({
+      query: ({ id, file_source }) => {
+        return {
+          url: buildModelsUrl(`install/${id}/restart_file`),
+          method: 'POST',
+          body: file_source,
+        };
+      },
+      invalidatesTags: ['ModelInstalls'],
+    }),
     pruneCompletedModelInstalls: build.mutation<PruneCompletedModelInstallsResponse, void>({
       query: () => {
         return {
@@ -230,8 +342,11 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['ModelInstalls'],
     }),
-    getModelConfigs: build.query<EntityState<AnyModelConfig, string>, void>({
-      query: () => ({ url: buildModelsUrl() }),
+    getModelConfigs: build.query<EntityState<AnyModelConfig, string>, GetModelConfigsArg>({
+      query: (arg) => {
+        const queryStr = arg ? `?${queryString.stringify(arg)}` : '';
+        return { url: buildModelsUrl(queryStr) };
+      },
       providesTags: (result) => {
         const tags: ApiTagDescription[] = [{ type: 'ModelConfig', id: LIST_TAG }];
         if (result) {
@@ -240,23 +355,121 @@ export const modelsApi = api.injectEndpoints({
         }
         return tags;
       },
-      keepUnusedDataFor: 60 * 60 * 1000 * 24, // 1 day (infinite)
       transformResponse: (response: GetModelConfigsResponse) => {
         return modelConfigsAdapter.setAll(modelConfigsAdapter.getInitialState(), response.models);
       },
-      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+      onQueryStarted: (_, { dispatch, queryFulfilled }) => {
         queryFulfilled.then(({ data }) => {
-          modelConfigsAdapterSelectors.selectAll(data).forEach((modelConfig) => {
-            dispatch(modelsApi.util.upsertQueryData('getModelConfig', modelConfig.key, modelConfig));
+          const updates: Param0<typeof modelsApi.util.upsertQueryEntries> = [];
+          for (const modelConfig of modelConfigsAdapterSelectors.selectAll(data)) {
+            updates.push({
+              endpointName: 'getModelConfig',
+              arg: modelConfig.key,
+              value: modelConfig,
+            });
             const { base, name, type } = modelConfig;
-            dispatch(modelsApi.util.upsertQueryData('getModelConfigByAttrs', { base, name, type }, modelConfig));
-          });
+            updates.push({
+              endpointName: 'getModelConfigByAttrs',
+              arg: { base, name, type },
+              value: modelConfig,
+            });
+          }
+          dispatch(modelsApi.util.upsertQueryEntries(updates));
         });
+      },
+    }),
+    getMissingModels: build.query<EntityState<AnyModelConfig, string>, void>({
+      query: () => ({ url: buildModelsUrl('missing') }),
+      providesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
+      transformResponse: (response: GetModelConfigsResponse) => {
+        return modelConfigsAdapter.setAll(modelConfigsAdapter.getInitialState(), response.models);
       },
     }),
     getStarterModels: build.query<GetStarterModelsResponse, void>({
       query: () => buildModelsUrl('starter_models'),
       providesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
+    }),
+    getHFTokenStatus: build.query<GetHFTokenStatusResponse, void>({
+      query: () => buildModelsUrl('hf_login'),
+      providesTags: ['HFTokenStatus'],
+    }),
+    setHFToken: build.mutation<SetHFTokenResponse, SetHFTokenArg>({
+      query: (body) => ({ url: buildModelsUrl('hf_login'), method: 'POST', body }),
+      invalidatesTags: ['HFTokenStatus'],
+      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(modelsApi.util.updateQueryData('getHFTokenStatus', undefined, () => data));
+        } catch {
+          // no-op
+        }
+      },
+    }),
+    resetHFToken: build.mutation<ResetHFTokenResponse, void>({
+      query: () => ({ url: buildModelsUrl('hf_login'), method: 'DELETE' }),
+      invalidatesTags: ['HFTokenStatus'],
+    }),
+    emptyModelCache: build.mutation<void, void>({
+      query: () => ({ url: buildModelsUrl('empty_model_cache'), method: 'POST' }),
+    }),
+    reidentifyModel: build.mutation<
+      paths['/api/v2/models/i/{key}/reidentify']['post']['responses']['200']['content']['application/json'],
+      { key: string }
+    >({
+      query: ({ key }) => {
+        return {
+          url: buildModelsUrl(`i/${key}/reidentify`),
+          method: 'POST',
+        };
+      },
+      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+        try {
+          const { data } = await queryFulfilled;
+
+          // Update the individual model query caches
+          dispatch(modelsApi.util.upsertQueryData('getModelConfig', data.key, data));
+
+          const { base, name, type } = data;
+          dispatch(modelsApi.util.upsertQueryData('getModelConfigByAttrs', { base, name, type }, data));
+
+          // Update the list query cache
+          dispatch(
+            modelsApi.util.updateQueryData('getModelConfigs', undefined, (draft) => {
+              modelConfigsAdapter.updateOne(draft, {
+                id: data.key,
+                changes: data,
+              });
+            })
+          );
+        } catch {
+          // no-op
+        }
+      },
+    }),
+    bulkReidentifyModels: build.mutation<BulkReidentifyModelsResponse, BulkReidentifyModelsArg>({
+      query: ({ keys }) => {
+        return {
+          url: buildModelsUrl('i/bulk_reidentify'),
+          method: 'POST',
+          body: { keys },
+        };
+      },
+      invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
+    }),
+    getOrphanedModels: build.query<GetOrphanedModelsResponse, void>({
+      query: () => ({
+        url: buildModelsUrl('sync/orphaned'),
+        method: 'GET',
+      }),
+      providesTags: ['OrphanedModels'],
+    }),
+    deleteOrphanedModels: build.mutation<DeleteOrphanedModelsResponse, DeleteOrphanedModelsArg>({
+      query: (arg) => ({
+        url: buildModelsUrl('sync/orphaned'),
+        method: 'DELETE',
+        body: arg,
+      }),
+      invalidatesTags: ['OrphanedModels'],
     }),
   }),
 });
@@ -264,7 +477,9 @@ export const modelsApi = api.injectEndpoints({
 export const {
   useGetModelConfigsQuery,
   useGetModelConfigQuery,
+  useGetMissingModelsQuery,
   useDeleteModelsMutation,
+  useBulkDeleteModelsMutation,
   useDeleteModelImageMutation,
   useUpdateModelMutation,
   useUpdateModelImageMutation,
@@ -274,6 +489,21 @@ export const {
   useLazyGetHuggingFaceModelsQuery,
   useListModelInstallsQuery,
   useCancelModelInstallMutation,
+  usePauseModelInstallMutation,
+  useResumeModelInstallMutation,
+  useRestartFailedModelInstallMutation,
+  useRestartModelInstallFileMutation,
   usePruneCompletedModelInstallsMutation,
   useGetStarterModelsQuery,
+  useGetHFTokenStatusQuery,
+  useSetHFTokenMutation,
+  useResetHFTokenMutation,
+  useEmptyModelCacheMutation,
+  useReidentifyModelMutation,
+  useBulkReidentifyModelsMutation,
+  useGetOrphanedModelsQuery,
+  useDeleteOrphanedModelsMutation,
 } = modelsApi;
+
+export const selectModelConfigsQuery = modelsApi.endpoints.getModelConfigs.select(undefined);
+export const selectMissingModelsQuery = modelsApi.endpoints.getMissingModels.select();

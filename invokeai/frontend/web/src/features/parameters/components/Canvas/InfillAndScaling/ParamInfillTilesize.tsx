@@ -1,21 +1,23 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { setInfillTileSize } from 'features/parameters/store/generationSlice';
+import { selectInfillMethod, selectInfillTileSize, setInfillTileSize } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+const CONSTRAINTS = {
+  initial: 32,
+  sliderMin: 16,
+  sliderMax: 64,
+  numberInputMin: 16,
+  numberInputMax: 256,
+  fineStep: 1,
+  coarseStep: 1,
+};
+
 const ParamInfillTileSize = () => {
   const dispatch = useAppDispatch();
-  const infillTileSize = useAppSelector((s) => s.generation.infillTileSize);
-  const initial = useAppSelector((s) => s.config.sd.infillTileSize.initial);
-  const sliderMin = useAppSelector((s) => s.config.sd.infillTileSize.sliderMin);
-  const sliderMax = useAppSelector((s) => s.config.sd.infillTileSize.sliderMax);
-  const numberInputMin = useAppSelector((s) => s.config.sd.infillTileSize.numberInputMin);
-  const numberInputMax = useAppSelector((s) => s.config.sd.infillTileSize.numberInputMax);
-  const coarseStep = useAppSelector((s) => s.config.sd.infillTileSize.coarseStep);
-  const fineStep = useAppSelector((s) => s.config.sd.infillTileSize.fineStep);
-
-  const infillMethod = useAppSelector((s) => s.generation.infillMethod);
+  const infillTileSize = useAppSelector(selectInfillTileSize);
+  const infillMethod = useAppSelector(selectInfillMethod);
 
   const { t } = useTranslation();
 
@@ -30,23 +32,23 @@ const ParamInfillTileSize = () => {
     <FormControl isDisabled={infillMethod !== 'tile'}>
       <FormLabel>{t('parameters.tileSize')}</FormLabel>
       <CompositeSlider
-        min={sliderMin}
-        max={sliderMax}
         value={infillTileSize}
-        defaultValue={initial}
         onChange={handleChange}
-        step={coarseStep}
-        fineStep={fineStep}
+        defaultValue={CONSTRAINTS.initial}
+        min={CONSTRAINTS.sliderMin}
+        max={CONSTRAINTS.sliderMax}
+        step={CONSTRAINTS.coarseStep}
+        fineStep={CONSTRAINTS.fineStep}
         marks
       />
       <CompositeNumberInput
-        min={numberInputMin}
-        max={numberInputMax}
         value={infillTileSize}
-        defaultValue={initial}
         onChange={handleChange}
-        step={coarseStep}
-        fineStep={fineStep}
+        defaultValue={CONSTRAINTS.initial}
+        min={CONSTRAINTS.numberInputMin}
+        max={CONSTRAINTS.numberInputMax}
+        step={CONSTRAINTS.coarseStep}
+        fineStep={CONSTRAINTS.fineStep}
       />
     </FormControl>
   );

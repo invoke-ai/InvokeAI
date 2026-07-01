@@ -1,28 +1,42 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { skipToken } from '@reduxjs/toolkit/query';
+import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
-import { setShouldShowImageDetails } from 'features/ui/store/uiSlice';
+import { useIsRegionFocused } from 'common/hooks/focus';
+import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
+import { selectShouldShowItemDetails, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
+import { setShouldShowItemDetails } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiInfoBold } from 'react-icons/pi';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+
+import { useImageViewerContext } from './context';
 
 export const ToggleMetadataViewerButton = memo(() => {
   const dispatch = useAppDispatch();
-  const shouldShowImageDetails = useAppSelector((s) => s.ui.shouldShowImageDetails);
-  const lastSelectedImage = useAppSelector(selectLastSelectedImage);
+  const ctx = useImageViewerContext();
+  const hasProgressImage = useStore(ctx.$hasProgressImage);
+  const isTemporarilyShowingSelectedImage = useStore(ctx.$isTemporarilyShowingSelectedImage);
+  const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
+
+  const isDisabledOverride = hasProgressImage && shouldShowProgressInViewer && !isTemporarilyShowingSelectedImage;
+
+  const shouldShowItemDetails = useAppSelector(selectShouldShowItemDetails);
+  const imageDTO = useAppSelector(selectLastSelectedItem);
   const { t } = useTranslation();
+  const isViewerFocused = useIsRegionFocused('viewer');
 
-  const { currentData: imageDTO } = useGetImageDTOQuery(lastSelectedImage?.image_name ?? skipToken);
+  const toggleMetadataViewer = useCallback(() => {
+    dispatch(setShouldShowItemDetails(!shouldShowItemDetails));
+  }, [dispatch, shouldShowItemDetails]);
 
-  const toggleMetadataViewer = useCallback(
-    () => dispatch(setShouldShowImageDetails(!shouldShowImageDetails)),
-    [dispatch, shouldShowImageDetails]
-  );
-
-  useHotkeys('i', toggleMetadataViewer, { enabled: Boolean(imageDTO) }, [imageDTO, shouldShowImageDetails]);
+  useRegisteredHotkeys({
+    id: 'toggleMetadata',
+    category: 'viewer',
+    callback: toggleMetadataViewer,
+    options: { enabled: isViewerFocused && !isDisabledOverride, preventDefault: true },
+    dependencies: [imageDTO, shouldShowItemDetails, isViewerFocused, isDisabledOverride],
+  });
 
   return (
     <IconButton
@@ -30,10 +44,11 @@ export const ToggleMetadataViewerButton = memo(() => {
       tooltip={`${t('parameters.info')} (I)`}
       aria-label={`${t('parameters.info')} (I)`}
       onClick={toggleMetadataViewer}
-      isDisabled={!imageDTO}
-      variant="outline"
-      colorScheme={shouldShowImageDetails ? 'invokeBlue' : 'base'}
+      variant="link"
+      alignSelf="stretch"
+      colorScheme={shouldShowItemDetails ? 'invokeBlue' : 'base'}
       data-testid="toggle-show-metadata-button"
+      isDisabled={isDisabledOverride}
     />
   );
 });

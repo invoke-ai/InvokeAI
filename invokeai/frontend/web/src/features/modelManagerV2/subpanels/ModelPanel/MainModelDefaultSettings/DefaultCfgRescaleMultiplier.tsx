@@ -1,8 +1,8 @@
 import { CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/SettingToggle';
-import { useCallback, useMemo } from 'react';
+import { CONSTRAINTS } from 'features/parameters/components/Advanced/ParamCFGRescaleMultiplier';
+import { memo, useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -11,17 +11,10 @@ import type { MainModelDefaultSettingsFormData } from './MainModelDefaultSetting
 
 type DefaultCfgRescaleMultiplierType = MainModelDefaultSettingsFormData['cfgRescaleMultiplier'];
 
-export function DefaultCfgRescaleMultiplier(props: UseControllerProps<MainModelDefaultSettingsFormData>) {
+export const DefaultCfgRescaleMultiplier = memo((props: UseControllerProps<MainModelDefaultSettingsFormData>) => {
   const { field } = useController(props);
 
-  const sliderMin = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.sliderMin);
-  const sliderMax = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.sliderMax);
-  const numberInputMin = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.numberInputMin);
-  const numberInputMax = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.numberInputMax);
-  const coarseStep = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.coarseStep);
-  const fineStep = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.fineStep);
   const { t } = useTranslation();
-  const marks = useMemo(() => [sliderMin, Math.floor(sliderMax / 2), sliderMax], [sliderMax, sliderMin]);
 
   const onChange = useCallback(
     (v: number) => {
@@ -54,24 +47,26 @@ export function DefaultCfgRescaleMultiplier(props: UseControllerProps<MainModelD
       <Flex w="full" gap={4}>
         <CompositeSlider
           value={value}
-          min={sliderMin}
-          max={sliderMax}
-          step={coarseStep}
-          fineStep={fineStep}
+          min={CONSTRAINTS.sliderMin}
+          max={CONSTRAINTS.sliderMax}
+          step={CONSTRAINTS.coarseStep}
+          fineStep={CONSTRAINTS.fineStep}
           onChange={onChange}
-          marks={marks}
           isDisabled={isDisabled}
+          marks
         />
         <CompositeNumberInput
           value={value}
-          min={numberInputMin}
-          max={numberInputMax}
-          step={coarseStep}
-          fineStep={fineStep}
+          min={CONSTRAINTS.numberInputMin}
+          max={CONSTRAINTS.numberInputMax}
+          step={CONSTRAINTS.coarseStep}
+          fineStep={CONSTRAINTS.fineStep}
           onChange={onChange}
           isDisabled={isDisabled}
         />
       </Flex>
     </FormControl>
   );
-}
+});
+
+DefaultCfgRescaleMultiplier.displayName = 'DefaultCfgRescaleMultiplier';

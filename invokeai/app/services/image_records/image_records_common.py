@@ -3,7 +3,7 @@ import datetime
 from enum import Enum
 from typing import Optional, Union
 
-from pydantic import Field, StrictBool, StrictStr
+from pydantic import BaseModel, Field, StrictBool, StrictStr
 
 from invokeai.app.util.metaenum import MetaEnum
 from invokeai.app.util.misc import get_iso_timestamp
@@ -58,6 +58,15 @@ class ImageCategory(str, Enum, metaclass=MetaEnum):
     """OTHER: The image is some other type of image with a specialized purpose. To be used by external nodes."""
 
 
+IMAGE_CATEGORIES: list[ImageCategory] = [ImageCategory.GENERAL]
+ASSETS_CATEGORIES: list[ImageCategory] = [
+    ImageCategory.CONTROL,
+    ImageCategory.MASK,
+    ImageCategory.USER,
+    ImageCategory.OTHER,
+]
+
+
 class InvalidImageCategoryException(ValueError):
     """Raised when a provided value is not a valid ImageCategory.
 
@@ -106,6 +115,7 @@ IMAGE_DTO_COLS = ", ".join(
             "updated_at",
             "deleted_at",
             "starred",
+            "image_subfolder",
         ]
     ]
 )
@@ -147,6 +157,7 @@ class ImageRecord(BaseModelExcludeNull):
     starred: bool = Field(description="Whether this image is starred.")
     """Whether this image is starred."""
     has_workflow: bool = Field(description="Whether this image has a workflow.")
+    image_subfolder: str = Field(default="", description="The subfolder where the image is stored on disk.")
 
 
 class ImageRecordChanges(BaseModelExcludeNull, extra="allow"):
@@ -191,6 +202,7 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
     is_intermediate = image_dict.get("is_intermediate", False)
     starred = image_dict.get("starred", False)
     has_workflow = image_dict.get("has_workflow", False)
+    image_subfolder = image_dict.get("image_subfolder", "")
 
     return ImageRecord(
         image_name=image_name,
@@ -206,4 +218,18 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
         is_intermediate=is_intermediate,
         starred=starred,
         has_workflow=has_workflow,
+        image_subfolder=image_subfolder,
     )
+
+
+class ImageCollectionCounts(BaseModel):
+    starred_count: int = Field(description="The number of starred images in the collection.")
+    unstarred_count: int = Field(description="The number of unstarred images in the collection.")
+
+
+class ImageNamesResult(BaseModel):
+    """Response containing ordered image names with metadata for optimistic updates."""
+
+    image_names: list[str] = Field(description="Ordered list of image names")
+    starred_count: int = Field(description="Number of starred images (when starred_first=True)")
+    total_count: int = Field(description="Total number of images matching the query")

@@ -1,8 +1,9 @@
+import type { XYPosition as ReactFlowXYPosition } from '@xyflow/react';
 import type { WorkflowCategory, WorkflowV3, XYPosition } from 'features/nodes/types/workflow';
-import type * as ReactFlow from 'reactflow';
 import type { S } from 'services/api/types';
 import type { Equals, Extends } from 'tsafe';
 import { assert } from 'tsafe';
+import type { SetRequired } from 'type-fest';
 import { describe, test } from 'vitest';
 
 /**
@@ -11,8 +12,7 @@ import { describe, test } from 'vitest';
  */
 
 describe('Workflow types', () => {
-  test('XYPosition', () => assert<Equals<XYPosition, ReactFlow.XYPosition>>());
+  test('XYPosition', () => assert<Equals<XYPosition, ReactFlowXYPosition>>());
   test('WorkflowCategory', () => assert<Equals<WorkflowCategory, S['WorkflowCategory']>>());
-  // @ts-expect-error TODO(psyche): Need to revise server types!
-  test('WorkflowV3', () => assert<Extends<WorkflowV3, S['Workflow']>>());
+  test('WorkflowV3', () => assert<Extends<SetRequired<WorkflowV3, 'id'>, S['Workflow']>>());
 });

@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 
+from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecord, BoardRecordOrderBy
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-
-from .board_records_common import BoardChanges, BoardRecord
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 
 class BoardRecordStorageBase(ABC):
@@ -17,8 +17,9 @@ class BoardRecordStorageBase(ABC):
     def save(
         self,
         board_name: str,
+        user_id: str,
     ) -> BoardRecord:
-        """Saves a board record."""
+        """Saves a board record for a specific user."""
         pass
 
     @abstractmethod
@@ -41,15 +42,25 @@ class BoardRecordStorageBase(ABC):
     @abstractmethod
     def get_many(
         self,
+        user_id: str,
+        is_admin: bool,
+        order_by: BoardRecordOrderBy,
+        direction: SQLiteDirection,
         offset: int = 0,
         limit: int = 10,
+        include_archived: bool = False,
     ) -> OffsetPaginatedResults[BoardRecord]:
-        """Gets many board records."""
+        """Gets many board records for a specific user, including shared boards. Admin users see all boards."""
         pass
 
     @abstractmethod
     def get_all(
         self,
+        user_id: str,
+        is_admin: bool,
+        order_by: BoardRecordOrderBy,
+        direction: SQLiteDirection,
+        include_archived: bool = False,
     ) -> list[BoardRecord]:
-        """Gets all board records."""
+        """Gets all board records for a specific user, including shared boards. Admin users see all boards."""
         pass

@@ -230,6 +230,86 @@ def heuristic_resize(np_img: np.ndarray[Any, Any], size: tuple[int, int]) -> np.
     return resized
 
 
+# precompute common kernels
+_KERNEL3 = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+# directional masks for NMS
+_DIRS = [
+    np.array([[0, 0, 0], [1, 1, 1], [0, 0, 0]], np.uint8),
+    np.array([[0, 1, 0], [0, 1, 0], [0, 1, 0]], np.uint8),
+    np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]], np.uint8),
+    np.array([[0, 0, 1], [0, 1, 0], [1, 0, 0]], np.uint8),
+]
+
+
+def heuristic_resize_fast(np_img: np.ndarray, size: tuple[int, int]) -> np.ndarray:
+    h, w = np_img.shape[:2]
+    # early exit
+    if (w, h) == size:
+        return np_img
+
+    # separate alpha channel
+    img = np_img
+    alpha = None
+    if img.ndim == 3 and img.shape[2] == 4:
+        alpha, img = img[:, :, 3], img[:, :, :3]
+
+    # build small sample for unique‐color & binary detection
+    flat = img.reshape(-1, img.shape[-1])
+    N = flat.shape[0]
+    # include four corners to avoid missing extreme values
+    corners = np.vstack([img[0, 0], img[0, w - 1], img[h - 1, 0], img[h - 1, w - 1]])
+    cnt = min(N, 100_000)
+    samp = np.vstack([corners, flat[np.random.choice(N, cnt, replace=False)]])
+    uc = np.unique(samp, axis=0).shape[0]
+    vmin, vmax = samp.min(), samp.max()
+
+    # detect binary edge map & one‐pixel‐edge case
+    is_binary = uc == 2 and vmin < 16 and vmax > 240
+    one_pixel_edge = False
+    if is_binary:
+        # single gray conversion
+        gray0 = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        grad = cv2.morphologyEx(gray0, cv2.MORPH_GRADIENT, _KERNEL3)
+        cnt_edge = cv2.countNonZero(grad)
+        cnt_all = cv2.countNonZero((gray0 > 127).astype(np.uint8))
+        one_pixel_edge = (2 * cnt_edge) > cnt_all
+
+    # choose interp for color/seg/grayscale
+    area_new, area_old = size[0] * size[1], w * h
+    if 2 < uc < 200:  # segmentation map
+        interp = cv2.INTER_NEAREST
+    elif area_new < area_old:
+        interp = cv2.INTER_AREA
+    else:
+        interp = cv2.INTER_CUBIC
+
+    # single resize pass on RGB
+    resized = cv2.resize(img, size, interpolation=interp)
+
+    if is_binary:
+        # convert to gray & apply NMS via C++ dilate
+        gray_r = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
+        nms = np.zeros_like(gray_r)
+        for K in _DIRS:
+            d = cv2.dilate(gray_r, K)
+            mask = d == gray_r
+            nms[mask] = gray_r[mask]
+
+        # threshold + thinning if needed
+        _, bw = cv2.threshold(nms, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        out_bin = cv2.ximgproc.thinning(bw) if one_pixel_edge else bw
+        # restore 3 channels
+        resized = np.stack([out_bin] * 3, axis=2)
+
+    # restore alpha with same interp as RGB for consistency
+    if alpha is not None:
+        am = cv2.resize(alpha, size, interpolation=interp)
+        am = (am > 127).astype(np.uint8) * 255
+        resized = np.dstack((resized, am))
+
+    return resized
+
+
 ###########################################################################
 # Copied from detectmap_proc method in scripts/detectmap_proc.py in Mikubill/sd-webui-controlnet
 #    modified for InvokeAI
@@ -244,7 +324,7 @@ def np_img_resize(
     np_img = normalize_image_channel_count(np_img)
 
     if resize_mode == "just_resize":  # RESIZE
-        np_img = heuristic_resize(np_img, (w, h))
+        np_img = heuristic_resize_fast(np_img, (w, h))
         np_img = clone_contiguous(np_img)
         return np_img_to_torch(np_img, device), np_img
 
@@ -265,7 +345,7 @@ def np_img_resize(
             # Inpaint hijack
             high_quality_border_color[3] = 255
         high_quality_background = np.tile(high_quality_border_color[None, None], [h, w, 1])
-        np_img = heuristic_resize(np_img, (safeint(old_w * k), safeint(old_h * k)))
+        np_img = heuristic_resize_fast(np_img, (safeint(old_w * k), safeint(old_h * k)))
         new_h, new_w, _ = np_img.shape
         pad_h = max(0, (h - new_h) // 2)
         pad_w = max(0, (w - new_w) // 2)
@@ -275,7 +355,7 @@ def np_img_resize(
         return np_img_to_torch(np_img, device), np_img
     else:  # resize_mode == "crop_resize"  (INNER_FIT)
         k = max(k0, k1)
-        np_img = heuristic_resize(np_img, (safeint(old_w * k), safeint(old_h * k)))
+        np_img = heuristic_resize_fast(np_img, (safeint(old_w * k), safeint(old_h * k)))
         new_h, new_w, _ = np_img.shape
         pad_h = max(0, (new_h - h) // 2)
         pad_w = max(0, (new_w - w) // 2)
@@ -289,7 +369,7 @@ def prepare_control_image(
     width: int,
     height: int,
     num_channels: int = 3,
-    device: str = "cuda",
+    device: str | torch.device = "cuda",
     dtype: torch.dtype = torch.float16,
     control_mode: CONTROLNET_MODE_VALUES = "balanced",
     resize_mode: CONTROLNET_RESIZE_VALUES = "just_resize_simple",
@@ -304,7 +384,7 @@ def prepare_control_image(
         num_channels (int, optional): The target number of image channels. This is achieved by converting the input
             image to RGB, then naively taking the first `num_channels` channels. The primary use case is converting a
             RGB image to a single-channel grayscale image. Raises if `num_channels` cannot be achieved. Defaults to 3.
-        device (str, optional): The target device for the output image. Defaults to "cuda".
+        device (str | torch.Device, optional): The target device for the output image. Defaults to "cuda".
         dtype (_type_, optional): The dtype for the output image. Defaults to torch.float16.
         do_classifier_free_guidance (bool, optional): If True, repeat the output image along the batch dimension.
             Defaults to True.

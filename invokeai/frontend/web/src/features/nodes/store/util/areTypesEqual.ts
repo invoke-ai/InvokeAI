@@ -1,5 +1,6 @@
+import { objectEquals } from '@observ33r/object-equals';
+import { omit } from 'es-toolkit/compat';
 import type { FieldType } from 'features/nodes/types/field';
-import { isEqual, omit } from 'lodash-es';
 
 /**
  * Checks if two types are equal. If the field types have original types, those are also compared. Any match is
@@ -13,16 +14,16 @@ export const areTypesEqual = (firstType: FieldType, secondType: FieldType) => {
   const _secondType = 'originalType' in secondType ? omit(secondType, 'originalType') : secondType;
   const _originalFirstType = 'originalType' in firstType ? firstType.originalType : null;
   const _originalSecondType = 'originalType' in secondType ? secondType.originalType : null;
-  if (isEqual(_firstType, _secondType)) {
+  if (objectEquals(_firstType, _secondType)) {
     return true;
   }
-  if (_originalSecondType && isEqual(_firstType, _originalSecondType)) {
+  if (_originalSecondType && objectEquals(_firstType, _originalSecondType)) {
     return true;
   }
-  if (_originalFirstType && isEqual(_originalFirstType, _secondType)) {
+  if (_originalFirstType && objectEquals(_originalFirstType, _secondType)) {
     return true;
   }
-  if (_originalFirstType && _originalSecondType && isEqual(_originalFirstType, _originalSecondType)) {
+  if (_originalFirstType && _originalSecondType && objectEquals(_originalFirstType, _originalSecondType)) {
     return true;
   }
   return false;

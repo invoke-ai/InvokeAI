@@ -45,3 +45,4 @@ yalc.lock
 # vitest
 tsconfig.vitest-temp.json
 coverage/
+*.tgz

@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from invokeai.app.services.image_records.image_records_common import ImageRecord
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
@@ -39,3 +39,27 @@ def image_record_to_dto(
         thumbnail_url=thumbnail_url,
         board_id=board_id,
     )
+
+
+class ResultWithAffectedBoards(BaseModel):
+    affected_boards: list[str] = Field(description="The ids of boards affected by the delete operation")
+
+
+class DeleteImagesResult(ResultWithAffectedBoards):
+    deleted_images: list[str] = Field(description="The names of the images that were deleted")
+
+
+class StarredImagesResult(ResultWithAffectedBoards):
+    starred_images: list[str] = Field(description="The names of the images that were starred")
+
+
+class UnstarredImagesResult(ResultWithAffectedBoards):
+    unstarred_images: list[str] = Field(description="The names of the images that were unstarred")
+
+
+class AddImagesToBoardResult(ResultWithAffectedBoards):
+    added_images: list[str] = Field(description="The image names that were added to the board")
+
+
+class RemoveImagesFromBoardResult(ResultWithAffectedBoards):
+    removed_images: list[str] = Field(description="The image names that were removed from their board")

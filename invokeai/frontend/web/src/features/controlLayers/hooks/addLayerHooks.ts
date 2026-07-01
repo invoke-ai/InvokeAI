@@ -1,111 +1,273 @@
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import type { AppGetState } from 'app/store/store';
+import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { deepClone } from 'common/util/deepClone';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
-  caLayerAdded,
-  iiLayerAdded,
-  ipaLayerAdded,
-  isInitialImageLayer,
-  rgLayerIPAdapterAdded,
-} from 'features/controlLayers/store/controlLayersSlice';
+  controlLayerAdded,
+  inpaintMaskAdded,
+  inpaintMaskDenoiseLimitAdded,
+  inpaintMaskNoiseAdded,
+  rasterLayerAdded,
+  rgAdded,
+  rgNegativePromptChanged,
+  rgPositivePromptChanged,
+  rgRefImageAdded,
+} from 'features/controlLayers/store/canvasSlice';
+import { selectBase, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import {
-  buildControlNet,
-  buildIPAdapter,
-  buildT2IAdapter,
-  CA_PROCESSOR_DATA,
-  isProcessorTypeV2,
-} from 'features/controlLayers/util/controlAdapters';
+  selectCanvasSlice,
+  selectEntity,
+  selectSelectedEntityIdentifier,
+} from 'features/controlLayers/store/selectors';
+import type {
+  CanvasEntityIdentifier,
+  CanvasRegionalGuidanceState,
+  ControlLoRAConfig,
+  ControlNetConfig,
+  Flux2ReferenceImageConfig,
+  FluxKontextReferenceImageConfig,
+  IPAdapterConfig,
+  QwenImageReferenceImageConfig,
+  RegionalGuidanceIPAdapterConfig,
+  T2IAdapterConfig,
+} from 'features/controlLayers/store/types';
+import {
+  initialControlNet,
+  initialFlux2ReferenceImage,
+  initialFluxKontextReferenceImage,
+  initialIPAdapter,
+  initialQwenImageReferenceImage,
+  initialRegionalGuidanceIPAdapter,
+  initialT2IAdapter,
+} from 'features/controlLayers/store/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import { useCallback, useMemo } from 'react';
-import { useControlNetAndT2IAdapterModels, useIPAdapterModels } from 'services/api/hooks/modelsByType';
-import type { ControlNetModelConfig, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
-import { v4 as uuidv4 } from 'uuid';
+import { useCallback } from 'react';
+import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
+import { selectIPAdapterModels } from 'services/api/hooks/modelsByType';
+import type { ControlLoRAModelConfig, ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
+import { isControlLayerModelConfig } from 'services/api/types';
 
-export const useAddCALayer = () => {
-  const dispatch = useAppDispatch();
-  const baseModel = useAppSelector((s) => s.generation.model?.base);
-  const [modelConfigs] = useControlNetAndT2IAdapterModels();
-  const model: ControlNetModelConfig | T2IAdapterModelConfig | null = useMemo(() => {
-    // prefer to use a model that matches the base model
-    const compatibleModels = modelConfigs.filter((m) => (baseModel ? m.base === baseModel : true));
-    return compatibleModels[0] ?? modelConfigs[0] ?? null;
-  }, [baseModel, modelConfigs]);
-  const isDisabled = useMemo(() => !model, [model]);
-  const addCALayer = useCallback(() => {
-    if (!model) {
-      return;
+/**
+ * Selects the default control adapter configuration based on the model configurations and the base.
+ *
+ * Be sure to clone the output of this selector before modifying it!
+ *
+ * @knipignore
+ */
+export const selectDefaultControlAdapter = createSelector(
+  selectModelConfigsQuery,
+  selectBase,
+  (query, base): ControlNetConfig | T2IAdapterConfig | ControlLoRAConfig => {
+    const { data } = query;
+    let model: ControlNetModelConfig | T2IAdapterModelConfig | ControlLoRAModelConfig | null = null;
+    if (data) {
+      const modelConfigs = modelConfigsAdapterSelectors
+        .selectAll(data)
+        .filter(isControlLayerModelConfig)
+        .sort((a) => (a.type === 'controlnet' ? -1 : 1)); // Prefer ControlNet models
+      const compatibleModels = modelConfigs.filter((m) => (base ? m.base === base : true));
+      model = compatibleModels[0] ?? modelConfigs[0] ?? null;
     }
+    const controlAdapter = model?.type === 't2i_adapter' ? deepClone(initialT2IAdapter) : deepClone(initialControlNet);
+    if (model) {
+      controlAdapter.model = zModelIdentifierField.parse(model);
+    }
+    return controlAdapter;
+  }
+);
 
-    const id = uuidv4();
-    const defaultPreprocessor = model.default_settings?.preprocessor;
-    const processorConfig = isProcessorTypeV2(defaultPreprocessor)
-      ? CA_PROCESSOR_DATA[defaultPreprocessor].buildDefaults(baseModel)
-      : null;
+export const getDefaultRefImageConfig = (
+  getState: AppGetState
+): IPAdapterConfig | FluxKontextReferenceImageConfig | Flux2ReferenceImageConfig | QwenImageReferenceImageConfig => {
+  const state = getState();
 
-    const builder = model.type === 'controlnet' ? buildControlNet : buildT2IAdapter;
-    const controlAdapter = builder(id, {
-      model: zModelIdentifierField.parse(model),
-      processorConfig,
-    });
+  const mainModelConfig = selectMainModelConfig(state);
+  const ipAdapterModelConfigs = selectIPAdapterModels(state);
 
-    dispatch(caLayerAdded(controlAdapter));
-  }, [dispatch, model, baseModel]);
+  const base = mainModelConfig?.base;
 
-  return [addCALayer, isDisabled] as const;
+  // FLUX.2 Klein has built-in reference image support - no model needed
+  if (base === 'flux2') {
+    return deepClone(initialFlux2ReferenceImage);
+  }
+
+  // Qwen Image Edit has built-in reference image support - no model needed
+  if (base === 'qwen-image') {
+    return deepClone(initialQwenImageReferenceImage);
+  }
+
+  if (base === 'flux' && mainModelConfig?.name?.toLowerCase().includes('kontext')) {
+    const config = deepClone(initialFluxKontextReferenceImage);
+    config.model = zModelIdentifierField.parse(mainModelConfig);
+    return config;
+  }
+
+  // Otherwise, find the first compatible IP Adapter model.
+  const modelConfig = ipAdapterModelConfigs.find((m) => m.base === base);
+
+  // Clone the initial IP Adapter config and set the model if available.
+  const config = deepClone(initialIPAdapter);
+
+  if (modelConfig) {
+    config.model = zModelIdentifierField.parse(modelConfig);
+    // FLUX models use a different vision model.
+    if (modelConfig.base === 'flux') {
+      config.clipVisionModel = 'ViT-L';
+    }
+  }
+  return config;
 };
 
-export const useAddIPALayer = () => {
-  const dispatch = useAppDispatch();
-  const baseModel = useAppSelector((s) => s.generation.model?.base);
-  const [modelConfigs] = useIPAdapterModels();
-  const model: IPAdapterModelConfig | null = useMemo(() => {
-    // prefer to use a model that matches the base model
-    const compatibleModels = modelConfigs.filter((m) => (baseModel ? m.base === baseModel : true));
-    return compatibleModels[0] ?? modelConfigs[0] ?? null;
-  }, [baseModel, modelConfigs]);
-  const isDisabled = useMemo(() => !model, [model]);
-  const addIPALayer = useCallback(() => {
-    if (!model) {
-      return;
-    }
-    const id = uuidv4();
-    const ipAdapter = buildIPAdapter(id, {
-      model: zModelIdentifierField.parse(model),
-    });
-    dispatch(ipaLayerAdded(ipAdapter));
-  }, [dispatch, model]);
+export const getDefaultRegionalGuidanceRefImageConfig = (getState: AppGetState): RegionalGuidanceIPAdapterConfig => {
+  // Regional guidance ref images do not support ChatGPT-4o, so we always return the IP Adapter config.
+  const state = getState();
 
-  return [addIPALayer, isDisabled] as const;
+  const mainModelConfig = selectMainModelConfig(state);
+  const ipAdapterModelConfigs = selectIPAdapterModels(state);
+
+  const base = mainModelConfig?.base;
+
+  // Find the first compatible IP Adapter model.
+  const modelConfig = ipAdapterModelConfigs.find((m) => m.base === base);
+
+  // Clone the initial IP Adapter config and set the model if available.
+  const config = deepClone(initialRegionalGuidanceIPAdapter);
+
+  if (modelConfig) {
+    config.model = zModelIdentifierField.parse(modelConfig);
+    // FLUX models use a different vision model.
+    if (modelConfig.base === 'flux') {
+      config.clipVisionModel = 'ViT-L';
+    }
+  }
+  return config;
 };
 
-export const useAddIPAdapterToIPALayer = (layerId: string) => {
+export const useAddControlLayer = () => {
   const dispatch = useAppDispatch();
-  const baseModel = useAppSelector((s) => s.generation.model?.base);
-  const [modelConfigs] = useIPAdapterModels();
-  const model: IPAdapterModelConfig | null = useMemo(() => {
-    // prefer to use a model that matches the base model
-    const compatibleModels = modelConfigs.filter((m) => (baseModel ? m.base === baseModel : true));
-    return compatibleModels[0] ?? modelConfigs[0] ?? null;
-  }, [baseModel, modelConfigs]);
-  const isDisabled = useMemo(() => !model, [model]);
-  const addIPAdapter = useCallback(() => {
-    if (!model) {
-      return;
-    }
-    const id = uuidv4();
-    const ipAdapter = buildIPAdapter(id, {
-      model: zModelIdentifierField.parse(model),
-    });
-    dispatch(rgLayerIPAdapterAdded({ layerId, ipAdapter }));
-  }, [dispatch, model, layerId]);
+  const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+  const selectedControlLayer =
+    selectedEntityIdentifier?.type === 'control_layer' ? selectedEntityIdentifier.id : undefined;
+  const func = useCallback(() => {
+    const overrides = { controlAdapter: deepClone(initialControlNet) };
+    dispatch(controlLayerAdded({ isSelected: true, overrides, addAfter: selectedControlLayer }));
+  }, [dispatch, selectedControlLayer]);
 
-  return [addIPAdapter, isDisabled] as const;
+  return func;
 };
 
-export const useAddIILayer = () => {
+export const useAddRasterLayer = () => {
   const dispatch = useAppDispatch();
-  const isDisabled = useAppSelector((s) => Boolean(s.controlLayers.present.layers.find(isInitialImageLayer)));
-  const addIILayer = useCallback(() => {
-    dispatch(iiLayerAdded(null));
-  }, [dispatch]);
+  const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+  const selectedRasterLayer =
+    selectedEntityIdentifier?.type === 'raster_layer' ? selectedEntityIdentifier.id : undefined;
+  const func = useCallback(() => {
+    dispatch(rasterLayerAdded({ isSelected: true, addAfter: selectedRasterLayer }));
+  }, [dispatch, selectedRasterLayer]);
 
-  return [addIILayer, isDisabled] as const;
+  return func;
+};
+
+export const useAddInpaintMask = () => {
+  const dispatch = useAppDispatch();
+  const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+  const selectedInpaintMask =
+    selectedEntityIdentifier?.type === 'inpaint_mask' ? selectedEntityIdentifier.id : undefined;
+  const func = useCallback(() => {
+    dispatch(inpaintMaskAdded({ isSelected: true, addAfter: selectedInpaintMask }));
+  }, [dispatch, selectedInpaintMask]);
+
+  return func;
+};
+
+export const useAddRegionalGuidance = () => {
+  const dispatch = useAppDispatch();
+  const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+  const selectedRegionalGuidance =
+    selectedEntityIdentifier?.type === 'regional_guidance' ? selectedEntityIdentifier.id : undefined;
+  const func = useCallback(() => {
+    dispatch(rgAdded({ isSelected: true, addAfter: selectedRegionalGuidance }));
+  }, [dispatch, selectedRegionalGuidance]);
+
+  return func;
+};
+
+export const useAddNewRegionalGuidanceWithARefImage = () => {
+  const { dispatch, getState } = useAppStore();
+
+  const func = useCallback(() => {
+    const config = getDefaultRegionalGuidanceRefImageConfig(getState);
+    const overrides: Partial<CanvasRegionalGuidanceState> = {
+      referenceImages: [{ id: getPrefixedId('regional_guidance_reference_image'), config }],
+    };
+    dispatch(rgAdded({ isSelected: true, overrides }));
+  }, [dispatch, getState]);
+
+  return func;
+};
+
+export const useAddRefImageToExistingRegionalGuidance = (
+  entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>
+) => {
+  const { dispatch, getState } = useAppStore();
+  const func = useCallback(() => {
+    const config = getDefaultRegionalGuidanceRefImageConfig(getState);
+    dispatch(rgRefImageAdded({ entityIdentifier, overrides: { config } }));
+  }, [dispatch, entityIdentifier, getState]);
+
+  return func;
+};
+
+export const useAddPositivePromptToExistingRegionalGuidance = (
+  entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>
+) => {
+  const dispatch = useAppDispatch();
+  const func = useCallback(() => {
+    dispatch(rgPositivePromptChanged({ entityIdentifier, prompt: '' }));
+  }, [dispatch, entityIdentifier]);
+
+  return func;
+};
+
+export const useAddNegativePromptToExistingRegionalGuidance = (
+  entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>
+) => {
+  const dispatch = useAppDispatch();
+  const runc = useCallback(() => {
+    dispatch(rgNegativePromptChanged({ entityIdentifier, prompt: '' }));
+  }, [dispatch, entityIdentifier]);
+
+  return runc;
+};
+
+export const useAddInpaintMaskNoise = (entityIdentifier: CanvasEntityIdentifier<'inpaint_mask'>) => {
+  const dispatch = useAppDispatch();
+  const func = useCallback(() => {
+    dispatch(inpaintMaskNoiseAdded({ entityIdentifier }));
+  }, [dispatch, entityIdentifier]);
+
+  return func;
+};
+
+export const useAddInpaintMaskDenoiseLimit = (entityIdentifier: CanvasEntityIdentifier<'inpaint_mask'>) => {
+  const dispatch = useAppDispatch();
+  const func = useCallback(() => {
+    dispatch(inpaintMaskDenoiseLimitAdded({ entityIdentifier }));
+  }, [dispatch, entityIdentifier]);
+
+  return func;
+};
+
+export const buildSelectValidRegionalGuidanceActions = (
+  entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>
+) => {
+  return createMemoizedSelector(selectCanvasSlice, (canvas) => {
+    const entity = selectEntity(canvas, entityIdentifier);
+    return {
+      canAddPositivePrompt: entity?.positivePrompt === null,
+      canAddNegativePrompt: entity?.negativePrompt === null,
+    };
+  });
 };

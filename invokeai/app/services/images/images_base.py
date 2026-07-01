@@ -6,12 +6,14 @@ from PIL.Image import Image as PILImageType
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
+    ImageNamesResult,
     ImageRecord,
     ImageRecordChanges,
     ResourceOrigin,
 )
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 
 class ImageServiceABC(ABC):
@@ -53,6 +55,7 @@ class ImageServiceABC(ABC):
         metadata: Optional[str] = None,
         workflow: Optional[str] = None,
         graph: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> ImageDTO:
         """Creates an image, storing the file and its metadata."""
         pass
@@ -116,12 +119,17 @@ class ImageServiceABC(ABC):
         self,
         offset: int = 0,
         limit: int = 10,
+        starred_first: bool = True,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
     ) -> OffsetPaginatedResults[ImageDTO]:
-        """Gets a paginated list of image DTOs."""
+        """Gets a paginated list of image DTOs with starred images first when starred_first=True."""
         pass
 
     @abstractmethod
@@ -135,11 +143,27 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
-    def get_intermediates_count(self) -> int:
-        """Gets the number of intermediate images."""
+    def get_intermediates_count(self, user_id: Optional[str] = None) -> int:
+        """Gets the number of intermediate images. If user_id is provided, only counts that user's intermediates."""
         pass
 
     @abstractmethod
     def delete_images_on_board(self, board_id: str):
         """Deletes all images on a board."""
+        pass
+
+    @abstractmethod
+    def get_image_names(
+        self,
+        starred_first: bool = True,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        image_origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
+    ) -> ImageNamesResult:
+        """Gets ordered list of image names with metadata for optimistic updates."""
         pass

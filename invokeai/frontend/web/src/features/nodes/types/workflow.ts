@@ -1,7 +1,9 @@
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { z } from 'zod';
 
+import type { FieldType } from './field';
 import { zFieldIdentifier } from './field';
-import { zInvocationNodeData, zNotesNodeData } from './invocation';
+import { zConnectorNodeData, zInvocationNodeData, zNotesNodeData } from './invocation';
 
 // #region Workflow misc
 const zXYPosition = z
@@ -12,7 +14,7 @@ const zXYPosition = z
   .default({ x: 0, y: 0 });
 export type XYPosition = z.infer<typeof zXYPosition>;
 
-const zWorkflowCategory = z.enum(['user', 'default', 'project']);
+const zWorkflowCategory = z.enum(['user', 'default']);
 export type WorkflowCategory = z.infer<typeof zWorkflowCategory>;
 // #endregion
 
@@ -29,7 +31,13 @@ const zWorkflowNotesNode = z.object({
   data: zNotesNodeData,
   position: zXYPosition,
 });
-const zWorkflowNode = z.union([zWorkflowInvocationNode, zWorkflowNotesNode]);
+const zWorkflowConnectorNode = z.object({
+  id: z.string().trim().min(1),
+  type: z.literal('connector'),
+  data: zConnectorNodeData,
+  position: zXYPosition,
+});
+const zWorkflowNode = z.union([zWorkflowInvocationNode, zWorkflowNotesNode, zWorkflowConnectorNode]);
 
 type WorkflowInvocationNode = z.infer<typeof zWorkflowInvocationNode>;
 
@@ -55,6 +63,311 @@ const zWorkflowEdgeCollapsed = zWorkflowEdgeBase.extend({
 const zWorkflowEdge = z.union([zWorkflowEdgeDefault, zWorkflowEdgeCollapsed]);
 // #endregion
 
+// #region Workflow Builder
+const zElementId = z.string().trim().min(1);
+export type ElementId = z.infer<typeof zElementId>;
+
+const zElementBase = z.object({
+  id: zElementId,
+  parentId: zElementId.optional(),
+  data: z.undefined().optional(),
+});
+
+export const zNumberComponent = z.enum(['number-input', 'slider', 'number-input-and-slider']);
+
+const NODE_FIELD_TYPE = 'node-field';
+export const NODE_FIELD_CLASS_NAME = `form-builder-${NODE_FIELD_TYPE}`;
+const FLOAT_FIELD_SETTINGS_TYPE = 'float-field-config';
+const zNodeFieldFloatSettings = z.object({
+  type: z.literal(FLOAT_FIELD_SETTINGS_TYPE).default(FLOAT_FIELD_SETTINGS_TYPE),
+  showShuffle: z.boolean().default(false),
+  component: zNumberComponent.default('number-input'),
+  min: z.number().optional(),
+  max: z.number().optional(),
+});
+export const getFloatFieldSettingsDefaults = (): NodeFieldFloatSettings => zNodeFieldFloatSettings.parse({});
+export type NodeFieldFloatSettings = z.infer<typeof zNodeFieldFloatSettings>;
+
+const INTEGER_FIELD_CONFIG_TYPE = 'integer-field-config';
+const zNodeFieldIntegerSettings = z.object({
+  type: z.literal(INTEGER_FIELD_CONFIG_TYPE).default(INTEGER_FIELD_CONFIG_TYPE),
+  showShuffle: z.boolean().default(false),
+  component: zNumberComponent.default('number-input'),
+  min: z.number().optional(),
+  max: z.number().optional(),
+});
+export type NodeFieldIntegerSettings = z.infer<typeof zNodeFieldIntegerSettings>;
+export const getIntegerFieldSettingsDefaults = (): NodeFieldIntegerSettings => zNodeFieldIntegerSettings.parse({});
+
+const zStringOption = z
+  .object({
+    label: z.string(),
+    value: z.string(),
+  })
+  .default({ label: '', value: '' });
+type StringOption = z.infer<typeof zStringOption>;
+export const getDefaultStringOption = (): StringOption => ({ label: '', value: '' });
+export const zStringComponent = z.enum(['input', 'textarea', 'dropdown']);
+const STRING_FIELD_CONFIG_TYPE = 'string-field-config';
+const zNodeFieldStringInputSettings = z.object({
+  type: z.literal(STRING_FIELD_CONFIG_TYPE).default(STRING_FIELD_CONFIG_TYPE),
+  component: z.literal('input').default('input'),
+});
+const zNodeFieldStringTextareaSettings = z.object({
+  type: z.literal(STRING_FIELD_CONFIG_TYPE).default(STRING_FIELD_CONFIG_TYPE),
+  component: z.literal('textarea').default('textarea'),
+});
+const zNodeFieldStringDropdownSettings = z.object({
+  type: z.literal(STRING_FIELD_CONFIG_TYPE).default(STRING_FIELD_CONFIG_TYPE),
+  component: z.literal('dropdown').default('dropdown'),
+  options: z.array(zStringOption),
+});
+export type NodeFieldStringDropdownSettings = z.infer<typeof zNodeFieldStringDropdownSettings>;
+const zNodeFieldStringSettings = z.union([
+  zNodeFieldStringInputSettings,
+  zNodeFieldStringTextareaSettings,
+  zNodeFieldStringDropdownSettings,
+]);
+export type NodeFieldStringSettings = z.infer<typeof zNodeFieldStringSettings>;
+export const getStringFieldSettingsDefaults = (): NodeFieldStringSettings => zNodeFieldStringInputSettings.parse({});
+
+const zNodeFieldData = z.object({
+  fieldIdentifier: zFieldIdentifier,
+  showDescription: z.boolean().default(true),
+  settings: z.union([zNodeFieldFloatSettings, zNodeFieldIntegerSettings, zNodeFieldStringSettings]).optional(),
+});
+const zNodeFieldElement = zElementBase.extend({
+  type: z.literal(NODE_FIELD_TYPE),
+  data: zNodeFieldData,
+});
+export type NodeFieldElement = z.infer<typeof zNodeFieldElement>;
+export const isNodeFieldElement = (el: FormElement): el is NodeFieldElement => el.type === NODE_FIELD_TYPE;
+export const buildNodeFieldElement = (
+  nodeId: NodeFieldElement['data']['fieldIdentifier']['nodeId'],
+  fieldName: NodeFieldElement['data']['fieldIdentifier']['fieldName'],
+  fieldType: FieldType,
+  parentId?: NodeFieldElement['parentId']
+): NodeFieldElement => {
+  let settings: NodeFieldElement['data']['settings'] = undefined;
+
+  if (fieldType.name === 'IntegerField' && fieldType.cardinality === 'SINGLE') {
+    settings = getIntegerFieldSettingsDefaults();
+  }
+
+  if (fieldType.name === 'FloatField' && fieldType.cardinality === 'SINGLE') {
+    settings = getFloatFieldSettingsDefaults();
+  }
+
+  if (fieldType.name === 'StringField' && fieldType.cardinality === 'SINGLE') {
+    settings = getStringFieldSettingsDefaults();
+  }
+
+  const element: NodeFieldElement = {
+    id: getPrefixedId(NODE_FIELD_TYPE, '-'),
+    type: NODE_FIELD_TYPE,
+    parentId,
+    data: {
+      fieldIdentifier: { nodeId, fieldName },
+      settings,
+      showDescription: true,
+    },
+  };
+  return element;
+};
+
+const HEADING_TYPE = 'heading';
+export const HEADING_CLASS_NAME = `form-builder-${HEADING_TYPE}`;
+const zHeadingElement = zElementBase.extend({
+  type: z.literal(HEADING_TYPE),
+  data: z.object({ content: z.string() }),
+});
+export type HeadingElement = z.infer<typeof zHeadingElement>;
+export const isHeadingElement = (el: FormElement): el is HeadingElement => el.type === HEADING_TYPE;
+export const buildHeading = (
+  content: HeadingElement['data']['content'],
+  parentId?: NodeFieldElement['parentId']
+): HeadingElement => {
+  const element: HeadingElement = {
+    id: getPrefixedId(HEADING_TYPE, '-'),
+    parentId,
+    type: HEADING_TYPE,
+    data: { content },
+  };
+  return element;
+};
+
+const TEXT_TYPE = 'text';
+export const TEXT_CLASS_NAME = `form-builder-${TEXT_TYPE}`;
+const zTextElement = zElementBase.extend({
+  type: z.literal(TEXT_TYPE),
+  data: z.object({ content: z.string() }),
+});
+export type TextElement = z.infer<typeof zTextElement>;
+export const isTextElement = (el: FormElement): el is TextElement => el.type === TEXT_TYPE;
+export const buildText = (
+  content: TextElement['data']['content'],
+  parentId?: NodeFieldElement['parentId']
+): TextElement => {
+  const element: TextElement = {
+    id: getPrefixedId(TEXT_TYPE, '-'),
+    parentId,
+    type: TEXT_TYPE,
+    data: { content },
+  };
+  return element;
+};
+
+const DIVIDER_TYPE = 'divider';
+export const DIVIDER_CLASS_NAME = `form-builder-${DIVIDER_TYPE}`;
+const zDividerElement = zElementBase.extend({
+  type: z.literal(DIVIDER_TYPE),
+});
+export type DividerElement = z.infer<typeof zDividerElement>;
+export const isDividerElement = (el: FormElement): el is DividerElement => el.type === DIVIDER_TYPE;
+export const buildDivider = (parentId?: NodeFieldElement['parentId']): DividerElement => {
+  const element: DividerElement = {
+    id: getPrefixedId(DIVIDER_TYPE, '-'),
+    parentId,
+    type: DIVIDER_TYPE,
+  };
+  return element;
+};
+
+const CONTAINER_TYPE = 'container';
+export const CONTAINER_CLASS_NAME = `form-builder-${CONTAINER_TYPE}`;
+export const ROOT_CONTAINER_CLASS_NAME = `form-builder-root-${CONTAINER_TYPE}`;
+const zContainerElement = zElementBase.extend({
+  type: z.literal(CONTAINER_TYPE),
+  data: z.object({
+    layout: z.enum(['row', 'column']),
+    children: z.array(zElementId),
+  }),
+});
+export type ContainerElement = z.infer<typeof zContainerElement>;
+export const isContainerElement = (el: FormElement): el is ContainerElement => el.type === CONTAINER_TYPE;
+export const buildContainer = (
+  layout: ContainerElement['data']['layout'],
+  children: ContainerElement['data']['children'],
+  parentId?: NodeFieldElement['parentId']
+): ContainerElement => {
+  const element: ContainerElement = {
+    id: getPrefixedId(CONTAINER_TYPE, '-'),
+    parentId,
+    type: CONTAINER_TYPE,
+    data: {
+      layout,
+      children,
+    },
+  };
+  return element;
+};
+
+const zFormElement = z.union([zContainerElement, zNodeFieldElement, zHeadingElement, zTextElement, zDividerElement]);
+
+export type FormElement = z.infer<typeof zFormElement>;
+
+const ROOT_ELEMENT_ID = 'root';
+export const getDefaultForm = (): BuilderForm => {
+  const rootElement = buildContainer('column', []);
+  rootElement.id = ROOT_ELEMENT_ID;
+  return {
+    elements: {
+      [rootElement.id]: rootElement,
+    },
+    rootElementId: rootElement.id,
+  };
+};
+
+const zBuilderForm = z.object({
+  elements: z.record(z.string(), zFormElement),
+  rootElementId: zElementId,
+});
+
+export type BuilderForm = z.infer<typeof zBuilderForm>;
+
+// This validation function needs to be here to avoid circular dependencies. It was intended to be in
+// `form-manipulation.ts` and is tested in taht file's tests.
+
+/**
+ * Validates the structure of a form.
+ *
+ * The form structure is valid if:
+ * - The root element is a container
+ * - Starting from the root element, all children referenced are reachable
+ * - There are no extra elements in the form that are not reachable from the root element
+ * - The root element has no parentId and is a container
+ * - Non-root elements have a parentId
+ * - All parent elements are containers
+ * - All elements with a parentId are children of their parent
+ *
+ * @param form The form to validate
+ *
+ * @returns True if the form structure is valid, false otherwise
+ */
+export const validateFormStructure = (form: BuilderForm): boolean => {
+  const { elements, rootElementId } = form;
+
+  const rootElement = elements[rootElementId];
+  const isRootElementAContainer = rootElement !== undefined && isContainerElement(rootElement);
+
+  const childrenFoundInTree = new Set<string>();
+
+  const findChildren = (elementId: string): boolean => {
+    const element = elements[elementId];
+    if (!element) {
+      // Element not found
+      return false;
+    }
+    childrenFoundInTree.add(elementId);
+    if (element.id === rootElementId) {
+      // Special handling for root
+      if (element.parentId !== undefined) {
+        // Root element must not have a parent
+        return false;
+      }
+    } else {
+      // Handling for all other elements
+      if (element.parentId === undefined) {
+        // Element must have a parent
+        return false;
+      }
+      const parent = elements[element.parentId];
+      if (!parent) {
+        // Parent must exist
+        return false;
+      }
+      if (!isContainerElement(parent)) {
+        // Parent must be a container
+        return false;
+      }
+      if (!parent.data.children.includes(elementId)) {
+        // Element must be a child of its parent
+        return false;
+      }
+    }
+    if (isContainerElement(element) && element.data.children.length > 0) {
+      return element.data.children.every(findChildren);
+    }
+    return true;
+  };
+
+  const noMissingChildren = findChildren(rootElementId);
+  const noExtraElements = Object.keys(elements).length === childrenFoundInTree.size;
+
+  return isRootElementAContainer && noMissingChildren && noExtraElements;
+};
+
+// Need to separate the form vaidation from the schema due to circular dependencies
+const zValidatedBuilderForm = zBuilderForm
+  .catch(getDefaultForm)
+  .refine((val) => val.rootElementId in val.elements, {
+    message: 'rootElementId must be a valid element id',
+  })
+  .refine((val) => validateFormStructure(val), {
+    message: 'Form structure is invalid',
+  });
+//# endregion
+
 // #region Workflow
 export const zWorkflowV3 = z.object({
   id: z.string().min(1).optional(),
@@ -70,8 +383,10 @@ export const zWorkflowV3 = z.object({
   exposedFields: z.array(zFieldIdentifier),
   meta: z.object({
     category: zWorkflowCategory.default('user'),
-    version: z.literal('3.0.0'),
+    version: z.literal('4.0.0'),
   }),
+  // Use the validated form schema!
+  form: zValidatedBuilderForm,
 });
 export type WorkflowV3 = z.infer<typeof zWorkflowV3>;
 // #endregion

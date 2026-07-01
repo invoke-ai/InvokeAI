@@ -1,6 +1,10 @@
 import { ButtonGroup, IconButton } from '@invoke-ai/ui-library';
+import { useReactFlow } from '@xyflow/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { shouldShowMinimapPanelChanged } from 'features/nodes/store/workflowSettingsSlice';
+import {
+  selectShouldShowMinimapPanel,
+  shouldShowMinimapPanelChanged,
+} from 'features/nodes/store/workflowSettingsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -9,32 +13,26 @@ import {
   PiMagnifyingGlassPlusBold,
   PiMapPinBold,
 } from 'react-icons/pi';
-import { useReactFlow } from 'reactflow';
+
+import { AutoLayoutPopover } from './AutoLayoutPopover';
 
 const ViewportControls = () => {
   const { t } = useTranslation();
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const dispatch = useAppDispatch();
-  // const shouldShowFieldTypeLegend = useAppSelector(
-  //   (s) => s.nodes.present.shouldShowFieldTypeLegend
-  // );
-  const shouldShowMinimapPanel = useAppSelector((s) => s.workflowSettings.shouldShowMinimapPanel);
+  const shouldShowMinimapPanel = useAppSelector(selectShouldShowMinimapPanel);
 
   const handleClickedZoomIn = useCallback(() => {
-    zoomIn();
+    zoomIn({ duration: 300 });
   }, [zoomIn]);
 
   const handleClickedZoomOut = useCallback(() => {
-    zoomOut();
+    zoomOut({ duration: 300 });
   }, [zoomOut]);
 
   const handleClickedFitView = useCallback(() => {
-    fitView();
+    fitView({ duration: 300 });
   }, [fitView]);
-
-  // const handleClickedToggleFieldTypeLegend = useCallback(() => {
-  //   dispatch(shouldShowFieldTypeLegendChanged(!shouldShowFieldTypeLegend));
-  // }, [shouldShowFieldTypeLegend, dispatch]);
 
   const handleClickedToggleMiniMapPanel = useCallback(() => {
     dispatch(shouldShowMinimapPanelChanged(!shouldShowMinimapPanel));
@@ -60,20 +58,7 @@ const ViewportControls = () => {
         onClick={handleClickedFitView}
         icon={<PiFrameCornersBold />}
       />
-      {/* <Tooltip
-        label={
-          shouldShowFieldTypeLegend
-            ? t('nodes.hideLegendNodes')
-            : t('nodes.showLegendNodes')
-        }
-      >
-        <IconButton
-          aria-label="Toggle field type legend"
-          isChecked={shouldShowFieldTypeLegend}
-          onClick={handleClickedToggleFieldTypeLegend}
-          icon={<FaInfo />}
-        />
-      </Tooltip> */}
+      <AutoLayoutPopover />
       <IconButton
         tooltip={shouldShowMinimapPanel ? t('nodes.hideMinimapnodes') : t('nodes.showMinimapnodes')}
         aria-label={shouldShowMinimapPanel ? t('nodes.hideMinimapnodes') : t('nodes.showMinimapnodes')}

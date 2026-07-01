@@ -1,20 +1,24 @@
 import { useStore } from '@nanostores/react';
 import { $templates } from 'features/nodes/store/nodesSlice';
+import { $flow } from 'features/nodes/store/reactFlowInstance';
 import { NODE_WIDTH } from 'features/nodes/types/constants';
 import type { AnyNode, InvocationTemplate } from 'features/nodes/types/invocation';
+import { buildConnectorNode } from 'features/nodes/util/node/buildConnectorNode';
 import { buildCurrentImageNode } from 'features/nodes/util/node/buildCurrentImageNode';
 import { buildInvocationNode } from 'features/nodes/util/node/buildInvocationNode';
 import { buildNotesNode } from 'features/nodes/util/node/buildNotesNode';
 import { useCallback } from 'react';
-import { useReactFlow } from 'reactflow';
+import { assert } from 'tsafe';
 
 export const useBuildNode = () => {
   const templates = useStore($templates);
-  const flow = useReactFlow();
 
   return useCallback(
     // string here is "any invocation type"
-    (type: string | 'current_image' | 'notes'): AnyNode => {
+    (type: string | 'connector' | 'current_image' | 'notes'): AnyNode => {
+      const flow = $flow.get();
+      assert(flow !== null);
+
       let _x = window.innerWidth / 2;
       let _y = window.innerHeight / 2;
 
@@ -39,12 +43,16 @@ export const useBuildNode = () => {
         return buildNotesNode(position);
       }
 
+      if (type === 'connector') {
+        return buildConnectorNode(position);
+      }
+
       // TODO: Keep track of invocation types so we do not need to cast this
       // We know it is safe because the caller of this function gets the `type` arg from the list of invocation templates.
       const template = templates[type] as InvocationTemplate;
 
       return buildInvocationNode(position, template);
     },
-    [templates, flow]
+    [templates]
   );
 };

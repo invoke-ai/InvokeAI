@@ -1,25 +1,25 @@
 import { Button } from '@invoke-ai/ui-library';
-import { useWorkflowLibraryModalContext } from 'features/workflowLibrary/context/useWorkflowLibraryModalContext';
-import { useLoadWorkflowFromFile } from 'features/workflowLibrary/hooks/useLoadWorkflowFromFile';
-import { memo, useCallback, useRef } from 'react';
+import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
+import { memo, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { PiUploadSimpleBold } from 'react-icons/pi';
 
-const UploadWorkflowButton = () => {
+export const UploadWorkflowButton = memo(() => {
   const { t } = useTranslation();
-  const resetRef = useRef<() => void>(null);
-  const { onClose } = useWorkflowLibraryModalContext();
-  const loadWorkflowFromFile = useLoadWorkflowFromFile({ resetRef, onSuccess: onClose });
+  const loadWorkflowWithDialog = useLoadWorkflowWithDialog();
 
   const onDropAccepted = useCallback(
-    (files: File[]) => {
-      if (!files[0]) {
+    ([file]: File[]) => {
+      if (!file) {
         return;
       }
-      loadWorkflowFromFile(files[0]);
+      loadWorkflowWithDialog({
+        type: 'file',
+        data: file,
+      });
     },
-    [loadWorkflowFromFile]
+    [loadWorkflowWithDialog]
   );
 
   const { getInputProps, getRootProps } = useDropzone({
@@ -28,20 +28,22 @@ const UploadWorkflowButton = () => {
     noDrag: true,
     multiple: false,
   });
+
   return (
     <>
       <Button
-        aria-label={t('workflows.uploadWorkflow')}
-        tooltip={t('workflows.uploadWorkflow')}
         leftIcon={<PiUploadSimpleBold />}
         {...getRootProps()}
         pointerEvents="auto"
+        variant="ghost"
+        justifyContent="flex-start"
       >
         {t('workflows.uploadWorkflow')}
       </Button>
+
       <input {...getInputProps()} />
     </>
   );
-};
+});
 
-export default memo(UploadWorkflowButton);
+UploadWorkflowButton.displayName = 'UploadWorkflowButton';

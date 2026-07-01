@@ -1,4 +1,5 @@
 import { deepClone } from 'common/util/deepClone';
+import { forEach, get } from 'es-toolkit/compat';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { WorkflowMigrationError, WorkflowVersionError } from 'features/nodes/types/error';
 import type { InvocationNodeData } from 'features/nodes/types/invocation';
@@ -12,7 +13,6 @@ import { zWorkflowV2 } from 'features/nodes/types/v2/workflow';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { zWorkflowV3 } from 'features/nodes/types/workflow';
 import { t } from 'i18next';
-import { forEach } from 'lodash-es';
 import { z } from 'zod';
 
 /**
@@ -70,14 +70,18 @@ const migrateV1toV2 = (workflowToMigrate: WorkflowV1): WorkflowV2 => {
 };
 
 const migrateV2toV3 = (workflowToMigrate: WorkflowV2): WorkflowV3 => {
-  // Bump version
-  (workflowToMigrate as unknown as WorkflowV3).meta.version = '3.0.0';
-  // Parsing strips out any extra properties not in the latest version
+  return migrateV3toV4(workflowToMigrate as unknown as WorkflowV3);
+};
+
+const migrateV3toV4 = (workflowToMigrate: WorkflowV3): WorkflowV3 => {
+  workflowToMigrate.meta.version = '4.0.0';
   return zWorkflowV3.parse(workflowToMigrate);
 };
 
 /**
  * Parses a workflow and migrates it to the latest version if necessary.
+ *
+ * This function will return a new workflow object, so the original workflow is not modified.
  */
 export const parseAndMigrateWorkflow = (data: unknown): WorkflowV3 => {
   const workflowVersionResult = zWorkflowMetaVersion.safeParse(data);
@@ -86,17 +90,24 @@ export const parseAndMigrateWorkflow = (data: unknown): WorkflowV3 => {
     throw new WorkflowVersionError(t('nodes.unableToGetWorkflowVersion'));
   }
 
-  let workflow = deepClone(data) as WorkflowV1 | WorkflowV2 | WorkflowV3;
+  let workflow = deepClone(data);
 
-  if (workflow.meta.version === '1.0.0') {
+  if (get(workflow, 'meta.version') === '1.0.0') {
     const v1 = zWorkflowV1.parse(workflow);
     workflow = migrateV1toV2(v1);
   }
 
-  if (workflow.meta.version === '2.0.0') {
+  if (get(workflow, 'meta.version') === '2.0.0') {
     const v2 = zWorkflowV2.parse(workflow);
     workflow = migrateV2toV3(v2);
   }
 
-  return workflow as WorkflowV3;
+  if (get(workflow, 'meta.version') === '3.0.0') {
+    workflow = migrateV3toV4(workflow as WorkflowV3);
+  }
+
+  // We should now have a V3 workflow
+  const migratedWorkflow = zWorkflowV3.parse(workflow);
+
+  return migratedWorkflow;
 };

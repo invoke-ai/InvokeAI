@@ -1,6 +1,6 @@
 import os
 
-from .urls_base import UrlServiceBase
+from invokeai.app.services.urls.urls_base import UrlServiceBase
 
 
 class LocalUrlService(UrlServiceBase):
@@ -19,3 +19,9 @@ class LocalUrlService(UrlServiceBase):
 
     def get_model_image_url(self, model_key: str) -> str:
         return f"{self._base_url_v2}/models/i/{model_key}/image"
+
+    def get_style_preset_image_url(self, style_preset_id: str) -> str:
+        return f"{self._base_url}/style_presets/i/{style_preset_id}/image"
+
+    def get_workflow_thumbnail_url(self, workflow_id: str) -> str:
+        return f"{self._base_url}/workflows/i/{workflow_id}/thumbnail"

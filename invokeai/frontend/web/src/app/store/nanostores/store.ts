@@ -1,4 +1,4 @@
-import type { createStore } from 'app/store/store';
+import type { AppStore } from 'app/store/store';
 import { atom } from 'nanostores';
 
 // Inject socket options and url into window for debugging
@@ -22,7 +22,7 @@ class ReduxStoreNotInitialized extends Error {
   }
 }
 
-export const $store = atom<Readonly<ReturnType<typeof createStore>> | undefined>();
+export const $store = atom<Readonly<AppStore | undefined>>();
 
 export const getStore = () => {
   const store = $store.get();

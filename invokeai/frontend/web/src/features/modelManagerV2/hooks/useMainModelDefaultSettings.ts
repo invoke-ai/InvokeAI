@@ -1,85 +1,52 @@
-import { skipToken } from '@reduxjs/toolkit/query';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { useAppSelector } from 'app/store/storeHooks';
-import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
-import { selectConfigSlice } from 'features/system/store/configSlice';
-import { isNil } from 'lodash-es';
+import { isNil } from 'es-toolkit/compat';
 import { useMemo } from 'react';
-import { useGetModelConfigWithTypeGuard } from 'services/api/hooks/useGetModelConfigWithTypeGuard';
-import { isNonRefinerMainModelConfig } from 'services/api/types';
+import type { MainModelConfig } from 'services/api/types';
 
-const initialStatesSelector = createMemoizedSelector(selectConfigSlice, (config) => {
-  const { steps, guidance, scheduler, cfgRescaleMultiplier, vaePrecision, width, height } = config.sd;
-
-  return {
-    initialSteps: steps.initial,
-    initialCfg: guidance.initial,
-    initialScheduler: scheduler,
-    initialCfgRescaleMultiplier: cfgRescaleMultiplier.initial,
-    initialVaePrecision: vaePrecision,
-    initialWidth: width.initial,
-    initialHeight: height.initial,
-  };
-});
-
-export const useMainModelDefaultSettings = (modelKey?: string | null) => {
-  const { modelConfig, isLoading } = useGetModelConfigWithTypeGuard(modelKey ?? skipToken, isNonRefinerMainModelConfig);
-
-  const {
-    initialSteps,
-    initialCfg,
-    initialScheduler,
-    initialCfgRescaleMultiplier,
-    initialVaePrecision,
-    initialWidth,
-    initialHeight,
-  } = useAppSelector(initialStatesSelector);
-
+export const useMainModelDefaultSettings = (modelConfig: MainModelConfig) => {
   const defaultSettingsDefaults = useMemo(() => {
     return {
       vae: {
         isEnabled: !isNil(modelConfig?.default_settings?.vae),
-        value: modelConfig?.default_settings?.vae || 'default',
+        value: modelConfig?.default_settings?.vae ?? 'default',
       },
       vaePrecision: {
         isEnabled: !isNil(modelConfig?.default_settings?.vae_precision),
-        value: modelConfig?.default_settings?.vae_precision || initialVaePrecision || 'fp32',
+        value: modelConfig?.default_settings?.vae_precision ?? 'fp32',
       },
       scheduler: {
         isEnabled: !isNil(modelConfig?.default_settings?.scheduler),
-        value: modelConfig?.default_settings?.scheduler || initialScheduler || 'euler',
+        value: modelConfig?.default_settings?.scheduler ?? 'dpmpp_3m_k',
       },
       steps: {
         isEnabled: !isNil(modelConfig?.default_settings?.steps),
-        value: modelConfig?.default_settings?.steps || initialSteps,
+        value: modelConfig?.default_settings?.steps ?? 30,
       },
       cfgScale: {
         isEnabled: !isNil(modelConfig?.default_settings?.cfg_scale),
-        value: modelConfig?.default_settings?.cfg_scale || initialCfg,
+        value: modelConfig?.default_settings?.cfg_scale ?? 7,
       },
       cfgRescaleMultiplier: {
         isEnabled: !isNil(modelConfig?.default_settings?.cfg_rescale_multiplier),
-        value: modelConfig?.default_settings?.cfg_rescale_multiplier || initialCfgRescaleMultiplier,
+        value: modelConfig?.default_settings?.cfg_rescale_multiplier ?? 0,
       },
       width: {
         isEnabled: !isNil(modelConfig?.default_settings?.width),
-        value: modelConfig?.default_settings?.width || initialWidth,
+        value: modelConfig?.default_settings?.width ?? 512,
       },
       height: {
         isEnabled: !isNil(modelConfig?.default_settings?.height),
-        value: modelConfig?.default_settings?.height || initialHeight,
+        value: modelConfig?.default_settings?.height ?? 512,
+      },
+      guidance: {
+        isEnabled: !isNil(modelConfig?.default_settings?.guidance),
+        value: modelConfig?.default_settings?.guidance ?? 4,
+      },
+      fp8Storage: {
+        isEnabled: !isNil(modelConfig?.default_settings?.fp8_storage),
+        value: modelConfig?.default_settings?.fp8_storage ?? false,
       },
     };
-  }, [
-    modelConfig,
-    initialVaePrecision,
-    initialScheduler,
-    initialSteps,
-    initialCfg,
-    initialCfgRescaleMultiplier,
-    initialWidth,
-    initialHeight,
-  ]);
+  }, [modelConfig]);
 
-  return { defaultSettingsDefaults, isLoading, optimalDimension: getOptimalDimension(modelConfig) };
+  return defaultSettingsDefaults;
 };

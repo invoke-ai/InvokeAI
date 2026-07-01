@@ -3,21 +3,42 @@ import { Box, Expander, Flex, FormControlGroup, StandaloneAccordion } from '@inv
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
+import {
+  selectFluxDypePreset,
+  selectIsAnima,
+  selectIsCogView4,
+  selectIsExternal,
+  selectIsFLUX,
+  selectIsFlux2,
+  selectIsQwenImage,
+  selectIsSD3,
+  selectIsZImage,
+  selectModelSupportsGuidance,
+  selectModelSupportsSteps,
+} from 'features/controlLayers/store/paramsSlice';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
-import { selectLoraSlice } from 'features/lora/store/loraSlice';
+import ParamAnimaScheduler from 'features/parameters/components/Core/ParamAnimaScheduler';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
+import ParamFluxDypeExponent from 'features/parameters/components/Core/ParamFluxDypeExponent';
+import ParamFluxDypePreset from 'features/parameters/components/Core/ParamFluxDypePreset';
+import ParamFluxDypeScale from 'features/parameters/components/Core/ParamFluxDypeScale';
+import ParamFluxScheduler from 'features/parameters/components/Core/ParamFluxScheduler';
+import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
+import ParamQwenImageShift from 'features/parameters/components/Core/ParamQwenImageShift';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
-import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
-import ParamMainModelSelect from 'features/parameters/components/MainModel/ParamMainModelSelect';
-import { UseDefaultSettingsButton } from 'features/parameters/components/MainModel/UseDefaultSettingsButton';
+import ParamZImageScheduler from 'features/parameters/components/Core/ParamZImageScheduler';
+import ParamZImageShift from 'features/parameters/components/Core/ParamZImageShift';
+import ParamZImageSeedVarianceSettings from 'features/parameters/components/SeedVariance/ParamZImageSeedVarianceSettings';
+import { MainModelPicker } from 'features/settingsAccordions/components/GenerationSettingsAccordion/MainModelPicker';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
-import { filter } from 'lodash-es';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
+import { isFluxFillMainModelModelConfig } from 'services/api/types';
 
 const formLabelProps: FormLabelProps = {
   minW: '4rem',
@@ -26,10 +47,23 @@ const formLabelProps: FormLabelProps = {
 export const GenerationSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const modelConfig = useSelectedModelConfig();
+  const isFLUX = useAppSelector(selectIsFLUX);
+  const isFlux2 = useAppSelector(selectIsFlux2);
+  const isSD3 = useAppSelector(selectIsSD3);
+  const isCogView4 = useAppSelector(selectIsCogView4);
+  const isZImage = useAppSelector(selectIsZImage);
+  const isExternal = useAppSelector(selectIsExternal);
+  const isQwenImage = useAppSelector(selectIsQwenImage);
+  const isAnima = useAppSelector(selectIsAnima);
+  const fluxDypePreset = useAppSelector(selectFluxDypePreset);
+  const modelSupportsGuidance = useAppSelector(selectModelSupportsGuidance);
+  const modelSupportsSteps = useAppSelector(selectModelSupportsSteps);
+  const hasExpanderContent = isExternal ? modelSupportsGuidance || modelSupportsSteps : true;
+
   const selectBadges = useMemo(
     () =>
-      createMemoizedSelector(selectLoraSlice, (lora) => {
-        const enabledLoRAsCount = filter(lora.loras, (l) => !!l.isEnabled).length;
+      createMemoizedSelector(selectLoRAsSlice, (loras) => {
+        const enabledLoRAsCount = loras.loras.filter((l) => l.isEnabled).length;
         const loraTabBadges = enabledLoRAsCount ? [`${enabledLoRAsCount} ${t('models.concepts')}`] : EMPTY_ARRAY;
         const accordionBadges = modelConfig ? [modelConfig.name, modelConfig.base] : EMPTY_ARRAY;
         return { loraTabBadges, accordionBadges };
@@ -42,40 +76,54 @@ export const GenerationSettingsAccordion = memo(() => {
     defaultIsOpen: false,
   });
   const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } = useStandaloneAccordionToggle({
-    id: 'generation-settings',
+    id: `generation-settings-generate`,
     defaultIsOpen: true,
   });
 
   return (
     <StandaloneAccordion
       label={t('accordions.generation.title')}
-      badges={[...accordionBadges, ...loraTabBadges]}
+      badges={[...accordionBadges, ...(isExternal ? EMPTY_ARRAY : loraTabBadges)]}
       isOpen={isOpenAccordion}
       onToggle={onToggleAccordion}
     >
-      <Box px={4} pt={4} data-testid="generation-accordion">
-        <Flex gap={4} flexDir="column">
-          <Flex gap={4} alignItems="center">
-            <ParamMainModelSelect />
-            <Flex>
-              <UseDefaultSettingsButton />
-              <NavigateToModelManagerButton />
-            </Flex>
-          </Flex>
-          <Flex gap={4} flexDir="column">
-            <LoRASelect />
-            <LoRAList />
-          </Flex>
+      <Box px={4} pt={4} pb={hasExpanderContent ? 0 : 4} data-testid="generation-accordion">
+        <Flex gap={4} flexDir="column" pb={0}>
+          <MainModelPicker />
+          {!isExternal && <LoRASelect />}
+          {!isExternal && <LoRAList />}
         </Flex>
-        <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
-          <Flex gap={4} flexDir="column" pb={4}>
-            <FormControlGroup formLabelProps={formLabelProps}>
-              <ParamScheduler />
-              <ParamSteps />
-              <ParamCFGScale />
-            </FormControlGroup>
-          </Flex>
-        </Expander>
+        {hasExpanderContent && (
+          <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
+            <Flex gap={4} flexDir="column" pb={4}>
+              <FormControlGroup formLabelProps={formLabelProps}>
+                {!isExternal &&
+                  !isFLUX &&
+                  !isFlux2 &&
+                  !isSD3 &&
+                  !isCogView4 &&
+                  !isZImage &&
+                  !isQwenImage &&
+                  !isAnima && <ParamScheduler />}
+                {!isExternal && (isFLUX || isFlux2) && <ParamFluxScheduler />}
+                {!isExternal && isZImage && <ParamZImageScheduler />}
+                {!isExternal && isAnima && <ParamAnimaScheduler />}
+                {modelSupportsSteps && <ParamSteps />}
+                {isExternal && modelSupportsGuidance && <ParamGuidance />}
+                {!isExternal && isFLUX && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && (
+                  <ParamGuidance />
+                )}
+                {!isExternal && !isFLUX && !isFlux2 && <ParamCFGScale />}
+                {!isExternal && isZImage && <ParamZImageShift />}
+                {!isExternal && isQwenImage && <ParamQwenImageShift />}
+                {!isExternal && isFLUX && <ParamFluxDypePreset />}
+                {!isExternal && isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeScale />}
+                {!isExternal && isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeExponent />}
+              </FormControlGroup>
+              {!isExternal && isZImage && <ParamZImageSeedVarianceSettings />}
+            </Flex>
+          </Expander>
+        )}
       </Box>
     </StandaloneAccordion>
   );

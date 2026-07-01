@@ -1,42 +1,50 @@
 import { useAppSelector } from 'app/store/storeHooks';
-import { toast } from 'features/toast/toast';
-import { isNil } from 'lodash-es';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
+import { useCurrentQueueItemId } from 'features/queue/hooks/useCurrentQueueItemId';
 import { useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useCancelQueueItemMutation, useGetQueueStatusQuery } from 'services/api/endpoints/queue';
+import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
+import { useGetCurrentQueueItemQuery } from 'services/api/endpoints/queue';
+
+import { useCancelQueueItem } from './useCancelQueueItem';
 
 export const useCancelCurrentQueueItem = () => {
-  const isConnected = useAppSelector((s) => s.system.isConnected);
-  const { data: queueStatus } = useGetQueueStatusQuery();
-  const [trigger, { isLoading }] = useCancelQueueItemMutation();
-  const { t } = useTranslation();
-  const currentQueueItemId = useMemo(() => queueStatus?.queue.item_id, [queueStatus?.queue.item_id]);
-  const cancelQueueItem = useCallback(async () => {
-    if (!currentQueueItemId) {
-      return;
-    }
-    try {
-      await trigger(currentQueueItemId).unwrap();
-      toast({
-        id: 'QUEUE_CANCEL_SUCCEEDED',
-        title: t('queue.cancelSucceeded'),
-        status: 'success',
-      });
-    } catch {
-      toast({
-        id: 'QUEUE_CANCEL_FAILED',
-        title: t('queue.cancelFailed'),
-        status: 'error',
-      });
-    }
-  }, [currentQueueItemId, t, trigger]);
+  const currentQueueItemId = useCurrentQueueItemId();
+  const { data: currentQueueItem } = useGetCurrentQueueItemQuery();
+  const currentUser = useAppSelector(selectCurrentUser);
+  const { data: setupStatus } = useGetSetupStatusQuery();
+  const cancelQueueItem = useCancelQueueItem();
 
-  const isDisabled = useMemo(() => !isConnected || isNil(currentQueueItemId), [isConnected, currentQueueItemId]);
+  // Check if current user can cancel the current item
+  const canCancelCurrentItem = useMemo(() => {
+    // In single-user mode, allow canceling current item without auth checks.
+    if (setupStatus && !setupStatus.multiuser_enabled) {
+      return true;
+    }
+
+    if (!currentUser || !currentQueueItem) {
+      return false;
+    }
+    // Admin users can cancel all items
+    if (currentUser.is_admin) {
+      return true;
+    }
+    // Non-admin users can only cancel their own items
+    return currentQueueItem.user_id === currentUser.user_id;
+  }, [setupStatus, currentUser, currentQueueItem]);
+
+  const trigger = useCallback(
+    (options?: { withToast?: boolean }) => {
+      if (currentQueueItemId === null) {
+        return;
+      }
+      cancelQueueItem.trigger(currentQueueItemId, options);
+    },
+    [currentQueueItemId, cancelQueueItem]
+  );
 
   return {
-    cancelQueueItem,
-    isLoading,
-    currentQueueItemId,
-    isDisabled,
+    trigger,
+    isLoading: cancelQueueItem.isLoading,
+    isDisabled: cancelQueueItem.isDisabled || currentQueueItemId === null || !canCancelCurrentItem,
   };
 };

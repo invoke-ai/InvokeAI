@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import inspect
 import re
+import sys
+import types
+import typing
 import warnings
 from abc import ABC, abstractmethod
 from enum import Enum
+from functools import lru_cache
 from inspect import signature
 from typing import (
     TYPE_CHECKING,
@@ -18,20 +22,23 @@ from typing import (
     Literal,
     Optional,
     Type,
+    TypedDict,
     TypeVar,
     Union,
     cast,
 )
 
 import semver
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, create_model
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, TypeAdapter, create_model
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
-from typing_extensions import TypeAliasType
 
 from invokeai.app.invocations.fields import (
     FieldKind,
     Input,
+    InputFieldJSONSchemaExtra,
+    UIType,
+    migrate_model_ui_type,
 )
 from invokeai.app.services.config.config_default import get_config
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -40,11 +47,9 @@ from invokeai.app.util.misc import uuid_string
 from invokeai.backend.util.logging import InvokeAILogger
 
 if TYPE_CHECKING:
-    from ..services.invocation_services import InvocationServices
+    from invokeai.app.services.invocation_services import InvocationServices
 
 logger = InvokeAILogger.get_logger()
-
-CUSTOM_NODE_PACK_SUFFIX = "__invokeai-custom-node"
 
 
 class InvalidVersionError(ValueError):
@@ -61,11 +66,28 @@ class Classification(str, Enum, metaclass=MetaEnum):
     - `Stable`: The invocation, including its inputs/outputs and internal logic, is stable. You may build workflows with it, having confidence that they will not break because of a change in this invocation.
     - `Beta`: The invocation is not yet stable, but is planned to be stable in the future. Workflows built around this invocation may break, but we are committed to supporting this invocation long-term.
     - `Prototype`: The invocation is not yet stable and may be removed from the application at any time. Workflows built around this invocation may break, and we are *not* committed to supporting this invocation.
+    - `Deprecated`: The invocation is deprecated and may be removed in a future version.
+    - `Internal`: The invocation is not intended for use by end-users. It may be changed or removed at any time, but is exposed for users to play with.
+    - `Special`: The invocation is a special case and does not fit into any of the other classifications.
     """
 
     Stable = "stable"
     Beta = "beta"
     Prototype = "prototype"
+    Deprecated = "deprecated"
+    Internal = "internal"
+    Special = "special"
+
+
+class Bottleneck(str, Enum, metaclass=MetaEnum):
+    """
+    The bottleneck of an invocation.
+    - `Network`: The invocation's execution is network-bound.
+    - `GPU`: The invocation's execution is GPU-bound.
+    """
+
+    Network = "network"
+    GPU = "gpu"
 
 
 class UIConfigBase(BaseModel):
@@ -74,19 +96,24 @@ class UIConfigBase(BaseModel):
     This is used internally by the @invocation decorator logic. Do not use this directly.
     """
 
-    tags: Optional[list[str]] = Field(default_factory=None, description="The node's tags")
+    tags: Optional[list[str]] = Field(default=None, description="The node's tags")
     title: Optional[str] = Field(default=None, description="The node's display name")
     category: Optional[str] = Field(default=None, description="The node's category")
     version: str = Field(
         description='The node\'s version. Should be a valid semver string e.g. "1.0.0" or "3.8.13".',
     )
-    node_pack: Optional[str] = Field(default=None, description="Whether or not this is a custom node")
+    node_pack: str = Field(description="The node pack that this node belongs to, will be 'invokeai' for built-in nodes")
     classification: Classification = Field(default=Classification.Stable, description="The node's classification")
 
     model_config = ConfigDict(
         validate_assignment=True,
         json_schema_serialization_defaults_required=True,
     )
+
+
+class OriginalModelField(TypedDict):
+    annotation: Any
+    field_info: FieldInfo
 
 
 class BaseInvocationOutput(BaseModel):
@@ -96,36 +123,11 @@ class BaseInvocationOutput(BaseModel):
     All invocation outputs must use the `@invocation_output` decorator to provide their unique type.
     """
 
-    _output_classes: ClassVar[set[BaseInvocationOutput]] = set()
-    _typeadapter: ClassVar[Optional[TypeAdapter[Any]]] = None
-    _typeadapter_needs_update: ClassVar[bool] = False
-
-    @classmethod
-    def register_output(cls, output: BaseInvocationOutput) -> None:
-        """Registers an invocation output."""
-        cls._output_classes.add(output)
-        cls._typeadapter_needs_update = True
-
-    @classmethod
-    def get_outputs(cls) -> Iterable[BaseInvocationOutput]:
-        """Gets all invocation outputs."""
-        return cls._output_classes
-
-    @classmethod
-    def get_typeadapter(cls) -> TypeAdapter[Any]:
-        """Gets a pydantc TypeAdapter for the union of all invocation output types."""
-        if not cls._typeadapter or cls._typeadapter_needs_update:
-            AnyInvocationOutput = TypeAliasType(
-                "AnyInvocationOutput", Annotated[Union[tuple(cls._output_classes)], Field(discriminator="type")]
-            )
-            cls._typeadapter = TypeAdapter(AnyInvocationOutput)
-            cls._typeadapter_needs_update = False
-        return cls._typeadapter
-
-    @classmethod
-    def get_output_types(cls) -> Iterable[str]:
-        """Gets all invocation output types."""
-        return (i.get_type() for i in BaseInvocationOutput.get_outputs())
+    output_meta: Optional[dict[str, JsonValue]] = Field(
+        default=None,
+        description="Optional dictionary of metadata for the invocation output, unrelated to the invocation's actual output value. This is not exposed as an output field.",
+        json_schema_extra={"field_kind": FieldKind.NodeAttribute},
+    )
 
     @staticmethod
     def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseInvocationOutput]) -> None:
@@ -141,6 +143,9 @@ class BaseInvocationOutput(BaseModel):
     def get_type(cls) -> str:
         """Gets the invocation output's type, as provided by the `@invocation_output` decorator."""
         return cls.model_fields["type"].default
+
+    _original_model_fields: ClassVar[dict[str, OriginalModelField]] = {}
+    """The original model fields, before any modifications were made by the @invocation_output decorator."""
 
     model_config = ConfigDict(
         protected_namespaces=(),
@@ -169,79 +174,29 @@ class BaseInvocation(ABC, BaseModel):
     All invocations must use the `@invocation` decorator to provide their unique type.
     """
 
-    _invocation_classes: ClassVar[set[BaseInvocation]] = set()
-    _typeadapter: ClassVar[Optional[TypeAdapter[Any]]] = None
-    _typeadapter_needs_update: ClassVar[bool] = False
-
     @classmethod
     def get_type(cls) -> str:
         """Gets the invocation's type, as provided by the `@invocation` decorator."""
         return cls.model_fields["type"].default
 
     @classmethod
-    def register_invocation(cls, invocation: BaseInvocation) -> None:
-        """Registers an invocation."""
-        cls._invocation_classes.add(invocation)
-        cls._typeadapter_needs_update = True
-
-    @classmethod
-    def get_typeadapter(cls) -> TypeAdapter[Any]:
-        """Gets a pydantc TypeAdapter for the union of all invocation types."""
-        if not cls._typeadapter or cls._typeadapter_needs_update:
-            AnyInvocation = TypeAliasType(
-                "AnyInvocation", Annotated[Union[tuple(cls._invocation_classes)], Field(discriminator="type")]
-            )
-            cls._typeadapter = TypeAdapter(AnyInvocation)
-            cls._typeadapter_needs_update = False
-        return cls._typeadapter
-
-    @classmethod
-    def get_invocations(cls) -> Iterable[BaseInvocation]:
-        """Gets all invocations, respecting the allowlist and denylist."""
-        app_config = get_config()
-        allowed_invocations: set[BaseInvocation] = set()
-        for sc in cls._invocation_classes:
-            invocation_type = sc.get_type()
-            is_in_allowlist = (
-                invocation_type in app_config.allow_nodes if isinstance(app_config.allow_nodes, list) else True
-            )
-            is_in_denylist = (
-                invocation_type in app_config.deny_nodes if isinstance(app_config.deny_nodes, list) else False
-            )
-            if is_in_allowlist and not is_in_denylist:
-                allowed_invocations.add(sc)
-        return allowed_invocations
-
-    @classmethod
-    def get_invocations_map(cls) -> dict[str, BaseInvocation]:
-        """Gets a map of all invocation types to their invocation classes."""
-        return {i.get_type(): i for i in BaseInvocation.get_invocations()}
-
-    @classmethod
-    def get_invocation_types(cls) -> Iterable[str]:
-        """Gets all invocation types."""
-        return (i.get_type() for i in BaseInvocation.get_invocations())
-
-    @classmethod
-    def get_output_annotation(cls) -> BaseInvocationOutput:
+    def get_output_annotation(cls) -> Type[BaseInvocationOutput]:
         """Gets the invocation's output annotation (i.e. the return annotation of its `invoke()` method)."""
         return signature(cls.invoke).return_annotation
 
     @staticmethod
     def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseInvocation]) -> None:
         """Adds various UI-facing attributes to the invocation's OpenAPI schema."""
-        uiconfig = cast(UIConfigBase | None, getattr(model_class, "UIConfig", None))
-        if uiconfig is not None:
-            if uiconfig.title is not None:
-                schema["title"] = uiconfig.title
-            if uiconfig.tags is not None:
-                schema["tags"] = uiconfig.tags
-            if uiconfig.category is not None:
-                schema["category"] = uiconfig.category
-            if uiconfig.node_pack is not None:
-                schema["node_pack"] = uiconfig.node_pack
-            schema["classification"] = uiconfig.classification
-            schema["version"] = uiconfig.version
+        if title := model_class.UIConfig.title:
+            schema["title"] = title
+        if tags := model_class.UIConfig.tags:
+            schema["tags"] = tags
+        if category := model_class.UIConfig.category:
+            schema["category"] = category
+        if node_pack := model_class.UIConfig.node_pack:
+            schema["node_pack"] = node_pack
+        schema["classification"] = model_class.UIConfig.classification
+        schema["version"] = model_class.UIConfig.version
         if "required" not in schema or not isinstance(schema["required"], list):
             schema["required"] = []
         schema["class"] = "invocation"
@@ -257,7 +212,7 @@ class BaseInvocation(ABC, BaseModel):
         Internal invoke method, calls `invoke()` after some prep.
         Handles optional fields that are required to call `invoke()` and invocation cache.
         """
-        for field_name, field in self.model_fields.items():
+        for field_name, field in type(self).model_fields.items():
             if not field.json_schema_extra or callable(field.json_schema_extra):
                 # something has gone terribly awry, we should always have this and it should be a dict
                 continue
@@ -272,9 +227,9 @@ class BaseInvocation(ABC, BaseModel):
                 setattr(self, field_name, orig_default)
             if orig_required and orig_default is PydanticUndefined and getattr(self, field_name) is None:
                 if input_ == Input.Connection:
-                    raise RequiredConnectionException(self.model_fields["type"].default, field_name)
+                    raise RequiredConnectionException(type(self).model_fields["type"].default, field_name)
                 elif input_ == Input.Any:
-                    raise MissingInputException(self.model_fields["type"].default, field_name)
+                    raise MissingInputException(type(self).model_fields["type"].default, field_name)
 
         # skip node cache codepath if it's disabled
         if services.configuration.node_cache_size == 0:
@@ -304,7 +259,9 @@ class BaseInvocation(ABC, BaseModel):
     is_intermediate: bool = Field(
         default=False,
         description="Whether or not this is an intermediate invocation.",
-        json_schema_extra={"ui_type": "IsIntermediate", "field_kind": FieldKind.NodeAttribute},
+        json_schema_extra=InputFieldJSONSchemaExtra(
+            input=Input.Direct, field_kind=FieldKind.NodeAttribute, ui_type=UIType._IsIntermediate
+        ).model_dump(exclude_none=True),
     )
     use_cache: bool = Field(
         default=True,
@@ -312,7 +269,9 @@ class BaseInvocation(ABC, BaseModel):
         json_schema_extra={"field_kind": FieldKind.NodeAttribute},
     )
 
-    UIConfig: ClassVar[Type[UIConfigBase]]
+    bottleneck: ClassVar[Bottleneck]
+
+    UIConfig: ClassVar[UIConfigBase]
 
     model_config = ConfigDict(
         protected_namespaces=(),
@@ -322,8 +281,175 @@ class BaseInvocation(ABC, BaseModel):
         coerce_numbers_to_str=True,
     )
 
+    _original_model_fields: ClassVar[dict[str, OriginalModelField]] = {}
+    """The original model fields, before any modifications were made by the @invocation decorator."""
+
 
 TBaseInvocation = TypeVar("TBaseInvocation", bound=BaseInvocation)
+
+
+class InvocationRegistry:
+    _invocation_classes: ClassVar[set[type[BaseInvocation]]] = set()
+    _output_classes: ClassVar[set[type[BaseInvocationOutput]]] = set()
+
+    @classmethod
+    def register_invocation(cls, invocation: type[BaseInvocation]) -> None:
+        """Registers an invocation."""
+
+        invocation_type = invocation.get_type()
+        node_pack = invocation.UIConfig.node_pack
+
+        # Log a warning when an existing invocation is being clobbered by the one we are registering
+        clobbered_invocation = InvocationRegistry.get_invocation_for_type(invocation_type)
+        if clobbered_invocation is not None:
+            # This should always be true - we just checked if the invocation type was in the set
+            clobbered_node_pack = clobbered_invocation.UIConfig.node_pack
+
+            if clobbered_node_pack == "invokeai":
+                # The invocation being clobbered is a core invocation
+                logger.warning(f'Overriding core node "{invocation_type}" with node from "{node_pack}"')
+            else:
+                # The invocation being clobbered is a custom invocation
+                logger.warning(
+                    f'Overriding node "{invocation_type}" from "{node_pack}" with node from "{clobbered_node_pack}"'
+                )
+            cls._invocation_classes.remove(clobbered_invocation)
+
+        cls._invocation_classes.add(invocation)
+        cls.invalidate_invocation_typeadapter()
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def get_invocation_typeadapter(cls) -> TypeAdapter[Any]:
+        """Gets a pydantic TypeAdapter for the union of all invocation types.
+
+        This is used to parse serialized invocations into the correct invocation class.
+
+        This method is cached to avoid rebuilding the TypeAdapter on every access. If the invocation allowlist or
+        denylist is changed, the cache should be cleared to ensure the TypeAdapter is updated and validation respects
+        the updated allowlist and denylist.
+
+        @see https://docs.pydantic.dev/latest/concepts/type_adapter/
+        """
+        return TypeAdapter(Annotated[Union[tuple(cls.get_invocation_classes())], Field(discriminator="type")])
+
+    @classmethod
+    def invalidate_invocation_typeadapter(cls) -> None:
+        """Invalidates the cached invocation type adapter."""
+        cls.get_invocation_typeadapter.cache_clear()
+
+    @classmethod
+    def unregister_pack(cls, node_pack: str) -> list[str]:
+        """Unregisters all invocations and outputs belonging to a node pack.
+
+        Returns a list of the invocation types that were removed.
+        """
+        removed_types: list[str] = []
+
+        invocations_to_remove = {inv for inv in cls._invocation_classes if inv.UIConfig.node_pack == node_pack}
+        for inv in invocations_to_remove:
+            removed_types.append(inv.get_type())
+            cls._invocation_classes.discard(inv)
+
+        if invocations_to_remove:
+            cls.invalidate_invocation_typeadapter()
+
+        # Also remove any output classes from this pack's modules
+        outputs_to_remove = {out for out in cls._output_classes if out.__module__.split(".")[0] == node_pack}
+        for out in outputs_to_remove:
+            cls._output_classes.discard(out)
+
+        if outputs_to_remove:
+            cls.invalidate_output_typeadapter()
+
+        return removed_types
+
+    @classmethod
+    def get_invocation_classes(cls) -> Iterable[type[BaseInvocation]]:
+        """Gets all invocations, respecting the allowlist and denylist."""
+        app_config = get_config()
+        allowed_invocations: set[type[BaseInvocation]] = set()
+        for sc in cls._invocation_classes:
+            invocation_type = sc.get_type()
+            is_in_allowlist = (
+                invocation_type in app_config.allow_nodes if isinstance(app_config.allow_nodes, list) else True
+            )
+            is_in_denylist = (
+                invocation_type in app_config.deny_nodes if isinstance(app_config.deny_nodes, list) else False
+            )
+            if is_in_allowlist and not is_in_denylist:
+                allowed_invocations.add(sc)
+        return allowed_invocations
+
+    @classmethod
+    def get_invocations_map(cls) -> dict[str, type[BaseInvocation]]:
+        """Gets a map of all invocation types to their invocation classes."""
+        return {i.get_type(): i for i in cls.get_invocation_classes()}
+
+    @classmethod
+    def get_invocation_types(cls) -> Iterable[str]:
+        """Gets all invocation types."""
+        return (i.get_type() for i in cls.get_invocation_classes())
+
+    @classmethod
+    def get_invocation_for_type(cls, invocation_type: str) -> type[BaseInvocation] | None:
+        """Gets the invocation class for a given invocation type."""
+        return cls.get_invocations_map().get(invocation_type)
+
+    @classmethod
+    def register_output(cls, output: "type[TBaseInvocationOutput]") -> None:
+        """Registers an invocation output."""
+        output_type = output.get_type()
+
+        # Log a warning when an existing invocation is being clobbered by the one we are registering
+        clobbered_output = InvocationRegistry.get_output_for_type(output_type)
+        if clobbered_output is not None:
+            # TODO(psyche): We do not record the node pack of the output, so we cannot log it here
+            logger.warning(f'Overriding invocation output "{output_type}"')
+            cls._output_classes.remove(clobbered_output)
+
+        cls._output_classes.add(output)
+        cls.invalidate_output_typeadapter()
+
+    @classmethod
+    def get_output_classes(cls) -> Iterable[type[BaseInvocationOutput]]:
+        """Gets all invocation outputs."""
+        return cls._output_classes
+
+    @classmethod
+    def get_outputs_map(cls) -> dict[str, type[BaseInvocationOutput]]:
+        """Gets a map of all output types to their output classes."""
+        return {i.get_type(): i for i in cls.get_output_classes()}
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def get_output_typeadapter(cls) -> TypeAdapter[Any]:
+        """Gets a pydantic TypeAdapter for the union of all invocation output types.
+
+        This is used to parse serialized invocation outputs into the correct invocation output class.
+
+        This method is cached to avoid rebuilding the TypeAdapter on every access. If the invocation allowlist or
+        denylist is changed, the cache should be cleared to ensure the TypeAdapter is updated and validation respects
+        the updated allowlist and denylist.
+
+        @see https://docs.pydantic.dev/latest/concepts/type_adapter/
+        """
+        return TypeAdapter(Annotated[Union[tuple(cls._output_classes)], Field(discriminator="type")])
+
+    @classmethod
+    def invalidate_output_typeadapter(cls) -> None:
+        """Invalidates the cached invocation output type adapter."""
+        cls.get_output_typeadapter.cache_clear()
+
+    @classmethod
+    def get_output_types(cls) -> Iterable[str]:
+        """Gets all invocation output types."""
+        return (i.get_type() for i in cls.get_output_classes())
+
+    @classmethod
+    def get_output_for_type(cls, output_type: str) -> type[BaseInvocationOutput] | None:
+        """Gets the output class for a given output type."""
+        return cls.get_outputs_map().get(output_type)
 
 
 RESERVED_NODE_ATTRIBUTE_FIELD_NAMES = {
@@ -332,11 +458,12 @@ RESERVED_NODE_ATTRIBUTE_FIELD_NAMES = {
     "use_cache",
     "type",
     "workflow",
+    "bottleneck",
 }
 
 RESERVED_INPUT_FIELD_NAMES = {"metadata", "board"}
 
-RESERVED_OUTPUT_FIELD_NAMES = {"type"}
+RESERVED_OUTPUT_FIELD_NAMES = {"type", "output_meta"}
 
 
 class _Model(BaseModel):
@@ -347,6 +474,15 @@ with warnings.catch_warnings():
     warnings.simplefilter("ignore", category=DeprecationWarning)
     # Get all pydantic model attrs, methods, etc
     RESERVED_PYDANTIC_FIELD_NAMES = {m[0] for m in inspect.getmembers(_Model())}
+
+
+def is_enum_member(value: Any, enum_class: type[Enum]) -> bool:
+    """Checks if a value is a member of an enum class."""
+    try:
+        enum_class(value)
+        return True
+    except ValueError:
+        return False
 
 
 def validate_fields(model_fields: dict[str, FieldInfo], model_type: str) -> None:
@@ -360,52 +496,142 @@ def validate_fields(model_fields: dict[str, FieldInfo], model_type: str) -> None
     """
     for name, field in model_fields.items():
         if name in RESERVED_PYDANTIC_FIELD_NAMES:
-            raise InvalidFieldError(f'Invalid field name "{name}" on "{model_type}" (reserved by pydantic)')
+            raise InvalidFieldError(f"{model_type}.{name}: Invalid field name (reserved by pydantic)")
 
         if not field.annotation:
-            raise InvalidFieldError(f'Invalid field type "{name}" on "{model_type}" (missing annotation)')
+            raise InvalidFieldError(f"{model_type}.{name}: Invalid field type (missing annotation)")
 
         if not isinstance(field.json_schema_extra, dict):
-            raise InvalidFieldError(
-                f'Invalid field definition for "{name}" on "{model_type}" (missing json_schema_extra dict)'
-            )
+            raise InvalidFieldError(f"{model_type}.{name}: Invalid field definition (missing json_schema_extra dict)")
 
         field_kind = field.json_schema_extra.get("field_kind", None)
 
         # must have a field_kind
-        if not isinstance(field_kind, FieldKind):
+        if not is_enum_member(field_kind, FieldKind):
             raise InvalidFieldError(
-                f'Invalid field definition for "{name}" on "{model_type}" (maybe it\'s not an InputField or OutputField?)'
+                f"{model_type}.{name}: Invalid field definition for (maybe it's not an InputField or OutputField?)"
             )
 
-        if field_kind is FieldKind.Input and (
+        if field_kind == FieldKind.Input.value and (
             name in RESERVED_NODE_ATTRIBUTE_FIELD_NAMES or name in RESERVED_INPUT_FIELD_NAMES
         ):
-            raise InvalidFieldError(f'Invalid field name "{name}" on "{model_type}" (reserved input field name)')
+            raise InvalidFieldError(f"{model_type}.{name}: Invalid field name (reserved input field name)")
 
-        if field_kind is FieldKind.Output and name in RESERVED_OUTPUT_FIELD_NAMES:
-            raise InvalidFieldError(f'Invalid field name "{name}" on "{model_type}" (reserved output field name)')
+        if field_kind == FieldKind.Output.value and name in RESERVED_OUTPUT_FIELD_NAMES:
+            raise InvalidFieldError(f"{model_type}.{name}: Invalid field name (reserved output field name)")
 
-        if (field_kind is FieldKind.Internal) and name not in RESERVED_INPUT_FIELD_NAMES:
-            raise InvalidFieldError(
-                f'Invalid field name "{name}" on "{model_type}" (internal field without reserved name)'
-            )
+        if field_kind == FieldKind.Internal.value and name not in RESERVED_INPUT_FIELD_NAMES:
+            raise InvalidFieldError(f"{model_type}.{name}: Invalid field name (internal field without reserved name)")
 
         # node attribute fields *must* be in the reserved list
         if (
-            field_kind is FieldKind.NodeAttribute
+            field_kind == FieldKind.NodeAttribute.value
             and name not in RESERVED_NODE_ATTRIBUTE_FIELD_NAMES
             and name not in RESERVED_OUTPUT_FIELD_NAMES
         ):
             raise InvalidFieldError(
-                f'Invalid field name "{name}" on "{model_type}" (node attribute field without reserved name)'
+                f"{model_type}.{name}: Invalid field name (node attribute field without reserved name)"
             )
 
         ui_type = field.json_schema_extra.get("ui_type", None)
-        if isinstance(ui_type, str) and ui_type.startswith("DEPRECATED_"):
-            logger.warn(f"\"UIType.{ui_type.split('_')[-1]}\" is deprecated, ignoring")
-            field.json_schema_extra.pop("ui_type")
+        ui_model_base = field.json_schema_extra.get("ui_model_base", None)
+        ui_model_type = field.json_schema_extra.get("ui_model_type", None)
+        ui_model_variant = field.json_schema_extra.get("ui_model_variant", None)
+        ui_model_format = field.json_schema_extra.get("ui_model_format", None)
+
+        if ui_type is not None:
+            # There are 3 cases where we may need to take action:
+            #
+            # 1. The ui_type is a migratable, deprecated value. For example, ui_type=UIType.MainModel value is
+            #    deprecated and should be migrated to:
+            #       - ui_model_base=[BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2]
+            #       - ui_model_type=[ModelType.Main]
+            #
+            # 2. ui_type was set in conjunction with any of the new ui_model_[base|type|variant|format] fields, which
+            #    is not allowed (they are mutually exclusive). In this case, we ignore ui_type and log a warning.
+            #
+            # 3. ui_type is a deprecated value that is not migratable. For example, ui_type=UIType.Image is deprecated;
+            #    Image fields are now automatically detected based on the field's type annotation. In this case, we
+            #    ignore ui_type and log a warning.
+            #
+            # The cases must be checked in this order to ensure proper handling.
+
+            # Easier to work with as an enum
+            ui_type = UIType(ui_type)
+
+            # The enum member values are not always the same as their names - we want to log the name so the user can
+            # easily review their code and see where the deprecated enum member is used.
+            human_readable_name = f"UIType.{ui_type.name}"
+
+            # Case 1: migratable deprecated value
+            did_migrate = migrate_model_ui_type(ui_type, field.json_schema_extra)
+
+            if did_migrate:
+                logger.warning(
+                    f'{model_type}.{name}: Migrated deprecated "ui_type" "{human_readable_name}" to new ui_model_[base|type|variant|format] fields'
+                )
+                field.json_schema_extra.pop("ui_type")
+
+            # Case 2: mutually exclusive with new fields
+            elif (
+                ui_model_base is not None
+                or ui_model_type is not None
+                or ui_model_variant is not None
+                or ui_model_format is not None
+            ):
+                logger.warning(
+                    f'{model_type}.{name}: "ui_type" is mutually exclusive with "ui_model_[base|type|format|variant]", ignoring "ui_type"'
+                )
+                field.json_schema_extra.pop("ui_type")
+
+            # Case 3: deprecated value that is not migratable
+            elif ui_type.startswith("DEPRECATED_"):
+                logger.warning(f'{model_type}.{name}: Deprecated "ui_type" "{human_readable_name}", ignoring')
+                field.json_schema_extra.pop("ui_type")
+
     return None
+
+
+class NoDefaultSentinel:
+    pass
+
+
+def validate_field_default(
+    cls_name: str, field_name: str, invocation_type: str, annotation: Any, field_info: FieldInfo
+) -> None:
+    """Validates the default value of a field against its pydantic field definition."""
+
+    assert isinstance(field_info.json_schema_extra, dict), "json_schema_extra is not a dict"
+
+    # By the time we are doing this, we've already done some pydantic magic by overriding the original default value.
+    # We store the original default value in the json_schema_extra dict, so we can validate it here.
+    orig_default = field_info.json_schema_extra.get("orig_default", NoDefaultSentinel)
+
+    if orig_default is NoDefaultSentinel:
+        return
+
+    # To validate the default value, we can create a temporary pydantic model with the field we are validating as its
+    # only field. Then validate the default value against this temporary model.
+    TempDefaultValidator = cast(BaseModel, create_model(cls_name, **{field_name: (annotation, field_info)}))
+
+    try:
+        TempDefaultValidator.model_validate({field_name: orig_default})
+    except Exception as e:
+        raise InvalidFieldError(
+            f'Default value for field "{field_name}" on invocation "{invocation_type}" is invalid, {e}'
+        ) from e
+
+
+def is_optional(annotation: Any) -> bool:
+    """
+    Checks if the given annotation is optional (i.e. Optional[X], Union[X, None] or X | None).
+    """
+    origin = typing.get_origin(annotation)
+    # PEP 604 unions (int|None) have origin types.UnionType
+    is_union = origin is typing.Union or origin is types.UnionType
+    if not is_union:
+        return False
+    return any(arg is type(None) for arg in typing.get_args(annotation))
 
 
 def invocation(
@@ -416,6 +642,7 @@ def invocation(
     version: Optional[str] = None,
     use_cache: Optional[bool] = True,
     classification: Classification = Classification.Stable,
+    bottleneck: Bottleneck = Bottleneck.GPU,
 ) -> Callable[[Type[TBaseInvocation]], Type[TBaseInvocation]]:
     """
     Registers an invocation.
@@ -427,6 +654,7 @@ def invocation(
     :param Optional[str] version: Adds a version to the invocation. Must be a valid semver string. Defaults to None.
     :param Optional[bool] use_cache: Whether or not to use the invocation cache. Defaults to True. The user may override this in the workflow editor.
     :param Classification classification: The classification of the invocation. Defaults to FeatureClassification.Stable. Use Beta or Prototype if the invocation is unstable.
+    :param Bottleneck bottleneck: The bottleneck of the invocation. Defaults to Bottleneck.GPU. Use Network if the invocation is network-bound.
     """
 
     def wrapper(cls: Type[TBaseInvocation]) -> Type[TBaseInvocation]:
@@ -435,39 +663,55 @@ def invocation(
         if re.compile(r"^\S+$").match(invocation_type) is None:
             raise ValueError(f'"invocation_type" must consist of non-whitespace characters, got "{invocation_type}"')
 
-        if invocation_type in BaseInvocation.get_invocation_types():
-            raise ValueError(f'Invocation type "{invocation_type}" already exists')
+        # The node pack is the module name - will be "invokeai" for built-in nodes
+        node_pack = cls.__module__.split(".")[0]
 
         validate_fields(cls.model_fields, invocation_type)
 
-        # Add OpenAPI schema extras
-        uiconfig_name = cls.__qualname__ + ".UIConfig"
-        if not hasattr(cls, "UIConfig") or cls.UIConfig.__qualname__ != uiconfig_name:
-            cls.UIConfig = type(uiconfig_name, (UIConfigBase,), {})
-        cls.UIConfig.title = title
-        cls.UIConfig.tags = tags
-        cls.UIConfig.category = category
-        cls.UIConfig.classification = classification
+        fields: dict[str, tuple[Any, FieldInfo]] = {}
 
-        # Grab the node pack's name from the module name, if it's a custom node
-        is_custom_node = cls.__module__.rsplit(".", 1)[0] == "invokeai.app.invocations"
-        if is_custom_node:
-            cls.UIConfig.node_pack = cls.__module__.split(".")[0]
-        else:
-            cls.UIConfig.node_pack = None
+        original_model_fields: dict[str, OriginalModelField] = {}
+
+        for field_name, field_info in cls.model_fields.items():
+            annotation = field_info.annotation
+            assert annotation is not None, f"{field_name} on invocation {invocation_type} has no type annotation."
+            assert isinstance(field_info.json_schema_extra, dict), (
+                f"{field_name} on invocation {invocation_type} has a non-dict json_schema_extra, did you forget to use InputField?"
+            )
+
+            original_model_fields[field_name] = OriginalModelField(annotation=annotation, field_info=field_info)
+
+            validate_field_default(cls.__name__, field_name, invocation_type, annotation, field_info)
+
+            if field_info.default is None and not is_optional(annotation):
+                annotation = annotation | None
+
+            fields[field_name] = (annotation, field_info)
+
+        # Add OpenAPI schema extras
+        uiconfig: dict[str, Any] = {}
+        uiconfig["title"] = title
+        uiconfig["tags"] = tags
+        uiconfig["category"] = category
+        uiconfig["classification"] = classification
+        uiconfig["node_pack"] = node_pack
 
         if version is not None:
             try:
                 semver.Version.parse(version)
             except ValueError as e:
                 raise InvalidVersionError(f'Invalid version string for node "{invocation_type}": "{version}"') from e
-            cls.UIConfig.version = version
+            uiconfig["version"] = version
         else:
-            logger.warn(f'No version specified for node "{invocation_type}", using "1.0.0"')
-            cls.UIConfig.version = "1.0.0"
+            logger.warning(f'No version specified for node "{invocation_type}", using "1.0.0"')
+            uiconfig["version"] = "1.0.0"
+
+        cls.UIConfig = UIConfigBase(**uiconfig)
 
         if use_cache is not None:
             cls.model_fields["use_cache"].default = use_cache
+
+        cls.bottleneck = bottleneck
 
         # Add the invocation type to the model.
 
@@ -478,24 +722,55 @@ def invocation(
         # Unfortunately, because the `GraphInvocation` uses a forward ref in its `graph` field's annotation, this does
         # not work. Instead, we have to create a new class with the type field and patch the original class with it.
 
-        invocation_type_annotation = Literal[invocation_type]  # type: ignore
-        invocation_type_field = Field(
-            title="type", default=invocation_type, json_schema_extra={"field_kind": FieldKind.NodeAttribute}
+        invocation_type_annotation = Literal[invocation_type]
+
+        # Field() returns an instance of FieldInfo, but thanks to a pydantic implementation detail, it is _typed_ as Any.
+        # This cast makes the type annotation match the class's true type.
+        invocation_type_field_info = cast(
+            FieldInfo,
+            Field(title="type", default=invocation_type, json_schema_extra={"field_kind": FieldKind.NodeAttribute}),
         )
+
+        fields["type"] = (invocation_type_annotation, invocation_type_field_info)
+
+        # Invocation outputs must be registered using the @invocation_output decorator, but it is possible that the
+        # output is registered _after_ this invocation is registered. It depends on module import ordering.
+        #
+        # We can only confirm the output for an invocation is registered after all modules are imported. There's
+        # only really one good time to do that - during application startup, in `run_app.py`, after loading all
+        # custom nodes.
+        #
+        # We can still do some basic validation here - ensure the invoke method is defined and returns an instance
+        # of BaseInvocationOutput.
+
+        # Validate the `invoke()` method is implemented
+        if "invoke" in cls.__abstractmethods__:
+            raise ValueError(f'Invocation "{invocation_type}" must implement the "invoke" method')
+
+        # And validate that `invoke()` returns a subclass of `BaseInvocationOutput
+        invoke_return_annotation = signature(cls.invoke).return_annotation
+
+        try:
+            # TODO(psyche): If `invoke()` is not defined, `return_annotation` ends up as the string "BaseInvocationOutput"
+            # instead of the class `BaseInvocationOutput`. This may be a pydantic bug: https://github.com/pydantic/pydantic/issues/7978
+            if isinstance(invoke_return_annotation, str):
+                invoke_return_annotation = getattr(sys.modules[cls.__module__], invoke_return_annotation)
+
+            assert invoke_return_annotation is not BaseInvocationOutput
+            assert issubclass(invoke_return_annotation, BaseInvocationOutput)
+        except Exception:
+            raise ValueError(
+                f'Invocation "{invocation_type}" must have a return annotation of a subclass of BaseInvocationOutput (got "{invoke_return_annotation}")'
+            )
 
         docstring = cls.__doc__
-        cls = create_model(
-            cls.__qualname__,
-            __base__=cls,
-            __module__=cls.__module__,
-            type=(invocation_type_annotation, invocation_type_field),
-        )
-        cls.__doc__ = docstring
+        new_class = create_model(cls.__qualname__, __base__=cls, __module__=cls.__module__, **fields)  # type: ignore
+        new_class.__doc__ = docstring
+        new_class._original_model_fields = original_model_fields
 
-        # TODO: how to type this correctly? it's typed as ModelMetaclass, a private class in pydantic
-        BaseInvocation.register_invocation(cls)  # type: ignore
+        InvocationRegistry.register_invocation(new_class)
 
-        return cls
+        return new_class
 
     return wrapper
 
@@ -518,29 +793,41 @@ def invocation_output(
         if re.compile(r"^\S+$").match(output_type) is None:
             raise ValueError(f'"output_type" must consist of non-whitespace characters, got "{output_type}"')
 
-        if output_type in BaseInvocationOutput.get_output_types():
-            raise ValueError(f'Invocation type "{output_type}" already exists')
-
         validate_fields(cls.model_fields, output_type)
 
-        # Add the output type to the model.
+        fields: dict[str, tuple[Any, FieldInfo]] = {}
 
-        output_type_annotation = Literal[output_type]  # type: ignore
-        output_type_field = Field(
-            title="type", default=output_type, json_schema_extra={"field_kind": FieldKind.NodeAttribute}
+        for field_name, field_info in cls.model_fields.items():
+            annotation = field_info.annotation
+            assert annotation is not None, f"{field_name} on invocation output {output_type} has no type annotation."
+            assert isinstance(field_info.json_schema_extra, dict), (
+                f"{field_name} on invocation output {output_type} has a non-dict json_schema_extra, did you forget to use InputField?"
+            )
+
+            cls._original_model_fields[field_name] = OriginalModelField(annotation=annotation, field_info=field_info)
+
+            if field_info.default is not PydanticUndefined and is_optional(annotation):
+                annotation = annotation | None
+            fields[field_name] = (annotation, field_info)
+
+        # Add the output type to the model.
+        output_type_annotation = Literal[output_type]
+
+        # Field() returns an instance of FieldInfo, but thanks to a pydantic implementation detail, it is _typed_ as Any.
+        # This cast makes the type annotation match the class's true type.
+        output_type_field_info = cast(
+            FieldInfo,
+            Field(title="type", default=output_type, json_schema_extra={"field_kind": FieldKind.NodeAttribute}),
         )
+
+        fields["type"] = (output_type_annotation, output_type_field_info)
 
         docstring = cls.__doc__
-        cls = create_model(
-            cls.__qualname__,
-            __base__=cls,
-            __module__=cls.__module__,
-            type=(output_type_annotation, output_type_field),
-        )
-        cls.__doc__ = docstring
+        new_class = create_model(cls.__qualname__, __base__=cls, __module__=cls.__module__, **fields)
+        new_class.__doc__ = docstring
 
-        BaseInvocationOutput.register_output(cls)  # type: ignore # TODO: how to type this correctly?
+        InvocationRegistry.register_output(new_class)
 
-        return cls
+        return new_class
 
     return wrapper

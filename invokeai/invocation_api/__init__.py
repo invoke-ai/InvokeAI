@@ -7,18 +7,20 @@ TODO(psyche): Do we want to dogfood this?
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
+    Bottleneck,
     Classification,
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.constants import SCHEDULER_NAME_VALUES
 from invokeai.app.invocations.fields import (
     BoardField,
+    BoundingBoxField,
     ColorField,
     ConditioningField,
     DenoiseMaskField,
     FieldDescriptions,
     FieldKind,
+    FluxConditioningField,
     ImageField,
     Input,
     InputField,
@@ -31,15 +33,19 @@ from invokeai.app.invocations.fields import (
     WithMetadata,
     WithWorkflow,
 )
-from invokeai.app.invocations.latent import SchedulerOutput
 from invokeai.app.invocations.metadata import MetadataItemField, MetadataItemOutput, MetadataOutput
 from invokeai.app.invocations.model import (
     CLIPField,
     CLIPOutput,
+    ControlLoRAField,
+    GlmEncoderField,
+    LoRAField,
     LoRALoaderOutput,
     ModelIdentifierField,
     ModelLoaderOutput,
     SDXLLoRALoaderOutput,
+    T5EncoderField,
+    TransformerField,
     UNetField,
     UNetOutput,
     VAEField,
@@ -48,6 +54,7 @@ from invokeai.app.invocations.model import (
 from invokeai.app.invocations.primitives import (
     BooleanCollectionOutput,
     BooleanOutput,
+    BoundingBoxOutput,
     ColorCollectionOutput,
     ColorOutput,
     ConditioningCollectionOutput,
@@ -55,6 +62,8 @@ from invokeai.app.invocations.primitives import (
     DenoiseMaskOutput,
     FloatCollectionOutput,
     FloatOutput,
+    FluxConditioningCollectionOutput,
+    FluxConditioningOutput,
     ImageCollectionOutput,
     ImageOutput,
     IntegerCollectionOutput,
@@ -64,20 +73,73 @@ from invokeai.app.invocations.primitives import (
     StringCollectionOutput,
     StringOutput,
 )
+from invokeai.app.invocations.scheduler import SchedulerOutput
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
-from invokeai.backend.model_manager.config import BaseModelType, ModelType, SubModelType
+from invokeai.backend.image_util.color_conversion import (
+    gamut_clip_tensor,
+    hsl_from_linear_srgb,
+    hsl_from_srgb,
+    lab_from_linear_srgb,
+    lab_from_srgb,
+    lab_from_xyz,
+    linear_srgb_from_hsl,
+    linear_srgb_from_lab,
+    linear_srgb_from_oklab,
+    linear_srgb_from_oklch,
+    linear_srgb_from_srgb,
+    linear_srgb_from_xyz,
+    okhsl_from_srgb,
+    okhsv_from_srgb,
+    oklab_from_linear_srgb,
+    oklab_from_oklch,
+    oklab_from_srgb,
+    oklab_from_xyz,
+    oklch_from_linear_srgb,
+    oklch_from_oklab,
+    oklch_from_srgb,
+    oklch_from_xyz,
+    srgb_from_hsl,
+    srgb_from_lab,
+    srgb_from_linear_srgb,
+    srgb_from_okhsl,
+    srgb_from_okhsv,
+    srgb_from_oklab,
+    srgb_from_oklch,
+    srgb_from_xyz,
+    xyz_d50_to_d65,
+    xyz_d65_to_d50,
+    xyz_from_lab,
+    xyz_from_linear_srgb,
+    xyz_from_oklab,
+    xyz_from_oklch,
+    xyz_from_srgb,
+)
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.load.load_base import LoadedModel
+from invokeai.backend.model_manager.taxonomy import (
+    BaseModelType,
+    ClipVariantType,
+    FluxLoRAFormat,
+    FluxVariantType,
+    ModelFormat,
+    ModelSourceType,
+    ModelType,
+    ModelVariantType,
+    SchedulerPredictionType,
+    SubModelType,
+)
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
     ConditioningFieldData,
     SDXLConditioningInfo,
 )
+from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 from invokeai.backend.util.devices import CPU_DEVICE, CUDA_DEVICE, MPS_DEVICE, choose_precision, choose_torch_device
 from invokeai.version import __version__
 
@@ -85,6 +147,7 @@ __all__ = [
     # invokeai.app.invocations.baseinvocation
     "BaseInvocation",
     "BaseInvocationOutput",
+    "Bottleneck",
     "Classification",
     "invocation",
     "invocation_output",
@@ -92,11 +155,13 @@ __all__ = [
     "InvocationContext",
     # invokeai.app.invocations.fields
     "BoardField",
+    "BoundingBoxField",
     "ColorField",
     "ConditioningField",
     "DenoiseMaskField",
     "FieldDescriptions",
     "FieldKind",
+    "FluxConditioningField",
     "ImageField",
     "Input",
     "InputField",
@@ -108,7 +173,7 @@ __all__ = [
     "WithBoard",
     "WithMetadata",
     "WithWorkflow",
-    # invokeai.app.invocations.latent
+    # invokeai.app.invocations.scheduler
     "SchedulerOutput",
     # invokeai.app.invocations.metadata
     "MetadataItemField",
@@ -116,9 +181,14 @@ __all__ = [
     "MetadataOutput",
     # invokeai.app.invocations.model
     "ModelIdentifierField",
+    "LoRAField",
     "UNetField",
     "CLIPField",
+    "T5EncoderField",
+    "GlmEncoderField",
     "VAEField",
+    "ControlLoRAField",
+    "TransformerField",
     "UNetOutput",
     "VAEOutput",
     "CLIPOutput",
@@ -128,6 +198,7 @@ __all__ = [
     # invokeai.app.invocations.primitives
     "BooleanCollectionOutput",
     "BooleanOutput",
+    "BoundingBoxOutput",
     "ColorCollectionOutput",
     "ColorOutput",
     "ConditioningCollectionOutput",
@@ -135,6 +206,8 @@ __all__ = [
     "DenoiseMaskOutput",
     "FloatCollectionOutput",
     "FloatOutput",
+    "FluxConditioningCollectionOutput",
+    "FluxConditioningOutput",
     "ImageCollectionOutput",
     "ImageOutput",
     "IntegerCollectionOutput",
@@ -160,10 +233,7 @@ __all__ = [
     # invokeai.backend.model_management.model_manager
     "LoadedModel",
     # invokeai.backend.model_management.models.base
-    "BaseModelType",
-    "ModelType",
-    "SubModelType",
-    # invokeai.app.invocations.constants
+    # invokeai.backend.stable_diffusion.schedulers.schedulers
     "SCHEDULER_NAME_VALUES",
     # invokeai.version
     "__version__",
@@ -176,4 +246,56 @@ __all__ = [
     # invokeai.app.util.misc
     "SEED_MAX",
     "get_random_seed",
+    # invokeai.backend.image_util.color_conversion
+    "linear_srgb_from_srgb",
+    "srgb_from_linear_srgb",
+    "oklab_from_srgb",
+    "oklab_from_linear_srgb",
+    "oklab_from_xyz",
+    "srgb_from_oklab",
+    "linear_srgb_from_oklab",
+    "oklch_from_linear_srgb",
+    "oklch_from_srgb",
+    "oklch_from_oklab",
+    "oklch_from_xyz",
+    "oklab_from_oklch",
+    "linear_srgb_from_oklch",
+    "srgb_from_oklch",
+    "xyz_from_linear_srgb",
+    "linear_srgb_from_xyz",
+    "xyz_from_srgb",
+    "srgb_from_xyz",
+    "xyz_d65_to_d50",
+    "xyz_d50_to_d65",
+    "xyz_from_oklab",
+    "xyz_from_oklch",
+    "lab_from_linear_srgb",
+    "linear_srgb_from_lab",
+    "lab_from_srgb",
+    "srgb_from_lab",
+    "lab_from_xyz",
+    "xyz_from_lab",
+    "hsl_from_linear_srgb",
+    "hsl_from_srgb",
+    "linear_srgb_from_hsl",
+    "srgb_from_hsl",
+    "okhsl_from_srgb",
+    "srgb_from_okhsl",
+    "okhsv_from_srgb",
+    "srgb_from_okhsv",
+    "gamut_clip_tensor",
+    # invokeai.backend.model_manager.taxonomy
+    "BaseModelType",
+    "ModelType",
+    "ModelSourceType",
+    "ModelFormat",
+    "ModelVariantType",
+    "SchedulerPredictionType",
+    "SubModelType",
+    "ClipVariantType",
+    "FluxLoRAFormat",
+    "FluxVariantType",
+    # invokeai.backend.model_manager.configs.factory
+    "AnyModelConfig",
+    "ModelConfigFactory",
 ]

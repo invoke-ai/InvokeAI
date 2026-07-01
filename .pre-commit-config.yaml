@@ -4,21 +4,29 @@ repos:
   hooks:
   - id: black
     name: black
-    stages: [commit]
+    stages: [pre-commit]
     language: system
     entry: black
     types: [python]
 
   - id: flake8
     name: flake8
-    stages: [commit]
+    stages: [pre-commit]
     language: system
     entry: flake8
     types: [python]
 
   - id: isort
     name: isort
-    stages: [commit]
+    stages: [pre-commit]
     language: system
     entry: isort
     types: [python]
+
+  - id: uvlock
+    name: uv lock
+    stages: [pre-commit]
+    language: system
+    entry: uv lock
+    files: ^pyproject\.toml$
+    pass_filenames: false

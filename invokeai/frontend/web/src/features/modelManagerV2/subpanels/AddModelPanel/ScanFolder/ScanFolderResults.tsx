@@ -10,11 +10,17 @@ import {
   Input,
   InputGroup,
   InputRightElement,
+  Tooltip,
 } from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
+import {
+  selectShouldInstallInPlace,
+  shouldInstallInPlaceChanged,
+} from 'features/modelManagerV2/store/modelManagerV2Slice';
 import type { ChangeEvent, ChangeEventHandler } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 import type { ScanFolderResponse } from 'services/api/endpoints/models';
@@ -25,10 +31,11 @@ type ScanModelResultsProps = {
   results: ScanFolderResponse;
 };
 
-export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
+export const ScanModelsResults = memo(({ results }: ScanModelResultsProps) => {
+  const inplace = useAppSelector(selectShouldInstallInPlace);
+  const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
-  const [inplace, setInplace] = useState(true);
   const [installModel] = useInstallModel();
 
   const filteredResults = useMemo(() => {
@@ -42,9 +49,12 @@ export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
     setSearchTerm(e.target.value.trim());
   }, []);
 
-  const onChangeInplace = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    setInplace(e.target.checked);
-  }, []);
+  const onChangeInplace = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(shouldInstallInPlaceChanged(e.target.checked));
+    },
+    [dispatch]
+  );
 
   const clearSearch = useCallback(() => {
     setSearchTerm('');
@@ -73,10 +83,12 @@ export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
         <Flex justifyContent="space-between" alignItems="center">
           <Heading size="sm">{t('modelManager.scanResults')}</Heading>
           <Flex alignItems="center" gap={3}>
-            <FormControl w="min-content">
-              <FormLabel m={0}>{t('modelManager.inplaceInstall')}</FormLabel>
-              <Checkbox isChecked={inplace} onChange={onChangeInplace} size="md" />
-            </FormControl>
+            <Tooltip label={t('modelManager.inplaceInstallDesc')} hasArrow>
+              <FormControl w="min-content">
+                <FormLabel m={0}>{t('modelManager.inplaceInstall')}</FormLabel>
+                <Checkbox isChecked={inplace} onChange={onChangeInplace} size="md" />
+              </FormControl>
+            </Tooltip>
             <Button size="sm" onClick={handleAddAll} isDisabled={filteredResults.length === 0}>
               {t('modelManager.installAll')}
             </Button>
@@ -104,9 +116,9 @@ export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
             </InputGroup>
           </Flex>
         </Flex>
-        <Flex height="100%" layerStyle="third" borderRadius="base" p={3}>
+        <Flex height="100%" layerStyle="second" borderRadius="base" px={2}>
           <ScrollableContent>
-            <Flex flexDir="column" gap={3}>
+            <Flex flexDir="column">
               {filteredResults.map((result) => (
                 <ScanModelResultItem key={result.path} result={result} installModel={handleInstallOne} />
               ))}
@@ -116,4 +128,6 @@ export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
       </Flex>
     </>
   );
-};
+});
+
+ScanModelsResults.displayName = 'ScanModelsResults';

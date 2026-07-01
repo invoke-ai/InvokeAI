@@ -1,5 +1,5 @@
 import { Button, Flex, Heading, Image, Link, Text } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useClipboard } from 'common/hooks/useClipboard';
 import { toast } from 'features/toast/toast';
 import newGithubIssueUrl from 'new-github-issue-url';
 import InvokeLogoYellow from 'public/assets/images/invoke-symbol-ylw-lrg.svg';
@@ -15,32 +15,29 @@ type Props = {
 
 const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
   const { t } = useTranslation();
-  const isLocal = useAppSelector((s) => s.config.isLocal);
+  const clipboard = useClipboard();
 
   const handleCopy = useCallback(() => {
     const text = JSON.stringify(serializeError(error), null, 2);
-    navigator.clipboard.writeText(`\`\`\`\n${text}\n\`\`\``);
-    toast({
-      id: 'ERROR_COPIED',
-      title: t('toast.errorCopied'),
+    clipboard.writeText(`\`\`\`\n${text}\n\`\`\``, () => {
+      toast({
+        id: 'ERROR_COPIED',
+        title: t('toast.errorCopied'),
+      });
     });
-  }, [error, t]);
+  }, [clipboard, error, t]);
 
   const url = useMemo(() => {
-    if (isLocal) {
-      return newGithubIssueUrl({
-        user: 'invoke-ai',
-        repo: 'InvokeAI',
-        template: 'BUG_REPORT.yml',
-        title: `[bug]: ${error.name}: ${error.message}`,
-      });
-    } else {
-      return 'https://support.invoke.ai/support/tickets/new';
-    }
-  }, [error.message, error.name, isLocal]);
+    return newGithubIssueUrl({
+      user: 'invoke-ai',
+      repo: 'InvokeAI',
+      template: 'BUG_REPORT.yml',
+      title: `[bug]: ${error.name}: ${error.message}`,
+    });
+  }, [error.message, error.name]);
 
   return (
-    <Flex layerStyle="body" w="100vw" h="100vh" alignItems="center" justifyContent="center" p={4}>
+    <Flex layerStyle="body" w="100dvw" h="100dvh" alignItems="center" justifyContent="center" p={4}>
       <Flex layerStyle="first" flexDir="column" borderRadius="base" justifyContent="center" gap={8} p={16}>
         <Flex alignItems="center" gap="2">
           <Image src={InvokeLogoYellow} alt="invoke-logo" w="24px" h="24px" minW="24px" minH="24px" userSelect="none" />
@@ -68,9 +65,7 @@ const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
             {t('common.copyError')}
           </Button>
           <Link href={url} isExternal>
-            <Button leftIcon={<PiArrowSquareOutBold />}>
-              {isLocal ? t('accessibility.createIssue') : t('accessibility.submitSupportTicket')}
-            </Button>
+            <Button leftIcon={<PiArrowSquareOutBold />}>{t('accessibility.createIssue')}</Button>
           </Link>
         </Flex>
       </Flex>

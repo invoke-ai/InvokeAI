@@ -1,6 +1,5 @@
+from invokeai.app.services.names.names_base import NameServiceBase
 from invokeai.app.util.misc import uuid_string
-
-from .names_base import NameServiceBase
 
 
 class SimpleNameService(NameServiceBase):

@@ -9,6 +9,6 @@ def validate_weights(weights: Union[float, list[float]]) -> None:
 
 
 def validate_begin_end_step(begin_step_percent: float, end_step_percent: float) -> None:
-    """Validate that begin_step_percent is less than end_step_percent"""
-    if begin_step_percent >= end_step_percent:
+    """Validate that begin_step_percent is less than or equal to end_step_percent"""
+    if begin_step_percent > end_step_percent:
         raise ValueError("Begin step percent must be less than or equal to end step percent")

@@ -8,17 +8,21 @@ describe(areTypesEqual.name, () => {
     const sourceType: FieldType = {
       name: 'IntegerField',
       cardinality: 'SINGLE',
+      batch: false,
       originalType: {
         name: 'Foo',
         cardinality: 'SINGLE',
+        batch: false,
       },
     };
     const targetType: FieldType = {
       name: 'IntegerField',
       cardinality: 'SINGLE',
+      batch: false,
       originalType: {
         name: 'Bar',
         cardinality: 'SINGLE',
+        batch: false,
       },
     };
     expect(areTypesEqual(sourceType, targetType)).toBe(true);
@@ -28,17 +32,21 @@ describe(areTypesEqual.name, () => {
     const sourceType: FieldType = {
       name: 'IntegerField',
       cardinality: 'SINGLE',
+      batch: false,
       originalType: {
         name: 'Foo',
         cardinality: 'SINGLE',
+        batch: false,
       },
     };
     const targetType: FieldType = {
-      name: 'MainModelField',
+      name: 'StringField',
       cardinality: 'SINGLE',
+      batch: false,
       originalType: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
     };
     expect(areTypesEqual(sourceType, targetType)).toBe(true);
@@ -46,19 +54,23 @@ describe(areTypesEqual.name, () => {
 
   it('should handle equal original source type and target type', () => {
     const sourceType: FieldType = {
-      name: 'MainModelField',
+      name: 'FloatField',
       cardinality: 'SINGLE',
+      batch: false,
       originalType: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
     };
     const targetType: FieldType = {
       name: 'IntegerField',
       cardinality: 'SINGLE',
+      batch: false,
       originalType: {
         name: 'Bar',
         cardinality: 'SINGLE',
+        batch: false,
       },
     };
     expect(areTypesEqual(sourceType, targetType)).toBe(true);
@@ -66,19 +78,23 @@ describe(areTypesEqual.name, () => {
 
   it('should handle equal original source type and original target type', () => {
     const sourceType: FieldType = {
-      name: 'MainModelField',
+      name: 'IntegerField',
       cardinality: 'SINGLE',
+      batch: false,
       originalType: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
     };
     const targetType: FieldType = {
-      name: 'LoRAModelField',
+      name: 'StringField',
       cardinality: 'SINGLE',
+      batch: false,
       originalType: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
     };
     expect(areTypesEqual(sourceType, targetType)).toBe(true);

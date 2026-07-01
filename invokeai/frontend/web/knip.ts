@@ -9,8 +9,18 @@ const config: KnipConfig = {
     'src/services/api/schema.ts',
     'src/features/nodes/types/v1/**',
     'src/features/nodes/types/v2/**',
+    'src/features/parameters/types/parameterSchemas.ts',
+    // TODO(psyche): maybe we can clean up these utils after canvas v2 release
+    'src/features/controlLayers/konva/util.ts',
+    // Will be using this
+    'src/common/hooks/useAsyncState.ts',
+    'src/app/store/use-debounced-app-selector.ts',
+    // Auth features - exports will be used in follow-up phases
+    'src/features/auth/**',
+    'src/services/api/endpoints/auth.ts',
   ],
   ignoreBinaries: ['only-allow'],
+  ignoreDependencies: ['magic-string', '@babel/preset-typescript', 'babel-plugin-react-compiler'],
   paths: {
     'public/*': ['public/*'],
   },

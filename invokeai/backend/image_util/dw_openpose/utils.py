@@ -3,13 +3,14 @@
 import math
 
 import cv2
-import matplotlib
 import numpy as np
+import numpy.typing as npt
 
 eps = 0.01
+NDArrayInt = npt.NDArray[np.uint8]
 
 
-def draw_bodypose(canvas, candidate, subset):
+def draw_bodypose(canvas: NDArrayInt, candidate: NDArrayInt, subset: NDArrayInt) -> NDArrayInt:
     H, W, C = canvas.shape
     candidate = np.array(candidate)
     subset = np.array(subset)
@@ -88,7 +89,7 @@ def draw_bodypose(canvas, candidate, subset):
     return canvas
 
 
-def draw_handpose(canvas, all_hand_peaks):
+def draw_handpose(canvas: NDArrayInt, all_hand_peaks: NDArrayInt) -> NDArrayInt:
     H, W, C = canvas.shape
 
     edges = [
@@ -125,11 +126,13 @@ def draw_handpose(canvas, all_hand_peaks):
             x2 = int(x2 * W)
             y2 = int(y2 * H)
             if x1 > eps and y1 > eps and x2 > eps and y2 > eps:
+                hsv_color = np.array([[[ie / float(len(edges)) * 180, 255, 255]]], dtype=np.uint8)
+                rgb_color = cv2.cvtColor(hsv_color, cv2.COLOR_HSV2RGB)[0, 0]
                 cv2.line(
                     canvas,
                     (x1, y1),
                     (x2, y2),
-                    matplotlib.colors.hsv_to_rgb([ie / float(len(edges)), 1.0, 1.0]) * 255,
+                    rgb_color.tolist(),
                     thickness=2,
                 )
 
@@ -142,7 +145,7 @@ def draw_handpose(canvas, all_hand_peaks):
     return canvas
 
 
-def draw_facepose(canvas, all_lmks):
+def draw_facepose(canvas: NDArrayInt, all_lmks: NDArrayInt) -> NDArrayInt:
     H, W, C = canvas.shape
     for lmks in all_lmks:
         lmks = np.array(lmks)

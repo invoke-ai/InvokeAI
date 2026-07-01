@@ -1,7 +1,12 @@
-import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
 import type { OpenAPIV3_1 } from 'openapi-types';
+import type { stringify } from 'querystring';
 import type { paths } from 'services/api/schema';
-import type { AppConfig, AppDependencyVersions, AppVersion } from 'services/api/types';
+import type {
+  AppVersion,
+  ExternalProviderConfig,
+  ExternalProviderConfigUpdate,
+  ExternalProviderStatus,
+} from 'services/api/types';
 
 import { api, buildV1Url } from '..';
 
@@ -11,7 +16,8 @@ import { api, buildV1Url } from '..';
  * buildAppInfoUrl('some-path')
  * // '/api/v1/app/some-path'
  */
-const buildAppInfoUrl = (path: string = '') => buildV1Url(`app/${path}`);
+const buildAppInfoUrl = (path: string = '', query?: Parameters<typeof stringify>[0]) =>
+  buildV1Url(`app/${path}`, query);
 
 export const appInfoApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -22,19 +28,83 @@ export const appInfoApi = api.injectEndpoints({
       }),
       providesTags: ['FetchOnReconnect'],
     }),
-    getAppDeps: build.query<AppDependencyVersions, void>({
+    getAppDeps: build.query<
+      paths['/api/v1/app/app_deps']['get']['responses']['200']['content']['application/json'],
+      void
+    >({
       query: () => ({
         url: buildAppInfoUrl('app_deps'),
         method: 'GET',
       }),
       providesTags: ['FetchOnReconnect'],
     }),
-    getAppConfig: build.query<AppConfig, void>({
+    getPatchmatchStatus: build.query<
+      paths['/api/v1/app/patchmatch_status']['get']['responses']['200']['content']['application/json'],
+      void
+    >({
       query: () => ({
-        url: buildAppInfoUrl('config'),
+        url: buildAppInfoUrl('patchmatch_status'),
         method: 'GET',
       }),
       providesTags: ['FetchOnReconnect'],
+    }),
+    getRuntimeConfig: build.query<
+      paths['/api/v1/app/runtime_config']['get']['responses']['200']['content']['application/json'],
+      void
+    >({
+      query: () => ({
+        url: buildAppInfoUrl('runtime_config'),
+        method: 'GET',
+      }),
+      providesTags: ['AppConfig'],
+    }),
+    updateRuntimeConfig: build.mutation<
+      paths['/api/v1/app/runtime_config']['patch']['responses']['200']['content']['application/json'],
+      paths['/api/v1/app/runtime_config']['patch']['requestBody']['content']['application/json']
+    >({
+      query: (body) => ({
+        url: buildAppInfoUrl('runtime_config'),
+        method: 'PATCH',
+        body,
+      }),
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(appInfoApi.util.upsertQueryData('getRuntimeConfig', undefined, data));
+        } catch {
+          // no-op
+        }
+      },
+      invalidatesTags: ['AppConfig'],
+    }),
+    getExternalProviderStatuses: build.query<ExternalProviderStatus[], void>({
+      query: () => ({
+        url: buildAppInfoUrl('external_providers/status'),
+        method: 'GET',
+      }),
+      providesTags: ['FetchOnReconnect'],
+    }),
+    getExternalProviderConfigs: build.query<ExternalProviderConfig[], void>({
+      query: () => ({
+        url: buildAppInfoUrl('external_providers/config'),
+        method: 'GET',
+      }),
+      providesTags: ['AppConfig', 'FetchOnReconnect'],
+    }),
+    setExternalProviderConfig: build.mutation<ExternalProviderConfig, SetExternalProviderConfigArg>({
+      query: ({ provider_id, ...body }) => ({
+        url: buildAppInfoUrl(`external_providers/config/${provider_id}`),
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['AppConfig', 'FetchOnReconnect'],
+    }),
+    resetExternalProviderConfig: build.mutation<ExternalProviderConfig, string>({
+      query: (provider_id) => ({
+        url: buildAppInfoUrl(`external_providers/config/${provider_id}`),
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['AppConfig', 'FetchOnReconnect'],
     }),
     getInvocationCacheStatus: build.query<
       paths['/api/v1/app/invocation_cache/status']['get']['responses']['200']['content']['application/json'],
@@ -68,11 +138,7 @@ export const appInfoApi = api.injectEndpoints({
       invalidatesTags: ['InvocationCacheStatus'],
     }),
     getOpenAPISchema: build.query<OpenAPIV3_1.Document, void>({
-      query: () => {
-        const openAPISchemaUrl = $openAPISchemaUrl.get();
-        const url = openAPISchemaUrl ? openAPISchemaUrl : `${window.location.href.replace(/\/$/, '')}/openapi.json`;
-        return url;
-      },
+      query: () => `${window.location.origin}/openapi.json`,
       providesTags: ['Schema'],
     }),
   }),
@@ -81,7 +147,13 @@ export const appInfoApi = api.injectEndpoints({
 export const {
   useGetAppVersionQuery,
   useGetAppDepsQuery,
-  useGetAppConfigQuery,
+  useGetPatchmatchStatusQuery,
+  useGetRuntimeConfigQuery,
+  useGetExternalProviderStatusesQuery,
+  useGetExternalProviderConfigsQuery,
+  useSetExternalProviderConfigMutation,
+  useResetExternalProviderConfigMutation,
+  useUpdateRuntimeConfigMutation,
   useClearInvocationCacheMutation,
   useDisableInvocationCacheMutation,
   useEnableInvocationCacheMutation,
@@ -89,3 +161,7 @@ export const {
   useGetOpenAPISchemaQuery,
   useLazyGetOpenAPISchemaQuery,
 } = appInfoApi;
+
+type SetExternalProviderConfigArg = ExternalProviderConfigUpdate & {
+  provider_id: string;
+};

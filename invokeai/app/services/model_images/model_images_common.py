@@ -1,4 +1,4 @@
-# TODO: Should these excpetions subclass existing python exceptions?
+# TODO: Should these exceptions subclass existing python exceptions?
 class ModelImageFileNotFoundException(Exception):
     """Raised when an image file is not found in storage."""
 

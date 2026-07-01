@@ -4,49 +4,105 @@ Base class for model loading in InvokeAI.
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from contextlib import contextmanager
 from logging import Logger
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Dict, Generator, Optional, Tuple
+
+import torch
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_manager.config import (
-    AnyModel,
-    AnyModelConfig,
-    SubModelType,
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
+from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
+    CachedModelWithPartialLoad,
 )
-from invokeai.backend.model_manager.load.convert_cache.convert_cache_base import ModelConvertCacheBase
-from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase, ModelLockerBase
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
 
 
-@dataclass
-class LoadedModel:
-    """Context manager object that mediates transfer from RAM<->VRAM."""
+class LoadedModelWithoutConfig:
+    """Context manager object that mediates transfer from RAM<->VRAM.
 
-    config: AnyModelConfig
-    _locker: ModelLockerBase
+    This is a context manager object that has two distinct APIs:
+
+    1. Older API (deprecated):
+    Use the LoadedModel object directly as a context manager.  It will move the model into VRAM (on CUDA devices), and
+    return the model in a form suitable for passing to torch.
+    Example:
+    ```
+    loaded_model_= loader.get_model_by_key('f13dd932', SubModelType('vae'))
+    with loaded_model as vae:
+      image = vae.decode(latents)[0]
+    ```
+
+    2. Newer API (recommended):
+    Call the LoadedModel's `model_on_device()` method in a context. It returns a tuple consisting of a copy of the
+    model's state dict in CPU RAM followed by a copy of the model in VRAM. The state dict is provided to allow LoRAs and
+    other model patchers to return the model to its unpatched state without expensive copy and restore operations.
+
+    Example:
+    ```
+    loaded_model_= loader.get_model_by_key('f13dd932', SubModelType('vae'))
+    with loaded_model.model_on_device() as (state_dict, vae):
+        image = vae.decode(latents)[0]
+    ```
+
+    The state_dict should be treated as a read-only object and never modified. Also be aware that some loadable models
+    do not have a state_dict, in which case this value will be None.
+    """
+
+    def __init__(self, cache_record: CacheRecord, cache: ModelCache):
+        self._cache_record = cache_record
+        self._cache = cache
 
     def __enter__(self) -> AnyModel:
-        """Context entry."""
-        self._locker.lock()
-        return self.model
+        self._cache.lock(self._cache_record, None)
+        try:
+            self.repair_required_tensors_on_device()
+            return self.model
+        except Exception:
+            self._cache.unlock(self._cache_record)
+            raise
 
     def __exit__(self, *args: Any, **kwargs: Any) -> None:
-        """Context exit."""
-        self._locker.unlock()
+        self._cache.unlock(self._cache_record)
+
+    @contextmanager
+    def model_on_device(
+        self, working_mem_bytes: Optional[int] = None
+    ) -> Generator[Tuple[Optional[Dict[str, torch.Tensor]], AnyModel], None, None]:
+        """Return a tuple consisting of the model's state dict (if it exists) and the locked model on execution device.
+
+        :param working_mem_bytes: The amount of working memory to keep available on the compute device when loading the
+            model.
+        """
+        self._cache.lock(self._cache_record, working_mem_bytes)
+        try:
+            self.repair_required_tensors_on_device()
+            yield (self._cache_record.cached_model.get_cpu_state_dict(), self._cache_record.cached_model.model)
+        finally:
+            self._cache.unlock(self._cache_record)
 
     @property
     def model(self) -> AnyModel:
         """Return the model without locking it."""
-        return self._locker.model
+        return self._cache_record.cached_model.model
+
+    def repair_required_tensors_on_device(self) -> int:
+        """Repair required tensors that should be resident on the cached model's execution device."""
+        cached_model = self._cache_record.cached_model
+        if not isinstance(cached_model, CachedModelWithPartialLoad):
+            return 0
+        return cached_model.repair_required_tensors_on_compute_device()
 
 
-# TODO(MM2):
-# Some "intermediary" subclasses in the ModelLoaderBase class hierarchy define methods that their subclasses don't
-# know about. I think the problem may be related to this class being an ABC.
-#
-# For example, GenericDiffusersLoader defines `get_hf_load_class()`, and StableDiffusionDiffusersModel attempts to
-# call it. However, the method is not defined in the ABC, so it is not guaranteed to be implemented.
+class LoadedModel(LoadedModelWithoutConfig):
+    """Context manager object that mediates transfer from RAM<->VRAM."""
+
+    def __init__(self, config: Optional[AnyModelConfig], cache_record: CacheRecord, cache: ModelCache):
+        super().__init__(cache_record=cache_record, cache=cache)
+        self.config = config
 
 
 class ModelLoaderBase(ABC):
@@ -57,8 +113,7 @@ class ModelLoaderBase(ABC):
         self,
         app_config: InvokeAIAppConfig,
         logger: Logger,
-        ram_cache: ModelCacheBase[AnyModel],
-        convert_cache: ModelConvertCacheBase,
+        ram_cache: ModelCache,
     ):
         """Initialize the loader."""
         pass
@@ -86,12 +141,6 @@ class ModelLoaderBase(ABC):
 
     @property
     @abstractmethod
-    def convert_cache(self) -> ModelConvertCacheBase:
-        """Return the convert cache associated with this loader."""
-        pass
-
-    @property
-    @abstractmethod
-    def ram_cache(self) -> ModelCacheBase[AnyModel]:
+    def ram_cache(self) -> ModelCache:
         """Return the ram cache associated with this loader."""
         pass

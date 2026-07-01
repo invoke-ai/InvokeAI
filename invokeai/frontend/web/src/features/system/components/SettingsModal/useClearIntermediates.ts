@@ -1,6 +1,3 @@
-import { useAppDispatch } from 'app/store/storeHooks';
-import { resetCanvas } from 'features/canvas/store/canvasSlice';
-import { controlAdaptersReset } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,13 +12,11 @@ type UseClearIntermediatesReturn = {
   refetchIntermediatesCount: () => void;
 };
 
-export const useClearIntermediates = (shouldShowClearIntermediates: boolean): UseClearIntermediatesReturn => {
+export const useClearIntermediates = (): UseClearIntermediatesReturn => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
 
   const { data: intermediatesCount, refetch: refetchIntermediatesCount } = useGetIntermediatesCountQuery(undefined, {
     refetchOnMountOrArgChange: true,
-    skip: !shouldShowClearIntermediates,
   });
 
   const [_clearIntermediates, { isLoading }] = useClearIntermediatesMutation();
@@ -40,8 +35,9 @@ export const useClearIntermediates = (shouldShowClearIntermediates: boolean): Us
     _clearIntermediates()
       .unwrap()
       .then((clearedCount) => {
-        dispatch(controlAdaptersReset());
-        dispatch(resetCanvas());
+        // TODO(psyche): Do we need to reset things w/ canvas v2?
+        // dispatch(controlAdaptersReset());
+        // dispatch(resetCanvas());
         toast({
           id: 'INTERMEDIATES_CLEARED',
           title: t('settings.intermediatesCleared', { count: clearedCount }),
@@ -55,7 +51,7 @@ export const useClearIntermediates = (shouldShowClearIntermediates: boolean): Us
           status: 'error',
         });
       });
-  }, [t, _clearIntermediates, dispatch, hasPendingItems]);
+  }, [t, _clearIntermediates, hasPendingItems]);
 
   return { intermediatesCount, clearIntermediates, isLoading, hasPendingItems, refetchIntermediatesCount };
 };

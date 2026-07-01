@@ -1,7 +1,6 @@
-import { Combobox, Flex, FormControl } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
+import { ModelFieldCombobox } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ModelFieldCombobox';
 import { fieldModelIdentifierValueChanged } from 'features/nodes/store/nodesSlice';
 import type { ModelIdentifierFieldInputInstance, ModelIdentifierFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback, useMemo } from 'react';
@@ -13,10 +12,10 @@ import type { FieldComponentProps } from './types';
 type Props = FieldComponentProps<ModelIdentifierFieldInputInstance, ModelIdentifierFieldInputTemplate>;
 
 const ModelIdentifierFieldInputComponent = (props: Props) => {
-  const { nodeId, field } = props;
+  const { nodeId, field, fieldTemplate } = props;
   const dispatch = useAppDispatch();
   const { data, isLoading } = useGetModelConfigsQuery();
-  const _onChange = useCallback(
+  const onChange = useCallback(
     (value: AnyModelConfig | null) => {
       if (!value) {
         return;
@@ -37,29 +36,47 @@ const ModelIdentifierFieldInputComponent = (props: Props) => {
       return EMPTY_ARRAY;
     }
 
-    return modelConfigsAdapterSelectors.selectAll(data);
-  }, [data]);
+    if (!fieldTemplate.ui_model_base && !fieldTemplate.ui_model_type && !fieldTemplate.ui_model_provider_id) {
+      return modelConfigsAdapterSelectors.selectAll(data);
+    }
 
-  const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
-    modelConfigs,
-    onChange: _onChange,
-    isLoading,
-    selectedModel: field.value,
-    groupByType: true,
-  });
+    return modelConfigsAdapterSelectors.selectAll(data).filter((config) => {
+      if (fieldTemplate.ui_model_base && !fieldTemplate.ui_model_base.includes(config.base)) {
+        return false;
+      }
+      if (fieldTemplate.ui_model_type && !fieldTemplate.ui_model_type.includes(config.type)) {
+        return false;
+      }
+      if (
+        fieldTemplate.ui_model_variant &&
+        'variant' in config &&
+        config.variant &&
+        !fieldTemplate.ui_model_variant.includes(config.variant)
+      ) {
+        return false;
+      }
+      if (fieldTemplate.ui_model_format && !fieldTemplate.ui_model_format.includes(config.format)) {
+        return false;
+      }
+      if (
+        fieldTemplate.ui_model_provider_id &&
+        (!('provider_id' in config) || !fieldTemplate.ui_model_provider_id.includes(config.provider_id as string))
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [data, fieldTemplate]);
 
   return (
-    <Flex w="full" alignItems="center" gap={2}>
-      <FormControl className="nowheel nodrag" isDisabled={!options.length} isInvalid={!value}>
-        <Combobox
-          value={value}
-          placeholder={placeholder}
-          options={options}
-          onChange={onChange}
-          noOptionsMessage={noOptionsMessage}
-        />
-      </FormControl>
-    </Flex>
+    <ModelFieldCombobox
+      value={field.value}
+      modelConfigs={modelConfigs}
+      isLoadingConfigs={isLoading}
+      onChange={onChange}
+      required={props.fieldTemplate.required}
+      groupByType
+    />
   );
 };
 

@@ -3,19 +3,27 @@ from tempfile import TemporaryDirectory
 from typing import Any
 
 import pytest
-from omegaconf import OmegaConf
 from pydantic import ValidationError
 
+from invokeai.app.invocations.baseinvocation import InvocationRegistry
 from invokeai.app.services.config.config_default import (
     DefaultInvokeAIAppConfig,
     InvokeAIAppConfig,
     get_config,
     load_and_migrate_config,
 )
+from invokeai.app.services.shared.graph import Graph
 from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 
 v4_config = """
 schema_version: 4.0.0
+
+host: "192.168.1.1"
+port: 8080
+"""
+
+v4_0_2_config = """
+schema_version: "4.0.2"
 
 host: "192.168.1.1"
 port: 8080
@@ -147,6 +155,19 @@ def test_failed_migrate_backup(tmp_path: Path, patch_rootdir: None):
     assert temp_config_file.read_text() == v3_config_with_bad_values
 
 
+def test_migrate_v4_0_2_to_4_0_3_config(tmp_path: Path, patch_rootdir: None):
+    """Test that a v4.0.2 config is migrated to v4.0.3 (image subfolder support)."""
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text(v4_0_2_config)
+
+    config = load_and_migrate_config(temp_config_file)
+    assert config.schema_version == "4.0.3"
+    assert config.host == "192.168.1.1"
+    assert config.port == 8080
+    # image_subfolder_strategy should have its default value
+    assert config.image_subfolder_strategy == "flat"
+
+
 def test_bails_on_invalid_config(tmp_path: Path, patch_rootdir: None):
     """Test reading configuration from a file."""
     temp_config_file = tmp_path / "temp_invokeai.yaml"
@@ -265,58 +286,69 @@ def test_get_config_writing(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch
     InvokeAIArgs.did_parse = False
 
 
-@pytest.mark.xfail(
-    reason="""
-    This test fails when run as part of the full test suite.
+def test_get_config_reads_external_api_keys_file(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    """Test that API keys are loaded from the dedicated api_keys.yaml file."""
+    InvokeAIArgs.did_parse = True
+    monkeypatch.setenv("INVOKEAI_ROOT", str(tmp_path))
+    (tmp_path / "invokeai.yaml").write_text("schema_version: 4.0.2\n")
+    (tmp_path / "api_keys.yaml").write_text("external_openai_api_key: openai-key\n")
 
-    This test needs to deny nodes from being included in the InvocationsUnion by providing
-    an app configuration as a test fixture. Pytest executes all test files before running
-    tests, so the app configuration is already initialized by the time this test runs, and
-    the InvocationUnion is already created and the denied nodes are not omitted from it.
+    get_config.cache_clear()
+    config = get_config()
+    get_config.cache_clear()
 
-    This test passes when `test_config.py` is tested in isolation.
+    assert config.external_openai_api_key == "openai-key"
 
-    Perhaps a solution would be to call `get_app_config().parse_args()` in
-    other test files?
-    """
-)
+    InvokeAIArgs.did_parse = False
+
+
+def test_get_config_env_vars_override_external_api_keys_file(
+    patch_rootdir: None, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    """Test that environment variables override values from api_keys.yaml."""
+    InvokeAIArgs.did_parse = True
+    monkeypatch.setenv("INVOKEAI_ROOT", str(tmp_path))
+    monkeypatch.setenv("INVOKEAI_EXTERNAL_OPENAI_API_KEY", "env-openai-key")
+    (tmp_path / "invokeai.yaml").write_text("schema_version: 4.0.2\n")
+    (tmp_path / "api_keys.yaml").write_text("external_openai_api_key: file-openai-key\n")
+
+    get_config.cache_clear()
+    config = get_config()
+    get_config.cache_clear()
+
+    assert config.external_openai_api_key == "env-openai-key"
+
+    InvokeAIArgs.did_parse = False
+
+
 def test_deny_nodes(patch_rootdir):
     # Allow integer, string and float, but explicitly deny float
-    allow_deny_nodes_conf = OmegaConf.create(
-        """
-        InvokeAI:
-          Nodes:
-            allow_nodes:
-              - integer
-              - string
-              - float
-            deny_nodes:
-              - float
-        """
-    )
-    # must parse config before importing Graph, so its nodes union uses the config
-    get_config.cache_clear()
     conf = get_config()
-    get_config.cache_clear()
-    conf.merge_from_file(conf=allow_deny_nodes_conf, argv=[])
-    from invokeai.app.services.shared.graph import Graph
+    conf.allow_nodes = ["integer", "string", "float"]
+    conf.deny_nodes = ["float"]
+
+    # We've changed the config, we need to invalidate the typeadapter cache so that the new config is used for
+    # subsequent graph validations
+    InvocationRegistry.invalidate_invocation_typeadapter()
 
     # confirm graph validation fails when using denied node
-    Graph(nodes={"1": {"id": "1", "type": "integer"}})
-    Graph(nodes={"1": {"id": "1", "type": "string"}})
+    Graph.model_validate({"nodes": {"1": {"id": "1", "type": "integer"}}})
+    Graph.model_validate({"nodes": {"1": {"id": "1", "type": "string"}}})
 
     with pytest.raises(ValidationError):
-        Graph(nodes={"1": {"id": "1", "type": "float"}})
-
-    from invokeai.app.invocations.baseinvocation import BaseInvocation
+        Graph.model_validate({"nodes": {"1": {"id": "1", "type": "float"}}})
 
     # confirm invocations union will not have denied nodes
-    all_invocations = BaseInvocation.get_invocations()
+    all_invocations = InvocationRegistry.get_invocation_classes()
 
-    has_integer = len([i for i in all_invocations if i.model_fields.get("type").default == "integer"]) == 1
-    has_string = len([i for i in all_invocations if i.model_fields.get("type").default == "string"]) == 1
-    has_float = len([i for i in all_invocations if i.model_fields.get("type").default == "float"]) == 1
+    has_integer = len([i for i in all_invocations if i.get_type() == "integer"]) == 1
+    has_string = len([i for i in all_invocations if i.get_type() == "string"]) == 1
+    has_float = len([i for i in all_invocations if i.get_type() == "float"]) == 1
 
     assert has_integer
     assert has_string
     assert not has_float
+
+    # Reset the config so that it doesn't affect other tests
+    get_config.cache_clear()
+    InvocationRegistry.invalidate_invocation_typeadapter()

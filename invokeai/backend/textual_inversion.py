@@ -9,7 +9,8 @@ from safetensors.torch import load_file
 from transformers import CLIPTokenizer
 from typing_extensions import Self
 
-from .raw_model import RawModel
+from invokeai.backend.raw_model import RawModel
+from invokeai.backend.util.calc_tensor_size import calc_tensors_size
 
 
 class TextualInversionModelRaw(RawModel):
@@ -64,6 +65,17 @@ class TextualInversionModelRaw(RawModel):
                 raise ValueError(f"Invalid embeddings file: {file_path.name}")
 
         return result
+
+    def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
+        if not torch.cuda.is_available():
+            return
+        for emb in [self.embedding, self.embedding_2]:
+            if emb is not None:
+                emb.to(device=device, dtype=dtype)
+
+    def calc_size(self) -> int:
+        """Get the size of this model in bytes."""
+        return calc_tensors_size([self.embedding, self.embedding_2])
 
 
 class TextualInversionManager(BaseTextualInversionManager):

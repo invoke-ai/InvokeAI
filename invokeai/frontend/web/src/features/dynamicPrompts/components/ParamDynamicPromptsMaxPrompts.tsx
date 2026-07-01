@@ -1,18 +1,27 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { maxPromptsChanged } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
+import {
+  maxPromptsChanged,
+  selectDynamicPromptsCombinatorial,
+  selectDynamicPromptsMaxPrompts,
+} from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+const CONSTRAINTS = {
+  initial: 100,
+  sliderMin: 1,
+  sliderMax: 1000,
+  numberInputMin: 1,
+  numberInputMax: 10000,
+  fineStep: 1,
+  coarseStep: 10,
+};
+
 const ParamDynamicPromptsMaxPrompts = () => {
-  const maxPrompts = useAppSelector((s) => s.dynamicPrompts.maxPrompts);
-  const sliderMin = useAppSelector((s) => s.config.sd.dynamicPrompts.maxPrompts.sliderMin);
-  const sliderMax = useAppSelector((s) => s.config.sd.dynamicPrompts.maxPrompts.sliderMax);
-  const numberInputMin = useAppSelector((s) => s.config.sd.dynamicPrompts.maxPrompts.numberInputMin);
-  const numberInputMax = useAppSelector((s) => s.config.sd.dynamicPrompts.maxPrompts.numberInputMax);
-  const initial = useAppSelector((s) => s.config.sd.dynamicPrompts.maxPrompts.initial);
-  const isDisabled = useAppSelector((s) => !s.dynamicPrompts.combinatorial);
+  const maxPrompts = useAppSelector(selectDynamicPromptsMaxPrompts);
+  const combinatorial = useAppSelector(selectDynamicPromptsCombinatorial);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -24,23 +33,23 @@ const ParamDynamicPromptsMaxPrompts = () => {
   );
 
   return (
-    <FormControl isDisabled={isDisabled}>
+    <FormControl isDisabled={!combinatorial}>
       <InformationalPopover feature="dynamicPromptsMaxPrompts" inPortal={false}>
         <FormLabel>{t('dynamicPrompts.maxPrompts')}</FormLabel>
       </InformationalPopover>
       <CompositeSlider
-        min={sliderMin}
-        max={sliderMax}
+        min={CONSTRAINTS.sliderMin}
+        max={CONSTRAINTS.sliderMax}
         value={maxPrompts}
-        defaultValue={initial}
+        defaultValue={CONSTRAINTS.initial}
         onChange={handleChange}
         marks
       />
       <CompositeNumberInput
-        min={numberInputMin}
-        max={numberInputMax}
+        min={CONSTRAINTS.numberInputMin}
+        max={CONSTRAINTS.numberInputMax}
         value={maxPrompts}
-        defaultValue={initial}
+        defaultValue={CONSTRAINTS.initial}
         onChange={handleChange}
       />
     </FormControl>

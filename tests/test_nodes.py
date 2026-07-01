@@ -1,4 +1,5 @@
 from typing import Any, Callable, Union
+from unittest.mock import MagicMock
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -9,6 +10,8 @@ from invokeai.app.invocations.baseinvocation import (
 from invokeai.app.invocations.fields import InputField, OutputField
 from invokeai.app.invocations.image import ImageField
 from invokeai.app.services.events.events_common import EventBase
+from invokeai.app.services.session_processor.session_processor_common import ProgressImage
+from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
 from invokeai.app.services.shared.invocation_context import InvocationContext
 
 
@@ -104,9 +107,22 @@ class PolymorphicStringTestInvocation(BaseInvocation):
         return PromptCollectionTestInvocationOutput(collection=self.value)
 
 
+@invocation_output("test_union_collection_output")
+class UnionCollectionTestInvocationOutput(BaseInvocationOutput):
+    value: Union[str, list[str], None] = OutputField(default=None)
+
+
+@invocation("test_union_collection", version="1.0.0")
+class UnionCollectionTestInvocation(BaseInvocation):
+    value: Union[str, list[str], None] = InputField(default=None)
+
+    def invoke(self, context: InvocationContext) -> UnionCollectionTestInvocationOutput:
+        return UnionCollectionTestInvocationOutput(value=self.value)
+
+
 # Importing these must happen after test invocations are defined or they won't register
 from invokeai.app.services.events.events_base import EventServiceBase  # noqa: E402
-from invokeai.app.services.shared.graph import Edge, EdgeConnection  # noqa: E402
+from invokeai.app.services.shared.graph import Edge, EdgeConnection, GraphExecutionState  # noqa: E402
 
 
 def create_edge(from_id: str, from_field: str, to_id: str, to_field: str) -> Edge:
@@ -133,6 +149,16 @@ class TestEventService(EventServiceBase):
         self.events.append(event)
         pass
 
+    def emit_invocation_progress(
+        self,
+        queue_item: "SessionQueueItem",
+        invocation: "BaseInvocation",
+        message: str,
+        percentage: float | None = None,
+        image: "ProgressImage | None" = None,
+    ) -> None:
+        pass
+
 
 def wait_until(condition: Callable[[], bool], timeout: int = 10, interval: float = 0.1) -> None:
     import time
@@ -143,3 +169,27 @@ def wait_until(condition: Callable[[], bool], timeout: int = 10, interval: float
             return
         time.sleep(interval)
     raise TimeoutError("Condition not met")
+
+
+def run_session_with_mock_context(session: GraphExecutionState):
+    """Run the session with a mock context to simulate invocation execution.
+
+    The graph may only contain invocations that operate on primitive types. Images, models, or any other types that
+    require a real context cannot be used in this mock execution.
+    """
+    mock_context = MagicMock(spec=InvocationContext)
+    invocation = session.next()
+    while invocation is not None:
+        output = invocation.invoke(mock_context)
+        session.complete(invocation.id, output)
+        invocation = session.next()
+
+
+def get_single_output_from_session(session: GraphExecutionState, node_id: str) -> BaseInvocationOutput:
+    assert len(session.source_prepared_mapping[node_id]) == 1, (
+        "Expected exactly one prepared node for the given node_id"
+    )
+    prepared_node_id = session.source_prepared_mapping[node_id].pop()
+    output = session.results[prepared_node_id]
+    assert isinstance(output, BaseInvocationOutput), "Expected output to be of type BaseInvocationOutput"
+    return output

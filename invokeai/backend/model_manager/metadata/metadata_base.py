@@ -17,15 +17,14 @@ remote repo.
 from pathlib import Path
 from typing import List, Literal, Optional, Union
 
-from huggingface_hub import configure_http_backend, hf_hub_url
+from huggingface_hub import hf_hub_url
 from pydantic import BaseModel, Field, TypeAdapter
 from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
 from typing_extensions import Annotated
 
-from invokeai.backend.model_manager import ModelRepoVariant
-
-from ..util import select_hf_files
+from invokeai.backend.model_manager.taxonomy import ModelRepoVariant
+from invokeai.backend.model_manager.util.select_hf_files import filter_files
 
 
 class UnknownMetadataException(Exception):
@@ -37,8 +36,11 @@ class RemoteModelFile(BaseModel):
 
     url: AnyHttpUrl = Field(description="The url to download this model file")
     path: Path = Field(description="The path to the file, relative to the model root")
-    size: int = Field(description="The size of this file, in bytes")
+    size: Optional[int] = Field(description="The size of this file, in bytes", default=0)
     sha256: Optional[str] = Field(description="SHA256 hash of this model (not always available)", default=None)
+
+    def __hash__(self) -> int:
+        return hash(str(self))
 
 
 class ModelMetadataBase(BaseModel):
@@ -93,13 +95,15 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
         self,
         variant: Optional[ModelRepoVariant] = None,
         subfolder: Optional[Path] = None,
+        subfolders: Optional[List[Path]] = None,
         session: Optional[Session] = None,
     ) -> List[RemoteModelFile]:
         """
-        Return list of downloadable files, filtering by variant and subfolder, if any.
+        Return list of downloadable files, filtering by variant and subfolder(s), if any.
 
         :param variant: Return model files needed to reconstruct the indicated variant
-        :param subfolder: Return model files from the designated subfolder only
+        :param subfolder: Return model files from the designated subfolder only (deprecated, use subfolders)
+        :param subfolders: Return model files from the designated subfolders
         :param session: A request.Session object used for internet-free testing
 
         Note that there is special variant-filtering behavior here:
@@ -107,14 +111,16 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
         full-precision model is returned.
         """
         session = session or Session()
-        configure_http_backend(backend_factory=lambda: session)  # used in testing
 
-        paths = select_hf_files.filter_files(
-            [x.path for x in self.files], variant, subfolder
-        )  #  all files in the model
-        prefix = f"{subfolder}/" if subfolder else ""
+        paths = filter_files([x.path for x in self.files], variant, subfolder, subfolders)  #  all files in the model
+
+        # Determine prefix for model_index.json check - only applies for single subfolder
+        prefix = ""
+        if subfolder and not subfolders:
+            prefix = f"{subfolder}/"
+
         # the next step reads model_index.json to determine which subdirectories belong
-        # to the model
+        # to the model (only for single subfolder case)
         if Path(f"{prefix}model_index.json") in paths:
             url = hf_hub_url(self.id, filename="model_index.json", subfolder=str(subfolder) if subfolder else None)
             resp = session.get(url)

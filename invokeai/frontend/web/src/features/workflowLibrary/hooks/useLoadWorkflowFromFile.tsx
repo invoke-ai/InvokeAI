@@ -1,54 +1,57 @@
-import { useLogger } from 'app/logging/useLogger';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { workflowLoadRequested } from 'features/nodes/store/actions';
-import { toast } from 'features/toast/toast';
+import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import { useValidateAndLoadWorkflow } from 'features/workflowLibrary/hooks/useValidateAndLoadWorkflow';
 import { workflowLoadedFromFile } from 'features/workflowLibrary/store/actions';
-import type { RefObject } from 'react';
 import { useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 
-type useLoadWorkflowFromFileOptions = {
-  resetRef: RefObject<() => void>;
-  onSuccess?: () => void;
-};
-
-type UseLoadWorkflowFromFile = (options: useLoadWorkflowFromFileOptions) => (file: File | null) => void;
-
-export const useLoadWorkflowFromFile: UseLoadWorkflowFromFile = ({ resetRef, onSuccess }) => {
+/**
+ * Loads a workflow from a file.
+ *
+ * You probably should instead use `useLoadWorkflowWithDialog`, which opens a dialog to prevent loss of unsaved changes
+ * and handles the loading process.
+ */
+export const useLoadWorkflowFromFile = () => {
   const dispatch = useAppDispatch();
-  const logger = useLogger('nodes');
-  const { t } = useTranslation();
+  const validatedAndLoadWorkflow = useValidateAndLoadWorkflow();
   const loadWorkflowFromFile = useCallback(
-    (file: File | null) => {
-      if (!file) {
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const rawJSON = reader.result;
+    (
+      file: File,
+      options: {
+        onSuccess?: (workflow: WorkflowV3) => void;
+        onError?: () => void;
+        onCompleted?: () => void;
+      } = {}
+    ) => {
+      return new Promise<WorkflowV3 | void>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const rawJSON = reader.result;
+          const { onSuccess, onError, onCompleted } = options;
+          try {
+            const unvalidatedWorkflow = JSON.parse(rawJSON as string);
+            const validatedWorkflow = await validatedAndLoadWorkflow(unvalidatedWorkflow, 'file');
 
-        try {
-          dispatch(workflowLoadRequested({ data: { workflow: String(rawJSON), graph: null }, asCopy: true }));
-          dispatch(workflowLoadedFromFile());
-          onSuccess && onSuccess();
-        } catch (e) {
-          // There was a problem reading the file
-          logger.error(t('nodes.unableToLoadWorkflow'));
-          toast({
-            id: 'UNABLE_TO_LOAD_WORKFLOW',
-            title: t('nodes.unableToLoadWorkflow'),
-            status: 'error',
-          });
-          reader.abort();
-        }
-      };
+            if (!validatedWorkflow) {
+              reader.abort();
+              onError?.();
+              return;
+            }
+            dispatch(workflowLoadedFromFile());
+            onSuccess?.(validatedWorkflow);
+            resolve(validatedWorkflow);
+          } catch {
+            // This is catching the error from the parsing the JSON file
+            onError?.();
+            reject();
+          } finally {
+            onCompleted?.();
+          }
+        };
 
-      reader.readAsText(file);
-
-      // Reset the file picker internal state so that the same file can be loaded again
-      resetRef.current?.();
+        reader.readAsText(file);
+      });
     },
-    [dispatch, logger, resetRef, t, onSuccess]
+    [validatedAndLoadWorkflow, dispatch]
   );
 
   return loadWorkflowFromFile;

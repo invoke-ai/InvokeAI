@@ -1,6 +1,5 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import NodeCollapseButton from 'features/nodes/components/flow/nodes/common/NodeCollapseButton';
-import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 import { useNodePack } from 'features/nodes/hooks/useNodePack';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import { memo } from 'react';
@@ -11,14 +10,13 @@ type Props = {
   isOpen: boolean;
   label: string;
   type: string;
-  selected: boolean;
 };
 
-const InvocationNodeUnknownFallback = ({ nodeId, isOpen, label, type, selected }: Props) => {
+const InvocationNodeUnknownFallback = ({ nodeId, isOpen, label, type }: Props) => {
   const { t } = useTranslation();
-  const nodePack = useNodePack(nodeId);
+  const nodePack = useNodePack();
   return (
-    <NodeWrapper nodeId={nodeId} selected={selected}>
+    <>
       <Flex
         className={DRAG_HANDLE_CLASSNAME}
         layerStyle="nodeHeader"
@@ -28,9 +26,10 @@ const InvocationNodeUnknownFallback = ({ nodeId, isOpen, label, type, selected }
         h={8}
         fontWeight="semibold"
         fontSize="sm"
+        bg="error.700"
       >
         <NodeCollapseButton nodeId={nodeId} isOpen={isOpen} />
-        <Text w="full" textAlign="center" pe={8} color="error.300">
+        <Text w="full" textAlign="center" pe={8}>
           {label ? `${label} (${type})` : type}
         </Text>
       </Flex>
@@ -64,7 +63,7 @@ const InvocationNodeUnknownFallback = ({ nodeId, isOpen, label, type, selected }
           </Flex>
         </Flex>
       )}
-    </NodeWrapper>
+    </>
   );
 };
 

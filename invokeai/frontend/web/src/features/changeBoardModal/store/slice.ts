@@ -1,27 +1,40 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import type { ImageDTO } from 'services/api/types';
+import type { SliceConfig } from 'app/store/types';
+import z from 'zod';
 
-import { initialState } from './initialState';
+const zChangeBoardModalState = z.object({
+  isModalOpen: z.boolean().default(false),
+  image_names: z.array(z.string()).default(() => []),
+});
+type ChangeBoardModalState = z.infer<typeof zChangeBoardModalState>;
 
-export const changeBoardModalSlice = createSlice({
+const getInitialState = (): ChangeBoardModalState => zChangeBoardModalState.parse({});
+
+const slice = createSlice({
   name: 'changeBoardModal',
-  initialState,
+  initialState: getInitialState(),
   reducers: {
     isModalOpenChanged: (state, action: PayloadAction<boolean>) => {
       state.isModalOpen = action.payload;
     },
-    imagesToChangeSelected: (state, action: PayloadAction<ImageDTO[]>) => {
-      state.imagesToChange = action.payload;
+    imagesToChangeSelected: (state, action: PayloadAction<string[]>) => {
+      state.image_names = action.payload;
     },
     changeBoardReset: (state) => {
-      state.imagesToChange = [];
+      state.image_names = [];
       state.isModalOpen = false;
     },
   },
 });
 
-export const { isModalOpenChanged, imagesToChangeSelected, changeBoardReset } = changeBoardModalSlice.actions;
+export const { isModalOpenChanged, imagesToChangeSelected, changeBoardReset } = slice.actions;
 
 export const selectChangeBoardModalSlice = (state: RootState) => state.changeBoardModal;
+
+export const changeBoardModalSliceConfig: SliceConfig<typeof slice> = {
+  slice,
+  schema: zChangeBoardModalState,
+  getInitialState,
+};

@@ -1,102 +1,123 @@
-import { Box, useGlobalModifiersInit } from '@invoke-ai/ui-library';
-import { useSocketIO } from 'app/hooks/useSocketIO';
-import { useSyncQueueStatus } from 'app/hooks/useSyncQueueStatus';
-import { useLogger } from 'app/logging/useLogger';
-import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import type { PartialAppConfig } from 'app/types/invokeai';
-import ImageUploadOverlay from 'common/components/ImageUploadOverlay';
-import { useClearStorage } from 'common/hooks/useClearStorage';
-import { useFullscreenDropzone } from 'common/hooks/useFullscreenDropzone';
-import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
-import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
-import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
-import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
-import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
-import { configChanged } from 'features/system/store/configSlice';
-import { languageSelector } from 'features/system/store/systemSelectors';
-import InvokeTabs from 'features/ui/components/InvokeTabs';
-import { AnimatePresence } from 'framer-motion';
-import i18n from 'i18n';
-import { size } from 'lodash-es';
-import { memo, useCallback, useEffect } from 'react';
+import { Box, Center, Spinner } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
+import { GlobalHookIsolator } from 'app/components/GlobalHookIsolator';
+import { GlobalModalIsolator } from 'app/components/GlobalModalIsolator';
+import { clearStorage } from 'app/store/enhancers/reduxRemember/driver';
+import Loading from 'common/components/Loading/Loading';
+import { AdministratorSetup } from 'features/auth/components/AdministratorSetup';
+import { LoginPage } from 'features/auth/components/LoginPage';
+import { ProtectedRoute } from 'features/auth/components/ProtectedRoute';
+import { UserManagement } from 'features/auth/components/UserManagement';
+import { UserProfile } from 'features/auth/components/UserProfile';
+import { AppContent } from 'features/ui/components/AppContent';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
+import type { ReactNode } from 'react';
+import { memo, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
-import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
+import { Route, Routes, useNavigate } from 'react-router-dom';
+import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
 
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
-import PreselectedImage from './PreselectedImage';
+import ThemeLocaleProvider from './ThemeLocaleProvider';
 
-const DEFAULT_CONFIG = {};
+const errorBoundaryOnReset = () => {
+  clearStorage();
+  location.reload();
+  return false;
+};
 
-interface Props {
-  config?: PartialAppConfig;
-  selectedImage?: {
-    imageName: string;
-    action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
-  };
-}
-
-const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
-  const language = useAppSelector(languageSelector);
-  const logger = useLogger('system');
-  const dispatch = useAppDispatch();
-  const clearStorage = useClearStorage();
-
-  // singleton!
-  useSocketIO();
-  useGlobalModifiersInit();
-  useGlobalHotkeys();
-  useGetOpenAPISchemaQuery();
-
-  const { dropzone, isHandlingUpload, setIsHandlingUpload } = useFullscreenDropzone();
-
-  const handleReset = useCallback(() => {
-    clearStorage();
-    location.reload();
-    return false;
-  }, [clearStorage]);
-
-  useEffect(() => {
-    i18n.changeLanguage(language);
-  }, [language]);
-
-  useEffect(() => {
-    if (size(config)) {
-      logger.info({ config }, 'Received config');
-      dispatch(configChanged(config));
-    }
-  }, [dispatch, config, logger]);
-
-  useEffect(() => {
-    dispatch(appStarted());
-  }, [dispatch]);
-
-  useStarterModelsToast();
-  useSyncQueueStatus();
-
+const MainApp = () => {
+  const isNavigationAPIConnected = useStore(navigationApi.$isConnected);
   return (
-    <ErrorBoundary onReset={handleReset} FallbackComponent={AppErrorBoundaryFallback}>
-      <Box
-        id="invoke-app-wrapper"
-        w="100vw"
-        h="100vh"
-        position="relative"
-        overflow="hidden"
-        {...dropzone.getRootProps()}
-      >
-        <input {...dropzone.getInputProps()} />
-        <InvokeTabs />
-        <AnimatePresence>
-          {dropzone.isDragActive && isHandlingUpload && (
-            <ImageUploadOverlay dropzone={dropzone} setIsHandlingUpload={setIsHandlingUpload} />
-          )}
-        </AnimatePresence>
-      </Box>
-      <DeleteImageModal />
-      <ChangeBoardModal />
-      <DynamicPromptsModal />
-      <PreselectedImage selectedImage={selectedImage} />
-    </ErrorBoundary>
+    <Box id="invoke-app-wrapper" w="100dvw" h="100dvh" position="relative" overflow="hidden">
+      {isNavigationAPIConnected ? <AppContent /> : <Loading />}
+    </Box>
+  );
+};
+
+const SetupChecker = () => {
+  const { data, isLoading } = useGetSetupStatusQuery();
+  const navigate = useNavigate();
+
+  // Check if user is already authenticated
+  const token = localStorage.getItem('auth_token');
+  const isAuthenticated = !!token;
+
+  useEffect(() => {
+    if (!isLoading && data) {
+      // If multiuser mode is disabled, go directly to the app
+      if (!data.multiuser_enabled) {
+        navigate('/app', { replace: true });
+      } else if (isAuthenticated) {
+        // In multiuser mode, check authentication
+        navigate('/app', { replace: true });
+      } else if (data.setup_required) {
+        navigate('/setup', { replace: true });
+      } else {
+        navigate('/login', { replace: true });
+      }
+    }
+  }, [data, isLoading, navigate, isAuthenticated]);
+
+  if (isLoading) {
+    return (
+      <Center w="100dvw" h="100dvh">
+        <Spinner size="xl" />
+      </Center>
+    );
+  }
+
+  return null;
+};
+
+/** Full-page wrapper for user management / profile pages rendered inside the protected area */
+const FullPageWrapper = ({ children }: { children: ReactNode }) => (
+  <Box w="100dvw" h="100dvh" overflowY="auto" bg="base.900">
+    {children}
+  </Box>
+);
+
+const App = () => {
+  return (
+    <ThemeLocaleProvider>
+      <ErrorBoundary onReset={errorBoundaryOnReset} FallbackComponent={AppErrorBoundaryFallback}>
+        <Routes>
+          <Route path="/" element={<SetupChecker />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/setup" element={<AdministratorSetup />} />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <FullPageWrapper>
+                  <UserProfile />
+                </FullPageWrapper>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <ProtectedRoute requireAdmin>
+                <FullPageWrapper>
+                  <UserManagement />
+                </FullPageWrapper>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/*"
+            element={
+              <ProtectedRoute>
+                <MainApp />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+        <GlobalHookIsolator />
+        <GlobalModalIsolator />
+      </ErrorBoundary>
+    </ThemeLocaleProvider>
   );
 };
 

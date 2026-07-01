@@ -1,15 +1,20 @@
 import { Box, Flex, Textarea } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { createSelector } from '@reduxjs/toolkit';
+import type { Node, NodeProps } from '@xyflow/react';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import NodeCollapseButton from 'features/nodes/components/flow/nodes/common/NodeCollapseButton';
-import NodeTitle from 'features/nodes/components/flow/nodes/common/NodeTitle';
-import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
+import NonInvocationNodeTitle from 'features/nodes/components/flow/nodes/common/NonInvocationNodeTitle';
+import NonInvocationNodeWrapper from 'features/nodes/components/flow/nodes/common/NonInvocationNodeWrapper';
 import { notesNodeValueChanged } from 'features/nodes/store/nodesSlice';
+import { selectNodes } from 'features/nodes/store/selectors';
+import { NO_DRAG_CLASS, NO_PAN_CLASS } from 'features/nodes/types/constants';
 import type { NotesNodeData } from 'features/nodes/types/invocation';
 import type { ChangeEvent } from 'react';
-import { memo, useCallback } from 'react';
-import type { NodeProps } from 'reactflow';
+import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
-const NotesNode = (props: NodeProps<NotesNodeData>) => {
+const NotesNode = (props: NodeProps<Node<NotesNodeData>>) => {
+  const { t } = useTranslation();
   const { id: nodeId, data, selected } = props;
   const { notes, isOpen } = data;
   const dispatch = useAppDispatch();
@@ -20,8 +25,18 @@ const NotesNode = (props: NodeProps<NotesNodeData>) => {
     [dispatch, nodeId]
   );
 
+  const selectNodeExists = useMemo(
+    () => createSelector(selectNodes, (nodes) => Boolean(nodes.find((n) => n.id === nodeId))),
+    [nodeId]
+  );
+  const nodeExists = useAppSelector(selectNodeExists);
+
+  if (!nodeExists) {
+    return null;
+  }
+
   return (
-    <NodeWrapper nodeId={nodeId} selected={selected}>
+    <NonInvocationNodeWrapper nodeId={nodeId} selected={selected}>
       <Flex
         layerStyle="nodeHeader"
         borderTopRadius="base"
@@ -31,14 +46,14 @@ const NotesNode = (props: NodeProps<NotesNodeData>) => {
         h={8}
       >
         <NodeCollapseButton nodeId={nodeId} isOpen={isOpen} />
-        <NodeTitle nodeId={nodeId} title="Notes" />
+        <NonInvocationNodeTitle nodeId={nodeId} title={t('nodes.notes')} />
         <Box minW={8} />
       </Flex>
       {isOpen && (
         <>
           <Flex
             layerStyle="nodeBody"
-            className="nopan"
+            className={NO_PAN_CLASS}
             cursor="auto"
             flexDirection="column"
             borderBottomRadius="base"
@@ -47,13 +62,20 @@ const NotesNode = (props: NodeProps<NotesNodeData>) => {
             p={2}
             gap={1}
           >
-            <Flex className="nopan" w="full" h="full" flexDir="column">
-              <Textarea className="nodrag" value={notes} onChange={handleChange} rows={8} resize="none" fontSize="sm" />
+            <Flex className={NO_PAN_CLASS} w="full" h="full" flexDir="column">
+              <Textarea
+                className={NO_DRAG_CLASS}
+                value={notes}
+                onChange={handleChange}
+                rows={8}
+                resize="none"
+                fontSize="sm"
+              />
             </Flex>
           </Flex>
         </>
       )}
-    </NodeWrapper>
+    </NonInvocationNodeWrapper>
   );
 };
 

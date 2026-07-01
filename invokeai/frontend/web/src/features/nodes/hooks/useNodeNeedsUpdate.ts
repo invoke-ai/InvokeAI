@@ -1,11 +1,18 @@
-import { useNodeData } from 'features/nodes/hooks/useNodeData';
-import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
-import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
+import { useNodeType } from 'features/nodes/hooks/useNodeType';
+import { useNodeVersion } from 'features/nodes/hooks/useNodeVersion';
 import { useMemo } from 'react';
 
-export const useNodeNeedsUpdate = (nodeId: string) => {
-  const data = useNodeData(nodeId);
-  const template = useNodeTemplate(nodeId);
-  const needsUpdate = useMemo(() => getNeedsUpdate(data, template), [data, template]);
+import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
+
+export const useNodeNeedsUpdate = () => {
+  const type = useNodeType();
+  const version = useNodeVersion();
+  const template = useNodeTemplateOrThrow();
+  const needsUpdate = useMemo(() => {
+    if (type !== template.type) {
+      return true;
+    }
+    return version !== template.version;
+  }, [template.type, template.version, type, version]);
   return needsUpdate;
 };

@@ -79,4 +79,4 @@ export const isInvocationOutputSchemaObject = (
 
 export const isInvocationFieldSchema = (
   obj: OpenAPIV3_1.ReferenceObject | OpenAPIV3_1.SchemaObject
-): obj is InvocationFieldSchema => !('$ref' in obj);
+): obj is InvocationFieldSchema => 'field_kind' in obj;

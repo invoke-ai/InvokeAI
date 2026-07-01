@@ -1,67 +1,132 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
-import { skipToken } from '@reduxjs/toolkit/query';
+import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import IAIDndImage from 'common/components/IAIDndImage';
-import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
+import { CanvasAlertsInvocationProgress } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsInvocationProgress';
+import { DndImage } from 'features/dnd/DndImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
-import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
-import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
+import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
+import { useNextPrevItemNavigation } from 'features/gallery/components/useNextPrevItemNavigation';
+import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
+import {
+  selectActiveTab,
+  selectShouldShowItemDetails,
+  selectShouldShowProgressInViewer,
+} from 'features/ui/store/uiSelectors';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { PiImageBold } from 'react-icons/pi';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import type { ImageDTO } from 'services/api/types';
 
-import ProgressImage from './ProgressImage';
+import { useImageViewerContext } from './context';
+import { NoContentForViewer } from './NoContentForViewer';
+import { ProgressImage } from './ProgressImage2';
+import { ProgressIndicator } from './ProgressIndicator2';
 
-const selectLastSelectedImageName = createSelector(
-  selectLastSelectedImage,
-  (lastSelectedImage) => lastSelectedImage?.image_name
-);
+export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | null }) => {
+  const activeTab = useAppSelector(selectActiveTab);
+  const selectedImageName = useAppSelector(selectLastSelectedItem);
+  const shouldShowItemDetails = useAppSelector(selectShouldShowItemDetails);
+  const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
+  const { goToPreviousImage, goToNextImage, isFetching } = useNextPrevItemNavigation();
+  const { onLoadImage, $progressEvent, $progressImage, $isProgressImageResolving, $isTemporarilyShowingSelectedImage } =
+    useImageViewerContext();
+  const progressEvent = useStore($progressEvent);
+  const progressImage = useStore($progressImage);
+  const isProgressImageResolving = useStore($isProgressImageResolving);
+  const isTemporarilyShowingSelectedImage = useStore($isTemporarilyShowingSelectedImage);
+  const [imageToRender, setImageToRender] = useState<ImageDTO | null>(null);
+  const previousRenderedImageNameRef = useRef<string | null>(null);
+  const selectedImageRevealTimeoutId = useRef(0);
 
-type Props = {
-  isDragDisabled?: boolean;
-  isDropDisabled?: boolean;
-  withNextPrevButtons?: boolean;
-  withMetadata?: boolean;
-  alwaysShowProgress?: boolean;
-};
-
-const CurrentImagePreview = ({
-  isDragDisabled = false,
-  isDropDisabled = false,
-  withNextPrevButtons = true,
-  withMetadata = true,
-  alwaysShowProgress = false,
-}: Props) => {
-  const { t } = useTranslation();
-  const shouldShowImageDetails = useAppSelector((s) => s.ui.shouldShowImageDetails);
-  const imageName = useAppSelector(selectLastSelectedImageName);
-  const hasDenoiseProgress = useAppSelector((s) => Boolean(s.system.denoiseProgress));
-  const shouldShowProgressInViewer = useAppSelector((s) => s.ui.shouldShowProgressInViewer);
-
-  const { currentData: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);
-
-  const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
-    if (imageDTO) {
-      return {
-        id: 'current-image',
-        payloadType: 'IMAGE_DTO',
-        payload: { imageDTO },
-      };
+  useEffect(() => {
+    if (!selectedImageName) {
+      setImageToRender(null);
+      return;
     }
-  }, [imageDTO]);
 
-  const droppableData = useMemo<TypesafeDroppableData | undefined>(
-    () => ({
-      id: 'current-image',
-      actionType: 'SET_CURRENT_IMAGE',
-    }),
-    []
-  );
+    if (!imageDTO || imageToRender?.image_name === imageDTO.image_name) {
+      return;
+    }
+
+    let canceled = false;
+
+    const onReady = () => {
+      if (canceled) {
+        return;
+      }
+      setImageToRender(imageDTO);
+    };
+
+    if (typeof window === 'undefined') {
+      onReady();
+      return;
+    }
+
+    const preloader = new window.Image();
+
+    preloader.onload = onReady;
+    preloader.onerror = onReady;
+    preloader.src = imageDTO.image_url;
+
+    if (preloader.complete) {
+      onReady();
+    }
+
+    return () => {
+      canceled = true;
+      preloader.onload = null;
+      preloader.onerror = null;
+    };
+  }, [imageDTO, imageToRender?.image_name, selectedImageName]);
+
+  const hasProgressImage = progressImage !== null;
+
+  useEffect(() => {
+    const renderedImageName = imageToRender?.image_name ?? null;
+    const previousRenderedImageName = previousRenderedImageNameRef.current;
+    previousRenderedImageNameRef.current = renderedImageName;
+
+    window.clearTimeout(selectedImageRevealTimeoutId.current);
+
+    if (
+      !shouldShowProgressInViewer ||
+      !hasProgressImage ||
+      isProgressImageResolving ||
+      !renderedImageName ||
+      renderedImageName !== selectedImageName
+    ) {
+      $isTemporarilyShowingSelectedImage.set(false);
+      return;
+    }
+
+    if (previousRenderedImageName === null || previousRenderedImageName === renderedImageName) {
+      return;
+    }
+
+    $isTemporarilyShowingSelectedImage.set(true);
+    selectedImageRevealTimeoutId.current = window.setTimeout(() => {
+      $isTemporarilyShowingSelectedImage.set(false);
+    }, SELECTED_IMAGE_REVEAL_DURATION_MS);
+
+    return () => {
+      window.clearTimeout(selectedImageRevealTimeoutId.current);
+    };
+  }, [
+    $isTemporarilyShowingSelectedImage,
+    hasProgressImage,
+    imageToRender?.image_name,
+    isProgressImageResolving,
+    selectedImageName,
+    shouldShowProgressInViewer,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      $isTemporarilyShowingSelectedImage.set(false);
+    };
+  }, [$isTemporarilyShowingSelectedImage]);
 
   // Show and hide the next/prev buttons on mouse move
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] = useState<boolean>(false);
@@ -76,6 +141,52 @@ const CurrentImagePreview = ({
     }, 500);
   }, []);
 
+  const handleViewerArrowNavigation = useCallback(
+    (event: KeyboardEvent, navigate: () => void) => {
+      if (!navigationApi.isViewerArrowNavigationMode(activeTab) || !imageToRender || isFetching) {
+        return;
+      }
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      event.preventDefault();
+      navigate();
+    },
+    [activeTab, imageToRender, isFetching]
+  );
+
+  const onHotkeyPrevImage = useCallback(
+    (event: KeyboardEvent) => {
+      handleViewerArrowNavigation(event, goToPreviousImage);
+    },
+    [goToPreviousImage, handleViewerArrowNavigation]
+  );
+
+  const onHotkeyNextImage = useCallback(
+    (event: KeyboardEvent) => {
+      handleViewerArrowNavigation(event, goToNextImage);
+    },
+    [goToNextImage, handleViewerArrowNavigation]
+  );
+
+  useRegisteredHotkeys({
+    id: 'galleryNavLeft',
+    category: 'gallery',
+    callback: onHotkeyPrevImage,
+    options: { preventDefault: true },
+    dependencies: [onHotkeyPrevImage],
+  });
+
+  useRegisteredHotkeys({
+    id: 'galleryNavRight',
+    category: 'gallery',
+    callback: onHotkeyNextImage,
+    options: { preventDefault: true },
+    dependencies: [onHotkeyNextImage],
+  });
+
+  const withProgress = shouldShowProgressInViewer && hasProgressImage && !isTemporarilyShowingSelectedImage;
+
   return (
     <Flex
       onMouseOver={onMouseOver}
@@ -86,30 +197,30 @@ const CurrentImagePreview = ({
       justifyContent="center"
       position="relative"
     >
-      {hasDenoiseProgress && (shouldShowProgressInViewer || alwaysShowProgress) ? (
-        <ProgressImage />
-      ) : (
-        <IAIDndImage
-          imageDTO={imageDTO}
-          droppableData={droppableData}
-          draggableData={draggableData}
-          isDragDisabled={isDragDisabled}
-          isDropDisabled={isDropDisabled}
-          isUploadDisabled={true}
-          fitContainer
-          useThumbailFallback
-          dropLabel={t('gallery.setCurrentImage')}
-          noContentFallback={<IAINoContentFallback icon={PiImageBold} label={t('gallery.noImageSelected')} />}
-          dataTestId="image-preview"
-        />
+      {imageToRender && (
+        <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center">
+          <DndImage imageDTO={imageToRender} onLoad={onLoadImage} borderRadius="base" />
+        </Flex>
       )}
-      {shouldShowImageDetails && imageDTO && withMetadata && (
+      {!imageToRender && <NoContentForViewer />}
+      {withProgress && (
+        <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center" bg="base.900">
+          <ProgressImage progressImage={progressImage} />
+          {progressEvent && (
+            <ProgressIndicator progressEvent={progressEvent} position="absolute" top={6} right={6} size={8} />
+          )}
+        </Flex>
+      )}
+      <Flex flexDir="column" gap={2} position="absolute" top={0} insetInlineStart={0} alignItems="flex-start">
+        <CanvasAlertsInvocationProgress />
+      </Flex>
+      {shouldShowItemDetails && imageToRender && !withProgress && (
         <Box position="absolute" opacity={0.8} top={0} width="full" height="full" borderRadius="base">
-          <ImageMetadataViewer image={imageDTO} />
+          <ImageMetadataViewer image={imageToRender} />
         </Box>
       )}
       <AnimatePresence>
-        {withNextPrevButtons && shouldShowNextPrevButtons && imageDTO && (
+        {shouldShowNextPrevButtons && imageToRender && (
           <Box
             as={motion.div}
             key="nextPrevButtons"
@@ -118,19 +229,19 @@ const CurrentImagePreview = ({
             exit={exit}
             position="absolute"
             top={0}
-            width="full"
-            height="full"
+            right={0}
+            bottom={0}
+            left={0}
             pointerEvents="none"
           >
-            <NextPrevImageButtons />
+            <NextPrevItemButtons />
           </Box>
         )}
       </AnimatePresence>
     </Flex>
   );
-};
-
-export default memo(CurrentImagePreview);
+});
+CurrentImagePreview.displayName = 'CurrentImagePreview';
 
 const initial: AnimationProps['initial'] = {
   opacity: 0,
@@ -143,3 +254,5 @@ const exit: AnimationProps['exit'] = {
   opacity: 0,
   transition: { duration: 0.07 },
 };
+
+const SELECTED_IMAGE_REVEAL_DURATION_MS = 2000;

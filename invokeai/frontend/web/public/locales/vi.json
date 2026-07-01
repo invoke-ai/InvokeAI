@@ -1,1 +1,2743 @@
-{}
+{
+    "accessibility": {
+        "uploadImages": "Tải Lên Hình Ảnh",
+        "previousImage": "Ảnh trước đó",
+        "about": "Giới Thiệu",
+        "nextImage": "Ảnh tiếp theo",
+        "reset": "Khởi Động Lại",
+        "toggleRightPanel": "Bật/Tắt Bảng Bên Phải (G)",
+        "toggleLeftPanel": "Bật/Tắt Bảng Bên Trái (T)",
+        "menu": "Menu",
+        "createIssue": "Mở Vấn Đề",
+        "resetUI": "$t(accessibility.reset) Giao Diện Người Dùng",
+        "mode": "Chế Độ",
+        "invokeProgressBar": "Thanh Tiến Trình",
+        "submitSupportTicket": "Gửi Phiếu Hỗ Trợ",
+        "uploadImage": "Tải Lên Hình Ảnh"
+    },
+    "boards": {
+        "autoAddBoard": "Tự Động Thêm Bảng",
+        "addBoard": "Thêm Bảng",
+        "downloadBoard": "Tải Xuống Bảng",
+        "movingImagesToBoard_other": "Di chuyển {{count}} ảnh vào Bảng:",
+        "noBoards": "Không Có Bảng Thuộc Loại {{boardType}}",
+        "noMatching": "Không Có Bảng Tương Ứng",
+        "searchBoard": "Tìm Bảng...",
+        "addPrivateBoard": "Thêm Bảng Cá Nhân",
+        "addSharedBoard": "Thêm Bảng Nhóm",
+        "boards": "Bảng",
+        "selectedForAutoAdd": "Đã Chọn Để Tự động thêm",
+        "myBoard": "Bảng Của Tôi",
+        "deletedPrivateBoardsCannotbeRestored": "Bảng và ảnh đã xoá sẽ không thể khôi phục lại. Chọn 'Chỉ Xoá Bảng' sẽ dời ảnh vào trạng thái chưa phân loại riêng cho chủ ảnh.",
+        "changeBoard": "Thay Đổi Bảng",
+        "clearSearch": "Làm Sạch Thanh Tìm Kiếm",
+        "updateBoardError": "Lỗi khi cập nhật Bảng",
+        "private": "Bảng Cá Nhân",
+        "shared": "Bảng Nhóm",
+        "imagesWithCount_other": "{{count}} hình ảnh",
+        "cancel": "Huỷ",
+        "deleteBoard": "Xoá Bảng",
+        "deleteBoardAndImages": "Xoá Bảng Lẫn Hình ảnh",
+        "deleteBoardOnly": "Chỉ Xoá Bảng",
+        "deletedBoardsCannotbeRestored": "Bảng và ảnh đã xoá sẽ không thể khôi phục lại. Chọn 'Chỉ Xoá Bảng' sẽ dời ảnh vào trạng thái chưa phân loại.",
+        "bottomMessage": "Việc xóa ảnh sẽ khởi động lại mọi tính năng đang sử dụng chúng.",
+        "menuItemAutoAdd": "Tự động thêm cho Bảng này",
+        "move": "Di Chuyển",
+        "topMessage": "Lựa chọn này chứa ảnh được dùng với những tính năng sau:",
+        "uncategorized": "Chưa Sắp Xếp",
+        "archived": "Được Lưu Trữ",
+        "loading": "Đang Tải...",
+        "selectBoard": "Chọn Bảng",
+        "archiveBoard": "Lưu trữ Bảng",
+        "unarchiveBoard": "Ngừng Lưu Trữ Bảng",
+        "assetsWithCount_other": "{{count}} tài nguyên",
+        "uncategorizedImages": "Ảnh Chưa Sắp Xếp",
+        "deleteAllUncategorizedImages": "Xoá Tất Cả Ảnh Chưa Sắp Xếp",
+        "locateInGalery": "Vị Trí Ở Thư Viện Ảnh",
+        "deletedImagesCannotBeRestored": "Ảnh đã xóa không thể khôi phục lại.",
+        "hideBoards": "Ẩn Bảng",
+        "viewBoards": "Xem Bảng"
+    },
+    "gallery": {
+        "swapImages": "Đổi Hình Ảnh",
+        "dropToUpload": "$t(gallery.drop) Để Tải Lên",
+        "deleteSelection": "Xoá Phần Được Lựa Chọn",
+        "hover": "Di Chuột",
+        "deleteImage_other": "Xoá {{count}} Hình Ảnh",
+        "compareImage": "So Sánh Ảnh",
+        "compareHelp4": "Nhấn <Kbd>Z</Kbd> hoặc <Kbd>Esc</Kbd> để thoát.",
+        "compareHelp3": "Nhấn <Kbd>C</Kbd> để đổi ảnh được so sánh.",
+        "compareHelp1": "Giữ <Kbd>Alt</Kbd> khi bấm vào ảnh trong thư viện ảnh hoặc dùng phím mũi tên để đổi ảnh dùng cho so sánh.",
+        "showArchivedBoards": "Hiển Thị Bảng Được Lưu Trữ",
+        "drop": "Thả",
+        "copy": "Sao Chép",
+        "selectAllOnPage": "Chọn Tất Cả Trên Trang",
+        "bulkDownloadFailed": "Tải Xuống Thất Bại",
+        "bulkDownloadRequestFailed": "Có Vấn Đề Khi Đang Chuẩn Bị Tải Xuống",
+        "download": "Tải Xuống",
+        "dropOrUpload": "Kéo Thả Hoặc Tải Lên",
+        "currentlyInUse": "Hình ảnh này hiện đang sử dụng các tính năng sau:",
+        "deleteImagePermanent": "Ảnh đã xoá không thể phục hồi.",
+        "exitSearch": "Thoát Tìm Kiếm Hình Ảnh",
+        "exitBoardSearch": "Thoát Tìm Kiểm Bảng",
+        "gallery": "Thư Viện Ảnh",
+        "galleryImageSize": "Kích Thước Ảnh",
+        "downloadSelection": "Tải xuống Phần Được Lựa Chọn",
+        "bulkDownloadRequested": "Chuẩn Bị Tải Xuống",
+        "newestFirst": "Mới Nhất Trước",
+        "showStarredImagesFirst": "Hiển Thị Ảnh Gắn Sao Trước",
+        "bulkDownloadRequestedDesc": "Yêu cầu tải xuống đang được chuẩn bị. Vui lòng chờ trong giây lát.",
+        "starImage": "Gắn Sao",
+        "viewerImage": "Trình Xem Ảnh",
+        "sideBySide": "Cạnh Nhau",
+        "alwaysShowImageSizeBadge": "Luôn Hiển Thị Kích Thước Ảnh",
+        "autoAssignBoardOnClick": "Tự Động Gán Vào Bảng Khi Nhấp Chuột",
+        "go": "Đi",
+        "autoSwitchNewImages": "Tự Động Đổi Sang Hình Ảnh Mới",
+        "featuresWillReset": "Nếu bạn xoá hình ảnh này, những tính năng đó sẽ lập tức được khởi động lại.",
+        "openInViewer": "Mở Trong Trình Xem",
+        "searchImages": "Tìm Theo Metadata",
+        "selectForCompare": "Chọn Để So Sánh",
+        "move": "Di Chuyển",
+        "displayBoardSearch": "Tìm Kiếm Bảng",
+        "displaySearch": "Tìm Kiếm Hình Ảnh",
+        "slider": "Thanh Trượt",
+        "gallerySettings": "Cài Đặt Thư Viện Ảnh",
+        "image": "hình ảnh",
+        "noImageSelected": "Không Có Ảnh Được Chọn",
+        "assetsTab": "Tài liệu bạn đã tải lên để dùng cho dự án của mình.",
+        "imagesTab": "Ảnh bạn vừa được tạo và lưu trong Invoke.",
+        "loading": "Đang Tải",
+        "oldestFirst": "Cũ Nhất Trước",
+        "exitCompare": "Ngừng So Sánh",
+        "stretchToFit": "Kéo Dài Cho Vừa Vặn",
+        "sortDirection": "Cách Sắp Xếp",
+        "unstarImage": "Bỏ Gắn Sao",
+        "compareHelp2": "Nhấn <Kbd>M</Kbd> để tuần hoàn trong chế độ so sánh.",
+        "boardsSettings": "Thiết Lập Bảng",
+        "imagesSettings": "Cài Đặt Ảnh Trong Thư Viện Ảnh",
+        "assets": "Tài Nguyên",
+        "images": "Hình Ảnh",
+        "useForPromptGeneration": "Dùng Để Tạo Sinh Lệnh",
+        "jump": "Nhảy Đến",
+        "noImagesInGallery": "Không Có Ảnh Để Hiển Thị",
+        "unableToLoad": "Không Thể Tải Thư Viện Ảnh",
+        "selectAnImageToCompare": "Chọn Ảnh Để So Sánh",
+        "openViewer": "Mở Trình Xem",
+        "closeViewer": "Đóng Trình Xem"
+    },
+    "common": {
+        "ipAdapter": "IP Adapter",
+        "positivePrompt": "Lệnh Tích Cực",
+        "negativePrompt": "Lệnh Tiêu Cực",
+        "editor": "Biên Tập Viên",
+        "loading": "Đang Tải",
+        "clipboard": "Clipboard",
+        "learnMore": "Tìm Hiểu Thêm",
+        "openInViewer": "Mở Trong Trình Xem",
+        "alpha": "Alpha",
+        "edit": "Sửa",
+        "nodes": "Workflow",
+        "format": "Định Dạng",
+        "delete": "Xoá",
+        "details": "Chi Tiết",
+        "img2img": "Hình ảnh sang Hình ảnh",
+        "upload": "Tải Lên",
+        "somethingWentWrong": "Có vấn đề phát sinh",
+        "statusDisconnected": "Mất Kết Nối",
+        "t2iAdapter": "T2I Adapter",
+        "orderBy": "Sắp Xếp Theo",
+        "random": "Ngẫu Nhiên",
+        "settingsLabel": "Cài Đặt",
+        "reportBugLabel": "Báo Lỗi",
+        "controlNet": "ControlNet",
+        "apply": "Áp Dụng",
+        "view": "Xem",
+        "dontAskMeAgain": "Không hỏi lại",
+        "error": "Lỗi",
+        "or": "hoặc",
+        "installed": "Được Tải Xuống Sẵn",
+        "simple": "Cơ Bản",
+        "linear": "Tuyến Tính",
+        "safetensors": "Safetensors",
+        "off": "Tắt",
+        "add": "Thêm",
+        "load": "Tải",
+        "accept": "Đồng Ý",
+        "communityLabel": "Cộng Đồng",
+        "discordLabel": "Discord",
+        "back": "Trở Về",
+        "advanced": "Nâng Cao",
+        "batch": "Quản Lý Lô",
+        "modelManager": "Quản Lý Model",
+        "dontShowMeThese": "Không hiển thị thứ này",
+        "ok": "OK",
+        "placeholderSelectAModel": "Chọn một model",
+        "reset": "Khởi Động Lại",
+        "none": "Không Có",
+        "on": "Bật",
+        "checkpoint": "Checkpoint",
+        "txt2img": "Từ Ngữ Sang Hình Ảnh",
+        "unknown": "Không Rõ",
+        "githubLabel": "Github",
+        "folder": "Thư mục",
+        "hotkeysLabel": "Phím Tắt",
+        "loadingImage": "Đang Tải Hình ảnh",
+        "input": "Đầu Vào",
+        "languagePickerLabel": "Ngôn Ngữ",
+        "openInNewTab": "Mở Trong Tab Mới",
+        "outpaint": "outpaint",
+        "save": "Lưu",
+        "saveAs": "Lưu Như",
+        "auto": "Tự Động",
+        "inpaint": "inpaint",
+        "beta": "Beta",
+        "toResolve": "Để khắc phục",
+        "areYouSure": "Bạn chắc chứ?",
+        "ai": "ai",
+        "aboutDesc": "Sử dụng Invoke cho công việc? Xem thử:",
+        "aboutHeading": "Quyền Năng Sáng Tạo Của Riêng",
+        "enabled": "Đã Bật",
+        "close": "Đóng",
+        "data": "Dữ Liệu",
+        "file": "Tài liệu",
+        "outputs": "Đầu Ra",
+        "postprocessing": "Xử Lý Hậu Kỳ",
+        "template": "Mẫu Trình Bày",
+        "copy": "Sao Chép",
+        "copyError": "Lỗi Khi $t(gallery.copy)",
+        "updated": "Đã Cập Nhật",
+        "created": "Đã Tạo",
+        "red": "Đỏ",
+        "disabled": "Đã Tắt",
+        "new": "Mới",
+        "blue": "Lam",
+        "green": "Lục",
+        "cancel": "Huỷ",
+        "direction": "Phương Hướng",
+        "unknownError": "Lỗi Không Rõ",
+        "selected": "Đã chọn",
+        "tab": "Tab",
+        "loadingModel": "Đang Tải Model",
+        "generating": "Đang Tạo Sinh",
+        "warnings": "Cảnh Báo",
+        "count": "Đếm",
+        "step": "Bước",
+        "values": "Giá Trị",
+        "start": "Bắt Đầu",
+        "end": "Kết Thúc",
+        "min": "Tối Thiểu",
+        "max": "Tối Đa",
+        "seed": "Hạt Giống",
+        "combinatorial": "Tổ Hợp",
+        "column": "Cột",
+        "layout": "Bố Cục",
+        "row": "Hàng",
+        "board": "Bảng",
+        "saveChanges": "Lưu Thay Đổi",
+        "error_withCount_other": "{{count}} lỗi",
+        "value": "Giá Trị",
+        "label": "Nhãn Tên",
+        "systemInformation": "Thông Tin Hệ Thống",
+        "model_withCount_other": "{{count}} model",
+        "noOptions": "Không Có Lựa Chọn",
+        "noMatches": "Không Có Mục Phù Hợp",
+        "search": "Tìm Kiếm",
+        "clear": "Dọn Dẹp",
+        "compactView": "Chế Độ Xem Gọn",
+        "fullView": "Chế Độ Xem Đầy Đủ",
+        "options_withCount_other": "{{count}} thiết lập",
+        "removeNegativePrompt": "Xóa Lệnh Tiêu Cực",
+        "addNegativePrompt": "Thêm Lệnh Tiêu Cực",
+        "selectYourModel": "Chọn Model",
+        "goTo": "Đi Đến",
+        "imageFailedToLoad": "Không Thể Tải Ảnh",
+        "localSystem": "Hệ Thống Máy Chủ",
+        "notInstalled": "Chưa $t(common.installed)",
+        "prevPage": "Trang Trước",
+        "nextPage": "Trang Sau",
+        "resetToDefaults": "Tải Lại Mặc Định"
+    },
+    "prompt": {
+        "addPromptTrigger": "Thêm Trigger Cho Lệnh",
+        "compatibleEmbeddings": "Embedding Tương Thích",
+        "noMatchingTriggers": "Không có trigger phù hợp",
+        "generateFromImage": "Tạo sinh lệnh từ ảnh",
+        "expandCurrentPrompt": "Mở Rộng Lệnh Hiện Tại",
+        "uploadImageForPromptGeneration": "Tải Ảnh Để Tạo Sinh Lệnh",
+        "expandingPrompt": "Đang mở rộng lệnh...",
+        "replace": "Thay Thế",
+        "discard": "Huỷ Bỏ",
+        "resultTitle": "Mở Rộng Lệnh Hoàn Tất",
+        "resultSubtitle": "Chọn phương thức mở rộng lệnh:",
+        "insert": "Chèn"
+    },
+    "queue": {
+        "resume": "Tiếp Tục",
+        "enqueueing": "Xếp Vào Hàng Hàng Loạt",
+        "prompts_other": "Lệnh",
+        "iterations_other": "Vòng Lặp",
+        "total": "Tổng",
+        "pruneFailed": "Có Vấn Đề Khi Cắt Bớt Mục Khỏi Hàng",
+        "clearSucceeded": "Hàng Đã Được Dọn Sạch",
+        "cancel": "Huỷ Bỏ",
+        "clearQueueAlertDialog2": "Bạn chắc chắn muốn dọn sạch hàng không?",
+        "queueEmpty": "Hàng Trống",
+        "queueBack": "Thêm Vào Hàng",
+        "openQueue": "Mở Queue",
+        "pause": "Dừng Lại",
+        "pauseFailed": "Có Vấn Đề Khi Dừng Lại Bộ Xử Lý",
+        "batchQueued": "Lô Đã Vào Hàng",
+        "batchFailedToQueue": "Lỗi Khi Xếp Lô Vào Hàng",
+        "next": "Tiếp Theo",
+        "in_progress": "Đang Chạy",
+        "failed": "Thất Bại",
+        "canceled": "Bị Huỷ",
+        "cancelBatchFailed": "Có Vấn Đề Khi Huỷ Bỏ Lô",
+        "workflows": "Workflow (Luồng làm việc)",
+        "canvas": "Canvas (Vùng ảnh)",
+        "upscaling": "Upscale (Nâng Cấp Chất Lượng Hình Ảnh)",
+        "generation": "Generation (Máy Tạo sinh)",
+        "back": "sau",
+        "pruneTooltip": "Cắt bớt {{item_count}} mục đã hoàn tất",
+        "pruneSucceeded": "Đã cắt bớt {{item_count}} mục đã hoàn tất khỏi hàng",
+        "clearTooltip": "Huỷ Và Dọn Dẹp Tất Cả Mục",
+        "clearQueueAlertDialog": "Dọn dẹp hàng đợi sẽ ngay lập tức huỷ tất cả mục đang xử lý và làm sạch hàng hoàn toàn. Bộ lọc đang chờ xử lý sẽ bị huỷ bỏ và Vùng Dựng Canva sẽ được khởi động lại.",
+        "session": "Phiên",
+        "item": "Mục",
+        "resumeFailed": "Có Vấn Đề Khi Tiếp Tục Bộ Xử Lý",
+        "resumeSucceeded": "Bộ Xử Lý Đã Tiếp Tục",
+        "cancelTooltip": "Huỷ Bỏ Mục Hiện Tại",
+        "cancelFailed": "Có Vấn Đề Khi Huỷ Bỏ Mục Hiện Tại",
+        "prune": "Cắt Bớt",
+        "clear": "Dọn Dẹp",
+        "queue": "Queue (Hàng Đợi)",
+        "queueFront": "Thêm Vào Đầu Hàng",
+        "resumeTooltip": "Tiếp Tục Bộ Xử Lý",
+        "clearFailed": "Có Vấn Đề Khi Dọn Dẹp Hàng",
+        "generations_other": "Ảnh Tạo Sinh",
+        "cancelBatch": "Huỷ Bỏ Lô",
+        "status": "Trạng Thái",
+        "pending": "Đang Chờ",
+        "gallery": "Thư Viện Ảnh",
+        "front": "trước",
+        "batch": "Lô",
+        "origin": "Nguồn Gốc",
+        "destination": "Điểm Đến",
+        "other": "Khác",
+        "graphFailedToQueue": "Lỗi Khi Xếp Đồ Thị Vào Hàng",
+        "notReady": "Không Thể Xếp Hàng",
+        "cancelItem": "Huỷ Bỏ Mục",
+        "cancelBatchSucceeded": "Lô Đã Huỷ Bỏ",
+        "current": "Hiện Tại",
+        "time": "Thời Gian",
+        "completed": "Hoàn Tất",
+        "pauseTooltip": "Dừng Lại Bộ Xử Lý",
+        "pauseSucceeded": "Bộ Xử Lý Đã Dừng Lại",
+        "cancelSucceeded": "Mục Đã Huỷ Bỏ",
+        "completedIn": "Hoàn tất trong",
+        "graphQueued": "Đồ Thị Đã Vào Hàng",
+        "batchQueuedDesc_other": "Thêm {{count}} phiên vào {{direction}} của hàng",
+        "batchSize": "Kích Thước Lô",
+        "cancelAllExceptCurrentQueueItemAlertDialog": "Huỷ tất cả mục đang xếp hàng ngoại trừ việc nó sẽ dừng các mục đang chờ nhưng cho phép các mục đang chạy được hoàn tất.",
+        "cancelAllExceptCurrentQueueItemAlertDialog2": "Bạn có chắc muốn huỷ tất cả mục đang chờ?",
+        "cancelAllExceptCurrentTooltip": "Huỷ Bỏ Tất Cả Ngoại Trừ Mục Hiện Tại",
+        "confirm": "Đồng Ý",
+        "retrySucceeded": "Mục Đã Thử Lại",
+        "retryFailed": "Có Vấn Đề Khi Thử Lại Mục",
+        "retryItem": "Thử Lại Mục",
+        "credits": "Nguồn",
+        "cancelAllExceptCurrent": "Huỷ Bỏ Tất Cả Ngoại Trừ Mục Hiện Tại",
+        "createdAt": "Tạo tại",
+        "completedAt": "Hoàn Thành Tại",
+        "sortColumn": "Sắp Xếp Cột",
+        "sortBy": "Sắp Xếp Theo {{column}}",
+        "sortOrderAscending": "Tăng Dần",
+        "sortOrderDescending": "Giảm Dần"
+    },
+    "hotkeys": {
+        "canvas": {
+            "fitLayersToCanvas": {
+                "title": "Xếp Vừa Layers Vào Canvas",
+                "desc": "Căn chỉnh để góc nhìn vừa vặn với tất cả layer nhìn thấy dược."
+            },
+            "setZoomTo800Percent": {
+                "desc": "Phóng to canvas lên 800%.",
+                "title": "Phóng To Vào 800%"
+            },
+            "transformSelected": {
+                "title": "Biến Đổi",
+                "desc": "Biến đổi layer được chọn."
+            },
+            "fitBboxToCanvas": {
+                "title": "Xếp Vừa Hộp Giới Hạn Vào Canvas",
+                "desc": "Căn chỉnh để góc nhìn vừa vặn với hộp giới hạn."
+            },
+            "setZoomTo400Percent": {
+                "desc": "Phóng to canvas lên 400%.",
+                "title": "Phóng To Vào 400%"
+            },
+            "decrementToolWidth": {
+                "desc": "Giảm độ rộng của cọ hoặc tẩy, tuỳ theo cái được chọn.",
+                "title": "Giảm Độ Rộng"
+            },
+            "setZoomTo100Percent": {
+                "desc": "Phóng to canvas lên 100%.",
+                "title": "Phóng To Vào 100%"
+            },
+            "setZoomTo200Percent": {
+                "title": "Phóng To Vào 200%",
+                "desc": "Phóng to canvas lên 200%."
+            },
+            "prevEntity": {
+                "desc": "Chọn layer trước đó trong danh sách.",
+                "title": "Layer Trước Đó"
+            },
+            "redo": {
+                "title": "Làm Lại",
+                "desc": "Khôi phục hành động cuối cùng lên canvas sau khi bị hoàn tác."
+            },
+            "nextEntity": {
+                "title": "Layer Tiếp Theo",
+                "desc": "Chọn layer tiếp theo trong danh sách."
+            },
+            "selectBrushTool": {
+                "title": "Cọ",
+                "desc": "Dùng cọ."
+            },
+            "selectBboxTool": {
+                "desc": "Dùng hộp giới hạn.",
+                "title": "Hộp Giới Hạn"
+            },
+            "incrementToolWidth": {
+                "title": "Tăng Độ Rộng",
+                "desc": "Tăng độ rộng của cọ hoặc tẩy, tuỳ theo cái được chọn."
+            },
+            "selectEraserTool": {
+                "title": "Tẩy",
+                "desc": "Dùng tẩy."
+            },
+            "title": "Canvas (Vùng Ảnh)",
+            "selectColorPickerTool": {
+                "title": "Chọn Màu",
+                "desc": "Dùng công cụ chọn màu."
+            },
+            "selectViewTool": {
+                "title": "Xem",
+                "desc": "Dùng công cụ xem."
+            },
+            "selectRectTool": {
+                "desc": "Dùng công cụ vẽ hình chữ nhật.",
+                "title": "Hình Chữ Nhật"
+            },
+            "selectMoveTool": {
+                "title": "Di Chuyển",
+                "desc": "Dùng công cụ di chuyển."
+            },
+            "deleteSelected": {
+                "desc": "Xoá layer được chọn.",
+                "title": "Xoá Layer"
+            },
+            "quickSwitch": {
+                "title": "Đổi Layer Nhanh",
+                "desc": "Đổi giữa hai layer cuối cùng được chọn. Nếu một layer bị đánh dấu, luôn luôn đổi giữa nó với layer bị đánh dấu cuối cùng."
+            },
+            "undo": {
+                "title": "Hoàn Tác",
+                "desc": "Hoàn tác hành động cuối cùng lên canvas."
+            },
+            "applyTransform": {
+                "desc": "Áp dụng lệnh biến đổi đang chờ sẵn cho layer được chọn.",
+                "title": "Áp Dụng Lệnh Biến Đổi"
+            },
+            "cancelFilter": {
+                "title": "Huỷ Bộ Lọc",
+                "desc": "Huỷ bộ lọc đang chờ sẵn."
+            },
+            "cancelTransform": {
+                "title": "Huỷ Lệnh Biến Đổi",
+                "desc": "Huỷ lệnh biến đổi đang chờ sẵn cho layer được chọn."
+            },
+            "resetSelected": {
+                "title": "Làm Mới Layer",
+                "desc": "Làm mới lại layer được chọn. Chỉ áp dụng cho Lớp Phủ Inpaint và Chỉ Dẫn Khu Vực."
+            },
+            "filterSelected": {
+                "title": "Bộ Lọc",
+                "desc": "Lọc layer được lựa chọn. Chỉ áp dụng cho layer dạng Raster và layer điều khiển được."
+            },
+            "applyFilter": {
+                "title": "Áp Dụng Bộ Lộc",
+                "desc": "Áp dụng bộ lọc đang chờ sẵn cho layer được chọn."
+            },
+            "settings": {
+                "behavior": "Hành Vi",
+                "display": "Hiển Thị",
+                "grid": "Lưới",
+                "debug": "Gỡ Lỗi"
+            },
+            "toggleNonRasterLayers": {
+                "title": "Bật/Tắt Layer Không Thuộc Dạng Raster",
+                "desc": "Hiện hoặc ẩn tất cả layer không thuộc dạng raster (Layer Điều Khiển Được, Lớp Phủ Inpaint, Chỉ Dẫn Khu Vực)."
+            },
+            "invertMask": {
+                "title": "Đảo Ngược Lớp Phủ",
+                "desc": "Đảo ngược lớp phủ inpaint được chọn, tạo một lớp phủ mới với độ trong suốt đối nghịch."
+            },
+            "fitBboxToMasks": {
+                "title": "Xếp Vừa Hộp Giới Hạn Vào Lớp Phủ",
+                "desc": "Tự động điểu chỉnh hộp giới hạn tạo sinh vừa vặn vào lớp phủ inpaint nhìn thấy được"
+            },
+            "applySegmentAnything": {
+                "title": "Áp Dụng Segment Anything",
+                "desc": "Áp dụng lớp phủ Segment Anything hiện tại.",
+                "key": "enter"
+            },
+            "cancelSegmentAnything": {
+                "title": "Huỷ Segment Anything",
+                "desc": "Huỷ hoạt động Segment Anything hiện tại.",
+                "key": "esc"
+            },
+            "fitBboxToLayers": {
+                "title": "Xếp Vừa Hộp Giới Hạn Vào Layer",
+                "desc": "Tự động điểu chỉnh hộp giới hạn tạo sinh vừa vặn vào layer nhìn thấy được"
+            },
+            "toggleBbox": {
+                "title": "Bật/Tắt Hiển Thị Hộp Giới Hạn",
+                "desc": "Ẩn hoặc hiện hộp giới hạn tạo sinh"
+            },
+            "setFillColorsToDefault": {
+                "title": "Đặt Màu Lại Mặc Định",
+                "desc": "Chỉnh công cụ màu hiện tại về mặc định."
+            },
+            "toggleFillColor": {
+                "title": "Bật/Tắt Màu Lấp Đầy",
+                "desc": "Bật/Tắt công cụ đổ màu hiện tại."
+            }
+        },
+        "workflows": {
+            "title": "Workflow (Luồng Làm Việc)",
+            "pasteSelection": {
+                "desc": "Dán node và kết nối đã chọn.",
+                "title": "Dán"
+            },
+            "pasteSelectionWithEdges": {
+                "title": "Dán Với Các Kết Nối",
+                "desc": "Dán tất cả node, kết nối và toàn bộ kết nối liên kết với node được sao chép."
+            },
+            "copySelection": {
+                "title": "Sao Chép",
+                "desc": "Sao chép node và kết nối đã chọn."
+            },
+            "deleteSelection": {
+                "title": "Xoá",
+                "desc": "Xoá node và kết nối."
+            },
+            "redo": {
+                "title": "Làm Lại",
+                "desc": "Khôi phục hành động cuối cùng lên workflow được hoàn tác."
+            },
+            "addNode": {
+                "desc": "Mở menu thêm node.",
+                "title": "Thêm Node"
+            },
+            "selectAll": {
+                "title": "Chọn Tất Cả",
+                "desc": "Chọn tất cả node và kết nối."
+            },
+            "undo": {
+                "desc": "Hoàn tác hành động cuối cùng lên workflow.",
+                "title": "Hoàn Tác"
+            }
+        },
+        "viewer": {
+            "recallAll": {
+                "desc": "Gợi lại tất cả metadata của ảnh hiện tại.",
+                "title": "Gợi Lại Tất Cả Metadata"
+            },
+            "recallSeed": {
+                "title": "Gợi Lại Hạt Giống",
+                "desc": "Gợi lại hạt giống của ảnh hiện tại."
+            },
+            "useSize": {
+                "title": "Dùng Kích Thước",
+                "desc": "Dùng kích thước của ảnh hiện tại cho kích thước của hộp giới hạn."
+            },
+            "toggleMetadata": {
+                "desc": "Hiển thị hoặc ẩn lớp phủ từ metadata của ảnh hiện tại.",
+                "title": "Hiển Thị/Ẩn Metadata"
+            },
+            "title": "Trình Xem Ảnh",
+            "toggleViewer": {
+                "title": "Hiển Thị/Ẩn Trình Xem Ảnh",
+                "desc": "Hiển thị hoặc ẩn trình xem ảnh. Chỉ có trên tab Canvas."
+            },
+            "recallPrompts": {
+                "title": "Gợi Lại Lệnh",
+                "desc": "Gợi lại lệnh tích cực lẫn tiêu cực của ảnh hiện tại."
+            },
+            "loadWorkflow": {
+                "title": "Tải Từ Workflow",
+                "desc": "Tải hình ảnh hiện tại được lưu trong workflow (nếu có)."
+            },
+            "nextComparisonMode": {
+                "title": "Chế Độ So Sánh Kế Tiếp",
+                "desc": "Tuần hoàn trong chế độ so sánh."
+            },
+            "swapImages": {
+                "desc": "Đổi ảnh được so sánh.",
+                "title": "Đổi Ảnh So Sánh"
+            },
+            "remix": {
+                "desc": "Gợi lại tất cả metadata cho hạt giống của ảnh hiện tại.",
+                "title": "Phối Lại"
+            },
+            "runPostprocessing": {
+                "title": "Chạy Trình Xử Lý Hậu Kỳ",
+                "desc": "Chạy trình xử lý hậu kỳ được chọn cho anh hiện tại."
+            }
+        },
+        "gallery": {
+            "galleryNavRight": {
+                "desc": "Sang phải theo mạng lưới thư viện ảnh, chọn hình ảnh đó. Nếu đến cuối hàng, qua hàng tiếp theo. Nếu đến hình ảnh cuối cùng, qua trang tiếp theo.",
+                "title": "Sang Phải"
+            },
+            "galleryNavDown": {
+                "title": "Đi Xuống",
+                "desc": "Đi xuống theo mạng lưới thư viện ảnh, chọn hình ảnh đó. Nếu xuống cuối cùng trang, sang trang tiếp theo."
+            },
+            "galleryNavLeft": {
+                "title": "Sang Trái",
+                "desc": "Sang trái theo mạng lưới thư viện ảnh, chọn hình ảnh đó. Nếu đến đầu hàng, về lại hàng trước đó. Nếu đến hình ảnh đầu tiên, về lại trang trước đó."
+            },
+            "galleryNavUpAlt": {
+                "title": "Đi Lên (So Sánh Ảnh)",
+                "desc": "Giống với \"Đi Lên\", nhưng là chọn ảnh được so sánh, mở chế độ so sánh nếu chưa được mở."
+            },
+            "deleteSelection": {
+                "desc": "Xoá ảnh được chọn. Theo mặc định, bạn sẽ được nhắc để chấp nhận thực hiện xoá. Nếu ảnh đang được dùng trong ứng dụng, bạn sẽ được cảnh báo.",
+                "title": "Xoá"
+            },
+            "galleryNavUp": {
+                "title": "Đi Lên",
+                "desc": "Đi lên theo mạng lưới thư viện ảnh, chọn hình ảnh đó. Nếu lên trên cùng trang, về lại trang trước đó."
+            },
+            "galleryNavRightAlt": {
+                "title": "Sang Phải (So Sánh Ảnh)",
+                "desc": "Giống với \"Sang Phải\", nhưng là chọn ảnh được so sánh, mở chế độ so sánh nếu chưa được mở."
+            },
+            "selectAllOnPage": {
+                "title": "Chọn Tất Cả Trên Trang",
+                "desc": "Chọn tất cả ảnh trên trang hiện tại."
+            },
+            "title": "Thư Viện Ảnh",
+            "galleryNavDownAlt": {
+                "title": "Đi Xuống (So Sánh Ảnh)",
+                "desc": "Giống với \"Đi Xuống\", nhưng là chọn ảnh được so sánh, mở chế độ so sánh nếu chưa được mở."
+            },
+            "galleryNavLeftAlt": {
+                "desc": "Giống với \"Sang Trái\", nhưng là chọn ảnh được so sánh, mở chế độ so sánh nếu chưa được mở.",
+                "title": "Sang Trái (So Sánh Ảnh)"
+            },
+            "clearSelection": {
+                "desc": "Xoá phần lựa chọn hiện tại nếu có.",
+                "title": "Xoá Phần Lựa Chọn"
+            },
+            "starImage": {
+                "title": "Dấu/Huỷ Sao Hình Ảnh",
+                "desc": "Đánh dấu sao hoặc huỷ đánh dấu sao ảnh được chọn."
+            }
+        },
+        "app": {
+            "togglePanels": {
+                "title": "Bật/Tắt Bảng",
+                "desc": "Hiển thị hoặc ẩn phần bảng bên trái và phải cùng lúc."
+            },
+            "focusPrompt": {
+                "desc": "Đưa con trỏ chuột vào vùng lệnh tích cực.",
+                "title": "Chuyển Tập Trung Vào Lệnh"
+            },
+            "toggleLeftPanel": {
+                "desc": "Hiển thị hoặc ẩn phần bảng bên trái.",
+                "title": "Bật/Tắt Bảng Bên Trái"
+            },
+            "toggleRightPanel": {
+                "desc": "Hiển thị hoặc ẩn phần bảng bên phải.",
+                "title": "Bật/Tắt Bảng Bên Phải"
+            },
+            "resetPanelLayout": {
+                "title": "Khởi Động Lại Cách Trình Bày Của Bảng",
+                "desc": "Khởi động lại phần bảng bên trái và phải vào kích thước và cách trình bày ban đầu."
+            },
+            "selectQueueTab": {
+                "desc": "Chọn tab Queue (Hàng Đợi).",
+                "title": "Chọn Tab Queue"
+            },
+            "invoke": {
+                "desc": "Xếp một đợt tạo sinh vào cuối hàng.",
+                "title": "Kích Hoạt"
+            },
+            "invokeFront": {
+                "desc": "Xếp một đợt tạo sinh vào đầu hàng.",
+                "title": "Kích Hoạt (Đằng Trước)"
+            },
+            "cancelQueueItem": {
+                "desc": "Huỷ bỏ mục hiện đang xếp hàng xử lý.",
+                "title": "Huỷ Bỏ"
+            },
+            "clearQueue": {
+                "desc": "Huỷ và dọn sạch các mục đang xếp hàng.",
+                "title": "Dọn Sạch Hàng Đợi"
+            },
+            "selectCanvasTab": {
+                "desc": "Chọn tab Canvas (Vùng ảnh).",
+                "title": "Chọn Tab Canvas"
+            },
+            "title": "Ứng Dụng",
+            "selectUpscalingTab": {
+                "title": "Chọn Tab Upscale",
+                "desc": "Chọn tab Upscale (Nâng cấp chất lượng Hình ảnh)."
+            },
+            "selectWorkflowsTab": {
+                "title": "Chọn Tab Workflow",
+                "desc": "Chọn tab Workflow (Luồng làm việc)."
+            },
+            "selectModelsTab": {
+                "desc": "Chọn tab Model (Mô Hình).",
+                "title": "Chọn Tab Model"
+            },
+            "selectGenerateTab": {
+                "title": "Chọn Tab Tạo Sinh",
+                "desc": "Chọn tab Tạo Sinh.",
+                "key": "1"
+            }
+        },
+        "searchHotkeys": "Tìm Phím tắt",
+        "noHotkeysFound": "Không Tìm Thấy Phím Tắt",
+        "clearSearch": "Làm Sạch Thanh Tìm Kiếm",
+        "hotkeys": "Phím Tắt"
+    },
+    "modelManager": {
+        "modelConverted": "Model Đã Được Chuyển Đổi",
+        "model": "Model",
+        "convertingModelBegin": "Đang chuyển đổi Model. Chờ chút.",
+        "hfForbidden": "Bạn không có quyền truy cập vào model HF này",
+        "convertToDiffusersHelpText3": "Checkpoint của bạn trên ổ đĩa SẼ bị xoá nên nó nằm trong thư mục gốc của InvokeAI. Nếu nó ở vị trí tuỳ chỉnh thì SẼ KHÔNG bị xoá.",
+        "modelDeleted": "Model Đã Được Xoá",
+        "alpha": "Alpha",
+        "convertToDiffusersHelpText5": "Hãy chắc chắn bạn có đủ chỗ trống trong ổ đĩa. Model thường ngốn khoảng 2-7GB.",
+        "convertToDiffusersHelpText6": "Bạc có chắc muốn chuyển đổi model này?",
+        "installAll": "Tải Xuống Toàn Bộ",
+        "advanced": "Nâng Cao",
+        "convertToDiffusers": "Đổi Sang Diffusers",
+        "convertToDiffusersHelpText1": "Model này sẽ được đổi sang định dạng 🧨 Diffusers.",
+        "modelSettings": "Thiết Lập Model",
+        "metadata": "Metadata",
+        "noDefaultSettings": "Không có thiết lập cấu hình mặc định cho model này. Hãy vào Trình Quản Lý Model để thêm thiết lập mặc định.",
+        "restoreDefaultSettings": "Nhấp vào để xem thiết lập mặc định của model.",
+        "defaultSettingsOutOfSync": "Một vài thiết lập không khớp với mặc định của model:",
+        "usingDefaultSettings": "Dùng thiết lập mặc định của model",
+        "deleteMsg1": "Bạn có chắc muốn xoá model này khỏi InvokeAI?",
+        "modelManager": "Quản Lý Model",
+        "name": "Tên",
+        "noModelSelected": "Không Có Model Được Chọn",
+        "installQueue": "Danh Sách Tải Xuống",
+        "modelDeleteFailed": "Xoá model thất bại",
+        "inplaceInstallDesc": "Tải xuống model mà không sao chép toàn bộ tài nguyên. Khi sử dụng model, nó được sẽ tải từ vị trí được đặt. Nếu bị tắt, toàn bộ tài nguyên của model sẽ được sao chép vào thư mục quản lý model của Invoke trong quá trình tải xuống.",
+        "modelType": "Loại Model",
+        "install": "Tải Xuống",
+        "active": "khởi động",
+        "addModel": "Thêm Model",
+        "addModels": "Thêm Model",
+        "allModels": "Tất Cả Model",
+        "clipEmbed": "CLIP Embed",
+        "defaultSettings": "Thiết Lập Mặc Định",
+        "convertToDiffusersHelpText2": "Quá trình này sẽ thay thế đầu vào của Trình Quản Lý Model bằng phiên bản Diffusers của model đó.",
+        "defaultSettingsSaved": "Đã Lưu Thiết Lập Mặc Định",
+        "description": "Dòng Mô Tả",
+        "imageEncoderModelId": "ID Model Image Encoder",
+        "hfForbiddenErrorMessage": "Chúng tôi gợi ý vào các repository. Chủ sở hữu có thể yêu cầu chấp nhận điều khoản để tải xuống.",
+        "hfTokenSaved": "Đã Lưu HF Token",
+        "learnMoreAboutSupportedModels": "Tìm hiểu thêm về những model được hỗ trợ",
+        "availableModels": "Model Có Sẵn",
+        "load": "Tải",
+        "cancel": "Huỷ",
+        "huggingFace": "HuggingFace (HF)",
+        "huggingFacePlaceholder": "chủ-sỡ-hữu/tên-model",
+        "includesNModels": "Thêm vào {{n}} model và dependency của nó.",
+        "localOnly": "chỉ ở trên máy chủ",
+        "manual": "Thủ Công",
+        "convertToDiffusersHelpText4": "Đây là quá trình diễn ra chỉ một lần. Nó có thể tốn tầm 30-60 giây tuỳ theo thông số kỹ thuật của máy tính.",
+        "edit": "Sửa",
+        "huggingFaceRepoID": "ID HuggingFace Repository",
+        "huggingFaceHelper": "Nếu nhiều model được tìm thấy trong repository này, bạn sẽ được nhắc để chọn một trong số chúng để tải.",
+        "modelImageDeleted": "Model Ảnh Đã Xoá",
+        "delete": "Xoá",
+        "deleteConfig": "Xoá Cấu Hình",
+        "modelUpdateFailed": "Cập Nhật Model Thất Bại",
+        "deleteMsg2": "Model trên ổ đĩa SẼ bị xoá nên nó nằm trong thư mục gốc của InvokeAI. Nếu bạn dùng ở vị trí tuỳ chỉnh thì SẼ KHÔNG bị xoá.",
+        "deleteModel": "Xoá Model",
+        "modelImageDeleteFailed": "Xoá Model Ảnh Thất Bại",
+        "height": "Chiều Dài",
+        "deleteModelImage": "Xoá Model Ảnh",
+        "none": "trống",
+        "modelImageUpdated": "Model Ảnh Đã Được Cập Nhật",
+        "modelImageUpdateFailed": "Cập Nhật Model Ảnh Thất Bại",
+        "path": "Đường Dẫn",
+        "noModelsInstalledDesc1": "Tải xuống model với",
+        "noModelsInstalled": "Chưa Tải Model",
+        "config": "Cấu Hình",
+        "convert": "Chuyển Đổi",
+        "baseModel": "Model Cơ Sở",
+        "hfTokenLabel": "HuggingFace Token (Bắt buộc cho một vài model)",
+        "hfTokenHelperText": "HF Token là cần thiết để sử dụng một số model. Nhấp vào đây để tạo hoặc lấy token của bạn.",
+        "hfTokenInvalid": "HF Token Không Hợp Lệ Hoặc Bị Thiếu",
+        "hfTokenInvalidErrorMessage": "HuggingFace token không hợp lệ hoặc bị thiếu.",
+        "hfTokenRequired": "Bạn đang tải xuống model yêu cầu HuggingFace Token hợp lệ.",
+        "hfTokenInvalidErrorMessage2": "Cập nhật vào ",
+        "hfTokenUnableToVerify": "Không Thể Xác Minh HF Token",
+        "hfTokenUnableToVerifyErrorMessage": "Không thể xác minh HuggingFace token. Khả năng cao lỗi mạng. Vui lòng thử lại sau.",
+        "inplaceInstall": "Tải Xuống Tại Chỗ",
+        "installRepo": "Tải Xuống Kho Lưu Trữ (Repository)",
+        "loraModels": "LoRA",
+        "main": "Chính",
+        "modelConversionFailed": "Chuyển Đổi Model Thất Bại",
+        "modelName": "Tên Model",
+        "modelUpdated": "Model Đã Được Cập Nhật",
+        "noMatchingModels": "Không Có Model Phù Hợp",
+        "predictionType": "Loại Prediction",
+        "repoVariant": "Phiên Bản Repository",
+        "simpleModelPlaceholder": "Url hoặc đường đẫn đến tệp hoặc thư mục chứa diffusers trong máy chủ",
+        "selectModel": "Chọn Model",
+        "spandrelImageToImage": "Hình Ảnh Sang Hình Ảnh (Spandrel)",
+        "starterBundles": "Gói Khởi Đầu",
+        "vae": "VAE",
+        "urlOrLocalPath": "URL / Đường Dẫn",
+        "triggerPhrases": "Từ Ngữ Kích Hoạt",
+        "variant": "Biến Thể",
+        "urlOrLocalPathHelper": "Url cần chỉ vào một tệp duy nhất. Còn đường dẫn trên máy chủ có thể chỉ vào một tệp hoặc một thư mục cho chỉ một model diffusers.",
+        "prune": "Cắt Bớt",
+        "uploadImage": "Tải Lên Hình Ảnh",
+        "syncModels": "Liên Kết Model",
+        "pruneTooltip": "Cắt bớt những thành phần đã hoàn tất trong hàng",
+        "scanPlaceholder": "Dường đẫn đến thư mục trong máy chủ",
+        "pathToConfig": "Đường Dẫn Đến Tệp Cấu Hình",
+        "search": "Tìm Kiếm",
+        "selected": "Đã Chọn",
+        "settings": "Cài Đặt",
+        "source": "Nguồn",
+        "starterBundleHelpText": "Tải toàn bộ những model cần thiết để bắt đầu với một model cơ sở, bao gồm model chính, controlnet, IP adapter, v.v... Chọn nguyên một bộ sẽ bỏ qua những model khác bạn đã tải.",
+        "starterModels": "Model Khởi Đầu",
+        "typePhraseHere": "Thêm từ ngữ ở đây",
+        "upcastAttention": "Upcast Attention",
+        "vaePrecision": "Độ Chuẩn VAE",
+        "installingBundle": "Đang Tải Nguyên Bộ",
+        "installingModel": "Đang Tải Model",
+        "installingXModels_other": "Đang tải {{count}} model",
+        "skippingXDuplicates_other": ", bỏ qua {{count}} thành phần bị lặp lại",
+        "repo_id": "ID Repository",
+        "scanFolder": "Quét Thư Mục",
+        "scanFolderHelper": "Thư mục sẽ được quét để tìm model. Có thể sẽ mất nhiều thời gian với những thư mục lớn.",
+        "scanResults": "Kết Quả",
+        "t5Encoder": "T5 Encoder",
+        "mainModelTriggerPhrases": "Từ Ngữ Kích Hoạt Cho Model Chính",
+        "textualInversions": "Bộ Đảo Ngược Văn Bản",
+        "loraTriggerPhrases": "Từ Ngữ Kích Hoạt Cho LoRA",
+        "width": "Chiều Rộng",
+        "clipLEmbed": "CLIP-L Embed",
+        "clipGEmbed": "CLIP-G Embed",
+        "controlLora": "LoRA Điều Khiển Được",
+        "urlUnauthorizedErrorMessage2": "Tìm hiểu thêm.",
+        "urlForbidden": "Bạn không có quyền truy cập vào model này",
+        "urlForbiddenErrorMessage": "Bạn có thể cần yêu cầu quyền truy cập từ trang web đang cung cấp model.",
+        "urlUnauthorizedErrorMessage": "Bạn có thể cần thiếp lập một token API để dùng được model này.",
+        "fluxRedux": "FLUX Redux",
+        "sigLip": "SigLIP",
+        "llavaOnevision": "LLaVA OneVision",
+        "fileSize": "Kích Thước Tệp",
+        "modelPickerFallbackNoModelsInstalled2": "Nhấp vào <LinkComponent>Trình Quản Lý Model</LinkComponent> để tải.",
+        "modelPickerFallbackNoModelsInstalled": "Không Có Sẵn Model.",
+        "manageModels": "Quản Lý Model",
+        "hfTokenReset": "Làm Mới HF Token",
+        "relatedModels": "Model Liên Quan",
+        "installedModelsCount": "Đã tải {{installed}} trên {{total}} model.",
+        "allNModelsInstalled": "Đã tải tất cả {{count}} model",
+        "nToInstall": "Còn {{count}} để tải",
+        "nAlreadyInstalled": "Có {{count}} đã tải",
+        "bundleAlreadyInstalled": "Gói đã được cài sẵn",
+        "bundleAlreadyInstalledDesc": "Tất cả model trong gói {{bundleName}} đã được cài sẵn.",
+        "launchpadTab": "Launchpad",
+        "launchpad": {
+            "welcome": "Chào mừng đến Trình Quản Lý Model",
+            "description": "Invoke yêu cầu tải model nhằm tối ưu hoá các tính năng trên nền tảng. Chọn tải các phương án thủ công hoặc khám phá các model khởi đầu thích hợp.",
+            "manualInstall": "Tải Thủ Công",
+            "urlDescription": "Tải model bằng URL hoặc đường dẫn trên máy. Phù hợp để cụ thể model muốn thêm vào.",
+            "huggingFaceDescription": "Duyệt và cài đặt model từ các repository trên HuggingFace.",
+            "scanFolderDescription": "Quét một thư mục trên máy để tự động tra và tải model.",
+            "recommendedModels": "Model Khuyến Nghị",
+            "exploreStarter": "Hoặc duyệt tất cả model khởi đầu có sẵn",
+            "bundleDescription": "Các gói đều bao gồm những model cần thiết cho từng nhánh model và những model cơ sở đã chọn lọc để bắt đầu.",
+            "sdxl": "SDXL",
+            "quickStart": "Gói Khởi Đầu Nhanh",
+            "browseAll": "Hoặc duyệt tất cả model có sẵn:",
+            "stableDiffusion15": "Stable Diffusion 1.5",
+            "fluxDev": "FLUX.1 dev"
+        },
+        "installBundle": "Tải Xuống Gói",
+        "installBundleMsg1": "Bạn có chắc chắn muốn tải xuống gói {{bundleName}}?",
+        "installBundleMsg2": "Gói này sẽ tải xuống {{count}} model sau đây:",
+        "filterModels": "Lọc Model",
+        "ipAdapters": "IP Adapters",
+        "showOnlyRelatedModels": "Liên Quan",
+        "starterModelsInModelManager": "Model Khởi Đầu có thể tìm thấy ở Trình Quản Lý Model"
+    },
+    "metadata": {
+        "guidance": "Hướng Dẫn",
+        "noRecallParameters": "Không tìm thấy tham số",
+        "imageDetails": "Chi Tiết Ảnh",
+        "createdBy": "Được Tạo Bởi",
+        "canvasV2Metadata": "Layer Canvas",
+        "parameterSet": "Dữ liệu tham số {{parameter}}",
+        "positivePrompt": "Lệnh Tích Cực",
+        "seed": "Hạt Giống",
+        "negativePrompt": "Lệnh Tiêu Cực",
+        "noImageDetails": "Không tìm thấy chi tiết ảnh",
+        "strength": "Mức độ mạnh từ ảnh sang ảnh",
+        "Threshold": "Ngưỡng Nhiễu",
+        "width": "Chiều Rộng",
+        "steps": "Số Bước",
+        "vae": "VAE",
+        "workflow": "Workflow",
+        "seamlessXAxis": "Trục X Liền Mạch",
+        "seamlessYAxis": "Trục Y Liền Mạch",
+        "cfgScale": "Thang CFG",
+        "allPrompts": "Tất Cả Lệnh",
+        "generationMode": "Chế Độ Tạo Sinh",
+        "height": "Chiều Dài",
+        "metadata": "Metadata",
+        "model": "Model",
+        "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
+        "recallParameters": "Gợi Nhớ Tham Số",
+        "scheduler": "Scheduler",
+        "noMetaData": "Không tìm thấy metadata",
+        "imageDimensions": "Kích Thước Ảnh",
+        "clipSkip": "$t(parameters.clipSkip)",
+        "parsingFailed": "Lỗi Cú Pháp",
+        "recallParameter": "Gợi Nhớ {{label}}"
+    },
+    "accordions": {
+        "generation": {
+            "title": "Generation (Tạo Sinh)"
+        },
+        "image": {
+            "title": "Hình Ảnh"
+        },
+        "advanced": {
+            "title": "Nâng Cao",
+            "options": "Lựa Chọn $t(accordions.advanced.title)"
+        },
+        "compositing": {
+            "coherenceTab": "Coherence Pass (Liên Kết)",
+            "title": "Kết Hợp",
+            "infillTab": "Infill (Lấp Đầy)"
+        },
+        "control": {
+            "title": "Điều Khiển"
+        }
+    },
+    "invocationCache": {
+        "disableSucceeded": "Bộ Nhớ Đệm Đã Tắt",
+        "disableFailed": "Có Vấn Đề Khi Tắt Bộ Nhớ Đệm",
+        "hits": "Số Lần Trúng",
+        "maxCacheSize": "Tối Đa",
+        "cacheSize": "Tổng Cache",
+        "enableFailed": "Có Vấn Đề Khi Bật Bộ Nhớ Đệm",
+        "disable": "Tắt",
+        "invocationCache": "Bộ Nhớ Đệm",
+        "clearSucceeded": "Bộ Nhớ Đệm Đã Được Dọn",
+        "enableSucceeded": "Bộ Nhớ Đệm Đã Bật",
+        "useCache": "Dùng Bộ Nhớ Đệm",
+        "enable": "Bật",
+        "misses": "Số Lần Trật",
+        "clear": "Dọn Dẹp",
+        "clearFailed": "Có Vấn Đề Khi Dọn Dẹp Bộ Nhớ Đệm"
+    },
+    "hrf": {
+        "metadata": {
+            "enabled": "Đã Bật Sửa Độ Phân Giải Cao",
+            "strength": "Mức Độ Mạnh Của Sửa Độ Phân Giải Cao",
+            "method": "Cách Thức Sửa Độ Phân Giải Cao"
+        },
+        "hrf": "Sửa Độ Phân Giải Cao",
+        "enableHrf": "Bật Chế Độ Chỉnh Sửa Phân Giải Cao",
+        "upscaleMethod": "Phương Thức Upscale"
+    },
+    "nodes": {
+        "validateConnectionsHelp": "Ngăn chặn những kết nối không hợp lý được tạo ra, và đồ thị không hợp lệ bị kích hoạt",
+        "nodeOpacity": "Độ Mờ Đục Của Node",
+        "nodeVersion": "Phiên Bản Của Node",
+        "clearWorkflowDesc": "Dọn workflow này và bắt đầu cái mới?",
+        "enum": "Dữ Liệu Cố Định",
+        "newWorkflow": "Workflow Mới",
+        "integer": "Số Nguyên",
+        "workflowHelpText": "Cần hỗ trợ? Xem hướng dẫn ở <LinkComponent>Làm Quen Với Workflow</LinkComponent>.",
+        "scheduler": "Scheduler",
+        "snapToGridHelp": "Gắn các node vào lưới khi di chuyển",
+        "showMinimapnodes": "HIển Thị Bản Đồ Thu Nhỏ",
+        "newWorkflowDesc2": "Workflow hiện tại của bạn vẫn chưa lưu các thay đổi.",
+        "unableToValidateWorkflow": "Không Thể Xác Thực Workflow",
+        "inputFieldTypeParseError": "Không thể phân tích loại dữ liệu đầu vào của {{node}}.{{field}} ({{message}})",
+        "boolean": "Đúng/Sai",
+        "missingInvocationTemplate": "Thiếu mẫu trình bày kích hoạt",
+        "nodeOutputs": "Đầu Ra Của Node",
+        "unableToUpdateNodes_other": "Không thể cập nhật {{count}} node",
+        "notesDescription": "Thêm ghi chú vào workflow",
+        "noConnectionInProgress": "Không có kết nối nào đang diễn ra",
+        "float": "Số Thực",
+        "missingNode": "Thiếu node kích hoạt",
+        "currentImage": "Hình Ảnh Hiện Tại",
+        "unknownErrorValidatingWorkflow": "Lỗi không rõ khi xác thực workflow",
+        "workflowSettings": "Cài Đặt Biên Tập Workflow",
+        "workflowVersion": "Phiên Bản",
+        "unableToGetWorkflowVersion": "Không thể tìm phiên bản của lược đồ workflow",
+        "collection": "Đa tài nguyên",
+        "cannotMixAndMatchCollectionItemTypes": "Không thể trộn và kết nối với loại đa tài nguyên",
+        "colorCodeEdges": "Mã Màu Kết Nối",
+        "ipAdapter": "IP Adapter",
+        "cannotDuplicateConnection": "Không thể tạo hai kết nối trùng lặp",
+        "workflowValidation": "Lỗi Xác Thực Workflow",
+        "sourceNodeFieldDoesNotExist": "Kết nối không phù hợp: nguồn/đầu ra của vùng {{node}}.{{field}} không tồn tại",
+        "targetNodeFieldDoesNotExist": "Kết nối không phù hợp: đích đến/đầu vào của vùng {{node}}.{{field}} không tồn tại",
+        "missingTemplate": "Node không hợp lệ: node {{node}} thuộc loại {{type}} bị thiếu mẫu trình bày (chưa tải?)",
+        "unsupportedMismatchedUnion": "Dạng số lượng dữ liệu không khớp với {{firstType}} và {{secondType}}",
+        "betaDesc": "Trình kích hoạt này vẫn trong giai đoạn beta. Cho đến khi ổn định, nó có thể phá hỏng thay đổi trong khi cập nhật ứng dụng. Chúng tôi dự định hỗ trợ trình kích hoạt này về lâu dài.",
+        "cannotConnectInputToInput": "Không thế kết nối đầu vào với đầu vào",
+        "showEdgeLabelsHelp": "Hiển thị tên trên kết nối, chỉ ra những node được kết nối",
+        "unsupportedArrayItemType": "loại mảng không được hỗ trợ: \"{{type}}\"",
+        "boardAccessError": "Không thể tìm thấy bảng {{board_id}}, chuyển về mặc định",
+        "collectionOrScalarFieldType": "{{name}} (Đơn/Đa)",
+        "edge": "Kết Nối",
+        "graph": "Đồ Thị",
+        "workflowAuthor": "Tác Giả",
+        "showEdgeLabels": "Hiển Thị Tên Kết Nối",
+        "unknownField": "Vùng Dữ Liệu Không Rõ",
+        "executionStateCompleted": "Đã Hoàn Tất",
+        "loadingNodes": "Đang Tải Node...",
+        "singleFieldType": "{{name}} (Đơn)",
+        "clearWorkflowDesc2": "Workflow hiện tại của bạn vẫn chưa lưu các thay đổi.",
+        "clearWorkflow": "Dọn Dẹp Workflow",
+        "unableToParseFieldType": "không thể phân tích vùng dữ liệu",
+        "allNodesUpdated": "Cập Nhật Tất Cả Node",
+        "noGraph": "Không Có Đồ Thị",
+        "collectionFieldType": "{{name}} (Đa)",
+        "noOutputRecorded": "Chưa có đầu ra được ghi nhận",
+        "noNodeSelected": "Không có node được chọn",
+        "snapToGrid": "Gắn Vào Lưới",
+        "unknownFieldType": "Loại $t(nodes.unknownField): {{type}}",
+        "zoomOutNodes": "Phóng Nhỏ",
+        "deletedInvalidEdge": "Xoá kết nối không hợp lệ {{source}} -> {{target}}",
+        "unableToExtractSchemaNameFromRef": "không thể trích xuất tên lược đồ từ tham chiếu",
+        "nodePack": "Gói node",
+        "workflowDescription": "Mô Tả Ngắn",
+        "prototypeDesc": "Trình kích hoạt này chỉ mới là bản mẫu. Nó có thể phá hỏng thay đổi trong khi cập nhật ứng dụng và có thể bị xoá bất cứ lúc nào.",
+        "updateNode": "Cập Nhật Node",
+        "noWorkflow": "Không Có Workflow",
+        "loadWorkflow": "Tải Workflow",
+        "nodeSearch": "Tìm node",
+        "unableToExtractEnumOptions": "không thể trích xuất lựa chọn trong dữ liệu cố định",
+        "node": "Node",
+        "nodeTemplate": "Mẫu Trình Bày Của Node",
+        "nodeType": "Loại Node",
+        "notes": "Ghi Chú",
+        "updateApp": "Cập Nhật Ứng Dụng",
+        "updateAllNodes": "Cập Nhật Các Node",
+        "zoomInNodes": "Phóng To",
+        "imageAccessError": "Không thể tìm thấy ảnh {{image_name}}, chuyển về mặc định",
+        "unknownNode": "Node Không Rõ",
+        "unknownNodeType": "Loại Node Không Rõ",
+        "cannotConnectOutputToOutput": "Không thế kết nối đầu ra với đầu ra",
+        "cannotConnectToSelf": "Không thể kết nối với chính nó",
+        "workflow": "Workflow",
+        "addNodeToolTip": "Thêm Node (Shift+A, Space)",
+        "animatedEdges": "Hoạt Hoạ Các Kết Nối",
+        "animatedEdgesHelp": "Hoạt hoạ kết nối được chọn và các kết nối liên kết với node được chọn",
+        "colorCodeEdgesHelp": "Mã màu kết nối dựa theo vùng kết nối của nó",
+        "currentImageDescription": "Hiển thị hình ảnh hiện tại trong Trình Biên Tập Node",
+        "missingFieldTemplate": "Thiếu vùng mẫu trình bày",
+        "downloadWorkflow": "Tải Xuống Workflow Dưới Dạng JSON",
+        "executionStateError": "Lỗi",
+        "fieldTypesMustMatch": "Loại của vùng cần giống nhau",
+        "fitViewportNodes": "Chế Độ Xem Vừa Khớp",
+        "fullyContainNodes": "Bao Phủ Node Hoàn Toàn Để Chọn",
+        "fullyContainNodesHelp": "Node phải được phủ kín hoàn toàn trong hộp lựa chọn để được lựa chọn",
+        "hideMinimapnodes": "Ẩn Bản Đồ Thu Nhỏ",
+        "inputMayOnlyHaveOneConnection": "Đầu vào chỉ có thể có một kết nối",
+        "noWorkflows": "Không Có Workflow",
+        "noMatchingWorkflows": "Không Có Workflow Phù Hợp",
+        "sourceNodeDoesNotExist": "Kết nối không phù hợp: nguồn/đầu ra của node {{node}} không tồn tại",
+        "targetNodeDoesNotExist": "Kết nối không phù hợp: đích đến/đầu vào của node {{node}} không tồn tại",
+        "noFieldsViewMode": "Workflow này chưa có vùng được chọn để hiển thị. Xem workflow đầy đủ để tuỳ chỉnh dữ liệu.",
+        "problemSettingTitle": "Có Vấn Đề Khi Thiết Lập Tiêu Đề",
+        "resetToDefaultValue": "Đặt lại giá trị mặc định",
+        "reloadNodeTemplates": "Tải Lại Mẫu Trình Bày Node",
+        "viewMode": "Dùng Chế Độ Xem Tuyến Tính",
+        "newWorkflowDesc": "Tạo workflow mới?",
+        "string": "Chuỗi Ký Tự",
+        "version": "Phiên Bản",
+        "workflowContact": "Thông Tin Liên Lạc",
+        "workflowName": "Tên",
+        "saveToGallery": "Lưu Vào Thư Viện Ảnh",
+        "connectionWouldCreateCycle": "Kết nối này sẽ tạo ra vòng lặp",
+        "addNode": "Thêm Node",
+        "unsupportedAnyOfLength": "quá nhiều dữ liệu hợp nhất: {{count}}",
+        "validateConnections": "Xác Thực Kết Nối Và Đồ Thị",
+        "workflowNotes": "Ghi Chú",
+        "workflowTags": "Nhãn",
+        "editMode": "Chỉnh sửa trong Trình Biên Tập Workflow",
+        "edit": "Chỉnh Sửa",
+        "executionStateInProgress": "Đang Xử Lý",
+        "outputFieldTypeParseError": "Không thể phân tích loại dữ liệu đầu ra của {{node}}.{{field}} ({{message}})",
+        "modelAccessError": "Không thể tìm thấy model {{key}}, chuyển về mặc định",
+        "internalDesc": "Trình kích hoạt này được dùng bên trong bởi Invoke. Nó có thể phá hỏng thay đổi trong khi cập nhật ứng dụng và có thể bị xoá bất cứ lúc nào.",
+        "specialDesc": "Trình kích hoạt này có một số xử lý đặc biệt trong ứng dụng. Ví dụ, Node Hàng Loạt được dùng để xếp vào nhiều đồ thị từ một workflow.",
+        "addItem": "Thêm Mục",
+        "linearDistribution": "Phân Bố Tuyến Tính",
+        "uniformRandomDistribution": "Phân Bố Ngẫu Nhiên Đồng Nhất",
+        "parseString": "Phân Tích Chuỗi",
+        "noBatchGroup": "không có nhóm",
+        "generatorNoValues": "trống",
+        "splitOn": "Tách Ở",
+        "arithmeticSequence": "Cấp Số Cộng",
+        "generatorNRandomValues_other": "{{count}} giá trị ngẫu nhiên",
+        "generatorLoadFromFile": "Tải Từ Tệp",
+        "dynamicPromptsRandom": "Dynamic Prompts (Ngẫu Nhiên)",
+        "dynamicPromptsCombinatorial": "Dynamic Prompts (Tổ Hợp)",
+        "missingSourceOrTargetNode": "Thiếu nguồn hoặc node mục tiêu",
+        "missingSourceOrTargetHandle": "Thiếu nguồn hoặc mục tiêu xử lý",
+        "deletedMissingNodeFieldFormElement": "Xóa vùng nhập bị thiếu: vùng {{fieldName}} của node {{nodeId}}",
+        "description": "Mô Tả",
+        "loadWorkflowDesc": "Tải workflow?",
+        "loadWorkflowDesc2": "Workflow hiện tại của bạn có những điều chỉnh chưa được lưu.",
+        "nodeName": "Tên Node",
+        "unableToUpdateNode": "Cập nhật node thất bại: node {{node}} thuộc dạng {{type}} (có thể cần xóa và tạo lại)",
+        "downloadWorkflowError": "Lỗi tải xuống workflow",
+        "generatorImagesFromBoard": "Ảnh Từ Bảng",
+        "generatorImagesCategory": "Phân Loại",
+        "generatorImages_other": "{{count}} ảnh",
+        "unknownField_withName": "Vùng Dữ Liệu Không Rõ \"{{name}}\"",
+        "unexpectedField_withName": "Sai Vùng Dữ Liệu \"{{name}}\"",
+        "unknownFieldEditWorkflowToFix_withName": "Workflow chứa vùng dữ liệu không rõ \"{{name}}\".\nHãy biên tập workflow để sửa lỗi.",
+        "missingField_withName": "Thiếu Vùng Dữ Liệu \"{{name}}\"",
+        "layout": {
+            "autoLayout": "Bố Cục Tự Động",
+            "layeringStrategy": "Chiến Lược Phân Layer",
+            "networkSimplex": "Network Simplex",
+            "longestPath": "Đường Đi Dài Nhất",
+            "nodeSpacing": "Khoảng Cách Node",
+            "layerSpacing": "Khoảng Cách Layer",
+            "layoutDirection": "Hướng Bố Cục",
+            "layoutDirectionRight": "Phải",
+            "layoutDirectionDown": "Xuống",
+            "alignment": "Căn Chỉnh Node",
+            "alignmentUL": "Trên Cùng Bên Trái",
+            "alignmentDL": "Dưới Cùng Bên Trái",
+            "alignmentUR": "Trên Cùng Bên Phải",
+            "alignmentDR": "Dưới Cùng Bên Phải"
+        },
+        "generatorLoading": "đang tải",
+        "addLinearView": "Thêm Vào Chế Độ Xem Tuyến Tính (Linear View)",
+        "hideLegendNodes": "Ẩn Vùng Nhập",
+        "mismatchedVersion": "Node không hợp lệ: node {{node}} thuộc loại {{type}} có phiên bản không khớp (thử cập nhật?)",
+        "noFieldsLinearview": "Không có vùng được thêm vào Chế Độ Xem Tuyến Tính",
+        "removeLinearView": "Xoá Khỏi Chế Độ Xem Tuyến Tính",
+        "reorderLinearView": "Sắp Xếp Lại Chế Độ Xem Tuyến Tính",
+        "showLegendNodes": "Hiển Thị Vùng Nhập",
+        "unableToLoadWorkflow": "Không Thể Tải Workflow",
+        "unknownTemplate": "Mẫu Trình Bày Không Rõ",
+        "unknownInput": "Đầu Vào Không Rõ: {{name}}",
+        "loadingTemplates": "Đang Tải {{name}}",
+        "versionUnknown": " Phiên Bản Không Rõ",
+        "generateValues": "Giá Trị Tạo Sinh",
+        "floatRangeGenerator": "Phạm Vị Tạo Sinh Số Thực",
+        "integerRangeGenerator": "Phạm Vị Tạo Sinh Số Nguyên"
+    },
+    "popovers": {
+        "paramCFGRescaleMultiplier": {
+            "heading": "Hệ Số Nhân Thang CFG",
+            "paragraphs": [
+                "Hệ số nhân điều chỉnh để hướng dẫn cho CFG, dùng cho model được huấn luyện bằng zero-terminal SNR (ztsnr).",
+                "Giá trị khuyến cáo là 0.7 cho những model này."
+            ]
+        },
+        "refinerScheduler": {
+            "heading": "Scheduler",
+            "paragraphs": [
+                "Scheduler được dùng khi tinh chế các phần nhỏ của quá trình tạo sinh.",
+                "Giống với scheduler để tạo sinh."
+            ]
+        },
+        "paramCFGScale": {
+            "heading": "Thang CFG",
+            "paragraphs": [
+                "Điều khiển mức độ lệnh tác động lên quá trình tạo sinh.",
+                "Giá trị của Thang CFG quá cao có thể tạo độ bão hoà quá mức và khiến ảnh tạo sinh bị méo mó. "
+            ]
+        },
+        "paramScheduler": {
+            "heading": "Scheduler",
+            "paragraphs": [
+                "Scheduler được dùng trong quá trình tạo sinh.",
+                "Mỗi scheduler định nghĩa cách thêm độ nhiễu vào hình ảnh hoặc cách cập nhật mẫu dữ liệu dự vào đầu ra của model."
+            ]
+        },
+        "compositingCoherencePass": {
+            "heading": "Coherence Pass (Liên Kết)",
+            "paragraphs": [
+                "Bước thứ hai trong quá trình khử nhiễu để hợp nhất với ảnh inpaint/outpaint."
+            ]
+        },
+        "refinerNegativeAestheticScore": {
+            "heading": "Điểm Khác Tiêu Chuẩn",
+            "paragraphs": [
+                "Trọng lượng để tạo sinh ảnh giống với ảnh có điểm tiêu chuẩn thấp, dựa vào dữ liệu huấn luyện."
+            ]
+        },
+        "refinerCfgScale": {
+            "paragraphs": [
+                "Điều khiển mức độ lệnh tác động lên quá trình tạo sinh.",
+                "Giống với thang CFG để tạo sinh."
+            ],
+            "heading": "Thang CFG"
+        },
+        "refinerSteps": {
+            "heading": "Số Bước",
+            "paragraphs": [
+                "Số bước diễn ra trong khi tinh chế các phần nhỏ của quá trình tạo sinh.",
+                "Giống với số bước để tạo sinh."
+            ]
+        },
+        "paramSteps": {
+            "heading": "Số Bước",
+            "paragraphs": [
+                "Số bước dùng để biểu diễn trong mỗi lần tạo sinh.",
+                "Số bước càng cao thường sẽ tạo ra ảnh tốt hơn nhưng ngốn nhiều thời gian hơn."
+            ]
+        },
+        "paramWidth": {
+            "heading": "Rộng",
+            "paragraphs": [
+                "Chiều rộng của ảnh tạo sinh. Phải là bội số của 8."
+            ]
+        },
+        "inpainting": {
+            "heading": "Chế Độ Inpaint",
+            "paragraphs": [
+                "Điều khiển vị trí cần sửa đổi, được chỉ dẫn theo Sức Mạnh Khử Nhiễu."
+            ]
+        },
+        "rasterLayer": {
+            "paragraphs": [
+                "Dữ liệu dựa vào pixel trên ảnh, dùng cho để tạo sinh ảnh."
+            ],
+            "heading": "Layer Raster"
+        },
+        "creativity": {
+            "heading": "Độ Sáng Tạo",
+            "paragraphs": [
+                "Độ sáng tạo điều khiển mức độ tự do được trao cho model khi thêm chi tiết. Độ sáng tạo thấp cho ra ảnh gần giống với ảnh ban đầu, trong khi độ sáng tạo cao cho phép nhiều thay đổi hơn. Khi dùng lệnh, độ phân giải cao tăng ảnh hưởng của lệnh lên đầu ra."
+            ]
+        },
+        "refinerPositiveAestheticScore": {
+            "paragraphs": [
+                "Trọng lượng để tạo sinh ảnh giống với ảnh có điểm tiêu chuẩn cao, dựa vào dữ liệu huấn luyện."
+            ],
+            "heading": "Điểm Giống Tiêu Chuẩn"
+        },
+        "paramVAEPrecision": {
+            "paragraphs": [
+                "Độ chính xác dùng trong khi mã hoá và giải mã VAE.",
+                "Chính xác một nửa/Fp16 sẽ hiệu quả hơn, đổi lại cho những thay đổi nhỏ với ảnh."
+            ],
+            "heading": "Độ Chuẩn VAE"
+        },
+        "fluxDevLicense": {
+            "heading": "Giấy Phép Phi Thương Mại",
+            "paragraphs": [
+                "Model FLUX.1 [dev] được cấp phép dưới giấy phép phi thương mại FLUX [dev]. Để dùng loại model này cho lý do thương mại trong Invoke, vào trang web chúng tôi để tìm hiểu thêm."
+            ]
+        },
+        "scaleBeforeProcessing": {
+            "heading": "Chia Tỉ Lệ Trước Khi Xử Lý",
+            "paragraphs": [
+                "\"Tự động\" chỉnh tỉ lệ cho vùng được chọn thành kích thước phù hợp nhất cho model trước khi tạo sinh.",
+                "\"Thủ công\" cho phép bạn chọn chiều rộng và chiều dài cho vùng được chọn sẽ được chia tỉ lệ trước khi tạo sinh."
+            ]
+        },
+        "paramHeight": {
+            "paragraphs": [
+                "Chiều dài của ảnh tạo sinh. Phải là bội số của 8."
+            ],
+            "heading": "Dài"
+        },
+        "paramRatio": {
+            "paragraphs": [
+                "Tỉ lệ khung hình của kích thước của ảnh được tạo ra.",
+                "Kích thước ảnh (theo số lượng pixel) tương đương với 512x512 được khuyến nghị cho model SD1.5 và kích thước tương đương với 1024x1024 được khuyến nghị cho model SDXL."
+            ],
+            "heading": "Tỉ Lệ"
+        },
+        "seamlessTilingYAxis": {
+            "paragraphs": [
+                "Lát khối liền mạch bức ảnh theo trục dọc."
+            ],
+            "heading": "Lát Khối Liền Mạch Trục Y"
+        },
+        "controlNetControlMode": {
+            "paragraphs": [
+                "Đưa thêm trọng lượng vào lệnh hoặc ControlNet."
+            ],
+            "heading": "Chế Độ Điều Khiển"
+        },
+        "compositingMaskAdjustments": {
+            "paragraphs": [
+                "Điều chỉnh cái lớp bao phủ."
+            ],
+            "heading": "Điều Chỉnh Lớp Phủ"
+        },
+        "regionalGuidance": {
+            "paragraphs": [
+                "Vẽ để chỉ dẫn nơi các yếu tố từ lệnh cần xuất hiện."
+            ],
+            "heading": "Chỉ Dẫn Khu Vực"
+        },
+        "controlNetWeight": {
+            "paragraphs": [
+                "Điều chỉnh mức độ layer ảnh hưởng đến quá trình xử lý tạo sinh.",
+                "• Trọng Lượng Lớn Hơn (.75-2): Gây ra ảnh hưởng lớn hơn lên kết quả cuối cùng.",
+                "• Trọng Lượng Nhỏ Hơn (0-.75): Gây ra ảnh hưởng nhỏ hơn lên kết quả cuối cùng."
+            ],
+            "heading": "Trọng Lượng"
+        },
+        "regionalReferenceImage": {
+            "heading": "Ảnh Mẫu Khu Vực",
+            "paragraphs": [
+                "Vẽ để áp dụng ảnh tham khảo vào nơi cụ thể."
+            ]
+        },
+        "paramHrf": {
+            "paragraphs": [
+                "Tạo ra ảnh chất lượng cao với độ phân giải lớn hơn giá trị tối ưu cho model. Thường được dùng để tránh trùng lập trong ảnh tạo sinh."
+            ],
+            "heading": "Cho Phép Sửa Độ Phân Giải Cao"
+        },
+        "patchmatchDownScaleSize": {
+            "heading": "Downscale",
+            "paragraphs": [
+                "Downscale xảy ra bao nhiêu lần trước khi bắt đầu infill.",
+                "Downscale nhiều sẽ cải thiện hiệu suất nhưng giảm chất lượng."
+            ]
+        },
+        "compositingCoherenceMinDenoise": {
+            "paragraphs": [
+                "Độ khử nhiễu nhỏ nhất cho chế độ liên kết",
+                "Sức mạnh khử nhiễu nhỏ nhất cho vùng liên kết khi inpaint/outpaint"
+            ],
+            "heading": "Min Khử Nhiễu"
+        },
+        "compositingCoherenceEdgeSize": {
+            "paragraphs": [
+                "Kích cỡ cạnh dùng cho coherence pass."
+            ],
+            "heading": "Kích Cỡ Cạnh"
+        },
+        "compositingMaskBlur": {
+            "heading": "Độ Mờ Vùng",
+            "paragraphs": [
+                "Độ mờ của phần được phủ."
+            ]
+        },
+        "ipAdapterMethod": {
+            "paragraphs": [
+                "Phương thức định nghĩa cách ảnh mẫu sẽ chỉ dẫn quá trình xử lý tạo sinh."
+            ],
+            "heading": "Cách Thức"
+        },
+        "dynamicPrompts": {
+            "heading": "Dynamic Prompt",
+            "paragraphs": [
+                "Dynamic Prompt phân tích một lệnh đơn thành nhiều lệnh.",
+                "Cú pháp cơ bản là \"a {red|green|blue} ball\". Nó sẽ cấu thành ba lệnh: \"a red ball\", \"a green ball\" và \"a blue ball\".",
+                "Bạn có thể dùng cú pháp bao nhiêu lần tuỳ thích trong một lệnh đơn, nhưng hãy chắc chắn số lệnh tạo sinh không vượt mức Số lệnh Tối đa trong cài đặt."
+            ]
+        },
+        "imageFit": {
+            "heading": "Xếp Vừa Ảnh Ban Đầu Với Kích Thước Đầu Ra",
+            "paragraphs": [
+                "Điều chỉnh tỉ lệ ảnh ban đầu thành chiều dài và chiều rộng của ảnh đầu ra. Khuyến cáo nên bật."
+            ]
+        },
+        "noiseUseCPU": {
+            "paragraphs": [
+                "Điều chỉnh độ nhiễu được tạo ra trên CPU hay GPU.",
+                "Với Độ nhiễu CPU được bật, một hạt giống cụ thể sẽ tạo ra hình ảnh giống nhau trên mọi máy.",
+                "Không có tác động nào đến hiệu suất khi bật Độ nhiễu CPU."
+            ],
+            "heading": "Dùng Độ Nhiễu CPU"
+        },
+        "lora": {
+            "heading": "LoRA",
+            "paragraphs": [
+                "Model nhẹ dùng để kết hợp với model cơ sở."
+            ]
+        },
+        "refinerModel": {
+            "paragraphs": [
+                "Model được dùng khi tinh chế các phần nhỏ của quá trình tạo sinh.",
+                "Giống với model để tạo sinh."
+            ],
+            "heading": "Model Refiner"
+        },
+        "compositingBlurMethod": {
+            "heading": "Phương Thức Làm Mờ",
+            "paragraphs": [
+                "Cách làm mờ trên vùng được phủ."
+            ]
+        },
+        "controlNetBeginEnd": {
+            "paragraphs": [
+                "Cài đặt này xác định phần xử lý khử nhiễu (trong khi tạo sinh) kết hợp với chỉ dẫn từ layer này.",
+                "• Bước Bắt Đầu (%): Chỉ định lúc bắt đầu áp dụng chỉ dẫn từ layer này trong quá trình tạo sinh.",
+                "• Bước Kết Thúc (%): Chỉ định lúc dừng áp dụng chỉ dẫn của layer này và trở về chỉ dẫn chung từ model và các thiết lập khác."
+            ],
+            "heading": "Phần Trăm Số Bước Khi Bắt Đầu/Kết Thúc"
+        },
+        "scale": {
+            "heading": "Tỉ Lệ",
+            "paragraphs": [
+                "Tỉ lệ điều khiển kích thước ảnh đầu ra, và dựa vào bội số độ phân giải ảnh đầu vào. Ví dụ upscale 2x lần lên ảnh 1024x1024 sẽ cho ra ảnh đầu ra 2048x2048."
+            ]
+        },
+        "upscaleModel": {
+            "paragraphs": [
+                "Model upscale đặt tỉ lệ hình ảnh vào kích thước đầu ra trước khi thêm vào các chi tiết. Bất kỳ model upscale được hỗ trợ đều có thể sử dụng, nhưng một số sẽ chuyên về một lĩnh vực, như là ảnh chụp hay ảnh vẽ phát thảo nét."
+            ],
+            "heading": "Model Upscale"
+        },
+        "globalReferenceImage": {
+            "heading": "Ảnh Mẫu Toàn Vùng",
+            "paragraphs": [
+                "Áp dụng ảnh tham khảo để ảnh hưởng lên toàn bộ quá trình tạo sinh."
+            ]
+        },
+        "dynamicPromptsSeedBehaviour": {
+            "paragraphs": [
+                "Điều khiển cách hạt giống được dùng khi tạo sinh từ lệnh.",
+                "Cứ mỗi lần lặp, một hạt giống mới sẽ được dùng. Dùng nó để khám phá những biến thể từ lệnh trên mỗi hạt giống.",
+                "Ví dụ, nếu bạn có 5 lệnh, mỗi ảnh sẽ dùng cùng hạt giống.",
+                "Một hạt giống mới sẽ được dùng cho từng ảnh. Nó tạo ra nhiều biến thể."
+            ],
+            "heading": "Hành Vi Của Hạt Giống"
+        },
+        "paramGuidance": {
+            "heading": "Hướng Dẫn",
+            "paragraphs": [
+                "Điều khiển mức độ lệnh tác động lên quá trình tạo sinh.",
+                "Giá trị hướng dẫn cao có thể gây bão hoà quá mức, giá trị hướng dẫn quá cao hoặc quá thấp còn có nguy cơ khiến ảnh tạo sinh bị méo mó. Hướng dẫn chỉ áp dụng cho model FLUX DEV."
+            ]
+        },
+        "paramVAE": {
+            "paragraphs": [
+                "Model được dùng để dịch đầu ra của AI thành ảnh cuối cùng."
+            ],
+            "heading": "VAE"
+        },
+        "controlNet": {
+            "paragraphs": [
+                "ControlNet cung cấp hướng dẫn cho quá trình tạo sinh, giúp tạo ảnh với thành phần, cấu trúc hoặc phong cách được kiểm soát, tuỳ vào model được chọn."
+            ],
+            "heading": "ControlNet"
+        },
+        "controlNetProcessor": {
+            "heading": "Bộ Xử Lý",
+            "paragraphs": [
+                "Cách thức xử lý ảnh đầu vào để hướng dẫn xử lý quá trình tạo sinh. Bộ xử lý khác như sẽ cung cấp hiệu ứng hoặc phong cách khác nhau cho ảnh được tạo sinh."
+            ]
+        },
+        "paramAspect": {
+            "paragraphs": [
+                "Tỉ lệ khung hành của ảnh tạo sinh. Điều chỉnh tỉ lệ sẽ cập nhật chiều rộng và chiều dài tương ứng.",
+                "\"Tối ưu hoá\" sẽ đặt chiều rộng và chiều dài vào kích thước tối ưu cho model được chọn."
+            ],
+            "heading": "Tỉ Lệ"
+        },
+        "paramNegativeConditioning": {
+            "heading": "Lệnh Tiêu Cực",
+            "paragraphs": [
+                "Quá trình tạo sinh sẽ tránh những nội dung trong lệnh tiêu cực. Dùng nó để loại bỏ nội dung khỏi đầu ra.",
+                "Hỗ trợ Compel Syntax và Embedding."
+            ]
+        },
+        "optimizedDenoising": {
+            "paragraphs": [
+                "Bật \"Tối Ưu Hoá Hình Ảnh Sang Hình Ảnh\" cho một thang đo Sức Mạnh Khử Nhiễu tiến dần dành cho các dạng biến đổi ảnh sang ảnh và inpaint với model Flux. Cài đặt này cải thiện khả năng điều khiển số lượng biến đổi được áp dụng lên hình ảnh, nhưng có thể được tắt nếu bạn muốn thang đo Sức Mạnh Khử Nhiễu tiêu chuẩn. Cài đặt này vẫn còn được chỉnh sửa và trong quá trình beta."
+            ],
+            "heading": "Tối Ưu Hoá Hình Ảnh Sang Hình Ảnh"
+        },
+        "refinerStart": {
+            "paragraphs": [
+                "Nơi trong quá trình xử lý tạo sinh mà refiner bắt đầu được dùng.",
+                "0 nghĩa là bộ refiner sẽ được dùng trong toàn bộ quá trình tạo sinh , 0.8 nghĩa là refiner sẽ được dùng trong 20% cuối cùng quá trình tạo sinh."
+            ],
+            "heading": "Bắt Đầu Refiner"
+        },
+        "paramUpscaleMethod": {
+            "paragraphs": [
+                "Cách thức dùng để upscale để Sửa Độ Phân Giải Cao."
+            ],
+            "heading": "Phương Thức Upscale"
+        },
+        "dynamicPromptsMaxPrompts": {
+            "paragraphs": [
+                "Giới hạn số lệnh được tạo sinh bởi Dynamic Prompt."
+            ],
+            "heading": "Số Lệnh Tối Đa"
+        },
+        "structure": {
+            "paragraphs": [
+                "Độ cấu trúc điều khiển mức độ của ảnh đầu ra sẽ giữ nguyên các trình bày của bản gốc. Độ cấu trúc thấp cho phép các thay đổi đáng kể, trong khi độ cấu trúc cao nghiêm khắc hơn về cách trình bày và thành phần của bản gốc."
+            ],
+            "heading": "Độ Cấu Trúc"
+        },
+        "infillMethod": {
+            "heading": "Cách Infill",
+            "paragraphs": [
+                "Cách thức infill trong quá trình inpaint/outpaint."
+            ]
+        },
+        "paramDenoisingStrength": {
+            "paragraphs": [
+                "Kiểm soát độ khác nhau giữa các ảnh được tạo sinh và layer dạng raster.",
+                "Sức mạnh thấp cho ảnh giống với sự kết hợp của các layer dạng raster đang hiển thị. Sức mạnh cao lại cho ảnh phụ thuộc nhiều vào lệnh.",
+                "Khi không có gì được hiển thị bởi các layer dạng raster, điều chỉnh này sẽ được bỏ qua."
+            ],
+            "heading": "Sức Mạnh Khử Nhiễu"
+        },
+        "paramPositiveConditioning": {
+            "paragraphs": [
+                "Hướng dẫn cách máy tạo sinh xử lý. Bạn nên dùng từ hoặc cụm từ.",
+                "Hỗ trợ cú Compel Syntax, Dynamic Prompt và Embedding."
+            ],
+            "heading": "Lệnh Tích Cực"
+        },
+        "controlNetResizeMode": {
+            "heading": "Chế Độ Điều Chỉnh Kích Thước",
+            "paragraphs": [
+                "Phương thức để đặt kích thước ảnh đầu vào của Control Adapter lên kích thước đầu ra."
+            ]
+        },
+        "paramSeed": {
+            "paragraphs": [
+                "Điều khiển độ nhiễu ban đầu được dùng để tạo sinh.",
+                "Tắt lựa chọn \"Ngẫu Nhiên\" để tạo ra kết quá y hệt nhau với cùng một thiết lập tạo sinh."
+            ],
+            "heading": "Hạt Giống"
+        },
+        "clipSkip": {
+            "heading": "CLIP Skip",
+            "paragraphs": [
+                "Bao nhiêu lớp model CLIP được bỏ qua.",
+                "Một số model nhất định sẽ phù hợp hơn khi đi cùng CLIP Skip."
+            ]
+        },
+        "loraWeight": {
+            "heading": "Trọng Lượng",
+            "paragraphs": [
+                "Trọng lượng của LoRA. Trọng lượng càng cao sẽ dẫn đến tác động càng lớn lên ảnh cuối cùng."
+            ]
+        },
+        "paramIterations": {
+            "heading": "Vòng Lặp",
+            "paragraphs": [
+                "Số ảnh được tạo ra.",
+                "Nếu Dynamic Prompt được bật, một lệnh sẽ tạo sinh ảnh bấy nhiêu lần."
+            ]
+        },
+        "compositingCoherenceMode": {
+            "heading": "Chế Độ",
+            "paragraphs": [
+                "Cách thức được dùng để liên kết ảnh với vùng bao phủ vừa được tạo sinh."
+            ]
+        },
+        "paramModel": {
+            "paragraphs": [
+                "Model dùng để tạo sinh. Model khác nhau được huấn luyện để chuyên vào một kết quả và nội dung tiêu chuẩn."
+            ],
+            "heading": "Model"
+        },
+        "regionalGuidanceAndReferenceImage": {
+            "heading": "Chỉ Dẫn Khu Vực Và Ảnh Mẫu Khu Vực",
+            "paragraphs": [
+                "Dành cho Chỉ Dẫn Khu Vực, vẽ để chỉ dẫn nơi các yếu tố từ lệnh cần xuất hiện.",
+                "Dành cho Ảnh Mẫu Khu Vực, vẽ để áp dụng ảnh tham khảo vào nơi cụ thể."
+            ]
+        },
+        "seamlessTilingXAxis": {
+            "paragraphs": [
+                "Lát khối liền mạch bức ảnh theo trục ngang."
+            ],
+            "heading": "Lát Khối Liền Mạch Trục X"
+        },
+        "tileSize": {
+            "heading": "Kích Thước Khối",
+            "paragraphs": [
+                "Điều chỉnh kích thước của khối trong quá trình upscale. Khối càng lớn, bộ nhớ được sử dụng càng nhiều, nhưng có thể tạo sinh ảnh tốt hơn.",
+                "Model SD1.5 mặt định là 768, trong khi SDXL mặc định là 1024. Giảm kích thước khối nếu các gặp vấn đề bộ nhớ."
+            ]
+        },
+        "tileOverlap": {
+            "heading": "Chồng Chéo Khối",
+            "paragraphs": [
+                "Điều chỉnh sự chồng chéo giữa các khối liền kề trong quá trình upscale. Giá trị chồng chép lớn giúp giảm sự rõ nét của các chỗ nối nhau, nhưng ngốn nhiều bộ nhớ hơn.",
+                "Giá trị mặc định (128) hoạt động tốt với đa số trường hợp, nhưng bạn có thể điều chỉnh cho phù hợp với nhu cầu cụ thể và hạn chế về bộ nhớ."
+            ]
+        }
+    },
+    "models": {
+        "addLora": "Thêm LoRA",
+        "concepts": "LoRA",
+        "loading": "đang tải",
+        "lora": "LoRA",
+        "noRefinerModelsInstalled": "Chưa có model SDXL Refiner được tải xuống",
+        "defaultVAE": "VAE Mặc Định",
+        "noMatchingModels": "Không có Model phù hợp",
+        "noModelsAvailable": "Không có model",
+        "selectModel": "Chọn Model",
+        "noCompatibleLoRAs": "Không Có LoRAs Tương Thích",
+        "noMatchingLoRAs": "Không có LoRA phù hợp",
+        "noLoRAsInstalled": "Chưa có LoRA được tải xuống"
+    },
+    "parameters": {
+        "postProcessing": "Xử Lý Hậu Kỳ (Shift + U)",
+        "symmetry": "Tính Đối Xứng",
+        "type": "Loại",
+        "seed": "Hạt Giống",
+        "processImage": "Xử Lý Hình Ảnh",
+        "useSize": "Dùng Kích Thước",
+        "invoke": {
+            "noModelSelected": "Không có model được lựa chọn",
+            "canvasIsFiltering": "Canvas đang bận (đang lọc)",
+            "canvasIsRasterizing": "Canvas đang bận (đang raster hoá)",
+            "canvasIsTransforming": "Canvas đang bận (đang biến đổi)",
+            "canvasIsCompositing": "Canvas đang bận (đang kết hợp)",
+            "noPrompts": "Không có lệnh được tạo",
+            "noNodesInGraph": "Không có node trong đồ thị",
+            "addingImagesTo": "Thêm ảnh vào",
+            "noT5EncoderModelSelected": "Không có model T5 Encoder được lựa chọn cho máy tạo sinh FLUX",
+            "noFLUXVAEModelSelected": "Không có model VAE được lựa chọn cho máy tạo sinh FLUX",
+            "noCLIPEmbedModelSelected": "Không có model CLIP Embed được lựa chọn cho máy tạo sinh FLUX",
+            "systemDisconnected": "Hệ thống mất kết nối",
+            "invoke": "Kích Hoạt",
+            "missingNodeTemplate": "Thiếu mẫu trình bày node",
+            "missingInputForField": "thiếu đầu vào",
+            "missingFieldTemplate": "Thiếu vùng mẫu trình bày",
+            "collectionTooFewItems": "quá ít mục, tối thiểu là {{minItems}}",
+            "collectionTooManyItems": "quá nhiều mục, tối đa là {{maxItems}}",
+            "canvasIsSelectingObject": "Canvas đang bận (đang chọn đồ vật)",
+            "fluxModelMultipleControlLoRAs": "Chỉ có thể dùng 1 LoRA Điều Khiển Được",
+            "collectionStringTooLong": "quá dài, tối đa là {{maxLength}}",
+            "collectionStringTooShort": "quá ngắn, tối thiểu là {{minLength}}",
+            "collectionNumberGTMax": "{{value}} > {{maximum}} (giá trị tối đa)",
+            "collectionNumberLTMin": "{{value}} < {{minimum}} (giá trị tối thiểu)",
+            "collectionNumberNotMultipleOf": "{{value}} không phải bội của {{multipleOf}}",
+            "collectionNumberLTExclusiveMin": "{{value}} <= {{exclusiveMinimum}} (giá trị chọn lọc tối thiểu)",
+            "collectionNumberGTExclusiveMax": "{{value}} >= {{exclusiveMaximum}} (giá trị chọn lọc tối đa)",
+            "batchNodeCollectionSizeMismatch": "Kích cỡ tài nguyên không phù hợp với Lô {{batchGroupId}}",
+            "batchNodeNotConnected": "Node Hàng Loạt chưa được kết nối: {{label}}",
+            "batchNodeEmptyCollection": "Một vài node hàng loạt có tài nguyên rỗng",
+            "collectionEmpty": "tài nguyên trống",
+            "batchNodeCollectionSizeMismatchNoGroupId": "tài nguyên theo nhóm có kích thước sai lệch",
+            "modelIncompatibleBboxWidth": "Chiều rộng hộp giới hạn là {{width}} nhưng {{model}} yêu cầu bội số của {{multiple}}",
+            "modelIncompatibleBboxHeight": "Chiều dài hộp giới hạn là {{height}} nhưng {{model}} yêu cầu bội số của {{multiple}}",
+            "modelIncompatibleScaledBboxHeight": "Chiều dài hộp giới hạn theo tỉ lệ là {{height}} nhưng {{model}} yêu cầu bội số của {{multiple}}",
+            "modelIncompatibleScaledBboxWidth": "Chiều rộng hộp giới hạn theo tỉ lệ là {{width}} nhưng {{model}} yêu cầu bội số của {{multiple}}",
+            "modelDisabledForTrial": "Tạo sinh với {{modelName}} là không thể với tài khoản trial. Vào phần thiết lập tài khoản để nâng cấp.",
+            "promptExpansionPending": "Trong quá trình mở rộng lệnh",
+            "promptExpansionResultPending": "Hãy chấp thuận hoặc huỷ bỏ kết quả mở rộng lệnh của bạn",
+            "emptyBatches": "lô trống",
+            "noStartingFrameImage": "Chưa có khung hình ảnh đầu",
+            "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), chiều rộng hộp giới hạn là {{width}}",
+            "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), chiều cao hộp giới hạn là {{height}}",
+            "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), tỉ lệ chiều rộng hộp giới hạn là {{width}}",
+            "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), tỉ lệ chiều cao hộp giới hạn là {{height}}",
+            "incompatibleLoRAs": "LoRA không tương thích bị thêm vào"
+        },
+        "cfgScale": "Thang CFG",
+        "useSeed": "Dùng Hạt Giống",
+        "imageActions": "Hành Động Với Hình Ảnh",
+        "steps": "Số Bước",
+        "aspect": "Tỉ Lệ",
+        "coherenceMode": "Chế Độ",
+        "coherenceEdgeSize": "Kích Cỡ Cạnh",
+        "coherenceMinDenoise": "Min Khử Nhiễu",
+        "denoisingStrength": "Sức Mạnh Khử Nhiễu",
+        "infillMethod": "Cách Infill",
+        "setToOptimalSize": "Tối ưu hoá kích cỡ cho model",
+        "maskBlur": "Độ Mờ Vùng",
+        "width": "Rộng",
+        "scale": "Tỉ Lệ",
+        "recallMetadata": "Gợi Lại Metadata",
+        "clipSkip": "CLIP Skip",
+        "general": "Cài Đặt Chung",
+        "boxBlur": "Làm Mờ Dạng Box",
+        "gaussianBlur": "Làm Mờ Dạng Gaussian",
+        "staged": "Staged (Tăng khử nhiễu có hệ thống)",
+        "scaledHeight": "Tỉ Lệ Dài",
+        "cancel": {
+            "cancel": "Huỷ"
+        },
+        "infillColorValue": "Màu Lấp Đầy",
+        "optimizedImageToImage": "Tối Ưu Hoá Hình Ảnh Sang Hình Ảnh",
+        "sendToCanvas": "Gửi Vào Canvas",
+        "sendToUpscale": "Gửi Vào Upscale",
+        "scaledWidth": "Tỉ Lệ Rộng",
+        "scheduler": "Scheduler",
+        "seamlessXAxis": "Trục X Liền Mạch",
+        "seamlessYAxis": "Trục Y Liền Mạch",
+        "guidance": "Hướng Dẫn",
+        "height": "Dài",
+        "noiseThreshold": "Ngưỡng Nhiễu",
+        "negativePromptPlaceholder": "Lệnh Tiêu Cực",
+        "iterations": "Lặp Lại",
+        "strength": "Sức Mạnh",
+        "perlinNoise": "Nhiễu Loại Perlin",
+        "positivePromptPlaceholder": "Lệnh Tích Cực",
+        "scaleBeforeProcessing": "Tỉ Lệ Trước Khi Xử Lý",
+        "patchmatchDownScaleSize": "Downscale",
+        "useAll": "Dùng Tất Cả",
+        "useCpuNoise": "Dùng Độ Nhiễu CPU",
+        "remixImage": "Phối Lại Hình Ảnh",
+        "shuffle": "Xáo Trộn",
+        "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) (lớn quá)",
+        "cfgRescaleMultiplier": "Hệ Số Nhân Thang CFG",
+        "setToOptimalSizeTooSmall": "$t(parameters.setToOptimalSize) (nhỏ quá)",
+        "images": "Ảnh Ban Đầu",
+        "controlNetControlMode": "Chế Độ Điều Khiển",
+        "lockAspectRatio": "Khoá Tỉ Lệ",
+        "swapDimensions": "Hoán Đổi Kích Thước",
+        "copyImage": "Sao Chép Hình Ảnh",
+        "imageFit": "Căn Chỉnh Ảnh Ban Đầu Thành Kích Thước Đầu Ra",
+        "info": "Thông Tin",
+        "usePrompt": "Dùng Lệnh",
+        "upscaling": "Upscale",
+        "tileSize": "Kích Thước Khối",
+        "disabledNoRasterContent": "Đã Tắt (Không Có Nội Dung Dạng Raster)",
+        "modelDisabledForTrial": "Tạo sinh với {{modelName}} là không thể với tài khoản trial. Vào phần <LinkComponent>thiết lập tài khoản</LinkComponent> để nâng cấp.",
+        "useClipSkip": "Dùng CLIP Skip",
+        "duration": "Thời Lượng",
+        "downloadImage": "Tải Xuống Hình Ảnh",
+        "images_withCount_other": "Hình Ảnh",
+        "showOptionsPanel": "Hiển Thị Bảng Bên Cạnh (O hoặc T)",
+        "resolution": "Độ Phân Giải"
+    },
+    "dynamicPrompts": {
+        "seedBehaviour": {
+            "perIterationDesc": "Sử dụng hạt giống khác nhau cho mỗi lần lặp lại",
+            "perPromptDesc": "Sử dụng hạt giống khác nhau cho mỗi hình ảnh",
+            "label": "Hành Động Cho Hạt Giống",
+            "perPromptLabel": "Một Hạt Giống Mỗi Ảnh",
+            "perIterationLabel": "Hạt Giống Mỗi Lần Lặp Lại"
+        },
+        "loading": "Tạo Sinh Bằng Dynamic Prompt...",
+        "showDynamicPrompts": "HIện Dynamic Prompt",
+        "maxPrompts": "Số Lệnh Tối Đa",
+        "promptsPreview": "Xem Trước Lệnh",
+        "dynamicPrompts": "Dynamic Prompt",
+        "promptsToGenerate": "Lệnh Để Tạo Sinh"
+    },
+    "settings": {
+        "beta": "Beta",
+        "general": "Cài Đặt Chung",
+        "confirmOnDelete": "Xác Nhận Khi Xoá",
+        "developer": "Nhà Phát Triển",
+        "confirmOnNewSession": "Xác Nhận Khi Mở Phiên Mới",
+        "antialiasProgressImages": "Xử Lý Khử Răng Cưa Hình Ảnh",
+        "models": "Models",
+        "informationalPopoversDisabledDesc": "Hộp thoại hỗ trợ thông tin đã tắt. Bật lại trong Cài đặt.",
+        "enableModelDescriptions": "Bật Trình Mô Tả Model Bằng Hộp Thả",
+        "enableNSFWChecker": "Bật Trình Kiểm Tra NSFW",
+        "clearIntermediatesWithCount_other": "Dọn sạch {{count}} sản phẩm trung gian",
+        "reloadingIn": "Tải lại trong",
+        "resetWebUIDesc1": "Khởi động lại giao diện web chỉ làm mới bộ nhớ đệm của trình duyệt về ảnh và các thiết lập. Nó không hề xoá bất kỳ ảnh nào trong ổ đĩa.",
+        "intermediatesCleared_other": "Đã dọn {{count}} sản phẩm trung gian",
+        "generation": "Máy Tạo Sinh",
+        "enableInformationalPopovers": "Bật Hộp Thoại Hỗ Trợ Thông Tin",
+        "clearIntermediates": "Dọn Sạch Sản Phẩm Trung Gian",
+        "clearIntermediatesDisabled": "Hàng đợi phải trống để dọn dẹp các sản phẩm trung gian",
+        "clearIntermediatesDesc1": "Dọn dẹp các sản phẩm trung gian sẽ làm mới trạng thái của Canvas và ControlNet.",
+        "clearIntermediatesDesc2": "Các sản phẩm ảnh trung gian là sản phẩm phụ trong quá trình tạo sinh, khác với ảnh trong thư viện ảnh. Xoá sản phẩm trung gian sẽ giúp làm trống ổ đĩa.",
+        "resetWebUI": "Khởi Động Lại Giao Diện Web",
+        "showProgressInViewer": "Hiển Thị Hình Ảnh Đang Xử Lý Trong Trình Xem",
+        "ui": "Giao Diện Người Dùng",
+        "clearIntermediatesDesc3": "Ảnh trong thư viện ảnh sẽ không bị xoá.",
+        "informationalPopoversDisabled": "Hộp Thoại Hỗ Trợ Thông Tin Đã Tắt",
+        "resetComplete": "Giao diện web đã được khởi động lại.",
+        "resetWebUIDesc2": "Nếu ảnh không được xuất hiện trong thư viện ảnh hoặc điều gì đó không ổn đang diễn ra, hãy thử khởi động lại trước khi báo lỗi trên Github.",
+        "displayInProgress": "Hiển Thị Hình Ảnh Đang Xử Lý",
+        "intermediatesClearedFailed": "Có Vấn Đề Khi Dọn Sạch Sản Phẩm Trung Gian",
+        "enableInvisibleWatermark": "Bật Chế Độ Ẩn Watermark",
+        "showDetailedInvocationProgress": "Hiện Dữ Liệu Xử Lý",
+        "enableHighlightFocusedRegions": "Nhấn Mạnh Khu Vực Chỉ Định",
+        "modelDescriptionsDisabled": "Trình Mô Tả Model Bằng Hộp Thả Đã Tắt",
+        "modelDescriptionsDisabledDesc": "Trình mô tả model bằng hộp thả đã tắt. Bật lại trong Cài đặt."
+    },
+    "sdxl": {
+        "loading": "Đang Tải...",
+        "posAestheticScore": "Điểm Giống Tiêu Chuẩn",
+        "steps": "Số Bước",
+        "refinerSteps": "Số Bước Refiner",
+        "refinermodel": "Model Refiner",
+        "refinerStart": "Bắt Đầu Refiner",
+        "denoisingStrength": "Sức Mạnh Khử Nhiễu",
+        "scheduler": "Scheduler",
+        "refiner": "Refiner",
+        "cfgScale": "Thang CFG",
+        "negAestheticScore": "Điểm Khác Tiêu Chuẩn",
+        "noModelsAvailable": "Không có sẵn model",
+        "concatPromptStyle": "Liên Kết Lệnh & Phong Cách",
+        "freePromptStyle": "Viết Thủ Công Lệnh Phong Cách",
+        "negStylePrompt": "Điểm Tiêu Cực Cho Lệnh Phong Cách",
+        "posStylePrompt": "Điểm Tích Cực Cho Lệnh Phong Cách"
+    },
+    "controlLayers": {
+        "width": "Chiều Rộng",
+        "negativePrompt": "Lệnh Tiêu Cực",
+        "removeBookmark": "Bỏ Đánh Dấu",
+        "saveBboxToGallery": "Lưu Hộp Giới Hạn Vào Thư Viện Ảnh",
+        "global": "Toàn Vùng",
+        "pullBboxIntoReferenceImageError": "Có Vấn Đề Khi Chuyển Hộp Giới Hạn Thành Ảnh Mẫu",
+        "clearHistory": "Xoá Lịch Sử",
+        "recalculateRects": "Tính Toán Lại Hình Chữ Nhật",
+        "mergeVisibleOk": "Đã gộp layer",
+        "saveLayerToAssets": "Lưu Layer Vào Khu Tài Nguyên",
+        "canvas": "Canvas",
+        "savedToGalleryOk": "Đã Lưu Vào Thư Viện Ảnh",
+        "clipToBbox": "Chuyển Nét Thành Hộp Giới Hạn",
+        "moveToFront": "Chuyển Lên Trước",
+        "mergeVisible": "Gộp Layer Đang Hiển Thị",
+        "savedToGalleryError": "Lỗi khi lưu vào thư viện ảnh",
+        "moveToBack": "Chuyển Về Sau",
+        "moveBackward": "Chuyển Xuống Cuối",
+        "newGlobalReferenceImageError": "Có Vấn Đề Khi Tạo Ảnh Mẫu Toàn Vùng",
+        "newRegionalReferenceImageOk": "Đã Tạo Ảnh Mẫu Khu Vực",
+        "newControlLayerOk": "Đã Tạo Layer Điều Khiển Được",
+        "newControlLayerError": "Có Vấn Đề Khi Tạo Layer Điều Khiển Được",
+        "newRasterLayerOk": "Đã Tạo Layer Dạng Raster",
+        "pullBboxIntoLayerOk": "Chuyển Hợp Giới Hạn Thành Layer",
+        "newGlobalReferenceImageOk": "Đã Tạo Ảnh Mẫu Toàn Vùng",
+        "newRegionalReferenceImageError": "Có Vấn Đề Khi Tạo Ảnh Mẫu Khu Vực",
+        "newRasterLayerError": "Có Vấn Đề Khi Tạo Layer Dạng Raster",
+        "pullBboxIntoLayerError": "Có Vấn Đề Khi Chuyển Hộp Giới Hạn Thành Layer",
+        "pullBboxIntoReferenceImageOk": "Chuyển Hộp Giới Hạn Thành Ảnh Mẫu",
+        "clearCaches": "Xoá Bộ Nhớ Đệm",
+        "outputOnlyMaskedRegions": "Chỉ Xuất Đầu Ra Ở Vùng Tạo Sinh",
+        "addLayer": "Thêm Layer",
+        "regional": "Khu Vực",
+        "regionIsEmpty": "Vùng được chọn trống",
+        "bookmark": "Đánh Dấu Để Đổi Nhanh",
+        "saveCanvasToGallery": "Lưu Canvas Vào Thư Viện Ảnh",
+        "cropLayerToBbox": "Xén Layer Vào Hộp Giới Hạn",
+        "mergeDown": "Gộp Xuống",
+        "mergeVisibleError": "Lỗi khi gộp layer",
+        "bboxOverlay": "Hiển Thị Lớp Phủ Trên Hộp Giới Hạn",
+        "duplicate": "Nhân Bản",
+        "moveForward": "Chuyển Lên Đầu",
+        "fitBboxToLayers": "Xếp Vừa Hộp Giới Hạn Vào Layer",
+        "ipAdapterMethod": {
+            "full": "Phong Cách Và Thành Phần",
+            "style": "Phong Cách (Đơn Giản)",
+            "composition": "Chỉ Lấy Thành Phần",
+            "ipAdapterMethod": "Cách Thức",
+            "compositionDesc": "Áp dụng cách trình bày và bỏ qua phong cách mẫu.",
+            "fullDesc": "Áp dụng phong cách trực quan (màu, cấu tạo) & thành phần (cách trình bày).",
+            "styleDesc": "Áp dụng phong cách trực quan (màu, cấu tạo) và bỏ qua cách trình bày. Tên trước đây là Chỉ Lấy Phong Cách.",
+            "styleStrong": "Phong Cách (Mạnh Mẽ)",
+            "styleStrongDesc": "Áp dụng cách trình bày mạnh mẽ, với một chút giảm nhẹ ảnh hưởng lên thành phần.",
+            "stylePrecise": "Phong Cách (Chính Xác)",
+            "stylePreciseDesc": "Áp dụng cách trình bày chính xác, loại bỏ các chủ thể ảnh hưởng."
+        },
+        "rasterLayer": "Layer Dạng Raster",
+        "disableAutoNegative": "Tắt Tự Động Đảo Chiều",
+        "controlLayer": "Layer Điều Khiển Được",
+        "enableTransparencyEffect": "Bật Hiệu Ứng Trong Suốt",
+        "deleteSelected": "Xoá Phần Được Chọn",
+        "showHUD": "Hiển Thị HUD",
+        "autoNegative": "Tự Động Đảo Chiều",
+        "replaceLayer": "Thay Đổi Layer",
+        "regionalGuidance": "Chỉ Dẫn Khu Vực",
+        "newCanvasFromImage": "Canvas Mới Từ Ảnh",
+        "convertRasterLayerTo": "Chuyển Đổi $t(controlLayers.rasterLayer) Thành",
+        "convertControlLayerTo": "Chuyển Đổi $t(controlLayers.controlLayer) Thành",
+        "convertInpaintMaskTo": "Chuyển Đổi $t(controlLayers.inpaintMask) Thành",
+        "convertRegionalGuidanceTo": "Chuyển Đổi $t(controlLayers.regionalGuidance) Thành",
+        "copyInpaintMaskTo": "Sao Chép $t(controlLayers.inpaintMask) Tới",
+        "copyRegionalGuidanceTo": "Sao Chép $t(controlLayers.regionalGuidance) Tới",
+        "newControlLayer": "$t(controlLayers.controlLayer) Mới",
+        "newRasterLayer": "$t(controlLayers.rasterLayer) Mới",
+        "enableAutoNegative": "Bật Tự Động Đảo Chiều",
+        "sendToCanvas": "Chuyển Tới Canvas",
+        "hidingType": "Ẩn {{type}}",
+        "copyToClipboard": "Sao Chép Vào Clipboard",
+        "logDebugInfo": "Thông Tin Log Gỡ Lỗi",
+        "regionalReferenceImage": "Ảnh Mẫu Khu Vực",
+        "newLayerFromImage": "Layer Mới Từ Ảnh",
+        "fill": {
+            "fillStyle": "Kiểu Lấp Đầy",
+            "fillColor": "Màu Lấp Đầy",
+            "grid": "Theo Lưới",
+            "diagonal": "Đường Chéo",
+            "horizontal": "Đường Ngang",
+            "crosshatch": "Đường Chéo Song Song (Crosshatch)",
+            "vertical": "Đường Dọc",
+            "solid": "Chắc Chắn",
+            "bgFillColor": "Màu Nền",
+            "fgFillColor": "Màu Nổi"
+        },
+        "addControlLayer": "Thêm $t(controlLayers.controlLayer)",
+        "inpaintMask": "Lớp Phủ Inpaint",
+        "dynamicGrid": "Lưới Dynamic",
+        "layer_other": "Layer",
+        "pullBboxIntoLayer": "Chuyển Hộp Giới Hạn Vào Layer",
+        "addInpaintMask": "Thêm $t(controlLayers.inpaintMask)",
+        "addRegionalGuidance": "Thêm $t(controlLayers.regionalGuidance)",
+        "unlocked": "Mở Khoá",
+        "addReferenceImage": "Thêm $t(controlLayers.referenceImage)",
+        "inpaintMask_withCount_other": "Lớp Phủ Inpaint",
+        "regionalGuidance_withCount_other": "Chỉ Dẫn Khu Vực",
+        "rasterLayer_withCount_other": "Layer Dạng Raster",
+        "copyRasterLayerTo": "Sao Chép $t(controlLayers.rasterLayer) Tới",
+        "copyControlLayerTo": "Sao Chép $t(controlLayers.controlLayer) Tới",
+        "newRegionalGuidance": "$t(controlLayers.regionalGuidance) Mới",
+        "pullBboxIntoReferenceImage": "Chuyển Hộp Giới Hạn Vào Ảnh Mẫu",
+        "maskFill": "Lấp Đầy Lớp Phủ",
+        "addRasterLayer": "Thêm $t(controlLayers.rasterLayer)",
+        "referenceImage": "Ảnh Mẫu",
+        "showProgressOnCanvas": "Hiện Quá Trình Xử Lý Lên Canvas",
+        "prompt": "Lệnh",
+        "beginEndStepPercentShort": "Phần Trăm Bắt Đầu/Kết Thúc",
+        "weight": "Trọng Lượng",
+        "controlMode": {
+            "controlMode": "Chế Độ Điều Khiển",
+            "balanced": "Cân Bằng (khuyến khích)",
+            "prompt": "Lệnh",
+            "control": "Điều Khiển",
+            "megaControl": "Siêu Điều Khiển"
+        },
+        "addPositivePrompt": "Thêm $t(controlLayers.prompt)",
+        "deleteReferenceImage": "Xoá Ảnh Mẫu",
+        "disableTransparencyEffect": "Tắt Hiệu Ứng Trong Suốt",
+        "opacity": "Độ Mờ Đục",
+        "rectangle": "Hình Chữ Nhật",
+        "addNegativePrompt": "Thêm $t(controlLayers.negativePrompt)",
+        "globalReferenceImage": "Ảnh Mẫu Toàn Vùng",
+        "controlLayer_withCount_other": "Layer Điều Khiển Được",
+        "newInpaintMask": "$t(controlLayers.inpaintMask) Mới",
+        "locked": "Khoá",
+        "transparency": "Độ Trong Suốt",
+        "showingType": "Hiển Thị {{type}}",
+        "selectObject": {
+            "invertSelection": "Đảo Ngược Phần Chọn",
+            "include": "Bao Gồm",
+            "exclude": "Loại Trừ",
+            "reset": "Làm Mới",
+            "saveAs": "Lưu Như",
+            "dragToMove": "Kéo kiểm để di chuyển nó",
+            "clickToAdd": "Nhấp chuột vào layer để thêm điểm",
+            "clickToRemove": "Nhấp chuột vào một điểm để xoá",
+            "selectObject": "Chọn Đối Tượng",
+            "pointType": "Loại Điểm",
+            "neutral": "Trung Hoà",
+            "apply": "Áp Dụng",
+            "cancel": "Huỷ Bỏ",
+            "process": "Xử Lý"
+        },
+        "canvasContextMenu": {
+            "saveBboxToGallery": "Lưu Hộp Giới Hạn Vào Thư Viện Ảnh",
+            "newGlobalReferenceImage": "Ảnh Mẫu Toàn Vùng Mới",
+            "cropCanvasToBbox": "Xén Canvas Vào Hộp Giới Hạn",
+            "newRegionalGuidance": "Chỉ Dẫn Khu Vực Mới",
+            "saveToGalleryGroup": "Lưu Vào Thư Viện Ảnh",
+            "newInpaintMask": "Lớp Phủ Inpaint Mới",
+            "saveCanvasToGallery": "Lưu Canvas Vào Thư Viện Ảnh",
+            "newRegionalReferenceImage": "Ảnh Mẫu Khu Vực Mới",
+            "newControlLayer": "Layer Điều Khiển Được Mới",
+            "newRasterLayer": "Layer Dạng Raster Mới",
+            "bboxGroup": "Được Tạo Từ Hộp Giới Hạn",
+            "canvasGroup": "Canvas",
+            "copyCanvasToClipboard": "Sao Chép Canvas Vào Clipboard",
+            "copyToClipboard": "Sao Chép Vào Clipboard",
+            "copyBboxToClipboard": "Sao Chép Hộp Giới Hạn Vào Clipboard",
+            "newResizedControlLayer": "Layer Điều Khiển Được Đã Chỉnh Kích Thước Mới"
+        },
+        "stagingArea": {
+            "saveToGallery": "Lưu Vào Thư Viện Ảnh",
+            "accept": "Chấp Nhận",
+            "discard": "Bỏ Đi",
+            "previous": "Trước",
+            "next": "Sau",
+            "showResultsOn": "Hiển Thị Kết Quả",
+            "discardAll": "Bỏ Đi Tất Cả",
+            "showResultsOff": "Ẩn Đi Kết Quả"
+        },
+        "filter": {
+            "dw_openpose_detection": {
+                "draw_face": "Vẽ Mặt",
+                "description": "Phát hiện tư thế người trong layer được chọn bằng model DW Openpose.",
+                "draw_hands": "Vẽ Tay",
+                "label": "Trình Phát Hiện DW Openpose",
+                "draw_body": "Vẽ Cơ Thể"
+            },
+            "hed_edge_detection": {
+                "label": "Trình Phát Hiện HED Edge",
+                "description": "Tạo ra dữ liệu cạnh từ layer được chọn bằng model phát hiện HED Edge.",
+                "scribble": "Vẽ Nguệch Ngoạc"
+            },
+            "canny_edge_detection": {
+                "low_threshold": "Ngưỡng Thấp",
+                "high_threshold": "Ngưỡng Cao",
+                "label": "Trình Phát Hiện Cạnh Canny",
+                "description": "Tạo sinh một dữ liệu cạnh từ layer được chọn bằng thuật toán phát hiện cạnh Canny."
+            },
+            "depth_anything_depth_estimation": {
+                "label": "Depth Anything",
+                "model_size_small_v2": "Small v2",
+                "model_size": "Kích Thước Model",
+                "description": "Tạo dữ liệu chiều sâu từ layer được chọn bằng model Depth Anything.",
+                "model_size_base": "Base",
+                "model_size_small": "Small",
+                "model_size_large": "Large"
+            },
+            "mediapipe_face_detection": {
+                "min_confidence": "Độ Tư Tin Tối Thiểu",
+                "label": "Trình Phát Hiện Mặt MediaPipe",
+                "description": "Phát hiện mặt trong layer được chọn bằng model phát hiện mặt MediaPipe.",
+                "max_faces": "Số Lượng Mặt Tối Đa"
+            },
+            "lineart_edge_detection": {
+                "description": "Tạo ra dữ liệu cạnh từ layer được chọn bằng model phát hiện cạnh Lineart.",
+                "coarse": "Thô",
+                "label": "Trình Phát Hiện Cạnh Lineart"
+            },
+            "process": "Xử Lý",
+            "reset": "Làm Mới",
+            "cancel": "Huỷ Bỏ",
+            "pidi_edge_detection": {
+                "label": "Trình Phát Hiện Cạnh PiDiNet",
+                "scribble": "Vẽ Nguệch Ngoạc",
+                "quantize_edges": "Lượng Tử Hoá Cạnh",
+                "description": "Tạo ra dữ liệu cạnh từ layer được chọn bằng model phát hiện cạnh PiDiNet."
+            },
+            "spandrel_filter": {
+                "model": "Model",
+                "scale": "Tỉ Lệ Mong Muốn",
+                "label": "Model Hình Ảnh Sang Hình Ảnh",
+                "description": "Chạy model ảnh sang ảnh trên layer được chọn.",
+                "autoScale": "Tự Động Chỉnh Tỉ Lệ",
+                "autoScaleDesc": "Model được chọn sẽ chạy cho đến khi chạm đến tỉ lệ mong muốn."
+            },
+            "filterType": "Kiểu Lọc",
+            "apply": "Áp Dụng",
+            "mlsd_detection": {
+                "score_threshold": "Ngưỡng Điểm",
+                "distance_threshold": "Ngưỡng Xa",
+                "label": "Trình Phát Hiện Đoạn Thẳng",
+                "description": "Tạo ra dữ liệu đoạn thẳng từ layer được chọn bằng model phát hiện đoạn thẳng MLSD."
+            },
+            "content_shuffle": {
+                "description": "Xáo trộn nội dung của layer được chọn, giống với hiệu ứng kéo (liquify).",
+                "label": "Xáo Trộn Nội Dung",
+                "scale_factor": "Hệ Số Tỉ Lệ"
+            },
+            "normal_map": {
+                "label": "Dữ Liệu Bình Thường",
+                "description": "Tạo một dữ liệu bình thường từ layer được chọn."
+            },
+            "filters": "Bộ Lọc",
+            "autoProcess": "Tự Động Xử Lý",
+            "lineart_anime_edge_detection": {
+                "label": "Trình Phát Hiện Cạnh Lineart Anime",
+                "description": "Tạo ra dữ liệu cạnh từ layer được chọn bằng model phát hiện cạnh Lineart Anime."
+            },
+            "filter": "Bộ Lọc",
+            "color_map": {
+                "description": "Tạo một dữ liệu màu từ layer được chọn.",
+                "tile_size": "Kích Thước Khối",
+                "label": "Dữ Liệu Màu"
+            },
+            "advanced": "Nâng Cao",
+            "processingLayerWith": "Đang xử lý layer với bộ lọc {{type}}.",
+            "forMoreControl": "Để kiểm soát tốt hơn, bấm vào mục Nâng Cao bên dưới.",
+            "img_blur": {
+                "description": "Làm mờ layer được chọn.",
+                "blur_type": "Dạng Làm Mờ",
+                "blur_radius": "Radius",
+                "gaussian_type": "Gaussian",
+                "label": "Làm Mờ Ảnh",
+                "box_type": "Box"
+            },
+            "img_noise": {
+                "salt_and_pepper_type": "Salt and Pepper",
+                "noise_amount": "Lượng Nhiễu",
+                "label": "Độ Nhiễu Ảnh",
+                "description": "Tăng độ nhiễu vào layer được chọn.",
+                "noise_type": "Dạng Nhiễu",
+                "gaussian_type": "Gaussian",
+                "noise_color": "Màu Nhiễu",
+                "size": "Cỡ Nhiễu"
+            },
+            "adjust_image": {
+                "channel": "Kênh Màu",
+                "cyan": "Lục Lam (Cmyk)",
+                "value_setting": "Giá Trị",
+                "scale_values": "Giá Trị Theo Tỉ Lệ",
+                "red": "Đỏ (Rgba)",
+                "green": "Lục (rGba)",
+                "blue": "Lam (rgBa)",
+                "alpha": "Độ Trong Suốt (rgbA)",
+                "luminosity": "Độ Sáng (Lab)",
+                "magenta": "Hồng Đỏ (cMyk)",
+                "yellow": "Vàng (cmYk)",
+                "description": "Điều chỉnh kênh màu được chọn của ảnh.",
+                "black": "Đen (cmyK)",
+                "cr": "Cr (ycC)",
+                "label": "Điều Chỉnh Ảnh",
+                "value": "Độ Sáng (hsV)",
+                "saturation": "Độ Bão Hoà (hSv)",
+                "hue": "Vùng Màu (Hsv)",
+                "a": "A (lAb)",
+                "b": "B (laB)",
+                "y": "Y (Ycc)",
+                "cb": "Cb (yCc)"
+            }
+        },
+        "transform": {
+            "fitModeCover": "Che Phủ",
+            "fitModeFill": "Lấp Đầy",
+            "transform": "Biến Hình",
+            "fitToBbox": "Xếp Vừa Vào Hộp Giới Hạn",
+            "fitMode": "Chế Độ Xếp Vừa",
+            "apply": "Áp Dụng",
+            "cancel": "Huỷ Bỏ",
+            "fitModeContain": "Bao Gồm",
+            "reset": "Làm Mới"
+        },
+        "HUD": {
+            "entityStatus": {
+                "isHidden": "{{title}} đang được ẩn",
+                "isTransforming": "{{title}} đang được biến đổi",
+                "isEmpty": "{{title}} đang trống",
+                "isLocked": "{{title}} đang bị khoá",
+                "isFiltering": "{{title}} đang được lọc",
+                "isDisabled": "{{title}} đang bị tắt"
+            },
+            "bbox": "Hộp Giới Hạn",
+            "scaledBbox": "Hộp Giới Hạn Được Chia Tỉ Lệ"
+        },
+        "settings": {
+            "isolatedLayerPreview": "Xem Trước Layer Bị Cô Lập",
+            "invertBrushSizeScrollDirection": "Cuộn Ngược Lại Cho Cỡ Cọ",
+            "snapToGrid": {
+                "on": "Bật",
+                "label": "Gắn Vào Lưới",
+                "off": "Tắt"
+            },
+            "pressureSensitivity": "Độ Nhạy Áp Lực",
+            "preserveMask": {
+                "label": "Bảo Vệ Vùng Bao Phủ",
+                "alert": "Đang Bảo Vệ Vùng Bao Phủ"
+            },
+            "isolatedLayerPreviewDesc": "Có hay không hiển thị riêng layer này khi thực hiện các thao tác như lọc hay biến đổi.",
+            "isolatedStagingPreview": "Xem Trước Tổng Quan Phần Cô Lập",
+            "isolatedPreview": "Xem Trước Phần Cô Lập",
+            "saveAllImagesToGallery": {
+                "label": "Chuyển Sản Phẩm Tạo Sinh Mới Vào Thư Viện Ảnh",
+                "alert": "Đang chuyển sản phẩm tạo sinh mới vào Thư Viện Ảnh, bỏ qua Canvas"
+            }
+        },
+        "tool": {
+            "eraser": "Tẩy",
+            "brush": "Cọ",
+            "rectangle": "Hình Chữ Nhật",
+            "bbox": "Hộp Giới Hạn",
+            "move": "Di Chuyển",
+            "view": "Công Cụ Xem",
+            "colorPicker": "Chọn Màu"
+        },
+        "mergingLayers": "Đang gộp layer",
+        "controlLayerEmptyState": "<UploadButton>Tải lên ảnh</UploadButton>, kéo thả ảnh từ thư viện ảnh vào layer này, <PullBboxButton>kéo hộp giới hạn vào layer này</PullBboxButton>, hoặc vẽ trên canvas để bắt đầu.",
+        "referenceImageEmptyState": "<UploadButton>Tải lên hình ảnh</UploadButton> hoặc kéo ảnh từ thư viện ảnh vào Ảnh Mẫu để bắt đầu.",
+        "useImage": "Dùng Hình Ảnh",
+        "resetCanvasLayers": "Khởi Động Lại Layer Canvas",
+        "asRasterLayer": "Như $t(controlLayers.rasterLayer)",
+        "asRasterLayerResize": "Như $t(controlLayers.rasterLayer) (Thay Đổi Kích Thước)",
+        "asControlLayer": "Như $t(controlLayers.controlLayer)",
+        "asControlLayerResize": "Như $t(controlLayers.controlLayer) (Thay Đổi Kích Thước)",
+        "newSession": "Phiên Làm Việc Mới",
+        "resetGenerationSettings": "Khởi Động Lại Cài Đặt Tạo Sinh",
+        "referenceImageRegional": "Ảnh Mẫu (Khu Vực)",
+        "warnings": {
+            "problemsFound": "Phát hiện vấn đề",
+            "unsupportedModel": "layer không được hỗ trợ cho model cơ sở này",
+            "controlAdapterNoModelSelected": "không có model được chọn cho Layer Chỉnh Sửa Được",
+            "controlAdapterNoControl": "chưa chọn/vẽ điều khiển",
+            "ipAdapterIncompatibleBaseModel": "model cơ sở cho Ảnh Mẫu không tương thích",
+            "ipAdapterNoImageSelected": "chưa chọn Ảnh Mẫu",
+            "controlAdapterIncompatibleBaseModel": "model cơ sở cho Layer Chỉnh Sửa Được không tương thích",
+            "ipAdapterNoModelSelected": "không có model được chọn cho Ảnh Mẫu",
+            "rgNoPromptsOrIPAdapters": "không có lệnh hoặc Ảnh Mẫu",
+            "rgNegativePromptNotSupported": "Lệnh Tiêu Cực không được hỗ trợ cho model cơ sở được chọn",
+            "rgReferenceImagesNotSupported": "Ảnh Mẫu Khu Vực không được hỗ trợ cho model cơ sở được chọn",
+            "rgAutoNegativeNotSupported": "Tự Động Đảo Chiều không được hỗ trợ cho model cơ sở được chọn",
+            "rgNoRegion": "không có khu vực được vẽ",
+            "fluxFillIncompatibleWithControlLoRA": "LoRA Điều Khiển Được không tương tích với FLUX Fill",
+            "bboxHidden": "Hộp giới hạn đang ẩn (shift+o để bật/tắt)"
+        },
+        "pasteTo": "Dán Vào",
+        "pasteToAssets": "Tài Nguyên",
+        "pasteToAssetsDesc": "Dán Vào Tài Nguyên",
+        "pasteToBbox": "Hộp Giới Hạn",
+        "pasteToBboxDesc": "Layer Mới (Trong Hộp Giới Hạn)",
+        "pasteToCanvas": "Canvas",
+        "pasteToCanvasDesc": "Layer Mới (Trong Canvas)",
+        "regionCopiedToClipboard": "Sao Chép {{region}} Vào Clipboard",
+        "copyRegionError": "Lỗi khi sao chép {{region}}",
+        "errors": {
+            "unableToLoadImage": "Không Thể Tải Hình Ảnh",
+            "unableToFindImage": "Không Thể Tìm Hình Ảnh"
+        },
+        "fluxReduxImageInfluence": {
+            "low": "Thấp",
+            "lowest": "Thấp Nhất",
+            "high": "Cao",
+            "imageInfluence": "Ảnh Chi Phối",
+            "medium": "Vừa",
+            "highest": "Cao Nhất"
+        },
+        "addDenoiseLimit": "Thêm $t(controlLayers.denoiseLimit)",
+        "imageNoise": "Độ Nhiễu Hình Ảnh",
+        "denoiseLimit": "Giới Hạn Khử Nhiễu",
+        "addImageNoise": "Thêm $t(controlLayers.imageNoise)",
+        "referenceImageEmptyStateWithCanvasOptions": "<UploadButton>Tải lên hình ảnh</UploadButton>, kéo ảnh từ thư viện ảnh vào Ảnh Mẫu này, hoặc <PullBboxButton>kéo hộp giới hạn vào Ảnh Mẫu này</PullBboxButton> để bắt đầu.",
+        "exportCanvasToPSD": "Xuất Canvas Thành File PSD",
+        "ruleOfThirds": "Hiển Thị Quy Tắc Một Phần Ba",
+        "showNonRasterLayers": "Hiển Thị Layer Không Thuộc Dạng Raster (Shift + H)",
+        "hideNonRasterLayers": "Ẩn Layer Không Thuộc Dạng Raster (Shift + H)",
+        "autoSwitch": {
+            "off": "Tắt",
+            "switchOnStart": "Khi Bắt Đầu",
+            "switchOnFinish": "Khi Kết Thúc"
+        },
+        "fitBboxToMasks": "Xếp Vừa Hộp Giới Hạn Vào Lớp Phủ",
+        "invertMask": "Đảo Ngược Lớp Phủ",
+        "maxRefImages": "Ảnh Mẫu Tối Đa",
+        "useAsReferenceImage": "Dùng Làm Ảnh Mẫu",
+        "deletePrompt": "Xoá Lệnh",
+        "addGlobalReferenceImage": "Thêm $t(controlLayers.globalReferenceImage)",
+        "referenceImageGlobal": "Ảnh Mẫu (Toàn Vùng)",
+        "sendingToCanvas": "Chuyển Ảnh Tạo Sinh Vào Canvas",
+        "sendingToGallery": "Chuyển Ảnh Tạo Sinh Vào Thư Viện Ảnh",
+        "sendToGallery": "Chuyển Tới Thư Viện Ảnh",
+        "sendToGalleryDesc": "Bấm 'Kích Hoạt' sẽ tiến hành tạo sinh và lưu ảnh vào thư viện ảnh.",
+        "newImg2ImgCanvasFromImage": "Chuyển Đổi Ảnh Sang Ảnh Mới Từ Ảnh",
+        "sendToCanvasDesc": "Bấm 'Kích Hoạt' sẽ hiển thị công việc đang xử lý của bạn lên canvas.",
+        "viewProgressInViewer": "Xem quá trình xử lý và ảnh đầu ra trong <Btn>Trình Xem Ảnh</Btn>.",
+        "viewProgressOnCanvas": "Xem quá trình xử lý và ảnh đầu ra trong <Btn>Canvas</Btn>.",
+        "globalReferenceImage_withCount_other": "$t(controlLayers.globalReferenceImage)",
+        "regionalGuidance_withCount_hidden": "Chỉ Dẫn Khu Vực ({{count}} đang ẩn)",
+        "controlLayers_withCount_hidden": "Layer Điều Khiển Được ({{count}} đang ẩn)",
+        "rasterLayers_withCount_hidden": "Layer Dạng Raster ({{count}} đang ẩn)",
+        "globalReferenceImages_withCount_hidden": "Ảnh Mẫu Toàn Vùng ({{count}} đang ẩn)",
+        "inpaintMasks_withCount_hidden": "Lớp Phủ Inpaint ({{count}} đang ẩn)",
+        "regionalGuidance_withCount_visible": "Chỉ Dẫn Khu Vực ({{count}})",
+        "controlLayers_withCount_visible": "Layer Điều Khiển Được ({{count}})",
+        "rasterLayers_withCount_visible": "Layer Dạng Raster ({{count}})",
+        "globalReferenceImages_withCount_visible": "Ảnh Mẫu Toàn Vùng ({{count}})",
+        "inpaintMasks_withCount_visible": "Lớp Phủ Inpaint ({{count}})",
+        "layer_withCount_other": "Layer ({{count}})",
+        "pastedTo": "Dán Vào {{destination}}",
+        "stagingOnCanvas": "Hiển thị hình ảnh lên",
+        "newGallerySession": "Phiên Thư Viện Ảnh Mới",
+        "newGallerySessionDesc": "Nó sẽ dọn sạch canvas và các thiết lập trừ model được chọn. Các ảnh được tạo sinh sẽ được chuyển đến thư viện ảnh.",
+        "newCanvasSession": "Phiên Canvas Mới",
+        "newCanvasSessionDesc": "Nó sẽ dọn sạch canvas và các thiết lập trừ model được chọn. Các ảnh được tạo sinh sẽ được chuyển đến canvas.",
+        "replaceCurrent": "Thay Đổi Cái Hiện Tại",
+        "uploadOrDragAnImage": "Kéo ảnh từ thư viện ảnh hoặc <UploadButton>tải lên ảnh</UploadButton>."
+    },
+    "stylePresets": {
+        "negativePrompt": "Lệnh Tiêu Cực",
+        "viewModeTooltip": "Đây là cách lệnh của bạn sẽ trông giống khi dùng với mẫu trình bày được chọn hiện tại. Để chỉnh sửa lệnh, nhấp chuột vào bất kỳ nơi nào trên hộp văn bản.",
+        "flatten": "Chuyển mẫu trình bày đang chọn thành lệnh hiện tại",
+        "promptTemplatesDesc3": "Nếu bạn bỏ quá ký tự tạm thời, mẫu trình bày sẽ được thêm vào ở cuối lệnh.",
+        "positivePrompt": "Lệnh Tích Cực",
+        "private": "Cá Nhân",
+        "toggleViewMode": "Tắt Chế Độ Xem",
+        "acceptedColumnsKeys": "Các cột/từ khoá được chấp nhận:",
+        "positivePromptColumn": "'prompt' hoặc 'positive_prompt'",
+        "noMatchingTemplates": "Không có mẫu trình bày phù hợp",
+        "myTemplates": "Mẫu Trình Bày Của Tôi",
+        "type": "Loại",
+        "copyTemplate": "Sao Chép Mẫu Trình Bày",
+        "exportFailed": "Không thể tạo ra và tải xuống CSV",
+        "searchByName": "Tìm theo tên",
+        "sharedTemplates": "Mẫu Trình Bày Nhóm",
+        "shared": "Nhóm",
+        "uploadImage": "Tải Lên Ảnh",
+        "deleteTemplate": "Xoá Mẫu Trình Bày",
+        "editTemplate": "Chỉnh Sửa Mẫu Trình Bày",
+        "insertPlaceholder": "Thêm ký hiệu tạm thời",
+        "promptTemplatesDesc1": "Mẫu trình bày cho lệnh thêm từ ngữ cho lệnh bạn viết trong hộp lệnh.",
+        "preview": "Xem Trước",
+        "updatePromptTemplate": "Cập Nhật Mẫu Trình Bày Cho Lệnh",
+        "negativePromptColumn": "'negative_prompt'",
+        "useForTemplate": "Dùng Cho Mẫu Trình Bày Cho Lệnh",
+        "choosePromptTemplate": "Chọn Mẫu Trình Bày Cho Lệnh",
+        "defaultTemplates": "Mẫu Trình Bày Mặc Định",
+        "deleteTemplate2": "Bạn có chắc muốn xoá mẫu trình bày này? Không đi lại được đâu.",
+        "active": "Hiệu Lực",
+        "promptTemplatesDesc2": "Dùng ký tự tạm thời <Pre>{{placeholder}}</Pre> để cụ thể hoá nơi lệnh nên được bao gồm trong mẫu trình bày.",
+        "viewList": "Xem Danh Sách Mẫu Trình Bày",
+        "createPromptTemplate": "Tạo Mẫu Trình Bày Cho Lệnh",
+        "nameColumn": "'name'",
+        "name": "Tên",
+        "importTemplates": "Nhập Vào Mẫu Trình Bày Cho Lệnh (CSV/JSON)",
+        "clearTemplateSelection": "Dọn Sạch Mẫu Trình Bày Đã Chọn",
+        "exportDownloaded": "Xuất Mẫu Đã Tải Xuống",
+        "noTemplates": "Không có mẫu trình bày",
+        "promptTemplateCleared": "Mẫu Trình Bày Cho Lệnh Đã Được Dọn",
+        "deleteImage": "Xoá Hình Ảnh",
+        "exportPromptTemplates": "Xuất Mẫu Trình Bày Cho Lệnh Ra (CSV)",
+        "templateDeleted": "Mẫu trình bày cho lệnh đã được xoá",
+        "unableToDeleteTemplate": "Không thể xoá mẫu trình bày cho lệnh",
+        "togglePromptPreviews": "Bật/Tắt Xem Trước Lệnh"
+    },
+    "system": {
+        "enableLogging": "Bật Chế Độ Ghi Log",
+        "logNamespaces": {
+            "models": "Models",
+            "gallery": "Thư Viện Ảnh",
+            "config": "Cấu Hình",
+            "queue": "Queue",
+            "workflows": "Workflow",
+            "events": "Sự Kiện",
+            "metadata": "Metadata",
+            "generation": "Generation",
+            "system": "Hệ Thống",
+            "canvas": "Canvas",
+            "logNamespaces": "Vùng Ghi Log",
+            "dnd": "Kéo Thả"
+        },
+        "logLevel": {
+            "logLevel": "Cấp Độ Log",
+            "error": "Error",
+            "fatal": "Fatal",
+            "trace": "Trace",
+            "warn": "Warn",
+            "debug": "Debug",
+            "info": "Info"
+        }
+    },
+    "toast": {
+        "imageUploadFailed": "Tải Lên Ảnh Thất Bại",
+        "layerCopiedToClipboard": "Sao Chép Layer Vào Clipboard",
+        "imageCopied": "Ảnh Đã Được Sao Chép",
+        "sentToUpscale": "Chuyển Vào Upscale",
+        "unableToLoadImage": "Không Thể Tải Hình Ảnh",
+        "unableToLoadStylePreset": "Không Thể Tải Phong Cách Được Cài Đặt Trước",
+        "stylePresetLoaded": "Phong Cách Được Cài Đặt Trước Đã Tải",
+        "unableToLoadImageMetadata": "Không Thể Tải Metadata Của Ảnh",
+        "workflowLoaded": "Workflow Đã Tải",
+        "uploadFailed": "Tải Lên Thất Bại",
+        "uploadFailedInvalidUploadDesc": "Phải là ảnh PNG, JPEG hoặc WEBP.",
+        "serverError": "Lỗi Server",
+        "addedToBoard": "Thêm vào tài nguyên của bảng {{name}}",
+        "sessionRef": "Phiên: {{sessionId}}",
+        "sentToCanvas": "Chuyển Vào Canvas",
+        "importFailed": "Nhập Vào Thất Bại",
+        "importSuccessful": "Nhập Vào Thành Công",
+        "workflowDeleted": "Workflow Đã Xoá",
+        "connected": "Kết Nối Đến Server",
+        "imageUploaded": "Ảnh Đã Được Tải Lên",
+        "modelImportCanceled": "Nhập Vào Model Thất Bại",
+        "parameters": "Tham Số",
+        "parameterSet": "Gợi Lại Tham Số",
+        "parameterSetDesc": "Gợi lại {{parameter}}",
+        "loadedWithWarnings": "Đã Tải Workflow Với Cảnh Báo",
+        "outOfMemoryErrorDesc": "Thiết lập tạo sinh hiện tại đã vượt mức cho phép của thiết bị. Hãy điều chỉnh thiết lập và thử lại.",
+        "problemRetrievingWorkflow": "Có Vấn Đề Khi Lấy Lại Workflow",
+        "somethingWentWrong": "Có Vấn Đề Phát Sinh",
+        "problemDeletingWorkflow": "Có Vấn Đề Khi Xoá Workflow",
+        "parameterNotSet": "Tham Số Không Được Gợi Lại",
+        "parameterNotSetDescWithMessage": "Không thể gợi lại {{parameter}}: {{message}}",
+        "parametersNotSet": "Tham Số Không Được Gợi Lại",
+        "errorCopied": "Lỗi Khi Sao Chép",
+        "prunedQueue": "Cắt Bớt Hàng Đợi",
+        "imagesWillBeAddedTo": "Ảnh đã tải lên sẽ được thêm vào tài nguyên của bảng {{boardName}}.",
+        "baseModelChangedCleared_other": "Cập nhật, dọn sạch hoặc tắt {{count}} model phụ không tương thích",
+        "canceled": "Quá Trình Xử Lý Đã Huỷ",
+        "baseModelChanged": "Model Cơ Sở Đã Đổi",
+        "addedToUncategorized": "Thêm vào tài nguyên của bảng $t(boards.uncategorized)",
+        "linkCopied": "Đường Liên Kết Đã Được Sao Chép",
+        "outOfMemoryError": "Lỗi Vượt Quá Bộ Nhớ",
+        "modelAddedSimple": "Đã Thêm Model Vào Hàng Đợi",
+        "parametersSet": "Tham Số Đã Được Gợi Lại",
+        "parameterNotSetDesc": "Không thể gợi lại {{parameter}}",
+        "problemCopyingImage": "Không Thể Sao Chép Ảnh",
+        "problemDownloadingImage": "Không Thể Tải Xuống Ảnh",
+        "problemCopyingLayer": "Không Thể Sao Chép Layer",
+        "problemSavingLayer": "Không Thể Lưu Layer",
+        "outOfMemoryErrorDescLocal": "Làm theo <LinkComponent>hướng dẫn VRAM Thấp</LinkComponent> của chúng tôi để hạn chế OOM (Tràn bộ nhớ).",
+        "unableToCopy": "Không Thể Sao Chép",
+        "unableToCopyDesc_theseSteps": "các bước sau",
+        "unableToCopyDesc": "Trình duyệt của bạn không hỗ trợ tính năng clipboard. Người dùng Firefox có thể khắc phục theo ",
+        "pasteSuccess": "Dán Vào {{destination}}",
+        "pasteFailed": "Dán Thất Bại",
+        "fluxFillIncompatibleWithT2IAndI2I": "FLUX Fill không tương tích với Từ Ngữ Sang Hình Ảnh và Hình Ảnh Sang Hình Ảnh. Dùng model FLUX khác cho các tính năng này.",
+        "problemUnpublishingWorkflowDescription": "Có vấn đề khi ngừng đăng tải workflow. Vui lòng thử lại sau.",
+        "workflowUnpublished": "Workflow Đã Được Ngừng Đăng Tải",
+        "problemUnpublishingWorkflow": "Có Vấn Đề Khi Ngừng Đăng Tải Workflow",
+        "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4o chỉ hỗ trợ Từ Ngữ Sang Hình Ảnh và Hình Ảnh Sang Hình Ảnh. Hãy dùng model khác cho các tác vụ Inpaint và Outpaint.",
+        "imagenIncompatibleGenerationMode": "Google {{model}} chỉ hỗ trợ Từ Ngữ Sang Hình Ảnh. Dùng các model khác cho Hình Ảnh Sang Hình Ảnh, Inpaint và Outpaint.",
+        "fluxKontextIncompatibleGenerationMode": "FLUX Kontext không hỗ trợ tạo sinh từ hình ảnh từ canvas. Thử sử dụng Ảnh Mẫu và tắt các Layer Dạng Raster.",
+        "noVisibleRasterLayers": "Không Có Layer Dạng Raster Hiển Thị",
+        "noVisibleRasterLayersDesc": "Khởi động ít nhất một layer dạng raster để xuất file PSD",
+        "invalidCanvasDimensions": "Kích Thước Canvas Không Phù Hợp",
+        "canvasTooLarge": "Canvas Quá Lớn",
+        "canvasTooLargeDesc": "Kích thước canvas vượt mức tối đa cho phép để xuất file PSD. Giảm cả chiều dài và chiều rộng chủa canvas và thử lại.",
+        "psdExportSuccess": "Xuất File PSD Hoàn Tất",
+        "psdExportSuccessDesc": "Thành công xuất {{count}} layer sang file PSD",
+        "problemExportingPSD": "Có Vấn Đề Khi Xuất File PSD",
+        "canvasManagerNotAvailable": "Trình Quản Lý Canvas Không Có Sẵn",
+        "promptGenerationStarted": "Trình tạo sinh lệnh khởi động",
+        "uploadAndPromptGenerationFailed": "Thất bại khi tải lên ảnh để tạo sinh lệnh",
+        "promptExpansionFailed": "Có vấn đề xảy ra. Hãy thử mở rộng lệnh lại.",
+        "maskInverted": "Đã Đảo Ngược Lớp Phủ",
+        "maskInvertFailed": "Thất Bại Khi Đảo Ngược Lớp Phủ",
+        "noVisibleMasks": "Không Có Lớp Phủ Đang Hiển Thị",
+        "noVisibleMasksDesc": "Tạo hoặc bật ít nhất một lớp phủ inpaint để đảo ngược",
+        "imageNotLoadedDesc": "Không thể tìm thấy ảnh",
+        "imageSaved": "Ảnh Đã Lưu",
+        "imageSavingFailed": "Lưu Ảnh Thất Bại",
+        "invalidUpload": "Dữ Liệu Tải Lên Không Hợp Lệ",
+        "layerSavedToAssets": "Lưu Layer Vào Khu Tài Nguyên",
+        "noRasterLayers": "Không Tìm Thấy Layer Dạng Raster",
+        "noRasterLayersDesc": "Tạo ít nhất một layer dạng raster để xuất file PSD",
+        "noActiveRasterLayers": "Không Có Layer Dạng Raster Hoạt Động",
+        "noActiveRasterLayersDesc": "Bật ít nhất một layer dạng raster để xuất file PSD",
+        "failedToProcessLayers": "Thất Bại Khi Xử Lý Layer",
+        "noValidLayerAdapters": "Không có Layer Adaper Phù Hợp",
+        "setControlImage": "Đặt làm ảnh điều khiển được",
+        "setNodeField": "Đặt làm vùng node",
+        "uploadFailedInvalidUploadDesc_withCount_other": "Cần tối đa {{count}} ảnh PNG, JPEG, hoặc WEBP.",
+        "noInpaintMaskSelected": "Không Có Lớp Phủ Inpant Được Chọn",
+        "noInpaintMaskSelectedDesc": "Chọn một lớp phủ inpaint để đảo ngược",
+        "invalidBbox": "Hộp Giới Hạn Không Hợp Lệ",
+        "invalidBboxDesc": "Hợp giới hạn có kích thước không hợp lệ"
+    },
+    "ui": {
+        "tabs": {
+            "gallery": "Thư Viện Ảnh",
+            "models": "Models",
+            "upscaling": "Upscale (Nâng Cấp Chất Lượng Hình Ảnh)",
+            "canvas": "Canvas (Vùng Ảnh)",
+            "upscalingTab": "$t(common.tab) $t(ui.tabs.upscaling)",
+            "modelsTab": "$t(common.tab) $t(ui.tabs.models)",
+            "queue": "Queue (Hàng Đợi)",
+            "workflows": "Workflow (Luồng Làm Việc)",
+            "workflowsTab": "$t(common.tab) $t(ui.tabs.workflows)",
+            "generate": "Tạo Sinh"
+        },
+        "launchpad": {
+            "workflowsTitle": "Đi sâu hơn với Workflow.",
+            "upscalingTitle": "Upscale và thêm chi tiết.",
+            "canvasTitle": "Biên tập và làm đẹp trên Canvas.",
+            "generateTitle": "Tạo sinh ảnh từ lệnh chữ.",
+            "modelGuideText": "Muốn biết lệnh nào tốt nhất cho từng model chứ?",
+            "modelGuideLink": "Xem thêm Hướng Dẫn Model.",
+            "workflows": {
+                "description": "Workflow là các template tái sử dụng được sẽ tự động hoá các tác vụ tạo sinh ảnh, cho phép bạn nhanh chóng thực hiện cách thao tác phức tạp và nhận được kết quả nhất quán.",
+                "learnMoreLink": "Học thêm cách tạo ra workflow",
+                "browseTemplates": {
+                    "title": "Duyệt Template Workflow",
+                    "description": "Chọn từ các workflow có sẵn cho những tác vụ cơ bản"
+                },
+                "createNew": {
+                    "title": "Tạo workflow mới",
+                    "description": "Tạo workflow mới từ ban đầu"
+                },
+                "loadFromFile": {
+                    "title": "Tải workflow từ tệp",
+                    "description": "Tải lên workflow để bắt đầu với những thiết lập sẵn có"
+                }
+            },
+            "upscaling": {
+                "uploadImage": {
+                    "title": "Tải Ảnh Để Upscale",
+                    "description": "Nhấp hoặc kéo ảnh để upscale (JPG, PNG, WebP lên đến 100MB)"
+                },
+                "replaceImage": {
+                    "title": "Thay Thế Ảnh Hiện Tại",
+                    "description": "Nhấp hoặc kéo ảnh mới để thay thế cái hiện tại"
+                },
+                "imageReady": {
+                    "title": "Ảnh Đã Sẵn Sàng",
+                    "description": "Bấm 'Kích Hoạt' để chuẩn bị upscale"
+                },
+                "readyToUpscale": {
+                    "title": "Chuẩn bị upscale!",
+                    "description": "Điều chỉnh thiết lập bên dưới, sau đó bấm vào nút 'Khởi Động' để chuẩn bị upscale ảnh."
+                },
+                "upscaleModel": "Model Upscale",
+                "model": "Model",
+                "helpText": {
+                    "promptAdvice": "Khi upscale, dùng lệnh để mô tả phương thức và phong cách. Tránh mô tả các chi tiết cụ thể trong ảnh.",
+                    "styleAdvice": "Upscale thích hợp nhất cho phong cách chung của ảnh."
+                },
+                "scale": "Kích Thước",
+                "creativityAndStructure": {
+                    "title": "Độ Sáng Tạo & Cấu Trúc Mặc Định",
+                    "conservative": "Bảo toàn",
+                    "balanced": "Cân bằng",
+                    "creative": "Sáng tạo",
+                    "artistic": "Thẩm mỹ"
+                }
+            },
+            "createNewWorkflowFromScratch": "Tạo workflow mới từ đầu",
+            "browseAndLoadWorkflows": "Duyệt và tải workflow có sẵn",
+            "addStyleRef": {
+                "title": "Thêm Phong Cách Mẫu",
+                "description": "Thêm ảnh để chuyển đổi diện mạo của nó."
+            },
+            "editImage": {
+                "title": "Biên Tập Ảnh",
+                "description": "Thêm ảnh để chỉnh sửa."
+            },
+            "generateFromText": {
+                "title": "Tạo Sinh Từ Chữ",
+                "description": "Nhập lệnh vào và Kích Hoạt."
+            },
+            "useALayoutImage": {
+                "title": "Dùng Bố Cục Ảnh",
+                "description": "Thêm ảnh để điều khiển bố cục."
+            },
+            "generate": {
+                "canvasCalloutTitle": "Đang tìm cách để điều khiển, chỉnh sửa, và làm lại ảnh?",
+                "canvasCalloutLink": "Vào Canvas cho nhiều tính năng hơn."
+            }
+        },
+        "panels": {
+            "launchpad": "Launchpad",
+            "workflowEditor": "Trình Biên Tập Workflow",
+            "imageViewer": "Trình Xem",
+            "canvas": "Canvas"
+        }
+    },
+    "workflows": {
+        "delete": "Xoá",
+        "descending": "Giảm Dần",
+        "created": "Đã Tạo",
+        "edit": "Chỉnh Sửa",
+        "download": "Tải Xuống",
+        "copyShareLink": "Sao Chép Liên Kết Chia Sẻ",
+        "deleteWorkflow2": "Bạn có chắc muốn xoá workflow này không? Không có đi lại được đâu.",
+        "workflowSaved": "Workflow Đã Được Lưu",
+        "saveWorkflowAs": "Lưu Workflow Như",
+        "downloadWorkflow": "Lưu Vào Tệp",
+        "noWorkflows": "Không Có Workflow",
+        "savingWorkflow": "Đang Lưu Workflow...",
+        "ascending": "Tăng Dần",
+        "loading": "Đang Tải Workflow",
+        "chooseWorkflowFromLibrary": "Chọn Workflow Từ Thư Viện",
+        "workflows": "Workflow",
+        "copyShareLinkForWorkflow": "Sao Chép Liên Kết Chia Sẻ Cho Workflow",
+        "name": "Tên",
+        "unnamedWorkflow": "Workflow Vô Danh",
+        "saveWorkflow": "Lưu Workflow",
+        "problemSavingWorkflow": "Có Vấn Đề Khi Lưu Workflow",
+        "updated": "Đã Cập Nhật",
+        "uploadWorkflow": "Tải Từ Tệp",
+        "autoLayout": "Bố Trí Tự Động",
+        "loadWorkflow": "$t(common.load) Workflow",
+        "newWorkflowCreated": "Workflow Mới Được Tạo",
+        "workflowCleared": "Đã Dọn Dẹp Workflow",
+        "loadFromGraph": "Tải Workflow Từ Đồ Thị",
+        "convertGraph": "Chuyển Đổi Đồ Thị",
+        "saveWorkflowToProject": "Lưu Workflow Vào Dự Án",
+        "workflowName": "Tên Workflow",
+        "workflowLibrary": "Thư Viện Workflow",
+        "opened": "Đã Mở",
+        "deleteWorkflow": "Xoá Workflow",
+        "workflowEditorMenu": "Menu Biên Tập Workflow",
+        "builder": {
+            "resetAllNodeFields": "Tải Lại Các Vùng Node",
+            "builder": "Trình Tạo Vùng Nhập",
+            "layout": "Bố Cục",
+            "row": "Hàng",
+            "zoomToNode": "Phóng To Vào Node",
+            "addToForm": "Thêm Vào Vùng Nhập",
+            "label": "Nhãn Tên",
+            "showDescription": "Hiện Dòng Mô Tả",
+            "component": "Thành Phần",
+            "numberInput": "Nhập Số",
+            "singleLine": "Một Dòng",
+            "multiLine": "Nhiều Dòng",
+            "slider": "Thanh Trượt",
+            "both": "Cả Hai",
+            "emptyRootPlaceholderEditMode": "Kéo thành phần vùng nhập hoặc vùng node vào đây để bắt đầu.",
+            "containerPlaceholder": "Hộp Chứa Trống",
+            "headingPlaceholder": "Đầu Dòng Trống",
+            "textPlaceholder": "Văn Bản Trống",
+            "column": "Cột",
+            "deleteAllElements": "Xóa Tất Cả Thành Phần",
+            "nodeField": "Vùng Node",
+            "nodeFieldTooltip": "Để thêm vùng node, bấm vào dấu cộng nhỏ trên vùng trong Trình Biên Tập Workflow, hoặc kéo vùng theo tên của nó vào vùng nhập.",
+            "container": "Hộp Chứa",
+            "heading": "Đầu Dòng",
+            "text": "Văn Bản",
+            "divider": "Gạch Chia",
+            "minimum": "Tối Thiểu",
+            "maximum": "Tối Đa",
+            "containerRowLayout": "Hộp Chứa (bố cục hàng)",
+            "containerColumnLayout": "Hộp Chứa (bố cục cột)",
+            "resetOptions": "Tải Lại Lựa Chọn",
+            "addOption": "Thêm Lựa Chọn",
+            "dropdown": "Danh Sách Thả Xuống",
+            "publish": "Đăng Tải",
+            "published": "Đã Đăng",
+            "workflowLocked": "Workflow Bị Khóa",
+            "workflowLockedDuringPublishing": "Workflow bị khóa khi đang điều chỉnh để đăng tải.",
+            "selectOutputNode": "Chọn Node Đầu Ra",
+            "changeOutputNode": "Đổi Node Đầu Ra",
+            "publishedWorkflowOutputs": "Đầu Ra",
+            "unpublishableInputs": "Những đầu vào không đăng tải được sẽ bị bỏ sót",
+            "noPublishableInputs": "Không có đầu vào không đăng tải được",
+            "noOutputNodeSelected": "Không có node đầu ra được chọn",
+            "publishWarnings": "Cảnh Báo",
+            "errorWorkflowHasUnsavedChanges": "Workflow có các thay đổi chưa lưu",
+            "cannotPublish": "Không thể đăng workflow",
+            "publishedWorkflowInputs": "Đầu Vào",
+            "unpublish": "Chưa Đăng",
+            "workflowLockedPublished": "Workflow được đăng tải sẽ bị khóa không thể biên tập.\nBạn có thể ngừng đăng để chỉnh sửa, hoặc tạo một bản sao của nó.",
+            "errorWorkflowHasInvalidGraph": "Đồ thị workflow không hợp lệ (di chuột đến nút Khởi Động để xem chi tiết)",
+            "errorWorkflowHasNoOutputNode": "Không có node đầu ra được chọn",
+            "warningWorkflowHasUnpublishableInputFields": "Workflow có một số đầu ra không đăng được - chúng sẽ bị bỏ sót khỏi workflow",
+            "publishFailed": "Đăng Tải Thất Bại",
+            "publishFailedDesc": "Có vấn đề khi đăng tải workflow. Xin vui lòng thử lại.",
+            "publishSuccessDesc": "Kiểm tra <LinkComponent>Bảng Dự Án</LinkComponent> để xem tiến độ.",
+            "publishingValidationRun": "Kiểm Tra Tính Hợp Lệ",
+            "publishedWorkflowsLocked": "Workflow đã đăng sẽ bị khóa và không thể biên tập hoặc chạy nữa. Hoặc là ngừng đăng, hoặc là lưu một bản sao của chính nó để biên tập hay chạy workflow này.",
+            "publishInProgress": "Quá trình đăng tải đang diễn ra",
+            "warningWorkflowHasNoPublishableInputFields": "Không có vùng đầu vào đăng tải được được chọn - workflow sẽ chạy với các giá trị mặc định",
+            "publishSuccess": "Workflow của bạn đã được đăng",
+            "publishedWorkflowIsLocked": "Workflow đã đăng đang bị khóa",
+            "publishingValidationRunInProgress": "Quá trình kiểm tra tính hợp lệ đang diễn ra.",
+            "selectingOutputNodeDesc": "Bấm vào node để biến nó thành node đầu ra của workflow.",
+            "selectingOutputNode": "Chọn node đầu ra",
+            "errorWorkflowHasUnpublishableNodes": "Workflow có lô node, node sản sinh, hoặc node tách metadata",
+            "removeFromForm": "Xóa Khỏi Vùng Nhập",
+            "showShuffle": "Hiện Xáo Trộn",
+            "shuffle": "Xáo Trộn",
+            "emptyRootPlaceholderViewMode": "Chọn Chỉnh Sửa để bắt đầu tạo nên một vùng nhập cho workflow này.",
+            "workflowBuilderAlphaWarning": "Trình tạo vùng nhập đang trong giai đoạn alpha. Nó có thể xuất hiện những thay đổi đột ngột trước khi chính thức được phát hành."
+        },
+        "yourWorkflows": "Workflow Của Bạn",
+        "browseWorkflows": "Khám Phá Workflow",
+        "workflowThumbnail": "Ảnh Minh Họa Workflow",
+        "saveChanges": "Lưu Thay Đổi",
+        "shared": "Nhóm",
+        "searchPlaceholder": "Tìm theo tên, mô tả, hoặc nhãn",
+        "recentlyOpened": "Mở Gần Đây",
+        "private": "Cá Nhân",
+        "loadMore": "Tải Thêm",
+        "view": "Xem",
+        "deselectAll": "Huỷ Chọn Tất Cả",
+        "recommended": "Có Thể Bạn Sẽ Cần",
+        "emptyStringPlaceholder": "<xâu ký tự trống>",
+        "published": "Đã Đăng",
+        "defaultWorkflows": "Workflow Mặc Định",
+        "userWorkflows": "Workflow Của Người Dùng",
+        "projectWorkflows": "Dự Án Workflow",
+        "allLoaded": "Đã Tải Tất Cả Workflow",
+        "filterByTags": "Lọc Theo Nhãn",
+        "noRecentWorkflows": "Không Có Workflows Gần Đây",
+        "openWorkflow": "Mở Workflow",
+        "problemLoading": "Có Vấn Đề Khi Tải Workflow",
+        "noDescription": "Không có mô tả",
+        "searchWorkflows": "Tìm Workflow",
+        "clearWorkflowSearchFilter": "Xoá Workflow Khỏi Bộ Lọc Tìm Kiếm",
+        "openLibrary": "Mở Thư Viện"
+    },
+    "upscaling": {
+        "missingUpscaleInitialImage": "Thiếu ảnh dùng để upscale",
+        "scale": "Tỉ Lệ",
+        "upscale": "Upscale (Nâng Cấp Chất Lượng Hình Ảnh)",
+        "upscaleModel": "Model Upscale",
+        "upscaleModelDesc": "Model upscale (ảnh sang ảnh)",
+        "missingUpscaleModel": "Thiếu model upscale",
+        "missingTileControlNetModel": "Không có model ControlNet Tile phù hợp đã cài đặt",
+        "creativity": "Độ Sáng Tạo",
+        "structure": "Độ Cấu Trúc",
+        "exceedsMaxSize": "Thiết lập upscale vượt quá giới hạn kích thước tối đa",
+        "tileControlNetModelDesc": "Model ControlNet Tile dành cho phiên bản model chính đã chọn",
+        "exceedsMaxSizeDetails": "Giới hạn upscale tối đa là {{maxUpscaleDimension}}x{{maxUpscaleDimension}} pixel. Hãy thử lại ảnh nhỏ hơn hoặc giảm thang đo upscale xuống.",
+        "postProcessingModel": "Model Xử Lý Hậu Kỳ",
+        "mainModelDesc": "Model chính (SD1.5 hoặc SDXL)",
+        "postProcessingMissingModelWarning": "Đến <LinkComponent>Trình Quản Lý Model</LinkComponent> để tải model xử lý hậu kỳ (ảnh sang ảnh).",
+        "missingModelsWarning": "Đến <LinkComponent>Trình Quản Lý Model</LinkComponent> để tải model cần thiết:",
+        "incompatibleBaseModel": "Phiên bản model chính không được hỗ trợ để upscale",
+        "incompatibleBaseModelDesc": "Upscale chỉ hỗ trợ cho model phiên bản SD1.5 và SDXL. Đổi model chính để bật lại tính năng upscale.",
+        "tileControl": "Điều Chỉnh Khối",
+        "tileSize": "Kích Thước Khối",
+        "tileOverlap": "Chồng Chéo Khối"
+    },
+    "newUserExperience": {
+        "toGetStartedLocal": "Để bắt đầu, hãy chắc chắn đã tải xuống hoặc thêm vào model cần để chạy Invoke. Sau đó, nhập lệnh vào hộp và nhấp chuột vào <StrongComponent>Kích Hoạt</StrongComponent> để tạo ra bức ảnh đầu tiên. Chọn một mẫu trình bày cho lệnh để cải thiện kết quả. Bạn có thể chọn để lưu ảnh trực tiếp vào <StrongComponent>Thư Viện Ảnh</StrongComponent> hoặc chỉnh sửa chúng ở <StrongComponent>Canvas</StrongComponent>.",
+        "gettingStartedSeries": "Cần thêm hướng dẫn? Xem thử <LinkComponent>Bắt Đầu Làm Quen</LinkComponent> để biết thêm mẹo khai thác toàn bộ tiềm năng của Invoke Studio.",
+        "toGetStarted": "Để bắt đầu, hãy nhập lệnh vào hộp và nhấp chuột vào <StrongComponent>Kích Hoạt</StrongComponent> để tạo ra bức ảnh đầu tiên. Chọn một mẫu trình bày cho lệnh để cải thiện kết quả. Bạn có thể chọn để lưu ảnh trực tiếp vào <StrongComponent>Thư Viện Ảnh</StrongComponent> hoặc chỉnh sửa chúng ở <StrongComponent>Canvas</StrongComponent>.",
+        "noModelsInstalled": "Dường như bạn chưa tải model nào cả! Bạn có thể <DownloadStarterModelsButton>tải xuống các model khởi đầu</DownloadStarterModelsButton> hoặc <ImportModelsButton>nhập vào thêm model</ImportModelsButton>.",
+        "lowVRAMMode": "Cho hiệu suất tốt nhất, hãy làm theo <LinkComponent>hướng dẫn VRAM Thấp</LinkComponent> của chúng tôi.",
+        "toGetStartedWorkflow": "Để bắt đầu, hãy điền vào khu vực bên trái và bấm <StrongComponent>Kích Hoạt</StrongComponent> nhằm tạo sinh ảnh. Muốn khám phá thêm workflow? Nhấp vào <StrongComponent>icon thư mục</StrongComponent> nằm cạnh tiêu đề workflow để xem một dãy các mẫu trình bày khác."
+    },
+    "whatsNew": {
+        "whatsNewInInvoke": "Có Gì Mới Ở Invoke",
+        "readReleaseNotes": "Đọc Ghi Chú Phát Hành",
+        "watchRecentReleaseVideos": "Xem Video Phát Hành Mới Nhất",
+        "items": [
+            "Canvas: Chia tách màu nổi và màu nền - bật/tắt với 'x', khởi động lại về dạng đen trắng với 'd'",
+            "LoRA: Đặt khối lượng mặc định cho LoRA trong Trình Quản Lý Model"
+        ],
+        "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng"
+    },
+    "supportVideos": {
+        "supportVideos": "Video Hỗ Trợ",
+        "gettingStarted": "Bắt Đầu Làm Quen",
+        "watch": "Xem",
+        "studioSessionsDesc": "Tham gia <DiscordLink /> để xem các buổi phát trực tiếp và đặt câu hỏi. Các phiên được đăng lên trên playlist các tuần tiếp theo.",
+        "videos": {
+            "gettingStarted": {
+                "title": "Bắt Đầu Với Invoke",
+                "description": "Hoàn thành các video bao hàm mọi thứ bạn cần biết để bắt đầu với Invoke, từ tạo bức ảnh đầu tiên đến các kỹ thuật phức tạp khác."
+            },
+            "studioSessions": {
+                "title": "Phiên Studio",
+                "description": "Đào sâu vào các phiên họp để khám phá những tính năng nâng cao của Invoke, sáng tạo workflow, và thảo luận cộng đồng."
+            }
+        }
+    },
+    "modelCache": {
+        "clearSucceeded": "Cache Model Đã Được Dọn",
+        "clearFailed": "Có Vấn Đề Khi Dọn Cache Model",
+        "clear": "Dọn Cache Model"
+    },
+    "lora": {
+        "weight": "Trọng Lượng"
+    }
+}

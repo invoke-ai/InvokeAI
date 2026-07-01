@@ -86,12 +86,20 @@ def np_to_pil(image: np.ndarray) -> Image.Image:
 
 def pil_to_cv2(image: Image.Image) -> np.ndarray:
     """Converts a PIL image to a CV2 image."""
-    return cv2.cvtColor(np.array(image, dtype=np.uint8), cv2.COLOR_RGB2BGR)
+
+    if image.mode == "RGBA":
+        return cv2.cvtColor(np.array(image, dtype=np.uint8), cv2.COLOR_RGBA2BGRA)
+    else:
+        return cv2.cvtColor(np.array(image, dtype=np.uint8), cv2.COLOR_RGB2BGR)
 
 
 def cv2_to_pil(image: np.ndarray) -> Image.Image:
     """Converts a CV2 image to a PIL image."""
-    return Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+
+    if image.ndim == 3 and image.shape[2] == 4:
+        return Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGRA2RGBA))
+    else:
+        return Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
 
 
 def normalize_image_channel_count(image: np.ndarray) -> np.ndarray:
@@ -217,3 +225,23 @@ def safe_step(x: np.ndarray, step: int = 2) -> np.ndarray:
     y = x.astype(np.float32) * float(step + 1)
     y = y.astype(np.int32).astype(np.float32) / float(step)
     return y
+
+
+def resize_to_multiple(image: np.ndarray, multiple: int) -> np.ndarray:
+    """Resize an image to make its dimensions multiples of the given number."""
+
+    # Get the original dimensions
+    height, width = image.shape[:2]
+
+    # Calculate the scaling factor to make the dimensions multiples of the given number
+    new_width = (width // multiple) * multiple
+    new_height = int((new_width / width) * height)
+
+    # If new_height is not a multiple, adjust it
+    if new_height % multiple != 0:
+        new_height = (new_height // multiple) * multiple
+
+    # Resize the image
+    resized_image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
+
+    return resized_image

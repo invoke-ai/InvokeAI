@@ -1,34 +1,30 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 from pathlib import Path
 from queue import Queue
-from typing import Dict, Optional, Union
+from typing import Optional, Union
 
 from PIL import Image, PngImagePlugin
 from PIL.Image import Image as PILImageType
-from send2trash import send2trash
 
+from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
+from invokeai.app.services.image_files.image_files_common import (
+    ImageFileDeleteException,
+    ImageFileNotFoundException,
+    ImageFileSaveException,
+)
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
-
-from .image_files_base import ImageFileStorageBase
-from .image_files_common import ImageFileDeleteException, ImageFileNotFoundException, ImageFileSaveException
 
 
 class DiskImageFileStorage(ImageFileStorageBase):
     """Stores images on disk"""
 
-    __output_folder: Path
-    __cache_ids: Queue  # TODO: this is an incredibly naive cache
-    __cache: Dict[Path, PILImageType]
-    __max_cache_size: int
-    __invoker: Invoker
-
     def __init__(self, output_folder: Union[str, Path]):
-        self.__cache = {}
-        self.__cache_ids = Queue()
+        self.__cache: dict[Path, PILImageType] = {}
+        self.__cache_ids = Queue[Path]()
         self.__max_cache_size = 10  # TODO: get this from config
 
-        self.__output_folder: Path = output_folder if isinstance(output_folder, Path) else Path(output_folder)
+        self.__output_folder = output_folder if isinstance(output_folder, Path) else Path(output_folder)
         self.__thumbnails_folder = self.__output_folder / "thumbnails"
         # Validate required output folders at launch
         self.__validate_storage_folders()
@@ -36,9 +32,21 @@ class DiskImageFileStorage(ImageFileStorageBase):
     def start(self, invoker: Invoker) -> None:
         self.__invoker = invoker
 
-    def get(self, image_name: str) -> PILImageType:
+    @property
+    def image_root(self) -> Path:
+        return self.__output_folder.resolve()
+
+    @property
+    def thumbnail_root(self) -> Path:
+        return self.__thumbnails_folder.resolve()
+
+    def evict_cache_paths(self, paths: list[Path]) -> None:
+        for path in paths:
+            self.__cache.pop(path.resolve(), None)
+
+    def get(self, image_name: str, image_subfolder: str = "") -> PILImageType:
         try:
-            image_path = self.get_path(image_name)
+            image_path = self.get_path(image_name, image_subfolder=image_subfolder)
 
             cache_item = self.__get_cache(image_path)
             if cache_item:
@@ -58,10 +66,14 @@ class DiskImageFileStorage(ImageFileStorageBase):
         workflow: Optional[str] = None,
         graph: Optional[str] = None,
         thumbnail_size: int = 256,
+        image_subfolder: str = "",
     ) -> None:
         try:
             self.__validate_storage_folders()
-            image_path = self.get_path(image_name)
+            image_path = self.get_path(image_name, image_subfolder=image_subfolder)
+
+            # Ensure subfolder directories exist
+            image_path.parent.mkdir(parents=True, exist_ok=True)
 
             pnginfo = PngImagePlugin.PngInfo()
             info_dict = {}
@@ -85,8 +97,11 @@ class DiskImageFileStorage(ImageFileStorageBase):
                 compress_level=self.__invoker.services.configuration.pil_compress_level,
             )
 
-            thumbnail_name = get_thumbnail_name(image_name)
-            thumbnail_path = self.get_path(thumbnail_name, thumbnail=True)
+            thumbnail_path = self.get_path(image_name, thumbnail=True, image_subfolder=image_subfolder)
+
+            # Ensure thumbnail subfolder directories exist
+            thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
+
             thumbnail_image = make_thumbnail(image, thumbnail_size)
             thumbnail_image.save(thumbnail_path)
 
@@ -95,49 +110,79 @@ class DiskImageFileStorage(ImageFileStorageBase):
         except Exception as e:
             raise ImageFileSaveException from e
 
-    def delete(self, image_name: str) -> None:
+    def delete(self, image_name: str, image_subfolder: str = "") -> None:
         try:
-            image_path = self.get_path(image_name)
+            image_path = self.get_path(image_name, image_subfolder=image_subfolder)
 
             if image_path.exists():
-                send2trash(image_path)
+                image_path.unlink()
             if image_path in self.__cache:
                 del self.__cache[image_path]
 
-            thumbnail_name = get_thumbnail_name(image_name)
-            thumbnail_path = self.get_path(thumbnail_name, True)
+            thumbnail_path = self.get_path(image_name, True, image_subfolder=image_subfolder)
 
             if thumbnail_path.exists():
-                send2trash(thumbnail_path)
+                thumbnail_path.unlink()
             if thumbnail_path in self.__cache:
                 del self.__cache[thumbnail_path]
         except Exception as e:
             raise ImageFileDeleteException from e
 
-    # TODO: make this a bit more flexible for e.g. cloud storage
-    def get_path(self, image_name: str, thumbnail: bool = False) -> Path:
-        path = self.__output_folder / image_name
+    def get_path(self, image_name: str, thumbnail: bool = False, image_subfolder: str = "") -> Path:
+        base_folder = self.__thumbnails_folder if thumbnail else self.__output_folder
+        filename = get_thumbnail_name(image_name) if thumbnail else image_name
 
-        if thumbnail:
-            thumbnail_name = get_thumbnail_name(image_name)
-            path = self.__thumbnails_folder / thumbnail_name
+        # Validate the filename itself (no path separators allowed in the filename)
+        basename = Path(filename).name
+        if basename != filename:
+            raise ValueError("Invalid image name, potential directory traversal detected")
 
-        return path
+        # Build the full path with optional subfolder
+        if image_subfolder:
+            self._validate_subfolder(image_subfolder)
+            image_path = base_folder / image_subfolder / basename
+        else:
+            image_path = base_folder / basename
+
+        # Ensure the image path is within the base folder to prevent directory traversal
+        resolved_base = base_folder.resolve()
+        resolved_image_path = image_path.resolve()
+
+        if not resolved_image_path.is_relative_to(resolved_base):
+            raise ValueError("Image path outside outputs folder, potential directory traversal detected")
+
+        return resolved_image_path
+
+    @staticmethod
+    def _validate_subfolder(subfolder: str) -> None:
+        """Validates a subfolder path to prevent directory traversal while allowing controlled subdirectories."""
+        if not subfolder:
+            return
+        if "\\" in subfolder:
+            raise ValueError("Backslashes not allowed in subfolder path")
+        if subfolder.startswith("/"):
+            raise ValueError("Absolute paths not allowed in subfolder path")
+        parts = subfolder.split("/")
+        for part in parts:
+            if part == "..":
+                raise ValueError("Parent directory references not allowed in subfolder path")
+            if part == "":
+                raise ValueError("Empty path segments not allowed in subfolder path")
 
     def validate_path(self, path: Union[str, Path]) -> bool:
         """Validates the path given for an image or thumbnail."""
         path = path if isinstance(path, Path) else Path(path)
         return path.exists()
 
-    def get_workflow(self, image_name: str) -> str | None:
-        image = self.get(image_name)
+    def get_workflow(self, image_name: str, image_subfolder: str = "") -> str | None:
+        image = self.get(image_name, image_subfolder=image_subfolder)
         workflow = image.info.get("invokeai_workflow", None)
         if isinstance(workflow, str):
             return workflow
         return None
 
-    def get_graph(self, image_name: str) -> str | None:
-        image = self.get(image_name)
+    def get_graph(self, image_name: str, image_subfolder: str = "") -> str | None:
+        image = self.get(image_name, image_subfolder=image_subfolder)
         graph = image.info.get("invokeai_graph", None)
         if isinstance(graph, str):
             return graph

@@ -1,15 +1,23 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice, isAnyOf } from '@reduxjs/toolkit';
-import type { PersistConfig, RootState } from 'app/store/store';
-import { uniqBy } from 'lodash-es';
-import { boardsApi } from 'services/api/endpoints/boards';
-import { imagesApi } from 'services/api/endpoints/images';
-import type { ImageDTO } from 'services/api/types';
+import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
+import { isPlainObject, uniq } from 'es-toolkit';
+import { logout } from 'features/auth/store/authSlice';
+import type { BoardRecordOrderBy } from 'services/api/types';
+import { assert } from 'tsafe';
 
-import type { BoardId, GalleryState, GalleryView } from './types';
-import { IMAGE_LIMIT, INITIAL_IMAGE_LIMIT } from './types';
+import {
+  type BoardId,
+  type ComparisonMode,
+  type GalleryState,
+  type GalleryView,
+  isVirtualBoardId,
+  type OrderDir,
+  zGalleryState,
+} from './types';
 
-const initialGalleryState: GalleryState = {
+const getInitialState = (): GalleryState => ({
   selection: [],
   shouldAutoSwitch: true,
   autoAssignBoardOnClick: true,
@@ -19,20 +27,53 @@ const initialGalleryState: GalleryState = {
   selectedBoardId: 'none',
   galleryView: 'images',
   boardSearchText: '',
-  limit: INITIAL_IMAGE_LIMIT,
-  offset: 0,
-  isImageViewerOpen: true,
-};
+  starredFirst: true,
+  orderDir: 'DESC',
+  searchTerm: '',
+  imageToCompare: null,
+  comparisonMode: 'slider',
+  comparisonFit: 'fill',
+  shouldShowArchivedBoards: false,
+  showVirtualBoards: false,
+  virtualBoardsSectionOpen: true,
+  boardsListOrderBy: 'created_at',
+  boardsListOrderDir: 'DESC',
+});
 
-export const gallerySlice = createSlice({
+const slice = createSlice({
   name: 'gallery',
-  initialState: initialGalleryState,
+  initialState: getInitialState(),
   reducers: {
-    imageSelected: (state, action: PayloadAction<ImageDTO | null>) => {
-      state.selection = action.payload ? [action.payload] : [];
+    imageSelected: (state, action: PayloadAction<string | null>) => {
+      const selectedItem = action.payload;
+
+      if (!selectedItem) {
+        state.selection = [];
+      } else {
+        state.selection = [selectedItem];
+      }
     },
-    selectionChanged: (state, action: PayloadAction<ImageDTO[]>) => {
-      state.selection = uniqBy(action.payload, (i) => i.image_name);
+    selectionChanged: (state, action: PayloadAction<string[]>) => {
+      state.selection = uniq(action.payload);
+    },
+    imageToCompareChanged: (state, action: PayloadAction<string | null>) => {
+      state.imageToCompare = action.payload;
+    },
+    comparisonModeChanged: (state, action: PayloadAction<ComparisonMode>) => {
+      state.comparisonMode = action.payload;
+    },
+    comparisonModeCycled: (state) => {
+      switch (state.comparisonMode) {
+        case 'slider':
+          state.comparisonMode = 'side-by-side';
+          break;
+        case 'side-by-side':
+          state.comparisonMode = 'hover';
+          break;
+        case 'hover':
+          state.comparisonMode = 'slider';
+          break;
+      }
     },
     shouldAutoSwitchChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldAutoSwitch = action.payload;
@@ -43,63 +84,89 @@ export const gallerySlice = createSlice({
     autoAssignBoardOnClickChanged: (state, action: PayloadAction<boolean>) => {
       state.autoAssignBoardOnClick = action.payload;
     },
-    boardIdSelected: (state, action: PayloadAction<{ boardId: BoardId; selectedImageName?: string }>) => {
-      state.selectedBoardId = action.payload.boardId;
-      state.galleryView = 'images';
-      state.offset = 0;
-      state.limit = INITIAL_IMAGE_LIMIT;
+    boardIdSelected: (
+      state,
+      action: PayloadAction<{
+        boardId: BoardId;
+        select?: {
+          selection: GalleryState['selection'];
+          galleryView: GalleryState['galleryView'];
+        };
+      }>
+    ) => {
+      const { boardId, select } = action.payload;
+      state.selectedBoardId = boardId;
+      if (select) {
+        state.selection = select.selection;
+        state.galleryView = select.galleryView;
+      }
     },
     autoAddBoardIdChanged: (state, action: PayloadAction<BoardId>) => {
       if (!action.payload) {
         state.autoAddBoardId = 'none';
         return;
       }
+      // Virtual boards cannot be auto-add targets
+      if (isVirtualBoardId(action.payload)) {
+        return;
+      }
       state.autoAddBoardId = action.payload;
     },
     galleryViewChanged: (state, action: PayloadAction<GalleryView>) => {
       state.galleryView = action.payload;
-      state.offset = 0;
-      state.limit = INITIAL_IMAGE_LIMIT;
     },
     boardSearchTextChanged: (state, action: PayloadAction<string>) => {
       state.boardSearchText = action.payload;
     },
-    moreImagesLoaded: (state) => {
-      if (state.offset === 0 && state.limit === INITIAL_IMAGE_LIMIT) {
-        state.offset = INITIAL_IMAGE_LIMIT;
-        state.limit = IMAGE_LIMIT;
-      } else {
-        state.offset += IMAGE_LIMIT;
-        state.limit += IMAGE_LIMIT;
-      }
-    },
     alwaysShowImageSizeBadgeChanged: (state, action: PayloadAction<boolean>) => {
       state.alwaysShowImageSizeBadge = action.payload;
     },
-    isImageViewerOpenChanged: (state, action: PayloadAction<boolean>) => {
-      state.isImageViewerOpen = action.payload;
+    comparedImagesSwapped: (state) => {
+      if (state.imageToCompare) {
+        const oldSelection = state.selection;
+        state.selection = [state.imageToCompare];
+        state.imageToCompare = oldSelection[0] ?? null;
+      }
+    },
+    comparisonFitChanged: (state, action: PayloadAction<'contain' | 'fill'>) => {
+      state.comparisonFit = action.payload;
+    },
+    shouldShowArchivedBoardsChanged: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowArchivedBoards = action.payload;
+    },
+    showVirtualBoardsChanged: (state, action: PayloadAction<boolean>) => {
+      state.showVirtualBoards = action.payload;
+      // If virtual boards are hidden and a virtual board is selected, reset to 'none'
+      if (!action.payload && isVirtualBoardId(state.selectedBoardId)) {
+        state.selectedBoardId = 'none';
+        state.selection = [];
+      }
+    },
+    virtualBoardsSectionOpenChanged: (state, action: PayloadAction<boolean>) => {
+      state.virtualBoardsSectionOpen = action.payload;
+    },
+    starredFirstChanged: (state, action: PayloadAction<boolean>) => {
+      state.starredFirst = action.payload;
+    },
+    orderDirChanged: (state, action: PayloadAction<OrderDir>) => {
+      state.orderDir = action.payload;
+    },
+    searchTermChanged: (state, action: PayloadAction<string>) => {
+      state.searchTerm = action.payload;
+    },
+    boardsListOrderByChanged: (state, action: PayloadAction<BoardRecordOrderBy>) => {
+      state.boardsListOrderBy = action.payload;
+    },
+    boardsListOrderDirChanged: (state, action: PayloadAction<OrderDir>) => {
+      state.boardsListOrderDir = action.payload;
     },
   },
-  extraReducers: (builder) => {
-    builder.addMatcher(isAnyBoardDeleted, (state, action) => {
-      const deletedBoardId = action.meta.arg.originalArgs;
-      if (deletedBoardId === state.selectedBoardId) {
-        state.selectedBoardId = 'none';
-        state.galleryView = 'images';
-      }
-      if (deletedBoardId === state.autoAddBoardId) {
-        state.autoAddBoardId = 'none';
-      }
-    });
-    builder.addMatcher(boardsApi.endpoints.listAllBoards.matchFulfilled, (state, action) => {
-      const boards = action.payload;
-      if (!state.autoAddBoardId) {
-        return;
-      }
-
-      if (!boards.map((b) => b.board_id).includes(state.autoAddBoardId)) {
-        state.autoAddBoardId = 'none';
-      }
+  extraReducers(builder) {
+    // Clear board-related state on logout to prevent stale data when switching users
+    builder.addCase(logout, (state) => {
+      state.selectedBoardId = 'none';
+      state.autoAddBoardId = 'none';
+      state.boardSearchText = '';
     });
   },
 });
@@ -114,29 +181,43 @@ export const {
   galleryViewChanged,
   selectionChanged,
   boardSearchTextChanged,
-  moreImagesLoaded,
   alwaysShowImageSizeBadgeChanged,
-  isImageViewerOpenChanged,
-} = gallerySlice.actions;
-
-const isAnyBoardDeleted = isAnyOf(
-  imagesApi.endpoints.deleteBoard.matchFulfilled,
-  imagesApi.endpoints.deleteBoardAndImages.matchFulfilled
-);
+  imageToCompareChanged,
+  comparisonModeChanged,
+  comparedImagesSwapped,
+  comparisonFitChanged,
+  comparisonModeCycled,
+  orderDirChanged,
+  starredFirstChanged,
+  shouldShowArchivedBoardsChanged,
+  showVirtualBoardsChanged,
+  virtualBoardsSectionOpenChanged,
+  searchTermChanged,
+  boardsListOrderByChanged,
+  boardsListOrderDirChanged,
+} = slice.actions;
 
 export const selectGallerySlice = (state: RootState) => state.gallery;
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrateGalleryState = (state: any): any => {
-  if (!('_version' in state)) {
-    state._version = 1;
-  }
-  return state;
-};
-
-export const galleryPersistConfig: PersistConfig<GalleryState> = {
-  name: gallerySlice.name,
-  initialState: initialGalleryState,
-  migrate: migrateGalleryState,
-  persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'offset', 'limit', 'isImageViewerOpen'],
+export const gallerySliceConfig: SliceConfig<typeof slice> = {
+  slice,
+  schema: zGalleryState,
+  getInitialState,
+  persistConfig: {
+    migrate: (state) => {
+      assert(isPlainObject(state));
+      if (!('_version' in state)) {
+        state._version = 1;
+      }
+      // Add virtual boards fields if missing (added in virtual boards feature)
+      if (!('showVirtualBoards' in state)) {
+        state.showVirtualBoards = false;
+      }
+      if (!('virtualBoardsSectionOpen' in state)) {
+        state.virtualBoardsSectionOpen = true;
+      }
+      return zGalleryState.parse(state);
+    },
+    persistDenylist: ['selection', 'galleryView', 'imageToCompare'],
+  },
 };

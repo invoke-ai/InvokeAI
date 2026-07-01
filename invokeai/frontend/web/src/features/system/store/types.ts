@@ -1,17 +1,5 @@
-import type { LogLevel } from 'app/logging/logger';
-import type { ProgressImage } from 'services/events/types';
+import { zLogLevel, zLogNamespace } from 'app/logging/logger';
 import { z } from 'zod';
-
-type SystemStatus = 'CONNECTED' | 'DISCONNECTED' | 'PROCESSING' | 'ERROR' | 'LOADING_MODEL';
-
-type DenoiseProgress = {
-  session_id: string;
-  batch_id: string;
-  progress_image: ProgressImage | null | undefined;
-  step: number;
-  total_steps: number;
-  percentage: number;
-};
 
 const zLanguage = z.enum([
   'ar',
@@ -29,30 +17,34 @@ const zLanguage = z.enum([
   'nl',
   'pl',
   'pt',
-  'pt_BR',
+  'pt-BR',
   'ru',
   'sv',
   'tr',
   'ua',
-  'zh_CN',
-  'zh_Hant',
+  'vi',
+  'zh-CN',
+  'zh-Hant',
 ]);
 export type Language = z.infer<typeof zLanguage>;
 export const isLanguage = (v: unknown): v is Language => zLanguage.safeParse(v).success;
 
-export interface SystemState {
-  _version: 1;
-  isConnected: boolean;
-  shouldConfirmOnDelete: boolean;
-  enableImageDebugging: boolean;
-  denoiseProgress: DenoiseProgress | null;
-  consoleLogLevel: LogLevel;
-  shouldLogToConsole: boolean;
-  shouldAntialiasProgressImage: boolean;
-  language: Language;
-  shouldUseNSFWChecker: boolean;
-  shouldUseWatermarker: boolean;
-  status: SystemStatus;
-  shouldEnableInformationalPopovers: boolean;
-  cancellations: string[];
-}
+export const zSystemState = z.object({
+  _version: z.literal(3),
+  shouldConfirmOnDelete: z.boolean(),
+  shouldAntialiasProgressImage: z.boolean(),
+  shouldConfirmOnNewSession: z.boolean(),
+  language: zLanguage,
+  shouldUseNSFWChecker: z.boolean(),
+  shouldUseWatermarker: z.boolean(),
+  shouldEnableInformationalPopovers: z.boolean(),
+  shouldEnableModelDescriptions: z.boolean(),
+  logIsEnabled: z.boolean(),
+  logLevel: zLogLevel,
+  logNamespaces: z.array(zLogNamespace),
+  shouldShowInvocationProgressDetail: z.boolean(),
+  shouldHighlightFocusedRegions: z.boolean(),
+  shouldUseMiddleClickToOpenInNewTab: z.boolean(),
+  prefersNumericAttentionWeights: z.boolean(),
+});
+export type SystemState = z.infer<typeof zSystemState>;

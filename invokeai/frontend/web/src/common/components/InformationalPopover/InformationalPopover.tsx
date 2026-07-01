@@ -10,10 +10,14 @@ import {
   PopoverContent,
   PopoverTrigger,
   Portal,
+  Spacer,
   Text,
 } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
-import { merge, omit } from 'lodash-es';
+import { createSelector } from '@reduxjs/toolkit';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { merge, omit } from 'es-toolkit/compat';
+import { selectSystemSlice, setShouldEnableInformationalPopovers } from 'features/system/store/systemSlice';
+import { toast } from 'features/toast/toast';
 import type { ReactElement } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,73 +29,93 @@ import { OPEN_DELAY, POPOVER_DATA, POPPER_MODIFIERS } from './constants';
 type Props = {
   feature: Feature;
   inPortal?: boolean;
+  hideDisable?: boolean;
   children: ReactElement;
 };
 
-export const InformationalPopover = memo(({ feature, children, inPortal = true, ...rest }: Props) => {
-  const shouldEnableInformationalPopovers = useAppSelector((s) => s.system.shouldEnableInformationalPopovers);
+const selectShouldEnableInformationalPopovers = createSelector(
+  selectSystemSlice,
+  (system) => system.shouldEnableInformationalPopovers
+);
 
-  const data = useMemo(() => POPOVER_DATA[feature], [feature]);
+export const InformationalPopover = memo(
+  ({ feature, children, inPortal = true, hideDisable = false, ...rest }: Props) => {
+    const shouldEnableInformationalPopovers = useAppSelector(selectShouldEnableInformationalPopovers);
 
-  const popoverProps = useMemo(() => merge(omit(data, ['image', 'href', 'buttonLabel']), rest), [data, rest]);
+    const data = useMemo(() => POPOVER_DATA[feature], [feature]);
 
-  if (!shouldEnableInformationalPopovers) {
-    return children;
+    const popoverProps = useMemo(() => merge(omit(data, ['image', 'href', 'buttonLabel']), rest), [data, rest]);
+
+    if (!hideDisable && !shouldEnableInformationalPopovers) {
+      return children;
+    }
+
+    return (
+      <Popover
+        isLazy
+        closeOnBlur={false}
+        trigger="hover"
+        variant="informational"
+        openDelay={OPEN_DELAY}
+        modifiers={POPPER_MODIFIERS}
+        placement="top"
+        {...popoverProps}
+      >
+        <PopoverTrigger>{children}</PopoverTrigger>
+        {inPortal ? (
+          <Portal>
+            <Content data={data} feature={feature} hideDisable={hideDisable} />
+          </Portal>
+        ) : (
+          <Content data={data} feature={feature} hideDisable={hideDisable} />
+        )}
+      </Popover>
+    );
   }
-
-  return (
-    <Popover
-      isLazy
-      closeOnBlur={false}
-      trigger="hover"
-      variant="informational"
-      openDelay={OPEN_DELAY}
-      modifiers={POPPER_MODIFIERS}
-      placement="top"
-      {...popoverProps}
-    >
-      <PopoverTrigger>{children}</PopoverTrigger>
-      {inPortal ? (
-        <Portal>
-          <Content data={data} feature={feature} />
-        </Portal>
-      ) : (
-        <Content data={data} feature={feature} />
-      )}
-    </Popover>
-  );
-});
+);
 
 InformationalPopover.displayName = 'InformationalPopover';
 
 type ContentProps = {
   data?: PopoverData;
   feature: Feature;
+  hideDisable: boolean;
 };
 
-const Content = ({ data, feature }: ContentProps) => {
+const Content = ({ data, feature, hideDisable }: ContentProps) => {
   const { t } = useTranslation();
-
+  const dispatch = useAppDispatch();
   const heading = useMemo<string | undefined>(() => t(`popovers.${feature}.heading`), [feature, t]);
 
   const paragraphs = useMemo<string[]>(
     () =>
-      t(`popovers.${feature}.paragraphs`, {
+      t<string, { returnObjects: true }, string[]>(`popovers.${feature}.paragraphs`, {
         returnObjects: true,
       }) ?? [],
     [feature, t]
   );
 
-  const handleClick = useCallback(() => {
-    if (!data?.href) {
+  const href = data?.href;
+
+  const onClickLearnMore = useCallback(() => {
+    if (!href) {
       return;
     }
-    window.open(data.href);
-  }, [data?.href]);
+    window.open(href);
+  }, [href]);
+
+  const onClickDontShowMeThese = useCallback(() => {
+    dispatch(setShouldEnableInformationalPopovers(false));
+    toast({
+      title: t('settings.informationalPopoversDisabled'),
+      description: t('settings.informationalPopoversDisabledDesc'),
+      status: 'info',
+    });
+  }, [dispatch, t]);
 
   return (
-    <PopoverContent w={96}>
-      <PopoverCloseButton />
+    <PopoverContent maxW={300}>
+      <PopoverCloseButton top={2} />
       <PopoverBody>
         <Flex gap={2} flexDirection="column" alignItems="flex-start">
           {heading && (
@@ -102,34 +126,28 @@ const Content = ({ data, feature }: ContentProps) => {
           )}
           {data?.image && (
             <>
-              <Image
-                objectFit="contain"
-                maxW="60%"
-                maxH="60%"
-                backgroundColor="white"
-                src={data.image}
-                alt="Optional Image"
-              />
+              <Image objectFit="contain" backgroundColor="white" src={data.image} alt="Optional Image" />
               <Divider />
             </>
           )}
           {paragraphs.map((p) => (
             <Text key={p}>{p}</Text>
           ))}
-          {data?.href && (
-            <>
-              <Divider />
-              <Button
-                pt={1}
-                onClick={handleClick}
-                leftIcon={<PiArrowSquareOutBold />}
-                alignSelf="flex-end"
-                variant="link"
-              >
+
+          <Divider />
+          <Flex alignItems="center" justifyContent="space-between" w="full">
+            {!hideDisable && (
+              <Button onClick={onClickDontShowMeThese} variant="link" size="sm">
+                {t('common.dontShowMeThese')}
+              </Button>
+            )}
+            <Spacer />
+            {data?.href && (
+              <Button onClick={onClickLearnMore} leftIcon={<PiArrowSquareOutBold />} variant="link" size="sm">
                 {t('common.learnMore') ?? heading}
               </Button>
-            </>
-          )}
+            )}
+          </Flex>
         </Flex>
       </PopoverBody>
     </PopoverContent>

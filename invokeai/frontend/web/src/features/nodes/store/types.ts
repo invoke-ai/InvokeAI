@@ -1,17 +1,8 @@
-import type {
-  FieldIdentifier,
-  FieldInputTemplate,
-  FieldOutputTemplate,
-  StatefulFieldValue,
-} from 'features/nodes/types/field';
-import type {
-  AnyNode,
-  InvocationNodeEdge,
-  InvocationTemplate,
-  NodeExecutionState,
-} from 'features/nodes/types/invocation';
-import type { WorkflowV3 } from 'features/nodes/types/workflow';
-import type { HandleType } from 'reactflow';
+import type { HandleType } from '@xyflow/react';
+import { type FieldInputTemplate, type FieldOutputTemplate, zStatefulFieldValue } from 'features/nodes/types/field';
+import { type InvocationTemplate, type NodeExecutionState, zAnyEdge, zAnyNode } from 'features/nodes/types/invocation';
+import { zWorkflowV3 } from 'features/nodes/types/workflow';
+import z from 'zod';
 
 export type Templates = Record<string, InvocationTemplate>;
 export type NodeExecutionStates = Record<string, NodeExecutionState | undefined>;
@@ -23,20 +14,13 @@ export type PendingConnection = {
   fieldTemplate: FieldInputTemplate | FieldOutputTemplate;
 };
 
-export type NodesState = {
-  _version: 1;
-  nodes: AnyNode[];
-  edges: InvocationNodeEdge[];
-};
-
-export type WorkflowMode = 'edit' | 'view';
-export type FieldIdentifierWithValue = FieldIdentifier & {
-  value: StatefulFieldValue;
-};
-
-export type WorkflowsState = Omit<WorkflowV3, 'nodes' | 'edges'> & {
-  _version: 1;
-  isTouched: boolean;
-  mode: WorkflowMode;
-  originalExposedFieldValues: FieldIdentifierWithValue[];
-};
+export const zWorkflowMode = z.enum(['edit', 'view']);
+export type WorkflowMode = z.infer<typeof zWorkflowMode>;
+export const zNodesState = z.object({
+  _version: z.literal(1),
+  nodes: z.array(zAnyNode),
+  edges: z.array(zAnyEdge),
+  formFieldInitialValues: z.record(z.string(), zStatefulFieldValue),
+  ...zWorkflowV3.omit({ nodes: true, edges: true }).shape,
+});
+export type NodesState = z.infer<typeof zNodesState>;

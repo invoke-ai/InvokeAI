@@ -1,10 +1,11 @@
 {
-  "name": "ESRGAN Upscaling with Canny ControlNet",
+  "id": "default_686bb1d0-d086-4c70-9fa3-2f600b922023",
+  "name": "Upscaler - SD1.5, ESRGAN",
   "author": "InvokeAI",
-  "description": "Sample workflow for using Upscaling with ControlNet with SD1.5",
-  "version": "2.0.0",
+  "description": "Sample workflow for using ESRGAN to upscale with ControlNet with SD1.5",
+  "version": "2.1.0",
   "contact": "invoke@invoke.ai",
-  "tags": "upscale, controlnet, default",
+  "tags": "sd1.5, upscaling, control",
   "notes": "",
   "exposedFields": [
     {
@@ -36,14 +37,13 @@
     "version": "3.0.0",
     "category": "default"
   },
-  "id": "0e71a27e-a22b-4a9b-b20a-6d789abff2bc",
   "nodes": [
     {
-      "id": "e8bf67fe-67de-4227-87eb-79e86afdfc74",
+      "id": "63b6ab7e-5b05-4d1b-a3b1-42d8e53ce16b",
       "type": "invocation",
       "data": {
-        "id": "e8bf67fe-67de-4227-87eb-79e86afdfc74",
-        "version": "1.1.1",
+        "id": "63b6ab7e-5b05-4d1b-a3b1-42d8e53ce16b",
+        "version": "1.2.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -57,6 +57,10 @@
           "clip": {
             "name": "clip",
             "label": ""
+          },
+          "mask": {
+            "name": "mask",
+            "label": ""
           }
         },
         "isOpen": true,
@@ -65,7 +69,210 @@
       },
       "position": {
         "x": 1250,
-        "y": 1500
+        "y": 1200
+      }
+    },
+    {
+      "id": "5ca498a4-c8c8-4580-a396-0c984317205d",
+      "type": "invocation",
+      "data": {
+        "id": "5ca498a4-c8c8-4580-a396-0c984317205d",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "i2l",
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "vae": {
+            "name": "vae",
+            "label": ""
+          },
+          "tiled": {
+            "name": "tiled",
+            "label": "",
+            "value": false
+          },
+          "tile_size": {
+            "name": "tile_size",
+            "label": "",
+            "value": 0
+          },
+          "fp32": {
+            "name": "fp32",
+            "label": "",
+            "value": false
+          }
+        },
+        "isOpen": false,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 1650,
+        "y": 1675
+      }
+    },
+    {
+      "id": "3ed9b2ef-f4ec-40a7-94db-92e63b583ec0",
+      "type": "invocation",
+      "data": {
+        "id": "3ed9b2ef-f4ec-40a7-94db-92e63b583ec0",
+        "version": "1.3.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "l2i",
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": ""
+          },
+          "latents": {
+            "name": "latents",
+            "label": ""
+          },
+          "vae": {
+            "name": "vae",
+            "label": ""
+          },
+          "tiled": {
+            "name": "tiled",
+            "label": "",
+            "value": false
+          },
+          "tile_size": {
+            "name": "tile_size",
+            "label": "",
+            "value": 0
+          },
+          "fp32": {
+            "name": "fp32",
+            "label": "",
+            "value": false
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": true
+      },
+      "position": {
+        "x": 2559.4751127537957,
+        "y": 1246.6000376741406
+      }
+    },
+    {
+      "id": "ca1d020c-89a8-4958-880a-016d28775cfa",
+      "type": "invocation",
+      "data": {
+        "id": "ca1d020c-89a8-4958-880a-016d28775cfa",
+        "version": "1.1.2",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "controlnet",
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "control_model": {
+            "name": "control_model",
+            "label": "Control Model (select Canny)"
+          },
+          "control_weight": {
+            "name": "control_weight",
+            "label": "",
+            "value": 0.95
+          },
+          "begin_step_percent": {
+            "name": "begin_step_percent",
+            "label": "",
+            "value": 0.1
+          },
+          "end_step_percent": {
+            "name": "end_step_percent",
+            "label": "",
+            "value": 0.9
+          },
+          "control_mode": {
+            "name": "control_mode",
+            "label": "",
+            "value": "balanced"
+          },
+          "resize_mode": {
+            "name": "resize_mode",
+            "label": "",
+            "value": "just_resize"
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 1624.7980608333519,
+        "y": 1902.9649340196056
+      }
+    },
+    {
+      "id": "1d887701-df21-4966-ae6e-a7d82307d7bd",
+      "type": "invocation",
+      "data": {
+        "id": "1d887701-df21-4966-ae6e-a7d82307d7bd",
+        "version": "1.3.3",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "canny_image_processor",
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": ""
+          },
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "detect_resolution": {
+            "name": "detect_resolution",
+            "label": "",
+            "value": 512
+          },
+          "image_resolution": {
+            "name": "image_resolution",
+            "label": "",
+            "value": 512
+          },
+          "low_threshold": {
+            "name": "low_threshold",
+            "label": "",
+            "value": 100
+          },
+          "high_threshold": {
+            "name": "high_threshold",
+            "label": "",
+            "value": 200
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 1200,
+        "y": 1900
       }
     },
     {
@@ -73,7 +280,7 @@
       "type": "invocation",
       "data": {
         "id": "d8ace142-c05f-4f1d-8982-88dc7473958d",
-        "version": "1.0.2",
+        "version": "1.0.3",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -81,14 +288,7 @@
         "inputs": {
           "model": {
             "name": "model",
-            "label": "",
-            "value": {
-              "key": "5cd43ca0-dd0a-418d-9f7e-35b2b9d5e106",
-              "hash": "blake3:6987f323017f597213cc3264250edf57056d21a40a0a85d83a1a33a7d44dc41a",
-              "name": "Deliberate_v5",
-              "base": "sd-1",
-              "type": "main"
-            }
+            "label": ""
           }
         },
         "isOpen": true,
@@ -98,6 +298,40 @@
       "position": {
         "x": 700,
         "y": 1375
+      }
+    },
+    {
+      "id": "e8bf67fe-67de-4227-87eb-79e86afdfc74",
+      "type": "invocation",
+      "data": {
+        "id": "e8bf67fe-67de-4227-87eb-79e86afdfc74",
+        "version": "1.2.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "compel",
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "",
+            "value": ""
+          },
+          "clip": {
+            "name": "clip",
+            "label": ""
+          },
+          "mask": {
+            "name": "mask",
+            "label": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 1250,
+        "y": 1500
       }
     },
     {
@@ -113,10 +347,7 @@
         "inputs": {
           "image": {
             "name": "image",
-            "label": "Image To Upscale",
-            "value": {
-              "image_name": "d2e42ba6-d420-496b-82db-91c9b75956c1.png"
-            }
+            "label": "Image To Upscale"
           }
         },
         "isOpen": true,
@@ -169,120 +400,6 @@
       "position": {
         "x": 717.3863693661265,
         "y": 1721.9215053134815
-      }
-    },
-    {
-      "id": "1d887701-df21-4966-ae6e-a7d82307d7bd",
-      "type": "invocation",
-      "data": {
-        "id": "1d887701-df21-4966-ae6e-a7d82307d7bd",
-        "version": "1.3.2",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "canny_image_processor",
-        "inputs": {
-          "board": {
-            "name": "board",
-            "label": ""
-          },
-          "metadata": {
-            "name": "metadata",
-            "label": ""
-          },
-          "image": {
-            "name": "image",
-            "label": ""
-          },
-          "detect_resolution": {
-            "name": "detect_resolution",
-            "label": "",
-            "value": 512
-          },
-          "image_resolution": {
-            "name": "image_resolution",
-            "label": "",
-            "value": 512
-          },
-          "low_threshold": {
-            "name": "low_threshold",
-            "label": "",
-            "value": 100
-          },
-          "high_threshold": {
-            "name": "high_threshold",
-            "label": "",
-            "value": 200
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 1200,
-        "y": 1900
-      }
-    },
-    {
-      "id": "ca1d020c-89a8-4958-880a-016d28775cfa",
-      "type": "invocation",
-      "data": {
-        "id": "ca1d020c-89a8-4958-880a-016d28775cfa",
-        "version": "1.1.1",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "controlnet",
-        "inputs": {
-          "image": {
-            "name": "image",
-            "label": ""
-          },
-          "control_model": {
-            "name": "control_model",
-            "label": "Control Model (select Canny)",
-            "value": {
-              "key": "a7b9c76f-4bc5-42aa-b918-c1c458a5bb24",
-              "hash": "blake3:260c7f8e10aefea9868cfc68d89970e91033bd37132b14b903e70ee05ebf530e",
-              "name": "sd-controlnet-canny",
-              "base": "sd-1",
-              "type": "controlnet"
-            }
-          },
-          "control_weight": {
-            "name": "control_weight",
-            "label": "",
-            "value": 0.95
-          },
-          "begin_step_percent": {
-            "name": "begin_step_percent",
-            "label": "",
-            "value": 0.1
-          },
-          "end_step_percent": {
-            "name": "end_step_percent",
-            "label": "",
-            "value": 0.9
-          },
-          "control_mode": {
-            "name": "control_mode",
-            "label": "",
-            "value": "balanced"
-          },
-          "resize_mode": {
-            "name": "resize_mode",
-            "label": "",
-            "value": "just_resize"
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 1624.7980608333519,
-        "y": 1902.9649340196056
       }
     },
     {
@@ -411,122 +528,6 @@
       "position": {
         "x": 2128.740065979906,
         "y": 1232.6219060454753
-      }
-    },
-    {
-      "id": "3ed9b2ef-f4ec-40a7-94db-92e63b583ec0",
-      "type": "invocation",
-      "data": {
-        "id": "3ed9b2ef-f4ec-40a7-94db-92e63b583ec0",
-        "version": "1.2.2",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "l2i",
-        "inputs": {
-          "board": {
-            "name": "board",
-            "label": ""
-          },
-          "metadata": {
-            "name": "metadata",
-            "label": ""
-          },
-          "latents": {
-            "name": "latents",
-            "label": ""
-          },
-          "vae": {
-            "name": "vae",
-            "label": ""
-          },
-          "tiled": {
-            "name": "tiled",
-            "label": "",
-            "value": false
-          },
-          "fp32": {
-            "name": "fp32",
-            "label": "",
-            "value": false
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": false,
-        "useCache": true
-      },
-      "position": {
-        "x": 2559.4751127537957,
-        "y": 1246.6000376741406
-      }
-    },
-    {
-      "id": "5ca498a4-c8c8-4580-a396-0c984317205d",
-      "type": "invocation",
-      "data": {
-        "id": "5ca498a4-c8c8-4580-a396-0c984317205d",
-        "version": "1.0.2",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "i2l",
-        "inputs": {
-          "image": {
-            "name": "image",
-            "label": ""
-          },
-          "vae": {
-            "name": "vae",
-            "label": ""
-          },
-          "tiled": {
-            "name": "tiled",
-            "label": "",
-            "value": false
-          },
-          "fp32": {
-            "name": "fp32",
-            "label": "",
-            "value": false
-          }
-        },
-        "isOpen": false,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 1650,
-        "y": 1675
-      }
-    },
-    {
-      "id": "63b6ab7e-5b05-4d1b-a3b1-42d8e53ce16b",
-      "type": "invocation",
-      "data": {
-        "id": "63b6ab7e-5b05-4d1b-a3b1-42d8e53ce16b",
-        "version": "1.1.1",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "compel",
-        "inputs": {
-          "prompt": {
-            "name": "prompt",
-            "label": "",
-            "value": ""
-          },
-          "clip": {
-            "name": "clip",
-            "label": ""
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 1250,
-        "y": 1200
       }
     },
     {

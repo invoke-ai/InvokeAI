@@ -1,5 +1,5 @@
+import { get } from 'es-toolkit/compat';
 import type { FieldInputInstance, FieldInputTemplate, FieldValue, StatefulFieldType } from 'features/nodes/types/field';
-import { get } from 'lodash-es';
 
 const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = {
   EnumField: '',
@@ -9,23 +9,21 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   FloatField: 0,
   ImageField: undefined,
   IntegerField: 0,
-  IPAdapterModelField: undefined,
-  LoRAModelField: undefined,
   ModelIdentifierField: undefined,
-  MainModelField: undefined,
-  SchedulerField: 'euler',
-  SDXLMainModelField: undefined,
-  SDXLRefinerModelField: undefined,
+  SchedulerField: 'dpmpp_3m_k',
   StringField: '',
-  T2IAdapterModelField: undefined,
-  VAEModelField: undefined,
-  ControlNetModelField: undefined,
+  StylePresetField: undefined,
+  FloatGeneratorField: undefined,
+  IntegerGeneratorField: undefined,
+  StringGeneratorField: undefined,
+  ImageGeneratorField: undefined,
 };
 
 export const buildFieldInputInstance = (id: string, template: FieldInputTemplate): FieldInputInstance => {
   const fieldInstance: FieldInputInstance = {
     name: template.name,
     label: '',
+    description: '',
     value: template.default ?? get(FIELD_VALUE_FALLBACK_MAP, template.type.name),
   };
 

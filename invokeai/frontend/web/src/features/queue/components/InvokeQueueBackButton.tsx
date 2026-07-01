@@ -1,30 +1,35 @@
-import { Button, Flex, Spacer } from '@invoke-ai/ui-library';
+import { Button, Flex, Spacer, useShiftModifier } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectDynamicPromptsIsLoading } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { QueueIterationsNumberInput } from 'features/queue/components/QueueIterationsNumberInput';
-import { useQueueBack } from 'features/queue/hooks/useQueueBack';
+import { useInvoke } from 'features/queue/hooks/useInvoke';
 import { memo } from 'react';
-import { RiSparkling2Fill } from 'react-icons/ri';
+import { PiLightningFill, PiSparkleFill } from 'react-icons/pi';
+import { useAutoAddBoard } from 'services/api/hooks/useAutoAddBoard';
+import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
 
-import { QueueButtonTooltip } from './QueueButtonTooltip';
+import { InvokeButtonTooltip } from './InvokeButtonTooltip/InvokeButtonTooltip';
 
 const invoke = 'Invoke';
 
-export const InvokeQueueBackButton = memo(() => {
-  const { queueBack, isLoading, isDisabled } = useQueueBack();
-  const isLoadingDynamicPrompts = useAppSelector((s) => s.dynamicPrompts.isLoading);
+export const InvokeButton = memo(() => {
+  const queue = useInvoke();
+  const shift = useShiftModifier();
+  const isLoadingDynamicPrompts = useAppSelector(selectDynamicPromptsIsLoading);
+  const autoAddBoard = useAutoAddBoard();
+  const { canWriteImages } = useBoardAccess(autoAddBoard);
 
   return (
-    <Flex pos="relative" flexGrow={1} minW="240px">
+    <Flex pos="relative" w="200px">
       <QueueIterationsNumberInput />
-      <QueueButtonTooltip>
+      <InvokeButtonTooltip prepend={shift}>
         <Button
-          onClick={queueBack}
-          isLoading={isLoading || isLoadingDynamicPrompts}
+          onClick={shift ? queue.enqueueFront : queue.enqueueBack}
+          isLoading={queue.isLoading || isLoadingDynamicPrompts}
           loadingText={invoke}
-          isDisabled={isDisabled}
-          rightIcon={<RiSparkling2Fill />}
+          isDisabled={queue.isDisabled || !canWriteImages}
+          rightIcon={shift ? <PiLightningFill /> : <PiSparkleFill />}
           variant="solid"
-          zIndex={1}
           colorScheme="invokeYellow"
           size="lg"
           w="calc(100% - 60px)"
@@ -35,9 +40,9 @@ export const InvokeQueueBackButton = memo(() => {
           <span>{invoke}</span>
           <Spacer />
         </Button>
-      </QueueButtonTooltip>
+      </InvokeButtonTooltip>
     </Flex>
   );
 });
 
-InvokeQueueBackButton.displayName = 'InvokeQueueBackButton';
+InvokeButton.displayName = 'InvokeQueueBackButton';

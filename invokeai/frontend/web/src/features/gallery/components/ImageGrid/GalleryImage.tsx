@@ -1,200 +1,243 @@
-import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Flex, Text, useShiftModifier } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
-import { $customStarUI } from 'app/store/nanostores/customStarUI';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIDndImage from 'common/components/IAIDndImage';
-import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
-import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
-import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
-import type { GallerySelectionDraggableData, ImageDraggableData, TypesafeDraggableData } from 'features/dnd/types';
-import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
-import { useMultiselect } from 'features/gallery/hooks/useMultiselect';
-import { useScrollIntoView } from 'features/gallery/hooks/useScrollIntoView';
-import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
-import type { MouseEvent } from 'react';
-import { memo, useCallback, useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { PiStarBold, PiStarFill, PiTrashSimpleFill } from 'react-icons/pi';
-import { useGetImageDTOQuery, useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
+import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
+import { draggable, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import type { FlexProps } from '@invoke-ai/ui-library';
+import { Flex, Icon, Image } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
+import type { AppDispatch, AppGetState } from 'app/store/store';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { useMiddleClickOpenInNewTab } from 'common/hooks/useMiddleClickOpenInNewTab';
+import { uniq } from 'es-toolkit';
+import { multipleImageDndSource, singleImageDndSource } from 'features/dnd/dnd';
+import type { DndDragPreviewMultipleImageState } from 'features/dnd/DndDragPreviewMultipleImage';
+import { createMultipleImageDragPreview, setMultipleImageDragPreview } from 'features/dnd/DndDragPreviewMultipleImage';
+import type { DndDragPreviewSingleImageState } from 'features/dnd/DndDragPreviewSingleImage';
+import { createSingleImageDragPreview, setSingleImageDragPreview } from 'features/dnd/DndDragPreviewSingleImage';
+import { firefoxDndFix } from 'features/dnd/util';
+import { useImageContextMenu } from 'features/gallery/components/ContextMenu/ImageContextMenu';
+import { GalleryItemHoverIcons } from 'features/gallery/components/ImageGrid/GalleryItemHoverIcons';
+import {
+  selectGetImageNamesQueryArgs,
+  selectSelectedBoardId,
+  selectSelection,
+} from 'features/gallery/store/gallerySelectors';
+import { imageToCompareChanged, selectGallerySlice, selectionChanged } from 'features/gallery/store/gallerySlice';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
+import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
+import type { MouseEvent, MouseEventHandler } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { PiImageBold } from 'react-icons/pi';
+import { imagesApi } from 'services/api/endpoints/images';
+import type { ImageDTO } from 'services/api/types';
 
-const imageSx: SystemStyleObject = { w: 'full', h: 'full' };
-const imageIconStyleOverrides: SystemStyleObject = {
-  bottom: 2,
-  top: 'auto',
-};
-const boxSx: SystemStyleObject = {
-  containerType: 'inline-size',
-};
+import { galleryItemContainerSX } from './galleryItemContainerSX';
 
-const badgeSx: SystemStyleObject = {
-  '@container (max-width: 80px)': {
-    '&': { display: 'none' },
-  },
-};
-
-interface HoverableImageProps {
-  imageName: string;
-  index: number;
+interface Props {
+  imageDTO: ImageDTO;
 }
 
-const GalleryImage = (props: HoverableImageProps) => {
-  const dispatch = useAppDispatch();
-  const { imageName } = props;
-  const { currentData: imageDTO } = useGetImageDTOQuery(imageName);
-  const shift = useShiftModifier();
-  const { t } = useTranslation();
-  const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
-  const alwaysShowImageSizeBadge = useAppSelector((s) => s.gallery.alwaysShowImageSizeBadge);
-  const { handleClick, isSelected, areMultiplesSelected } = useMultiselect(imageDTO);
+const buildOnClick =
+  (imageName: string, dispatch: AppDispatch, getState: AppGetState) => (e: MouseEvent<HTMLDivElement>) => {
+    const { shiftKey, ctrlKey, metaKey, altKey } = e;
+    const state = getState();
+    const queryArgs = selectGetImageNamesQueryArgs(state);
+    const imageNames = imagesApi.endpoints.getImageNames.select(queryArgs)(state).data?.image_names ?? [];
 
-  const customStarUi = useStore($customStarUI);
-
-  const imageContainerRef = useScrollIntoView(isSelected, props.index, areMultiplesSelected);
-
-  const handleDelete = useCallback(
-    (e: MouseEvent<HTMLButtonElement>) => {
-      e.stopPropagation();
-      if (!imageDTO) {
-        return;
+    // If we don't have the image names cached, we can't perform selection operations
+    // This can happen if the user clicks on an image before the names are loaded
+    if (imageNames.length === 0) {
+      // For basic click without modifiers, we can still set selection
+      if (!shiftKey && !ctrlKey && !metaKey && !altKey) {
+        dispatch(selectionChanged([imageName]));
       }
-      dispatch(imagesToDeleteSelected([imageDTO]));
-    },
-    [dispatch, imageDTO]
+      return;
+    }
+
+    const selection = state.gallery.selection;
+
+    if (altKey) {
+      if (state.gallery.imageToCompare === imageName) {
+        dispatch(imageToCompareChanged(null));
+      } else {
+        dispatch(imageToCompareChanged(imageName));
+      }
+    } else if (shiftKey) {
+      const rangeEndImageName = imageName;
+      const lastSelectedImage = selection.at(-1);
+      const lastClickedIndex = imageNames.findIndex((name) => name === lastSelectedImage);
+      const currentClickedIndex = imageNames.findIndex((name) => name === rangeEndImageName);
+      if (lastClickedIndex > -1 && currentClickedIndex > -1) {
+        // We have a valid range!
+        const start = Math.min(lastClickedIndex, currentClickedIndex);
+        const end = Math.max(lastClickedIndex, currentClickedIndex);
+        const imagesToSelect = imageNames.slice(start, end + 1);
+        if (currentClickedIndex < lastClickedIndex) {
+          imagesToSelect.reverse();
+        }
+        dispatch(selectionChanged(uniq(selection.concat(imagesToSelect))));
+      }
+    } else if (ctrlKey || metaKey) {
+      if (selection.some((n) => n === imageName) && selection.length > 1) {
+        dispatch(selectionChanged(uniq(selection.filter((n) => n !== imageName))));
+      } else {
+        dispatch(selectionChanged(uniq(selection.concat(imageName))));
+      }
+    } else {
+      dispatch(selectionChanged([imageName]));
+    }
+  };
+
+export const GalleryImage = memo(({ imageDTO }: Props) => {
+  const store = useAppStore();
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragPreviewState, setDragPreviewState] = useState<
+    DndDragPreviewSingleImageState | DndDragPreviewMultipleImageState | null
+  >(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const selectIsSelectedForCompare = useMemo(
+    () => createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare === imageDTO.image_name),
+    [imageDTO.image_name]
   );
+  const isSelectedForCompare = useAppSelector(selectIsSelectedForCompare);
+  const selectIsSelected = useMemo(
+    () => createSelector(selectGallerySlice, (gallery) => gallery.selection.some((n) => n === imageDTO.image_name)),
+    [imageDTO.image_name]
+  );
+  const isSelected = useAppSelector(selectIsSelected);
 
-  const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
-    if (areMultiplesSelected) {
-      const data: GallerySelectionDraggableData = {
-        id: 'gallery-image',
-        payloadType: 'GALLERY_SELECTION',
-        payload: { boardId: selectedBoardId },
-      };
-      return data;
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) {
+      return;
     }
 
-    if (imageDTO) {
-      const data: ImageDraggableData = {
-        id: 'gallery-image',
-        payloadType: 'IMAGE_DTO',
-        payload: { imageDTO },
-      };
-      return data;
-    }
-  }, [imageDTO, selectedBoardId, areMultiplesSelected]);
+    const monitorBinding = monitorForElements({
+      // This is a "global" drag start event, meaning that it is called for all drag events.
+      onDragStart: ({ source }) => {
+        // When we start dragging multiple images, set the dragging state to true if the dragged image is part of the
+        // selection. This is called for all drag events.
+        if (
+          multipleImageDndSource.typeGuard(source.data) &&
+          source.data.payload.image_names.includes(imageDTO.image_name)
+        ) {
+          setIsDragging(true);
+        }
+      },
+      onDrop: () => {
+        // Always set the dragging state to false when a drop event occurs.
+        setIsDragging(false);
+      },
+    });
 
-  const [starImages] = useStarImagesMutation();
-  const [unstarImages] = useUnstarImagesMutation();
+    return combine(
+      firefoxDndFix(element),
+      draggable({
+        element,
+        getInitialData: () => {
+          const selection = selectSelection(store.getState());
+          const boardId = selectSelectedBoardId(store.getState());
 
-  const toggleStarredState = useCallback(() => {
-    if (imageDTO) {
-      if (imageDTO.starred) {
-        unstarImages({ imageDTOs: [imageDTO] });
-      }
-      if (!imageDTO.starred) {
-        starImages({ imageDTOs: [imageDTO] });
-      }
-    }
-  }, [starImages, unstarImages, imageDTO]);
+          // When we have multiple images selected, and the dragged image is part of the selection, initiate a
+          // multi-image drag.
+          if (selection.length > 1 && selection.some((n) => n === imageDTO.image_name)) {
+            return multipleImageDndSource.getData({
+              image_names: selection,
+              board_id: boardId,
+            });
+          }
+
+          // Otherwise, initiate a single-image drag
+          return singleImageDndSource.getData({ imageDTO }, imageDTO.image_name);
+        },
+        // This is a "local" drag start event, meaning that it is only called when this specific image is dragged.
+        onDragStart: ({ source }) => {
+          // When we start dragging a single image, set the dragging state to true. This is only called when this
+          // specific image is dragged.
+          if (singleImageDndSource.typeGuard(source.data)) {
+            setIsDragging(true);
+            return;
+          }
+        },
+        onGenerateDragPreview: (args) => {
+          if (multipleImageDndSource.typeGuard(args.source.data)) {
+            setMultipleImageDragPreview({
+              multipleImageDndData: args.source.data,
+              onGenerateDragPreviewArgs: args,
+              setDragPreviewState,
+            });
+          } else if (singleImageDndSource.typeGuard(args.source.data)) {
+            setSingleImageDragPreview({
+              singleImageDndData: args.source.data,
+              onGenerateDragPreviewArgs: args,
+              setDragPreviewState,
+            });
+          }
+        },
+      }),
+      monitorBinding
+    );
+  }, [imageDTO, store]);
 
   const [isHovered, setIsHovered] = useState(false);
 
-  const handleMouseOver = useCallback(() => {
+  const onMouseOver = useCallback(() => {
     setIsHovered(true);
   }, []);
 
-  const onDoubleClick = useCallback(() => {
-    dispatch(isImageViewerOpenChanged(true));
-  }, [dispatch]);
-
-  const handleMouseOut = useCallback(() => {
+  const onMouseOut = useCallback(() => {
     setIsHovered(false);
   }, []);
 
-  const starIcon = useMemo(() => {
-    if (imageDTO?.starred) {
-      return customStarUi ? customStarUi.on.icon : <PiStarFill size="20" />;
-    }
-    if (!imageDTO?.starred && isHovered) {
-      return customStarUi ? customStarUi.off.icon : <PiStarBold size="20" />;
-    }
-  }, [imageDTO?.starred, isHovered, customStarUi]);
+  const onClick = useMemo(() => buildOnClick(imageDTO.image_name, store.dispatch, store.getState), [imageDTO, store]);
+  useMiddleClickOpenInNewTab(ref, imageDTO.image_url, {
+    requireDirectTarget: true,
+  });
 
-  const starTooltip = useMemo(() => {
-    if (imageDTO?.starred) {
-      return customStarUi ? customStarUi.off.text : 'Unstar';
-    }
-    if (!imageDTO?.starred) {
-      return customStarUi ? customStarUi.on.text : 'Star';
-    }
-    return '';
-  }, [imageDTO?.starred, customStarUi]);
+  const onDoubleClick = useCallback<MouseEventHandler<HTMLDivElement>>(() => {
+    store.dispatch(imageToCompareChanged(null));
+    navigationApi.focusPanelInActiveTab(VIEWER_PANEL_ID);
+  }, [store]);
 
-  const dataTestId = useMemo(() => getGalleryImageDataTestId(imageDTO?.image_name), [imageDTO?.image_name]);
-
-  if (!imageDTO) {
-    return <IAIFillSkeleton />;
-  }
+  useImageContextMenu(imageDTO, ref);
 
   return (
-    <Box w="full" h="full" className="gallerygrid-image" data-testid={dataTestId} sx={boxSx}>
+    <>
       <Flex
-        ref={imageContainerRef}
-        userSelect="none"
-        position="relative"
-        justifyContent="center"
-        alignItems="center"
-        aspectRatio="1/1"
+        ref={ref}
+        sx={galleryItemContainerSX}
+        data-is-dragging={isDragging}
+        data-item-id={imageDTO.image_name}
+        role="button"
+        onMouseOver={onMouseOver}
+        onMouseOut={onMouseOut}
+        onClick={onClick}
+        onDoubleClick={onDoubleClick}
+        data-selected={isSelected}
+        data-selected-for-compare={isSelectedForCompare}
       >
-        <IAIDndImage
-          onClick={handleClick}
-          onDoubleClick={onDoubleClick}
-          imageDTO={imageDTO}
-          draggableData={draggableData}
-          isSelected={isSelected}
-          minSize={0}
-          imageSx={imageSx}
-          isDropDisabled={true}
-          isUploadDisabled={true}
-          thumbnail={true}
-          withHoverOverlay
-          onMouseOver={handleMouseOver}
-          onMouseOut={handleMouseOut}
-        >
-          <>
-            {(isHovered || alwaysShowImageSizeBadge) && (
-              <Text
-                position="absolute"
-                background="base.900"
-                color="base.50"
-                fontSize="sm"
-                fontWeight="semibold"
-                bottom={0}
-                left={0}
-                opacity={0.7}
-                px={2}
-                lineHeight={1.25}
-                borderTopEndRadius="base"
-                borderBottomStartRadius="base"
-                sx={badgeSx}
-                pointerEvents="none"
-              >{`${imageDTO.width}x${imageDTO.height}`}</Text>
-            )}
-            <IAIDndImageIcon onClick={toggleStarredState} icon={starIcon} tooltip={starTooltip} />
-
-            {isHovered && shift && (
-              <IAIDndImageIcon
-                onClick={handleDelete}
-                icon={<PiTrashSimpleFill size="16px" />}
-                tooltip={t('gallery.deleteImage', { count: 1 })}
-                styleOverrides={imageIconStyleOverrides}
-              />
-            )}
-          </>
-        </IAIDndImage>
+        <Image
+          pointerEvents="none"
+          src={imageDTO.thumbnail_url}
+          w={imageDTO.width}
+          fallback={<GalleryImagePlaceholder />}
+          objectFit="contain"
+          maxW="full"
+          maxH="full"
+          borderRadius="base"
+        />
+        <GalleryItemHoverIcons imageDTO={imageDTO} isHovered={isHovered} />
       </Flex>
-    </Box>
+      {dragPreviewState?.type === 'multiple-image' ? createMultipleImageDragPreview(dragPreviewState) : null}
+      {dragPreviewState?.type === 'single-image' ? createSingleImageDragPreview(dragPreviewState) : null}
+    </>
   );
-};
+});
 
-export default memo(GalleryImage);
+GalleryImage.displayName = 'GalleryImage';
+
+export const GalleryImagePlaceholder = memo((props: FlexProps) => (
+  <Flex w="full" h="full" bg="base.850" borderRadius="base" alignItems="center" justifyContent="center" {...props}>
+    <Icon as={PiImageBold} boxSize={16} color="base.800" />
+  </Flex>
+));
+
+GalleryImagePlaceholder.displayName = 'GalleryImagePlaceholder';

@@ -39,12 +39,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10 # expected run time: <2 min
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: check for changed frontend files
         if: ${{ inputs.always_run != true }}
         id: changed-files
-        uses: tj-actions/changed-files@v42
+        # Pinned to the _hash_ for v45.0.9 to prevent supply-chain attacks.
+        # See:
+        # - CVE-2025-30066
+        # - https://www.stepsecurity.io/blog/harden-runner-detection-tj-actions-changed-files-action-is-compromised
+        # - https://github.com/tj-actions/changed-files/issues/2463
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96
         with:
           files_yaml: |
             frontend:

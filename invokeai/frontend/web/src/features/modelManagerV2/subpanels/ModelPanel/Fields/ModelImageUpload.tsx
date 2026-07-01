@@ -1,11 +1,28 @@
-import { Box, Button, Flex, Icon, IconButton, Image, Tooltip } from '@invoke-ai/ui-library';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { Box, IconButton, Image } from '@invoke-ai/ui-library';
+import { dropzoneAccept } from 'common/hooks/useImageUploadButton';
 import { typedMemo } from 'common/util/typedMemo';
 import { toast } from 'features/toast/toast';
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
-import { PiArrowCounterClockwiseBold, PiUploadSimpleBold } from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold, PiUploadBold } from 'react-icons/pi';
 import { useDeleteModelImageMutation, useUpdateModelImageMutation } from 'services/api/endpoints/models';
+
+const sharedSx: SystemStyleObject = {
+  w: 108,
+  h: 108,
+  fontSize: 36,
+  borderRadius: 'base',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  bg: 'base.800',
+  borderWidth: '1px',
+  borderStyle: 'solid',
+  borderColor: 'base.700',
+  flexShrink: 0,
+};
 
 type Props = {
   model_key: string | null;
@@ -16,7 +33,7 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
   const [image, setImage] = useState<string | null>(model_image || null);
   const { t } = useTranslation();
 
-  const [updateModelImage] = useUpdateModelImageMutation();
+  const [updateModelImage, request] = useUpdateModelImageMutation();
   const [deleteModelImage] = useDeleteModelImageMutation();
 
   const onDropAccepted = useCallback(
@@ -72,7 +89,7 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
   }, [model_key, t, deleteModelImage]);
 
   const { getInputProps, getRootProps } = useDropzone({
-    accept: { 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg', '.png'] },
+    accept: dropzoneAccept,
     onDropAccepted,
     noDrag: true,
     multiple: false,
@@ -85,10 +102,9 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
           src={image}
           objectFit="cover"
           objectPosition="50% 50%"
-          height={108}
-          width={108}
           minWidth={108}
           borderRadius="base"
+          sx={sharedSx}
         />
         <IconButton
           position="absolute"
@@ -107,21 +123,16 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
 
   return (
     <>
-      <Tooltip label={t('modelManager.uploadImage')}>
-        <Flex
-          as={Button}
-          w={108}
-          h={108}
-          opacity={0.3}
-          borderRadius="base"
-          alignItems="center"
-          justifyContent="center"
-          flexShrink={0}
-          {...getRootProps()}
-        >
-          <Icon as={PiUploadSimpleBold} w={16} h={16} />
-        </Flex>
-      </Tooltip>
+      <IconButton
+        variant="ghost"
+        aria-label={t('modelManager.uploadImage')}
+        tooltip={t('modelManager.uploadImage')}
+        fontSize={36}
+        icon={<PiUploadBold />}
+        sx={sharedSx}
+        isLoading={request.isLoading}
+        {...getRootProps()}
+      />
       <input {...getInputProps()} />
     </>
   );

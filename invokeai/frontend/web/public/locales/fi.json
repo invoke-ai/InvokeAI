@@ -5,7 +5,7 @@
         "invokeProgressBar": "Invoken edistymispalkki",
         "nextImage": "Seuraava kuva",
         "previousImage": "Edellinen kuva",
-        "showOptionsPanel": "Näytä asetukset"
+        "uploadImages": "Lähetä Kuva(t)"
     },
     "common": {
         "languagePickerLabel": "Kielen valinta",
@@ -24,28 +24,34 @@
         "back": "Takaisin",
         "statusDisconnected": "Yhteys katkaistu",
         "loading": "Ladataan",
-        "txt2img": "Teksti kuvaksi",
-        "unifiedCanvas": "Yhdistetty kanvas"
+        "txt2img": "Teksti kuvaksi"
     },
     "gallery": {
         "galleryImageSize": "Kuvan koko",
         "gallerySettings": "Gallerian asetukset",
-        "autoSwitchNewImages": "Vaihda uusiin kuviin automaattisesti",
-        "noImagesInGallery": "Ei kuvia galleriassa",
-        "loadMore": "Lataa lisää"
+        "autoSwitchNewImages": "Vaihda uusiin kuviin automaattisesti"
     },
-    "hotkeys": {
-        "keyboardShortcuts": "näppäimistön pikavalinnat",
-        "appHotkeys": "Sovelluksen pikanäppäimet",
-        "generalHotkeys": "Yleiset pikanäppäimet",
-        "galleryHotkeys": "Gallerian pikanäppäimet",
-        "unifiedCanvasHotkeys": "Yhdistetyn kanvaan pikanäppäimet",
-        "cancel": {
-            "desc": "Peruuta kuvan luominen",
-            "title": "Peruuta"
+    "modelManager": {
+        "t5Encoder": "T5-kooderi",
+        "qwen3Encoder": "Qwen3-kooderi",
+        "zImageVae": "VAE (valinnainen)",
+        "zImageQwen3Encoder": "Qwen3-kooderi (valinnainen)",
+        "zImageQwen3SourcePlaceholder": "Pakollinen, jos VAE/Enkooderi on tyhjä",
+        "flux2KleinVae": "VAE (valinnainen)",
+        "flux2KleinQwen3Encoder": "Qwen3-kooderi (valinnainen)"
+    },
+    "auth": {
+        "login": {
+            "title": "Kirjaudu sisään InvokeAI:hin",
+            "password": "Salasana",
+            "passwordPlaceholder": "Salasana",
+            "signIn": "Kirjaudu sisään",
+            "signingIn": "Kirjaudutaan sisään...",
+            "loginFailed": "Kirjautuminen epäonnistui. Tarkista käyttäjätunnuksesi tiedot."
         },
-        "invoke": {
-            "desc": "Luo kuva"
+        "setup": {
+            "title": "Tervetuloa InvokeAI:hin",
+            "subtitle": "Määritä ensimmäiseksi järjestelmänvalvojan tili"
         }
     }
 }

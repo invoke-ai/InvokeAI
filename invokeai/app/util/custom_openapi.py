@@ -4,11 +4,18 @@ from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from pydantic.json_schema import models_json_schema
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, UIConfigBase
+from invokeai.app.invocations.baseinvocation import (
+    InvocationRegistry,
+    UIConfigBase,
+)
 from invokeai.app.invocations.fields import InputFieldJSONSchemaExtra, OutputFieldJSONSchemaExtra
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.events.events_common import EventBase
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
+from invokeai.backend.model_manager.configs.factory import AnyModelConfigValidator
+from invokeai.backend.util.logging import InvokeAILogger
+
+logger = InvokeAILogger.get_logger()
 
 
 def move_defs_to_top_level(openapi_schema: dict[str, Any], component_schema: dict[str, Any]) -> None:
@@ -21,6 +28,23 @@ def move_defs_to_top_level(openapi_schema: dict[str, Any], component_schema: dic
         if schema_key in openapi_schema["components"]["schemas"]:
             continue
         openapi_schema["components"]["schemas"][schema_key] = json_schema
+
+
+def normalize_path_defaults(node: Any) -> None:
+    """Recursively normalize `default` strings on schema nodes whose `format` is `path` to use forward slashes.
+
+    Pydantic stringifies `Path` defaults using the host OS's separator, so a default declared as
+    `Path("models/.convert_cache")` serializes to `models\\.convert_cache` on Windows. That OS-dependent drift
+    pollutes diffs whenever schema is regenerated on Windows. We force POSIX form for path-typed defaults.
+    """
+    if isinstance(node, dict):
+        if node.get("format") == "path" and isinstance(node.get("default"), str):
+            node["default"] = node["default"].replace("\\", "/")
+        for v in node.values():
+            normalize_path_defaults(v)
+    elif isinstance(node, list):
+        for v in node:
+            normalize_path_defaults(v)
 
 
 def get_openapi_func(
@@ -56,14 +80,18 @@ def get_openapi_func(
         invocation_output_map_required: list[str] = []
 
         # We need to manually add all outputs to the schema - pydantic doesn't add them because they aren't used directly.
-        for output in BaseInvocationOutput.get_outputs():
+        for output in InvocationRegistry.get_output_classes():
             json_schema = output.model_json_schema(mode="serialization", ref_template="#/components/schemas/{model}")
+            # Remove output_metadata that is only used on back-end from the schema
+            if "output_meta" in json_schema["properties"]:
+                json_schema["properties"].pop("output_meta")
+
             move_defs_to_top_level(openapi_schema, json_schema)
             openapi_schema["components"]["schemas"][output.__name__] = json_schema
 
         # Technically, invocations are added to the schema by pydantic, but we still need to manually set their output
         # property, so we'll just do it all manually.
-        for invocation in BaseInvocation.get_invocations():
+        for invocation in InvocationRegistry.get_invocation_classes():
             json_schema = invocation.model_json_schema(
                 mode="serialization", ref_template="#/components/schemas/{model}"
             )
@@ -81,8 +109,8 @@ def get_openapi_func(
         # Add the output map to the schema
         openapi_schema["components"]["schemas"]["InvocationOutputMap"] = {
             "type": "object",
-            "properties": invocation_output_map_properties,
-            "required": invocation_output_map_required,
+            "properties": dict(sorted(invocation_output_map_properties.items())),
+            "required": sorted(invocation_output_map_required),
         }
 
         # Some models don't end up in the schemas as standalone definitions because they aren't used directly in the API.
@@ -105,8 +133,17 @@ def get_openapi_func(
         # additional_schemas[1] is a dict of $defs that we need to add to the top level of the schema
         move_defs_to_top_level(openapi_schema, additional_schemas[1])
 
+        any_model_config_schema = AnyModelConfigValidator.json_schema(
+            mode="serialization",
+            ref_template="#/components/schemas/{model}",
+        )
+        move_defs_to_top_level(openapi_schema, any_model_config_schema)
+        openapi_schema["components"]["schemas"]["AnyModelConfig"] = any_model_config_schema
+
         if post_transform is not None:
             openapi_schema = post_transform(openapi_schema)
+
+        normalize_path_defaults(openapi_schema)
 
         openapi_schema["components"]["schemas"] = dict(sorted(openapi_schema["components"]["schemas"].items()))
 

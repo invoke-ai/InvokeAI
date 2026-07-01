@@ -1,4 +1,4 @@
-import type { Node } from 'reactflow';
+import type { Node } from '@xyflow/react';
 
 export const findUnoccupiedPosition = (nodes: Node[], x: number, y: number) => {
   let newX = x;

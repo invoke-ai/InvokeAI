@@ -4,29 +4,35 @@ from typing import Optional
 
 import torch
 
-from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
-from invokeai.app.invocations.fields import (
-    ColorField,
-    ConditioningField,
-    DenoiseMaskField,
-    FieldDescriptions,
-    ImageField,
-    Input,
-    InputField,
-    LatentsField,
-    OutputField,
-    TensorField,
-    UIComponent,
-)
-from invokeai.app.services.images.images_common import ImageDTO
-from invokeai.app.services.shared.invocation_context import InvocationContext
-
-from .baseinvocation import (
+from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
     invocation,
     invocation_output,
 )
+from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
+from invokeai.app.invocations.fields import (
+    AnimaConditioningField,
+    BoundingBoxField,
+    CogView4ConditioningField,
+    ColorField,
+    ConditioningField,
+    DenoiseMaskField,
+    FieldDescriptions,
+    FluxConditioningField,
+    ImageField,
+    Input,
+    InputField,
+    LatentsField,
+    OutputField,
+    QwenImageConditioningField,
+    SD3ConditioningField,
+    TensorField,
+    UIComponent,
+    ZImageConditioningField,
+)
+from invokeai.app.services.images.images_common import ImageDTO
+from invokeai.app.services.shared.invocation_context import InvocationContext
 
 """
 Primitives: Boolean, Integer, Float, String, Image, Latents, Conditioning, Color
@@ -263,13 +269,9 @@ class ImageInvocation(BaseInvocation):
     image: ImageField = InputField(description="The image to load")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.images.get_pil(self.image.image_name)
+        image_dto = context.images.get_dto(self.image.image_name)
 
-        return ImageOutput(
-            image=ImageField(image_name=self.image.image_name),
-            width=image.width,
-            height=image.height,
-        )
+        return ImageOutput.build(image_dto=image_dto)
 
 
 @invocation(
@@ -414,9 +416,85 @@ class ColorInvocation(BaseInvocation):
 class MaskOutput(BaseInvocationOutput):
     """A torch mask tensor."""
 
+    # shape: [1, H, W], dtype: bool
     mask: TensorField = OutputField(description="The mask.")
     width: int = OutputField(description="The width of the mask in pixels.")
     height: int = OutputField(description="The height of the mask in pixels.")
+
+
+@invocation_output("flux_conditioning_output")
+class FluxConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a single conditioning tensor"""
+
+    conditioning: FluxConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "FluxConditioningOutput":
+        return cls(conditioning=FluxConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("flux_conditioning_collection_output")
+class FluxConditioningCollectionOutput(BaseInvocationOutput):
+    """Base class for nodes that output a collection of conditioning tensors"""
+
+    collection: list[FluxConditioningField] = OutputField(
+        description="The output conditioning tensors",
+    )
+
+
+@invocation_output("sd3_conditioning_output")
+class SD3ConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a single SD3 conditioning tensor"""
+
+    conditioning: SD3ConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "SD3ConditioningOutput":
+        return cls(conditioning=SD3ConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("cogview4_conditioning_output")
+class CogView4ConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a CogView text conditioning tensor."""
+
+    conditioning: CogView4ConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "CogView4ConditioningOutput":
+        return cls(conditioning=CogView4ConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("z_image_conditioning_output")
+class ZImageConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a Z-Image text conditioning tensor."""
+
+    conditioning: ZImageConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "ZImageConditioningOutput":
+        return cls(conditioning=ZImageConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("qwen_image_conditioning_output")
+class QwenImageConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a Qwen Image Edit conditioning tensor."""
+
+    conditioning: QwenImageConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "QwenImageConditioningOutput":
+        return cls(conditioning=QwenImageConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("anima_conditioning_output")
+class AnimaConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output an Anima text conditioning tensor."""
+
+    conditioning: AnimaConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "AnimaConditioningOutput":
+        return cls(conditioning=AnimaConditioningField(conditioning_name=conditioning_name))
 
 
 @invocation_output("conditioning_output")
@@ -472,6 +550,45 @@ class ConditioningCollectionInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> ConditioningCollectionOutput:
         return ConditioningCollectionOutput(collection=self.collection)
+
+
+# endregion
+
+# region BoundingBox
+
+
+@invocation_output("bounding_box_output")
+class BoundingBoxOutput(BaseInvocationOutput):
+    """Base class for nodes that output a single bounding box"""
+
+    bounding_box: BoundingBoxField = OutputField(description="The output bounding box.")
+
+
+@invocation_output("bounding_box_collection_output")
+class BoundingBoxCollectionOutput(BaseInvocationOutput):
+    """Base class for nodes that output a collection of bounding boxes"""
+
+    collection: list[BoundingBoxField] = OutputField(description="The output bounding boxes.", title="Bounding Boxes")
+
+
+@invocation(
+    "bounding_box",
+    title="Bounding Box",
+    tags=["primitives", "segmentation", "collection", "bounding box"],
+    category="primitives",
+    version="1.0.0",
+)
+class BoundingBoxInvocation(BaseInvocation):
+    """Create a bounding box manually by supplying box coordinates"""
+
+    x_min: int = InputField(default=0, description="x-coordinate of the bounding box's top left vertex")
+    y_min: int = InputField(default=0, description="y-coordinate of the bounding box's top left vertex")
+    x_max: int = InputField(default=0, description="x-coordinate of the bounding box's bottom right vertex")
+    y_max: int = InputField(default=0, description="y-coordinate of the bounding box's bottom right vertex")
+
+    def invoke(self, context: InvocationContext) -> BoundingBoxOutput:
+        bounding_box = BoundingBoxField(x_min=self.x_min, y_min=self.y_min, x_max=self.x_max, y_max=self.y_max)
+        return BoundingBoxOutput(bounding_box=bounding_box)
 
 
 # endregion

@@ -1,0 +1,68 @@
+import { logger } from 'app/logging/logger';
+import type { AppStore } from 'app/store/store';
+import { useAppStore } from 'app/store/storeHooks';
+import {
+  positivePromptAddedToHistory,
+  selectNegativePrompt,
+  selectPositivePrompt,
+} from 'features/controlLayers/store/paramsSlice';
+import type { BaseModelType } from 'features/nodes/types/common';
+import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
+import { buildMultidiffusionUpscaleGraph } from 'features/nodes/util/graph/buildMultidiffusionUpscaleGraph';
+import { useCallback } from 'react';
+import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
+
+const log = logger('generation');
+
+const enqueueUpscaling = async (store: AppStore, prepend: boolean) => {
+  const { dispatch, getState } = store;
+
+  const state = getState();
+
+  const model = state.params.model;
+  if (!model) {
+    log.error('No model found in state');
+    return;
+  }
+  const base = model.base;
+
+  const { g, seed, positivePrompt, negativePrompt } = await buildMultidiffusionUpscaleGraph(state);
+
+  const batchConfig = prepareLinearUIBatch({
+    state,
+    g,
+    base: base as BaseModelType,
+    prepend,
+    seedNode: seed,
+    positivePromptNode: positivePrompt,
+    negativePromptNode: negativePrompt,
+    origin: 'upscaling',
+    destination: 'gallery',
+  });
+
+  const req = dispatch(
+    queueApi.endpoints.enqueueBatch.initiate(batchConfig, { ...enqueueMutationFixedCacheKeyOptions, track: false })
+  );
+  const enqueueResult = await req.unwrap();
+
+  // Push to prompt history on successful enqueue
+  dispatch(
+    positivePromptAddedToHistory({
+      positivePrompt: selectPositivePrompt(state),
+      negativePrompt: selectNegativePrompt(state),
+    })
+  );
+
+  return { batchConfig, enqueueResult };
+};
+
+export const useEnqueueUpscaling = () => {
+  const store = useAppStore();
+  const enqueue = useCallback(
+    (prepend: boolean) => {
+      return enqueueUpscaling(store, prepend);
+    },
+    [store]
+  );
+  return enqueue;
+};

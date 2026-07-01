@@ -1,38 +1,24 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
-import { $builtWorkflow } from 'features/nodes/hooks/useWorkflowWatcher';
-import { useSaveWorkflowAsDialog } from 'features/workflowLibrary/components/SaveWorkflowAsDialog/useSaveWorkflowAsDialog';
-import { isWorkflowWithID, useSaveLibraryWorkflow } from 'features/workflowLibrary/hooks/useSaveWorkflow';
-import { memo, useCallback } from 'react';
+import { useDoesWorkflowHaveUnsavedChanges } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
+import { useIsCurrentWorkflowOwner } from 'features/workflowLibrary/hooks/useIsCurrentWorkflowOwner';
+import { useSaveOrSaveAsWorkflow } from 'features/workflowLibrary/hooks/useSaveOrSaveAsWorkflow';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFloppyDiskBold } from 'react-icons/pi';
 
 const SaveWorkflowButton = () => {
   const { t } = useTranslation();
-  const isTouched = useAppSelector((s) => s.workflow.isTouched);
-  const { onOpen } = useSaveWorkflowAsDialog();
-  const { saveWorkflow } = useSaveLibraryWorkflow();
-
-  const handleClickSave = useCallback(async () => {
-    const builtWorkflow = $builtWorkflow.get();
-    if (!builtWorkflow) {
-      return;
-    }
-
-    if (isWorkflowWithID(builtWorkflow)) {
-      saveWorkflow();
-    } else {
-      onOpen();
-    }
-  }, [onOpen, saveWorkflow]);
+  const doesWorkflowHaveUnsavedChanges = useDoesWorkflowHaveUnsavedChanges();
+  const isCurrentWorkflowOwner = useIsCurrentWorkflowOwner();
+  const saveOrSaveAsWorkflow = useSaveOrSaveAsWorkflow();
 
   return (
     <IconButton
       tooltip={t('workflows.saveWorkflow')}
       aria-label={t('workflows.saveWorkflow')}
       icon={<PiFloppyDiskBold />}
-      isDisabled={!isTouched}
-      onClick={handleClickSave}
+      isDisabled={!doesWorkflowHaveUnsavedChanges || !isCurrentWorkflowOwner}
+      onClick={saveOrSaveAsWorkflow}
       pointerEvents="auto"
     />
   );

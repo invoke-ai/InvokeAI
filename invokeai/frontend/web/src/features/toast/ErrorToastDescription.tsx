@@ -1,59 +1,36 @@
-import { Flex, IconButton, Text } from '@invoke-ai/ui-library';
+import { Flex, Text } from '@invoke-ai/ui-library';
+import { ExternalLink } from 'features/gallery/components/ImageViewer/NoContentForViewer';
 import { t } from 'i18next';
 import { useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-import { PiCopyBold } from 'react-icons/pi';
+import { Trans } from 'react-i18next';
 
-function onCopy(sessionId: string) {
-  navigator.clipboard.writeText(sessionId);
-}
+type DescriptionProps = { errorType: string; errorMessage?: string | null };
 
-const ERROR_TYPE_TO_TITLE: Record<string, string> = {
-  OutOfMemoryError: 'toast.outOfMemoryError',
+export const getTitle = (errorType: string) => {
+  return errorType === 'OutOfMemoryError' ? t('toast.outOfMemoryError') : t('toast.serverError');
 };
 
-const COMMERCIAL_ERROR_TYPE_TO_DESC: Record<string, string> = {
-  OutOfMemoryError: 'toast.outOfMemoryErrorDesc',
-};
-
-export const getTitleFromErrorType = (errorType: string) => {
-  return t(ERROR_TYPE_TO_TITLE[errorType] ?? 'toast.serverError');
-};
-
-type Props = { errorType: string; errorMessage?: string | null; sessionId: string; isLocal: boolean };
-
-export default function ErrorToastDescription({ errorType, errorMessage, sessionId, isLocal }: Props) {
-  const { t } = useTranslation();
+export default function ErrorToastDescription({ errorType, errorMessage }: DescriptionProps) {
   const description = useMemo(() => {
-    // Special handling for commercial error types
-    const descriptionTKey = isLocal ? null : COMMERCIAL_ERROR_TYPE_TO_DESC[errorType];
-    if (descriptionTKey) {
-      return t(descriptionTKey);
-    }
-    if (errorMessage) {
+    if (errorType === 'OutOfMemoryError') {
+      return (
+        <Trans
+          i18nKey="toast.outOfMemoryErrorDescLocal"
+          components={{
+            LinkComponent: <ExternalLink href="https://invoke.ai/configuration/low-vram-mode/" />,
+          }}
+        />
+      );
+    } else if (errorMessage) {
       return `${errorType}: ${errorMessage}`;
     }
-  }, [errorMessage, errorType, isLocal, t]);
+  }, [errorMessage, errorType]);
+
   return (
     <Flex flexDir="column">
-      {description && <Text fontSize="md">{description}</Text>}
-      {!isLocal && (
-        <Flex gap="2" alignItems="center">
-          <Text fontSize="sm" fontStyle="italic">
-            {t('toast.sessionRef', { sessionId })}
-          </Text>
-          <IconButton
-            size="sm"
-            aria-label="Copy"
-            icon={<PiCopyBold />}
-            onClick={onCopy.bind(null, sessionId)}
-            variant="ghost"
-            sx={sx}
-          />
-        </Flex>
-      )}
+      <Text noOfLines={4} fontSize="md">
+        {description}
+      </Text>
     </Flex>
   );
 }
-
-const sx = { svg: { fill: 'base.50' } };

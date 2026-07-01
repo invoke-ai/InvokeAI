@@ -1,108 +1,147 @@
-import { useAppDispatch } from 'app/store/storeHooks';
-import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
+import { useAppStore } from 'app/store/storeHooks';
+import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
+import { selectSelection } from 'features/gallery/store/gallerySelectors';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
-import { useQueueBack } from 'features/queue/hooks/useQueueBack';
-import { useQueueFront } from 'features/queue/hooks/useQueueFront';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { setActiveTab } from 'features/ui/store/uiSlice';
-import { useHotkeys } from 'react-hotkeys-hook';
+import { useDeleteCurrentQueueItem } from 'features/queue/hooks/useDeleteCurrentQueueItem';
+import { useInvoke } from 'features/queue/hooks/useInvoke';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
+
+import { getFocusedRegion } from './focus';
 
 export const useGlobalHotkeys = () => {
-  const dispatch = useAppDispatch();
-  const isModelManagerEnabled = useFeatureStatus('modelManager');
-  const { queueBack, isDisabled: isDisabledQueueBack, isLoading: isLoadingQueueBack } = useQueueBack();
+  const { dispatch, getState } = useAppStore();
+  const queue = useInvoke();
 
-  useHotkeys(
-    ['ctrl+enter', 'meta+enter'],
-    queueBack,
-    {
-      enabled: () => !isDisabledQueueBack && !isLoadingQueueBack,
+  useRegisteredHotkeys({
+    id: 'invoke',
+    category: 'app',
+    callback: queue.enqueueBack,
+    options: {
+      enabled: !queue.isDisabled && !queue.isLoading,
       preventDefault: true,
       enableOnFormTags: ['input', 'textarea', 'select'],
     },
-    [queueBack, isDisabledQueueBack, isLoadingQueueBack]
-  );
+    dependencies: [queue],
+  });
 
-  const { queueFront, isDisabled: isDisabledQueueFront, isLoading: isLoadingQueueFront } = useQueueFront();
-
-  useHotkeys(
-    ['ctrl+shift+enter', 'meta+shift+enter'],
-    queueFront,
-    {
-      enabled: () => !isDisabledQueueFront && !isLoadingQueueFront,
+  useRegisteredHotkeys({
+    id: 'invokeFront',
+    category: 'app',
+    callback: queue.enqueueFront,
+    options: {
+      enabled: !queue.isDisabled && !queue.isLoading,
       preventDefault: true,
       enableOnFormTags: ['input', 'textarea', 'select'],
     },
-    [queueFront, isDisabledQueueFront, isLoadingQueueFront]
-  );
+    dependencies: [queue],
+  });
 
-  const {
-    cancelQueueItem,
-    isDisabled: isDisabledCancelQueueItem,
-    isLoading: isLoadingCancelQueueItem,
-  } = useCancelCurrentQueueItem();
+  const deleteCurrentQueueItem = useDeleteCurrentQueueItem();
 
-  useHotkeys(
-    ['shift+x'],
-    cancelQueueItem,
-    {
-      enabled: () => !isDisabledCancelQueueItem && !isLoadingCancelQueueItem,
+  useRegisteredHotkeys({
+    id: 'cancelQueueItem',
+    category: 'app',
+    callback: deleteCurrentQueueItem.trigger,
+    options: {
+      enabled: !deleteCurrentQueueItem.isDisabled && !deleteCurrentQueueItem.isLoading,
       preventDefault: true,
     },
-    [cancelQueueItem, isDisabledCancelQueueItem, isLoadingCancelQueueItem]
-  );
+    dependencies: [deleteCurrentQueueItem],
+  });
 
-  const { clearQueue, isDisabled: isDisabledClearQueue, isLoading: isLoadingClearQueue } = useClearQueue();
+  const clearQueue = useClearQueue();
 
-  useHotkeys(
-    ['ctrl+shift+x', 'meta+shift+x'],
-    clearQueue,
-    {
-      enabled: () => !isDisabledClearQueue && !isLoadingClearQueue,
+  useRegisteredHotkeys({
+    id: 'clearQueue',
+    category: 'app',
+    callback: clearQueue.trigger,
+    options: {
+      enabled: !clearQueue.isDisabled && !clearQueue.isLoading,
       preventDefault: true,
     },
-    [clearQueue, isDisabledClearQueue, isLoadingClearQueue]
-  );
+    dependencies: [clearQueue],
+  });
 
-  useHotkeys(
-    '1',
-    () => {
-      dispatch(setActiveTab('generation'));
+  useRegisteredHotkeys({
+    id: 'selectGenerateTab',
+    category: 'app',
+    callback: () => {
+      navigationApi.switchToTab('generate');
     },
-    [dispatch]
-  );
+    dependencies: [dispatch],
+  });
 
-  useHotkeys(
-    '2',
-    () => {
-      dispatch(setActiveTab('canvas'));
+  useRegisteredHotkeys({
+    id: 'selectCanvasTab',
+    category: 'app',
+    callback: () => {
+      navigationApi.switchToTab('canvas');
     },
-    [dispatch]
-  );
+    dependencies: [dispatch],
+  });
 
-  useHotkeys(
-    '3',
-    () => {
-      dispatch(setActiveTab('workflows'));
+  useRegisteredHotkeys({
+    id: 'selectUpscalingTab',
+    category: 'app',
+    callback: () => {
+      navigationApi.switchToTab('upscaling');
     },
-    [dispatch]
-  );
+    dependencies: [dispatch],
+  });
 
-  useHotkeys(
-    '4',
-    () => {
-      if (isModelManagerEnabled) {
-        dispatch(setActiveTab('models'));
+  useRegisteredHotkeys({
+    id: 'selectWorkflowsTab',
+    category: 'app',
+    callback: () => {
+      navigationApi.switchToTab('workflows');
+    },
+    dependencies: [dispatch],
+  });
+
+  useRegisteredHotkeys({
+    id: 'selectModelsTab',
+    category: 'app',
+    callback: () => {
+      navigationApi.switchToTab('models');
+    },
+    dependencies: [dispatch],
+  });
+
+  useRegisteredHotkeys({
+    id: 'selectQueueTab',
+    category: 'app',
+    callback: () => {
+      navigationApi.switchToTab('queue');
+    },
+    dependencies: [dispatch],
+  });
+
+  const deleteImageModalApi = useDeleteImageModalApi();
+
+  useRegisteredHotkeys({
+    id: 'deleteSelection',
+    category: 'gallery',
+    callback: () => {
+      const focusedRegion = getFocusedRegion();
+      if (focusedRegion !== 'gallery' && focusedRegion !== 'viewer') {
+        return;
       }
+      const selection = selectSelection(getState());
+      if (!selection.length) {
+        return;
+      }
+      deleteImageModalApi.delete(selection);
     },
-    [dispatch, isModelManagerEnabled]
-  );
+    dependencies: [getState, deleteImageModalApi],
+  });
 
-  useHotkeys(
-    isModelManagerEnabled ? '5' : '4',
-    () => {
-      dispatch(setActiveTab('queue'));
+  useRegisteredHotkeys({
+    id: 'toggleViewer',
+    category: 'viewer',
+    callback: () => {
+      navigationApi.toggleViewerPanel();
     },
-    [dispatch, isModelManagerEnabled]
-  );
+    dependencies: [],
+  });
 };

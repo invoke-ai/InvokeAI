@@ -1,6 +1,6 @@
 import { ListItem, Text, UnorderedList } from '@invoke-ai/ui-library';
+import { some } from 'es-toolkit/compat';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
-import { some } from 'lodash-es';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -28,11 +28,14 @@ const ImageUsageMessage = (props: Props) => {
   return (
     <>
       <Text>{topMessage}</Text>
-      <UnorderedList paddingInlineStart={6}>
-        {imageUsage.isCanvasImage && <ListItem>{t('ui.tabs.canvasTab')}</ListItem>}
-        {imageUsage.isControlImage && <ListItem>{t('common.controlNet')}</ListItem>}
+      <UnorderedList paddingInlineStart={6} fontSize="sm">
+        {imageUsage.isControlLayerImage && <ListItem>{t('controlLayers.controlLayer')}</ListItem>}
+        {imageUsage.isReferenceImage && <ListItem>{t('controlLayers.referenceImage')}</ListItem>}
+        {imageUsage.isInpaintMaskImage && <ListItem>{t('controlLayers.inpaintMask')}</ListItem>}
+        {imageUsage.isRasterLayerImage && <ListItem>{t('controlLayers.rasterLayer')}</ListItem>}
+        {imageUsage.isRegionalGuidanceImage && <ListItem>{t('controlLayers.regionalGuidance')}</ListItem>}
+        {imageUsage.isUpscaleImage && <ListItem>{t('ui.tabs.upscalingTab')}</ListItem>}
         {imageUsage.isNodesImage && <ListItem>{t('ui.tabs.workflowsTab')}</ListItem>}
-        {imageUsage.isControlLayerImage && <ListItem>{t('ui.tabs.generationTab')}</ListItem>}
       </UnorderedList>
       <Text>{bottomMessage}</Text>
     </>

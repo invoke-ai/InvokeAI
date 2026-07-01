@@ -5,11 +5,11 @@ import numpy as np
 from dynamicprompts.generators import CombinatorialPromptGenerator, RandomPromptGenerator
 from pydantic import field_validator
 
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.fields import InputField, UIComponent
 from invokeai.app.invocations.primitives import StringCollectionOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-
-from .baseinvocation import BaseInvocation, invocation
-from .fields import InputField, UIComponent
+from invokeai.app.util.dynamicprompts import find_missing_wildcards
 
 
 @invocation(
@@ -32,6 +32,13 @@ class DynamicPromptInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> StringCollectionOutput:
         if self.combinatorial:
+            # An unknown wildcard used as a variant value sends the combinatorial generator into an
+            # infinite loop, so fail fast with a clear message instead of hanging the invocation. The
+            # random generator handles unknown wildcards gracefully and needs no guard.
+            missing_wildcards = find_missing_wildcards(self.prompt)
+            if missing_wildcards:
+                raise ValueError(f"No values found for wildcard(s): {', '.join(missing_wildcards)}")
+
             generator = CombinatorialPromptGenerator()
             prompts = generator.generate(self.prompt, max_prompts=self.max_prompts)
         else:

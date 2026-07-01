@@ -1,29 +1,29 @@
 [build-system]
-requires = ["setuptools~=65.5", "pip~=22.3", "wheel"]
+requires = ["setuptools", "pip", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "InvokeAI"
-description = "An implementation of Stable Diffusion which provides various new features and options to aid the image generation process"
-requires-python = ">=3.10, <3.12"
+description = "A full-featured AI-assisted image generation environment designed for creatives and enthusiasts."
+requires-python = ">=3.11, <3.13"
 readme = { content-type = "text/markdown", file = "README.md" }
 keywords = ["stable-diffusion", "AI"]
 dynamic = ["version"]
 license = { file = "LICENSE" }
-authors = [{ name = "The InvokeAI Project", email = "lincoln.stein@gmail.com" }]
+authors = [{ name = "Invoke", email = "support@invoke.ai" }]
 classifiers = [
-  'Development Status :: 4 - Beta',
+  'Development Status :: 5 - Production/Stable',
   'Environment :: GPU',
   'Environment :: GPU :: NVIDIA CUDA',
   'Environment :: MacOS X',
   'Intended Audience :: End Users/Desktop',
   'Intended Audience :: Developers',
-  'License :: OSI Approved :: MIT License',
+  'License :: OSI Approved :: Apache Software License',
   'Operating System :: POSIX :: Linux',
   'Operating System :: MacOS',
   'Operating System :: Microsoft :: Windows',
   'Programming Language :: Python :: 3 :: Only',
-  'Programming Language :: Python :: 3.10',
+  'Programming Language :: Python :: 3.12',
   'Topic :: Artistic Software',
   'Topic :: Internet :: WWW/HTTP :: WSGI :: Application',
   'Topic :: Internet :: WWW/HTTP :: WSGI :: Server',
@@ -33,87 +33,84 @@ classifiers = [
 ]
 dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
-  "accelerate==0.30.1",
-  "clip_anytorch==2.6.0",       # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
-  "compel==2.0.2",
-  "controlnet-aux==0.0.7",
-  "diffusers[torch]==0.27.2",
-  "invisible-watermark==0.2.0", # needed to install SDXL base and refiner using their repo_ids
-  "mediapipe==0.10.7",          # needed for "mediapipeface" controlnet model
-  "numpy==1.26.4",              # >1.24.0 is needed to use the 'strict' argument to np.testing.assert_array_equal()
-  "onnx==1.15.0",
-  "onnxruntime==1.16.3",
-  "opencv-python==4.9.0.80",
-  "pytorch-lightning==2.1.3",
-  "safetensors==0.4.3",
-  "timm==0.6.13",               # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
-  "torch==2.2.2",
-  "torchmetrics==0.11.4",
-  "torchsde==0.2.6",
-  "torchvision==0.17.2",
-  "transformers==4.41.1",
+  "accelerate",
+  "bitsandbytes; sys_platform!='darwin'",
+  "compel>=2.4.0,<3",
+  "diffusers[torch]==0.37.0",
+  "gguf",
+  "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
+  "numpy<2.0.0",
+  "onnx==1.16.1",
+  "onnxruntime==1.19.2",
+  "opencv-contrib-python",
+  "safetensors",
+  "sentencepiece==0.2.0",                 # 0.2.1 coredumps windows when loading t5 tokenizer
+  "spandrel",
+  # Loosely pinned, will respect requirement of `diffusers[torch]`. Split by platform: linux/win allow
+  # >=2.10 so the rocm extra can use torch 2.10.0+rocm7.1, while macOS stays on 2.7.x — newer macOS torch
+  # wheels exercise MPS on CI runners (no usable Metal GPU) and fail with MPS OOM.
+  "torch>=2.7.0,<3.0; sys_platform != 'darwin'",
+  "torch>=2.7.0,<2.8.0; sys_platform == 'darwin'",
+  "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
+  "torchvision",
+  "transformers>=5.5,<5.6",
 
   # Core application dependencies, pinned for reproducible builds.
-  "fastapi-events==0.11.0",
-  "fastapi==0.111.0",
-  "huggingface-hub==0.23.1",
-  "pydantic-settings==2.2.1",
-  "pydantic==2.7.2",
-  "python-socketio==5.11.1",
-  "uvicorn[standard]==0.28.0",
+  "fastapi-events",
+  # FastAPI 0.119.0 breaks OpenAPI schema generation for the AnyInvocation class. It's not clear if this is an Invoke,
+  # FastAPI or pydantic bug. Probably Invoke's, because we are doing something unusual with AnyInvocation. 0.118.3 is
+  # the last known-good version.
+  "fastapi== 0.118.3",
+  "huggingface-hub",
+  "pydantic-settings",
+  "pydantic",
+  "python-socketio",
+  "uvicorn[standard]",
 
   # Auxiliary dependencies, pinned only if necessary.
-  "albumentations",
   "blake3",
-  "click",
-  "datasets",
+  "bcrypt<4.0.0",
   "Deprecated",
-  "dnspython~=2.4.0",
+  "dnspython",
   "dynamicprompts",
-  "easing-functions",
   "einops",
-  "facexlib",
-  "matplotlib",       # needed for plotting of Penner easing functions
-  "npyscreen",
-  "omegaconf",
+  "email-validator>=2.0.0",
+  "passlib[bcrypt]>=1.7.4",
   "picklescan",
   "pillow",
   "prompt-toolkit",
-  "pympler~=1.0.1",
   "pypatchmatch",
-  'pyperclip',
-  "pyreadline3",
+  "python-jose[cryptography]>=3.3.0",
   "python-multipart",
-  "requests~=2.28.2",
-  "rich~=13.3",
-  "scikit-image~=0.21.0",
+  "requests",
   "semver~=3.0.1",
-  "send2trash",
-  "test-tube~=0.7.5",
-  "windows-curses; sys_platform=='win32'",
+  "PyWavelets",
 ]
 
 [project.optional-dependencies]
 "xformers" = [
   # Core generation dependencies, pinned for reproducible builds.
-  "xformers==0.0.25post1; sys_platform!='darwin'",
-  # Auxiliary dependencies, pinned only if necessary.
-  "triton; sys_platform=='linux'",
+  "xformers>=0.0.28.post1; sys_platform!='darwin'",
+  # torch 2.4+cu carries its own triton dependency
 ]
+
+"cpu" = ["torch==2.7.1+cpu", "torchvision==0.22.1+cpu"]
+"cuda" = ["torch==2.7.1+cu128", "torchvision==0.22.1+cu128"]
+"rocm" = [
+  # ROCm wheels are x86_64-linux-only; gate by platform so macOS/win resolution is unaffected.
+  "torch==2.10.0+rocm7.1; sys_platform == 'linux'",
+  "torchvision==0.25.0+rocm7.1; sys_platform == 'linux'",
+  "triton-rocm==3.6.0; sys_platform == 'linux'",
+]
+
 "onnx" = ["onnxruntime"]
 "onnx-cuda" = ["onnxruntime-gpu"]
 "onnx-directml" = ["onnxruntime-directml"]
 "dist" = ["pip-tools", "pipdeptree", "twine"]
-"docs" = [
-  "mkdocs-material>=9.5.13",
-  "mkdocs-git-revision-date-localized-plugin",
-  "mkdocs-redirects",
-  "mkdocstrings[python]>=0.24.1",
-]
 "dev" = ["jurigged", "pudb", "snakeviz", "gprof2dot"]
 "test" = [
-  "ruff>=0.3.3",
-  "ruff-lsp>=0.0.53",
+  "ruff~=0.11.2",
+  "ruff-lsp~=0.0.62",
   "mypy",
   "pre-commit",
   "pytest>6.0.0",
@@ -122,16 +119,60 @@ dependencies = [
   "pytest-datadir",
   "requests_testadapter",
   "httpx",
+  "polyfactory==2.19.0",
+  "humanize==4.12.1",
 ]
+
+[tool.uv]
+# Prevent opencv-python from ever being chosen during dependency resolution.
+# This prevents conflicts with opencv-contrib-python, which Invoke requires.
+override-dependencies = ["opencv-python; sys_platform=='never'"]
+conflicts = [[{ extra = "cpu" }, { extra = "cuda" }, { extra = "rocm" }]]
+index-strategy = "unsafe-best-match"
+# We do not publish or support ARM Linux builds; restrict resolution to
+# x86_64 Linux, Windows, and macOS. (ROCm in particular is x86_64-only.)
+environments = ["sys_platform == 'win32' or sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'x86_64')"]
+
+[tool.uv.sources]
+torch = [
+  { index = "torch-cpu", extra = "cpu" },
+  { index = "torch-cuda", extra = "cuda" },
+  { index = "torch-rocm", extra = "rocm" },
+]
+torchvision = [
+  { index = "torch-cpu", extra = "cpu" },
+  { index = "torch-cuda", extra = "cuda" },
+  { index = "torch-rocm", extra = "rocm" },
+]
+triton-rocm = [
+  { index = "torch-rocm", marker = "sys_platform == 'linux'" },
+]
+
+[[tool.uv.index]]
+name = "torch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "torch-cuda"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[[tool.uv.index]]
+name = "torch-rocm"
+url = "https://download.pytorch.org/whl/rocm7.1"
+explicit = true
 
 [project.scripts]
 "invokeai-web" = "invokeai.app.run_app:run_app"
-"invokeai-import-images" = "invokeai.frontend.install.import_images:main"
-"invokeai-db-maintenance" = "invokeai.backend.util.db_maintenance:main"
+"invoke-useradd" = "invokeai.app.util.user_management:useradd"
+"invoke-userdel" = "invokeai.app.util.user_management:userdel"
+"invoke-userlist" = "invokeai.app.util.user_management:userlist"
+"invoke-usermod" = "invokeai.app.util.user_management:usermod"
 
 [project.urls]
-"Homepage" = "https://invoke-ai.github.io/InvokeAI/"
-"Documentation" = "https://invoke-ai.github.io/InvokeAI/"
+"Homepage" = "https://invoke.ai/"
+"Documentation" = "https://invoke.ai/"
 "Source" = "https://github.com/invoke-ai/InvokeAI/"
 "Bug Reports" = "https://github.com/invoke-ai/InvokeAI/issues"
 "Discord" = "https://discord.gg/ZmtBAhwWhy"
@@ -156,9 +197,14 @@ version = { attr = "invokeai.version.__version__" }
 
 [tool.setuptools.package-data]
 "invokeai.app.assets" = ["**/*.png"]
+"invokeai.backend.anima" = ["tokenizer/*.json"]
 "invokeai.app.services.workflow_records.default_workflows" = ["*.json"]
+"invokeai.app.services.style_preset_records" = ["*.json"]
+"invokeai.app.services.style_preset_images.default_style_preset_images" = [
+  "*.png",
+]
 "invokeai.assets.fonts" = ["**/*.ttf"]
-"invokeai.backend" = ["**.png"]
+"invokeai.backend" = ["**.png", "**/*.icc"]
 "invokeai.configs" = ["*.example", "**/*.yaml", "*.txt"]
 "invokeai.frontend.web.dist" = ["**"]
 "invokeai.frontend.web.static" = ["**"]
@@ -197,6 +243,12 @@ exclude = [
   "dist",
   "invokeai/frontend/web/node_modules/",
   ".venv*",
+  "*.ipynb",
+  "invokeai/backend/image_util/mediapipe_face/", # External code
+  "invokeai/backend/image_util/mlsd/",           # External code
+  "invokeai/backend/image_util/normal_bae/",     # External code
+  "invokeai/backend/image_util/pidi/",           # External code
+  "invokeai/backend/image_util/imwatermark/",    # External code
 ]
 
 [tool.ruff.lint]
@@ -206,7 +258,12 @@ ignore = [
   "B008", # https://docs.astral.sh/ruff/rules/function-call-in-default-argument/
   "B904", # https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
 ]
-select = ["B", "C", "E", "F", "W", "I"]
+select = ["B", "C", "E", "F", "W", "I", "TID"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+# Disallow all relative imports.
+ban-relative-imports = "all"
+
 #=== End: Ruff
 
 #=== Begin: MyPy
@@ -224,7 +281,7 @@ follow_imports = "skip" # skips type checking of the modules listed below
 module = [
   "invokeai.app.api.routers.models",
   "invokeai.app.invocations.compel",
-  "invokeai.app.invocations.latent",
+  "invokeai.app.invocations.denoise_latents",
   "invokeai.app.services.invocation_stats.invocation_stats_default",
   "invokeai.app.services.model_manager.model_manager_base",
   "invokeai.app.services.model_manager.model_manager_default",

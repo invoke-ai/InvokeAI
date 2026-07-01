@@ -1,29 +1,21 @@
-import { useAppSelector } from 'app/store/storeHooks';
+import { useStore } from '@nanostores/react';
 import { toast } from 'features/toast/toast';
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEnableInvocationCacheMutation, useGetInvocationCacheStatusQuery } from 'services/api/endpoints/appInfo';
+import { $isConnected } from 'services/events/stores';
 
 export const useEnableInvocationCache = () => {
   const { t } = useTranslation();
   const { data: cacheStatus } = useGetInvocationCacheStatusQuery();
-  const isConnected = useAppSelector((s) => s.system.isConnected);
-  const [trigger, { isLoading }] = useEnableInvocationCacheMutation({
+  const isConnected = useStore($isConnected);
+  const [_trigger, { isLoading }] = useEnableInvocationCacheMutation({
     fixedCacheKey: 'enableInvocationCache',
   });
 
-  const isDisabled = useMemo(
-    () => cacheStatus?.enabled || !isConnected || cacheStatus?.max_size === 0,
-    [cacheStatus?.enabled, cacheStatus?.max_size, isConnected]
-  );
-
-  const enableInvocationCache = useCallback(async () => {
-    if (isDisabled) {
-      return;
-    }
-
+  const trigger = useCallback(async () => {
     try {
-      await trigger().unwrap();
+      await _trigger().unwrap();
       toast({
         id: 'INVOCATION_CACHE_ENABLE_SUCCEEDED',
         title: t('invocationCache.enableSucceeded'),
@@ -36,7 +28,11 @@ export const useEnableInvocationCache = () => {
         status: 'error',
       });
     }
-  }, [isDisabled, trigger, t]);
+  }, [_trigger, t]);
 
-  return { enableInvocationCache, isLoading, cacheStatus, isDisabled };
+  return {
+    trigger,
+    isLoading,
+    isDisabled: cacheStatus?.enabled || !isConnected || cacheStatus?.max_size === 0,
+  };
 };

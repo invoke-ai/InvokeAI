@@ -2,12 +2,13 @@
 """Base class for model loader."""
 
 from abc import ABC, abstractmethod
-from typing import Optional
+from pathlib import Path
+from typing import Callable, Optional
 
-from invokeai.backend.model_manager import AnyModel, AnyModelConfig, SubModelType
-from invokeai.backend.model_manager.load import LoadedModel
-from invokeai.backend.model_manager.load.convert_cache import ModelConvertCacheBase
-from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.load import LoadedModel, LoadedModelWithoutConfig
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
 
 
 class ModelLoadServiceBase(ABC):
@@ -24,10 +25,28 @@ class ModelLoadServiceBase(ABC):
 
     @property
     @abstractmethod
-    def ram_cache(self) -> ModelCacheBase[AnyModel]:
+    def ram_cache(self) -> ModelCache:
         """Return the RAM cache used by this loader."""
 
-    @property
     @abstractmethod
-    def convert_cache(self) -> ModelConvertCacheBase:
-        """Return the checkpoint convert cache used by this loader."""
+    def load_model_from_path(
+        self, model_path: Path, loader: Optional[Callable[[Path], AnyModel]] = None
+    ) -> LoadedModelWithoutConfig:
+        """
+        Load the model file or directory located at the indicated Path.
+
+        This will load an arbitrary model file into the RAM cache. If the optional loader
+        argument is provided, the loader will be invoked to load the model into
+        memory. Otherwise the method will call safetensors.torch.load_file() or
+        torch.load() as appropriate to the file suffix.
+
+        Be aware that this returns a LoadedModelWithoutConfig object, which is the same as
+        LoadedModel, but without the config attribute.
+
+        Args:
+          model_path: A pathlib.Path to a checkpoint-style models file
+          loader: A Callable that expects a Path and returns a Dict[str, Tensor]
+
+        Returns:
+          A LoadedModel object.
+        """

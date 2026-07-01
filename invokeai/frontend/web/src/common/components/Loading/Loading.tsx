@@ -6,11 +6,18 @@ import { memo } from 'react';
 
 const Loading = () => {
   return (
-    <Flex position="relative" width="100vw" height="100vh" alignItems="center" justifyContent="center" bg="#151519">
+    <Flex
+      position="absolute"
+      alignItems="center"
+      justifyContent="center"
+      bg="hsl(220 12% 10% / 1)" // base.900
+      inset={0}
+      zIndex={99999}
+    >
       <Image src={InvokeLogoWhite} w="8rem" h="8rem" />
       <Spinner
         label="Loading"
-        color="grey"
+        color="hsl(220 12% 68% / 1)" // base.300
         position="absolute"
         size="sm"
         width="24px !important"

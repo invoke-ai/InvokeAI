@@ -1,5 +1,5 @@
 import graphlib from '@dagrejs/graphlib';
-import type { Edge, Node } from 'reactflow';
+import type { Edge, Node } from '@xyflow/react';
 
 /**
  * Check if adding an edge between the source and target nodes would create a cycle in the graph.

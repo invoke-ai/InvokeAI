@@ -1,8 +1,8 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Flex, FormControlGroup } from '@invoke-ai/ui-library';
-import { useHasImageOutput } from 'features/nodes/hooks/useHasImageOutput';
+import { useIsExecutableNode } from 'features/nodes/hooks/useIsBatchNode';
+import { useNodeHasImageOutput } from 'features/nodes/hooks/useNodeHasImageOutput';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 
 import SaveToGalleryCheckbox from './SaveToGalleryCheckbox';
@@ -15,8 +15,8 @@ type Props = {
 const props: ChakraProps = { w: 'unset' };
 
 const InvocationNodeFooter = ({ nodeId }: Props) => {
-  const hasImageOutput = useHasImageOutput(nodeId);
-  const isCacheEnabled = useFeatureStatus('invocationCache');
+  const hasImageOutput = useNodeHasImageOutput();
+  const isExecutableNode = useIsExecutableNode();
   return (
     <Flex
       className={DRAG_HANDLE_CLASSNAME}
@@ -30,8 +30,8 @@ const InvocationNodeFooter = ({ nodeId }: Props) => {
       justifyContent="space-between"
     >
       <FormControlGroup formControlProps={props} formLabelProps={props}>
-        {isCacheEnabled && <UseCacheCheckbox nodeId={nodeId} />}
-        {hasImageOutput && <SaveToGalleryCheckbox nodeId={nodeId} />}
+        {isExecutableNode && <UseCacheCheckbox nodeId={nodeId} />}
+        {isExecutableNode && hasImageOutput && <SaveToGalleryCheckbox nodeId={nodeId} />}
       </FormControlGroup>
     </Flex>
   );

@@ -1,0 +1,61 @@
+import { Flex, FormControl, FormLabel, Icon } from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { isExternalModelUnsupportedForTab } from 'features/parameters/components/MainModel/mainModelPickerUtils';
+import { ModelPicker } from 'features/parameters/components/ModelPicker';
+import { modelSelected } from 'features/parameters/store/actions';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { MdMoneyOff } from 'react-icons/md';
+import { useMainModels } from 'services/api/hooks/modelsByType';
+import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
+import { type AnyModelConfigWithExternal, isNonCommercialMainModelConfig } from 'services/api/types';
+
+export const InitialStateMainModelPicker = memo(() => {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+  const activeTab = useAppSelector(selectActiveTab);
+  const [modelConfigs] = useMainModels();
+  const selectedModelConfig = useSelectedModelConfig();
+  const onChange = useCallback(
+    (modelConfig: AnyModelConfigWithExternal) => {
+      dispatch(modelSelected(modelConfig));
+    },
+    [dispatch]
+  );
+
+  const isNonCommercialSelected = useMemo(
+    () => selectedModelConfig && isNonCommercialMainModelConfig(selectedModelConfig),
+    [selectedModelConfig]
+  );
+
+  const getIsOptionDisabled = useCallback(
+    (modelConfig: AnyModelConfigWithExternal) => isExternalModelUnsupportedForTab(modelConfig, activeTab),
+    [activeTab]
+  );
+
+  return (
+    <FormControl orientation="vertical" alignItems="unset">
+      <FormLabel display="flex" fontSize="md" gap={2}>
+        {t('common.selectYourModel')}{' '}
+        {isNonCommercialSelected && (
+          <InformationalPopover feature="fluxDevLicense" hideDisable={true}>
+            <Flex justifyContent="flex-start">
+              <Icon as={MdMoneyOff} />
+            </Flex>
+          </InformationalPopover>
+        )}
+      </FormLabel>
+      <ModelPicker
+        pickerId="initial-state-main-model"
+        modelConfigs={modelConfigs}
+        selectedModelConfig={selectedModelConfig}
+        onChange={onChange}
+        grouped
+        getIsOptionDisabled={getIsOptionDisabled}
+      />
+    </FormControl>
+  );
+});
+InitialStateMainModelPicker.displayName = 'InitialStateMainModelPicker';

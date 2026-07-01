@@ -1,30 +1,50 @@
-import { ButtonGroup, Flex, Spacer } from '@invoke-ai/ui-library';
-import { ClearQueueIconButton } from 'features/queue/components/ClearQueueIconButton';
-import QueueFrontButton from 'features/queue/components/QueueFrontButton';
+import { Flex, Spacer, useShiftModifier } from '@invoke-ai/ui-library';
+import { DeleteAllExceptCurrentIconButton } from 'features/queue/components/DeleteAllExceptCurrentIconButton';
+import { DeleteCurrentQueueItemIconButton } from 'features/queue/components/DeleteCurrentQueueItemIconButton';
+import { QueueActionsMenuButton } from 'features/queue/components/QueueActionsMenuButton';
 import ProgressBar from 'features/system/components/ProgressBar';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 
-import { InvokeQueueBackButton } from './InvokeQueueBackButton';
-import { QueueActionsMenuButton } from './QueueActionsMenuButton';
+import { CancelAllExceptCurrentIconButton } from './CancelAllExceptCurrentIconButton';
+import { CancelCurrentQueueItemIconButton } from './CancelCurrentQueueItemIconButton';
+import { InvokeButton } from './InvokeQueueBackButton';
 
 const QueueControls = () => {
-  const isPrependEnabled = useFeatureStatus('prependQueue');
   return (
-    <Flex w="full" position="relative" borderRadius="base" gap={2} pt={2} flexDir="column">
-      <ButtonGroup size="lg" isAttached={false}>
-        {isPrependEnabled && <QueueFrontButton />}
-        <InvokeQueueBackButton />
+    <Flex w="full" position="relative" borderRadius="base" gap={2} flexDir="column">
+      <Flex gap={2}>
+        <InvokeButton />
         <Spacer />
         <QueueActionsMenuButton />
-        {/* <CancelCurrentQueueItemButton asIconButton />
-        {isResumeEnabled && <ResumeProcessorButton asIconButton />}
-        {isPauseEnabled && <PauseProcessorButton asIconButton />} */}
-        <ClearQueueIconButton />
-      </ButtonGroup>
+        <CancelIconButton />
+      </Flex>
       <ProgressBar />
     </Flex>
   );
 };
 
 export default memo(QueueControls);
+
+const DeleteIconButton = memo(() => {
+  const shift = useShiftModifier();
+
+  if (!shift) {
+    return <DeleteCurrentQueueItemIconButton />;
+  }
+
+  return <DeleteAllExceptCurrentIconButton />;
+});
+
+DeleteIconButton.displayName = 'DeleteIconButton';
+
+const CancelIconButton = memo(() => {
+  const shift = useShiftModifier();
+
+  if (!shift) {
+    return <CancelCurrentQueueItemIconButton />;
+  }
+
+  return <CancelAllExceptCurrentIconButton />;
+});
+
+CancelIconButton.displayName = 'CancelIconButton';

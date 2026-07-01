@@ -5,18 +5,24 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from typing_extensions import Self
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
-from invokeai.app.invocations.fields import FieldDescriptions, InputField, OutputField, TensorField, UIType
+from invokeai.app.invocations.fields import FieldDescriptions, InputField, OutputField, TensorField
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
+from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
-    BaseModelType,
-    IPAdapterCheckpointConfig,
-    IPAdapterInvokeAIConfig,
-    ModelType,
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.configs.ip_adapter import (
+    IPAdapter_Checkpoint_Config_Base,
+    IPAdapter_InvokeAI_Config_Base,
 )
+from invokeai.backend.model_manager.starter_models import (
+    StarterModel,
+    clip_vit_l_image_encoder,
+    ip_adapter_sd_image_encoder,
+    ip_adapter_sdxl_image_encoder,
+)
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
 
 class IPAdapterField(BaseModel):
@@ -25,6 +31,7 @@ class IPAdapterField(BaseModel):
     image_encoder_model: ModelIdentifierField = Field(description="The name of the CLIP image encoder model.")
     weight: Union[float, List[float]] = Field(default=1, description="The weight given to the IP-Adapter.")
     target_blocks: List[str] = Field(default=[], description="The IP Adapter blocks to apply")
+    method: str = Field(default="full", description="Weight apply method")
     begin_step_percent: float = Field(
         default=0, ge=0, le=1, description="When the IP-Adapter is first applied (% of total steps)"
     )
@@ -55,10 +62,20 @@ class IPAdapterOutput(BaseInvocationOutput):
     ip_adapter: IPAdapterField = OutputField(description=FieldDescriptions.ip_adapter, title="IP-Adapter")
 
 
-CLIP_VISION_MODEL_MAP = {"ViT-H": "ip_adapter_sd_image_encoder", "ViT-G": "ip_adapter_sdxl_image_encoder"}
+CLIP_VISION_MODEL_MAP: dict[Literal["ViT-L", "ViT-H", "ViT-G"], StarterModel] = {
+    "ViT-L": clip_vit_l_image_encoder,
+    "ViT-H": ip_adapter_sd_image_encoder,
+    "ViT-G": ip_adapter_sdxl_image_encoder,
+}
 
 
-@invocation("ip_adapter", title="IP-Adapter", tags=["ip_adapter", "control"], category="ip_adapter", version="1.4.1")
+@invocation(
+    "ip_adapter",
+    title="IP-Adapter - SD1.5, SDXL",
+    tags=["ip_adapter", "control"],
+    category="conditioning",
+    version="1.5.1",
+)
 class IPAdapterInvocation(BaseInvocation):
     """Collects IP-Adapter info to pass to other nodes."""
 
@@ -68,9 +85,10 @@ class IPAdapterInvocation(BaseInvocation):
         description="The IP-Adapter model.",
         title="IP-Adapter Model",
         ui_order=-1,
-        ui_type=UIType.IPAdapterModel,
+        ui_model_base=[BaseModelType.StableDiffusion1, BaseModelType.StableDiffusionXL],
+        ui_model_type=ModelType.IPAdapter,
     )
-    clip_vision_model: Literal["ViT-H", "ViT-G"] = InputField(
+    clip_vision_model: Literal["ViT-H", "ViT-G", "ViT-L"] = InputField(
         description="CLIP Vision model to use. Overrides model settings. Mandatory for checkpoint models.",
         default="ViT-H",
         ui_order=2,
@@ -78,7 +96,7 @@ class IPAdapterInvocation(BaseInvocation):
     weight: Union[float, List[float]] = InputField(
         default=1, description="The weight given to the IP-Adapter", title="Weight"
     )
-    method: Literal["full", "style", "composition"] = InputField(
+    method: Literal["full", "style", "composition", "style_strong", "style_precise"] = InputField(
         default="full", description="The method to apply the IP-Adapter"
     )
     begin_step_percent: float = InputField(
@@ -105,15 +123,17 @@ class IPAdapterInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> IPAdapterOutput:
         # Lookup the CLIP Vision encoder that is intended to be used with the IP-Adapter model.
         ip_adapter_info = context.models.get_config(self.ip_adapter_model.key)
-        assert isinstance(ip_adapter_info, (IPAdapterInvokeAIConfig, IPAdapterCheckpointConfig))
+        assert isinstance(ip_adapter_info, (IPAdapter_InvokeAI_Config_Base, IPAdapter_Checkpoint_Config_Base))
 
-        if isinstance(ip_adapter_info, IPAdapterInvokeAIConfig):
+        if isinstance(ip_adapter_info, IPAdapter_InvokeAI_Config_Base):
             image_encoder_model_id = ip_adapter_info.image_encoder_model_id
             image_encoder_model_name = image_encoder_model_id.split("/")[-1].strip()
         else:
-            image_encoder_model_name = CLIP_VISION_MODEL_MAP[self.clip_vision_model]
+            image_encoder_starter_model = CLIP_VISION_MODEL_MAP[self.clip_vision_model]
+            image_encoder_model_id = image_encoder_starter_model.source
+            image_encoder_model_name = image_encoder_starter_model.name
 
-        image_encoder_model = self._get_image_encoder(context, image_encoder_model_name)
+        image_encoder_model = self.get_clip_image_encoder(context, image_encoder_model_id, image_encoder_model_name)
 
         if self.method == "style":
             if ip_adapter_info.base == "sd-1":
@@ -127,6 +147,38 @@ class IPAdapterInvocation(BaseInvocation):
                 target_blocks = ["down_blocks.2", "mid_block"]
             elif ip_adapter_info.base == "sdxl":
                 target_blocks = ["down_blocks.2.attentions.1"]
+            else:
+                raise ValueError(f"Unsupported IP-Adapter base type: '{ip_adapter_info.base}'.")
+        elif self.method == "style_precise":
+            if ip_adapter_info.base == "sd-1":
+                target_blocks = ["up_blocks.1", "down_blocks.2", "mid_block"]
+            elif ip_adapter_info.base == "sdxl":
+                target_blocks = ["up_blocks.0.attentions.1", "down_blocks.2.attentions.1"]
+            else:
+                raise ValueError(f"Unsupported IP-Adapter base type: '{ip_adapter_info.base}'.")
+        elif self.method == "style_strong":
+            if ip_adapter_info.base == "sd-1":
+                target_blocks = ["up_blocks.0", "up_blocks.1", "up_blocks.2", "down_blocks.0", "down_blocks.1"]
+            elif ip_adapter_info.base == "sdxl":
+                target_blocks = [
+                    "up_blocks.0.attentions.1",
+                    "up_blocks.1.attentions.1",
+                    "up_blocks.2.attentions.1",
+                    "up_blocks.0.attentions.2",
+                    "up_blocks.1.attentions.2",
+                    "up_blocks.2.attentions.2",
+                    "up_blocks.0.attentions.0",
+                    "up_blocks.1.attentions.0",
+                    "up_blocks.2.attentions.0",
+                    "down_blocks.0.attentions.0",
+                    "down_blocks.0.attentions.1",
+                    "down_blocks.0.attentions.2",
+                    "down_blocks.1.attentions.0",
+                    "down_blocks.1.attentions.1",
+                    "down_blocks.1.attentions.2",
+                    "down_blocks.2.attentions.0",
+                    "down_blocks.2.attentions.2",
+                ]
             else:
                 raise ValueError(f"Unsupported IP-Adapter base type: '{ip_adapter_info.base}'.")
         elif self.method == "full":
@@ -144,10 +196,14 @@ class IPAdapterInvocation(BaseInvocation):
                 begin_step_percent=self.begin_step_percent,
                 end_step_percent=self.end_step_percent,
                 mask=self.mask,
+                method=self.method,
             ),
         )
 
-    def _get_image_encoder(self, context: InvocationContext, image_encoder_model_name: str) -> AnyModelConfig:
+    @classmethod
+    def get_clip_image_encoder(
+        cls, context: InvocationContext, image_encoder_model_id: str, image_encoder_model_name: str
+    ) -> AnyModelConfig:
         image_encoder_models = context.models.search_by_attrs(
             name=image_encoder_model_name, base=BaseModelType.Any, type=ModelType.CLIPVision
         )
@@ -159,7 +215,11 @@ class IPAdapterInvocation(BaseInvocation):
             )
 
             installer = context._services.model_manager.install
-            job = installer.heuristic_import(f"InvokeAI/{image_encoder_model_name}")
+            # Note: We hard-code the type to CLIPVision here because if the model contains both a CLIPVision and a
+            # CLIPText model, the probe may treat it as a CLIPText model.
+            job = installer.heuristic_import(
+                image_encoder_model_id, ModelRecordChanges(name=image_encoder_model_name, type=ModelType.CLIPVision)
+            )
             installer.wait_for_job(job, timeout=600)  # Wait for up to 10 minutes
             image_encoder_models = context.models.search_by_attrs(
                 name=image_encoder_model_name, base=BaseModelType.Any, type=ModelType.CLIPVision

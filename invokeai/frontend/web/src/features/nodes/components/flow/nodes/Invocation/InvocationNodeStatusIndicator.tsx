@@ -1,6 +1,6 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Badge, CircularProgress, Flex, Icon, Image, Text, Tooltip } from '@invoke-ai/ui-library';
-import { useExecutionState } from 'features/nodes/hooks/useExecutionState';
+import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import type { NodeExecutionState } from 'features/nodes/types/invocation';
 import { zNodeStatus } from 'features/nodes/types/invocation';
@@ -22,7 +22,7 @@ const circleStyles: SystemStyleObject = {
 };
 
 const InvocationNodeStatusIndicator = ({ nodeId }: Props) => {
-  const nodeExecutionState = useExecutionState(nodeId);
+  const nodeExecutionState = useNodeExecutionState(nodeId);
 
   if (!nodeExecutionState) {
     return null;

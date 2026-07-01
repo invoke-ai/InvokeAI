@@ -5,10 +5,12 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from functools import total_ordering
 from pathlib import Path
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, List, Optional, Set, Union
 
 from pydantic import BaseModel, Field, PrivateAttr
 from pydantic.networks import AnyHttpUrl
+
+from invokeai.backend.model_manager.metadata import RemoteModelFile
 
 
 class DownloadJobStatus(str, Enum):
@@ -16,6 +18,7 @@ class DownloadJobStatus(str, Enum):
 
     WAITING = "waiting"  # not enqueued, will not run
     RUNNING = "running"  # actively downloading
+    PAUSED = "paused"  # paused, can be resumed
     COMPLETED = "completed"  # finished running
     CANCELLED = "cancelled"  # user cancelled
     ERROR = "error"  # terminated with an error message
@@ -33,30 +36,23 @@ class ServiceInactiveException(Exception):
     """This exception is raised when user attempts to initiate a download before the service is started."""
 
 
-DownloadEventHandler = Callable[["DownloadJob"], None]
-DownloadExceptionHandler = Callable[["DownloadJob", Optional[Exception]], None]
+SingleFileDownloadEventHandler = Callable[["DownloadJob"], None]
+SingleFileDownloadExceptionHandler = Callable[["DownloadJob", Optional[Exception]], None]
+MultiFileDownloadEventHandler = Callable[["MultiFileDownloadJob"], None]
+MultiFileDownloadExceptionHandler = Callable[["MultiFileDownloadJob", Optional[Exception]], None]
+DownloadEventHandler = Union[SingleFileDownloadEventHandler, MultiFileDownloadEventHandler]
+DownloadExceptionHandler = Union[SingleFileDownloadExceptionHandler, MultiFileDownloadExceptionHandler]
 
 
-@total_ordering
-class DownloadJob(BaseModel):
-    """Class to monitor and control a model download request."""
+class DownloadJobBase(BaseModel):
+    """Base of classes to monitor and control downloads."""
 
-    # required variables to be passed in on creation
-    source: AnyHttpUrl = Field(description="Where to download from. Specific types specified in child classes.")
-    dest: Path = Field(description="Destination of downloaded model on local disk; a directory or file path")
-    access_token: Optional[str] = Field(default=None, description="authorization token for protected resources")
     # automatically assigned on creation
     id: int = Field(description="Numeric ID of this job", default=-1)  # default id is a sentinel
-    priority: int = Field(default=10, description="Queue priority; lower values are higher priority")
 
-    # set internally during download process
+    dest: Path = Field(description="Initial destination of downloaded model on local disk; a directory or file path")
+    download_path: Optional[Path] = Field(default=None, description="Final location of downloaded file or directory")
     status: DownloadJobStatus = Field(default=DownloadJobStatus.WAITING, description="Status of the download")
-    download_path: Optional[Path] = Field(default=None, description="Final location of downloaded file")
-    job_started: Optional[str] = Field(default=None, description="Timestamp for when the download job started")
-    job_ended: Optional[str] = Field(
-        default=None, description="Timestamp for when the download job ende1d (completed or errored)"
-    )
-    content_type: Optional[str] = Field(default=None, description="Content type of downloaded file")
     bytes: int = Field(default=0, description="Bytes downloaded so far")
     total_bytes: int = Field(default=0, description="Total file size (bytes)")
 
@@ -66,6 +62,7 @@ class DownloadJob(BaseModel):
 
     # internal flag
     _cancelled: bool = PrivateAttr(default=False)
+    _paused: bool = PrivateAttr(default=False)
 
     # optional event handlers passed in on creation
     _on_start: Optional[DownloadEventHandler] = PrivateAttr(default=None)
@@ -74,16 +71,14 @@ class DownloadJob(BaseModel):
     _on_cancelled: Optional[DownloadEventHandler] = PrivateAttr(default=None)
     _on_error: Optional[DownloadExceptionHandler] = PrivateAttr(default=None)
 
-    def __hash__(self) -> int:
-        """Return hash of the string representation of this object, for indexing."""
-        return hash(str(self))
-
-    def __le__(self, other: "DownloadJob") -> bool:
-        """Return True if this job's priority is less than another's."""
-        return self.priority <= other.priority
-
     def cancel(self) -> None:
         """Call to cancel the job."""
+        self._cancelled = True
+        self._paused = False
+
+    def pause(self) -> None:
+        """Pause the job, preserving partial downloads."""
+        self._paused = True
         self._cancelled = True
 
     # cancelled and the callbacks are private attributes in order to prevent
@@ -94,9 +89,19 @@ class DownloadJob(BaseModel):
         return self._cancelled
 
     @property
+    def paused(self) -> bool:
+        """Return true if job is paused."""
+        return self._paused
+
+    @property
     def complete(self) -> bool:
         """Return true if job completed without errors."""
         return self.status == DownloadJobStatus.COMPLETED
+
+    @property
+    def waiting(self) -> bool:
+        """Return true if the job is waiting to run."""
+        return self.status == DownloadJobStatus.WAITING
 
     @property
     def running(self) -> bool:
@@ -154,6 +159,48 @@ class DownloadJob(BaseModel):
         self._on_cancelled = on_cancelled
 
 
+@total_ordering
+class DownloadJob(DownloadJobBase):
+    """Class to monitor and control a model download request."""
+
+    # required variables to be passed in on creation
+    source: AnyHttpUrl = Field(description="Where to download from. Specific types specified in child classes.")
+    access_token: Optional[str] = Field(default=None, description="authorization token for protected resources")
+    priority: int = Field(default=10, description="Queue priority; lower values are higher priority")
+
+    # set internally during download process
+    job_started: Optional[str] = Field(default=None, description="Timestamp for when the download job started")
+    job_ended: Optional[str] = Field(
+        default=None, description="Timestamp for when the download job ende1d (completed or errored)"
+    )
+    content_type: Optional[str] = Field(default=None, description="Content type of downloaded file")
+    canonical_url: Optional[str] = Field(default=None, description="Canonical URL to request on resume")
+    etag: Optional[str] = Field(default=None, description="ETag from the remote server, if available")
+    last_modified: Optional[str] = Field(default=None, description="Last-Modified from the remote server, if available")
+    final_url: Optional[str] = Field(default=None, description="Final resolved URL after redirects, if available")
+    expected_total_bytes: Optional[int] = Field(default=None, description="Expected total size of the download")
+    resume_required: bool = Field(default=False, description="True if server refused resume; restart required")
+    resume_message: Optional[str] = Field(default=None, description="Message explaining why resume is required")
+    resume_from_scratch: bool = Field(
+        default=False,
+        description="True if resume metadata existed but the partial file was missing and the download restarted from the beginning",
+    )
+
+    def __hash__(self) -> int:
+        """Return hash of the string representation of this object, for indexing."""
+        return hash(str(self))
+
+    def __le__(self, other: "DownloadJob") -> bool:
+        """Return True if this job's priority is less than another's."""
+        return self.priority <= other.priority
+
+
+class MultiFileDownloadJob(DownloadJobBase):
+    """Class to monitor and control multifile downloads."""
+
+    download_parts: Set[DownloadJob] = Field(default_factory=set, description="List of download parts.")
+
+
 class DownloadQueueServiceBase(ABC):
     """Multithreaded queue for downloading models via URL."""
 
@@ -198,6 +245,48 @@ class DownloadQueueServiceBase(ABC):
         3. If the path exists and is an existing file, then the downloader will try to resume the download from
            the end of the existing file.
 
+        """
+        pass
+
+    @abstractmethod
+    def multifile_download(
+        self,
+        parts: List[RemoteModelFile],
+        dest: Path,
+        access_token: Optional[str] = None,
+        submit_job: bool = True,
+        on_start: Optional[DownloadEventHandler] = None,
+        on_progress: Optional[DownloadEventHandler] = None,
+        on_complete: Optional[DownloadEventHandler] = None,
+        on_cancelled: Optional[DownloadEventHandler] = None,
+        on_error: Optional[DownloadExceptionHandler] = None,
+    ) -> MultiFileDownloadJob:
+        """
+        Create and enqueue a multifile download job.
+
+        :param parts: Set of URL / filename pairs
+        :param dest: Path to download to. See below.
+        :param access_token: Access token to download the indicated files. If not provided,
+         each file's URL may be matched to an access token using the config file matching
+         system.
+        :param submit_job: If true [default] then submit the job for execution. Otherwise,
+         you will need to pass the job to submit_multifile_download().
+        :param on_start, on_progress, on_complete, on_error: Callbacks for the indicated
+         events.
+        :returns: A MultiFileDownloadJob object for monitoring the state of the download.
+
+        The `dest` argument is a Path object pointing to a directory. All downloads
+        with be placed inside this directory. The callbacks will receive the
+        MultiFileDownloadJob.
+        """
+        pass
+
+    @abstractmethod
+    def submit_multifile_download(self, job: MultiFileDownloadJob) -> None:
+        """
+        Enqueue a previously-created multi-file download job.
+
+        :param job: A MultiFileDownloadJob created with multifile_download()
         """
         pass
 
@@ -252,9 +341,13 @@ class DownloadQueueServiceBase(ABC):
         pass
 
     @abstractmethod
-    def cancel_job(self, job: DownloadJob) -> None:
+    def cancel_job(self, job: DownloadJobBase) -> None:
         """Cancel the job, clearing partial downloads and putting it into ERROR state."""
         pass
+
+    def pause_job(self, job: DownloadJobBase) -> None:  # noqa D401
+        """Pause the job, preserving partial downloads."""
+        raise NotImplementedError
 
     @abstractmethod
     def join(self) -> None:
@@ -262,7 +355,7 @@ class DownloadQueueServiceBase(ABC):
         pass
 
     @abstractmethod
-    def wait_for_job(self, job: DownloadJob, timeout: int = 0) -> DownloadJob:
+    def wait_for_job(self, job: DownloadJobBase, timeout: int = 0) -> DownloadJobBase:
         """Wait until the indicated download job has reached a terminal state.
 
         This will block until the indicated install job has completed,

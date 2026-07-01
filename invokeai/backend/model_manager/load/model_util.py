@@ -2,25 +2,85 @@
 """Various utility functions needed by the loader and caching system."""
 
 import json
+import logging
 from pathlib import Path
 from typing import Optional
 
+import onnxruntime as ort
 import torch
-from diffusers import DiffusionPipeline
+from diffusers.pipelines.pipeline_utils import DiffusionPipeline
+from diffusers.schedulers.scheduling_utils import SchedulerMixin
+from transformers import CLIPTokenizer, PreTrainedTokenizerBase, T5Tokenizer
 
-from invokeai.backend.model_manager.config import AnyModel
+from invokeai.backend.image_util.depth_anything.depth_anything_pipeline import DepthAnythingPipeline
+from invokeai.backend.image_util.grounding_dino.grounding_dino_pipeline import GroundingDinoPipeline
+from invokeai.backend.image_util.segment_anything.segment_anything_pipeline import SegmentAnythingPipeline
+from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
+from invokeai.backend.model_manager.taxonomy import AnyModel
 from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
+from invokeai.backend.textual_inversion import TextualInversionModelRaw
+from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 
 
-def calc_model_size_by_data(model: AnyModel) -> int:
+def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
     """Get size of a model in memory in bytes."""
+    # TODO(ryand): We should create a CacheableModel interface for all models, and move the size calculations down to
+    # the models themselves.
     if isinstance(model, DiffusionPipeline):
         return _calc_pipeline_by_data(model)
     elif isinstance(model, torch.nn.Module):
-        return _calc_model_by_data(model)
+        return calc_module_size(model)
     elif isinstance(model, IAIOnnxRuntimeModel):
         return _calc_onnx_model_by_data(model)
+    elif isinstance(model, SchedulerMixin):
+        return 0
+    elif isinstance(model, CLIPTokenizer):
+        # TODO(ryand): Accurately calculate the tokenizer's size. It's small enough that it shouldn't matter for now.
+        return 0
+    elif isinstance(
+        model,
+        (
+            TextualInversionModelRaw,
+            IPAdapter,
+            ModelPatchRaw,
+            SpandrelImageToImageModel,
+            GroundingDinoPipeline,
+            SegmentAnythingPipeline,
+            DepthAnythingPipeline,
+        ),
+    ):
+        return model.calc_size()
+    elif isinstance(model, ort.InferenceSession):
+        if model._model_bytes is not None:
+            # If the model is already loaded, return the size of the model bytes
+            return len(model._model_bytes)
+        elif model._model_path is not None:
+            # If the model is not loaded, return the size of the model path
+            return calc_model_size_by_fs(Path(model._model_path))
+        else:
+            # If neither is available, return 0
+            return 0
+    elif isinstance(
+        model,
+        T5Tokenizer,
+    ):
+        # HACK(ryand): len(model) just returns the vocabulary size, so this is blatantly wrong. It should be small
+        # relative to the text encoder that it's used with, so shouldn't matter too much, but we should fix this at some
+        # point.
+        return len(model)
+    elif isinstance(model, PreTrainedTokenizerBase):
+        # Catch-all for other tokenizer types (e.g., Qwen2Tokenizer, Qwen3Tokenizer).
+        # Tokenizers are small relative to models, so returning 0 is acceptable.
+        return 0
     else:
+        # TODO(ryand): Promote this from a log to an exception once we are confident that we are handling all of the
+        # supported model types.
+        logger.warning(
+            f"Failed to calculate model size for unexpected model type: {type(model)}. The model will be treated as "
+            "having size 0."
+        )
         return 0
 
 
@@ -30,15 +90,15 @@ def _calc_pipeline_by_data(pipeline: DiffusionPipeline) -> int:
     for submodel_key in pipeline.components.keys():
         submodel = getattr(pipeline, submodel_key)
         if submodel is not None and isinstance(submodel, torch.nn.Module):
-            res += _calc_model_by_data(submodel)
+            res += calc_module_size(submodel)
     return res
 
 
-def _calc_model_by_data(model: torch.nn.Module) -> int:
-    mem_params = sum([param.nelement() * param.element_size() for param in model.parameters()])
-    mem_bufs = sum([buf.nelement() * buf.element_size() for buf in model.buffers()])
-    mem: int = mem_params + mem_bufs  # in bytes
-    return mem
+def calc_module_size(model: torch.nn.Module) -> int:
+    """Calculate the size (in bytes) of a torch.nn.Module."""
+    mem_params = sum([calc_tensor_size(param) for param in model.parameters()])
+    mem_bufs = sum([calc_tensor_size(buf) for buf in model.buffers()])
+    return mem_params + mem_bufs
 
 
 def _calc_onnx_model_by_data(model: IAIOnnxRuntimeModel) -> int:
@@ -97,6 +157,7 @@ def calc_model_size_by_fs(model_path: Path, subfolder: Optional[str] = None, var
         (".msgpack",),  # flax
         (".ckpt",),  # tf
         (".h5",),  # tf2
+        (".gguf",),  # gguf quantized
     ]
 
     for file_format in formats:

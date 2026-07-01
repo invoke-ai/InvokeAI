@@ -6,18 +6,20 @@ from typing import Optional
 import torch
 from typing_extensions import Self
 
+from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.download.download_base import DownloadQueueServiceBase
+from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
-from invokeai.backend.model_manager.load import ModelCache, ModelConvertCache, ModelLoaderRegistry
+from invokeai.app.services.model_install.model_install_base import ModelInstallServiceBase
+from invokeai.app.services.model_install.model_install_default import ModelInstallService
+from invokeai.app.services.model_load.model_load_base import ModelLoadServiceBase
+from invokeai.app.services.model_load.model_load_default import ModelLoadService
+from invokeai.app.services.model_manager.model_manager_base import ModelManagerServiceBase
+from invokeai.app.services.model_records.model_records_base import ModelRecordServiceBase
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
-
-from ..config import InvokeAIAppConfig
-from ..download import DownloadQueueServiceBase
-from ..events.events_base import EventServiceBase
-from ..model_install import ModelInstallService, ModelInstallServiceBase
-from ..model_load import ModelLoadService, ModelLoadServiceBase
-from ..model_records import ModelRecordServiceBase
-from .model_manager_base import ModelManagerServiceBase
 
 
 class ModelManagerService(ModelManagerServiceBase):
@@ -58,6 +60,10 @@ class ModelManagerService(ModelManagerServiceBase):
                 service.start(invoker)
 
     def stop(self, invoker: Invoker) -> None:
+        # Shutdown the model cache to cancel any pending timers
+        if hasattr(self._load, "ram_cache"):
+            self._load.ram_cache.shutdown()
+
         for service in [self._store, self._install, self._load]:
             if hasattr(service, "stop"):
                 service.stop(invoker)
@@ -80,17 +86,20 @@ class ModelManagerService(ModelManagerServiceBase):
         logger.setLevel(app_config.log_level.upper())
 
         ram_cache = ModelCache(
-            max_cache_size=app_config.ram,
-            max_vram_cache_size=app_config.vram,
-            lazy_offloading=app_config.lazy_offload,
-            logger=logger,
+            execution_device_working_mem_gb=app_config.device_working_mem_gb,
+            enable_partial_loading=app_config.enable_partial_loading,
+            keep_ram_copy_of_weights=app_config.keep_ram_copy_of_weights,
+            max_ram_cache_size_gb=app_config.max_cache_ram_gb,
+            max_vram_cache_size_gb=app_config.max_cache_vram_gb,
             execution_device=execution_device or TorchDevice.choose_torch_device(),
+            storage_device="cpu",
+            log_memory_usage=app_config.log_memory_usage,
+            logger=logger,
+            keep_alive_minutes=app_config.model_cache_keep_alive_min,
         )
-        convert_cache = ModelConvertCache(cache_path=app_config.convert_cache_path, max_size=app_config.convert_cache)
         loader = ModelLoadService(
             app_config=app_config,
             ram_cache=ram_cache,
-            convert_cache=convert_cache,
             registry=ModelLoaderRegistry,
         )
         installer = ModelInstallService(

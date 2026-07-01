@@ -7,7 +7,11 @@ class BulkDownloadBase(ABC):
 
     @abstractmethod
     def handler(
-        self, image_names: Optional[list[str]], board_id: Optional[str], bulk_download_item_id: Optional[str]
+        self,
+        image_names: Optional[list[str]],
+        board_id: Optional[str],
+        bulk_download_item_id: Optional[str],
+        user_id: str = "system",
     ) -> None:
         """
         Create a zip file containing the images specified by the given image names or board id.
@@ -15,6 +19,7 @@ class BulkDownloadBase(ABC):
         :param image_names: A list of image names to include in the zip file.
         :param board_id: The ID of the board. If provided, all images associated with the board will be included in the zip file.
         :param bulk_download_item_id: The bulk_download_item_id that will be used to retrieve the bulk download item when it is prepared, if none is provided a uuid will be generated.
+        :param user_id: The ID of the user who initiated the download.
         """
 
     @abstractmethod
@@ -41,4 +46,13 @@ class BulkDownloadBase(ABC):
         Delete the bulk download file.
 
         :param bulk_download_item_name: The name of the bulk download item.
+        """
+
+    @abstractmethod
+    def get_owner(self, bulk_download_item_name: str) -> Optional[str]:
+        """
+        Get the user_id of the user who initiated the download.
+
+        :param bulk_download_item_name: The name of the bulk download item.
+        :return: The user_id of the owner, or None if not tracked.
         """

@@ -10,84 +10,37 @@ import PIL.Image
 import psutil
 import torch
 import torchvision.transforms as T
-from diffusers.models import AutoencoderKL, UNet2DConditionModel
-from diffusers.models.controlnet import ControlNetModel
+from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
+from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
-from diffusers.schedulers import KarrasDiffusionSchedulers
-from diffusers.schedulers.scheduling_utils import SchedulerMixin
+from diffusers.schedulers.scheduling_utils import KarrasDiffusionSchedulers, SchedulerMixin
 from diffusers.utils.import_utils import is_xformers_available
 from pydantic import Field
-from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
+from transformers import CLIPImageProcessor, CLIPTextModel, CLIPTokenizer
 
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import IPAdapterData, TextConditioningData
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from invokeai.backend.stable_diffusion.diffusion.unet_attention_patcher import UNetAttentionPatcher, UNetIPAdapterData
+from invokeai.backend.stable_diffusion.extensions.preview import PipelineIntermediateState
 from invokeai.backend.util.attention import auto_detect_slice_size
 from invokeai.backend.util.devices import TorchDevice
-
-
-@dataclass
-class PipelineIntermediateState:
-    step: int
-    order: int
-    total_steps: int
-    timestep: int
-    latents: torch.Tensor
-    predicted_original: Optional[torch.Tensor] = None
-
-
-@dataclass
-class AddsMaskLatents:
-    """Add the channels required for inpainting model input.
-
-    The inpainting model takes the normal latent channels as input, _plus_ a one-channel mask
-    and the latent encoding of the base image.
-
-    This class assumes the same mask and base image should apply to all items in the batch.
-    """
-
-    forward: Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
-    mask: torch.Tensor
-    initial_image_latents: torch.Tensor
-
-    def __call__(
-        self,
-        latents: torch.Tensor,
-        t: torch.Tensor,
-        text_embeddings: torch.Tensor,
-        **kwargs,
-    ) -> torch.Tensor:
-        model_input = self.add_mask_channels(latents)
-        return self.forward(model_input, t, text_embeddings, **kwargs)
-
-    def add_mask_channels(self, latents):
-        batch_size = latents.size(0)
-        # duplicate mask and latents for each batch
-        mask = einops.repeat(self.mask, "b c h w -> (repeat b) c h w", repeat=batch_size)
-        image_latents = einops.repeat(self.initial_image_latents, "b c h w -> (repeat b) c h w", repeat=batch_size)
-        # add mask and image as additional channels
-        model_input, _ = einops.pack([latents, mask, image_latents], "b * h w")
-        return model_input
-
-
-def are_like_tensors(a: torch.Tensor, b: object) -> bool:
-    return isinstance(b, torch.Tensor) and (a.size() == b.size())
+from invokeai.backend.util.hotfixes import ControlNetModel
 
 
 @dataclass
 class AddsMaskGuidance:
-    mask: torch.FloatTensor
-    mask_latents: torch.FloatTensor
+    mask: torch.Tensor
+    mask_latents: torch.Tensor
     scheduler: SchedulerMixin
     noise: torch.Tensor
-    gradient_mask: bool
+    is_gradient_mask: bool
 
     def __call__(self, latents: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
         return self.apply_mask(latents, t)
 
-    def apply_mask(self, latents: torch.Tensor, t) -> torch.Tensor:
+    def apply_mask(self, latents: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
         batch_size = latents.size(0)
         mask = einops.repeat(self.mask, "b c h w -> (repeat b) c h w", repeat=batch_size)
         if t.dim() == 0:
@@ -100,7 +53,7 @@ class AddsMaskGuidance:
         # TODO: Do we need to also apply scheduler.scale_model_input? Or is add_noise appropriately scaled already?
         # mask_latents = self.scheduler.scale_model_input(mask_latents, t)
         mask_latents = einops.repeat(mask_latents, "b c h w -> (repeat b) c h w", repeat=batch_size)
-        if self.gradient_mask:
+        if self.is_gradient_mask:
             threshhold = (t.item()) / self.scheduler.config.num_train_timesteps
             mask_bool = mask > threshhold  # I don't know when mask got inverted, but it did
             masked_input = torch.where(mask_bool, latents, mask_latents)
@@ -186,7 +139,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         safety_checker ([`StableDiffusionSafetyChecker`]):
             Classification module that estimates whether generated images could be considered offensive or harmful.
             Please, refer to the [model card](https://huggingface.co/CompVis/stable-diffusion-v1-4) for details.
-        feature_extractor ([`CLIPFeatureExtractor`]):
+        feature_extractor ([`CLIPImageProcessor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
 
@@ -198,9 +151,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         unet: UNet2DConditionModel,
         scheduler: KarrasDiffusionSchedulers,
         safety_checker: Optional[StableDiffusionSafetyChecker],
-        feature_extractor: Optional[CLIPFeatureExtractor],
+        feature_extractor: Optional[CLIPImageProcessor],
         requires_safety_checker: bool = False,
-        control_model: ControlNetModel = None,
     ):
         super().__init__(
             vae=vae,
@@ -214,15 +166,24 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         )
 
         self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet, self._unet_forward)
-        self.control_model = control_model
-        self.use_ip_adapter = False
 
     def _adjust_memory_efficient_attention(self, latents: torch.Tensor):
         """
         if xformers is available, use it, otherwise use sliced attention.
         """
+
+        # On 30xx and 40xx series GPUs, `torch-sdp` is faster than `xformers`. This corresponds to a CUDA major
+        # version of 8 or higher. So, for major version 7 or below, we prefer `xformers`.
+        # See:
+        # - https://developer.nvidia.com/cuda-gpus
+        # - https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#compute-capabilities
+        try:
+            prefer_xformers = torch.cuda.is_available() and torch.cuda.get_device_properties("cuda").major <= 7  # type: ignore # Type of "get_device_properties" is partially unknown
+        except Exception:
+            prefer_xformers = False
+
         config = get_config()
-        if config.attention_type == "xformers":
+        if config.attention_type == "xformers" and is_xformers_available() and prefer_xformers:
             self.enable_xformers_memory_efficient_attention()
             return
         elif config.attention_type == "sliced":
@@ -237,20 +198,24 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             self.disable_attention_slicing()
             return
         elif config.attention_type == "torch-sdp":
-            if hasattr(torch.nn.functional, "scaled_dot_product_attention"):
-                # diffusers enables sdp automatically
-                return
-            else:
-                raise Exception("torch-sdp attention slicing not available")
+            # torch-sdp is the default in diffusers.
+            return
 
-        # the remainder if this code is called when attention_type=='auto'
+        # See https://github.com/invoke-ai/InvokeAI/issues/7049 for context.
+        # Bumping torch from 2.2.2 to 2.4.1 caused the sliced attention implementation to produce incorrect results.
+        # For now, if a user is on an MPS device and has not explicitly set the attention_type, then we select the
+        # non-sliced torch-sdp implementation. This keeps things working on MPS at the cost of increased peak memory
+        # utilization.
+        if torch.backends.mps.is_available():
+            return
+
+        # The remainder if this code is called when attention_type=='auto'.
         if self.unet.device.type == "cuda":
-            if is_xformers_available():
+            if is_xformers_available() and prefer_xformers:
                 self.enable_xformers_memory_efficient_attention()
                 return
-            elif hasattr(torch.nn.functional, "scaled_dot_product_attention"):
-                # diffusers enables sdp automatically
-                return
+            # torch-sdp is the default in diffusers.
+            return
 
         if self.unet.device.type == "cpu" or self.unet.device.type == "mps":
             mem_free = psutil.virtual_memory().free
@@ -280,121 +245,136 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
     def to(self, torch_device: Optional[Union[str, torch.device]] = None, silence_dtype_warnings=False):
         raise Exception("Should not be called")
 
+    def add_inpainting_channels_to_latents(
+        self, latents: torch.Tensor, masked_ref_image_latents: torch.Tensor, inpainting_mask: torch.Tensor
+    ):
+        """Given a `latents` tensor, adds the mask and image latents channels required for inpainting.
+
+        Standard (non-inpainting) SD UNet models expect an input with shape (N, 4, H, W). Inpainting models expect an
+        input of shape (N, 9, H, W). The 9 channels are defined as follows:
+        - Channel 0-3: The latents being denoised.
+        - Channel 4: The mask indicating which parts of the image are being inpainted.
+        - Channel 5-8: The latent representation of the masked reference image being inpainted.
+
+        This function assumes that the same mask and base image should apply to all items in the batch.
+        """
+        # Validate assumptions about input tensor shapes.
+        batch_size, latent_channels, latent_height, latent_width = latents.shape
+        assert latent_channels == 4
+        assert list(masked_ref_image_latents.shape) == [1, 4, latent_height, latent_width]
+        assert list(inpainting_mask.shape) == [1, 1, latent_height, latent_width]
+
+        # Repeat original_image_latents and inpainting_mask to match the latents batch size.
+        original_image_latents = masked_ref_image_latents.expand(batch_size, -1, -1, -1)
+        inpainting_mask = inpainting_mask.expand(batch_size, -1, -1, -1)
+
+        # Concatenate along the channel dimension.
+        return torch.cat([latents, inpainting_mask, original_image_latents], dim=1)
+
     def latents_from_embeddings(
         self,
         latents: torch.Tensor,
-        num_inference_steps: int,
         scheduler_step_kwargs: dict[str, Any],
         conditioning_data: TextConditioningData,
-        *,
         noise: Optional[torch.Tensor],
+        seed: int,
         timesteps: torch.Tensor,
         init_timestep: torch.Tensor,
-        additional_guidance: List[Callable] = None,
-        callback: Callable[[PipelineIntermediateState], None] = None,
-        control_data: List[ControlNetData] = None,
+        callback: Callable[[PipelineIntermediateState], None],
+        control_data: list[ControlNetData] | None = None,
         ip_adapter_data: Optional[list[IPAdapterData]] = None,
         t2i_adapter_data: Optional[list[T2IAdapterData]] = None,
         mask: Optional[torch.Tensor] = None,
         masked_latents: Optional[torch.Tensor] = None,
-        gradient_mask: Optional[bool] = False,
-        seed: int,
+        is_gradient_mask: bool = False,
     ) -> torch.Tensor:
+        """Denoise the latents.
+
+        Args:
+            latents: The latent-space image to denoise.
+                - If we are inpainting, this is the initial latent image before noise has been added.
+                - If we are generating a new image, this should be initialized to zeros.
+                - In some cases, this may be a partially-noised latent image (e.g. when running the SDXL refiner).
+            scheduler_step_kwargs: kwargs forwarded to the scheduler.step() method.
+            conditioning_data: Text conditionging data.
+            noise: Noise used for two purposes:
+                1. Used by the scheduler to noise the initial `latents` before denoising.
+                2. Used to noise the `masked_latents` when inpainting.
+                `noise` should be None if the `latents` tensor has already been noised.
+            seed: The seed used to generate the noise for the denoising process.
+                HACK(ryand): seed is only used in a particular case when `noise` is None, but we need to re-generate the
+                same noise used earlier in the pipeline. This should really be handled in a clearer way.
+            timesteps: The timestep schedule for the denoising process.
+            init_timestep: The first timestep in the schedule. This is used to determine the initial noise level, so
+                should be populated if you want noise applied *even* if timesteps is empty.
+            callback: A callback function that is called to report progress during the denoising process.
+            control_data: ControlNet data.
+            ip_adapter_data: IP-Adapter data.
+            t2i_adapter_data: T2I-Adapter data.
+            mask: A mask indicating which parts of the image are being inpainted. The presence of mask is used to
+                determine whether we are inpainting or not. `mask` should have the same spatial dimensions as the
+                `latents` tensor.
+                TODO(ryand): Check and document the expected dtype, range, and values used to represent
+                foreground/background.
+            masked_latents: A latent-space representation of a masked inpainting reference image. This tensor is only
+                used if an *inpainting* model is being used i.e. this tensor is not used when inpainting with a standard
+                SD UNet model.
+            is_gradient_mask: A flag indicating whether `mask` is a gradient mask or not.
+        """
         if init_timestep.shape[0] == 0:
             return latents
-
-        if additional_guidance is None:
-            additional_guidance = []
 
         orig_latents = latents.clone()
 
         batch_size = latents.shape[0]
-        batched_t = init_timestep.expand(batch_size)
+        batched_init_timestep = init_timestep.expand(batch_size)
 
+        # noise can be None if the latents have already been noised (e.g. when running the SDXL refiner).
         if noise is not None:
+            # TODO(ryand): I'm pretty sure we should be applying init_noise_sigma in cases where we are starting with
+            # full noise. Investigate the history of why this got commented out.
             # latents = noise * self.scheduler.init_noise_sigma # it's like in t2l according to diffusers
-            latents = self.scheduler.add_noise(latents, noise, batched_t)
+            latents = self.scheduler.add_noise(latents, noise, batched_init_timestep)
 
-        if mask is not None:
-            if is_inpainting_model(self.unet):
-                if masked_latents is None:
-                    raise Exception("Source image required for inpaint mask when inpaint model used!")
-
-                self.invokeai_diffuser.model_forward_callback = AddsMaskLatents(
-                    self._unet_forward, mask, masked_latents
-                )
-            else:
-                # if no noise provided, noisify unmasked area based on seed
-                if noise is None:
-                    noise = torch.randn(
-                        orig_latents.shape,
-                        dtype=torch.float32,
-                        device="cpu",
-                        generator=torch.Generator(device="cpu").manual_seed(seed),
-                    ).to(device=orig_latents.device, dtype=orig_latents.dtype)
-
-                additional_guidance.append(AddsMaskGuidance(mask, orig_latents, self.scheduler, noise, gradient_mask))
-
-        try:
-            latents = self.generate_latents_from_embeddings(
-                latents,
-                timesteps,
-                conditioning_data,
-                scheduler_step_kwargs=scheduler_step_kwargs,
-                additional_guidance=additional_guidance,
-                control_data=control_data,
-                ip_adapter_data=ip_adapter_data,
-                t2i_adapter_data=t2i_adapter_data,
-                callback=callback,
-            )
-        finally:
-            self.invokeai_diffuser.model_forward_callback = self._unet_forward
-
-        # restore unmasked part after the last step is completed
-        # in-process masking happens before each step
-        if mask is not None:
-            if gradient_mask:
-                latents = torch.where(mask > 0, latents, orig_latents)
-            else:
-                latents = torch.lerp(
-                    orig_latents, latents.to(dtype=orig_latents.dtype), mask.to(dtype=orig_latents.dtype)
-                )
-
-        return latents
-
-    def generate_latents_from_embeddings(
-        self,
-        latents: torch.Tensor,
-        timesteps,
-        conditioning_data: TextConditioningData,
-        scheduler_step_kwargs: dict[str, Any],
-        *,
-        additional_guidance: List[Callable] = None,
-        control_data: List[ControlNetData] = None,
-        ip_adapter_data: Optional[list[IPAdapterData]] = None,
-        t2i_adapter_data: Optional[list[T2IAdapterData]] = None,
-        callback: Callable[[PipelineIntermediateState], None] = None,
-    ) -> torch.Tensor:
         self._adjust_memory_efficient_attention(latents)
-        if additional_guidance is None:
-            additional_guidance = []
 
-        batch_size = latents.shape[0]
+        # Handle mask guidance (a.k.a. inpainting).
+        mask_guidance: AddsMaskGuidance | None = None
+        if mask is not None and not is_inpainting_model(self.unet):
+            # We are doing inpainting, since a mask is provided, but we are not using an inpainting model, so we will
+            # apply mask guidance to the latents.
 
-        if timesteps.shape[0] == 0:
-            return latents
+            # 'noise' might be None if the latents have already been noised (e.g. when running the SDXL refiner).
+            # We still need noise for inpainting, so we generate it from the seed here.
+            if noise is None:
+                noise = torch.randn(
+                    orig_latents.shape,
+                    dtype=torch.float32,
+                    device="cpu",
+                    generator=torch.Generator(device="cpu").manual_seed(seed),
+                ).to(device=orig_latents.device, dtype=orig_latents.dtype)
+
+            mask_guidance = AddsMaskGuidance(
+                mask=mask,
+                mask_latents=orig_latents,
+                scheduler=self.scheduler,
+                noise=noise,
+                is_gradient_mask=is_gradient_mask,
+            )
 
         use_ip_adapter = ip_adapter_data is not None
         use_regional_prompting = (
             conditioning_data.cond_regions is not None or conditioning_data.uncond_regions is not None
         )
         unet_attention_patcher = None
-        self.use_ip_adapter = use_ip_adapter
         attn_ctx = nullcontext()
 
         if use_ip_adapter or use_regional_prompting:
             ip_adapters: Optional[List[UNetIPAdapterData]] = (
-                [{"ip_adapter": ipa.ip_adapter_model, "target_blocks": ipa.target_blocks} for ipa in ip_adapter_data]
+                [
+                    {"ip_adapter": ipa.ip_adapter_model, "target_blocks": ipa.target_blocks, "method": ipa.method}
+                    for ipa in ip_adapter_data
+                ]
                 if use_ip_adapter
                 else None
             )
@@ -402,28 +382,28 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             attn_ctx = unet_attention_patcher.apply_ip_adapter_attention(self.invokeai_diffuser.model)
 
         with attn_ctx:
-            if callback is not None:
-                callback(
-                    PipelineIntermediateState(
-                        step=-1,
-                        order=self.scheduler.order,
-                        total_steps=len(timesteps),
-                        timestep=self.scheduler.config.num_train_timesteps,
-                        latents=latents,
-                    )
+            callback(
+                PipelineIntermediateState(
+                    step=0,  # initial latents
+                    order=self.scheduler.order,
+                    total_steps=len(timesteps),
+                    timestep=self.scheduler.config.num_train_timesteps,
+                    latents=latents,
                 )
+            )
 
-            # print("timesteps:", timesteps)
             for i, t in enumerate(self.progress_bar(timesteps)):
                 batched_t = t.expand(batch_size)
                 step_output = self.step(
-                    batched_t,
-                    latents,
-                    conditioning_data,
+                    t=batched_t,
+                    latents=latents,
+                    conditioning_data=conditioning_data,
                     step_index=i,
                     total_step_count=len(timesteps),
                     scheduler_step_kwargs=scheduler_step_kwargs,
-                    additional_guidance=additional_guidance,
+                    mask_guidance=mask_guidance,
+                    mask=mask,
+                    masked_latents=masked_latents,
                     control_data=control_data,
                     ip_adapter_data=ip_adapter_data,
                     t2i_adapter_data=t2i_adapter_data,
@@ -431,19 +411,28 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 latents = step_output.prev_sample
                 predicted_original = getattr(step_output, "pred_original_sample", None)
 
-                if callback is not None:
-                    callback(
-                        PipelineIntermediateState(
-                            step=i,
-                            order=self.scheduler.order,
-                            total_steps=len(timesteps),
-                            timestep=int(t),
-                            latents=latents,
-                            predicted_original=predicted_original,
-                        )
+                callback(
+                    PipelineIntermediateState(
+                        step=i + 1,  # final latents
+                        order=self.scheduler.order,
+                        total_steps=len(timesteps),
+                        timestep=int(t),
+                        latents=latents,
+                        predicted_original=predicted_original,
                     )
+                )
 
-            return latents
+        # restore unmasked part after the last step is completed
+        # in-process masking happens before each step
+        if mask is not None:
+            if is_gradient_mask:
+                latents = torch.where(mask > 0, latents, orig_latents)
+            else:
+                latents = torch.lerp(
+                    orig_latents, latents.to(dtype=orig_latents.dtype), mask.to(dtype=orig_latents.dtype)
+                )
+
+        return latents
 
     @torch.inference_mode()
     def step(
@@ -454,19 +443,20 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         step_index: int,
         total_step_count: int,
         scheduler_step_kwargs: dict[str, Any],
-        additional_guidance: List[Callable] = None,
-        control_data: List[ControlNetData] = None,
+        mask_guidance: AddsMaskGuidance | None,
+        mask: torch.Tensor | None,
+        masked_latents: torch.Tensor | None,
+        control_data: list[ControlNetData] | None = None,
         ip_adapter_data: Optional[list[IPAdapterData]] = None,
         t2i_adapter_data: Optional[list[T2IAdapterData]] = None,
     ):
         # invokeai_diffuser has batched timesteps, but diffusers schedulers expect a single value
         timestep = t[0]
-        if additional_guidance is None:
-            additional_guidance = []
 
-        # one day we will expand this extension point, but for now it just does denoise masking
-        for guidance in additional_guidance:
-            latents = guidance(latents, timestep)
+        # Handle masked image-to-image (a.k.a inpainting).
+        if mask_guidance is not None:
+            # NOTE: This is intentionally done *before* self.scheduler.scale_model_input(...).
+            latents = mask_guidance(latents, timestep)
 
         # TODO: should this scaling happen here or inside self._unet_forward?
         #     i.e. before or after passing it to InvokeAIDiffuserComponent
@@ -512,7 +502,48 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     for idx, value in enumerate(single_t2i_adapter_data.adapter_state):
                         accum_adapter_state[idx] += value * t2i_adapter_weight
 
+            # Hack: force compatibility with irregular resolutions by padding the feature map with zeros
+            for idx, tensor in enumerate(accum_adapter_state):
+                # The tensor size is supposed to be some integer downscale factor of the latents size.
+                # Internally, the unet will pad the latents before downscaling between levels when it is no longer divisible by its downscale factor.
+                # If the latent size does not scale down evenly, we need to pad the tensor so that it matches the the downscaled padded latents later on.
+                scale_factor = latents.size()[-1] // tensor.size()[-1]
+                required_padding_width = math.ceil(latents.size()[-1] / scale_factor) - tensor.size()[-1]
+                required_padding_height = math.ceil(latents.size()[-2] / scale_factor) - tensor.size()[-2]
+                tensor = torch.nn.functional.pad(
+                    tensor,
+                    (0, required_padding_width, 0, required_padding_height, 0, 0, 0, 0),
+                    mode="constant",
+                    value=0,
+                )
+                accum_adapter_state[idx] = tensor
+
             down_intrablock_additional_residuals = accum_adapter_state
+
+        # Handle inpainting models.
+        if is_inpainting_model(self.unet):
+            # NOTE: These calls to add_inpainting_channels_to_latents(...) are intentionally done *after*
+            # self.scheduler.scale_model_input(...) so that the scaling is not applied to the mask or reference image
+            # latents.
+            if mask is not None:
+                if masked_latents is None:
+                    raise ValueError("Source image required for inpaint mask when inpaint model used!")
+                latent_model_input = self.add_inpainting_channels_to_latents(
+                    latents=latent_model_input, masked_ref_image_latents=masked_latents, inpainting_mask=mask
+                )
+            else:
+                # We are using an inpainting model, but no mask was provided, so we are not really "inpainting".
+                # We generate a global mask and empty original image so that we can still generate in this
+                # configuration.
+                # TODO(ryand): Should we just raise an exception here instead? I can't think of a use case for wanting
+                # to do this.
+                # TODO(ryand): If we decide that there is a good reason to keep this, then we should generate the 'fake'
+                # mask and original image once rather than on every denoising step.
+                latent_model_input = self.add_inpainting_channels_to_latents(
+                    latents=latent_model_input,
+                    masked_ref_image_latents=torch.zeros_like(latent_model_input[:1]),
+                    inpainting_mask=torch.ones_like(latent_model_input[:1, :1]),
+                )
 
         uc_noise_pred, c_noise_pred = self.invokeai_diffuser.do_unet_step(
             sample=latent_model_input,
@@ -542,17 +573,18 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         # compute the previous noisy sample x_t -> x_t-1
         step_output = self.scheduler.step(noise_pred, timestep, latents, **scheduler_step_kwargs)
 
-        # TODO: discuss injection point options. For now this is a patch to get progress images working with inpainting again.
-        for guidance in additional_guidance:
-            # apply the mask to any "denoised" or "pred_original_sample" fields
+        # TODO: discuss injection point options. For now this is a patch to get progress images working with inpainting
+        # again.
+        if mask_guidance is not None:
+            # Apply the mask to any "denoised" or "pred_original_sample" fields.
             if hasattr(step_output, "denoised"):
-                step_output.pred_original_sample = guidance(step_output.denoised, self.scheduler.timesteps[-1])
+                step_output.pred_original_sample = mask_guidance(step_output.denoised, self.scheduler.timesteps[-1])
             elif hasattr(step_output, "pred_original_sample"):
-                step_output.pred_original_sample = guidance(
+                step_output.pred_original_sample = mask_guidance(
                     step_output.pred_original_sample, self.scheduler.timesteps[-1]
                 )
             else:
-                step_output.pred_original_sample = guidance(latents, self.scheduler.timesteps[-1])
+                step_output.pred_original_sample = mask_guidance(latents, self.scheduler.timesteps[-1])
 
         return step_output
 
@@ -575,17 +607,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         **kwargs,
     ):
         """predict the noise residual"""
-        if is_inpainting_model(self.unet) and latents.size(1) == 4:
-            # Pad out normal non-inpainting inputs for an inpainting model.
-            # FIXME: There are too many layers of functions and we have too many different ways of
-            #     overriding things! This should get handled in a way more consistent with the other
-            #     use of AddsMaskLatents.
-            latents = AddsMaskLatents(
-                self._unet_forward,
-                mask=torch.ones_like(latents[:1, :1], device=latents.device, dtype=latents.dtype),
-                initial_image_latents=torch.zeros_like(latents[:1], device=latents.device, dtype=latents.dtype),
-            ).add_mask_channels(latents)
-
         # First three args should be positional, not keywords, so torch hooks can see them.
         return self.unet(
             latents,

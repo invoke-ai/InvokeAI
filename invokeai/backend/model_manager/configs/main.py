@@ -1,0 +1,1466 @@
+import re
+from abc import ABC
+from pathlib import Path
+from typing import Any, Literal, Self
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from invokeai.backend.model_manager.configs.base import (
+    Checkpoint_Config_Base,
+    Config_Base,
+    Diffusers_Config_Base,
+    SubmodelDefinition,
+)
+from invokeai.backend.model_manager.configs.clip_embed import get_clip_variant_type_from_config
+from invokeai.backend.model_manager.configs.identification_utils import (
+    NotAMatchError,
+    common_config_paths,
+    get_config_dict_or_raise,
+    raise_for_class_name,
+    raise_for_override_fields,
+    raise_if_not_dir,
+    raise_if_not_file,
+    state_dict_has_any_keys_exact,
+)
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
+from invokeai.backend.model_manager.taxonomy import (
+    BaseModelType,
+    Flux2VariantType,
+    FluxVariantType,
+    ModelFormat,
+    ModelType,
+    ModelVariantType,
+    QwenImageVariantType,
+    SchedulerPredictionType,
+    SubModelType,
+    ZImageVariantType,
+)
+from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
+
+DEFAULTS_PRECISION = Literal["fp16", "fp32"]
+
+
+class MainModelDefaultSettings(BaseModel):
+    vae: str | None = Field(default=None, description="Default VAE for this model (model key)")
+    vae_precision: DEFAULTS_PRECISION | None = Field(default=None, description="Default VAE precision for this model")
+    scheduler: SCHEDULER_NAME_VALUES | None = Field(default=None, description="Default scheduler for this model")
+    steps: int | None = Field(default=None, gt=0, description="Default number of steps for this model")
+    cfg_scale: float | None = Field(default=None, ge=1, description="Default CFG Scale for this model")
+    cfg_rescale_multiplier: float | None = Field(
+        default=None, ge=0, lt=1, description="Default CFG Rescale Multiplier for this model"
+    )
+    width: int | None = Field(default=None, multiple_of=8, ge=64, description="Default width for this model")
+    height: int | None = Field(default=None, multiple_of=8, ge=64, description="Default height for this model")
+    guidance: float | None = Field(default=None, ge=1, description="Default Guidance for this model")
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
+    fp8_storage: bool | None = Field(
+        default=None,
+        description="Store weights in FP8 to reduce VRAM usage (~50% savings). Weights are cast to compute dtype during inference.",
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+    @classmethod
+    def from_base(
+        cls,
+        base: BaseModelType,
+        variant: Flux2VariantType | FluxVariantType | ModelVariantType | ZImageVariantType | None = None,
+    ) -> Self | None:
+        match base:
+            case BaseModelType.StableDiffusion1:
+                return cls(width=512, height=512)
+            case BaseModelType.StableDiffusion2:
+                return cls(width=768, height=768)
+            case BaseModelType.StableDiffusionXL:
+                return cls(width=1024, height=1024)
+            case BaseModelType.ZImage:
+                # Different defaults based on variant
+                if variant == ZImageVariantType.ZBase:
+                    # Undistilled base model needs more steps and supports CFG
+                    # Recommended: steps=28-50, cfg_scale=3.0-5.0
+                    return cls(steps=50, cfg_scale=4.0, width=1024, height=1024)
+                else:
+                    # Turbo (distilled) uses fewer steps, no CFG
+                    return cls(steps=9, cfg_scale=1.0, width=1024, height=1024)
+            case BaseModelType.Anima:
+                return cls(steps=35, cfg_scale=4.5, width=1024, height=1024)
+            case BaseModelType.Flux2:
+                # Different defaults based on variant
+                if variant in (Flux2VariantType.Klein4BBase, Flux2VariantType.Klein9BBase):
+                    # Undistilled base models need more steps
+                    return cls(steps=28, cfg_scale=1.0, width=1024, height=1024)
+                else:
+                    # Distilled models (Klein 4B, Klein 9B) use fewer steps
+                    return cls(steps=4, cfg_scale=1.0, width=1024, height=1024)
+            case BaseModelType.QwenImage:
+                return cls(steps=40, cfg_scale=4.0, width=1024, height=1024)
+            case _:
+                # TODO(psyche): Do we want defaults for other base types?
+                return None
+
+
+class Main_Config_Base(ABC, BaseModel):
+    type: Literal[ModelType.Main] = Field(default=ModelType.Main)
+    trigger_phrases: set[str] | None = Field(
+        default=None,
+        description="Set of trigger phrases for this model",
+    )
+    default_settings: MainModelDefaultSettings | None = Field(
+        default=None,
+        description="Default settings for this model",
+    )
+
+
+def _has_bnb_nf4_keys(state_dict: dict[str | int, Any]) -> bool:
+    bnb_nf4_keys = {
+        "double_blocks.0.img_attn.proj.weight.quant_state.bitsandbytes__nf4",
+        "model.diffusion_model.double_blocks.0.img_attn.proj.weight.quant_state.bitsandbytes__nf4",
+    }
+    return any(key in state_dict for key in bnb_nf4_keys)
+
+
+def _has_ggml_tensors(state_dict: dict[str | int, Any]) -> bool:
+    return any(isinstance(v, GGMLTensor) for v in state_dict.values())
+
+
+def _has_main_keys(state_dict: dict[str | int, Any]) -> bool:
+    for key in state_dict.keys():
+        if isinstance(key, int):
+            continue
+        elif key.startswith(
+            (
+                "cond_stage_model.",
+                "first_stage_model.",
+                "model.diffusion_model.",
+                # Some FLUX checkpoint files contain transformer keys prefixed with "model.diffusion_model".
+                # This prefix is typically used to distinguish between multiple models bundled in a single file.
+                "model.diffusion_model.double_blocks.",
+            )
+        ):
+            return True
+        elif key.startswith("double_blocks.") and "ip_adapter" not in key:
+            # FLUX models in the official BFL format contain keys with the "double_blocks." prefix, but we must be
+            # careful to avoid false positives on XLabs FLUX IP-Adapter models.
+            return True
+    return False
+
+
+def _has_z_image_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains Z-Image S3-DiT transformer keys.
+
+    This function returns True only for Z-Image main models, not LoRAs.
+    LoRAs are excluded by checking for LoRA-specific weight suffixes.
+    """
+    # Z-Image specific keys that distinguish it from other models
+    z_image_specific_keys = {
+        "cap_embedder",  # Caption embedder - unique to Z-Image
+        "context_refiner",  # Context refiner blocks
+        "cap_pad_token",  # Caption padding token
+    }
+
+    # LoRA-specific suffixes - if present, this is a LoRA not a main model
+    lora_suffixes = (
+        ".lora_down.weight",
+        ".lora_up.weight",
+        ".lora_A.weight",
+        ".lora_B.weight",
+        ".dora_scale",
+        ".alpha",
+    )
+
+    # First pass: check if any key has LoRA suffixes - if so, this is a LoRA not a main model
+    for key in state_dict.keys():
+        if isinstance(key, int):
+            continue
+        if key.endswith(lora_suffixes):
+            return False
+
+    # Second pass: check for Z-Image specific key parts
+    for key in state_dict.keys():
+        if isinstance(key, int):
+            continue
+        # Handle both direct keys (cap_embedder.0.weight) and
+        # ComfyUI-style keys (model.diffusion_model.cap_embedder.0.weight)
+        key_parts = key.split(".")
+        for part in key_parts:
+            if part in z_image_specific_keys:
+                return True
+
+    return False
+
+
+class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
+    """Model config for main checkpoint models."""
+
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+
+    prediction_type: SchedulerPredictionType = Field()
+    variant: ModelVariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_main_model(mod)
+
+        cls._validate_base(mod)
+
+        prediction_type = override_fields.pop("prediction_type", None) or cls._get_scheduler_prediction_type_or_raise(
+            mod
+        )
+
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
+
+        return cls(**override_fields, prediction_type=prediction_type, variant=variant)
+
+    @classmethod
+    def _validate_base(cls, mod: ModelOnDisk) -> None:
+        """Raise `NotAMatch` if the model base does not match this config class."""
+        expected_base = cls.model_fields["base"].default
+        recognized_base = cls._get_base_or_raise(mod)
+        if expected_base is not recognized_base:
+            raise NotAMatchError(f"base is {recognized_base}, not {expected_base}")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        state_dict = mod.load_state_dict()
+
+        key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
+        if key_name in state_dict and state_dict[key_name].shape[-1] == 768:
+            return BaseModelType.StableDiffusion1
+        if key_name in state_dict and state_dict[key_name].shape[-1] == 1024:
+            return BaseModelType.StableDiffusion2
+
+        key_name = "model.diffusion_model.input_blocks.4.1.transformer_blocks.0.attn2.to_k.weight"
+        if key_name in state_dict and state_dict[key_name].shape[-1] == 2048:
+            return BaseModelType.StableDiffusionXL
+        elif key_name in state_dict and state_dict[key_name].shape[-1] == 1280:
+            return BaseModelType.StableDiffusionXLRefiner
+
+        raise NotAMatchError("unable to determine base type from state dict")
+
+    @classmethod
+    def _get_scheduler_prediction_type_or_raise(cls, mod: ModelOnDisk) -> SchedulerPredictionType:
+        base = cls.model_fields["base"].default
+
+        if base is BaseModelType.StableDiffusion2:
+            state_dict = mod.load_state_dict()
+            key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
+            if key_name in state_dict and state_dict[key_name].shape[-1] == 1024:
+                if "global_step" in state_dict:
+                    if state_dict["global_step"] == 220000:
+                        return SchedulerPredictionType.Epsilon
+                    elif state_dict["global_step"] == 110000:
+                        return SchedulerPredictionType.VPrediction
+            return SchedulerPredictionType.VPrediction
+        else:
+            return SchedulerPredictionType.Epsilon
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> ModelVariantType:
+        base = cls.model_fields["base"].default
+
+        state_dict = mod.load_state_dict()
+        key_name = "model.diffusion_model.input_blocks.0.0.weight"
+
+        if key_name not in state_dict:
+            raise NotAMatchError("unable to determine model variant from state dict")
+
+        in_channels = state_dict["model.diffusion_model.input_blocks.0.0.weight"].shape[1]
+
+        match in_channels:
+            case 4:
+                return ModelVariantType.Normal
+            case 5:
+                # Only SD2 has a depth variant
+                assert base is BaseModelType.StableDiffusion2, f"unexpected unet in_channels 5 for base '{base}'"
+                return ModelVariantType.Depth
+            case 9:
+                return ModelVariantType.Inpaint
+            case _:
+                raise NotAMatchError(f"unrecognized unet in_channels {in_channels} for base '{base}'")
+
+    @classmethod
+    def _validate_looks_like_main_model(cls, mod: ModelOnDisk) -> None:
+        has_main_model_keys = _has_main_keys(mod.load_state_dict())
+        if not has_main_model_keys:
+            raise NotAMatchError("state dict does not look like a main model")
+
+
+class Main_Checkpoint_SD1_Config(Main_SD_Checkpoint_Config_Base, Config_Base):
+    base: Literal[BaseModelType.StableDiffusion1] = Field(default=BaseModelType.StableDiffusion1)
+
+
+class Main_Checkpoint_SD2_Config(Main_SD_Checkpoint_Config_Base, Config_Base):
+    base: Literal[BaseModelType.StableDiffusion2] = Field(default=BaseModelType.StableDiffusion2)
+
+
+class Main_Checkpoint_SDXL_Config(Main_SD_Checkpoint_Config_Base, Config_Base):
+    base: Literal[BaseModelType.StableDiffusionXL] = Field(default=BaseModelType.StableDiffusionXL)
+
+
+class Main_Checkpoint_SDXLRefiner_Config(Main_SD_Checkpoint_Config_Base, Config_Base):
+    base: Literal[BaseModelType.StableDiffusionXLRefiner] = Field(default=BaseModelType.StableDiffusionXLRefiner)
+
+
+def _is_flux2_model(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict is a FLUX.2 model by examining context_embedder dimensions.
+
+    FLUX.2 Klein uses Qwen3 encoder with larger context dimension:
+    - FLUX.1: context_in_dim = 4096 (T5)
+    - FLUX.2 Klein 4B: context_in_dim = 7680 (3×Qwen3-4B hidden size)
+    - FLUX.2 Klein 8B: context_in_dim = 12288 (3×Qwen3-8B hidden size)
+
+    Also checks for FLUX.2-specific 32-channel latent space (in_channels=128 after packing).
+    """
+    # Check context_embedder input dimension (most reliable)
+    # Weight shape: [hidden_size, context_in_dim]
+    for key in {"context_embedder.weight", "model.diffusion_model.context_embedder.weight"}:
+        if key in state_dict:
+            weight = state_dict[key]
+            if hasattr(weight, "shape") and len(weight.shape) >= 2:
+                context_in_dim = weight.shape[1]
+                # FLUX.2 has context_in_dim > 4096 (Qwen3 vs T5)
+                if context_in_dim > 4096:
+                    return True
+
+    # Also check in_channels - FLUX.2 uses 128 (32 latent channels × 4 packing)
+    for key in {"img_in.weight", "model.diffusion_model.img_in.weight"}:
+        if key in state_dict:
+            in_channels = state_dict[key].shape[1]
+            # FLUX.2 uses 128 in_channels (32 latent channels × 4)
+            # FLUX.1 uses 64 in_channels (16 latent channels × 4)
+            if in_channels == 128:
+                return True
+
+    return False
+
+
+def _filename_suggests_base(name: str) -> bool:
+    """Check if a model name/filename suggests it is a Base (undistilled) variant.
+
+    Klein 9B Base and Klein 9B have identical architectures and cannot be distinguished
+    from the state dict. We use the filename as a heuristic: filenames containing "base"
+    (e.g. "flux-2-klein-base-9b", "FLUX.2-klein-base-9B") indicate the undistilled model.
+    """
+    return "base" in name.lower()
+
+
+def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | None:
+    """Determine FLUX.2 variant from state dict.
+
+    Distinguishes between Klein 4B and Klein 9B based on context embedding dimension:
+    - Klein 4B: context_in_dim = 7680 (3 × Qwen3-4B hidden_size 2560)
+    - Klein 9B: context_in_dim = 12288 (3 × Qwen3-8B hidden_size 4096)
+
+    Note: Klein 9B (distilled) and Klein 9B Base (undistilled) have identical architectures
+    and cannot be distinguished from the state dict alone. This function defaults to Klein9B
+    for all 9B models. Callers should use filename heuristics to detect Klein9BBase.
+
+    Supports both BFL format (checkpoint) and diffusers format keys:
+    - BFL format: txt_in.weight (context embedder)
+    - Diffusers format: context_embedder.weight
+    """
+    # Context dimensions for each variant
+    KLEIN_4B_CONTEXT_DIM = 7680  # 3 × 2560
+    KLEIN_9B_CONTEXT_DIM = 12288  # 3 × 4096
+
+    # Check context_embedder to determine variant
+    # Support both BFL format (txt_in.weight) and diffusers format (context_embedder.weight)
+    context_keys = {
+        # Diffusers format
+        "context_embedder.weight",
+        "model.diffusion_model.context_embedder.weight",
+        # BFL format (used by checkpoint/GGUF models)
+        "txt_in.weight",
+        "model.diffusion_model.txt_in.weight",
+    }
+    for key in context_keys:
+        if key in state_dict:
+            weight = state_dict[key]
+            # Handle GGUF quantized tensors which use tensor_shape instead of shape
+            if hasattr(weight, "tensor_shape"):
+                shape = weight.tensor_shape
+            elif hasattr(weight, "shape"):
+                shape = weight.shape
+            else:
+                continue
+            if len(shape) >= 2:
+                context_in_dim = shape[1]
+                # Determine variant based on context dimension
+                if context_in_dim == KLEIN_9B_CONTEXT_DIM:
+                    # Default to Klein9B - callers use filename heuristics to detect Klein9BBase
+                    return Flux2VariantType.Klein9B
+                elif context_in_dim == KLEIN_4B_CONTEXT_DIM:
+                    # Default to Klein4B - callers use filename heuristics to detect Klein4BBase
+                    return Flux2VariantType.Klein4B
+                elif context_in_dim > 4096:
+                    # Unknown FLUX.2 variant, default to 4B
+                    return Flux2VariantType.Klein4B
+
+    # Check in_channels as backup - can only confirm it's FLUX.2, not which variant
+    for key in {"img_in.weight", "model.diffusion_model.img_in.weight"}:
+        if key in state_dict:
+            weight = state_dict[key]
+            # Handle GGUF quantized tensors
+            if hasattr(weight, "tensor_shape"):
+                in_channels = weight.tensor_shape[1]
+            elif hasattr(weight, "shape"):
+                in_channels = weight.shape[1]
+            else:
+                continue
+            if in_channels == 128:
+                # It's FLUX.2 but we can't determine which Klein variant, default to 4B
+                return Flux2VariantType.Klein4B
+
+    return None
+
+
+def _get_flux_variant(state_dict: dict[str | int, Any]) -> FluxVariantType | None:
+    # FLUX Model variant types are distinguished by input channels and the presence of certain keys.
+
+    # Input channels are derived from the shape of either "img_in.weight" or "model.diffusion_model.img_in.weight".
+    #
+    # Known models that use the latter key:
+    # - https://civitai.com/models/885098?modelVersionId=990775
+    # - https://civitai.com/models/1018060?modelVersionId=1596255
+    # - https://civitai.com/models/978314/ultrareal-fine-tune?modelVersionId=1413133
+    #
+    # Input channels for known FLUX models:
+    # - Unquantized Dev and Schnell have in_channels=64
+    # - BNB-NF4 Dev and Schnell have in_channels=1
+    # - FLUX Fill has in_channels=384
+    # - Unsure of quantized FLUX Fill models
+    # - Unsure of GGUF-quantized models
+
+    in_channels = None
+    for key in {"img_in.weight", "model.diffusion_model.img_in.weight"}:
+        if key in state_dict:
+            in_channels = state_dict[key].shape[1]
+            break
+
+    if in_channels is None:
+        # TODO(psyche): Should we have a graceful fallback here? Previously we fell back to the "normal" variant,
+        # but this variant is no longer used for FLUX models. If we get here, but the model is definitely a FLUX
+        # model, we should figure out a good fallback value.
+        return None
+
+    # Because FLUX Dev and Schnell models have the same in_channels, we need to check for the presence of
+    # certain keys to distinguish between them.
+    is_flux_dev = (
+        "guidance_in.out_layer.weight" in state_dict
+        or "model.diffusion_model.guidance_in.out_layer.weight" in state_dict
+    )
+
+    if is_flux_dev and in_channels == 384:
+        return FluxVariantType.DevFill
+    elif is_flux_dev:
+        return FluxVariantType.Dev
+    else:
+        # Must be a Schnell model...?
+        return FluxVariantType.Schnell
+
+
+class Main_Checkpoint_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for main checkpoint models."""
+
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    base: Literal[BaseModelType.Flux] = Field(default=BaseModelType.Flux)
+
+    variant: FluxVariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_main_model(mod)
+
+        cls._validate_is_flux(mod)
+
+        cls._validate_does_not_look_like_bnb_quantized(mod)
+
+        cls._validate_does_not_look_like_gguf_quantized(mod)
+
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _validate_is_flux(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
+        if not state_dict_has_any_keys_exact(
+            state_dict,
+            {
+                "double_blocks.0.img_attn.norm.key_norm.scale",
+                "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale",
+            },
+        ):
+            raise NotAMatchError("state dict does not look like a FLUX checkpoint")
+
+        # Exclude FLUX.2 models - they have their own config class
+        if _is_flux2_model(state_dict):
+            raise NotAMatchError("model is a FLUX.2 model, not FLUX.1")
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> FluxVariantType:
+        # FLUX Model variant types are distinguished by input channels and the presence of certain keys.
+        state_dict = mod.load_state_dict()
+        variant = _get_flux_variant(state_dict)
+
+        if variant is None:
+            # TODO(psyche): Should we have a graceful fallback here? Previously we fell back to the "normal" variant,
+            # but this variant is no longer used for FLUX models. If we get here, but the model is definitely a FLUX
+            # model, we should figure out a good fallback value.
+            raise NotAMatchError("unable to determine model variant from state dict")
+
+        return variant
+
+    @classmethod
+    def _validate_looks_like_main_model(cls, mod: ModelOnDisk) -> None:
+        has_main_model_keys = _has_main_keys(mod.load_state_dict())
+        if not has_main_model_keys:
+            raise NotAMatchError("state dict does not look like a main model")
+
+    @classmethod
+    def _validate_does_not_look_like_bnb_quantized(cls, mod: ModelOnDisk) -> None:
+        has_bnb_nf4_keys = _has_bnb_nf4_keys(mod.load_state_dict())
+        if has_bnb_nf4_keys:
+            raise NotAMatchError("state dict looks like bnb quantized nf4")
+
+    @classmethod
+    def _validate_does_not_look_like_gguf_quantized(cls, mod: ModelOnDisk):
+        has_ggml_tensors = _has_ggml_tensors(mod.load_state_dict())
+        if has_ggml_tensors:
+            raise NotAMatchError("state dict looks like GGUF quantized")
+
+
+class Main_Checkpoint_Flux2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for FLUX.2 checkpoint models (e.g. Klein)."""
+
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    base: Literal[BaseModelType.Flux2] = Field(default=BaseModelType.Flux2)
+
+    variant: Flux2VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_main_model(mod)
+
+        cls._validate_is_flux2(mod)
+
+        cls._validate_does_not_look_like_bnb_quantized(mod)
+
+        cls._validate_does_not_look_like_gguf_quantized(mod)
+
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _validate_is_flux2(cls, mod: ModelOnDisk) -> None:
+        """Validate that this is a FLUX.2 model, not FLUX.1."""
+        state_dict = mod.load_state_dict()
+        if not _is_flux2_model(state_dict):
+            raise NotAMatchError("state dict does not look like a FLUX.2 model")
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> Flux2VariantType:
+        state_dict = mod.load_state_dict()
+        variant = _get_flux2_variant(state_dict)
+
+        if variant is None:
+            raise NotAMatchError("unable to determine FLUX.2 model variant from state dict")
+
+        # Base (undistilled) and distilled variants share identical architectures.
+        # Use filename heuristic to detect the Base variant.
+        if variant == Flux2VariantType.Klein9B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein9BBase
+        if variant == Flux2VariantType.Klein4B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein4BBase
+
+        return variant
+
+    @classmethod
+    def _validate_looks_like_main_model(cls, mod: ModelOnDisk) -> None:
+        has_main_model_keys = _has_main_keys(mod.load_state_dict())
+        if not has_main_model_keys:
+            raise NotAMatchError("state dict does not look like a main model")
+
+    @classmethod
+    def _validate_does_not_look_like_bnb_quantized(cls, mod: ModelOnDisk) -> None:
+        has_bnb_nf4_keys = _has_bnb_nf4_keys(mod.load_state_dict())
+        if has_bnb_nf4_keys:
+            raise NotAMatchError("state dict looks like bnb quantized nf4")
+
+    @classmethod
+    def _validate_does_not_look_like_gguf_quantized(cls, mod: ModelOnDisk):
+        has_ggml_tensors = _has_ggml_tensors(mod.load_state_dict())
+        if has_ggml_tensors:
+            raise NotAMatchError("state dict looks like GGUF quantized")
+
+
+class Main_BnBNF4_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for main checkpoint models."""
+
+    base: Literal[BaseModelType.Flux] = Field(default=BaseModelType.Flux)
+    format: Literal[ModelFormat.BnbQuantizednf4b] = Field(default=ModelFormat.BnbQuantizednf4b)
+
+    variant: FluxVariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_main_model(mod)
+
+        cls._validate_model_looks_like_bnb_quantized(mod)
+
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> FluxVariantType:
+        # FLUX Model variant types are distinguished by input channels and the presence of certain keys.
+        state_dict = mod.load_state_dict()
+        variant = _get_flux_variant(state_dict)
+
+        if variant is None:
+            # TODO(psyche): Should we have a graceful fallback here? Previously we fell back to the "normal" variant,
+            # but this variant is no longer used for FLUX models. If we get here, but the model is definitely a FLUX
+            # model, we should figure out a good fallback value.
+            raise NotAMatchError("unable to determine model variant from state dict")
+
+        return variant
+
+    @classmethod
+    def _validate_looks_like_main_model(cls, mod: ModelOnDisk) -> None:
+        has_main_model_keys = _has_main_keys(mod.load_state_dict())
+        if not has_main_model_keys:
+            raise NotAMatchError("state dict does not look like a main model")
+
+    @classmethod
+    def _validate_model_looks_like_bnb_quantized(cls, mod: ModelOnDisk) -> None:
+        has_bnb_nf4_keys = _has_bnb_nf4_keys(mod.load_state_dict())
+        if not has_bnb_nf4_keys:
+            raise NotAMatchError("state dict does not look like bnb quantized nf4")
+
+
+class Main_GGUF_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for main checkpoint models."""
+
+    base: Literal[BaseModelType.Flux] = Field(default=BaseModelType.Flux)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+
+    variant: FluxVariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_main_model(mod)
+
+        cls._validate_looks_like_gguf_quantized(mod)
+
+        cls._validate_is_not_flux2(mod)
+
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> FluxVariantType:
+        # FLUX Model variant types are distinguished by input channels and the presence of certain keys.
+        state_dict = mod.load_state_dict()
+        variant = _get_flux_variant(state_dict)
+
+        if variant is None:
+            # TODO(psyche): Should we have a graceful fallback here? Previously we fell back to the "normal" variant,
+            # but this variant is no longer used for FLUX models. If we get here, but the model is definitely a FLUX
+            # model, we should figure out a good fallback value.
+            raise NotAMatchError("unable to determine model variant from state dict")
+
+        return variant
+
+    @classmethod
+    def _validate_looks_like_main_model(cls, mod: ModelOnDisk) -> None:
+        has_main_model_keys = _has_main_keys(mod.load_state_dict())
+        if not has_main_model_keys:
+            raise NotAMatchError("state dict does not look like a main model")
+
+    @classmethod
+    def _validate_looks_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
+        has_ggml_tensors = _has_ggml_tensors(mod.load_state_dict())
+        if not has_ggml_tensors:
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+
+    @classmethod
+    def _validate_is_not_flux2(cls, mod: ModelOnDisk) -> None:
+        """Validate that this is NOT a FLUX.2 model."""
+        state_dict = mod.load_state_dict()
+        if _is_flux2_model(state_dict):
+            raise NotAMatchError("model is a FLUX.2 model, not FLUX.1")
+
+
+class Main_GGUF_Flux2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized FLUX.2 checkpoint models (e.g. Klein)."""
+
+    base: Literal[BaseModelType.Flux2] = Field(default=BaseModelType.Flux2)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+
+    variant: Flux2VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_main_model(mod)
+
+        cls._validate_looks_like_gguf_quantized(mod)
+
+        cls._validate_is_flux2(mod)
+
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _validate_is_flux2(cls, mod: ModelOnDisk) -> None:
+        """Validate that this is a FLUX.2 model, not FLUX.1."""
+        state_dict = mod.load_state_dict()
+        if not _is_flux2_model(state_dict):
+            raise NotAMatchError("state dict does not look like a FLUX.2 model")
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> Flux2VariantType:
+        state_dict = mod.load_state_dict()
+        variant = _get_flux2_variant(state_dict)
+
+        if variant is None:
+            raise NotAMatchError("unable to determine FLUX.2 model variant from state dict")
+
+        # Base (undistilled) and distilled variants share identical architectures.
+        # Use filename heuristic to detect the Base variant.
+        if variant == Flux2VariantType.Klein9B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein9BBase
+        if variant == Flux2VariantType.Klein4B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein4BBase
+
+        return variant
+
+    @classmethod
+    def _validate_looks_like_main_model(cls, mod: ModelOnDisk) -> None:
+        has_main_model_keys = _has_main_keys(mod.load_state_dict())
+        if not has_main_model_keys:
+            raise NotAMatchError("state dict does not look like a main model")
+
+    @classmethod
+    def _validate_looks_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
+        has_ggml_tensors = _has_ggml_tensors(mod.load_state_dict())
+        if not has_ggml_tensors:
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+
+
+class Main_Diffusers_FLUX_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for FLUX.1 models in diffusers format."""
+
+    base: Literal[BaseModelType.Flux] = Field(BaseModelType.Flux)
+    variant: FluxVariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # Check for FLUX-specific pipeline or transformer class names
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "FluxPipeline",
+                "FluxFillPipeline",
+                "FluxTransformer2DModel",
+            },
+        )
+
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        return cls(
+            **override_fields,
+            variant=variant,
+            repo_variant=repo_variant,
+        )
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> FluxVariantType:
+        """Determine the FLUX variant from the transformer config.
+
+        FLUX variants are distinguished by:
+        - in_channels: 64 for Dev/Schnell, 384 for DevFill
+        - guidance_embeds: True for Dev, False for Schnell
+        """
+        transformer_config = get_config_dict_or_raise(mod.path / "transformer" / "config.json")
+
+        in_channels = transformer_config.get("in_channels", 64)
+        guidance_embeds = transformer_config.get("guidance_embeds", False)
+
+        # DevFill has 384 input channels
+        if in_channels == 384:
+            return FluxVariantType.DevFill
+
+        # Dev has guidance_embeds=True, Schnell has guidance_embeds=False
+        if guidance_embeds:
+            return FluxVariantType.Dev
+        else:
+            return FluxVariantType.Schnell
+
+
+class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for FLUX.2 models in diffusers format (e.g. FLUX.2 Klein)."""
+
+    base: Literal[BaseModelType.Flux2] = Field(BaseModelType.Flux2)
+    variant: Flux2VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # Check for FLUX.2-specific pipeline class names
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "Flux2KleinPipeline",
+            },
+        )
+
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        return cls(
+            **override_fields,
+            variant=variant,
+            repo_variant=repo_variant,
+        )
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> Flux2VariantType:
+        """Determine the FLUX.2 variant from the transformer config.
+
+        FLUX.2 Klein uses Qwen3 text encoder with larger joint_attention_dim:
+        - Klein 4B/4B Base: joint_attention_dim = 7680 (3×Qwen3-4B hidden size)
+        - Klein 9B/9B Base: joint_attention_dim = 12288 (3×Qwen3-8B hidden size)
+
+        Distilled and Base variants share identical architectures. We use a filename heuristic to detect Base models.
+        """
+        KLEIN_4B_CONTEXT_DIM = 7680  # 3 × 2560
+        KLEIN_9B_CONTEXT_DIM = 12288  # 3 × 4096
+
+        transformer_config = get_config_dict_or_raise(mod.path / "transformer" / "config.json")
+
+        joint_attention_dim = transformer_config.get("joint_attention_dim", 4096)
+
+        # Determine variant based on joint_attention_dim
+        if joint_attention_dim == KLEIN_9B_CONTEXT_DIM:
+            if _filename_suggests_base(mod.name):
+                return Flux2VariantType.Klein9BBase
+            return Flux2VariantType.Klein9B
+        elif joint_attention_dim == KLEIN_4B_CONTEXT_DIM:
+            if _filename_suggests_base(mod.name):
+                return Flux2VariantType.Klein4BBase
+            return Flux2VariantType.Klein4B
+        elif joint_attention_dim > 4096:
+            # Unknown FLUX.2 variant, default to 4B
+            return Flux2VariantType.Klein4B
+
+        # Default to 4B
+        return Flux2VariantType.Klein4B
+
+
+class Main_SD_Diffusers_Config_Base(Diffusers_Config_Base, Main_Config_Base):
+    prediction_type: SchedulerPredictionType = Field()
+    variant: ModelVariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                # SD 1.x and 2.x
+                "StableDiffusionPipeline",
+                "StableDiffusionInpaintPipeline",
+                # SDXL
+                "StableDiffusionXLPipeline",
+                "StableDiffusionXLInpaintPipeline",
+                # SDXL Refiner
+                "StableDiffusionXLImg2ImgPipeline",
+                # TODO(psyche): Do we actually support LCM models? I don't see using this class anywhere in the codebase.
+                "LatentConsistencyModelPipeline",
+            },
+        )
+
+        cls._validate_base(mod)
+
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
+
+        prediction_type = override_fields.pop("prediction_type", None) or cls._get_scheduler_prediction_type_or_raise(
+            mod
+        )
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        return cls(
+            **override_fields,
+            variant=variant,
+            prediction_type=prediction_type,
+            repo_variant=repo_variant,
+        )
+
+    @classmethod
+    def _validate_base(cls, mod: ModelOnDisk) -> None:
+        """Raise `NotAMatch` if the model base does not match this config class."""
+        expected_base = cls.model_fields["base"].default
+        recognized_base = cls._get_base_or_raise(mod)
+        if expected_base is not recognized_base:
+            raise NotAMatchError(f"base is {recognized_base}, not {expected_base}")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        # Handle pipelines with a UNet (i.e SD 1.x, SD2.x, SDXL).
+        unet_conf = get_config_dict_or_raise(mod.path / "unet" / "config.json")
+        cross_attention_dim = unet_conf.get("cross_attention_dim")
+        match cross_attention_dim:
+            case 768:
+                return BaseModelType.StableDiffusion1
+            case 1024:
+                return BaseModelType.StableDiffusion2
+            case 1280:
+                return BaseModelType.StableDiffusionXLRefiner
+            case 2048:
+                return BaseModelType.StableDiffusionXL
+            case _:
+                raise NotAMatchError(f"unrecognized cross_attention_dim {cross_attention_dim}")
+
+    @classmethod
+    def _get_scheduler_prediction_type_or_raise(cls, mod: ModelOnDisk) -> SchedulerPredictionType:
+        scheduler_conf = get_config_dict_or_raise(mod.path / "scheduler" / "scheduler_config.json")
+
+        # TODO(psyche): Is epsilon the right default or should we raise if it's not present?
+        prediction_type = scheduler_conf.get("prediction_type", "epsilon")
+
+        match prediction_type:
+            case "v_prediction":
+                return SchedulerPredictionType.VPrediction
+            case "epsilon":
+                return SchedulerPredictionType.Epsilon
+            case _:
+                raise NotAMatchError(f"unrecognized scheduler prediction_type {prediction_type}")
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> ModelVariantType:
+        base = cls.model_fields["base"].default
+        unet_config = get_config_dict_or_raise(mod.path / "unet" / "config.json")
+        in_channels = unet_config.get("in_channels")
+
+        match in_channels:
+            case 4:
+                return ModelVariantType.Normal
+            case 5:
+                # Only SD2 has a depth variant
+                assert base is BaseModelType.StableDiffusion2, f"unexpected unet in_channels 5 for base '{base}'"
+                return ModelVariantType.Depth
+            case 9:
+                return ModelVariantType.Inpaint
+            case _:
+                raise NotAMatchError(f"unrecognized unet in_channels {in_channels} for base '{base}'")
+
+
+class Main_Diffusers_SD1_Config(Main_SD_Diffusers_Config_Base, Config_Base):
+    base: Literal[BaseModelType.StableDiffusion1] = Field(BaseModelType.StableDiffusion1)
+
+
+class Main_Diffusers_SD2_Config(Main_SD_Diffusers_Config_Base, Config_Base):
+    base: Literal[BaseModelType.StableDiffusion2] = Field(BaseModelType.StableDiffusion2)
+
+
+class Main_Diffusers_SDXL_Config(Main_SD_Diffusers_Config_Base, Config_Base):
+    base: Literal[BaseModelType.StableDiffusionXL] = Field(BaseModelType.StableDiffusionXL)
+
+
+class Main_Diffusers_SDXLRefiner_Config(Main_SD_Diffusers_Config_Base, Config_Base):
+    base: Literal[BaseModelType.StableDiffusionXLRefiner] = Field(BaseModelType.StableDiffusionXLRefiner)
+
+
+class Main_Diffusers_SD3_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    base: Literal[BaseModelType.StableDiffusion3] = Field(BaseModelType.StableDiffusion3)
+    submodels: dict[SubModelType, SubmodelDefinition] | None = Field(
+        description="Loadable submodels in this model",
+        default=None,
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # This check implies the base type - no further validation needed.
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "StableDiffusion3Pipeline",
+                "SD3Transformer2DModel",
+            },
+        )
+
+        submodels = override_fields.pop("submodels", None) or cls._get_submodels_or_raise(mod)
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        return cls(
+            **override_fields,
+            submodels=submodels,
+            repo_variant=repo_variant,
+        )
+
+    @classmethod
+    def _get_submodels_or_raise(cls, mod: ModelOnDisk) -> dict[SubModelType, SubmodelDefinition]:
+        # Example: https://huggingface.co/stabilityai/stable-diffusion-3.5-medium/blob/main/model_index.json
+        config = get_config_dict_or_raise(common_config_paths(mod.path))
+
+        submodels: dict[SubModelType, SubmodelDefinition] = {}
+
+        for key, value in config.items():
+            # Anything that starts with an underscore is top-level metadata, not a submodel
+            if key.startswith("_") or not (isinstance(value, list) and len(value) == 2):
+                continue
+            # The key is something like "transformer" and is a submodel - it will be in a dir of the same name.
+            # The value value is something like ["diffusers", "SD3Transformer2DModel"]
+            _library_name, class_name = value
+
+            match class_name:
+                case "CLIPTextModelWithProjection":
+                    model_type = ModelType.CLIPEmbed
+                    path_or_prefix = (mod.path / key).resolve().as_posix()
+
+                    # We need to read the config to determine the variant of the CLIP model.
+                    clip_embed_config = get_config_dict_or_raise(
+                        {
+                            mod.path / key / "config.json",
+                            mod.path / key / "model_index.json",
+                        }
+                    )
+                    variant = get_clip_variant_type_from_config(clip_embed_config)
+                    submodels[SubModelType(key)] = SubmodelDefinition(
+                        path_or_prefix=path_or_prefix,
+                        model_type=model_type,
+                        variant=variant,
+                    )
+                case "SD3Transformer2DModel":
+                    model_type = ModelType.Main
+                    path_or_prefix = (mod.path / key).resolve().as_posix()
+                    variant = None
+                    submodels[SubModelType(key)] = SubmodelDefinition(
+                        path_or_prefix=path_or_prefix,
+                        model_type=model_type,
+                        variant=variant,
+                    )
+                case _:
+                    pass
+
+        return submodels
+
+
+class Main_Diffusers_CogView4_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    base: Literal[BaseModelType.CogView4] = Field(BaseModelType.CogView4)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # This check implies the base type - no further validation needed.
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "CogView4Pipeline",
+            },
+        )
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        return cls(
+            **override_fields,
+            repo_variant=repo_variant,
+        )
+
+
+def _has_anima_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains Anima model keys.
+
+    Anima models are identified by the presence of `llm_adapter` keys
+    (unique to Anima - the LLM Adapter that bridges Qwen3 text encoder to the Cosmos DiT)
+    alongside Cosmos Predict2 DiT keys (blocks, t_embedder, x_embedder, final_layer).
+
+    The checkpoint keys may have a `net.` prefix (e.g. `net.llm_adapter.`, `net.blocks.`)
+    or a `model.diffusion_model.` prefix (ComfyUI bundled checkpoint format).
+    """
+    has_llm_adapter = False
+    has_cosmos_dit = False
+
+    # LLM adapter key prefixes — support bare, `net.`, and `model.diffusion_model.` prefixes
+    llm_adapter_prefixes = (
+        "llm_adapter.",
+        "net.llm_adapter.",
+        "model.diffusion_model.llm_adapter.",
+    )
+
+    # Cosmos DiT key prefixes — support bare, `net.`, and `model.diffusion_model.` prefixes
+    cosmos_prefixes = (
+        "blocks.",
+        "t_embedder.",
+        "x_embedder.",
+        "final_layer.",
+        "net.blocks.",
+        "net.t_embedder.",
+        "net.x_embedder.",
+        "net.final_layer.",
+        "model.diffusion_model.blocks.",
+        "model.diffusion_model.t_embedder.",
+        "model.diffusion_model.x_embedder.",
+        "model.diffusion_model.final_layer.",
+    )
+
+    for key in state_dict.keys():
+        if isinstance(key, int):
+            continue
+        if any(key.startswith(p) for p in llm_adapter_prefixes):
+            has_llm_adapter = True
+        if any(key.startswith(p) for p in cosmos_prefixes):
+            has_cosmos_dit = True
+        if has_llm_adapter and has_cosmos_dit:
+            return True
+
+    return False
+
+
+class Main_Diffusers_ZImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Z-Image diffusers models (Z-Image-Turbo, Z-Image-Base)."""
+
+    base: Literal[BaseModelType.ZImage] = Field(BaseModelType.ZImage)
+    variant: ZImageVariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # This check implies the base type - no further validation needed.
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "ZImagePipeline",
+            },
+        )
+
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        return cls(
+            **override_fields,
+            variant=variant,
+            repo_variant=repo_variant,
+        )
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> ZImageVariantType:
+        """Determine Z-Image variant from the scheduler config.
+
+        Z-Image variants are distinguished by the scheduler shift value:
+        - Turbo (distilled): shift = 3.0
+        - Base (undistilled): shift = 6.0
+        """
+        scheduler_config = get_config_dict_or_raise(mod.path / "scheduler" / "scheduler_config.json")
+
+        shift = scheduler_config.get("shift", 3.0)
+
+        # ZBase (undistilled) uses shift = 6.0, Turbo uses shift = 3.0
+        if shift >= 5.0:
+            return ZImageVariantType.ZBase
+        else:
+            return ZImageVariantType.Turbo
+
+
+class Main_Checkpoint_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Z-Image single-file checkpoint models (safetensors, etc)."""
+
+    base: Literal[BaseModelType.ZImage] = Field(default=BaseModelType.ZImage)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    variant: ZImageVariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_z_image_model(mod)
+
+        cls._validate_does_not_look_like_gguf_quantized(mod)
+
+        variant = override_fields.pop("variant", None) or ZImageVariantType.Turbo
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _validate_looks_like_z_image_model(cls, mod: ModelOnDisk) -> None:
+        has_z_image_keys = _has_z_image_keys(mod.load_state_dict())
+        if not has_z_image_keys:
+            raise NotAMatchError("state dict does not look like a Z-Image model")
+
+    @classmethod
+    def _validate_does_not_look_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
+        has_ggml_tensors = _has_ggml_tensors(mod.load_state_dict())
+        if has_ggml_tensors:
+            raise NotAMatchError("state dict looks like GGUF quantized")
+
+
+class Main_GGUF_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized Z-Image transformer models."""
+
+    base: Literal[BaseModelType.ZImage] = Field(default=BaseModelType.ZImage)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    variant: ZImageVariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_z_image_model(mod)
+
+        cls._validate_looks_like_gguf_quantized(mod)
+
+        variant = override_fields.pop("variant", None) or ZImageVariantType.Turbo
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _validate_looks_like_z_image_model(cls, mod: ModelOnDisk) -> None:
+        has_z_image_keys = _has_z_image_keys(mod.load_state_dict())
+        if not has_z_image_keys:
+            raise NotAMatchError("state dict does not look like a Z-Image model")
+
+    @classmethod
+    def _validate_looks_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
+        has_ggml_tensors = _has_ggml_tensors(mod.load_state_dict())
+        if not has_ggml_tensors:
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+
+
+class Main_Diffusers_QwenImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Qwen Image diffusers models (both txt2img and edit)."""
+
+    base: Literal[BaseModelType.QwenImage] = Field(BaseModelType.QwenImage)
+    variant: QwenImageVariantType | None = Field(default=None)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # This check implies the base type - no further validation needed.
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "QwenImagePlusPipeline",
+                "QwenImageEditPlusPipeline",
+                "QwenImagePipeline",
+            },
+        )
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+        variant = override_fields.pop("variant", None) or cls._get_qwen_image_variant(mod)
+
+        return cls(
+            **override_fields,
+            repo_variant=repo_variant,
+            variant=variant,
+        )
+
+    @classmethod
+    def _get_qwen_image_variant(cls, mod: ModelOnDisk) -> QwenImageVariantType:
+        """Detect whether this is an edit or txt2img model from the pipeline class name."""
+        import json
+
+        model_index = mod.path / "model_index.json"
+        if model_index.exists():
+            with open(model_index) as f:
+                config = json.load(f)
+            class_name = config.get("_class_name", "")
+            if "Edit" in class_name:
+                return QwenImageVariantType.Edit
+        return QwenImageVariantType.Generate
+
+
+# ComfyUI single-file checkpoints prefix every transformer key with one of these.
+# The loaders strip them before instantiating the model (see `_strip_comfyui_prefix`
+# in the qwen_image loader); detection must strip them too so the two paths agree.
+_COMFYUI_KEY_PREFIXES = ("model.diffusion_model.", "diffusion_model.")
+
+
+def _strip_comfyui_key_prefix(key: str) -> str:
+    """Strip a leading ComfyUI `model.diffusion_model.` / `diffusion_model.` prefix from a key."""
+    for prefix in _COMFYUI_KEY_PREFIXES:
+        if key.startswith(prefix):
+            return key[len(prefix) :]
+    return key
+
+
+def _has_qwen_image_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains Qwen Image Edit transformer keys.
+
+    Qwen Image Edit uses 'txt_in' and 'txt_norm' instead of 'context_embedder' (FLUX).
+    This distinguishes it from FLUX and other architectures. ComfyUI-style prefixes are
+    stripped first so prefixed checkpoints are detected and reach the loader.
+    """
+    keys = [_strip_comfyui_key_prefix(k) for k in state_dict.keys() if isinstance(k, str)]
+    has_txt_in = any(k.startswith("txt_in.") for k in keys)
+    has_txt_norm = any(k.startswith("txt_norm.") for k in keys)
+    has_img_in = any(k.startswith("img_in.") for k in keys)
+    # Must NOT have context_embedder (which would indicate FLUX)
+    has_context_embedder = any("context_embedder" in k for k in keys)
+    return has_txt_in and has_txt_norm and has_img_in and not has_context_embedder
+
+
+# Matches "edit" as a standalone token (delimited by start/end or any non-alphanumeric
+# separator), so `qwen_image_edit_2509` matches but `credited` / `edited` / `unedited` do not.
+_EDIT_TOKEN_RE = re.compile(r"(?:^|[^a-z0-9])edit(?:[^a-z0-9]|$)")
+
+
+def _infer_qwen_image_variant(sd: dict[str | int, Any], path: Path) -> QwenImageVariantType:
+    """Infer Qwen Image variant from state dict marker or filename heuristic.
+
+    Edit-variant models include an `__index_timestep_zero__` tensor used by the
+    `zero_cond_t` dual-modulation path. Falls back to a filename "edit" token check
+    for converters that don't emit the marker.
+    """
+    marker = "__index_timestep_zero__"
+    if marker in sd or any(isinstance(k, str) and _strip_comfyui_key_prefix(k) == marker for k in sd):
+        return QwenImageVariantType.Edit
+    if _EDIT_TOKEN_RE.search(path.stem.lower()):
+        return QwenImageVariantType.Edit
+    return QwenImageVariantType.Generate
+
+
+class Main_Checkpoint_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Qwen Image single-file checkpoint models (safetensors, etc).
+
+    Covers both raw bf16/fp16 checkpoints and ComfyUI-style fp8_scaled checkpoints.
+    The loader dequantizes fp8 weights back to bf16 at load time; the
+    `default_settings.fp8_storage` toggle can then optionally re-cast to fp8 for
+    VRAM savings.
+    """
+
+    base: Literal[BaseModelType.QwenImage] = Field(default=BaseModelType.QwenImage)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    variant: QwenImageVariantType | None = Field(default=None)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        sd = mod.load_state_dict()
+
+        if not _has_qwen_image_keys(sd):
+            raise NotAMatchError("state dict does not look like a Qwen Image model")
+
+        if _has_ggml_tensors(sd):
+            raise NotAMatchError("state dict looks like GGUF quantized")
+
+        explicit_variant = override_fields.pop("variant", None) or _infer_qwen_image_variant(sd, mod.path)
+
+        return cls(**override_fields, variant=explicit_variant)
+
+
+class Main_GGUF_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized Qwen Image transformer models."""
+
+    base: Literal[BaseModelType.QwenImage] = Field(default=BaseModelType.QwenImage)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    variant: QwenImageVariantType | None = Field(default=None)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        sd = mod.load_state_dict()
+
+        if not _has_qwen_image_keys(sd):
+            raise NotAMatchError("state dict does not look like a Qwen Image Edit model")
+
+        if not _has_ggml_tensors(sd):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+
+        explicit_variant = override_fields.pop("variant", None) or _infer_qwen_image_variant(sd, mod.path)
+
+        return cls(**override_fields, variant=explicit_variant)
+
+
+class Main_Checkpoint_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Anima single-file checkpoint models (safetensors).
+
+    Anima is built on NVIDIA Cosmos Predict2 DiT with a custom LLM Adapter
+    that bridges Qwen3 0.6B text encoder outputs to the DiT.
+    """
+
+    base: Literal[BaseModelType.Anima] = Field(default=BaseModelType.Anima)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_anima_model(mod)
+
+        return cls(**override_fields)
+
+    @classmethod
+    def _validate_looks_like_anima_model(cls, mod: ModelOnDisk) -> None:
+        has_anima_keys = _has_anima_keys(mod.load_state_dict())
+        if not has_anima_keys:
+            raise NotAMatchError("state dict does not look like an Anima model")

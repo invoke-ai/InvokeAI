@@ -1,0 +1,25 @@
+import { isNil } from 'es-toolkit/compat';
+import { DEFAULT_LORA_WEIGHT_CONFIG } from 'features/controlLayers/store/lorasSlice';
+import { useMemo } from 'react';
+import type { LoRAModelConfig } from 'services/api/types';
+
+export const useLoRAModelDefaultSettings = (modelConfig: LoRAModelConfig) => {
+  const defaultSettingsDefaults = useMemo(() => {
+    return {
+      weight: {
+        isEnabled: !isNil(modelConfig?.default_settings?.weight),
+        value: modelConfig?.default_settings?.weight ?? DEFAULT_LORA_WEIGHT_CONFIG.initial,
+      },
+      weightMin: {
+        isEnabled: !isNil(modelConfig?.default_settings?.weight_min),
+        value: modelConfig?.default_settings?.weight_min ?? DEFAULT_LORA_WEIGHT_CONFIG.sliderMin,
+      },
+      weightMax: {
+        isEnabled: !isNil(modelConfig?.default_settings?.weight_max),
+        value: modelConfig?.default_settings?.weight_max ?? DEFAULT_LORA_WEIGHT_CONFIG.sliderMax,
+      },
+    };
+  }, [modelConfig?.default_settings]);
+
+  return defaultSettingsDefaults;
+};

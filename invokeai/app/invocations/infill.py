@@ -3,7 +3,9 @@ from typing import Literal, get_args
 
 from PIL import Image
 
-from invokeai.app.invocations.fields import ColorField, ImageField
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.fields import ColorField, ImageField, InputField, WithBoard, WithMetadata
+from invokeai.app.invocations.image import PIL_RESAMPLING_MAP, PIL_RESAMPLING_MODES
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import SEED_MAX
@@ -13,10 +15,6 @@ from invokeai.backend.image_util.infill_methods.mosaic import infill_mosaic
 from invokeai.backend.image_util.infill_methods.patchmatch import PatchMatch, infill_patchmatch
 from invokeai.backend.image_util.infill_methods.tile import infill_tile
 from invokeai.backend.util.logging import InvokeAILogger
-
-from .baseinvocation import BaseInvocation, invocation
-from .fields import InputField, WithBoard, WithMetadata
-from .image import PIL_RESAMPLING_MAP, PIL_RESAMPLING_MODES
 
 logger = InvokeAILogger.get_logger()
 
@@ -42,15 +40,16 @@ class InfillImageProcessorInvocation(BaseInvocation, WithMetadata, WithBoard):
         """Infill the image with the specified method"""
         pass
 
-    def load_image(self, context: InvocationContext) -> tuple[Image.Image, bool]:
+    def load_image(self) -> tuple[Image.Image, bool]:
         """Process the image to have an alpha channel before being infilled"""
-        image = context.images.get_pil(self.image.image_name)
+        image = self._context.images.get_pil(self.image.image_name)
         has_alpha = True if image.mode == "RGBA" else False
         return image, has_alpha
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
+        self._context = context
         # Retrieve and process image to be infilled
-        input_image, has_alpha = self.load_image(context)
+        input_image, has_alpha = self.load_image()
 
         # If the input image has no alpha channel, return it
         if has_alpha is False:
@@ -128,13 +127,20 @@ class InfillPatchMatchInvocation(InfillImageProcessorInvocation):
         return infilled
 
 
+LAMA_MODEL_URL = "https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt"
+
+
 @invocation("infill_lama", title="LaMa Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.2")
 class LaMaInfillInvocation(InfillImageProcessorInvocation):
     """Infills transparent areas of an image using the LaMa model"""
 
     def infill(self, image: Image.Image):
-        lama = LaMA()
-        return lama(image)
+        with self._context.models.load_remote_model(
+            source=LAMA_MODEL_URL,
+            loader=LaMA.load_jit_model,
+        ) as model:
+            lama = LaMA(model)
+            return lama(image)
 
 
 @invocation("infill_cv2", title="CV2 Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.2")

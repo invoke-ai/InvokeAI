@@ -1,21 +1,33 @@
 import { Button, Text, useToast } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { setActiveTab } from 'features/ui/store/uiSlice';
+import { useAppSelector } from 'app/store/storeHooks';
+import { selectCurrentUser, selectIsAuthenticated } from 'features/auth/store/authSlice';
+import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
 import { useMainModels } from 'services/api/hooks/modelsByType';
 
 const TOAST_ID = 'starterModels';
 
 export const useStarterModelsToast = () => {
   const { t } = useTranslation();
-  const isEnabled = useFeatureStatus('starterModels');
   const [didToast, setDidToast] = useState(false);
   const [mainModels, { data }] = useMainModels();
   const toast = useToast();
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const { data: setupStatus } = useGetSetupStatusQuery();
+  const user = useAppSelector(selectCurrentUser);
+
+  const isMultiuser = setupStatus?.multiuser_enabled ?? false;
+  const isAdmin = !isMultiuser || (user?.is_admin ?? false);
 
   useEffect(() => {
+    // Only show the toast if the user is authenticated
+    if (!isAuthenticated) {
+      return;
+    }
+
     if (toast.isActive(TOAST_ID)) {
       if (mainModels.length === 0) {
         return;
@@ -23,29 +35,29 @@ export const useStarterModelsToast = () => {
         toast.close(TOAST_ID);
       }
     }
-    if (data && mainModels.length === 0 && !didToast && isEnabled) {
+    if (data && mainModels.length === 0 && !didToast) {
       toast({
         id: TOAST_ID,
         title: t('modelManager.noModelsInstalled'),
-        description: <ToastDescription />,
+        description: isAdmin ? <AdminToastDescription /> : <NonAdminToastDescription />,
         status: 'info',
         isClosable: true,
         duration: null,
         onCloseComplete: () => setDidToast(true),
       });
     }
-  }, [data, didToast, isEnabled, mainModels.length, t, toast]);
+  }, [data, didToast, isAuthenticated, isAdmin, mainModels.length, t, toast]);
 };
 
-const ToastDescription = () => {
+const AdminToastDescription = () => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
   const toast = useToast();
 
   const onClick = useCallback(() => {
-    dispatch(setActiveTab('models'));
+    navigationApi.switchToTab('models');
+    setInstallModelsTabByName('launchpad');
     toast.close(TOAST_ID);
-  }, [dispatch, toast]);
+  }, [toast]);
 
   return (
     <Text fontSize="md">
@@ -55,4 +67,10 @@ const ToastDescription = () => {
       </Button>
     </Text>
   );
+};
+
+const NonAdminToastDescription = () => {
+  const { t } = useTranslation();
+
+  return <Text fontSize="md">{t('modelManager.noModelsInstalledAskAdmin')}</Text>;
 };

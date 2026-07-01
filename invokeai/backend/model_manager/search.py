@@ -130,7 +130,7 @@ class ModelSearch:
                 return
 
         for n in file_names:
-            if n.endswith((".ckpt", ".bin", ".pth", ".safetensors", ".pt")):
+            if n.endswith((".ckpt", ".bin", ".pth", ".safetensors", ".pt", ".gguf")):
                 try:
                     self.model_found(absolute_path / n)
                 except KeyboardInterrupt:

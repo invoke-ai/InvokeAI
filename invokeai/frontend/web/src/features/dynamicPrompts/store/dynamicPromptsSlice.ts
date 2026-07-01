@@ -1,24 +1,29 @@
-import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
-import type { PersistConfig, RootState } from 'app/store/store';
+import type { PayloadAction, Selector } from '@reduxjs/toolkit';
+import { createSelector, createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
+import { buildZodTypeGuard } from 'common/util/zodUtils';
+import { isPlainObject } from 'es-toolkit';
+import { assert } from 'tsafe';
 import { z } from 'zod';
 
 const zSeedBehaviour = z.enum(['PER_ITERATION', 'PER_PROMPT']);
-type SeedBehaviour = z.infer<typeof zSeedBehaviour>;
-export const isSeedBehaviour = (v: unknown): v is SeedBehaviour => zSeedBehaviour.safeParse(v).success;
+export const isSeedBehaviour = buildZodTypeGuard(zSeedBehaviour);
+export type SeedBehaviour = z.infer<typeof zSeedBehaviour>;
 
-interface DynamicPromptsState {
-  _version: 1;
-  maxPrompts: number;
-  combinatorial: boolean;
-  prompts: string[];
-  parsingError: string | undefined | null;
-  isError: boolean;
-  isLoading: boolean;
-  seedBehaviour: SeedBehaviour;
-}
+const zDynamicPromptsState = z.object({
+  _version: z.literal(1),
+  maxPrompts: z.number().int().min(1).max(1000),
+  combinatorial: z.boolean(),
+  prompts: z.array(z.string()),
+  parsingError: z.string().nullish(),
+  isError: z.boolean(),
+  isLoading: z.boolean(),
+  seedBehaviour: zSeedBehaviour,
+});
+export type DynamicPromptsState = z.infer<typeof zDynamicPromptsState>;
 
-const initialDynamicPromptsState: DynamicPromptsState = {
+const getInitialState = (): DynamicPromptsState => ({
   _version: 1,
   maxPrompts: 100,
   combinatorial: true,
@@ -27,20 +32,14 @@ const initialDynamicPromptsState: DynamicPromptsState = {
   isError: false,
   isLoading: false,
   seedBehaviour: 'PER_ITERATION',
-};
+});
 
-export const dynamicPromptsSlice = createSlice({
+const slice = createSlice({
   name: 'dynamicPrompts',
-  initialState: initialDynamicPromptsState,
+  initialState: getInitialState(),
   reducers: {
     maxPromptsChanged: (state, action: PayloadAction<number>) => {
       state.maxPrompts = action.payload;
-    },
-    maxPromptsReset: (state) => {
-      state.maxPrompts = initialDynamicPromptsState.maxPrompts;
-    },
-    combinatorialToggled: (state) => {
-      state.combinatorial = !state.combinatorial;
     },
     promptsChanged: (state, action: PayloadAction<string[]>) => {
       state.prompts = action.payload;
@@ -63,28 +62,45 @@ export const dynamicPromptsSlice = createSlice({
 
 export const {
   maxPromptsChanged,
-  maxPromptsReset,
-  combinatorialToggled,
   promptsChanged,
   parsingErrorChanged,
   isErrorChanged,
   isLoadingChanged,
   seedBehaviourChanged,
-} = dynamicPromptsSlice.actions;
+} = slice.actions;
+
+export const dynamicPromptsSliceConfig: SliceConfig<typeof slice> = {
+  slice,
+  schema: zDynamicPromptsState,
+  getInitialState,
+  persistConfig: {
+    migrate: (state) => {
+      assert(isPlainObject(state));
+      if (!('_version' in state)) {
+        state._version = 1;
+      }
+      return zDynamicPromptsState.parse(state);
+    },
+    persistDenylist: ['prompts', 'parsingError', 'isError', 'isLoading'],
+  },
+};
 
 export const selectDynamicPromptsSlice = (state: RootState) => state.dynamicPrompts;
+const createDynamicPromptsSelector = <T>(selector: Selector<DynamicPromptsState, T>) =>
+  createSelector(selectDynamicPromptsSlice, selector);
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrateDynamicPromptsState = (state: any): any => {
-  if (!('_version' in state)) {
-    state._version = 1;
-  }
-  return state;
-};
-
-export const dynamicPromptsPersistConfig: PersistConfig<DynamicPromptsState> = {
-  name: dynamicPromptsSlice.name,
-  initialState: initialDynamicPromptsState,
-  migrate: migrateDynamicPromptsState,
-  persistDenylist: ['prompts'],
-};
+export const selectDynamicPromptsMaxPrompts = createDynamicPromptsSelector(
+  (dynamicPrompts) => dynamicPrompts.maxPrompts
+);
+export const selectDynamicPromptsCombinatorial = createDynamicPromptsSelector(
+  (dynamicPrompts) => dynamicPrompts.combinatorial
+);
+export const selectDynamicPromptsPrompts = createDynamicPromptsSelector((dynamicPrompts) => dynamicPrompts.prompts);
+export const selectDynamicPromptsParsingError = createDynamicPromptsSelector(
+  (dynamicPrompts) => dynamicPrompts.parsingError
+);
+export const selectDynamicPromptsIsError = createDynamicPromptsSelector((dynamicPrompts) => dynamicPrompts.isError);
+export const selectDynamicPromptsIsLoading = createDynamicPromptsSelector((dynamicPrompts) => dynamicPrompts.isLoading);
+export const selectDynamicPromptsSeedBehaviour = createDynamicPromptsSelector(
+  (dynamicPrompts) => dynamicPrompts.seedBehaviour
+);

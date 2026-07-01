@@ -1,0 +1,203 @@
+import {
+  Button,
+  Divider,
+  Flex,
+  IconButton,
+  Input,
+  Kbd,
+  Popover,
+  PopoverBody,
+  PopoverContent,
+  PopoverTrigger,
+  Portal,
+  Text,
+  useShiftModifier,
+} from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
+import {
+  negativePromptChanged,
+  positivePromptChanged,
+  promptHistoryCleared,
+  promptRemovedFromHistory,
+  selectModelSupportsNegativePrompt,
+  selectPositivePromptHistory,
+} from 'features/controlLayers/store/paramsSlice';
+import type { PromptHistoryItem } from 'features/controlLayers/store/types';
+import type { ChangeEvent } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { PiArrowArcLeftBold, PiClockCounterClockwise, PiTrashBold, PiTrashSimpleBold } from 'react-icons/pi';
+
+export const PositivePromptHistoryIconButton = memo(() => {
+  const { t } = useTranslation();
+  return (
+    <Popover isLazy>
+      <PopoverTrigger>
+        <IconButton
+          size="sm"
+          variant="promptOverlay"
+          aria-label={t('prompt.promptHistory')}
+          icon={<PiClockCounterClockwise />}
+          tooltip={t('prompt.promptHistory')}
+        />
+      </PopoverTrigger>
+      <Portal>
+        <PopoverContent>
+          <PopoverBody maxH={300} maxW={400} h={300} w={400}>
+            <PromptHistoryContent />
+          </PopoverBody>
+        </PopoverContent>
+      </Portal>
+    </Popover>
+  );
+});
+
+PositivePromptHistoryIconButton.displayName = 'PositivePromptHistoryIconButton';
+
+const PromptHistoryContent = memo(() => {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+  const positivePromptHistory = useAppSelector(selectPositivePromptHistory);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const onClickClearHistory = useCallback(() => {
+    dispatch(promptHistoryCleared());
+  }, [dispatch]);
+
+  const filteredPrompts = useMemo(() => {
+    const trimmedSearchTerm = searchTerm.trim();
+    if (!trimmedSearchTerm) {
+      return positivePromptHistory;
+    }
+    const searchTermLower = trimmedSearchTerm.toLowerCase();
+    return positivePromptHistory.filter(
+      (prompt) =>
+        prompt.positivePrompt.toLowerCase().includes(searchTermLower) ||
+        (prompt.negativePrompt ?? '').toLowerCase().includes(searchTermLower)
+    );
+  }, [positivePromptHistory, searchTerm]);
+
+  const onChangeSearchTerm = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  }, []);
+
+  return (
+    <Flex flexDir="column" gap={2} w="full" h="full">
+      <Flex alignItems="center" gap={2} justifyContent="space-between">
+        <Text fontWeight="semibold" color="base.300">
+          {t('prompt.promptHistory')}
+        </Text>
+        <Input
+          size="sm"
+          variant="outline"
+          placeholder={t('prompt.searchPrompts')}
+          value={searchTerm}
+          onChange={onChangeSearchTerm}
+          width="max-content"
+          isDisabled={positivePromptHistory.length === 0}
+        />
+        <Button
+          size="sm"
+          variant="link"
+          leftIcon={<PiTrashSimpleBold />}
+          onClick={onClickClearHistory}
+          isDisabled={positivePromptHistory.length === 0}
+        >
+          {t('prompt.clearHistory')}
+        </Button>
+      </Flex>
+      <Divider />
+      <Flex flexDir="column" flexGrow={1} minH={0}>
+        {positivePromptHistory.length === 0 && (
+          <Flex w="full" h="full" alignItems="center" justifyContent="center">
+            <Text color="base.300">{t('prompt.noPromptHistory')}</Text>
+          </Flex>
+        )}
+        {positivePromptHistory.length !== 0 && filteredPrompts.length === 0 && (
+          <Flex w="full" h="full" alignItems="center" justifyContent="center">
+            <Text color="base.300">{t('prompt.noMatchingPrompts')}</Text>{' '}
+          </Flex>
+        )}
+        {filteredPrompts.length > 0 && (
+          <ScrollableContent>
+            <Flex flexDir="column">
+              {filteredPrompts.map((prompt, index) => (
+                <PromptItem key={`${prompt.positivePrompt}-${prompt.negativePrompt ?? ''}-${index}`} prompt={prompt} />
+              ))}
+            </Flex>
+          </ScrollableContent>
+        )}
+      </Flex>
+      <Flex alignItems="center" justifyContent="center" pt={1}>
+        <Text color="base.300" textAlign="center">
+          <Kbd textTransform="lowercase">alt+up/down</Kbd> {t('prompt.toSwitchBetweenPrompts')}
+        </Text>
+      </Flex>
+    </Flex>
+  );
+});
+PromptHistoryContent.displayName = 'PromptHistoryContent';
+
+const PromptItem = memo(({ prompt }: { prompt: PromptHistoryItem }) => {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+  const shiftKey = useShiftModifier();
+  const modelSupportsNegativePrompt = useAppSelector(selectModelSupportsNegativePrompt);
+
+  const onClickUse = useCallback(() => {
+    dispatch(positivePromptChanged(prompt.positivePrompt));
+    // Only restore the negative prompt for models that support one, otherwise we'd silently set negative prompt state
+    // that is hidden in the UI and would resurface when switching to a model that supports negative prompts.
+    if (modelSupportsNegativePrompt) {
+      dispatch(negativePromptChanged(prompt.negativePrompt));
+    }
+  }, [dispatch, modelSupportsNegativePrompt, prompt]);
+
+  const onClickDelete = useCallback(() => {
+    dispatch(promptRemovedFromHistory(prompt));
+  }, [dispatch, prompt]);
+
+  return (
+    <Flex gap={2}>
+      {!shiftKey && (
+        <IconButton
+          size="sm"
+          variant="ghost"
+          aria-label={t('prompt.usePrompt')}
+          icon={<PiArrowArcLeftBold />}
+          onClick={onClickUse}
+        />
+      )}
+      {shiftKey && (
+        <IconButton
+          size="sm"
+          variant="ghost"
+          aria-label={t('common.delete')}
+          icon={<PiTrashBold />}
+          onClick={onClickDelete}
+          colorScheme="error"
+        />
+      )}
+      <Flex flexDir="column" gap={1} minW={0}>
+        {prompt.positivePrompt && (
+          <Text color="base.300" wordBreak="break-word">
+            <Text as="span" color="base.100">
+              {t('common.prompt')}:
+            </Text>{' '}
+            {prompt.positivePrompt}
+          </Text>
+        )}
+        {prompt.negativePrompt && (
+          <Text color="base.400" wordBreak="break-word">
+            <Text as="span" color="base.100">
+              {t('common.negativePrompt')}:
+            </Text>{' '}
+            {prompt.negativePrompt}
+          </Text>
+        )}
+      </Flex>
+    </Flex>
+  );
+});
+PromptItem.displayName = 'PromptItem';

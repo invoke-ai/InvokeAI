@@ -1,32 +1,41 @@
-import type { InvokeTabName } from './tabMap';
+import { isPlainObject } from 'es-toolkit';
+import { z } from 'zod';
 
-export interface UIState {
-  /**
-   * Slice schema version.
-   */
-  _version: 2;
-  /**
-   * The currently active tab.
-   */
-  activeTab: InvokeTabName;
-  /**
-   * Whether or not to show image details, e.g. metadata, workflow, etc.
-   */
-  shouldShowImageDetails: boolean;
-  /**
-   * Whether or not to show progress in the viewer.
-   */
-  shouldShowProgressInViewer: boolean;
-  /**
-   * The react-resizable-panels state. The shape is managed by react-resizable-panels.
-   */
-  panels: Record<string, string>;
-  /**
-   * The state of accordions. The key is the id of the accordion, and the value is a boolean representing the open state.
-   */
-  accordions: Record<string, boolean>;
-  /**
-   * The state of expanders. The key is the id of the expander, and the value is a boolean representing the open state.
-   */
-  expanders: Record<string, boolean>;
-}
+const zTabName = z.enum(['generate', 'canvas', 'upscaling', 'workflows', 'models', 'customNodes', 'queue']);
+export type TabName = z.infer<typeof zTabName>;
+
+const zPartialDimensions = z.object({
+  width: z.number().optional(),
+  height: z.number().optional(),
+});
+
+const zSerializable = z.any().refine(isPlainObject);
+export type Serializable = z.infer<typeof zSerializable>;
+
+export const zUIState = z.object({
+  _version: z.literal(5),
+  activeTab: zTabName,
+  shouldShowItemDetails: z.boolean(),
+  shouldShowProgressInViewer: z.boolean(),
+  shouldUsePagedGalleryView: z.boolean(),
+  accordions: z.record(z.string(), z.boolean()),
+  expanders: z.record(z.string(), z.boolean()),
+  textAreaSizes: z.record(z.string(), zPartialDimensions),
+  panels: z.record(z.string(), zSerializable),
+  shouldShowNotificationV2: z.boolean(),
+  pickerCompactViewStates: z.record(z.string(), z.boolean()),
+});
+export type UIState = z.infer<typeof zUIState>;
+export const getInitialUIState = (): UIState => ({
+  _version: 5 as const,
+  activeTab: 'generate' as const,
+  shouldShowItemDetails: false,
+  shouldShowProgressInViewer: true,
+  shouldUsePagedGalleryView: false,
+  accordions: {},
+  expanders: {},
+  textAreaSizes: {},
+  panels: {},
+  shouldShowNotificationV2: true,
+  pickerCompactViewStates: {},
+});

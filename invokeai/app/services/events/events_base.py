@@ -11,39 +11,43 @@ from invokeai.app.services.events.events_common import (
     DownloadCancelledEvent,
     DownloadCompleteEvent,
     DownloadErrorEvent,
+    DownloadPausedEvent,
     DownloadProgressEvent,
     DownloadStartedEvent,
     EventBase,
     InvocationCompleteEvent,
-    InvocationDenoiseProgressEvent,
     InvocationErrorEvent,
+    InvocationProgressEvent,
     InvocationStartedEvent,
     ModelInstallCancelledEvent,
     ModelInstallCompleteEvent,
     ModelInstallDownloadProgressEvent,
     ModelInstallDownloadsCompleteEvent,
+    ModelInstallDownloadStartedEvent,
     ModelInstallErrorEvent,
     ModelInstallStartedEvent,
     ModelLoadCompleteEvent,
     ModelLoadStartedEvent,
     QueueClearedEvent,
+    QueueItemsRetriedEvent,
     QueueItemStatusChangedEvent,
+    RecallParametersUpdatedEvent,
 )
-from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
     from invokeai.app.services.download.download_base import DownloadJob
-    from invokeai.app.services.events.events_common import EventBase
     from invokeai.app.services.model_install.model_install_common import ModelInstallJob
     from invokeai.app.services.session_processor.session_processor_common import ProgressImage
     from invokeai.app.services.session_queue.session_queue_common import (
         BatchStatus,
         EnqueueBatchResult,
+        RetryItemsResult,
         SessionQueueItem,
         SessionQueueStatus,
     )
-    from invokeai.backend.model_manager.config import AnyModelConfig, SubModelType
+    from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+    from invokeai.backend.model_manager.taxonomy import SubModelType
 
 
 class EventServiceBase:
@@ -58,15 +62,16 @@ class EventServiceBase:
         """Emitted when an invocation is started"""
         self.dispatch(InvocationStartedEvent.build(queue_item, invocation))
 
-    def emit_invocation_denoise_progress(
+    def emit_invocation_progress(
         self,
         queue_item: "SessionQueueItem",
         invocation: "BaseInvocation",
-        intermediate_state: PipelineIntermediateState,
-        progress_image: "ProgressImage",
+        message: str,
+        percentage: float | None = None,
+        image: "ProgressImage | None" = None,
     ) -> None:
-        """Emitted at each step during denoising of an invocation."""
-        self.dispatch(InvocationDenoiseProgressEvent.build(queue_item, invocation, intermediate_state, progress_image))
+        """Emitted at periodically during an invocation"""
+        self.dispatch(InvocationProgressEvent.build(queue_item, invocation, message, percentage, image))
 
     def emit_invocation_complete(
         self, queue_item: "SessionQueueItem", invocation: "BaseInvocation", output: "BaseInvocationOutput"
@@ -95,13 +100,21 @@ class EventServiceBase:
         """Emitted when a queue item's status changes"""
         self.dispatch(QueueItemStatusChangedEvent.build(queue_item, batch_status, queue_status))
 
-    def emit_batch_enqueued(self, enqueue_result: "EnqueueBatchResult") -> None:
+    def emit_batch_enqueued(self, enqueue_result: "EnqueueBatchResult", user_id: str = "system") -> None:
         """Emitted when a batch is enqueued"""
-        self.dispatch(BatchEnqueuedEvent.build(enqueue_result))
+        self.dispatch(BatchEnqueuedEvent.build(enqueue_result, user_id))
+
+    def emit_queue_items_retried(self, retry_result: "RetryItemsResult") -> None:
+        """Emitted when a list of queue items are retried"""
+        self.dispatch(QueueItemsRetriedEvent.build(retry_result))
 
     def emit_queue_cleared(self, queue_id: str) -> None:
         """Emitted when a queue is cleared"""
         self.dispatch(QueueClearedEvent.build(queue_id))
+
+    def emit_recall_parameters_updated(self, queue_id: str, user_id: str, parameters: dict) -> None:
+        """Emitted when recall parameters are updated"""
+        self.dispatch(RecallParametersUpdatedEvent.build(queue_id, user_id, parameters))
 
     # endregion
 
@@ -122,6 +135,10 @@ class EventServiceBase:
     def emit_download_cancelled(self, job: "DownloadJob") -> None:
         """Emitted when a download is cancelled"""
         self.dispatch(DownloadCancelledEvent.build(job))
+
+    def emit_download_paused(self, job: "DownloadJob") -> None:
+        """Emitted when a download is paused"""
+        self.dispatch(DownloadPausedEvent.build(job))
 
     def emit_download_error(self, job: "DownloadJob") -> None:
         """Emitted when a download encounters an error"""
@@ -144,6 +161,10 @@ class EventServiceBase:
     # endregion
 
     # region Model install
+
+    def emit_model_install_download_started(self, job: "ModelInstallJob") -> None:
+        """Emitted at intervals while the install job is started (remote models only)."""
+        self.dispatch(ModelInstallDownloadStartedEvent.build(job))
 
     def emit_model_install_download_progress(self, job: "ModelInstallJob") -> None:
         """Emitted at intervals while the install job is in progress (remote models only)."""
@@ -173,23 +194,42 @@ class EventServiceBase:
     # region Bulk image download
 
     def emit_bulk_download_started(
-        self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
+        self,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        user_id: str = "system",
     ) -> None:
         """Emitted when a bulk image download is started"""
-        self.dispatch(BulkDownloadStartedEvent.build(bulk_download_id, bulk_download_item_id, bulk_download_item_name))
+        self.dispatch(
+            BulkDownloadStartedEvent.build(bulk_download_id, bulk_download_item_id, bulk_download_item_name, user_id)
+        )
 
     def emit_bulk_download_complete(
-        self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
+        self,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        user_id: str = "system",
     ) -> None:
         """Emitted when a bulk image download is complete"""
-        self.dispatch(BulkDownloadCompleteEvent.build(bulk_download_id, bulk_download_item_id, bulk_download_item_name))
+        self.dispatch(
+            BulkDownloadCompleteEvent.build(bulk_download_id, bulk_download_item_id, bulk_download_item_name, user_id)
+        )
 
     def emit_bulk_download_error(
-        self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str, error: str
+        self,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        error: str,
+        user_id: str = "system",
     ) -> None:
         """Emitted when a bulk image download has an error"""
         self.dispatch(
-            BulkDownloadErrorEvent.build(bulk_download_id, bulk_download_item_id, bulk_download_item_name, error)
+            BulkDownloadErrorEvent.build(
+                bulk_download_id, bulk_download_item_id, bulk_download_item_name, error, user_id
+            )
         )
 
     # endregion

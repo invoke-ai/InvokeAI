@@ -79,9 +79,6 @@ instance/
 # Scrapy stuff:
 .scrapy
 
-# Sphinx documentation
-docs/_build/
-
 # PyBuilder
 .pybuilder/
 target/
@@ -145,9 +142,6 @@ ENV/
 # Rope project settings
 .ropeproject
 
-# mkdocs documentation
-/site
-
 # mypy
 .mypy_cache/
 .dmypy.json
@@ -179,7 +173,9 @@ cython_debug/
 
 # Scratch folder
 .scratch/
+worktrees/
 .vscode/
+.zed/
 
 # source installer files
 installer/*zip
@@ -188,3 +184,9 @@ installer/install.sh
 installer/update.bat
 installer/update.sh
 installer/InvokeAI-Installer/
+.aider*
+
+.claude/
+
+# Weblate configuration file
+weblate.ini

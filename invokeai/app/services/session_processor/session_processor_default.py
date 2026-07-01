@@ -1,3 +1,4 @@
+import gc
 import traceback
 from contextlib import suppress
 from threading import BoundedSemaphore, Thread
@@ -13,23 +14,23 @@ from invokeai.app.services.events.events_common import (
     register_events,
 )
 from invokeai.app.services.invocation_stats.invocation_stats_common import GESStatsNotFoundError
+from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_processor.session_processor_base import (
+    InvocationServices,
     OnAfterRunNode,
     OnAfterRunSession,
     OnBeforeRunNode,
     OnBeforeRunSession,
     OnNodeError,
     OnNonFatalProcessorError,
+    SessionProcessorBase,
+    SessionRunnerBase,
 )
-from invokeai.app.services.session_processor.session_processor_common import CanceledException
+from invokeai.app.services.session_processor.session_processor_common import CanceledException, SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem, SessionQueueItemNotFoundError
 from invokeai.app.services.shared.graph import NodeInputError
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
 from invokeai.app.util.profiler import Profiler
-
-from ..invoker import Invoker
-from .session_processor_base import InvocationServices, SessionProcessorBase, SessionRunnerBase
-from .session_processor_common import SessionProcessorStatus
 
 
 class DefaultSessionRunner(SessionRunnerBase):
@@ -132,9 +133,6 @@ class DefaultSessionRunner(SessionRunnerBase):
 
                 self._on_after_run_node(invocation, queue_item, output)
 
-        except KeyboardInterrupt:
-            # TODO(psyche): This is expected to be caught in the main thread. Do we need to catch this here?
-            pass
         except CanceledException:
             # A CanceledException is raised during the denoising step callback if the cancel event is set. We don't need
             # to do any handling here, and no error should be set - just pass and the cancellation will be handled
@@ -210,7 +208,7 @@ class DefaultSessionRunner(SessionRunnerBase):
             # we don't care about that - suppress the error.
             with suppress(GESStatsNotFoundError):
                 self._services.performance_statistics.log_stats(queue_item.session.id)
-                self._services.performance_statistics.reset_stats()
+                self._services.performance_statistics.reset_stats(queue_item.session.id)
 
             for callback in self._on_after_run_session_callbacks:
                 callback(queue_item=queue_item)
@@ -354,6 +352,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self._thread = Thread(
             name="session_processor",
             target=self._process,
+            daemon=True,
             kwargs={
                 "stop_event": self._stop_event,
                 "poll_now_event": self._poll_now_event,
@@ -365,6 +364,14 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
     def stop(self, *args, **kwargs) -> None:
         self._stop_event.set()
+        # Cancel any in-progress generation so that long-running nodes (e.g. denoising) stop at
+        # the next step boundary instead of running to completion. Without this, the generation
+        # thread may still be executing CUDA operations when Python teardown begins, which can
+        # cause a C++ std::terminate() crash ("terminate called without an active exception").
+        self._cancel_event.set()
+        # Wake the thread if it is sleeping in poll_now_event.wait() or blocked in resume_event.wait() (paused).
+        self._poll_now_event.set()
+        self._resume_event.set()
 
     def _poll_now(self) -> None:
         self._poll_now_event.set()
@@ -378,6 +385,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self._poll_now()
 
     async def _on_queue_item_status_changed(self, event: FastAPIEvent[QueueItemStatusChangedEvent]) -> None:
+        # Make sure the cancel event is for the currently processing queue item
+        if self._queue_item and self._queue_item.item_id != event[1].item_id:
+            return
         if self._queue_item and event[1].status in ["completed", "failed", "canceled"]:
             # When the queue item is canceled via HTTP, the queue item status is set to `"canceled"` and this event is
             # emitted. We need to respond to this event and stop graph execution. This is done by setting the cancel
@@ -406,6 +416,10 @@ class DefaultSessionProcessor(SessionProcessorBase):
             is_processing=self._queue_item is not None,
         )
 
+    def _is_image_move_maintenance_active(self) -> bool:
+        image_moves = getattr(self._invoker.services, "image_moves", None)
+        return image_moves is not None and image_moves.is_maintenance_active()
+
     def _process(
         self,
         stop_event: ThreadEvent,
@@ -427,6 +441,11 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     # If we are paused, wait for resume event
                     resume_event.wait()
 
+                    if self._is_image_move_maintenance_active():
+                        self._invoker.services.logger.debug("Image storage maintenance is active")
+                        poll_now_event.wait(self._polling_interval)
+                        continue
+
                     # Get the next session to process
                     self._queue_item = self._invoker.services.session_queue.dequeue()
 
@@ -436,7 +455,15 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         poll_now_event.wait(self._polling_interval)
                         continue
 
-                    self._invoker.services.logger.debug(f"Executing queue item {self._queue_item.item_id}")
+                    # GC-ing here can reduce peak memory usage of the invoke process by freeing allocated memory blocks.
+                    # Most queue items take seconds to execute, so the relative cost of a GC is very small.
+                    # Python will never cede allocated memory back to the OS, so anything we can do to reduce the peak
+                    # allocation is well worth it.
+                    gc.collect()
+
+                    self._invoker.services.logger.info(
+                        f"Executing queue item {self._queue_item.item_id}, session {self._queue_item.session_id}"
+                    )
                     cancel_event.clear()
 
                     # Run the graph

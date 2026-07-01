@@ -1,72 +1,88 @@
-import { Collapse, Flex, Grid, GridItem } from '@invoke-ai/ui-library';
+import { Collapse, Flex, Text, useDisclosure } from '@invoke-ai/ui-library';
+import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
-import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
-import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
-import type { CSSProperties } from 'react';
-import { memo, useState } from 'react';
+import { fixTooltipCloseOnScrollStyles } from 'common/util/fixTooltipCloseOnScrollStyles';
+import {
+  selectBoardSearchText,
+  selectListBoardsQueryArgs,
+  selectSelectedBoardId,
+} from 'features/gallery/store/gallerySelectors';
+import { memo, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
-import type { BoardDTO } from 'services/api/types';
 
 import AddBoardButton from './AddBoardButton';
-import BoardsSearch from './BoardsSearch';
 import GalleryBoard from './GalleryBoard';
 import NoBoardBoard from './NoBoardBoard';
+import { VirtualBoardSection } from './VirtualBoardSection';
 
-const overlayScrollbarsStyles: CSSProperties = {
-  height: '100%',
-  width: '100%',
-};
+export const BoardsList = memo(() => {
+  const { t } = useTranslation();
+  const selectedBoardId = useAppSelector(selectSelectedBoardId);
+  const boardSearchText = useAppSelector(selectBoardSearchText);
+  const queryArgs = useAppSelector(selectListBoardsQueryArgs);
+  const { data: boards } = useListAllBoardsQuery(queryArgs);
+  const { isOpen } = useDisclosure({ defaultIsOpen: true });
 
-type Props = {
-  isOpen: boolean;
-};
+  const filteredBoards = useMemo(() => {
+    if (!boards) {
+      return EMPTY_ARRAY;
+    }
 
-const BoardsList = (props: Props) => {
-  const { isOpen } = props;
-  const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
-  const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
-  const { data: boards } = useListAllBoardsQuery();
-  const filteredBoards = boardSearchText
-    ? boards?.filter((board) => board.board_name.toLowerCase().includes(boardSearchText.toLowerCase()))
-    : boards;
-  const [boardToDelete, setBoardToDelete] = useState<BoardDTO>();
+    if (boardSearchText.length) {
+      return boards.filter((board) => board.board_name.toLowerCase().includes(boardSearchText.toLowerCase()));
+    }
+
+    return boards;
+  }, [boardSearchText, boards]);
+
+  const boardElements = useMemo(() => {
+    const elements = [];
+
+    if (!boardSearchText.length) {
+      elements.push(<NoBoardBoard key="none" isSelected={selectedBoardId === 'none'} />);
+      elements.push(<VirtualBoardSection key="virtual-boards" />);
+    }
+
+    filteredBoards.forEach((board) => {
+      elements.push(
+        <GalleryBoard board={board} isSelected={selectedBoardId === board.board_id} key={board.board_id} />
+      );
+    });
+
+    return elements;
+  }, [boardSearchText.length, filteredBoards, selectedBoardId]);
 
   return (
-    <>
-      <Collapse in={isOpen} animateOpacity>
-        <Flex layerStyle="first" flexDir="column" gap={2} p={2} mt={2} borderRadius="base">
-          <Flex gap={2} alignItems="center">
-            <BoardsSearch />
-            <AddBoardButton />
-          </Flex>
-          <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
-            <Grid
-              className="list-container"
-              data-testid="boards-list"
-              gridTemplateColumns="repeat(auto-fill, minmax(90px, 1fr))"
-              maxH={346}
-            >
-              <GridItem p={1.5} data-testid="no-board">
-                <NoBoardBoard isSelected={selectedBoardId === 'none'} />
-              </GridItem>
-              {filteredBoards &&
-                filteredBoards.map((board, index) => (
-                  <GridItem key={board.board_id} p={1.5} data-testid={`board-${index}`}>
-                    <GalleryBoard
-                      board={board}
-                      isSelected={selectedBoardId === board.board_id}
-                      setBoardToDelete={setBoardToDelete}
-                    />
-                  </GridItem>
-                ))}
-            </Grid>
-          </OverlayScrollbarsComponent>
+    <Flex direction="column">
+      <Flex
+        position="sticky"
+        w="full"
+        justifyContent="space-between"
+        alignItems="center"
+        ps={2}
+        py={1}
+        zIndex={1}
+        top={0}
+        bg="base.900"
+      >
+        <Text fontSize="sm" fontWeight="semibold" userSelect="none" color="base.500">
+          {t('boards.boards')}
+        </Text>
+        <AddBoardButton />
+      </Flex>
+      <Collapse in={isOpen} style={fixTooltipCloseOnScrollStyles}>
+        <Flex direction="column" gap={1}>
+          {boardElements.length ? (
+            boardElements
+          ) : (
+            <Text variant="subtext" textAlign="center">
+              {t('boards.noBoards', { boardType: boardSearchText.length ? 'Matching' : '' })}
+            </Text>
+          )}
         </Flex>
       </Collapse>
-      <DeleteBoardModal boardToDelete={boardToDelete} setBoardToDelete={setBoardToDelete} />
-    </>
+    </Flex>
   );
-};
-
-export default memo(BoardsList);
+});
+BoardsList.displayName = 'BoardsList';

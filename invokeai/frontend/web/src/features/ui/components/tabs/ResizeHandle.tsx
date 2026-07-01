@@ -1,80 +1,102 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, chakra, Flex } from '@invoke-ai/ui-library';
+import { chakra, Flex, Icon } from '@invoke-ai/ui-library';
 import { memo } from 'react';
+import { PiDotsSix, PiDotsSixVertical } from 'react-icons/pi';
 import type { PanelResizeHandleProps } from 'react-resizable-panels';
 import { PanelResizeHandle } from 'react-resizable-panels';
 
-type ResizeHandleProps = PanelResizeHandleProps & {
-  orientation: 'horizontal' | 'vertical';
-};
-
 const ChakraPanelResizeHandle = chakra(PanelResizeHandle);
 
-const ResizeHandle = (props: ResizeHandleProps) => {
-  const { orientation, ...rest } = props;
+const commonSx: SystemStyleObject = {
+  '&[data-resize-handle-state="hover"]': {
+    _before: {
+      background: 'base.600 !important',
+    },
+    '.resize-handle-dots': {
+      color: 'base.400',
+    },
+  },
+  '&[data-resize-handle-state="drag"]': {
+    _before: {
+      background: 'base.500 !important',
+    },
+    '.resize-handle-dots': {
+      color: 'base.300',
+    },
+  },
+  '.resize-handle-dots': {
+    pointerEvents: 'none',
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    transform: 'translateX(-50%) translateY(-50%) scale(0.75)',
+    background: 'base.900',
+    color: 'base.500',
+  },
+};
 
+const horizontalSx: SystemStyleObject = {
+  ...commonSx,
+  '&[data-panel-group-direction="vertical"]': {
+    h: 4,
+    w: 'full',
+    position: 'relative',
+    _before: {
+      transitionProperty: 'background',
+      transitionDuration: 'fast',
+      content: '""',
+      w: 'full',
+      h: '2px',
+      background: 'base.800',
+      position: 'absolute',
+      top: '50%',
+      left: 0,
+      transform: 'translateY(-50%)',
+    },
+  },
+};
+
+export const HorizontalResizeHandle = memo((props: Omit<PanelResizeHandleProps, 'style'>) => {
   return (
-    <ChakraPanelResizeHandle {...rest}>
-      <Flex sx={sx} data-orientation={orientation}>
-        <Box className="resize-handle-inner" data-orientation={orientation} />
-        <Box className="resize-handle-drag-handle" data-orientation={orientation} />
+    <ChakraPanelResizeHandle {...props} sx={horizontalSx}>
+      <Flex className="resize-handle-dots" clipPath="inset(0px 2px 2px 0px)" px={1}>
+        <Icon as={PiDotsSix} me={-0.5} />
+        <Icon as={PiDotsSix} ms={-0.5} />
       </Flex>
     </ChakraPanelResizeHandle>
   );
-};
+});
+HorizontalResizeHandle.displayName = 'HorizontalResizeHandle';
 
-export default memo(ResizeHandle);
-
-const sx: SystemStyleObject = {
-  display: 'flex',
-  pos: 'relative',
-  '&[data-orientation="horizontal"]': {
-    w: 'full',
-    h: 5,
-  },
-  '&[data-orientation="vertical"]': { w: 5, h: 'full' },
-  alignItems: 'center',
-  justifyContent: 'center',
-  div: {
-    bg: 'base.800',
-  },
-  _hover: {
-    div: { bg: 'base.700' },
-  },
-  _active: {
-    div: { bg: 'base.600' },
-  },
-  transitionProperty: 'common',
-  transitionDuration: 'normal',
-  '.resize-handle-inner': {
-    '&[data-orientation="horizontal"]': {
-      w: 'calc(100% - 1rem)',
-      h: '2px',
-    },
-    '&[data-orientation="vertical"]': {
+const verticalSx: SystemStyleObject = {
+  ...commonSx,
+  '&[data-panel-group-direction="horizontal"]': {
+    w: 4,
+    h: 'full',
+    position: 'relative',
+    _before: {
+      transitionProperty: 'background',
+      transitionDuration: 'normal',
+      content: '""',
       w: '2px',
-      h: 'calc(100% - 1rem)',
-    },
-    borderRadius: 'base',
-    transitionProperty: 'inherit',
-    transitionDuration: 'inherit',
-  },
-  '.resize-handle-drag-handle': {
-    pos: 'absolute',
-    borderRadius: '1px',
-    transitionProperty: 'inherit',
-    transitionDuration: 'inherit',
-    '&[data-orientation="horizontal"]': {
-      w: '30px',
-      h: '6px',
-      insetInlineStart: '50%',
-      transform: 'translate(-50%, 0)',
-    },
-    '&[data-orientation="vertical"]': {
-      w: '6px',
-      h: '30px',
-      insetBlockStart: '50%',
-      transform: 'translate(0, -50%)',
+      h: 'full',
+      background: 'base.800',
+      position: 'absolute',
+      left: '50%',
+      top: 0,
+      transform: 'translateX(-50%)',
     },
   },
 };
+
+export const VerticalResizeHandle = memo((props: Omit<PanelResizeHandleProps, 'style'>) => {
+  return (
+    <ChakraPanelResizeHandle {...props} sx={verticalSx}>
+      <Flex flexDir="column" className="resize-handle-dots" clipPath="inset(2px 0px 0px 2px)" py={1}>
+        <Icon as={PiDotsSixVertical} mb={-0.5} />
+        <Icon as={PiDotsSixVertical} mt={-0.5} />
+      </Flex>
+    </ChakraPanelResizeHandle>
+  );
+});
+VerticalResizeHandle.displayName = 'VerticalResizeHandle';

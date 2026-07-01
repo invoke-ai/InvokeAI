@@ -8,15 +8,13 @@ import { type FieldType, isCollection, isSingle, isSingleOrCollection } from 'fe
  * @returns True if the connection is valid, false otherwise.
  */
 export const validateConnectionTypes = (sourceType: FieldType, targetType: FieldType) => {
-  // TODO: There's a bug with Collect -> Iterate nodes:
-  // https://github.com/invoke-ai/InvokeAI/issues/3956
-  // Once this is resolved, we can remove this check.
-  if (sourceType.name === 'CollectionField' && targetType.name === 'CollectionField') {
-    return false;
-  }
-
   if (areTypesEqual(sourceType, targetType)) {
     return true;
+  }
+
+  // Batch and non-batch fields are incompatible.
+  if (sourceType.batch !== targetType.batch) {
+    return false;
   }
 
   /**
@@ -60,6 +58,7 @@ export const validateConnectionTypes = (sourceType: FieldType, targetType: Field
   const isSubTypeMatch = doesCardinalityMatch && (isIntToFloat || isIntToString || isFloatToString);
 
   const isTargetAnyType = targetType.name === 'AnyField';
+  const isSourceAnyType = sourceType.name === 'AnyField' && doesCardinalityMatch;
 
   // One of these must be true for the connection to be valid
   return (
@@ -69,6 +68,7 @@ export const validateConnectionTypes = (sourceType: FieldType, targetType: Field
     isGenericCollectionToAnyCollectionOrSingleOrCollection ||
     isCollectionToGenericCollection ||
     isSubTypeMatch ||
-    isTargetAnyType
+    isTargetAnyType ||
+    isSourceAnyType
   );
 };

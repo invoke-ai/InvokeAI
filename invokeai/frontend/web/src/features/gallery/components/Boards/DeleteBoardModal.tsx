@@ -10,50 +10,66 @@ import {
   Skeleton,
   Text,
 } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
-import { selectControlAdaptersSlice } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
+import { some } from 'es-toolkit/compat';
+import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import ImageUsageMessage from 'features/deleteImageModal/components/ImageUsageMessage';
-import { getImageUsage } from 'features/deleteImageModal/store/selectors';
+import { getImageUsage } from 'features/deleteImageModal/store/state';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
-import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { some } from 'lodash-es';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
+import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
+import { atom } from 'nanostores';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListAllImageNamesForBoardQuery } from 'services/api/endpoints/boards';
-import { useDeleteBoardAndImagesMutation, useDeleteBoardMutation } from 'services/api/endpoints/images';
+import {
+  useDeleteBoardAndImagesMutation,
+  useDeleteBoardMutation,
+  useDeleteUncategorizedImagesMutation,
+} from 'services/api/endpoints/images';
 import type { BoardDTO } from 'services/api/types';
 
-type Props = {
-  boardToDelete?: BoardDTO;
-  setBoardToDelete: (board?: BoardDTO) => void;
-};
+export const $boardToDelete = atom<BoardDTO | 'none' | null>(null);
 
-const DeleteBoardModal = (props: Props) => {
-  const { boardToDelete, setBoardToDelete } = props;
+const DeleteBoardModal = () => {
+  useAssertSingleton('DeleteBoardModal');
+  const boardToDelete = useStore($boardToDelete);
   const { t } = useTranslation();
-  const canRestoreDeletedImagesFromBin = useAppSelector((s) => s.config.canRestoreDeletedImagesFromBin);
+
+  const boardId = useMemo(() => (boardToDelete === 'none' ? 'none' : boardToDelete?.board_id), [boardToDelete]);
+
   const { currentData: boardImageNames, isFetching: isFetchingBoardNames } = useListAllImageNamesForBoardQuery(
-    boardToDelete?.board_id ?? skipToken
+    boardId
+      ? {
+          board_id: boardId,
+          categories: undefined,
+          is_intermediate: undefined,
+        }
+      : skipToken
   );
 
   const selectImageUsageSummary = useMemo(
     () =>
       createMemoizedSelector(
-        [selectCanvasSlice, selectNodesSlice, selectControlAdaptersSlice, selectControlLayersSlice],
-        (canvas, nodes, controlAdapters, controlLayers) => {
+        [selectNodesSlice, selectCanvasSlice, selectUpscaleSlice, selectRefImagesSlice],
+        (nodes, canvas, upscale, refImages) => {
           const allImageUsage = (boardImageNames ?? []).map((imageName) =>
-            getImageUsage(canvas, nodes, controlAdapters, controlLayers.present, imageName)
+            getImageUsage(nodes, canvas, upscale, refImages, imageName)
           );
 
           const imageUsageSummary: ImageUsage = {
-            isCanvasImage: some(allImageUsage, (i) => i.isCanvasImage),
+            isUpscaleImage: some(allImageUsage, (i) => i.isUpscaleImage),
+            isRasterLayerImage: some(allImageUsage, (i) => i.isRasterLayerImage),
+            isInpaintMaskImage: some(allImageUsage, (i) => i.isInpaintMaskImage),
+            isRegionalGuidanceImage: some(allImageUsage, (i) => i.isRegionalGuidanceImage),
             isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
-            isControlImage: some(allImageUsage, (i) => i.isControlImage),
             isControlLayerImage: some(allImageUsage, (i) => i.isControlLayerImage),
+            isReferenceImage: some(allImageUsage, (i) => i.isReferenceImage),
           };
 
           return imageUsageSummary;
@@ -66,33 +82,48 @@ const DeleteBoardModal = (props: Props) => {
 
   const [deleteBoardAndImages, { isLoading: isDeleteBoardAndImagesLoading }] = useDeleteBoardAndImagesMutation();
 
+  const [deleteUncategorizedImages, { isLoading: isDeleteUncategorizedImagesLoading }] =
+    useDeleteUncategorizedImagesMutation();
+
   const imageUsageSummary = useAppSelector(selectImageUsageSummary);
 
   const handleDeleteBoardOnly = useCallback(() => {
-    if (!boardToDelete) {
+    if (!boardToDelete || boardToDelete === 'none') {
       return;
     }
-    deleteBoardOnly(boardToDelete.board_id);
-    setBoardToDelete(undefined);
-  }, [boardToDelete, deleteBoardOnly, setBoardToDelete]);
+    deleteBoardOnly({ board_id: boardToDelete.board_id });
+    $boardToDelete.set(null);
+  }, [boardToDelete, deleteBoardOnly]);
 
   const handleDeleteBoardAndImages = useCallback(() => {
-    if (!boardToDelete) {
+    if (!boardToDelete || boardToDelete === 'none') {
       return;
     }
-    deleteBoardAndImages(boardToDelete.board_id);
-    setBoardToDelete(undefined);
-  }, [boardToDelete, deleteBoardAndImages, setBoardToDelete]);
+    deleteBoardAndImages({ board_id: boardToDelete.board_id });
+    $boardToDelete.set(null);
+  }, [boardToDelete, deleteBoardAndImages]);
+
+  const handleDeleteUncategorizedImages = useCallback(() => {
+    if (!boardToDelete || boardToDelete !== 'none') {
+      return;
+    }
+    deleteUncategorizedImages();
+    $boardToDelete.set(null);
+  }, [boardToDelete, deleteUncategorizedImages]);
 
   const handleClose = useCallback(() => {
-    setBoardToDelete(undefined);
-  }, [setBoardToDelete]);
+    $boardToDelete.set(null);
+  }, []);
 
   const cancelRef = useRef<HTMLButtonElement>(null);
 
   const isLoading = useMemo(
-    () => isDeleteBoardAndImagesLoading || isDeleteBoardOnlyLoading || isFetchingBoardNames,
-    [isDeleteBoardAndImagesLoading, isDeleteBoardOnlyLoading, isFetchingBoardNames]
+    () =>
+      isDeleteBoardAndImagesLoading ||
+      isDeleteBoardOnlyLoading ||
+      isFetchingBoardNames ||
+      isDeleteUncategorizedImagesLoading,
+    [isDeleteBoardAndImagesLoading, isDeleteBoardOnlyLoading, isFetchingBoardNames, isDeleteUncategorizedImagesLoading]
   );
 
   if (!boardToDelete) {
@@ -104,7 +135,7 @@ const DeleteBoardModal = (props: Props) => {
       <AlertDialogOverlay>
         <AlertDialogContent>
           <AlertDialogHeader fontSize="lg" fontWeight="bold">
-            {t('controlnet.delete')} {boardToDelete.board_name}
+            {t('common.delete')} {boardToDelete === 'none' ? t('boards.uncategorizedImages') : boardToDelete.board_name}
           </AlertDialogHeader>
 
           <AlertDialogBody>
@@ -120,10 +151,8 @@ const DeleteBoardModal = (props: Props) => {
                   bottomMessage={t('boards.bottomMessage')}
                 />
               )}
-              <Text>{t('boards.deletedBoardsCannotbeRestored')}</Text>
-              <Text>
-                {canRestoreDeletedImagesFromBin ? t('gallery.deleteImageBin') : t('gallery.deleteImagePermanent')}
-              </Text>
+              {boardToDelete !== 'none' && <Text>{t('boards.deletedBoardsCannotbeRestored')}</Text>}
+              <Text>{t('gallery.deleteImagePermanent')}</Text>
             </Flex>
           </AlertDialogBody>
           <AlertDialogFooter>
@@ -131,12 +160,21 @@ const DeleteBoardModal = (props: Props) => {
               <Button ref={cancelRef} onClick={handleClose}>
                 {t('boards.cancel')}
               </Button>
-              <Button colorScheme="warning" isLoading={isLoading} onClick={handleDeleteBoardOnly}>
-                {t('boards.deleteBoardOnly')}
-              </Button>
-              <Button colorScheme="error" isLoading={isLoading} onClick={handleDeleteBoardAndImages}>
-                {t('boards.deleteBoardAndImages')}
-              </Button>
+              {boardToDelete !== 'none' && (
+                <Button colorScheme="warning" isLoading={isLoading} onClick={handleDeleteBoardOnly}>
+                  {t('boards.deleteBoardOnly')}
+                </Button>
+              )}
+              {boardToDelete !== 'none' && (
+                <Button colorScheme="error" isLoading={isLoading} onClick={handleDeleteBoardAndImages}>
+                  {t('boards.deleteBoardAndImages')}
+                </Button>
+              )}
+              {boardToDelete === 'none' && (
+                <Button colorScheme="error" isLoading={isLoading} onClick={handleDeleteUncategorizedImages}>
+                  {t('boards.deleteAllUncategorizedImages')}
+                </Button>
+              )}
             </Flex>
           </AlertDialogFooter>
         </AlertDialogContent>

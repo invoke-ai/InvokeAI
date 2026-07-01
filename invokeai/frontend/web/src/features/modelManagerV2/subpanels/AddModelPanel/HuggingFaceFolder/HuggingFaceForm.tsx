@@ -1,13 +1,14 @@
 import { Button, Flex, FormControl, FormErrorMessage, FormHelperText, FormLabel, Input } from '@invoke-ai/ui-library';
 import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
 import type { ChangeEventHandler } from 'react';
-import { useCallback, useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLazyGetHuggingFaceModelsQuery } from 'services/api/endpoints/models';
 
+import { HFToken } from './HFToken';
 import { HuggingFaceResults } from './HuggingFaceResults';
 
-export const HuggingFaceForm = () => {
+export const HuggingFaceForm = memo(() => {
   const [huggingFaceRepo, setHuggingFaceRepo] = useState('');
   const [displayResults, setDisplayResults] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -16,7 +17,7 @@ export const HuggingFaceForm = () => {
   const [_getHuggingFaceModels, { isLoading, data }] = useLazyGetHuggingFaceModelsQuery();
   const [installModel] = useInstallModel();
 
-  const getModels = useCallback(async () => {
+  const getModels = useCallback(() => {
     _getHuggingFaceModels(huggingFaceRepo)
       .unwrap()
       .then((response) => {
@@ -41,7 +42,7 @@ export const HuggingFaceForm = () => {
   }, []);
 
   return (
-    <Flex flexDir="column" height="100%" gap={3}>
+    <Flex flexDir="column" height="100%" gap={4}>
       <FormControl isInvalid={!!errorMessage.length} w="full" orientation="vertical" flexShrink={0}>
         <FormLabel>{t('modelManager.huggingFaceRepoID')}</FormLabel>
         <Flex gap={3} alignItems="center" w="full">
@@ -63,7 +64,10 @@ export const HuggingFaceForm = () => {
         <FormHelperText>{t('modelManager.huggingFaceHelper')}</FormHelperText>
         {!!errorMessage.length && <FormErrorMessage>{errorMessage}</FormErrorMessage>}
       </FormControl>
+      <HFToken />
       {data && data.urls && displayResults && <HuggingFaceResults results={data.urls} />}
     </Flex>
   );
-};
+});
+
+HuggingFaceForm.displayName = 'HuggingFaceForm';

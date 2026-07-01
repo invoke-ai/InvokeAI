@@ -1,0 +1,375 @@
+{
+  "id": "default_dbe46d95-22aa-43fb-9c16-94400d0ce2fd",
+  "name": "Text to Image - SD3.5",
+  "author": "InvokeAI",
+  "description": "Sample text to image workflow for Stable Diffusion 3.5",
+  "version": "1.0.0",
+  "contact": "invoke@invoke.ai",
+  "tags": "SD3.5, text to image",
+  "notes": "",
+  "exposedFields": [
+    {
+      "nodeId": "3f22f668-0e02-4fde-a2bb-c339586ceb4c",
+      "fieldName": "model"
+    },
+    {
+      "nodeId": "e17d34e7-6ed1-493c-9a85-4fcd291cb084",
+      "fieldName": "prompt"
+    }
+  ],
+  "meta": {
+    "version": "3.0.0",
+    "category": "default"
+  },
+  "nodes": [
+    {
+      "id": "3f22f668-0e02-4fde-a2bb-c339586ceb4c",
+      "type": "invocation",
+      "data": {
+        "id": "3f22f668-0e02-4fde-a2bb-c339586ceb4c",
+        "type": "sd3_model_loader",
+        "version": "1.0.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "nodePack": "invokeai",
+        "inputs": {
+          "model": {
+            "name": "model",
+            "label": ""
+          },
+          "t5_encoder_model": {
+            "name": "t5_encoder_model",
+            "label": ""
+          },
+          "clip_l_model": {
+            "name": "clip_l_model",
+            "label": ""
+          },
+          "clip_g_model": {
+            "name": "clip_g_model",
+            "label": ""
+          },
+          "vae_model": {
+            "name": "vae_model",
+            "label": ""
+          }
+        }
+      },
+      "position": {
+        "x": -55.58689609637031,
+        "y": -111.53602444662268
+      }
+    },
+    {
+      "id": "f7e394ac-6394-4096-abcb-de0d346506b3",
+      "type": "invocation",
+      "data": {
+        "id": "f7e394ac-6394-4096-abcb-de0d346506b3",
+        "type": "rand_int",
+        "version": "1.0.1",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": false,
+        "nodePack": "invokeai",
+        "inputs": {
+          "low": {
+            "name": "low",
+            "label": "",
+            "value": 0
+          },
+          "high": {
+            "name": "high",
+            "label": "",
+            "value": 2147483647
+          }
+        }
+      },
+      "position": {
+        "x": 470.45870147220353,
+        "y": 350.3141781644303
+      }
+    },
+    {
+      "id": "9eb72af0-dd9e-4ec5-ad87-d65e3c01f48b",
+      "type": "invocation",
+      "data": {
+        "id": "9eb72af0-dd9e-4ec5-ad87-d65e3c01f48b",
+        "type": "sd3_l2i",
+        "version": "1.3.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": true,
+        "nodePack": "invokeai",
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": ""
+          },
+          "latents": {
+            "name": "latents",
+            "label": ""
+          },
+          "vae": {
+            "name": "vae",
+            "label": ""
+          }
+        }
+      },
+      "position": {
+        "x": 1192.3097009334897,
+        "y": -366.0994675072209
+      }
+    },
+    {
+      "id": "3b4f7f27-cfc0-4373-a009-99c5290d0cd6",
+      "type": "invocation",
+      "data": {
+        "id": "3b4f7f27-cfc0-4373-a009-99c5290d0cd6",
+        "type": "sd3_text_encoder",
+        "version": "1.0.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "nodePack": "invokeai",
+        "inputs": {
+          "clip_l": {
+            "name": "clip_l",
+            "label": ""
+          },
+          "clip_g": {
+            "name": "clip_g",
+            "label": ""
+          },
+          "t5_encoder": {
+            "name": "t5_encoder",
+            "label": ""
+          },
+          "prompt": {
+            "name": "prompt",
+            "label": "",
+            "value": ""
+          }
+        }
+      },
+      "position": {
+        "x": 408.16054647924784,
+        "y": 65.06415352118786
+      }
+    },
+    {
+      "id": "e17d34e7-6ed1-493c-9a85-4fcd291cb084",
+      "type": "invocation",
+      "data": {
+        "id": "e17d34e7-6ed1-493c-9a85-4fcd291cb084",
+        "type": "sd3_text_encoder",
+        "version": "1.0.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "nodePack": "invokeai",
+        "inputs": {
+          "clip_l": {
+            "name": "clip_l",
+            "label": ""
+          },
+          "clip_g": {
+            "name": "clip_g",
+            "label": ""
+          },
+          "t5_encoder": {
+            "name": "t5_encoder",
+            "label": ""
+          },
+          "prompt": {
+            "name": "prompt",
+            "label": "",
+            "value": ""
+          }
+        }
+      },
+      "position": {
+        "x": 378.9283412440941,
+        "y": -302.65777497352553
+      }
+    },
+    {
+      "id": "c7539f7b-7ac5-49b9-93eb-87ede611409f",
+      "type": "invocation",
+      "data": {
+        "id": "c7539f7b-7ac5-49b9-93eb-87ede611409f",
+        "type": "sd3_denoise",
+        "version": "1.0.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "nodePack": "invokeai",
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": ""
+          },
+          "transformer": {
+            "name": "transformer",
+            "label": ""
+          },
+          "positive_conditioning": {
+            "name": "positive_conditioning",
+            "label": ""
+          },
+          "negative_conditioning": {
+            "name": "negative_conditioning",
+            "label": ""
+          },
+          "cfg_scale": {
+            "name": "cfg_scale",
+            "label": "",
+            "value": 3.5
+          },
+          "width": {
+            "name": "width",
+            "label": "",
+            "value": 1024
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "value": 1024
+          },
+          "steps": {
+            "name": "steps",
+            "label": "",
+            "value": 30
+          },
+          "seed": {
+            "name": "seed",
+            "label": "",
+            "value": 0
+          }
+        }
+      },
+      "position": {
+        "x": 813.7814762740603,
+        "y": -142.20529727605867
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "reactflow__edge-3f22f668-0e02-4fde-a2bb-c339586ceb4cvae-9eb72af0-dd9e-4ec5-ad87-d65e3c01f48bvae",
+      "type": "default",
+      "source": "3f22f668-0e02-4fde-a2bb-c339586ceb4c",
+      "target": "9eb72af0-dd9e-4ec5-ad87-d65e3c01f48b",
+      "sourceHandle": "vae",
+      "targetHandle": "vae"
+    },
+    {
+      "id": "reactflow__edge-3f22f668-0e02-4fde-a2bb-c339586ceb4ct5_encoder-3b4f7f27-cfc0-4373-a009-99c5290d0cd6t5_encoder",
+      "type": "default",
+      "source": "3f22f668-0e02-4fde-a2bb-c339586ceb4c",
+      "target": "3b4f7f27-cfc0-4373-a009-99c5290d0cd6",
+      "sourceHandle": "t5_encoder",
+      "targetHandle": "t5_encoder"
+    },
+    {
+      "id": "reactflow__edge-3f22f668-0e02-4fde-a2bb-c339586ceb4ct5_encoder-e17d34e7-6ed1-493c-9a85-4fcd291cb084t5_encoder",
+      "type": "default",
+      "source": "3f22f668-0e02-4fde-a2bb-c339586ceb4c",
+      "target": "e17d34e7-6ed1-493c-9a85-4fcd291cb084",
+      "sourceHandle": "t5_encoder",
+      "targetHandle": "t5_encoder"
+    },
+    {
+      "id": "reactflow__edge-3f22f668-0e02-4fde-a2bb-c339586ceb4cclip_g-3b4f7f27-cfc0-4373-a009-99c5290d0cd6clip_g",
+      "type": "default",
+      "source": "3f22f668-0e02-4fde-a2bb-c339586ceb4c",
+      "target": "3b4f7f27-cfc0-4373-a009-99c5290d0cd6",
+      "sourceHandle": "clip_g",
+      "targetHandle": "clip_g"
+    },
+    {
+      "id": "reactflow__edge-3f22f668-0e02-4fde-a2bb-c339586ceb4cclip_g-e17d34e7-6ed1-493c-9a85-4fcd291cb084clip_g",
+      "type": "default",
+      "source": "3f22f668-0e02-4fde-a2bb-c339586ceb4c",
+      "target": "e17d34e7-6ed1-493c-9a85-4fcd291cb084",
+      "sourceHandle": "clip_g",
+      "targetHandle": "clip_g"
+    },
+    {
+      "id": "reactflow__edge-3f22f668-0e02-4fde-a2bb-c339586ceb4cclip_l-3b4f7f27-cfc0-4373-a009-99c5290d0cd6clip_l",
+      "type": "default",
+      "source": "3f22f668-0e02-4fde-a2bb-c339586ceb4c",
+      "target": "3b4f7f27-cfc0-4373-a009-99c5290d0cd6",
+      "sourceHandle": "clip_l",
+      "targetHandle": "clip_l"
+    },
+    {
+      "id": "reactflow__edge-3f22f668-0e02-4fde-a2bb-c339586ceb4cclip_l-e17d34e7-6ed1-493c-9a85-4fcd291cb084clip_l",
+      "type": "default",
+      "source": "3f22f668-0e02-4fde-a2bb-c339586ceb4c",
+      "target": "e17d34e7-6ed1-493c-9a85-4fcd291cb084",
+      "sourceHandle": "clip_l",
+      "targetHandle": "clip_l"
+    },
+    {
+      "id": "reactflow__edge-3f22f668-0e02-4fde-a2bb-c339586ceb4ctransformer-c7539f7b-7ac5-49b9-93eb-87ede611409ftransformer",
+      "type": "default",
+      "source": "3f22f668-0e02-4fde-a2bb-c339586ceb4c",
+      "target": "c7539f7b-7ac5-49b9-93eb-87ede611409f",
+      "sourceHandle": "transformer",
+      "targetHandle": "transformer"
+    },
+    {
+      "id": "reactflow__edge-f7e394ac-6394-4096-abcb-de0d346506b3value-c7539f7b-7ac5-49b9-93eb-87ede611409fseed",
+      "type": "default",
+      "source": "f7e394ac-6394-4096-abcb-de0d346506b3",
+      "target": "c7539f7b-7ac5-49b9-93eb-87ede611409f",
+      "sourceHandle": "value",
+      "targetHandle": "seed"
+    },
+    {
+      "id": "reactflow__edge-c7539f7b-7ac5-49b9-93eb-87ede611409flatents-9eb72af0-dd9e-4ec5-ad87-d65e3c01f48blatents",
+      "type": "default",
+      "source": "c7539f7b-7ac5-49b9-93eb-87ede611409f",
+      "target": "9eb72af0-dd9e-4ec5-ad87-d65e3c01f48b",
+      "sourceHandle": "latents",
+      "targetHandle": "latents"
+    },
+    {
+      "id": "reactflow__edge-e17d34e7-6ed1-493c-9a85-4fcd291cb084conditioning-c7539f7b-7ac5-49b9-93eb-87ede611409fpositive_conditioning",
+      "type": "default",
+      "source": "e17d34e7-6ed1-493c-9a85-4fcd291cb084",
+      "target": "c7539f7b-7ac5-49b9-93eb-87ede611409f",
+      "sourceHandle": "conditioning",
+      "targetHandle": "positive_conditioning"
+    },
+    {
+      "id": "reactflow__edge-3b4f7f27-cfc0-4373-a009-99c5290d0cd6conditioning-c7539f7b-7ac5-49b9-93eb-87ede611409fnegative_conditioning",
+      "type": "default",
+      "source": "3b4f7f27-cfc0-4373-a009-99c5290d0cd6",
+      "target": "c7539f7b-7ac5-49b9-93eb-87ede611409f",
+      "sourceHandle": "conditioning",
+      "targetHandle": "negative_conditioning"
+    }
+  ]
+}

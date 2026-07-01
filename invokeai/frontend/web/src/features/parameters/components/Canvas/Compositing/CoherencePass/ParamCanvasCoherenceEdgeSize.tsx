@@ -1,20 +1,23 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { setCanvasCoherenceEdgeSize } from 'features/parameters/store/generationSlice';
+import { selectCanvasCoherenceEdgeSize, setCanvasCoherenceEdgeSize } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+const CONSTRAINTS = {
+  initial: 16,
+  sliderMin: 0,
+  sliderMax: 128,
+  numberInputMin: 0,
+  numberInputMax: 1024,
+  fineStep: 8,
+  coarseStep: 16,
+};
+
 const ParamCanvasCoherenceEdgeSize = () => {
   const dispatch = useAppDispatch();
-  const canvasCoherenceEdgeSize = useAppSelector((s) => s.generation.canvasCoherenceEdgeSize);
-  const initial = useAppSelector((s) => s.config.sd.canvasCoherenceEdgeSize.initial);
-  const sliderMin = useAppSelector((s) => s.config.sd.canvasCoherenceEdgeSize.sliderMin);
-  const sliderMax = useAppSelector((s) => s.config.sd.canvasCoherenceEdgeSize.sliderMax);
-  const numberInputMin = useAppSelector((s) => s.config.sd.canvasCoherenceEdgeSize.numberInputMin);
-  const numberInputMax = useAppSelector((s) => s.config.sd.canvasCoherenceEdgeSize.numberInputMax);
-  const coarseStep = useAppSelector((s) => s.config.sd.canvasCoherenceEdgeSize.coarseStep);
-  const fineStep = useAppSelector((s) => s.config.sd.canvasCoherenceEdgeSize.fineStep);
+  const canvasCoherenceEdgeSize = useAppSelector(selectCanvasCoherenceEdgeSize);
 
   const { t } = useTranslation();
 
@@ -31,22 +34,22 @@ const ParamCanvasCoherenceEdgeSize = () => {
         <FormLabel>{t('parameters.coherenceEdgeSize')}</FormLabel>
       </InformationalPopover>
       <CompositeSlider
-        min={sliderMin}
-        max={sliderMax}
-        step={coarseStep}
-        fineStep={fineStep}
+        min={CONSTRAINTS.sliderMin}
+        max={CONSTRAINTS.sliderMax}
+        step={CONSTRAINTS.coarseStep}
+        fineStep={CONSTRAINTS.fineStep}
         value={canvasCoherenceEdgeSize}
-        defaultValue={initial}
+        defaultValue={CONSTRAINTS.initial}
         onChange={handleChange}
         marks
       />
       <CompositeNumberInput
-        min={numberInputMin}
-        max={numberInputMax}
-        step={coarseStep}
-        fineStep={fineStep}
+        min={CONSTRAINTS.numberInputMin}
+        max={CONSTRAINTS.numberInputMax}
+        step={CONSTRAINTS.coarseStep}
+        fineStep={CONSTRAINTS.fineStep}
         value={canvasCoherenceEdgeSize}
-        defaultValue={initial}
+        defaultValue={CONSTRAINTS.initial}
         onChange={handleChange}
       />
     </FormControl>

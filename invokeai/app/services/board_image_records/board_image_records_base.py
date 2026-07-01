@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
+from invokeai.app.services.image_records.image_records_common import ImageCategory
+
 
 class BoardImageRecordStorageBase(ABC):
     """Abstract base class for the one-to-many board-image relationship record storage."""
@@ -26,6 +28,8 @@ class BoardImageRecordStorageBase(ABC):
     def get_all_board_image_names_for_board(
         self,
         board_id: str,
+        categories: list[ImageCategory] | None,
+        is_intermediate: bool | None,
     ) -> list[str]:
         """Gets all board images for a board, as a list of the image names."""
         pass
@@ -44,4 +48,12 @@ class BoardImageRecordStorageBase(ABC):
         board_id: str,
     ) -> int:
         """Gets the number of images for a board."""
+        pass
+
+    @abstractmethod
+    def get_asset_count_for_board(
+        self,
+        board_id: str,
+    ) -> int:
+        """Gets the number of assets for a board."""
         pass

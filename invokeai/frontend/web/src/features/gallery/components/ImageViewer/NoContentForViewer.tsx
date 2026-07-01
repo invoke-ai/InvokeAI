@@ -1,0 +1,186 @@
+import type { ButtonProps } from '@invoke-ai/ui-library';
+import { Alert, AlertDescription, AlertIcon, Button, Divider, Flex, Link, Spinner, Text } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
+import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { InvokeLogoIcon } from 'common/components/InvokeLogoIcon';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
+import { LOADING_SYMBOL, useHasImages } from 'features/gallery/hooks/useHasImages';
+import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
+import type { PropsWithChildren } from 'react';
+import { memo, useCallback, useMemo } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
+import { PiArrowSquareOutBold, PiImageBold } from 'react-icons/pi';
+import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
+import { useMainModels } from 'services/api/hooks/modelsByType';
+
+export const NoContentForViewer = memo(() => {
+  const hasImages = useHasImages();
+  const [mainModels, { data }] = useMainModels();
+  const { data: setupStatus } = useGetSetupStatusQuery();
+  const user = useAppSelector(selectCurrentUser);
+  const { t } = useTranslation();
+
+  const isMultiuser = setupStatus?.multiuser_enabled ?? false;
+  const isAdmin = !isMultiuser || (user?.is_admin ?? false);
+  const adminEmail = setupStatus?.admin_email ?? null;
+
+  const modelsLoaded = data !== undefined;
+  const hasModels = mainModels.length > 0;
+
+  const showStarterBundles = useMemo(() => {
+    return modelsLoaded && !hasModels && isAdmin;
+  }, [modelsLoaded, hasModels, isAdmin]);
+
+  if (hasImages === LOADING_SYMBOL) {
+    // Blank bg w/ a spinner. The new user experience components below have an invoke logo, but it's not centered.
+    // If we show the logo while loading, there is an awkward layout shift where the invoke logo moves a bit. Less
+    // jarring to show a blank bg with a spinner - it will only be shown for a moment as we do the initial images
+    // fetching.
+    return <LoadingSpinner />;
+  }
+
+  if (hasImages) {
+    return <IAINoContentFallback icon={PiImageBold} label={t('gallery.noImageSelected')} />;
+  }
+
+  return (
+    <Flex flexDir="column" gap={8} alignItems="center" textAlign="center" maxW="400px">
+      <InvokeLogoIcon w={32} h={32} />
+      <Flex flexDir="column" gap={4} alignItems="center" textAlign="center">
+        {isAdmin ? (
+          // Admin / single-user mode
+          <>
+            {modelsLoaded && hasModels ? <GetStartedWithModels /> : <GetStartedLocal />}
+            {showStarterBundles && <StarterBundlesCallout />}
+            <Divider />
+            <LowVRAMAlert />
+          </>
+        ) : (
+          // Non-admin user in multiuser mode
+          <>{modelsLoaded && hasModels ? <GetStartedWithModels /> : <GetStartedNonAdmin adminEmail={adminEmail} />}</>
+        )}
+      </Flex>
+    </Flex>
+  );
+});
+
+NoContentForViewer.displayName = 'NoContentForViewer';
+
+const LoadingSpinner = () => {
+  const { t } = useTranslation();
+  return (
+    <Flex position="relative" width="full" height="full" alignItems="center" justifyContent="center">
+      <Spinner
+        label={t('common.loading')}
+        color="grey"
+        position="absolute"
+        size="sm"
+        width={8}
+        height={8}
+        right={4}
+        bottom={4}
+      />
+    </Flex>
+  );
+};
+
+export const ExternalLink = (props: ButtonProps & { href: string }) => {
+  return (
+    <Button
+      as={Link}
+      variant="unstyled"
+      isExternal
+      display="inline-flex"
+      alignItems="center"
+      rightIcon={<PiArrowSquareOutBold />}
+      color="base.50"
+      mt={-1}
+      {...props}
+    />
+  );
+};
+
+const InlineButton = (props: PropsWithChildren<{ onClick: () => void }>) => {
+  return (
+    <Button variant="link" size="md" onClick={props.onClick} color="base.50">
+      {props.children}
+    </Button>
+  );
+};
+
+const StrongComponent = <Text as="span" color="base.50" fontSize="md" />;
+
+const GetStartedLocal = () => {
+  return (
+    <Text fontSize="md" color="base.200">
+      <Trans i18nKey="newUserExperience.toGetStartedLocal" components={{ StrongComponent }} />
+    </Text>
+  );
+};
+
+const GetStartedWithModels = () => {
+  return (
+    <Text fontSize="md" color="base.200">
+      <Trans i18nKey="newUserExperience.toGetStarted" components={{ StrongComponent }} />
+    </Text>
+  );
+};
+
+const GetStartedNonAdmin = ({ adminEmail }: { adminEmail: string | null }) => {
+  const AdminEmailLink = adminEmail ? (
+    <Link href={`mailto:${adminEmail}`} color="base.50">
+      {adminEmail}
+    </Link>
+  ) : (
+    <Text as="span" color="base.50">
+      your administrator
+    </Text>
+  );
+
+  return (
+    <Text fontSize="md" color="base.200">
+      <Trans i18nKey="newUserExperience.toGetStartedNonAdmin" components={{ StrongComponent, AdminEmailLink }} />
+    </Text>
+  );
+};
+
+const StarterBundlesCallout = () => {
+  const handleClickDownloadStarterModels = useCallback(() => {
+    navigationApi.switchToTab('models');
+    setInstallModelsTabByName('starterModels');
+  }, []);
+
+  const handleClickImportModels = useCallback(() => {
+    navigationApi.switchToTab('models');
+    setInstallModelsTabByName('urlOrLocal');
+  }, []);
+
+  return (
+    <Text fontSize="md" color="base.200">
+      <Trans
+        i18nKey="newUserExperience.noModelsInstalled"
+        components={{
+          DownloadStarterModelsButton: <InlineButton onClick={handleClickDownloadStarterModels} />,
+          ImportModelsButton: <InlineButton onClick={handleClickImportModels} />,
+        }}
+      />
+    </Text>
+  );
+};
+
+const LowVRAMAlert = () => {
+  return (
+    <Alert status="warning" borderRadius="base" fontSize="md" shadow="md" w="fit-content">
+      <AlertIcon />
+      <AlertDescription>
+        <Trans
+          i18nKey="newUserExperience.lowVRAMMode"
+          components={{
+            LinkComponent: <ExternalLink href="https://invoke.ai/configuration/low-vram-mode/" />,
+          }}
+        />
+      </AlertDescription>
+    </Alert>
+  );
+};

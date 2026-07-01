@@ -1,21 +1,28 @@
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Optional, Union
 
 from PIL.Image import Image
+from pydantic.networks import AnyHttpUrl
 from torch import Tensor
 
 from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.invocations.fields import MetadataField, WithBoard, WithMetadata
+from invokeai.app.services.board_records.board_records_common import BoardRecordOrderBy
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
-from invokeai.app.util.step_callback import stable_diffusion_step_callback
-from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelFormat, ModelType, SubModelType
-from invokeai.backend.model_manager.load.load_base import LoadedModel
+from invokeai.app.services.session_processor.session_processor_common import ProgressImage
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.util.step_callback import diffusion_step_callback
+from invokeai.backend.model_manager.configs.base import Config_Base
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
+from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
 
@@ -65,7 +72,7 @@ class InvocationContextInterface:
 
 class BoardsInterface(InvocationContextInterface):
     def create(self, board_name: str) -> BoardDTO:
-        """Creates a board.
+        """Creates a board for the current user.
 
         Args:
             board_name: The name of the board to create.
@@ -73,7 +80,8 @@ class BoardsInterface(InvocationContextInterface):
         Returns:
             The created board DTO.
         """
-        return self._services.boards.create(board_name)
+        user_id = self._data.queue_item.user_id
+        return self._services.boards.create(board_name, user_id)
 
     def get_dto(self, board_id: str) -> BoardDTO:
         """Gets a board DTO.
@@ -87,12 +95,15 @@ class BoardsInterface(InvocationContextInterface):
         return self._services.boards.get_dto(board_id)
 
     def get_all(self) -> list[BoardDTO]:
-        """Gets all boards.
+        """Gets all boards accessible to the current user.
 
         Returns:
-            A list of all boards.
+            A list of all boards accessible to the current user.
         """
-        return self._services.boards.get_all()
+        user_id = self._data.queue_item.user_id
+        return self._services.boards.get_all(
+            user_id, order_by=BoardRecordOrderBy.CreatedAt, direction=SQLiteDirection.Descending
+        )
 
     def add_image_to_board(self, board_id: str, image_name: str) -> None:
         """Adds an image to a board.
@@ -112,7 +123,11 @@ class BoardsInterface(InvocationContextInterface):
         Returns:
             A list of all image names for the board.
         """
-        return self._services.board_images.get_all_board_image_names_for_board(board_id)
+        return self._services.board_images.get_all_board_image_names_for_board(
+            board_id,
+            categories=None,
+            is_intermediate=None,
+        )
 
 
 class LoggerInterface(InvocationContextInterface):
@@ -150,6 +165,10 @@ class LoggerInterface(InvocationContextInterface):
 
 
 class ImagesInterface(InvocationContextInterface):
+    def __init__(self, services: InvocationServices, data: InvocationContextData, util: "UtilInterface") -> None:
+        super().__init__(services, data)
+        self._util = util
+
     def save(
         self,
         image: Image,
@@ -175,6 +194,8 @@ class ImagesInterface(InvocationContextInterface):
         Returns:
             The saved image DTO.
         """
+
+        self._util.signal_progress("Saving image")
 
         # If `metadata` is provided directly, use that. Else, use the metadata provided by `WithMetadata`, falling back to None.
         metadata_ = None
@@ -209,10 +230,11 @@ class ImagesInterface(InvocationContextInterface):
             graph=graph_,
             session_id=self._data.queue_item.session_id,
             node_id=self._data.invocation.id,
+            user_id=self._data.queue_item.user_id,
         )
 
     def get_pil(self, image_name: str, mode: IMAGE_MODES | None = None) -> Image:
-        """Gets an image as a PIL Image object.
+        """Gets an image as a PIL Image object. This method returns a copy of the image.
 
         Args:
             image_name: The name of the image to get.
@@ -224,11 +246,15 @@ class ImagesInterface(InvocationContextInterface):
         image = self._services.images.get_pil_image(image_name)
         if mode and mode != image.mode:
             try:
+                # convert makes a copy!
                 image = image.convert(mode)
             except ValueError:
                 self._services.logger.warning(
                     f"Could not convert image from {image.mode} to {mode}. Using original mode instead."
                 )
+        else:
+            # copy the image to prevent the user from modifying the original
+            image = image.copy()
         return image
 
     def get_metadata(self, image_name: str) -> Optional[MetadataField]:
@@ -263,7 +289,7 @@ class ImagesInterface(InvocationContextInterface):
         Returns:
             The local path of the image or thumbnail.
         """
-        return self._services.images.get_path(image_name, thumbnail)
+        return Path(self._services.images.get_path(image_name, thumbnail))
 
 
 class TensorsInterface(InvocationContextInterface):
@@ -281,15 +307,15 @@ class TensorsInterface(InvocationContextInterface):
         return name
 
     def load(self, name: str) -> Tensor:
-        """Loads a tensor by name.
+        """Loads a tensor by name. This method returns a copy of the tensor.
 
         Args:
             name: The name of the tensor to load.
 
         Returns:
-            The loaded tensor.
+            The tensor.
         """
-        return self._services.tensors.load(name)
+        return self._services.tensors.load(name).clone()
 
 
 class ConditioningInterface(InvocationContextInterface):
@@ -307,21 +333,27 @@ class ConditioningInterface(InvocationContextInterface):
         return name
 
     def load(self, name: str) -> ConditioningFieldData:
-        """Loads conditioning data by name.
+        """Loads conditioning data by name. This method returns a copy of the conditioning data.
 
         Args:
             name: The name of the conditioning data to load.
 
         Returns:
-            The loaded conditioning data.
+            The conditioning data.
         """
 
-        return self._services.conditioning.load(name)
+        return deepcopy(self._services.conditioning.load(name))
 
 
 class ModelsInterface(InvocationContextInterface):
+    """Common API for loading, downloading and managing models."""
+
+    def __init__(self, services: InvocationServices, data: InvocationContextData, util: "UtilInterface") -> None:
+        super().__init__(services, data)
+        self._util = util
+
     def exists(self, identifier: Union[str, "ModelIdentifierField"]) -> bool:
-        """Checks if a model exists.
+        """Check if a model exists.
 
         Args:
             identifier: The key or ModelField representing the model.
@@ -331,13 +363,13 @@ class ModelsInterface(InvocationContextInterface):
         """
         if isinstance(identifier, str):
             return self._services.model_manager.store.exists(identifier)
-
-        return self._services.model_manager.store.exists(identifier.key)
+        else:
+            return self._services.model_manager.store.exists(identifier.key)
 
     def load(
         self, identifier: Union[str, "ModelIdentifierField"], submodel_type: Optional[SubModelType] = None
     ) -> LoadedModel:
-        """Loads a model.
+        """Load a model.
 
         Args:
             identifier: The key or ModelField representing the model.
@@ -352,16 +384,22 @@ class ModelsInterface(InvocationContextInterface):
 
         if isinstance(identifier, str):
             model = self._services.model_manager.store.get_model(identifier)
-            return self._services.model_manager.load.load_model(model, submodel_type)
         else:
-            _submodel_type = submodel_type or identifier.submodel_type
+            submodel_type = submodel_type or identifier.submodel_type
             model = self._services.model_manager.store.get_model(identifier.key)
-            return self._services.model_manager.load.load_model(model, _submodel_type)
+
+        self._raise_if_external(model)
+
+        message = f"Loading model {model.name}"
+        if submodel_type:
+            message += f" ({submodel_type.value})"
+        self._util.signal_progress(message)
+        return self._services.model_manager.load.load_model(model, submodel_type)
 
     def load_by_attrs(
         self, name: str, base: BaseModelType, type: ModelType, submodel_type: Optional[SubModelType] = None
     ) -> LoadedModel:
-        """Loads a model by its attributes.
+        """Load a model by its attributes.
 
         Args:
             name: Name of the model.
@@ -381,10 +419,20 @@ class ModelsInterface(InvocationContextInterface):
         if len(configs) > 1:
             raise ValueError(f"More than one model found with name {name}, base {base}, and type {type}")
 
+        self._raise_if_external(configs[0])
+        message = f"Loading model {name}"
+        if submodel_type:
+            message += f" ({submodel_type.value})"
+        self._util.signal_progress(message)
         return self._services.model_manager.load.load_model(configs[0], submodel_type)
 
+    @staticmethod
+    def _raise_if_external(model: AnyModelConfig) -> None:
+        if model.base == BaseModelType.External or model.format == ModelFormat.ExternalApi:
+            raise ValueError("External API models cannot be loaded from disk")
+
     def get_config(self, identifier: Union[str, "ModelIdentifierField"]) -> AnyModelConfig:
-        """Gets a model's config.
+        """Get a model's config.
 
         Args:
             identifier: The key or ModelField representing the model.
@@ -394,11 +442,11 @@ class ModelsInterface(InvocationContextInterface):
         """
         if isinstance(identifier, str):
             return self._services.model_manager.store.get_model(identifier)
-
-        return self._services.model_manager.store.get_model(identifier.key)
+        else:
+            return self._services.model_manager.store.get_model(identifier.key)
 
     def search_by_path(self, path: Path) -> list[AnyModelConfig]:
-        """Searches for models by path.
+        """Search for models by path.
 
         Args:
             path: The path to search for.
@@ -415,7 +463,7 @@ class ModelsInterface(InvocationContextInterface):
         type: Optional[ModelType] = None,
         format: Optional[ModelFormat] = None,
     ) -> list[AnyModelConfig]:
-        """Searches for models by attributes.
+        """Search for models by attributes.
 
         Args:
             name: The name to search for (exact match).
@@ -433,6 +481,101 @@ class ModelsInterface(InvocationContextInterface):
             model_type=type,
             model_format=format,
         )
+
+    def download_and_cache_model(
+        self,
+        source: str | AnyHttpUrl,
+    ) -> Path:
+        """
+        Download the model file located at source to the models cache and return its Path.
+
+        This can be used to single-file install models and other resources of arbitrary types
+        which should not get registered with the database. If the model is already
+        installed, the cached path will be returned. Otherwise it will be downloaded.
+
+        Args:
+            source: A URL that points to the model, or a huggingface repo_id.
+
+        Returns:
+            Path to the downloaded model
+        """
+        self._util.signal_progress(f"Downloading model {source}")
+        return self._services.model_manager.install.download_and_cache_model(source=source)
+
+    def load_local_model(
+        self,
+        model_path: Path,
+        loader: Optional[Callable[[Path], AnyModel]] = None,
+    ) -> LoadedModelWithoutConfig:
+        """
+        Load the model file located at the indicated path
+
+        If a loader callable is provided, it will be invoked to load the model. Otherwise,
+        `safetensors.torch.load_file()` or `torch.load()` will be called to load the model.
+
+        Be aware that the LoadedModelWithoutConfig object has no `config` attribute
+
+        Args:
+            path: A model Path
+            loader: A Callable that expects a Path and returns a dict[str|int, Any]
+
+        Returns:
+            A LoadedModelWithoutConfig object.
+        """
+
+        self._util.signal_progress(f"Loading model {model_path.name}")
+        return self._services.model_manager.load.load_model_from_path(model_path=model_path, loader=loader)
+
+    def load_remote_model(
+        self,
+        source: str | AnyHttpUrl,
+        loader: Optional[Callable[[Path], AnyModel]] = None,
+    ) -> LoadedModelWithoutConfig:
+        """
+        Download, cache, and load the model file located at the indicated URL or repo_id.
+
+        If the model is already downloaded, it will be loaded from the cache.
+
+        If the a loader callable is provided, it will be invoked to load the model. Otherwise,
+        `safetensors.torch.load_file()` or `torch.load()` will be called to load the model.
+
+        Be aware that the LoadedModelWithoutConfig object has no `config` attribute
+
+        Args:
+            source: A URL or huggingface repoid.
+            loader: A Callable that expects a Path and returns a dict[str|int, Any]
+
+        Returns:
+            A LoadedModelWithoutConfig object.
+        """
+        model_path = self._services.model_manager.install.download_and_cache_model(source=str(source))
+
+        self._util.signal_progress(f"Loading model {source}")
+        return self._services.model_manager.load.load_model_from_path(model_path=model_path, loader=loader)
+
+    def get_absolute_path(self, config_or_path: AnyModelConfig | Path | str) -> Path:
+        """Gets the absolute path for a given model config or path.
+
+        For example, if the model's path is `flux/main/FLUX Dev.safetensors`, and the models path is
+        `/home/username/InvokeAI/models`, this method will return
+        `/home/username/InvokeAI/models/flux/main/FLUX Dev.safetensors`.
+
+        Args:
+            config_or_path: The model config or path.
+
+        Returns:
+            The absolute path to the model.
+        """
+
+        model_path = Path(config_or_path.path) if isinstance(config_or_path, Config_Base) else Path(config_or_path)
+
+        if model_path.is_absolute():
+            return model_path.resolve()
+
+        base_models_path = self._services.configuration.models_path
+        joined_path = base_models_path / model_path
+        resolved_path = joined_path.resolve()
+        return resolved_path
 
 
 class ConfigInterface(InvocationContextInterface):
@@ -473,12 +616,106 @@ class UtilInterface(InvocationContextInterface):
             base_model: The base model for the current denoising step.
         """
 
-        stable_diffusion_step_callback(
-            context_data=self._data,
+        diffusion_step_callback(
+            signal_progress=self.signal_progress,
             intermediate_state=intermediate_state,
             base_model=base_model,
-            events=self._services.events,
             is_canceled=self.is_canceled,
+        )
+
+    def flux_step_callback(self, intermediate_state: PipelineIntermediateState) -> None:
+        """
+        The step callback emits a progress event with the current step, the total number of
+        steps, a preview image, and some other internal metadata.
+
+        This should be called after each denoising step.
+
+        Args:
+            intermediate_state: The intermediate state of the diffusion pipeline.
+        """
+
+        diffusion_step_callback(
+            signal_progress=self.signal_progress,
+            intermediate_state=intermediate_state,
+            base_model=BaseModelType.Flux,
+            is_canceled=self.is_canceled,
+        )
+
+    def flux2_step_callback(self, intermediate_state: PipelineIntermediateState) -> None:
+        """
+        The step callback for FLUX.2 Klein models (32-channel VAE).
+
+        Args:
+            intermediate_state: The intermediate state of the diffusion pipeline.
+        """
+
+        diffusion_step_callback(
+            signal_progress=self.signal_progress,
+            intermediate_state=intermediate_state,
+            base_model=BaseModelType.Flux2,
+            is_canceled=self.is_canceled,
+        )
+
+    def signal_progress(
+        self,
+        message: str,
+        percentage: float | None = None,
+        image: Image | None = None,
+        image_size: tuple[int, int] | None = None,
+    ) -> None:
+        """Signals the progress of some long-running invocation. The progress is displayed in the UI.
+
+        If a percentage is provided, the UI will display a progress bar and automatically append the percentage to the
+        message. You should not include the percentage in the message.
+
+        Example:
+            ```py
+            total_steps = 10
+            for i in range(total_steps):
+                percentage = i / (total_steps - 1)
+                context.util.signal_progress("Doing something cool", percentage)
+            ```
+
+        If an image is provided, the UI will display it. If your image should be displayed at a different size, provide
+        a tuple of `(width, height)` for the `image_size` parameter. The image will be displayed at the specified size
+        in the UI.
+
+        For example, SD denoising progress images are 1/8 the size of the original image, so you'd do this to ensure the
+        image is displayed at the correct size:
+            ```py
+            # Calculate the output size of the image (8x the progress image's size)
+            width = progress_image.width * 8
+            height = progress_image.height * 8
+            # Signal the progress with the image and output size
+            signal_progress("Denoising", percentage, progress_image, (width, height))
+            ```
+
+        If your progress image is very large, consider downscaling it to reduce the payload size and provide the original
+        size to the `image_size` parameter. The PIL `thumbnail` method is useful for this, as it maintains the aspect
+        ratio of the image:
+            ```py
+            # `thumbnail` modifies the image in-place, so we need to first make a copy
+            thumbnail_image = progress_image.copy()
+            # Resize the image to a maximum of 256x256 pixels, maintaining the aspect ratio
+            thumbnail_image.thumbnail((256, 256))
+            # Signal the progress with the thumbnail, passing the original size
+            signal_progress("Denoising", percentage, thumbnail, progress_image.size)
+            ```
+
+        Args:
+            message: A message describing the current status. Do not include the percentage in this message.
+            percentage: The current percentage completion for the process. Omit for indeterminate progress.
+            image: An optional image to display.
+            image_size: The optional size of the image to display. If omitted, the image will be displayed at its
+                original size.
+        """
+
+        self._services.events.emit_invocation_progress(
+            queue_item=self._data.queue_item,
+            invocation=self._data.invocation,
+            message=message,
+            percentage=percentage,
+            image=ProgressImage.build(image, image_size) if image else None,
         )
 
 
@@ -547,12 +784,12 @@ def build_invocation_context(
     """
 
     logger = LoggerInterface(services=services, data=data)
-    images = ImagesInterface(services=services, data=data)
     tensors = TensorsInterface(services=services, data=data)
-    models = ModelsInterface(services=services, data=data)
     config = ConfigInterface(services=services, data=data)
     util = UtilInterface(services=services, data=data, is_canceled=is_canceled)
     conditioning = ConditioningInterface(services=services, data=data)
+    models = ModelsInterface(services=services, data=data, util=util)
+    images = ImagesInterface(services=services, data=data, util=util)
     boards = BoardsInterface(services=services, data=data)
 
     ctx = InvocationContext(

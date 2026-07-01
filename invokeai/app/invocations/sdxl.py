@@ -1,14 +1,8 @@
-from invokeai.app.invocations.fields import FieldDescriptions, InputField, OutputField, UIType
+from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
+from invokeai.app.invocations.fields import FieldDescriptions, InputField, OutputField
+from invokeai.app.invocations.model import CLIPField, ModelIdentifierField, UNetField, VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager import SubModelType
-
-from .baseinvocation import (
-    BaseInvocation,
-    BaseInvocationOutput,
-    invocation,
-    invocation_output,
-)
-from .model import CLIPField, ModelIdentifierField, UNetField, VAEField
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 
 
 @invocation_output("sdxl_model_loader_output")
@@ -30,12 +24,14 @@ class SDXLRefinerModelLoaderOutput(BaseInvocationOutput):
     vae: VAEField = OutputField(description=FieldDescriptions.vae, title="VAE")
 
 
-@invocation("sdxl_model_loader", title="SDXL Main Model", tags=["model", "sdxl"], category="model", version="1.0.3")
+@invocation("sdxl_model_loader", title="Main Model - SDXL", tags=["model", "sdxl"], category="model", version="1.0.4")
 class SDXLModelLoaderInvocation(BaseInvocation):
     """Loads an sdxl base model, outputting its submodels."""
 
     model: ModelIdentifierField = InputField(
-        description=FieldDescriptions.sdxl_main_model, ui_type=UIType.SDXLMainModel
+        description=FieldDescriptions.sdxl_main_model,
+        ui_model_base=BaseModelType.StableDiffusionXL,
+        ui_model_type=ModelType.Main,
     )
     # TODO: precision?
 
@@ -64,16 +60,18 @@ class SDXLModelLoaderInvocation(BaseInvocation):
 
 @invocation(
     "sdxl_refiner_model_loader",
-    title="SDXL Refiner Model",
+    title="Refiner Model - SDXL",
     tags=["model", "sdxl", "refiner"],
     category="model",
-    version="1.0.3",
+    version="1.0.4",
 )
 class SDXLRefinerModelLoaderInvocation(BaseInvocation):
     """Loads an sdxl refiner model, outputting its submodels."""
 
     model: ModelIdentifierField = InputField(
-        description=FieldDescriptions.sdxl_refiner_model, ui_type=UIType.SDXLRefinerModel
+        description=FieldDescriptions.sdxl_refiner_model,
+        ui_model_base=BaseModelType.StableDiffusionXLRefiner,
+        ui_model_type=ModelType.Main,
     )
     # TODO: precision?
 

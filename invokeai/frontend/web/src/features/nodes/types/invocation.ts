@@ -1,4 +1,4 @@
-import type { Edge, Node } from 'reactflow';
+import type { Edge, Node } from '@xyflow/react';
 import { z } from 'zod';
 
 import { zClassification, zProgressImage } from './common';
@@ -6,31 +6,32 @@ import { zFieldInputInstance, zFieldInputTemplate, zFieldOutputTemplate } from '
 import { zSemVer } from './semver';
 
 // #region InvocationTemplate
-const zInvocationTemplate = z.object({
+const _zInvocationTemplate = z.object({
   type: z.string(),
   title: z.string(),
   description: z.string(),
   tags: z.array(z.string().min(1)),
-  inputs: z.record(zFieldInputTemplate),
-  outputs: z.record(zFieldOutputTemplate),
+  inputs: z.record(z.string(), zFieldInputTemplate),
+  outputs: z.record(z.string(), zFieldOutputTemplate),
   outputType: z.string().min(1),
   version: zSemVer,
   useCache: z.boolean(),
-  nodePack: z.string().min(1).nullish(),
+  nodePack: z.string().min(1).default('invokeai'),
   classification: zClassification,
+  category: z.string().default('other'),
 });
-export type InvocationTemplate = z.infer<typeof zInvocationTemplate>;
+export type InvocationTemplate = z.infer<typeof _zInvocationTemplate>;
 // #endregion
 
 // #region NodeData
 export const zInvocationNodeData = z.object({
   id: z.string().trim().min(1),
   version: zSemVer,
-  nodePack: z.string().min(1).nullish(),
+  nodePack: z.string().min(1).default('invokeai'),
   label: z.string(),
   notes: z.string(),
   type: z.string().trim().min(1),
-  inputs: z.record(zFieldInputInstance),
+  inputs: z.record(z.string(), zFieldInputInstance),
   isOpen: z.boolean(),
   isIntermediate: z.boolean(),
   useCache: z.boolean(),
@@ -43,29 +44,66 @@ export const zNotesNodeData = z.object({
   isOpen: z.boolean(),
   notes: z.string(),
 });
+export const zConnectorNodeData = z.object({
+  id: z.string().trim().min(1),
+  type: z.literal('connector'),
+  label: z.string(),
+  isOpen: z.boolean(),
+});
 const zCurrentImageNodeData = z.object({
   id: z.string().trim().min(1),
   type: z.literal('current_image'),
   label: z.string(),
   isOpen: z.boolean(),
 });
-const zAnyNodeData = z.union([zInvocationNodeData, zNotesNodeData, zCurrentImageNodeData]);
 
 export type NotesNodeData = z.infer<typeof zNotesNodeData>;
 export type InvocationNodeData = z.infer<typeof zInvocationNodeData>;
+export type ConnectorNodeData = z.infer<typeof zConnectorNodeData>;
 type CurrentImageNodeData = z.infer<typeof zCurrentImageNodeData>;
-type AnyNodeData = z.infer<typeof zAnyNodeData>;
 
-export type InvocationNode = Node<InvocationNodeData, 'invocation'>;
-export type NotesNode = Node<NotesNodeData, 'notes'>;
-export type CurrentImageNode = Node<CurrentImageNodeData, 'current_image'>;
-export type AnyNode = Node<AnyNodeData>;
+const zInvocationNodeValidationSchema = z.looseObject({
+  type: z.literal('invocation'),
+  data: zInvocationNodeData,
+});
+const zInvocationNode = z.custom<Node<InvocationNodeData, 'invocation'>>(
+  (val) => zInvocationNodeValidationSchema.safeParse(val).success
+);
+export type InvocationNode = z.infer<typeof zInvocationNode>;
+
+const zNotesNodeValidationSchema = z.looseObject({
+  type: z.literal('notes'),
+  data: zNotesNodeData,
+});
+const zNotesNode = z.custom<Node<NotesNodeData, 'notes'>>((val) => zNotesNodeValidationSchema.safeParse(val).success);
+export type NotesNode = z.infer<typeof zNotesNode>;
+
+const zConnectorNodeValidationSchema = z.looseObject({
+  type: z.literal('connector'),
+  data: zConnectorNodeData,
+});
+const zConnectorNode = z.custom<Node<ConnectorNodeData, 'connector'>>(
+  (val) => zConnectorNodeValidationSchema.safeParse(val).success
+);
+export type ConnectorNode = z.infer<typeof zConnectorNode>;
+
+const zCurrentImageNodeValidationSchema = z.looseObject({
+  type: z.literal('current_image'),
+  data: zCurrentImageNodeData,
+});
+const zCurrentImageNode = z.custom<Node<CurrentImageNodeData, 'current_image'>>(
+  (val) => zCurrentImageNodeValidationSchema.safeParse(val).success
+);
+export type CurrentImageNode = z.infer<typeof zCurrentImageNode>;
+
+export const zAnyNode = z.union([zInvocationNode, zNotesNode, zConnectorNode, zCurrentImageNode]);
+export type AnyNode = z.infer<typeof zAnyNode>;
 
 export const isInvocationNode = (node?: AnyNode | null): node is InvocationNode =>
   Boolean(node && node.type === 'invocation');
 export const isNotesNode = (node?: AnyNode | null): node is NotesNode => Boolean(node && node.type === 'notes');
-export const isInvocationNodeData = (node?: AnyNodeData | null): node is InvocationNodeData =>
-  Boolean(node && !['notes', 'current_image'].includes(node.type)); // node.type may be 'notes', 'current_image', or any invocation type
+export const isConnectorNode = (node?: AnyNode | null): node is ConnectorNode =>
+  Boolean(node && node.type === 'connector');
 // #endregion
 
 // #region NodeExecutionState
@@ -75,7 +113,7 @@ const zNodeError = z.object({
   error_message: z.string(),
   error_traceback: z.string(),
 });
-const zNodeExecutionState = z.object({
+const _zNodeExecutionState = z.object({
   nodeId: z.string().trim().min(1),
   status: zNodeStatus,
   progress: z.number().nullable(),
@@ -83,13 +121,44 @@ const zNodeExecutionState = z.object({
   outputs: z.array(z.any()),
   error: zNodeError.nullable(),
 });
-export type NodeExecutionState = z.infer<typeof zNodeExecutionState>;
+export type NodeExecutionState = z.infer<typeof _zNodeExecutionState>;
 // #endregion
 
 // #region Edges
-const zInvocationNodeEdgeExtra = z.object({
-  type: z.union([z.literal('default'), z.literal('collapsed')]),
+const zDefaultInvocationNodeEdgeValidationSchema = z.looseObject({
+  type: z.literal('default'),
 });
-type InvocationNodeEdgeExtra = z.infer<typeof zInvocationNodeEdgeExtra>;
-export type InvocationNodeEdge = Edge<InvocationNodeEdgeExtra>;
+const zDefaultInvocationNodeEdge = z.custom<Edge<Record<string, never>, 'default'>>(
+  (val) => zDefaultInvocationNodeEdgeValidationSchema.safeParse(val).success
+);
+export type DefaultInvocationNodeEdge = z.infer<typeof zDefaultInvocationNodeEdge>;
+
+const zInvocationNodeEdgeCollapsedData = z.object({
+  count: z.number().int().min(1),
+});
+const zInvocationNodeEdgeCollapsedValidationSchema = z.looseObject({
+  type: z.literal('default'),
+  data: zInvocationNodeEdgeCollapsedData,
+});
+type InvocationNodeEdgeCollapsedData = z.infer<typeof zInvocationNodeEdgeCollapsedData>;
+
+const zCollapsedInvocationNodeEdge = z.custom<Edge<InvocationNodeEdgeCollapsedData, 'collapsed'>>(
+  (val) => zInvocationNodeEdgeCollapsedValidationSchema.safeParse(val).success
+);
+export type CollapsedInvocationNodeEdge = z.infer<typeof zCollapsedInvocationNodeEdge>;
+export const zAnyEdge = z.union([zDefaultInvocationNodeEdge, zCollapsedInvocationNodeEdge]);
+export type AnyEdge = z.infer<typeof zAnyEdge>;
 // #endregion
+
+export const isBatchNodeType = (type: string) =>
+  ['image_batch', 'string_batch', 'integer_batch', 'float_batch'].includes(type);
+
+export const isGeneratorNodeType = (type: string) =>
+  ['image_generator', 'string_generator', 'integer_generator', 'float_generator'].includes(type);
+
+export const isBatchNode = (node: InvocationNode) => isBatchNodeType(node.data.type);
+const isGeneratorNode = (node: InvocationNode) => isGeneratorNodeType(node.data.type);
+
+export const isExecutableNode = (node: InvocationNode) => {
+  return !isBatchNode(node) && !isGeneratorNode(node);
+};

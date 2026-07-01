@@ -1,3 +1,5 @@
-export const stopPropagation = (e: React.MouseEvent) => {
-  e.stopPropagation();
+import type { MouseEvent } from 'react';
+
+export const preventDefault = (e: MouseEvent) => {
+  e.preventDefault();
 };

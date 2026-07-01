@@ -1,28 +1,35 @@
 import { Button, ButtonGroup, Flex, Heading, Spinner, Text } from '@invoke-ai/ui-library';
+import { get } from 'es-toolkit/compat';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
+import { useDestinationText } from 'features/queue/components/QueueList/useDestinationText';
+import { useOriginText } from 'features/queue/components/QueueList/useOriginText';
+import { useBatchIsCanceled } from 'features/queue/hooks/useBatchIsCanceled';
 import { useCancelBatch } from 'features/queue/hooks/useCancelBatch';
 import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
+import { useRetryQueueItem } from 'features/queue/hooks/useRetryQueueItem';
 import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTimestamps';
-import { get } from 'lodash-es';
 import type { ReactNode } from 'react';
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiXBold } from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold, PiXBold } from 'react-icons/pi';
 import { useGetQueueItemQuery } from 'services/api/endpoints/queue';
-import type { SessionQueueItemDTO } from 'services/api/types';
+import type { S } from 'services/api/types';
 
 type Props = {
-  queueItemDTO: SessionQueueItemDTO;
+  queueItem: S['SessionQueueItem'];
 };
 
-const QueueItemComponent = ({ queueItemDTO }: Props) => {
-  const { session_id, batch_id, item_id } = queueItemDTO;
+const QueueItemComponent = ({ queueItem: queueItemDTO }: Props) => {
+  const { session_id, batch_id, item_id, origin, destination } = queueItemDTO;
   const { t } = useTranslation();
-  const { cancelBatch, isLoading: isLoadingCancelBatch, isCanceled } = useCancelBatch(batch_id);
-
-  const { cancelQueueItem, isLoading: isLoadingCancelQueueItem } = useCancelQueueItem(item_id);
-
+  const isBatchCanceled = useBatchIsCanceled(batch_id);
+  const cancelBatch = useCancelBatch();
+  const cancelQueueItem = useCancelQueueItem();
+  const retryQueueItem = useRetryQueueItem();
   const { data: queueItem } = useGetQueueItemQuery(item_id);
+
+  const originText = useOriginText(origin);
+  const destinationText = useDestinationText(destination);
 
   const statusAndTiming = useMemo(() => {
     if (!queueItem) {
@@ -38,6 +45,25 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
     return `${seconds}s`;
   }, [queueItem, t]);
 
+  const isCanceled = useMemo(
+    () => !!queueItem && ['canceled', 'completed', 'failed'].includes(queueItem.status),
+    [queueItem]
+  );
+
+  const isFailed = useMemo(() => !!queueItem && ['canceled', 'failed'].includes(queueItem.status), [queueItem]);
+
+  const onCancelBatch = useCallback(() => {
+    cancelBatch.trigger(batch_id);
+  }, [cancelBatch, batch_id]);
+
+  const onCancelQueueItem = useCallback(() => {
+    cancelQueueItem.trigger(item_id);
+  }, [cancelQueueItem, item_id]);
+
+  const onRetryQueueItem = useCallback(() => {
+    retryQueueItem.trigger(item_id);
+  }, [retryQueueItem, item_id]);
+
   return (
     <Flex layerStyle="third" flexDir="column" p={2} pt={0} borderRadius="base" gap={2}>
       <Flex
@@ -50,24 +76,40 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
         h={20}
       >
         <QueueItemData label={t('queue.status')} data={statusAndTiming} />
+        <QueueItemData label={t('queue.origin')} data={originText} />
+        <QueueItemData label={t('queue.destination')} data={destinationText} />
         <QueueItemData label={t('queue.item')} data={item_id} />
         <QueueItemData label={t('queue.batch')} data={batch_id} />
         <QueueItemData label={t('queue.session')} data={session_id} />
         <ButtonGroup size="xs" orientation="vertical">
+          {!isFailed && (
+            <Button
+              onClick={onCancelQueueItem}
+              isLoading={cancelQueueItem.isLoading}
+              isDisabled={cancelQueueItem.isDisabled || queueItem ? isCanceled : true}
+              aria-label={t('queue.cancelItem')}
+              leftIcon={<PiXBold />}
+              colorScheme="error"
+            >
+              {t('queue.cancelItem')}
+            </Button>
+          )}
+          {isFailed && (
+            <Button
+              onClick={onRetryQueueItem}
+              isLoading={retryQueueItem.isLoading}
+              isDisabled={retryQueueItem.isDisabled || !queueItem}
+              aria-label={t('queue.retryItem')}
+              leftIcon={<PiArrowCounterClockwiseBold />}
+              colorScheme="invokeBlue"
+            >
+              {t('queue.retryItem')}
+            </Button>
+          )}
           <Button
-            onClick={cancelQueueItem}
-            isLoading={isLoadingCancelQueueItem}
-            isDisabled={queueItem ? ['canceled', 'completed', 'failed'].includes(queueItem.status) : true}
-            aria-label={t('queue.cancelItem')}
-            leftIcon={<PiXBold />}
-            colorScheme="error"
-          >
-            {t('queue.cancelItem')}
-          </Button>
-          <Button
-            onClick={cancelBatch}
-            isLoading={isLoadingCancelBatch}
-            isDisabled={isCanceled}
+            onClick={onCancelBatch}
+            isLoading={cancelBatch.isLoading}
+            isDisabled={cancelBatch.isDisabled || isBatchCanceled}
             aria-label={t('queue.cancelBatch')}
             leftIcon={<PiXBold />}
             colorScheme="error"
@@ -95,7 +137,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
       <Flex layerStyle="second" h={512} w="full" borderRadius="base" alignItems="center" justifyContent="center">
         {queueItem ? (
           <DataViewer
-            label="Queue Item"
+            label={t('queue.queueItem')}
             data={queueItem}
             extraCopyActions={[{ label: 'Graph', getData: (data) => get(data, 'session.graph') }]}
           />

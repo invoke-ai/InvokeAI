@@ -1,22 +1,23 @@
 import type { RootState } from 'app/store/store';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import { LORA_LOADER } from 'features/nodes/util/graph/constants';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { filter, size } from 'lodash-es';
 import type { Invocation, S } from 'services/api/types';
 
 export const addLoRAs = (
   state: RootState,
   g: Graph,
-  denoise: Invocation<'denoise_latents'>,
+  denoise: Invocation<'denoise_latents'> | Invocation<'tiled_multi_diffusion_denoise_latents'>,
   modelLoader: Invocation<'main_model_loader'>,
   seamless: Invocation<'seamless'> | null,
   clipSkip: Invocation<'clip_skip'>,
   posCond: Invocation<'compel'>,
   negCond: Invocation<'compel'>
 ): void => {
-  const enabledLoRAs = filter(state.lora.loras, (l) => l.isEnabled ?? false);
-  const loraCount = size(enabledLoRAs);
+  const enabledLoRAs = state.loras.loras.filter(
+    (l) => l.isEnabled && (l.model.base === 'sd-1' || l.model.base === 'sd-2')
+  );
+  const loraCount = enabledLoRAs.length;
 
   if (loraCount === 0) {
     return;
@@ -27,12 +28,12 @@ export const addLoRAs = (
   // We will collect LoRAs into a single collection node, then pass them to the LoRA collection loader, which applies
   // each LoRA to the UNet and CLIP.
   const loraCollector = g.addNode({
-    id: `${LORA_LOADER}_collect`,
     type: 'collect',
+    id: getPrefixedId('lora_collector'),
   });
   const loraCollectionLoader = g.addNode({
-    id: LORA_LOADER,
     type: 'lora_collection_loader',
+    id: getPrefixedId('lora_collection_loader'),
   });
 
   g.addEdge(loraCollector, 'collection', loraCollectionLoader, 'loras');
@@ -49,12 +50,11 @@ export const addLoRAs = (
 
   for (const lora of enabledLoRAs) {
     const { weight } = lora;
-    const { key } = lora.model;
     const parsedModel = zModelIdentifierField.parse(lora.model);
 
     const loraSelector = g.addNode({
       type: 'lora_selector',
-      id: `${LORA_LOADER}_${key}`,
+      id: getPrefixedId('lora_selector'),
       lora: parsedModel,
       weight,
     });

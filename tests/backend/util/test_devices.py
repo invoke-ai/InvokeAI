@@ -10,7 +10,7 @@ import torch
 from invokeai.app.services.config import get_config
 from invokeai.backend.util.devices import TorchDevice, choose_precision, choose_torch_device, torch_dtype
 
-devices = ["cpu", "cuda:0", "cuda:1", "mps"]
+devices = ["cpu", "cuda:0", "cuda:1", "cuda:2", "mps"]
 device_types_cpu = [("cpu", torch.float32), ("cuda:0", torch.float32), ("mps", torch.float32)]
 device_types_cuda = [("cpu", torch.float32), ("cuda:0", torch.float16), ("mps", torch.float32)]
 device_types_mps = [("cpu", torch.float32), ("cuda:0", torch.float32), ("mps", torch.float16)]
@@ -130,3 +130,42 @@ def test_legacy_precision_name():
         assert "float16" == choose_precision(torch.device("cuda"))
         assert "float16" == choose_precision(torch.device("mps"))
         assert "float32" == choose_precision(torch.device("cpu"))
+
+
+# ===== choose_anima_inference_dtype (config.precision honoring) ============
+
+
+def test_choose_anima_inference_dtype_float16():
+    """precision='float16' returns torch.float16 without touching hardware."""
+    config = get_config()
+    config.precision = "float16"
+    result = TorchDevice.choose_anima_inference_dtype(torch.device("cpu"))
+    assert result is torch.float16
+
+
+def test_choose_anima_inference_dtype_bfloat16():
+    """precision='bfloat16' returns torch.bfloat16 without touching hardware."""
+    config = get_config()
+    config.precision = "bfloat16"
+    result = TorchDevice.choose_anima_inference_dtype(torch.device("cpu"))
+    assert result is torch.bfloat16
+
+
+def test_choose_anima_inference_dtype_float32():
+    """precision='float32' returns torch.float32 without touching hardware."""
+    config = get_config()
+    config.precision = "float32"
+    result = TorchDevice.choose_anima_inference_dtype(torch.device("cpu"))
+    assert result is torch.float32
+
+
+def test_choose_anima_inference_dtype_auto_delegates_to_safe_dtype():
+    """precision='auto' delegates to choose_bfloat16_safe_dtype (current behavior)."""
+    config = get_config()
+    config.precision = "auto"
+    device = torch.device("cpu")
+    sentinel = torch.bfloat16
+    with patch.object(TorchDevice, "choose_bfloat16_safe_dtype", return_value=sentinel) as mock_safe:
+        result = TorchDevice.choose_anima_inference_dtype(device)
+    assert result is sentinel
+    mock_safe.assert_called_once_with(device)

@@ -1,13 +1,16 @@
-import type { EntityState, ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
-import { createEntityAdapter } from '@reduxjs/toolkit';
-import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
-import { $queueId } from 'app/store/nanostores/queueId';
-import { listParamsReset } from 'features/queue/store/queueSlice';
 import queryString from 'query-string';
 import type { components, paths } from 'services/api/schema';
+import type {
+  GetQueueItemDTOsByItemIdsArgs,
+  GetQueueItemDTOsByItemIdsResult,
+  GetQueueItemIdsArgs,
+  GetQueueItemIdsResult,
+} from 'services/api/types';
+import stableHash from 'stable-hash';
+import type { Param0 } from 'tsafe';
 
 import type { ApiTagDescription } from '..';
-import { api, buildV1Url } from '..';
+import { api, buildV1Url, LIST_ALL_TAG, LIST_TAG } from '..';
 
 /**
  * Builds an endpoint URL for the queue router
@@ -15,49 +18,9 @@ import { api, buildV1Url } from '..';
  * buildQueueUrl('some-path')
  * // '/api/v1/queue/queue_id/some-path'
  */
-const buildQueueUrl = (path: string = '') => buildV1Url(`queue/${$queueId.get()}/${path}`);
+const buildQueueUrl = (path: string = '') => buildV1Url(`queue/default/${path}`);
 
-const getListQueueItemsUrl = (queryArgs?: paths['/api/v1/queue/{queue_id}/list']['get']['parameters']['query']) => {
-  const query = queryArgs
-    ? queryString.stringify(queryArgs, {
-        arrayFormat: 'none',
-      })
-    : undefined;
-
-  if (query) {
-    return buildQueueUrl(`list?${query}`);
-  }
-
-  return buildQueueUrl('list');
-};
-
-export type SessionQueueItemStatus = NonNullable<
-  NonNullable<paths['/api/v1/queue/{queue_id}/list']['get']['parameters']['query']>['status']
->;
-
-export const queueItemsAdapter = createEntityAdapter<components['schemas']['SessionQueueItemDTO'], string>({
-  selectId: (queueItem) => String(queueItem.item_id),
-  sortComparer: (a, b) => {
-    // Sort by priority in descending order
-    if (a.priority > b.priority) {
-      return -1;
-    }
-    if (a.priority < b.priority) {
-      return 1;
-    }
-
-    // If priority is the same, sort by id in ascending order
-    if (a.item_id < b.item_id) {
-      return -1;
-    }
-    if (a.item_id > b.item_id) {
-      return 1;
-    }
-
-    return 0;
-  },
-});
-export const queueItemsAdapterSelectors = queueItemsAdapter.getSelectors(undefined, getSelectorsOptions);
+export type SessionQueueItemStatus = NonNullable<components['schemas']['SessionQueueItem']['status']>;
 
 export const queueApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -70,12 +33,24 @@ export const queueApi = api.injectEndpoints({
         body: arg,
         method: 'POST',
       }),
-      invalidatesTags: ['SessionQueueStatus', 'CurrentSessionQueueItem', 'NextSessionQueueItem'],
+      invalidatesTags: [
+        'CurrentSessionQueueItem',
+        'NextSessionQueueItem',
+        'QueueCountsByDestination',
+        'SessionQueueItemIdList',
+        { type: 'SessionQueueItem', id: LIST_TAG },
+        { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+      ],
       onQueryStarted: async (arg, api) => {
         const { dispatch, queryFulfilled } = api;
         try {
-          await queryFulfilled;
-          resetListQueryData(dispatch);
+          const { data } = await queryFulfilled;
+          dispatch(
+            queueApi.util.updateQueryData('getQueueStatus', undefined, (draft) => {
+              draft.queue.in_progress += data.item_ids.length;
+              draft.queue.total += data.item_ids.length;
+            })
+          );
         } catch {
           // no-op
         }
@@ -109,16 +84,13 @@ export const queueApi = api.injectEndpoints({
         url: buildQueueUrl('prune'),
         method: 'PUT',
       }),
-      invalidatesTags: ['SessionQueueStatus', 'BatchStatus'],
-      onQueryStarted: async (arg, api) => {
-        const { dispatch, queryFulfilled } = api;
-        try {
-          await queryFulfilled;
-          resetListQueryData(dispatch);
-        } catch {
-          // no-op
-        }
-      },
+      invalidatesTags: [
+        'SessionQueueStatus',
+        'BatchStatus',
+        'SessionQueueItemIdList',
+        { type: 'SessionQueueItem', id: LIST_TAG },
+        { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+      ],
     }),
     clearQueue: build.mutation<
       paths['/api/v1/queue/{queue_id}/clear']['put']['responses']['200']['content']['application/json'],
@@ -134,16 +106,11 @@ export const queueApi = api.injectEndpoints({
         'BatchStatus',
         'CurrentSessionQueueItem',
         'NextSessionQueueItem',
+        'QueueCountsByDestination',
+        'SessionQueueItemIdList',
+        { type: 'SessionQueueItem', id: LIST_TAG },
+        { type: 'SessionQueueItem', id: LIST_ALL_TAG },
       ],
-      onQueryStarted: async (arg, api) => {
-        const { dispatch, queryFulfilled } = api;
-        try {
-          await queryFulfilled;
-          resetListQueryData(dispatch);
-        } catch {
-          // no-op
-        }
-      },
     }),
     getCurrentQueueItem: build.query<
       paths['/api/v1/queue/{queue_id}/current']['get']['responses']['200']['content']['application/json'],
@@ -215,45 +182,31 @@ export const queueApi = api.injectEndpoints({
         const tags: ApiTagDescription[] = ['FetchOnReconnect'];
         if (result) {
           tags.push({ type: 'SessionQueueItem', id: result.item_id });
+          tags.push({ type: 'BatchStatus', id: result.batch_id });
         }
         return tags;
       },
     }),
     cancelQueueItem: build.mutation<
       paths['/api/v1/queue/{queue_id}/i/{item_id}/cancel']['put']['responses']['200']['content']['application/json'],
-      number
+      { item_id: number }
     >({
-      query: (item_id) => ({
+      query: ({ item_id }) => ({
         url: buildQueueUrl(`i/${item_id}/cancel`),
         method: 'PUT',
       }),
-      onQueryStarted: async (item_id, { dispatch, queryFulfilled }) => {
-        try {
-          const { data } = await queryFulfilled;
-          dispatch(
-            queueApi.util.updateQueryData('listQueueItems', undefined, (draft) => {
-              queueItemsAdapter.updateOne(draft, {
-                id: String(item_id),
-                changes: {
-                  status: data.status,
-                  completed_at: data.completed_at,
-                  updated_at: data.updated_at,
-                },
-              });
-            })
-          );
-        } catch {
-          // no-op
-        }
-      },
       invalidatesTags: (result) => {
         if (!result) {
           return [];
         }
-        return [
+        const tags: ApiTagDescription[] = [
           { type: 'SessionQueueItem', id: result.item_id },
           { type: 'BatchStatus', id: result.batch_id },
         ];
+        if (result.destination) {
+          tags.push({ type: 'QueueCountsByDestination', id: result.destination });
+        }
+        return tags;
       },
     }),
     cancelByBatchIds: build.mutation<
@@ -265,49 +218,187 @@ export const queueApi = api.injectEndpoints({
         method: 'PUT',
         body,
       }),
-      onQueryStarted: async (arg, api) => {
-        const { dispatch, queryFulfilled } = api;
-        try {
-          await queryFulfilled;
-          resetListQueryData(dispatch);
-        } catch {
-          // no-op
+      invalidatesTags: (result, error, { batch_ids }) => {
+        if (!result) {
+          return [];
         }
+        return [
+          'SessionQueueStatus',
+          'BatchStatus',
+          'QueueCountsByDestination',
+          { type: 'SessionQueueItem', id: LIST_TAG },
+          { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+          ...batch_ids.map((id) => ({ type: 'BatchStatus', id }) satisfies ApiTagDescription),
+        ];
       },
-      invalidatesTags: ['SessionQueueStatus', 'BatchStatus'],
     }),
-    listQueueItems: build.query<
-      EntityState<components['schemas']['SessionQueueItemDTO'], string> & {
-        has_more: boolean;
-      },
-      { cursor?: number; priority?: number } | undefined
+    cancelQueueItemsByDestination: build.mutation<
+      paths['/api/v1/queue/{queue_id}/cancel_by_destination']['put']['responses']['200']['content']['application/json'],
+      paths['/api/v1/queue/{queue_id}/cancel_by_destination']['put']['parameters']['query']
     >({
+      query: (params) => ({
+        url: buildQueueUrl('cancel_by_destination'),
+        method: 'PUT',
+        params,
+      }),
+      invalidatesTags: (result, error, { destination }) => {
+        if (!result) {
+          return [];
+        }
+        return [
+          'SessionQueueStatus',
+          'BatchStatus',
+          { type: 'SessionQueueItem', id: LIST_TAG },
+          { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+          { type: 'QueueCountsByDestination', id: destination },
+        ];
+      },
+    }),
+    cancelAllExceptCurrent: build.mutation<
+      paths['/api/v1/queue/{queue_id}/cancel_all_except_current']['put']['responses']['200']['content']['application/json'],
+      void
+    >({
+      query: () => ({
+        url: buildQueueUrl('cancel_all_except_current'),
+        method: 'PUT',
+      }),
+      invalidatesTags: ['SessionQueueStatus', 'BatchStatus', 'QueueCountsByDestination', 'SessionQueueItem'],
+    }),
+    retryItemsById: build.mutation<
+      paths['/api/v1/queue/{queue_id}/retry_items_by_id']['put']['responses']['200']['content']['application/json'],
+      paths['/api/v1/queue/{queue_id}/retry_items_by_id']['put']['requestBody']['content']['application/json']
+    >({
+      query: (body) => ({
+        url: buildQueueUrl('retry_items_by_id'),
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: (result, error, item_ids) => {
+        if (!result) {
+          return [];
+        }
+        return [
+          'SessionQueueStatus',
+          'BatchStatus',
+          'CurrentSessionQueueItem',
+          'NextSessionQueueItem',
+          'QueueCountsByDestination',
+          'SessionQueueItemIdList',
+          { type: 'SessionQueueItem', id: LIST_TAG },
+          { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+          ...item_ids.map((id) => ({ type: 'SessionQueueItem', id }) satisfies ApiTagDescription),
+        ];
+      },
+    }),
+    listAllQueueItems: build.query<
+      paths['/api/v1/queue/{queue_id}/list_all']['get']['responses']['200']['content']['application/json'],
+      paths['/api/v1/queue/{queue_id}/list_all']['get']['parameters']['query']
+    >({
+      query: (queryArgs) => {
+        const q = queryArgs
+          ? queryString.stringify(queryArgs, {
+              arrayFormat: 'none',
+            })
+          : undefined;
+
+        return q ? buildQueueUrl(`list_all?${q}`) : buildQueueUrl('list_all');
+      },
+      providesTags: (result, _error, _args) => {
+        if (!result) {
+          return [];
+        }
+        const tags: ApiTagDescription[] = [
+          'FetchOnReconnect',
+          { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+          ...result.map(({ item_id }) => ({ type: 'SessionQueueItem', id: item_id }) satisfies ApiTagDescription),
+        ];
+        return tags;
+      },
+    }),
+    getQueueItemIds: build.query<GetQueueItemIdsResult, GetQueueItemIdsArgs>({
       query: (queryArgs) => ({
-        url: getListQueueItemsUrl(queryArgs),
+        url: buildQueueUrl(`item_ids?${queryString.stringify(queryArgs)}`),
         method: 'GET',
       }),
-      serializeQueryArgs: () => {
-        return buildQueueUrl('list');
+      providesTags: (queryArgs) => [
+        'FetchOnReconnect',
+        'SessionQueueItemIdList',
+        { type: 'SessionQueueItemIdList', id: stableHash(queryArgs) },
+      ],
+    }),
+    getQueueItemDTOsByItemIds: build.mutation<GetQueueItemDTOsByItemIdsResult, GetQueueItemDTOsByItemIdsArgs>({
+      query: (body) => ({
+        url: buildQueueUrl('items_by_ids'),
+        method: 'POST',
+        body,
+      }),
+      // Don't provide cache tags - we'll manually upsert into individual getQueueItem caches
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          const { data: queueItems } = await queryFulfilled;
+
+          // Upsert each queue item into the individual item cache
+          const updates: Param0<typeof queueApi.util.upsertQueryEntries> = [];
+          for (const queueItem of queueItems) {
+            updates.push({
+              endpointName: 'getQueueItem',
+              arg: queueItem.item_id,
+              value: queueItem,
+            });
+          }
+          dispatch(queueApi.util.upsertQueryEntries(updates));
+        } catch {
+          // Handle error if needed
+        }
       },
-      transformResponse: (response: components['schemas']['CursorPaginatedResults_SessionQueueItemDTO_']) =>
-        queueItemsAdapter.addMany(
-          queueItemsAdapter.getInitialState({
-            has_more: response.has_more,
-          }),
-          response.items
-        ),
-      merge: (cache, response) => {
-        queueItemsAdapter.addMany(cache, queueItemsAdapterSelectors.selectAll(response));
-        cache.has_more = response.has_more;
-      },
-      forceRefetch: ({ currentArg, previousArg }) => currentArg !== previousArg,
-      keepUnusedDataFor: 60 * 5, // 5 minutes
-      providesTags: ['FetchOnReconnect'],
+    }),
+    deleteQueueItem: build.mutation<void, { item_id: number }>({
+      query: ({ item_id }) => ({
+        url: buildQueueUrl(`i/${item_id}`),
+        method: 'DELETE',
+      }),
+      invalidatesTags: (result, error, { item_id }) => [
+        { type: 'SessionQueueItem', id: item_id },
+        { type: 'SessionQueueItem', id: LIST_TAG },
+        { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+      ],
+    }),
+    deleteQueueItemsByDestination: build.mutation<void, { destination: string }>({
+      query: ({ destination }) => ({
+        url: buildQueueUrl(`d/${destination}`),
+        method: 'DELETE',
+      }),
+      invalidatesTags: (result, error, { destination }) => [
+        { type: 'QueueCountsByDestination', id: destination },
+        { type: 'SessionQueueItem', id: LIST_TAG },
+        { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+      ],
+    }),
+    deleteAllExceptCurrent: build.mutation<
+      paths['/api/v1/queue/{queue_id}/delete_all_except_current']['put']['responses']['200']['content']['application/json'],
+      void
+    >({
+      query: () => ({
+        url: buildQueueUrl('delete_all_except_current'),
+        method: 'PUT',
+      }),
+      invalidatesTags: ['SessionQueueStatus', 'BatchStatus', 'QueueCountsByDestination', 'SessionQueueItem'],
+    }),
+    getQueueCountsByDestination: build.query<
+      paths['/api/v1/queue/{queue_id}/counts_by_destination']['get']['responses']['200']['content']['application/json'],
+      paths['/api/v1/queue/{queue_id}/counts_by_destination']['get']['parameters']['query']
+    >({
+      query: (params) => ({ url: buildQueueUrl('counts_by_destination'), method: 'GET', params }),
+      providesTags: (result, error, { destination }) => [
+        'FetchOnReconnect',
+        { type: 'QueueCountsByDestination', id: destination },
+      ],
     }),
   }),
 });
 
 export const {
+  useCancelAllExceptCurrentMutation,
   useCancelByBatchIdsMutation,
   useEnqueueBatchMutation,
   usePauseProcessorMutation,
@@ -316,27 +407,27 @@ export const {
   usePruneQueueMutation,
   useGetQueueStatusQuery,
   useGetQueueItemQuery,
-  useListQueueItemsQuery,
+  useGetQueueItemIdsQuery,
+  useGetQueueItemDTOsByItemIdsMutation,
   useCancelQueueItemMutation,
+  useCancelQueueItemsByDestinationMutation,
+  useGetCurrentQueueItemQuery,
+
+  useDeleteQueueItemMutation,
+  useDeleteAllExceptCurrentMutation,
   useGetBatchStatusQuery,
+
+  useGetQueueCountsByDestinationQuery,
+  useRetryItemsByIdMutation,
 } = queueApi;
 
 export const selectQueueStatus = queueApi.endpoints.getQueueStatus.select();
 
-const resetListQueryData = (
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  dispatch: ThunkDispatch<any, any, UnknownAction>
-) => {
-  dispatch(
-    queueApi.util.updateQueryData('listQueueItems', undefined, (draft) => {
-      // remove all items from the list
-      queueItemsAdapter.removeAll(draft);
-      // reset the has_more flag
-      draft.has_more = false;
-    })
-  );
-  // set the list cursor and priority to undefined
-  dispatch(listParamsReset());
-  // we have to manually kick off another query to get the first page and re-initialize the list
-  dispatch(queueApi.endpoints.listQueueItems.initiate(undefined));
+export const enqueueMutationFixedCacheKeyOptions = {
+  fixedCacheKey: 'enqueueBatch',
+} as const;
+
+export const useIsGenerationInProgress = () => {
+  const { data } = useGetQueueStatusQuery();
+  return data && data.queue.in_progress > 0;
 };

@@ -4,34 +4,44 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from invokeai.app.services.object_serializer.object_serializer_base import ObjectSerializerBase
+from invokeai.app.services.style_preset_images.style_preset_images_base import StylePresetImageFileStorageBase
+from invokeai.app.services.style_preset_records.style_preset_records_base import StylePresetRecordsStorageBase
 
 if TYPE_CHECKING:
     from logging import Logger
 
     import torch
 
+    from invokeai.app.services.board_image_records.board_image_records_base import BoardImageRecordStorageBase
+    from invokeai.app.services.board_images.board_images_base import BoardImagesServiceABC
+    from invokeai.app.services.board_records.board_records_base import BoardRecordStorageBase
+    from invokeai.app.services.boards.boards_base import BoardServiceABC
+    from invokeai.app.services.bulk_download.bulk_download_base import BulkDownloadBase
+    from invokeai.app.services.client_state_persistence.client_state_persistence_base import ClientStatePersistenceABC
+    from invokeai.app.services.config import InvokeAIAppConfig
+    from invokeai.app.services.download import DownloadQueueServiceBase
+    from invokeai.app.services.events.events_base import EventServiceBase
+    from invokeai.app.services.external_generation.external_generation_base import ExternalGenerationServiceBase
+    from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
+    from invokeai.app.services.image_moves.image_moves_default import ImageMoveService
+    from invokeai.app.services.image_records.image_records_base import ImageRecordStorageBase
+    from invokeai.app.services.images.images_base import ImageServiceABC
+    from invokeai.app.services.invocation_cache.invocation_cache_base import InvocationCacheBase
+    from invokeai.app.services.invocation_stats.invocation_stats_base import InvocationStatsServiceBase
+    from invokeai.app.services.model_images.model_images_base import ModelImageFileStorageBase
+    from invokeai.app.services.model_manager.model_manager_base import ModelManagerServiceBase
+    from invokeai.app.services.model_relationship_records.model_relationship_records_base import (
+        ModelRelationshipRecordStorageBase,
+    )
+    from invokeai.app.services.model_relationships.model_relationships_base import ModelRelationshipsServiceABC
+    from invokeai.app.services.names.names_base import NameServiceBase
+    from invokeai.app.services.session_processor.session_processor_base import SessionProcessorBase
+    from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
+    from invokeai.app.services.urls.urls_base import UrlServiceBase
+    from invokeai.app.services.users.users_base import UserServiceBase
+    from invokeai.app.services.workflow_records.workflow_records_base import WorkflowRecordsStorageBase
+    from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_base import WorkflowThumbnailServiceBase
     from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
-
-    from .board_image_records.board_image_records_base import BoardImageRecordStorageBase
-    from .board_images.board_images_base import BoardImagesServiceABC
-    from .board_records.board_records_base import BoardRecordStorageBase
-    from .boards.boards_base import BoardServiceABC
-    from .bulk_download.bulk_download_base import BulkDownloadBase
-    from .config import InvokeAIAppConfig
-    from .download import DownloadQueueServiceBase
-    from .events.events_base import EventServiceBase
-    from .image_files.image_files_base import ImageFileStorageBase
-    from .image_records.image_records_base import ImageRecordStorageBase
-    from .images.images_base import ImageServiceABC
-    from .invocation_cache.invocation_cache_base import InvocationCacheBase
-    from .invocation_stats.invocation_stats_base import InvocationStatsServiceBase
-    from .model_images.model_images_base import ModelImageFileStorageBase
-    from .model_manager.model_manager_base import ModelManagerServiceBase
-    from .names.names_base import NameServiceBase
-    from .session_processor.session_processor_base import SessionProcessorBase
-    from .session_queue.session_queue_base import SessionQueueBase
-    from .urls.urls_base import UrlServiceBase
-    from .workflow_records.workflow_records_base import WorkflowRecordsStorageBase
 
 
 class InvocationServices:
@@ -52,7 +62,10 @@ class InvocationServices:
         logger: "Logger",
         model_images: "ModelImageFileStorageBase",
         model_manager: "ModelManagerServiceBase",
+        model_relationships: "ModelRelationshipsServiceABC",
+        model_relationship_records: "ModelRelationshipRecordStorageBase",
         download_queue: "DownloadQueueServiceBase",
+        external_generation: "ExternalGenerationServiceBase",
         performance_statistics: "InvocationStatsServiceBase",
         session_queue: "SessionQueueBase",
         session_processor: "SessionProcessorBase",
@@ -62,6 +75,12 @@ class InvocationServices:
         workflow_records: "WorkflowRecordsStorageBase",
         tensors: "ObjectSerializerBase[torch.Tensor]",
         conditioning: "ObjectSerializerBase[ConditioningFieldData]",
+        style_preset_records: "StylePresetRecordsStorageBase",
+        style_preset_image_files: "StylePresetImageFileStorageBase",
+        workflow_thumbnails: "WorkflowThumbnailServiceBase",
+        client_state_persistence: "ClientStatePersistenceABC",
+        users: "UserServiceBase",
+        image_moves: "ImageMoveService | None" = None,
     ):
         self.board_images = board_images
         self.board_image_records = board_image_records
@@ -76,9 +95,13 @@ class InvocationServices:
         self.logger = logger
         self.model_images = model_images
         self.model_manager = model_manager
+        self.model_relationships = model_relationships
+        self.model_relationship_records = model_relationship_records
         self.download_queue = download_queue
+        self.external_generation = external_generation
         self.performance_statistics = performance_statistics
         self.session_queue = session_queue
+        self.image_moves = image_moves
         self.session_processor = session_processor
         self.invocation_cache = invocation_cache
         self.names = names
@@ -86,3 +109,8 @@ class InvocationServices:
         self.workflow_records = workflow_records
         self.tensors = tensors
         self.conditioning = conditioning
+        self.style_preset_records = style_preset_records
+        self.style_preset_image_files = style_preset_image_files
+        self.workflow_thumbnails = workflow_thumbnails
+        self.client_state_persistence = client_state_persistence
+        self.users = users

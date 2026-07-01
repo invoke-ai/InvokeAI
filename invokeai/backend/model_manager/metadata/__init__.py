@@ -16,8 +16,8 @@ data = HuggingFaceMetadataFetch().from_id("<REPO_ID>")
 assert isinstance(data, HuggingFaceMetadata)
 """
 
-from .fetch import HuggingFaceMetadataFetch, ModelMetadataFetchBase
-from .metadata_base import (
+from invokeai.backend.model_manager.metadata.fetch import HuggingFaceMetadataFetch, ModelMetadataFetchBase
+from invokeai.backend.model_manager.metadata.metadata_base import (
     AnyModelRepoMetadata,
     AnyModelRepoMetadataValidator,
     BaseMetadata,

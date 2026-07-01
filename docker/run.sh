@@ -8,11 +8,15 @@ run() {
   local build_args=""
   local profile=""
 
+  # create .env file if it doesn't exist, otherwise docker compose will fail
   touch .env
-  build_args=$(awk '$1 ~ /=[^$]/ && $0 !~ /^#/ {print "--build-arg " $0 " "}' .env) &&
-  profile="$(awk -F '=' '/GPU_DRIVER/ {print $2}' .env)"
 
-  [[ -z "$profile" ]] && profile="nvidia"
+  # parse .env file for build args
+  build_args=$(awk '$1 ~ /=[^$]/ && $0 !~ /^#/ {print "--build-arg " $0 " "}' .env) &&
+  profile="$(awk -F '=' '/GPU_DRIVER=/ {print $2}' .env)"
+
+  # default to 'cuda' profile
+  [[ -z "$profile" ]] && profile="cuda"
 
   local service_name="invokeai-$profile"
 
@@ -26,7 +30,7 @@ run() {
 
   printf "%s\n" "starting service $service_name"
   docker compose --profile "$profile" up -d "$service_name"
-  docker compose logs -f
+  docker compose --profile "$profile" logs -f
 }
 
 run

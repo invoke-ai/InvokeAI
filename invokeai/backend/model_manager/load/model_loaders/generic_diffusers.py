@@ -8,21 +8,19 @@ from typing import Any, Optional
 from diffusers.configuration_utils import ConfigMixin
 from diffusers.models.modeling_utils import ModelMixin
 
-from invokeai.backend.model_manager import (
+from invokeai.backend.model_manager.configs.base import Diffusers_Config_Base
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.load.load_default import ModelLoader
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
-    AnyModelConfig,
     BaseModelType,
-    InvalidModelConfigException,
     ModelFormat,
     ModelType,
     SubModelType,
 )
-from invokeai.backend.model_manager.config import DiffusersConfigBase
-
-from .. import ModelLoader, ModelLoaderRegistry
 
 
-@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.CLIPVision, format=ModelFormat.Diffusers)
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T2IAdapter, format=ModelFormat.Diffusers)
 class GenericDiffusersLoader(ModelLoader):
     """Class to load simple diffusers models."""
@@ -36,17 +34,20 @@ class GenericDiffusersLoader(ModelLoader):
         model_class = self.get_hf_load_class(model_path)
         if submodel_type is not None:
             raise Exception(f"There are no submodels in models of type {model_class}")
-        repo_variant = config.repo_variant if isinstance(config, DiffusersConfigBase) else None
+        repo_variant = config.repo_variant if isinstance(config, Diffusers_Config_Base) else None
         variant = repo_variant.value if repo_variant else None
         try:
-            result: AnyModel = model_class.from_pretrained(model_path, torch_dtype=self._torch_dtype, variant=variant)
+            result: AnyModel = model_class.from_pretrained(
+                model_path, torch_dtype=self._torch_dtype, variant=variant, local_files_only=True
+            )
         except OSError as e:
             if variant and "no file named" in str(
                 e
             ):  # try without the variant, just in case user's preferences changed
-                result = model_class.from_pretrained(model_path, torch_dtype=self._torch_dtype)
+                result = model_class.from_pretrained(model_path, torch_dtype=self._torch_dtype, local_files_only=True)
             else:
                 raise e
+        result = self._apply_fp8_layerwise_casting(result, config, submodel_type)
         return result
 
     # TO DO: Add exception handling
@@ -59,29 +60,29 @@ class GenericDiffusersLoader(ModelLoader):
                 module, class_name = config[submodel_type.value]
                 result = self._hf_definition_to_type(module=module, class_name=class_name)
             except KeyError as e:
-                raise InvalidModelConfigException(
-                    f'The "{submodel_type}" submodel is not available for this model.'
-                ) from e
+                raise ValueError(f'The "{submodel_type}" submodel is not available for this model.') from e
         else:
             try:
                 config = self._load_diffusers_config(model_path, config_name="config.json")
-                class_name = config.get("_class_name", None)
-                if class_name:
+                if class_name := config.get("_class_name"):
                     result = self._hf_definition_to_type(module="diffusers", class_name=class_name)
-                if config.get("model_type", None) == "clip_vision_model":
-                    class_name = config.get("architectures")
-                    assert class_name is not None
+                elif class_name := config.get("architectures"):
                     result = self._hf_definition_to_type(module="transformers", class_name=class_name[0])
-                if not class_name:
-                    raise InvalidModelConfigException("Unable to decipher Load Class based on given config.json")
+                else:
+                    raise RuntimeError("Unable to decipher Load Class based on given config.json")
             except KeyError as e:
-                raise InvalidModelConfigException("An expected config.json file is missing from this model.") from e
+                raise ValueError("An expected config.json file is missing from this model.") from e
         assert result is not None
         return result
 
     # TO DO: Add exception handling
     def _hf_definition_to_type(self, module: str, class_name: str) -> ModelMixin:  # fix with correct type
-        if module in ["diffusers", "transformers"]:
+        if module in [
+            "diffusers",
+            "transformers",
+            "invokeai.backend.quantization.fast_quantized_transformers_model",
+            "invokeai.backend.quantization.fast_quantized_diffusion_model",
+        ]:
             res_type = sys.modules[module]
         else:
             res_type = sys.modules["diffusers"].pipelines

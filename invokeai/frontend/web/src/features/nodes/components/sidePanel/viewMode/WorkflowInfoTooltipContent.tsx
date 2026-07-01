@@ -1,17 +1,17 @@
 import { Box, Flex, Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => {
+const selector = createMemoizedSelector(selectNodesSlice, (nodes) => {
   return {
-    name: workflow.name,
-    description: workflow.description,
-    notes: workflow.notes,
-    author: workflow.author,
-    tags: workflow.tags,
+    name: nodes.name,
+    description: nodes.description,
+    notes: nodes.notes,
+    author: nodes.author,
+    tags: nodes.tags,
   };
 });
 

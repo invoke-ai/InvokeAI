@@ -21,16 +21,18 @@ def count_files(path: Path):
 
 @pytest.fixture
 def obj_serializer(tmp_path: Path):
-    return ObjectSerializerDisk[MockDataclass](tmp_path)
+    return ObjectSerializerDisk[MockDataclass](tmp_path, safe_globals=[MockDataclass])
 
 
 @pytest.fixture
 def fwd_cache(tmp_path: Path):
-    return ObjectSerializerForwardCache(ObjectSerializerDisk[MockDataclass](tmp_path), max_cache_size=2)
+    return ObjectSerializerForwardCache(
+        ObjectSerializerDisk[MockDataclass](tmp_path, safe_globals=[MockDataclass]), max_cache_size=2
+    )
 
 
 def test_obj_serializer_disk_initializes(tmp_path: Path):
-    obj_serializer = ObjectSerializerDisk[MockDataclass](tmp_path)
+    obj_serializer = ObjectSerializerDisk[MockDataclass](tmp_path, safe_globals=[MockDataclass])
     assert obj_serializer._output_dir == tmp_path
 
 
@@ -70,7 +72,7 @@ def test_obj_serializer_disk_deletes(obj_serializer: ObjectSerializerDisk[MockDa
 
 
 def test_obj_serializer_ephemeral_creates_tempdir(tmp_path: Path):
-    obj_serializer = ObjectSerializerDisk[MockDataclass](tmp_path, ephemeral=True)
+    obj_serializer = ObjectSerializerDisk[MockDataclass](tmp_path, safe_globals=[MockDataclass], ephemeral=True)
     assert isinstance(obj_serializer._tempdir, tempfile.TemporaryDirectory)
     assert obj_serializer._base_output_dir == tmp_path
     assert obj_serializer._output_dir != tmp_path
@@ -78,21 +80,21 @@ def test_obj_serializer_ephemeral_creates_tempdir(tmp_path: Path):
 
 
 def test_obj_serializer_ephemeral_deletes_tempdir(tmp_path: Path):
-    obj_serializer = ObjectSerializerDisk[MockDataclass](tmp_path, ephemeral=True)
+    obj_serializer = ObjectSerializerDisk[MockDataclass](tmp_path, safe_globals=[MockDataclass], ephemeral=True)
     tempdir_path = obj_serializer._output_dir
     del obj_serializer
     assert not tempdir_path.exists()
 
 
 def test_obj_serializer_ephemeral_deletes_tempdir_on_stop(tmp_path: Path):
-    obj_serializer = ObjectSerializerDisk[MockDataclass](tmp_path, ephemeral=True)
+    obj_serializer = ObjectSerializerDisk[MockDataclass](tmp_path, safe_globals=[MockDataclass], ephemeral=True)
     tempdir_path = obj_serializer._output_dir
     obj_serializer.stop(None)  # pyright: ignore [reportArgumentType]
     assert not tempdir_path.exists()
 
 
 def test_obj_serializer_ephemeral_writes_to_tempdir(tmp_path: Path):
-    obj_serializer = ObjectSerializerDisk[MockDataclass](tmp_path, ephemeral=True)
+    obj_serializer = ObjectSerializerDisk[MockDataclass](tmp_path, safe_globals=[MockDataclass], ephemeral=True)
     obj_1 = MockDataclass(foo="bar")
     obj_1_name = obj_serializer.save(obj_1)
     assert Path(obj_serializer._output_dir, obj_1_name).exists()
@@ -102,19 +104,19 @@ def test_obj_serializer_ephemeral_writes_to_tempdir(tmp_path: Path):
 def test_obj_serializer_ephemeral_deletes_dangling_tempdirs_on_init(tmp_path: Path):
     tempdir = tmp_path / "tmpdir"
     tempdir.mkdir()
-    ObjectSerializerDisk[MockDataclass](tmp_path, ephemeral=True)
+    ObjectSerializerDisk[MockDataclass](tmp_path, safe_globals=[MockDataclass], ephemeral=True)
     assert not tempdir.exists()
 
 
 def test_obj_serializer_does_not_delete_tempdirs_on_init(tmp_path: Path):
     tempdir = tmp_path / "tmpdir"
     tempdir.mkdir()
-    ObjectSerializerDisk[MockDataclass](tmp_path, ephemeral=False)
+    ObjectSerializerDisk[MockDataclass](tmp_path, safe_globals=[MockDataclass], ephemeral=False)
     assert tempdir.exists()
 
 
 def test_obj_serializer_disk_different_types(tmp_path: Path):
-    obj_serializer_1 = ObjectSerializerDisk[MockDataclass](tmp_path)
+    obj_serializer_1 = ObjectSerializerDisk[MockDataclass](tmp_path, safe_globals=[MockDataclass])
     obj_1 = MockDataclass(foo="bar")
     obj_1_name = obj_serializer_1.save(obj_1)
     obj_1_loaded = obj_serializer_1.load(obj_1_name)
@@ -123,19 +125,19 @@ def test_obj_serializer_disk_different_types(tmp_path: Path):
     assert obj_1_loaded.foo == "bar"
     assert obj_1_name.startswith("MockDataclass_")
 
-    obj_serializer_2 = ObjectSerializerDisk[int](tmp_path)
+    obj_serializer_2 = ObjectSerializerDisk[int](tmp_path, safe_globals=[int])
     obj_2_name = obj_serializer_2.save(9001)
     assert obj_serializer_2._obj_class_name == "int"
     assert obj_serializer_2.load(obj_2_name) == 9001
     assert obj_2_name.startswith("int_")
 
-    obj_serializer_3 = ObjectSerializerDisk[str](tmp_path)
+    obj_serializer_3 = ObjectSerializerDisk[str](tmp_path, safe_globals=[str])
     obj_3_name = obj_serializer_3.save("foo")
     assert obj_serializer_3._obj_class_name == "str"
     assert obj_serializer_3.load(obj_3_name) == "foo"
     assert obj_3_name.startswith("str_")
 
-    obj_serializer_4 = ObjectSerializerDisk[torch.Tensor](tmp_path)
+    obj_serializer_4 = ObjectSerializerDisk[torch.Tensor](tmp_path, safe_globals=[torch.Tensor])
     obj_4_name = obj_serializer_4.save(torch.tensor([1, 2, 3]))
     obj_4_loaded = obj_serializer_4.load(obj_4_name)
     assert obj_serializer_4._obj_class_name == "Tensor"

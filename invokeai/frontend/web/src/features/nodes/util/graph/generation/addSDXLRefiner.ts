@@ -1,14 +1,7 @@
 import type { RootState } from 'app/store/store';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
-import { getModelMetadataField } from 'features/nodes/util/graph/canvas/metadata';
-import {
-  SDXL_REFINER_DENOISE_LATENTS,
-  SDXL_REFINER_MODEL_LOADER,
-  SDXL_REFINER_NEGATIVE_CONDITIONING,
-  SDXL_REFINER_POSITIVE_CONDITIONING,
-  SDXL_REFINER_SEAMLESS,
-} from 'features/nodes/util/graph/constants';
-import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { Invocation } from 'services/api/types';
 import { isRefinerMainModelModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -30,7 +23,7 @@ export const addSDXLRefiner = async (
     refinerScheduler,
     refinerCFGScale,
     refinerStart,
-  } = state.sdxl;
+  } = state.params;
 
   assert(refinerModel, 'No refiner model found in state');
 
@@ -43,24 +36,24 @@ export const addSDXLRefiner = async (
 
   const refinerModelLoader = g.addNode({
     type: 'sdxl_refiner_model_loader',
-    id: SDXL_REFINER_MODEL_LOADER,
+    id: getPrefixedId('refiner_model_loader'),
     model: refinerModel,
   });
   const refinerPosCond = g.addNode({
     type: 'sdxl_refiner_compel_prompt',
-    id: SDXL_REFINER_POSITIVE_CONDITIONING,
+    id: getPrefixedId('refiner_pos_cond'),
     style: posCond.style,
     aesthetic_score: refinerPositiveAestheticScore,
   });
   const refinerNegCond = g.addNode({
     type: 'sdxl_refiner_compel_prompt',
-    id: SDXL_REFINER_NEGATIVE_CONDITIONING,
+    id: getPrefixedId('refiner_neg_cond'),
     style: negCond.style,
     aesthetic_score: refinerNegativeAestheticScore,
   });
   const refinerDenoise = g.addNode({
     type: 'denoise_latents',
-    id: SDXL_REFINER_DENOISE_LATENTS,
+    id: getPrefixedId('refiner_denoise_latents'),
     cfg_scale: refinerCFGScale,
     steps: refinerSteps,
     scheduler: refinerScheduler,
@@ -70,8 +63,8 @@ export const addSDXLRefiner = async (
 
   if (seamless) {
     const refinerSeamless = g.addNode({
-      id: SDXL_REFINER_SEAMLESS,
       type: 'seamless',
+      id: getPrefixedId('refiner_seamless'),
       seamless_x: seamless.seamless_x,
       seamless_y: seamless.seamless_y,
     });
@@ -89,7 +82,7 @@ export const addSDXLRefiner = async (
   g.addEdge(refinerDenoise, 'latents', l2i, 'latents');
 
   g.upsertMetadata({
-    refiner_model: getModelMetadataField(modelConfig),
+    refiner_model: Graph.getModelMetadataField(modelConfig),
     refiner_positive_aesthetic_score: refinerPositiveAestheticScore,
     refiner_negative_aesthetic_score: refinerNegativeAestheticScore,
     refiner_cfg_scale: refinerCFGScale,

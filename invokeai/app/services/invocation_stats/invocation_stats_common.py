@@ -14,7 +14,7 @@ class NodeExecutionStatsSummary:
     node_type: str
     num_calls: int
     time_used_seconds: float
-    peak_vram_gb: float
+    delta_vram_gb: float
 
 
 @dataclass
@@ -58,10 +58,10 @@ class InvocationStatsSummary:
     def __str__(self) -> str:
         _str = ""
         _str = f"Graph stats: {self.graph_stats.graph_execution_state_id}\n"
-        _str += f"{'Node':>30} {'Calls':>7} {'Seconds':>9} {'VRAM Used':>10}\n"
+        _str += f"{'Node':>30} {'Calls':>7} {'Seconds':>9} {'VRAM Change':+>10}\n"
 
         for summary in self.node_stats:
-            _str += f"{summary.node_type:>30} {summary.num_calls:>7} {summary.time_used_seconds:>8.3f}s {summary.peak_vram_gb:>9.3f}G\n"
+            _str += f"{summary.node_type:>30} {summary.num_calls:>7} {summary.time_used_seconds:>8.3f}s {summary.delta_vram_gb:+10.3f}G\n"
 
         _str += f"TOTAL GRAPH EXECUTION TIME: {self.graph_stats.execution_time_seconds:7.3f}s\n"
 
@@ -100,7 +100,7 @@ class NodeExecutionStats:
     start_ram_gb: float  # GB
     end_ram_gb: float  # GB
 
-    peak_vram_gb: float  # GB
+    delta_vram_gb: float  # GB
 
     def total_time(self) -> float:
         return self.end_time - self.start_time
@@ -174,9 +174,9 @@ class GraphExecutionStats:
         for node_type, node_type_stats_list in node_stats_by_type.items():
             num_calls = len(node_type_stats_list)
             time_used = sum([n.total_time() for n in node_type_stats_list])
-            peak_vram = max([n.peak_vram_gb for n in node_type_stats_list])
+            delta_vram = max([n.delta_vram_gb for n in node_type_stats_list])
             summary = NodeExecutionStatsSummary(
-                node_type=node_type, num_calls=num_calls, time_used_seconds=time_used, peak_vram_gb=peak_vram
+                node_type=node_type, num_calls=num_calls, time_used_seconds=time_used, delta_vram_gb=delta_vram
             )
             summaries.append(summary)
 

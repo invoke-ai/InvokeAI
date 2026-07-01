@@ -1,36 +1,57 @@
 """Model installation class."""
 
+import gc
+import json
 import locale
 import os
 import re
+import sys
 import threading
 import time
-from hashlib import sha256
+from copy import deepcopy
 from pathlib import Path
 from queue import Empty, Queue
-from shutil import copyfile, copytree, move, rmtree
+from shutil import move, rmtree
 from tempfile import mkdtemp
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
 
 import torch
 import yaml
-from huggingface_hub import HfFolder
+from huggingface_hub import get_token as hf_get_token
 from pydantic.networks import AnyHttpUrl
+from pydantic_core import Url
 from requests import Session
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.download import DownloadJob, DownloadQueueServiceBase, TqdmProgress
+from invokeai.app.services.download import DownloadQueueServiceBase, MultiFileDownloadJob
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_install.model_install_base import ModelInstallServiceBase
-from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase
-from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
-    CheckpointConfigBase,
+from invokeai.app.services.model_install.model_install_common import (
+    MODEL_SOURCE_TO_TYPE_MAP,
+    ExternalModelSource,
+    HFModelSource,
+    InstallStatus,
     InvalidModelConfigException,
-    ModelRepoVariant,
-    ModelSourceType,
+    LocalModelSource,
+    ModelInstallJob,
+    ModelSource,
+    StringLikeSource,
+    URLModelSource,
 )
+from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase, UnknownModelException
+from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
+from invokeai.app.util.misc import get_iso_timestamp
+from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
+from invokeai.backend.model_manager.configs.external_api import (
+    ExternalApiModelConfig,
+    ExternalApiModelDefaultSettings,
+    ExternalModelCapabilities,
+)
+from invokeai.backend.model_manager.configs.factory import (
+    AnyModelConfig,
+    ModelConfigFactory,
+)
+from invokeai.backend.model_manager.configs.unknown import Unknown_Config
 from invokeai.backend.model_manager.metadata import (
     AnyModelRepoMetadata,
     HuggingFaceMetadataFetch,
@@ -39,27 +60,28 @@ from invokeai.backend.model_manager.metadata import (
     RemoteModelFile,
 )
 from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMetadata
-from invokeai.backend.model_manager.probe import ModelProbe
 from invokeai.backend.model_manager.search import ModelSearch
+from invokeai.backend.model_manager.taxonomy import (
+    BaseModelType,
+    ModelFormat,
+    ModelRepoVariant,
+    ModelSourceType,
+    ModelType,
+)
+from invokeai.backend.model_manager.util.lora_metadata_extractor import apply_lora_metadata
 from invokeai.backend.util import InvokeAILogger
 from invokeai.backend.util.catch_sigint import catch_sigint
 from invokeai.backend.util.devices import TorchDevice
-
-from .model_install_common import (
-    MODEL_SOURCE_TO_TYPE_MAP,
-    HFModelSource,
-    InstallStatus,
-    LocalModelSource,
-    ModelInstallJob,
-    ModelSource,
-    StringLikeSource,
-    URLModelSource,
-)
-
-TMPDIR_PREFIX = "tmpinstall_"
+from invokeai.backend.util.util import slugify
 
 if TYPE_CHECKING:
     from invokeai.app.services.events.events_base import EventServiceBase
+
+
+TMPDIR_PREFIX = "tmpinstall_"
+# Marker file used to resume or pause remote model installs across restarts.
+INSTALL_MARKER_FILENAME = ".invokeai_install.json"
+INSTALL_MARKER_VERSION = 1
 
 
 class ModelInstallService(ModelInstallServiceBase):
@@ -90,12 +112,203 @@ class ModelInstallService(ModelInstallServiceBase):
         self._stop_event = threading.Event()
         self._downloads_changed_event = threading.Event()
         self._install_completed_event = threading.Event()
+        self._restore_completed_event = threading.Event()
+        self._restore_completed_event.set()
         self._download_queue = download_queue
-        self._download_cache: Dict[AnyHttpUrl, ModelInstallJob] = {}
+        self._download_cache: Dict[int, ModelInstallJob] = {}
         self._running = False
         self._session = session
         self._install_thread: Optional[threading.Thread] = None
         self._next_job_id = 0
+
+    def _marker_path(self, tmpdir: Path) -> Path:
+        return tmpdir / INSTALL_MARKER_FILENAME
+
+    def _write_install_marker(self, job: ModelInstallJob, status: Optional[InstallStatus] = None) -> None:
+        if job._install_tmpdir is None:
+            return
+        files: list[dict] = []
+        if job.download_parts:
+            for part in job.download_parts:
+                files.append(
+                    {
+                        "url": str(part.source),
+                        "canonical_url": part.canonical_url,
+                        "etag": part.etag,
+                        "last_modified": part.last_modified,
+                        "expected_total_bytes": part.expected_total_bytes,
+                        "final_url": part.final_url,
+                        "download_path": part.download_path.as_posix() if part.download_path else None,
+                        "resume_required": part.resume_required,
+                        "resume_message": part.resume_message,
+                    }
+                )
+        marker = {
+            "version": INSTALL_MARKER_VERSION,
+            "source": str(job.source),
+            "access_token": (
+                job.source.access_token if isinstance(job.source, (HFModelSource, URLModelSource)) else None
+            ),
+            "config_in": job.config_in.model_dump(),
+            "status": (status or job.status).value,
+            "updated_at": get_iso_timestamp(),
+            "files": files,
+        }
+        path = self._marker_path(job._install_tmpdir)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "wt", encoding="utf-8") as f:
+            json.dump(marker, f)
+
+    def _read_install_marker(self, tmpdir: Path) -> Optional[dict]:
+        path = self._marker_path(tmpdir)
+        if not path.exists():
+            return None
+        try:
+            with open(path, "rt", encoding="utf-8") as f:
+                marker = json.load(f)
+            if marker.get("version") != INSTALL_MARKER_VERSION:
+                return None
+            return marker
+        except Exception as e:
+            self._logger.warning(f"Invalid install marker in {tmpdir}: {e}")
+            return None
+
+    def _delete_install_marker(self, tmpdir: Path) -> None:
+        path = self._marker_path(tmpdir)
+        if path.exists():
+            try:
+                path.unlink()
+            except Exception as e:
+                self._logger.warning(f"Failed to remove install marker {path}: {e}")
+
+    def _find_reusable_tmpdir(self, source: ModelSource) -> Optional[Path]:
+        path = self._app_config.models_path
+        source_str = str(source)
+        candidates: list[tuple[str, Path]] = []
+        for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
+            marker = self._read_install_marker(tmpdir)
+            if not marker:
+                continue
+            if marker.get("source") != source_str:
+                continue
+            status = marker.get("status")
+            if status in {InstallStatus.COMPLETED.value, InstallStatus.ERROR.value, InstallStatus.CANCELLED.value}:
+                continue
+            candidates.append((marker.get("updated_at", ""), tmpdir))
+        if not candidates:
+            return None
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        return candidates[0][1]
+
+    def _restore_incomplete_installs(self) -> None:
+        path = self._app_config.models_path
+        seen_sources: set[str] = set()
+        # Collect sources already tracked by active jobs (including those being downloaded right now).
+        # We must not re-queue these or delete their tmpdirs.
+        with self._lock:
+            active_sources = {str(j.source) for j in self._install_jobs if not j.in_terminal_state}
+            active_sources.update(str(j.source) for j in self._download_cache.values() if not j.in_terminal_state)
+        for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
+            marker = self._read_install_marker(tmpdir)
+            if not marker:
+                continue
+            status = marker.get("status")
+            if status in {InstallStatus.COMPLETED.value, InstallStatus.ERROR.value, InstallStatus.CANCELLED.value}:
+                continue
+
+            try:
+                source_str = marker.get("source")
+                if not isinstance(source_str, str):
+                    raise ValueError("Missing source in install marker")
+                source = self._guess_source(source_str)
+                access_token = marker.get("access_token")
+                if isinstance(source, (HFModelSource, URLModelSource)) and isinstance(access_token, str):
+                    source.access_token = access_token
+                if source_str in active_sources:
+                    # This tmpdir belongs to an install already in progress; leave it alone.
+                    self._logger.debug(f"Skipping restore for {source_str} - already being tracked")
+                    continue
+                if source_str in seen_sources:
+                    self._logger.info(f"Removing duplicate temporary directory {tmpdir}")
+                    self._safe_rmtree(tmpdir, self._logger)
+                    continue
+                seen_sources.add(source_str)
+            except Exception as e:
+                self._logger.warning(f"Skipping install marker in {tmpdir}: {e}")
+                continue
+
+            config_in = ModelRecordChanges(**(marker.get("config_in") or {}))
+            job = ModelInstallJob(
+                id=self._next_id(),
+                source=source,
+                config_in=config_in,
+                local_path=tmpdir,
+            )
+            job._install_tmpdir = tmpdir
+            files_meta = marker.get("files") or []
+            if files_meta:
+                job._resume_metadata = {f.get("url"): f for f in files_meta if f.get("url")}
+            job.status = InstallStatus(status) if status else InstallStatus.WAITING
+            self._install_jobs.append(job)
+
+            if job.paused:
+                continue
+
+            if job.status in [InstallStatus.DOWNLOADS_DONE, InstallStatus.RUNNING]:
+                job.status = InstallStatus.DOWNLOADS_DONE
+                self._put_in_queue(job)
+            else:
+                try:
+                    self._resume_remote_download(job)
+                except Exception as e:
+                    self._set_error(job, e)
+                    if job._install_tmpdir is not None:
+                        self._safe_rmtree(job._install_tmpdir, self._logger)
+
+    def _restore_incomplete_installs_async(self) -> None:
+        self._restore_completed_event.clear()
+
+        def _run() -> None:
+            try:
+                self._logger.info("Restoring incomplete installs")
+                self._restore_incomplete_installs()
+                self._logger.info("Finished restoring incomplete installs")
+            except Exception as e:
+                self._logger.error(f"Failed to restore incomplete installs: {e}")
+            finally:
+                self._restore_completed_event.set()
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _wait_for_restore_complete(self) -> None:
+        self._restore_completed_event.wait()
+
+    def _resume_remote_download(self, job: ModelInstallJob) -> None:
+        job.status = InstallStatus.WAITING
+        if job.download_parts:
+            for part in job.download_parts:
+                if part.complete or part.bytes <= 0:
+                    continue
+                if not part.download_path:
+                    continue
+                in_progress_path = part.download_path.with_name(part.download_path.name + ".downloading")
+                if not in_progress_path.exists():
+                    part.bytes = 0
+                    part.resume_from_scratch = True
+                    part.resume_message = "Partial file missing. Restarted download from the beginning."
+            job.bytes = sum(p.bytes for p in job.download_parts)
+        remote_files, metadata = self._remote_files_from_source(job.source)
+        subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
+        self._enqueue_remote_download(
+            job=job,
+            source=job.source,
+            remote_files=remote_files,
+            metadata=metadata,
+            destdir=job._install_tmpdir or job.local_path,
+            subfolder=job.source.subfolder if isinstance(job.source, HFModelSource) and len(subfolders) <= 1 else None,
+            subfolders=subfolders if len(subfolders) > 1 else None,
+            resume_metadata=job._resume_metadata,
+        )
 
     @property
     def app_config(self) -> InvokeAIAppConfig:  # noqa D102
@@ -132,10 +345,13 @@ class ModelInstallService(ModelInstallServiceBase):
             for model in self._scan_for_missing_models():
                 self._logger.warning(f"Missing model file: {model.name} at {model.path}")
 
+            self._write_invoke_managed_models_dir_readme()
+            self._restore_incomplete_installs_async()
+
     def stop(self, invoker: Optional[Invoker] = None) -> None:
         """Stop the installer thread; after this the object can be deleted and garbage collected."""
         if not self._running:
-            raise Exception("Attempt to stop the install service before it was started")
+            return
         self._logger.debug("calling stop_event.set()")
         self._stop_event.set()
         self._clear_pending_jobs()
@@ -144,11 +360,23 @@ class ModelInstallService(ModelInstallServiceBase):
         self._install_thread.join()
         self._running = False
 
+    def _write_invoke_managed_models_dir_readme(self) -> None:
+        """Write a README file to the Invoke-managed models directory warning users to not fiddle with it."""
+        readme_path = self.app_config.models_path / "README.txt"
+        with open(readme_path, "wt", encoding=locale.getpreferredencoding()) as f:
+            f.write(
+                "This directory is managed by Invoke. Do not add, delete or move files in this directory.\n\nTo manage models, use the web interface.\n"
+            )
+
     def _clear_pending_jobs(self) -> None:
         for job in self.list_jobs():
             if not job.in_terminal_state:
-                self._logger.warning("Cancelling job {job.id}")
-                self.cancel_job(job)
+                if job._multifile_job is not None:
+                    self._logger.warning(f"Pausing job {job.id}")
+                    self.pause_job(job)
+                else:
+                    self._logger.warning(f"Cancelling job {job.id}")
+                    self.cancel_job(job)
         while True:
             try:
                 job = self._install_queue.get(block=False)
@@ -165,40 +393,61 @@ class ModelInstallService(ModelInstallServiceBase):
     def register_path(
         self,
         model_path: Union[Path, str],
-        config: Optional[Dict[str, Any]] = None,
+        config: Optional[ModelRecordChanges] = None,
     ) -> str:  # noqa D102
         model_path = Path(model_path)
-        config = config or {}
-        if not config.get("source"):
-            config["source"] = model_path.resolve().as_posix()
-        config["source_type"] = ModelSourceType.Path
+        config = config or ModelRecordChanges()
+        if not config.source:
+            config.source = model_path.resolve().as_posix()
+        config.source_type = ModelSourceType.Path
         return self._register(model_path, config)
+
+    # TODO: Replace this with a proper fix for underlying problem of Windows holding open
+    # the file when it needs to be moved.
+    @staticmethod
+    def _move_with_retries(src: Path, dst: Path, attempts: int = 5, delay: float = 0.5) -> None:
+        """Workaround for Windows file-handle issues when moving files."""
+        for tries_left in range(attempts, 0, -1):
+            try:
+                move(src, dst)
+                return
+            except PermissionError:
+                gc.collect()
+                if tries_left == 1:
+                    raise
+                time.sleep(delay)
+                delay *= 2  # Exponential backoff
 
     def install_path(
         self,
         model_path: Union[Path, str],
-        config: Optional[Dict[str, Any]] = None,
-    ) -> str:  # noqa D102
+        config: Optional[ModelRecordChanges] = None,
+    ) -> str:
         model_path = Path(model_path)
-        config = config or {}
+        config = config or ModelRecordChanges()
+        info: AnyModelConfig = self._probe(Path(model_path), config)  # type: ignore
 
-        info: AnyModelConfig = ModelProbe.probe(Path(model_path), config, hash_algo=self._app_config.hashing_algorithm)
-
-        if preferred_name := config.get("name"):
-            preferred_name = Path(preferred_name).with_suffix(model_path.suffix)
-
-        dest_path = (
-            self.app_config.models_path / info.base.value / info.type.value / (preferred_name or model_path.name)
-        )
+        dest_dir = self.app_config.models_path / info.key
         try:
-            new_path = self._copy_model(model_path, dest_path)
-        except FileExistsError as excp:
+            if dest_dir.exists():
+                raise FileExistsError(
+                    f"Cannot install model {model_path.name} to {dest_dir}: destination already exists"
+                )
+            dest_dir.mkdir(parents=True)
+            dest_path = dest_dir / model_path.name if model_path.is_file() else dest_dir
+            if model_path.is_file():
+                self._move_with_retries(model_path, dest_path)  # Windows workaround TODO: fix root cause
+            elif model_path.is_dir():
+                # Move the contents of the directory, not the directory itself
+                for item in model_path.iterdir():
+                    move(item, dest_dir / item.name)
+        except FileExistsError as e:
             raise DuplicateModelException(
-                f"A model named {model_path.name} is already installed at {dest_path.as_posix()}"
-            ) from excp
+                f"A model named {model_path.name} is already installed at {dest_dir.as_posix()}"
+            ) from e
 
         return self._register(
-            new_path,
+            dest_path,
             config,
             info,
         )
@@ -206,40 +455,21 @@ class ModelInstallService(ModelInstallServiceBase):
     def heuristic_import(
         self,
         source: str,
-        config: Optional[Dict[str, Any]] = None,
+        config: Optional[ModelRecordChanges] = None,
         access_token: Optional[str] = None,
         inplace: Optional[bool] = False,
     ) -> ModelInstallJob:
-        variants = "|".join(ModelRepoVariant.__members__.values())
-        hf_repoid_re = f"^([^/:]+/[^/:]+)(?::({variants})?(?::/?([^:]+))?)?$"
-        source_obj: Optional[StringLikeSource] = None
-
-        if Path(source).exists():  # A local file or directory
-            source_obj = LocalModelSource(path=Path(source), inplace=inplace)
-        elif match := re.match(hf_repoid_re, source):
-            source_obj = HFModelSource(
-                repo_id=match.group(1),
-                variant=match.group(2) if match.group(2) else None,  # pass None rather than ''
-                subfolder=Path(match.group(3)) if match.group(3) else None,
-                access_token=access_token,
-            )
-        elif re.match(r"^https?://[^/]+", source):
-            # Pull the token from config if it exists and matches the URL
-            _token = access_token
-            if _token is None:
-                for pair in self.app_config.remote_api_tokens or []:
-                    if re.search(pair.url_regex, source):
-                        _token = pair.token
-                        break
-            source_obj = URLModelSource(
-                url=AnyHttpUrl(source),
-                access_token=_token,
-            )
-        else:
-            raise ValueError(f"Unsupported model source: '{source}'")
+        """Install a model using pattern matching to infer the type of source."""
+        source_obj = self._guess_source(source)
+        if isinstance(source_obj, LocalModelSource):
+            source_obj.inplace = inplace
+        elif isinstance(source_obj, HFModelSource) or isinstance(source_obj, URLModelSource):
+            source_obj.access_token = access_token
         return self.import_model(source_obj, config)
 
-    def import_model(self, source: ModelSource, config: Optional[Dict[str, Any]] = None) -> ModelInstallJob:  # noqa D102
+    def import_model(self, source: ModelSource, config: Optional[ModelRecordChanges] = None) -> ModelInstallJob:  # noqa D102
+        self._wait_for_restore_complete()
+
         similar_jobs = [x for x in self.list_jobs() if x.source == source and not x.in_terminal_state]
         if similar_jobs:
             self._logger.warning(f"There is already an active install job for {source}. Not enqueuing.")
@@ -252,6 +482,9 @@ class ModelInstallService(ModelInstallServiceBase):
             install_job = self._import_from_hf(source, config)
         elif isinstance(source, URLModelSource):
             install_job = self._import_from_url(source, config)
+        elif isinstance(source, ExternalModelSource):
+            install_job = self._import_external_model(source, config)
+            self._put_in_queue(install_job)
         else:
             raise ValueError(f"Unsupported model source: '{type(source)}'")
 
@@ -284,6 +517,8 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def wait_for_installs(self, timeout: int = 0) -> List[ModelInstallJob]:  # noqa D102
         """Block until all installation jobs are done."""
+        self._wait_for_restore_complete()
+
         start = time.time()
         while len(self._download_cache) > 0:
             if self._downloads_changed_event.wait(timeout=0.25):  # in case we miss an event
@@ -297,8 +532,79 @@ class ModelInstallService(ModelInstallServiceBase):
     def cancel_job(self, job: ModelInstallJob) -> None:
         """Cancel the indicated job."""
         job.cancel()
-        with self._lock:
-            self._cancel_download_parts(job)
+        self._logger.warning(f"Cancelling {job.source}")
+        if dj := job._multifile_job:
+            self._download_queue.cancel_job(dj)
+        if job._install_tmpdir is not None:
+            # Mark cancelled before cleanup so we don't reuse the folder if deletion fails.
+            self._write_install_marker(job, status=InstallStatus.CANCELLED)
+            self._delete_install_marker(job._install_tmpdir)
+            self._safe_rmtree(job._install_tmpdir, self._logger)
+
+    def pause_job(self, job: ModelInstallJob) -> None:
+        """Pause the indicated job, preserving partial downloads."""
+        if job.in_terminal_state:
+            return
+        job.status = InstallStatus.PAUSED
+        self._logger.warning(f"Pausing {job.source}")
+        if dj := job._multifile_job:
+            for part in dj.download_parts:
+                self._download_queue.pause_job(part)
+        self._write_install_marker(job, status=InstallStatus.PAUSED)
+
+    def resume_job(self, job: ModelInstallJob) -> None:
+        """Resume a previously paused job."""
+        if not job.paused:
+            return
+        self._logger.info(f"Resuming {job.source}")
+        self._resume_remote_download(job)
+
+    def restart_failed(self, job: ModelInstallJob) -> None:
+        """Restart failed or non-resumable downloads for a job."""
+        if not isinstance(job.source, (HFModelSource, URLModelSource)):
+            return
+        if not job.download_parts:
+            return
+        if not any(part.resume_required or part.errored for part in job.download_parts):
+            return
+        sources_to_restart = {str(part.source) for part in job.download_parts if not part.complete}
+        if not sources_to_restart:
+            return
+        job.status = InstallStatus.WAITING
+        remote_files, metadata = self._remote_files_from_source(job.source)
+        remote_files = [rf for rf in remote_files if str(rf.url) in sources_to_restart]
+        subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
+        self._enqueue_remote_download(
+            job=job,
+            source=job.source,
+            remote_files=remote_files,
+            metadata=metadata,
+            destdir=job._install_tmpdir or job.local_path,
+            subfolder=job.source.subfolder if isinstance(job.source, HFModelSource) and len(subfolders) <= 1 else None,
+            subfolders=subfolders if len(subfolders) > 1 else None,
+            clear_partials=True,
+        )
+
+    def restart_file(self, job: ModelInstallJob, file_source: str) -> None:
+        """Restart a specific file download for a job."""
+        if not isinstance(job.source, (HFModelSource, URLModelSource)):
+            return
+        job.status = InstallStatus.WAITING
+        remote_files, metadata = self._remote_files_from_source(job.source)
+        remote_files = [rf for rf in remote_files if str(rf.url) == file_source]
+        if not remote_files:
+            return
+        subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
+        self._enqueue_remote_download(
+            job=job,
+            source=job.source,
+            remote_files=remote_files,
+            metadata=metadata,
+            destdir=job._install_tmpdir or job.local_path,
+            subfolder=job.source.subfolder if isinstance(job.source, HFModelSource) and len(subfolders) <= 1 else None,
+            subfolders=subfolders if len(subfolders) > 1 else None,
+            clear_partials=True,
+        )
 
     def prune_jobs(self) -> None:
         """Prune all completed and errored jobs."""
@@ -340,16 +646,17 @@ class ModelInstallService(ModelInstallServiceBase):
                         model_path = self._app_config.models_path / model_path
                     model_path = model_path.resolve()
 
-                    config: dict[str, Any] = {}
-                    config["name"] = model_name
-                    config["description"] = stanza.get("description")
+                    config = ModelRecordChanges(
+                        name=model_name,
+                        description=stanza.get("description"),
+                    )
                     legacy_config_path = stanza.get("config")
                     if legacy_config_path:
                         # In v3, these paths were relative to the root. Migrate them to be relative to the legacy_conf_dir.
-                        legacy_config_path: Path = self._app_config.root_path / legacy_config_path
+                        legacy_config_path = self._app_config.root_path / legacy_config_path
                         if legacy_config_path.is_relative_to(self._app_config.legacy_conf_path):
                             legacy_config_path = legacy_config_path.relative_to(self._app_config.legacy_conf_path)
-                        config["config_path"] = str(legacy_config_path)
+                        config.config_path = str(legacy_config_path)
                     try:
                         id = self.register_path(model_path=model_path, config=config)
                         self._logger.info(f"Migrated {model_name} with id {id}")
@@ -380,43 +687,126 @@ class ModelInstallService(ModelInstallServiceBase):
     def unconditionally_delete(self, key: str) -> None:  # noqa D102
         model = self.record_store.get_model(key)
         model_path = self.app_config.models_path / model.path
+        # Models are stored in a directory named by their key. To delete the model on disk, we delete the entire
+        # directory. However, the path we store in the model record may be either a file within the key directory,
+        # or the directory itself. So we have to handle both cases.
         if model_path.is_file() or model_path.is_symlink():
+            # Delete the individual model file, not the entire parent directory.
+            # Other unrelated files may exist in the same directory.
             model_path.unlink()
+            # Clean up the parent directory only if it is now empty
+            if model_path.parent != self.app_config.models_path and not any(model_path.parent.iterdir()):
+                model_path.parent.rmdir()
         elif model_path.is_dir():
+            # Sanity check - folder models should be in their own directory under the models dir. The path should
+            # not be the Invoke models dir itself!
+            assert model_path != self.app_config.models_path
             rmtree(model_path)
         self.unregister(key)
 
-    def download_and_cache(
+    @classmethod
+    def _download_cache_path(cls, source: Union[str, AnyHttpUrl], app_config: InvokeAIAppConfig) -> Path:
+        escaped_source = slugify(str(source))
+        return app_config.download_cache_path / escaped_source
+
+    def download_and_cache_model(
         self,
-        source: Union[str, AnyHttpUrl],
-        access_token: Optional[str] = None,
-        timeout: int = 0,
+        source: str | AnyHttpUrl,
     ) -> Path:
         """Download the model file located at source to the models cache and return its Path."""
-        model_hash = sha256(str(source).encode("utf-8")).hexdigest()[0:32]
-        model_path = self._app_config.convert_cache_path / model_hash
+        model_path = self._download_cache_path(str(source), self._app_config)
 
-        # We expect the cache directory to contain one and only one downloaded file.
+        # We expect the cache directory to contain one and only one downloaded file or directory.
         # We don't know the file's name in advance, as it is set by the download
         # content-disposition header.
         if model_path.exists():
-            contents = [x for x in model_path.iterdir() if x.is_file()]
+            contents: List[Path] = list(model_path.iterdir())
             if len(contents) > 0:
                 return contents[0]
 
         model_path.mkdir(parents=True, exist_ok=True)
-        job = self._download_queue.download(
-            source=AnyHttpUrl(str(source)),
+        model_source = self._guess_source(str(source))
+        remote_files, _ = self._remote_files_from_source(model_source)
+        # Handle multiple subfolders for HFModelSource
+        subfolders = model_source.subfolders if isinstance(model_source, HFModelSource) else []
+        job = self._multifile_download(
             dest=model_path,
-            access_token=access_token,
-            on_progress=TqdmProgress().update,
+            remote_files=remote_files,
+            subfolder=model_source.subfolder
+            if isinstance(model_source, HFModelSource) and len(subfolders) <= 1
+            else None,
+            subfolders=subfolders if len(subfolders) > 1 else None,
         )
-        self._download_queue.wait_for_job(job, timeout)
+        files_string = "file" if len(remote_files) == 1 else "files"
+        self._logger.info(f"Queuing model download: {source} ({len(remote_files)} {files_string})")
+        self._download_queue.wait_for_job(job)
         if job.complete:
             assert job.download_path is not None
             return job.download_path
         else:
             raise Exception(job.error)
+
+    def _remote_files_from_source(
+        self, source: ModelSource
+    ) -> Tuple[List[RemoteModelFile], Optional[AnyModelRepoMetadata]]:
+        metadata = None
+        if isinstance(source, HFModelSource):
+            metadata = HuggingFaceMetadataFetch(self._session).from_id(source.repo_id, source.variant)
+            assert isinstance(metadata, ModelMetadataWithFiles)
+            # Use subfolders property which handles '+' separated multiple subfolders
+            subfolders = source.subfolders
+            return (
+                metadata.download_urls(
+                    variant=source.variant or self._guess_variant(),
+                    subfolder=source.subfolder if len(subfolders) <= 1 else None,
+                    subfolders=subfolders if len(subfolders) > 1 else None,
+                    session=self._session,
+                ),
+                metadata,
+            )
+
+        if isinstance(source, URLModelSource):
+            try:
+                fetcher = self.get_fetcher_from_url(str(source.url))
+                kwargs: dict[str, Any] = {"session": self._session}
+                metadata = fetcher(**kwargs).from_url(source.url)
+                assert isinstance(metadata, ModelMetadataWithFiles)
+                return metadata.download_urls(session=self._session), metadata
+            except ValueError:
+                pass
+
+            return [RemoteModelFile(url=self._normalize_huggingface_blob_url(source.url), path=Path("."), size=0)], None
+
+        raise Exception(f"No files associated with {source}")
+
+    def _guess_source(self, source: str) -> ModelSource:
+        """Turn a source string into a ModelSource object."""
+        variants = "|".join(ModelRepoVariant.__members__.values())
+        hf_repoid_re = f"^([^/:]+/[^/:]+)(?::({variants})?(?::/?([^:]+))?)?$"
+        source_obj: Optional[StringLikeSource] = None
+        source_stripped = source.strip('"')
+
+        if source_stripped.startswith("external://"):
+            external_id = source_stripped.removeprefix("external://")
+            provider_id, _, provider_model_id = external_id.partition("/")
+            if not provider_id or not provider_model_id:
+                raise ValueError(f"Invalid external model source: '{source_stripped}'")
+            source_obj = ExternalModelSource(provider_id=provider_id, provider_model_id=provider_model_id)
+        elif Path(source_stripped).exists():  # A local file or directory
+            source_obj = LocalModelSource(path=Path(source_stripped))
+        elif match := re.match(hf_repoid_re, source):
+            source_obj = HFModelSource(
+                repo_id=match.group(1),
+                variant=ModelRepoVariant(match.group(2)) if match.group(2) else None,  # pass None rather than ''
+                subfolder=Path(match.group(3)) if match.group(3) else None,
+            )
+        elif re.match(r"^https?://[^/]+", source):
+            source_obj = URLModelSource(
+                url=Url(source),
+            )
+        else:
+            raise ValueError(f"Unsupported model source: '{source}'")
+        return source_obj
 
     # --------------------------------------------------------------------------------------------
     # Internal functions that manage the installer threads
@@ -425,6 +815,39 @@ class ModelInstallService(ModelInstallServiceBase):
         self._install_thread = threading.Thread(target=self._install_next_item, daemon=True)
         self._install_thread.start()
         self._running = True
+
+    @staticmethod
+    def _safe_rmtree(path: Path, logger: Any) -> None:
+        """Remove a directory tree with retry logic for Windows file locking issues.
+
+        On Windows, memory-mapped files may not be immediately released even after
+        the file handle is closed. This function retries the removal with garbage
+        collection to help release any lingering references.
+        """
+        max_retries = 3
+        retry_delay = 0.5  # seconds
+
+        for attempt in range(max_retries):
+            try:
+                # Force garbage collection to release any lingering file references
+                gc.collect()
+                rmtree(path)
+                return
+            except PermissionError as e:
+                if attempt < max_retries - 1 and sys.platform == "win32":
+                    logger.warning(
+                        f"Failed to remove {path} (attempt {attempt + 1}/{max_retries}): {e}. "
+                        f"Retrying in {retry_delay}s..."
+                    )
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    logger.error(f"Failed to remove temporary directory {path}: {e}")
+                    # On final failure, don't raise - the temp dir will be cleaned up on next startup
+                    return
+            except Exception as e:
+                logger.error(f"Unexpected error removing {path}: {e}")
+                return
 
     def _install_next_item(self) -> None:
         self._logger.debug(f"Installer thread {threading.get_ident()} starting")
@@ -455,21 +878,27 @@ class ModelInstallService(ModelInstallServiceBase):
             finally:
                 # if this is an install of a remote file, then clean up the temporary directory
                 if job._install_tmpdir is not None:
-                    rmtree(job._install_tmpdir)
+                    self._safe_rmtree(job._install_tmpdir, self._logger)
                 self._install_completed_event.set()
                 self._install_queue.task_done()
         self._logger.info(f"Installer thread {threading.get_ident()} exiting")
 
     def _register_or_install(self, job: ModelInstallJob) -> None:
+        if isinstance(job.source, ExternalModelSource):
+            self._register_external_model(job)
+            return
         # local jobs will be in waiting state, remote jobs will be downloading state
         job.total_bytes = self._stat_size(job.local_path)
         job.bytes = job.total_bytes
         self._signal_job_running(job)
-        job.config_in["source"] = str(job.source)
-        job.config_in["source_type"] = MODEL_SOURCE_TO_TYPE_MAP[job.source.__class__]
+        job.config_in.source = str(job.source)
+        job.config_in.source_type = MODEL_SOURCE_TO_TYPE_MAP[job.source.__class__]
         # enter the metadata, if there is any
         if isinstance(job.source_metadata, (HuggingFaceMetadata)):
-            job.config_in["source_api_response"] = job.source_metadata.api_response
+            job.config_in.source_api_response = job.source_metadata.api_response
+
+        if job._install_tmpdir is not None:
+            self._delete_install_marker(job._install_tmpdir)
 
         if job.inplace:
             key = self.register_path(job.local_path, job.config_in)
@@ -478,16 +907,84 @@ class ModelInstallService(ModelInstallServiceBase):
         job.config_out = self.record_store.get_model(key)
         self._signal_job_completed(job)
 
-    def _set_error(self, job: ModelInstallJob, excp: Exception) -> None:
-        if any(x.content_type is not None and "text/html" in x.content_type for x in job.download_parts):
-            job.set_error(
-                InvalidModelConfigException(
-                    f"At least one file in {job.local_path} is an HTML page, not a model. This can happen when an access token is required to download."
+    def _register_external_model(self, job: ModelInstallJob) -> None:
+        job.total_bytes = 0
+        job.bytes = 0
+        self._signal_job_running(job)
+        job.config_in.source = str(job.source)
+        job.config_in.source_type = MODEL_SOURCE_TO_TYPE_MAP[job.source.__class__]
+
+        provider_id = job.source.provider_id
+        provider_model_id = job.source.provider_model_id
+        capabilities = job.config_in.capabilities or ExternalModelCapabilities()
+        default_settings = (
+            job.config_in.default_settings
+            if isinstance(job.config_in.default_settings, ExternalApiModelDefaultSettings)
+            else None
+        )
+        name = job.config_in.name or f"{provider_id} {provider_model_id}"
+        key = job.config_in.key or slugify(f"{provider_id}-{provider_model_id}")
+
+        existing_external = next(
+            (
+                model
+                for model in self.record_store.search_by_attr(
+                    base_model=BaseModelType.External, model_type=ModelType.ExternalImageGenerator
+                )
+                if isinstance(model, ExternalApiModelConfig)
+                and model.provider_id == provider_id
+                and model.provider_model_id == provider_model_id
+            ),
+            None,
+        )
+
+        if existing_external is not None:
+            key = existing_external.key
+        else:
+            try:
+                self.record_store.get_model(key)
+                raise DuplicateModelException(
+                    f"Model key '{key}' already exists. Provide a different key to install this external model."
+                )
+            except UnknownModelException:
+                pass
+
+        config = ExternalApiModelConfig(
+            key=key,
+            name=name,
+            description=job.config_in.description,
+            provider_id=provider_id,
+            provider_model_id=provider_model_id,
+            capabilities=capabilities,
+            default_settings=default_settings,
+            source=str(job.source),
+            source_type=MODEL_SOURCE_TO_TYPE_MAP[job.source.__class__],
+            path="",
+            hash="",
+            file_size=0,
+        )
+
+        if existing_external is not None:
+            self.record_store.replace_model(existing_external.key, config)
+        else:
+            self.record_store.add_model(config)
+
+        job.config_out = self.record_store.get_model(config.key)
+        self._signal_job_completed(job)
+
+    def _set_error(self, install_job: ModelInstallJob, excp: Exception) -> None:
+        multifile_download_job = install_job._multifile_job
+        if multifile_download_job and any(
+            x.content_type is not None and "text/html" in x.content_type for x in multifile_download_job.download_parts
+        ):
+            install_job.set_error(
+                ValueError(
+                    f"At least one file in {install_job.local_path} is an HTML page, not a model. This can happen when an access token is required to download."
                 )
             )
         else:
-            job.set_error(excp)
-        self._signal_job_errored(job)
+            install_job.set_error(excp)
+        self._signal_job_errored(install_job)
 
     # --------------------------------------------------------------------------------------------
     # Internal functions that manage the models directory
@@ -496,13 +993,22 @@ class ModelInstallService(ModelInstallServiceBase):
         """Remove leftover tmpdirs from aborted installs."""
         path = self._app_config.models_path
         for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
-            self._logger.info(f"Removing dangling temporary directory {tmpdir}")
-            rmtree(tmpdir)
+            marker = self._read_install_marker(tmpdir)
+            if marker is None:
+                self._logger.info(f"Removing dangling temporary directory {tmpdir}")
+                self._safe_rmtree(tmpdir, self._logger)
+                continue
+            status = marker.get("status")
+            if status in {InstallStatus.COMPLETED.value, InstallStatus.ERROR.value, InstallStatus.CANCELLED.value}:
+                self._logger.info(f"Removing completed/errored temporary directory {tmpdir}")
+                self._safe_rmtree(tmpdir, self._logger)
 
     def _scan_for_missing_models(self) -> list[AnyModelConfig]:
         """Scan the models directory for missing models and return a list of them."""
         missing_models: list[AnyModelConfig] = []
         for model_config in self.record_store.all_models():
+            if model_config.base == BaseModelType.External or model_config.format == ModelFormat.ExternalApi:
+                continue
             if not (self.app_config.models_path / model_config.path).resolve().exists():
                 missing_models.append(model_config)
         return missing_models
@@ -513,7 +1019,6 @@ class ModelInstallService(ModelInstallServiceBase):
         This is typically only used during testing with a new DB or when using the memory DB, because those are the
         only situations in which we may have orphaned models in the models directory.
         """
-
         installed_model_paths = {
             (self._app_config.models_path / x.path).resolve() for x in self.record_store.all_models()
         }
@@ -525,8 +1030,13 @@ class ModelInstallService(ModelInstallServiceBase):
             if resolved_path in installed_model_paths:
                 return True
             # Skip core models entirely - these aren't registered with the model manager.
-            if str(resolved_path).startswith(str(self.app_config.models_path / "core")):
-                return False
+            for special_directory in [
+                self.app_config.models_path / "core",
+                self.app_config.convert_cache_dir,
+                self.app_config.download_cache_dir,
+            ]:
+                if resolved_path.is_relative_to(special_directory):
+                    return False
             try:
                 model_id = self.register_path(model_path)
                 self._logger.info(f"Registered {model_path.name} with id {model_id}")
@@ -540,68 +1050,36 @@ class ModelInstallService(ModelInstallServiceBase):
         found_models = search.search(self._app_config.models_path)
         self._logger.info(f"{len(found_models)} new models registered")
 
-    def sync_model_path(self, key: str) -> AnyModelConfig:
-        """
-        Move model into the location indicated by its basetype, type and name.
+    def _probe(self, model_path: Path, config: Optional[ModelRecordChanges] = None):
+        config = config or ModelRecordChanges()
+        hash_algo = self._app_config.hashing_algorithm
+        fields = config.model_dump()
 
-        Call this after updating a model's attributes in order to move
-        the model's path into the location indicated by its basetype, type and
-        name. Applies only to models whose paths are within the root `models_dir`
-        directory.
+        result = ModelConfigFactory.from_model_on_disk(
+            mod=model_path,
+            override_fields=deepcopy(fields),
+            hash_algo=hash_algo,
+            allow_unknown=self.app_config.allow_unknown_models,
+        )
 
-        May raise an UnknownModelException.
-        """
-        model = self.record_store.get_model(key)
-        models_dir = self.app_config.models_path
-        old_path = self.app_config.models_path / model.path
+        if result.config is None:
+            self._logger.error(f"Could not identify model for {model_path}, detailed results: {result.details}")
+            raise InvalidModelConfigException(f"Could not identify model for {model_path}")
+        elif isinstance(result.config, Unknown_Config):
+            self._logger.error(f"Could not identify model for {model_path}, detailed results: {result.details}")
 
-        if not old_path.is_relative_to(models_dir):
-            # The model is not in the models directory - we don't need to move it.
-            return model
-
-        new_path = models_dir / model.base.value / model.type.value / old_path.name
-
-        if old_path == new_path or new_path.exists() and old_path == new_path.resolve():
-            return model
-
-        self._logger.info(f"Moving {model.name} to {new_path}.")
-        new_path = self._move_model(old_path, new_path)
-        model.path = new_path.relative_to(models_dir).as_posix()
-        self.record_store.update_model(key, ModelRecordChanges(path=model.path))
-        return model
-
-    def _copy_model(self, old_path: Path, new_path: Path) -> Path:
-        if old_path == new_path:
-            return old_path
-        new_path.parent.mkdir(parents=True, exist_ok=True)
-        if old_path.is_dir():
-            copytree(old_path, new_path)
-        else:
-            copyfile(old_path, new_path)
-        return new_path
-
-    def _move_model(self, old_path: Path, new_path: Path) -> Path:
-        if old_path == new_path:
-            return old_path
-
-        new_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # if path already exists then we jigger the name to make it unique
-        counter: int = 1
-        while new_path.exists():
-            path = new_path.with_stem(new_path.stem + f"_{counter:02d}")
-            if not path.exists():
-                new_path = path
-            counter += 1
-        move(old_path, new_path)
-        return new_path
+        return result.config
 
     def _register(
-        self, model_path: Path, config: Optional[Dict[str, Any]] = None, info: Optional[AnyModelConfig] = None
+        self, model_path: Path, config: Optional[ModelRecordChanges] = None, info: Optional[AnyModelConfig] = None
     ) -> str:
-        config = config or {}
+        config = config or ModelRecordChanges()
 
-        info = info or ModelProbe.probe(model_path, config, hash_algo=self._app_config.hashing_algorithm)
+        info = info or self._probe(model_path, config)
+
+        # Apply LoRA metadata if applicable
+        model_images_path = self.app_config.models_path / "model_images"
+        apply_lora_metadata(info, model_path.resolve(), model_images_path)
 
         model_path = model_path.resolve()
 
@@ -611,7 +1089,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         info.path = model_path.as_posix()
 
-        if isinstance(info, CheckpointConfigBase):
+        if isinstance(info, Checkpoint_Config_Base) and info.config_path is not None:
             # Checkpoints have a config file needed for conversion. Same handling as the model weights - if it's in the
             # invoke-managed legacy config dir, we use a relative path.
             legacy_config_path = self.app_config.legacy_conf_path / info.config_path
@@ -632,29 +1110,26 @@ class ModelInstallService(ModelInstallServiceBase):
         precision = TorchDevice.choose_torch_dtype()
         return ModelRepoVariant.FP16 if precision == torch.float16 else None
 
-    def _import_local_model(self, source: LocalModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
+    def _import_local_model(
+        self, source: LocalModelSource, config: Optional[ModelRecordChanges] = None
+    ) -> ModelInstallJob:
         return ModelInstallJob(
             id=self._next_id(),
             source=source,
-            config_in=config or {},
+            config_in=config or ModelRecordChanges(),
             local_path=Path(source.path),
             inplace=source.inplace or False,
         )
 
-    def _import_from_hf(self, source: HFModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
+    def _import_from_hf(
+        self,
+        source: HFModelSource,
+        config: Optional[ModelRecordChanges] = None,
+    ) -> ModelInstallJob:
         # Add user's cached access token to HuggingFace requests
-        source.access_token = source.access_token or HfFolder.get_token()
-        if not source.access_token:
-            self._logger.info("No HuggingFace access token present; some models may not be downloadable.")
-
-        metadata = HuggingFaceMetadataFetch(self._session).from_id(source.repo_id, source.variant)
-        assert isinstance(metadata, ModelMetadataWithFiles)
-        remote_files = metadata.download_urls(
-            variant=source.variant or self._guess_variant(),
-            subfolder=source.subfolder,
-            session=self._session,
-        )
-
+        if source.access_token is None:
+            source.access_token = hf_get_token()
+        remote_files, metadata = self._remote_files_from_source(source)
         return self._import_remote_model(
             source=source,
             config=config,
@@ -662,27 +1137,30 @@ class ModelInstallService(ModelInstallServiceBase):
             metadata=metadata,
         )
 
-    def _import_from_url(self, source: URLModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
-        # URLs from HuggingFace will be handled specially
-        metadata = None
-        fetcher = None
-        try:
-            fetcher = self.get_fetcher_from_url(str(source.url))
-        except ValueError:
-            pass
-        kwargs: dict[str, Any] = {"session": self._session}
-        if fetcher is not None:
-            metadata = fetcher(**kwargs).from_url(source.url)
-        self._logger.debug(f"metadata={metadata}")
-        if metadata and isinstance(metadata, ModelMetadataWithFiles):
-            remote_files = metadata.download_urls(session=self._session)
-        else:
-            remote_files = [RemoteModelFile(url=source.url, path=Path("."), size=0)]
+    def _import_from_url(
+        self,
+        source: URLModelSource,
+        config: Optional[ModelRecordChanges] = None,
+    ) -> ModelInstallJob:
+        remote_files, metadata = self._remote_files_from_source(source)
         return self._import_remote_model(
             source=source,
             config=config,
             metadata=metadata,
             remote_files=remote_files,
+        )
+
+    def _import_external_model(
+        self,
+        source: ExternalModelSource,
+        config: Optional[ModelRecordChanges] = None,
+    ) -> ModelInstallJob:
+        return ModelInstallJob(
+            id=self._next_id(),
+            source=source,
+            config_in=config or ModelRecordChanges(),
+            local_path=self._app_config.models_path,
+            inplace=True,
         )
 
     def _import_remote_model(
@@ -690,74 +1168,104 @@ class ModelInstallService(ModelInstallServiceBase):
         source: HFModelSource | URLModelSource,
         remote_files: List[RemoteModelFile],
         metadata: Optional[AnyModelRepoMetadata],
-        config: Optional[Dict[str, Any]],
+        config: Optional[ModelRecordChanges],
     ) -> ModelInstallJob:
-        # TODO: Replace with tempfile.tmpdir() when multithreading is cleaned up.
-        # Currently the tmpdir isn't automatically removed at exit because it is
-        # being held in a daemon thread.
         if len(remote_files) == 0:
             raise ValueError(f"{source}: No downloadable files found")
-        tmpdir = Path(
-            mkdtemp(
-                dir=self._app_config.models_path,
-                prefix=TMPDIR_PREFIX,
+        destdir = self._find_reusable_tmpdir(source)
+        if destdir is None:
+            destdir = Path(
+                mkdtemp(
+                    dir=self._app_config.models_path,
+                    prefix=TMPDIR_PREFIX,
+                )
             )
-        )
         install_job = ModelInstallJob(
             id=self._next_id(),
             source=source,
-            config_in=config or {},
+            config_in=config or ModelRecordChanges(),
             source_metadata=metadata,
-            local_path=tmpdir,  # local path may change once the download has started due to content-disposition handling
+            local_path=destdir,  # local path may change once the download has started due to content-disposition handling
             bytes=0,
             total_bytes=0,
         )
-        # In the event that there is a subfolder specified in the source,
-        # we need to remove it from the destination path in order to avoid
-        # creating unwanted subfolders
-        if isinstance(source, HFModelSource) and source.subfolder:
-            root = Path(remote_files[0].path.parts[0])
-            subfolder = root / source.subfolder
-        else:
-            root = Path(".")
-            subfolder = Path(".")
+        # remember the temporary directory for later removal
+        install_job._install_tmpdir = destdir
 
-        # we remember the path up to the top of the tmpdir so that it may be
-        # removed safely at the end of the install process.
-        install_job._install_tmpdir = tmpdir
-        assert install_job.total_bytes is not None  # to avoid type checking complaints in the loop below
+        # Handle multiple subfolders for HFModelSource
+        subfolders = source.subfolders if isinstance(source, HFModelSource) else []
+        return self._enqueue_remote_download(
+            job=install_job,
+            source=source,
+            remote_files=remote_files,
+            metadata=metadata,
+            destdir=destdir,
+            subfolder=source.subfolder if isinstance(source, HFModelSource) and len(subfolders) <= 1 else None,
+            subfolders=subfolders if len(subfolders) > 1 else None,
+        )
 
-        files_string = "file" if len(remote_files) == 1 else "file"
-        self._logger.info(f"Queuing model install: {source} ({len(remote_files)} {files_string})")
+    def _enqueue_remote_download(
+        self,
+        job: ModelInstallJob,
+        source: HFModelSource | URLModelSource,
+        remote_files: List[RemoteModelFile],
+        metadata: Optional[AnyModelRepoMetadata],
+        destdir: Path,
+        subfolder: Optional[Path] = None,
+        subfolders: Optional[List[Path]] = None,
+        resume_metadata: Optional[dict] = None,
+        clear_partials: bool = False,
+    ) -> ModelInstallJob:
+        job.source_metadata = metadata
+        job.local_path = destdir
+        job._install_tmpdir = destdir
+        job.total_bytes = sum((x.size or 0) for x in remote_files)
+
+        multifile_job = self._multifile_download(
+            remote_files=remote_files,
+            dest=destdir,
+            subfolder=subfolder,
+            subfolders=subfolders,
+            access_token=source.access_token,
+            submit_job=False,  # Important! Don't submit the job until we have set our _download_cache dict
+        )
+        if clear_partials:
+            for part in multifile_job.download_parts:
+                target_path = part.dest
+                if target_path.exists():
+                    try:
+                        self._logger.info(f"Deleting partial file before restart: {target_path}")
+                        target_path.unlink()
+                    except Exception:
+                        pass
+                in_progress_path = target_path.with_name(target_path.name + ".downloading")
+                if in_progress_path.exists():
+                    try:
+                        self._logger.info(f"Deleting partial file before restart: {in_progress_path}")
+                        in_progress_path.unlink()
+                    except Exception:
+                        pass
+        if resume_metadata:
+            for part in multifile_job.download_parts:
+                meta = resume_metadata.get(str(part.source))
+                if not meta:
+                    continue
+                part.canonical_url = meta.get("canonical_url") or part.canonical_url
+                part.etag = meta.get("etag") or part.etag
+                part.last_modified = meta.get("last_modified") or part.last_modified
+                part.expected_total_bytes = meta.get("expected_total_bytes") or part.expected_total_bytes
+                part.final_url = meta.get("final_url") or part.final_url
+                if meta.get("download_path"):
+                    part.download_path = Path(meta.get("download_path"))
+        self._download_cache[multifile_job.id] = job
+        job._multifile_job = multifile_job
+
+        self._write_install_marker(job, status=InstallStatus.WAITING)
+        files_string = "file" if len(remote_files) == 1 else "files"
+        self._logger.info(f"Queueing model install: {source} ({len(remote_files)} {files_string})")
         self._logger.debug(f"remote_files={remote_files}")
-        for model_file in remote_files:
-            url = model_file.url
-            path = root / model_file.path.relative_to(subfolder)
-            self._logger.debug(f"Downloading {url} => {path}")
-            install_job.total_bytes += model_file.size
-            assert hasattr(source, "access_token")
-            dest = tmpdir / path.parent
-            dest.mkdir(parents=True, exist_ok=True)
-            download_job = DownloadJob(
-                source=url,
-                dest=dest,
-                access_token=source.access_token,
-            )
-            self._download_cache[download_job.source] = install_job  # matches a download job to an install job
-            install_job.download_parts.add(download_job)
-
-        # only start the jobs once install_job.download_parts is fully populated
-        for download_job in install_job.download_parts:
-            self._download_queue.submit_download_job(
-                download_job,
-                on_start=self._download_started_callback,
-                on_progress=self._download_progress_callback,
-                on_complete=self._download_complete_callback,
-                on_error=self._download_error_callback,
-                on_cancelled=self._download_cancelled_callback,
-            )
-
-        return install_job
+        self._download_queue.submit_multifile_download(multifile_job)
+        return job
 
     def _stat_size(self, path: Path) -> int:
         size = 0
@@ -768,87 +1276,159 @@ class ModelInstallService(ModelInstallServiceBase):
                 size += sum(self._stat_size(Path(root, x)) for x in files)
         return size
 
+    def _multifile_download(
+        self,
+        remote_files: List[RemoteModelFile],
+        dest: Path,
+        subfolder: Optional[Path] = None,
+        subfolders: Optional[List[Path]] = None,
+        access_token: Optional[str] = None,
+        submit_job: bool = True,
+    ) -> MultiFileDownloadJob:
+        # HuggingFace repo subfolders are a little tricky. If the name of the model is "sdxl-turbo", and
+        # we are installing the "vae" subfolder, we do not want to create an additional folder level, such
+        # as "sdxl-turbo/vae", nor do we want to put the contents of the vae folder directly into "sdxl-turbo".
+        # So what we do is to synthesize a folder named "sdxl-turbo_vae" here.
+        #
+        # For multiple subfolders (e.g., text_encoder+tokenizer), we create a combined folder name
+        # (e.g., sdxl-turbo_text_encoder_tokenizer) and keep each subfolder's contents in its own
+        # subdirectory within the model folder.
+
+        if subfolders and len(subfolders) > 1:
+            # Multiple subfolders: create combined name and keep subfolder structure
+            top = Path(remote_files[0].path.parts[0])  # e.g. "Z-Image-Turbo/"
+            subfolder_names = [sf.name.replace("/", "_").replace("\\", "_") for sf in subfolders]
+            combined_name = "_".join(subfolder_names)
+            path_to_add = Path(f"{top}_{combined_name}")
+
+            parts: List[RemoteModelFile] = []
+            for model_file in remote_files:
+                assert model_file.size is not None
+                # Determine which subfolder this file belongs to
+                file_path = model_file.path
+                new_path: Optional[Path] = None
+                for sf in subfolders:
+                    try:
+                        # Try to get relative path from this subfolder
+                        relative = file_path.relative_to(top / sf)
+                        # Keep the subfolder name as a subdirectory
+                        new_path = path_to_add / sf.name / relative
+                        break
+                    except ValueError:
+                        continue
+
+                if new_path is None:
+                    # File doesn't match any subfolder, keep original path structure
+                    new_path = path_to_add / file_path.relative_to(top)
+
+                parts.append(RemoteModelFile(url=model_file.url, path=new_path))
+        elif subfolder:
+            # Single subfolder: flatten into renamed folder
+            top = Path(remote_files[0].path.parts[0])  # e.g. "sdxl-turbo/"
+            path_to_remove = top / subfolder  # sdxl-turbo/vae/
+            subfolder_rename = subfolder.name.replace("/", "_").replace("\\", "_")
+            path_to_add = Path(f"{top}_{subfolder_rename}")
+
+            parts = []
+            for model_file in remote_files:
+                assert model_file.size is not None
+                parts.append(
+                    RemoteModelFile(
+                        url=model_file.url,
+                        path=path_to_add / model_file.path.relative_to(path_to_remove),
+                    )
+                )
+        else:
+            # No subfolder specified - pass through unchanged
+            parts = []
+            for model_file in remote_files:
+                assert model_file.size is not None
+                parts.append(RemoteModelFile(url=model_file.url, path=model_file.path))
+
+        return self._download_queue.multifile_download(
+            parts=parts,
+            dest=dest,
+            access_token=access_token,
+            submit_job=submit_job,
+            on_start=self._download_started_callback,
+            on_progress=self._download_progress_callback,
+            on_complete=self._download_complete_callback,
+            on_error=self._download_error_callback,
+            on_cancelled=self._download_cancelled_callback,
+        )
+
     # ------------------------------------------------------------------
     # Callbacks are executed by the download queue in a separate thread
     # ------------------------------------------------------------------
-    def _download_started_callback(self, download_job: DownloadJob) -> None:
-        self._logger.info(f"Model download started: {download_job.source}")
+    def _download_started_callback(self, download_job: MultiFileDownloadJob) -> None:
         with self._lock:
-            install_job = self._download_cache[download_job.source]
-            install_job.status = InstallStatus.DOWNLOADING
+            if install_job := self._download_cache.get(download_job.id, None):
+                install_job.status = InstallStatus.DOWNLOADING
 
-            assert download_job.download_path
-            if install_job.local_path == install_job._install_tmpdir:
-                partial_path = download_job.download_path.relative_to(install_job._install_tmpdir)
-                dest_name = partial_path.parts[0]
-                install_job.local_path = install_job._install_tmpdir / dest_name
+                if install_job.local_path == install_job._install_tmpdir:  # first time
+                    assert download_job.download_path
+                    install_job.local_path = download_job.download_path
+                install_job.download_parts = download_job.download_parts
+                install_job.bytes = sum(x.bytes for x in download_job.download_parts)
+                total_parts = sum(x.total_bytes for x in download_job.download_parts)
+                if total_parts > 0:
+                    install_job.total_bytes = max(install_job.total_bytes or 0, total_parts)
+                self._signal_job_download_started(install_job)
 
-            # Update the total bytes count for remote sources.
-            if not install_job.total_bytes:
-                install_job.total_bytes = sum(x.total_bytes for x in install_job.download_parts)
-
-    def _download_progress_callback(self, download_job: DownloadJob) -> None:
+    def _download_progress_callback(self, download_job: MultiFileDownloadJob) -> None:
         with self._lock:
-            install_job = self._download_cache[download_job.source]
-            if install_job.cancelled:  # This catches the case in which the caller directly calls job.cancel()
-                self._cancel_download_parts(install_job)
-            else:
-                # update sizes
-                install_job.bytes = sum(x.bytes for x in install_job.download_parts)
-                self._signal_job_downloading(install_job)
+            if install_job := self._download_cache.get(download_job.id, None):
+                if install_job.cancelled:  # This catches the case in which the caller directly calls job.cancel()
+                    self._download_queue.cancel_job(download_job)
+                else:
+                    # update sizes
+                    install_job.bytes = sum(x.bytes for x in download_job.download_parts)
+                    total_parts = sum(x.total_bytes for x in download_job.download_parts)
+                    if total_parts > 0:
+                        install_job.total_bytes = max(install_job.total_bytes or 0, total_parts)
+                    self._signal_job_downloading(install_job)
 
-    def _download_complete_callback(self, download_job: DownloadJob) -> None:
-        self._logger.info(f"Model download complete: {download_job.source}")
+    def _download_complete_callback(self, download_job: MultiFileDownloadJob) -> None:
         with self._lock:
-            install_job = self._download_cache[download_job.source]
-
-            # are there any more active jobs left in this task?
-            if install_job.downloading and all(x.complete for x in install_job.download_parts):
+            if install_job := self._download_cache.pop(download_job.id, None):
                 self._signal_job_downloads_done(install_job)
-                self._put_in_queue(install_job)
+                self._put_in_queue(install_job)  # this starts the installation and registration
 
-            # Let other threads know that the number of downloads has changed
-            self._download_cache.pop(download_job.source, None)
-            self._downloads_changed_event.set()
+                # Let other threads know that the number of downloads has changed
+                self._downloads_changed_event.set()
 
-    def _download_error_callback(self, download_job: DownloadJob, excp: Optional[Exception] = None) -> None:
+    def _download_error_callback(self, download_job: MultiFileDownloadJob, excp: Optional[Exception] = None) -> None:
         with self._lock:
-            install_job = self._download_cache.pop(download_job.source, None)
-            assert install_job is not None
-            assert excp is not None
-            install_job.set_error(excp)
-            self._logger.error(
-                f"Cancelling {install_job.source} due to an error while downloading {download_job.source}: {str(excp)}"
-            )
-            self._cancel_download_parts(install_job)
+            if install_job := self._download_cache.pop(download_job.id, None):
+                assert excp is not None
+                self._set_error(install_job, excp)
+                self._download_queue.cancel_job(download_job)
+                if install_job._install_tmpdir is not None:
+                    self._safe_rmtree(install_job._install_tmpdir, self._logger)
 
-            # Let other threads know that the number of downloads has changed
-            self._downloads_changed_event.set()
+                # Let other threads know that the number of downloads has changed
+                self._downloads_changed_event.set()
 
-    def _download_cancelled_callback(self, download_job: DownloadJob) -> None:
+    def _download_cancelled_callback(self, download_job: MultiFileDownloadJob) -> None:
         with self._lock:
-            install_job = self._download_cache.pop(download_job.source, None)
-            if not install_job:
-                return
-            self._downloads_changed_event.set()
-            self._logger.warning(f"Model download canceled: {download_job.source}")
-            # if install job has already registered an error, then do not replace its status with cancelled
-            if not install_job.errored:
-                install_job.cancel()
-            self._cancel_download_parts(install_job)
+            if install_job := self._download_cache.pop(download_job.id, None):
+                self._downloads_changed_event.set()
+                if any(part.resume_required for part in download_job.download_parts):
+                    install_job.status = InstallStatus.PAUSED
+                    self._write_install_marker(install_job, status=InstallStatus.PAUSED)
+                    self._downloads_changed_event.set()
+                    return
+                # if install job has already registered an error, then do not replace its status with cancelled
+                if not install_job.errored and not install_job.paused:
+                    install_job.cancel()
+                    if install_job._install_tmpdir is not None:
+                        # Mark cancelled before cleanup so we don't reuse the folder if deletion fails.
+                        self._write_install_marker(install_job, status=InstallStatus.CANCELLED)
+                        self._delete_install_marker(install_job._install_tmpdir)
+                        self._safe_rmtree(install_job._install_tmpdir, self._logger)
 
-            # Let other threads know that the number of downloads has changed
-            self._downloads_changed_event.set()
-
-    def _cancel_download_parts(self, install_job: ModelInstallJob) -> None:
-        # on multipart downloads, _cancel_components() will get called repeatedly from the download callbacks
-        # do not lock here because it gets called within a locked context
-        for s in install_job.download_parts:
-            self._download_queue.cancel_job(s)
-
-        if all(x.in_terminal_state for x in install_job.download_parts):
-            # When all parts have reached their terminal state, we finalize the job to clean up the temporary directory and other resources
-            self._put_in_queue(install_job)
+                # Let other threads know that the number of downloads has changed
+                self._downloads_changed_event.set()
 
     # ------------------------------------------------------------------------------------------------
     # Internal methods that put events on the event bus
@@ -856,16 +1436,29 @@ class ModelInstallService(ModelInstallServiceBase):
     def _signal_job_running(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.RUNNING
         self._logger.info(f"Model install started: {job.source}")
+        self._write_install_marker(job, status=InstallStatus.RUNNING)
         if self._event_bus:
             self._event_bus.emit_model_install_started(job)
 
+    def _signal_job_download_started(self, job: ModelInstallJob) -> None:
+        if self._event_bus:
+            assert job._multifile_job is not None
+            assert job.bytes is not None
+            assert job.total_bytes is not None
+            self._event_bus.emit_model_install_download_started(job)
+        self._write_install_marker(job, status=InstallStatus.DOWNLOADING)
+
     def _signal_job_downloading(self, job: ModelInstallJob) -> None:
         if self._event_bus:
+            assert job._multifile_job is not None
+            assert job.bytes is not None
+            assert job.total_bytes is not None
             self._event_bus.emit_model_install_download_progress(job)
 
     def _signal_job_downloads_done(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.DOWNLOADS_DONE
         self._logger.info(f"Model download complete: {job.source}")
+        self._write_install_marker(job, status=InstallStatus.DOWNLOADS_DONE)
         if self._event_bus:
             self._event_bus.emit_model_install_downloads_complete(job)
 
@@ -874,11 +1467,17 @@ class ModelInstallService(ModelInstallServiceBase):
         assert job.config_out
         self._logger.info(f"Model install complete: {job.source}")
         self._logger.debug(f"{job.local_path} registered key {job.config_out.key}")
+        if job._install_tmpdir is not None:
+            self._delete_install_marker(job._install_tmpdir)
         if self._event_bus:
+            assert job.local_path is not None
+            assert job.config_out is not None
             self._event_bus.emit_model_install_complete(job)
 
     def _signal_job_errored(self, job: ModelInstallJob) -> None:
         self._logger.error(f"Model install error: {job.source}\n{job.error_type}: {job.error}")
+        if job._install_tmpdir is not None:
+            self._delete_install_marker(job._install_tmpdir)
         if self._event_bus:
             assert job.error_type is not None
             assert job.error is not None
@@ -886,11 +1485,31 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _signal_job_cancelled(self, job: ModelInstallJob) -> None:
         self._logger.info(f"Model install canceled: {job.source}")
+        if job._install_tmpdir is not None:
+            self._delete_install_marker(job._install_tmpdir)
         if self._event_bus:
             self._event_bus.emit_model_install_cancelled(job)
 
     @staticmethod
-    def get_fetcher_from_url(url: str) -> ModelMetadataFetchBase:
+    def get_fetcher_from_url(url: str) -> Type[ModelMetadataFetchBase]:
+        """
+        Return a metadata fetcher appropriate for provided url.
+
+        This used to be more useful, but the number of supported model
+        sources has been reduced to HuggingFace alone.
+        """
         if re.match(r"^https?://huggingface.co/[^/]+/[^/]+$", url.lower()):
             return HuggingFaceMetadataFetch
         raise ValueError(f"Unsupported model source: '{url}'")
+
+    @staticmethod
+    def _normalize_huggingface_blob_url(url: AnyHttpUrl) -> Url:
+        """Convert Hugging Face file page URLs to direct download URLs."""
+        return Url(
+            re.sub(
+                r"^(https?://huggingface\.co/[^/]+/[^/]+)/blob/([^?#]+)([?#].*)?$",
+                r"\1/resolve/\2\3",
+                str(url),
+                flags=re.IGNORECASE,
+            )
+        )

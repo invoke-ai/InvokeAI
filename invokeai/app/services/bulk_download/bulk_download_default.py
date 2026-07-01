@@ -4,6 +4,7 @@ from typing import Optional, Union
 from zipfile import ZipFile
 
 from invokeai.app.services.board_records.board_records_common import BoardRecordNotFoundException
+from invokeai.app.services.bulk_download.bulk_download_base import BulkDownloadBase
 from invokeai.app.services.bulk_download.bulk_download_common import (
     DEFAULT_BULK_DOWNLOAD_ID,
     BulkDownloadException,
@@ -15,8 +16,6 @@ from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.util.misc import uuid_string
 
-from .bulk_download_base import BulkDownloadBase
-
 
 class BulkDownloadService(BulkDownloadBase):
     def start(self, invoker: Invoker) -> None:
@@ -26,15 +25,24 @@ class BulkDownloadService(BulkDownloadBase):
         self._temp_directory = TemporaryDirectory()
         self._bulk_downloads_folder = Path(self._temp_directory.name) / "bulk_downloads"
         self._bulk_downloads_folder.mkdir(parents=True, exist_ok=True)
+        # Track which user owns each download so the fetch endpoint can enforce ownership
+        self._download_owners: dict[str, str] = {}
 
     def handler(
-        self, image_names: Optional[list[str]], board_id: Optional[str], bulk_download_item_id: Optional[str]
+        self,
+        image_names: Optional[list[str]],
+        board_id: Optional[str],
+        bulk_download_item_id: Optional[str],
+        user_id: str = "system",
     ) -> None:
         bulk_download_id: str = DEFAULT_BULK_DOWNLOAD_ID
         bulk_download_item_id = bulk_download_item_id or uuid_string()
         bulk_download_item_name = bulk_download_item_id + ".zip"
 
-        self._signal_job_started(bulk_download_id, bulk_download_item_id, bulk_download_item_name)
+        # Record ownership so the fetch endpoint can verify the caller
+        self._download_owners[bulk_download_item_name] = user_id
+
+        self._signal_job_started(bulk_download_id, bulk_download_item_id, bulk_download_item_name, user_id)
 
         try:
             image_dtos: list[ImageDTO] = []
@@ -47,16 +55,16 @@ class BulkDownloadService(BulkDownloadBase):
                 raise BulkDownloadParametersException()
 
             bulk_download_item_name: str = self._create_zip_file(image_dtos, bulk_download_item_id)
-            self._signal_job_completed(bulk_download_id, bulk_download_item_id, bulk_download_item_name)
+            self._signal_job_completed(bulk_download_id, bulk_download_item_id, bulk_download_item_name, user_id)
         except (
             ImageRecordNotFoundException,
             BoardRecordNotFoundException,
             BulkDownloadException,
             BulkDownloadParametersException,
         ) as e:
-            self._signal_job_failed(bulk_download_id, bulk_download_item_id, bulk_download_item_name, e)
+            self._signal_job_failed(bulk_download_id, bulk_download_item_id, bulk_download_item_name, e, user_id)
         except Exception as e:
-            self._signal_job_failed(bulk_download_id, bulk_download_item_id, bulk_download_item_name, e)
+            self._signal_job_failed(bulk_download_id, bulk_download_item_id, bulk_download_item_name, e, user_id)
             self._invoker.services.logger.error("Problem bulk downloading images.")
             raise e
 
@@ -64,7 +72,11 @@ class BulkDownloadService(BulkDownloadBase):
         return [self._invoker.services.images.get_dto(image_name) for image_name in image_names]
 
     def _board_handler(self, board_id: str) -> list[ImageDTO]:
-        image_names = self._invoker.services.board_image_records.get_all_board_image_names_for_board(board_id)
+        image_names = self._invoker.services.board_image_records.get_all_board_image_names_for_board(
+            board_id,
+            categories=None,
+            is_intermediate=None,
+        )
         return self._image_handler(image_names)
 
     def generate_item_id(self, board_id: Optional[str]) -> str:
@@ -100,43 +112,60 @@ class BulkDownloadService(BulkDownloadBase):
         return "".join([c for c in s if c.isalpha() or c.isdigit() or c == " " or c == "_" or c == "-"]).rstrip()
 
     def _signal_job_started(
-        self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
+        self,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        user_id: str = "system",
     ) -> None:
         """Signal that a bulk download job has started."""
         if self._invoker:
             assert bulk_download_id is not None
             self._invoker.services.events.emit_bulk_download_started(
-                bulk_download_id, bulk_download_item_id, bulk_download_item_name
+                bulk_download_id, bulk_download_item_id, bulk_download_item_name, user_id=user_id
             )
 
     def _signal_job_completed(
-        self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
+        self,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        user_id: str = "system",
     ) -> None:
         """Signal that a bulk download job has completed."""
         if self._invoker:
             assert bulk_download_id is not None
             assert bulk_download_item_name is not None
             self._invoker.services.events.emit_bulk_download_complete(
-                bulk_download_id, bulk_download_item_id, bulk_download_item_name
+                bulk_download_id, bulk_download_item_id, bulk_download_item_name, user_id=user_id
             )
 
     def _signal_job_failed(
-        self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str, exception: Exception
+        self,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        exception: Exception,
+        user_id: str = "system",
     ) -> None:
         """Signal that a bulk download job has failed."""
         if self._invoker:
             assert bulk_download_id is not None
             assert exception is not None
             self._invoker.services.events.emit_bulk_download_error(
-                bulk_download_id, bulk_download_item_id, bulk_download_item_name, str(exception)
+                bulk_download_id, bulk_download_item_id, bulk_download_item_name, str(exception), user_id=user_id
             )
 
     def stop(self, *args, **kwargs):
         self._temp_directory.cleanup()
 
+    def get_owner(self, bulk_download_item_name: str) -> Optional[str]:
+        return self._download_owners.get(bulk_download_item_name)
+
     def delete(self, bulk_download_item_name: str) -> None:
         path = self.get_path(bulk_download_item_name)
         Path(path).unlink()
+        self._download_owners.pop(bulk_download_item_name, None)
 
     def get_path(self, bulk_download_item_name: str) -> str:
         path = str(self._bulk_downloads_folder / bulk_download_item_name)
@@ -147,4 +176,15 @@ class BulkDownloadService(BulkDownloadBase):
     def _is_valid_path(self, path: Union[str, Path]) -> bool:
         """Validates the path given for a bulk download."""
         path = path if isinstance(path, Path) else Path(path)
-        return path.exists()
+
+        # Resolve the path to handle any path traversal attempts (e.g., ../)
+        resolved_path = path.resolve()
+
+        # The path may not traverse out of the bulk downloads folder or its subfolders
+        does_not_traverse = resolved_path.parent == self._bulk_downloads_folder.resolve()
+
+        # The path must exist and be a .zip file
+        does_exist = resolved_path.exists()
+        is_zip_file = resolved_path.suffix == ".zip"
+
+        return does_exist and is_zip_file and does_not_traverse

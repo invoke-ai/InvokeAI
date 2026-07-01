@@ -1,0 +1,17 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import DownloadOptions from '@components/DownloadOptions.astro';
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Download Invoke',
+    template: 'splash',
+    hero: {
+      tagline:
+        'Invoke is a free and open-source creative engine for AI-powered image generation. Built by creatives, for creatives. Self-hosted, fully customizable, and Apache 2.0 licensed.',
+    },
+  }}
+>
+  <DownloadOptions />
+</StarlightPage>

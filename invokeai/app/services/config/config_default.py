@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import copy
+import filecmp
 import locale
 import os
 import re
@@ -11,7 +13,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal, Optional
 
-import psutil
 import yaml
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
@@ -21,36 +22,26 @@ from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
 from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 
 INIT_FILE = Path("invokeai.yaml")
+API_KEYS_FILE = Path("api_keys.yaml")
 DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
-DEFAULT_RAM_CACHE = 10.0
-DEFAULT_VRAM_CACHE = 0.25
-DEFAULT_CONVERT_CACHE = 20.0
-DEVICE = Literal["auto", "cpu", "cuda", "cuda:1", "mps"]
 PRECISION = Literal["auto", "float16", "bfloat16", "float32"]
 ATTENTION_TYPE = Literal["auto", "normal", "xformers", "sliced", "torch-sdp"]
 ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8]
 LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
-CONFIG_SCHEMA_VERSION = "4.0.1"
-
-
-def get_default_ram_cache_size() -> float:
-    """Run a heuristic for the default RAM cache based on installed RAM."""
-
-    # On some machines, psutil.virtual_memory().total gives a value that is slightly less than the actual RAM, so the
-    # limits are set slightly lower than than what we expect the actual RAM to be.
-
-    GB = 1024**3
-    max_ram = psutil.virtual_memory().total / GB
-
-    if max_ram >= 60:
-        return 15.0
-    if max_ram >= 30:
-        return 7.5
-    if max_ram >= 14:
-        return 4.0
-    return 2.1  # 2.1 is just large enough for sd 1.5 ;-)
+IMAGE_SUBFOLDER_STRATEGY = Literal["flat", "date", "type", "hash"]
+CONFIG_SCHEMA_VERSION = "4.0.3"
+EXTERNAL_PROVIDER_CONFIG_FIELDS = (
+    "external_alibabacloud_api_key",
+    "external_alibabacloud_base_url",
+    "external_gemini_api_key",
+    "external_gemini_base_url",
+    "external_openai_api_key",
+    "external_openai_base_url",
+    "external_seedream_api_key",
+    "external_seedream_base_url",
+)
 
 
 class URLRegexTokenPair(BaseModel):
@@ -80,31 +71,42 @@ class InvokeAIAppConfig(BaseSettings):
         allow_credentials: Allow CORS credentials.
         allow_methods: Methods allowed for CORS.
         allow_headers: Headers allowed for CORS.
-        ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.org/settings/#https.
-        ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.
+        ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.
+        ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.
         log_tokenization: Enable logging of parsed prompt tokens.
         patchmatch: Enable patchmatch inpaint code.
         models_dir: Path to the models directory.
-        convert_cache_dir: Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location.
+        convert_cache_dir: Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).
+        download_cache_dir: Path to the directory that contains dynamically downloaded models.
         legacy_conf_dir: Path to directory of legacy checkpoint config files.
         db_dir: Path to InvokeAI databases directory.
         outputs_dir: Path to directory for outputs.
+        image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`
         custom_nodes_dir: Path to directory for custom nodes.
+        style_presets_dir: Path to directory for style presets.
+        workflow_thumbnails_dir: Path to directory for workflow thumbnails.
         log_handlers: Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".
         log_format: Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`
         log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`
         log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.
+        log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`
         use_memory_db: Use in-memory database. Useful for development.
         dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.
         profile_graphs: Enable graph profiling using `cProfile`.
         profile_prefix: An optional prefix for profile output files.
         profiles_dir: Path to profiles output directory.
-        ram: Maximum memory amount used by memory model cache for rapid switching (GB).
-        vram: Amount of VRAM reserved for model storage (GB).
-        convert_cache: Maximum size of on-disk converted models cache (GB).
-        lazy_offload: Keep models in VRAM until their space is needed.
+        max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.
+        max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.
         log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
-        device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `cuda:1`, `mps`
+        model_cache_keep_alive_min: How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.
+        device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.
+        enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.
+        keep_ram_copy_of_weights: Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.
+        ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.
+        vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.
+        lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.
+        pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to "backend:cudaMallocAsync" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.
+        device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)
         precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`
         sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.
         attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`
@@ -112,12 +114,26 @@ class InvokeAIAppConfig(BaseSettings):
         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).
         pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
         max_queue_size: Maximum number of items in the session queue.
+        clear_queue_on_startup: Empties session queue on startup. If true, disables `max_queue_history`.
+        max_queue_history: Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.
         allow_nodes: List of nodes to allow. Omit to allow all.
         deny_nodes: List of nodes to deny. Omit to deny none.
         node_cache_size: How many cached nodes to keep in memory.
         hashing_algorithm: Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.<br>Valid values: `blake3_multi`, `blake3_single`, `random`, `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `blake2b`, `blake2s`, `sha3_224`, `sha3_256`, `sha3_384`, `sha3_512`, `shake_128`, `shake_256`
         remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.
         scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.
+        unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.
+        allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.
+        multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.
+        strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.
+        external_alibabacloud_api_key: API key for Alibaba Cloud DashScope image generation.
+        external_alibabacloud_base_url: Base URL override for Alibaba Cloud DashScope image generation.
+        external_gemini_api_key: API key for Gemini image generation.
+        external_openai_api_key: API key for OpenAI image generation.
+        external_gemini_base_url: Base URL override for Gemini image generation.
+        external_openai_base_url: Base URL override for OpenAI image generation.
+        external_seedream_api_key: API key for Seedream image generation.
+        external_seedream_base_url: Base URL override for Seedream image generation.
     """
 
     _root: Optional[Path] = PrivateAttr(default=None)
@@ -137,8 +153,8 @@ class InvokeAIAppConfig(BaseSettings):
     allow_credentials:             bool = Field(default=True,               description="Allow CORS credentials.")
     allow_methods:            list[str] = Field(default=["*"],              description="Methods allowed for CORS.")
     allow_headers:            list[str] = Field(default=["*"],              description="Headers allowed for CORS.")
-    ssl_certfile:        Optional[Path] = Field(default=None,               description="SSL certificate file for HTTPS. See https://www.uvicorn.org/settings/#https.")
-    ssl_keyfile:         Optional[Path] = Field(default=None,               description="SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.")
+    ssl_certfile:        Optional[Path] = Field(default=None,               description="SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.")
+    ssl_keyfile:         Optional[Path] = Field(default=None,               description="SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.")
 
     # MISC FEATURES
     log_tokenization:              bool = Field(default=False,              description="Enable logging of parsed prompt tokens.")
@@ -146,11 +162,15 @@ class InvokeAIAppConfig(BaseSettings):
 
     # PATHS
     models_dir:                    Path = Field(default=Path("models"),     description="Path to the models directory.")
-    convert_cache_dir:             Path = Field(default=Path("models/.cache"), description="Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location.")
+    convert_cache_dir:             Path = Field(default=Path("models/.convert_cache"), description="Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).")
+    download_cache_dir:            Path = Field(default=Path("models/.download_cache"), description="Path to the directory that contains dynamically downloaded models.")
     legacy_conf_dir:               Path = Field(default=Path("configs"), description="Path to directory of legacy checkpoint config files.")
     db_dir:                        Path = Field(default=Path("databases"),  description="Path to InvokeAI databases directory.")
     outputs_dir:                   Path = Field(default=Path("outputs"),    description="Path to directory for outputs.")
+    image_subfolder_strategy: IMAGE_SUBFOLDER_STRATEGY = Field(default="flat", description="Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.")
     custom_nodes_dir:              Path = Field(default=Path("nodes"),      description="Path to directory for custom nodes.")
+    style_presets_dir:      Path = Field(default=Path("style_presets"),      description="Path to directory for style presets.")
+    workflow_thumbnails_dir: Path = Field(default=Path("workflow_thumbnails"), description="Path to directory for workflow thumbnails.")
 
     # LOGGING
     log_handlers:             list[str] = Field(default=["console"],        description='Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".')
@@ -158,6 +178,7 @@ class InvokeAIAppConfig(BaseSettings):
     log_format:              LOG_FORMAT = Field(default="color",            description='Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style.')
     log_level:                LOG_LEVEL = Field(default="info",             description="Emit logging messages at this level or higher.")
     log_sql:                       bool = Field(default=False,              description="Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.")
+    log_level_network:        LOG_LEVEL = Field(default='warning',          description="Log level for network-related messages. 'info' and 'debug' are very verbose.")
 
     # Development
     use_memory_db:                 bool = Field(default=False,              description="Use in-memory database. Useful for development.")
@@ -167,14 +188,23 @@ class InvokeAIAppConfig(BaseSettings):
     profiles_dir:                  Path = Field(default=Path("profiles"),   description="Path to profiles output directory.")
 
     # CACHE
-    ram:                          float = Field(default_factory=get_default_ram_cache_size, gt=0, description="Maximum memory amount used by memory model cache for rapid switching (GB).")
-    vram:                         float = Field(default=DEFAULT_VRAM_CACHE, ge=0, description="Amount of VRAM reserved for model storage (GB).")
-    convert_cache:                float = Field(default=DEFAULT_CONVERT_CACHE, ge=0, description="Maximum size of on-disk converted models cache (GB).")
-    lazy_offload:                  bool = Field(default=True,               description="Keep models in VRAM until their space is needed.")
+    max_cache_ram_gb:   Optional[float] = Field(default=None, gt=0,         description="The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.")
+    max_cache_vram_gb:  Optional[float] = Field(default=None, ge=0,         description="The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.")
     log_memory_usage:              bool = Field(default=False,              description="If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.")
+    model_cache_keep_alive_min:   float = Field(default=0, ge=0,            description="How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.")
+    device_working_mem_gb:        float = Field(default=3,                  description="The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.")
+    enable_partial_loading:        bool = Field(default=True,               description="Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.")
+    keep_ram_copy_of_weights:      bool = Field(default=True,               description="Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.")
+    # Deprecated CACHE configs
+    ram:                Optional[float] = Field(default=None, gt=0,         description="DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.")
+    vram:               Optional[float] = Field(default=None, ge=0,         description="DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.")
+    lazy_offload:                  bool = Field(default=True,               description="DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.")
+
+    # PyTorch Memory Allocator
+    pytorch_cuda_alloc_conf: Optional[str] = Field(default=None,            description="Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.")
 
     # DEVICE
-    device:                      DEVICE = Field(default="auto",             description="Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.")
+    device:                      str = Field(default="auto",                description="Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)", pattern=r"^(auto|cpu|mps|cuda(:\d+)?)$")
     precision:                PRECISION = Field(default="auto",             description="Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.")
 
     # GENERATION
@@ -184,6 +214,8 @@ class InvokeAIAppConfig(BaseSettings):
     force_tiled_decode:            bool = Field(default=False,              description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).")
     pil_compress_level:             int = Field(default=1,                  description="The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.")
     max_queue_size:                 int = Field(default=10000, gt=0,        description="Maximum number of items in the session queue.")
+    clear_queue_on_startup:        bool = Field(default=False,              description="Empties session queue on startup. If true, disables `max_queue_history`.")
+    max_queue_history:      Optional[int] = Field(default=None, ge=0,        description="Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.")
 
     # NODES
     allow_nodes:    Optional[list[str]] = Field(default=None,               description="List of nodes to allow. Omit to allow all.")
@@ -194,6 +226,32 @@ class InvokeAIAppConfig(BaseSettings):
     hashing_algorithm: HASHING_ALGORITHMS = Field(default="blake3_single",  description="Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.")
     remote_api_tokens: Optional[list[URLRegexTokenPair]] = Field(default=None, description="List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.")
     scan_models_on_startup:        bool = Field(default=False,              description="Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.")
+    unsafe_disable_picklescan:     bool = Field(default=False,              description="UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.")
+    allow_unknown_models:          bool = Field(default=True,              description="Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.")
+
+    # MULTIUSER
+    multiuser:                     bool = Field(default=False,              description="Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.")
+    strict_password_checking:      bool = Field(default=False,              description="Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.")
+
+    # EXTERNAL PROVIDERS
+    external_alibabacloud_api_key: Optional[str] = Field(default=None, description="API key for Alibaba Cloud DashScope image generation.")
+    external_alibabacloud_base_url: Optional[str] = Field(
+        default=None, description="Base URL override for Alibaba Cloud DashScope image generation."
+    )
+    external_gemini_api_key: Optional[str] = Field(default=None, description="API key for Gemini image generation.")
+    external_openai_api_key: Optional[str] = Field(default=None, description="API key for OpenAI image generation.")
+    external_gemini_base_url: Optional[str] = Field(
+        default=None, description="Base URL override for Gemini image generation."
+    )
+    external_openai_base_url: Optional[str] = Field(
+        default=None, description="Base URL override for OpenAI image generation."
+    )
+    external_seedream_api_key: Optional[str] = Field(
+        default=None, description="API key for Seedream image generation."
+    )
+    external_seedream_base_url: Optional[str] = Field(
+        default=None, description="Base URL override for Seedream image generation."
+    )
 
     # fmt: on
 
@@ -246,13 +304,13 @@ class InvokeAIAppConfig(BaseSettings):
             )
 
             if as_example:
-                file.write(
-                    "# This is an example file with default and example settings. Use the values here as a baseline.\n\n"
-                )
+                file.write("# This is an example file with default and example settings.\n")
+                file.write("# You should not copy this whole file into your config.\n")
+                file.write("# Only add the settings you need to change to your config file.\n\n")
             file.write("# Internal metadata - do not edit:\n")
             file.write(yaml.dump(meta_dict, sort_keys=False))
             file.write("\n")
-            file.write("# Put user settings here - see https://invoke-ai.github.io/InvokeAI/features/CONFIGURATION/:\n")
+            file.write("# Put user settings here - see https://invoke.ai/configuration/invokeai-yaml/:\n")
             if len(config_dict) > 0:
                 file.write(yaml.dump(config_dict, sort_keys=False))
 
@@ -273,6 +331,13 @@ class InvokeAIAppConfig(BaseSettings):
     def config_file_path(self) -> Path:
         """Path to invokeai.yaml, resolved to an absolute path.."""
         resolved_path = self._resolve(self._config_file or INIT_FILE)
+        assert resolved_path is not None
+        return resolved_path
+
+    @property
+    def api_keys_file_path(self) -> Path:
+        """Path to api_keys.yaml, resolved to an absolute path.."""
+        resolved_path = self._resolve(API_KEYS_FILE)
         assert resolved_path is not None
         return resolved_path
 
@@ -299,9 +364,24 @@ class InvokeAIAppConfig(BaseSettings):
         return self._resolve(self.models_dir)
 
     @property
+    def style_presets_path(self) -> Path:
+        """Path to the style presets directory, resolved to an absolute path.."""
+        return self._resolve(self.style_presets_dir)
+
+    @property
+    def workflow_thumbnails_path(self) -> Path:
+        """Path to the workflow thumbnails directory, resolved to an absolute path.."""
+        return self._resolve(self.workflow_thumbnails_dir)
+
+    @property
     def convert_cache_path(self) -> Path:
         """Path to the converted cache models directory, resolved to an absolute path.."""
         return self._resolve(self.convert_cache_dir)
+
+    @property
+    def download_cache_path(self) -> Path:
+        """Path to the downloaded models directory, resolved to an absolute path.."""
+        return self._resolve(self.download_cache_dir)
 
     @property
     def custom_nodes_path(self) -> Path:
@@ -348,14 +428,14 @@ class DefaultInvokeAIAppConfig(InvokeAIAppConfig):
         return (init_settings,)
 
 
-def migrate_v3_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
-    """Migrate a v3 config dictionary to a current config object.
+def migrate_v3_config_dict(config_dict: dict[str, Any]) -> dict[str, Any]:
+    """Migrate a v3 config dictionary to a v4.0.0.
 
     Args:
         config_dict: A dictionary of settings from a v3 config file.
 
     Returns:
-        An instance of `InvokeAIAppConfig` with the migrated settings.
+        An `InvokeAIAppConfig` config dict.
 
     """
     parsed_config_dict: dict[str, Any] = {}
@@ -389,32 +469,55 @@ def migrate_v3_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
             elif k in InvokeAIAppConfig.model_fields:
                 # skip unknown fields
                 parsed_config_dict[k] = v
-    # When migrating the config file, we should not include currently-set environment variables.
-    config = DefaultInvokeAIAppConfig.model_validate(parsed_config_dict)
-
-    return config
+    parsed_config_dict["schema_version"] = "4.0.0"
+    return parsed_config_dict
 
 
-def migrate_v4_0_0_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
-    """Migrate v4.0.0 config dictionary to a current config object.
+def migrate_v4_0_0_to_4_0_1_config_dict(config_dict: dict[str, Any]) -> dict[str, Any]:
+    """Migrate v4.0.0 config dictionary to a v4.0.1 config dictionary
 
     Args:
         config_dict: A dictionary of settings from a v4.0.0 config file.
 
     Returns:
-        An instance of `InvokeAIAppConfig` with the migrated settings.
+        A config dict with the settings migrated to v4.0.1.
     """
-    parsed_config_dict: dict[str, Any] = {}
-    for k, v in config_dict.items():
-        # autocast was removed from precision in v4.0.1
-        if k == "precision" and v == "autocast":
-            parsed_config_dict["precision"] = "auto"
-        else:
-            parsed_config_dict[k] = v
-        if k == "schema_version":
-            parsed_config_dict[k] = CONFIG_SCHEMA_VERSION
-    config = DefaultInvokeAIAppConfig.model_validate(parsed_config_dict)
-    return config
+    parsed_config_dict: dict[str, Any] = copy.deepcopy(config_dict)
+    # precision "autocast" was replaced by "auto" in v4.0.1
+    if parsed_config_dict.get("precision") == "autocast":
+        parsed_config_dict["precision"] = "auto"
+    parsed_config_dict["schema_version"] = "4.0.1"
+    return parsed_config_dict
+
+
+def migrate_v4_0_1_to_4_0_2_config_dict(config_dict: dict[str, Any]) -> dict[str, Any]:
+    """Migrate v4.0.1 config dictionary to a v4.0.2 config dictionary.
+
+    Args:
+        config_dict: A dictionary of settings from a v4.0.1 config file.
+
+    Returns:
+        An config dict with the settings migrated to v4.0.2.
+    """
+    parsed_config_dict: dict[str, Any] = copy.deepcopy(config_dict)
+    # convert_cache was removed in 4.0.2
+    parsed_config_dict.pop("convert_cache", None)
+    parsed_config_dict["schema_version"] = "4.0.2"
+    return parsed_config_dict
+
+
+def migrate_v4_0_2_to_4_0_3_config_dict(config_dict: dict[str, Any]) -> dict[str, Any]:
+    """Migrate v4.0.2 config dictionary to a v4.0.3 config dictionary.
+
+    Args:
+        config_dict: A dictionary of settings from a v4.0.2 config file.
+
+    Returns:
+        A config dict with the settings migrated to v4.0.3.
+    """
+    parsed_config_dict: dict[str, Any] = copy.deepcopy(config_dict)
+    parsed_config_dict["schema_version"] = "4.0.3"
+    return parsed_config_dict
 
 
 def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
@@ -428,36 +531,73 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
     """
     assert config_path.suffix == ".yaml"
     with open(config_path, "rt", encoding=locale.getpreferredencoding()) as file:
-        loaded_config_dict = yaml.safe_load(file)
+        loaded_config_dict: dict[str, Any] = yaml.safe_load(file)
 
     assert isinstance(loaded_config_dict, dict)
 
+    migrated = False
     if "InvokeAI" in loaded_config_dict:
-        # This is a v3 config file, attempt to migrate it
+        migrated = True
+        loaded_config_dict = migrate_v3_config_dict(loaded_config_dict)  # pyright: ignore [reportUnknownArgumentType]
+    if loaded_config_dict["schema_version"] == "4.0.0":
+        migrated = True
+        loaded_config_dict = migrate_v4_0_0_to_4_0_1_config_dict(loaded_config_dict)
+    if loaded_config_dict["schema_version"] == "4.0.1":
+        migrated = True
+        loaded_config_dict = migrate_v4_0_1_to_4_0_2_config_dict(loaded_config_dict)
+    if loaded_config_dict["schema_version"] == "4.0.2":
+        migrated = True
+        loaded_config_dict = migrate_v4_0_2_to_4_0_3_config_dict(loaded_config_dict)
+
+    if migrated:
         shutil.copy(config_path, config_path.with_suffix(".yaml.bak"))
         try:
-            # loaded_config_dict could be the wrong shape, but we will catch all exceptions below
-            migrated_config = migrate_v3_config_dict(loaded_config_dict)  # pyright: ignore [reportUnknownArgumentType]
+            # load and write without environment variables
+            migrated_config = DefaultInvokeAIAppConfig.model_validate(loaded_config_dict)
+            migrated_config.write_file(config_path)
         except Exception as e:
             shutil.copy(config_path.with_suffix(".yaml.bak"), config_path)
             raise RuntimeError(f"Failed to load and migrate v3 config file {config_path}: {e}") from e
-        migrated_config.write_file(config_path)
-        return migrated_config
 
-    if loaded_config_dict["schema_version"] == "4.0.0":
-        loaded_config_dict = migrate_v4_0_0_config_dict(loaded_config_dict)
-        loaded_config_dict.write_file(config_path)
-
-    # Attempt to load as a v4 config file
     try:
         # Meta is not included in the model fields, so we need to validate it separately
         config = InvokeAIAppConfig.model_validate(loaded_config_dict)
-        assert (
-            config.schema_version == CONFIG_SCHEMA_VERSION
-        ), f"Invalid schema version, expected {CONFIG_SCHEMA_VERSION}: {config.schema_version}"
+        assert config.schema_version == CONFIG_SCHEMA_VERSION, (
+            f"Invalid schema version, expected {CONFIG_SCHEMA_VERSION}: {config.schema_version}"
+        )
         return config
     except Exception as e:
         raise RuntimeError(f"Failed to load config file {config_path}: {e}") from e
+
+
+def load_external_api_keys(api_keys_file_path: Path) -> dict[str, str]:
+    """Load external provider config (API keys and base URLs) from a dedicated YAML file."""
+    if not api_keys_file_path.exists():
+        return {}
+
+    with open(api_keys_file_path, "rt", encoding=locale.getpreferredencoding()) as file:
+        loaded_api_keys: Any = yaml.safe_load(file)
+
+    if loaded_api_keys is None:
+        return {}
+
+    if not isinstance(loaded_api_keys, dict):
+        raise RuntimeError(f"Failed to load api keys file {api_keys_file_path}: expected a mapping")
+
+    parsed_api_keys: dict[str, str] = {}
+    for field_name in EXTERNAL_PROVIDER_CONFIG_FIELDS:
+        value = loaded_api_keys.get(field_name)
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            raise RuntimeError(
+                f"Failed to load api keys file {api_keys_file_path}: value for '{field_name}' must be a string"
+            )
+        stripped_value = value.strip()
+        if stripped_value:
+            parsed_api_keys[field_name] = stripped_value
+
+    return parsed_api_keys
 
 
 @lru_cache(maxsize=1)
@@ -476,6 +616,7 @@ def get_config() -> InvokeAIAppConfig:
     """
     # This object includes environment variables, as parsed by pydantic-settings
     config = InvokeAIAppConfig()
+    env_fields_set = set(config.model_fields_set)
 
     args = InvokeAIArgs.args
 
@@ -498,9 +639,35 @@ def get_config() -> InvokeAIAppConfig:
     ]
     example_config.write_file(config.config_file_path.with_suffix(".example.yaml"), as_example=True)
 
-    # Copy all legacy configs - We know `__path__[0]` is correct here
+    # Copy all legacy configs only if needed
+    # We know `__path__[0]` is correct here
     configs_src = Path(model_configs.__path__[0])  # pyright: ignore [reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
-    shutil.copytree(configs_src, config.legacy_conf_path, dirs_exist_ok=True)
+    dest_path = config.legacy_conf_path
+
+    # Create destination (we don't need to check for existence)
+    dest_path.mkdir(parents=True, exist_ok=True)
+
+    # Compare directories recursively
+    comparison = filecmp.dircmp(configs_src, dest_path)
+    need_copy = any(
+        [
+            comparison.left_only,  # Files exist only in source
+            comparison.diff_files,  # Files that differ
+            comparison.common_funny,  # Files that couldn't be compared
+        ]
+    )
+
+    if need_copy:
+        # Get permissions from destination directory
+        dest_mode = dest_path.stat().st_mode
+
+        # Copy directory tree
+        shutil.copytree(configs_src, dest_path, dirs_exist_ok=True)
+
+        # Set permissions on copied files to match destination directory
+        dest_path.chmod(dest_mode)
+        for p in dest_path.glob("**/*"):
+            p.chmod(dest_mode)
 
     if config.config_file_path.exists():
         config_from_file = load_and_migrate_config(config.config_file_path)
@@ -510,5 +677,12 @@ def get_config() -> InvokeAIAppConfig:
         # We should never write env vars to the config file
         default_config = DefaultInvokeAIAppConfig()
         default_config.write_file(config.config_file_path, as_example=False)
+
+    api_keys_from_file = load_external_api_keys(config.api_keys_file_path)
+    if api_keys_from_file:
+        # API keys file should take precedence over invokeai.yaml, but not over environment variables.
+        api_keys_to_apply = {key: value for key, value in api_keys_from_file.items() if key not in env_fields_set}
+        if api_keys_to_apply:
+            config.update_config(api_keys_to_apply, clobber=True)
 
     return config

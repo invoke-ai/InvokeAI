@@ -1,24 +1,32 @@
-import { ConfirmationAlertDialog, Flex, Text, useDisclosure } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { ConfirmationAlertDialog, Flex, Text } from '@invoke-ai/ui-library';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
+import { buildUseDisclosure } from 'common/hooks/useBoolean';
+import { useDoesWorkflowHaveUnsavedChanges } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
-import { workflowModeChanged } from 'features/nodes/store/workflowSlice';
+import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
+import { workflowModeChanged } from 'features/nodes/store/workflowLibrarySlice';
 import { toast } from 'features/toast/toast';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
+import { WORKSPACE_PANEL_ID } from 'features/ui/layouts/shared';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-type Props = {
-  renderButton: (onClick: () => void) => JSX.Element;
-};
+const [useDialogState] = buildUseDisclosure(false);
 
-export const NewWorkflowConfirmationAlertDialog = memo((props: Props) => {
+export const useNewWorkflow = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const isTouched = useAppSelector((s) => s.workflow.isTouched);
+  const dialog = useDialogState();
+  const doesWorkflowHaveUnsavedChanges = useDoesWorkflowHaveUnsavedChanges();
+  const workflowLibraryModal = useWorkflowLibraryModal();
 
-  const handleNewWorkflow = useCallback(() => {
+  const createImmediate = useCallback(() => {
     dispatch(nodeEditorReset());
     dispatch(workflowModeChanged('edit'));
+    workflowLibraryModal.close();
+
+    navigationApi.focusPanel('workflows', WORKSPACE_PANEL_ID);
 
     toast({
       id: 'NEW_WORKFLOW_CREATED',
@@ -26,33 +34,43 @@ export const NewWorkflowConfirmationAlertDialog = memo((props: Props) => {
       status: 'success',
     });
 
-    onClose();
-  }, [dispatch, onClose, t]);
+    dialog.close();
+  }, [dialog, dispatch, t, workflowLibraryModal]);
 
-  const onClick = useCallback(() => {
-    if (!isTouched) {
-      handleNewWorkflow();
+  const createWithDialog = useCallback(() => {
+    if (!doesWorkflowHaveUnsavedChanges) {
+      createImmediate();
       return;
     }
-    onOpen();
-  }, [handleNewWorkflow, isTouched, onOpen]);
+    dialog.open();
+  }, [doesWorkflowHaveUnsavedChanges, dialog, createImmediate]);
+
+  return {
+    createImmediate,
+    createWithDialog,
+  } as const;
+};
+
+export const NewWorkflowConfirmationAlertDialog = memo(() => {
+  useAssertSingleton('NewWorkflowConfirmationAlertDialog');
+  const { t } = useTranslation();
+  const dialog = useDialogState();
+  const newWorkflow = useNewWorkflow();
 
   return (
-    <>
-      {props.renderButton(onClick)}
-
-      <ConfirmationAlertDialog
-        isOpen={isOpen}
-        onClose={onClose}
-        title={t('nodes.newWorkflow')}
-        acceptCallback={handleNewWorkflow}
-      >
-        <Flex flexDir="column" gap={2}>
-          <Text>{t('nodes.newWorkflowDesc')}</Text>
-          <Text variant="subtext">{t('nodes.newWorkflowDesc2')}</Text>
-        </Flex>
-      </ConfirmationAlertDialog>
-    </>
+    <ConfirmationAlertDialog
+      isOpen={dialog.isOpen}
+      onClose={dialog.close}
+      title={t('nodes.newWorkflow')}
+      acceptCallback={newWorkflow.createImmediate}
+      useInert={false}
+      acceptButtonText={t('common.load')}
+    >
+      <Flex flexDir="column" gap={2}>
+        <Text>{t('nodes.newWorkflowDesc')}</Text>
+        <Text variant="subtext">{t('nodes.newWorkflowDesc2')}</Text>
+      </Flex>
+    </ConfirmationAlertDialog>
   );
 });
 

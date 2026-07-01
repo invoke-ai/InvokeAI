@@ -1,207 +1,191 @@
-import { ButtonGroup, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { skipToken } from '@reduxjs/toolkit/query';
-import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
+import { Button, Divider, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { iiLayerAdded } from 'features/controlLayers/store/controlLayersSlice';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
-import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
-import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
-import { useImageActions } from 'features/gallery/hooks/useImageActions';
-import { sentImageToImg2Img } from 'features/gallery/store/actions';
-import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
-import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
-import { parseAndRecallImageDimensions } from 'features/metadata/util/handlers';
-import { $templates } from 'features/nodes/store/nodesSlice';
-import ParamUpscalePopover from 'features/parameters/components/Upscale/ParamUpscaleSettings';
-import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { selectSystemSlice } from 'features/system/store/systemSlice';
-import { setActiveTab } from 'features/ui/store/uiSlice';
-import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
-import { size } from 'lodash-es';
-import { memo, useCallback } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
+import SingleSelectionMenuItems from 'features/gallery/components/ContextMenu/SingleSelectionMenuItems';
+import { useDeleteImage } from 'features/gallery/hooks/useDeleteImage';
+import { useEditImage } from 'features/gallery/hooks/useEditImage';
+import { useLoadWorkflow } from 'features/gallery/hooks/useLoadWorkflow';
+import { useRecallAll } from 'features/gallery/hooks/useRecallAllImageMetadata';
+import { useRecallDimensions } from 'features/gallery/hooks/useRecallDimensions';
+import { useRecallPrompts } from 'features/gallery/hooks/useRecallPrompts';
+import { useRecallRemix } from 'features/gallery/hooks/useRecallRemix';
+import { useRecallSeed } from 'features/gallery/hooks/useRecallSeed';
+import { boardIdSelected } from 'features/gallery/store/gallerySlice';
+import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
+import { PostProcessingPopover } from 'features/parameters/components/PostProcessing/PostProcessingPopover';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
+import { useGalleryPanel } from 'features/ui/layouts/use-gallery-panel';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { memo, useCallback, useMemo } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   PiArrowsCounterClockwiseBold,
   PiAsteriskBold,
+  PiCrosshairBold,
   PiDotsThreeOutlineFill,
   PiFlowArrowBold,
+  PiPencilBold,
   PiPlantBold,
   PiQuotesBold,
   PiRulerBold,
 } from 'react-icons/pi';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import type { ImageDTO } from 'services/api/types';
 
-const selectShouldDisableToolbarButtons = createSelector(
-  selectSystemSlice,
-  selectGallerySlice,
-  selectLastSelectedImage,
-  (system, gallery, lastSelectedImage) => {
-    const hasProgressImage = Boolean(system.denoiseProgress?.progress_image);
-    return hasProgressImage || !lastSelectedImage;
-  }
-);
-
-const CurrentImageButtons = () => {
-  const dispatch = useAppDispatch();
-  const isConnected = useAppSelector((s) => s.system.isConnected);
-  const lastSelectedImage = useAppSelector(selectLastSelectedImage);
-  const selection = useAppSelector((s) => s.gallery.selection);
-  const shouldDisableToolbarButtons = useAppSelector(selectShouldDisableToolbarButtons);
-  const templates = useStore($templates);
-  const isUpscalingEnabled = useFeatureStatus('upscaling');
-  const isQueueMutationInProgress = useIsQueueMutationInProgress();
+export const CurrentImageButtons = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
   const { t } = useTranslation();
+  const tab = useAppSelector(selectActiveTab);
+  const dispatch = useAppDispatch();
+  const activeTab = useAppSelector(selectActiveTab);
+  const galleryPanel = useGalleryPanel(activeTab);
 
-  const { currentData: imageDTO } = useGetImageDTOQuery(lastSelectedImage?.image_name ?? skipToken);
+  const isGalleryImage = useMemo(() => {
+    return !imageDTO.is_intermediate;
+  }, [imageDTO]);
 
-  const { recallAll, remix, recallSeed, recallPrompts, hasMetadata, hasSeed, hasPrompts, isLoadingMetadata } =
-    useImageActions(lastSelectedImage?.image_name);
+  const locateInGallery = useCallback(() => {
+    navigationApi.expandRightPanel();
+    galleryPanel.expand();
+    flushSync(() => {
+      dispatch(
+        boardIdSelected({
+          boardId: imageDTO.board_id ?? 'none',
+          select: {
+            selection: [imageDTO.image_name],
+            galleryView: IMAGE_CATEGORIES.includes(imageDTO.image_category) ? 'images' : 'assets',
+          },
+        })
+      );
+    });
+  }, [dispatch, galleryPanel, imageDTO]);
 
-  const { getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult } = useGetAndLoadEmbeddedWorkflow({});
+  const isCanvasOrGenerateTab = tab === 'canvas' || tab === 'generate';
+  const isCanvasOrGenerateOrUpscalingTab = tab === 'canvas' || tab === 'generate' || tab === 'upscaling';
+  const doesTabHaveGallery = tab === 'canvas' || tab === 'generate' || tab === 'workflows' || tab === 'upscaling';
 
-  const handleLoadWorkflow = useCallback(() => {
-    if (!lastSelectedImage || !lastSelectedImage.has_workflow) {
-      return;
-    }
-    getAndLoadEmbeddedWorkflow(lastSelectedImage.image_name);
-  }, [getAndLoadEmbeddedWorkflow, lastSelectedImage]);
-
-  useHotkeys('w', handleLoadWorkflow, [lastSelectedImage]);
-  useHotkeys('a', recallAll, [recallAll]);
-  useHotkeys('s', recallSeed, [recallSeed]);
-  useHotkeys('p', recallPrompts, [recallPrompts]);
-  useHotkeys('r', remix, [remix]);
-
-  const handleUseSize = useCallback(() => {
-    parseAndRecallImageDimensions(lastSelectedImage);
-  }, [lastSelectedImage]);
-
-  useHotkeys('d', handleUseSize, [handleUseSize]);
-
-  const handleSendToImageToImage = useCallback(() => {
-    if (!imageDTO) {
-      return;
-    }
-    dispatch(sentImageToImg2Img());
-    dispatch(iiLayerAdded(imageDTO));
-    dispatch(setActiveTab('generation'));
-  }, [dispatch, imageDTO]);
-
-  useHotkeys('shift+i', handleSendToImageToImage, [imageDTO]);
-
-  const handleClickUpscale = useCallback(() => {
-    if (!imageDTO) {
-      return;
-    }
-    dispatch(upscaleRequested({ imageDTO }));
-  }, [dispatch, imageDTO]);
-
-  const handleDelete = useCallback(() => {
-    if (!imageDTO) {
-      return;
-    }
-    dispatch(imagesToDeleteSelected(selection));
-  }, [dispatch, imageDTO, selection]);
-
-  useHotkeys(
-    'Shift+U',
-    () => {
-      handleClickUpscale();
-    },
-    {
-      enabled: () => Boolean(isUpscalingEnabled && !shouldDisableToolbarButtons && isConnected),
-    },
-    [isUpscalingEnabled, imageDTO, shouldDisableToolbarButtons, isConnected]
-  );
-
-  useHotkeys(
-    'delete',
-    () => {
-      handleDelete();
-    },
-    [dispatch, imageDTO]
-  );
+  const recallAll = useRecallAll(imageDTO);
+  const recallRemix = useRecallRemix(imageDTO);
+  const recallPrompts = useRecallPrompts(imageDTO);
+  const recallSeed = useRecallSeed(imageDTO);
+  const recallDimensions = useRecallDimensions(imageDTO);
+  const loadWorkflow = useLoadWorkflow(imageDTO);
+  const editImage = useEditImage(imageDTO);
+  const deleteImage = useDeleteImage(imageDTO);
 
   return (
     <>
-      <ButtonGroup isDisabled={shouldDisableToolbarButtons}>
-        <Menu isLazy>
-          <MenuButton
-            as={IconButton}
-            aria-label={t('parameters.imageActions')}
-            tooltip={t('parameters.imageActions')}
-            isDisabled={!imageDTO}
-            icon={<PiDotsThreeOutlineFill />}
-          />
-          <MenuList>{imageDTO && <SingleSelectionMenuItems imageDTO={imageDTO} />}</MenuList>
-        </Menu>
-      </ButtonGroup>
-
-      <ButtonGroup isDisabled={shouldDisableToolbarButtons}>
-        <IconButton
-          icon={<PiFlowArrowBold />}
-          tooltip={`${t('nodes.loadWorkflow')} (W)`}
-          aria-label={`${t('nodes.loadWorkflow')} (W)`}
-          isDisabled={!imageDTO?.has_workflow || !size(templates)}
-          onClick={handleLoadWorkflow}
-          isLoading={getAndLoadEmbeddedWorkflowResult.isLoading}
+      <Menu isLazy>
+        <MenuButton
+          as={IconButton}
+          aria-label={t('parameters.imageActions')}
+          tooltip={t('parameters.imageActions')}
+          isDisabled={!imageDTO}
+          variant="link"
+          alignSelf="stretch"
+          icon={<PiDotsThreeOutlineFill />}
         />
+        <MenuList>{imageDTO && <SingleSelectionMenuItems imageDTO={imageDTO} />}</MenuList>
+      </Menu>
+
+      <Divider orientation="vertical" h={8} mx={2} />
+
+      <Button
+        leftIcon={<PiPencilBold />}
+        onClick={editImage.edit}
+        isDisabled={!editImage.isEnabled}
+        variant="link"
+        size="sm"
+        alignSelf="stretch"
+        px={2}
+      >
+        {t('common.edit')}
+      </Button>
+
+      <Divider orientation="vertical" h={8} mx={2} />
+
+      {doesTabHaveGallery && isGalleryImage && (
         <IconButton
-          isLoading={isLoadingMetadata}
+          icon={<PiCrosshairBold />}
+          aria-label={t('boards.locateInGalery')}
+          tooltip={t('boards.locateInGalery')}
+          onClick={locateInGallery}
+          variant="link"
+          size="sm"
+          alignSelf="stretch"
+        />
+      )}
+      <IconButton
+        icon={<PiFlowArrowBold />}
+        tooltip={`${t('nodes.loadWorkflow')} (W)`}
+        aria-label={`${t('nodes.loadWorkflow')} (W)`}
+        isDisabled={!loadWorkflow.isEnabled}
+        variant="link"
+        alignSelf="stretch"
+        onClick={loadWorkflow.load}
+      />
+      {isCanvasOrGenerateTab && (
+        <IconButton
           icon={<PiArrowsCounterClockwiseBold />}
           tooltip={`${t('parameters.remixImage')} (R)`}
           aria-label={`${t('parameters.remixImage')} (R)`}
-          isDisabled={!hasMetadata}
-          onClick={remix}
+          isDisabled={!recallRemix.isEnabled}
+          variant="link"
+          alignSelf="stretch"
+          onClick={recallRemix.recall}
         />
+      )}
+      {isCanvasOrGenerateOrUpscalingTab && (
         <IconButton
-          isLoading={isLoadingMetadata}
           icon={<PiQuotesBold />}
           tooltip={`${t('parameters.usePrompt')} (P)`}
           aria-label={`${t('parameters.usePrompt')} (P)`}
-          isDisabled={!hasPrompts}
-          onClick={recallPrompts}
+          isDisabled={!recallPrompts.isEnabled}
+          variant="link"
+          alignSelf="stretch"
+          onClick={recallPrompts.recall}
         />
+      )}
+      {isCanvasOrGenerateOrUpscalingTab && (
         <IconButton
-          isLoading={isLoadingMetadata}
           icon={<PiPlantBold />}
           tooltip={`${t('parameters.useSeed')} (S)`}
           aria-label={`${t('parameters.useSeed')} (S)`}
-          isDisabled={!hasSeed}
-          onClick={recallSeed}
+          isDisabled={!recallSeed.isEnabled}
+          variant="link"
+          alignSelf="stretch"
+          onClick={recallSeed.recall}
         />
+      )}
+      {isCanvasOrGenerateTab && (
         <IconButton
-          isLoading={isLoadingMetadata}
           icon={<PiRulerBold />}
           tooltip={`${t('parameters.useSize')} (D)`}
           aria-label={`${t('parameters.useSize')} (D)`}
-          onClick={handleUseSize}
+          variant="link"
+          alignSelf="stretch"
+          onClick={recallDimensions.recall}
+          isDisabled={!recallDimensions.isEnabled}
         />
+      )}
+      {isCanvasOrGenerateTab && (
         <IconButton
-          isLoading={isLoadingMetadata}
           icon={<PiAsteriskBold />}
           tooltip={`${t('parameters.useAll')} (A)`}
           aria-label={`${t('parameters.useAll')} (A)`}
-          isDisabled={!hasMetadata}
-          onClick={recallAll}
+          isDisabled={!recallAll.isEnabled}
+          variant="link"
+          alignSelf="stretch"
+          onClick={recallAll.recall}
         />
-      </ButtonGroup>
-
-      {isUpscalingEnabled && (
-        <ButtonGroup isDisabled={isQueueMutationInProgress}>
-          {isUpscalingEnabled && <ParamUpscalePopover imageDTO={imageDTO} />}
-        </ButtonGroup>
       )}
 
-      <ButtonGroup>
-        <DeleteImageButton onClick={handleDelete} />
-      </ButtonGroup>
+      <PostProcessingPopover imageDTO={imageDTO} isDisabled={false} />
+
+      <Divider orientation="vertical" h={8} mx={2} />
+
+      <DeleteImageButton onClick={deleteImage.delete} isDisabled={!deleteImage.isEnabled} />
     </>
   );
-};
+});
 
-export default memo(CurrentImageButtons);
+CurrentImageButtons.displayName = 'CurrentImageButtons';

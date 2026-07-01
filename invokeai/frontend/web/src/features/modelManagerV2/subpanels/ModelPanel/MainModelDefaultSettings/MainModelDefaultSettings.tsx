@@ -1,19 +1,25 @@
-import { Button, Flex, Heading, SimpleGrid, Text } from '@invoke-ai/ui-library';
+import { Button, Flex, Heading, SimpleGrid } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { useIsModelManagerEnabled } from 'features/modelManagerV2/hooks/useIsModelManagerEnabled';
 import { useMainModelDefaultSettings } from 'features/modelManagerV2/hooks/useMainModelDefaultSettings';
+import { selectSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { DefaultHeight } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/DefaultHeight';
 import { DefaultWidth } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/DefaultWidth';
 import type { ParameterScheduler } from 'features/parameters/types/parameterSchemas';
+import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { toast } from 'features/toast/toast';
-import { useCallback } from 'react';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { PiCheckBold } from 'react-icons/pi';
 import { useUpdateModelMutation } from 'services/api/endpoints/models';
+import type { MainModelConfig } from 'services/api/types';
 
 import { DefaultCfgRescaleMultiplier } from './DefaultCfgRescaleMultiplier';
 import { DefaultCfgScale } from './DefaultCfgScale';
+import { DefaultFp8Storage } from './DefaultFp8Storage';
+import { DefaultGuidance } from './DefaultGuidance';
 import { DefaultScheduler } from './DefaultScheduler';
 import { DefaultSteps } from './DefaultSteps';
 import { DefaultVae } from './DefaultVae';
@@ -33,23 +39,41 @@ export type MainModelDefaultSettingsFormData = {
   cfgRescaleMultiplier: FormField<number>;
   width: FormField<number>;
   height: FormField<number>;
+  guidance: FormField<number>;
+  fp8Storage: FormField<boolean>;
 };
 
-export const MainModelDefaultSettings = () => {
-  const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
+type Props = {
+  modelConfig: MainModelConfig;
+};
+
+export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
+  const selectedModelKey = useAppSelector(selectSelectedModelKey);
+  const canManageModels = useIsModelManagerEnabled();
   const { t } = useTranslation();
 
-  const {
-    defaultSettingsDefaults,
-    isLoading: isLoadingDefaultSettings,
-    optimalDimension,
-  } = useMainModelDefaultSettings(selectedModelKey);
+  const isFluxFamily = useMemo(() => {
+    return ['flux', 'flux2'].includes(modelConfig.base);
+  }, [modelConfig]);
 
+  const isZImage = useMemo(() => {
+    return modelConfig.base === 'z-image';
+  }, [modelConfig]);
+
+  const defaultSettingsDefaults = useMainModelDefaultSettings(modelConfig);
+  const optimalDimension = useMemo(() => {
+    const modelBase = modelConfig?.base;
+    return getOptimalDimension(modelBase ?? null);
+  }, [modelConfig]);
   const [updateModel, { isLoading: isLoadingUpdateModel }] = useUpdateModelMutation();
 
   const { handleSubmit, control, formState, reset } = useForm<MainModelDefaultSettingsFormData>({
     defaultValues: defaultSettingsDefaults,
   });
+
+  useEffect(() => {
+    reset(defaultSettingsDefaults);
+  }, [defaultSettingsDefaults, reset]);
 
   const onSubmit = useCallback<SubmitHandler<MainModelDefaultSettingsFormData>>(
     (data) => {
@@ -66,6 +90,8 @@ export const MainModelDefaultSettings = () => {
         scheduler: data.scheduler.isEnabled ? data.scheduler.value : null,
         width: data.width.isEnabled ? data.width.value : null,
         height: data.height.isEnabled ? data.height.value : null,
+        guidance: data.guidance.isEnabled ? data.guidance.value : null,
+        fp8_storage: data.fp8Storage.isEnabled ? data.fp8Storage.value : null,
       };
 
       updateModel({
@@ -94,36 +120,38 @@ export const MainModelDefaultSettings = () => {
     [selectedModelKey, reset, updateModel, t]
   );
 
-  if (isLoadingDefaultSettings) {
-    return <Text>{t('common.loading')}</Text>;
-  }
-
   return (
     <>
       <Flex gap="4" justifyContent="space-between" w="full" pb={4}>
         <Heading fontSize="md">{t('modelManager.defaultSettings')}</Heading>
-        <Button
-          size="sm"
-          leftIcon={<PiCheckBold />}
-          colorScheme="invokeYellow"
-          isDisabled={!formState.isDirty}
-          onClick={handleSubmit(onSubmit)}
-          isLoading={isLoadingUpdateModel}
-        >
-          {t('common.save')}
-        </Button>
+        {canManageModels && (
+          <Button
+            size="sm"
+            leftIcon={<PiCheckBold />}
+            colorScheme="invokeYellow"
+            isDisabled={!formState.isDirty}
+            onClick={handleSubmit(onSubmit)}
+            isLoading={isLoadingUpdateModel}
+          >
+            {t('common.save')}
+          </Button>
+        )}
       </Flex>
 
       <SimpleGrid columns={2} gap={8}>
         <DefaultVae control={control} name="vae" />
-        <DefaultVaePrecision control={control} name="vaePrecision" />
-        <DefaultScheduler control={control} name="scheduler" />
+        {!isFluxFamily && <DefaultVaePrecision control={control} name="vaePrecision" />}
+        {!isFluxFamily && <DefaultScheduler control={control} name="scheduler" />}
         <DefaultSteps control={control} name="steps" />
-        <DefaultCfgScale control={control} name="cfgScale" />
-        <DefaultCfgRescaleMultiplier control={control} name="cfgRescaleMultiplier" />
+        {isFluxFamily && <DefaultGuidance control={control} name="guidance" />}
+        {!isFluxFamily && <DefaultCfgScale control={control} name="cfgScale" />}
+        {!isFluxFamily && <DefaultCfgRescaleMultiplier control={control} name="cfgRescaleMultiplier" />}
         <DefaultWidth control={control} optimalDimension={optimalDimension} />
         <DefaultHeight control={control} optimalDimension={optimalDimension} />
+        {!isZImage && <DefaultFp8Storage control={control} name="fp8Storage" />}
       </SimpleGrid>
     </>
   );
-};
+});
+
+MainModelDefaultSettings.displayName = 'MainModelDefaultSettings';

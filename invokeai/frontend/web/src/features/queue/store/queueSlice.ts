@@ -1,35 +1,44 @@
-import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import type { PayloadAction, Selector } from '@reduxjs/toolkit';
+import { createSelector, createSlice } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import type { RootState } from 'app/store/store';
+import type { SliceConfig } from 'app/store/types';
+import { type GetQueueItemIdsArgs, zSQLiteDirection } from 'services/api/types';
+import z from 'zod';
 
-interface QueueState {
-  listCursor: number | undefined;
-  listPriority: number | undefined;
-  selectedQueueItem: string | undefined;
-  resumeProcessorOnEnqueue: boolean;
-}
+const zQueueState = z.object({
+  sortOrder: zSQLiteDirection,
+});
+type QueueState = z.infer<typeof zQueueState>;
 
-const initialQueueState: QueueState = {
-  listCursor: undefined,
-  listPriority: undefined,
-  selectedQueueItem: undefined,
-  resumeProcessorOnEnqueue: true,
-};
+const getInitialState = (): QueueState => ({
+  sortOrder: 'DESC',
+});
 
-export const queueSlice = createSlice({
+const slice = createSlice({
   name: 'queue',
-  initialState: initialQueueState,
+  initialState: getInitialState(),
   reducers: {
-    listCursorChanged: (state, action: PayloadAction<number | undefined>) => {
-      state.listCursor = action.payload;
-    },
-    listPriorityChanged: (state, action: PayloadAction<number | undefined>) => {
-      state.listPriority = action.payload;
-    },
-    listParamsReset: (state) => {
-      state.listCursor = undefined;
-      state.listPriority = undefined;
+    sortOrderChanged: (state, action: PayloadAction<'ASC' | 'DESC'>) => {
+      state.sortOrder = action.payload;
     },
   },
 });
 
-export const { listCursorChanged, listPriorityChanged, listParamsReset } = queueSlice.actions;
+export const { sortOrderChanged } = slice.actions;
+
+export const queueSliceConfig: SliceConfig<typeof slice> = {
+  slice,
+  schema: zQueueState,
+  getInitialState,
+};
+
+const selectQueueSlice = (state: RootState) => state.queue;
+const createQueueSelector = <T>(selector: Selector<QueueState, T>) => createSelector(selectQueueSlice, selector);
+export const selectQueueSortOrder = createQueueSelector((queue) => queue.sortOrder);
+export const selectGetQueueItemIdsArgs = createMemoizedSelector(
+  [selectQueueSortOrder],
+  (order_dir): GetQueueItemIdsArgs => ({
+    order_dir,
+  })
+);

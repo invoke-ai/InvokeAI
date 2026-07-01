@@ -1,10 +1,17 @@
+from __future__ import annotations
+
 import math
-from dataclasses import dataclass
-from typing import List, Optional, Union
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
 import torch
 
-from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
+from invokeai.backend.stable_diffusion.diffusion.regional_prompt_data import RegionalPromptData
+
+if TYPE_CHECKING:
+    from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
+    from invokeai.backend.stable_diffusion.denoise_context import UNetKwargs
 
 
 @dataclass
@@ -16,11 +23,6 @@ class BasicConditioningInfo:
     def to(self, device, dtype=None):
         self.embeds = self.embeds.to(device=device, dtype=dtype)
         return self
-
-
-@dataclass
-class ConditioningFieldData:
-    conditionings: List[BasicConditioningInfo]
 
 
 @dataclass
@@ -37,6 +39,115 @@ class SDXLConditioningInfo(BasicConditioningInfo):
 
 
 @dataclass
+class FLUXConditioningInfo:
+    clip_embeds: torch.Tensor
+    t5_embeds: torch.Tensor
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.clip_embeds = self.clip_embeds.to(device=device, dtype=dtype)
+        self.t5_embeds = self.t5_embeds.to(device=device, dtype=dtype)
+        return self
+
+
+@dataclass
+class SD3ConditioningInfo:
+    clip_l_pooled_embeds: torch.Tensor
+    clip_l_embeds: torch.Tensor
+    clip_g_pooled_embeds: torch.Tensor
+    clip_g_embeds: torch.Tensor
+    t5_embeds: torch.Tensor | None
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.clip_l_pooled_embeds = self.clip_l_pooled_embeds.to(device=device, dtype=dtype)
+        self.clip_l_embeds = self.clip_l_embeds.to(device=device, dtype=dtype)
+        self.clip_g_pooled_embeds = self.clip_g_pooled_embeds.to(device=device, dtype=dtype)
+        self.clip_g_embeds = self.clip_g_embeds.to(device=device, dtype=dtype)
+        if self.t5_embeds is not None:
+            self.t5_embeds = self.t5_embeds.to(device=device, dtype=dtype)
+        return self
+
+
+@dataclass
+class CogView4ConditioningInfo:
+    glm_embeds: torch.Tensor
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.glm_embeds = self.glm_embeds.to(device=device, dtype=dtype)
+        return self
+
+
+@dataclass
+class ZImageConditioningInfo:
+    """Z-Image text conditioning information from Qwen3 text encoder."""
+
+    prompt_embeds: torch.Tensor
+    """Text embeddings from Qwen3 encoder. Shape: (batch_size, seq_len, hidden_size)."""
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+        return self
+
+
+@dataclass
+class QwenImageConditioningInfo:
+    """Qwen Image Edit conditioning information from Qwen2.5-VL encoder."""
+
+    prompt_embeds: torch.Tensor
+    """Text/image embeddings from Qwen2.5-VL encoder. Shape: (batch_size, seq_len, hidden_size)."""
+
+    prompt_embeds_mask: torch.Tensor | None = None
+    """Attention mask for prompt_embeds. Shape: (batch_size, seq_len). 1 for valid, 0 for padding."""
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+        if self.prompt_embeds_mask is not None:
+            self.prompt_embeds_mask = self.prompt_embeds_mask.to(device=device)
+        return self
+
+
+@dataclass
+class AnimaConditioningInfo:
+    """Anima text conditioning information from Qwen3 0.6B encoder + T5-XXL tokenizer.
+
+    Anima uses a dual-conditioning scheme where Qwen3 hidden states are combined
+    with T5-XXL token IDs inside the LLM Adapter (part of the transformer).
+    """
+
+    qwen3_embeds: torch.Tensor
+    """Qwen3 0.6B hidden states. Shape: (seq_len, hidden_size) where hidden_size=1024."""
+
+    t5xxl_ids: torch.Tensor
+    """T5-XXL token IDs. Shape: (seq_len,)."""
+
+    t5xxl_weights: Optional[torch.Tensor] = None
+    """Per-token weights for prompt weighting. Shape: (seq_len,). None means uniform weight."""
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.qwen3_embeds = self.qwen3_embeds.to(device=device, dtype=dtype)
+        self.t5xxl_ids = self.t5xxl_ids.to(device=device)
+        if self.t5xxl_weights is not None:
+            self.t5xxl_weights = self.t5xxl_weights.to(device=device, dtype=dtype)
+        return self
+
+
+@dataclass
+class ConditioningFieldData:
+    # If you change this class, adding more types, you _must_ update the instantiation of ObjectSerializerDisk in
+    # invokeai/app/api/dependencies.py, adding the types to the list of safe globals. If you do not, torch will be
+    # unable to deserialize the object and will raise an error.
+    conditionings: (
+        List[BasicConditioningInfo]
+        | List[SDXLConditioningInfo]
+        | List[FLUXConditioningInfo]
+        | List[SD3ConditioningInfo]
+        | List[CogView4ConditioningInfo]
+        | List[ZImageConditioningInfo]
+        | List[QwenImageConditioningInfo]
+        | List[AnimaConditioningInfo]
+    )
+
+
+@dataclass
 class IPAdapterConditioningInfo:
     cond_image_prompt_embeds: torch.Tensor
     """IP-Adapter image encoder conditioning embeddings.
@@ -50,15 +161,29 @@ class IPAdapterConditioningInfo:
 
 @dataclass
 class IPAdapterData:
+    """Data class for IP-Adapter configuration.
+
+    Attributes:
+        ip_adapter_model: The IP-Adapter model to use.
+        ip_adapter_conditioning: The IP-Adapter conditioning data.
+        mask: The mask to apply to the IP-Adapter conditioning.
+        target_blocks: List of target attention block names to apply IP-Adapter to.
+        negative_blocks: List of target attention block names that should use negative attention.
+        weight: The weight to apply to the IP-Adapter conditioning.
+        begin_step_percent: The percentage of steps at which to start applying the IP-Adapter.
+        end_step_percent: The percentage of steps at which to stop applying the IP-Adapter.
+        method: The method to use for applying the IP-Adapter ('full', 'style', 'composition').
+    """
+
     ip_adapter_model: IPAdapter
     ip_adapter_conditioning: IPAdapterConditioningInfo
     mask: torch.Tensor
     target_blocks: List[str]
-
-    # Either a single weight applied to all steps, or a list of weights for each step.
+    negative_blocks: List[str] = field(default_factory=list)
     weight: Union[float, List[float]] = 1.0
     begin_step_percent: float = 0.0
     end_step_percent: float = 1.0
+    method: str = "full"
 
     def scale_for_step(self, step_index: int, total_steps: int) -> float:
         first_adapter_step = math.floor(self.begin_step_percent * total_steps)
@@ -95,6 +220,12 @@ class TextConditioningRegions:
         assert self.masks.shape[1] == len(self.ranges)
 
 
+class ConditioningMode(Enum):
+    Both = "both"
+    Negative = "negative"
+    Positive = "positive"
+
+
 class TextConditioningData:
     def __init__(
         self,
@@ -103,7 +234,7 @@ class TextConditioningData:
         uncond_regions: Optional[TextConditioningRegions],
         cond_regions: Optional[TextConditioningRegions],
         guidance_scale: Union[float, List[float]],
-        guidance_rescale_multiplier: float = 0,
+        guidance_rescale_multiplier: float = 0,  # TODO: old backend, remove
     ):
         self.uncond_text = uncond_text
         self.cond_text = cond_text
@@ -114,6 +245,7 @@ class TextConditioningData:
         # Guidance scale is enabled by setting `guidance_scale > 1`. Higher guidance scale encourages to generate
         # images that are closely linked to the text `prompt`, usually at the expense of lower image quality.
         self.guidance_scale = guidance_scale
+        # TODO: old backend, remove
         # For models trained using zero-terminal SNR ("ztsnr"), it's suggested to use guidance_rescale_multiplier of 0.7.
         # See [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/pdf/2305.08891.pdf).
         self.guidance_rescale_multiplier = guidance_rescale_multiplier
@@ -121,3 +253,114 @@ class TextConditioningData:
     def is_sdxl(self):
         assert isinstance(self.uncond_text, SDXLConditioningInfo) == isinstance(self.cond_text, SDXLConditioningInfo)
         return isinstance(self.cond_text, SDXLConditioningInfo)
+
+    def to_unet_kwargs(self, unet_kwargs: UNetKwargs, conditioning_mode: ConditioningMode):
+        """Fills unet arguments with data from provided conditionings.
+
+        Args:
+            unet_kwargs (UNetKwargs): Object which stores UNet model arguments.
+            conditioning_mode (ConditioningMode): Describes which conditionings should be used.
+        """
+        _, _, h, w = unet_kwargs.sample.shape
+        device = unet_kwargs.sample.device
+        dtype = unet_kwargs.sample.dtype
+
+        # TODO: combine regions with conditionings
+        if conditioning_mode == ConditioningMode.Both:
+            conditionings = [self.uncond_text, self.cond_text]
+            c_regions = [self.uncond_regions, self.cond_regions]
+        elif conditioning_mode == ConditioningMode.Positive:
+            conditionings = [self.cond_text]
+            c_regions = [self.cond_regions]
+        elif conditioning_mode == ConditioningMode.Negative:
+            conditionings = [self.uncond_text]
+            c_regions = [self.uncond_regions]
+        else:
+            raise ValueError(f"Unexpected conditioning mode: {conditioning_mode}")
+
+        encoder_hidden_states, encoder_attention_mask = self._concat_conditionings_for_batch(
+            [c.embeds for c in conditionings]
+        )
+
+        unet_kwargs.encoder_hidden_states = encoder_hidden_states
+        unet_kwargs.encoder_attention_mask = encoder_attention_mask
+
+        if self.is_sdxl():
+            added_cond_kwargs = dict(  # noqa: C408
+                text_embeds=torch.cat([c.pooled_embeds for c in conditionings]),
+                time_ids=torch.cat([c.add_time_ids for c in conditionings]),
+            )
+
+            unet_kwargs.added_cond_kwargs = added_cond_kwargs
+
+        if any(r is not None for r in c_regions):
+            tmp_regions = []
+            for c, r in zip(conditionings, c_regions, strict=True):
+                if r is None:
+                    r = TextConditioningRegions(
+                        masks=torch.ones((1, 1, h, w), dtype=dtype),
+                        ranges=[Range(start=0, end=c.embeds.shape[1])],
+                    )
+                tmp_regions.append(r)
+
+            if unet_kwargs.cross_attention_kwargs is None:
+                unet_kwargs.cross_attention_kwargs = {}
+
+            unet_kwargs.cross_attention_kwargs.update(
+                regional_prompt_data=RegionalPromptData(regions=tmp_regions, device=device, dtype=dtype),
+            )
+
+    @staticmethod
+    def _pad_zeros(t: torch.Tensor, pad_shape: tuple, dim: int) -> torch.Tensor:
+        return torch.cat([t, torch.zeros(pad_shape, device=t.device, dtype=t.dtype)], dim=dim)
+
+    @classmethod
+    def _pad_conditioning(
+        cls,
+        cond: torch.Tensor,
+        target_len: int,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Pad provided conditioning tensor to target_len by zeros and returns mask of unpadded bytes.
+
+        Args:
+            cond (torch.Tensor): Conditioning tensor which to pads by zeros.
+            target_len (int): To which length(tokens count) pad tensor.
+        """
+        conditioning_attention_mask = torch.ones((cond.shape[0], cond.shape[1]), device=cond.device, dtype=cond.dtype)
+
+        if cond.shape[1] < target_len:
+            conditioning_attention_mask = cls._pad_zeros(
+                conditioning_attention_mask,
+                pad_shape=(cond.shape[0], target_len - cond.shape[1]),
+                dim=1,
+            )
+
+            cond = cls._pad_zeros(
+                cond,
+                pad_shape=(cond.shape[0], target_len - cond.shape[1], cond.shape[2]),
+                dim=1,
+            )
+
+        return cond, conditioning_attention_mask
+
+    @classmethod
+    def _concat_conditionings_for_batch(
+        cls,
+        conditionings: List[torch.Tensor],
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        """Concatenate provided conditioning tensors to one batched tensor.
+        If tensors have different sizes then pad them by zeros and creates
+        encoder_attention_mask to exclude padding from attention.
+
+        Args:
+            conditionings (List[torch.Tensor]): List of conditioning tensors to concatenate.
+        """
+        encoder_attention_mask = None
+        max_len = max([c.shape[1] for c in conditionings])
+        if any(c.shape[1] != max_len for c in conditionings):
+            encoder_attention_masks = [None] * len(conditionings)
+            for i in range(len(conditionings)):
+                conditionings[i], encoder_attention_masks[i] = cls._pad_conditioning(conditionings[i], max_len)
+            encoder_attention_mask = torch.cat(encoder_attention_masks)
+
+        return torch.cat(conditionings), encoder_attention_mask

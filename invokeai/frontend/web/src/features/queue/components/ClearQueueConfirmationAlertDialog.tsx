@@ -1,30 +1,45 @@
-import type { UseDisclosureReturn } from '@invoke-ai/ui-library';
 import { ConfirmationAlertDialog, Text } from '@invoke-ai/ui-library';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
+import { buildUseBoolean } from 'common/hooks/useBoolean';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-type Props = {
-  disclosure: UseDisclosureReturn;
+const [useClearQueueConfirmationAlertDialog] = buildUseBoolean(false);
+
+export const useClearQueueDialog = () => {
+  const dialog = useClearQueueConfirmationAlertDialog();
+  const clearQueue = useClearQueue();
+
+  return {
+    isOpen: dialog.isTrue,
+    openDialog: dialog.setTrue,
+    closeDialog: dialog.setFalse,
+    trigger: clearQueue.trigger,
+    isLoading: clearQueue.isLoading,
+    isDisabled: clearQueue.isDisabled,
+  };
 };
 
-const ClearQueueButton = ({ disclosure }: Props) => {
+export const ClearQueueConfirmationsAlertDialog = memo(() => {
+  useAssertSingleton('ClearQueueConfirmationsAlertDialog');
   const { t } = useTranslation();
-  const { clearQueue } = useClearQueue();
+  const clearQueue = useClearQueueDialog();
 
   return (
     <ConfirmationAlertDialog
-      isOpen={disclosure.isOpen}
-      onClose={disclosure.onClose}
+      isOpen={clearQueue.isOpen}
+      onClose={clearQueue.closeDialog}
       title={t('queue.clearTooltip')}
-      acceptCallback={clearQueue}
+      acceptCallback={clearQueue.trigger}
       acceptButtonText={t('queue.clear')}
+      useInert={false}
     >
       <Text>{t('queue.clearQueueAlertDialog')}</Text>
       <br />
       <Text>{t('queue.clearQueueAlertDialog2')}</Text>
     </ConfirmationAlertDialog>
   );
-};
+});
 
-export default memo(ClearQueueButton);
+ClearQueueConfirmationsAlertDialog.displayName = 'ClearQueueConfirmationsAlertDialog';

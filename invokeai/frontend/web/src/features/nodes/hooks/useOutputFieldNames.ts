@@ -1,10 +1,17 @@
-import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
+import { createSelector } from '@reduxjs/toolkit';
+import { useAppSelector } from 'app/store/storeHooks';
+import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { getSortedFilteredFieldNames } from 'features/nodes/util/node/getSortedFilteredFieldNames';
-import { map } from 'lodash-es';
 import { useMemo } from 'react';
 
-export const useOutputFieldNames = (nodeId: string): string[] => {
-  const template = useNodeTemplate(nodeId);
-  const fieldNames = useMemo(() => getSortedFilteredFieldNames(map(template.outputs)), [template.outputs]);
-  return fieldNames;
+export const useOutputFieldNames = (): string[] => {
+  const ctx = useInvocationNodeContext();
+  const selector = useMemo(
+    () =>
+      createSelector([ctx.selectNodeTemplateOrThrow], (template) =>
+        getSortedFilteredFieldNames(Object.values(template.outputs))
+      ),
+    [ctx]
+  );
+  return useAppSelector(selector);
 };

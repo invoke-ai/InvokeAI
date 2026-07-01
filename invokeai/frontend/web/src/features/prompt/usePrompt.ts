@@ -1,19 +1,20 @@
 import { useDisclosure } from '@invoke-ai/ui-library';
-import { isNil } from 'lodash-es';
+import { isNil } from 'es-toolkit/compat';
 import type { ChangeEventHandler, KeyboardEventHandler, RefObject } from 'react';
 import { useCallback } from 'react';
 import { flushSync } from 'react-dom';
 
 type UseInsertTriggerArg = {
   prompt: string;
-  textareaRef: RefObject<HTMLTextAreaElement>;
+  textareaRef: RefObject<HTMLTextAreaElement | null>;
   onChange: (v: string) => void;
+  isDisabled?: boolean;
 };
 
-export const usePrompt = ({ prompt, textareaRef, onChange: _onChange }: UseInsertTriggerArg) => {
+export const usePrompt = ({ prompt, textareaRef, onChange: _onChange, isDisabled = false }: UseInsertTriggerArg) => {
   const { isOpen, onClose, onOpen } = useDisclosure();
 
-  const onChange: ChangeEventHandler<HTMLTextAreaElement> = useCallback(
+  const onChange: ChangeEventHandler<HTMLTextAreaElement | null> = useCallback(
     (e) => {
       _onChange(e.target.value);
     },
@@ -73,12 +74,12 @@ export const usePrompt = ({ prompt, textareaRef, onChange: _onChange }: UseInser
 
   const onKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = useCallback(
     (e) => {
-      if (e.key === '<') {
+      if (e.key === '<' && !isDisabled) {
         onOpen();
         e.preventDefault();
       }
     },
-    [onOpen]
+    [onOpen, isDisabled]
   );
 
   return {

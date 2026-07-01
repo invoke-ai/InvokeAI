@@ -1,0 +1,54 @@
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { selectUpscaleCfgScale, setUpscaleCfgScale } from 'features/controlLayers/store/paramsSlice';
+import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+
+const CONSTRAINTS = {
+  initial: 7,
+  sliderMin: 1,
+  sliderMax: 20,
+  numberInputMin: 1,
+  numberInputMax: 200,
+  fineStep: 0.1,
+  coarseStep: 0.5,
+};
+
+const MARKS = [CONSTRAINTS.sliderMin, Math.floor(CONSTRAINTS.sliderMax / 2), CONSTRAINTS.sliderMax];
+
+const ParamUpscaleCFGScale = () => {
+  const cfgScale = useAppSelector(selectUpscaleCfgScale);
+  const dispatch = useAppDispatch();
+  const { t } = useTranslation();
+  const onChange = useCallback((v: number) => dispatch(setUpscaleCfgScale(v)), [dispatch]);
+
+  return (
+    <FormControl>
+      <InformationalPopover feature="paramCFGScale">
+        <FormLabel>{t('parameters.cfgScale')}</FormLabel>
+      </InformationalPopover>
+      <CompositeSlider
+        value={cfgScale}
+        defaultValue={CONSTRAINTS.initial}
+        min={CONSTRAINTS.sliderMin}
+        max={CONSTRAINTS.sliderMax}
+        step={CONSTRAINTS.coarseStep}
+        fineStep={CONSTRAINTS.fineStep}
+        onChange={onChange}
+        marks={MARKS}
+      />
+      <CompositeNumberInput
+        value={cfgScale}
+        defaultValue={CONSTRAINTS.initial}
+        min={CONSTRAINTS.numberInputMin}
+        max={CONSTRAINTS.numberInputMax}
+        step={CONSTRAINTS.coarseStep}
+        fineStep={CONSTRAINTS.fineStep}
+        onChange={onChange}
+      />
+    </FormControl>
+  );
+};
+
+export default memo(ParamUpscaleCFGScale);

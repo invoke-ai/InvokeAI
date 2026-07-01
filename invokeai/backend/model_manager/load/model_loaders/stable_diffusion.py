@@ -4,25 +4,37 @@
 from pathlib import Path
 from typing import Optional
 
-from invokeai.backend.model_manager import (
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_inpaint import StableDiffusionInpaintPipeline
+from diffusers.pipelines.stable_diffusion_xl.pipeline_stable_diffusion_xl import StableDiffusionXLPipeline
+from diffusers.pipelines.stable_diffusion_xl.pipeline_stable_diffusion_xl_inpaint import (
+    StableDiffusionXLInpaintPipeline,
+)
+
+from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Diffusers_Config_Base
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.configs.main import (
+    Main_Checkpoint_SD1_Config,
+    Main_Checkpoint_SD2_Config,
+    Main_Checkpoint_SDXL_Config,
+    Main_Checkpoint_SDXLRefiner_Config,
+    Main_Diffusers_SD1_Config,
+    Main_Diffusers_SD2_Config,
+    Main_Diffusers_SDXL_Config,
+    Main_Diffusers_SDXLRefiner_Config,
+)
+from invokeai.backend.model_manager.load.model_cache.model_cache import get_model_cache_key
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
+from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
-    AnyModelConfig,
     BaseModelType,
     ModelFormat,
     ModelType,
-    SchedulerPredictionType,
+    ModelVariantType,
     SubModelType,
 )
-from invokeai.backend.model_manager.config import (
-    CheckpointConfigBase,
-    DiffusersConfigBase,
-    MainCheckpointConfig,
-    ModelVariantType,
-)
-from invokeai.backend.model_manager.convert_ckpt_to_diffusers import convert_ckpt_to_diffusers
-
-from .. import ModelLoaderRegistry
-from .generic_diffusers import GenericDiffusersLoader
+from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 VARIANT_TO_IN_CHANNEL_MAP = {
     ModelVariantType.Normal: 4,
@@ -31,28 +43,36 @@ VARIANT_TO_IN_CHANNEL_MAP = {
 }
 
 
-@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Main, format=ModelFormat.Diffusers)
-@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Main, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion1, type=ModelType.Main, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion2, type=ModelType.Main, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusionXL, type=ModelType.Main, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.StableDiffusionXLRefiner, type=ModelType.Main, format=ModelFormat.Diffusers
+)
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion3, type=ModelType.Main, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion1, type=ModelType.Main, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion2, type=ModelType.Main, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusionXL, type=ModelType.Main, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.StableDiffusionXLRefiner, type=ModelType.Main, format=ModelFormat.Checkpoint
+)
 class StableDiffusionDiffusersModel(GenericDiffusersLoader):
     """Class to load main models."""
-
-    model_base_to_model_type = {
-        BaseModelType.StableDiffusion1: "FrozenCLIPEmbedder",
-        BaseModelType.StableDiffusion2: "FrozenOpenCLIPEmbedder",
-        BaseModelType.StableDiffusionXL: "SDXL",
-        BaseModelType.StableDiffusionXLRefiner: "SDXL-Refiner",
-    }
 
     def _load_model(
         self,
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if not submodel_type is not None:
+        if isinstance(config, Checkpoint_Config_Base):
+            return self._load_from_singlefile(config, submodel_type)
+
+        if submodel_type is None:
             raise Exception("A submodel type must be provided when loading main pipelines.")
+
         model_path = Path(config.path)
         load_class = self.get_hf_load_class(model_path, submodel_type)
-        repo_variant = config.repo_variant if isinstance(config, DiffusersConfigBase) else None
+        repo_variant = config.repo_variant if isinstance(config, Diffusers_Config_Base) else None
         variant = repo_variant.value if repo_variant else None
         model_path = model_path / submodel_type.value
         try:
@@ -60,57 +80,81 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
                 model_path,
                 torch_dtype=self._torch_dtype,
                 variant=variant,
+                local_files_only=True,
             )
         except OSError as e:
             if variant and "no file named" in str(
                 e
             ):  # try without the variant, just in case user's preferences changed
-                result = load_class.from_pretrained(model_path, torch_dtype=self._torch_dtype)
+                result = load_class.from_pretrained(model_path, torch_dtype=self._torch_dtype, local_files_only=True)
             else:
                 raise e
 
+        result = self._apply_fp8_layerwise_casting(result, config, submodel_type)
         return result
 
-    def _needs_conversion(self, config: AnyModelConfig, model_path: Path, dest_path: Path) -> bool:
-        if not isinstance(config, CheckpointConfigBase):
-            return False
-        elif (
-            dest_path.exists()
-            and (dest_path / "model_index.json").stat().st_mtime >= (config.converted_at or 0.0)
-            and (dest_path / "model_index.json").stat().st_mtime >= model_path.stat().st_mtime
-        ):
-            return False
-        else:
-            return True
-
-    def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Optional[Path] = None) -> AnyModel:
-        assert isinstance(config, MainCheckpointConfig)
-        base = config.base
-
-        prediction_type = config.prediction_type.value
-        upcast_attention = config.upcast_attention
-        image_size = (
-            1024
-            if base == BaseModelType.StableDiffusionXL
-            else 768
-            if config.prediction_type == SchedulerPredictionType.VPrediction and base == BaseModelType.StableDiffusion2
-            else 512
+    def _load_from_singlefile(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        load_classes = {
+            BaseModelType.StableDiffusion1: {
+                ModelVariantType.Normal: StableDiffusionPipeline,
+                ModelVariantType.Inpaint: StableDiffusionInpaintPipeline,
+            },
+            BaseModelType.StableDiffusion2: {
+                ModelVariantType.Normal: StableDiffusionPipeline,
+                ModelVariantType.Inpaint: StableDiffusionInpaintPipeline,
+            },
+            BaseModelType.StableDiffusionXL: {
+                ModelVariantType.Normal: StableDiffusionXLPipeline,
+                ModelVariantType.Inpaint: StableDiffusionXLInpaintPipeline,
+            },
+            BaseModelType.StableDiffusionXLRefiner: {
+                ModelVariantType.Normal: StableDiffusionXLPipeline,
+            },
+        }
+        assert isinstance(
+            config,
+            (
+                Main_Diffusers_SD1_Config,
+                Main_Diffusers_SD2_Config,
+                Main_Diffusers_SDXL_Config,
+                Main_Diffusers_SDXLRefiner_Config,
+                Main_Checkpoint_SD1_Config,
+                Main_Checkpoint_SD2_Config,
+                Main_Checkpoint_SDXL_Config,
+                Main_Checkpoint_SDXLRefiner_Config,
+            ),
         )
+        try:
+            load_class = load_classes[config.base][config.variant]
+        except KeyError as e:
+            raise Exception(f"No diffusers pipeline known for base={config.base}, variant={config.variant}") from e
 
-        self._logger.info(f"Converting {model_path} to diffusers format")
+        # Without SilenceWarnings we get log messages like this:
+        # site-packages/huggingface_hub/file_download.py:1132: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+        # warnings.warn(
+        # Some weights of the model checkpoint were not used when initializing CLIPTextModel:
+        # ['text_model.embeddings.position_ids']
+        # Some weights of the model checkpoint were not used when initializing CLIPTextModelWithProjection:
+        # ['text_model.embeddings.position_ids']
 
-        loaded_model = convert_ckpt_to_diffusers(
-            model_path,
-            output_path,
-            model_type=self.model_base_to_model_type[base],
-            original_config_file=self._app_config.legacy_conf_path / config.config_path,
-            extract_ema=True,
-            from_safetensors=model_path.suffix == ".safetensors",
-            precision=self._torch_dtype,
-            prediction_type=prediction_type,
-            image_size=image_size,
-            upcast_attention=upcast_attention,
-            load_safety_checker=False,
-            num_in_channels=VARIANT_TO_IN_CHANNEL_MAP[config.variant],
-        )
-        return loaded_model
+        with SilenceWarnings():
+            pipeline = load_class.from_single_file(config.path, torch_dtype=self._torch_dtype)
+
+        if not submodel_type:
+            return pipeline
+
+        # Proactively load the various submodels into the RAM cache so that we don't have to re-load
+        # the entire pipeline every time a new submodel is needed.
+        for subtype in SubModelType:
+            if subtype == submodel_type:
+                continue
+            if submodel := getattr(pipeline, subtype.value, None):
+                self._apply_fp8_layerwise_casting(submodel, config, subtype)
+                self._ram_cache.put(get_model_cache_key(config.key, subtype), model=submodel)
+        result = getattr(pipeline, submodel_type.value)
+        result = self._apply_fp8_layerwise_casting(result, config, submodel_type)
+        return result

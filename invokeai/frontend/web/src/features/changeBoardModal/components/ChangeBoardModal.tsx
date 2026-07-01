@@ -1,42 +1,68 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, ConfirmationAlertDialog, Flex, FormControl, Text } from '@invoke-ai/ui-library';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import {
   changeBoardReset,
   isModalOpenChanged,
   selectChangeBoardModalSlice,
 } from 'features/changeBoardModal/store/slice';
+import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import { useAddImagesToBoardMutation, useRemoveImagesFromBoardMutation } from 'services/api/endpoints/images';
+import type { BoardDTO } from 'services/api/types';
 
-const selectImagesToChange = createMemoizedSelector(
+const selectImagesToChange = createSelector(
   selectChangeBoardModalSlice,
-  (changeBoardModal) => changeBoardModal.imagesToChange
+  (changeBoardModal) => changeBoardModal.image_names
+);
+
+const selectIsModalOpen = createSelector(
+  selectChangeBoardModalSlice,
+  (changeBoardModal) => changeBoardModal.isModalOpen
 );
 
 const ChangeBoardModal = () => {
+  useAssertSingleton('ChangeBoardModal');
   const dispatch = useAppDispatch();
-  const [selectedBoard, setSelectedBoard] = useState<string | null>();
-  const { data: boards, isFetching } = useListAllBoardsQuery();
-  const isModalOpen = useAppSelector((s) => s.changeBoardModal.isModalOpen);
+  const currentBoardId = useAppSelector(selectSelectedBoardId);
+  const currentUser = useAppSelector(selectCurrentUser);
+  const [selectedBoardId, setSelectedBoardId] = useState<string | null>();
+  const { data: boards, isFetching } = useListAllBoardsQuery({ include_archived: true });
+  const isModalOpen = useAppSelector(selectIsModalOpen);
   const imagesToChange = useAppSelector(selectImagesToChange);
   const [addImagesToBoard] = useAddImagesToBoardMutation();
   const [removeImagesFromBoard] = useRemoveImagesFromBoardMutation();
   const { t } = useTranslation();
 
-  const options = useMemo<ComboboxOption[]>(() => {
-    return [{ label: t('boards.uncategorized'), value: 'none' }].concat(
-      (boards ?? []).map((board) => ({
-        label: board.board_name,
-        value: board.board_id,
-      }))
-    );
-  }, [boards, t]);
+  // Returns true if the current user can write images to the given board.
+  const canWriteToBoard = useCallback(
+    (board: BoardDTO): boolean => {
+      const isOwnerOrAdmin = !currentUser || currentUser.is_admin || board.user_id === currentUser.user_id;
+      return isOwnerOrAdmin || board.board_visibility === 'public';
+    },
+    [currentUser]
+  );
 
-  const value = useMemo(() => options.find((o) => o.value === selectedBoard), [options, selectedBoard]);
+  const options = useMemo<ComboboxOption[]>(() => {
+    return [{ label: t('boards.uncategorized'), value: 'none' }]
+      .concat(
+        (boards ?? [])
+          .filter(canWriteToBoard)
+          .map((board) => ({
+            label: board.board_name,
+            value: board.board_id,
+          }))
+          .sort((a, b) => a.label.localeCompare(b.label))
+      )
+      .filter((board) => board.value !== currentBoardId);
+  }, [boards, canWriteToBoard, currentBoardId, t]);
+
+  const value = useMemo(() => options.find((o) => o.value === selectedBoardId), [options, selectedBoardId]);
 
   const handleClose = useCallback(() => {
     dispatch(changeBoardReset());
@@ -44,27 +70,28 @@ const ChangeBoardModal = () => {
   }, [dispatch]);
 
   const handleChangeBoard = useCallback(() => {
-    if (!imagesToChange.length || !selectedBoard) {
+    if (!selectedBoardId || imagesToChange.length === 0) {
       return;
     }
 
-    if (selectedBoard === 'none') {
-      removeImagesFromBoard({ imageDTOs: imagesToChange });
-    } else {
-      addImagesToBoard({
-        imageDTOs: imagesToChange,
-        board_id: selectedBoard,
-      });
+    if (imagesToChange.length) {
+      if (selectedBoardId === 'none') {
+        removeImagesFromBoard({ image_names: imagesToChange });
+      } else {
+        addImagesToBoard({
+          image_names: imagesToChange,
+          board_id: selectedBoardId,
+        });
+      }
     }
-    setSelectedBoard(null);
     dispatch(changeBoardReset());
-  }, [addImagesToBoard, dispatch, imagesToChange, removeImagesFromBoard, selectedBoard]);
+  }, [addImagesToBoard, dispatch, imagesToChange, removeImagesFromBoard, selectedBoardId]);
 
   const onChange = useCallback<ComboboxOnChange>((v) => {
     if (!v) {
       return;
     }
-    setSelectedBoard(v.value);
+    setSelectedBoardId(v.value);
   }, []);
 
   return (
@@ -75,13 +102,13 @@ const ChangeBoardModal = () => {
       acceptCallback={handleChangeBoard}
       acceptButtonText={t('boards.move')}
       cancelButtonText={t('boards.cancel')}
+      useInert={false}
     >
       <Flex flexDir="column" gap={4}>
         <Text>
           {t('boards.movingImagesToBoard', {
             count: imagesToChange.length,
           })}
-          :
         </Text>
         <FormControl isDisabled={isFetching}>
           <Combobox

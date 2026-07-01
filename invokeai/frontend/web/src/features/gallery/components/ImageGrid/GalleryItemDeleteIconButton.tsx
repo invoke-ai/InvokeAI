@@ -1,0 +1,47 @@
+import { useShiftModifier } from '@invoke-ai/ui-library';
+import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
+import { DndImageIcon } from 'features/dnd/DndImageIcon';
+import type { MouseEvent } from 'react';
+import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { PiTrashSimpleFill } from 'react-icons/pi';
+import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
+import { useSelectedBoard } from 'services/api/hooks/useSelectedBoard';
+import type { ImageDTO } from 'services/api/types';
+
+type Props = {
+  imageDTO: ImageDTO;
+};
+
+export const GalleryItemDeleteIconButton = memo(({ imageDTO }: Props) => {
+  const shift = useShiftModifier();
+  const { t } = useTranslation();
+  const deleteImageModal = useDeleteImageModalApi();
+  const selectedBoard = useSelectedBoard();
+  const { canWriteImages } = useBoardAccess(selectedBoard);
+
+  const onClick = useCallback(
+    (e: MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      deleteImageModal.delete([imageDTO.image_name]);
+    },
+    [deleteImageModal, imageDTO]
+  );
+
+  if (!shift || !canWriteImages) {
+    return null;
+  }
+
+  return (
+    <DndImageIcon
+      onClick={onClick}
+      icon={<PiTrashSimpleFill />}
+      tooltip={t('gallery.deleteImage_one')}
+      position="absolute"
+      bottom={2}
+      insetInlineEnd={2}
+    />
+  );
+});
+
+GalleryItemDeleteIconButton.displayName = 'GalleryItemDeleteIconButton';

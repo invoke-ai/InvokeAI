@@ -21,6 +21,20 @@ body:
         - label: I have searched the existing issues
           required: true
 
+  - type: dropdown
+    id: install_method
+    attributes:
+      label: Install method
+      description: How did you install Invoke?
+      multiple: false
+      options:
+        - "Invoke's Launcher"
+        - 'Stability Matrix'
+        - 'Pinokio'
+        - 'Manual'
+    validations:
+      required: true
+
   - type: markdown
     attributes:
       value: __Describe your environment__
@@ -76,8 +90,8 @@ body:
     attributes:
       label: Version number
       description: |
-        The version of Invoke you have installed. If it is not the latest version, please update and try again to confirm the issue still exists. If you are testing main, please include the commit hash instead.
-      placeholder: ex. 3.6.1
+        The version of Invoke you have installed. If it is not the [latest version](https://github.com/invoke-ai/InvokeAI/releases/latest), please update and try again to confirm the issue still exists. If you are testing main, please include the commit hash instead.
+      placeholder: ex. v6.0.2
     validations:
       required: true
 
@@ -85,17 +99,17 @@ body:
     id: browser-version
     attributes:
       label: Browser
-      description: Your web browser and version.
+      description: Your web browser and version, if you do not use the Launcher's provided GUI.
       placeholder: ex. Firefox 123.0b3
     validations:
-      required: true
+      required: false
 
   - type: textarea
     id: python-deps
     attributes:
-      label: Python dependencies
+      label: System Information
       description: |
-        If the problem occurred during image generation, click the gear icon at the bottom left corner, click "About", click the copy button and then paste here.
+        Click the gear icon at the bottom left corner, then click "About". Click the copy button and then paste here.
     validations:
       required: false
 

@@ -1,19 +1,21 @@
+import { deepClone } from 'common/util/deepClone';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { AnyInvocation, Invocation } from 'services/api/types';
 import { assert, AssertionError, is } from 'tsafe';
-import { validate } from 'uuid';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 describe('Graph', () => {
   describe('constructor', () => {
     it('should create a new graph with the correct id', () => {
       const g = new Graph('test-id');
       expect(g._graph.id).toBe('test-id');
+      expect(g.id).toBe('test-id');
     });
-    it('should create a new graph with a uuid id if none is provided', () => {
+    it('should create an id if none is provided', () => {
       const g = new Graph();
       expect(g._graph.id).not.toBeUndefined();
-      expect(validate(g._graph.id)).toBeTruthy();
+      expect(g.id).not.toBeUndefined();
     });
   });
 
@@ -66,6 +68,88 @@ describe('Graph', () => {
       const g2 = new Graph();
       // @ts-expect-error The node object is an `add` type, but the generic is a `sub` type
       g2.addNode<'sub'>(testNode);
+    });
+  });
+
+  describe('updateNode', () => {
+    const initialNode: Invocation<'add'> = {
+      id: 'old-id',
+      type: 'add',
+      a: 1,
+    };
+
+    it('should update node properties correctly', () => {
+      const g = new Graph();
+      const n = g.addNode(deepClone(initialNode));
+      const updates = { is_intermediate: true, use_cache: true };
+      const updatedNode = g.updateNode(n, updates);
+      expect(updatedNode.is_intermediate).toBe(true);
+      expect(updatedNode.use_cache).toBe(true);
+    });
+
+    it('should allow updating the node id and update related edges', () => {
+      const g = new Graph();
+      const n = g.addNode(deepClone(initialNode));
+      const n2 = g.addNode({ id: 'node-2', type: 'add' });
+      const n3 = g.addNode({ id: 'node-4', type: 'add' });
+      const oldId = n.id;
+      const newId = 'new-id';
+      const e1 = g.addEdge(n, 'value', n2, 'a');
+      const e2 = g.addEdge(n3, 'value', n, 'a');
+      g.updateNode(n, { id: newId });
+      expect(g.hasNode(newId)).toBe(true);
+      expect(g.hasNode(oldId)).toBe(false);
+      expect(e1.source.node_id).toBe(newId);
+      expect(e2.destination.node_id).toBe(newId);
+    });
+
+    it('should throw an error if updated id already exists', () => {
+      const g = new Graph();
+      const n = g.addNode(deepClone(initialNode));
+      const n2 = g.addNode({
+        id: 'other-id',
+        type: 'add',
+      });
+      expect(() => g.updateNode(n, { id: n2.id })).toThrowError(AssertionError);
+    });
+
+    it('should preserve other fields not specified in updates', () => {
+      const g = new Graph();
+      const n = g.addNode(deepClone(initialNode));
+      const updatedNode = g.updateNode(n, { b: 3 });
+      expect(updatedNode.b).toBe(3);
+      expect(updatedNode.a).toBe(initialNode.a);
+    });
+
+    it('should allow changing multiple properties at once', () => {
+      const g = new Graph();
+      const n = g.addNode(deepClone(initialNode));
+      const updatedNode = g.updateNode(n, { a: 2, b: 3 });
+      expect(updatedNode.a).toBe(2);
+      expect(updatedNode.b).toBe(3);
+    });
+
+    it('should handle updates with no changes gracefully', () => {
+      const g = new Graph();
+      const n = g.addNode(deepClone(initialNode));
+      const updates = {};
+      const updatedNode = g.updateNode(n, updates);
+      expect(updatedNode).toEqual(n);
+    });
+  });
+
+  describe('getNodes', () => {
+    it('should return all nodes in the graph', () => {
+      const g = new Graph();
+      const n1 = g.addNode({
+        id: 'n1',
+        type: 'add',
+      });
+      const n2 = g.addNode({
+        id: 'n2',
+        type: 'sub',
+      });
+      expect(g.getNodes()).toEqual([n1, n2]);
     });
   });
 
@@ -476,14 +560,14 @@ describe('Graph', () => {
   });
 
   describe('metadata utils', () => {
-    describe('_getMetadataNode', () => {
+    describe('getMetadataNode', () => {
       it("should get the metadata node, creating it if it doesn't exist", () => {
         const g = new Graph();
-        const metadata = g._getMetadataNode();
-        expect(metadata.id).toBe('core_metadata');
+        const metadata = g.getMetadataNode();
+        expect(metadata.id).toBe(g._metadataNodeId);
         expect(metadata.type).toBe('core_metadata');
         g.upsertMetadata({ test: 'test' });
-        const metadata2 = g._getMetadataNode();
+        const metadata2 = g.getMetadataNode();
         expect(metadata2).toHaveProperty('test');
       });
     });
@@ -492,15 +576,23 @@ describe('Graph', () => {
       it('should add metadata to the metadata node', () => {
         const g = new Graph();
         g.upsertMetadata({ test: 'test' });
-        const metadata = g._getMetadataNode();
+        const metadata = g.getMetadataNode();
         expect(metadata).toHaveProperty('test');
       });
-      it('should update metadata on the metadata node', () => {
+      it("should overwrite metadata on the metadata node if the strategy is 'replace'", () => {
         const g = new Graph();
-        g.upsertMetadata({ test: 'test' });
-        g.upsertMetadata({ test: 'test2' });
-        const metadata = g._getMetadataNode();
-        expect(metadata.test).toBe('test2');
+        g.upsertMetadata({ test: { foo: 'test' } }, 'replace');
+        g.upsertMetadata({ test: { bar: 'test2' } }, 'replace');
+        const metadata = g.getMetadataNode();
+        expect(metadata.test).toEqual({ bar: 'test2' });
+      });
+      it("should merge keys if the strategy is 'merge'", () => {
+        const g = new Graph();
+        g.upsertMetadata({ test: { foo: 'test' }, arr: [1] }, 'merge');
+        g.upsertMetadata({ test: { bar: 'test2' }, arr: [2] }, 'merge');
+        const metadata = g.getMetadataNode();
+        expect(metadata.test).toEqual({ foo: 'test', bar: 'test2' });
+        expect(metadata.arr).toEqual([1, 2]);
       });
     });
 
@@ -509,16 +601,31 @@ describe('Graph', () => {
         const g = new Graph();
         g.upsertMetadata({ test: 'test', test2: 'test2' });
         g.removeMetadata(['test']);
-        const metadata = g._getMetadataNode();
+        const metadata = g.getMetadataNode();
         expect(metadata).not.toHaveProperty('test');
       });
       it('should remove multiple metadata from the metadata node', () => {
         const g = new Graph();
         g.upsertMetadata({ test: 'test', test2: 'test2' });
         g.removeMetadata(['test', 'test2']);
-        const metadata = g._getMetadataNode();
+        const metadata = g.getMetadataNode();
         expect(metadata).not.toHaveProperty('test');
         expect(metadata).not.toHaveProperty('test2');
+      });
+    });
+
+    describe('addEdgeToMetadata', () => {
+      it('should add an edge to the metadata node', () => {
+        const g = new Graph();
+        const n1 = g.addNode({
+          id: 'n1',
+          type: 'img_resize',
+        });
+        g.upsertMetadata({ test: 'test' });
+        g.addEdgeToMetadata(n1, 'width', 'width');
+        const metadata = g.getMetadataNode();
+        expect(g.getEdgesFrom(n1).length).toBe(1);
+        expect(g.getEdgesTo(metadata as unknown as AnyInvocation).length).toBe(1);
       });
     });
 
@@ -531,7 +638,7 @@ describe('Graph', () => {
         });
         g.upsertMetadata({ test: 'test' });
         g.setMetadataReceivingNode(n1);
-        const metadata = g._getMetadataNode();
+        const metadata = g.getMetadataNode();
         expect(g.getEdgesFrom(metadata as unknown as AnyInvocation).length).toBe(1);
         expect(g.getEdgesTo(n1).length).toBe(1);
       });
@@ -543,15 +650,18 @@ describe('Graph', () => {
           key: 'b00ee8df-523d-40d2-9578-597283b07cb2',
           hash: 'random:9adf270422f525715297afa1649c4ff007a55f09937f57ca628278305624d194',
           path: 'sdxl/main/stable-diffusion-xl-1.0-inpainting-0.1',
+          file_size: 6123456789,
           name: 'stable-diffusion-xl-1.0-inpainting-0.1',
           base: 'sdxl',
           description: 'sdxl main model stable-diffusion-xl-1.0-inpainting-0.1',
           source: '/home/bat/invokeai-4.0.0/models/sdxl/main/stable-diffusion-xl-1.0-inpainting-0.1',
           source_type: 'path',
           source_api_response: null,
+          source_url: null,
           cover_image: null,
           type: 'main',
           trigger_phrases: null,
+          prediction_type: 'epsilon',
           default_settings: {
             vae: null,
             vae_precision: null,
@@ -573,6 +683,33 @@ describe('Graph', () => {
           base: 'sdxl',
           type: 'main',
         });
+      });
+    });
+  });
+
+  describe('other utils', () => {
+    describe('edgeToString', () => {
+      it('should return a string representation of the edge given the edge fields', () => {
+        expect(Graph.edgeToString('from-node', 'value', 'to-node', 'b')).toBe('from-node.value -> to-node.b');
+      });
+      it('should return a string representation of the edge given an edge object', () => {
+        expect(
+          Graph.edgeToString({
+            source: { node_id: 'from-node', field: 'value' },
+            destination: { node_id: 'to-node', field: 'b' },
+          })
+        ).toBe('from-node.value -> to-node.b');
+      });
+    });
+
+    describe('getId', () => {
+      it('should create a new uuid v4 id', () => {
+        const id = Graph.getId();
+        expect(() => z.string().uuid().parse(id)).not.toThrow();
+      });
+      it('should prepend the prefix if provided', () => {
+        const id = Graph.getId('prefix');
+        expect(id.startsWith('prefix_')).toBe(true);
       });
     });
   });

@@ -18,21 +18,18 @@
         "postprocessing": "Nachbearbeitung",
         "t2iAdapter": "T2I Adapter",
         "communityLabel": "Gemeinschaft",
-        "dontAskMeAgain": "Frag mich nicht nochmal",
-        "areYouSure": "Bist du dir sicher?",
+        "dontAskMeAgain": "Nicht nochmal fragen",
+        "areYouSure": "Bist du sicher?",
         "on": "An",
-        "nodeEditor": "Knoten Editor",
         "ipAdapter": "IP Adapter",
-        "auto": "Automatisch",
+        "auto": "Auto",
         "controlNet": "ControlNet",
-        "imageFailedToLoad": "Kann Bild nicht laden",
         "modelManager": "Model Manager",
-        "learnMore": "Mehr lernen",
+        "learnMore": "Mehr erfahren",
         "loading": "Lade",
         "random": "Zufall",
         "batch": "Stapel-Manager",
         "advanced": "Erweitert",
-        "unifiedCanvas": "Leinwand",
         "openInNewTab": "In einem neuem Tab öffnen",
         "linear": "Linear",
         "checkpoint": "Checkpoint",
@@ -42,7 +39,7 @@
         "outputs": "Ausgabe",
         "data": "Daten",
         "safetensors": "Safe-Tensors",
-        "outpaint": "Outpaint (Außen ausmalen)",
+        "outpaint": "Outpaint",
         "details": "Details",
         "format": "Format",
         "unknown": "Unbekannt",
@@ -54,7 +51,6 @@
         "somethingWentWrong": "Etwas ist schief gelaufen",
         "copyError": "$t(gallery.copy) Fehler",
         "input": "Eingabe",
-        "notInstalled": "Nicht $t(common.installed)",
         "alpha": "Alpha",
         "red": "Rot",
         "green": "Grün",
@@ -64,11 +60,8 @@
         "direction": "Richtung",
         "save": "Speichern",
         "created": "Erstellt",
-        "prevPage": "Vorherige Seite",
-        "nextPage": "Nächste Seite",
         "unknownError": "Unbekannter Fehler",
         "aboutDesc": "Verwenden Sie Invoke für die Arbeit? Siehe hier:",
-        "localSystem": "Lokales System",
         "orderBy": "Ordnen nach",
         "saveAs": "Speichern als",
         "updated": "Aktualisiert",
@@ -76,267 +69,451 @@
         "aboutHeading": "Nutzen Sie Ihre kreative Energie",
         "toResolve": "Lösen",
         "add": "Hinzufügen",
-        "loglevel": "Protokoll Stufe",
         "selected": "Ausgewählt",
-        "beta": "Beta"
+        "beta": "Beta",
+        "editor": "Editor",
+        "positivePrompt": "Positiv-Prompt",
+        "negativePrompt": "Negativ-Prompt",
+        "tab": "Tabulator",
+        "enabled": "Aktiviert",
+        "disabled": "Ausgeschaltet",
+        "dontShowMeThese": "Zeig mir diese nicht",
+        "apply": "Anwenden",
+        "edit": "Ändern",
+        "openInViewer": "Im Viewer öffnen",
+        "loadingImage": "Lade Bild",
+        "off": "Aus",
+        "view": "Anzeigen",
+        "placeholderSelectAModel": "Modell auswählen",
+        "reset": "Zurücksetzen",
+        "none": "Keine",
+        "new": "Neu",
+        "ok": "OK",
+        "close": "Schließen",
+        "clipboard": "Zwischenablage",
+        "generating": "Generieren",
+        "loadingModel": "Lade Modell",
+        "warnings": "Warnungen",
+        "start": "Starten",
+        "count": "Anzahl",
+        "step": "Schritt",
+        "values": "Werte",
+        "min": "Min",
+        "max": "Max",
+        "seed": "Seed",
+        "row": "Reihe",
+        "column": "Spalte",
+        "end": "Ende",
+        "layout": "Layout",
+        "board": "Ordner",
+        "combinatorial": "Kombinatorisch",
+        "saveChanges": "Änderungen speichern",
+        "error_withCount_one": "{{count}} Fehler",
+        "error_withCount_other": "{{count}} Fehler",
+        "value": "Wert",
+        "label": "Label",
+        "systemInformation": "Systeminformationen",
+        "search": "Suche",
+        "clear": "Zurücksetzen",
+        "fullView": "Vollansicht",
+        "compactView": "Kompaktansicht",
+        "options_withCount_one": "{{count}} Option",
+        "options_withCount_other": "{{count}} Optionen",
+        "noOptions": "Keine Optionen",
+        "noMatches": "Keine Treffer",
+        "model_withCount_one": "{{count}} Modell",
+        "model_withCount_other": "{{count}} Modelle"
     },
     "gallery": {
         "galleryImageSize": "Bildgröße",
         "gallerySettings": "Galerie-Einstellungen",
         "autoSwitchNewImages": "Auto-Wechsel zu neuen Bildern",
-        "loadMore": "Mehr laden",
-        "noImagesInGallery": "Keine Bilder in der Galerie",
         "loading": "Lade",
         "deleteImage_one": "Lösche Bild",
         "deleteImage_other": "Lösche {{count}} Bilder",
         "copy": "Kopieren",
         "download": "Runterladen",
-        "setCurrentImage": "Setze aktuelle Bild",
         "featuresWillReset": "Wenn Sie dieses Bild löschen, werden diese Funktionen sofort zurückgesetzt.",
-        "deleteImageBin": "Gelöschte Bilder werden an den Papierkorb Ihres Betriebssystems gesendet.",
-        "unableToLoad": "Galerie kann nicht geladen werden",
         "downloadSelection": "Auswahl herunterladen",
         "currentlyInUse": "Dieses Bild wird derzeit in den folgenden Funktionen verwendet:",
         "deleteImagePermanent": "Gelöschte Bilder können nicht wiederhergestellt werden.",
         "autoAssignBoardOnClick": "Board per Klick automatisch zuweisen",
         "noImageSelected": "Kein Bild ausgewählt",
-        "problemDeletingImagesDesc": "Ein oder mehrere Bilder konnten nicht gelöscht werden",
         "starImage": "Bild markieren",
-        "assets": "Ressourcen",
         "unstarImage": "Markierung entfernen",
         "image": "Bild",
         "deleteSelection": "Lösche Auswahl",
         "dropToUpload": "$t(gallery.drop) zum hochladen",
         "dropOrUpload": "$t(gallery.drop) oder hochladen",
         "drop": "Ablegen",
-        "problemDeletingImages": "Problem beim Löschen der Bilder",
         "bulkDownloadRequested": "Download vorbereiten",
         "bulkDownloadRequestedDesc": "Dein Download wird vorbereitet. Dies kann ein paar Momente dauern.",
         "bulkDownloadRequestFailed": "Problem beim Download vorbereiten",
         "bulkDownloadFailed": "Download fehlgeschlagen",
-        "alwaysShowImageSizeBadge": "Zeige immer Bilder Größe Abzeichen"
+        "alwaysShowImageSizeBadge": "Zeige immer Bilder Größe Abzeichen",
+        "selectForCompare": "Zum Vergleichen auswählen",
+        "compareImage": "Bilder vergleichen",
+        "exitSearch": "Bildsuche beenden",
+        "newestFirst": "Neueste zuerst",
+        "oldestFirst": "Älteste zuerst",
+        "openInViewer": "Im Viewer öffnen",
+        "swapImages": "Bilder tauschen",
+        "slider": "Slider",
+        "showStarredImagesFirst": "Mit * markierte Bilder zuerst zeigen",
+        "compareHelp1": "Halten Sie <Kbd>Alt</Kbd> gedrückt, während Sie auf ein Galeriebild klicken oder die Pfeiltasten verwenden, um das Vergleichsbild zu ändern.",
+        "compareHelp4": "Drücken Sie <Kbd>Z</Kbd> oder <Kbd>Esc</Kbd> zum Beenden.",
+        "move": "Bewegen",
+        "exitBoardSearch": "Suchen beenden",
+        "searchImages": "Suche mit Metadaten",
+        "selectAllOnPage": "Alle auf Seite auswählen",
+        "showArchivedBoards": "Archivierte Boards anzeigen",
+        "hover": "Schweben",
+        "compareHelp2": "Drücken Sie <Kbd>M</Kbd>, um durch alle Vergleichsmodi zu wechseln.",
+        "compareHelp3": "Drücken Sie <Kbd>C</Kbd>, um die verglichenen Bilder zu wechseln.",
+        "gallery": "Galerie",
+        "sortDirection": "Sortierreihenfolge",
+        "sideBySide": "Nebeneinander",
+        "viewerImage": "Viewer-Bild",
+        "exitCompare": "Vergleichen beenden",
+        "stretchToFit": "Strecken bis es passt",
+        "displayBoardSearch": "Board durchsuchen",
+        "displaySearch": "Bild suchen",
+        "go": "Los",
+        "assetsTab": "Dateien, die Sie zur Verwendung in Ihren Projekten hochgeladen haben.",
+        "imagesTab": "Bilder, die Sie in Invoke erstellt und gespeichert haben.",
+        "boardsSettings": "Ordnereinstellungen",
+        "imagesSettings": "Galeriebildereinstellungen"
     },
     "hotkeys": {
-        "keyboardShortcuts": "Tastenkürzel",
-        "appHotkeys": "App",
-        "generalHotkeys": "Allgemein",
-        "galleryHotkeys": "Galerie",
-        "unifiedCanvasHotkeys": "Leinwand",
-        "invoke": {
-            "desc": "Ein Bild erzeugen",
-            "title": "Invoke"
-        },
-        "cancel": {
-            "title": "Abbrechen",
-            "desc": "Aktuelle Bilderzeugung abbrechen"
-        },
-        "focusPrompt": {
-            "title": "Fokussiere Prompt",
-            "desc": "Fokussieren des Eingabefeldes für den Prompt"
-        },
-        "toggleOptions": {
-            "title": "Optionen umschalten",
-            "desc": "Öffnen und Schließen des Optionsfeldes"
-        },
-        "pinOptions": {
-            "title": "Optionen anheften",
-            "desc": "Anheften des Optionsfeldes"
-        },
-        "toggleGallery": {
-            "title": "Galerie umschalten",
-            "desc": "Öffnen und Schließen des Galerie-Schubfachs"
-        },
-        "maximizeWorkSpace": {
-            "title": "Arbeitsbereich maximieren",
-            "desc": "Schließen Sie die Panels und maximieren Sie den Arbeitsbereich"
-        },
-        "changeTabs": {
-            "title": "Tabs wechseln",
-            "desc": "Zu einem anderen Arbeitsbereich wechseln"
-        },
-        "consoleToggle": {
-            "title": "Konsole Umschalten",
-            "desc": "Konsole öffnen und schließen"
-        },
-        "setPrompt": {
-            "title": "Prompt setzen",
-            "desc": "Verwende den Prompt des aktuellen Bildes"
-        },
-        "setSeed": {
-            "title": "Seed setzen",
-            "desc": "Verwende den Seed des aktuellen Bildes"
-        },
-        "setParameters": {
-            "title": "Parameter setzen",
-            "desc": "Alle Parameter des aktuellen Bildes verwenden"
-        },
-        "restoreFaces": {
-            "title": "Gesicht restaurieren",
-            "desc": "Das aktuelle Bild restaurieren"
-        },
-        "upscale": {
-            "title": "Hochskalieren",
-            "desc": "Das aktuelle Bild hochskalieren"
-        },
-        "showInfo": {
-            "title": "Info anzeigen",
-            "desc": "Metadaten des aktuellen Bildes anzeigen"
-        },
-        "sendToImageToImage": {
-            "title": "An Bild zu Bild senden",
-            "desc": "Aktuelles Bild an Bild-zu-Bild senden"
-        },
-        "deleteImage": {
-            "title": "Bild löschen",
-            "desc": "Aktuelles Bild löschen"
-        },
-        "closePanels": {
-            "title": "Panels schließen",
-            "desc": "Schließt offene Panels"
-        },
-        "previousImage": {
-            "title": "Vorheriges Bild",
-            "desc": "Vorheriges Bild in der Galerie anzeigen"
-        },
-        "nextImage": {
-            "title": "Nächstes Bild",
-            "desc": "Nächstes Bild in Galerie anzeigen"
-        },
-        "increaseGalleryThumbSize": {
-            "title": "Größe der Galeriebilder erhöhen",
-            "desc": "Vergrößert die Galerie-Miniaturansichten"
-        },
-        "decreaseGalleryThumbSize": {
-            "title": "Größe der Galeriebilder verringern",
-            "desc": "Verringert die Größe der Galerie-Miniaturansichten"
-        },
-        "selectBrush": {
-            "title": "Pinsel auswählen",
-            "desc": "Wählt den Leinwandpinsel aus"
-        },
-        "selectEraser": {
-            "title": "Radiergummi auswählen",
-            "desc": "Wählt den Radiergummi aus"
-        },
-        "decreaseBrushSize": {
-            "title": "Pinselgröße verkleinern",
-            "desc": "Verringert die Größe des Pinsels/Radiergummis"
-        },
-        "increaseBrushSize": {
-            "title": "Pinselgröße erhöhen",
-            "desc": "Erhöht die Größe des Pinsels/Radiergummis"
-        },
-        "decreaseBrushOpacity": {
-            "title": "Deckkraft des Pinsels vermindern",
-            "desc": "Verringert die Deckkraft des Pinsels"
-        },
-        "increaseBrushOpacity": {
-            "title": "Deckkraft des Pinsels erhöhen",
-            "desc": "Erhöht die Deckkraft des Pinsels"
-        },
-        "moveTool": {
-            "title": "Verschieben Werkzeug",
-            "desc": "Ermöglicht die Navigation auf der Leinwand"
-        },
-        "fillBoundingBox": {
-            "title": "Begrenzungsrahmen füllen",
-            "desc": "Füllt den Begrenzungsrahmen mit Pinselfarbe"
-        },
-        "eraseBoundingBox": {
-            "title": "Begrenzungsrahmen löschen",
-            "desc": "Löscht den Bereich des Begrenzungsrahmens"
-        },
-        "colorPicker": {
-            "title": "Farbpipette",
-            "desc": "Farben aus dem Bild aufnehmen"
-        },
-        "toggleSnap": {
-            "title": "Einrasten umschalten",
-            "desc": "Schaltet Einrasten am Raster ein und aus"
-        },
-        "quickToggleMove": {
-            "title": "Schnell Verschiebemodus",
-            "desc": "Schaltet vorübergehend den Verschiebemodus um"
-        },
-        "toggleLayer": {
-            "title": "Ebene umschalten",
-            "desc": "Schaltet die Auswahl von Maske/Basisebene um"
-        },
-        "clearMask": {
-            "title": "Lösche Maske",
-            "desc": "Die gesamte Maske löschen"
-        },
-        "hideMask": {
-            "title": "Maske ausblenden",
-            "desc": "Maske aus- und einblenden"
-        },
-        "showHideBoundingBox": {
-            "title": "Begrenzungsrahmen ein-/ausblenden",
-            "desc": "Sichtbarkeit des Begrenzungsrahmens ein- und ausschalten"
-        },
-        "mergeVisible": {
-            "title": "Sichtbares Zusammenführen",
-            "desc": "Alle sichtbaren Ebenen der Leinwand zusammenführen"
-        },
-        "saveToGallery": {
-            "title": "In Galerie speichern",
-            "desc": "Aktuelle Leinwand in Galerie speichern"
-        },
-        "copyToClipboard": {
-            "title": "In die Zwischenablage kopieren",
-            "desc": "Aktuelle Leinwand in die Zwischenablage kopieren"
-        },
-        "downloadImage": {
-            "title": "Bild herunterladen",
-            "desc": "Aktuelles Bild herunterladen"
-        },
-        "undoStroke": {
-            "title": "Pinselstrich rückgängig machen",
-            "desc": "Einen Pinselstrich rückgängig machen"
-        },
-        "redoStroke": {
-            "title": "Pinselstrich wiederherstellen",
-            "desc": "Einen Pinselstrich wiederherstellen"
-        },
-        "resetView": {
-            "title": "Ansicht zurücksetzen",
-            "desc": "Leinwandansicht zurücksetzen"
-        },
-        "previousStagingImage": {
-            "title": "Vorheriges Staging-Bild",
-            "desc": "Bild des vorherigen Staging-Bereichs"
-        },
-        "nextStagingImage": {
-            "title": "Nächstes Staging-Bild",
-            "desc": "Bild des nächsten Staging-Bereichs"
-        },
-        "acceptStagingImage": {
-            "title": "Staging-Bild akzeptieren",
-            "desc": "Akzeptieren Sie das aktuelle Bild des Staging-Bereichs"
-        },
-        "nodesHotkeys": "Knoten",
-        "addNodes": {
-            "title": "Knotenpunkt hinzufügen",
-            "desc": "Öffnet das Menü zum Hinzufügen von Knoten"
-        },
-        "cancelAndClear": {
-            "title": "Abbruch und leeren",
-            "desc": "Aktuelle Berechnung abbrechen und alle wartenden löschen"
-        },
+        "hotkeys": "Tastaturbefehle",
         "noHotkeysFound": "Kein Hotkey gefunden",
         "searchHotkeys": "Hotkeys durchsuchen",
         "clearSearch": "Suche leeren",
-        "resetOptionsAndGallery": {
-            "desc": "Optionen und Galerie-Panels zurücksetzen",
-            "title": "Optionen und Galerie zurücksetzen"
+        "editMode": "Bearbeitungsmodus",
+        "viewMode": "Ansichtsmodus",
+        "editHotkey": "Hotkey bearbeiten",
+        "resetToDefault": "Auf Standard zurücksetzen",
+        "resetAll": "Alle auf Standard zurücksetzen",
+        "enterHotkeys": "Tastenkombination(en) eingeben, mit Komma getrennt",
+        "save": "Speichern",
+        "cancel": "Abbrechen",
+        "modifiers": "Modifikatoren",
+        "syntaxHelp": "Syntax-Hilfe",
+        "combineWith": "Kombinieren mit +",
+        "multipleHotkeys": "Mehrere Hotkeys mit Komma",
+        "validKeys": "Gültige Tasten",
+        "help": "Hilfe",
+        "noHotkeysRecorded": "Noch keine Hotkeys aufgenommen",
+        "pressKeys": "Tasten drücken...",
+        "setHotkey": "SETZEN",
+        "setAnother": "WEITEREN SETZEN",
+        "removeLastHotkey": "Letzten Hotkey entfernen",
+        "clearAll": "Alle löschen",
+        "duplicateWarning": "Dieser Hotkey wurde bereits aufgenommen",
+        "conflictWarning": "wird bereits von \"{{hotkeyTitle}}\" verwendet",
+        "thisHotkey": "diesem Hotkey",
+        "canvas": {
+            "fitBboxToCanvas": {
+                "desc": "Skalierung und Positionierung der Ansicht auf Bbox-Größe.",
+                "title": "Bbox auf Arbeitsfläche skalieren"
+            },
+            "selectBboxTool": {
+                "title": "Bbox Werkzeug",
+                "desc": "Bbox Werkzeug auswählen."
+            },
+            "title": "Leinwand",
+            "selectBrushTool": {
+                "title": "Pinselwerkzeug",
+                "desc": "Wählen Sie das Pinselwerkzeug aus."
+            },
+            "decrementToolWidth": {
+                "title": "Werkzeugbreite verringern",
+                "desc": "Verringern Sie die Breite des Pinsels oder Radiergummis, je nachdem, welches ausgewählt ist."
+            },
+            "incrementToolWidth": {
+                "title": "Werkzeugbreite erhöhen",
+                "desc": "Vergrößern Sie die Breite des Pinsels oder Radiergummis, je nachdem, welches ausgewählt ist."
+            },
+            "selectColorPickerTool": {
+                "title": "Farbwähler-Werkzeug",
+                "desc": "Farbwähler-Werkzeug auswählen."
+            },
+            "selectEraserTool": {
+                "title": "Radiergummi-Werkzeug",
+                "desc": "Radiergummi-Werkzeug auswählen."
+            },
+            "fitLayersToCanvas": {
+                "title": "Ebenen an die Leinwand anpassen",
+                "desc": "Alle sichtbaren Ebenen in der Ansicht einpassen."
+            },
+            "filterSelected": {
+                "title": "Filter",
+                "desc": "Gewählte Ebene filtern. Nur bei \"Raster\" und Kontroll-Ebenen."
+            },
+            "transformSelected": {
+                "title": "Umwandeln",
+                "desc": "Transformieren Sie die ausgewählte Ebene."
+            },
+            "setZoomTo100Percent": {
+                "title": "Auf 100 % zoomen",
+                "desc": "Leinwand-Zoom auf 100 % setzen."
+            },
+            "setZoomTo200Percent": {
+                "title": "Auf 200 % zoomen",
+                "desc": "Leinwand-Zoom auf 200 % setzen."
+            },
+            "setZoomTo400Percent": {
+                "title": "Auf 400 % zoomen",
+                "desc": "Leinwand-Zoom auf 400 % setzen."
+            },
+            "setZoomTo800Percent": {
+                "title": "Auf 800 % zoomen",
+                "desc": "Leinwand-Zoom auf 800 % setzen."
+            },
+            "deleteSelected": {
+                "title": "Ebene löschen",
+                "desc": "Ausgewählte Ebene löschen."
+            },
+            "undo": {
+                "title": "Rückgängig",
+                "desc": "Letzte Aktion rückgängig machen."
+            },
+            "redo": {
+                "title": "Wiederholen",
+                "desc": "Letzte Aktion wiederholen."
+            },
+            "nextEntity": {
+                "title": "Nächste Ebene",
+                "desc": "Nächste Ebene in der Liste auswählen."
+            },
+            "resetSelected": {
+                "title": "Ebene zurücksetzen",
+                "desc": "Ausgewählte Ebene zurücksetzen. Gilt nur für Malmaske bei \"Inpaint\" und \"Regionaler Führung\"."
+            },
+            "prevEntity": {
+                "title": "Vorherige Ebene",
+                "desc": "Vorherige Ebene in der Liste auswählen."
+            },
+            "selectMoveTool": {
+                "title": "Verschieben-Werkzeug",
+                "desc": "Verschieben-Werkzeug auswählen."
+            },
+            "selectRectTool": {
+                "title": "Rechteck-Werkzeug",
+                "desc": "Rechteck-Werkzeug auswählen."
+            },
+            "selectViewTool": {
+                "desc": "Wählen Sie das Ansichts-Tool.",
+                "title": "Ansichts-Tool"
+            },
+            "quickSwitch": {
+                "title": "Ebenen Schnell-Umschalten",
+                "desc": "Wechseln Sie zwischen den beiden zuletzt gewählten Ebenen. Wenn eine Ebene mit einem Lesezeichen versehen ist, wird zwischen ihr und der letzten nicht markierten Ebene gewechselt."
+            },
+            "applyFilter": {
+                "title": "Filter anwenden",
+                "desc": "Wende den ausstehenden Filter auf die ausgewählte Ebene an."
+            },
+            "cancelFilter": {
+                "title": "Filter abbrechen",
+                "desc": "Den ausstehenden Filter abbrechen."
+            },
+            "applyTransform": {
+                "desc": "Die ausstehende Transformation auf die ausgewählte Ebene anwenden.",
+                "title": "Transformation anwenden"
+            },
+            "cancelTransform": {
+                "title": "Transformation abbrechen",
+                "desc": "Die ausstehende Transformation abbrechen."
+            }
         },
-        "remixImage": {
-            "desc": "Alle Parameter außer Seed vom aktuellen Bild verwenden",
-            "title": "Remix des Bilds erstellen"
+        "viewer": {
+            "useSize": {
+                "desc": "Aktuelle Bildgröße als Bbox-Größe verwenden.",
+                "title": "Maße übernehmen"
+            },
+            "title": "Bildbetrachter",
+            "toggleViewer": {
+                "title": "Bildbetrachter anzeigen/ausblenden",
+                "desc": "Zeigen oder verbergen Sie den Bildbetrachter. Nur auf der Arbeitsflächen-Registerkarte."
+            },
+            "nextComparisonMode": {
+                "title": "Nächster Vergleichsmodus",
+                "desc": "Alle Vergleichsmodi durchlaufen."
+            },
+            "swapImages": {
+                "title": "Vergleichsbilder tauschen",
+                "desc": "Vergleichs-Bilder tauschen."
+            },
+            "runPostprocessing": {
+                "title": "Nachbearbeitung ausführen",
+                "desc": "Ausgewählte Nachbearbeitung/en auf aktuelles Bild anwenden."
+            },
+            "toggleMetadata": {
+                "title": "Metadaten anzeigen/ausblenden",
+                "desc": "Zeigen oder verbergen der Metadaten des Bildes."
+            },
+            "recallPrompts": {
+                "title": "Prompts abrufen",
+                "desc": "Rufen Sie die positiven und negativen Prompts für das aktuelle Bild ab."
+            },
+            "recallSeed": {
+                "desc": "Seed für aktuelles Bild abrufen.",
+                "title": "Seed abrufen"
+            },
+            "loadWorkflow": {
+                "title": "Lade Arbeitsablauf/Workflow",
+                "desc": "Laden Sie den gespeicherten Workflow des aktuellen Bildes (falls es einen hat)."
+            },
+            "recallAll": {
+                "title": "Alle Metadaten abrufen",
+                "desc": "Alle Metadaten für das aktuelle Bild abrufen."
+            },
+            "remix": {
+                "desc": "Rufen Sie alle Metadaten außer dem Seed für das aktuelle Bild ab.",
+                "title": "Remixen"
+            }
         },
-        "toggleOptionsAndGallery": {
-            "title": "Optionen und Galerie umschalten",
-            "desc": "Optionen und Galerie-Panels öffnen und schließen"
+        "app": {
+            "invoke": {
+                "title": "Invoke",
+                "desc": "Stellt eine Generierung in die Warteschlange und fügt sie am Ende hinzu."
+            },
+            "invokeFront": {
+                "title": "Invoke (Front)",
+                "desc": "Stellt eine Generierung in die Warteschlange und fügt sie am Anfang hinzu."
+            },
+            "cancelQueueItem": {
+                "title": "Abbrechen",
+                "desc": "Aktuelles Warteschlangenelement abbrechen."
+            },
+            "clearQueue": {
+                "title": "Warteschlange löschen",
+                "desc": "Warteschlange abbrechen und komplett löschen."
+            },
+            "selectUpscalingTab": {
+                "title": "Wählen Sie die Registerkarte Hochskalieren",
+                "desc": "Wählt die Registerkarte Hochskalieren."
+            },
+            "selectCanvasTab": {
+                "desc": "Wählt die Arbeitsflächen-Registerkarte.",
+                "title": "Wählen Sie die Arbeitsflächen-Registerkarte"
+            },
+            "selectWorkflowsTab": {
+                "title": "Wählt die Registerkarte Arbeitsabläufe",
+                "desc": "Wählt die Registerkarte Arbeitsabläufe."
+            },
+            "selectModelsTab": {
+                "title": "Wählt die Registerkarte Modelle",
+                "desc": "Wählt die Registerkarte Modelle."
+            },
+            "selectQueueTab": {
+                "title": "Wählt die Registerkarte Warteschlange",
+                "desc": "Wählt die Registerkarte Warteschlange."
+            },
+            "focusPrompt": {
+                "desc": "Bewegt den Cursor-Fokus auf den positiven Prompt.",
+                "title": "Fokus-Prompt"
+            },
+            "toggleLeftPanel": {
+                "title": "Linkes Panel ein-/ausblenden",
+                "desc": "Linke Seite zeigen/verbergen."
+            },
+            "toggleRightPanel": {
+                "title": "Rechte Seite umschalten",
+                "desc": "Rechte Seite zeigen/verbergen."
+            },
+            "resetPanelLayout": {
+                "title": "Layout zurücksetzen",
+                "desc": "Beide Seiten auf Standard zurücksetzen."
+            },
+            "title": "Anwendung",
+            "togglePanels": {
+                "title": "Seiten umschalten",
+                "desc": "Zeigen oder verbergen Sie beide Panels auf einmal."
+            }
+        },
+        "gallery": {
+            "title": "Galerie",
+            "selectAllOnPage": {
+                "title": "Alle auf der Seite auswählen",
+                "desc": "Alle Bilder auf der aktuellen Seite auswählen."
+            },
+            "galleryNavRight": {
+                "title": "Nach rechts navigieren",
+                "desc": "Navigieren Sie im Galerieraster nach rechts, und wählen Sie das Bild aus. Wenn es sich um das letzte Bild in der Reihe handelt, gehen Sie zur nächsten Reihe. Wenn Sie sich beim letzten Bild der Seite befinden, gehen Sie zur nächsten Seite."
+            },
+            "galleryNavDownAlt": {
+                "title": "Nach unten navigieren (Bild vergleichen)",
+                "desc": "Wie \"Abwärts navigieren\", wählt aber das Vergleichsbild aus und öffnet den Vergleichsmodus, falls er nicht bereits geöffnet ist."
+            },
+            "galleryNavUp": {
+                "title": "Nach oben navigieren",
+                "desc": "Navigieren Sie im Galerieraster nach oben, und wählen Sie das Bild aus. Wenn Sie sich oben auf der Seite befinden, gehen Sie zur vorherigen Seite."
+            },
+            "galleryNavDown": {
+                "title": "Nach unten navigieren",
+                "desc": "Navigieren Sie im Galerieraster nach unten, und wählen Sie das Bild aus. Wenn Sie sich am Ende der Seite befinden, gehen Sie zur nächsten Seite."
+            },
+            "galleryNavLeft": {
+                "title": "Nach links navigieren",
+                "desc": "Navigieren Sie im Galerieraster nach links, und wählen Sie das Bild aus. Wenn Sie sich im ersten Bild der Reihe befinden, gehen Sie zur vorherigen Reihe. Wenn Sie sich beim ersten Bild der Seite befinden, gehen Sie zur vorherigen Seite."
+            },
+            "galleryNavUpAlt": {
+                "title": "Nach oben navigieren (Bild vergleichen)",
+                "desc": "Wie „Nach oben navigieren“, wählt aber das Vergleichsbild aus und öffnet den Vergleichsmodus, falls er nicht bereits geöffnet ist."
+            },
+            "galleryNavRightAlt": {
+                "title": "Nach rechts navigieren (Bild vergleichen)",
+                "desc": "Wie \"Navigieren nach rechts\", wählt aber das Vergleichsbild aus und öffnet den Vergleichsmodus, falls er nicht bereits geöffnet ist."
+            },
+            "clearSelection": {
+                "title": "Auswahl aufheben",
+                "desc": "Aktuelle Auswahl aufheben, falls vorhanden."
+            },
+            "galleryNavLeftAlt": {
+                "title": "Nach links navigieren (Bild vergleichen)",
+                "desc": "Wie „Nach links navigieren“, wählt aber das Vergleichsbild aus und öffnet den Vergleichsmodus, falls er nicht bereits geöffnet ist."
+            },
+            "deleteSelection": {
+                "title": "Löschen",
+                "desc": "Alle ausgewählten Bilder löschen. Standardmäßig werden Sie aufgefordert, den Löschvorgang zu bestätigen. Wenn die Bilder derzeit in der App verwendet werden, werden Sie gewarnt."
+            }
+        },
+        "workflows": {
+            "redo": {
+                "title": "Wiederholen",
+                "desc": "Letzte Workflow-Aktion wiederherstellen."
+            },
+            "copySelection": {
+                "title": "Kopieren",
+                "desc": "Ausgewählte Knoten und Kanten kopieren."
+            },
+            "title": "Arbeitsabläufe",
+            "addNode": {
+                "title": "Knoten hinzufügen",
+                "desc": "Öffnen Sie das \"Knoten zufügen\"-Menü."
+            },
+            "pasteSelection": {
+                "title": "Einfügen",
+                "desc": "Kopierte Knoten und Kanten einfügen."
+            },
+            "selectAll": {
+                "title": "Alles auswählen",
+                "desc": "Alle Knoten und Kanten auswählen."
+            },
+            "deleteSelection": {
+                "title": "Löschen",
+                "desc": "Lösche ausgewählte Knoten und Kanten."
+            },
+            "undo": {
+                "title": "Rückgängig",
+                "desc": "Letzte Workflow-Aktion rückgängig machen."
+            },
+            "pasteSelectionWithEdges": {
+                "desc": "Kopierte Knoten, Kanten und alle mit den kopierten Knoten verbundenen Kanten einfügen.",
+                "title": "Einfügen mit Kanten"
+            }
         }
     },
     "modelManager": {
@@ -368,19 +545,16 @@
         "manual": "Manuell",
         "modelManager": "Modell Manager",
         "model": "Modell",
-        "v2_base": "v2 (512px)",
         "name": "Name",
-        "v2_768": "v2 (768px)",
         "none": "Nix",
         "advanced": "Erweitert",
         "convertingModelBegin": "Konvertiere Modell. Bitte warten.",
         "baseModel": "Basis Modell",
         "convertToDiffusers": "Konvertiere zu Diffusers",
         "vae": "VAE",
-        "predictionType": "Vorhersagetyp (für Stable Diffusion 2.x-Modelle und gelegentliche Stable Diffusion 1.x-Modelle)",
+        "predictionType": "Vorhersagetyp",
         "selectModel": "Wählen Sie Modell aus",
         "repo_id": "Repo-ID",
-        "modelSyncFailed": "Modellsynchronisierung fehlgeschlagen",
         "modelDeleted": "Modell gelöscht",
         "modelUpdateFailed": "Modellaktualisierung fehlgeschlagen",
         "settings": "Einstellungen",
@@ -388,7 +562,6 @@
         "syncModels": "Modelle synchronisieren",
         "modelType": "Modelltyp",
         "convertToDiffusersHelpText1": "Dieses Modell wird in das 🧨 Diffusers-Format konvertiert.",
-        "modelsSynced": "Modelle synchronisiert",
         "vaePrecision": "VAE-Präzision",
         "variant": "Variante",
         "modelDeleteFailed": "Modell konnte nicht gelöscht werden",
@@ -400,13 +573,78 @@
         "defaultSettingsSaved": "Standardeinstellungen gespeichert",
         "addModels": "Model hinzufügen",
         "deleteModelImage": "Lösche Model Bild",
-        "hfTokenInvalidErrorMessage": "Falscher oder fehlender HuggingFace Schlüssel.",
         "huggingFaceRepoID": "HuggingFace Repo ID",
-        "hfToken": "HuggingFace Schlüssel",
-        "hfTokenInvalid": "Falscher oder fehlender HF Schlüssel",
         "huggingFacePlaceholder": "besitzer/model-name",
-        "hfTokenSaved": "HF Schlüssel gespeichert",
-        "hfTokenUnableToVerify": "Konnte den HF Schlüssel nicht validieren"
+        "modelSettings": "Modelleinstellungen",
+        "typePhraseHere": "Phrase hier eingeben",
+        "spandrelImageToImage": "Bild zu Bild (Spandrel)",
+        "starterModels": "Einstiegsmodelle",
+        "t5Encoder": "T5-Kodierer",
+        "uploadImage": "Bild hochladen",
+        "urlOrLocalPath": "URL oder lokaler Pfad",
+        "install": "Installieren",
+        "textualInversions": "Textuelle Inversionen",
+        "modelImageUpdated": "Modellbild aktualisiert",
+        "path": "Pfad",
+        "pathToConfig": "Pfad zur Konfiguration",
+        "scanPlaceholder": "Pfad zu einem lokalen Ordner",
+        "noMatchingModels": "Keine passenden Modelle",
+        "localOnly": "nur lokal",
+        "installAll": "Alles installieren",
+        "main": "Haupt",
+        "metadata": "Metadaten",
+        "modelImageDeleted": "Modellbild gelöscht",
+        "modelName": "Modellname",
+        "noModelsInstalled": "Keine Modelle installiert",
+        "source": "Quelle",
+        "simpleModelPlaceholder": "URL oder Pfad zu einem lokalen Datei- oder Diffusers-Ordner",
+        "imageEncoderModelId": "Bild Encoder Modell ID",
+        "installRepo": "Repo installieren",
+        "huggingFaceHelper": "Wenn mehrere Modelle in diesem Repo gefunden werden, werden Sie aufgefordert, eines für die Installation auszuwählen.",
+        "inplaceInstall": "In-place-Installation",
+        "modelImageDeleteFailed": "Modellbild konnte nicht gelöscht werden",
+        "repoVariant": "Repo Variante",
+        "learnMoreAboutSupportedModels": "Erfahren Sie mehr über die Modelle, die wir unterstützen",
+        "clipEmbed": "CLIP einbetten",
+        "noModelsInstalledDesc1": "Installiere Modelle mit dem",
+        "modelImageUpdateFailed": "Modellbild-Update fehlgeschlagen",
+        "prune": "Bereinigen",
+        "loraModels": "LoRAs",
+        "scanFolder": "Ordner scannen",
+        "installQueue": "Installations-Warteschlange",
+        "pruneTooltip": "Abgeschlossene Importe aus Warteschlange entfernen",
+        "scanResults": "Ergebnisse des Scans",
+        "urlOrLocalPathHelper": "URLs sollten auf eine einzelne Datei deuten. Lokale Pfade können zusätzlich auch auf einen Ordner für ein einzelnes Diffusers-Modell hinweisen.",
+        "inplaceInstallDesc": "Installieren Sie Modelle, ohne die Dateien zu kopieren. Wenn Sie das Modell verwenden, wird es direkt von seinem Speicherort geladen. Wenn deaktiviert, werden die Dateien während der Installation in das von Invoke verwaltete Modellverzeichnis kopiert.",
+        "scanFolderHelper": "Der Ordner wird rekursiv nach Modellen durchsucht. Dies kann bei sehr großen Ordnern etwas dauern.",
+        "includesNModels": "Enthält {{n}} Modelle und deren Abhängigkeiten",
+        "starterBundles": "Starterpakete",
+        "installingXModels_one": "{{count}} Modell wird installiert",
+        "installingXModels_other": "{{count}} Modelle werden installiert",
+        "skippingXDuplicates_one": ", überspringe {{count}} Duplikat",
+        "skippingXDuplicates_other": ", überspringe {{count}} Duplikate",
+        "installingModel": "Modell wird installiert",
+        "loraTriggerPhrases": "LoRA-Auslösephrasen",
+        "installingBundle": "Bündel wird installiert",
+        "triggerPhrases": "Auslösephrasen",
+        "mainModelTriggerPhrases": "Hauptmodell-Auslösephrasen",
+        "noDefaultSettings": "Für dieses Modell sind keine Standardeinstellungen konfiguriert. Besuchen Sie den Modell-Manager, um Standardeinstellungen hinzuzufügen.",
+        "defaultSettingsOutOfSync": "Einige Einstellungen stimmen nicht mit den Standardeinstellungen des Modells überein:",
+        "clipLEmbed": "CLIP-L einbetten",
+        "clipGEmbed": "CLIP-G einbetten",
+        "hfTokenLabel": "HuggingFace-Token (für einige Modelle erforderlich)",
+        "hfTokenHelperText": "Für die Nutzung einiger Modelle ist ein HF-Token erforderlich. Klicken Sie hier, um Ihr Token zu erstellen oder zu erhalten.",
+        "hfForbidden": "Sie haben keinen Zugriff auf dieses HF-Modell",
+        "hfTokenInvalid": "Ungültiges oder fehlendes HF-Token",
+        "restoreDefaultSettings": "Klicken, um die Standardeinstellungen des Modells zu verwenden.",
+        "usingDefaultSettings": "Die Standardeinstellungen des Modells werden verwendet",
+        "hfTokenInvalidErrorMessage": "Ungültiges oder fehlendes HuggingFace-Token.",
+        "hfTokenUnableToVerify": "HF-Token kann nicht überprüft werden",
+        "hfTokenUnableToVerifyErrorMessage": "HuggingFace-Token kann nicht überprüft werden. Dies ist wahrscheinlich auf einen Netzwerkfehler zurückzuführen. Bitte versuchen Sie es später erneut.",
+        "hfTokenSaved": "HF-Token gespeichert",
+        "hfTokenRequired": "Sie versuchen, ein Modell herunterzuladen, für das ein gültiges HuggingFace-Token erforderlich ist.",
+        "urlUnauthorizedErrorMessage2": "Hier erfahren wie.",
+        "urlForbidden": "Sie haben keinen Zugriff auf dieses Modell"
     },
     "parameters": {
         "images": "Bilder",
@@ -420,8 +658,6 @@
         "type": "Art",
         "strength": "Stärke",
         "upscaling": "Hochskalierung",
-        "upscale": "Hochskalieren (Shift + U)",
-        "upscaleImage": "Bild hochskalieren",
         "scale": "Maßstab",
         "imageFit": "Ausgangsbild an Ausgabegröße anpassen",
         "scaleBeforeProcessing": "Skalieren vor der Verarbeitung",
@@ -429,13 +665,9 @@
         "scaledHeight": "Skaliert H",
         "infillMethod": "Infill-Methode",
         "tileSize": "Kachelgröße",
-        "sendToImg2Img": "Senden an Bild-zu-Bild",
-        "sendToUnifiedCanvas": "Senden an Leinwand",
-        "downloadImage": "Bild herunterladen",
         "usePrompt": "Prompt verwenden",
         "useSeed": "Seed verwenden",
         "useAll": "Alle verwenden",
-        "showOptionsPanel": "Optionsleiste zeigen",
         "copyImage": "Bild kopieren",
         "denoisingStrength": "Stärke der Entrauschung",
         "symmetry": "Symmetrie",
@@ -449,12 +681,40 @@
         "setToOptimalSize": "Optimiere Größe für Modell",
         "useSize": "Maße übernehmen",
         "remixImage": "Remix des Bilds erstellen",
-        "imageActions": "Weitere Bildaktionen"
+        "imageActions": "Weitere Bildaktionen",
+        "invoke": {
+            "noNodesInGraph": "Keine Knoten im Graphen",
+            "canvasIsTransforming": "Leinwand ist beschäftigt (wird transformiert)",
+            "canvasIsRasterizing": "Leinwand ist beschäftigt (wird gerastert)",
+            "canvasIsCompositing": "Leinwand ist beschäftigt (wird zusammengesetzt)",
+            "canvasIsFiltering": "Leinwand ist beschäftigt (wird gefiltert)",
+            "canvasIsSelectingObject": "Leinwand ist beschäftigt (wird Objekt ausgewählt)",
+            "noPrompts": "Keine Eingabeaufforderungen generiert",
+            "noModelSelected": "Kein Modell ausgewählt"
+        },
+        "seed": "Seed",
+        "patchmatchDownScaleSize": "Herunterskalieren",
+        "seamlessXAxis": "Nahtlose X Achse",
+        "seamlessYAxis": "Nahtlose Y Achse",
+        "coherenceEdgeSize": "Kantengröße",
+        "infillColorValue": "Füllfarbe",
+        "controlNetControlMode": "Kontrollmodus",
+        "cancel": {
+            "cancel": "Abbrechen"
+        },
+        "iterations": "Iterationen",
+        "guidance": "Führung",
+        "coherenceMode": "Modus",
+        "recallMetadata": "Metadaten abrufen",
+        "gaussianBlur": "Gaußsche Unschärfe",
+        "sendToUpscale": "An Hochskalieren senden",
+        "useCpuNoise": "CPU-Rauschen verwenden",
+        "sendToCanvas": "An Leinwand senden",
+        "disabledNoRasterContent": "Deaktiviert (kein Rasterinhalt)"
     },
     "settings": {
         "displayInProgress": "Zwischenbilder anzeigen",
         "confirmOnDelete": "Bestätigen beim Löschen",
-        "enableImageDebugging": "Bild-Debugging aktivieren",
         "resetWebUI": "Web-Oberfläche zurücksetzen",
         "resetWebUIDesc1": "Das Zurücksetzen der Web-Oberfläche setzt nur den lokalen Cache des Browsers mit Ihren Bildern und gespeicherten Einstellungen zurück. Es werden keine Bilder von der Festplatte gelöscht.",
         "resetWebUIDesc2": "Wenn die Bilder nicht in der Galerie angezeigt werden oder etwas anderes nicht funktioniert, versuchen Sie bitte, die Einstellungen zurückzusetzen, bevor Sie einen Fehler auf GitHub melden.",
@@ -463,7 +723,6 @@
         "clearIntermediatesDesc1": "Das Löschen der Zwischenbilder setzt Leinwand und ControlNet zurück.",
         "generation": "Erzeugung",
         "enableInformationalPopovers": "Info-Popouts anzeigen",
-        "shouldLogToConsole": "Konsole loggen",
         "showProgressInViewer": "Zwischenbilder im Viewer anzeigen",
         "clearIntermediatesDesc3": "Ihre Bilder werden nicht gelöscht.",
         "clearIntermediatesWithCount_one": "Lösche {{count}} Zwischenbilder",
@@ -486,116 +745,71 @@
     "toast": {
         "uploadFailed": "Hochladen fehlgeschlagen",
         "imageCopied": "Bild kopiert",
-        "imageNotLoadedDesc": "Konnte kein Bild finden",
-        "canvasMerged": "Leinwand zusammengeführt",
-        "sentToImageToImage": "Gesendet an Bild zu Bild",
-        "sentToUnifiedCanvas": "Gesendet an Leinwand",
-        "parametersNotSet": "Parameter nicht festgelegt",
-        "metadataLoadFailed": "Metadaten konnten nicht geladen werden",
-        "setCanvasInitialImage": "Ausgangsbild setzen",
-        "problemMergingCanvas": "Problem bei Verschmelzung der Leinwand",
-        "canvasCopiedClipboard": "Leinwand in Zwischenablage kopiert",
-        "canvasSentControlnetAssets": "Leinwand an ControlNet & Sammlung geschickt",
-        "problemDownloadingCanvasDesc": "Kann Basis-Layer nicht exportieren",
-        "canvasDownloaded": "Leinwand heruntergeladen",
-        "problemSavingCanvasDesc": "Kann Basis-Layer nicht exportieren",
-        "canvasSavedGallery": "Leinwand in Galerie gespeichert",
-        "problemMergingCanvasDesc": "Kann Basis-Layer nicht exportieren",
-        "problemSavingCanvas": "Problem beim Speichern der Leinwand",
-        "problemCopyingCanvas": "Problem beim Kopieren der Leinwand",
-        "problemCopyingCanvasDesc": "Kann Basis-Layer nicht exportieren",
-        "problemDownloadingCanvas": "Problem beim Herunterladen der Leinwand",
-        "setAsCanvasInitialImage": "Als Ausgangsbild gesetzt",
+        "parametersNotSet": "Parameter nicht zurückgerufen",
         "addedToBoard": "Dem Board hinzugefügt",
-        "loadedWithWarnings": "Workflow mit Warnungen geladen"
-    },
-    "tooltip": {
-        "feature": {
-            "prompt": "Dies ist das Prompt-Feld. Ein Prompt enthält Generierungsobjekte und stilistische Begriffe. Sie können auch Gewichtungen (Token-Bedeutung) dem Prompt hinzufügen, aber CLI-Befehle und Parameter funktionieren nicht.",
-            "gallery": "Die Galerie zeigt erzeugte Bilder aus dem Ausgabeordner an, sobald sie erstellt wurden. Die Einstellungen werden in den Dateien gespeichert und können über das Kontextmenü aufgerufen werden.",
-            "other": "Mit diesen Optionen werden alternative Verarbeitungsmodi für InvokeAI aktiviert. 'Nahtlose Kachelung' erzeugt sich wiederholende Muster in der Ausgabe. 'Hohe Auflösungen' werden in zwei Schritten mit img2img erzeugt: Verwenden Sie diese Einstellung, wenn Sie ein größeres und kohärenteres Bild ohne Artefakte wünschen. Es dauert länger als das normale txt2img.",
-            "seed": "Der Seed-Wert beeinflusst das Ausgangsrauschen, aus dem das Bild erstellt wird. Sie können die bereits vorhandenen Seeds von früheren Bildern verwenden. 'Der Rauschschwellenwert' wird verwendet, um Artefakte bei hohen CFG-Werten abzuschwächen (versuchen Sie es im Bereich 0-10), und Perlin, um während der Erzeugung Perlin-Rauschen hinzuzufügen: Beide dienen dazu, Ihre Ergebnisse zu variieren.",
-            "upscale": "Verwenden Sie ESRGAN, um das Bild unmittelbar nach der Erzeugung zu vergrößern.",
-            "boundingBox": "Der Begrenzungsrahmen ist derselbe wie die Einstellungen für Breite und Höhe bei Text-zu-Bild oder Bild-zu-Bild. Es wird nur der Bereich innerhalb des Rahmens verarbeitet."
-        }
-    },
-    "unifiedCanvas": {
-        "layer": "Ebene",
-        "base": "Basis",
-        "mask": "Maske",
-        "maskingOptions": "Maskierungsoptionen",
-        "enableMask": "Maske aktivieren",
-        "preserveMaskedArea": "Maskierten Bereich bewahren",
-        "clearMask": "Maske löschen (Shift+C)",
-        "brush": "Pinsel",
-        "eraser": "Radierer",
-        "fillBoundingBox": "Begrenzungsrahmen füllen",
-        "eraseBoundingBox": "Begrenzungsrahmen löschen",
-        "colorPicker": "Pipette",
-        "brushOptions": "Pinseloptionen",
-        "brushSize": "Größe",
-        "move": "Bewegen",
-        "resetView": "Ansicht zurücksetzen",
-        "mergeVisible": "Sichtbare zusammenführen",
-        "saveToGallery": "In Galerie speichern",
-        "copyToClipboard": "In Zwischenablage kopieren",
-        "downloadAsImage": "Als Bild herunterladen",
-        "undo": "Rückgängig",
-        "redo": "Wiederherstellen",
-        "clearCanvas": "Leinwand löschen",
-        "canvasSettings": "Leinwand-Einstellungen",
-        "showIntermediates": "Zwischenbilder anzeigen",
-        "showGrid": "Gitternetz anzeigen",
-        "snapToGrid": "Am Gitternetz einrasten",
-        "darkenOutsideSelection": "Außerhalb der Auswahl verdunkeln",
-        "autoSaveToGallery": "Automatisch in Galerie speichern",
-        "saveBoxRegionOnly": "Nur Auswahlbox speichern",
-        "limitStrokesToBox": "Striche auf Auswahl beschränken",
-        "showCanvasDebugInfo": "Zusätzliche Informationen anzeigen",
-        "clearCanvasHistory": "Leinwand-Verlauf löschen",
-        "clearHistory": "Verlauf löschen",
-        "clearCanvasHistoryMessage": "Wenn Sie den Verlauf löschen, bleibt die aktuelle Leinwand intakt, aber der Verlauf der Rückgängig- und Wiederherstellung wird unwiderruflich gelöscht.",
-        "clearCanvasHistoryConfirm": "Sind Sie sicher, dass Sie den Verlauf löschen möchten?",
-        "activeLayer": "Aktive Ebene",
-        "canvasScale": "Leinwand Maßstab",
-        "boundingBox": "Begrenzungsrahmen",
-        "scaledBoundingBox": "Skalierter Begrenzungsrahmen",
-        "boundingBoxPosition": "Begrenzungsrahmen Position",
-        "canvasDimensions": "Maße der Leinwand",
-        "canvasPosition": "Leinwandposition",
-        "cursorPosition": "Position des Cursors",
-        "previous": "Vorherige",
-        "next": "Nächste",
-        "accept": "Akzeptieren",
-        "discardAll": "Alles verwerfen",
-        "antialiasing": "Kantenglättung",
-        "showResultsOn": "Zeige Ergebnisse (An)",
-        "showResultsOff": "Zeige Ergebnisse (Aus)"
+        "loadedWithWarnings": "Workflow mit Warnungen geladen",
+        "linkCopied": "Link kopiert",
+        "problemCopyingLayer": "Ebene kann nicht kopiert werden",
+        "problemSavingLayer": "Ebene kann nicht gespeichert werden",
+        "parameterSetDesc": "{{parameter}} zurückgerufen",
+        "imageUploaded": "Bild hochgeladen",
+        "problemCopyingImage": "Bild kann nicht kopiert werden",
+        "parameterNotSetDesc": "{{parameter}} kann nicht zurückgerufen werden",
+        "prunedQueue": "Warteschlange bereinigt",
+        "modelAddedSimple": "Modell zur Warteschlange hinzugefügt",
+        "parametersSet": "Parameter zurückgerufen",
+        "sentToUpscale": "An Vergrößerung gesendet",
+        "parameterNotSetDescWithMessage": "{{parameter}} kann nicht zurückgerufen werden: {{message}}",
+        "unableToLoadImageMetadata": "Bildmetadaten können nicht geladen werden",
+        "unableToLoadImage": "Bild kann nicht geladen werden",
+        "serverError": "Serverfehler",
+        "parameterNotSet": "Parameter nicht zurückgerufen",
+        "sessionRef": "Sitzung: {{sessionId}}",
+        "problemDownloadingImage": "Bild kann nicht heruntergeladen werden",
+        "parameters": "Parameter",
+        "parameterSet": "Parameter zurückgerufen",
+        "importFailed": "Import fehlgeschlagen",
+        "importSuccessful": "Import erfolgreich",
+        "somethingWentWrong": "Etwas ist schief gelaufen",
+        "workflowLoaded": "Arbeitsablauf geladen",
+        "workflowDeleted": "Arbeitsablauf gelöscht",
+        "errorCopied": "Fehler kopiert",
+        "layerCopiedToClipboard": "Ebene in die Zwischenablage kopiert",
+        "sentToCanvas": "An Leinwand gesendet",
+        "problemDeletingWorkflow": "Problem beim Löschen des Arbeitsablaufs",
+        "problemRetrievingWorkflow": "Problem beim Abrufen des Arbeitsablaufs",
+        "uploadFailedInvalidUploadDesc": "Müssen PNG-, JPEG- oder WEBP-Bilder sein.",
+        "pasteSuccess": "Eingefügt in {{destination}}",
+        "pasteFailed": "Einfügen fehlgeschlagen",
+        "unableToCopy": "Kopieren nicht möglich",
+        "unableToCopyDesc_theseSteps": "diese Schritte",
+        "noVisibleRasterLayers": "Keine sichtbaren Rasterebenen"
     },
     "accessibility": {
         "uploadImage": "Bild hochladen",
         "previousImage": "Vorheriges Bild",
-        "showOptionsPanel": "Seitenpanel anzeigen",
         "reset": "Zurücksetzten",
         "nextImage": "Nächstes Bild",
-        "showGalleryPanel": "Galerie-Panel anzeigen",
         "menu": "Menü",
-        "loadMore": "Mehr laden",
         "invokeProgressBar": "Invoke Fortschrittsanzeige",
         "mode": "Modus",
         "resetUI": "$t(accessibility.reset) von UI",
         "createIssue": "Ticket erstellen",
-        "about": "Über"
+        "about": "Über",
+        "submitSupportTicket": "Support-Ticket senden",
+        "toggleRightPanel": "Rechtes Bedienfeld umschalten (G)",
+        "toggleLeftPanel": "Linkes Bedienfeld umschalten (T)",
+        "uploadImages": "Bild(er) hochladen"
     },
     "boards": {
-        "autoAddBoard": "Automatisches Hinzufügen zum Board",
-        "topMessage": "Dieser Ordner enthält Bilder die in den folgenden Funktionen verwendet werden:",
+        "autoAddBoard": "Board automatisch erstellen",
+        "topMessage": "Diese Auswahl enthält Bilder, die in den folgenden Funktionen verwendet werden:",
         "move": "Bewegen",
         "menuItemAutoAdd": "Auto-Hinzufügen zu diesem Ordner",
         "myBoard": "Meine Ordner",
         "searchBoard": "Ordner durchsuchen...",
         "noMatching": "Keine passenden Ordner",
-        "selectBoard": "Ordner aussuchen",
+        "selectBoard": "Ordner wählen",
         "cancel": "Abbrechen",
         "addBoard": "Board hinzufügen",
         "uncategorized": "Ohne Kategorie",
@@ -603,107 +817,47 @@
         "changeBoard": "Ordner wechseln",
         "loading": "Laden...",
         "clearSearch": "Suche leeren",
-        "bottomMessage": "Löschen des Boards und seiner Bilder setzt alle Funktionen zurück, die sie gerade verwenden.",
+        "bottomMessage": "Durch das Löschen von Bildern werden alle Funktionen zurückgesetzt, die diese Bilder derzeit verwenden.",
         "deleteBoardOnly": "Nur Ordner löschen",
-        "deleteBoard": "Löschen Ordner",
-        "deleteBoardAndImages": "Löschen Ordner und Bilder",
-        "deletedBoardsCannotbeRestored": "Gelöschte Ordner könnte nicht wiederhergestellt werden",
-        "movingImagesToBoard_one": "Verschiebe {{count}} Bild zu Ordner:",
-        "movingImagesToBoard_other": "Verschiebe {{count}} Bilder in Ordner:"
-    },
-    "controlnet": {
-        "showAdvanced": "Zeige Erweitert",
-        "contentShuffleDescription": "Mischt den Inhalt von einem Bild",
-        "addT2IAdapter": "$t(common.t2iAdapter) hinzufügen",
-        "importImageFromCanvas": "Bild von Zeichenfläche importieren",
-        "lineartDescription": "Konvertiere Bild in Strichzeichnung",
-        "importMaskFromCanvas": "Importiere Maske von Zeichenfläche",
-        "hed": "HED",
-        "hideAdvanced": "Verstecke Erweitert",
-        "contentShuffle": "Inhalt mischen",
-        "beginEndStepPercent": "Start / Ende Step Prozent",
-        "duplicate": "Kopieren",
-        "f": "F",
-        "h": "H",
-        "depthMidasDescription": "Tiefenmap erstellen mit Midas",
-        "controlnet": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.controlNet))",
-        "weight": "Einfluss",
-        "selectModel": "Wähle ein Modell",
-        "depthMidas": "Tiefe (Midas)",
-        "w": "W",
-        "addControlNet": "$t(common.controlNet) hinzufügen",
-        "none": "Kein",
-        "detectResolution": "Auflösung erkennen",
-        "ip_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.ipAdapter))",
-        "fill": "Füllen",
-        "addIPAdapter": "$t(common.ipAdapter) hinzufügen",
-        "colorMapDescription": "Erstelle eine Farbkarte von diesem Bild",
-        "t2i_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.t2iAdapter))",
-        "imageResolution": "Bild Auflösung",
-        "depthZoe": "Tiefe (Zoe)",
-        "colorMap": "Farbe",
-        "lowThreshold": "Niedrige Schwelle",
-        "highThreshold": "Hohe Schwelle",
-        "toggleControlNet": "Dieses ControlNet ein- oder ausschalten",
-        "delete": "Löschen",
-        "controlAdapter_one": "Control Adapter",
-        "controlAdapter_other": "Control Adapter",
-        "colorMapTileSize": "Kachelgröße",
-        "depthZoeDescription": "Tiefenmap erstellen mit Zoe",
-        "setControlImageDimensions": "Setze Control-Bild Auflösung auf Breite/Höhe",
-        "resize": "Größe ändern",
-        "resetControlImage": "Zurücksetzen vom Referenz Bild",
-        "balanced": "Ausgewogen",
-        "prompt": "Prompt",
-        "resizeMode": "Größe",
-        "processor": "Prozessor",
-        "saveControlImage": "Speichere Referenz Bild",
-        "safe": "Speichern",
-        "pidi": "PIDI",
-        "normalBae": "Normales BAE",
-        "mlsdDescription": "Minimalistischer Liniensegmentdetektor",
-        "control": "Kontrolle",
-        "coarse": "Grob",
-        "crop": "Zuschneiden",
-        "pidiDescription": "PIDI-Bildverarbeitung",
-        "mediapipeFace": "Mediapipe Gesichter",
-        "mlsd": "M-LSD",
-        "controlMode": "Steuermodus",
-        "cannyDescription": "Canny Umrisserkennung",
-        "lineart": "Linienzeichnung",
-        "lineartAnimeDescription": "Lineart-Verarbeitung im Anime-Stil",
-        "minConfidence": "Minimales Vertrauen",
-        "megaControl": "Mega-Kontrolle",
-        "autoConfigure": "Prozessor Auto-konfig",
-        "normalBaeDescription": "Normale BAE-Verarbeitung",
-        "noneDescription": "Es wurde keine Verarbeitung angewendet",
-        "lineartAnime": "Lineart Anime / \"Strichzeichnung Anime\"",
-        "mediapipeFaceDescription": "Gesichtserkennung mit Mediapipe",
-        "canny": "\"Canny\"",
-        "hedDescription": "Ganzheitlich verschachtelte Kantenerkennung",
-        "scribble": "Scribble",
-        "maxFaces": "Maximale Anzahl Gesichter",
-        "resizeSimple": "Größe ändern (einfach)",
-        "large": "Groß",
-        "modelSize": "Modellgröße",
-        "small": "Klein",
-        "base": "Basis",
-        "depthAnything": "Depth Anything",
-        "depthAnythingDescription": "Erstellung einer Tiefenkarte mit der Depth-Anything-Technik",
-        "face": "Gesicht",
-        "body": "Körper",
-        "hands": "Hände",
-        "dwOpenpose": "DW Openpose",
-        "dwOpenposeDescription": "Posenschätzung mit DW Openpose",
-        "selectCLIPVisionModel": "Wähle ein CLIP Vision Model aus",
-        "ipAdapterMethod": "Methode",
-        "composition": "Nur Komposition",
-        "full": "Voll",
-        "style": "Nur Style"
+        "deleteBoard": "Lösche Ordner",
+        "deleteBoardAndImages": "Lösche Ordner und Bilder",
+        "movingImagesToBoard_one": "Verschiebe {{count}} Bild in Ordner:",
+        "movingImagesToBoard_other": "Verschiebe {{count}} Bilder in Ordner:",
+        "selectedForAutoAdd": "Ausgewählt für Automatisches hinzufügen",
+        "imagesWithCount_one": "{{count}} Bild",
+        "imagesWithCount_other": "{{count}} Bilder",
+        "addPrivateBoard": "Privaten Ordner hinzufügen",
+        "addSharedBoard": "Geteilten Ordner hinzufügen",
+        "boards": "Ordner",
+        "unarchiveBoard": "Unarchive Ordner",
+        "private": "Private Ordner",
+        "shared": "Geteilte Ordner",
+        "archiveBoard": "Ordner archivieren",
+        "archived": "Archiviert",
+        "noBoards": "Kein {{boardType}} Ordner",
+        "deletedPrivateBoardsCannotbeRestored": "Gelöschte Pinnwände und Bilder können nicht wiederhergestellt werden. Wenn Sie „Nur Pinnwand löschen“ auswählen, werden die Bilder in einen privaten, nicht kategorisierten Zustand verschoben, der nur dem Ersteller des Bildes zugänglich ist.",
+        "assetsWithCount_one": "{{count}} in der Sammlung",
+        "assetsWithCount_other": "{{count}} in der Sammlung",
+        "deletedBoardsCannotbeRestored": "Gelöschte Boards und Bilder können nicht wiederhergestellt werden. Durch Auswahl von „Nur Board löschen“ werden die Bilder in den nicht kategorisierten Zustand verschoben.",
+        "updateBoardError": "Fehler beim Aktualisieren des Ordners",
+        "uncategorizedImages": "Nicht kategorisierte Bilder",
+        "deleteAllUncategorizedImages": "Alle nicht kategorisierten Bilder löschen",
+        "pause": "Pause",
+        "resume": "Weiter",
+        "restartFailed": "Neustart fehlgeschlagen",
+        "restartFile": "Datei erneut starten",
+        "restartRequired": "Neustart erforderlich",
+        "resumeRefused": "Der Server hat die Fortsetzung des Vorgangs abgelehnt. Ein Neustart ist erforderlich.",
+        "deletedImagesCannotBeRestored": "Gelöschte Bilder können nicht wiederhergestellt werden.",
+        "hideBoards": "Ordner verstecken",
+        "locateInGalery": "In der Galerie finden",
+        "viewBoards": "Ordner anzeigen",
+        "setBoardVisibility": "Sichtbarkeit des Ordner",
+        "setVisibilityPrivate": "Privat einstellen"
     },
     "queue": {
         "status": "Status",
-        "cancelTooltip": "Aktuellen Aufgabe abbrechen",
+        "cancelTooltip": "Aufgabe abbrechen",
         "queueEmpty": "Warteschlange leer",
         "in_progress": "In Arbeit",
         "queueFront": "Am Anfang der Warteschlange einreihen",
@@ -739,7 +893,7 @@
         "clearQueueAlertDialog2": "Warteschlange wirklich leeren?",
         "pruneSucceeded": "{{item_count}} abgeschlossene Elemente aus der Warteschlange entfernt",
         "pauseSucceeded": "Prozess angehalten",
-        "cancelFailed": "Problem beim Stornieren des Auftrags",
+        "cancelFailed": "Problem beim Abbrechen",
         "pauseFailed": "Problem beim Anhalten des Prozesses",
         "front": "Vorne",
         "pruneTooltip": "Bereinigen Sie {{item_count}} abgeschlossene Aufträge",
@@ -754,10 +908,25 @@
         "batchQueuedDesc_other": "{{count}} Einträge an {{direction}} der Wartschlange hinzugefügt",
         "openQueue": "Warteschlange öffnen",
         "batchFailedToQueue": "Fehler beim Einreihen in die Stapelverarbeitung",
-        "batchFieldValues": "Stapelverarbeitungswerte",
         "batchQueued": "Stapelverarbeitung eingereiht",
         "graphQueued": "Graph eingereiht",
-        "graphFailedToQueue": "Fehler beim Einreihen des Graphen"
+        "graphFailedToQueue": "Fehler beim Einreihen des Graphen",
+        "generations_one": "Generation",
+        "generations_other": "Generationen",
+        "iterations_one": "Iteration",
+        "iterations_other": "Iterationen",
+        "gallery": "Galerie",
+        "generation": "Erstellung",
+        "workflows": "Arbeitsabläufe",
+        "other": "Sonstige",
+        "origin": "Ursprung",
+        "destination": "Ziel",
+        "upscaling": "Hochskalierung",
+        "canvas": "Leinwand",
+        "prompts_one": "Prompt",
+        "prompts_other": "Prompts",
+        "batchSize": "Stapelgröße",
+        "confirm": "Bestätigen"
     },
     "metadata": {
         "negativePrompt": "Negativ Beschreibung",
@@ -767,18 +936,15 @@
         "model": "Modell",
         "noImageDetails": "Keine Bild Details gefunden",
         "cfgScale": "CFG-Skala",
-        "fit": "Bild zu Bild anpassen",
         "height": "Höhe",
         "noMetaData": "Keine Meta-Daten gefunden",
         "width": "Breite",
         "createdBy": "Erstellt von",
         "steps": "Schritte",
-        "seamless": "Nahtlos",
         "positivePrompt": "Positiver Prompt",
         "generationMode": "Generierungsmodus",
         "Threshold": "Rauschen-Schwelle",
         "seed": "Seed",
-        "initImage": "Erstes Bild",
         "vae": "VAE",
         "workflow": "Workflow",
         "scheduler": "Planer",
@@ -788,8 +954,10 @@
         "allPrompts": "Alle Prompts",
         "imageDimensions": "Bilder Auslösungen",
         "parameterSet": "Parameter {{parameter}} setzen",
-        "recallParameter": "{{label}} Abrufen",
-        "parsingFailed": "Parsing Fehlgeschlagen"
+        "canvasV2Metadata": "Leinwand",
+        "guidance": "Führung",
+        "seamlessXAxis": "Nahtlose X Achse",
+        "seamlessYAxis": "Nahtlose Y Achse"
     },
     "popovers": {
         "noiseUseCPU": {
@@ -914,7 +1082,8 @@
         },
         "paramScheduler": {
             "paragraphs": [
-                "\"Planer\" definiert, wie iterativ Rauschen zu einem Bild hinzugefügt wird, oder wie ein Sample bei der Ausgabe eines Modells aktualisiert wird."
+                "Verwendeter Planer währende des Generierungsprozesses.",
+                "Jeder Planer definiert, wie einem Bild iterativ Rauschen hinzugefügt wird, oder wie ein Sample basierend auf der Ausgabe eines Modells aktualisiert wird."
             ],
             "heading": "Planer"
         },
@@ -922,6 +1091,115 @@
             "paragraphs": [
                 "Reduziert das Ausgangsbild auf die Breite und Höhe des Ausgangsbildes. Empfohlen zu aktivieren."
             ]
+        },
+        "structure": {
+            "paragraphs": [
+                "Die Struktur steuert, wie genau sich das Ausgabebild an das Layout des Originals hält. Eine niedrige Struktur erlaubt größere Änderungen, während eine hohe Struktur die ursprüngliche Komposition und das Layout strikter beibehält."
+            ]
+        },
+        "creativity": {
+            "paragraphs": [
+                "Die Kreativität bestimmt den Grad der Freiheit, die dem Modell beim Hinzufügen von Details gewährt wird. Eine niedrige Kreativität hält sich eng an das Originalbild, während eine hohe Kreativität mehr Veränderungen zulässt. Bei der Verwendung eines Prompts erhöht eine hohe Kreativität den Einfluss des Prompts."
+            ]
+        },
+        "scale": {
+            "paragraphs": [
+                "Die Skalierung steuert die Größe des Ausgabebildes und basiert auf einem Vielfachen der Auflösung des Originalbildes. So würde z. B. eine 2-fache Hochskalierung eines 1024x1024px Bildes eine 2048x2048px große Ausgabe erzeugen."
+            ]
+        },
+        "ipAdapterMethod": {
+            "heading": "Methode"
+        },
+        "refinerScheduler": {
+            "heading": "Planer",
+            "paragraphs": [
+                "Planer, der während der Veredelungsphase des Generierungsprozesses verwendet wird.",
+                "Ähnlich wie der Generierungsplaner."
+            ]
+        },
+        "compositingCoherenceMode": {
+            "paragraphs": [
+                "Verwendete Methode zur Erstellung eines kohärenten Bildes mit dem neu generierten maskierten Bereich."
+            ],
+            "heading": "Modus"
+        },
+        "compositingCoherencePass": {
+            "heading": "Kohärenzdurchlauf"
+        },
+        "controlNet": {
+            "heading": "ControlNet"
+        },
+        "compositingMaskAdjustments": {
+            "paragraphs": [
+                "Die Maske anpassen."
+            ],
+            "heading": "Maskenanpassungen"
+        },
+        "compositingMaskBlur": {
+            "paragraphs": [
+                "Der Unschärferadius der Maske."
+            ],
+            "heading": "Maskenunschärfe"
+        },
+        "compositingBlurMethod": {
+            "paragraphs": [
+                "Die auf den maskierten Bereich angewendete Unschärfemethode."
+            ],
+            "heading": "Unschärfemethode"
+        },
+        "controlNetResizeMode": {
+            "heading": "Größenänderungsmodus"
+        },
+        "paramWidth": {
+            "heading": "Breite",
+            "paragraphs": [
+                "Breite des generierten Bildes. Muss ein Vielfaches von 8 sein."
+            ]
+        },
+        "controlNetControlMode": {
+            "heading": "Kontrollmodus"
+        },
+        "controlNetProcessor": {
+            "heading": "Prozessor"
+        },
+        "patchmatchDownScaleSize": {
+            "heading": "Herunterskalieren"
+        },
+        "paramHeight": {
+            "heading": "Höhe",
+            "paragraphs": [
+                "Höhe des generierten Bildes. Muss ein Vielfaches von 8 sein."
+            ]
+        },
+        "paramUpscaleMethod": {
+            "heading": "Vergrößerungsmethode",
+            "paragraphs": [
+                "Methode zum Hochskalieren des Bildes für High Resolution Fix."
+            ]
+        },
+        "paramHrf": {
+            "heading": "High Resolution Fix aktivieren"
+        },
+        "seamlessTilingYAxis": {
+            "heading": "Nahtlose Kachelung Y Achse",
+            "paragraphs": [
+                "Nahtloses Kacheln eines Bildes entlang der vertikalen Achse."
+            ]
+        },
+        "seamlessTilingXAxis": {
+            "paragraphs": [
+                "Nahtloses Kacheln eines Bildes entlang der horizontalen Achse."
+            ],
+            "heading": "Nahtlose Kachelung X Achse"
+        },
+        "compositingCoherenceEdgeSize": {
+            "paragraphs": [
+                "Die Kantengröße des Kohärenzdurchlaufs."
+            ],
+            "heading": "Kantengröße"
+        },
+        "rasterLayer": {
+            "heading": "Rasterebene"
         }
     },
     "invocationCache": {
@@ -955,22 +1233,18 @@
         "cannotConnectToSelf": "Es kann keine Verbindung zu sich selbst hergestellt werden",
         "colorCodeEdges": "Farbkodierte Kanten",
         "addNodeToolTip": "Knoten hinzufügen (Umschalt+A, Leertaste)",
-        "collectionFieldType": "{{name}} Sammlung",
+        "collectionFieldType": "{{name}} (Sammlung)",
         "connectionWouldCreateCycle": "Verbindung würde einen Kreislauf/cycle schaffen",
         "inputMayOnlyHaveOneConnection": "Eingang darf nur eine Verbindung haben",
-        "hideLegendNodes": "Feldtyp-Legende ausblenden",
         "integer": "Ganze Zahl",
-        "addLinearView": "Zur linearen Ansicht hinzufügen",
         "currentImageDescription": "Zeigt das aktuelle Bild im Node-Editor an",
         "ipAdapter": "IP-Adapter",
         "hideMinimapnodes": "Miniatur-Kartenansicht ausblenden",
         "newWorkflowDesc2": "Ihr aktueller Arbeitsablauf hat ungespeicherte Änderungen.",
         "problemSettingTitle": "Problem beim Einstellen des Titels",
-        "noConnectionData": "Keine Verbindungsdaten",
         "reloadNodeTemplates": "Knoten-Vorlagen neu laden",
         "newWorkflow": "Neuer Arbeitsablauf / Workflow",
         "newWorkflowDesc": "Einen neuen Arbeitsablauf erstellen?",
-        "noFieldsLinearview": "Keine Felder zur linearen Ansicht hinzugefügt",
         "clearWorkflow": "Workflow löschen",
         "clearWorkflowDesc": "Diesen Arbeitsablauf löschen und neu starten?",
         "noConnectionInProgress": "Es besteht keine Verbindung",
@@ -978,12 +1252,9 @@
         "nodeVersion": "Knoten Version",
         "node": "Knoten",
         "nodeSearch": "Knoten suchen",
-        "removeLinearView": "Entfernen aus Linear View",
         "nodeOutputs": "Knoten-Ausgänge",
         "nodeTemplate": "Knoten-Vorlage",
         "nodeType": "Knotentyp",
-        "noFieldType": "Kein Feldtyp",
-        "noMatchingNodes": "Keine passenden Knoten",
         "noNodeSelected": "Kein Knoten gewählt",
         "nodeOpacity": "Knoten-Deckkraft",
         "noOutputRecorded": "Keine Ausgänge aufgezeichnet",
@@ -991,7 +1262,6 @@
         "clearWorkflowDesc2": "Ihr aktueller Arbeitsablauf hat ungespeicherte Änderungen.",
         "scheduler": "Planer",
         "showMinimapnodes": "MiniMap anzeigen",
-        "showLegendNodes": "Feldtyp-Legende anzeigen",
         "executionStateCompleted": "Erledigt",
         "downloadWorkflow": "Workflow JSON herunterladen",
         "executionStateInProgress": "In Bearbeitung",
@@ -1001,50 +1271,94 @@
         "fieldTypesMustMatch": "Feldtypen müssen übereinstimmen",
         "fitViewportNodes": "An Ansichtsgröße anpassen",
         "loadingNodes": "Lade Nodes...",
-        "mismatchedVersion": "Ungültiger Knoten: Knoten {{node}} vom Typ {{type}} hat keine passende Version (Update versuchen?)",
         "fullyContainNodesHelp": "Nodes müssen vollständig innerhalb der Auswahlbox sein, um ausgewählt werden zu können",
         "noWorkflow": "Kein Workflow",
         "executionStateError": "Fehler",
         "nodePack": "Knoten-Pack",
         "loadWorkflow": "Lade Workflow",
         "snapToGrid": "Am Gitternetz einrasten",
-        "unknownOutput": "Unbekannte Ausgabe: {{name}}",
         "updateNode": "Knoten updaten",
         "edge": "Rand / Kante",
         "sourceNodeDoesNotExist": "Ungültiger Rand: Quell- / Ausgabe-Knoten {{node}} existiert nicht",
         "updateAllNodes": "Update Knoten",
         "allNodesUpdated": "Alle Knoten aktualisiert",
-        "unknownTemplate": "Unbekannte Vorlage",
         "updateApp": "Update App",
-        "unknownInput": "Unbekannte Eingabe: {{name}}",
         "unknownNodeType": "Unbekannter Knotentyp",
         "float": "Kommazahlen",
         "enum": "Aufzählung",
         "fullyContainNodes": "Vollständig ausgewählte Nodes auswählen",
-        "editMode": "Im Workflow-Editor bearbeiten"
+        "editMode": "Im Workflow-Editor bearbeiten",
+        "resetToDefaultValue": "Auf Standardwert zurücksetzen",
+        "singleFieldType": "{{name}} (Einzeln)",
+        "collectionOrScalarFieldType": "{{name}} (Einzeln oder Sammlung)",
+        "missingFieldTemplate": "Fehlende Feldvorlage",
+        "missingNode": "Fehlender Aufrufknoten",
+        "missingInvocationTemplate": "Fehlende Aufrufvorlage",
+        "edit": "Bearbeiten",
+        "workflowAuthor": "Autor",
+        "graph": "Graph",
+        "workflowDescription": "Kurze Beschreibung",
+        "workflow": "Arbeitsablauf",
+        "noGraph": "Kein Graph",
+        "version": "Version",
+        "zoomInNodes": "Hineinzoomen",
+        "zoomOutNodes": "Herauszoomen",
+        "workflowName": "Name",
+        "unknownNode": "Unbekannter Knoten",
+        "workflowContact": "Kontaktdaten",
+        "workflowNotes": "Notizen",
+        "workflowTags": "Tags",
+        "workflowVersion": "Version",
+        "saveToGallery": "In Galerie speichern",
+        "noWorkflows": "Keine Arbeitsabläufe",
+        "noMatchingWorkflows": "Keine passenden Arbeitsabläufe",
+        "unknownErrorValidatingWorkflow": "Unbekannter Fehler beim Validieren des Arbeitsablaufes",
+        "inputFieldTypeParseError": "Typ des Eingabefelds {{node}}.{{field}} kann nicht analysiert werden ({{message}})",
+        "workflowSettings": "Arbeitsablauf Editor Einstellungen",
+        "viewMode": "In linearen Ansicht verwenden",
+        "unableToValidateWorkflow": "Arbeitsablauf kann nicht validiert werden",
+        "outputFieldTypeParseError": "Typ des Ausgabefelds {{node}}.{{field}} kann nicht analysiert werden ({{message}})",
+        "unableToGetWorkflowVersion": "Version des Arbeitsablaufschemas kann nicht bestimmt werden",
+        "unknownFieldType": "$t(nodes.unknownField) Typ: {{type}}",
+        "unknownField": "Unbekanntes Feld",
+        "unableToUpdateNodes_one": "{{count}} Knoten kann nicht aktualisiert werden",
+        "unableToUpdateNodes_other": "{{count}} Knoten können nicht aktualisiert werden",
+        "uniformRandomDistribution": "Uniforme Zufallsverteilung",
+        "linearDistribution": "Lineare Verteilung",
+        "generatorNRandomValues_one": "{{count}} Zufallswert",
+        "generatorNRandomValues_other": "{{count}} Zufallswerte",
+        "arithmeticSequence": "Arithmetische Folge",
+        "noBatchGroup": "keine Gruppe",
+        "generatorNoValues": "leer",
+        "generatorLoadFromFile": "Aus Datei laden",
+        "showEdgeLabels": "Kantenbeschriftungen anzeigen",
+        "downloadWorkflowError": "Fehler beim Herunterladen des Arbeitsablaufs",
+        "nodeName": "Knotenname",
+        "description": "Beschreibung",
+        "loadWorkflowDesc": "Arbeitsablauf laden?",
+        "loadWorkflowDesc2": "Ihr aktueller Arbeitsablauf enthält nicht gespeicherte Änderungen.",
+        "missingSourceOrTargetHandle": "Fehlender Quell- oder Zielgriff",
+        "missingSourceOrTargetNode": "Fehlender Quell- oder Zielknoten",
+        "showEdgeLabelsHelp": "Beschriftungen an Kanten anzeigen, um die verknüpften Knoten zu kennzeichnen"
     },
     "hrf": {
-        "enableHrf": "Korrektur für hohe Auflösungen",
-        "upscaleMethod": "Vergrößerungsmethoden",
         "metadata": {
-            "strength": "Hochauflösender Fix Stärke",
-            "enabled": "Hochauflösender Fix aktiviert",
-            "method": "Hochauflösender Fix Methode"
+            "strength": "Auflösungs-Fix Stärke",
+            "enabled": "Auflösungs-Fix aktiviert",
+            "method": "Auflösungs-Fix Methode"
         },
-        "hrf": "Hochauflösender Fix"
+        "hrf": "Hohe-Auflösung-Fix"
     },
     "models": {
         "noMatchingModels": "Keine passenden Modelle",
         "loading": "lade",
-        "noMatchingLoRAs": "Keine passenden LoRAs",
         "noModelsAvailable": "Keine Modelle verfügbar",
         "selectModel": "Wählen ein Modell aus",
         "noRefinerModelsInstalled": "Keine SDXL Refiner-Modelle installiert",
-        "noLoRAsInstalled": "Keine LoRAs installiert",
-        "esrganModel": "ESRGAN Modell",
         "addLora": "LoRA hinzufügen",
         "defaultVAE": "Standard VAE",
-        "lora": "LoRA"
+        "lora": "LoRA",
+        "concepts": "Konzepte"
     },
     "accordions": {
         "generation": {
@@ -1062,7 +1376,7 @@
         },
         "compositing": {
             "coherenceTab": "Kohärenzpass",
-            "infillTab": "Füllung / Infill",
+            "infillTab": "Infill",
             "title": "Compositing"
         }
     },
@@ -1070,32 +1384,40 @@
         "workflows": "Arbeitsabläufe",
         "workflowName": "Arbeitsablauf-Name",
         "saveWorkflowAs": "Arbeitsablauf speichern als",
-        "searchWorkflows": "Suche Arbeitsabläufe",
         "newWorkflowCreated": "Neuer Arbeitsablauf erstellt",
         "problemSavingWorkflow": "Problem beim Speichern des Arbeitsablaufs",
-        "problemLoading": "Problem beim Laden von Arbeitsabläufen",
         "downloadWorkflow": "Speichern als",
         "savingWorkflow": "Speichere Arbeitsablauf...",
         "saveWorkflow": "Arbeitsablauf speichern",
         "noWorkflows": "Keine Arbeitsabläufe",
         "workflowLibrary": "Bibliothek",
         "unnamedWorkflow": "Unbenannter Arbeitsablauf",
-        "noDescription": "Keine Beschreibung",
-        "clearWorkflowSearchFilter": "Suchfilter zurücksetzen",
         "workflowEditorMenu": "Arbeitsablauf-Editor Menü",
         "deleteWorkflow": "Arbeitsablauf löschen",
         "workflowSaved": "Arbeitsablauf gespeichert",
         "uploadWorkflow": "Aus Datei laden",
-        "openWorkflow": "Arbeitsablauf öffnen",
         "saveWorkflowToProject": "Arbeitsablauf in Projekt speichern",
         "workflowCleared": "Arbeitsablauf gelöscht",
-        "loading": "Lade Arbeitsabläufe"
-    },
-    "app": {
-        "storeNotInitialized": "App-Store ist nicht initialisiert"
+        "loading": "Lade Arbeitsabläufe",
+        "name": "Name",
+        "ascending": "Aufsteigend",
+        "opened": "Geöffnet",
+        "loadWorkflow": "Arbeitsablauf $t(common.load)",
+        "updated": "Aktualisiert",
+        "created": "Erstellt",
+        "descending": "Absteigend",
+        "edit": "Bearbeiten",
+        "loadFromGraph": "Arbeitsablauf aus dem Graph laden",
+        "delete": "Löschen",
+        "copyShareLinkForWorkflow": "Teilen-Link für Arbeitsablauf kopieren",
+        "autoLayout": "Auto Layout",
+        "copyShareLink": "Teilen-Link kopieren",
+        "download": "Herunterladen",
+        "convertGraph": "Graph konvertieren",
+        "yourWorkflows": "Ihre Arbeitsabläufe",
+        "recentlyOpened": "Kürzlich geöffnet"
     },
     "sdxl": {
-        "concatPromptStyle": "Verknüpfen von Prompt & Stil",
         "scheduler": "Planer",
         "steps": "Schritte"
     },
@@ -1103,8 +1425,345 @@
         "showDynamicPrompts": "Dynamische Prompts anzeigen"
     },
     "prompt": {
-        "noMatchingTriggers": "Keine passenden Auslöser",
-        "addPromptTrigger": "Auslöse Text hinzufügen",
-        "compatibleEmbeddings": "Kompatible Einbettungen"
+        "noMatchingTriggers": "Keine passenden Trigger",
+        "addPromptTrigger": "Prompt-Trigger hinzufügen",
+        "compatibleEmbeddings": "Kompatible Einbettungen",
+        "replace": "Ersetzen",
+        "discard": "Verwerfen",
+        "generateFromImage": "Prompt aus Bild generieren",
+        "expandCurrentPrompt": "Aktuelle Prompt erweitern",
+        "uploadImageForPromptGeneration": "Bild zur Prompt-Generierung hochladen",
+        "expandingPrompt": "Prompt wird erweitert..."
+    },
+    "ui": {
+        "tabs": {
+            "queue": "Warteschlange",
+            "gallery": "Galerie",
+            "models": "Modelle",
+            "upscaling": "Hochskalierung",
+            "workflows": "Arbeitsabläufe",
+            "canvas": "Leinwand"
+        }
+    },
+    "system": {
+        "logNamespaces": {
+            "logNamespaces": "Namespaces loggen",
+            "models": "Modelle",
+            "gallery": "Galerie",
+            "events": "Ereignisse",
+            "queue": "Warteschlange",
+            "system": "System",
+            "workflows": "Arbeitsabläufe",
+            "generation": "Erstellung",
+            "metadata": "Metadaten",
+            "config": "Konfiguration",
+            "canvas": "Leinwand"
+        },
+        "logLevel": {
+            "fatal": "Fatal",
+            "trace": "Trace",
+            "logLevel": "Protokollierungsstufe",
+            "error": "Fehler",
+            "info": "Infos",
+            "warn": "Warnung",
+            "debug": "Fehlerdiagnose"
+        },
+        "enableLogging": "Protokollierung aktivieren"
+    },
+    "whatsNew": {
+        "whatsNewInInvoke": "Was gibt's Neues"
+    },
+    "stylePresets": {
+        "name": "Name",
+        "acceptedColumnsKeys": "Akzeptierte Spalten/Schlüssel:",
+        "noTemplates": "Keine Vorlagen",
+        "promptTemplatesDesc2": "Verwenden Sie die Platzhalterzeichenfolge<Pre>{{placeholder}}</Pre>, um anzugeben, wo Ihre Eingabeaufforderung in die Vorlage aufgenommen werden soll.",
+        "noMatchingTemplates": "Keine passenden Vorlagen",
+        "myTemplates": "Meine Vorlagen",
+        "toggleViewMode": "Ansicht umschalten",
+        "viewModeTooltip": "So sieht Ihr Prompt mit der aktuell ausgewählten Vorlage aus. Um Ihren Prompt zu bearbeiten, klicken Sie irgendwo in das Textfeld.",
+        "templateDeleted": "Promptvorlage gelöscht",
+        "unableToDeleteTemplate": "Promptvorlage kann nicht gelöscht werden",
+        "insertPlaceholder": "Platzhalter einfügen",
+        "type": "Typ",
+        "uploadImage": "Bild hochladen",
+        "updatePromptTemplate": "Promptvorlage aktualisieren",
+        "exportFailed": "CSV kann nicht generiert und heruntergeladen werden",
+        "viewList": "Vorlagenliste anzeigen",
+        "useForTemplate": "Für Promptvorlage nutzen",
+        "shared": "Geteilt",
+        "private": "Privat",
+        "promptTemplatesDesc1": "Promptvorlagen fügen den Prompts, die Sie in das Prompt-Feld schreiben, Text hinzu.",
+        "negativePrompt": "Negativ-Prompt",
+        "positivePromptColumn": "'prompt' oder 'positive_prompt'",
+        "promptTemplatesDesc3": "Wenn Sie den Platzhalter weglassen, wird die Vorlage an das Ende Ihres Prompts angehängt.",
+        "sharedTemplates": "Geteilte Vorlagen",
+        "importTemplates": "Promptvorlagen importieren (CSV/JSON)",
+        "flatten": "Ausgewählte Vorlage in aktuelle Eingabeaufforderung einblenden",
+        "searchByName": "Nach Name suchen",
+        "promptTemplateCleared": "Promptvorlage gelöscht",
+        "preview": "Vorschau",
+        "positivePrompt": "Positiv-Prompt",
+        "active": "Aktiv",
+        "deleteTemplate2": "Sind Sie sicher, dass Sie diese Vorlage löschen möchten? Dies kann nicht rückgängig gemacht werden.",
+        "deleteTemplate": "Vorlage löschen",
+        "copyTemplate": "Vorlage kopieren",
+        "editTemplate": "Vorlage bearbeiten",
+        "deleteImage": "Bild löschen",
+        "defaultTemplates": "Standardvorlagen",
+        "nameColumn": "'name'",
+        "exportDownloaded": "Export heruntergeladen"
+    },
+    "newUserExperience": {
+        "gettingStartedSeries": "Wünschen Sie weitere Anleitungen? In unserer <LinkComponent>Einführungsserie</LinkComponent> finden Sie Tipps, wie Sie das Potenzial von Invoke Studio voll ausschöpfen können.",
+        "toGetStarted": "Um zu beginnen, geben Sie einen Prompt in das Feld ein und klicken Sie auf <StrongComponent>Invoke</StrongComponent>, um Ihr erstes Bild zu erzeugen. Sie können Ihre Bilder direkt in der <StrongComponent>Galerie</StrongComponent> speichern oder sie auf der <StrongComponent>Leinwand</StrongComponent> bearbeiten."
+    },
+    "controlLayers": {
+        "pullBboxIntoLayerOk": "Bbox in die Ebene gezogen",
+        "saveBboxToGallery": "Bbox in Galerie speichern",
+        "tool": {
+            "bbox": "Bbox",
+            "brush": "Pinsel",
+            "eraser": "Radiergummi",
+            "colorPicker": "Farbwähler",
+            "view": "Ansicht",
+            "rectangle": "Rechteck",
+            "move": "Verschieben"
+        },
+        "transform": {
+            "fitToBbox": "An Bbox anpassen",
+            "reset": "Zurücksetzen",
+            "apply": "Anwenden",
+            "cancel": "Abbrechen"
+        },
+        "pullBboxIntoLayerError": "Problem, Bbox in die Ebene zu ziehen",
+        "pullBboxIntoLayer": "Bbox in Ebene ziehen",
+        "HUD": {
+            "bbox": "Bbox",
+            "scaledBbox": "Skalierte Bbox",
+            "entityStatus": {
+                "isHidden": "{{title}} ist ausgeblendet",
+                "isDisabled": "{{title}} ist deaktiviert",
+                "isLocked": "{{title}} ist gesperrt",
+                "isEmpty": "{{title}} ist leer"
+            }
+        },
+        "fitBboxToLayers": "Bbox an Ebenen anpassen",
+        "pullBboxIntoReferenceImage": "Bbox ins Referenzbild ziehen",
+        "pullBboxIntoReferenceImageOk": "Bbox in Referenzbild gezogen",
+        "pullBboxIntoReferenceImageError": "Problem, Bbox ins Referenzbild zu ziehen",
+        "bboxOverlay": "Bbox Overlay anzeigen",
+        "clipToBbox": "Pinselstriche auf Bbox beschränken",
+        "canvasContextMenu": {
+            "saveBboxToGallery": "Bbox in Galerie speichern",
+            "bboxGroup": "Aus Bbox erstellen",
+            "canvasGroup": "Leinwand",
+            "newGlobalReferenceImage": "Neues globales Referenzbild",
+            "newRegionalReferenceImage": "Neues regionales Referenzbild",
+            "newControlLayer": "Neue Kontroll-Ebene",
+            "newRasterLayer": "Neue Rasterebene"
+        },
+        "rectangle": "Rechteck",
+        "saveCanvasToGallery": "Leinwand in Galerie speichern",
+        "newRasterLayerError": "Problem beim Erstellen einer Rasterebene",
+        "saveLayerToAssets": "Ebene in Galerie speichern",
+        "deleteReferenceImage": "Referenzbild löschen",
+        "referenceImage": "Referenzbild",
+        "opacity": "Opazität",
+        "removeBookmark": "Lesezeichen entfernen",
+        "rasterLayer": "Rasterebene",
+        "deleteSelected": "Ausgewählte löschen",
+        "newRegionalReferenceImageError": "Problem beim Erstellen eines regionalen Referenzbilds",
+        "newControlLayerOk": "Kontroll-Ebene erstellt",
+        "newControlLayerError": "Problem beim Erstellen einer Kontroll-Ebene",
+        "newRasterLayerOk": "Rasterebene erstellt",
+        "moveToFront": "Nach vorne bringen",
+        "copyToClipboard": "In die Zwischenablage kopieren",
+        "clearCaches": "Cache leeren",
+        "controlLayer": "Kontroll-Ebene",
+        "transparency": "Transparenz",
+        "canvas": "Leinwand",
+        "global": "Global",
+        "regional": "Regional",
+        "newGlobalReferenceImageOk": "Globales Referenzbild erstellt",
+        "savedToGalleryError": "Fehler beim Speichern in der Galerie",
+        "savedToGalleryOk": "In Galerie gespeichert",
+        "newGlobalReferenceImageError": "Problem beim Erstellen eines globalen Referenzbilds",
+        "newRegionalReferenceImageOk": "Regionales Referenzbild erstellt",
+        "duplicate": "Duplizieren",
+        "regionalReferenceImage": "Regionales Referenzbild",
+        "globalReferenceImage": "Globales Referenzbild",
+        "regionIsEmpty": "Ausgewählte Region is leer",
+        "mergeVisible": "Sichtbare vereinen",
+        "mergeVisibleOk": "Sichtbare Ebenen vereinen",
+        "mergeVisibleError": "Fehler beim Vereinen sichtbarer Ebenen",
+        "clearHistory": "Verlauf leeren",
+        "addLayer": "Ebene hinzufügen",
+        "width": "Breite",
+        "weight": "Gewichtung",
+        "addReferenceImage": "$t(controlLayers.referenceImage) hinzufügen",
+        "addInpaintMask": "$t(controlLayers.inpaintMask) hinzufügen",
+        "regionalGuidance": "Regionale Führung",
+        "addPositivePrompt": "$t(controlLayers.prompt) hinzufügen",
+        "locked": "Gesperrt",
+        "showHUD": "HUD anzeigen",
+        "addNegativePrompt": "$t(controlLayers.negativePrompt) hinzufügen",
+        "addRasterLayer": "$t(controlLayers.rasterLayer) hinzufügen",
+        "addRegionalGuidance": "$t(controlLayers.regionalGuidance) hinzufügen",
+        "addControlLayer": "$t(controlLayers.controlLayer) hinzufügen",
+        "replaceLayer": "Ebene ersetzen",
+        "unlocked": "Entsperrt",
+        "showProgressOnCanvas": "Fortschritt auf Leinwand anzeigen",
+        "controlMode": {
+            "balanced": "Ausgewogen"
+        },
+        "stagingArea": {
+            "accept": "Annehmen",
+            "next": "Nächste",
+            "discardAll": "Alle verwerfen",
+            "discard": "Verwerfen",
+            "previous": "Vorherige"
+        },
+        "settings": {
+            "snapToGrid": {
+                "on": "Ein",
+                "off": "Aus",
+                "label": "Am Raster ausrichten"
+            }
+        },
+        "layer_one": "Ebene",
+        "layer_other": "Ebenen",
+        "fill": {
+            "fillStyle": "Füllstil",
+            "diagonal": "Diagonal",
+            "vertical": "Vertikal",
+            "fillColor": "Füllfarbe",
+            "grid": "Raster",
+            "solid": "Solide",
+            "crosshatch": "Kreuzschraffur",
+            "horizontal": "Horizontal"
+        },
+        "filter": {
+            "apply": "Anwenden",
+            "reset": "Zurücksetzen",
+            "cancel": "Abbrechen",
+            "spandrel_filter": {
+                "label": "Bild-zu-Bild Modell",
+                "description": "Ein Bild-zu-Bild Modell auf der ausgewählten Ebene ausführen.",
+                "model": "Modell"
+            },
+            "filters": "Filter",
+            "filterType": "Filtertyp",
+            "filter": "Filter"
+        },
+        "bookmark": "Lesezeichen für Schnell-Umschalten",
+        "asRasterLayer": "Als $t(controlLayers.rasterLayer)",
+        "asRasterLayerResize": "Als $t(controlLayers.rasterLayer) (Größe anpassen)",
+        "rasterLayer_withCount_one": "$t(controlLayers.rasterLayer)",
+        "rasterLayer_withCount_other": "Rasterebenen",
+        "newRasterLayer": "Neue $t(controlLayers.rasterLayer)",
+        "showNonRasterLayers": "Nicht-Rasterebenen anzeigen (Umschalt+H)",
+        "hideNonRasterLayers": "Nicht-Rasterebenen ausblenden (Umschalt+H)"
+    },
+    "upscaling": {
+        "creativity": "Kreativität",
+        "structure": "Struktur",
+        "scale": "Maßstab"
+    },
+    "auth": {
+        "login": {
+            "title": "Einloggen in InvokeAi",
+            "email": "Email",
+            "emailPlaceholder": "Email",
+            "password": "Password",
+            "passwordPlaceholder": "Password",
+            "rememberMe": "Eingeloggt bleiben für 7 Tage",
+            "signIn": "Einloggen",
+            "signingIn": "einloggen...",
+            "loginFailed": "Fehler beim einloggen. Daten prüfen.",
+            "sessionExpired": "Session ist abgelaufen. Bitte erneuert einloggen."
+        },
+        "setup": {
+            "title": "Willkommen zu InvokeAI",
+            "subtitle": "Admin Account anlegen um zu starten",
+            "email": "Email",
+            "emailPlaceholder": "admin@beispiel.de",
+            "emailHelper": "Das wird dein Username sein zum einloggen",
+            "displayName": "Anzeige Name",
+            "displayNamePlaceholder": "Administrator",
+            "displayNameHelper": "Der Anzeigename in der Anwendung",
+            "password": "Password",
+            "passwordPlaceholder": "Passwort",
+            "passwordHelper": "Muss mindestens 8 Zeichen lang sein und Großbuchstaben, Kleinbuchstaben und Zahlen enthalten",
+            "passwordTooShort": "Das Passwort muss mindestens 8 Zeichen lang sein",
+            "passwordMissingRequirements": "Das Passwort muss Großbuchstaben, Kleinbuchstaben und Zahlen enthalten",
+            "confirmPassword": "Passwort bestätigen",
+            "confirmPasswordPlaceholder": "Passwort bestätigen",
+            "passwordsDoNotMatch": "Die Passwörter stimmen nicht überein",
+            "createAccount": "Administratorkonto erstellen",
+            "creatingAccount": "Einrichtung läuft...",
+            "setupFailed": "Die Einrichtung ist fehlgeschlagen. Bitte versuchen Sie es erneut.",
+            "passwordHelperRelaxed": "Geben Sie ein Passwort ein (die Stärke wird angezeigt)"
+        },
+        "userMenu": "User Menü",
+        "admin": "Admin",
+        "logout": "Ausloggen",
+        "adminOnlyFeature": "Diese Funktion steht nur Administratoren zur Verfügung.",
+        "profile": {
+            "menuItem": "Mein Profile",
+            "title": "Mein Profile",
+            "email": "Email",
+            "emailReadOnly": "Die E-Mail-Adresse kann nicht geändert werden",
+            "displayName": "Anzeige Name",
+            "displayNamePlaceholder": "Dein Name",
+            "changePassword": "Passwort ändern",
+            "currentPassword": "Aktuelle Passwort",
+            "currentPasswordPlaceholder": "Aktuelles Passwort",
+            "newPassword": "Neues Passwort",
+            "newPasswordPlaceholder": "Neues Passwort",
+            "confirmPassword": "Neues Passwort bestätigen",
+            "confirmPasswordPlaceholder": "Neues Passwort bestätigen",
+            "passwordsDoNotMatch": "Die Passwörter stimmen nicht überein",
+            "saveSuccess": "Profil erfolgreich aktualisiert",
+            "saveFailed": "Profil konnte nicht gespeichert werden. Bitte versuchen Sie es erneut."
+        },
+        "userManagement": {
+            "menuItem": "Benutzerverwaltung",
+            "title": "Benutzerverwaltung",
+            "email": "Email",
+            "emailPlaceholder": "user@beispiel.de",
+            "displayName": "Anzeige Name",
+            "displayNamePlaceholder": "Anzeige Name",
+            "password": "Passwort",
+            "passwordPlaceholder": "Passwort",
+            "newPassword": "Neues Passwort",
+            "newPasswordPlaceholder": "Lassen Sie dieses Feld leer, um das aktuelle Passwort beizubehalten",
+            "role": "Rolle",
+            "status": "Status",
+            "actions": "Aktionen",
+            "isAdmin": "Administrator",
+            "user": "Benutzer",
+            "you": "Du",
+            "createUser": "Benutzer anlegen",
+            "editUser": "Benutzer bearbeiten",
+            "deleteUser": "Benutzer löschen",
+            "deleteConfirm": "Möchten Sie \"{{name}}\" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+            "generatePassword": "Generieren sicheres Passwort",
+            "showPassword": "Passwort zeigen",
+            "hidePassword": "Passwort verstecken",
+            "activate": "Aktivieren",
+            "deactivate": "Deaktivieren",
+            "saveFailed": "Benutzer konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
+            "deleteFailed": "Benutzer konnte nicht gelöscht werden. Bitte versuchen Sie es erneut.",
+            "loadFailed": "Benutzer konnten nicht geladen werden.",
+            "back": "Zurück",
+            "cannotDeleteSelf": "Sie können Ihr eigenes Konto nicht löschen",
+            "cannotDeactivateSelf": "Sie können Ihr eigenes Konto nicht löschen"
+        },
+        "passwordStrength": {
+            "weak": "schwaches Passwort",
+            "moderate": "Moderates Passwort",
+            "strong": "Starkes Passwort"
+        }
     }
 }

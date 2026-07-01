@@ -37,19 +37,21 @@ class Struct_mallinfo2(ctypes.Structure):
 
     def __str__(self) -> str:
         s = ""
-        s += f"{'arena': <10}= {(self.arena/2**30):15.5f}   # Non-mmapped space allocated (GB) (uordblks + fordblks)\n"
+        s += (
+            f"{'arena': <10}= {(self.arena / 2**30):15.5f}   # Non-mmapped space allocated (GB) (uordblks + fordblks)\n"
+        )
         s += f"{'ordblks': <10}= {(self.ordblks): >15}   # Number of free chunks\n"
         s += f"{'smblks': <10}= {(self.smblks): >15}   # Number of free fastbin blocks \n"
         s += f"{'hblks': <10}= {(self.hblks): >15}   # Number of mmapped regions \n"
-        s += f"{'hblkhd': <10}= {(self.hblkhd/2**30):15.5f}   # Space allocated in mmapped regions (GB)\n"
+        s += f"{'hblkhd': <10}= {(self.hblkhd / 2**30):15.5f}   # Space allocated in mmapped regions (GB)\n"
         s += f"{'usmblks': <10}= {(self.usmblks): >15}   # Unused\n"
-        s += f"{'fsmblks': <10}= {(self.fsmblks/2**30):15.5f}   # Space in freed fastbin blocks (GB)\n"
+        s += f"{'fsmblks': <10}= {(self.fsmblks / 2**30):15.5f}   # Space in freed fastbin blocks (GB)\n"
         s += (
-            f"{'uordblks': <10}= {(self.uordblks/2**30):15.5f}   # Space used by in-use allocations (non-mmapped)"
+            f"{'uordblks': <10}= {(self.uordblks / 2**30):15.5f}   # Space used by in-use allocations (non-mmapped)"
             " (GB)\n"
         )
-        s += f"{'fordblks': <10}= {(self.fordblks/2**30):15.5f}   # Space in free blocks (non-mmapped) (GB)\n"
-        s += f"{'keepcost': <10}= {(self.keepcost/2**30):15.5f}   # Top-most, releasable space (GB)\n"
+        s += f"{'fordblks': <10}= {(self.fordblks / 2**30):15.5f}   # Space in free blocks (non-mmapped) (GB)\n"
+        s += f"{'keepcost': <10}= {(self.keepcost / 2**30):15.5f}   # Top-most, releasable space (GB)\n"
         return s
 
 

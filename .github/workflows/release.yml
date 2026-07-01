@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: check python version
         uses: samuelcolvin/check-python-version@v4
@@ -49,7 +49,7 @@ jobs:
       always_run: true
 
   build:
-    uses: ./.github/workflows/build-installer.yml
+    uses: ./.github/workflows/build-wheel.yml
 
   publish-testpypi:
     runs-on: ubuntu-latest
@@ -70,7 +70,7 @@ jobs:
       id-token: write
     steps:
       - name: download distribution from build job
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/
@@ -99,7 +99,7 @@ jobs:
       id-token: write
     steps:
       - name: download distribution from build job
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/

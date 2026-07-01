@@ -1,11 +1,9 @@
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { useMemo } from 'react';
+import { useIsExecutableNode } from 'features/nodes/hooks/useIsBatchNode';
 
-import { useHasImageOutput } from './useHasImageOutput';
+import { useNodeHasImageOutput } from './useNodeHasImageOutput';
 
-export const useWithFooter = (nodeId: string) => {
-  const hasImageOutput = useHasImageOutput(nodeId);
-  const isCacheEnabled = useFeatureStatus('invocationCache');
-  const withFooter = useMemo(() => hasImageOutput || isCacheEnabled, [hasImageOutput, isCacheEnabled]);
-  return withFooter;
+export const useWithFooter = () => {
+  const hasImageOutput = useNodeHasImageOutput();
+  const isExecutableNode = useIsExecutableNode();
+  return isExecutableNode && hasImageOutput;
 };

@@ -4,17 +4,17 @@
 from pathlib import Path
 from typing import Optional
 
-from invokeai.backend.model_manager import (
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.load.load_default import ModelLoader
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
-    AnyModelConfig,
     BaseModelType,
     ModelFormat,
     ModelType,
     SubModelType,
 )
 from invokeai.backend.textual_inversion import TextualInversionModelRaw
-
-from .. import ModelLoader, ModelLoaderRegistry
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.TextualInversion, format=ModelFormat.EmbeddingFile)

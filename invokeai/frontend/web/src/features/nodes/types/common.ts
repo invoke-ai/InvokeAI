@@ -1,18 +1,24 @@
 import { z } from 'zod';
 
-import type { ModelIdentifier as ModelIdentifierV2 } from './v2/common';
-import { zModelIdentifier as zModelIdentifierV2 } from './v2/common';
-
 // #region Field data schemas
 export const zImageField = z.object({
   image_name: z.string().trim().min(1),
 });
 export type ImageField = z.infer<typeof zImageField>;
+export const isImageField = (field: unknown): field is ImageField => zImageField.safeParse(field).success;
+const zImageFieldCollection = z.array(zImageField);
+type ImageFieldCollection = z.infer<typeof zImageFieldCollection>;
+export const isImageFieldCollection = (field: unknown): field is ImageFieldCollection =>
+  zImageFieldCollection.safeParse(field).success;
 
 export const zBoardField = z.object({
   board_id: z.string().trim().min(1),
 });
 export type BoardField = z.infer<typeof zBoardField>;
+
+export const zStylePresetField = z.object({
+  style_preset_id: z.string().trim().min(1),
+});
 
 export const zColorField = z.object({
   r: z.number().int().min(0).max(255),
@@ -22,7 +28,7 @@ export const zColorField = z.object({
 });
 export type ColorField = z.infer<typeof zColorField>;
 
-export const zClassification = z.enum(['stable', 'beta', 'prototype']);
+export const zClassification = z.enum(['stable', 'beta', 'prototype', 'deprecated', 'internal', 'special']);
 export type Classification = z.infer<typeof zClassification>;
 
 export const zSchedulerField = z.enum([
@@ -32,70 +38,187 @@ export const zSchedulerField = z.enum([
   'ddpm',
   'dpmpp_2s',
   'dpmpp_2m',
+  'dpmpp_3m',
   'dpmpp_2m_sde',
   'dpmpp_sde',
+  'er_sde',
   'heun',
   'kdpm_2',
   'lms',
   'pndm',
   'unipc',
   'euler_k',
+  'deis_k',
   'dpmpp_2s_k',
   'dpmpp_2m_k',
+  'dpmpp_3m_k',
   'dpmpp_2m_sde_k',
   'dpmpp_sde_k',
   'heun_k',
+  'kdpm_2_k',
+  'kdpm_2_a_k',
   'lms_k',
+  'unipc_k',
   'euler_a',
   'kdpm_2_a',
   'lcm',
   'tcd',
 ]);
 export type SchedulerField = z.infer<typeof zSchedulerField>;
+
+// Flux-specific scheduler options (Flow Matching schedulers)
+export const zFluxSchedulerField = z.enum(['euler', 'heun', 'lcm']);
+
+// Z-Image scheduler options (Flow Matching schedulers)
+// Note: LCM is only supported for Z-Image Turbo, not for Z-Image Base (undistilled)
+export const zZImageSchedulerField = z.enum(['euler', 'heun', 'lcm']);
+// Anima scheduler options (same flow-matching schedulers, defined separately to avoid coupling)
+export const zAnimaSchedulerField = z.enum(['euler', 'heun', 'dpmpp_2m', 'dpmpp_2m_sde', 'er_sde', 'lcm']);
+
+// Flux DyPE (Dynamic Position Extrapolation) preset options for high-resolution generation
+export const zFluxDypePresetField = z.enum(['off', 'manual', 'auto', 'area', '4k']);
+
+// Flux DyPE scale (magnitude λs) - 0.0-8.0, default 2.0
+export const zFluxDypeScaleField = z.number().min(0).max(8);
+
+// Flux DyPE exponent (decay speed λt) - 0.0-1000.0, default 2.0
+export const zFluxDypeExponentField = z.number().min(0).max(1000);
 // #endregion
 
 // #region Model-related schemas
-const zBaseModel = z.enum(['any', 'sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
-const zModelType = z.enum([
+export const zBaseModelType = z.enum([
+  'any',
+  'sd-1',
+  'sd-2',
+  'sd-3',
+  'sdxl',
+  'sdxl-refiner',
+  'flux',
+  'flux2',
+  'cogview4',
+  'qwen-image',
+  'z-image',
+  'external',
+  'anima',
+  'unknown',
+]);
+export type BaseModelType = z.infer<typeof zBaseModelType>;
+export const zMainModelBase = z.enum([
+  'sd-1',
+  'sd-2',
+  'sd-3',
+  'sdxl',
+  'flux',
+  'flux2',
+  'cogview4',
+  'qwen-image',
+  'z-image',
+  'anima',
+]);
+type MainModelBase = z.infer<typeof zMainModelBase>;
+export const isMainModelBase = (base: unknown): base is MainModelBase => zMainModelBase.safeParse(base).success;
+export const zModelType = z.enum([
   'main',
   'vae',
   'lora',
+  'llava_onevision',
+  'text_llm',
+  'control_lora',
   'controlnet',
   't2i_adapter',
   'ip_adapter',
   'embedding',
   'onnx',
   'clip_vision',
+  'spandrel_image_to_image',
+  't5_encoder',
+  'qwen3_encoder',
+  'qwen_vl_encoder',
+  'clip_embed',
+  'siglip',
+  'flux_redux',
+  'external_image_generator',
+  'unknown',
 ]);
-const zSubModelType = z.enum([
+export type ModelType = z.infer<typeof zModelType>;
+export const zSubModelType = z.enum([
   'unet',
+  'transformer',
   'text_encoder',
   'text_encoder_2',
+  'text_encoder_3',
   'tokenizer',
   'tokenizer_2',
+  'tokenizer_3',
   'vae',
   'vae_decoder',
   'vae_encoder',
   'scheduler',
   'safety_checker',
 ]);
+
+export const zClipVariantType = z.enum(['large', 'gigantic']);
+export const zModelVariantType = z.enum(['normal', 'inpaint', 'depth']);
+export const zFluxVariantType = z.enum(['dev', 'dev_fill', 'schnell']);
+export const zFlux2VariantType = z.enum(['klein_4b', 'klein_4b_base', 'klein_9b', 'klein_9b_base']);
+export const zZImageVariantType = z.enum(['turbo', 'zbase']);
+const zQwenImageVariantType = z.enum(['generate', 'edit']);
+export const zQwen3VariantType = z.enum(['qwen3_4b', 'qwen3_8b', 'qwen3_06b']);
+export const zAnyModelVariant = z.union([
+  zModelVariantType,
+  zClipVariantType,
+  zFluxVariantType,
+  zFlux2VariantType,
+  zZImageVariantType,
+  zQwenImageVariantType,
+  zQwen3VariantType,
+]);
+export type AnyModelVariant = z.infer<typeof zAnyModelVariant>;
+export const zModelFormat = z.enum([
+  'omi',
+  'diffusers',
+  'checkpoint',
+  'lycoris',
+  'onnx',
+  'olive',
+  'embedding_file',
+  'embedding_folder',
+  'invokeai',
+  't5_encoder',
+  'qwen3_encoder',
+  'qwen_vl_encoder',
+  'bnb_quantized_int8b',
+  'bnb_quantized_nf4b',
+  'gguf_quantized',
+  'external_api',
+  'unknown',
+]);
+export type ModelFormat = z.infer<typeof zModelFormat>;
+
 export const zModelIdentifierField = z.object({
   key: z.string().min(1),
   hash: z.string().min(1),
   name: z.string().min(1),
-  base: zBaseModel,
+  base: zBaseModelType,
   type: zModelType,
   submodel_type: zSubModelType.nullish(),
 });
-export const isModelIdentifier = (field: unknown): field is ModelIdentifierField =>
-  zModelIdentifierField.safeParse(field).success;
-export const isModelIdentifierV2 = (field: unknown): field is ModelIdentifierV2 =>
-  zModelIdentifierV2.safeParse(field).success;
 export type ModelIdentifierField = z.infer<typeof zModelIdentifierField>;
+
+// Frontend-only identifier for external API models (not part of the backend schema)
+export const zExternalModelIdentifierField = z.object({
+  key: z.string().min(1),
+  hash: z.string().min(1),
+  name: z.string().min(1),
+  base: z.literal('external'),
+  type: z.literal('external_image_generator'),
+  submodel_type: zSubModelType.nullish(),
+});
+
 // #endregion
 
 // #region Control Adapters
-export const zControlField = z.object({
+const _zControlField = z.object({
   image: zImageField,
   control_model: zModelIdentifierField,
   control_weight: z.union([z.number(), z.array(z.number())]).optional(),
@@ -104,19 +227,19 @@ export const zControlField = z.object({
   control_mode: z.enum(['balanced', 'more_prompt', 'more_control', 'unbalanced']).optional(),
   resize_mode: z.enum(['just_resize', 'crop_resize', 'fill_resize', 'just_resize_simple']).optional(),
 });
-export type ControlField = z.infer<typeof zControlField>;
+export type ControlField = z.infer<typeof _zControlField>;
 
-export const zIPAdapterField = z.object({
+const _zIPAdapterField = z.object({
   image: zImageField,
   ip_adapter_model: zModelIdentifierField,
   weight: z.number(),
-  method: z.enum(['full', 'style', 'composition']),
+  method: z.enum(['full', 'style', 'composition', 'style_strong', 'style_precise']),
   begin_step_percent: z.number().optional(),
   end_step_percent: z.number().optional(),
 });
-export type IPAdapterField = z.infer<typeof zIPAdapterField>;
+export type IPAdapterField = z.infer<typeof _zIPAdapterField>;
 
-export const zT2IAdapterField = z.object({
+const _zT2IAdapterField = z.object({
   image: zImageField,
   t2i_adapter_model: zModelIdentifierField,
   weight: z.union([z.number(), z.array(z.number())]).optional(),
@@ -124,7 +247,7 @@ export const zT2IAdapterField = z.object({
   end_step_percent: z.number().optional(),
   resize_mode: z.enum(['just_resize', 'crop_resize', 'fill_resize', 'just_resize_simple']).optional(),
 });
-export type T2IAdapterField = z.infer<typeof zT2IAdapterField>;
+export type T2IAdapterField = z.infer<typeof _zT2IAdapterField>;
 // #endregion
 
 // #region ProgressImage
@@ -137,7 +260,7 @@ export type ProgressImage = z.infer<typeof zProgressImage>;
 // #endregion
 
 // #region ImageOutput
-const zImageOutput = z.object({
+export const zImageOutput = z.object({
   image: zImageField,
   width: z.number().int().gt(0),
   height: z.number().int().gt(0),

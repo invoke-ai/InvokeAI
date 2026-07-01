@@ -1,26 +1,27 @@
-from math import floor
 from typing import TYPE_CHECKING, Any, ClassVar, Coroutine, Generic, Optional, Protocol, TypeAlias, TypeVar
 
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.registry.payload_schema import registry as payload_schema
 from pydantic import BaseModel, ConfigDict, Field
 
+from invokeai.app.services.model_install.model_install_common import ModelInstallJob, ModelSource
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
     BatchStatus,
     EnqueueBatchResult,
+    RetryItemsResult,
     SessionQueueItem,
     SessionQueueStatus,
 )
 from invokeai.app.services.shared.graph import AnyInvocation, AnyInvocationOutput
 from invokeai.app.util.misc import get_timestamp
-from invokeai.backend.model_manager.config import AnyModelConfig, SubModelType
-from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.taxonomy import SubModelType
 
 if TYPE_CHECKING:
     from invokeai.app.services.download.download_base import DownloadJob
-    from invokeai.app.services.model_install.model_install_common import ModelInstallJob
+    from invokeai.app.services.model_install.model_install_common import ModelInstallJob, ModelSource
 
 
 class EventBase(BaseModel):
@@ -88,6 +89,9 @@ class QueueItemEventBase(QueueEventBase):
 
     item_id: int = Field(description="The ID of the queue item")
     batch_id: str = Field(description="The ID of the queue batch")
+    origin: str | None = Field(default=None, description="The origin of the queue item")
+    destination: str | None = Field(default=None, description="The destination of the queue item")
+    user_id: str = Field(default="system", description="The ID of the user who created the queue item")
 
 
 class InvocationEventBase(QueueItemEventBase):
@@ -95,8 +99,6 @@ class InvocationEventBase(QueueItemEventBase):
 
     session_id: str = Field(description="The ID of the session (aka graph execution state)")
     queue_id: str = Field(description="The ID of the queue")
-    item_id: int = Field(description="The ID of the queue item")
-    batch_id: str = Field(description="The ID of the queue batch")
     session_id: str = Field(description="The ID of the session (aka graph execution state)")
     invocation: AnyInvocation = Field(description="The ID of the invocation")
     invocation_source_id: str = Field(description="The ID of the prepared invocation's source node")
@@ -114,6 +116,9 @@ class InvocationStartedEvent(InvocationEventBase):
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
+            origin=queue_item.origin,
+            destination=queue_item.destination,
+            user_id=queue_item.user_id,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
@@ -121,51 +126,42 @@ class InvocationStartedEvent(InvocationEventBase):
 
 
 @payload_schema.register
-class InvocationDenoiseProgressEvent(InvocationEventBase):
-    """Event model for invocation_denoise_progress"""
+class InvocationProgressEvent(InvocationEventBase):
+    """Event model for invocation_progress"""
 
-    __event_name__ = "invocation_denoise_progress"
+    __event_name__ = "invocation_progress"
 
-    progress_image: ProgressImage = Field(description="The progress image sent at each step during processing")
-    step: int = Field(description="The current step of the invocation")
-    total_steps: int = Field(description="The total number of steps in the invocation")
-    order: int = Field(description="The order of the invocation in the session")
-    percentage: float = Field(description="The percentage of completion of the invocation")
+    message: str = Field(description="A message to display")
+    percentage: float | None = Field(
+        default=None, ge=0, le=1, description="The percentage of the progress (omit to indicate indeterminate progress)"
+    )
+    image: ProgressImage | None = Field(
+        default=None, description="An image representing the current state of the progress"
+    )
 
     @classmethod
     def build(
         cls,
         queue_item: SessionQueueItem,
         invocation: AnyInvocation,
-        intermediate_state: PipelineIntermediateState,
-        progress_image: ProgressImage,
-    ) -> "InvocationDenoiseProgressEvent":
-        step = intermediate_state.step
-        total_steps = intermediate_state.total_steps
-        order = intermediate_state.order
+        message: str,
+        percentage: float | None = None,
+        image: ProgressImage | None = None,
+    ) -> "InvocationProgressEvent":
         return cls(
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
+            origin=queue_item.origin,
+            destination=queue_item.destination,
+            user_id=queue_item.user_id,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
-            progress_image=progress_image,
-            step=step,
-            total_steps=total_steps,
-            order=order,
-            percentage=cls.calc_percentage(step, total_steps, order),
+            percentage=percentage,
+            image=image,
+            message=message,
         )
-
-    @staticmethod
-    def calc_percentage(step: int, total_steps: int, scheduler_order: float) -> float:
-        """Calculate the percentage of completion of denoising."""
-        if total_steps == 0:
-            return 0.0
-        if scheduler_order == 2:
-            return floor((step + 1 + 1) / 2) / floor((total_steps + 1) / 2)
-        # order == 1
-        return (step + 1 + 1) / (total_steps + 1)
 
 
 @payload_schema.register
@@ -184,6 +180,9 @@ class InvocationCompleteEvent(InvocationEventBase):
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
+            origin=queue_item.origin,
+            destination=queue_item.destination,
+            user_id=queue_item.user_id,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
@@ -200,8 +199,6 @@ class InvocationErrorEvent(InvocationEventBase):
     error_type: str = Field(description="The error type")
     error_message: str = Field(description="The error message")
     error_traceback: str = Field(description="The error traceback")
-    user_id: Optional[str] = Field(default=None, description="The ID of the user who created the invocation")
-    project_id: Optional[str] = Field(default=None, description="The ID of the user who created the invocation")
 
     @classmethod
     def build(
@@ -216,14 +213,15 @@ class InvocationErrorEvent(InvocationEventBase):
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
+            origin=queue_item.origin,
+            destination=queue_item.destination,
+            user_id=queue_item.user_id,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
             error_type=error_type,
             error_message=error_message,
             error_traceback=error_traceback,
-            user_id=getattr(queue_item, "user_id", None),
-            project_id=getattr(queue_item, "project_id", None),
         )
 
 
@@ -234,11 +232,15 @@ class QueueItemStatusChangedEvent(QueueItemEventBase):
     __event_name__ = "queue_item_status_changed"
 
     status: QUEUE_ITEM_STATUS = Field(description="The new status of the queue item")
+    status_sequence: int | None = Field(
+        default=None,
+        description="A monotonically increasing version for this queue item's visible status lifecycle",
+    )
     error_type: Optional[str] = Field(default=None, description="The error type, if any")
     error_message: Optional[str] = Field(default=None, description="The error message, if any")
     error_traceback: Optional[str] = Field(default=None, description="The error traceback, if any")
-    created_at: Optional[str] = Field(default=None, description="The timestamp when the queue item was created")
-    updated_at: Optional[str] = Field(default=None, description="The timestamp when the queue item was last updated")
+    created_at: str = Field(description="The timestamp when the queue item was created")
+    updated_at: str = Field(description="The timestamp when the queue item was last updated")
     started_at: Optional[str] = Field(default=None, description="The timestamp when the queue item was started")
     completed_at: Optional[str] = Field(default=None, description="The timestamp when the queue item was completed")
     batch_status: BatchStatus = Field(description="The status of the batch")
@@ -253,13 +255,17 @@ class QueueItemStatusChangedEvent(QueueItemEventBase):
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
+            origin=queue_item.origin,
+            destination=queue_item.destination,
+            user_id=queue_item.user_id,
             session_id=queue_item.session_id,
             status=queue_item.status,
+            status_sequence=queue_item.status_sequence,
             error_type=queue_item.error_type,
             error_message=queue_item.error_message,
             error_traceback=queue_item.error_traceback,
-            created_at=str(queue_item.created_at) if queue_item.created_at else None,
-            updated_at=str(queue_item.updated_at) if queue_item.updated_at else None,
+            created_at=str(queue_item.created_at),
+            updated_at=str(queue_item.updated_at),
             started_at=str(queue_item.started_at) if queue_item.started_at else None,
             completed_at=str(queue_item.completed_at) if queue_item.completed_at else None,
             batch_status=batch_status,
@@ -279,15 +285,35 @@ class BatchEnqueuedEvent(QueueEventBase):
         description="The number of invocations initially requested to be enqueued (may be less than enqueued if queue was full)"
     )
     priority: int = Field(description="The priority of the batch")
+    origin: str | None = Field(default=None, description="The origin of the batch")
+    user_id: str = Field(default="system", description="The ID of the user who enqueued the batch")
 
     @classmethod
-    def build(cls, enqueue_result: EnqueueBatchResult) -> "BatchEnqueuedEvent":
+    def build(cls, enqueue_result: EnqueueBatchResult, user_id: str = "system") -> "BatchEnqueuedEvent":
         return cls(
             queue_id=enqueue_result.queue_id,
             batch_id=enqueue_result.batch.batch_id,
+            origin=enqueue_result.batch.origin,
             enqueued=enqueue_result.enqueued,
             requested=enqueue_result.requested,
             priority=enqueue_result.priority,
+            user_id=user_id,
+        )
+
+
+@payload_schema.register
+class QueueItemsRetriedEvent(QueueEventBase):
+    """Event model for queue_items_retried"""
+
+    __event_name__ = "queue_items_retried"
+
+    retried_item_ids: list[int] = Field(description="The IDs of the queue items that were retried")
+
+    @classmethod
+    def build(cls, retry_result: RetryItemsResult) -> "QueueItemsRetriedEvent":
+        return cls(
+            queue_id=retry_result.queue_id,
+            retried_item_ids=retry_result.retried_item_ids,
         )
 
 
@@ -370,6 +396,17 @@ class DownloadCancelledEvent(DownloadEventBase):
 
 
 @payload_schema.register
+class DownloadPausedEvent(DownloadEventBase):
+    """Event model for download_paused"""
+
+    __event_name__ = "download_paused"
+
+    @classmethod
+    def build(cls, job: "DownloadJob") -> "DownloadPausedEvent":
+        return cls(source=str(job.source))
+
+
+@payload_schema.register
 class DownloadErrorEvent(DownloadEventBase):
     """Event model for download_error"""
 
@@ -418,13 +455,49 @@ class ModelLoadCompleteEvent(ModelEventBase):
 
 
 @payload_schema.register
+class ModelInstallDownloadStartedEvent(ModelEventBase):
+    """Event model for model_install_download_started"""
+
+    __event_name__ = "model_install_download_started"
+
+    id: int = Field(description="The ID of the install job")
+    source: ModelSource = Field(description="Source of the model; local path, repo_id or url")
+    local_path: str = Field(description="Where model is downloading to")
+    bytes: int = Field(description="Number of bytes downloaded so far")
+    total_bytes: int = Field(description="Total size of download, including all files")
+    parts: list[dict[str, int | str]] = Field(
+        description="Progress of downloading URLs that comprise the model, if any"
+    )
+
+    @classmethod
+    def build(cls, job: "ModelInstallJob") -> "ModelInstallDownloadStartedEvent":
+        parts: list[dict[str, str | int]] = [
+            {
+                "url": str(x.source),
+                "local_path": str(x.download_path),
+                "bytes": x.bytes,
+                "total_bytes": x.total_bytes,
+            }
+            for x in job.download_parts
+        ]
+        return cls(
+            id=job.id,
+            source=job.source,
+            local_path=job.local_path.as_posix(),
+            parts=parts,
+            bytes=job.bytes,
+            total_bytes=job.total_bytes,
+        )
+
+
+@payload_schema.register
 class ModelInstallDownloadProgressEvent(ModelEventBase):
     """Event model for model_install_download_progress"""
 
     __event_name__ = "model_install_download_progress"
 
     id: int = Field(description="The ID of the install job")
-    source: str = Field(description="Source of the model; local path, repo_id or url")
+    source: ModelSource = Field(description="Source of the model; local path, repo_id or url")
     local_path: str = Field(description="Where model is downloading to")
     bytes: int = Field(description="Number of bytes downloaded so far")
     total_bytes: int = Field(description="Total size of download, including all files")
@@ -445,7 +518,7 @@ class ModelInstallDownloadProgressEvent(ModelEventBase):
         ]
         return cls(
             id=job.id,
-            source=str(job.source),
+            source=job.source,
             local_path=job.local_path.as_posix(),
             parts=parts,
             bytes=job.bytes,
@@ -460,11 +533,11 @@ class ModelInstallDownloadsCompleteEvent(ModelEventBase):
     __event_name__ = "model_install_downloads_complete"
 
     id: int = Field(description="The ID of the install job")
-    source: str = Field(description="Source of the model; local path, repo_id or url")
+    source: ModelSource = Field(description="Source of the model; local path, repo_id or url")
 
     @classmethod
     def build(cls, job: "ModelInstallJob") -> "ModelInstallDownloadsCompleteEvent":
-        return cls(id=job.id, source=str(job.source))
+        return cls(id=job.id, source=job.source)
 
 
 @payload_schema.register
@@ -474,11 +547,11 @@ class ModelInstallStartedEvent(ModelEventBase):
     __event_name__ = "model_install_started"
 
     id: int = Field(description="The ID of the install job")
-    source: str = Field(description="Source of the model; local path, repo_id or url")
+    source: ModelSource = Field(description="Source of the model; local path, repo_id or url")
 
     @classmethod
     def build(cls, job: "ModelInstallJob") -> "ModelInstallStartedEvent":
-        return cls(id=job.id, source=str(job.source))
+        return cls(id=job.id, source=job.source)
 
 
 @payload_schema.register
@@ -488,14 +561,21 @@ class ModelInstallCompleteEvent(ModelEventBase):
     __event_name__ = "model_install_complete"
 
     id: int = Field(description="The ID of the install job")
-    source: str = Field(description="Source of the model; local path, repo_id or url")
+    source: ModelSource = Field(description="Source of the model; local path, repo_id or url")
     key: str = Field(description="Model config record key")
     total_bytes: Optional[int] = Field(description="Size of the model (may be None for installation of a local path)")
+    config: AnyModelConfig = Field(description="The installed model's config")
 
     @classmethod
     def build(cls, job: "ModelInstallJob") -> "ModelInstallCompleteEvent":
         assert job.config_out is not None
-        return cls(id=job.id, source=str(job.source), key=(job.config_out.key), total_bytes=job.total_bytes)
+        return cls(
+            id=job.id,
+            source=job.source,
+            key=(job.config_out.key),
+            total_bytes=job.total_bytes,
+            config=job.config_out,
+        )
 
 
 @payload_schema.register
@@ -505,11 +585,11 @@ class ModelInstallCancelledEvent(ModelEventBase):
     __event_name__ = "model_install_cancelled"
 
     id: int = Field(description="The ID of the install job")
-    source: str = Field(description="Source of the model; local path, repo_id or url")
+    source: ModelSource = Field(description="Source of the model; local path, repo_id or url")
 
     @classmethod
     def build(cls, job: "ModelInstallJob") -> "ModelInstallCancelledEvent":
-        return cls(id=job.id, source=str(job.source))
+        return cls(id=job.id, source=job.source)
 
 
 @payload_schema.register
@@ -519,7 +599,7 @@ class ModelInstallErrorEvent(ModelEventBase):
     __event_name__ = "model_install_error"
 
     id: int = Field(description="The ID of the install job")
-    source: str = Field(description="Source of the model; local path, repo_id or url")
+    source: ModelSource = Field(description="Source of the model; local path, repo_id or url")
     error_type: str = Field(description="The name of the exception")
     error: str = Field(description="A text description of the exception")
 
@@ -527,7 +607,7 @@ class ModelInstallErrorEvent(ModelEventBase):
     def build(cls, job: "ModelInstallJob") -> "ModelInstallErrorEvent":
         assert job.error_type is not None
         assert job.error is not None
-        return cls(id=job.id, source=str(job.source), error_type=job.error_type, error=job.error)
+        return cls(id=job.id, source=job.source, error_type=job.error_type, error=job.error)
 
 
 class BulkDownloadEventBase(EventBase):
@@ -536,6 +616,7 @@ class BulkDownloadEventBase(EventBase):
     bulk_download_id: str = Field(description="The ID of the bulk image download")
     bulk_download_item_id: str = Field(description="The ID of the bulk image download item")
     bulk_download_item_name: str = Field(description="The name of the bulk image download item")
+    user_id: str = Field(default="system", description="The ID of the user who initiated the download")
 
 
 @payload_schema.register
@@ -546,12 +627,17 @@ class BulkDownloadStartedEvent(BulkDownloadEventBase):
 
     @classmethod
     def build(
-        cls, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
+        cls,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        user_id: str = "system",
     ) -> "BulkDownloadStartedEvent":
         return cls(
             bulk_download_id=bulk_download_id,
             bulk_download_item_id=bulk_download_item_id,
             bulk_download_item_name=bulk_download_item_name,
+            user_id=user_id,
         )
 
 
@@ -563,12 +649,17 @@ class BulkDownloadCompleteEvent(BulkDownloadEventBase):
 
     @classmethod
     def build(
-        cls, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
+        cls,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        user_id: str = "system",
     ) -> "BulkDownloadCompleteEvent":
         return cls(
             bulk_download_id=bulk_download_id,
             bulk_download_item_id=bulk_download_item_id,
             bulk_download_item_name=bulk_download_item_name,
+            user_id=user_id,
         )
 
 
@@ -582,11 +673,31 @@ class BulkDownloadErrorEvent(BulkDownloadEventBase):
 
     @classmethod
     def build(
-        cls, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str, error: str
+        cls,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        error: str,
+        user_id: str = "system",
     ) -> "BulkDownloadErrorEvent":
         return cls(
             bulk_download_id=bulk_download_id,
             bulk_download_item_id=bulk_download_item_id,
             bulk_download_item_name=bulk_download_item_name,
             error=error,
+            user_id=user_id,
         )
+
+
+@payload_schema.register
+class RecallParametersUpdatedEvent(QueueEventBase):
+    """Event model for recall_parameters_updated"""
+
+    __event_name__ = "recall_parameters_updated"
+
+    user_id: str = Field(description="The ID of the user whose recall parameters were updated")
+    parameters: dict[str, Any] = Field(description="The recall parameters that were updated")
+
+    @classmethod
+    def build(cls, queue_id: str, user_id: str, parameters: dict[str, Any]) -> "RecallParametersUpdatedEvent":
+        return cls(queue_id=queue_id, user_id=user_id, parameters=parameters)

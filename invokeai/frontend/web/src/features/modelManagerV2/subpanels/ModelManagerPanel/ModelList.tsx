@@ -1,155 +1,249 @@
-import { Flex, Text } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { Flex, Text, useToast } from '@invoke-ai/ui-library';
+import { logger } from 'app/logging/logger';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import type { FilterableModelType } from 'features/modelManagerV2/store/modelManagerV2Slice';
-import { memo, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
+import { buildUseDisclosure } from 'common/hooks/useBoolean';
+import { MODEL_CATEGORIES_AS_LIST } from 'features/modelManagerV2/models';
 import {
-  useControlNetModels,
-  useEmbeddingModels,
-  useIPAdapterModels,
-  useLoRAModels,
-  useMainModels,
-  useRefinerModels,
-  useT2IAdapterModels,
-  useVAEModels,
-} from 'services/api/hooks/modelsByType';
+  clearModelSelection,
+  type FilterableModelType,
+  selectFilteredModelType,
+  selectOrderBy,
+  selectSearchTerm,
+  selectSelectedModelKeys,
+  selectSortDirection,
+  setSelectedModelKey,
+} from 'features/modelManagerV2/store/modelManagerV2Slice';
+import { memo, useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { serializeError } from 'serialize-error';
+import {
+  modelConfigsAdapterSelectors,
+  useBulkDeleteModelsMutation,
+  useBulkReidentifyModelsMutation,
+  useGetMissingModelsQuery,
+  useGetModelConfigsQuery,
+} from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 
+import { BulkDeleteModelsModal } from './BulkDeleteModelsModal';
+import { BulkReidentifyModelsModal } from './BulkReidentifyModelsModal';
 import { FetchingModelsLoader } from './FetchingModelsLoader';
+import { MissingModelsProvider } from './MissingModelsContext';
 import { ModelListWrapper } from './ModelListWrapper';
 
+const log = logger('models');
+
+export const [useBulkDeleteModal] = buildUseDisclosure(false);
+export const [useBulkReidentifyModal] = buildUseDisclosure(false);
+
 const ModelList = () => {
-  const { searchTerm, filteredModelType } = useAppSelector((s) => s.modelmanagerV2);
+  const dispatch = useAppDispatch();
+  const filteredModelType = useAppSelector(selectFilteredModelType);
+  const searchTerm = useAppSelector(selectSearchTerm);
+  const orderBy = useAppSelector(selectOrderBy);
+  const direction = useAppSelector(selectSortDirection);
+  const selectedModelKeys = useAppSelector(selectSelectedModelKeys);
   const { t } = useTranslation();
+  const toast = useToast();
+  const { isOpen, close } = useBulkDeleteModal();
+  const { isOpen: isReidentifyOpen, close: closeReidentify } = useBulkReidentifyModal();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isReidentifying, setIsReidentifying] = useState(false);
 
-  const [mainModels, { isLoading: isLoadingMainModels }] = useMainModels();
-  const filteredMainModels = useMemo(
-    () => modelsFilter(mainModels, searchTerm, filteredModelType),
-    [mainModels, searchTerm, filteredModelType]
-  );
+  const queryArgs = useMemo(() => ({ order_by: orderBy, direction: direction.toUpperCase() }), [orderBy, direction]);
+  const { data: allModelsData, isLoading: isLoadingAll } = useGetModelConfigsQuery(queryArgs);
+  const { data: missingModelsData, isLoading: isLoadingMissing } = useGetMissingModelsQuery();
+  const [bulkDeleteModels] = useBulkDeleteModelsMutation();
+  const [bulkReidentifyModels] = useBulkReidentifyModelsMutation();
 
-  const [refinerModels, { isLoading: isLoadingRefinerModels }] = useRefinerModels();
-  const filteredRefinerModels = useMemo(
-    () => modelsFilter(refinerModels, searchTerm, filteredModelType),
-    [refinerModels, searchTerm, filteredModelType]
-  );
+  const data = filteredModelType === 'missing' ? missingModelsData : allModelsData;
+  const isLoading = filteredModelType === 'missing' ? isLoadingMissing : isLoadingAll;
 
-  const [loraModels, { isLoading: isLoadingLoRAModels }] = useLoRAModels();
-  const filteredLoRAModels = useMemo(
-    () => modelsFilter(loraModels, searchTerm, filteredModelType),
-    [loraModels, searchTerm, filteredModelType]
-  );
+  const models = useMemo(() => {
+    const modelConfigs = modelConfigsAdapterSelectors.selectAll(data ?? { ids: [], entities: {} });
 
-  const [embeddingModels, { isLoading: isLoadingEmbeddingModels }] = useEmbeddingModels();
-  const filteredEmbeddingModels = useMemo(
-    () => modelsFilter(embeddingModels, searchTerm, filteredModelType),
-    [embeddingModels, searchTerm, filteredModelType]
-  );
+    // For missing models filter, show all models in a single category
+    if (filteredModelType === 'missing') {
+      const filtered = modelConfigs.filter(
+        (m) =>
+          m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          m.base.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          m.type.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      return {
+        total: filtered.length,
+        byCategory: [{ i18nKey: 'modelManager.missingFiles', configs: filtered }],
+      };
+    }
 
-  const [controlNetModels, { isLoading: isLoadingControlNetModels }] = useControlNetModels();
-  const filteredControlNetModels = useMemo(
-    () => modelsFilter(controlNetModels, searchTerm, filteredModelType),
-    [controlNetModels, searchTerm, filteredModelType]
-  );
+    const baseFilteredModelConfigs = modelsFilter(modelConfigs, searchTerm, filteredModelType);
+    const byCategory: { i18nKey: string; configs: AnyModelConfig[] }[] = [];
+    const total = baseFilteredModelConfigs.length;
+    let renderedTotal = 0;
+    for (const { i18nKey, filter } of MODEL_CATEGORIES_AS_LIST) {
+      const configs = baseFilteredModelConfigs.filter(filter);
+      renderedTotal += configs.length;
+      byCategory.push({ i18nKey, configs });
+    }
+    if (renderedTotal !== total) {
+      const ctx = { total, renderedTotal, difference: total - renderedTotal };
+      log.warn(
+        ctx,
+        `ModelList: Not all models were categorized - ensure all possible models are covered in MODEL_CATEGORIES`
+      );
+    }
+    return { total, byCategory };
+  }, [data, filteredModelType, searchTerm]);
 
-  const [t2iAdapterModels, { isLoading: isLoadingT2IAdapterModels }] = useT2IAdapterModels();
-  const filteredT2IAdapterModels = useMemo(
-    () => modelsFilter(t2iAdapterModels, searchTerm, filteredModelType),
-    [t2iAdapterModels, searchTerm, filteredModelType]
-  );
+  const handleConfirmBulkDelete = useCallback(async () => {
+    setIsDeleting(true);
+    try {
+      const result = await bulkDeleteModels({ keys: selectedModelKeys }).unwrap();
 
-  const [ipAdapterModels, { isLoading: isLoadingIPAdapterModels }] = useIPAdapterModels();
-  const filteredIPAdapterModels = useMemo(
-    () => modelsFilter(ipAdapterModels, searchTerm, filteredModelType),
-    [ipAdapterModels, searchTerm, filteredModelType]
-  );
+      // Clear selection and close modal
+      dispatch(clearModelSelection());
+      dispatch(setSelectedModelKey(null));
+      close();
 
-  const [vaeModels, { isLoading: isLoadingVAEModels }] = useVAEModels();
-  const filteredVAEModels = useMemo(
-    () => modelsFilter(vaeModels, searchTerm, filteredModelType),
-    [vaeModels, searchTerm, filteredModelType]
-  );
+      // Show success/failure toast
+      if (result.failed.length === 0) {
+        toast({
+          id: 'BULK_DELETE_SUCCESS',
+          title: t('modelManager.modelsDeleted', {
+            count: result.deleted.length,
+          }),
+          status: 'success',
+        });
+      } else if (result.deleted.length === 0) {
+        toast({
+          id: 'BULK_DELETE_FAILED',
+          title: t('modelManager.modelsDeleteFailed'),
+          description: t('modelManager.someModelsFailedToDelete', {
+            count: result.failed.length,
+          }),
+          status: 'error',
+        });
+      } else {
+        // Partial success
+        toast({
+          id: 'BULK_DELETE_PARTIAL',
+          title: t('modelManager.modelsDeletedPartial'),
+          description: t('modelManager.someModelsDeleted', {
+            deleted: result.deleted.length,
+            failed: result.failed.length,
+          }),
+          status: 'warning',
+        });
+      }
 
-  const totalFilteredModels = useMemo(() => {
-    return (
-      filteredMainModels.length +
-      filteredRefinerModels.length +
-      filteredLoRAModels.length +
-      filteredEmbeddingModels.length +
-      filteredControlNetModels.length +
-      filteredT2IAdapterModels.length +
-      filteredIPAdapterModels.length +
-      filteredVAEModels.length
-    );
-  }, [
-    filteredControlNetModels.length,
-    filteredEmbeddingModels.length,
-    filteredIPAdapterModels.length,
-    filteredLoRAModels.length,
-    filteredMainModels.length,
-    filteredRefinerModels.length,
-    filteredT2IAdapterModels.length,
-    filteredVAEModels.length,
-  ]);
+      log.info(`Bulk delete completed: ${result.deleted.length} deleted, ${result.failed.length} failed`);
+    } catch (err) {
+      log.error({ error: serializeError(err as Error) }, 'Bulk delete error');
+      toast({
+        id: 'BULK_DELETE_ERROR',
+        title: t('modelManager.modelsDeleteError'),
+        status: 'error',
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [bulkDeleteModels, selectedModelKeys, dispatch, close, toast, t]);
+
+  const handleConfirmBulkReidentify = useCallback(async () => {
+    setIsReidentifying(true);
+    try {
+      const result = await bulkReidentifyModels({ keys: selectedModelKeys }).unwrap();
+
+      // Clear selection and close modal
+      dispatch(clearModelSelection());
+      dispatch(setSelectedModelKey(null));
+      closeReidentify();
+
+      if (result.failed.length === 0) {
+        toast({
+          id: 'BULK_REIDENTIFY_SUCCESS',
+          title: t('modelManager.modelsReidentified', {
+            count: result.succeeded.length,
+            defaultValue: `Successfully reidentified ${result.succeeded.length} model(s)`,
+          }),
+          status: 'success',
+        });
+      } else if (result.succeeded.length === 0) {
+        toast({
+          id: 'BULK_REIDENTIFY_FAILED',
+          title: t('modelManager.modelsReidentifyFailed', {
+            defaultValue: 'Failed to reidentify models',
+          }),
+          description: t('modelManager.someModelsFailedToReidentify', {
+            count: result.failed.length,
+            defaultValue: `${result.failed.length} model(s) could not be reidentified`,
+          }),
+          status: 'error',
+        });
+      } else {
+        toast({
+          id: 'BULK_REIDENTIFY_PARTIAL',
+          title: t('modelManager.modelsReidentifiedPartial', {
+            defaultValue: 'Partially completed',
+          }),
+          description: t('modelManager.someModelsReidentified', {
+            succeeded: result.succeeded.length,
+            failed: result.failed.length,
+            defaultValue: `${result.succeeded.length} reidentified, ${result.failed.length} failed`,
+          }),
+          status: 'warning',
+        });
+      }
+
+      log.info(`Bulk reidentify completed: ${result.succeeded.length} succeeded, ${result.failed.length} failed`);
+    } catch (err) {
+      log.error({ error: serializeError(err as Error) }, 'Bulk reidentify error');
+      toast({
+        id: 'BULK_REIDENTIFY_ERROR',
+        title: t('modelManager.modelsReidentifyError', {
+          defaultValue: 'Error reidentifying models',
+        }),
+        status: 'error',
+      });
+    } finally {
+      setIsReidentifying(false);
+    }
+  }, [bulkReidentifyModels, selectedModelKeys, dispatch, closeReidentify, toast, t]);
 
   return (
-    <ScrollableContent>
-      <Flex flexDirection="column" w="full" h="full" gap={4}>
-        {/* Main Model List */}
-        {isLoadingMainModels && <FetchingModelsLoader loadingMessage="Loading Main Models..." />}
-        {!isLoadingMainModels && filteredMainModels.length > 0 && (
-          <ModelListWrapper title={t('modelManager.main')} modelList={filteredMainModels} key="main" />
-        )}
-        {/* Refiner Model List */}
-        {isLoadingRefinerModels && <FetchingModelsLoader loadingMessage="Loading Refiner Models..." />}
-        {!isLoadingRefinerModels && filteredRefinerModels.length > 0 && (
-          <ModelListWrapper title={t('sdxl.refiner')} modelList={filteredRefinerModels} key="refiner" />
-        )}
-        {/* LoRAs List */}
-        {isLoadingLoRAModels && <FetchingModelsLoader loadingMessage="Loading LoRAs..." />}
-        {!isLoadingLoRAModels && filteredLoRAModels.length > 0 && (
-          <ModelListWrapper title={t('modelManager.loraModels')} modelList={filteredLoRAModels} key="loras" />
-        )}
-
-        {/* TI List */}
-        {isLoadingEmbeddingModels && <FetchingModelsLoader loadingMessage="Loading Textual Inversions..." />}
-        {!isLoadingEmbeddingModels && filteredEmbeddingModels.length > 0 && (
-          <ModelListWrapper
-            title={t('modelManager.textualInversions')}
-            modelList={filteredEmbeddingModels}
-            key="textual-inversions"
-          />
-        )}
-
-        {/* VAE List */}
-        {isLoadingVAEModels && <FetchingModelsLoader loadingMessage="Loading VAEs..." />}
-        {!isLoadingVAEModels && filteredVAEModels.length > 0 && (
-          <ModelListWrapper title="VAE" modelList={filteredVAEModels} key="vae" />
-        )}
-
-        {/* Controlnet List */}
-        {isLoadingControlNetModels && <FetchingModelsLoader loadingMessage="Loading ControlNets..." />}
-        {!isLoadingControlNetModels && filteredControlNetModels.length > 0 && (
-          <ModelListWrapper title="ControlNet" modelList={filteredControlNetModels} key="controlnets" />
-        )}
-        {/* IP Adapter List */}
-        {isLoadingIPAdapterModels && <FetchingModelsLoader loadingMessage="Loading IP Adapters..." />}
-        {!isLoadingIPAdapterModels && filteredIPAdapterModels.length > 0 && (
-          <ModelListWrapper title={t('common.ipAdapter')} modelList={filteredIPAdapterModels} key="ip-adapters" />
-        )}
-        {/* T2I Adapters List */}
-        {isLoadingT2IAdapterModels && <FetchingModelsLoader loadingMessage="Loading T2I Adapters..." />}
-        {!isLoadingT2IAdapterModels && filteredT2IAdapterModels.length > 0 && (
-          <ModelListWrapper title={t('common.t2iAdapter')} modelList={filteredT2IAdapterModels} key="t2i-adapters" />
-        )}
-        {totalFilteredModels === 0 && (
-          <Flex w="full" h="full" alignItems="center" justifyContent="center">
-            <Text>{t('modelManager.noMatchingModels')}</Text>
+    <MissingModelsProvider>
+      <Flex flexDirection="column" w="full" h="full">
+        <ScrollableContent>
+          <Flex flexDirection="column" w="full" h="full" gap={4}>
+            {isLoading && <FetchingModelsLoader loadingMessage="Loading..." />}
+            {models.byCategory.map(({ i18nKey, configs }) => (
+              <ModelListWrapper key={i18nKey} title={t(i18nKey)} modelList={configs} />
+            ))}
+            {!isLoading && models.total === 0 && (
+              <Flex w="full" h="full" alignItems="center" justifyContent="center">
+                <Text>{t('modelManager.noMatchingModels')}</Text>
+              </Flex>
+            )}
           </Flex>
-        )}
+        </ScrollableContent>
       </Flex>
-    </ScrollableContent>
+
+      <BulkDeleteModelsModal
+        isOpen={isOpen}
+        onClose={close}
+        onConfirm={handleConfirmBulkDelete}
+        modelCount={selectedModelKeys.length}
+        isDeleting={isDeleting}
+      />
+      <BulkReidentifyModelsModal
+        isOpen={isReidentifyOpen}
+        onClose={closeReidentify}
+        onConfirm={handleConfirmBulkReidentify}
+        modelCount={selectedModelKeys.length}
+        isReidentifying={isReidentifying}
+      />
+    </MissingModelsProvider>
   );
 };
 
@@ -161,7 +255,13 @@ const modelsFilter = <T extends AnyModelConfig>(
   filteredModelType: FilterableModelType | null
 ): T[] => {
   return data.filter((model) => {
-    const matchesFilter = model.name.toLowerCase().includes(nameFilter.toLowerCase());
+    const matchesFilter =
+      model.name.toLowerCase().includes(nameFilter.toLowerCase()) ||
+      model.base.toLowerCase().includes(nameFilter.toLowerCase()) ||
+      model.type.toLowerCase().includes(nameFilter.toLowerCase()) ||
+      model.description?.toLowerCase().includes(nameFilter.toLowerCase()) ||
+      model.format.toLowerCase().includes(nameFilter.toLowerCase());
+
     const matchesType = getMatchesType(model, filteredModelType);
 
     return matchesFilter && matchesType;

@@ -1,5 +1,13 @@
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
-import type { BoardDTO, OffsetPaginatedResults_ImageDTO_, UpdateBoardArg } from 'services/api/types';
+import queryString from 'query-string';
+import type {
+  BoardDTO,
+  CreateBoardArg,
+  ImageCategory,
+  ListBoardsArgs,
+  OffsetPaginatedResults_ImageDTO_,
+  UpdateBoardArg,
+} from 'services/api/types';
 import { getListImagesUrl } from 'services/api/util';
 
 import type { ApiTagDescription } from '..';
@@ -18,10 +26,10 @@ export const boardsApi = api.injectEndpoints({
     /**
      * Boards Queries
      */
-    listAllBoards: build.query<Array<BoardDTO>, void>({
-      query: () => ({
+    listAllBoards: build.query<Array<BoardDTO>, ListBoardsArgs>({
+      query: (args) => ({
         url: buildBoardsUrl(),
-        params: { all: true },
+        params: { all: true, ...args },
       }),
       providesTags: (result) => {
         // any list of boards
@@ -41,12 +49,16 @@ export const boardsApi = api.injectEndpoints({
       },
     }),
 
-    listAllImageNamesForBoard: build.query<Array<string>, string>({
-      query: (board_id) => ({
-        url: buildBoardsUrl(`${board_id}/image_names`),
+    listAllImageNamesForBoard: build.query<
+      Array<string>,
+      { board_id: string | 'none'; categories: ImageCategory[] | undefined; is_intermediate: boolean | undefined }
+    >({
+      query: ({ board_id, categories, is_intermediate }) => ({
+        url: buildBoardsUrl(
+          `${board_id}/image_names?${queryString.stringify({ categories, is_intermediate }, { arrayFormat: 'none' })}`
+        ),
       }),
-      providesTags: (result, error, arg) => [{ type: 'ImageNameList', id: arg }, 'FetchOnReconnect'],
-      keepUnusedDataFor: 0,
+      providesTags: (result, error, arg) => [{ type: 'ImageNameList', id: JSON.stringify(arg) }, 'FetchOnReconnect'],
     }),
 
     getBoardImagesTotal: build.query<{ total: number }, string | undefined>({
@@ -87,8 +99,8 @@ export const boardsApi = api.injectEndpoints({
      * Boards Mutations
      */
 
-    createBoard: build.mutation<BoardDTO, string>({
-      query: (board_name) => ({
+    createBoard: build.mutation<BoardDTO, CreateBoardArg>({
+      query: ({ board_name }) => ({
         url: buildBoardsUrl(),
         method: 'POST',
         params: { board_name },
@@ -102,7 +114,16 @@ export const boardsApi = api.injectEndpoints({
         method: 'PATCH',
         body: changes,
       }),
-      invalidatesTags: (result, error, arg) => [{ type: 'Board', id: arg.board_id }],
+      invalidatesTags: (result, error, arg) => {
+        const tags: ApiTagDescription[] = [];
+        if (Object.keys(arg.changes).includes('archived')) {
+          tags.push({ type: 'Board', id: LIST_TAG });
+        }
+
+        tags.push({ type: 'Board', id: arg.board_id });
+
+        return tags;
+      },
     }),
   }),
 });

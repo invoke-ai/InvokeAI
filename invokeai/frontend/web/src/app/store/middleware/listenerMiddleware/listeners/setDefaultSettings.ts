@@ -1,17 +1,23 @@
-import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { heightChanged, widthChanged } from 'features/controlLayers/store/controlLayersSlice';
-import { setDefaultSettings } from 'features/parameters/store/actions';
+import type { AppStartListening } from 'app/store/store';
+import { isNil } from 'es-toolkit';
+import { bboxHeightChanged, bboxWidthChanged } from 'features/controlLayers/store/canvasSlice';
+import { buildSelectIsStaging, selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
+  heightChanged,
   setCfgRescaleMultiplier,
   setCfgScale,
+  setGuidance,
   setScheduler,
   setSteps,
   vaePrecisionChanged,
   vaeSelected,
-} from 'features/parameters/store/generationSlice';
+  widthChanged,
+} from 'features/controlLayers/store/paramsSlice';
+import { setDefaultSettings } from 'features/parameters/store/actions';
 import {
   isParameterCFGRescaleMultiplier,
   isParameterCFGScale,
+  isParameterGuidance,
   isParameterHeight,
   isParameterPrecision,
   isParameterScheduler,
@@ -20,6 +26,7 @@ import {
   zParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
@@ -30,15 +37,14 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
     effect: async (action, { dispatch, getState }) => {
       const state = getState();
 
-      const currentModel = state.generation.model;
+      const currentModel = state.params.model;
 
       if (!currentModel) {
         return;
       }
 
-      const request = dispatch(modelsApi.endpoints.getModelConfigs.initiate());
+      const request = dispatch(modelsApi.endpoints.getModelConfigs.initiate(undefined, { subscribe: false }));
       const data = await request.unwrap();
-      request.unsubscribe();
       const models = modelConfigsAdapterSelectors.selectAll(data);
 
       const modelConfig = models.find((model) => model.key === currentModel.key);
@@ -48,7 +54,7 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
       }
 
       if (isNonRefinerMainModelConfig(modelConfig) && modelConfig.default_settings) {
-        const { vae, vae_precision, cfg_scale, cfg_rescale_multiplier, steps, scheduler, width, height } =
+        const { vae, vae_precision, cfg_scale, cfg_rescale_multiplier, steps, scheduler, width, height, guidance } =
           modelConfig.default_settings;
 
         if (vae) {
@@ -72,16 +78,28 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
           }
         }
 
-        if (cfg_scale) {
+        if (guidance) {
+          if (isParameterGuidance(guidance)) {
+            dispatch(setGuidance(guidance));
+          }
+        }
+
+        if (!isNil(cfg_scale)) {
           if (isParameterCFGScale(cfg_scale)) {
             dispatch(setCfgScale(cfg_scale));
           }
         }
 
-        if (cfg_rescale_multiplier) {
+        if (!isNil(cfg_rescale_multiplier)) {
           if (isParameterCFGRescaleMultiplier(cfg_rescale_multiplier)) {
             dispatch(setCfgRescaleMultiplier(cfg_rescale_multiplier));
           }
+        } else {
+          // Set this to 0 if it doesn't have a default. This value is
+          // easy to miss in the UI when users are resetting defaults
+          // and leaving it non-zero could lead to detrimental
+          // effects.
+          dispatch(setCfgRescaleMultiplier(0));
         }
 
         if (steps) {
@@ -96,15 +114,27 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
           }
         }
         const setSizeOptions = { updateAspectRatio: true, clamp: true };
-        if (width) {
+
+        const isStaging = buildSelectIsStaging(selectCanvasSessionId(state))(state);
+
+        const activeTab = selectActiveTab(getState());
+        if (activeTab === 'generate') {
           if (isParameterWidth(width)) {
             dispatch(widthChanged({ width, ...setSizeOptions }));
           }
-        }
-
-        if (height) {
           if (isParameterHeight(height)) {
             dispatch(heightChanged({ height, ...setSizeOptions }));
+          }
+        }
+
+        if (activeTab === 'canvas') {
+          if (!isStaging) {
+            if (isParameterWidth(width)) {
+              dispatch(bboxWidthChanged({ width, ...setSizeOptions }));
+            }
+            if (isParameterHeight(height)) {
+              dispatch(bboxHeightChanged({ height, ...setSizeOptions }));
+            }
           }
         }
 

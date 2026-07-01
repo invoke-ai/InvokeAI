@@ -14,6 +14,7 @@ from invokeai.backend.stable_diffusion.diffusion.regional_prompt_data import Reg
 class IPAdapterAttentionWeights:
     ip_adapter_weights: IPAttentionProcessorWeights
     skip: bool
+    negative: bool
 
 
 class CustomAttnProcessor2_0(AttnProcessor2_0):
@@ -162,6 +163,10 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
                     # Expected ip_hidden_state shape: (batch_size, num_ip_images, ip_seq_len, ip_image_embedding)
 
                     if not self._ip_adapter_attention_weights[ipa_index].skip:
+                        # apply the IP-Adapter weights to the negative embeds
+                        if self._ip_adapter_attention_weights[ipa_index].negative:
+                            ip_hidden_states = torch.cat([ip_hidden_states[1], ip_hidden_states[0] * 0], dim=0)
+
                         ip_key = ipa_weights.to_k_ip(ip_hidden_states)
                         ip_value = ipa_weights.to_v_ip(ip_hidden_states)
 

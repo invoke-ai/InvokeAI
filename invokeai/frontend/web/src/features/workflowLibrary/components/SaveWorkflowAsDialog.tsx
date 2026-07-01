@@ -1,0 +1,184 @@
+import {
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  Button,
+  Checkbox,
+  Flex,
+  FormControl,
+  FormLabel,
+  Input,
+} from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
+import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { deepClone } from 'common/util/deepClone';
+import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import { isDraftWorkflow, useCreateLibraryWorkflow } from 'features/workflowLibrary/hooks/useCreateNewWorkflow';
+import { t } from 'i18next';
+import { atom, computed } from 'nanostores';
+import type { ChangeEvent, RefObject } from 'react';
+import { memo, useCallback, useRef, useState } from 'react';
+import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
+import { useUpdateWorkflowIsPublicMutation } from 'services/api/endpoints/workflows';
+import { assert } from 'tsafe';
+
+/**
+ * The workflow to save as a new workflow.
+ *
+ * This state is used to determine whether or not the modal is open.
+ */
+const $workflowToSave = atom<WorkflowV3 | null>(null);
+
+/**
+ * Whether or not the modal is open. It is open if there is a workflow to save.
+ *
+ * The state is derived from the workflow to save.
+ *
+ * To open the modal, set the workflow to save to a workflow object.
+ * To close the modal, set the workflow to save to null.
+ */
+const $isOpen = computed($workflowToSave, (val) => val !== null);
+
+const getInitialName = (workflow: WorkflowV3): string => {
+  if (!workflow.id) {
+    // If the workflow has no ID, that means it's a new workflow that has never been saved to the server. In this case,
+    // we should use whatever the user has entered in the workflow name field.
+    return workflow.name;
+  }
+  // Otherwise, the workflow is already saved to the server.
+  if (workflow.name.length) {
+    // This workflow has a name so let's use the workflow's name with " (copy)" appended to it.
+    return `${workflow.name.trim()} (copy)`;
+  }
+  // Fallback - will show a placeholder in the input field.
+  return '';
+};
+
+/**
+ * Save the workflow as a new workflow. This will open a dialog where the user can enter the name of the new workflow.
+ * The workflow object is deep cloned to prevent any changes to the original workflow object.
+ * @param workflow The workflow to save as a new workflow.
+ */
+export const saveWorkflowAs = (workflow: WorkflowV3) => {
+  $workflowToSave.set(deepClone(workflow));
+};
+
+export const SaveWorkflowAsDialog = () => {
+  const isOpen = useStore($isOpen);
+  const workflowToSave = useStore($workflowToSave);
+
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  const onClose = useCallback(() => {
+    $workflowToSave.set(null);
+  }, []);
+
+  return (
+    <AlertDialog isOpen={isOpen} onClose={onClose} leastDestructiveRef={cancelRef} isCentered={true}>
+      {!workflowToSave && <NoWorkflowToSaveContent />}
+      {workflowToSave && <Content workflow={workflowToSave} cancelRef={cancelRef} />}
+    </AlertDialog>
+  );
+};
+
+const Content = memo(
+  ({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef: RefObject<HTMLButtonElement | null> }) => {
+    const [name, setName] = useState(() => {
+      if (workflow) {
+        return getInitialName(workflow);
+      }
+      return '';
+    });
+    const [isPublic, setIsPublic] = useState(false);
+    const { data: setupStatus } = useGetSetupStatusQuery();
+    const multiuserEnabled = setupStatus?.multiuser_enabled ?? false;
+
+    const { createNewWorkflow } = useCreateLibraryWorkflow();
+    const [updateIsPublic] = useUpdateWorkflowIsPublicMutation();
+
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const onChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+      setName(e.target.value);
+    }, []);
+
+    const onChangeIsPublic = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+      setIsPublic(e.target.checked);
+    }, []);
+
+    const onClose = useCallback(() => {
+      $workflowToSave.set(null);
+    }, []);
+
+    const onSave = useCallback(async () => {
+      const workflowToCreate = {
+        ...workflow,
+        id: undefined,
+        name,
+        meta: { ...workflow.meta, category: 'user' as const },
+      };
+
+      // We've just made the workflow a draft, but TS doesn't know that. We need to assert it.
+      assert(isDraftWorkflow(workflowToCreate));
+
+      await createNewWorkflow({
+        workflow: workflowToCreate,
+        onSuccess: async (workflowId?: string) => {
+          if (isPublic && workflowId) {
+            try {
+              await updateIsPublic({ workflow_id: workflowId, is_public: true }).unwrap();
+            } catch {
+              // Sharing failed silently - workflow was saved, just not shared
+            }
+          }
+          onClose();
+        },
+        onError: onClose,
+      });
+    }, [workflow, name, isPublic, createNewWorkflow, updateIsPublic, onClose]);
+
+    return (
+      <AlertDialogContent>
+        <AlertDialogHeader fontSize="lg" fontWeight="bold">
+          {t('workflows.saveWorkflowAs')}
+        </AlertDialogHeader>
+
+        <AlertDialogBody>
+          <FormControl alignItems="flex-start">
+            <FormLabel mt="2">{t('workflows.workflowName')}</FormLabel>
+            <Flex flexDir="column" width="full" gap="2">
+              <Input ref={inputRef} value={name} onChange={onChange} placeholder={t('workflows.workflowName')} />
+              {multiuserEnabled && (
+                <Flex alignItems="center" gap={2}>
+                  <Checkbox isChecked={isPublic} onChange={onChangeIsPublic} />
+                  <FormLabel mb={0}>{t('workflows.shareWorkflow')}</FormLabel>
+                </Flex>
+              )}
+            </Flex>
+          </FormControl>
+        </AlertDialogBody>
+
+        <AlertDialogFooter>
+          <Button ref={cancelRef} onClick={onClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button colorScheme="invokeBlue" onClick={onSave} ml={3} isDisabled={!name || !name.length}>
+            {t('common.saveAs')}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    );
+  }
+);
+Content.displayName = 'Content';
+
+const NoWorkflowToSaveContent = memo(() => {
+  return (
+    <AlertDialogContent>
+      <IAINoContentFallback icon={null} label={t('workflows.noWorkflowToSave')} />
+    </AlertDialogContent>
+  );
+});
+NoWorkflowToSaveContent.displayName = 'NoWorkflowToSaveContent';

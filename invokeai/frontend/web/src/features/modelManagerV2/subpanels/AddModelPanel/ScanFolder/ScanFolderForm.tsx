@@ -1,22 +1,24 @@
 import { Button, Flex, FormControl, FormErrorMessage, FormHelperText, FormLabel, Input } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { setScanPath } from 'features/modelManagerV2/store/modelManagerV2Slice';
+import { createModelManagerSelector, setScanPath } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import type { ChangeEventHandler } from 'react';
-import { useCallback, useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLazyScanFolderQuery } from 'services/api/endpoints/models';
 
 import { ScanModelsResults } from './ScanFolderResults';
 
-export const ScanModelsForm = () => {
-  const scanPath = useAppSelector((state) => state.modelmanagerV2.scanPath);
+const selectScanPath = createModelManagerSelector((mm) => mm.scanPath);
+
+export const ScanModelsForm = memo(() => {
+  const scanPath = useAppSelector(selectScanPath);
   const dispatch = useAppDispatch();
   const [errorMessage, setErrorMessage] = useState('');
   const { t } = useTranslation();
 
   const [_scanFolder, { isLoading, data }] = useLazyScanFolderQuery();
 
-  const scanFolder = useCallback(async () => {
+  const scanFolder = useCallback(() => {
     _scanFolder({ scan_path: scanPath })
       .unwrap()
       .catch((error) => {
@@ -56,4 +58,6 @@ export const ScanModelsForm = () => {
       {data && <ScanModelsResults results={data} />}
     </Flex>
   );
-};
+});
+
+ScanModelsForm.displayName = 'ScanModelsForm';

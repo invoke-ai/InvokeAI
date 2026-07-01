@@ -1,0 +1,38 @@
+# Builds and uploads python build artifacts.
+
+name: build wheel
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build-installer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5 # expected run time: <2 min
+    steps:
+      - name: checkout
+        uses: actions/checkout@v6
+
+      - name: setup python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: install pypa/build
+        run: pip install --upgrade build
+
+      - name: setup frontend
+        uses: ./.github/actions/install-frontend-deps
+
+      - name: build wheel
+        id: build_wheel
+        run: ./scripts/build_wheel.sh
+
+      - name: upload python distribution artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: ${{ steps.build_wheel.outputs.DIST_PATH }}

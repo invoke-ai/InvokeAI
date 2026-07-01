@@ -1,22 +1,20 @@
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { Combobox, FormControl, FormLabel, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
+import { refinerModelChanged, selectRefinerModel } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import { refinerModelChanged, selectSdxlSlice } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiXBold } from 'react-icons/pi';
 import { useRefinerModels } from 'services/api/hooks/modelsByType';
 import type { MainModelConfig } from 'services/api/types';
-
-const selectModel = createMemoizedSelector(selectSdxlSlice, (sdxl) => sdxl.refinerModel);
 
 const optionsFilter = (model: MainModelConfig) => model.base === 'sdxl-refiner';
 
 const ParamSDXLRefinerModelSelect = () => {
   const dispatch = useAppDispatch();
-  const model = useAppSelector(selectModel);
+  const model = useAppSelector(selectRefinerModel);
   const { t } = useTranslation();
   const [modelConfigs, { isLoading }] = useRefinerModels();
   const _onChange = useCallback(
@@ -36,8 +34,12 @@ const ParamSDXLRefinerModelSelect = () => {
     isLoading,
     optionsFilter,
   });
+  const onReset = useCallback(() => {
+    _onChange(null);
+  }, [_onChange]);
+
   return (
-    <FormControl isDisabled={!options.length} isInvalid={!options.length}>
+    <FormControl isDisabled={!options.length} isInvalid={!options.length} w="full" gap={2}>
       <InformationalPopover feature="refinerModel">
         <FormLabel>{t('sdxl.refinermodel')}</FormLabel>
       </InformationalPopover>
@@ -47,7 +49,14 @@ const ParamSDXLRefinerModelSelect = () => {
         options={options}
         onChange={onChange}
         noOptionsMessage={noOptionsMessage}
-        isClearable
+      />
+      <IconButton
+        size="sm"
+        variant="ghost"
+        icon={<PiXBold />}
+        aria-label={t('common.reset')}
+        onClick={onReset}
+        isDisabled={!value}
       />
     </FormControl>
   );

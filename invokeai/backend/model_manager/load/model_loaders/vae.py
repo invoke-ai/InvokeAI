@@ -1,69 +1,80 @@
 # Copyright (c) 2024, Lincoln D. Stein and the InvokeAI Development Team
 """Class for VAE model loading in InvokeAI."""
 
-from pathlib import Path
 from typing import Optional
 
-import torch
-from omegaconf import DictConfig, OmegaConf
-from safetensors.torch import load_file as safetensors_load_file
+from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 
-from invokeai.backend.model_manager import (
-    AnyModelConfig,
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.configs.vae import (
+    VAE_Checkpoint_Anima_Config,
+    VAE_Checkpoint_Config_Base,
+    VAE_Checkpoint_QwenImage_Config,
+)
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
+from invokeai.backend.model_manager.taxonomy import (
+    AnyModel,
     BaseModelType,
     ModelFormat,
     ModelType,
+    SubModelType,
 )
-from invokeai.backend.model_manager.config import AnyModel, CheckpointConfigBase
-from invokeai.backend.model_manager.convert_ckpt_to_diffusers import convert_ldm_vae_to_diffusers
-
-from .. import ModelLoaderRegistry
-from .generic_diffusers import GenericDiffusersLoader
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.VAE, format=ModelFormat.Diffusers)
-@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion1, type=ModelType.VAE, format=ModelFormat.Checkpoint)
-@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion2, type=ModelType.VAE, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.VAE, format=ModelFormat.Checkpoint)
 class VAELoader(GenericDiffusersLoader):
     """Class to load VAE models."""
 
-    def _needs_conversion(self, config: AnyModelConfig, model_path: Path, dest_path: Path) -> bool:
-        if not isinstance(config, CheckpointConfigBase):
-            return False
-        elif (
-            dest_path.exists()
-            and (dest_path / "config.json").stat().st_mtime >= (config.converted_at or 0.0)
-            and (dest_path / "config.json").stat().st_mtime >= model_path.stat().st_mtime
-        ):
-            return False
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if isinstance(config, VAE_Checkpoint_Anima_Config):
+            from diffusers.models.autoencoders import AutoencoderKLWan
+
+            return AutoencoderKLWan.from_single_file(
+                config.path,
+                torch_dtype=self._torch_dtype,
+            )
+        elif isinstance(config, VAE_Checkpoint_QwenImage_Config):
+            return self._load_qwen_image_vae(config)
+        elif isinstance(config, VAE_Checkpoint_Config_Base):
+            return AutoencoderKL.from_single_file(
+                config.path,
+                torch_dtype=self._torch_dtype,
+            )
         else:
-            return True
+            return super()._load_model(config, submodel_type)
 
-    def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Optional[Path] = None) -> AnyModel:
-        # TODO(MM2): check whether sdxl VAE models convert.
-        if config.base not in {BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2}:
-            raise Exception(f"VAE conversion not supported for model type: {config.base}")
-        else:
-            assert isinstance(config, CheckpointConfigBase)
-            config_file = self._app_config.legacy_conf_path / config.config_path
+    def _load_qwen_image_vae(self, config: VAE_Checkpoint_QwenImage_Config) -> AnyModel:
+        """Load a Qwen Image VAE from a single safetensors file.
 
-        if model_path.suffix == ".safetensors":
-            checkpoint = safetensors_load_file(model_path, device="cpu")
-        else:
-            checkpoint = torch.load(model_path, map_location="cpu")
+        The Qwen Image VAE checkpoint is expected to be in the diffusers state-dict
+        layout (i.e. the same keys as `vae/diffusion_pytorch_model.safetensors` from
+        the Qwen-Image repo). `AutoencoderKLQwenImage` does not register a single-file
+        conversion in diffusers, so we instantiate the model with default config and
+        load the state dict directly.
+        """
+        import accelerate
+        from diffusers.models.autoencoders.autoencoder_kl_qwenimage import AutoencoderKLQwenImage
+        from safetensors.torch import load_file
 
-        # sometimes weights are hidden under "state_dict", and sometimes not
-        if "state_dict" in checkpoint:
-            checkpoint = checkpoint["state_dict"]
+        sd = load_file(config.path)
 
-        ckpt_config = OmegaConf.load(config_file)
-        assert isinstance(ckpt_config, DictConfig)
-        self._logger.info(f"Converting {model_path} to diffusers format")
-        vae_model = convert_ldm_vae_to_diffusers(
-            checkpoint=checkpoint,
-            vae_config=ckpt_config,
-            image_size=512,
-            precision=self._torch_dtype,
-            dump_path=output_path,
-        )
-        return vae_model
+        if self._torch_dtype is not None:
+            for k in list(sd.keys()):
+                if sd[k].is_floating_point():
+                    sd[k] = sd[k].to(self._torch_dtype)
+
+        new_sd_size = sum(t.nelement() * t.element_size() for t in sd.values())
+        self._ram_cache.make_room(new_sd_size)
+
+        with accelerate.init_empty_weights():
+            model = AutoencoderKLQwenImage()
+
+        model.load_state_dict(sd, strict=True, assign=True)
+        model.eval()
+        return model

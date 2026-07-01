@@ -11,24 +11,36 @@ from pydantic import ValidationError
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.model_records import (
     DuplicateModelException,
+    ModelRecordOrderBy,
     ModelRecordServiceBase,
     ModelRecordServiceSQL,
     UnknownModelException,
 )
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
-from invokeai.backend.model_manager.config import (
-    BaseModelType,
-    ControlAdapterDefaultSettings,
-    MainDiffusersConfig,
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
+from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_SDXL_Config
+from invokeai.backend.model_manager.configs.main import (
+    Main_Diffusers_SD1_Config,
+    Main_Diffusers_SD2_Config,
+    Main_Diffusers_SDXL_Config,
     MainModelDefaultSettings,
+)
+from invokeai.backend.model_manager.configs.qwen3_encoder import Qwen3Encoder_Qwen3Encoder_Config
+from invokeai.backend.model_manager.configs.text_llm import TextLLM_Diffusers_Config
+from invokeai.backend.model_manager.configs.textual_inversion import TI_File_SD1_Config
+from invokeai.backend.model_manager.configs.vae import VAE_Diffusers_SD1_Config
+from invokeai.backend.model_manager.taxonomy import (
+    BaseModelType,
     ModelFormat,
+    ModelRepoVariant,
     ModelSourceType,
     ModelType,
-    TextualInversionFileConfig,
-    VAEDiffusersConfig,
+    ModelVariantType,
+    Qwen3VariantType,
+    SchedulerPredictionType,
 )
 from invokeai.backend.util.logging import InvokeAILogger
-from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
 
@@ -40,14 +52,15 @@ def store(
     config._root = datadir
     logger = InvokeAILogger.get_logger(config=config)
     db = create_mock_sqlite_database(config, logger)
-    return ModelRecordServiceSQL(db)
+    return ModelRecordServiceSQL(db, logger)
 
 
-def example_ti_config(key: Optional[str] = None) -> TextualInversionFileConfig:
-    config = TextualInversionFileConfig(
+def example_ti_config(key: Optional[str] = None) -> TI_File_SD1_Config:
+    config = TI_File_SD1_Config(
         source="test/source/",
         source_type=ModelSourceType.Path,
         path="/tmp/pokemon.bin",
+        file_size=1024,
         name="old name",
         base=BaseModelType.StableDiffusion1,
         type=ModelType.TextualInversion,
@@ -63,7 +76,7 @@ def test_type(store: ModelRecordServiceBase):
     config = example_ti_config("key1")
     store.add_model(config)
     config1 = store.get_model("key1")
-    assert isinstance(config1, TextualInversionFileConfig)
+    assert isinstance(config1, TI_File_SD1_Config)
 
 
 def test_raises_on_violating_uniqueness(store: ModelRecordServiceBase):
@@ -90,7 +103,53 @@ def test_model_records_updates_model(store: ModelRecordServiceBase):
     assert new_config.name == new_name
 
 
-def test_model_records_rejects_invalid_changes(store: ModelRecordServiceBase):
+def test_model_records_updates_model_class(store: ModelRecordServiceBase):
+    config = example_ti_config("key1")
+    store.add_model(config)
+    changes = ModelRecordChanges(
+        type=ModelType.LoRA,
+        format=ModelFormat.LyCORIS,
+        base=BaseModelType.StableDiffusionXL,
+    )
+    new_config = store.update_model(config.key, changes, allow_class_change=True)
+    assert isinstance(new_config, LoRA_LyCORIS_SDXL_Config)
+
+
+def test_update_changing_type_drops_stale_format_and_variant(store: ModelRecordServiceBase):
+    """When the type changes, format/variant from the old class must not block validation of the new class.
+
+    Regression test for https://github.com/invoke-ai/InvokeAI/issues/9090: switching a misidentified
+    Qwen3 encoder to TextLLM previously failed because the old `format=qwen3_encoder` and `variant`
+    fields were carried over and no discriminator under `type=text_llm` matched.
+    """
+    config = Qwen3Encoder_Qwen3Encoder_Config(
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        path="/tmp/Qwen2.5-1.5B-Instruct",
+        file_size=1024,
+        name="Qwen2.5-1.5B-Instruct",
+        hash="ABC123",
+        variant=Qwen3VariantType.Qwen3_4B,
+    )
+    config.key = "key1"
+    store.add_model(config)
+
+    changes = ModelRecordChanges(type=ModelType.TextLLM)
+    new_config = store.update_model(config.key, changes, allow_class_change=True)
+    assert isinstance(new_config, TextLLM_Diffusers_Config)
+
+
+def test_model_records_rejects_invalid_attr_changes(store: ModelRecordServiceBase):
+    config = example_ti_config("key1")
+    store.add_model(config)
+    config = store.get_model("key1")
+    # upcast_attention is an invalid field for TIs
+    changes = ModelRecordChanges(upcast_attention=True)
+    with pytest.raises(ValidationError):
+        store.update_model(config.key, changes)
+
+
+def test_model_records_rejects_invalid_attr_changes_that_change_class(store: ModelRecordServiceBase):
     config = example_ti_config("key1")
     store.add_model(config)
     config = store.get_model("key1")
@@ -124,35 +183,45 @@ def test_exists(store: ModelRecordServiceBase):
 
 
 def test_filter(store: ModelRecordServiceBase):
-    config1 = MainDiffusersConfig(
+    config1 = Main_Diffusers_SD1_Config(
         key="config1",
         path="/tmp/config1",
         name="config1",
         base=BaseModelType.StableDiffusion1,
         type=ModelType.Main,
         hash="CONFIG1HASH",
+        file_size=1001,
         source="test/source",
         source_type=ModelSourceType.Path,
+        variant=ModelVariantType.Normal,
+        prediction_type=SchedulerPredictionType.Epsilon,
+        repo_variant=ModelRepoVariant.Default,
     )
-    config2 = MainDiffusersConfig(
+    config2 = Main_Diffusers_SD1_Config(
         key="config2",
         path="/tmp/config2",
         name="config2",
         base=BaseModelType.StableDiffusion1,
         type=ModelType.Main,
         hash="CONFIG2HASH",
+        file_size=1002,
         source="test/source",
         source_type=ModelSourceType.Path,
+        variant=ModelVariantType.Normal,
+        prediction_type=SchedulerPredictionType.Epsilon,
+        repo_variant=ModelRepoVariant.Default,
     )
-    config3 = VAEDiffusersConfig(
+    config3 = VAE_Diffusers_SD1_Config(
         key="config3",
         path="/tmp/config3",
         name="config3",
-        base=BaseModelType("sd-2"),
+        base=BaseModelType.StableDiffusion1,
         type=ModelType.VAE,
         hash="CONFIG3HASH",
+        file_size=1003,
         source="test/source",
         source_type=ModelSourceType.Path,
+        repo_variant=ModelRepoVariant.Default,
     )
     for c in config1, config2, config3:
         store.add_model(c)
@@ -174,100 +243,132 @@ def test_filter(store: ModelRecordServiceBase):
     assert len(matches) == 3
 
 
-def test_unique(store: ModelRecordServiceBase):
-    config1 = MainDiffusersConfig(
+def test_unique_by_path(store: ModelRecordServiceBase):
+    config1 = Main_Diffusers_SD1_Config(
         path="/tmp/config1",
         base=BaseModelType.StableDiffusion1,
         type=ModelType.Main,
         name="nonuniquename",
         hash="CONFIG1HASH",
+        file_size=1004,
         source="test/source/",
         source_type=ModelSourceType.Path,
+        variant=ModelVariantType.Normal,
+        prediction_type=SchedulerPredictionType.Epsilon,
+        repo_variant=ModelRepoVariant.Default,
     )
-    config2 = MainDiffusersConfig(
+    config2 = Main_Diffusers_SD2_Config(
         path="/tmp/config2",
-        base=BaseModelType("sd-2"),
+        base=BaseModelType.StableDiffusion2,
         type=ModelType.Main,
         name="nonuniquename",
         hash="CONFIG1HASH",
+        file_size=1005,
         source="test/source/",
         source_type=ModelSourceType.Path,
+        variant=ModelVariantType.Normal,
+        prediction_type=SchedulerPredictionType.Epsilon,
+        repo_variant=ModelRepoVariant.Default,
     )
-    config3 = VAEDiffusersConfig(
+    config3 = VAE_Diffusers_SD1_Config(
         path="/tmp/config3",
-        base=BaseModelType("sd-2"),
+        base=BaseModelType.StableDiffusion1,
         type=ModelType.VAE,
         name="nonuniquename",
         hash="CONFIG1HASH",
+        file_size=1006,
         source="test/source/",
         source_type=ModelSourceType.Path,
+        repo_variant=ModelRepoVariant.Default,
     )
-    config4 = MainDiffusersConfig(
-        path="/tmp/config4",
+    config4 = Main_Diffusers_SD1_Config(
+        path="/tmp/config1",
         base=BaseModelType.StableDiffusion1,
         type=ModelType.Main,
         name="nonuniquename",
         hash="CONFIG1HASH",
+        file_size=1007,
         source="test/source/",
         source_type=ModelSourceType.Path,
+        variant=ModelVariantType.Normal,
+        prediction_type=SchedulerPredictionType.Epsilon,
+        repo_variant=ModelRepoVariant.Default,
     )
-    # config1, config2 and config3 are compatible because they have unique combos
+    # config1, config2 and config3 are compatible because they have unique paths
     # of name, type and base
     for c in config1, config2, config3:
         c.key = sha256(c.path.encode("utf-8")).hexdigest()
         store.add_model(c)
 
-    # config4 clashes with config1 and should raise an integrity error
+    # config4 clashes with config1 (same path) and should raise an integrity error
     with pytest.raises(DuplicateModelException):
         config4.key = sha256(config4.path.encode("utf-8")).hexdigest()
         store.add_model(config4)
 
 
 def test_filter_2(store: ModelRecordServiceBase):
-    config1 = MainDiffusersConfig(
+    config1 = Main_Diffusers_SD1_Config(
         path="/tmp/config1",
         name="config1",
         base=BaseModelType.StableDiffusion1,
         type=ModelType.Main,
         hash="CONFIG1HASH",
+        file_size=1008,
         source="test/source/",
         source_type=ModelSourceType.Path,
+        variant=ModelVariantType.Normal,
+        prediction_type=SchedulerPredictionType.Epsilon,
+        repo_variant=ModelRepoVariant.Default,
     )
-    config2 = MainDiffusersConfig(
+    config2 = Main_Diffusers_SD1_Config(
         path="/tmp/config2",
         name="config2",
         base=BaseModelType.StableDiffusion1,
         type=ModelType.Main,
         hash="CONFIG2HASH",
+        file_size=1009,
         source="test/source/",
         source_type=ModelSourceType.Path,
+        variant=ModelVariantType.Normal,
+        prediction_type=SchedulerPredictionType.Epsilon,
+        repo_variant=ModelRepoVariant.Default,
     )
-    config3 = MainDiffusersConfig(
+    config3 = Main_Diffusers_SD2_Config(
         path="/tmp/config3",
         name="dup_name1",
-        base=BaseModelType("sd-2"),
+        base=BaseModelType.StableDiffusion2,
         type=ModelType.Main,
         hash="CONFIG3HASH",
+        file_size=1010,
         source="test/source/",
         source_type=ModelSourceType.Path,
+        variant=ModelVariantType.Normal,
+        prediction_type=SchedulerPredictionType.Epsilon,
+        repo_variant=ModelRepoVariant.Default,
     )
-    config4 = MainDiffusersConfig(
+    config4 = Main_Diffusers_SDXL_Config(
         path="/tmp/config4",
         name="dup_name1",
-        base=BaseModelType("sdxl"),
+        base=BaseModelType.StableDiffusionXL,
         type=ModelType.Main,
         hash="CONFIG3HASH",
+        file_size=1011,
         source="test/source/",
         source_type=ModelSourceType.Path,
+        variant=ModelVariantType.Normal,
+        prediction_type=SchedulerPredictionType.Epsilon,
+        repo_variant=ModelRepoVariant.Default,
     )
-    config5 = VAEDiffusersConfig(
+    config5 = VAE_Diffusers_SD1_Config(
         path="/tmp/config5",
         name="dup_name1",
         base=BaseModelType.StableDiffusion1,
         type=ModelType.VAE,
         hash="CONFIG3HASH",
+        file_size=1012,
         source="test/source/",
         source_type=ModelSourceType.Path,
+        repo_variant=ModelRepoVariant.Default,
     )
     for c in config1, config2, config3, config4, config5:
         store.add_model(c)
@@ -290,6 +391,73 @@ def test_filter_2(store: ModelRecordServiceBase):
         model_name="dup_name1",
     )
     assert len(matches) == 1
+
+
+def test_search_by_attr_sorting(store: ModelRecordServiceSQL):
+    config1 = Main_Diffusers_SD1_Config(
+        path="/tmp/config1",
+        name="alpha",
+        base=BaseModelType.StableDiffusion1,
+        type=ModelType.Main,
+        hash="CONFIG1HASH",
+        file_size=1000,
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        variant=ModelVariantType.Normal,
+        prediction_type=SchedulerPredictionType.Epsilon,
+        repo_variant=ModelRepoVariant.Default,
+    )
+    config2 = Main_Diffusers_SD2_Config(
+        path="/tmp/config2",
+        name="beta",
+        base=BaseModelType.StableDiffusion2,
+        type=ModelType.Main,
+        hash="CONFIG2HASH",
+        file_size=2000,
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        variant=ModelVariantType.Normal,
+        prediction_type=SchedulerPredictionType.Epsilon,
+        repo_variant=ModelRepoVariant.Default,
+    )
+    config3 = VAE_Diffusers_SD1_Config(
+        path="/tmp/config3",
+        name="gamma",
+        base=BaseModelType.StableDiffusion1,
+        type=ModelType.VAE,
+        hash="CONFIG3HASH",
+        file_size=500,
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        repo_variant=ModelRepoVariant.Default,
+    )
+    for c in config1, config2, config3:
+        store.add_model(c)
+
+    # Test sorting by Name Ascending
+    matches = store.search_by_attr(order_by=ModelRecordOrderBy.Name, direction=SQLiteDirection.Ascending)
+    assert len(matches) == 3
+    assert matches[0].name == "alpha"
+    assert matches[1].name == "beta"
+    assert matches[2].name == "gamma"
+
+    # Test sorting by Name Descending
+    matches = store.search_by_attr(order_by=ModelRecordOrderBy.Name, direction=SQLiteDirection.Descending)
+    assert matches[0].name == "gamma"
+    assert matches[1].name == "beta"
+    assert matches[2].name == "alpha"
+
+    # Test sorting by Size Ascending
+    matches = store.search_by_attr(order_by=ModelRecordOrderBy.Size, direction=SQLiteDirection.Ascending)
+    assert matches[0].name == "gamma"  # 500
+    assert matches[1].name == "alpha"  # 1000
+    assert matches[2].name == "beta"  # 2000
+
+    # Test sorting by Size Descending
+    matches = store.search_by_attr(order_by=ModelRecordOrderBy.Size, direction=SQLiteDirection.Descending)
+    assert matches[0].name == "beta"  # 2000
+    assert matches[1].name == "alpha"  # 1000
+    assert matches[2].name == "gamma"  # 500
 
 
 def test_model_record_changes():

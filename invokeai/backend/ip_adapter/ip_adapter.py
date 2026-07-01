@@ -11,9 +11,8 @@ from PIL import Image
 from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 
 from invokeai.backend.ip_adapter.ip_attention_weights import IPAttentionWeights
-
-from ..raw_model import RawModel
-from .resampler import Resampler
+from invokeai.backend.ip_adapter.resampler import Resampler
+from invokeai.backend.raw_model import RawModel
 
 
 class IPAdapterStateDict(TypedDict):
@@ -125,19 +124,20 @@ class IPAdapter(RawModel):
             self.device, dtype=self.dtype
         )
 
-    def to(self, device: torch.device, dtype: Optional[torch.dtype] = None):
-        self.device = device
+    def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None):
+        if device is not None:
+            self.device = device
         if dtype is not None:
             self.dtype = dtype
 
         self._image_proj_model.to(device=self.device, dtype=self.dtype)
         self.attn_weights.to(device=self.device, dtype=self.dtype)
 
-    def calc_size(self):
-        # workaround for circular import
-        from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
+    def calc_size(self) -> int:
+        # HACK(ryand): Fix this issue with circular imports.
+        from invokeai.backend.model_manager.load.model_util import calc_module_size
 
-        return calc_model_size_by_data(self._image_proj_model) + calc_model_size_by_data(self.attn_weights)
+        return calc_module_size(self._image_proj_model) + calc_module_size(self.attn_weights)
 
     def _init_image_proj_model(
         self, state_dict: dict[str, torch.Tensor]
@@ -207,15 +207,24 @@ class IPAdapterPlusXL(IPAdapterPlus):
 
 
 def load_ip_adapter_tensors(ip_adapter_ckpt_path: pathlib.Path, device: str) -> IPAdapterStateDict:
-    state_dict: IPAdapterStateDict = {"ip_adapter": {}, "image_proj": {}}
+    state_dict: IPAdapterStateDict = {
+        "ip_adapter": {},
+        "image_proj": {},
+        "adapter_modules": {},  # added for noobai-mark-ipa
+        "image_proj_model": {},  # added for noobai-mark-ipa
+    }
 
     if ip_adapter_ckpt_path.suffix == ".safetensors":
         model = safetensors.torch.load_file(ip_adapter_ckpt_path, device=device)
         for key in model.keys():
-            if key.startswith("image_proj."):
-                state_dict["image_proj"][key.replace("image_proj.", "")] = model[key]
-            elif key.startswith("ip_adapter."):
+            if key.startswith("ip_adapter."):
                 state_dict["ip_adapter"][key.replace("ip_adapter.", "")] = model[key]
+            elif key.startswith("image_proj_model."):
+                state_dict["image_proj_model"][key.replace("image_proj_model.", "")] = model[key]
+            elif key.startswith("image_proj."):
+                state_dict["image_proj"][key.replace("image_proj.", "")] = model[key]
+            elif key.startswith("adapter_modules."):
+                state_dict["adapter_modules"][key.replace("adapter_modules.", "")] = model[key]
             else:
                 raise RuntimeError(f"Encountered unexpected IP Adapter state dict key: '{key}'.")
     else:

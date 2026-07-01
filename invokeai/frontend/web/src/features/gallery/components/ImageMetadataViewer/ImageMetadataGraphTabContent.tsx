@@ -8,9 +8,11 @@ import DataViewer from './DataViewer';
 
 type Props = {
   image: ImageDTO;
+  searchTerm?: string;
+  showSearchInput?: boolean;
 };
 
-const ImageMetadataGraphTabContent = ({ image }: Props) => {
+const ImageMetadataGraphTabContent = ({ image, searchTerm, showSearchInput }: Props) => {
   const { t } = useTranslation();
   const { currentData } = useDebouncedImageWorkflow(image);
   const graph = useMemo(() => {
@@ -28,7 +30,16 @@ const ImageMetadataGraphTabContent = ({ image }: Props) => {
     return <IAINoContentFallback label={t('nodes.noGraph')} />;
   }
 
-  return <DataViewer data={graph} label={t('nodes.graph')} />;
+  return (
+    <DataViewer
+      fileName={`${image.image_name.replace('.png', '')}_graph`}
+      data={graph}
+      label={t('nodes.graph')}
+      withSearch
+      searchTerm={searchTerm}
+      showSearchInput={showSearchInput}
+    />
+  );
 };
 
 export default memo(ImageMetadataGraphTabContent);
