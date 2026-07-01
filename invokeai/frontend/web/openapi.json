@@ -6521,6 +6521,30 @@
         }
       }
     },
+    "/api/v1/app/generation_device_options": {
+      "get": {
+        "tags": ["app"],
+        "summary": "Get Generation Device Options",
+        "description": "List the devices available for generation, for use with the `generation_devices` setting.",
+        "operationId": "get_generation_device_options",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GenerationDeviceOption"
+                  },
+                  "type": "array",
+                  "title": "Response Get Generation Device Options"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/app/runtime_config": {
       "get": {
         "tags": ["app"],
@@ -28535,6 +28559,24 @@
         "title": "GeneratePasswordResponse",
         "description": "Response containing a generated password."
       },
+      "GenerationDeviceOption": {
+        "properties": {
+          "device": {
+            "type": "string",
+            "title": "Device",
+            "description": "The device identifier, e.g. 'cuda:0', 'mps', or 'cpu'"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Human-readable device name"
+          }
+        },
+        "type": "object",
+        "required": ["device", "name"],
+        "title": "GenerationDeviceOption",
+        "description": "A device that may be selected for generation."
+      },
       "GetMaskBoundingBoxInvocation": {
         "category": "mask",
         "class": "invocation",
@@ -40093,6 +40135,19 @@
             ],
             "default": null,
             "description": "An image representing the current state of the progress"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The device processing this session, e.g. 'cuda:1' (set only when running on a CUDA GPU)",
+            "title": "Device"
           }
         },
         "required": [
@@ -40108,7 +40163,8 @@
           "invocation_source_id",
           "message",
           "percentage",
-          "image"
+          "image",
+          "device"
         ],
         "title": "InvocationProgressEvent",
         "type": "object"
@@ -41319,6 +41375,29 @@
             "title": "Device",
             "description": "Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)",
             "default": "auto"
+          },
+          "generation_devices": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "auto"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Generation Devices",
+            "description": "Devices to use for parallel generation. `auto` (the default) uses every available GPU, running one generation session per GPU concurrently and distributing jobs fairly across users. Provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices, or a single-device list (e.g. `[cuda:0]`) to run serially. On systems without a GPU, `auto` resolves to the single `cpu`/`mps` device.<br>Valid values: `auto`, or a list whose entries are each `cpu`, `cuda`, `mps`, or `cuda:N` (where N is a device number)",
+            "default": "auto"
+          },
+          "offload_text_encoders_to_idle_gpus": {
+            "type": "boolean",
+            "title": "Offload Text Encoders To Idle Gpus",
+            "description": "When running on multiple GPUs, load text encoders onto a currently-idle GPU instead of the one running the denoise pipeline. This avoids churning the denoise model in and out of VRAM to make room for the encoder, and lets a cached encoder be reused across generations. Has no effect unless at least two `generation_devices` are configured and a GPU is idle; under full load encoders run on the session's own GPU as before.",
+            "default": true
           },
           "precision": {
             "type": "string",
@@ -65543,6 +65622,18 @@
             "title": "Retried From Item Id",
             "description": "The item_id of the queue item that this item was retried from"
           },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device",
+            "description": "The device that processed this queue item, e.g. 'cuda:1' (set only when running on a CUDA GPU)"
+          },
           "session": {
             "$ref": "#/components/schemas/GraphExecutionState",
             "description": "The fully-populated session to be executed"
@@ -70544,6 +70635,10 @@
             ],
             "title": "Max Queue History",
             "description": "Keep the last N completed, failed, and canceled queue items on startup. Set to 0 to prune all terminal items."
+          },
+          "generation_devices": {
+            "title": "Generation Devices",
+            "description": "Devices to use for parallel generation. `auto` uses every available GPU; provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices. Takes effect after restarting InvokeAI."
           }
         },
         "type": "object",

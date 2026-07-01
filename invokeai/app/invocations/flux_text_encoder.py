@@ -30,6 +30,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Condit
     tags=["prompt", "conditioning", "flux"],
     category="prompt",
     version="1.1.2",
+    idle_gpu_offloadable=True,
 )
 class FluxTextEncoderInvocation(BaseInvocation):
     """Encodes and preps a prompt for a flux image."""

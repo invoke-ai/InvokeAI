@@ -21,6 +21,39 @@ import { Steps, LinkCard } from '@astrojs/starlight/components';
   4. A maintainer will review the pull request and node. If the node is aligned with the direction of the project, you may be asked for permission to include it in the core project.
 </Steps>
 
+### Supporting multi-GPU text-encoder offload
+
+On a machine with more than one GPU, InvokeAI can run several generation sessions at once — one per GPU. When fewer sessions are running than there are GPUs, the spare GPUs sit idle. To put that capacity to use, InvokeAI can run a session's **prompt/text encoder** on a currently-idle GPU instead of on the GPU running the denoise pipeline. This avoids evicting the denoise model from VRAM just to make room for the encoder, and lets the cached encoder be reused across generations.
+
+This is controlled globally by the `offload_text_encoders_to_idle_gpus` config setting (enabled by default) and opted into **per node** via the `@invocation` decorator:
+
+```python
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+
+
+@invocation(
+    "my_text_encoder",
+    title="Prompt - My Model",
+    category="conditioning",
+    version="1.0.0",
+    idle_gpu_offloadable=True,  # opt in to idle-GPU offload
+)
+class MyTextEncoderInvocation(BaseInvocation):
+    ...
+```
+
+When the feature is enabled and an idle GPU is available, the **entire node** is temporarily re-pinned to a borrowed idle GPU: any model it loads goes onto that GPU and runs there. If no idle GPU is free (e.g. every GPU is busy with its own session), the node simply runs on its own GPU, unchanged. The borrow holds the idle GPU exclusively for the duration of the node, so it can never run concurrently against a native session on that same GPU.
+
+Because the whole node is moved to another device, only mark a node `idle_gpu_offloadable=True` if **all** of the following hold:
+
+- **It is encoder-only.** Its sole GPU work is loading one or more encoder models and running their forward pass. It must not load or run the denoise/transformer or VAE, or do any other work tied to the session's own GPU.
+- **It stores its result on the CPU before returning.** Move output tensors to the CPU (`tensor.detach().to("cpu")`) and save them as conditioning/tensors. The denoiser picks them up and moves them onto its own GPU later — this is what makes the cross-GPU handoff safe and device-agnostic.
+- **It places inputs on the loaded model's device, not a fixed device.** Resolve the device from the model you just loaded (e.g. `get_effective_device(model)` from `invokeai.backend.model_manager.load.model_cache.utils`, or `TorchDevice.choose_torch_device()`), rather than hard-coding `cuda:0`. The built-in `flux_text_encoder` and `compel` nodes are good references.
+
+:::caution[Only mark encoder-only nodes]
+If a node that also runs the denoiser, VAE, or other session-GPU work is marked `idle_gpu_offloadable=True`, that work will be re-pinned to the wrong GPU and can misplace tensors or raise device-mismatch errors. When in doubt, leave it unset (the default is `False`) — the node will still work correctly, just without the offload optimization.
+:::
+
 ### Community Node Template
 
 Append the following template to your pull request and the [Community Nodes](../../../workflows/community-nodes) page when submitting a node to be added to the community nodes list:

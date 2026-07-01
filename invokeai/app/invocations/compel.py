@@ -45,6 +45,7 @@ from invokeai.backend.util.devices import TorchDevice
     tags=["prompt", "compel"],
     category="prompt",
     version="1.2.1",
+    idle_gpu_offloadable=True,
 )
 class CompelInvocation(BaseInvocation):
     """Parse prompt using compel package to conditioning."""
@@ -250,6 +251,7 @@ class SDXLPromptInvocationBase:
     tags=["sdxl", "compel", "prompt"],
     category="prompt",
     version="1.2.1",
+    idle_gpu_offloadable=True,
 )
 class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     """Parse prompt using compel package to conditioning."""
@@ -344,6 +346,7 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     tags=["sdxl", "compel", "prompt"],
     category="prompt",
     version="1.1.2",
+    idle_gpu_offloadable=True,
 )
 class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     """Parse prompt using compel package to conditioning."""

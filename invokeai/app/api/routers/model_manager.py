@@ -443,7 +443,11 @@ async def update_model_record(
         # nn.Module at load time, so toggling them on a cached model is otherwise silently a no-op until
         # the entry is evicted. Drop any unlocked cached entries for this model so the next load rebuilds.
         if _load_settings_changed(previous_config, config):
-            dropped = ApiDependencies.invoker.services.model_manager.load.ram_cache.drop_model(key)
+            # Drop the model from every per-device cache so the next load on any GPU rebuilds it.
+            dropped = sum(
+                cache.drop_model(key)
+                for cache in ApiDependencies.invoker.services.model_manager.load.ram_caches.values()
+            )
             if dropped:
                 logger.info(
                     f"Dropped {dropped} cached entr{'y' if dropped == 1 else 'ies'} for model {key} after settings change."
@@ -1304,9 +1308,10 @@ async def get_stats() -> Optional[CacheStats]:
 )
 async def empty_model_cache(current_admin: AdminUserOrDefault) -> None:
     """Drop all models from the model cache to free RAM/VRAM. 'Locked' models that are in active use will not be dropped."""
-    # Request 1000GB of room in order to force the cache to drop all models.
+    # Request 1000GB of room in order to force each per-device cache to drop all models.
     ApiDependencies.invoker.services.logger.info("Emptying model cache.")
-    ApiDependencies.invoker.services.model_manager.load.ram_cache.make_room(1000 * 2**30)
+    for cache in ApiDependencies.invoker.services.model_manager.load.ram_caches.values():
+        cache.make_room(1000 * 2**30)
 
 
 class HFTokenStatus(str, Enum):

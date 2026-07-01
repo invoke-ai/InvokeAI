@@ -32,6 +32,7 @@ SD3_T5_MAX_SEQ_LEN = 256
     tags=["prompt", "conditioning", "sd3"],
     category="prompt",
     version="1.0.1",
+    idle_gpu_offloadable=True,
 )
 class Sd3TextEncoderInvocation(BaseInvocation):
     """Encodes and preps a prompt for a SD3 image."""

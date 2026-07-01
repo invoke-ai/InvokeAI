@@ -14,6 +14,7 @@ from tqdm import tqdm
 
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
+from invokeai.backend.util.devices import TorchDevice
 
 
 def denoise(
@@ -118,7 +119,7 @@ def denoise(
         is_heun = hasattr(scheduler, "state_in_first_order")
         user_step = 0
 
-        pbar = tqdm(total=total_steps, desc="Denoising")
+        pbar = tqdm(total=total_steps, desc=f"Denoising{TorchDevice.get_session_device_label()}")
         for step_index in range(num_scheduler_steps):
             timestep = scheduler.timesteps[step_index]
             # Convert scheduler timestep (0-1000) to normalized (0-1) for the model
@@ -230,7 +231,10 @@ def denoise(
         pbar.close()
     else:
         # Manual Euler stepping (original behavior)
-        for step_index, (t_curr, t_prev) in tqdm(list(enumerate(zip(timesteps[:-1], timesteps[1:], strict=True)))):
+        for step_index, (t_curr, t_prev) in tqdm(
+            list(enumerate(zip(timesteps[:-1], timesteps[1:], strict=True))),
+            desc=f"Denoising{TorchDevice.get_session_device_label()}",
+        ):
             t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
 
             # Run the transformer model (matching diffusers: guidance=guidance, return_dict=False)

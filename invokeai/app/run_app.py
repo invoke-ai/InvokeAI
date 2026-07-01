@@ -41,7 +41,7 @@ def run_app() -> None:
     from invokeai.app.invocations.load_custom_nodes import load_custom_nodes
     from invokeai.backend.util.devices import TorchDevice
 
-    torch_device_name = TorchDevice.get_torch_device_name()
+    torch_device_name = TorchDevice.get_generation_devices_summary(app_config.generation_devices)
     logger.info(f"Using torch device: {torch_device_name}")
 
     # Import from startup_utils here to avoid importing torch before configure_torch_cuda_allocator() is called.

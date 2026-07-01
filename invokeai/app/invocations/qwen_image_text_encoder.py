@@ -68,6 +68,7 @@ def _build_prompt(user_prompt: str, num_images: int) -> str:
     category="conditioning",
     version="1.2.0",
     classification=Classification.Prototype,
+    idle_gpu_offloadable=True,
 )
 class QwenImageTextEncoderInvocation(BaseInvocation):
     """Encodes text and reference images for Qwen Image using Qwen2.5-VL."""

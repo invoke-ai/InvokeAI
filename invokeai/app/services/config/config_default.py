@@ -11,7 +11,7 @@ import re
 import shutil
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, Union
 
 import yaml
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
@@ -205,6 +205,8 @@ class InvokeAIAppConfig(BaseSettings):
 
     # DEVICE
     device:                      str = Field(default="auto",                description="Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)", pattern=r"^(auto|cpu|mps|cuda(:\d+)?)$")
+    generation_devices: Union[Literal["auto"], list[str]] = Field(default="auto", description="Devices to use for parallel generation. `auto` (the default) uses every available GPU, running one generation session per GPU concurrently and distributing jobs fairly across users. Provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices, or a single-device list (e.g. `[cuda:0]`) to run serially. On systems without a GPU, `auto` resolves to the single `cpu`/`mps` device.<br>Valid values: `auto`, or a list whose entries are each `cpu`, `cuda`, `mps`, or `cuda:N` (where N is a device number)")
+    offload_text_encoders_to_idle_gpus: bool = Field(default=True,          description="When running on multiple GPUs, load text encoders onto a currently-idle GPU instead of the one running the denoise pipeline. This avoids churning the denoise model in and out of VRAM to make room for the encoder, and lets a cached encoder be reused across generations. Has no effect unless at least two `generation_devices` are configured and a GPU is idle; under full load encoders run on the session's own GPU as before.")
     precision:                PRECISION = Field(default="auto",             description="Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.")
 
     # GENERATION
@@ -256,6 +258,27 @@ class InvokeAIAppConfig(BaseSettings):
     # fmt: on
 
     model_config = SettingsConfigDict(env_prefix="INVOKEAI_", env_ignore_empty=True)
+
+    @field_validator("generation_devices")
+    @classmethod
+    def validate_generation_devices(cls, v: Union[str, list[str]]) -> Union[str, list[str]]:
+        if v == "auto":
+            return v
+        # A non-"auto" string would otherwise be iterated character-by-character below (rejecting
+        # 'c' from "cuda:0"), producing a confusing error. Require an explicit list instead.
+        if isinstance(v, str):
+            raise ValueError(
+                f"Invalid generation_devices value '{v}'. Use 'auto' or a list of devices, e.g. ['cuda:0', 'cuda:1']."
+            )
+        if len(v) == 0:
+            raise ValueError("generation_devices cannot be an empty list. Use 'auto' or a list of devices.")
+        pattern = re.compile(r"^(cpu|mps|cuda(:\d+)?)$")
+        for device in v:
+            if not pattern.match(device):
+                raise ValueError(
+                    f"Invalid generation device '{device}'. Valid values are 'auto', 'cpu', 'mps', 'cuda', or 'cuda:N'."
+                )
+        return v
 
     def update_config(self, config: dict[str, Any] | InvokeAIAppConfig, clobber: bool = True) -> None:
         """Updates the config, overwriting existing values.
