@@ -1,5 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, AppGetState } from 'app/store/store';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import { canvasWorkflowIntegrationProcessingCompleted } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
 import {
   selectAutoSwitch,
@@ -45,6 +46,20 @@ export const buildOnInvocationComplete = (
   completedInvocationKeysByItemId: Map<number, Set<string>>
 ) => {
   const addImagesToGallery = async (data: S['InvocationCompleteEvent']) => {
+    // In multiuser mode, admins are subscribed to the "admin" socket room and therefore receive
+    // invocation events for *every* user, not just their own. Those images belong to another
+    // user's gallery and boards — we must not insert them into this client's gallery or, worse,
+    // auto-switch the selected board to the other user's board and select their image.
+    //
+    // Only gate this when we actually know who is logged in. In single-user mode there is no
+    // authenticated user (selectCurrentUser is null) and every event is the local user's own, so
+    // we fall through and preserve the original behavior.
+    const currentUser = selectCurrentUser(getState());
+    if (currentUser && data.user_id !== currentUser.user_id) {
+      log.trace(`Skipping gallery update for image owned by another user (${data.user_id})`);
+      return;
+    }
+
     if (nodeTypeDenylist.includes(data.invocation.type)) {
       log.trace(`Skipping denylisted node type (${data.invocation.type})`);
       return;

@@ -1787,15 +1787,26 @@ class TestWebSocketAuth:
 
         asyncio.run(socketio._handle_queue_event(("queue_item_status_changed", event)))
 
-        rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
-        assert "user:owner-xyz" in rooms_emitted_to
-        assert "admin" in rooms_emitted_to
-        # CRITICAL: must NOT emit to the queue_id room — that would leak to other users
-        assert "default" not in rooms_emitted_to
+        emits = [(call.kwargs.get("event"), call.kwargs.get("room")) for call in mock_emit.call_args_list]
+
+        # The private queue_item_status_changed event carries unsanitized per-user
+        # metadata and must go ONLY to the owner + admin rooms.
+        private_rooms = [room for name, room in emits if name == "queue_item_status_changed"]
+        assert "user:owner-xyz" in private_rooms
+        assert "admin" in private_rooms
+        # CRITICAL: must NOT emit the private event to the queue_id room — that would leak to other users
+        assert "default" not in private_rooms
+
+        # A redacted queue_counts_changed nudge (no per-user data) IS broadcast to the
+        # whole queue room so every subscriber's badge stays live across users.
+        counts_rooms = [room for name, room in emits if name == "queue_counts_changed"]
+        assert "default" in counts_rooms
 
     def test_batch_enqueued_routed_privately(self, socketio: Any) -> None:
-        """Verify that _handle_queue_event emits BatchEnqueuedEvent ONLY to
-        user:{user_id} and admin rooms, never to the queue_id room."""
+        """Verify that _handle_queue_event emits the private BatchEnqueuedEvent ONLY to
+        user:{user_id} and admin rooms, never to the queue_id room. A redacted
+        queue_counts_changed nudge is still broadcast to the queue room so every
+        user's badge stays live."""
         import asyncio
         from unittest.mock import AsyncMock
 
@@ -1821,10 +1832,19 @@ class TestWebSocketAuth:
 
         asyncio.run(socketio._handle_queue_event(("batch_enqueued", event)))
 
-        rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
-        assert "user:owner-zzz" in rooms_emitted_to
-        assert "admin" in rooms_emitted_to
-        assert "default" not in rooms_emitted_to
+        emits = [(call.kwargs.get("event"), call.kwargs.get("room")) for call in mock_emit.call_args_list]
+
+        # The private batch_enqueued event carries the enqueuing user's batch_id/origin/
+        # counts and must go ONLY to the owner + admin rooms.
+        private_rooms = [room for name, room in emits if name == "batch_enqueued"]
+        assert "user:owner-zzz" in private_rooms
+        assert "admin" in private_rooms
+        assert "default" not in private_rooms
+
+        # A redacted queue_counts_changed nudge (no per-user data) IS broadcast to the
+        # whole queue room so every subscriber's badge stays live across users.
+        counts_rooms = [room for name, room in emits if name == "queue_counts_changed"]
+        assert "default" in counts_rooms
 
     def test_queue_cleared_still_broadcast(self, socketio: Any) -> None:
         """QueueClearedEvent does not carry user identity and should still be broadcast

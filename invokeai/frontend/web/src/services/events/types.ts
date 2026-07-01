@@ -26,6 +26,11 @@ export type ServerToClientEvents = {
   model_install_cancelled: (payload: S['ModelInstallCancelledEvent']) => void;
   model_load_complete: (payload: S['ModelLoadCompleteEvent']) => void;
   queue_item_status_changed: (payload: S['QueueItemStatusChangedEvent']) => void;
+  // Content-free broadcast to the whole queue room: the global queue counts may have changed
+  // (some user enqueued or a job changed status). Carries only queue_id — no per-user data —
+  // so every subscriber can refetch the redacted queue status. Emitted by the backend socket
+  // layer, not the event bus, so it has no generated `S[...]` schema type.
+  queue_counts_changed: (payload: { queue_id: string }) => void;
   queue_cleared: (payload: S['QueueClearedEvent']) => void;
   batch_enqueued: (payload: S['BatchEnqueuedEvent']) => void;
   queue_items_retried: (payload: S['QueueItemsRetriedEvent']) => void;

@@ -260,6 +260,21 @@ class SocketIO:
     async def _handle_unsub_bulk_download(self, sid: str, data: Any) -> None:
         await self._sio.leave_room(sid, BulkDownloadSubscriptionEvent(**data).bulk_download_id)
 
+    async def _broadcast_queue_counts_changed(self, queue_id: str):
+        """Broadcast a content-free signal that the queue's aggregate counts may have changed.
+
+        The detailed queue item events (status changes, enqueues) are private to their owner
+        and admins, so non-admin subscribers never learn when *other* users' jobs are queued,
+        started, or finished. Without that signal their badge's global total — and the
+        in_progress count that drives the progress animation — go stale and get stuck once
+        their own jobs finish.
+
+        This event carries nothing but the queue_id: no user_id, batch_id, session_id, or
+        counts. Every subscriber simply refetches GET /queue/{queue_id}/status, which already
+        redacts per-user data, so broadcasting it to the whole queue room leaks nothing.
+        """
+        await self._sio.emit(event="queue_counts_changed", data={"queue_id": queue_id}, room=queue_id)
+
     async def _handle_queue_event(self, event: FastAPIEvent[QueueEventBase]):
         """Handle queue events with user isolation.
 
@@ -313,6 +328,10 @@ class SocketIO:
 
                 logger.debug(f"Emitted private queue item event {event_name} to user room {user_room} and admin room")
 
+                # A status change shifts the global pending/in_progress totals, so nudge every
+                # subscriber to refetch their (redacted) queue status — see _broadcast_queue_counts_changed.
+                await self._broadcast_queue_counts_changed(event_data.queue_id)
+
             # RecallParametersUpdatedEvent is private - only emit to owner + admins.
             #
             # Emit to the union of the owner room and the admin room in a SINGLE
@@ -339,6 +358,10 @@ class SocketIO:
                 await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=user_room)
                 await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
                 logger.debug(f"Emitted private batch_enqueued event to user room {user_room} and admin room")
+
+                # Newly enqueued items raise the global total, so nudge every subscriber to
+                # refetch their (redacted) queue status — see _broadcast_queue_counts_changed.
+                await self._broadcast_queue_counts_changed(event_data.queue_id)
 
             else:
                 # For remaining queue events (e.g. QueueClearedEvent) that do not
