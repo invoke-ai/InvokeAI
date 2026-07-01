@@ -1,48 +1,67 @@
-"""Migration 33: Add workflow-call relationship columns to session_queue."""
-
 import sqlite3
 
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
 
 
 class Migration33Callback:
-    """Add durable parent/child workflow-call relationship columns to session_queue."""
-
     def __call__(self, cursor: sqlite3.Cursor) -> None:
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='session_queue';")
-        if cursor.fetchone() is None:
-            return
-
-        cursor.execute("PRAGMA table_info(session_queue);")
-        columns = [row[1] for row in cursor.fetchall()]
-
-        if "workflow_call_id" not in columns:
-            cursor.execute("ALTER TABLE session_queue ADD COLUMN workflow_call_id TEXT;")
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_session_queue_workflow_call_id ON session_queue(workflow_call_id);"
-            )
-
-        if "parent_item_id" not in columns:
-            cursor.execute("ALTER TABLE session_queue ADD COLUMN parent_item_id INTEGER;")
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_session_queue_parent_item_id ON session_queue(parent_item_id);"
-            )
-
-        if "parent_session_id" not in columns:
-            cursor.execute("ALTER TABLE session_queue ADD COLUMN parent_session_id TEXT;")
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_session_queue_parent_session_id ON session_queue(parent_session_id);"
-            )
-
-        if "root_item_id" not in columns:
-            cursor.execute("ALTER TABLE session_queue ADD COLUMN root_item_id INTEGER;")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_session_queue_root_item_id ON session_queue(root_item_id);")
-
-        if "workflow_call_depth" not in columns:
-            cursor.execute("ALTER TABLE session_queue ADD COLUMN workflow_call_depth INTEGER;")
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_session_queue_workflow_call_depth ON session_queue(workflow_call_depth);"
-            )
+        cursor.execute(
+            """--sql
+            CREATE TABLE IF NOT EXISTS image_subfolder_move_jobs (
+                id INTEGER PRIMARY KEY,
+                state TEXT NOT NULL CHECK (
+                    state IN ('planned', 'moving', 'moved', 'committed', 'error')
+                ),
+                created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+                updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+                error_message TEXT
+            );
+            """
+        )
+        cursor.execute(
+            """--sql
+            CREATE TABLE IF NOT EXISTS image_subfolder_move_items (
+                job_id INTEGER NOT NULL REFERENCES image_subfolder_move_jobs(id),
+                image_name TEXT NOT NULL REFERENCES images(image_name),
+                old_subfolder TEXT NOT NULL,
+                new_subfolder TEXT NOT NULL,
+                is_intermediate BOOLEAN NOT NULL DEFAULT FALSE,
+                old_path TEXT,
+                new_path TEXT,
+                old_thumbnail_path TEXT,
+                new_thumbnail_path TEXT,
+                state TEXT NOT NULL CHECK (
+                    state IN ('planned', 'moved', 'committed', 'error')
+                ),
+                error_message TEXT,
+                PRIMARY KEY (job_id, image_name)
+            );
+            """
+        )
+        cursor.execute(
+            """--sql
+            CREATE INDEX IF NOT EXISTS idx_image_subfolder_move_items_job_state
+            ON image_subfolder_move_items(job_id, state);
+            """
+        )
+        cursor.execute(
+            """--sql
+            CREATE INDEX IF NOT EXISTS idx_image_subfolder_move_items_image_name
+            ON image_subfolder_move_items(image_name);
+            """
+        )
+        cursor.execute(
+            """--sql
+            CREATE TRIGGER IF NOT EXISTS tg_image_subfolder_move_jobs_updated_at
+            AFTER UPDATE
+            ON image_subfolder_move_jobs FOR EACH ROW
+            BEGIN
+                UPDATE image_subfolder_move_jobs
+                SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
+                WHERE id = old.id;
+            END;
+            """
+        )
 
 
 def build_migration_33() -> Migration:

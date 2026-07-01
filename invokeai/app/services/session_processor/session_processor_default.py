@@ -430,6 +430,10 @@ class DefaultSessionProcessor(SessionProcessorBase):
             is_processing=self._queue_item is not None,
         )
 
+    def _is_image_move_maintenance_active(self) -> bool:
+        image_moves = getattr(self._invoker.services, "image_moves", None)
+        return image_moves is not None and image_moves.is_maintenance_active()
+
     def _process(
         self,
         stop_event: ThreadEvent,
@@ -450,6 +454,11 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     # Any unhandled exception in this block is a nonfatal processor error and will be handled.
                     # If we are paused, wait for resume event
                     resume_event.wait()
+
+                    if self._is_image_move_maintenance_active():
+                        self._invoker.services.logger.debug("Image storage maintenance is active")
+                        poll_now_event.wait(self._polling_interval)
+                        continue
 
                     # Get the next session to process
                     self._queue_item = self._invoker.services.session_queue.dequeue()
