@@ -10,8 +10,7 @@ export const projectWidgetManifest: WidgetManifest = {
   failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
   icon: FolderCogIcon,
   id: 'project',
-  label: 'Project',
-  labelText: 'Project',
+  label: (t) => t('widgets.labels.project'),
   version: 1,
   view: ProjectWidgetView,
 };

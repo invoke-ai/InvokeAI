@@ -11,8 +11,7 @@ export const serverStatusWidgetManifest: WidgetManifest = {
   failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
   icon: PlugZapIcon,
   id: 'server-status',
-  label: 'Server Status',
-  labelText: 'Server Status',
+  label: (t) => t('widgets.labels.serverStatus'),
   version: 1,
   view: ServerStatusWidgetView,
 };

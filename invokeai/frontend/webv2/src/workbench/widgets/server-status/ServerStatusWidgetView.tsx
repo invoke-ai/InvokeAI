@@ -4,26 +4,29 @@ import { Stack, Text } from '@chakra-ui/react';
 import { StatusWidgetChip } from '@workbench/widget-frame';
 import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { CircleXIcon, PlugZapIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export const ServerStatusWidgetView = ({ presentation }: WidgetViewProps) => {
+  const { t } = useTranslation();
   const backendConnection = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection);
   const isConnected = backendConnection.status === 'connected';
   const isDisconnected = backendConnection.status === 'disconnected';
   const label = isConnected
-    ? 'Connected to Server'
+    ? t('widgets.serverStatus.connected')
     : isDisconnected
-      ? 'Disconnected from Server'
-      : 'Connecting to Server';
+      ? t('widgets.serverStatus.disconnected')
+      : t('widgets.serverStatus.connecting');
 
   if (presentation === 'tooltip') {
     return (
       <Stack gap="2">
         <Text fontSize="xs" fontWeight="700">
-          Server Status
+          {t('widgets.serverStatus.label')}
         </Text>
         <Text color="fg.subtle" fontSize="2xs">
-          {label}
-          {backendConnection.error ? `: ${backendConnection.error}` : ''}
+          {backendConnection.error
+            ? t('widgets.serverStatus.labelWithError', { error: backendConnection.error, label })
+            : label}
         </Text>
       </Stack>
     );

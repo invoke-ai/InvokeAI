@@ -9,21 +9,23 @@ import { formatBytes } from '@workbench/models/taxonomy';
 import { useNotify } from '@workbench/useNotify';
 import { BrushCleaningIcon, FolderSearchIcon, MoreHorizontalIcon, RefreshCcwIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Library maintenance: refresh, clean up orphaned model folders (files on disk
  * with no database record), and empty the in-memory model cache.
  */
 export const MaintenanceMenu = () => {
+  const { t } = useTranslation();
   const notify = useNotify();
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
 
   const handleEmptyCache = async () => {
     try {
       await emptyModelCache();
-      notify.success('Model cache emptied');
+      notify.success(t('models.cacheEmptied'));
     } catch (error) {
-      notify.error('Failed to empty model cache', error instanceof Error ? error.message : String(error));
+      notify.error(t('models.failedToEmptyCache'), error instanceof Error ? error.message : String(error));
     }
   };
 
@@ -31,7 +33,7 @@ export const MaintenanceMenu = () => {
     <>
       <Menu.Root positioning={{ placement: 'bottom-end' }}>
         <Menu.Trigger asChild>
-          <IconButton aria-label="Model library maintenance" size="2xs" variant="ghost">
+          <IconButton aria-label={t('models.libraryMaintenance')} size="2xs" variant="ghost">
             <Icon as={MoreHorizontalIcon} boxSize="4" />
           </IconButton>
         </Menu.Trigger>
@@ -40,15 +42,15 @@ export const MaintenanceMenu = () => {
             <MenuContent minW="14rem">
               <Menu.Item value="refresh" onClick={() => void refreshModels()}>
                 <Icon as={RefreshCcwIcon} boxSize="3.5" />
-                <Menu.ItemText fontSize="xs">Refresh model list</Menu.ItemText>
+                <Menu.ItemText fontSize="xs">{t('models.refreshList')}</Menu.ItemText>
               </Menu.Item>
               <Menu.Item value="sync" onClick={() => setIsSyncDialogOpen(true)}>
                 <Icon as={FolderSearchIcon} boxSize="3.5" />
-                <Menu.ItemText fontSize="xs">Clean up orphaned models…</Menu.ItemText>
+                <Menu.ItemText fontSize="xs">{t('models.cleanupOrphaned')}</Menu.ItemText>
               </Menu.Item>
               <Menu.Item value="empty-cache" onClick={() => void handleEmptyCache()}>
                 <Icon as={BrushCleaningIcon} boxSize="3.5" />
-                <Menu.ItemText fontSize="xs">Empty model cache</Menu.ItemText>
+                <Menu.ItemText fontSize="xs">{t('models.emptyCache')}</Menu.ItemText>
               </Menu.Item>
             </MenuContent>
           </Menu.Positioner>
@@ -60,6 +62,7 @@ export const MaintenanceMenu = () => {
 };
 
 const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
+  const { t } = useTranslation();
   const notify = useNotify();
   const [orphans, setOrphans] = useState<OrphanedModelInfo[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -78,14 +81,14 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
       })
       .catch((error: unknown) => {
         if (!isStale) {
-          setLoadError(error instanceof Error ? error.message : 'Failed to scan for orphaned models.');
+          setLoadError(error instanceof Error ? error.message : t('models.failedToScanOrphaned'));
         }
       });
 
     return () => {
       isStale = true;
     };
-  }, []);
+  }, [t]);
 
   const togglePath = (path: string) => {
     setSelectedPaths((current) => {
@@ -110,17 +113,24 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
 
       if (errorCount > 0) {
         notify.error(
-          'Orphaned model cleanup',
-          `${result.deleted.length} deleted, ${errorCount} failed: ${Object.values(result.errors)[0]}`
+          t('models.orphanedCleanup'),
+          t('models.orphanedCleanupPartialDescription', {
+            deleted: result.deleted.length,
+            error: Object.values(result.errors)[0],
+            failed: errorCount,
+          })
         );
       } else {
-        notify.success('Orphaned model cleanup', `${result.deleted.length} orphaned model folder(s) deleted.`);
+        notify.success(
+          t('models.orphanedCleanup'),
+          t('models.orphanedDeletedDescription', { count: result.deleted.length })
+        );
       }
 
       void refreshModels();
       onClose();
     } catch (error) {
-      notify.error('Orphaned model cleanup failed', error instanceof Error ? error.message : String(error));
+      notify.error(t('models.orphanedCleanupFailed'), error instanceof Error ? error.message : String(error));
     } finally {
       setIsDeleting(false);
     }
@@ -149,11 +159,10 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
             <Dialog.Header borderBottomWidth="1px" borderColor="border.subtle">
               <Stack gap="0.5">
                 <Dialog.Title fontSize="sm" fontWeight="700">
-                  Orphaned Models
+                  {t('models.orphanedTitle')}
                 </Dialog.Title>
                 <Text color="fg.subtle" fontSize="2xs">
-                  Folders in the models directory with no database record — usually leftovers from failed installs or
-                  external deletes.
+                  {t('models.orphanedDescription')}
                 </Text>
               </Stack>
             </Dialog.Header>
@@ -168,7 +177,7 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
                 </Flex>
               ) : orphans.length === 0 ? (
                 <Text color="fg.muted" fontSize="xs" py="4" textAlign="center">
-                  No orphaned model folders found — your library is clean.
+                  {t('models.noOrphaned')}
                 </Text>
               ) : (
                 <Stack gap="1.5" py="2">
@@ -190,7 +199,7 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
                     <Checkbox.HiddenInput />
                     <Checkbox.Control />
                     <Checkbox.Label color="fg.muted" fontSize="2xs">
-                      Select all ({orphans.length})
+                      {t('models.selectAllCount', { count: orphans.length })}
                     </Checkbox.Label>
                   </Checkbox.Root>
                   {orphans.map((orphan) => (
@@ -209,8 +218,7 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
                           {orphan.path}
                         </Text>
                         <Text color="fg.subtle" fontSize="2xs">
-                          {orphan.files.length} file{orphan.files.length === 1 ? '' : 's'} ·{' '}
-                          {formatBytes(orphan.size_bytes)}
+                          {t('models.fileCount', { count: orphan.files.length })} · {formatBytes(orphan.size_bytes)}
                         </Text>
                       </Stack>
                     </Panel>
@@ -220,7 +228,7 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
             </Dialog.Body>
             <Dialog.Footer gap="2">
               <Button disabled={isDeleting} size="xs" variant="ghost" onClick={onClose}>
-                Close
+                {t('common.close')}
               </Button>
               <Button
                 colorPalette="red"
@@ -230,7 +238,7 @@ const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
                 variant="solid"
                 onClick={() => void handleDelete()}
               >
-                Delete Selected ({formatBytes(totalSelectedBytes)})
+                {t('models.deleteSelectedWithBytes', { bytes: formatBytes(totalSelectedBytes) })}
               </Button>
             </Dialog.Footer>
             <Dialog.CloseTrigger asChild>

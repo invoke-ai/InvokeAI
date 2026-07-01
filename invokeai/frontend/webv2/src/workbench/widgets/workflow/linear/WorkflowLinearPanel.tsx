@@ -4,6 +4,7 @@ import { useActiveProjectSelector, useWidgetValuesSelector, useWorkbenchDispatch
 import { ensureInvocationTemplatesLoaded } from '@workbench/workflows/templates';
 import { EyeIcon, PencilIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { FormBuilderTab } from './FormBuilderTab';
 import { LinearFormView } from './LinearFormView';
@@ -21,7 +22,7 @@ import { WorkflowJsonTab } from './WorkflowJsonTab';
 type PanelMode = 'view' | 'edit';
 type EditTab = 'form' | 'details' | 'json';
 type PanelModeItem = {
-  label: string;
+  labelKey: string;
   icon: typeof EyeIcon;
   mode: PanelMode;
 };
@@ -33,8 +34,8 @@ const SPLITTER_PANELS = [
   { id: 'inspector', minSize: 12 },
 ];
 const PANEL_MODES: PanelModeItem[] = [
-  { label: 'View', icon: EyeIcon, mode: 'view' },
-  { label: 'Edit', icon: PencilIcon, mode: 'edit' },
+  { labelKey: 'common.view', icon: EyeIcon, mode: 'view' },
+  { labelKey: 'common.edit', icon: PencilIcon, mode: 'edit' },
 ];
 
 export interface WorkflowPanelState {
@@ -63,6 +64,7 @@ export const areWorkflowPanelStatesEqual = (left: WorkflowPanelState, right: Wor
   left.mode === right.mode && left.editTab === right.editTab && left.inspectorSizePct === right.inspectorSizePct;
 
 const PanelModeToggle = ({ mode, onChange }: { mode: PanelMode; onChange: (mode: PanelMode) => void }) => {
+  const { t } = useTranslation();
   const onValueChange = useCallback(
     (details: { value: string | null }) => {
       if (details.value === 'view' || details.value === 'edit') {
@@ -75,11 +77,11 @@ const PanelModeToggle = ({ mode, onChange }: { mode: PanelMode; onChange: (mode:
   return (
     <SegmentGroup.Root value={mode} onValueChange={onValueChange} size="xs">
       <SegmentGroup.Indicator />
-      {PANEL_MODES.map(({ label, icon, mode }) => (
+      {PANEL_MODES.map(({ labelKey, icon, mode }) => (
         <SegmentGroup.Item key={mode} value={mode}>
           <SegmentGroup.ItemHiddenInput />
           <Icon as={icon} boxSize="3" />
-          <SegmentGroup.ItemText>{label}</SegmentGroup.ItemText>
+          <SegmentGroup.ItemText>{t(labelKey)}</SegmentGroup.ItemText>
         </SegmentGroup.Item>
       ))}
     </SegmentGroup.Root>
@@ -87,6 +89,7 @@ const PanelModeToggle = ({ mode, onChange }: { mode: PanelMode; onChange: (mode:
 };
 
 export const WorkflowLinearPanel = () => {
+  const { t } = useTranslation();
   const { editTab, inspectorSizePct, mode } = useWidgetValuesSelector(
     'workflow',
     getWorkflowPanelState,
@@ -116,13 +119,13 @@ export const WorkflowLinearPanel = () => {
           <Tabs.Root size="sm" value={editTab} variant="outline" mb="-1" onValueChange={onEditTabChange}>
             <Tabs.List>
               <Tabs.Trigger value="form" fontSize="2xs">
-                Form
+                {t('widgets.workflow.form')}
               </Tabs.Trigger>
               <Tabs.Trigger value="details" fontSize="2xs">
-                Details
+                {t('widgets.workflow.details')}
               </Tabs.Trigger>
               <Tabs.Trigger value="json" fontSize="2xs">
-                JSON
+                {t('common.json')}
               </Tabs.Trigger>
             </Tabs.List>
           </Tabs.Root>
@@ -138,10 +141,11 @@ export const WorkflowLinearPanel = () => {
 };
 
 const WorkflowLinearViewContent = () => {
+  const { t } = useTranslation();
   const projectGraph = useActiveProjectSelector((project) => project.projectGraph);
 
   return (
-    <Scrollable flex="1" label="Workflow panel content" minH="0">
+    <Scrollable flex="1" label={t('widgets.workflow.panelContent')} minH="0">
       <LinearFormView projectGraph={projectGraph} />
     </Scrollable>
   );
@@ -156,6 +160,7 @@ const WorkflowLinearEditContent = ({
   inspectorSizePct: number;
   patchValues: (values: Record<string, unknown>) => void;
 }) => {
+  const { t } = useTranslation();
   const projectGraph = useActiveProjectSelector((project) => project.projectGraph);
   const defaultSize = useMemo(() => [100 - inspectorSizePct, inspectorSizePct], [inspectorSizePct]);
   const onResizeEnd = useCallback(
@@ -183,7 +188,7 @@ const WorkflowLinearEditContent = ({
         {editTab === 'json' ? (
           <WorkflowJsonTab projectGraph={projectGraph} />
         ) : (
-          <Scrollable flex="1" h="full" label="Workflow panel content" minH="0" minW="0" w="full">
+          <Scrollable flex="1" h="full" label={t('widgets.workflow.panelContent')} minH="0" minW="0" w="full">
             {editTab === 'form' ? (
               <FormBuilderTab projectGraph={projectGraph} />
             ) : (
@@ -192,7 +197,7 @@ const WorkflowLinearEditContent = ({
           </Scrollable>
         )}
       </Splitter.Panel>
-      <Splitter.ResizeTrigger aria-label="Resize node inspector" id="content:inspector" />
+      <Splitter.ResizeTrigger aria-label={t('widgets.workflow.resizeNodeInspector')} id="content:inspector" />
       <Splitter.Panel id="inspector" minH="0" overflow="hidden">
         <NodeInspector projectGraph={projectGraph} />
       </Splitter.Panel>

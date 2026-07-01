@@ -1,4 +1,5 @@
 import { SimpleGrid, Stat } from '@chakra-ui/react';
+import { useTranslation } from 'react-i18next';
 
 import { useScopedQueueCounts } from './queueScope';
 
@@ -15,14 +16,15 @@ const QueueStatCard = ({ value, label, danger }: { value: number; label: string;
 );
 
 export const QueueStats = () => {
+  const { t } = useTranslation();
   const counts = useScopedQueueCounts();
 
   return (
     <SimpleGrid columns={4}>
-      <QueueStatCard label="done" value={counts.completed} />
-      <QueueStatCard danger={counts.failed > 0} label="failed" value={counts.failed} />
-      <QueueStatCard label="canceled" value={counts.canceled} />
-      <QueueStatCard label="total" value={counts.total} />
+      <QueueStatCard label={t('common.done')} value={counts.completed} />
+      <QueueStatCard danger={counts.failed > 0} label={t('common.failed')} value={counts.failed} />
+      <QueueStatCard label={t('common.canceled')} value={counts.canceled} />
+      <QueueStatCard label={t('common.total')} value={counts.total} />
     </SimpleGrid>
   );
 };

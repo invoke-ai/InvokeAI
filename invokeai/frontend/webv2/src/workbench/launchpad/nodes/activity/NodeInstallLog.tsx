@@ -7,17 +7,18 @@ import { Scrollable } from '@workbench/components/ui';
 import { EmptyState } from '@workbench/components/ui/EmptyState';
 import { useCustomNodeInstallLog } from '@workbench/customNodes/installLogStore';
 import { InboxIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const INSTALL_LOG_TABLE_SX: SystemStyleObject = {
   '& tbody tr:nth-of-type(odd)': { bg: 'bg.muted' },
   '& th': { bg: 'bg.subtle', position: 'sticky', top: 0, zIndex: 1 },
 };
 
-const STATUS_BADGES: Record<CustomNodeInstallLogEntry['status'], { label: string; palette: string }> = {
-  completed: { label: 'Completed', palette: 'green' },
-  error: { label: 'Error', palette: 'red' },
-  installing: { label: 'Installing', palette: 'blue' },
-  uninstalled: { label: 'Uninstalled', palette: 'orange' },
+const STATUS_BADGES: Record<CustomNodeInstallLogEntry['status'], { labelKey: string; palette: string }> = {
+  completed: { labelKey: 'common.status.completed', palette: 'green' },
+  error: { labelKey: 'common.error', palette: 'red' },
+  installing: { labelKey: 'nodes.installing', palette: 'blue' },
+  uninstalled: { labelKey: 'nodes.uninstalled', palette: 'orange' },
 };
 
 /**
@@ -25,29 +26,30 @@ const STATUS_BADGES: Record<CustomNodeInstallLogEntry['status'], { label: string
  * outcomes for the current session in a sticky-header table.
  */
 export const NodeInstallLog = () => {
+  const { t } = useTranslation();
   const log = useCustomNodeInstallLog();
 
   if (log.length === 0) {
     return (
       <EmptyState
-        description="Install or uninstall a node pack and the outcome shows up here."
+        description={t('nodes.noRecentActivityDescription')}
         icon={<Icon as={InboxIcon} />}
-        title="No recent activity"
+        title={t('nodes.noRecentActivity')}
       />
     );
   }
 
   return (
-    <Scrollable h="full" label="Custom node install activity" minH="0">
+    <Scrollable h="full" label={t('nodes.installActivity')} minH="0">
       <Table.Root css={INSTALL_LOG_TABLE_SX} minW="36rem" size="sm">
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader borderColor="border.subtle" ps="3">
-              Name
+              {t('common.name')}
             </Table.ColumnHeader>
-            <Table.ColumnHeader borderColor="border.subtle">Status</Table.ColumnHeader>
+            <Table.ColumnHeader borderColor="border.subtle">{t('nodes.status')}</Table.ColumnHeader>
             <Table.ColumnHeader borderColor="border.subtle" pe="3">
-              Message
+              {t('nodes.message')}
             </Table.ColumnHeader>
           </Table.Row>
         </Table.Header>
@@ -62,6 +64,7 @@ export const NodeInstallLog = () => {
 };
 
 const InstallLogRow = ({ entry }: { entry: CustomNodeInstallLogEntry }) => {
+  const { t } = useTranslation();
   const badge = STATUS_BADGES[entry.status];
 
   return (
@@ -73,7 +76,7 @@ const InstallLogRow = ({ entry }: { entry: CustomNodeInstallLogEntry }) => {
       </Table.Cell>
       <Table.Cell borderColor="border.subtle">
         <Badge colorPalette={badge.palette} fontSize="2xs" variant="surface">
-          {badge.label}
+          {t(badge.labelKey)}
         </Badge>
       </Table.Cell>
       <Table.Cell borderColor="border.subtle" pe="3">

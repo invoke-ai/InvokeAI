@@ -11,6 +11,7 @@ import {
 import { isMainModelConfig, isModelIdentifierConfig, isVaeModelConfig } from '@workbench/generation/settings';
 import { ModelSelect } from '@workbench/models/components';
 import { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 
@@ -67,6 +68,7 @@ const ComponentPicker = ({
 };
 
 export const GenerateComponentsSection = ({ onCommit, selectedModel, settings }: GenerateComponentsSectionProps) => {
+  const { t } = useTranslation();
   const ctx = useMemo(
     () => (selectedModel ? getComponentPolicyContext(selectedModel, settings) : null),
     [selectedModel, settings]
@@ -100,7 +102,7 @@ export const GenerateComponentsSection = ({ onCommit, selectedModel, settings }:
   }
 
   return (
-    <GenerateCollapsibleSection label="Components" defaultOpen={policy.defaultOpen}>
+    <GenerateCollapsibleSection label={t('widgets.generate.components')} defaultOpen={policy.defaultOpen}>
       <Stack gap="2" p="2">
         {policy.slots.map((slot) => (
           <ComponentPickerRow key={slot.key} commitSlotValue={commitSlotValue} ctx={ctx!} slot={slot} />

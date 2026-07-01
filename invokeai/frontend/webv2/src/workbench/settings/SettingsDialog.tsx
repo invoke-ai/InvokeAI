@@ -30,6 +30,7 @@ import { themeCardRecipe } from '@theme/recipes';
 import { previewSwatches, THEMES, type ThemeDefinition } from '@theme/system';
 import { Button, CloseButton, IconButton, ConfirmDialog, Tabs, Tooltip } from '@workbench/components/ui';
 import { registerHotkeyModalLayer } from '@workbench/hotkeys';
+import { WORKBENCH_LANGUAGE_OPTIONS } from '@workbench/i18n';
 import { syncedWorkbenchPersistence } from '@workbench/projects/syncedPersistence';
 import {
   shallowEqual,
@@ -53,6 +54,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { HotkeysSettingsSection } from './HotkeysSettingsSection';
 import {
@@ -68,7 +70,6 @@ import {
   patchWorkbenchPreferences,
   useWorkbenchPreferences,
   useWorkbenchSettings,
-  WORKBENCH_LANGUAGES,
 } from './store';
 
 interface SettingsTabDefinition {
@@ -149,6 +150,7 @@ export const SettingsDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
 };
 
 const SettingsDialogContent = ({ onClose }: { onClose: () => void }) => {
+  const { t } = useTranslation();
   const { error, scope, status } = useWorkbenchSettings();
   const handlePositionerClick = useCallback(
     (event: { target: EventTarget; currentTarget: EventTarget }) => {
@@ -169,12 +171,10 @@ const SettingsDialogContent = ({ onClose }: { onClose: () => void }) => {
               <Icon as={SettingsIcon} boxSize="5" />
               <Stack gap="1">
                 <Dialog.Title fontSize="md" fontWeight="700" mt="0.5" lineHeight={1}>
-                  Settings
+                  {t('settings.title')}
                 </Dialog.Title>
                 <Text color="fg.subtle" fontSize="xs">
-                  {scope === 'user'
-                    ? 'Preferences for the signed-in user. Project settings apply only to the active project.'
-                    : 'Global preferences for this single-user install. Project settings apply only to the active project.'}
+                  {scope === 'user' ? t('settings.descriptionUser') : t('settings.descriptionGlobal')}
                 </Text>
                 {status === 'error' && error ? (
                   <Text color="fg.error" fontSize="2xs">
@@ -197,60 +197,61 @@ const SettingsDialogContent = ({ onClose }: { onClose: () => void }) => {
 };
 
 const SettingsTabs = () => {
+  const { t } = useTranslation();
   const hasWorkbench = useOptionalWorkbenchStore() !== null;
   const settingsTabs: SettingsTabDefinition[] = useMemo(
     () => [
       {
         children: <AppearanceSection />,
         icon: PaletteIcon,
-        label: 'Appearance',
+        label: t('settings.tabs.appearance'),
         value: 'appearance',
       },
       {
         children: <BehaviorSection />,
         icon: SlidersHorizontalIcon,
-        label: 'Behavior',
+        label: t('settings.tabs.behavior'),
         value: 'behavior',
       },
       {
         children: <HotkeysSettingsSection />,
         icon: KeyboardIcon,
-        label: 'Hotkeys',
+        label: t('settings.tabs.hotkeys'),
         value: 'hotkeys',
       },
       {
         children: <ProjectSection />,
         condition: hasWorkbench,
         icon: FolderIcon,
-        label: 'Project',
+        label: t('settings.tabs.project'),
         value: 'project',
       },
       {
         children: <QueueSection />,
         icon: ListOrderedIcon,
-        label: 'Queue',
+        label: t('settings.tabs.queue'),
         value: 'queue',
       },
       {
         children: <WorkflowSection />,
         icon: WorkflowIcon,
-        label: 'Workflow',
+        label: t('settings.tabs.workflow'),
         value: 'workflow',
       },
       {
         children: <DeveloperSection />,
         icon: Code2Icon,
-        label: 'Developer',
+        label: t('settings.tabs.developer'),
         value: 'developer',
       },
       {
         children: <WorkspaceSection />,
         icon: DatabaseIcon,
-        label: 'Workspace',
+        label: t('settings.tabs.workspace'),
         value: 'workspace',
       },
     ],
-    [hasWorkbench]
+    [hasWorkbench, t]
   );
   const tabs = settingsTabs.filter((tab) => tab.condition !== false);
   const sectionId = settingsDialogStore.useSelector((snapshot) => snapshot.sectionId);
@@ -323,6 +324,7 @@ const SettingsSection = ({
 );
 
 const AppearanceSection = () => {
+  const { t } = useTranslation();
   const { language, reduceMotion, showFocusRegionHighlight, themeId } = useWorkbenchPreferences();
 
   const selectTheme = useCallback((nextThemeId: WorkbenchThemeId) => {
@@ -346,15 +348,14 @@ const AppearanceSection = () => {
         ))}
       </SimpleGrid>
       <SettingSelect
-        comingSoon
-        description="Interface language. More i18n coverage will arrive soon."
-        label="Language"
+        description={t('settings.languageDescription')}
+        label={t('settings.language')}
         value={language}
         onChange={updateLanguage}
       >
-        {WORKBENCH_LANGUAGES.map((value) => (
-          <option key={value} value={value}>
-            {value}
+        {WORKBENCH_LANGUAGE_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
           </option>
         ))}
       </SettingSelect>
@@ -366,8 +367,7 @@ const AppearanceSection = () => {
       />
       <SettingToggle
         checked={showFocusRegionHighlight}
-        description="Draw a subtle outline around the active workbench region."
-        label="Highlight focused region"
+        label={t('settings.enableHighlightFocusedRegions')}
         onChange={updateShowFocusRegionHighlight}
       />
     </SettingsSection>
@@ -780,7 +780,7 @@ const SettingToggle = ({
 }: {
   checked: boolean;
   comingSoon?: boolean;
-  description: string;
+  description?: string;
   label: string;
   onChange: (checked: boolean) => void;
 }) => {
@@ -805,9 +805,11 @@ const SettingToggle = ({
         <Switch.Label color="fg" fontSize="sm" fontWeight="500" m="0">
           {label}
         </Switch.Label>
-        <Text color="fg.subtle" fontSize="xs" id={descriptionId}>
-          {description}
-        </Text>
+        {description && (
+          <Text color="fg.subtle" fontSize="xs" id={descriptionId}>
+            {description}
+          </Text>
+        )}
       </Stack>
       <Switch.HiddenInput aria-describedby={descriptionId} />
       <Switch.Control flexShrink={0} _checked={SWITCH_CHECKED_STYLES}>
@@ -827,7 +829,7 @@ const SettingSelect = ({
 }: {
   children: ReactNode;
   comingSoon?: boolean;
-  description: string;
+  description?: string;
   label: string;
   onChange: (value: string) => void;
   value: string;
@@ -850,9 +852,11 @@ const SettingSelect = ({
         <Field.Label color="fg" fontSize="sm" fontWeight="500" m="0">
           {label}
         </Field.Label>
-        <Field.HelperText color="fg.subtle" fontSize="xs" m="0">
-          {description}
-        </Field.HelperText>
+        {description && (
+          <Field.HelperText color="fg.subtle" fontSize="xs" m="0">
+            {description}
+          </Field.HelperText>
+        )}
       </Stack>
       <NativeSelect.Root flexShrink={0} maxW={SELECT_MAX_WIDTH} size="sm" w="full">
         <NativeSelect.Field value={value} onChange={handleChange}>

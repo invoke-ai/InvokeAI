@@ -4,6 +4,7 @@ import { Stack } from '@chakra-ui/react';
 import { StatusWidgetChip } from '@workbench/widget-frame';
 import { ListOrderedIcon } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { QueueFilterId } from './queueFilters';
 
@@ -20,6 +21,7 @@ import { RecentSection } from './RecentSection';
  * body. In a collapsed bottom dock it degrades to a single status chip.
  */
 export const QueueWidgetView = ({ presentation, region }: WidgetViewProps) => {
+  const { t } = useTranslation();
   const counts = useScopedQueueCounts();
 
   if (region === 'bottom' && presentation !== 'expanded') {
@@ -27,7 +29,9 @@ export const QueueWidgetView = ({ presentation, region }: WidgetViewProps) => {
 
     return (
       <StatusWidgetChip icon={ListOrderedIcon} tone={isGenerating ? 'accent' : undefined}>
-        {isGenerating ? `${counts.in_progress} generating` : `${counts.pending} queued`}
+        {isGenerating
+          ? t('widgets.queue.generating', { count: counts.in_progress })
+          : t('widgets.queue.queued', { count: counts.pending })}
       </StatusWidgetChip>
     );
   }

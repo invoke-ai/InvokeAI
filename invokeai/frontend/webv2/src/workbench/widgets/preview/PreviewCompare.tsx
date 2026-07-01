@@ -13,6 +13,7 @@ import {
   type CSSProperties,
   type PointerEvent,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 
 type CompareMode = 'slider' | 'side-by-side';
 
@@ -53,30 +54,32 @@ export const PreviewCompare = ({
   onSwap: () => void;
   runtime: WidgetRuntimeApi;
 }) => {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<CompareMode>('slider');
   const [dividerPercent, setDividerPercent] = useState(50);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
   const nextMode = useEffectEvent(() => setMode((current) => (current === 'slider' ? 'side-by-side' : 'slider')));
+  const nextComparisonModeLabel = t('widgets.preview.commands.nextComparisonMode');
 
   useEffect(() => {
     const command = runtime.commands.register({
       handler: nextMode,
       id: 'viewer.nextComparisonMode',
-      title: 'Next comparison mode',
+      title: nextComparisonModeLabel,
     });
     const hotkey = runtime.hotkeys.register({
       commandId: 'viewer.nextComparisonMode',
       defaultKeys: ['m'],
       id: 'viewer.nextComparisonMode',
-      title: 'Next comparison mode',
+      title: nextComparisonModeLabel,
     });
 
     return () => {
       command();
       hotkey();
     };
-  }, [runtime.commands, runtime.hotkeys]);
+  }, [nextComparisonModeLabel, runtime.commands, runtime.hotkeys]);
 
   const updateDivider = useCallback((clientX: number) => {
     const rect = containerRef.current?.getBoundingClientRect();
@@ -172,31 +175,31 @@ export const PreviewCompare = ({
               w="2px"
             />
             <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
-              Compare
+              {t('widgets.preview.compare')}
             </Badge>
             <Badge pointerEvents="none" position="absolute" right="2" size="xs" top="2" variant="solid">
-              Viewing
+              {t('widgets.preview.viewing')}
             </Badge>
           </Box>
         ) : (
           <HStack gap="2" h="full" minH="0" w="full">
-            <CompareSidePane image={compareImage} label="Compare" />
-            <CompareSidePane image={baseImage} label="Viewing" />
+            <CompareSidePane image={compareImage} label={t('widgets.preview.compare')} />
+            <CompareSidePane image={baseImage} label={t('widgets.preview.viewing')} />
           </HStack>
         )}
       </Flex>
       <HStack flexShrink={0} gap="1" justify="center">
         <Button size="2xs" variant="outline" onClick={toggleMode}>
           <Columns2Icon />
-          {mode === 'slider' ? 'Side by Side' : 'Slider'}
+          {mode === 'slider' ? t('widgets.preview.sideBySide') : t('widgets.preview.slider')}
         </Button>
         <Button size="2xs" variant="outline" onClick={onSwap}>
           <ArrowLeftRightIcon />
-          Swap
+          {t('common.swap')}
         </Button>
         <Button size="2xs" variant="outline" onClick={onExit}>
           <XIcon />
-          Exit Compare
+          {t('widgets.preview.exitCompare')}
         </Button>
       </HStack>
     </Stack>

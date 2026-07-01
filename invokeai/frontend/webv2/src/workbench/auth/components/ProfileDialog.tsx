@@ -8,12 +8,14 @@ import { useZodForm } from '@workbench/models/useZodForm';
 import { useNotify } from '@workbench/useNotify';
 import { WandSparklesIcon } from 'lucide-react';
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { AuthFormAlert } from './AuthScreen';
 import { PasswordInput, PasswordStrengthMeter } from './PasswordInput';
 
 /** Account settings: display name and password change for the signed-in user. */
 export const ProfileDialog = ({ isOpen, onClose, user }: { isOpen: boolean; onClose: () => void; user: UserDTO }) => {
+  const { t } = useTranslation();
   const handleOpenChange = useCallback(
     (event: Dialog.OpenChangeDetails) => {
       if (!event.open) {
@@ -40,10 +42,10 @@ export const ProfileDialog = ({ isOpen, onClose, user }: { isOpen: boolean; onCl
             <Dialog.Header borderBottomWidth="1px" borderColor="border.subtle">
               <Stack gap="0.5">
                 <Dialog.Title fontSize="md" fontWeight="700">
-                  Account
+                  {t('auth.account')}
                 </Dialog.Title>
                 <Text color="fg.subtle" fontSize="xs">
-                  Signed in as {user.email}
+                  {t('auth.signedInAs', { email: user.email })}
                 </Text>
               </Stack>
             </Dialog.Header>
@@ -59,6 +61,7 @@ export const ProfileDialog = ({ isOpen, onClose, user }: { isOpen: boolean; onCl
 };
 
 const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) => {
+  const { t } = useTranslation();
   const session = useAuthSession();
   const notify = useNotify();
   const [isGenerating, setIsGenerating] = useState(false);
@@ -77,13 +80,13 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
 
       form.setValue('newPassword', password);
       form.setValue('confirmPassword', password);
-      notify.info('Password generated', 'Reveal it with the eye icon and store it somewhere safe.');
+      notify.info(t('users.passwordGenerated'), t('auth.passwordGeneratedDescription'));
     } catch (error) {
-      notify.error('Could not generate a password', getApiErrorMessage(error, 'The backend rejected the request.'));
+      notify.error(t('users.couldNotGeneratePassword'), getApiErrorMessage(error, t('users.backendRejectedRequest')));
     } finally {
       setIsGenerating(false);
     }
-  }, [form, notify]);
+  }, [form, notify, t]);
 
   const submit = useCallback(
     () =>
@@ -110,13 +113,13 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
 
           setSessionUser(updated);
         } catch (error) {
-          throw new Error(getApiErrorMessage(error, 'Could not update your account.'));
+          throw new Error(getApiErrorMessage(error, t('auth.couldNotUpdateAccount')));
         }
 
-        notify.success('Account updated');
+        notify.success(t('auth.accountUpdated'));
         onClose();
       }),
-    [form, notify, onClose, user.display_name]
+    [form, notify, onClose, t, user.display_name]
   );
   const handleDisplayNameChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => form.setValue('displayName', event.target.value),
@@ -142,7 +145,7 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
       <Dialog.Body>
         <Stack gap="5" py="2">
           {form.formError ? <AuthFormAlert message={form.formError} tone="error" /> : null}
-          <Field helpText="Shown instead of your email across the workspace." label="Display name">
+          <Field helpText={t('auth.profileDisplayNameHelp')} label={t('users.displayName')}>
             <Input
               autoComplete="name"
               placeholder={user.email}
@@ -152,13 +155,13 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
           </Field>
           <Stack gap="3">
             <HStack justify="space-between">
-              <FieldLabel>Change password</FieldLabel>
+              <FieldLabel>{t('auth.changePassword')}</FieldLabel>
               <Button loading={isGenerating} size="2xs" variant="outline" onClick={handleGeneratePassword}>
                 <WandSparklesIcon />
-                Generate
+                {t('users.generate')}
               </Button>
             </HStack>
-            <Field error={form.errors.currentPassword} label="Current password">
+            <Field error={form.errors.currentPassword} label={t('auth.currentPassword')}>
               <PasswordInput
                 aria-invalid={form.errors.currentPassword ? true : undefined}
                 autoComplete="current-password"
@@ -168,8 +171,8 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
             </Field>
             <Field
               error={form.errors.newPassword}
-              helpText={session.strictPasswordChecking ? PASSWORD_RULES_HINT : 'Leave blank to keep your password.'}
-              label="New password"
+              helpText={session.strictPasswordChecking ? PASSWORD_RULES_HINT : t('auth.leaveBlankKeepPassword')}
+              label={t('users.newPassword')}
             >
               <Stack gap="1.5">
                 <PasswordInput
@@ -181,7 +184,7 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
                 <PasswordStrengthMeter password={form.values.newPassword} />
               </Stack>
             </Field>
-            <Field error={form.errors.confirmPassword} label="Confirm new password">
+            <Field error={form.errors.confirmPassword} label={t('auth.confirmNewPassword')}>
               <PasswordInput
                 aria-invalid={form.errors.confirmPassword ? true : undefined}
                 autoComplete="new-password"
@@ -194,10 +197,10 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
       </Dialog.Body>
       <Dialog.Footer gap="2">
         <Button size="xs" variant="ghost" onClick={onClose}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button loading={form.isSubmitting} size="xs" variant="solid" onClick={handleSave}>
-          Save changes
+          {t('users.saveChanges')}
         </Button>
       </Dialog.Footer>
     </>

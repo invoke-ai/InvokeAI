@@ -14,7 +14,6 @@ const createManifest = (overrides: Partial<WidgetManifest> = {}): WidgetManifest
   icon: TestIcon,
   id: 'vendor.widget',
   label: 'Test Widget',
-  labelText: 'Test Widget',
   version: 1,
   view: TestView,
   ...overrides,

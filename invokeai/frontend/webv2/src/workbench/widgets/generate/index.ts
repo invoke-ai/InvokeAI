@@ -11,8 +11,7 @@ export const generateWidgetManifest: WidgetManifest = {
   graphBearing: { defaultGraphId: 'generate-graph', sourceId: 'generate', surfaces: ['left'] },
   icon: SlidersHorizontalIcon,
   id: 'generate',
-  label: 'Generate',
-  labelText: 'Generate',
+  label: (t) => t('widgets.labels.generate'),
   version: 1,
   view: GenerateWidgetView,
 };

@@ -15,6 +15,7 @@ import { isActiveInstallStatus, refreshInstalls, replaceInstallJob } from '@work
 import { getInstallSourceLabel } from '@workbench/models/taxonomy';
 import { PauseIcon, PlayIcon, RotateCcwIcon, TriangleAlertIcon, XIcon } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { InstallJobProgress } from './InstallJobProgress';
 import { STATUS_BADGES, getInstallJobDisplayName } from './queueUtils';
@@ -29,6 +30,7 @@ export const InstallJobRow = ({
   job: ModelInstallJob;
   onError: (title: string, message: string) => void;
 }) => {
+  const { t } = useTranslation();
   const [isActing, setIsActing] = useState(false);
   const connectionStatus = useConnectionStatusSelector((snapshot) => snapshot.status);
   const badge = STATUS_BADGES[job.status] ?? { label: job.status, palette: 'gray' };
@@ -72,7 +74,7 @@ export const InstallJobRow = ({
           {displayName}
         </Text>
         {showDisconnected ? (
-          <Tooltip content="Backend disconnected — progress may be stale">
+          <Tooltip content={t('models.backendDisconnectedProgressStale')}>
             <Icon as={TriangleAlertIcon} boxSize="3" color="fg.warning" flexShrink={0} />
           </Tooltip>
         ) : null}
@@ -81,52 +83,52 @@ export const InstallJobRow = ({
         </Badge>
         <HStack flexShrink={0} gap="0.5">
           {job.status === 'downloading' ? (
-            <Tooltip content="Pause download">
+            <Tooltip content={t('models.pauseDownload')}>
               <IconButton
-                aria-label="Pause install"
+                aria-label={t('models.pauseInstall')}
                 disabled={isActing}
                 size="2xs"
                 variant="ghost"
-                onClick={() => void runAction(() => pauseModelInstall(job.id), 'Pause failed')}
+                onClick={() => void runAction(() => pauseModelInstall(job.id), t('models.pauseFailed'))}
               >
                 <Icon as={PauseIcon} boxSize="3" />
               </IconButton>
             </Tooltip>
           ) : null}
           {job.status === 'paused' ? (
-            <Tooltip content="Resume download">
+            <Tooltip content={t('models.resumeDownload')}>
               <IconButton
-                aria-label="Resume install"
+                aria-label={t('models.resumeInstall')}
                 disabled={isActing}
                 size="2xs"
                 variant="ghost"
-                onClick={() => void runAction(() => resumeModelInstall(job.id), 'Resume failed')}
+                onClick={() => void runAction(() => resumeModelInstall(job.id), t('models.resumeFailed'))}
               >
                 <Icon as={PlayIcon} boxSize="3" />
               </IconButton>
             </Tooltip>
           ) : null}
           {job.status === 'error' ? (
-            <Tooltip content="Retry failed download">
+            <Tooltip content={t('models.retryFailedDownload')}>
               <IconButton
-                aria-label="Retry install"
+                aria-label={t('models.retryInstall')}
                 disabled={isActing}
                 size="2xs"
                 variant="ghost"
-                onClick={() => void runAction(() => restartFailedModelInstall(job.id), 'Retry failed')}
+                onClick={() => void runAction(() => restartFailedModelInstall(job.id), t('models.retryFailed'))}
               >
                 <Icon as={RotateCcwIcon} boxSize="3" />
               </IconButton>
             </Tooltip>
           ) : null}
           {isActiveInstallStatus(job.status) || job.status === 'paused' ? (
-            <Tooltip content="Cancel install">
+            <Tooltip content={t('models.cancelInstall')}>
               <IconButton
-                aria-label="Cancel install"
+                aria-label={t('models.cancelInstall')}
                 disabled={isActing}
                 size="2xs"
                 variant="ghost"
-                onClick={() => void runAction(() => cancelModelInstall(job.id), 'Cancel failed')}
+                onClick={() => void runAction(() => cancelModelInstall(job.id), t('models.cancelFailed'))}
               >
                 <Icon as={XIcon} boxSize="3" />
               </IconButton>
@@ -164,17 +166,17 @@ export const InstallJobRow = ({
                 size="sm"
                 variant="surface"
               >
-                {isResume ? 'Resume required' : 'Failed'}
+                {isResume ? t('models.resumeRequired') : t('common.failed')}
               </Badge>
               {partUrl ? (
-                <Tooltip content="Restart this file">
+                <Tooltip content={t('models.restartThisFile')}>
                   <IconButton
-                    aria-label="Restart file"
+                    aria-label={t('models.restartFile')}
                     disabled={isActing}
                     size="2xs"
                     variant="ghost"
                     onClick={() =>
-                      void runAction(() => restartModelInstallFile(job.id, partUrl), 'Restart file failed')
+                      void runAction(() => restartModelInstallFile(job.id, partUrl), t('models.restartFileFailed'))
                     }
                   >
                     <Icon as={RotateCcwIcon} boxSize="3" />

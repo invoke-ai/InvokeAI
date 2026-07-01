@@ -11,6 +11,7 @@ import { Tooltip } from '@workbench/components/ui';
 import { getWorkflowNodeChromeProps } from '@workbench/widgets/workflow/editor/nodeChrome';
 import { getFieldTypeColor, getFieldTypeLabel, isModelFieldType } from '@workbench/workflows/fields';
 import { InfoIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * A read-only, static rendering of a single node — the same visual language as
@@ -53,22 +54,26 @@ const FieldTooltip = ({
   template,
 }: {
   description: string;
-  direction: 'Input' | 'Output';
+  direction: 'input' | 'output';
   template: { name: string; title: string; type: FieldType };
-}) => (
-  <Stack gap="0.5" maxW="18rem">
-    <Text fontWeight="700">{template.title}</Text>
-    <Text color="fg.subtle">Field: {template.name}</Text>
-    <Text color="fg.subtle">Type: {getFieldTypeLabel(template.type)}</Text>
-    <Text color="fg.subtle">{direction}</Text>
-    {description ? <Text>{description}</Text> : null}
-  </Stack>
-);
+}) => {
+  const { t } = useTranslation();
+
+  return (
+    <Stack gap="0.5" maxW="18rem">
+      <Text fontWeight="700">{template.title}</Text>
+      <Text color="fg.subtle">{t('nodes.fieldName', { name: template.name })}</Text>
+      <Text color="fg.subtle">{t('nodes.fieldType', { type: getFieldTypeLabel(template.type) })}</Text>
+      <Text color="fg.subtle">{t(direction === 'input' ? 'nodes.input' : 'nodes.output')}</Text>
+      {description ? <Text>{description}</Text> : null}
+    </Stack>
+  );
+};
 
 const OutputRow = ({ template }: { template: FieldOutputTemplate }) => (
   <Box position="relative" px="3" py="1">
     <Tooltip
-      content={<FieldTooltip description={template.description} direction="Output" template={template} />}
+      content={<FieldTooltip description={template.description} direction="output" template={template} />}
       positioning={{ placement: 'top-end' }}
     >
       <Flex justify="flex-end">
@@ -84,7 +89,7 @@ const OutputRow = ({ template }: { template: FieldOutputTemplate }) => (
 const InputRow = ({ template }: { template: FieldInputTemplate }) => (
   <Box position="relative" px="3" py="1">
     <Tooltip
-      content={<FieldTooltip description={template.description} direction="Input" template={template} />}
+      content={<FieldTooltip description={template.description} direction="input" template={template} />}
       positioning={{ placement: 'top-start' }}
     >
       <Text color="fg" fontSize="2xs" lineHeight="1" minW="0" truncate>
@@ -100,15 +105,19 @@ const InputRow = ({ template }: { template: FieldInputTemplate }) => (
   </Box>
 );
 
-const NodeInfoTooltip = ({ template }: { template: InvocationTemplate }) => (
-  <Stack gap="1" maxW="20rem">
-    <Text fontWeight="700">{template.title}</Text>
-    <Text color="fg.subtle">Type: {template.type}</Text>
-    <Text color="fg.subtle">Category: {template.category}</Text>
-    <Text color="fg.subtle">Version: {template.version}</Text>
-    {template.description ? <Text fontStyle="italic">{template.description}</Text> : null}
-  </Stack>
-);
+const NodeInfoTooltip = ({ template }: { template: InvocationTemplate }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Stack gap="1" maxW="20rem">
+      <Text fontWeight="700">{template.title}</Text>
+      <Text color="fg.subtle">{t('nodes.nodeType', { type: template.type })}</Text>
+      <Text color="fg.subtle">{t('nodes.nodeCategory', { category: template.category })}</Text>
+      <Text color="fg.subtle">{t('nodes.nodeVersion', { version: template.version })}</Text>
+      {template.description ? <Text fontStyle="italic">{template.description}</Text> : null}
+    </Stack>
+  );
+};
 
 export const NodePreviewCard = ({ template }: { template: InvocationTemplate }) => {
   const inputTemplates = sortByUiOrder(Object.values(template.inputs).filter((input) => !input.uiHidden));

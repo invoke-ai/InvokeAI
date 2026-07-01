@@ -303,7 +303,7 @@ export const WorkbenchProvider = ({
   return (
     <WorkbenchStoreContext value={store}>
       <WorkbenchDispatchContext value={dispatch}>
-        {hasHydrated ? children : <WorkbenchSplashScreen message="Opening project" />}
+        {hasHydrated ? children : <WorkbenchSplashScreen messageKey="splash.openingProject" />}
       </WorkbenchDispatchContext>
     </WorkbenchStoreContext>
   );

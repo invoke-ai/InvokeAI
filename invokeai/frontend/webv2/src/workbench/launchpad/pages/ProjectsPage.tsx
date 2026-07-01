@@ -9,6 +9,7 @@ import { refreshProjectLibrary } from '@workbench/projects/library';
 import { importProjectFile, pickProjectFile } from '@workbench/projects/projectFile';
 import { FileUpIcon, PlusIcon } from 'lucide-react';
 import { useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * The Launchpad's home section: your project library. It keeps a comfortable
@@ -27,13 +28,16 @@ const NEW_PROJECT_SEARCH = { new: true } as const;
 export const ProjectsPage = () => {
   const session = useAuthSession();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
     void refreshProjectLibrary();
   }, []);
 
   const displayName = session.user?.display_name?.trim();
-  const greeting = displayName ? `Welcome back, ${displayName}` : 'Welcome to Invoke';
+  const greeting = displayName
+    ? t('launchpad.projectsGreetingWithName', { name: displayName })
+    : t('launchpad.projectsGreeting');
 
   const handleImport = useCallback(async () => {
     const file = await pickProjectFile();
@@ -49,15 +53,15 @@ export const ProjectsPage = () => {
     } catch (error) {
       toaster.create({
         description: error instanceof Error ? error.message : undefined,
-        title: 'Import failed',
+        title: t('projects.importFailed'),
         type: 'error',
       });
     }
-  }, [navigate]);
+  }, [navigate, t]);
   const handleImportClick = useCallback(() => void handleImport(), [handleImport]);
 
   return (
-    <Scrollable h="full" label="Projects" minH="0">
+    <Scrollable h="full" label={t('launchpad.sections.projects')} minH="0">
       <Stack css={PROJECTS_PAGE_MEASURE_SX} gap="5">
         <Flex align="center" gap="3" justify="space-between" wrap="wrap">
           <Stack gap="0.5">
@@ -65,18 +69,18 @@ export const ProjectsPage = () => {
               {greeting}
             </Heading>
             <Text color="fg.muted" fontSize="xs">
-              Pick up where you left off, or start something new.
+              {t('launchpad.projectsSubtitle')}
             </Text>
           </Stack>
           <HStack gap="2" wrap="wrap">
             <Button size="xs" variant="outline" onClick={handleImportClick}>
               <FileUpIcon />
-              Import…
+              {t('projects.importWithEllipsis')}
             </Button>
             <Button asChild size="xs" variant="solid">
               <Link search={NEW_PROJECT_SEARCH} to="/app">
                 <PlusIcon />
-                New project
+                {t('projects.newProject')}
               </Link>
             </Button>
           </HStack>

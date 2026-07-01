@@ -11,8 +11,7 @@ export const autosaveStatusWidgetManifest: WidgetManifest = {
   failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
   icon: CloudCheckIcon,
   id: 'autosave-status',
-  label: 'Autosave',
-  labelText: 'Autosave',
+  label: (t) => t('widgets.labels.autosaveStatus'),
   version: 1,
   view: AutosaveStatusWidgetView,
 };

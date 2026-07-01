@@ -19,6 +19,7 @@ import { getCompatibleInputTemplate, getCompatibleOutputTemplate } from '@workbe
 import { parseWorkflowJson } from '@workbench/workflows/workflowJson';
 import { HistoryIcon, LibraryIcon, PlusIcon } from 'lucide-react';
 import { useEffect, useId, useRef, type ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { AddNodeDialog } from './editor/AddNodeDialog';
 import { getWorkflowFlowInstance } from './editor/flowInstanceStore';
@@ -41,13 +42,14 @@ import {
  */
 
 export const WorkflowWidgetLabel = ({ region }: WidgetLabelProps) => {
+  const { t } = useTranslation();
   const workflowName = useActiveProjectSelector((project) => project.projectGraph.name);
   const dispatch = useWorkbenchDispatch();
 
   if (region !== 'center') {
     return (
       <Text fontSize="xs" fontWeight="700">
-        Workflow
+        {t('widgets.labels.workflow')}
       </Text>
     );
   }
@@ -55,18 +57,18 @@ export const WorkflowWidgetLabel = ({ region }: WidgetLabelProps) => {
   return (
     <HStack flex="1" gap="1" minW="0">
       <Text flexShrink={0} fontSize="xs" fontWeight="700">
-        Workflow
+        {t('widgets.labels.workflow')}
       </Text>
       <Text color="fg.subtle" flexShrink={0} fontSize="xs">
         /
       </Text>
       <Input
-        aria-label="Workflow name"
+        aria-label={t('widgets.workflow.name')}
         fontSize="xs"
         fontWeight="600"
         h="6"
         maxW="16rem"
-        placeholder="Untitled Workflow"
+        placeholder={t('widgets.workflow.untitled')}
         size="2xs"
         value={workflowName}
         variant="flushed"
@@ -83,6 +85,7 @@ export const WorkflowWidgetLabel = ({ region }: WidgetLabelProps) => {
 
 /** Entries contributed to the shared widget actions menu. */
 export const WorkflowMenuItems = (_props: WidgetViewProps) => {
+  const { t } = useTranslation();
   const store = useWorkbenchStore();
   const dispatch = useWorkbenchDispatch();
   const notify = useNotify();
@@ -95,38 +98,39 @@ export const WorkflowMenuItems = (_props: WidgetViewProps) => {
   return (
     <Menu.ItemGroup>
       <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
-        Workflow
+        {t('widgets.labels.workflow')}
       </Menu.ItemGroupLabel>
       <Menu.Item value="snapshot" onClick={() => dispatch({ type: 'saveProjectGraphSnapshot' })}>
-        Save graph snapshot
+        {t('widgets.workflow.saveGraphSnapshot')}
       </Menu.Item>
       <Menu.Item value="details" onClick={openDetailsPanel}>
-        Workflow details…
+        {t('widgets.workflow.detailsWithEllipsis')}
       </Menu.Item>
       <Menu.Item value="import" onClick={requestWorkflowImport}>
-        Import workflow JSON…
+        {t('widgets.workflow.importJsonWithEllipsis')}
       </Menu.Item>
       <Menu.Item value="export" onClick={() => downloadWorkflowJson(store.getSnapshot().activeProject.projectGraph)}>
-        Export workflow JSON
+        {t('widgets.workflow.exportJson')}
       </Menu.Item>
       <Menu.Item
         value="copy"
         onClick={() => {
           copyWorkflowJson(store.getSnapshot().activeProject.projectGraph)
-            .then(() => notify.success('Workflow JSON copied'))
-            .catch(() => notify.error('Failed to copy workflow JSON'));
+            .then(() => notify.success(t('widgets.workflow.copyJsonSuccess')))
+            .catch(() => notify.error(t('widgets.workflow.copyJsonFailed')));
         }}
       >
-        Copy workflow JSON
+        {t('widgets.workflow.copyJson')}
       </Menu.Item>
       <Menu.Item color="fg.error" value="new" onClick={() => setNewWorkflowConfirmOpen(true)}>
-        New workflow…
+        {t('widgets.workflow.newWorkflowWithEllipsis')}
       </Menu.Item>
     </Menu.ItemGroup>
   );
 };
 
 export const WorkflowHeaderActions = ({ region }: WidgetViewProps) => {
+  const { t } = useTranslation();
   const graphHistory = useActiveProjectSelector((project) => project.graphHistory);
   const dispatch = useWorkbenchDispatch();
   const restorableHistory = graphHistory.filter((entry) => entry.document);
@@ -135,9 +139,9 @@ export const WorkflowHeaderActions = ({ region }: WidgetViewProps) => {
   return (
     <HStack gap="0.5">
       {region === 'center' ? (
-        <Tooltip content="Add node">
+        <Tooltip content={t('widgets.workflow.addNode')}>
           <IconButton
-            aria-label="Add node"
+            aria-label={t('widgets.workflow.addNode')}
             color="fg.muted"
             size="2xs"
             variant="ghost"
@@ -147,9 +151,9 @@ export const WorkflowHeaderActions = ({ region }: WidgetViewProps) => {
           </IconButton>
         </Tooltip>
       ) : null}
-      <Tooltip content="Workflow library">
+      <Tooltip content={t('widgets.workflow.library')}>
         <IconButton
-          aria-label="Workflow library"
+          aria-label={t('widgets.workflow.library')}
           color="fg.muted"
           size="2xs"
           variant="ghost"
@@ -159,10 +163,10 @@ export const WorkflowHeaderActions = ({ region }: WidgetViewProps) => {
         </IconButton>
       </Tooltip>
       <Menu.Root ids={{ trigger: historyTriggerId }} positioning={{ placement: 'bottom-end' }}>
-        <Tooltip content="Graph history snapshots" ids={{ trigger: historyTriggerId }}>
+        <Tooltip content={t('widgets.workflow.graphHistorySnapshots')} ids={{ trigger: historyTriggerId }}>
           <Menu.Trigger asChild>
             <IconButton
-              aria-label="Graph history snapshots"
+              aria-label={t('widgets.workflow.graphHistorySnapshots')}
               color="fg.muted"
               disabled={restorableHistory.length === 0}
               size="2xs"
@@ -177,7 +181,7 @@ export const WorkflowHeaderActions = ({ region }: WidgetViewProps) => {
             <Menu.Content maxH="18rem" minW="16rem" overflowY="auto">
               <Menu.ItemGroup>
                 <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
-                  Graph History Snapshots
+                  {t('widgets.workflow.graphHistorySnapshots')}
                 </Menu.ItemGroupLabel>
                 {restorableHistory.map((entry) => (
                   <Menu.Item

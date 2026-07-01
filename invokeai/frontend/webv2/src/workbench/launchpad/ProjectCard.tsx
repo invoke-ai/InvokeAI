@@ -18,6 +18,7 @@ import {
   Trash2Icon,
 } from 'lucide-react';
 import { useCallback, useMemo, useState, type MouseEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { formatRelativeTime } from './formatRelativeTime';
 
@@ -33,6 +34,7 @@ const MENU_POSITION_BOTTOM_END = { placement: 'bottom-end' } as const;
  * mounting the editor.
  */
 export const ProjectCard = ({ summary }: { summary: ProjectSummary }) => {
+  const { t } = useTranslation();
   const [isRenameOpen, setIsRenameOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isActionsOpen, setIsActionsOpen] = useState(false);
@@ -57,28 +59,32 @@ export const ProjectCard = ({ summary }: { summary: ProjectSummary }) => {
       } catch (error) {
         toaster.create({
           description: error instanceof Error ? error.message : undefined,
-          title: 'Rename failed',
+          title: t('projects.renameFailed'),
           type: 'error',
         });
         throw error;
       }
     },
-    [summary.id]
+    [summary.id, t]
   );
 
   const handleDuplicate = useCallback(async () => {
     try {
       const copy = await duplicateLibraryProject(summary.id);
 
-      toaster.create({ description: `"${copy.name}" was created.`, title: 'Project duplicated', type: 'success' });
+      toaster.create({
+        description: t('projects.projectDuplicatedDescription', { name: copy.name }),
+        title: t('projects.projectDuplicated'),
+        type: 'success',
+      });
     } catch (error) {
       toaster.create({
         description: error instanceof Error ? error.message : undefined,
-        title: 'Duplicate failed',
+        title: t('projects.duplicateFailed'),
         type: 'error',
       });
     }
-  }, [summary.id]);
+  }, [summary.id, t]);
 
   const handleExport = useCallback(async () => {
     try {
@@ -86,11 +92,11 @@ export const ProjectCard = ({ summary }: { summary: ProjectSummary }) => {
     } catch (error) {
       toaster.create({
         description: error instanceof Error ? error.message : undefined,
-        title: 'Export failed',
+        title: t('projects.exportFailed'),
         type: 'error',
       });
     }
-  }, [summary.id]);
+  }, [summary.id, t]);
 
   const handleDelete = useCallback(async () => {
     try {
@@ -98,11 +104,11 @@ export const ProjectCard = ({ summary }: { summary: ProjectSummary }) => {
     } catch (error) {
       toaster.create({
         description: error instanceof Error ? error.message : undefined,
-        title: 'Delete failed',
+        title: t('projects.deleteFailed'),
         type: 'error',
       });
     }
-  }, [summary.id]);
+  }, [summary.id, t]);
   const handleContextMenu = useCallback((event: MouseEvent<HTMLDivElement>) => {
     event.preventDefault();
     setContextMenuTarget({ x: event.clientX, y: event.clientY });
@@ -133,7 +139,12 @@ export const ProjectCard = ({ summary }: { summary: ProjectSummary }) => {
       _hover={CARD_HOVER}
       onContextMenu={handleContextMenu}
     >
-      <Link aria-label={`Open ${summary.name}`} search={projectSearch} style={LINK_STYLE} to="/app" />
+      <Link
+        aria-label={t('projects.openProjectLabel', { name: summary.name })}
+        search={projectSearch}
+        style={LINK_STYLE}
+        to="/app"
+      />
       <Flex align="center" bg="bg.muted" h="24" justify="center" pointerEvents="none">
         <Icon as={FolderIcon} boxSize="8" color="fg.subtle" opacity={0.6} />
       </Flex>
@@ -143,7 +154,7 @@ export const ProjectCard = ({ summary }: { summary: ProjectSummary }) => {
             {summary.name}
           </Text>
           <Text color="fg.muted" fontSize="2xs">
-            Edited {formatRelativeTime(summary.updatedAt)}
+            {t('projects.editedRelative', { time: formatRelativeTime(summary.updatedAt) })}
           </Text>
         </Stack>
       </Flex>
@@ -151,7 +162,7 @@ export const ProjectCard = ({ summary }: { summary: ProjectSummary }) => {
         <Menu.Root open={isActionsOpen} positioning={menuPositioning} onOpenChange={handleOpenChange}>
           <Menu.Trigger asChild>
             <IconButton
-              aria-label={`Actions for ${summary.name}`}
+              aria-label={t('common.actions')}
               color="fg.muted"
               size="2xs"
               variant="ghost"
@@ -166,25 +177,25 @@ export const ProjectCard = ({ summary }: { summary: ProjectSummary }) => {
                 <Menu.Item asChild value="open">
                   <Link search={projectSearch} to="/app">
                     <Icon as={ArrowRightIcon} boxSize="3.5" />
-                    Open
+                    {t('common.open')}
                   </Link>
                 </Menu.Item>
                 <Menu.Item value="rename" onClick={openRenameDialog}>
                   <Icon as={PencilIcon} boxSize="3.5" />
-                  Rename…
+                  {t('projects.renameWithEllipsis')}
                 </Menu.Item>
                 <Menu.Item value="duplicate" onClick={handleDuplicate}>
                   <Icon as={CopyIcon} boxSize="3.5" />
-                  Duplicate
+                  {t('common.duplicate')}
                 </Menu.Item>
                 <Menu.Item value="export" onClick={handleExport}>
                   <Icon as={FileDownIcon} boxSize="3.5" />
-                  Export
+                  {t('common.export')}
                 </Menu.Item>
                 <Menu.Separator />
                 <Menu.Item color="fg.error" value="delete" _hover={MENU_ITEM_DELETE_HOVER} onClick={openDeleteDialog}>
                   <Icon as={Trash2Icon} boxSize="3.5" />
-                  Delete…
+                  {t('common.delete')}…
                 </Menu.Item>
               </MenuContent>
             </Menu.Positioner>
@@ -200,10 +211,10 @@ export const ProjectCard = ({ summary }: { summary: ProjectSummary }) => {
       />
 
       <ConfirmDialog
-        body={`Delete "${summary.name}"? The project is removed from the server permanently.`}
-        confirmLabel="Delete project"
+        body={t('projects.deleteProjectCardBody', { name: summary.name })}
+        confirmLabel={t('projects.deleteProject')}
         isOpen={isDeleteOpen}
-        title="Delete project?"
+        title={t('projects.deleteProjectQuestion')}
         onClose={closeDeleteDialog}
         onConfirm={handleDelete}
       />

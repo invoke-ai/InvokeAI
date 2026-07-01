@@ -6,7 +6,7 @@ describe('getQueueHeaderCancelState', () => {
   it('enables cancelling when connected with an in-progress current item', () => {
     expect(getQueueHeaderCancelState({ currentStatus: 'in_progress', isConnected: true })).toEqual({
       disabled: false,
-      itemLabel: 'Cancel Current',
+      itemLabel: 'widgets.queue.cancelCurrent',
     });
   });
 

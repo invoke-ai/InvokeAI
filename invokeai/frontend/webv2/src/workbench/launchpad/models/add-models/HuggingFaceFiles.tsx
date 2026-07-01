@@ -5,6 +5,7 @@ import { Stack } from '@chakra-ui/react';
 import { ResultsListHeader } from '@workbench/launchpad/models/shared/ResultsListHeader';
 import { InstallSourceButton, SourceListItem } from '@workbench/launchpad/models/shared/SourceListItem';
 import { useDeferredValue, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const fileNameOf = (url: string): string => url.split(/[\\/]/).at(-1) ?? url;
 
@@ -19,6 +20,7 @@ export const HuggingFaceFiles = ({
   onInstall: (url: string) => void;
   pendingSources: ReadonlySet<string>;
 }) => {
+  const { t } = useTranslation();
   const [filter, setFilter] = useState('');
   const deferredFilter = useDeferredValue(filter);
 
@@ -42,10 +44,10 @@ export const HuggingFaceFiles = ({
     <Stack gap="1.5">
       <ResultsListHeader
         installAllDisabled={filteredUrls.length === 0}
-        installAllLabel={`Install all (${filteredUrls.length})`}
-        searchPlaceholder="Filter files"
+        installAllLabel={t('models.installAllCount', { count: filteredUrls.length })}
+        searchPlaceholder={t('models.filterFiles')}
         searchValue={filter}
-        summary={`${lookup.urls.length} file${lookup.urls.length === 1 ? '' : 's'} in ${lookup.repo}`}
+        summary={t('models.filesInRepo', { count: lookup.urls.length, repo: lookup.repo })}
         onClear={onClear}
         onInstallAll={installAll}
         onSearchChange={setFilter}

@@ -1,5 +1,6 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { AnyModelDefaultSettings, ModelConfig } from '@workbench/models/types';
+import type { TFunction } from 'i18next';
 
 import { Grid, HStack, Icon, NativeSelect, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
 import { Button, FieldLabel, Panel } from '@workbench/components/ui';
@@ -8,6 +9,7 @@ import { replaceModelInStore } from '@workbench/models/modelsStore';
 import { loraDefaultSettingsSchema, mainDefaultSettingsSchema } from '@workbench/models/schemas';
 import { MoveHorizontalIcon } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Per-model generation defaults ("use these settings when this model is
@@ -79,13 +81,13 @@ export const supportsDefaultSettings = (model: Pick<ModelConfig, 'type'>): boole
 
 interface FieldSpec {
   key: keyof AnyModelDefaultSettings;
-  label: string;
+  labelKey: string;
   /** Render the control; disabled (showing the inherited value) until customized. */
   control: (value: unknown, setValue: (value: unknown) => void, disabled: boolean) => ReactNode;
   /** Value used when the toggle is switched on; also previewed while off. */
   defaultValue: unknown;
-  /** What applies while the toggle is off, e.g. "App default: 30 steps". */
-  inheritLabel: string;
+  /** Translation key for what applies while the toggle is off. */
+  inheritLabelKey: string;
 }
 
 const numberControl =
@@ -147,58 +149,58 @@ const MAIN_FIELDS: FieldSpec[] = [
   {
     control: selectControl(SCHEDULERS),
     defaultValue: 'euler_a',
-    inheritLabel: 'App default: euler_a',
+    inheritLabelKey: 'models.defaultFieldInherited.scheduler',
     key: 'scheduler',
-    label: 'Scheduler',
+    labelKey: 'models.defaultFields.scheduler',
   },
   {
     control: numberControl({ max: 10000, min: 1 }),
     defaultValue: 30,
-    inheritLabel: 'App default: 30',
+    inheritLabelKey: 'models.defaultFieldInherited.steps',
     key: 'steps',
-    label: 'Steps',
+    labelKey: 'models.defaultFields.steps',
   },
   {
     control: numberControl({ max: 200, min: 1, step: 0.5 }),
     defaultValue: 7,
-    inheritLabel: 'App default: 7',
+    inheritLabelKey: 'models.defaultFieldInherited.cfgScale',
     key: 'cfg_scale',
-    label: 'CFG Scale',
+    labelKey: 'models.defaultFields.cfgScale',
   },
   {
     control: numberControl({ max: 0.99, min: 0, step: 0.05 }),
     defaultValue: 0,
-    inheritLabel: 'App default: 0 (off)',
+    inheritLabelKey: 'models.defaultFieldInherited.cfgRescale',
     key: 'cfg_rescale_multiplier',
-    label: 'CFG Rescale',
+    labelKey: 'models.defaultFields.cfgRescale',
   },
   {
     control: numberControl({ max: 20, min: 1, step: 0.5 }),
     defaultValue: 4,
-    inheritLabel: 'Uses the generator default',
+    inheritLabelKey: 'models.defaultFieldInherited.guidance',
     key: 'guidance',
-    label: 'Guidance',
+    labelKey: 'models.defaultFields.guidance',
   },
   {
     control: numberControl({ max: 8192, min: 64, step: 8 }),
     defaultValue: 1024,
-    inheritLabel: 'App default: 1024',
+    inheritLabelKey: 'models.defaultFieldInherited.width',
     key: 'width',
-    label: 'Width',
+    labelKey: 'models.defaultFields.width',
   },
   {
     control: numberControl({ max: 8192, min: 64, step: 8 }),
     defaultValue: 1024,
-    inheritLabel: 'App default: 1024',
+    inheritLabelKey: 'models.defaultFieldInherited.height',
     key: 'height',
-    label: 'Height',
+    labelKey: 'models.defaultFields.height',
   },
   {
     control: selectControl(['fp16', 'fp32']),
     defaultValue: 'fp16',
-    inheritLabel: 'App default: fp16',
+    inheritLabelKey: 'models.defaultFieldInherited.vaePrecision',
     key: 'vae_precision',
-    label: 'VAE Precision',
+    labelKey: 'models.defaultFields.vaePrecision',
   },
 ];
 
@@ -206,9 +208,9 @@ const LORA_FIELDS: FieldSpec[] = [
   {
     control: numberControl({ max: 10, min: -10, step: 0.05 }),
     defaultValue: 0.75,
-    inheritLabel: 'App default: 0.75',
+    inheritLabelKey: 'models.defaultFieldInherited.weight',
     key: 'weight',
-    label: 'Weight',
+    labelKey: 'models.defaultFields.weight',
   },
 ];
 
@@ -216,9 +218,9 @@ const CONTROL_ADAPTER_FIELDS: FieldSpec[] = [
   {
     control: selectControl(PREPROCESSORS),
     defaultValue: 'canny_edge_detection',
-    inheritLabel: 'Chosen automatically per image',
+    inheritLabelKey: 'models.defaultFieldInherited.preprocessor',
     key: 'preprocessor',
-    label: 'Preprocessor',
+    labelKey: 'models.defaultFields.preprocessor',
   },
 ];
 
@@ -234,7 +236,11 @@ const getFieldsForModel = (model: Pick<ModelConfig, 'type'>): FieldSpec[] => {
   return CONTROL_ADAPTER_FIELDS;
 };
 
-const validateDefaults = (model: Pick<ModelConfig, 'type'>, settings: AnyModelDefaultSettings): string | null => {
+const validateDefaults = (
+  model: Pick<ModelConfig, 'type'>,
+  settings: AnyModelDefaultSettings,
+  t: TFunction
+): string | null => {
   if (model.type === 'main') {
     const result = mainDefaultSettingsSchema.safeParse({
       cfgRescaleMultiplier: settings.cfg_rescale_multiplier ?? null,
@@ -247,13 +253,13 @@ const validateDefaults = (model: Pick<ModelConfig, 'type'>, settings: AnyModelDe
       width: settings.width ?? null,
     });
 
-    return result.success ? null : (result.error.issues[0]?.message ?? 'Invalid default settings.');
+    return result.success ? null : (result.error.issues[0]?.message ?? t('models.invalidDefaultSettings'));
   }
 
   if (model.type === 'lora') {
     const result = loraDefaultSettingsSchema.safeParse({ weight: settings.weight ?? null });
 
-    return result.success ? null : (result.error.issues[0]?.message ?? 'Invalid default settings.');
+    return result.success ? null : (result.error.issues[0]?.message ?? t('models.invalidDefaultSettings'));
   }
 
   return null;
@@ -268,6 +274,7 @@ export const DefaultSettingsSection = ({
   onError: (message: string) => void;
   onSaved: () => void;
 }) => {
+  const { t } = useTranslation();
   const fields = useMemo(() => getFieldsForModel(model), [model]);
   const [draft, setDraft] = useState<DefaultSettingsDraft>(() => ({
     modelKey: model.key,
@@ -298,7 +305,7 @@ export const DefaultSettingsSection = ({
   };
 
   const handleSave = async () => {
-    const validationError = validateDefaults(model, settings);
+    const validationError = validateDefaults(model, settings, t);
 
     if (validationError) {
       setError(validationError);
@@ -311,7 +318,7 @@ export const DefaultSettingsSection = ({
       replaceModelInStore(await updateModel(model.key, { default_settings: settings }));
       onSaved();
     } catch (saveError) {
-      onError(saveError instanceof Error ? saveError.message : 'Failed to save default settings.');
+      onError(saveError instanceof Error ? saveError.message : t('models.failedToSaveDefaults'));
     } finally {
       setIsSaving(false);
     }
@@ -321,9 +328,9 @@ export const DefaultSettingsSection = ({
     <Stack gap="3">
       <HStack justify="space-between">
         <Stack gap="0.5">
-          <FieldLabel>Default Settings</FieldLabel>
+          <FieldLabel>{t('models.defaultSettings')}</FieldLabel>
           <Text color="fg.subtle" fontSize="2xs">
-            Applied automatically when this model is selected. Off = use the app default.
+            {t('models.defaultSettingsHelp')}
           </Text>
         </Stack>
         <Button
@@ -333,7 +340,7 @@ export const DefaultSettingsSection = ({
           variant="solid"
           onClick={() => void handleSave()}
         >
-          Save Defaults
+          {t('models.saveDefaults')}
         </Button>
       </HStack>
       {visibleError ? (
@@ -350,7 +357,7 @@ export const DefaultSettingsSection = ({
             <Panel key={field.key} gap="2" p="2.5" tone="control">
               <HStack justify="space-between">
                 <Text fontSize="2xs" fontWeight="600" textTransform="uppercase">
-                  {field.label}
+                  {t(field.labelKey)}
                 </Text>
                 <Switch.Root
                   checked={isEnabled}
@@ -362,7 +369,7 @@ export const DefaultSettingsSection = ({
                   <Switch.Control>
                     <Switch.Thumb />
                   </Switch.Control>
-                  <Switch.Label srOnly>{`Customize ${field.label} for this model`}</Switch.Label>
+                  <Switch.Label srOnly>{t('models.customizeDefaultField', { field: t(field.labelKey) })}</Switch.Label>
                 </Switch.Root>
               </HStack>
               {field.control(
@@ -371,7 +378,7 @@ export const DefaultSettingsSection = ({
                 !isEnabled
               )}
               <Text color="fg.subtle" fontSize="2xs">
-                {isEnabled ? 'Customized for this model' : field.inheritLabel}
+                {isEnabled ? t('models.customizedForThisModel') : t(field.inheritLabelKey)}
               </Text>
             </Panel>
           );

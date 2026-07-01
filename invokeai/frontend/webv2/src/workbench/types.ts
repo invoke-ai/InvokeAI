@@ -1,6 +1,10 @@
+import type { TFunction } from 'i18next';
 import type { ComponentType, ExoticComponent, JSXElementConstructor, SVGProps } from 'react';
 
+import type { WorkbenchLanguage } from './i18n/languages';
 import type { ProjectGraphState } from './workflows/types';
+
+export type { WorkbenchLanguage } from './i18n/languages';
 
 export type BuiltInLayoutPresetId = 'canvas-default' | 'gallery' | 'workflow' | 'canvas';
 export type LayoutPresetId = BuiltInLayoutPresetId | (string & {});
@@ -147,7 +151,8 @@ export interface WidgetLabelProps {
   presentation?: 'compact' | 'expanded' | 'tooltip';
 }
 
-export type WidgetLabel = string | ComponentType<WidgetLabelProps>;
+export type WidgetLabel = string | ((t: TFunction) => string);
+export type WidgetHeaderLabel = ComponentType<WidgetLabelProps>;
 
 export type WidgetIconComponent =
   | JSXElementConstructor<SVGProps<SVGSVGElement>>
@@ -319,7 +324,7 @@ export interface WidgetManifest {
   apiVersion?: 1;
   id: WidgetTypeId;
   label: WidgetLabel;
-  labelText: string;
+  headerLabel?: WidgetHeaderLabel;
   version: 1;
   allowedRegions: WidgetRegion[];
   allowMultiple: boolean;
@@ -652,31 +657,6 @@ export interface AutosaveState {
  * semantic-token conditions in `theme/system.ts` resolve to the right colors.
  */
 export type WorkbenchThemeId = 'classic' | 'light' | 'forest' | 'mono' | 'ultradark';
-
-export type WorkbenchLanguage =
-  | 'ar'
-  | 'az'
-  | 'de'
-  | 'en'
-  | 'es'
-  | 'fi'
-  | 'fr'
-  | 'he'
-  | 'hu'
-  | 'it'
-  | 'ja'
-  | 'ko'
-  | 'nl'
-  | 'pl'
-  | 'pt'
-  | 'pt-BR'
-  | 'ru'
-  | 'sv'
-  | 'tr'
-  | 'ua'
-  | 'vi'
-  | 'zh-CN'
-  | 'zh-Hant';
 
 export type DeveloperLogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 

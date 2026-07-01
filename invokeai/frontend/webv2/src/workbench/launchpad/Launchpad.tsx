@@ -4,6 +4,7 @@ import { useCapabilities } from '@workbench/auth/capabilities';
 import { Tabs } from '@workbench/components/ui';
 import { BoxIcon, BlocksIcon, FolderIcon, UsersIcon, type LucideIcon } from 'lucide-react';
 import { useCallback, useMemo, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { LaunchpadNav } from './LaunchpadNav';
 import { LaunchpadTopBar } from './LaunchpadTopBar';
@@ -69,18 +70,42 @@ const getActiveSectionId = (
 
 export const Launchpad = () => {
   const { canManageModels, canManageNodes, canManageUsers } = useCapabilities();
+  const { t } = useTranslation();
 
   const filtered = useMemo<LaunchpadSection[]>(
     () =>
       (
         [
-          { icon: FolderIcon, id: 'projects', label: 'Projects', render: () => <ProjectsPage /> },
-          { condition: canManageModels, icon: BoxIcon, id: 'models', label: 'Models', render: () => <ModelsPage /> },
-          { condition: canManageNodes, icon: BlocksIcon, id: 'nodes', label: 'Nodes', render: () => <NodesPage /> },
-          { condition: canManageUsers, icon: UsersIcon, id: 'users', label: 'Users', render: () => <UsersPage /> },
+          {
+            icon: FolderIcon,
+            id: 'projects',
+            label: t('launchpad.sections.projects'),
+            render: () => <ProjectsPage />,
+          },
+          {
+            condition: canManageModels,
+            icon: BoxIcon,
+            id: 'models',
+            label: t('launchpad.sections.models'),
+            render: () => <ModelsPage />,
+          },
+          {
+            condition: canManageNodes,
+            icon: BlocksIcon,
+            id: 'nodes',
+            label: t('launchpad.sections.nodes'),
+            render: () => <NodesPage />,
+          },
+          {
+            condition: canManageUsers,
+            icon: UsersIcon,
+            id: 'users',
+            label: t('launchpad.sections.users'),
+            render: () => <UsersPage />,
+          },
         ] satisfies (LaunchpadSection & { condition?: boolean })[]
       ).filter((section) => section.condition ?? true),
-    [canManageModels, canManageNodes, canManageUsers]
+    [canManageModels, canManageNodes, canManageUsers, t]
   );
 
   return (

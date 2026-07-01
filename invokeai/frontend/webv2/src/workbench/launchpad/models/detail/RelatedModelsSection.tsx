@@ -11,6 +11,7 @@ import { useModelsSelector } from '@workbench/models/modelsStore';
 import { getModelTypeLabel } from '@workbench/models/taxonomy';
 import { Link2OffIcon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 /** Types offered when linking related models, grouped in one picker. */
 const LINKABLE_TYPES: ModelTaxonomyType[] = [
@@ -36,6 +37,7 @@ export const RelatedModelsSection = ({
   model: Pick<ModelConfig, 'base' | 'key'>;
   onError: (message: string) => void;
 }) => {
+  const { t } = useTranslation();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const [relatedKeys, setRelatedKeys] = useState<string[] | null>(null);
   const [isMutating, setIsMutating] = useState(false);
@@ -52,14 +54,14 @@ export const RelatedModelsSection = ({
       .catch((error: unknown) => {
         if (!isStale) {
           setRelatedKeys([]);
-          onError(error instanceof Error ? error.message : 'Failed to load related models.');
+          onError(error instanceof Error ? error.message : t('models.failedToLoadRelatedModels'));
         }
       });
 
     return () => {
       isStale = true;
     };
-  }, [model.key, onError]);
+  }, [model.key, onError, t]);
 
   const relatedModels = useMemo(() => {
     const byKey = new Map(models.map((candidate) => [candidate.key, candidate]));
@@ -80,7 +82,7 @@ export const RelatedModelsSection = ({
       await addModelRelationship(model.key, target.key);
       setRelatedKeys((current) => [...(current ?? []), target.key]);
     } catch (error) {
-      onError(error instanceof Error ? error.message : 'Failed to link models.');
+      onError(error instanceof Error ? error.message : t('models.failedToLinkModels'));
     } finally {
       setIsMutating(false);
     }
@@ -93,7 +95,7 @@ export const RelatedModelsSection = ({
       await removeModelRelationship(model.key, key);
       setRelatedKeys((current) => (current ?? []).filter((existing) => existing !== key));
     } catch (error) {
-      onError(error instanceof Error ? error.message : 'Failed to unlink models.');
+      onError(error instanceof Error ? error.message : t('models.failedToUnlink'));
     } finally {
       setIsMutating(false);
     }
@@ -102,16 +104,16 @@ export const RelatedModelsSection = ({
   return (
     <Stack gap="2">
       <Stack gap="0.5">
-        <FieldLabel>Related Models</FieldLabel>
+        <FieldLabel>{t('models.relatedModels')}</FieldLabel>
         <Text color="fg.subtle" fontSize="2xs">
-          Link the models that pair well with this one — they are suggested together elsewhere in the app.
+          {t('models.relatedModelsHelp')}
         </Text>
       </Stack>
       <ModelSelect
         excludeKeys={excludeKeys}
         filter={(candidate) => candidate.base === model.base || candidate.base === 'any' || model.base === 'any'}
         modelTypes={LINKABLE_TYPES}
-        placeholder="Search compatible models to link…"
+        placeholder={t('models.searchCompatibleToLink')}
         showManagerButton={false}
         size="sm"
         value={null}
@@ -123,7 +125,7 @@ export const RelatedModelsSection = ({
         <Spinner color="fg.subtle" size="xs" />
       ) : relatedModels.length === 0 ? (
         <Text color="fg.subtle" fontSize="2xs">
-          No related models linked yet.
+          {t('models.noRelatedModels')}
         </Text>
       ) : (
         <Stack gap="1.5">
@@ -150,9 +152,9 @@ export const RelatedModelsSection = ({
               }
               title={relatedModel?.name ?? key}
               trailing={
-                <Tooltip content="Unlink">
+                <Tooltip content={t('models.unlink')}>
                   <IconButton
-                    aria-label={`Unlink ${relatedModel?.name ?? key}`}
+                    aria-label={t('models.unlinkNamed', { name: relatedModel?.name ?? key })}
                     disabled={isMutating}
                     size="2xs"
                     variant="ghost"

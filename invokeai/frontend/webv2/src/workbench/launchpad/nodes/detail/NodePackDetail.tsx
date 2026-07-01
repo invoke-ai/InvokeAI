@@ -8,6 +8,7 @@ import { useNodePackActions } from '@workbench/launchpad/nodes/shared/useNodePac
 import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSelector } from '@workbench/workflows/templates';
 import { BlocksIcon, TriangleAlertIcon, Trash2Icon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { NodePreviewCard } from './NodePreviewCard';
 
@@ -19,6 +20,7 @@ import { NodePreviewCard } from './NodePreviewCard';
  * share `template.nodePack === pack.name`.
  */
 export const NodePackDetail = ({ onUninstalled, pack }: { onUninstalled: () => void; pack: NodePackInfo }) => {
+  const { t } = useTranslation();
   const status = useInvocationTemplatesSelector((snapshot) => snapshot.status);
   const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
 
@@ -48,7 +50,7 @@ export const NodePackDetail = ({ onUninstalled, pack }: { onUninstalled: () => v
           </Text>
           <HStack gap="1.5" wrap="wrap">
             <Badge colorPalette="blue" fontSize="2xs" variant="surface">
-              {pack.node_count} node{pack.node_count === 1 ? '' : 's'}
+              {t('nodes.nodeCount', { count: pack.node_count })}
             </Badge>
           </HStack>
         </Stack>
@@ -57,7 +59,7 @@ export const NodePackDetail = ({ onUninstalled, pack }: { onUninstalled: () => v
 
       <Stack gap="2">
         <Text color="fg.subtle" fontSize="2xs" fontWeight="600" textTransform="uppercase">
-          Nodes in this pack
+          {t('nodes.nodesInPack')}
         </Text>
         {isLoadingTemplates ? (
           <Flex align="center" justify="center" py="10">
@@ -65,9 +67,9 @@ export const NodePackDetail = ({ onUninstalled, pack }: { onUninstalled: () => v
           </Flex>
         ) : packTemplates.length === 0 ? (
           <EmptyState
-            description="The backend has no node definitions for this pack yet. Reload nodes or restart InvokeAI to load them."
+            description={t('nodes.noPreviewsDescription')}
             icon={<Icon as={TriangleAlertIcon} />}
-            title="No node previews available"
+            title={t('nodes.noPreviews')}
           />
         ) : (
           <Flex gap="8" wrap="wrap" px="2">
@@ -84,6 +86,7 @@ export const NodePackDetail = ({ onUninstalled, pack }: { onUninstalled: () => v
 };
 
 const UninstallButton = ({ onUninstalled, pack }: { onUninstalled: () => void; pack: NodePackInfo }) => {
+  const { t } = useTranslation();
   const { uninstall } = useNodePackActions();
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isUninstalling, setIsUninstalling] = useState(false);
@@ -109,13 +112,13 @@ const UninstallButton = ({ onUninstalled, pack }: { onUninstalled: () => void; p
         onClick={() => setIsConfirmOpen(true)}
       >
         <Icon as={Trash2Icon} boxSize="3" />
-        Uninstall
+        {t('nodes.uninstall')}
       </Button>
       <ConfirmDialog
-        body="Remove this pack from the custom nodes directory? A restart is required for removal to fully apply."
-        confirmLabel="Uninstall Node Pack"
+        body={t('nodes.uninstallBody')}
+        confirmLabel={t('nodes.uninstallPack')}
         isOpen={isConfirmOpen}
-        title={`Uninstall ${pack.name}?`}
+        title={t('nodes.uninstallTitle', { name: pack.name })}
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={handleUninstall}
       />

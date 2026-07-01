@@ -7,6 +7,7 @@ import { refreshCustomNodePacks, useCustomNodesSelector } from '@workbench/custo
 import { updateNodesUi, useNodesUiSelector, type AddNodesTab } from '@workbench/customNodes/nodesUiStore';
 import { FolderOpenIcon, GitBranchIcon } from 'lucide-react';
 import { useCallback, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Every way to add custom nodes, one sub-tab per source — Git URL install and
@@ -14,6 +15,7 @@ import { useCallback, useState, type ChangeEvent, type KeyboardEvent } from 'rea
  * active sub-tab lives in the nodes UI store so it survives navigation.
  */
 export const AddNodesView = () => {
+  const { t } = useTranslation();
   const addTab = useNodesUiSelector((snapshot) => snapshot.addTab);
   const customNodesPath = useCustomNodesSelector((snapshot) => snapshot.customNodesPath);
   const handleValueChange = useCallback(
@@ -27,15 +29,15 @@ export const AddNodesView = () => {
         <Tabs.List>
           <Tabs.Trigger fontSize="xs" value="git">
             <Icon as={GitBranchIcon} boxSize="3" />
-            Git URL
+            {t('nodes.gitUrl')}
           </Tabs.Trigger>
           <Tabs.Trigger fontSize="xs" value="scan">
             <Icon as={FolderOpenIcon} boxSize="3" />
-            Scan Folder
+            {t('nodes.scanFolder')}
           </Tabs.Trigger>
         </Tabs.List>
       </Tabs.Root>
-      <Scrollable flex="1" label="Add custom nodes" minH="0" pr="1">
+      <Scrollable flex="1" label={t('nodes.addCustomNodes')} minH="0" pr="1">
         {addTab === 'git' ? <InstallFromGitForm /> : <ScanFolderInfo customNodesPath={customNodesPath} />}
       </Scrollable>
     </Stack>
@@ -43,6 +45,7 @@ export const AddNodesView = () => {
 };
 
 const InstallFromGitForm = () => {
+  const { t } = useTranslation();
   const [source, setSource] = useState('');
   const [isInstalling, setIsInstalling] = useState(false);
   const trimmedSource = source.trim();
@@ -65,8 +68,11 @@ const InstallFromGitForm = () => {
 
         if (result.requires_dependencies) {
           toaster.create({
-            description: `${result.name} requires dependencies from ${result.dependency_file ?? 'requirements.txt'}. Install them, then restart InvokeAI.`,
-            title: 'Dependencies required',
+            description: t('nodes.dependenciesRequiredDescription', {
+              dependencyFile: result.dependency_file ?? 'requirements.txt',
+              name: result.name,
+            }),
+            title: t('nodes.dependenciesRequired'),
             type: 'warning',
           });
         }
@@ -75,14 +81,14 @@ const InstallFromGitForm = () => {
       }
     } catch (error) {
       addCustomNodeInstallLogEntry({
-        message: getApiErrorMessage(error, 'Install failed.'),
+        message: getApiErrorMessage(error, t('nodes.installFailed')),
         name: trimmedSource,
         status: 'error',
       });
     } finally {
       setIsInstalling(false);
     }
-  }, [trimmedSource]);
+  }, [t, trimmedSource]);
   const handleSourceChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => setSource(event.currentTarget.value),
     []
@@ -102,14 +108,9 @@ const InstallFromGitForm = () => {
     <Stack gap="4" maxW="44rem">
       <Alert.Root borderRadius="md" size="sm" status="warning" variant="surface">
         <Alert.Indicator />
-        <Alert.Title fontSize="xs">
-          Custom nodes execute Python code. Only install packs from authors you trust.
-        </Alert.Title>
+        <Alert.Title fontSize="xs">{t('nodes.trustWarning')}</Alert.Title>
       </Alert.Root>
-      <Field
-        helpText="Paste a public Git repository URL. InvokeAI clones it into your custom nodes directory."
-        label="Git URL"
-      >
+      <Field helpText={t('nodes.gitUrlHelp')} label={t('nodes.gitUrl')}>
         <HStack align="start" gap="2">
           <Input
             placeholder="https://github.com/owner/invokeai-node-pack.git"
@@ -119,7 +120,7 @@ const InstallFromGitForm = () => {
             onKeyDown={handleKeyDown}
           />
           <Button disabled={!trimmedSource} loading={isInstalling} size="sm" onClick={handleInstallClick}>
-            Install
+            {t('nodes.install')}
           </Button>
         </HStack>
       </Field>
@@ -127,21 +128,24 @@ const InstallFromGitForm = () => {
   );
 };
 
-const ScanFolderInfo = ({ customNodesPath }: { customNodesPath: string | null }) => (
-  <Stack gap="3" maxW="44rem">
-    <Text color="fg.muted" fontSize="xs">
-      Add node packs directly to the custom nodes directory, then reload nodes. InvokeAI scans this folder on startup
-      and reload.
-    </Text>
-    {customNodesPath ? (
-      <Box bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" p="3" rounded="md">
-        <Text color="fg.subtle" fontSize="2xs" fontWeight="600" textTransform="uppercase">
-          Nodes Directory
-        </Text>
-        <Text fontFamily="mono" fontSize="xs" mt="1" overflowWrap="anywhere">
-          {customNodesPath}
-        </Text>
-      </Box>
-    ) : null}
-  </Stack>
-);
+const ScanFolderInfo = ({ customNodesPath }: { customNodesPath: string | null }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Stack gap="3" maxW="44rem">
+      <Text color="fg.muted" fontSize="xs">
+        {t('nodes.scanFolderDescription')}
+      </Text>
+      {customNodesPath ? (
+        <Box bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" p="3" rounded="md">
+          <Text color="fg.subtle" fontSize="2xs" fontWeight="600" textTransform="uppercase">
+            {t('nodes.nodesDirectory')}
+          </Text>
+          <Text fontFamily="mono" fontSize="xs" mt="1" overflowWrap="anywhere">
+            {customNodesPath}
+          </Text>
+        </Box>
+      ) : null}
+    </Stack>
+  );
+};

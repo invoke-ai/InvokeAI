@@ -14,6 +14,7 @@ import { chipRecipe } from '@theme/recipes';
 import { IconButton, Tooltip } from '@workbench/components/ui';
 import { useFocusRegionProps } from '@workbench/focusRegions';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
+import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { SettingsIcon, type LucideIcon } from 'lucide-react';
 import {
@@ -24,6 +25,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { WidgetActionsMenu } from './WidgetActionsMenu';
 
@@ -204,9 +206,11 @@ export const WidgetHeader = ({
   region: WorkbenchRegion;
   runtime: WidgetRuntimeApi;
 }) => {
+  const { t } = useTranslation();
   // Manifests may provide a component label (e.g. Workflow's editable
   // `Workflow / [name]`); plain strings render as the standard title.
-  const Label = manifest.label;
+  const HeaderLabel = manifest.headerLabel;
+  const label = resolveWidgetLabel(manifest, t);
   const handleSettingsClick = useCallback(
     () => openWorkbenchSettings(manifest.settingsSection),
     [manifest.settingsSection]
@@ -215,20 +219,20 @@ export const WidgetHeader = ({
   return (
     <HStack justify="space-between" borderBottomWidth={1} h={10} ps="3" pe="2">
       <HStack flex="1" gap="1.5" minW="0">
-        {typeof Label === 'string' ? (
-          <Text fontSize="xs" fontWeight="700">
-            {Label}
-          </Text>
+        {HeaderLabel ? (
+          <HeaderLabel region={region} />
         ) : (
-          <Label region={region} />
+          <Text fontSize="xs" fontWeight="700">
+            {label}
+          </Text>
         )}
       </HStack>
       <HStack flexShrink={0} gap="1.5">
         {actions}
         {manifest.settingsSection ? (
-          <Tooltip content={`${manifest.labelText} settings`}>
+          <Tooltip content={t('widgets.settingsLabel', { label })}>
             <IconButton
-              aria-label={`${manifest.labelText} settings`}
+              aria-label={t('widgets.settingsLabel', { label })}
               color="fg.muted"
               size="2xs"
               variant="ghost"

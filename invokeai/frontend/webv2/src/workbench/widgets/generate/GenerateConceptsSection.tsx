@@ -15,6 +15,7 @@ import { getModelBaseColorPalette, getModelBaseLabel } from '@workbench/models/b
 import { ModelSelect } from '@workbench/models/components';
 import { Trash2Icon } from 'lucide-react';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { GenerateSettingsUpdate } from './generateDebounce';
 
@@ -51,6 +52,7 @@ export const GenerateConceptsSection = ({
   selectedModel,
   settings,
 }: GenerateConceptsSectionProps) => {
+  const { t } = useTranslation();
   const loras = useMemo(() => syncGenerateLorasWithModels(settings.loras, loraModels), [loraModels, settings.loras]);
   const selectedLoraKeys = useMemo(() => new Set(loras.map((lora) => lora.model.key)), [loras]);
 
@@ -91,25 +93,30 @@ export const GenerateConceptsSection = ({
   const badges =
     activeCount > 0 ? (
       <Badge colorPalette="green" size="xs" variant="surface">
-        {activeCount} active
+        {t('widgets.generate.activeCount', { count: activeCount })}
       </Badge>
     ) : loras.length > 0 ? (
       <Badge size="xs" variant="surface">
-        {loras.length} off
+        {t('widgets.generate.offCount', { count: loras.length })}
       </Badge>
     ) : null;
 
   return (
-    <GenerateCollapsibleSection label="Concepts" defaultOpen badges={badges}>
+    <GenerateCollapsibleSection label={t('widgets.generate.concepts')} defaultOpen badges={badges}>
       <Stack gap="2" p="2">
-        <Field label="Add concept" helpText={selectedModel ? undefined : 'Select a main model before adding concepts.'}>
+        <Field
+          label={t('widgets.generate.addConcept')}
+          helpText={selectedModel ? undefined : t('widgets.generate.selectMainModelBeforeConcepts')}
+        >
           <ModelSelect
             excludeKeys={selectedLoraKeys}
             filter={(model) =>
               Boolean(selectedModel && isLoraModelConfig(model) && isLoraCompatibleWithModel(model, selectedModel))
             }
             modelTypes={['lora']}
-            placeholder={selectedModel ? 'Search compatible concepts...' : 'Select a model first'}
+            placeholder={
+              selectedModel ? t('widgets.generate.searchCompatibleConcepts') : t('widgets.generate.selectModelFirst')
+            }
             size="xs"
             value={null}
             onChange={addLora}
@@ -118,7 +125,7 @@ export const GenerateConceptsSection = ({
 
         {loras.length === 0 ? (
           <Text color="fg.subtle" fontSize="2xs">
-            Add LoRAs/concepts here to blend them into this generation.
+            {t('widgets.generate.addConceptsHelp')}
           </Text>
         ) : (
           <Stack gap="2">
@@ -155,6 +162,7 @@ const LoraRow = ({
   onToggle: (isEnabled: boolean) => void;
   onWeightChange: (weight: number) => void;
 }) => {
+  const { t } = useTranslation();
   const isActive = lora.isEnabled && isCompatible;
   const defaultWeight = getDefaultLoraWeight(lora.model);
 
@@ -192,7 +200,7 @@ const LoraRow = ({
             </Badge>
             {!isCompatible ? (
               <Badge colorPalette="orange" flexShrink={0} size="xs" variant="surface">
-                Incompatible
+                {t('widgets.generate.incompatible')}
               </Badge>
             ) : null}
           </HStack>
@@ -205,7 +213,11 @@ const LoraRow = ({
 
         <HStack flexShrink="0" gap="1">
           <Switch.Root
-            aria-label={`${isActive ? 'Disable' : 'Enable'} ${lora.model.name}`}
+            aria-label={
+              isActive
+                ? t('widgets.generate.disableConcept', { name: lora.model.name })
+                : t('widgets.generate.enableConcept', { name: lora.model.name })
+            }
             checked={isActive}
             disabled={!isCompatible}
             size="sm"
@@ -217,9 +229,9 @@ const LoraRow = ({
             </Switch.Control>
           </Switch.Root>
 
-          <Tooltip content="Remove concept">
+          <Tooltip content={t('widgets.generate.removeConcept')}>
             <IconButton
-              aria-label={`Remove ${lora.model.name}`}
+              aria-label={t('widgets.generate.removeConceptNamed', { name: lora.model.name })}
               color="fg.muted"
               size="2xs"
               variant="ghost"
@@ -233,7 +245,7 @@ const LoraRow = ({
 
       <HStack gap="2">
         <Slider.Root
-          aria-label={[`${lora.model.name} weight`]}
+          aria-label={[t('widgets.generate.conceptWeight', { name: lora.model.name })]}
           disabled={!isActive}
           flex="1"
           size="sm"
@@ -277,13 +289,13 @@ const LoraRow = ({
             endElement={
               <ModelDefaultButton
                 disabled={!isActive || draftWeight === defaultWeight}
-                label="Use concept default weight"
+                label={t('widgets.generate.useConceptDefaultWeight')}
                 onClick={() => setWeight(defaultWeight)}
               />
             }
             endElementProps={{ pointerEvents: 'auto' }}
           >
-            <NumberInput.Input aria-label={`${lora.model.name} weight`} />
+            <NumberInput.Input aria-label={t('widgets.generate.conceptWeight', { name: lora.model.name })} />
           </InputGroup>
         </NumberInput.Root>
       </HStack>

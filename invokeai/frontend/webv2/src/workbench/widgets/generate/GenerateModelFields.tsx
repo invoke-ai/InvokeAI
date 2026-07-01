@@ -20,6 +20,7 @@ import {
 import { ModelSelect } from '@workbench/models/components';
 import { useNotify } from '@workbench/useNotify';
 import { ArrowRightLeft, DicesIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { ModelDefaultButton } from './shared/ModelDefaultButton';
@@ -62,6 +63,7 @@ export const GenerateModelFields = ({
   settings,
   vaeModels,
 }: GenerateModelFieldsProps) => {
+  const { t } = useTranslation();
   const notify = useNotify();
   const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
   const policy = getGenerationModelPolicy(selectedModel, settings);
@@ -98,10 +100,12 @@ export const GenerateModelFields = ({
 
     if (result.clearedLabels.length > 0) {
       notify.info(
-        'Incompatible settings cleared',
-        `${formatClearedSettings(result.clearedLabels)} ${
-          result.clearedLabels.length === 1 ? 'was' : 'were'
-        } not compatible with ${model.name}.`
+        t('widgets.generate.incompatibleSettingsCleared'),
+        t('widgets.generate.incompatibleSettingsClearedDescription', {
+          count: result.clearedLabels.length,
+          labels: formatClearedSettings(result.clearedLabels),
+          name: model.name,
+        })
       );
     }
   };
@@ -111,15 +115,15 @@ export const GenerateModelFields = ({
   };
 
   return (
-    <GenerateCollapsibleSection label="Model" defaultOpen>
+    <GenerateCollapsibleSection label={t('widgets.generate.model')} defaultOpen>
       <Stack gap="2" p="2">
-        <Field label="Model">
+        <Field label={t('widgets.generate.model')}>
           <HStack gap="1">
             <ModelSelect
               filter={(model) => isGenerateModelConfig(model) && isGenerateModelSelectable(model)}
               isClearable={false}
               modelTypes={['main', 'external_image_generator']}
-              placeholder="Select a model…"
+              placeholder={t('widgets.generate.selectModel')}
               value={selectedModel?.key ?? null}
               size="xs"
               onChange={(model) => {
@@ -140,7 +144,7 @@ export const GenerateModelFields = ({
           </HStack>
         </Field>
         <HStack gap="2">
-          <Field label="Steps">
+          <Field label={t('widgets.generate.steps')}>
             <NumberInput.Root
               size="xs"
               value={String(settings.steps)}
@@ -158,7 +162,7 @@ export const GenerateModelFields = ({
                 endElement={
                   <ModelDefaultButton
                     disabled={!modelDefaults || settings.steps === modelDefaults.steps}
-                    label="Use model default steps"
+                    label={t('widgets.generate.useModelDefaultSteps')}
                     onClick={() => {
                       if (modelDefaults) {
                         onCommit({ steps: modelDefaults.steps });
@@ -185,7 +189,7 @@ export const GenerateModelFields = ({
                 endElement={
                   <ModelDefaultButton
                     disabled={!modelDefaults || settings.cfgScale === modelDefaults.cfgScale}
-                    label={`Use model default ${policy.ui.guidanceLabel}`}
+                    label={t('widgets.generate.useModelDefaultField', { field: policy.ui.guidanceLabel })}
                     onClick={() => {
                       if (modelDefaults) {
                         onCommit({ cfgScale: modelDefaults.cfgScale });
@@ -200,11 +204,11 @@ export const GenerateModelFields = ({
             </NumberInput.Root>
           </Field>
           {policy.ui.schedulerVisible ? (
-            <Field label="Scheduler">
+            <Field label={t('widgets.generate.scheduler')}>
               <HStack gap="1">
                 <NativeSelect.Root flex="1" size="xs">
                   <NativeSelect.Field
-                    aria-label="Scheduler"
+                    aria-label={t('widgets.generate.scheduler')}
                     value={settings.scheduler}
                     onChange={(event: ChangeEvent<HTMLSelectElement>) =>
                       onCommit({ scheduler: event.currentTarget.value })
@@ -220,7 +224,7 @@ export const GenerateModelFields = ({
                 </NativeSelect.Root>
                 <ModelDefaultButton
                   disabled={!modelDefaults || settings.scheduler === modelDefaults.scheduler}
-                  label="Use model default scheduler"
+                  label={t('widgets.generate.useModelDefaultScheduler')}
                   onClick={() => {
                     if (modelDefaults) {
                       onCommit({ scheduler: modelDefaults.scheduler });
@@ -232,7 +236,7 @@ export const GenerateModelFields = ({
           ) : null}
         </HStack>
         {policy.ui.seedVisible ? (
-          <Field label="Seed">
+          <Field label={t('common.seed')}>
             <HStack gap="2">
               <NumberInput.Root
                 size="xs"
@@ -245,9 +249,9 @@ export const GenerateModelFields = ({
               >
                 <NumberInput.Input />
               </NumberInput.Root>
-              <Tooltip content="Shuffle seed">
+              <Tooltip content={t('widgets.generate.shuffleSeed')}>
                 <IconButton
-                  aria-label="Shuffle seed"
+                  aria-label={t('widgets.generate.shuffleSeed')}
                   disabled={settings.shouldRandomizeSeed}
                   size="xs"
                   variant="outline"
@@ -261,7 +265,7 @@ export const GenerateModelFields = ({
                 variant={settings.shouldRandomizeSeed ? 'solid' : 'outline'}
                 onClick={() => onCommit({ shouldRandomizeSeed: !settings.shouldRandomizeSeed })}
               >
-                Random
+                {t('widgets.generate.random')}
               </Button>
             </HStack>
           </Field>

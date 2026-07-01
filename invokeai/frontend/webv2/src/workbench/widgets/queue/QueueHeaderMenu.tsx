@@ -3,6 +3,7 @@ import { getApiErrorMessage } from '@workbench/backend/http';
 import { useNotify } from '@workbench/useNotify';
 import { Trash2Icon, TrashIcon } from 'lucide-react';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { requestQueueConfirmation } from './queueConfirmationStore';
 import { refreshQueue, useQueueCounts } from './queueDataStore';
@@ -18,6 +19,7 @@ const ERROR_ITEM_HOVER_PROPS = { bg: 'bg.error', color: 'fg.error' };
  * topbar queue menu so backend mutations keep local run coordination in sync.
  */
 export const QueueHeaderMenu = () => {
+  const { t } = useTranslation();
   const actions = useQueueMenuActions();
   const counts = useQueueCounts();
   const scope = useQueueQueryScope();
@@ -27,45 +29,51 @@ export const QueueHeaderMenu = () => {
     try {
       await clearFailedQueueItems(scope);
       await refreshQueue();
-      notify.success('Failed queue items cleared');
+      notify.success(t('widgets.queue.failedItemsCleared'));
     } catch (error) {
-      notify.error('Failed to clear queue items', getApiErrorMessage(error, 'Could not clear failed queue items.'));
+      notify.error(
+        t('widgets.queue.failedToClearItems'),
+        getApiErrorMessage(error, t('widgets.queue.couldNotClearFailedItems'))
+      );
     }
-  }, [notify, scope]);
+  }, [notify, scope, t]);
 
   const clearAll = useCallback(async () => {
     try {
       await clearScopedQueue(scope);
       await refreshQueue();
-      notify.success('Queue cleared');
+      notify.success(t('widgets.queue.queueCleared'));
     } catch (error) {
-      notify.error('Failed to clear queue', getApiErrorMessage(error, 'Could not clear the queue.'));
+      notify.error(
+        t('widgets.queue.failedToClearQueue'),
+        getApiErrorMessage(error, t('widgets.queue.couldNotClearQueue'))
+      );
     }
-  }, [notify, scope]);
+  }, [notify, scope, t]);
   const onClearFailed = useCallback(() => {
     requestQueueConfirmation({
-      body: 'This permanently removes failed queue items in the current queue scope.',
-      confirmLabel: 'Clear Failed Items',
+      body: t('widgets.queue.clearFailedConfirmationBody'),
+      confirmLabel: t('widgets.queue.clearFailedItems'),
       onConfirm: clearFailed,
-      title: 'Clear failed queue items?',
+      title: t('widgets.queue.clearFailedTitle'),
     });
-  }, [clearFailed]);
+  }, [clearFailed, t]);
   const onClearAll = useCallback(() => {
     requestQueueConfirmation({
-      body: 'This permanently clears queue items in the current queue scope.',
-      confirmLabel: 'Clear Queue',
+      body: t('widgets.queue.clearQueueConfirmationBody'),
+      confirmLabel: t('widgets.queue.clearQueue'),
       onConfirm: clearAll,
-      title: 'Clear queue?',
+      title: t('widgets.queue.clearQueueTitle'),
     });
-  }, [clearAll]);
+  }, [clearAll, t]);
 
   return (
     <>
-      <QueueMenuItems actions={actions} label="Queue" />
+      <QueueMenuItems actions={actions} label={t('widgets.labels.queue')} />
       <Menu.Separator />
       <Menu.ItemGroup>
         <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
-          Clear
+          {t('common.clear')}
         </Menu.ItemGroupLabel>
         <Menu.Item
           color="fg.error"
@@ -75,7 +83,7 @@ export const QueueHeaderMenu = () => {
           onClick={onClearFailed}
         >
           <Icon as={Trash2Icon} boxSize="3" />
-          <Menu.ItemText>Clear Failed Items</Menu.ItemText>
+          <Menu.ItemText>{t('widgets.queue.clearFailedItems')}</Menu.ItemText>
         </Menu.Item>
         <Menu.Item
           color="fg.error"
@@ -85,7 +93,7 @@ export const QueueHeaderMenu = () => {
           onClick={onClearAll}
         >
           <Icon as={TrashIcon} boxSize="3" />
-          <Menu.ItemText>Clear All Items</Menu.ItemText>
+          <Menu.ItemText>{t('widgets.queue.clearAllItems')}</Menu.ItemText>
         </Menu.Item>
       </Menu.ItemGroup>
     </>

@@ -11,8 +11,7 @@ export const versionStatusWidgetManifest: WidgetManifest = {
   failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
   icon: InfoIcon,
   id: 'version-status',
-  label: 'Version',
-  labelText: 'Version',
+  label: (t) => t('widgets.labels.versionStatus'),
   version: 1,
   view: VersionStatusWidgetView,
 };

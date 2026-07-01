@@ -24,6 +24,7 @@ import {
   type MouseEvent,
 } from 'react';
 import { useVirtualizer } from 'react-hook-tanstack-virtual';
+import { useTranslation } from 'react-i18next';
 
 import type { GalleryImageDragImage } from './galleryDnd';
 import type { GalleryQueuePlaceholder } from './galleryStateView';
@@ -65,6 +66,7 @@ type GridCell =
   | { kind: 'placeholder'; placeholder: GalleryQueuePlaceholder };
 
 export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => {
+  const { t } = useTranslation();
   const { actions, gallery, imageActions, runtime } = useGalleryWidget();
   const dispatch = useWorkbenchDispatch();
   const [contextMenuTarget, setContextMenuTarget] = useState<ImageContextMenuTarget | null>(null);
@@ -81,7 +83,9 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
     gallery.compareImageName !== null &&
     gallery.selectedImageName !== null &&
     gallery.compareImageName !== gallery.selectedImageName;
-  const selectedBoardName = gallery.boards.find((board) => board.id === gallery.selectedBoardId)?.name ?? 'this board';
+  const selectedBoardName =
+    gallery.boards.find((board) => board.id === gallery.selectedBoardId)?.name ??
+    t('widgets.gallery.selectedBoardFallback');
   const isEmpty = gallery.images.length === 0 && gallery.pendingPlaceholders.length === 0;
 
   // Fresh generations are unstarred, so with newest-first ordering they land
@@ -382,18 +386,18 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
 
   useEffect(() => {
     const directions = [
-      ['gallery.selectAllOnPage', 'Select all gallery images on page', null, ['mod+a']],
-      ['gallery.clearSelection', 'Clear gallery selection', null, ['esc']],
-      ['gallery.galleryNavUp', 'Gallery navigation up', 'up', ['arrowup']],
-      ['gallery.galleryNavRight', 'Gallery navigation right', 'right', ['arrowright']],
-      ['gallery.galleryNavDown', 'Gallery navigation down', 'down', ['arrowdown']],
-      ['gallery.galleryNavLeft', 'Gallery navigation left', 'left', ['arrowleft']],
-      ['gallery.galleryNavUpAlt', 'Gallery navigation up', 'up', ['alt+arrowup']],
-      ['gallery.galleryNavRightAlt', 'Gallery navigation right', 'right', ['alt+arrowright']],
-      ['gallery.galleryNavDownAlt', 'Gallery navigation down', 'down', ['alt+arrowdown']],
-      ['gallery.galleryNavLeftAlt', 'Gallery navigation left', 'left', ['alt+arrowleft']],
-      ['gallery.deleteSelection', 'Delete gallery selection', null, ['delete', 'backspace']],
-      ['gallery.starImage', 'Toggle gallery image star', null, ['.']],
+      ['gallery.selectAllOnPage', t('widgets.gallery.commands.selectAllOnPage'), null, ['mod+a']],
+      ['gallery.clearSelection', t('widgets.gallery.commands.clearSelection'), null, ['esc']],
+      ['gallery.galleryNavUp', t('widgets.gallery.commands.navigationUp'), 'up', ['arrowup']],
+      ['gallery.galleryNavRight', t('widgets.gallery.commands.navigationRight'), 'right', ['arrowright']],
+      ['gallery.galleryNavDown', t('widgets.gallery.commands.navigationDown'), 'down', ['arrowdown']],
+      ['gallery.galleryNavLeft', t('widgets.gallery.commands.navigationLeft'), 'left', ['arrowleft']],
+      ['gallery.galleryNavUpAlt', t('widgets.gallery.commands.navigationUp'), 'up', ['alt+arrowup']],
+      ['gallery.galleryNavRightAlt', t('widgets.gallery.commands.navigationRight'), 'right', ['alt+arrowright']],
+      ['gallery.galleryNavDownAlt', t('widgets.gallery.commands.navigationDown'), 'down', ['alt+arrowdown']],
+      ['gallery.galleryNavLeftAlt', t('widgets.gallery.commands.navigationLeft'), 'left', ['alt+arrowleft']],
+      ['gallery.deleteSelection', t('widgets.gallery.commands.deleteSelection'), null, ['delete', 'backspace']],
+      ['gallery.starImage', t('widgets.gallery.commands.toggleStarImage'), null, ['.']],
     ] as const;
     const disposers = directions.flatMap(([id, title, direction, defaultKeys]) => [
       runtime.commands.register({
@@ -412,7 +416,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
     return () => {
       disposers.forEach((dispose) => dispose());
     };
-  }, [runtime.commands, runtime.hotkeys]);
+  }, [runtime.commands, runtime.hotkeys, t]);
 
   return (
     <Box
@@ -430,14 +434,14 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
       {isEmpty ? (
         <Flex align="center" color="fg.subtle" h="full" justify="center" minH="8rem">
           <Text fontSize="2xs">
-            {gallery.isLoading ? 'Loading backend gallery...' : 'No images match this board, tab, or search.'}
+            {gallery.isLoading ? t('widgets.gallery.loadingBackendGallery') : t('widgets.gallery.noImagesMatch')}
           </Text>
         </Flex>
       ) : (
         <ScrollArea.Root h="full" minH="0" size="xs" variant="hover" w="full">
           <ScrollArea.Viewport
             ref={viewportRef}
-            aria-label="Gallery images"
+            aria-label={t('widgets.gallery.imagesAriaLabel')}
             h="full"
             role="listbox"
             tabIndex={0}
@@ -474,9 +478,9 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
                             alwaysShowDimensions={showImageDimensions}
                             compareRole={
                               isComparisonActive && cell.image.imageName === gallery.selectedImageName
-                                ? 'Viewing'
+                                ? t('widgets.preview.viewing')
                                 : isComparisonActive && cell.image.imageName === gallery.compareImageName
-                                  ? 'Compare'
+                                  ? t('widgets.preview.compare')
                                   : null
                             }
                             fit={thumbnailFit}
@@ -523,7 +527,7 @@ export const GalleryImageGrid = ({ layout }: { layout: 'stacked' | 'wide' }) => 
         >
           <UploadIcon size="20" />
           <Text fontSize="xs" fontWeight="600">
-            Drop images to upload to {selectedBoardName}
+            {t('widgets.gallery.dropImagesToUploadToBoard', { name: selectedBoardName })}
           </Text>
         </Flex>
       )}
@@ -548,6 +552,7 @@ const GalleryQueuePlaceholderCell = ({
   onClick: () => void;
   placeholder: GalleryQueuePlaceholder;
 }) => {
+  const { t } = useTranslation();
   const progressImage = useQueueItemProgressImage(placeholder.queueItemId, placeholder.itemIndex);
   const progress = useQueueItemProgress(placeholder.queueItemId);
   const isActive = progress?.activeItemIndex === placeholder.itemIndex;
@@ -556,7 +561,7 @@ const GalleryQueuePlaceholderCell = ({
   return (
     <Box
       as="button"
-      aria-label="Show in-progress diffusion in Preview"
+      aria-label={t('widgets.preview.showInProgressDiffusion')}
       aspectRatio={1}
       bg="bg"
       borderColor={isActive ? 'accent.solid' : 'border.subtle'}
@@ -584,10 +589,16 @@ const GalleryQueuePlaceholderCell = ({
 };
 
 const GalleryPlaceholderCircularProgress = ({ percentage }: { percentage: number | null }) => {
+  const { t } = useTranslation();
+
   return (
     <Flex
       align="center"
-      aria-label={percentage === null ? 'Generation progress' : `Generation ${percentage}%`}
+      aria-label={
+        percentage === null
+          ? t('widgets.gallery.generationProgress')
+          : t('widgets.gallery.generationProgressPercent', { percentage })
+      }
       justify="center"
       alignItems="center"
       pointerEvents="none"
@@ -618,7 +629,7 @@ const GalleryThumbnail = ({
   onToggleStarred,
 }: {
   alwaysShowDimensions: boolean;
-  compareRole: 'Compare' | 'Viewing' | null;
+  compareRole: string | null;
   dragImages: GalleryImageDragImage[];
   fit: GalleryThumbnailFit;
   image: GalleryImage;
@@ -628,6 +639,7 @@ const GalleryThumbnail = ({
   onContextMenu: (image: GalleryImage, x: number, y: number) => void;
   onToggleStarred: (image: GalleryImage) => void;
 }) => {
+  const { t } = useTranslation();
   const isCompared = compareRole !== null;
 
   const { isDragging, listeners, setNodeRef, transform } = useDraggable({
@@ -693,7 +705,7 @@ const GalleryThumbnail = ({
       onContextMenu={handleContextMenu}
     >
       <button
-        aria-label={`Select ${image.imageName} for preview`}
+        aria-label={t('widgets.gallery.selectImageForPreview', { name: image.imageName })}
         style={THUMBNAIL_BUTTON_STYLE}
         tabIndex={isPrimary ? 0 : -1}
         type="button"
@@ -715,7 +727,11 @@ const GalleryThumbnail = ({
         </Badge>
       )}
       <IconButton
-        aria-label={image.starred ? `Unstar ${image.imageName}` : `Star ${image.imageName}`}
+        aria-label={
+          image.starred
+            ? t('widgets.gallery.unstarImage', { name: image.imageName })
+            : t('widgets.gallery.starImage', { name: image.imageName })
+        }
         className="gallery-thumb-overlay"
         colorPalette={image.starred ? 'yellow' : 'gray'}
         insetInlineEnd="1"

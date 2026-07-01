@@ -14,6 +14,7 @@ import {
 } from '@workbench/WorkbenchContext';
 import { ArrowRightIcon, CopyIcon, History as HistoryIcon, Trash2Icon } from 'lucide-react';
 import { useCallback, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const RECOVERY_DELETE_HOVER = { color: 'fg.error' } as const;
 
@@ -53,6 +54,7 @@ type ProjectPanelViewModel = Pick<
 >;
 
 const NameSection = ({ project }: { project: ProjectPanelViewModel }) => {
+  const { t } = useTranslation();
   const dispatch = useWorkbenchDispatch();
 
   const commitName = useCallback(
@@ -76,7 +78,7 @@ const NameSection = ({ project }: { project: ProjectPanelViewModel }) => {
   }, []);
 
   return (
-    <Field helpText="Saved with the project." label="Project name">
+    <Field helpText={t('widgets.project.nameHelp')} label={t('widgets.project.nameLabel')}>
       <Input
         defaultValue={project.name}
         key={`${project.id}:${project.name}`}
@@ -91,17 +93,18 @@ const NameSection = ({ project }: { project: ProjectPanelViewModel }) => {
 /** The id whose recovery family this project belongs to. */
 const getRecoveryRootId = (project: Pick<Project, 'id' | 'recoveryOf'>): string => project.recoveryOf ?? project.id;
 
-const formatTimestamp = (timestamp: string | undefined): string => {
+const formatTimestamp = (timestamp: string | undefined, unknownTime: string): string => {
   if (!timestamp) {
-    return 'Unknown time';
+    return unknownTime;
   }
 
   const date = new Date(timestamp);
 
-  return Number.isNaN(date.getTime()) ? 'Unknown time' : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? unknownTime : date.toLocaleString();
 };
 
 const RecoverySection = ({ project }: { project: ProjectPanelViewModel }) => {
+  const { t } = useTranslation();
   const projects = useWorkbenchSelector((snapshot) => snapshot.state.projects);
   const dispatch = useWorkbenchDispatch();
   const { deleteProject } = useProjectActions();
@@ -130,24 +133,26 @@ const RecoverySection = ({ project }: { project: ProjectPanelViewModel }) => {
 
   return (
     <Stack gap="2">
-      <FieldLabel>Recoveries</FieldLabel>
+      <FieldLabel>{t('widgets.project.recoveries')}</FieldLabel>
       {project.recoveryOf ? (
         <Panel p="2.5">
           <HStack gap="2">
             <Icon as={HistoryIcon} boxSize="3.5" color="fg.muted" flexShrink={0} />
             <Stack flex="1" gap="0" minW="0">
               <Text fontSize="xs" fontWeight="600">
-                Recovery copy
+                {t('widgets.project.recoveryCopy')}
               </Text>
               <Text color="fg.muted" fontSize="2xs">
-                Forked {formatTimestamp(project.recoveredAt)} after this project was changed elsewhere.
+                {t('widgets.project.recoveryForkedDescription', {
+                  time: formatTimestamp(project.recoveredAt, t('common.unknownTime')),
+                })}
               </Text>
             </Stack>
           </HStack>
           {original ? (
             <Button mt="2" size="2xs" variant="outline" w="full" onClick={handleOpenOriginal}>
               <ArrowRightIcon />
-              Open original "{original.name}"
+              {t('widgets.project.openOriginal', { name: original.name })}
             </Button>
           ) : null}
         </Panel>
@@ -156,10 +161,10 @@ const RecoverySection = ({ project }: { project: ProjectPanelViewModel }) => {
         <RecoveryRow key={recovery.id} recovery={recovery} onDelete={setDeleteTarget} />
       ))}
       <ConfirmDialog
-        body={`Delete "${deleteTarget?.name ?? ''}"? The recovery copy is removed permanently.`}
-        confirmLabel="Delete recovery"
+        body={t('widgets.project.deleteRecoveryBody', { name: deleteTarget?.name ?? '' })}
+        confirmLabel={t('widgets.project.deleteRecovery')}
         isOpen={deleteTarget !== null}
-        title="Delete recovery?"
+        title={t('widgets.project.deleteRecoveryTitle')}
         onClose={handleCloseDeleteDialog}
         onConfirm={handleConfirmDelete}
       />
@@ -174,6 +179,7 @@ const RecoveryRow = ({
   recovery: Project;
   onDelete: React.Dispatch<React.SetStateAction<Project | null>>;
 }) => {
+  const { t } = useTranslation();
   const dispatch = useWorkbenchDispatch();
   const handleOpen = useCallback(() => {
     flushGenerateDrafts();
@@ -188,14 +194,20 @@ const RecoveryRow = ({
           {recovery.name}
         </Text>
         <Text color="fg.muted" fontSize="2xs">
-          {formatTimestamp(recovery.recoveredAt)}
+          {formatTimestamp(recovery.recoveredAt, t('common.unknownTime'))}
         </Text>
       </Stack>
-      <IconButton aria-label={`Open ${recovery.name}`} color="fg.muted" size="2xs" variant="ghost" onClick={handleOpen}>
+      <IconButton
+        aria-label={t('widgets.project.openRecovery', { name: recovery.name })}
+        color="fg.muted"
+        size="2xs"
+        variant="ghost"
+        onClick={handleOpen}
+      >
         <ArrowRightIcon />
       </IconButton>
       <IconButton
-        aria-label={`Delete ${recovery.name}`}
+        aria-label={t('widgets.project.deleteRecoveryAria', { name: recovery.name })}
         color="fg.muted"
         size="2xs"
         variant="ghost"
@@ -209,6 +221,7 @@ const RecoveryRow = ({
 };
 
 const DetailsSection = ({ project }: { project: ProjectPanelViewModel }) => {
+  const { t } = useTranslation();
   const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection.status);
   const lastSavedAt = useWorkbenchSelector((snapshot) => snapshot.state.autosave.lastSavedAt);
   const projectSync = useProjectSyncSelector((snapshot) => snapshot.projects[project.id]);
@@ -216,40 +229,48 @@ const DetailsSection = ({ project }: { project: ProjectPanelViewModel }) => {
 
   const syncLabel =
     backendConnectionStatus !== 'connected'
-      ? 'Offline — saved in this browser'
+      ? t('widgets.project.syncOffline')
       : projectSync === undefined || projectSync.isPendingPush
-        ? 'Waiting to sync'
-        : `Synced (revision ${projectSync.revision ?? '—'})`;
+        ? t('widgets.project.syncWaiting')
+        : t('widgets.project.syncSynced', { revision: projectSync.revision ?? '—' });
 
   const copyId = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(project.id);
-      notify.success('Project id copied');
+      notify.success(t('widgets.project.idCopied'));
     } catch {
-      notify.error('Could not copy', 'Clipboard access was blocked by the browser.');
+      notify.error(t('common.couldNotCopy'), t('common.clipboardBlocked'));
     }
-  }, [notify, project.id]);
+  }, [notify, project.id, t]);
   const handleCopyId = useCallback(() => void copyId(), [copyId]);
 
   return (
     <Stack gap="2">
-      <FieldLabel>Details</FieldLabel>
+      <FieldLabel>{t('common.details')}</FieldLabel>
       <Panel gap="1.5" p="2.5">
-        <DetailRow label="ID">
+        <DetailRow label={t('common.id')}>
           <HStack gap="1" minW="0">
             <Text fontFamily="mono" fontSize="2xs" truncate>
               {project.id}
             </Text>
-            <IconButton aria-label="Copy project id" color="fg.muted" size="2xs" variant="ghost" onClick={handleCopyId}>
+            <IconButton
+              aria-label={t('widgets.project.copyId')}
+              color="fg.muted"
+              size="2xs"
+              variant="ghost"
+              onClick={handleCopyId}
+            >
               <CopyIcon />
             </IconButton>
           </HStack>
         </DetailRow>
-        <DetailRow label="Sync">{syncLabel}</DetailRow>
-        <DetailRow label="Last saved">{lastSavedAt ? formatTimestamp(lastSavedAt) : 'Not yet'}</DetailRow>
-        <DetailRow label="Graph nodes">{project.projectGraph.nodes.length}</DetailRow>
-        <DetailRow label="Queue items">{project.queue.items.length}</DetailRow>
-        <DetailRow label="Events">{project.events.length}</DetailRow>
+        <DetailRow label={t('widgets.project.sync')}>{syncLabel}</DetailRow>
+        <DetailRow label={t('common.lastSaved')}>
+          {lastSavedAt ? formatTimestamp(lastSavedAt, t('common.unknownTime')) : t('common.notYet')}
+        </DetailRow>
+        <DetailRow label={t('widgets.project.graphNodes')}>{project.projectGraph.nodes.length}</DetailRow>
+        <DetailRow label={t('widgets.project.queueItems')}>{project.queue.items.length}</DetailRow>
+        <DetailRow label={t('widgets.project.events')}>{project.events.length}</DetailRow>
       </Panel>
     </Stack>
   );

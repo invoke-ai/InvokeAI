@@ -15,6 +15,7 @@ import { flushGenerateDrafts } from '@workbench/widgets/generate/generateDraftRe
 import { useActiveProjectSelector, useWorkbenchDispatch, useWorkbenchStore } from '@workbench/WorkbenchContext';
 import { useInvocationTemplatesSelector } from '@workbench/workflows/templates';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { GraphPreviewFlow } from './GraphPreviewFlow';
 
@@ -33,8 +34,8 @@ type PreviewMode = 'nodes' | 'json';
 
 const selectInvocationRouteInput = createInvocationRouteInputSelector();
 const modeItems = [
-  { label: 'Nodes', value: 'nodes' },
-  { label: 'JSON', value: 'json' },
+  { labelKey: 'graphPreview.nodes', value: 'nodes' },
+  { labelKey: 'common.json', value: 'json' },
 ];
 
 const PreviewPane = ({ children }: { children: ReactNode }) => (
@@ -52,6 +53,7 @@ export const GraphPreviewDialog = ({
   title,
   onOpenChange,
 }: GraphPreviewDialogProps) => {
+  const { t } = useTranslation();
   const routeInput = useActiveProjectSelector(selectInvocationRouteInput);
   const dispatch = useWorkbenchDispatch();
   const store = useWorkbenchStore();
@@ -106,7 +108,7 @@ export const GraphPreviewDialog = ({
     });
     onOpenChange(false);
   }, [availabilityModels, dispatch, onOpenChange, sourceId, store]);
-  const jsonLabel = useMemo(() => `${title} graph JSON`, [title]);
+  const jsonLabel = useMemo(() => t('graphPreview.graphJsonLabel', { title }), [t, title]);
 
   return (
     <Dialog.Root open={isOpen} size="xl" onOpenChange={handleOpenChange}>
@@ -115,16 +117,21 @@ export const GraphPreviewDialog = ({
         <Dialog.Positioner>
           <Dialog.Content h="62vh" maxH="62vh">
             <Dialog.Header alignItems="center" flexDirection="row" justifyContent="space-between">
-              <Dialog.Title>{title} Graph Preview</Dialog.Title>
+              <Dialog.Title>{t('graphPreview.title', { title })}</Dialog.Title>
               <SegmentGroup.Root size="xs" value={mode} onValueChange={handleModeChange}>
                 <SegmentGroup.Indicator />
-                <SegmentGroup.Items items={modeItems} />
+                {modeItems.map((item) => (
+                  <SegmentGroup.Item key={item.value} value={item.value}>
+                    <SegmentGroup.ItemHiddenInput />
+                    <SegmentGroup.ItemText>{t(item.labelKey)}</SegmentGroup.ItemText>
+                  </SegmentGroup.Item>
+                ))}
               </SegmentGroup.Root>
             </Dialog.Header>
             <Dialog.Body display="flex" flex="1" flexDirection="column" minH="0">
               {!graph ? (
                 <Text color="fg.muted" fontSize="sm">
-                  No compiled graph is available for "{graphId}" yet.
+                  {t('graphPreview.noCompiledGraph', { graphId })}
                 </Text>
               ) : mode === 'nodes' ? (
                 <PreviewPane>
@@ -146,11 +153,11 @@ export const GraphPreviewDialog = ({
                   title={dialogRoute.validationMessage}
                   onClick={invokeRoute}
                 >
-                  Invoke {formatRoute(dialogRoute)}
+                  {t('graphPreview.invokeRoute', { route: formatRoute(dialogRoute) })}
                 </Button>
               ) : null}
               <Button size="sm" variant="outline" onClick={closeDialog}>
-                Close
+                {t('common.close')}
               </Button>
             </Dialog.Footer>
           </Dialog.Content>

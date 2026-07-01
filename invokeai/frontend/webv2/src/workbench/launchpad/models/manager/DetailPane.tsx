@@ -9,17 +9,19 @@ import { useModelsSelector } from '@workbench/models/modelsStore';
 import { updateModelsUi, useModelsUiSelector, type ModelManagerTab } from '@workbench/models/uiStore';
 import { BoxIcon, KeyRoundIcon, PlusIcon } from 'lucide-react';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { HEADER_MIN_HEIGHT } from './layoutConstants';
 
 /** The tabbed detail pane: selected model, Add Models, API Keys, and queue footer. */
 export const DetailPane = () => {
+  const { t } = useTranslation();
   const { activeModelKey, activeTab } = useModelsUiSelector(
     (snapshot) => ({ activeModelKey: snapshot.activeModelKey, activeTab: snapshot.activeTab }),
     (left, right) => left.activeModelKey === right.activeModelKey && left.activeTab === right.activeTab
   );
   const detailLabel = useModelsSelector(
-    (snapshot) => snapshot.models.find((model) => model.key === activeModelKey)?.name ?? 'Model Details'
+    (snapshot) => snapshot.models.find((model) => model.key === activeModelKey)?.name ?? t('models.details')
   );
 
   return (
@@ -40,11 +42,11 @@ export const DetailPane = () => {
             </Tabs.Trigger>
             <Tabs.Trigger fontSize="xs" value="add">
               <Icon as={PlusIcon} boxSize="3" />
-              Add Models
+              {t('models.addModels')}
             </Tabs.Trigger>
             <Tabs.Trigger fontSize="xs" value="keys">
               <Icon as={KeyRoundIcon} boxSize="3" />
-              API Keys
+              {t('models.apiKeys')}
             </Tabs.Trigger>
           </Tabs.List>
         </Tabs.Root>
@@ -54,7 +56,7 @@ export const DetailPane = () => {
         {activeTab === 'details' ? <DetailTab modelKey={activeModelKey} /> : null}
         {activeTab === 'add' ? <AddModelsView /> : null}
         {activeTab === 'keys' ? (
-          <Scrollable h="full" label="API keys" minH="0" p="3">
+          <Scrollable h="full" label={t('models.apiKeys')} minH="0" p="3">
             <ApiKeysSection />
           </Scrollable>
         ) : null}
@@ -66,6 +68,7 @@ export const DetailPane = () => {
 };
 
 const DetailTab = ({ modelKey }: { modelKey: string | null }) => {
+  const { t } = useTranslation();
   const handleDeleted = useCallback(() => updateModelsUi({ activeModelKey: null }), []);
 
   if (modelKey === null) {
@@ -73,18 +76,17 @@ const DetailTab = ({ modelKey }: { modelKey: string | null }) => {
       <Flex align="center" direction="column" gap="2" h="full" justify="center" p="6">
         <Icon as={BoxIcon} boxSize="8" color="fg.subtle" />
         <Text color="fg.muted" fontSize="sm" fontWeight="600">
-          Select a model
+          {t('models.selectModel')}
         </Text>
         <Text color="fg.subtle" fontSize="xs" maxW="22rem" textAlign="center">
-          Pick a model from the library to view details, edit metadata, set per-model defaults, and manage trigger
-          phrases.
+          {t('models.selectModelDescription')}
         </Text>
       </Flex>
     );
   }
 
   return (
-    <Scrollable h="full" label="Model details" minH="0" p="3">
+    <Scrollable h="full" label={t('models.details')} minH="0" p="3">
       <ModelDetail key={modelKey} density="full" modelKey={modelKey} onDeleted={handleDeleted} />
     </Scrollable>
   );

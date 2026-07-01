@@ -12,11 +12,13 @@ import { Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { IconButton } from '@workbench/components/ui';
 import { GraphPreviewDialog } from '@workbench/graph-preview';
 import { createGraphBearingSurface } from '@workbench/graphSurfaces';
+import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import { shallowEqual, useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { compileProjectGraph } from '@workbench/workflows/buildGraph';
 import { getInvocationTemplatesSnapshot } from '@workbench/workflows/templates';
 import { GitBranchIcon, MoreHorizontalIcon, TargetIcon } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * The widget frame's shared header actions menu. It hosts the universal
@@ -55,6 +57,7 @@ const GraphSurfaceMenuItems = ({
   surface: GraphBearingSurfaceContract;
   onPreview: () => void;
 }) => {
+  const { t } = useTranslation();
   const activeSourceId = useActiveProjectSelector((project) => project.invocation.sourceId);
   const dispatch = useWorkbenchDispatch();
   const isActiveSource = activeSourceId === surface.sourceId;
@@ -66,7 +69,7 @@ const GraphSurfaceMenuItems = ({
   return (
     <Menu.ItemGroup>
       <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
-        Graph
+        {t('common.graph')}
       </Menu.ItemGroupLabel>
       <Menu.Item
         value="set-source"
@@ -75,16 +78,16 @@ const GraphSurfaceMenuItems = ({
         onClick={handleSetSource}
       >
         <Icon as={TargetIcon} boxSize="3.5" />
-        <Menu.ItemText>Set Source</Menu.ItemText>
+        <Menu.ItemText>{t('widgets.graph.setSource')}</Menu.ItemText>
         {isActiveSource ? (
           <Text color="fg.subtle" fontSize="2xs" ms="auto">
-            Active
+            {t('common.active')}
           </Text>
         ) : null}
       </Menu.Item>
       <Menu.Item value="view-graph" disabled={!surface.canPreviewGraph} onClick={onPreview}>
         <Icon as={GitBranchIcon} boxSize="3.5" />
-        <Menu.ItemText>View Graph</Menu.ItemText>
+        <Menu.ItemText>{t('widgets.graph.viewGraph')}</Menu.ItemText>
       </Menu.Item>
     </Menu.ItemGroup>
   );
@@ -101,21 +104,23 @@ export const WidgetActionsMenu = ({
   region: WorkbenchRegion;
   runtime: WidgetRuntimeApi;
 }) => {
+  const { t } = useTranslation();
   const activeProject = useActiveProjectSelector(
     (project) => ({ projectGraph: project.projectGraph, widgetGraphs: project.widgetGraphs }),
     shallowEqual
   ) as Project;
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const surface = manifest.graphBearing?.surfaces.includes(region) ? createGraphBearingSurface(manifest, region) : null;
   const HeaderMenu = manifest.headerMenu;
+  const label = resolveWidgetLabel(manifest, t);
+  const surface = manifest.graphBearing?.surfaces.includes(region)
+    ? createGraphBearingSurface(manifest, region, label)
+    : null;
+  const surfaceSourceId = surface?.sourceId;
   const handlePreview = useCallback(() => setIsPreviewOpen(true), []);
-  const positionHints = useMemo(
-    () =>
-      isPreviewOpen && surface?.sourceId === 'workflow'
-        ? Object.fromEntries(activeProject.projectGraph.nodes.map((node) => [node.id, node.position]))
-        : undefined,
-    [activeProject.projectGraph.nodes, isPreviewOpen, surface?.sourceId]
-  );
+  const positionHints =
+    isPreviewOpen && surfaceSourceId === 'workflow'
+      ? Object.fromEntries(activeProject.projectGraph.nodes.map((node) => [node.id, node.position]))
+      : undefined;
 
   if (!surface && !HeaderMenu) {
     return null;
@@ -128,7 +133,7 @@ export const WidgetActionsMenu = ({
     <>
       <Menu.Root positioning={MENU_POSITIONING}>
         <Menu.Trigger asChild>
-          <IconButton aria-label={`${manifest.labelText} actions`} color="fg.muted" size="2xs" variant="ghost">
+          <IconButton aria-label={t('widgets.actionsLabel', { label })} color="fg.muted" size="2xs" variant="ghost">
             <MoreHorizontalIcon />
           </IconButton>
         </Menu.Trigger>

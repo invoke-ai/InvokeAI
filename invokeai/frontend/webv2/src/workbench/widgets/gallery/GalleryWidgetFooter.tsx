@@ -7,17 +7,12 @@ import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { getGalleryPage, getGalleryTotalImages } from './galleryStateView';
 import { GALLERY_PAGE_SIZE } from './useGalleryData';
 
 const PAGINATION_ITEM_VARIANT = { _selected: 'outline', base: 'ghost' } as const;
-
-const renderPaginationItem = (paginationPage: { value: number }) => (
-  <IconButton aria-label={`Page ${paginationPage.value}`} variant={PAGINATION_ITEM_VARIANT}>
-    {paginationPage.value}
-  </IconButton>
-);
 
 /**
  * Widget-chrome footer: page navigation for the gallery's paginated mode.
@@ -25,6 +20,7 @@ const renderPaginationItem = (paginationPage: { value: number }) => (
  * decoupled from the view's data fetching.
  */
 export const GalleryWidgetFooter = (_props: WidgetViewProps) => {
+  const { t } = useTranslation();
   const galleryValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'gallery'));
   const dispatch = useWorkbenchDispatch();
   const settings = getGallerySettings(galleryValues);
@@ -33,6 +29,14 @@ export const GalleryWidgetFooter = (_props: WidgetViewProps) => {
   const handlePageChange = useCallback(
     (event: { page: number }) => dispatch({ page: event.page - 1, type: 'setGalleryPage' }),
     [dispatch]
+  );
+  const renderPaginationItem = useCallback(
+    (paginationPage: { value: number }) => (
+      <IconButton aria-label={t('common.pageNumber', { page: paginationPage.value })} variant={PAGINATION_ITEM_VARIANT}>
+        {paginationPage.value}
+      </IconButton>
+    ),
+    [t]
   );
 
   if (settings.paginationMode !== 'paginated' || totalImages === null || totalImages <= GALLERY_PAGE_SIZE) {
@@ -50,13 +54,13 @@ export const GalleryWidgetFooter = (_props: WidgetViewProps) => {
       >
         <ButtonGroup gap="1" size="2xs" variant="ghost">
           <Pagination.PrevTrigger asChild>
-            <IconButton aria-label="Previous page">
+            <IconButton aria-label={t('common.previousPage')}>
               <ChevronLeftIcon />
             </IconButton>
           </Pagination.PrevTrigger>
           <Pagination.Items render={renderPaginationItem} />
           <Pagination.NextTrigger asChild>
-            <IconButton aria-label="Next page">
+            <IconButton aria-label={t('common.nextPage')}>
               <ChevronRightIcon />
             </IconButton>
           </Pagination.NextTrigger>

@@ -29,10 +29,11 @@ import {
   Undo2Icon,
 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const DISABLED_PROMPT_ACTIONS = [
-  { icon: BookDashedIcon, label: 'Prompt Template' },
-  { icon: CurlyBracesIcon, label: 'Show dynamic prompts' },
+  { icon: BookDashedIcon, labelKey: 'widgets.generate.promptTemplate' },
+  { icon: CurlyBracesIcon, labelKey: 'widgets.generate.showDynamicPrompts' },
 ];
 const POPOVER_POSITIONING_BOTTOM_END = { placement: 'bottom-end' } as const;
 const TEXT_LLM_MODEL_TYPES = ['text_llm'];
@@ -56,25 +57,32 @@ export const PositivePromptActions = ({
   onUsePrompt,
   positivePrompt,
   projectId,
-}: PositivePromptActionsProps) => (
-  <HStack gap="0.5">
-    <AddPromptTriggerButton isOpen={isPromptTriggerPickerOpen} onOpenPromptTriggerPicker={onOpenPromptTriggerPicker} />
-    {DISABLED_PROMPT_ACTIONS.map(({ icon: ActionIcon, label }) => (
-      <Tooltip key={label} content={label}>
-        <IconButton aria-label={label} disabled size="2xs" variant="ghost">
-          <ActionIcon />
-        </IconButton>
-      </Tooltip>
-    ))}
-    <ExpandPromptButton
-      positivePrompt={positivePrompt}
-      projectId={projectId}
-      onPositivePromptChange={onPositivePromptChangeImmediate}
-    />
-    <ImageToPromptButton projectId={projectId} onPositivePromptChange={onPositivePromptChangeImmediate} />
-    <PositivePromptHistoryButton onUsePrompt={onUsePrompt} />
-  </HStack>
-);
+}: PositivePromptActionsProps) => {
+  const { t } = useTranslation();
+
+  return (
+    <HStack gap="0.5">
+      <AddPromptTriggerButton
+        isOpen={isPromptTriggerPickerOpen}
+        onOpenPromptTriggerPicker={onOpenPromptTriggerPicker}
+      />
+      {DISABLED_PROMPT_ACTIONS.map(({ icon: ActionIcon, labelKey }) => (
+        <Tooltip key={labelKey} content={t(labelKey)}>
+          <IconButton aria-label={t(labelKey)} disabled size="2xs" variant="ghost">
+            <ActionIcon />
+          </IconButton>
+        </Tooltip>
+      ))}
+      <ExpandPromptButton
+        positivePrompt={positivePrompt}
+        projectId={projectId}
+        onPositivePromptChange={onPositivePromptChangeImmediate}
+      />
+      <ImageToPromptButton projectId={projectId} onPositivePromptChange={onPositivePromptChangeImmediate} />
+      <PositivePromptHistoryButton onUsePrompt={onUsePrompt} />
+    </HStack>
+  );
+};
 
 type PromptTriggerOption = {
   group: string;
@@ -95,18 +103,22 @@ const getTriggerPhrases = (model: unknown): string[] => {
 };
 
 const getPromptTriggerOptions = ({
+  compatibleEmbeddingsLabel,
   loras,
+  mainModelLabel,
   models,
   selectedModel,
 }: {
+  compatibleEmbeddingsLabel: string;
   loras: GenerateLora[];
+  mainModelLabel: string;
   models: readonly ModelConfig[];
   selectedModel: GenerateModelConfig | undefined;
 }): PromptTriggerOption[] => {
   const options: PromptTriggerOption[] = [];
 
   for (const phrase of getTriggerPhrases(selectedModel)) {
-    options.push({ group: selectedModel?.name ?? 'Main model', label: phrase, value: phrase });
+    options.push({ group: selectedModel?.name ?? mainModelLabel, label: phrase, value: phrase });
   }
 
   for (const lora of loras) {
@@ -122,7 +134,7 @@ const getPromptTriggerOptions = ({
   if (selectedModel) {
     for (const model of models) {
       if (model.type === 'embedding' && model.base === selectedModel.base) {
-        options.push({ group: 'Compatible embeddings', label: model.name, value: `<${model.name}>` });
+        options.push({ group: compatibleEmbeddingsLabel, label: model.name, value: `<${model.name}>` });
       }
     }
   }
@@ -148,14 +160,21 @@ export const AddPromptTriggerButton = ({
   isOpen: boolean;
   onOpenPromptTriggerPicker: (anchorElement: HTMLElement) => void;
 }) => {
+  const { t } = useTranslation();
   const handleClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => onOpenPromptTriggerPicker(event.currentTarget),
     [onOpenPromptTriggerPicker]
   );
 
   return (
-    <Tooltip content="Add prompt trigger">
-      <IconButton aria-label="Add prompt trigger" disabled={isOpen} size="2xs" variant="ghost" onClick={handleClick}>
+    <Tooltip content={t('widgets.generate.addPromptTrigger')}>
+      <IconButton
+        aria-label={t('widgets.generate.addPromptTrigger')}
+        disabled={isOpen}
+        size="2xs"
+        variant="ghost"
+        onClick={handleClick}
+      >
         <PlusIcon />
       </IconButton>
     </Tooltip>
@@ -175,12 +194,20 @@ export const PromptTriggerPopover = ({
   onClose: () => void;
   onSelect: (trigger: string) => void;
 }) => {
+  const { t } = useTranslation();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const [searchTerm, setSearchTerm] = useState('');
 
   const options = useMemo(
-    () => getPromptTriggerOptions({ loras, models, selectedModel }),
-    [loras, models, selectedModel]
+    () =>
+      getPromptTriggerOptions({
+        compatibleEmbeddingsLabel: t('widgets.generate.compatibleEmbeddings'),
+        loras,
+        mainModelLabel: t('widgets.generate.mainModel'),
+        models,
+        selectedModel,
+      }),
+    [loras, models, selectedModel, t]
   );
 
   const filteredOptions = useMemo(
@@ -238,19 +265,19 @@ export const PromptTriggerPopover = ({
             <Popover.Body p="2.5">
               <Stack gap="2" h="18rem">
                 <Input
-                  aria-label="Search prompt triggers"
+                  aria-label={t('widgets.generate.searchPromptTriggers')}
                   disabled={options.length === 0}
-                  placeholder="Search prompt triggers"
+                  placeholder={t('widgets.generate.searchPromptTriggers')}
                   size="xs"
                   value={searchTerm}
                   onChange={handleSearchChange}
                 />
                 <Separator />
-                <Scrollable flex="1" label="Prompt trigger options" minH="0">
+                <Scrollable flex="1" label={t('widgets.generate.promptTriggerOptions')} minH="0">
                   {options.length === 0 ? (
-                    <PromptHistoryEmptyText>No prompt triggers available.</PromptHistoryEmptyText>
+                    <PromptHistoryEmptyText>{t('widgets.generate.noPromptTriggersAvailable')}</PromptHistoryEmptyText>
                   ) : filteredOptions.length === 0 ? (
-                    <PromptHistoryEmptyText>No matching triggers.</PromptHistoryEmptyText>
+                    <PromptHistoryEmptyText>{t('widgets.generate.noMatchingTriggers')}</PromptHistoryEmptyText>
                   ) : (
                     <Stack gap="2">
                       {groupedOptions.map((group) => (
@@ -316,6 +343,7 @@ const ExpandPromptButton = ({
   projectId: string;
   onPositivePromptChange: (prompt: string) => void;
 }) => {
+  const { t } = useTranslation();
   const dispatch = useWorkbenchDispatch();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const activeProjectId = useActiveProjectId();
@@ -351,7 +379,7 @@ const ExpandPromptButton = ({
     } catch (error) {
       dispatch({
         area: 'expand-prompt',
-        message: getApiErrorMessage(error, 'Could not expand the prompt.'),
+        message: getApiErrorMessage(error, t('widgets.generate.couldNotExpandPrompt')),
         namespace: 'generation',
         projectId,
         type: 'recordError',
@@ -359,7 +387,7 @@ const ExpandPromptButton = ({
     } finally {
       setIsLoading(false);
     }
-  }, [dispatch, onPositivePromptChange, positivePrompt, projectId, selectedModel]);
+  }, [dispatch, onPositivePromptChange, positivePrompt, projectId, selectedModel, t]);
 
   const popoverIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
   const handleOpenChange = useCallback((event: { open: boolean }) => setIsOpen(event.open), []);
@@ -374,10 +402,15 @@ const ExpandPromptButton = ({
       positioning={POPOVER_POSITIONING_BOTTOM_END}
       onOpenChange={handleOpenChange}
     >
-      <Tooltip content={textLlmModels.length === 0 ? 'No Text LLM installed' : 'Expand prompt'} ids={popoverIds}>
+      <Tooltip
+        content={
+          textLlmModels.length === 0 ? t('widgets.generate.noTextLlmInstalled') : t('widgets.generate.expandPrompt')
+        }
+        ids={popoverIds}
+      >
         <Popover.Trigger asChild>
           <IconButton
-            aria-label="Expand prompt"
+            aria-label={t('widgets.generate.expandPrompt')}
             disabled={isLoading || !positivePrompt.trim()}
             size="2xs"
             variant="ghost"
@@ -392,18 +425,18 @@ const ExpandPromptButton = ({
             <Popover.Body p="2.5">
               <Stack gap="2.5">
                 <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
-                  Expand Prompt
+                  {t('widgets.generate.expandPrompt')}
                 </Text>
                 {textLlmModels.length === 0 ? (
                   <Text color="fg.subtle" fontSize="xs">
-                    Install a Text LLM model to expand prompts.
+                    {t('widgets.generate.installTextLlmToExpandPrompts')}
                   </Text>
                 ) : (
                   <>
                     <ModelSelect
                       isClearable={false}
                       modelTypes={TEXT_LLM_MODEL_TYPES}
-                      placeholder="Select Text LLM"
+                      placeholder={t('widgets.generate.selectTextLlm')}
                       size="xs"
                       value={selectedModelKey}
                       onChange={handleModelChange}
@@ -414,7 +447,7 @@ const ExpandPromptButton = ({
                       size="xs"
                       onClick={handleRunExpandPrompt}
                     >
-                      Expand
+                      {t('widgets.generate.expand')}
                     </Button>
                   </>
                 )}
@@ -434,6 +467,7 @@ const ImageToPromptButton = ({
   projectId: string;
   onPositivePromptChange: (prompt: string) => void;
 }) => {
+  const { t } = useTranslation();
   const dispatch = useWorkbenchDispatch();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const selectedImage = useActiveProjectSelector(getSelectedGalleryImage, shallowEqual);
@@ -470,7 +504,7 @@ const ImageToPromptButton = ({
     } catch (error) {
       dispatch({
         area: 'image-to-prompt',
-        message: getApiErrorMessage(error, 'Could not generate a prompt from the selected image.'),
+        message: getApiErrorMessage(error, t('widgets.generate.couldNotGeneratePromptFromImage')),
         namespace: 'generation',
         projectId,
         type: 'recordError',
@@ -478,7 +512,7 @@ const ImageToPromptButton = ({
     } finally {
       setIsLoading(false);
     }
-  }, [dispatch, onPositivePromptChange, projectId, selectedImage, selectedModel]);
+  }, [dispatch, onPositivePromptChange, projectId, selectedImage, selectedModel, t]);
 
   const popoverIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
   const handleOpenChange = useCallback((event: { open: boolean }) => setIsOpen(event.open), []);
@@ -493,9 +527,14 @@ const ImageToPromptButton = ({
       positioning={POPOVER_POSITIONING_BOTTOM_END}
       onOpenChange={handleOpenChange}
     >
-      <Tooltip content={llavaModels.length === 0 ? 'No vision model installed' : 'Image to prompt'} ids={popoverIds}>
+      <Tooltip
+        content={
+          llavaModels.length === 0 ? t('widgets.generate.noVisionModelInstalled') : t('widgets.generate.imageToPrompt')
+        }
+        ids={popoverIds}
+      >
         <Popover.Trigger asChild>
-          <IconButton aria-label="Image to prompt" disabled={isLoading} size="2xs" variant="ghost">
+          <IconButton aria-label={t('widgets.generate.imageToPrompt')} disabled={isLoading} size="2xs" variant="ghost">
             <ImageUpIcon />
           </IconButton>
         </Popover.Trigger>
@@ -506,18 +545,18 @@ const ImageToPromptButton = ({
             <Popover.Body p="2.5">
               <Stack gap="2.5">
                 <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
-                  Image to Prompt
+                  {t('widgets.generate.imageToPrompt')}
                 </Text>
                 {llavaModels.length === 0 ? (
                   <Text color="fg.subtle" fontSize="xs">
-                    Install a LLaVA OneVision model to generate prompts from images.
+                    {t('widgets.generate.installVisionModelToGeneratePrompts')}
                   </Text>
                 ) : (
                   <>
                     <ModelSelect
                       isClearable={false}
                       modelTypes={LLAVA_MODEL_TYPES}
-                      placeholder="Select vision model"
+                      placeholder={t('widgets.generate.selectVisionModel')}
                       size="xs"
                       value={selectedModelKey}
                       onChange={handleModelChange}
@@ -538,7 +577,7 @@ const ImageToPromptButton = ({
                       </HStack>
                     ) : (
                       <Text color="fg.subtle" fontSize="xs">
-                        Select an image in Gallery or Preview first.
+                        {t('widgets.generate.selectImageFirst')}
                       </Text>
                     )}
                     <Button
@@ -547,7 +586,7 @@ const ImageToPromptButton = ({
                       size="xs"
                       onClick={handleRunImageToPrompt}
                     >
-                      Generate Prompt
+                      {t('widgets.generate.generatePrompt')}
                     </Button>
                   </>
                 )}
@@ -561,6 +600,7 @@ const ImageToPromptButton = ({
 };
 
 const PositivePromptHistoryButton = ({ onUsePrompt }: Pick<PositivePromptActionsProps, 'onUsePrompt'>) => {
+  const { t } = useTranslation();
   const dispatch = useWorkbenchDispatch();
   const promptHistory = useActiveProjectSelector((project) => project.promptHistory);
   const historyTriggerId = useId();
@@ -592,9 +632,9 @@ const PositivePromptHistoryButton = ({ onUsePrompt }: Pick<PositivePromptActions
       positioning={POPOVER_POSITIONING_BOTTOM_END}
       onOpenChange={handleOpenChange}
     >
-      <Tooltip content="Prompt history" ids={popoverIds}>
+      <Tooltip content={t('widgets.generate.promptHistory')} ids={popoverIds}>
         <Popover.Trigger asChild>
-          <IconButton aria-label="Prompt history" size="2xs" variant="ghost">
+          <IconButton aria-label={t('widgets.generate.promptHistory')} size="2xs" variant="ghost">
             <HistoryIcon />
           </IconButton>
         </Popover.Trigger>
@@ -606,24 +646,24 @@ const PositivePromptHistoryButton = ({ onUsePrompt }: Pick<PositivePromptActions
               <Stack gap="2" h="18rem">
                 <HStack justify="space-between">
                   <Input
-                    aria-label="Search prompt history"
+                    aria-label={t('widgets.generate.searchPromptHistory')}
                     disabled={promptHistory.length === 0}
-                    placeholder="Search prompt history"
+                    placeholder={t('widgets.generate.searchPromptHistory')}
                     size="xs"
                     value={searchTerm}
                     onChange={onChangeSearchTerm}
                   />
                   <Button disabled={promptHistory.length === 0} size="xs" variant="ghost" onClick={clearPromptHistory}>
                     <Icon as={TrashIcon} boxSize="3" />
-                    Clear
+                    {t('common.clear')}
                   </Button>
                 </HStack>
                 <Separator />
-                <Scrollable flex="1" label="Prompt history entries" minH="0">
+                <Scrollable flex="1" label={t('widgets.generate.promptHistoryEntries')} minH="0">
                   {promptHistory.length === 0 ? (
-                    <PromptHistoryEmptyText>No prompt history yet.</PromptHistoryEmptyText>
+                    <PromptHistoryEmptyText>{t('widgets.generate.noPromptHistoryYet')}</PromptHistoryEmptyText>
                   ) : filteredPrompts.length === 0 ? (
-                    <PromptHistoryEmptyText>No matching prompts.</PromptHistoryEmptyText>
+                    <PromptHistoryEmptyText>{t('widgets.generate.noMatchingPrompts')}</PromptHistoryEmptyText>
                   ) : (
                     <Stack gap="1">
                       {filteredPrompts.map((prompt, index) => (
@@ -637,7 +677,7 @@ const PositivePromptHistoryButton = ({ onUsePrompt }: Pick<PositivePromptActions
                   )}
                 </Scrollable>
                 <Text color="fg.subtle" fontSize="2xs" textAlign="center">
-                  Alt+Up/Down switches between prompts while focused.
+                  {t('widgets.generate.promptHistoryKeyboardHelp')}
                 </Text>
               </Stack>
             </Popover.Body>
@@ -676,20 +716,21 @@ const PromptHistoryItemRow = ({
   onUsePrompt: (prompt: PromptHistoryItem) => void;
   prompt: PromptHistoryItem;
 }) => {
+  const { t } = useTranslation();
   const dispatch = useWorkbenchDispatch();
   const handleUsePrompt = useCallback(() => onUsePrompt(prompt), [onUsePrompt, prompt]);
   const handleDelete = useCallback(() => dispatch({ prompt, type: 'removePromptFromHistory' }), [dispatch, prompt]);
 
   return (
     <HStack align="start" gap="1.5" pr="1">
-      <IconButton aria-label="Use prompt" size="2xs" variant="ghost" onClick={handleUsePrompt}>
+      <IconButton aria-label={t('widgets.generate.usePrompt')} size="2xs" variant="ghost" onClick={handleUsePrompt}>
         <Icon as={Undo2Icon} boxSize="3.5" />
       </IconButton>
       <Stack flex="1" gap="0.5" minW="0">
         {prompt.positivePrompt ? (
           <Text color="fg" fontSize="2xs" wordBreak="break-word">
             <Text as="span" color="fg.subtle" fontWeight="600">
-              Prompt:
+              {t('common.prompt')}:
             </Text>{' '}
             {prompt.positivePrompt}
           </Text>
@@ -697,7 +738,7 @@ const PromptHistoryItemRow = ({
         {prompt.negativePrompt ? (
           <Text color="fg" fontSize="2xs" wordBreak="break-word">
             <Text as="span" color="fg.subtle" fontWeight="600">
-              Negative:
+              {t('common.negative')}:
             </Text>{' '}
             {prompt.negativePrompt}
           </Text>
@@ -705,7 +746,7 @@ const PromptHistoryItemRow = ({
       </Stack>
 
       <IconButton
-        aria-label="Delete prompt history item"
+        aria-label={t('widgets.generate.deletePromptHistoryItem')}
         colorPalette="red"
         size="2xs"
         variant="ghost"

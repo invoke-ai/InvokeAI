@@ -23,6 +23,7 @@ import {
 } from '@workbench/workflows/libraryCache';
 import { parseWorkflowJson, serializeWorkflowJson } from '@workbench/workflows/workflowJson';
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Backend workflow library browser: list/search user and default workflows,
@@ -50,7 +51,8 @@ const WorkflowPreviewPane = ({
   onLoad: () => void;
 }) => {
   const [mode, setMode] = useState<'nodes' | 'json'>('nodes');
-  const { graph, positionHints } = documentToPreviewGraph(preview.document);
+  const { t } = useTranslation();
+  const { graph, positionHints } = documentToPreviewGraph(preview.document, t('widgets.labels.workflow'));
 
   return (
     <Stack gap="2">

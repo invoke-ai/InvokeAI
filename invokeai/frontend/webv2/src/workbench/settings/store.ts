@@ -1,46 +1,17 @@
-import type {
-  DeveloperLogLevel,
-  DeveloperLogNamespace,
-  ProjectSettings,
-  WorkbenchLanguage,
-  WorkbenchPreferences,
-} from '@workbench/types';
+import type { DeveloperLogLevel, DeveloperLogNamespace, ProjectSettings, WorkbenchPreferences } from '@workbench/types';
 
 import { DEFAULT_THEME_ID, isWorkbenchThemeId } from '@theme/themes';
 import { getUserStorageScope } from '@workbench/auth/session';
 import { createExternalStore } from '@workbench/externalStore';
+import { normalizeWorkbenchLanguage } from '@workbench/i18n/languages';
 import { deleteClientStateValue, getClientStateValue, setClientStateValue } from '@workbench/projects/api';
 import { fetchSessionBlob } from '@workbench/projects/session';
+
+export { WORKBENCH_LANGUAGES } from '@workbench/i18n/languages';
 
 const SETTINGS_BASE_STORAGE_KEY = 'invokeai:v7:webv2:settings';
 const LEGACY_WORKBENCH_BASE_STORAGE_KEY = 'invokeai:v7:webv2:workbench';
 const SETTINGS_CLIENT_STATE_KEY = 'webv2:workbench-settings';
-
-export const WORKBENCH_LANGUAGES: WorkbenchLanguage[] = [
-  'ar',
-  'az',
-  'de',
-  'en',
-  'es',
-  'fi',
-  'fr',
-  'he',
-  'hu',
-  'it',
-  'ja',
-  'ko',
-  'nl',
-  'pl',
-  'pt',
-  'pt-BR',
-  'ru',
-  'sv',
-  'tr',
-  'ua',
-  'vi',
-  'zh-CN',
-  'zh-Hant',
-];
 
 export const DEVELOPER_LOG_LEVELS: DeveloperLogLevel[] = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'];
 
@@ -108,9 +79,6 @@ const getSettingsStorageKey = (): string => `${SETTINGS_BASE_STORAGE_KEY}${getUs
 const getLegacyWorkbenchStorageKey = (): string => `${LEGACY_WORKBENCH_BASE_STORAGE_KEY}${getUserStorageScope()}`;
 
 const getSettingsScope = (): WorkbenchSettingsSnapshot['scope'] => (getUserStorageScope() ? 'user' : 'global');
-
-const isWorkbenchLanguage = (value: unknown): value is WorkbenchLanguage =>
-  typeof value === 'string' && WORKBENCH_LANGUAGES.includes(value as WorkbenchLanguage);
 
 const isDeveloperLogLevel = (value: unknown): value is DeveloperLogLevel =>
   typeof value === 'string' && DEVELOPER_LOG_LEVELS.includes(value as DeveloperLogLevel);
@@ -202,7 +170,7 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.enableModelDescriptions === 'boolean'
       ? preferences.enableModelDescriptions
       : DEFAULT_PREFERENCES.enableModelDescriptions,
-  language: isWorkbenchLanguage(preferences?.language) ? preferences.language : DEFAULT_PREFERENCES.language,
+  language: normalizeWorkbenchLanguage(preferences?.language) ?? DEFAULT_PREFERENCES.language,
   queueJobsScope:
     preferences?.queueJobsScope === 'all-projects'
       ? 'all'

@@ -11,6 +11,7 @@ import { IconButton } from '@workbench/components/ui';
 import { WidgetIcon } from '@workbench/iconResolver';
 import { CheckIcon, MoreHorizontalIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export interface WidgetEnableMenuItem {
   allowMultiple: boolean;
@@ -86,6 +87,7 @@ export const WidgetEnableMenu = ({
   trigger,
   triggerLabel,
 }: WidgetEnableMenuProps) => {
+  const { t } = useTranslation();
   const content = (
     <Menu.Content minW="12rem">
       <Menu.ItemGroup>
@@ -93,7 +95,7 @@ export const WidgetEnableMenu = ({
           {groupLabel}
         </Menu.ItemGroupLabel>
         {items.map((item) => {
-          const meta = getItemMeta?.(item) ?? (item.failureMessage ? 'Failed' : null);
+          const meta = getItemMeta?.(item) ?? (item.failureMessage ? t('common.failed') : null);
           const disabled = item.status === 'disabled' || isItemDisabled?.(item) === true;
 
           return <WidgetEnableMenuRow key={item.id} disabled={disabled} item={item} meta={meta} onToggle={onToggle} />;

@@ -7,9 +7,11 @@ import { refreshCustomNodePacks } from '@workbench/customNodes/nodesStore';
 import { useNotify } from '@workbench/useNotify';
 import { RefreshCwIcon } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export const ReloadNodesButton = () => {
   const notify = useNotify();
+  const { t } = useTranslation();
   const [isReloading, setIsReloading] = useState(false);
 
   const handleReload = async () => {
@@ -18,9 +20,9 @@ export const ReloadNodesButton = () => {
     try {
       await reloadCustomNodes();
       await refreshCustomNodePacks();
-      notify.success('Custom nodes reloaded');
+      notify.success(t('nodes.customNodesReloaded'));
     } catch (error) {
-      notify.error('Reload failed', getApiErrorMessage(error, 'Could not reload custom nodes.'));
+      notify.error(t('nodes.reloadFailed'), getApiErrorMessage(error, t('nodes.couldNotReloadCustomNodes')));
     } finally {
       setIsReloading(false);
     }
@@ -29,7 +31,7 @@ export const ReloadNodesButton = () => {
   return (
     <Button loading={isReloading} size="2xs" variant="ghost" onClick={() => void handleReload()}>
       <Icon as={RefreshCwIcon} boxSize="3.5" />
-      {isReloading ? 'Reloading' : 'Reload'}
+      {isReloading ? t('nodes.reloading') : t('common.reload')}
     </Button>
   );
 };

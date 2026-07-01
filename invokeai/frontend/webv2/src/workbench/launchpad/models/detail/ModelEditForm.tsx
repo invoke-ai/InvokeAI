@@ -9,6 +9,7 @@ import { replaceModelInStore } from '@workbench/models/modelsStore';
 import { modelEditSchema, type ModelEditFormValues } from '@workbench/models/schemas';
 import { getModelTypeLabel, MODEL_CATEGORIES } from '@workbench/models/taxonomy';
 import { useZodForm } from '@workbench/models/useZodForm';
+import { useTranslation } from 'react-i18next';
 
 const KNOWN_BASES = [
   'sd-1',
@@ -41,6 +42,7 @@ export const ModelEditForm = ({
   onCancel: () => void;
   onSaved: () => void;
 }) => {
+  const { t } = useTranslation();
   const form = useZodForm(modelEditSchema, {
     base: String(model.base),
     description: model.description ?? '',
@@ -71,7 +73,7 @@ export const ModelEditForm = ({
 
   return (
     <Stack gap="3">
-      <Field error={form.errors.name} label="Name">
+      <Field error={form.errors.name} label={t('common.name')}>
         <Input
           aria-invalid={form.errors.name ? true : undefined}
           size="sm"
@@ -79,7 +81,7 @@ export const ModelEditForm = ({
           onChange={(event) => form.setValue('name', event.currentTarget.value)}
         />
       </Field>
-      <Field error={form.errors.description} label="Description">
+      <Field error={form.errors.description} label={t('models.description')}>
         <Textarea
           rows={2}
           size="sm"
@@ -88,7 +90,7 @@ export const ModelEditForm = ({
         />
       </Field>
       <HStack align="start" gap="2">
-        <Field error={form.errors.base} label="Base">
+        <Field error={form.errors.base} label={t('models.base')}>
           <NativeSelect.Root size="sm">
             <NativeSelect.Field
               value={form.values.base}
@@ -103,7 +105,7 @@ export const ModelEditForm = ({
             <NativeSelect.Indicator />
           </NativeSelect.Root>
         </Field>
-        <Field error={form.errors.type} label="Type">
+        <Field error={form.errors.type} label={t('models.type')}>
           <NativeSelect.Root size="sm">
             <NativeSelect.Field
               value={form.values.type}
@@ -120,14 +122,14 @@ export const ModelEditForm = ({
         </Field>
       </HStack>
       <HStack align="start" gap="2">
-        <Field error={form.errors.variant} helpText="Architecture variant, e.g. inpaint or dev." label="Variant">
+        <Field error={form.errors.variant} helpText={t('models.variantHelp')} label={t('models.variant')}>
           <Input
             size="sm"
             value={form.values.variant}
             onChange={(event) => form.setValue('variant', event.currentTarget.value)}
           />
         </Field>
-        <Field error={form.errors.predictionType} label="Prediction Type">
+        <Field error={form.errors.predictionType} label={t('models.predictionType')}>
           <NativeSelect.Root size="sm">
             <NativeSelect.Field
               value={form.values.predictionType}
@@ -135,7 +137,7 @@ export const ModelEditForm = ({
                 form.setValue('predictionType', event.currentTarget.value as ModelEditFormValues['predictionType'])
               }
             >
-              <option value="">None</option>
+              <option value="">{t('common.none')}</option>
               <option value="epsilon">epsilon</option>
               <option value="v_prediction">v_prediction</option>
               <option value="sample">sample</option>
@@ -144,7 +146,7 @@ export const ModelEditForm = ({
           </NativeSelect.Root>
         </Field>
       </HStack>
-      <Field error={form.errors.sourceUrl} helpText="Model page or download URL." label="Source URL">
+      <Field error={form.errors.sourceUrl} helpText={t('models.sourceUrlHelp')} label={t('models.sourceUrl')}>
         <Input
           aria-invalid={form.errors.sourceUrl ? true : undefined}
           placeholder="https://…"
@@ -160,10 +162,10 @@ export const ModelEditForm = ({
       ) : null}
       <HStack gap="2" justify="flex-end">
         <Button disabled={form.isSubmitting} size="xs" variant="ghost" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button loading={form.isSubmitting} size="xs" variant="solid" onClick={() => void handleSave()}>
-          Save Changes
+          {t('users.saveChanges')}
         </Button>
       </HStack>
     </Stack>

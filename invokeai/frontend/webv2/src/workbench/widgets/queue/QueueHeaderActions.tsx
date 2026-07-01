@@ -1,10 +1,12 @@
+/* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import { Icon } from '@chakra-ui/react';
 import { getApiErrorMessage } from '@workbench/backend/http';
 import { Button } from '@workbench/components/ui';
 import { useNotify } from '@workbench/useNotify';
 import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { XIcon } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { QueueServerItem } from './queueServerApi';
 
@@ -19,7 +21,7 @@ export const getQueueHeaderCancelState = ({
   isConnected: boolean;
 }): { disabled: boolean; itemLabel: string } => ({
   disabled: !isConnected || currentStatus !== 'in_progress',
-  itemLabel: 'Cancel Current',
+  itemLabel: 'widgets.queue.cancelCurrent',
 });
 
 /**
@@ -27,36 +29,38 @@ export const getQueueHeaderCancelState = ({
  * most common interruption action sits inline beside the actions menu.
  */
 export const QueueHeaderActions = () => {
+  const { t } = useTranslation();
   const isConnected = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection.status === 'connected');
   const { current } = useNowNextItems();
   const notify = useNotify();
   const [busy, setBusy] = useState(false);
+  const currentItemId = current?.item_id ?? null;
   const { disabled, itemLabel } = getQueueHeaderCancelState({
     currentStatus: current?.status ?? null,
     isConnected,
   });
 
-  const onCancel = useCallback(async () => {
-    if (disabled || !current) {
+  const onCancel = async () => {
+    if (disabled || currentItemId === null) {
       return;
     }
 
     setBusy(true);
 
     try {
-      await cancelQueueItem(current.item_id);
+      await cancelQueueItem(currentItemId);
       await refreshQueue();
     } catch (error) {
-      notify.error('Cancel failed', getApiErrorMessage(error, 'Could not cancel the current item.'));
+      notify.error(t('common.cancelFailed'), getApiErrorMessage(error, t('widgets.queue.couldNotCancelCurrentItem')));
     } finally {
       setBusy(false);
     }
-  }, [current, disabled, notify]);
+  };
 
   return (
     <Button disabled={disabled} loading={busy} size="2xs" variant="outline" onClick={onCancel}>
       <Icon as={XIcon} boxSize="3.5" />
-      {itemLabel}
+      {t(itemLabel)}
     </Button>
   );
 };

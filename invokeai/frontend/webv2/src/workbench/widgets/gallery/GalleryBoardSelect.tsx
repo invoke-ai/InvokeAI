@@ -40,6 +40,7 @@ import {
   type MouseEvent,
   type PointerEvent,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { GalleryBoardMenu, type GalleryBoardMenuTarget } from './GalleryBoardMenu';
 import {
@@ -53,6 +54,7 @@ import { getBoardCounts } from './galleryStateView';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 export const GalleryBoardSelect = () => {
+  const { t } = useTranslation();
   const { actions, gallery, imageActions, projectName } = useGalleryWidget();
   const { active } = useDndContext();
   const [isOpen, setIsOpen] = useState(false);
@@ -156,11 +158,11 @@ export const GalleryBoardSelect = () => {
   const clearSearchButton = useMemo(
     () =>
       boardSearchTerm ? (
-        <CloseButton aria-label="Clear search" size="2xs" onClick={clearSearch} me="-2">
+        <CloseButton aria-label={t('common.clearSearch')} size="2xs" onClick={clearSearch} me="-2">
           <XIcon />
         </CloseButton>
       ) : null,
-    [boardSearchTerm, clearSearch]
+    [boardSearchTerm, clearSearch, t]
   );
 
   const searchStartElement = useMemo(() => <Icon as={SearchIcon} size="xs" />, []);
@@ -216,13 +218,14 @@ export const GalleryBoardSelect = () => {
           <Button minW="0" size="sm" variant="outline" w="full" px="1">
             {selectedBoard ? (
               <BoardOptionContent
-                badge={selectedBoard.id === gallery.projectBoardId ? 'Project' : undefined}
+                badge={selectedBoard.id === gallery.projectBoardId ? t('common.project') : undefined}
+                badgeColor={selectedBoard.id === gallery.projectBoardId ? 'blue' : undefined}
                 board={selectedBoard}
                 isSelected={false}
               />
             ) : (
               <Text fontSize="xs" me="auto">
-                Loading board...
+                {t('widgets.gallery.loadingBoard')}
               </Text>
             )}
             <Icon as={ChevronDownIcon} boxSize="3" flexShrink={0} />
@@ -239,8 +242,8 @@ export const GalleryBoardSelect = () => {
               <Stack gap="2" p="2">
                 <InputGroup startElement={searchStartElement} endElement={clearSearchButton}>
                   <Input
-                    aria-label="Search or create boards"
-                    placeholder="Search or create boards"
+                    aria-label={t('widgets.gallery.searchOrCreateBoards')}
+                    placeholder={t('widgets.gallery.searchOrCreateBoards')}
                     size="sm"
                     value={boardSearchTerm}
                     onChange={handleSearchChange}
@@ -256,7 +259,8 @@ export const GalleryBoardSelect = () => {
                     {showProjectRow &&
                       (projectBoard ? (
                         <BoardRow
-                          badge="Project"
+                          badge={t('common.project')}
+                          badgeColor="blue"
                           board={projectBoard}
                           isSelected={projectBoard.id === gallery.selectedBoardId}
                           onOpenMenu={openBoardMenu}
@@ -271,7 +275,7 @@ export const GalleryBoardSelect = () => {
                               {projectRowName}
                             </Text>
                             <Badge colorPalette="blue" flexShrink={0} size="xs" variant="subtle">
-                              Project
+                              {t('common.project')}
                             </Badge>
                           </HStack>
                         </Menu.Item>
@@ -287,7 +291,7 @@ export const GalleryBoardSelect = () => {
                     )}
                     {dateBoards.length > 0 && (
                       <>
-                        <BoardGroupLabel>By Date</BoardGroupLabel>
+                        <BoardGroupLabel>{t('widgets.gallery.boardGroups.byDate')}</BoardGroupLabel>
                         {dateBoards.map((board) => (
                           <BoardRow
                             key={board.id}
@@ -299,11 +303,14 @@ export const GalleryBoardSelect = () => {
                         ))}
                       </>
                     )}
-                    {(regularBoards.length > 0 || canCreateFromSearch) && <BoardGroupLabel>Boards</BoardGroupLabel>}
+                    {(regularBoards.length > 0 || canCreateFromSearch) && (
+                      <BoardGroupLabel>{t('widgets.gallery.boardGroups.boards')}</BoardGroupLabel>
+                    )}
                     {regularBoards.map((board) => (
                       <BoardRow
                         key={board.id}
-                        badge={board.archived ? 'Archived' : undefined}
+                        badge={board.archived ? t('common.archived') : undefined}
+                        badgeColor="gray"
                         board={board}
                         isSelected={board.id === gallery.selectedBoardId}
                         onOpenMenu={openBoardMenu}
@@ -313,7 +320,7 @@ export const GalleryBoardSelect = () => {
                     ))}
                     {!hasAnyMatch && !canCreateFromSearch && (
                       <Text color="fg.subtle" fontSize="2xs" px="3" py="2">
-                        No boards match this search.
+                        {t('widgets.gallery.noBoardsMatchSearch')}
                       </Text>
                     )}
                     {canCreateFromSearch && (
@@ -321,7 +328,7 @@ export const GalleryBoardSelect = () => {
                         <HStack gap="2" minW="0" w="full">
                           <BoardCoverIcon icon={PlusIcon} />
                           <Text flex="1" fontSize="xs" fontWeight="600" minW="0" truncate>
-                            Create board &ldquo;{trimmedSearchTerm}&rdquo;
+                            {t('widgets.gallery.createBoardNamed', { name: trimmedSearchTerm })}
                           </Text>
                         </HStack>
                       </Menu.Item>
@@ -346,6 +353,7 @@ export const GalleryBoardSelect = () => {
 };
 
 const BoardListControls = () => {
+  const { t } = useTranslation();
   const { actions, gallery } = useGalleryWidget();
   const { boardOrderBy, boardOrderDir, showArchivedBoards, showDateBoards } = gallery.settings;
   const isAscending = boardOrderDir === 'ASC';
@@ -371,13 +379,15 @@ const BoardListControls = () => {
     <HStack gap="1" justify="space-between">
       <HStack gap="1">
         <Button size="2xs" variant={boardOrderBy === 'board_name' ? 'solid' : 'outline'} onClick={handleOrderByName}>
-          Name
+          {t('common.name')}
         </Button>
         <Button size="2xs" variant={boardOrderBy === 'created_at' ? 'solid' : 'outline'} onClick={handleOrderByCreated}>
-          Created
+          {t('common.created')}
         </Button>
         <IconButton
-          aria-label={isAscending ? 'Sort boards descending' : 'Sort boards ascending'}
+          aria-label={
+            isAscending ? t('widgets.gallery.sortBoardsDescending') : t('widgets.gallery.sortBoardsAscending')
+          }
           size="2xs"
           variant="outline"
           onClick={handleToggleOrderDir}
@@ -387,20 +397,22 @@ const BoardListControls = () => {
       </HStack>
       <HStack gap="1">
         <IconButton
-          aria-label={showDateBoards ? 'Hide date boards' : 'Show date boards'}
+          aria-label={showDateBoards ? t('widgets.gallery.hideDateBoards') : t('widgets.gallery.showDateBoards')}
           aria-pressed={showDateBoards}
           size="2xs"
-          title={showDateBoards ? 'Hide date boards' : 'Show date boards'}
+          title={showDateBoards ? t('widgets.gallery.hideDateBoards') : t('widgets.gallery.showDateBoards')}
           variant={showDateBoards ? 'solid' : 'outline'}
           onClick={handleToggleDateBoards}
         >
           <CalendarIcon />
         </IconButton>
         <IconButton
-          aria-label={showArchivedBoards ? 'Hide archived boards' : 'Show archived boards'}
+          aria-label={
+            showArchivedBoards ? t('widgets.gallery.hideArchivedBoards') : t('widgets.gallery.showArchivedBoards')
+          }
           aria-pressed={showArchivedBoards}
           size="2xs"
-          title={showArchivedBoards ? 'Hide archived boards' : 'Show archived boards'}
+          title={showArchivedBoards ? t('widgets.gallery.hideArchivedBoards') : t('widgets.gallery.showArchivedBoards')}
           variant={showArchivedBoards ? 'solid' : 'outline'}
           onClick={handleToggleArchivedBoards}
         >
@@ -419,19 +431,22 @@ const BoardGroupLabel = ({ children }: { children: string }) => (
 
 const BoardRow = ({
   badge,
+  badgeColor,
   board,
   isSelected,
   onOpenMenu,
   onSelectBoard,
   onSelectComplete,
 }: {
-  badge?: 'Project' | 'Archived';
+  badge?: string;
+  badgeColor?: 'blue' | 'gray';
   board: GalleryBoard;
   isSelected: boolean;
   onOpenMenu?: (board: GalleryBoard, x: number, y: number) => void;
   onSelectBoard: (boardId: string) => void;
   onSelectComplete: () => void;
 }) => {
+  const { t } = useTranslation();
   const { active } = useDndContext();
   const dragData = active?.data.current;
 
@@ -498,10 +513,10 @@ const BoardRow = ({
       onClick={handleSelect}
       onContextMenu={onOpenMenu ? handleContextMenu : undefined}
     >
-      <BoardOptionContent badge={badge} board={board} isSelected={isSelected} showOwner />
+      <BoardOptionContent badge={badge} badgeColor={badgeColor} board={board} isSelected={isSelected} showOwner />
       {onOpenMenu && (
         <IconButton
-          aria-label={`Board actions for ${board.name}`}
+          aria-label={t('widgets.gallery.boardActionsForBoard', { name: board.name })}
           className="board-row-actions"
           flexShrink={0}
           opacity={0}
@@ -521,11 +536,13 @@ const BoardRow = ({
 
 const BoardOptionContent = ({
   badge,
+  badgeColor = 'gray',
   board,
   isSelected,
   showOwner = false,
 }: {
-  badge?: 'Project' | 'Archived';
+  badge?: string;
+  badgeColor?: 'blue' | 'gray';
   board: GalleryBoard;
   isSelected: boolean;
   /** Render the owner line (admins on multi-user backends); off in the compact trigger. */
@@ -548,7 +565,7 @@ const BoardOptionContent = ({
       </Stack>
       <Flex ms="auto">
         {badge && (
-          <Badge colorPalette={badge === 'Project' ? 'blue' : 'gray'} flexShrink={0} size="xs" variant="subtle">
+          <Badge colorPalette={badgeColor} flexShrink={0} size="xs" variant="subtle">
             {badge}
           </Badge>
         )}

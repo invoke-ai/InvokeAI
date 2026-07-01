@@ -6,6 +6,7 @@ import { Field } from '@workbench/components/ui';
 import { useRegisterGenerateDraftFlusher } from '@workbench/widgets/generate/generateDraftRegistry';
 import { useDebouncedDraftValue } from '@workbench/widgets/generate/useDebouncedDraftValue';
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { PositivePromptActions, PromptTriggerPopover } from './PositivePromptActions';
 import { PROMPT_ATTENTION_TARGET_PROPS } from './promptAttentionHotkeys';
@@ -43,6 +44,7 @@ export const PositivePromptField = ({
   showSyntaxHighlighting,
   value,
 }: PositivePromptFieldProps) => {
+  const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [triggerPickerState, setTriggerPickerState] = useState<PromptTriggerPickerState | null>(null);
   const { commitDraftValue, draftValue, flushDraftValue, replaceDraftValue, setDraftValue } = useDebouncedDraftValue({
@@ -164,14 +166,14 @@ export const PositivePromptField = ({
   );
 
   return (
-    <Field label="Prompt" labelEnd={labelEnd}>
+    <Field label={t('common.prompt')} labelEnd={labelEnd}>
       <PromptTextarea
         {...PROMPT_ATTENTION_TARGET_PROPS}
-        aria-label="Positive prompt"
+        aria-label={t('widgets.generate.positivePrompt')}
         defaultHeightPx={heightPx}
         maxHeightPx={360}
         minHeightPx={96}
-        resizeHandleAriaLabel="Resize positive prompt"
+        resizeHandleAriaLabel={t('widgets.generate.resizePositivePrompt')}
         size="xs"
         fontFamily="mono"
         showSyntaxHighlighting={showSyntaxHighlighting}

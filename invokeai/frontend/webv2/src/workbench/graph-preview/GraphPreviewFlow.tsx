@@ -17,6 +17,7 @@ import {
   type NodeTypes,
 } from '@xyflow/react';
 import { useId, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { flowThemeCss, getFlowColorMode } from './flowTheme';
 
@@ -35,7 +36,8 @@ type PreviewFlowNode = FlowNode<{ inputCount: number; nodeId: string; nodeType: 
  * library entries before loading them.
  */
 export const documentToPreviewGraph = (
-  document: ProjectGraphState
+  document: ProjectGraphState,
+  fallbackLabel: string
 ): { graph: GraphContract; positionHints: Record<string, XYPosition> } => {
   const invocationNodes = document.nodes.filter(isInvocationNode);
   const invocationNodeIds = new Set(invocationNodes.map((node) => node.id));
@@ -52,7 +54,7 @@ export const documentToPreviewGraph = (
           targetNodeId: edge.target,
         })),
       id: document.id,
-      label: document.name || 'Workflow',
+      label: document.name || fallbackLabel,
       nodes: invocationNodes.map((node) => ({
         id: node.id,
         inputs: Object.fromEntries(Object.values(node.data.inputs).map((instance) => [instance.name, instance.value])),
@@ -71,20 +73,24 @@ const handleStyle = { background: 'var(--wb-flow-grid)', border: 'none' } as con
 const reactFlowProOptions = { hideAttribution: true } as const;
 const reactFlowStyle = { background: 'transparent' } as const;
 
-const PreviewNode = ({ data }: NodeProps<PreviewFlowNode>) => (
-  <Box bg="bg" borderColor="border.emphasized" borderWidth="1px" fontSize="xs" minW="14rem" rounded="lg" shadow="sm">
-    <Handle position={Position.Left} style={handleStyle} type="target" />
-    <Handle position={Position.Right} style={handleStyle} type="source" />
-    <Stack gap="0.5" px="3" py="2">
-      <Badge fontFamily="mono" size="xs" w="fit-content">
-        {data.nodeType}
-      </Badge>
-      <Text color="fg.subtle" fontSize="2xs" truncate>
-        {data.nodeId} · {data.inputCount} input{data.inputCount === 1 ? '' : 's'}
-      </Text>
-    </Stack>
-  </Box>
-);
+const PreviewNode = ({ data }: NodeProps<PreviewFlowNode>) => {
+  const { t } = useTranslation();
+
+  return (
+    <Box bg="bg" borderColor="border.emphasized" borderWidth="1px" fontSize="xs" minW="14rem" rounded="lg" shadow="sm">
+      <Handle position={Position.Left} style={handleStyle} type="target" />
+      <Handle position={Position.Right} style={handleStyle} type="source" />
+      <Stack gap="0.5" px="3" py="2">
+        <Badge fontFamily="mono" size="xs" w="fit-content">
+          {data.nodeType}
+        </Badge>
+        <Text color="fg.subtle" fontSize="2xs" truncate>
+          {data.nodeId} · {t('graphPreview.inputCount', { count: data.inputCount })}
+        </Text>
+      </Stack>
+    </Box>
+  );
+};
 
 const nodeTypes: NodeTypes = { preview: PreviewNode };
 

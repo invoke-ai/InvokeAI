@@ -6,6 +6,7 @@ import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { ListOrderedIcon, PauseIcon, PlayIcon, XIcon, type LucideIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { requestQueueConfirmation } from './queueConfirmationStore';
 import { refreshQueue, useNowNextItems, useQueueCounts } from './queueDataStore';
@@ -15,6 +16,14 @@ import { cancelQueueItem, cancelScopedQueueItems, pauseQueueProcessor, resumeQue
 const ERROR_ITEM_HOVER_PROPS = { bg: 'bg.error', color: 'fg.error' };
 
 interface QueueMenuActionInputs {
+  labels: {
+    cancelAll: string;
+    cancelAllExceptCurrent: string;
+    cancelCurrent: string;
+    openQueue: string;
+    pauseProcessor: string;
+    resumeProcessor: string;
+  };
   cancellableCount: number;
   hasPendingQueueWork: boolean;
   hasRunningItem: boolean;
@@ -37,6 +46,7 @@ export interface QueueMenuAction {
 }
 
 export const getQueueMenuActions = ({
+  labels,
   cancellableCount,
   hasPendingQueueWork,
   hasRunningItem,
@@ -53,44 +63,45 @@ export const getQueueMenuActions = ({
     destructive: true,
     disabled: !isConnected || !hasRunningItem,
     icon: XIcon,
-    label: 'Cancel Current Item',
+    label: labels.cancelCurrent,
     onClick: onCancelCurrent,
   },
   {
     destructive: true,
     disabled: cancellableCount === 0,
     icon: XIcon,
-    label: 'Cancel All Items',
+    label: labels.cancelAll,
     onClick: onCancelAll,
   },
   {
     destructive: true,
     disabled: !isConnected || !hasPendingQueueWork,
     icon: XIcon,
-    label: 'Cancel all except current item',
+    label: labels.cancelAllExceptCurrent,
     onClick: onCancelAllExceptCurrent,
   },
   {
     disabled: !isConnected || !canManageProcessor,
     icon: PlayIcon,
-    label: 'Resume Processor',
+    label: labels.resumeProcessor,
     onClick: onResumeProcessor,
   },
   {
     disabled: !isConnected || !canManageProcessor,
     icon: PauseIcon,
-    label: 'Pause Processor',
+    label: labels.pauseProcessor,
     onClick: onPauseProcessor,
   },
   {
     disabled: false,
     icon: ListOrderedIcon,
-    label: 'Open Queue',
+    label: labels.openQueue,
     onClick: onOpenQueue,
   },
 ];
 
 export const useQueueMenuActions = (): QueueMenuAction[] => {
+  const { t } = useTranslation();
   const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.state.backendConnection.status);
   const counts = useQueueCounts();
   const { current } = useNowNextItems();
@@ -105,56 +116,74 @@ export const useQueueMenuActions = (): QueueMenuAction[] => {
 
   const cancelCurrent = useCallback(() => {
     if (!current) {
-      notify.info('No current item', 'The scoped queue has no in-progress item to cancel.');
+      notify.info(t('widgets.queue.noCurrentItem'), t('widgets.queue.noCurrentItemDescription'));
       return;
     }
 
     cancelQueueItem(current.item_id)
       .then(() => refreshQueue())
-      .then(() => notify.success('Cancellation requested', `Backend queue item ${current.item_id}.`))
+      .then(() =>
+        notify.success(
+          t('widgets.queue.cancellationRequested'),
+          t('widgets.queue.backendItem', { id: current.item_id })
+        )
+      )
       .catch((error: unknown) =>
-        notify.error('Failed to cancel current item', getApiErrorMessage(error, 'Could not cancel the current item.'))
+        notify.error(
+          t('widgets.queue.failedToCancelCurrentItem'),
+          getApiErrorMessage(error, t('widgets.queue.couldNotCancelCurrentItem'))
+        )
       );
-  }, [current, notify]);
+  }, [current, notify, t]);
 
   const cancelAllExceptCurrent = useCallback(() => {
     cancelScopedQueueItems(scope, current?.item_id ?? null)
       .then(() => refreshQueue())
       .then(() =>
         notify.success(
-          'Queue cancellation requested',
-          'All pending scoped items except the current item were requested.'
+          t('widgets.queue.queueCancellationRequested'),
+          t('widgets.queue.cancelAllExceptCurrentRequested')
         )
       )
       .catch((error: unknown) =>
-        notify.error('Failed to cancel queue items', getApiErrorMessage(error, 'Could not cancel scoped queue items.'))
+        notify.error(
+          t('widgets.queue.failedToCancelItems'),
+          getApiErrorMessage(error, t('widgets.queue.couldNotCancelItems'))
+        )
       );
-  }, [current?.item_id, notify, scope]);
+  }, [current?.item_id, notify, scope, t]);
 
   const runProcessorAction = useCallback(
     (label: 'pause' | 'resume') => {
       const action = label === 'pause' ? pauseQueueProcessor : resumeQueueProcessor;
 
       action()
-        .then(() => notify.success(label === 'pause' ? 'Processor paused' : 'Processor resumed'))
+        .then(() =>
+          notify.success(label === 'pause' ? t('widgets.queue.processorPaused') : t('widgets.queue.processorResumed'))
+        )
         .then(() => refreshQueue())
         .catch((error: unknown) =>
           notify.error(
-            label === 'pause' ? 'Failed to pause processor' : 'Failed to resume processor',
-            getApiErrorMessage(error, 'Could not change the queue processor.')
+            label === 'pause' ? t('widgets.queue.failedToPauseProcessor') : t('widgets.queue.failedToResumeProcessor'),
+            getApiErrorMessage(error, t('widgets.queue.couldNotChangeProcessor'))
           )
         );
     },
-    [notify]
+    [notify, t]
   );
   const cancelAll = useCallback(() => {
     cancelScopedQueueItems(scope)
       .then(() => refreshQueue())
-      .then(() => notify.success('Queue cancellation requested', 'All scoped queue items were requested.'))
+      .then(() =>
+        notify.success(t('widgets.queue.queueCancellationRequested'), t('widgets.queue.allScopedItemsRequested'))
+      )
       .catch((error: unknown) =>
-        notify.error('Failed to cancel queue items', getApiErrorMessage(error, 'Could not cancel scoped queue items.'))
+        notify.error(
+          t('widgets.queue.failedToCancelItems'),
+          getApiErrorMessage(error, t('widgets.queue.couldNotCancelItems'))
+        )
       );
-  }, [notify, scope]);
+  }, [notify, scope, t]);
   const resumeProcessor = useCallback(() => runProcessorAction('resume'), [runProcessorAction]);
   const pauseProcessor = useCallback(() => runProcessorAction('pause'), [runProcessorAction]);
   const openQueue = useCallback(() => openWorkbenchWidget('queue'), [openWorkbenchWidget]);
@@ -162,6 +191,14 @@ export const useQueueMenuActions = (): QueueMenuAction[] => {
   return useMemo(
     () =>
       getQueueMenuActions({
+        labels: {
+          cancelAll: t('widgets.queue.cancelAllItems'),
+          cancelAllExceptCurrent: t('widgets.queue.cancelAllExceptCurrent'),
+          cancelCurrent: t('widgets.queue.cancelCurrentItem'),
+          openQueue: t('widgets.queue.openQueue'),
+          pauseProcessor: t('widgets.queue.pauseProcessor'),
+          resumeProcessor: t('widgets.queue.resumeProcessor'),
+        },
         cancellableCount,
         canManageProcessor: canManageModels,
         hasPendingQueueWork,
@@ -186,6 +223,7 @@ export const useQueueMenuActions = (): QueueMenuAction[] => {
       openQueue,
       pauseProcessor,
       resumeProcessor,
+      t,
     ]
   );
 };
@@ -220,15 +258,16 @@ export const QueueMenuItems = ({ actions, label }: { actions: QueueMenuAction[];
 };
 
 const DestructiveQueueMenuItem = ({ action }: { action: QueueMenuAction }) => {
+  const { t } = useTranslation();
   const onClick = useCallback(
     () =>
       requestQueueConfirmation({
-        body: 'This requests cancellation for queue work in the current scope. In-progress items may stop after the backend acknowledges cancellation.',
+        body: t('widgets.queue.cancelConfirmationBody'),
         confirmLabel: action.label,
         onConfirm: action.onClick,
-        title: `${action.label}?`,
+        title: t('widgets.queue.actionConfirmationTitle', { action: action.label }),
       }),
-    [action]
+    [action, t]
   );
 
   return (

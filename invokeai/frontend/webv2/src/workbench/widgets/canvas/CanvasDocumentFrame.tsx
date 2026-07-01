@@ -2,6 +2,7 @@ import type { CanvasPlacementContract, GeneratedImageContract } from '@workbench
 import type { ReactNode } from 'react';
 
 import { Box, Flex, Text } from '@chakra-ui/react';
+import { useTranslation } from 'react-i18next';
 
 const toPercent = (value: number, max: number) => `${(value / max) * 100}%`;
 
@@ -47,42 +48,50 @@ export const CanvasPlaneImage = ({
   placement: CanvasPlacementContract;
   planeHeight: number;
   planeWidth: number;
-}) => (
-  <Box
-    borderWidth={isStaged ? '2px' : '0'}
-    borderColor="accent.solid"
-    boxShadow={isStaged ? '0 0 0 1px {colors.accent.solid}, 0 18px 60px rgba(0,0,0,0.38)' : undefined}
-    left={toPercent(placement.x, planeWidth)}
-    opacity={opacity}
-    overflow="hidden"
-    position="absolute"
-    top={toPercent(placement.y, planeHeight)}
-    w={toPercent(placement.width, planeWidth)}
-    h={toPercent(placement.height, planeHeight)}
-    zIndex={isStaged ? 2 : 1}
-  >
-    <img
-      alt={isStaged ? `Staging preview ${image.imageName}` : image.imageName}
-      src={image.imageUrl}
-      style={{ display: 'block', height: '100%', objectFit: 'contain', width: '100%' }}
-    />
-  </Box>
-);
+}) => {
+  const { t } = useTranslation();
 
-export const EmptyCanvasFrame = () => (
-  <Flex
-    align="center"
-    bg="bg.emphasized"
-    borderWidth="1px"
-    borderColor="border.emphasized"
-    color="fg.subtle"
-    h="min(56vh, 34rem)"
-    justify="center"
-    rounded="md"
-  >
-    <Text fontSize="sm">Canvas layer stack is empty.</Text>
-  </Flex>
-);
+  return (
+    <Box
+      borderWidth={isStaged ? '2px' : '0'}
+      borderColor="accent.solid"
+      boxShadow={isStaged ? '0 0 0 1px {colors.accent.solid}, 0 18px 60px rgba(0,0,0,0.38)' : undefined}
+      left={toPercent(placement.x, planeWidth)}
+      opacity={opacity}
+      overflow="hidden"
+      position="absolute"
+      top={toPercent(placement.y, planeHeight)}
+      w={toPercent(placement.width, planeWidth)}
+      h={toPercent(placement.height, planeHeight)}
+      zIndex={isStaged ? 2 : 1}
+    >
+      <img
+        alt={isStaged ? t('widgets.canvas.stagingPreviewAlt', { name: image.imageName }) : image.imageName}
+        src={image.imageUrl}
+        style={{ display: 'block', height: '100%', objectFit: 'contain', width: '100%' }}
+      />
+    </Box>
+  );
+};
+
+export const EmptyCanvasFrame = () => {
+  const { t } = useTranslation();
+
+  return (
+    <Flex
+      align="center"
+      bg="bg.emphasized"
+      borderWidth="1px"
+      borderColor="border.emphasized"
+      color="fg.subtle"
+      h="min(56vh, 34rem)"
+      justify="center"
+      rounded="md"
+    >
+      <Text fontSize="sm">{t('widgets.canvas.emptyLayerStack')}</Text>
+    </Flex>
+  );
+};
 
 export const ToolScrubber = () => (
   <Box

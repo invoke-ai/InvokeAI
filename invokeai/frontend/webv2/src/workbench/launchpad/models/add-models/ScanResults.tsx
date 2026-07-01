@@ -7,6 +7,7 @@ import { ResultsListHeader } from '@workbench/launchpad/models/shared/ResultsLis
 import { InstallSourceButton, SourceListItem } from '@workbench/launchpad/models/shared/SourceListItem';
 import { XIcon } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const fileNameOf = (path: string): string => path.split(/[\\/]/).at(-1) ?? path;
 
@@ -25,6 +26,7 @@ export const ScanResults = ({
   pendingSources: ReadonlySet<string>;
   scan: { path: string; results: FoundModel[] };
 }) => {
+  const { t } = useTranslation();
   const [filter, setFilter] = useState('');
   const deferredFilter = useDeferredValue(filter);
 
@@ -51,9 +53,9 @@ export const ScanResults = ({
     return (
       <HStack justify="space-between">
         <Text color="fg.subtle" fontSize="2xs">
-          No model files found in {scan.path}.
+          {t('models.noModelFilesFound', { path: scan.path })}
         </Text>
-        <IconButton aria-label="Dismiss scan results" size="2xs" variant="ghost" onClick={onClear}>
+        <IconButton aria-label={t('models.dismissScanResults')} size="2xs" variant="ghost" onClick={onClear}>
           <Icon as={XIcon} boxSize="3" />
         </IconButton>
       </HStack>
@@ -72,13 +74,17 @@ export const ScanResults = ({
           >
             <Checkbox.HiddenInput />
             <Checkbox.Control />
-            <Checkbox.Label fontSize="2xs">Install in place</Checkbox.Label>
+            <Checkbox.Label fontSize="2xs">{t('models.installInPlace')}</Checkbox.Label>
           </Checkbox.Root>
         }
         installAllDisabled={installable.length === 0}
-        installAllLabel={`Install all (${installable.length})`}
+        installAllLabel={t('models.installAllCount', { count: installable.length })}
         searchValue={filter}
-        summary={`${scan.results.length} file${scan.results.length === 1 ? '' : 's'} in ${scan.path} · ${notInstalledCount} not installed`}
+        summary={t('models.scanSummary', {
+          count: scan.results.length,
+          notInstalled: notInstalledCount,
+          path: scan.path,
+        })}
         onClear={onClear}
         onInstallAll={installAll}
         onSearchChange={setFilter}

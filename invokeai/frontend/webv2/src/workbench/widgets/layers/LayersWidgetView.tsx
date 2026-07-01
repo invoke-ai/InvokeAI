@@ -2,8 +2,10 @@ import { Box, Flex, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { Panel } from '@workbench/components/ui';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { LayersIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export const LayersWidgetView = () => {
+  const { t } = useTranslation();
   const { eventsCount, graphHistoryCount, layers, redoCount, stagedImageCount, undoCount } = useActiveProjectSelector(
     (project) => ({
       eventsCount: project.events.length,
@@ -39,13 +41,13 @@ export const LayersWidgetView = () => {
       >
         <Icon as={LayersIcon} boxSize="6" />
         <Text fontSize="2xs" textAlign="center">
-          {layers.length} layers, {stagedImageCount} staged images.
+          {t('widgets.layers.summary', { layers: layers.length, stagedImages: stagedImageCount })}
         </Text>
       </Flex>
       <Panel gap="2" p="2">
         {layers.length === 0 ? (
           <Text color="fg.subtle" fontSize="2xs">
-            Accepted canvas layers will appear here.
+            {t('widgets.layers.empty')}
           </Text>
         ) : (
           layers.map((layer) => (
@@ -79,16 +81,16 @@ export const LayersWidgetView = () => {
       </Panel>
       <Panel gap="1" p="2">
         <Text color="fg.muted" fontSize="2xs" fontWeight="700" textTransform="uppercase">
-          Project Contracts
+          {t('widgets.layers.projectContracts')}
         </Text>
         <Text color="fg.subtle" fontSize="2xs">
-          Graph history: {graphHistoryCount}
+          {t('widgets.layers.graphHistoryCount', { count: graphHistoryCount })}
         </Text>
         <Text color="fg.subtle" fontSize="2xs">
-          Events: {eventsCount}
+          {t('widgets.layers.eventsCount', { count: eventsCount })}
         </Text>
         <Text color="fg.subtle" fontSize="2xs">
-          Undo: {undoCount} / Redo: {redoCount}
+          {t('widgets.layers.undoRedoCount', { redo: redoCount, undo: undoCount })}
         </Text>
       </Panel>
     </>

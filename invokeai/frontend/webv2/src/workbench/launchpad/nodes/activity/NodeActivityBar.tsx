@@ -4,22 +4,24 @@ import { Button } from '@workbench/components/ui';
 import { clearCustomNodeInstallLog, useCustomNodeInstallLog } from '@workbench/customNodes/installLogStore';
 import { setNodeActivityExpanded, useNodesUiSelector } from '@workbench/customNodes/nodesUiStore';
 import { ChevronUpIcon, ListOrderedIcon, Trash2Icon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { NodeInstallLog } from './NodeInstallLog';
 
 /** Persistent, collapsible install activity footer for the nodes manager detail pane. */
 export const NodeActivityBar = () => {
+  const { t } = useTranslation();
   const activityExpanded = useNodesUiSelector((snapshot) => snapshot.activityExpanded);
   const log = useCustomNodeInstallLog();
   const installingCount = log.filter((entry) => entry.status === 'installing').length;
   const summary =
     installingCount > 0
-      ? `${log.find((entry) => entry.status === 'installing')?.name ?? 'Installing'}${
-          installingCount > 1 ? ` +${installingCount - 1} more` : ''
+      ? `${log.find((entry) => entry.status === 'installing')?.name ?? t('nodes.installing')}${
+          installingCount > 1 ? t('models.plusMore', { count: installingCount - 1 }) : ''
         }`
       : log.length > 0
-        ? `${log.length} recent activit${log.length === 1 ? 'y' : 'ies'}`
-        : 'No recent activity';
+        ? t('nodes.recentActivitySummary', { count: log.length })
+        : t('nodes.noRecentActivity');
 
   return (
     <Collapsible.Root
@@ -34,11 +36,11 @@ export const NodeActivityBar = () => {
         <Flex direction="column" h="min(22rem, 45dvh)" minH="0" overflow="hidden">
           <HStack borderBottomWidth={1} gap="2" justify="space-between" px="3" py="1.5">
             <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
-              Install Activity
+              {t('nodes.installActivity')}
             </Text>
             <Button disabled={log.length === 0} size="2xs" variant="ghost" onClick={clearCustomNodeInstallLog}>
               <Icon as={Trash2Icon} boxSize="3" />
-              Clear
+              {t('common.clear')}
             </Button>
           </HStack>
           <Box flex="1" minH="0" overflow="hidden" p="2">

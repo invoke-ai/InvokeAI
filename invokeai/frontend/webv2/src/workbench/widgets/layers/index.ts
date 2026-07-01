@@ -12,8 +12,7 @@ export const layersWidgetManifest: WidgetManifest = {
   headerActions: LayersHeaderActions,
   icon: LayersIcon,
   id: 'layers',
-  label: 'Layers',
-  labelText: 'Layers',
+  label: (t) => t('widgets.labels.layers'),
   version: 1,
   view: LayersWidgetView,
 };

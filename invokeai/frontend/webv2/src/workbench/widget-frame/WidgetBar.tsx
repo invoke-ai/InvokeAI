@@ -7,6 +7,7 @@ import { verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Row, Tooltip } from '@workbench/components/ui';
 import { WidgetIcon } from '@workbench/iconResolver';
 import { type MouseEvent, useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useWidgetSortable } from './useWidgetSortable';
 import { WidgetEnableMenu, type WidgetEnableMenuItem } from './WidgetEnableMenu';
@@ -38,6 +39,7 @@ export const WidgetBar = ({
   region,
   side,
 }: WidgetBarProps) => {
+  const { t } = useTranslation();
   const [enableMenuTarget, setEnableMenuTarget] = useState<{
     x: number;
     y: number;
@@ -103,11 +105,11 @@ export const WidgetBar = ({
       <Box mt="1.5">
         <WidgetEnableMenu
           contextTarget={enableMenuTarget}
-          groupLabel="Widgets"
+          groupLabel={t('widgets.groupLabel')}
           items={menuItems}
           positioning={positioning}
           trigger={trigger}
-          triggerLabel={`${region === 'left' ? 'Left' : 'Right'} widget visibility`}
+          triggerLabel={t('widgets.visibilityLabel', { region: region === 'left' ? 'Left' : 'Right' })}
           onContextClose={handleContextClose}
           onToggle={handleMenuToggle}
         />

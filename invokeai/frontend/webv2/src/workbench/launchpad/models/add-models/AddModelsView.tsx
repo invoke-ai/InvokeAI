@@ -12,6 +12,7 @@ import { updateModelsUi, useModelsUiSelector } from '@workbench/models/uiStore';
 import { useNotify } from '@workbench/useNotify';
 import { DownloadIcon, FileIcon, FolderIcon, FolderSearchIcon, LinkIcon, SearchIcon } from 'lucide-react';
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SiHuggingface } from 'react-icons/si';
 
 import type { StarterInstallSource } from './starterModelInstallSources';
@@ -54,6 +55,7 @@ const compareStarterModels = (a: IndexedStarterModel, b: IndexedStarterModel, fi
  * stays focused on state and install orchestration.
  */
 export const AddModelsView = () => {
+  const { t } = useTranslation();
   const notify = useNotify();
   const { install, pendingSources } = useInstallActions();
   const loadError = useStartersSelector((snapshot) => snapshot.error);
@@ -97,13 +99,16 @@ export const AddModelsView = () => {
         }
 
         setConfiguredExternalProviders(new Set());
-        notify.error('External provider keys unavailable', error instanceof Error ? error.message : String(error));
+        notify.error(
+          t('models.externalProviderKeysUnavailable'),
+          error instanceof Error ? error.message : String(error)
+        );
       });
 
     return () => {
       isStale = true;
     };
-  }, [notify]);
+  }, [notify, t]);
 
   const trimmed = query.trim();
   const deferredTrimmed = useDeferredValue(trimmed);
@@ -181,8 +186,8 @@ export const AddModelsView = () => {
 
     if (queued > 0) {
       notify.success(
-        'Model install queued',
-        queued > 1 ? `${model.name} and ${queued - 1} dependenc${queued === 2 ? 'y' : 'ies'}` : model.name
+        t('models.modelInstallQueued'),
+        queued > 1 ? t('models.modelAndDependenciesQueued', { count: queued - 1, name: model.name }) : model.name
       );
     }
   };
@@ -199,8 +204,8 @@ export const AddModelsView = () => {
 
       if (queued > 0) {
         notify.success(
-          'Bundle install queued',
-          `${selectedBundle.name}: ${queued} install${queued === 1 ? '' : 's'} queued.`
+          t('models.bundleInstallQueued'),
+          t('models.bundleInstallQueuedDescription', { count: queued, name: selectedBundle.name })
         );
       }
     } finally {
@@ -230,7 +235,7 @@ export const AddModelsView = () => {
         }
 
         if (!lookup.urls || lookup.urls.length === 0) {
-          notify.error('No model files found', 'This HuggingFace repo has no installable model files.');
+          notify.error(t('models.noModelFilesFoundTitle'), t('models.noInstallableModelFiles'));
 
           return;
         }
@@ -258,7 +263,7 @@ export const AddModelsView = () => {
         setQuery('');
       }
     } catch (error) {
-      notify.error('Install failed', error instanceof Error ? error.message : String(error));
+      notify.error(t('models.installFailed'), error instanceof Error ? error.message : String(error));
     } finally {
       setIsPulling(false);
     }
@@ -270,7 +275,7 @@ export const AddModelsView = () => {
     try {
       updateModelsUi({ scan: { path: trimmed, results: await scanFolderForModels(trimmed) } });
     } catch (error) {
-      notify.error('Scan failed', error instanceof Error ? error.message : String(error));
+      notify.error(t('models.scanFailed'), error instanceof Error ? error.message : String(error));
     } finally {
       setIsScanning(false);
     }
@@ -282,8 +287,8 @@ export const AddModelsView = () => {
         <HStack align="center" gap="2" px="3">
           <InputGroup flex="1" startElement={<Icon as={searchIcon} boxSize="3.5" color="fg.subtle" />}>
             <Input
-              aria-label="Search or add a model"
-              placeholder="Search models, or paste a URL, file path, or Hugging Face repo"
+              aria-label={t('models.searchOrAdd')}
+              placeholder={t('models.searchOrAddPlaceholder')}
               size="sm"
               value={query}
               onChange={(event) => setQuery(event.currentTarget.value)}
@@ -312,10 +317,10 @@ export const AddModelsView = () => {
           ) : null}
 
           {canScan ? (
-            <Tooltip content="Scan this folder for model files">
+            <Tooltip content={t('models.scanFolderTooltip')}>
               <Button loading={isScanning} size="sm" variant="solid" onClick={() => void handleScan()}>
                 <Icon as={FolderSearchIcon} boxSize="3.5" />
-                Scan
+                {t('models.scan')}
               </Button>
             </Tooltip>
           ) : null}
@@ -323,7 +328,7 @@ export const AddModelsView = () => {
           {canPull ? (
             <Button loading={isPulling} size="sm" variant="solid" onClick={() => void handlePull()}>
               <Icon as={DownloadIcon} boxSize="3.5" />
-              Pull
+              {t('models.pull')}
             </Button>
           ) : null}
         </HStack>
@@ -332,19 +337,19 @@ export const AddModelsView = () => {
           <HStack color="fg.subtle" fontSize="2xs" gap="2" px="3" wrap="wrap">
             {canScan ? (
               <Text>
-                Press{' '}
+                {t('models.press')}{' '}
                 <Text as="span" color="fg.muted" fontWeight="600">
-                  Scan
+                  {t('models.scan')}
                 </Text>{' '}
-                to find models in this folder.
+                {t('models.toFindModelsInFolder')}
               </Text>
             ) : (
               <Text>
-                Press{' '}
+                {t('models.press')}{' '}
                 <Text as="span" color="fg.muted" fontWeight="600">
-                  Pull
+                  {t('models.pull')}
                 </Text>{' '}
-                to install from {kind.label}.
+                {t('models.toInstallFrom', { source: kind.label })}
               </Text>
             )}
             {kind.localKind === 'file' ? (
@@ -356,7 +361,7 @@ export const AddModelsView = () => {
               >
                 <Checkbox.HiddenInput />
                 <Checkbox.Control />
-                <Checkbox.Label fontSize="2xs">Install in place</Checkbox.Label>
+                <Checkbox.Label fontSize="2xs">{t('models.installInPlace')}</Checkbox.Label>
               </Checkbox.Root>
             ) : null}
           </HStack>
@@ -393,7 +398,7 @@ export const AddModelsView = () => {
       </Stack>
 
       <Box flex="1" minH="0">
-        <Scrollable h="full" label="Add models results" minH="0" px="3" pb="3">
+        <Scrollable h="full" label={t('models.addModelsResults')} minH="0" px="3" pb="3">
           <Stack gap="3">
             {hfLookup ? (
               <HuggingFaceFiles

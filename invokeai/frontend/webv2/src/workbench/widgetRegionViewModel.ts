@@ -1,4 +1,5 @@
 import type {
+  NormalizedWidgetManifest,
   RegisteredWidget,
   WidgetIconComponent,
   WidgetInstanceContract,
@@ -57,12 +58,14 @@ export const createWidgetRegionViewModel = <Instance extends WidgetPlacementInst
   region,
   widgetInstances,
   widgets,
+  getWidgetLabel = (manifest) => (typeof manifest.label === 'string' ? manifest.label : manifest.id),
 }: {
   activeInstanceId?: WidgetInstanceId;
   instanceIds: WidgetInstanceId[];
   region: WidgetRegion;
   widgetInstances: Record<string, Instance>;
   widgets: RegisteredWidget[];
+  getWidgetLabel?: (manifest: NormalizedWidgetManifest) => string;
 }): WidgetRegionViewModel<Instance> => {
   const widgetsByType = new Map(widgets.map((widget) => [widget.manifest.id, widget]));
   const placedItems = instanceIds.flatMap((instanceId): PlacedWidgetRegionItem<Instance>[] => {
@@ -81,7 +84,7 @@ export const createWidgetRegionViewModel = <Instance extends WidgetPlacementInst
         id: instance.id,
         instance,
         isEnabled: true,
-        label: instance.title ?? widget.manifest.labelText,
+        label: instance.title ?? getWidgetLabel(widget.manifest),
         status: widget.status,
         typeId: instance.typeId,
         widget,
@@ -97,7 +100,7 @@ export const createWidgetRegionViewModel = <Instance extends WidgetPlacementInst
       icon: widget.manifest.icon,
       id: `${region}:new:${widget.manifest.id}`,
       isEnabled: false,
-      label: widget.manifest.labelText,
+      label: getWidgetLabel(widget.manifest),
       status: widget.status,
       typeId: widget.manifest.id,
       widget,
@@ -118,14 +121,17 @@ export const createWidgetRegionViewModelFromState = <Instance extends WidgetPlac
   regionState,
   widgetInstances,
   widgets,
+  getWidgetLabel,
 }: {
   region: WidgetRegion;
   regionState: WidgetRegionState;
   widgetInstances: Record<string, Instance>;
   widgets: RegisteredWidget[];
+  getWidgetLabel?: (manifest: NormalizedWidgetManifest) => string;
 }): WidgetRegionViewModel<Instance> =>
   createWidgetRegionViewModel({
     activeInstanceId: regionState.activeInstanceId,
+    getWidgetLabel,
     instanceIds: regionState.instanceIds,
     region,
     widgetInstances,

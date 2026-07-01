@@ -14,6 +14,7 @@ import {
   type WidgetEnableMenuItem,
   type WidgetInstanceContextMenuTarget,
 } from '@workbench/widget-frame';
+import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import { closeWidgetPlacement, openWidgetPlacement, revealWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import {
@@ -25,6 +26,7 @@ import {
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { useActiveProjectSelector, useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { type KeyboardEvent, type MouseEvent, useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface BottomWidgetItem extends PlacedWidgetRegionItem<WidgetPlacementInstanceMeta> {
   isExpandable: boolean;
@@ -37,12 +39,18 @@ const COMPACT_ROW_ACTIVE_HOVER_PROPS = { color: 'accent.contrast' };
 const TOOLTIP_POSITIONING = { placement: 'top-start' } as const;
 
 export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) => {
+  const { t } = useTranslation();
   const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const bottomRegion = useActiveProjectSelector((project) => project.widgetRegions.bottom);
   const dispatch = useWorkbenchDispatch();
   const [enableMenuTarget, setEnableMenuTarget] = useState<{ x: number; y: number } | null>(null);
   const [instanceMenuTarget, setInstanceMenuTarget] = useState<WidgetInstanceContextMenuTarget | null>(null);
+  const getWidgetLabel = useCallback(
+    (manifest: Parameters<typeof resolveWidgetLabel>[0]) => resolveWidgetLabel(manifest, t),
+    [t]
+  );
   const bottomRegionViewModel = createWidgetRegionViewModelFromState({
+    getWidgetLabel,
     region: 'bottom',
     regionState: bottomRegion,
     widgetInstances: placementProject.widgetInstances,

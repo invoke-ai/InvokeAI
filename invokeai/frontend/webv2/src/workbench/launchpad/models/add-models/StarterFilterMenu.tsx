@@ -4,6 +4,7 @@ import type { ModelSortField } from '@workbench/models/library';
 import type { ModelTaxonomyType } from '@workbench/models/types';
 
 import { ModelFilterMenu } from '@workbench/launchpad/models/shared/ModelFilterMenu';
+import { useTranslation } from 'react-i18next';
 
 export interface StarterModelFilters {
   /** null = all types. */
@@ -22,10 +23,10 @@ export const DEFAULT_STARTER_MODEL_FILTERS: StarterModelFilters = {
 };
 
 const STARTER_SORT_FIELDS: ModelFilterSortOption[] = [
-  { field: 'default', label: 'Default' },
-  { field: 'name', label: 'Name' },
-  { field: 'base', label: 'Base' },
-  { field: 'format', label: 'Format' },
+  { field: 'default', labelKey: 'models.sortDefault' },
+  { field: 'name', labelKey: 'models.sortName' },
+  { field: 'base', labelKey: 'models.sortBase' },
+  { field: 'format', labelKey: 'models.sortFormat' },
 ];
 
 const isFiltering = (filters: StarterModelFilters): boolean =>
@@ -41,20 +42,24 @@ export const StarterFilterMenu = ({
   availableTypes: ModelTaxonomyType[];
   filters: StarterModelFilters;
   onChange: (filters: StarterModelFilters) => void;
-}) => (
-  <ModelFilterMenu
-    ariaLabel="Filter and sort starter models"
-    availableBases={availableBases}
-    availableTypes={availableTypes}
-    baseFilter={filters.baseFilter}
-    isActive={isFiltering(filters)}
-    sortDirection={filters.sortDirection}
-    sortField={filters.sortField}
-    sortFields={STARTER_SORT_FIELDS}
-    typeFilter={filters.typeFilter}
-    onBaseFilterChange={(baseFilter) => onChange({ ...filters, baseFilter })}
-    onSortChange={(sortField, sortDirection) => onChange({ ...filters, sortDirection, sortField })}
-    onTypeFilterChange={(typeFilter) => onChange({ ...filters, typeFilter })}
-  />
-);
+}) => {
+  const { t } = useTranslation();
+
+  return (
+    <ModelFilterMenu
+      ariaLabel={t('models.filterAndSortStarterModels')}
+      availableBases={availableBases}
+      availableTypes={availableTypes}
+      baseFilter={filters.baseFilter}
+      isActive={isFiltering(filters)}
+      sortDirection={filters.sortDirection}
+      sortField={filters.sortField}
+      sortFields={STARTER_SORT_FIELDS}
+      typeFilter={filters.typeFilter}
+      onBaseFilterChange={(baseFilter) => onChange({ ...filters, baseFilter })}
+      onSortChange={(sortField, sortDirection) => onChange({ ...filters, sortDirection, sortField })}
+      onTypeFilterChange={(typeFilter) => onChange({ ...filters, typeFilter })}
+    />
+  );
+};
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

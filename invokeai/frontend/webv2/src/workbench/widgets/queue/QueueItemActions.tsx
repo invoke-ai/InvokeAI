@@ -7,6 +7,7 @@ import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useWorkbenchDispatch } from '@workbench/WorkbenchContext';
 import { FileTextIcon, UndoIcon, WandSparklesIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { QueueServerItem } from './queueServerApi';
 
@@ -26,6 +27,7 @@ export const QueueItemActions = ({
   item: QueueServerItem;
   localGenerateValues: GenerateWidgetValues | null;
 }) => {
+  const { t } = useTranslation();
   const dispatch = useWorkbenchDispatch();
   const openWidget = useOpenWorkbenchWidget();
   const notify = useNotify();
@@ -40,12 +42,12 @@ export const QueueItemActions = ({
 
     dispatch({ type: 'setGenerateSettings', values: localGenerateValues });
     openWidget('generate', { preferredRegions: ['left'] });
-    notify.success('Settings recalled', 'Loaded these settings into Generate.');
-  }, [dispatch, localGenerateValues, notify, openWidget]);
+    notify.success(t('widgets.queue.settingsRecalled'), t('widgets.queue.settingsRecalledDescription'));
+  }, [dispatch, localGenerateValues, notify, openWidget, t]);
 
   const onSendToCanvas = useCallback(
-    () => notify.info('Send to canvas', 'Sending queue results to the canvas is coming soon.'),
-    [notify]
+    () => notify.info(t('widgets.queue.sendToCanvas'), t('widgets.queue.sendToCanvasComingSoon')),
+    [notify, t]
   );
 
   const openJson = useCallback(() => setJsonOpen(true), []);
@@ -68,19 +70,21 @@ export const QueueItemActions = ({
       </HStack>*/}
 
       <ButtonGroup size="2xs" variant="subtle">
-        <Tooltip content={canRecall ? 'Load these settings into Generate' : 'Recall this generation from the gallery'}>
+        <Tooltip
+          content={canRecall ? t('widgets.queue.loadSettingsIntoGenerate') : t('widgets.queue.recallFromGallery')}
+        >
           <Button onClick={onUseAgain} disabled={!canRecall}>
             <Icon as={UndoIcon} boxSize="3" />
-            Recall All
+            {t('widgets.queue.recallAll')}
           </Button>
         </Tooltip>
         <Button disabled variant="ghost" onClick={onSendToCanvas}>
           <Icon as={WandSparklesIcon} boxSize="3" />
-          Send to canvas
+          {t('widgets.queue.sendToCanvas')}
         </Button>
         <Button size="2xs" onClick={openJson}>
           <Icon as={FileTextIcon} boxSize="3" />
-          View JSON
+          {t('common.viewJson')}
         </Button>
       </ButtonGroup>
 
@@ -91,11 +95,11 @@ export const QueueItemActions = ({
             <Dialog.Content bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" color="fg">
               <Dialog.Header>
                 <Dialog.Title fontSize="sm" fontWeight="700">
-                  Queue item #{item.item_id}
+                  {t('widgets.queue.itemTitle', { id: item.item_id })}
                 </Dialog.Title>
               </Dialog.Header>
               <Dialog.Body>
-                <JsonPreview label={`Queue item ${item.item_id} JSON`} maxH="60vh" value={item} />
+                <JsonPreview label={t('widgets.queue.itemJsonLabel', { id: item.item_id })} maxH="60vh" value={item} />
               </Dialog.Body>
               <Dialog.CloseTrigger asChild>
                 <CloseButton color="fg.muted" size="sm" />

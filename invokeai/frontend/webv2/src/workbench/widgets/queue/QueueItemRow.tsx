@@ -5,6 +5,7 @@ import { useItemProgress } from '@workbench/backend/itemProgressStore';
 import { Row } from '@workbench/components/ui';
 import { ChevronRightIcon } from 'lucide-react';
 import { memo, useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { QueueServerItem } from './queueServerApi';
 
@@ -34,6 +35,7 @@ const QUEUE_ITEM_BUTTON_SX: SystemStyleObject = {
 } as const;
 
 export const QueueItemRow = memo(({ item }: { item: QueueServerItem }) => {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const toggle = useCallback(() => setExpanded((open) => !open), []);
   const meta = extractGenerationMeta(item);
@@ -45,7 +47,7 @@ export const QueueItemRow = memo(({ item }: { item: QueueServerItem }) => {
   const progress = useItemProgress(item.item_id);
   const liveImage = progress?.image ?? null;
   const resultImageName = getResultImageName(item);
-  const statusLabel = getStatusMeta(item.status).label;
+  const statusLabel = t(getStatusMeta(item.status).labelKey);
 
   const showBorder = expanded || isFailed;
   const borderColor = showBorder ? (isFailed ? 'fg.error' : 'border') : 'transparent';
@@ -57,7 +59,7 @@ export const QueueItemRow = memo(({ item }: { item: QueueServerItem }) => {
           <QueueItemThumbnail boxSize="8" imageName={resultImageName} liveImage={liveImage} />
           <Stack flex="1" gap="0.5" minW="0">
             <Text fontSize="xs" truncate>
-              {meta.positivePrompt?.trim() || 'No prompt'}
+              {meta.positivePrompt?.trim() || t('widgets.queue.noPrompt')}
             </Text>
             <HStack gap="1.5" minW="0">
               <QueueStatusDot status={item.status} />

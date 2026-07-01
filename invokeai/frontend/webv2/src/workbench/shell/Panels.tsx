@@ -2,8 +2,10 @@ import type { WidgetInstanceId, WorkbenchRegion } from '@workbench/types';
 
 import { MissingWidgetFrame, WidgetRendererById } from '@workbench/widget-frame';
 import { areWidgetRenderInstancesEqual } from '@workbench/widget-frame/widgetRenderInstance';
+import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import { getWidgetById } from '@workbench/widgetRegistry';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { useTranslation } from 'react-i18next';
 
 /** Left panel — hosts the active registered widget panel view. */
 export const LeftPanel = ({ instanceId }: { instanceId: WidgetInstanceId }) => (
@@ -21,6 +23,7 @@ const panelRegions = {
 } as const satisfies Record<string, WorkbenchRegion>;
 
 const WidgetPanelSlot = ({ instanceId, panel }: { instanceId: WidgetInstanceId; panel: keyof typeof panelRegions }) => {
+  const { t } = useTranslation();
   const instance = useActiveProjectSelector(
     (project) => project.widgetInstances[instanceId],
     areWidgetRenderInstancesEqual
@@ -30,7 +33,7 @@ const WidgetPanelSlot = ({ instanceId, panel }: { instanceId: WidgetInstanceId; 
   const region = panelRegions[panel];
 
   if (!instance || !widget || widget.status !== 'enabled' || !View) {
-    return <MissingWidgetFrame label={widget?.manifest.labelText ?? instanceId} region={region} />;
+    return <MissingWidgetFrame label={widget ? resolveWidgetLabel(widget.manifest, t) : instanceId} region={region} />;
   }
 
   return <WidgetRendererById instanceId={instance.id} widget={widget} region={region} />;

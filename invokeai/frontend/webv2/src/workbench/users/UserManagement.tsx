@@ -7,6 +7,7 @@ import { Button, IconButton, ConfirmDialog, Scrollable, Tooltip } from '@workben
 import { useNotify } from '@workbench/useNotify';
 import { PencilIcon, Trash2Icon, UserPlusIcon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { UserFormDialog, type UserFormTarget } from './UserFormDialog';
 
@@ -21,21 +22,24 @@ const DELETE_BUTTON_HOVER_STYLES = { color: 'fg.error' };
  * layouts that still point at it.
  */
 export const UserManagement = () => {
+  const { t } = useTranslation();
+
   return (
-    <Scrollable flex="1" h="full" label="User management">
+    <Scrollable flex="1" h="full" label={t('users.management')}>
       <UsersManagementPanel />
     </Scrollable>
   );
 };
 
 export const UsersManagementPanel = () => {
+  const { t } = useTranslation();
   const session = useAuthSession();
 
   if (!session.multiuserEnabled || session.user?.is_admin !== true) {
     return (
       <Center h="full" w="full">
         <Text color="fg.subtle" fontSize="sm">
-          User management is available to administrators only.
+          {t('users.adminOnly')}
         </Text>
       </Center>
     );
@@ -45,6 +49,7 @@ export const UsersManagementPanel = () => {
 };
 
 const UsersDirectory = ({ currentUserId }: { currentUserId: string }) => {
+  const { t } = useTranslation();
   const notify = useNotify();
   const [users, setUsers] = useState<UserDTO[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -56,9 +61,9 @@ const UsersDirectory = ({ currentUserId }: { currentUserId: string }) => {
       setUsers(await listUsers());
       setLoadError(null);
     } catch (error) {
-      setLoadError(getApiErrorMessage(error, 'Could not load users.'));
+      setLoadError(getApiErrorMessage(error, t('users.couldNotLoad')));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void refresh();
@@ -71,12 +76,12 @@ const UsersDirectory = ({ currentUserId }: { currentUserId: string }) => {
         await refresh();
       } catch (error) {
         notify.error(
-          isActive ? 'Could not activate the user' : 'Could not deactivate the user',
-          getApiErrorMessage(error, 'The backend rejected the change.')
+          isActive ? t('users.couldNotActivate') : t('users.couldNotDeactivate'),
+          getApiErrorMessage(error, t('users.backendRejectedChange'))
         );
       }
     },
-    [notify, refresh]
+    [notify, refresh, t]
   );
 
   const confirmDelete = useCallback(async () => {
@@ -86,12 +91,12 @@ const UsersDirectory = ({ currentUserId }: { currentUserId: string }) => {
 
     try {
       await deleteUser(deleteTarget.user_id);
-      notify.success('User deleted');
+      notify.success(t('users.deleted'));
       await refresh();
     } catch (error) {
-      notify.error('Could not delete the user', getApiErrorMessage(error, 'The backend rejected the request.'));
+      notify.error(t('users.couldNotDelete'), getApiErrorMessage(error, t('users.backendRejectedRequest')));
     }
-  }, [deleteTarget, notify, refresh]);
+  }, [deleteTarget, notify, refresh, t]);
 
   const openCreateForm = useCallback(() => setFormTarget({ mode: 'create' }), []);
   const closeForm = useCallback(() => setFormTarget(null), []);
@@ -106,17 +111,15 @@ const UsersDirectory = ({ currentUserId }: { currentUserId: string }) => {
           <HStack align="flex-start" justify="space-between">
             <Stack gap="0.5">
               <Text fontSize="md" fontWeight="700">
-                Users
+                {t('users.title')}
               </Text>
               <Text color="fg.subtle" fontSize="xs">
-                {users
-                  ? `${users.length} ${users.length === 1 ? 'account' : 'accounts'} in this workspace.`
-                  : 'Manage workspace accounts and roles.'}
+                {users ? t('users.accountCount', { count: users.length }) : t('users.description')}
               </Text>
             </Stack>
             <Button size="xs" variant="solid" onClick={openCreateForm}>
               <UserPlusIcon />
-              Add user
+              {t('users.addUser')}
             </Button>
           </HStack>
           <Box bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" overflowX="auto" rounded="lg">
@@ -128,7 +131,7 @@ const UsersDirectory = ({ currentUserId }: { currentUserId: string }) => {
                       {loadError}
                     </Text>
                     <Button size="xs" variant="outline" onClick={retryLoad}>
-                      Retry
+                      {t('common.retry')}
                     </Button>
                   </Stack>
                 ) : (
@@ -140,16 +143,16 @@ const UsersDirectory = ({ currentUserId }: { currentUserId: string }) => {
                 <Table.Header>
                   <Table.Row bg="bg.muted">
                     <Table.ColumnHeader borderColor="border.subtle" color="fg.muted" ps="4">
-                      User
+                      {t('users.user')}
                     </Table.ColumnHeader>
                     <Table.ColumnHeader borderColor="border.subtle" color="fg.muted">
-                      Role
+                      {t('users.role')}
                     </Table.ColumnHeader>
                     <Table.ColumnHeader borderColor="border.subtle" color="fg.muted">
-                      Last sign-in
+                      {t('users.lastSignIn')}
                     </Table.ColumnHeader>
                     <Table.ColumnHeader borderColor="border.subtle" color="fg.muted">
-                      Active
+                      {t('common.active')}
                     </Table.ColumnHeader>
                     <Table.ColumnHeader borderColor="border.subtle" pe="4" />
                   </Table.Row>
@@ -173,10 +176,10 @@ const UsersDirectory = ({ currentUserId }: { currentUserId: string }) => {
       </Flex>
       <UserFormDialog target={formTarget} onClose={closeForm} onSaved={refreshAfterSave} />
       <ConfirmDialog
-        body={`Delete ${deleteTarget ? getUserLabel(deleteTarget) : 'this user'}? Their account is removed permanently.`}
-        confirmLabel="Delete user"
+        body={t('users.deleteBody', { name: deleteTarget ? getUserLabel(deleteTarget) : t('users.thisUser') })}
+        confirmLabel={t('users.deleteUser')}
         isOpen={deleteTarget !== null}
-        title="Delete user?"
+        title={t('users.deleteTitle')}
         onClose={closeDeleteConfirm}
         onConfirm={confirmDelete}
       />
@@ -186,14 +189,14 @@ const UsersDirectory = ({ currentUserId }: { currentUserId: string }) => {
 
 const getUserLabel = (user: UserDTO): string => user.display_name?.trim() || user.email;
 
-const formatLastSignIn = (lastLoginAt: string | null): string => {
+const formatLastSignIn = (lastLoginAt: string | null, neverLabel: string): string => {
   if (!lastLoginAt) {
-    return 'Never';
+    return neverLabel;
   }
 
   const date = new Date(lastLoginAt);
 
-  return Number.isNaN(date.getTime()) ? 'Never' : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? neverLabel : date.toLocaleString();
 };
 
 const UserRow = ({
@@ -209,6 +212,7 @@ const UserRow = ({
   setUserActive: (user: UserDTO, isActive: boolean) => void;
   user: UserDTO;
 }) => {
+  const { t } = useTranslation();
   const handleDelete = useCallback(() => setDeleteTarget(user), [setDeleteTarget, user]);
   const handleEdit = useCallback(() => setFormTarget({ mode: 'edit', user }), [setFormTarget, user]);
   const handleSetActive = useCallback(
@@ -230,7 +234,7 @@ const UserRow = ({
               </Text>
               {isSelf ? (
                 <Badge fontSize="2xs" variant="surface">
-                  You
+                  {t('users.you')}
                 </Badge>
               ) : null}
             </HStack>
@@ -242,18 +246,18 @@ const UserRow = ({
       </Table.Cell>
       <Table.Cell borderColor="border.subtle">
         <Badge colorPalette={user.is_admin ? 'purple' : 'gray'} fontSize="2xs" variant="surface">
-          {user.is_admin ? 'Admin' : 'User'}
+          {user.is_admin ? t('users.admin') : t('users.user')}
         </Badge>
       </Table.Cell>
       <Table.Cell borderColor="border.subtle">
         <Text color="fg.muted" fontSize="2xs">
-          {formatLastSignIn(user.last_login_at)}
+          {formatLastSignIn(user.last_login_at, t('users.never'))}
         </Text>
       </Table.Cell>
       <Table.Cell borderColor="border.subtle">
-        <Tooltip content="You cannot deactivate your own account." disabled={!isSelf} showArrow>
+        <Tooltip content={t('users.cannotDeactivateSelf')} disabled={!isSelf} showArrow>
           <Switch.Root
-            aria-label={`${getUserLabel(user)} active`}
+            aria-label={t('users.activeLabel', { name: getUserLabel(user) })}
             checked={user.is_active}
             disabled={isSelf}
             size="sm"
@@ -269,7 +273,7 @@ const UserRow = ({
       <Table.Cell borderColor="border.subtle" pe="4" textAlign="end">
         <HStack gap="0.5" justify="flex-end">
           <IconButton
-            aria-label={`Edit ${getUserLabel(user)}`}
+            aria-label={t('users.editUserNamed', { name: getUserLabel(user) })}
             color="fg.muted"
             size="2xs"
             variant="ghost"
@@ -277,9 +281,9 @@ const UserRow = ({
           >
             <PencilIcon />
           </IconButton>
-          <Tooltip content="You cannot delete your own account." disabled={!isSelf} showArrow>
+          <Tooltip content={t('users.cannotDeleteSelf')} disabled={!isSelf} showArrow>
             <IconButton
-              aria-label={`Delete ${getUserLabel(user)}`}
+              aria-label={t('users.deleteUserNamed', { name: getUserLabel(user) })}
               color="fg.muted"
               disabled={isSelf}
               size="2xs"

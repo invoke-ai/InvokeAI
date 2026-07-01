@@ -17,11 +17,13 @@ import {
 import { useNotify } from '@workbench/useNotify';
 import { Trash2Icon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { HEADER_MIN_HEIGHT, LIBRARY_WIDTH } from './layoutConstants';
 
 /** The persistent master list: header, search/filter bar, and bulk actions. */
 export const LibraryColumn = () => {
+  const { t } = useTranslation();
   const notify = useNotify();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const missingCount = useModelsSelector((snapshot) => snapshot.missingModelKeys.size);
@@ -55,17 +57,18 @@ export const LibraryColumn = () => {
 
       if (result.failed.length > 0) {
         notify.error(
-          'Some models could not be deleted',
-          `${result.deleted.length} deleted; ${result.failed.length} failed: ${result.failed[0]?.error ?? ''}`
+          t('models.someCouldNotBeDeleted'),
+          t('models.bulkDeletePartialDescription', {
+            deleted: result.deleted.length,
+            error: result.failed[0]?.error ?? '',
+            failed: result.failed.length,
+          })
         );
       } else {
-        notify.success(
-          'Models deleted',
-          `${result.deleted.length} model${result.deleted.length === 1 ? '' : 's'} deleted.`
-        );
+        notify.success(t('models.deleted'), t('models.deletedDescription', { count: result.deleted.length }));
       }
     } catch (error) {
-      notify.error('Bulk delete failed', error instanceof Error ? error.message : String(error));
+      notify.error(t('models.bulkDeleteFailed'), error instanceof Error ? error.message : String(error));
       void refreshModels();
     }
   };
@@ -74,7 +77,7 @@ export const LibraryColumn = () => {
     <Flex direction="column" flexShrink={0} h="full" minH="0" position="relative" w={LIBRARY_WIDTH} borderEndWidth={1}>
       <HStack align="center" borderBottomWidth={1} flexShrink={0} gap="2" minH={HEADER_MIN_HEIGHT} px="3">
         <Text fontSize="sm" fontWeight="700">
-          Models
+          {t('models.title')}
         </Text>
         <Text color="fg.subtle" fontSize="xs">
           {models.length}
@@ -126,16 +129,16 @@ export const LibraryColumn = () => {
             py="1"
             rounded="md"
           >
-            {selectedKeys.size} selected
+            {t('models.selectedCount', { count: selectedKeys.size })}
           </Text>
           <Separator borderColor="border.subtle" h="5" orientation="vertical" />
           <Button colorPalette="red" size="2xs" variant="solid" onClick={() => setIsBulkDeleteOpen(true)}>
             <Icon as={Trash2Icon} boxSize="3" />
-            Delete
+            {t('common.delete')}
           </Button>
           <Box flex="1" />
           <IconButton
-            aria-label="Clear selection"
+            aria-label={t('models.clearSelection')}
             size="2xs"
             variant="ghost"
             onClick={() => updateModelsUi({ selectedKeys: new Set() })}
@@ -146,10 +149,10 @@ export const LibraryColumn = () => {
       ) : null}
 
       <ConfirmDialog
-        body={`Delete ${selectedKeys.size} selected model${selectedKeys.size === 1 ? '' : 's'}? Database records are removed, and files inside the InvokeAI models directory are deleted.`}
-        confirmLabel={`Delete ${selectedKeys.size} Model${selectedKeys.size === 1 ? '' : 's'}`}
+        body={t('models.bulkDeleteBody', { count: selectedKeys.size })}
+        confirmLabel={t('models.bulkDeleteConfirm', { count: selectedKeys.size })}
         isOpen={isBulkDeleteOpen}
-        title="Delete selected models"
+        title={t('models.deleteSelectedTitle')}
         onClose={() => setIsBulkDeleteOpen(false)}
         onConfirm={handleBulkDelete}
       />

@@ -18,6 +18,7 @@ import { setQueueExpanded, useModelsUiSelector } from '@workbench/models/uiStore
 import { useNotify } from '@workbench/useNotify';
 import { ChevronUpIcon, ListOrderedIcon, PauseIcon, PlayIcon, RefreshCcwIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { InstallQueueList } from './InstallQueueList';
 import { getInstallJobDisplayName } from './queueUtils';
@@ -27,6 +28,7 @@ const INDICATOR_OPEN = { transform: 'rotate(180deg)' } as const;
 
 /** Persistent, collapsible install queue footer for the model manager detail pane. */
 export const InstallQueueBar = () => {
+  const { t } = useTranslation();
   const notify = useNotify();
   const error = useInstallsSelector((snapshot) => snapshot.error);
   const jobs = useInstallsSelector((snapshot) => snapshot.jobs);
@@ -59,13 +61,13 @@ export const InstallQueueBar = () => {
         await Promise.all(targets.map((job) => call(job.id)));
         await refreshInstalls();
       } catch (bulkError) {
-        notify.error('Queue action failed', bulkError instanceof Error ? bulkError.message : String(bulkError));
+        notify.error(t('models.queueActionFailed'), bulkError instanceof Error ? bulkError.message : String(bulkError));
         void refreshInstalls();
       } finally {
         setBusyAction(null);
       }
     },
-    [notify]
+    [notify, t]
   );
 
   const handlePrune = useCallback(async () => {
@@ -75,11 +77,11 @@ export const InstallQueueBar = () => {
       await pruneCompletedModelInstalls();
       await refreshInstalls();
     } catch (pruneError) {
-      notify.error('Prune failed', pruneError instanceof Error ? pruneError.message : String(pruneError));
+      notify.error(t('models.pruneFailed'), pruneError instanceof Error ? pruneError.message : String(pruneError));
     } finally {
       setBusyAction(null);
     }
-  }, [notify]);
+  }, [notify, t]);
 
   const handleRefresh = useCallback(async () => {
     setBusyAction('refresh');
@@ -97,10 +99,10 @@ export const InstallQueueBar = () => {
 
   const summary =
     activeJobs.length > 0
-      ? `${getInstallJobDisplayName(activeJobs[0]!)}${activeJobs.length > 1 ? ` +${activeJobs.length - 1} more` : ''}`
+      ? `${getInstallJobDisplayName(activeJobs[0]!)}${activeJobs.length > 1 ? t('models.plusMore', { count: activeJobs.length - 1 }) : ''}`
       : jobs.length > 0
-        ? `${jobs.length} job${jobs.length === 1 ? '' : 's'} · no active installs`
-        : 'No installs yet';
+        ? t('models.installJobSummary', { count: jobs.length })
+        : t('models.noInstallsYet');
 
   return (
     <Collapsible.Root
@@ -115,12 +117,12 @@ export const InstallQueueBar = () => {
         <Flex direction="column" h="min(22rem, 45dvh)" minH="0" overflow="hidden">
           <HStack borderBottomWidth={1} gap="2" justify="space-between" px="3" py="1.5">
             <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
-              Install Queue
+              {t('models.installQueue')}
             </Text>
             <HStack gap="1">
               <Button loading={busyAction === 'refresh'} size="2xs" variant="ghost" onClick={handleRefresh}>
                 <Icon as={RefreshCcwIcon} boxSize="3" />
-                Refresh
+                {t('common.refresh')}
               </Button>
               <Button
                 disabled={settledCount === 0}
@@ -130,7 +132,7 @@ export const InstallQueueBar = () => {
                 onClick={handlePrune}
               >
                 <Icon as={Trash2Icon} boxSize="3" />
-                Clear finished
+                {t('models.clearFinished')}
               </Button>
             </HStack>
           </HStack>
@@ -173,9 +175,9 @@ export const InstallQueueBar = () => {
 
         <HStack flexShrink={0} gap="0.5">
           {pausableJobs.length > 0 ? (
-            <Tooltip content="Pause all downloads">
+            <Tooltip content={t('models.pauseAllDownloads')}>
               <IconButton
-                aria-label="Pause all installs"
+                aria-label={t('models.pauseAllInstalls')}
                 loading={busyAction === 'pause'}
                 size="2xs"
                 variant="ghost"
@@ -186,9 +188,9 @@ export const InstallQueueBar = () => {
             </Tooltip>
           ) : null}
           {pausedJobs.length > 0 ? (
-            <Tooltip content="Resume all paused downloads">
+            <Tooltip content={t('models.resumeAllPausedDownloads')}>
               <IconButton
-                aria-label="Resume all installs"
+                aria-label={t('models.resumeAllInstalls')}
                 loading={busyAction === 'resume'}
                 size="2xs"
                 variant="ghost"
@@ -199,9 +201,9 @@ export const InstallQueueBar = () => {
             </Tooltip>
           ) : null}
           {cancellableJobs.length > 0 ? (
-            <Tooltip content="Cancel all installs">
+            <Tooltip content={t('models.cancelAllInstalls')}>
               <IconButton
-                aria-label="Cancel all installs"
+                aria-label={t('models.cancelAllInstalls')}
                 loading={busyAction === 'cancel'}
                 size="2xs"
                 variant="ghost"

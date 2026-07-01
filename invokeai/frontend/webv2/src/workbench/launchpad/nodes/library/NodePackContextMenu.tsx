@@ -6,6 +6,7 @@ import { ConfirmDialog, MenuContent } from '@workbench/components/ui';
 import { useNodePackActions } from '@workbench/launchpad/nodes/shared/useNodePackActions';
 import { Trash2Icon } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export interface NodePackContextMenuTarget {
   pack: NodePackInfo;
@@ -22,6 +23,7 @@ export const NodePackContextMenu = ({
   onUninstalled: (packName: string) => void;
   target: NodePackContextMenuTarget | null;
 }) => {
+  const { t } = useTranslation();
   const { uninstall } = useNodePackActions();
   const [pendingUninstall, setPendingUninstall] = useState<NodePackInfo | null>(null);
   const pack = target?.pack ?? null;
@@ -49,7 +51,7 @@ export const NodePackContextMenu = ({
               <MenuContent minW="12rem">
                 <Menu.Item color="fg.error" value="uninstall" onClick={() => setPendingUninstall(pack)}>
                   <Icon as={Trash2Icon} boxSize="3.5" />
-                  <Menu.ItemText fontSize="xs">Uninstall</Menu.ItemText>
+                  <Menu.ItemText fontSize="xs">{t('nodes.uninstall')}</Menu.ItemText>
                 </Menu.Item>
               </MenuContent>
             ) : null}
@@ -57,10 +59,10 @@ export const NodePackContextMenu = ({
         </Portal>
       </Menu.Root>
       <ConfirmDialog
-        body="Remove this pack from the custom nodes directory? A restart is required for removal to fully apply."
-        confirmLabel="Uninstall Node Pack"
+        body={t('nodes.uninstallBody')}
+        confirmLabel={t('nodes.uninstallPack')}
         isOpen={pendingUninstall !== null}
-        title={`Uninstall ${pendingUninstall?.name ?? 'node pack'}?`}
+        title={t('nodes.uninstallTitle', { name: pendingUninstall?.name ?? t('nodes.nodePack') })}
         onClose={() => setPendingUninstall(null)}
         onConfirm={async () => {
           if (!pendingUninstall) {

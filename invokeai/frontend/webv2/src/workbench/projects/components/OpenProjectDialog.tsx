@@ -10,6 +10,7 @@ import { useWorkbenchDispatch, useWorkbenchSelector } from '@workbench/Workbench
 import { areArraysEqual } from '@workbench/workbenchSelectors';
 import { ArrowRightIcon, FileUpIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const disabledRowStyles = { opacity: 0.6 } as const;
 
@@ -25,6 +26,7 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
   );
   const dispatch = useWorkbenchDispatch();
   const notify = useNotify();
+  const { t } = useTranslation();
   const summaries = useProjectLibrarySelector((snapshot) => snapshot.summaries);
   const [busyProjectId, setBusyProjectId] = useState<string | null>(null);
 
@@ -49,7 +51,7 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
       setBusyProjectId(null);
 
       if (!project) {
-        notify.error('Could not open project', `"${summary.name}" could not be loaded from the server.`);
+        notify.error(t('projects.couldNotOpen'), t('projects.couldNotOpenDescription', { name: summary.name }));
         void refreshProjectLibrary();
 
         return;
@@ -59,7 +61,7 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
       dispatch({ project, type: 'openProject' });
       onClose();
     },
-    [dispatch, notify, onClose]
+    [dispatch, notify, onClose, t]
   );
 
   const handleImport = useCallback(async () => {
@@ -79,9 +81,9 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
         onClose();
       }
     } catch (error) {
-      notify.error('Import failed', error instanceof Error ? error.message : undefined);
+      notify.error(t('projects.importFailed'), error instanceof Error ? error.message : undefined);
     }
-  }, [dispatch, notify, onClose]);
+  }, [dispatch, notify, onClose, t]);
 
   const handleOpenChange = useCallback(
     (event: { open: boolean }) => {
@@ -102,7 +104,7 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
           <Dialog.Content>
             <Dialog.Header>
               <Dialog.Title fontSize="sm" fontWeight="700">
-                Open project
+                {t('projects.openProject')}
               </Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
@@ -119,7 +121,7 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
                   ))}
                   {available.length === 0 ? (
                     <Text color="fg.muted" fontSize="xs" px="2.5" py="4" textAlign="center">
-                      {summaries.length === 0 ? 'No saved projects yet.' : 'All saved projects are already open.'}
+                      {summaries.length === 0 ? t('projects.noSavedProjects') : t('projects.allSavedAlreadyOpen')}
                     </Text>
                   ) : null}
                 </Stack>
@@ -128,10 +130,10 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
             <Dialog.Footer gap="2" justifyContent="space-between">
               <Button size="xs" variant="outline" onClick={startImport}>
                 <FileUpIcon />
-                Import…
+                {t('projects.importWithEllipsis')}
               </Button>
               <Button size="xs" variant="ghost" onClick={onClose}>
-                Cancel
+                {t('common.cancel')}
               </Button>
             </Dialog.Footer>
             <Dialog.CloseTrigger asChild>
@@ -156,6 +158,7 @@ const OpenProjectRow = ({
   summary: ProjectSummary;
 }) => {
   const open = useCallback(() => void onOpen(summary), [onOpen, summary]);
+  const { t } = useTranslation();
 
   return (
     <Row asChild gap="2.5" px="2.5" py="2" rounded="md" _disabled={disabledRowStyles}>
@@ -165,7 +168,7 @@ const OpenProjectRow = ({
             {summary.name}
           </Text>
           <Text color="fg.muted" fontSize="2xs">
-            Edited {formatRelativeTime(summary.updatedAt)}
+            {t('projects.editedRelative', { time: formatRelativeTime(summary.updatedAt) })}
           </Text>
         </Stack>
         {isBusy ? <Spinner color="fg.muted" size="xs" /> : <Icon as={ArrowRightIcon} boxSize="3.5" color="fg.muted" />}

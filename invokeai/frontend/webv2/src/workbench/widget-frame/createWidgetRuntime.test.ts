@@ -17,7 +17,7 @@ const TestIcon = () => null;
 const TestView = () => null;
 
 const createWidget = (
-  overrides: Partial<NormalizedWidgetManifest> & Pick<NormalizedWidgetManifest, 'id' | 'labelText'>
+  overrides: Partial<NormalizedWidgetManifest> & Pick<NormalizedWidgetManifest, 'id' | 'label'>
 ): RegisteredWidget => ({
   manifest: {
     apiVersion: 1,
@@ -27,7 +27,6 @@ const createWidget = (
     centerPlacement: 'view',
     failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
     icon: TestIcon,
-    label: overrides.labelText,
     state: { createInitial: () => ({}), persistence: 'project', version: 1 },
     version: 1,
     view: TestView,
@@ -166,12 +165,12 @@ describe('createWidgetRuntime', () => {
       dispatch,
       getWidgetById: () => undefined,
       getWidgetsForRegion: createRegistry({
-        bottom: [createWidget({ bottomPanel: 'tooltip', id: 'tooltip-widget', labelText: 'Tooltip Widget' })],
-        center: [createWidget({ centerPlacement: 'toolbar', id: 'toolbar-widget', labelText: 'Toolbar Widget' })],
+        bottom: [createWidget({ bottomPanel: 'tooltip', id: 'tooltip-widget', label: 'Tooltip Widget' })],
+        center: [createWidget({ centerPlacement: 'toolbar', id: 'toolbar-widget', label: 'Toolbar Widget' })],
         right: [
           createWidget({
             id: 'panel-widget',
-            labelText: 'Panel Widget',
+            label: 'Panel Widget',
             state: { createInitial, persistence: 'project', version: 1 },
           }),
         ],
@@ -216,7 +215,7 @@ describe('createWidgetRuntime', () => {
     const { actions, dispatch } = createDispatch();
     const runtime = createWidgetRuntime({
       dispatch,
-      getWidgetById: (typeId) => createWidget({ id: typeId, labelText: typeId }),
+      getWidgetById: (typeId) => createWidget({ id: typeId, label: typeId }),
       getWidgetsForRegion: createRegistry({}),
       instance: createInstance(),
       project: createPlacementProject({
