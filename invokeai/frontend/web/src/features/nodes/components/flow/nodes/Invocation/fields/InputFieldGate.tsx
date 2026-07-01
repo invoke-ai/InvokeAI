@@ -3,6 +3,8 @@ import { InputFieldWrapper } from 'features/nodes/components/flow/nodes/Invocati
 import { useInputFieldInstanceExists } from 'features/nodes/hooks/useInputFieldInstanceExists';
 import { useInputFieldNameSafe } from 'features/nodes/hooks/useInputFieldNameSafe';
 import { useInputFieldTemplateExists } from 'features/nodes/hooks/useInputFieldTemplateExists';
+import { useNodeType } from 'features/nodes/hooks/useNodeType';
+import { nodeAcceptsExtraInputs } from 'features/nodes/types/extraInputs';
 import type { PropsWithChildren, ReactNode } from 'react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,8 +19,14 @@ type Props = PropsWithChildren<{
 export const InputFieldGate = memo(({ nodeId, fieldName, children, fallback, formatLabel }: Props) => {
   const hasInstance = useInputFieldInstanceExists(fieldName);
   const hasTemplate = useInputFieldTemplateExists(fieldName);
+  const nodeType = useNodeType();
 
   if (!hasTemplate || !hasInstance) {
+    // Backend nodes with `extra='allow'` (e.g. core_metadata) accept inputs that aren't declared
+    // in the OpenAPI schema. Render nothing rather than an "unexpected field" warning.
+    if (hasInstance && !hasTemplate && nodeAcceptsExtraInputs(nodeType)) {
+      return null;
+    }
     // fallback may be null, indicating we should render nothing at all - must check for undefined explicitly
     if (fallback !== undefined) {
       return fallback;

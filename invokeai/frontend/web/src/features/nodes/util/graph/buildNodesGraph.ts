@@ -6,6 +6,7 @@ import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { Templates } from 'features/nodes/store/types';
 import { resolveConnectorSource } from 'features/nodes/store/util/connectorTopology';
 import type { BoardField } from 'features/nodes/types/common';
+import { nodeAcceptsExtraInputs } from 'features/nodes/types/extraInputs';
 import type { BoardFieldInputInstance } from 'features/nodes/types/field';
 import { isBoardFieldInputInstance, isBoardFieldInputTemplate } from 'features/nodes/types/field';
 import { isConnectorNode, isExecutableNode, isInvocationNode } from 'features/nodes/types/invocation';
@@ -61,7 +62,11 @@ export const buildNodesGraph = (state: RootState, templates: Templates): Require
       (inputsAccumulator, input, name) => {
         const fieldTemplate = nodeTemplate.inputs[name];
         if (!fieldTemplate) {
-          log.warn({ id, name }, 'Field template not found!');
+          if (nodeAcceptsExtraInputs(type) && input.value !== undefined) {
+            inputsAccumulator[name] = input.value;
+          } else {
+            log.warn({ id, name }, 'Field template not found!');
+          }
           return inputsAccumulator;
         }
         if (isBoardFieldInputTemplate(fieldTemplate) && isBoardFieldInputInstance(input)) {
