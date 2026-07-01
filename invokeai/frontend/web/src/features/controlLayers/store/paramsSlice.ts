@@ -299,9 +299,6 @@ const slice = createSlice({
       }
       state.gemma2EncoderModel = result.data;
     },
-    setPidSteps: (state, action: PayloadAction<number>) => {
-      state.pidSteps = action.payload;
-    },
     qwenImageComponentSourceSelected: (state, action: PayloadAction<ParameterModel | null>) => {
       const result = zParamsState.shape.qwenImageComponentSource.safeParse(action.payload);
       if (!result.success) {
@@ -724,7 +721,6 @@ export const {
   pidModeChanged,
   pidDecoderModelSelected,
   gemma2EncoderModelSelected,
-  setPidSteps,
   qwenImageComponentSourceSelected,
   qwenImageVaeModelSelected,
   qwenImageQwenVLEncoderModelSelected,
@@ -856,7 +852,6 @@ export const selectKleinQwen3EncoderModel = createParamsSelector((params) => par
 export const selectPidMode = createParamsSelector((params) => params.pidMode);
 export const selectPidDecoderModel = createParamsSelector((params) => params.pidDecoderModel);
 export const selectGemma2EncoderModel = createParamsSelector((params) => params.gemma2EncoderModel);
-export const selectPidSteps = createParamsSelector((params) => params.pidSteps);
 export const selectQwenImageComponentSource = createParamsSelector((params) => params.qwenImageComponentSource);
 export const selectQwenImageVaeModel = createParamsSelector((params) => params.qwenImageVaeModel);
 export const selectQwenImageQwenVLEncoderModel = createParamsSelector((params) => params.qwenImageQwenVLEncoderModel);
