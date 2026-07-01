@@ -6,7 +6,7 @@ from typing import (
     Self,
 )
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from invokeai.backend.model_manager.configs.base import (
     Config_Base,
@@ -46,10 +46,34 @@ from invokeai.backend.patches.lora_conversions.wan_lora_constants import (
     has_wan_peft_keys,
 )
 
+# Defaults used to compute the effective slider range when one or both bounds
+# are unset. These intentionally mirror the frontend's DEFAULT_LORA_WEIGHT_CONFIG
+# in invokeai/frontend/web/src/features/controlLayers/store/lorasSlice.ts so that
+# bound/weight validation produces the same result whether it runs in the form
+# or in this pydantic model.
+_DEFAULT_LORA_WEIGHT_SLIDER_MIN = -1.0
+_DEFAULT_LORA_WEIGHT_SLIDER_MAX = 2.0
+
 
 class LoraModelDefaultSettings(BaseModel):
-    weight: float | None = Field(default=None, ge=-1, le=2, description="Default weight for this model")
+    weight: float | None = Field(default=None, description="Default weight for this model")
+    weight_min: float | None = Field(default=None, description="Minimum weight slider value for this model")
+    weight_max: float | None = Field(default=None, description="Maximum weight slider value for this model")
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def _validate_weight_bounds(self) -> "LoraModelDefaultSettings":
+        effective_min = self.weight_min if self.weight_min is not None else _DEFAULT_LORA_WEIGHT_SLIDER_MIN
+        effective_max = self.weight_max if self.weight_max is not None else _DEFAULT_LORA_WEIGHT_SLIDER_MAX
+        if effective_min >= effective_max:
+            raise ValueError(
+                f"effective weight range is invalid: min ({effective_min}) must be less than max ({effective_max})"
+            )
+        if self.weight is not None and not (effective_min <= self.weight <= effective_max):
+            raise ValueError(
+                f"weight ({self.weight}) must be within the effective range [{effective_min}, {effective_max}]"
+            )
+        return self
 
 
 class LoRA_Config_Base(ABC, BaseModel):

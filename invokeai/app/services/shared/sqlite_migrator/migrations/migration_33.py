@@ -1,10 +1,3 @@
-"""Migration 33: Add `videos` and `board_videos` tables for minimal video support.
-
-The `videos` table parallels `images` but with extra `duration` and `fps` columns.
-The `board_videos` table parallels `board_images`, providing one-to-many board↔video association.
-Foreign-key cascades from `boards` mirror the image side, so deleting a board also removes its videos' associations.
-"""
-
 import sqlite3
 
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
@@ -12,99 +5,63 @@ from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import 
 
 class Migration33Callback:
     def __call__(self, cursor: sqlite3.Cursor) -> None:
-        self._create_videos(cursor)
-        self._create_board_videos(cursor)
-
-    def _create_videos(self, cursor: sqlite3.Cursor) -> None:
-        tables = [
+        cursor.execute(
             """--sql
-            CREATE TABLE IF NOT EXISTS videos (
-                video_name TEXT NOT NULL PRIMARY KEY,
-                video_origin TEXT NOT NULL,
-                video_category TEXT NOT NULL,
-                width INTEGER NOT NULL,
-                height INTEGER NOT NULL,
-                duration REAL NOT NULL DEFAULT 0.0,
-                fps REAL,
-                session_id TEXT,
-                node_id TEXT,
-                metadata TEXT,
-                is_intermediate BOOLEAN DEFAULT FALSE,
-                starred BOOLEAN DEFAULT FALSE,
-                has_workflow BOOLEAN DEFAULT FALSE,
-                user_id TEXT NOT NULL DEFAULT 'system',
-                video_subfolder TEXT NOT NULL DEFAULT '',
+            CREATE TABLE IF NOT EXISTS image_subfolder_move_jobs (
+                id INTEGER PRIMARY KEY,
+                state TEXT NOT NULL CHECK (
+                    state IN ('planned', 'moving', 'moved', 'committed', 'error')
+                ),
                 created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                -- Updated via trigger
                 updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                -- Soft delete, currently unused
-                deleted_at DATETIME
+                error_message TEXT
             );
             """
-        ]
-
-        indices = [
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_videos_video_name ON videos(video_name);",
-            "CREATE INDEX IF NOT EXISTS idx_videos_video_origin ON videos(video_origin);",
-            "CREATE INDEX IF NOT EXISTS idx_videos_video_category ON videos(video_category);",
-            "CREATE INDEX IF NOT EXISTS idx_videos_created_at ON videos(created_at);",
-            "CREATE INDEX IF NOT EXISTS idx_videos_starred ON videos(starred);",
-            "CREATE INDEX IF NOT EXISTS idx_videos_user_id ON videos(user_id);",
-        ]
-
-        triggers = [
+        )
+        cursor.execute(
             """--sql
-            CREATE TRIGGER IF NOT EXISTS tg_videos_updated_at
-            AFTER UPDATE
-            ON videos FOR EACH ROW
-            BEGIN
-                UPDATE videos SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
-                    WHERE video_name = old.video_name;
-            END;
-            """
-        ]
-
-        for stmt in tables + indices + triggers:
-            cursor.execute(stmt)
-
-    def _create_board_videos(self, cursor: sqlite3.Cursor) -> None:
-        tables = [
-            """--sql
-            CREATE TABLE IF NOT EXISTS board_videos (
-                board_id TEXT NOT NULL,
-                video_name TEXT NOT NULL,
-                created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                -- updated via trigger
-                updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                -- Soft delete, currently unused
-                deleted_at DATETIME,
-                -- enforce one-to-many board↔video using PK on video_name
-                PRIMARY KEY (video_name),
-                FOREIGN KEY (board_id) REFERENCES boards (board_id) ON DELETE CASCADE,
-                FOREIGN KEY (video_name) REFERENCES videos (video_name) ON DELETE CASCADE
+            CREATE TABLE IF NOT EXISTS image_subfolder_move_items (
+                job_id INTEGER NOT NULL REFERENCES image_subfolder_move_jobs(id),
+                image_name TEXT NOT NULL REFERENCES images(image_name),
+                old_subfolder TEXT NOT NULL,
+                new_subfolder TEXT NOT NULL,
+                is_intermediate BOOLEAN NOT NULL DEFAULT FALSE,
+                old_path TEXT,
+                new_path TEXT,
+                old_thumbnail_path TEXT,
+                new_thumbnail_path TEXT,
+                state TEXT NOT NULL CHECK (
+                    state IN ('planned', 'moved', 'committed', 'error')
+                ),
+                error_message TEXT,
+                PRIMARY KEY (job_id, image_name)
             );
             """
-        ]
-
-        indices = [
-            "CREATE INDEX IF NOT EXISTS idx_board_videos_board_id ON board_videos (board_id);",
-            "CREATE INDEX IF NOT EXISTS idx_board_videos_board_id_created_at ON board_videos (board_id, created_at);",
-        ]
-
-        triggers = [
+        )
+        cursor.execute(
             """--sql
-            CREATE TRIGGER IF NOT EXISTS tg_board_videos_updated_at
+            CREATE INDEX IF NOT EXISTS idx_image_subfolder_move_items_job_state
+            ON image_subfolder_move_items(job_id, state);
+            """
+        )
+        cursor.execute(
+            """--sql
+            CREATE INDEX IF NOT EXISTS idx_image_subfolder_move_items_image_name
+            ON image_subfolder_move_items(image_name);
+            """
+        )
+        cursor.execute(
+            """--sql
+            CREATE TRIGGER IF NOT EXISTS tg_image_subfolder_move_jobs_updated_at
             AFTER UPDATE
-            ON board_videos FOR EACH ROW
+            ON image_subfolder_move_jobs FOR EACH ROW
             BEGIN
-                UPDATE board_videos SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
-                    WHERE board_id = old.board_id AND video_name = old.video_name;
+                UPDATE image_subfolder_move_jobs
+                SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
+                WHERE id = old.id;
             END;
             """
-        ]
-
-        for stmt in tables + indices + triggers:
-            cursor.execute(stmt)
+        )
 
 
 def build_migration_33() -> Migration:
