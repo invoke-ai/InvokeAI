@@ -1,0 +1,267 @@
+---
+title: Video Generation
+description: Generate short videos with the Wan 2.2 model family — text-to-video, image-to-video, and the trick for stitching longer sequences.
+lastUpdated: 2026-05-13
+---
+
+import { Card, CardGrid, Steps } from '@astrojs/starlight/components';
+
+InvokeAI ships **experimental support for the Wan 2.2 model family**, which lets you generate short MP4 clips from a text prompt, an image, or both. Output ranges from a few-second loop (the model's training distribution) up to longer sequences assembled with the [concat trick](#making-longer-videos) below.
+
+:::caution[Experimental]
+Video generation is a prototype feature. Workflows, node fields, and starter-model packaging may change between releases. The underlying models are also new — expect rough edges in coherence and artifacts at longer durations.
+:::
+
+:::tip[Just want to make a video?]
+Start with the [**Video Workflows** guide](/features/video-workflows/) — a plain-language tour of the eight ready-made workflows that ship with InvokeAI and how to run them. This page is the deeper technical reference behind them.
+:::
+
+---
+
+## Models
+
+Wan 2.2 ships three transformer variants, plus a shared text encoder and two VAEs. All share the same diffusion-style sampling but differ in size, conditioning, and intended task.
+
+### The variants
+
+| Variant | Task | Params | VAE | Conditioning |
+|---|---|---|---|---|
+| **T2V-A14B** | Text → Video | 14B × 2 experts | A14B VAE (16-ch, 8× spatial) | Text only |
+| **I2V-A14B** | Image+Text → Video | 14B × 2 experts | A14B VAE (16-ch, 8× spatial) | Text + reference image (36-channel concat) |
+| **TI2V-5B** | Text → Video OR Image+Text → Video | 5B (single) | Wan 2.2-VAE (48-ch, 16× spatial) | Text, optionally with reference image (first-frame mask blend) |
+
+* **T2V-A14B** generates videos from a text prompt alone. Best motion coherence and prompt-following of the three.
+* **I2V-A14B** locks the first frame to a reference image you supply. Best subject-preservation; the image is concatenated to the noise latents at every step so the model "sees" the reference throughout denoising.
+* **TI2V-5B** is the small single-expert variant. It can do **both** text-to-video and image-to-video with the same checkpoint, at substantially lower VRAM, but with somewhat less stable long-range coherence than the A14B variants.
+
+### High-noise and low-noise transformers (A14B variants only)
+
+The A14B models are a **mixture-of-experts (MoE)** pair. There are actually *two* 14B transformers on disk per variant — a "high-noise" expert and a "low-noise" expert — and the denoise loop swaps between them at a model-defined boundary timestep:
+
+* **High-noise expert** runs early in denoising, when the latents are still mostly noise. It's responsible for composition, layout, and broad motion.
+* **Low-noise expert** runs later, when the latents are close to clean. It refines detail and texture.
+
+InvokeAI handles the swap automatically — both experts have to be installed (the starter bundle handles this), but the workflow only references the "high-noise" model as the main and the "low-noise" model is wired alongside it via the loader node. You don't manage the boundary yourself.
+
+**TI2V-5B is single-expert** — no swap, no boundary, just one model that runs every step. Workflows for TI2V-5B are correspondingly simpler.
+
+### Lightning LoRAs (4-step inference for A14B)
+
+The default A14B variants need ~40–50 denoise steps for clean output. The Wan team also released **Lightning distillation LoRAs** that collapse that to 4 steps with minimal quality loss — about a 10× speedup. There's a pair per variant (one LoRA for the high-noise expert, one for the low-noise), wired through the LoRA loader nodes in the starter workflows.
+
+:::tip
+**TI2V-5B doesn't have a Lightning LoRA.** Its smaller size means each step is cheap; you typically run it at 40–50 steps and end up in a similar wall-clock ballpark as A14B + Lightning.
+:::
+
+### Installing models
+
+The model manager ships two **starter bundles** for video work:
+
+* **Wan 2.2 Text-to-Video** (~36 GB) — UMT5-XXL text encoder, both VAEs, TI2V-5B Q4_K_M, T2V-A14B Q4_K_M (high + low), T2V Lightning (high + low).
+* **Wan 2.2 Image-to-Video** (~32 GB) — UMT5-XXL, A14B VAE, I2V-A14B Q4_K_M (high + low), I2V Lightning (high + low).
+
+The bundles are independent. Installing both ends up at ~56 GB total (shared components — UMT5-XXL and the A14B VAE — are deduplicated on the second install). A 12 GB VRAM card can install only the Text-to-Video bundle and have **TI2V-5B available for both T2V and image-to-video** without ever touching the I2V bundle.
+
+Higher-quality Q8_0 quantizations of every transformer, plus full Diffusers builds of all three variants, are available as a-la-carte installs in the starter models list.
+
+:::tip
+**On a 12 GB VRAM card**: install just the Text-to-Video bundle and use TI2V-5B. The A14B variants will technically run via aggressive offloading but are slow and prone to OOM. TI2V-5B Q4_K_M fits comfortably and is what we recommend for that tier.
+:::
+
+---
+
+## Workflow setup
+
+The shipped starter workflows ("Text to Video - Wan 2.2 Lightning", "Image to Video - Wan 2.2 Lightning") are the easiest starting point — load them from the workflow library, pick your models, set a prompt, and Invoke. The [Video Workflows guide](/features/video-workflows/) walks through all eight and how to choose between them; the sections below describe what's happening inside so you can build your own.
+
+### Constraints that apply to every video workflow
+
+**Frame count**: `num_frames - 1` must be divisible by **4**. This is dictated by the Wan VAE's temporal compression (4 pixel-frames → 1 latent-frame). Valid values: 5, 9, 13, … **81** (the training default, 5 seconds at 16 fps), 85, 89, etc.
+
+**Pixel dimensions**: must be a multiple of **16** for T2V-A14B and I2V-A14B, and a multiple of **32** for TI2V-5B. The constraint comes from the VAE's spatial downsample × the transformer's 2×2 patch size:
+
+| Variant | VAE spatial | Pixel multiple of |
+|---|---|---|
+| T2V-A14B, I2V-A14B | 8× | **16** |
+| TI2V-5B | 16× | **32** |
+
+Reference values that work: 832×480 (480p), 1280×720 (720p, A14B only — TI2V-5B needs 1280×704 instead since 720 isn't divisible by 32).
+
+**Encoder and denoise dimensions must match**: the `Reference Image - Wan 2.2` encoder and the `Denoise Video - Wan 2.2` node both have their own `width` and `height` fields. They have to be identical or the denoise loop will reject the condition tensor.
+
+:::tip[Use Wan 2.2 I2V Ideal Dimensions]
+The **Wan 2.2 I2V Ideal Dimensions** node takes a source image's W×H and a target preset (480p / 720p / 1080p) and outputs valid (width, height) for the encoder + denoise inputs. Wire it once and feed its outputs into both nodes. Saves the manual snap-to-16/snap-to-32 math.
+:::
+
+### Text-to-video workflow
+
+The minimum node chain for T2V:
+
+```
+Wan Main Model Loader ──┐
+                        │
+Wan T5 Text Encoder ────┤
+                        ▼
+Wan Compel Conditioning (positive)
+                        │
+                        ▼
+              Denoise Video - Wan 2.2 ──→ Latents to Video - Wan 2.2 ──→ MP4
+                        ▲
+Wan Compel Conditioning (negative) ─┘
+```
+
+For **TI2V-5B T2V** this is the entire graph — load the TI2V-5B model and the TI2V-5B VAE, set width/height/num_frames, and run.
+
+For **T2V-A14B** the main model loader also exposes the low-noise expert slot, and you typically add the **Lightning LoRA pair** (one for each expert) to bring step count down to 4. Recommended:
+
+* Steps: **4** (with Lightning) or **40–50** (without)
+* CFG: **5.0** high-noise / **4.0** low-noise (the dedicated `Guidance Scale (Low Noise)` field on the denoise node)
+* Width × Height: 832×480 (faster, default) or 1280×720 (sharper, 4× the memory)
+
+### Image-to-video workflow
+
+I2V adds a **Reference Image** branch alongside the denoise. The reference image gets VAE-encoded into a conditioning tensor that the denoise loop uses to anchor the video's content:
+
+```
+Wan Main Model Loader ──┐
+Wan T5 Text Encoder ────┤
+Wan Compel Conditioning ┤
+                        │
+Image Primitive ──→ Reference Image - Wan 2.2 ──┐
+                        │                        │
+                        ▼                        ▼
+              Denoise Video - Wan 2.2 ──→ Latents to Video - Wan 2.2 ──→ MP4
+```
+
+For **I2V-A14B**, both the reference encoder and the denoise node need to use the same width/height. The encoder also takes a `num_frames` parameter that must match the denoise's `num_frames` — set both to 81 by default.
+
+For **TI2V-5B image-to-video**, the conditioning math is different (the model uses a first-frame-mask blend rather than channel concatenation), but the workflow shape is the same. The encoder auto-detects TI2V-5B from the VAE's 48 latent channels and emits the right condition tensor.
+
+:::caution[TI2V-5B I2V dimensional constraint]
+TI2V-5B image-to-video requires **width and height divisible by 32** (not just 16). The encoder will refuse the workflow with a clear error if not. 832×480 works; 1280×720 does not (720 is not divisible by 32). Use 1280×704 for 720p-ish on TI2V-5B.
+:::
+
+### First-last-frame interpolation (FLF2V)
+
+The **Reference Image - Wan 2.2** node has an optional **End Image** input. Provide a start image on the regular `image` field and an end image on `End Image (FLF2V)`, and the model interpolates a clip that **begins on the first image and animates to the second** — handy for morphing between two stills or bridging two shots.
+
+```
+Image Primitive (start) ──→ image ────┐
+                                       ├─→ Reference Image - Wan 2.2 ──→ Denoise Video ──→ MP4
+Image Primitive (end) ──→ End Image ───┘
+```
+
+This is **I2V-A14B only** (`num_frames > 1`); it is not supported on TI2V-5B or single-frame I2V (the node raises a clear error). Wan 2.2 has no dedicated first-last-frame checkpoint — that was a Wan 2.1 model — so the stock I2V-A14B model accepts the end-frame anchor through its existing conditioning channels. Quality is good in practice but not guaranteed for every image pair, so eyeball your results. The shipped **"Interpolate 2 Images to Video - Wan 2.2 Lightning"** workflow wires this up end to end.
+
+### Recommended starting parameters
+
+| | T2V-A14B + Lightning | T2V-A14B | I2V-A14B + Lightning | TI2V-5B (T2V or I2V) |
+|---|---|---|---|---|
+| Steps | 4 | 40–50 | 4 | 40–50 |
+| CFG (high) | 1.0 | 5.0 | 1.0 | 5.0–5.5 |
+| CFG (low) | 1.0 | 4.0 | 1.0 | n/a (single expert) |
+| Num frames | 81 | 81 | 81 | 81 |
+| Width × Height | 832×480 | 832×480 | 832×480 | 832×480 |
+| Scheduler | Auto (FlowMatchEuler) | Auto | Auto | Auto (UniPC) |
+
+---
+
+## Making longer videos
+
+The Wan 2.2 models were trained on **81-frame** clips (5 seconds at 16 fps). Outputs much longer than that suffer rapidly degrading coherence — the temporal positional encoding goes out of distribution and the model loses track of scene content. So instead of asking for `num_frames=200`, the recommended pattern is **chaining**: render a sequence of 81-frame clips where each one's first frame matches the previous clip's last frame, then concatenate them with the `Concatenate Videos` node.
+
+### The basic chain
+
+<Steps>
+
+1. **Render the first clip** with I2V or T2V, ending on whatever subject/scene you want to continue.
+
+2. **Extract the last frame** of clip 1 using the `Frame from Video` node. Use `frame_index = -1` for the literal last frame, or `-3` / `-5` to step back a few frames (last frames sometimes have boundary artifacts — see the [troubleshooting](#late-frame-artifacts-text-color-blobs) note).
+
+3. **Feed that frame as the reference image** for an I2V run that becomes clip 2. Adjust the prompt for whatever motion you want next.
+
+4. **Repeat** as many times as you want clips.
+
+5. **Concatenate** all the clips into a single MP4 with `Concatenate Videos`. Pick a transition mode based on whether you want a seamless join (`cut` if the bridge frame matches perfectly), a smooth blend (`crossfade`), or a punctuated scene change (`fade_through_black`).
+
+</Steps>
+
+### Transition modes
+
+The `Concatenate Videos` node offers three:
+
+* **`cut`** — hard splice. Fastest. Total length = sum of inputs. Use this when the bridge frame is genuinely shared (clip 2's first frame = clip 1's last frame) — the seam is invisible.
+* **`crossfade`** — linear A→B dissolve over `transition_frames`. Consumes `transition_frames` from both sides of each boundary. Total length = `sum(inputs) - transition_frames × (n-1)`. Use this when bridge frames don't quite match.
+* **`fade_through_black`** — A fades to black, then B fades in from black. Total length is preserved. Use this for explicit scene changes.
+
+### Quality degradation across iterations
+
+A real failure mode of long chains: each iteration's reference image is itself a *generation output*, so artifacts compound. The model treats codec artifacts and VAE softness in the bridge frame as "style" and reproduces them in the next clip. By the 4th or 5th iteration you can see noticeable softening or color drift.
+
+**Mitigations**:
+
+1. **Pick a bridge frame a few back from the end** (e.g., `frame_index = -3` or `-5`). The very last frame is often the worst frame of a clip due to boundary effects in the temporal attention.
+2. **Refresh the bridge frame with a low-strength img2img pass** before feeding it into the next I2V. An SDXL or FLUX img2img at strength ~0.2 with a quality-focused negative prompt (`blurry, low quality, compression artifacts`) noticeably suppresses the cumulative drift.
+3. **Don't chain more than 4–5 clips** unless you're explicitly doing img2img refinement between each.
+
+---
+
+## Troubleshooting
+
+### OOM errors
+
+Video denoise is memory-intensive — attention scales roughly as `(T_lat × H/16 × W/16)²`, so resolution and frame count both quadratically affect peak VRAM.
+
+* **Drop resolution before frame count.** Going from 1280×720 to 832×480 is a ~2.4× memory drop and visually subtle in most content. Going from 81 frames to 65 only saves ~20%.
+* **TI2V-5B before A14B.** TI2V-5B Q4_K_M peaks around ~6–8 GB at 832×480, versus ~12–14 GB for A14B Q4_K_M. If you're at the OOM edge, switch model family.
+* **OOM at the *reference image encoder* step** is usually allocator fragmentation from a previous run rather than absolute memory pressure. Restart the dev server and try again; if it recurs reproducibly, file an issue.
+
+### Late-frame artifacts (text, color blobs)
+
+If your video looks great for most of its duration but the last ~20% develops Asian text, watermarks, or floating colored shapes, **that's the model's training-data prior leaking through** as temporal coherence weakens at long temporal distance. It's particularly common on TI2V-5B (smaller model, less capacity to hold scene).
+
+**Mitigations**:
+
+* Add to the negative prompt: `text, watermark, logo, subtitles, chinese characters, kanji, ticker, banner`
+* Use a more specific prompt — describe the action you want to *happen* through the clip, not just the static scene
+* Bump CFG to 5.5 (TI2V-5B tolerates this)
+* Stay at `num_frames=81`; values above push temporal RoPE out of distribution and artifacts accelerate
+
+### "Dimensions must be multiples of 16/32"
+
+The encoder and denoise nodes enforce these at runtime. Either:
+
+* Use the **Wan 2.2 I2V Ideal Dimensions** node to compute valid (W, H) automatically from a source image, or
+* Manually round to the right multiple (16 for A14B variants, 32 for TI2V-5B)
+
+### Reference image / denoise dimension mismatch
+
+If the denoise refuses with `Reference-image dimensions … must match denoise dimensions`, both nodes have their own width/height fields and they need to agree. Wire the same values (or the same Ideal Dimensions output) into both.
+
+### TI2V-5B VAE state-dict load error
+
+If `Latents to Video - Wan 2.2` fails with `Error(s) in loading state_dict for AutoencoderKLWan: ... size mismatch for ...`, you have the **wrong VAE installed** for the chosen transformer. TI2V-5B needs the **Wan 2.2 TI2V-5B VAE** (48-channel, Wan 2.2-VAE), not the A14B VAE (16-channel). Both are in the model manager — check the VAE field on the loader and the latents-to-video node.
+
+### Sampler drift on the standalone TI2V-5B GGUF
+
+Standalone GGUF installs don't ship a `scheduler/` config directory. InvokeAI now defaults to `UniPCMultistepScheduler` with the correct Wan-flow params when the model is TI2V-5B and there's no on-disk scheduler — but if you have an older install behaving oddly, the safer alternative is the **full Diffusers TI2V-5B** install (which includes the scheduler config).
+
+### Preview images don't appear
+
+Two known causes:
+
+1. **A video is already loaded in the viewer.** If the last-selected gallery item is a video, the viewer renders the video element. The progress preview overlays on top of it. If you don't see it at all, **hard-refresh the browser** (`Ctrl+Shift+R` / `Cmd+Shift+R`) — Vite's bundle cache occasionally serves a stale build.
+2. **`Show progress in viewer` is disabled.** Check the gallery settings (gear icon at the top of the gallery panel).
+
+### Pipeline runs but the final MP4 is glitchy
+
+This is almost always a **VAE mismatch** or a **scheduler mismatch** — both surface as garbage at the very end of the pipeline. Check that:
+
+* The VAE matches the transformer family (16-ch for A14B, 48-ch for TI2V-5B)
+* You're using the default (auto-selected) scheduler — manually overriding it is currently not supported
+
+---
+
+## Acknowledgements
+
+Wan 2.2 model family by the Alibaba Wan-AI team. Lightning distillation LoRAs by [lightx2v](https://huggingface.co/lightx2v/Wan2.2-Lightning). GGUF quantizations by [QuantStack](https://huggingface.co/QuantStack).

@@ -22,6 +22,14 @@ class DeleteBoardResult(BaseModel):
         description="The image names of the board-images relationships that were deleted."
     )
     deleted_images: list[str] = Field(description="The names of the images that were deleted.")
+    deleted_board_videos: list[str] = Field(
+        default_factory=list,
+        description="The video names of the board-videos relationships that were deleted.",
+    )
+    deleted_videos: list[str] = Field(
+        default_factory=list,
+        description="The names of the videos that were deleted.",
+    )
 
 
 @boards_router.post(
@@ -106,7 +114,9 @@ async def update_board(
 async def delete_board(
     current_user: CurrentUserOrDefault,
     board_id: str = Path(description="The id of board to delete"),
-    include_images: Optional[bool] = Query(description="Permanently delete all images on the board", default=False),
+    include_images: Optional[bool] = Query(
+        description="Permanently delete all images and videos on the board", default=False
+    ),
 ) -> DeleteBoardResult:
     """Deletes a board (user must have access to it)"""
     try:
@@ -117,6 +127,11 @@ async def delete_board(
     if not current_user.is_admin and board.user_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Not authorized to delete this board")
 
+    # Admins delete everything on the board; regular owners only delete their own
+    # contributions so that contributions from other users to a public/shared board
+    # are preserved (they cascade to "uncategorized" via FK on board_videos / board_images).
+    cascade_user_id: Optional[str] = None if current_user.is_admin else current_user.user_id
+
     try:
         if include_images is True:
             assert_image_move_maintenance_inactive()
@@ -124,13 +139,24 @@ async def delete_board(
                 board_id=board_id,
                 categories=None,
                 is_intermediate=None,
+                user_id=cascade_user_id,
             )
-            ApiDependencies.invoker.services.images.delete_images_on_board(board_id=board_id)
+            ApiDependencies.invoker.services.images.delete_images_on_board(board_id=board_id, user_id=cascade_user_id)
+            # Use the service-returned list as the authoritative ``deleted_videos``.
+            # delete_videos_on_board now preserves DB records when the underlying file
+            # delete fails (so the API doesn't lie about a file that is still orphaned
+            # on disk), and the preserved records cascade to "uncategorized" via the
+            # board_videos FK when the board itself is deleted below.
+            deleted_videos = ApiDependencies.invoker.services.videos.delete_videos_on_board(
+                board_id=board_id, user_id=cascade_user_id
+            )
             ApiDependencies.invoker.services.boards.delete(board_id=board_id)
             return DeleteBoardResult(
                 board_id=board_id,
                 deleted_board_images=[],
                 deleted_images=deleted_images,
+                deleted_board_videos=[],
+                deleted_videos=deleted_videos,
             )
         else:
             deleted_board_images = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
@@ -138,11 +164,20 @@ async def delete_board(
                 categories=None,
                 is_intermediate=None,
             )
+            deleted_board_videos = (
+                ApiDependencies.invoker.services.board_video_records.get_all_board_video_names_for_board(
+                    board_id=board_id,
+                    categories=None,
+                    is_intermediate=None,
+                )
+            )
             ApiDependencies.invoker.services.boards.delete(board_id=board_id)
             return DeleteBoardResult(
                 board_id=board_id,
                 deleted_board_images=deleted_board_images,
                 deleted_images=[],
+                deleted_board_videos=deleted_board_videos,
+                deleted_videos=[],
             )
     except HTTPException:
         raise

@@ -3,11 +3,26 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectGetImageNamesQueryArgs, selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { getDateFromVirtualBoardId, isVirtualBoardId } from 'features/gallery/store/types';
-import { useGetImageNamesQuery } from 'services/api/endpoints/images';
+import { useMemo } from 'react';
+import { useGetGalleryItemNamesQuery } from 'services/api/endpoints/gallery';
 import { useGetVirtualBoardImageNamesByDateQuery } from 'services/api/endpoints/virtual_boards';
 import { useDebounce } from 'use-debounce';
 
-const selectFromResult = ({
+const selectFromGalleryItemNamesResult = ({
+  currentData,
+  isLoading,
+  isFetching,
+}: {
+  currentData?: { items: { kind: 'image' | 'video'; name: string }[] };
+  isLoading: boolean;
+  isFetching: boolean;
+}) => ({
+  items: currentData?.items ?? (EMPTY_ARRAY as { kind: 'image' | 'video'; name: string }[]),
+  isLoading,
+  isFetching,
+});
+
+const selectFromVirtualBoardResult = ({
   currentData,
   isLoading,
   isFetching,
@@ -21,41 +36,60 @@ const selectFromResult = ({
   isFetching,
 });
 
-const queryOptions = {
+const galleryQueryOptions = {
   refetchOnReconnect: true,
-  selectFromResult,
+  selectFromResult: selectFromGalleryItemNamesResult,
 };
 
+const virtualBoardQueryOptions = {
+  refetchOnReconnect: true,
+  selectFromResult: selectFromVirtualBoardResult,
+};
+
+/**
+ * Returns the ordered flat list of gallery item names. Names are polymorphic — both image and
+ * video names appear in the same list, interleaved by created_at. Callers that need to know the
+ * kind of a particular name use `isVideoName` from `features/gallery/store/types`.
+ *
+ * Virtual boards (date-based) are image-only for now and call the legacy by-date endpoint.
+ */
 export const useGalleryImageNames = () => {
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
-  const _queryArgs = useAppSelector(selectGetImageNamesQueryArgs);
-  const [queryArgs] = useDebounce(_queryArgs, 300);
+  const _imageQueryArgs = useAppSelector(selectGetImageNamesQueryArgs);
+  const [imageQueryArgs] = useDebounce(_imageQueryArgs, 300);
   const isVirtual = isVirtualBoardId(selectedBoardId);
 
-  // Regular board query
-  const regularResult = useGetImageNamesQuery(isVirtual ? skipToken : queryArgs, queryOptions);
+  // The polymorphic gallery names endpoint shares the same filter args as the image names
+  // endpoint (board_id, categories, search_term, order_dir, starred_first, is_intermediate).
+  const galleryResult = useGetGalleryItemNamesQuery(isVirtual ? skipToken : imageQueryArgs, galleryQueryOptions);
 
-  // Virtual board query
   const date = isVirtual ? getDateFromVirtualBoardId(selectedBoardId) : '';
   const virtualResult = useGetVirtualBoardImageNamesByDateQuery(
     isVirtual
       ? {
           date,
-          categories: queryArgs.categories ?? undefined,
-          search_term: queryArgs.search_term || undefined,
-          order_dir: queryArgs.order_dir,
-          starred_first: queryArgs.starred_first,
+          categories: imageQueryArgs.categories ?? undefined,
+          search_term: imageQueryArgs.search_term || undefined,
+          order_dir: imageQueryArgs.order_dir,
+          starred_first: imageQueryArgs.starred_first,
         }
       : skipToken,
-    queryOptions
+    virtualBoardQueryOptions
   );
 
-  const result = isVirtual ? virtualResult : regularResult;
+  // Flat names + isLoading exposed for backward compatibility with the existing callers (paged
+  // grid, search, navigation hotkeys). The kind is recoverable from the filename extension.
+  const imageNames = useMemo(() => {
+    if (isVirtual) {
+      return virtualResult.imageNames;
+    }
+    return galleryResult.items.map((ref) => ref.name);
+  }, [isVirtual, virtualResult.imageNames, galleryResult.items]);
 
   return {
-    imageNames: result.imageNames,
-    isLoading: result.isLoading,
-    isFetching: result.isFetching,
-    queryArgs,
+    imageNames,
+    isLoading: isVirtual ? virtualResult.isLoading : galleryResult.isLoading,
+    isFetching: isVirtual ? virtualResult.isFetching : galleryResult.isFetching,
+    queryArgs: imageQueryArgs,
   };
 };

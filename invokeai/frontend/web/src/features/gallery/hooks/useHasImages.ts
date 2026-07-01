@@ -22,7 +22,7 @@ export const useHasImages = () => {
     const hasBoards = boardList && boardList.length > 0;
 
     if (hasBoards) {
-      if (boardList.filter((board) => board.image_count > 0).length > 0) {
+      if (boardList.filter((board) => board.image_count + (board.video_count ?? 0) > 0).length > 0) {
         return true;
       }
     }

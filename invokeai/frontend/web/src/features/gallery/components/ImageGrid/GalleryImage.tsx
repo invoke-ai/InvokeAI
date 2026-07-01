@@ -15,18 +15,15 @@ import { createSingleImageDragPreview, setSingleImageDragPreview } from 'feature
 import { firefoxDndFix } from 'features/dnd/util';
 import { useImageContextMenu } from 'features/gallery/components/ContextMenu/ImageContextMenu';
 import { GalleryItemHoverIcons } from 'features/gallery/components/ImageGrid/GalleryItemHoverIcons';
-import {
-  selectGetImageNamesQueryArgs,
-  selectSelectedBoardId,
-  selectSelection,
-} from 'features/gallery/store/gallerySelectors';
+import { selectSelectedBoardId, selectSelection } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectGallerySlice, selectionChanged } from 'features/gallery/store/gallerySlice';
+import { selectCachedGalleryItemNames } from 'features/gallery/store/selectCachedGalleryItemNames';
+import { isVideoName } from 'features/gallery/store/types';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import type { MouseEvent, MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PiImageBold } from 'react-icons/pi';
-import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
 import { galleryItemContainerSX } from './galleryItemContainerSX';
@@ -39,13 +36,14 @@ const buildOnClick =
   (imageName: string, dispatch: AppDispatch, getState: AppGetState) => (e: MouseEvent<HTMLDivElement>) => {
     const { shiftKey, ctrlKey, metaKey, altKey } = e;
     const state = getState();
-    const queryArgs = selectGetImageNamesQueryArgs(state);
-    const imageNames = imagesApi.endpoints.getImageNames.select(queryArgs)(state).data?.image_names ?? [];
+    // Read from the polymorphic getGalleryItemNames cache (the source of truth for grid order)
+    // rather than the legacy image-only getImageNames cache, which is no longer populated for
+    // the grid. Without this, shift- and ctrl-click would silently no-op because the legacy
+    // list comes back empty.
+    const itemNames = selectCachedGalleryItemNames(state);
 
-    // If we don't have the image names cached, we can't perform selection operations
-    // This can happen if the user clicks on an image before the names are loaded
-    if (imageNames.length === 0) {
-      // For basic click without modifiers, we can still set selection
+    if (itemNames.length === 0) {
+      // Without an ordered list we can still honor a plain single-click.
       if (!shiftKey && !ctrlKey && !metaKey && !altKey) {
         dispatch(selectionChanged([imageName]));
       }
@@ -63,13 +61,12 @@ const buildOnClick =
     } else if (shiftKey) {
       const rangeEndImageName = imageName;
       const lastSelectedImage = selection.at(-1);
-      const lastClickedIndex = imageNames.findIndex((name) => name === lastSelectedImage);
-      const currentClickedIndex = imageNames.findIndex((name) => name === rangeEndImageName);
+      const lastClickedIndex = itemNames.findIndex((name) => name === lastSelectedImage);
+      const currentClickedIndex = itemNames.findIndex((name) => name === rangeEndImageName);
       if (lastClickedIndex > -1 && currentClickedIndex > -1) {
-        // We have a valid range!
         const start = Math.min(lastClickedIndex, currentClickedIndex);
         const end = Math.max(lastClickedIndex, currentClickedIndex);
-        const imagesToSelect = imageNames.slice(start, end + 1);
+        const imagesToSelect = itemNames.slice(start, end + 1);
         if (currentClickedIndex < lastClickedIndex) {
           imagesToSelect.reverse();
         }
@@ -136,11 +133,17 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
           const selection = selectSelection(store.getState());
           const boardId = selectSelectedBoardId(store.getState());
 
-          // When we have multiple images selected, and the dragged image is part of the selection, initiate a
-          // multi-image drag.
+          // When we have multiple items selected, and the dragged image is part of the
+          // selection, initiate a multi-drag. Mixed selections (images + videos) ride along in
+          // the same payload: the board drop handler splits them and dispatches both mutations.
+          // Without filtering, video names would land in `image_names` and the image router
+          // would 404 on each one.
           if (selection.length > 1 && selection.some((n) => n === imageDTO.image_name)) {
+            const image_names = selection.filter((n) => !isVideoName(n));
+            const video_names = selection.filter(isVideoName);
             return multipleImageDndSource.getData({
-              image_names: selection,
+              image_names,
+              video_names,
               board_id: boardId,
             });
           }

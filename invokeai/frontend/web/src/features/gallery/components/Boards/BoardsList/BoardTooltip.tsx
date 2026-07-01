@@ -2,6 +2,7 @@ import { Flex, Image, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useTranslation } from 'react-i18next';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { useGetVideoDTOQuery } from 'services/api/endpoints/videos';
 import type { BoardDTO } from 'services/api/types';
 
 type Props = {
@@ -15,13 +16,18 @@ type Props = {
 export const BoardTooltip = ({ board, boardCounts }: Props) => {
   const { t } = useTranslation();
 
-  const { currentData: coverImage } = useGetImageDTOQuery(board?.cover_image_name ?? skipToken);
+  // Backend picks a single cover — either an image or a video. Prefer the video when set.
+  const { currentData: coverVideo } = useGetVideoDTOQuery(board?.cover_video_name ?? skipToken);
+  const { currentData: coverImage } = useGetImageDTOQuery(
+    board?.cover_video_name ? skipToken : (board?.cover_image_name ?? skipToken)
+  );
+  const thumbnailUrl = coverVideo?.thumbnail_url ?? coverImage?.thumbnail_url;
 
   return (
     <Flex flexDir="column" alignItems="center" gap={1}>
-      {coverImage && (
+      {thumbnailUrl && (
         <Image
-          src={coverImage.thumbnail_url}
+          src={thumbnailUrl}
           draggable={false}
           objectFit="cover"
           maxW={150}

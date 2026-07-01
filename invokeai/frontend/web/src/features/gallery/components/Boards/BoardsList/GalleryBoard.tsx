@@ -20,6 +20,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArchiveBold, PiGlobeBold, PiImageSquare, PiShareNetworkBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { useGetVideoDTOQuery } from 'services/api/endpoints/videos';
 import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
 import type { BoardDTO } from 'services/api/types';
 
@@ -53,9 +54,11 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
     [board.board_id]
   );
 
+  // Videos are counted alongside images in the headline count so a board that only
+  // contains videos doesn't read as empty in the gallery list.
   const boardCounts = useMemo(
     () => ({
-      image_count: board.image_count,
+      image_count: board.image_count + (board.video_count ?? 0),
       asset_count: board.asset_count,
     }),
     [board]
@@ -118,7 +121,7 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
               )}
               <Flex justifyContent="flex-end">
                 <Text variant="subtext">
-                  {board.image_count} | {board.asset_count}
+                  {board.image_count + (board.video_count ?? 0)} | {board.asset_count}
                 </Text>
               </Flex>
             </Flex>
@@ -138,12 +141,19 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
 export default memo(GalleryBoard);
 
 const CoverImage = ({ board }: { board: BoardDTO }) => {
-  const { currentData: coverImage } = useGetImageDTOQuery(board.cover_image_name ?? skipToken);
+  // Backend picks a single cover — either an image or a video — so at most one of these
+  // queries fires (the other is `skipToken`). The video case takes precedence when set.
+  const { currentData: coverVideo } = useGetVideoDTOQuery(board.cover_video_name ?? skipToken);
+  const { currentData: coverImage } = useGetImageDTOQuery(
+    board.cover_video_name ? skipToken : (board.cover_image_name ?? skipToken)
+  );
 
-  if (coverImage) {
+  const thumbnailUrl = coverVideo?.thumbnail_url ?? coverImage?.thumbnail_url;
+
+  if (thumbnailUrl) {
     return (
       <Image
-        src={coverImage.thumbnail_url}
+        src={thumbnailUrl}
         draggable={false}
         objectFit="cover"
         w={10}

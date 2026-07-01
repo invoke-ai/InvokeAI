@@ -12,6 +12,7 @@ import {
   selectSelectionCount,
 } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
+import { isVideoName } from 'features/gallery/store/types';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
@@ -28,12 +29,14 @@ import type {
 } from 'react-virtuoso';
 import { VirtuosoGrid } from 'react-virtuoso';
 import { imagesApi, useImageDTO, useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
+import { useStarVideosMutation, useUnstarVideosMutation, useVideoDTO, videosApi } from 'services/api/endpoints/videos';
 import { useDebounce } from 'use-debounce';
 
 import { getItemIndex } from './getItemIndex';
 import { getItemsPerRow } from './getItemsPerRow';
 import { GalleryImage, GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
 import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
+import { GalleryVideoItem } from './ImageGrid/GalleryVideoItem';
 import { scrollIntoView } from './scrollIntoView';
 import { useGalleryImageNames } from './use-gallery-image-names';
 import { useScrollableGallery } from './useScrollableGallery';
@@ -46,35 +49,40 @@ type GridContext = {
 };
 
 /**
- * Wraps an image - either the placeholder as it is being loaded or the loaded image
+ * Wraps a gallery item — either the placeholder as it is being loaded, or the loaded image / video.
+ *
+ * Names are polymorphic: image names end in `.png`, video names in `.mp4` (see SimpleNameService).
+ * `isVideoName` discriminates so we can subscribe to the right query and render the right component.
+ *
+ * We rely on `useRangeBasedImageFetching` to fetch all DTOs into the RTK Query cache. Here we just
+ * consume the cache — `useQuerySubscription` with `skip: isUninitialized` subscribes only after the
+ * fetch has populated data (see https://github.com/reduxjs/redux-toolkit/discussions/4213).
  */
 const ImageAtPosition = memo(({ imageName }: { index: number; imageName: string }) => {
-  /*
-   * We rely on the useRangeBasedImageFetching to fetch all image DTOs, caching them with RTK Query.
-   *
-   * In this component, we just want to consume that cache. Unforutnately, RTK Query does not provide a way to
-   * subscribe to a query without triggering a new fetch.
-   *
-   * There is a hack, though:
-   * - https://github.com/reduxjs/redux-toolkit/discussions/4213
-   *
-   * This essentially means "subscribe to the query once it has some data".
-   *
-   * One issue with this approach. When an item DTO is already cached - for example, because it is selected and
-   * rendered in the viewer - it will show up in the grid before the other items have loaded. This is most
-   * noticeable when first loading a board. The first item in the board is selected and rendered immediately in
-   * the viewer, caching the DTO. The gallery grid renders, and that first item displays as a thumbnail while the
-   * others are still placeholders. After a moment, the rest of the items load up and display as thumbnails.
-   */
+  const isVideo = isVideoName(imageName);
 
-  // Use `currentData` instead of `data` to prevent a flash of previous image rendered at this index
-  const { currentData: imageDTO, isUninitialized } = imagesApi.endpoints.getImageDTO.useQueryState(imageName);
-  imagesApi.endpoints.getImageDTO.useQuerySubscription(imageName, { skip: isUninitialized });
+  // Always call both hooks (React rules of hooks) — the irrelevant one is just a no-op subscription.
+  const imageState = imagesApi.endpoints.getImageDTO.useQueryState(isVideo ? '' : imageName);
+  imagesApi.endpoints.getImageDTO.useQuerySubscription(isVideo ? '' : imageName, {
+    skip: isVideo || imageState.isUninitialized,
+  });
+  const videoState = videosApi.endpoints.getVideoDTO.useQueryState(isVideo ? imageName : '');
+  videosApi.endpoints.getVideoDTO.useQuerySubscription(isVideo ? imageName : '', {
+    skip: !isVideo || videoState.isUninitialized,
+  });
 
+  if (isVideo) {
+    const videoDTO = videoState.currentData;
+    if (!videoDTO) {
+      return <GalleryImagePlaceholder data-item-id={imageName} />;
+    }
+    return <GalleryVideoItem videoDTO={videoDTO} />;
+  }
+
+  const imageDTO = imageState.currentData;
   if (!imageDTO) {
     return <GalleryImagePlaceholder data-item-id={imageName} />;
   }
-
   return <GalleryImage imageDTO={imageDTO} />;
 });
 ImageAtPosition.displayName = 'ImageAtPosition';
@@ -309,30 +317,47 @@ const useStarImageHotkey = () => {
   const lastSelectedItem = useAppSelector(selectLastSelectedItem);
   const selectionCount = useAppSelector(selectSelectionCount);
   const isGalleryFocused = useIsRegionFocused('gallery');
-  const imageDTO = useImageDTO(lastSelectedItem);
+  const isVideo = lastSelectedItem ? isVideoName(lastSelectedItem) : false;
+  const imageDTO = useImageDTO(isVideo ? null : lastSelectedItem);
+  const videoDTO = useVideoDTO(isVideo ? lastSelectedItem : null);
   const [starImages] = useStarImagesMutation();
   const [unstarImages] = useUnstarImagesMutation();
+  const [starVideos] = useStarVideosMutation();
+  const [unstarVideos] = useUnstarVideosMutation();
+
+  const dto = isVideo ? videoDTO : imageDTO;
 
   const handleStarHotkey = useCallback(() => {
-    if (!imageDTO) {
-      return;
-    }
     if (!isGalleryFocused) {
       return;
     }
-    if (imageDTO.starred) {
-      unstarImages({ image_names: [imageDTO.image_name] });
+    if (isVideo) {
+      if (!videoDTO) {
+        return;
+      }
+      if (videoDTO.starred) {
+        unstarVideos({ video_names: [videoDTO.video_name] });
+      } else {
+        starVideos({ video_names: [videoDTO.video_name] });
+      }
     } else {
-      starImages({ image_names: [imageDTO.image_name] });
+      if (!imageDTO) {
+        return;
+      }
+      if (imageDTO.starred) {
+        unstarImages({ image_names: [imageDTO.image_name] });
+      } else {
+        starImages({ image_names: [imageDTO.image_name] });
+      }
     }
-  }, [imageDTO, isGalleryFocused, starImages, unstarImages]);
+  }, [isGalleryFocused, isVideo, imageDTO, videoDTO, starImages, unstarImages, starVideos, unstarVideos]);
 
   useRegisteredHotkeys({
     id: 'starImage',
     category: 'gallery',
     callback: handleStarHotkey,
-    options: { enabled: !!imageDTO && selectionCount === 1 && isGalleryFocused },
-    dependencies: [imageDTO, selectionCount, isGalleryFocused, handleStarHotkey],
+    options: { enabled: !!dto && selectionCount === 1 && isGalleryFocused },
+    dependencies: [dto, selectionCount, isGalleryFocused, handleStarHotkey],
   });
 };
 

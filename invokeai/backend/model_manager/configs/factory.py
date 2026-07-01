@@ -54,6 +54,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_LyCORIS_SD1_Config,
     LoRA_LyCORIS_SD2_Config,
     LoRA_LyCORIS_SDXL_Config,
+    LoRA_LyCORIS_Wan_Config,
     LoRA_LyCORIS_ZImage_Config,
     LoRA_OMI_FLUX_Config,
     LoRA_OMI_SDXL_Config,
@@ -79,10 +80,12 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_SD3_Config,
     Main_Diffusers_SDXL_Config,
     Main_Diffusers_SDXLRefiner_Config,
+    Main_Diffusers_Wan_Config,
     Main_Diffusers_ZImage_Config,
     Main_GGUF_Flux2_Config,
     Main_GGUF_FLUX_Config,
     Main_GGUF_QwenImage_Config,
+    Main_GGUF_Wan_Config,
     Main_GGUF_ZImage_Config,
     MainModelDefaultSettings,
 )
@@ -120,10 +123,13 @@ from invokeai.backend.model_manager.configs.vae import (
     VAE_Checkpoint_SD1_Config,
     VAE_Checkpoint_SD2_Config,
     VAE_Checkpoint_SDXL_Config,
+    VAE_Checkpoint_Wan_Config,
     VAE_Diffusers_Flux2_Config,
     VAE_Diffusers_SD1_Config,
     VAE_Diffusers_SDXL_Config,
+    VAE_Diffusers_Wan_Config,
 )
+from invokeai.backend.model_manager.configs.wan_t5_encoder import WanT5Encoder_WanT5Encoder_Config
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -174,6 +180,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Diffusers_Flux2_Config, Main_Diffusers_Flux2_Config.get_tag()],
         Annotated[Main_Diffusers_CogView4_Config, Main_Diffusers_CogView4_Config.get_tag()],
         Annotated[Main_Diffusers_QwenImage_Config, Main_Diffusers_QwenImage_Config.get_tag()],
+        Annotated[Main_Diffusers_Wan_Config, Main_Diffusers_Wan_Config.get_tag()],
         Annotated[Main_Diffusers_ZImage_Config, Main_Diffusers_ZImage_Config.get_tag()],
         # Main (Pipeline) - checkpoint format
         # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
@@ -194,6 +201,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_GGUF_Flux2_Config, Main_GGUF_Flux2_Config.get_tag()],
         Annotated[Main_GGUF_FLUX_Config, Main_GGUF_FLUX_Config.get_tag()],
         Annotated[Main_GGUF_QwenImage_Config, Main_GGUF_QwenImage_Config.get_tag()],
+        Annotated[Main_GGUF_Wan_Config, Main_GGUF_Wan_Config.get_tag()],
         Annotated[Main_GGUF_ZImage_Config, Main_GGUF_ZImage_Config.get_tag()],
         # VAE - checkpoint format
         Annotated[VAE_Checkpoint_SD1_Config, VAE_Checkpoint_SD1_Config.get_tag()],
@@ -201,12 +209,18 @@ AnyModelConfig = Annotated[
         Annotated[VAE_Checkpoint_SDXL_Config, VAE_Checkpoint_SDXL_Config.get_tag()],
         Annotated[VAE_Checkpoint_FLUX_Config, VAE_Checkpoint_FLUX_Config.get_tag()],
         Annotated[VAE_Checkpoint_Flux2_Config, VAE_Checkpoint_Flux2_Config.get_tag()],
+        # IMPORTANT: VAE_Checkpoint_Wan_Config must be checked BEFORE QwenImage —
+        # both share the AutoencoderKLWan architecture and the Wan config relies
+        # on a filename heuristic to claim 16-channel files; ordering here lets
+        # Wan win when the filename suggests it.
+        Annotated[VAE_Checkpoint_Wan_Config, VAE_Checkpoint_Wan_Config.get_tag()],
         Annotated[VAE_Checkpoint_QwenImage_Config, VAE_Checkpoint_QwenImage_Config.get_tag()],
         Annotated[VAE_Checkpoint_Anima_Config, VAE_Checkpoint_Anima_Config.get_tag()],
         # VAE - diffusers format
         Annotated[VAE_Diffusers_SD1_Config, VAE_Diffusers_SD1_Config.get_tag()],
         Annotated[VAE_Diffusers_SDXL_Config, VAE_Diffusers_SDXL_Config.get_tag()],
         Annotated[VAE_Diffusers_Flux2_Config, VAE_Diffusers_Flux2_Config.get_tag()],
+        Annotated[VAE_Diffusers_Wan_Config, VAE_Diffusers_Wan_Config.get_tag()],
         # ControlNet - checkpoint format
         Annotated[ControlNet_Checkpoint_SD1_Config, ControlNet_Checkpoint_SD1_Config.get_tag()],
         Annotated[ControlNet_Checkpoint_SD2_Config, ControlNet_Checkpoint_SD2_Config.get_tag()],
@@ -228,6 +242,13 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_LyCORIS_FLUX_Config, LoRA_LyCORIS_FLUX_Config.get_tag()],
         Annotated[LoRA_LyCORIS_ZImage_Config, LoRA_LyCORIS_ZImage_Config.get_tag()],
         Annotated[LoRA_LyCORIS_QwenImage_Config, LoRA_LyCORIS_QwenImage_Config.get_tag()],
+        # Wan and Anima both target ``blocks.X`` shapes; their LoRA probes are
+        # mutually exclusive — Wan rejects Anima's ``_proj``/``mlp``/
+        # ``adaln_modulation`` markers, Anima requires at least one of those
+        # markers (see ``has_cosmos_dit_*_keys_strict``). Order between these
+        # two doesn't affect correctness; mutual exclusivity is locked in by
+        # ``test_wan_lora_probe_independence.py``.
+        Annotated[LoRA_LyCORIS_Wan_Config, LoRA_LyCORIS_Wan_Config.get_tag()],
         Annotated[LoRA_LyCORIS_Anima_Config, LoRA_LyCORIS_Anima_Config.get_tag()],
         # LoRA - OMI format
         Annotated[LoRA_OMI_SDXL_Config, LoRA_OMI_SDXL_Config.get_tag()],
@@ -253,6 +274,8 @@ AnyModelConfig = Annotated[
         # Qwen VL Encoder (Qwen2.5-VL multimodal encoder for Qwen Image)
         Annotated[QwenVLEncoder_Diffusers_Config, QwenVLEncoder_Diffusers_Config.get_tag()],
         Annotated[QwenVLEncoder_Checkpoint_Config, QwenVLEncoder_Checkpoint_Config.get_tag()],
+        # Wan T5 Encoder (UMT5-XXL for Wan 2.2)
+        Annotated[WanT5Encoder_WanT5Encoder_Config, WanT5Encoder_WanT5Encoder_Config.get_tag()],
         # TI - file format
         Annotated[TI_File_SD1_Config, TI_File_SD1_Config.get_tag()],
         Annotated[TI_File_SD2_Config, TI_File_SD2_Config.get_tag()],
